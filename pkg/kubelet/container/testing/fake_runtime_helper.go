@@ -128,3 +128,8 @@ func (f *FakeRuntimeHelper) PodCPUAndMemoryStats(_ context.Context, pod *v1.Pod,
 	}
 	return nil, fmt.Errorf("stats for pod %q not found", pod.UID)
 }
+
+func (f *FakeRuntimeHelper) OnPodSandboxReady(_ context.Context, _ *v1.Pod) error {
+	// Not implemented
+	return nil
+}

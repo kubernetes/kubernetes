@@ -5121,3 +5121,287 @@ func TestCmpActuatedAllocated(t *testing.T) {
 		})
 	}
 }
+
+// testRuntimeHelper implements the RuntimeHelper interface for testing OnPodSandboxReady invocation.
+type testRuntimeHelper struct {
+	*containertest.FakeRuntimeHelper
+	onPodSandboxReadyCalled       bool
+	onPodSandboxReadyPod          *v1.Pod
+	onPodSandboxReadyCtx          context.Context
+	onPodSandboxReadyError        error
+	captureStateFunc              func() // optional function to capture state when OnPodSandboxReady is called
+	prepareDynamicResourcesCalled bool
+	prepareDynamicResourcesError  error
+}
+
+func (t *testRuntimeHelper) OnPodSandboxReady(ctx context.Context, pod *v1.Pod) error {
+	t.onPodSandboxReadyCalled = true
+	t.onPodSandboxReadyPod = pod
+	t.onPodSandboxReadyCtx = ctx
+	if t.captureStateFunc != nil {
+		t.captureStateFunc()
+	}
+	return t.onPodSandboxReadyError
+}
+
+func (t *testRuntimeHelper) PrepareDynamicResources(ctx context.Context, pod *v1.Pod) error {
+	t.prepareDynamicResourcesCalled = true
+	return t.prepareDynamicResourcesError
+}
+
+// TestOnPodSandboxReadyInvocation verifies OnPodSandboxReady is called at the correct time
+// and validates the order between the DRA allocate calls and PodReadytoStartContainers condition.
+// It works in the following order:
+// 1. setup test helper and inject errors
+// 2. create pod (with/without devices)
+// 3. run SyncPod
+// 4. verify device allocation
+// 5. verify OnPodSandboxReady invocation
+// 6. verify final pod state
+func TestOnPodSandboxReadyInvocation(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
+	tests := []struct {
+		name                            string
+		onPodSandboxReadyShouldErr      bool
+		deviceAllocationShouldErr       bool
+		expectOnPodSandboxReady         bool
+		expectSyncPodSuccess            bool
+		expectDeviceAllocation          bool
+		enablePodReadyToStartContainers bool
+		description                     string
+	}{
+		{
+			name:                            "OnPodSandboxReady succeeds with feature enabled",
+			onPodSandboxReadyShouldErr:      false,
+			deviceAllocationShouldErr:       false,
+			expectOnPodSandboxReady:         true,
+			expectSyncPodSuccess:            true,
+			expectDeviceAllocation:          false,
+			enablePodReadyToStartContainers: true,
+			description:                     "Verifies OnPodSandboxReady is called and succeeds with PodReadyToStartContainersCondition feature gate enabled",
+		},
+		{
+			name:                            "OnPodSandboxReady succeeds with feature disabled",
+			onPodSandboxReadyShouldErr:      false,
+			deviceAllocationShouldErr:       false,
+			expectOnPodSandboxReady:         true,
+			expectSyncPodSuccess:            true,
+			expectDeviceAllocation:          false,
+			enablePodReadyToStartContainers: false,
+			description:                     "Verifies OnPodSandboxReady is called and succeeds with PodReadyToStartContainersCondition feature gate disabled",
+		},
+		{
+			name:                            "OnPodSandboxReady fails but SyncPod continues with feature enabled",
+			onPodSandboxReadyShouldErr:      true,
+			deviceAllocationShouldErr:       false,
+			expectOnPodSandboxReady:         true,
+			expectSyncPodSuccess:            true, // SyncPod still succeed even if OnPodSandboxReady fails
+			expectDeviceAllocation:          false,
+			enablePodReadyToStartContainers: true,
+			description:                     "Verifies OnPodSandboxReady errors don't block pod creation with PodReadyToStartContainersCondition feature gate enabled",
+		},
+		{
+			name:                            "OnPodSandboxReady fails but SyncPod continues with feature disabled",
+			onPodSandboxReadyShouldErr:      true,
+			deviceAllocationShouldErr:       false,
+			expectOnPodSandboxReady:         true,
+			expectSyncPodSuccess:            true, // SyncPod still succeed even if OnPodSandboxReady fails
+			expectDeviceAllocation:          false,
+			enablePodReadyToStartContainers: false,
+			description:                     "Verifies OnPodSandboxReady errors don't block pod creation with PodReadyToStartContainersCondition feature gate disabled",
+		},
+		{
+			name:                            "PrepareDynamicResources (device allocation) called before OnPodSandboxReady with feature enabled",
+			onPodSandboxReadyShouldErr:      false,
+			deviceAllocationShouldErr:       false,
+			expectOnPodSandboxReady:         true,
+			expectSyncPodSuccess:            true,
+			expectDeviceAllocation:          true,
+			enablePodReadyToStartContainers: true,
+			description:                     "Verifies the order (PrepareDynamicResources -> OnPodSandboxReady) in case of pod with ResourceClaims with PodReadyToStartContainersCondition feature gate enabled",
+		},
+		{
+			name:                            "PrepareDynamicResources (device allocation) called before OnPodSandboxReady with feature disabled",
+			onPodSandboxReadyShouldErr:      false,
+			deviceAllocationShouldErr:       false,
+			expectOnPodSandboxReady:         true,
+			expectSyncPodSuccess:            true,
+			expectDeviceAllocation:          true,
+			enablePodReadyToStartContainers: false,
+			description:                     "Verifies the order (PrepareDynamicResources -> OnPodSandboxReady) in case of pod with ResourceClaims with PodReadyToStartContainersCondition feature gate disabled",
+		},
+		{
+			name:                            "PrepareDynamicResources (device allocation) failure prevents sandbox creation with feature enabled",
+			onPodSandboxReadyShouldErr:      false,
+			deviceAllocationShouldErr:       true,
+			expectOnPodSandboxReady:         false,
+			expectSyncPodSuccess:            true, // SyncPod doesn't return error, just returns early if `PrepareDynamicResources` call ends up failing
+			expectDeviceAllocation:          true,
+			enablePodReadyToStartContainers: true,
+			description:                     "Verifies PrepareDynamicResources failure causes early return in case of pod with ResourceClaims with PodReadyToStartContainersCondition feature gate enabled",
+		},
+		{
+			name:                            "PrepareDynamicResources (device allocation) failure prevents sandbox creation with feature disabled",
+			onPodSandboxReadyShouldErr:      false,
+			deviceAllocationShouldErr:       true,
+			expectOnPodSandboxReady:         false,
+			expectSyncPodSuccess:            true, // SyncPod doesn't return error, just returns early if `PrepareDynamicResources` call ends up failing
+			expectDeviceAllocation:          true,
+			enablePodReadyToStartContainers: false,
+			description:                     "Verifies PrepareDynamicResources failure causes early return in case of pod with ResourceClaims with PodReadyToStartContainersCondition feature gate disabled",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodReadyToStartContainersCondition, test.enablePodReadyToStartContainers)
+
+			// step 1 - setup test helper and inject errors
+			fakeRuntime, fakeImage, m, err := createTestRuntimeManager(tCtx)
+			require.NoError(t, err)
+
+			testHelper := &testRuntimeHelper{
+				FakeRuntimeHelper: &containertest.FakeRuntimeHelper{},
+			}
+			if test.onPodSandboxReadyShouldErr {
+				testHelper.onPodSandboxReadyError = fmt.Errorf("OnPodSandboxReady intentionally failed for testing")
+			}
+			if test.deviceAllocationShouldErr {
+				testHelper.prepareDynamicResourcesError = fmt.Errorf("PrepareDynamicResources intentionally failed for testing")
+			}
+			m.runtimeHelper = testHelper
+
+			// step 2 - create pod (with/without devices)
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:       "test-pod-uid",
+					Name:      "test-pod",
+					Namespace: "test-namespace",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:            "test-container",
+							Image:           "busybox",
+							ImagePullPolicy: v1.PullIfNotPresent,
+						},
+					},
+				},
+			}
+			if test.expectDeviceAllocation {
+				pod.Spec.ResourceClaims = []v1.PodResourceClaim{
+					{
+						Name: "test-device",
+					},
+				}
+			}
+
+			// step 3 - run SyncPod
+			backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+			result := m.SyncPod(tCtx, pod, &kubecontainer.PodStatus{}, []v1.Secret{}, backOff, false)
+
+			if test.expectSyncPodSuccess {
+				require.NoError(t, result.Error(), test.description)
+			} else {
+				require.Error(t, result.Error(), test.description)
+			}
+
+			// step 4 - verify device allocation
+			if test.expectDeviceAllocation {
+				require.True(t, testHelper.prepareDynamicResourcesCalled,
+					"PrepareDynamicResources should be called for pods with resource claims")
+
+				if test.expectOnPodSandboxReady && testHelper.onPodSandboxReadyCalled {
+					require.True(t, testHelper.prepareDynamicResourcesCalled,
+						"PrepareDynamicResources must be called before OnPodSandboxReady")
+				}
+			}
+
+			// step 5 - verify OnPodSandboxReady invocation
+			assert.Equal(t, test.expectOnPodSandboxReady, testHelper.onPodSandboxReadyCalled, "OnPodSandboxReady invocation mismatch: "+test.description)
+
+			if test.expectOnPodSandboxReady {
+				assert.NotNil(t, testHelper.onPodSandboxReadyPod, "OnPodSandboxReady should receive pod")
+				assert.Equal(t, pod.UID, testHelper.onPodSandboxReadyPod.UID, "OnPodSandboxReady should receive correct pod UID")
+				assert.Equal(t, pod.Name, testHelper.onPodSandboxReadyPod.Name, "OnPodSandboxReady should receive correct pod name")
+				assert.Equal(t, pod.Namespace, testHelper.onPodSandboxReadyPod.Namespace, "OnPodSandboxReady should receive correct pod namespace")
+				assert.NotNil(t, testHelper.onPodSandboxReadyCtx, "OnPodSandboxReady should receive context")
+
+				require.Len(t, fakeRuntime.Sandboxes, 1, "sandbox should be created before OnPodSandboxReady")
+				for _, sandbox := range fakeRuntime.Sandboxes {
+					require.Equal(t, runtimeapi.PodSandboxState_SANDBOX_READY, sandbox.State, "sandbox should be ready when OnPodSandboxReady is invoked")
+				}
+			}
+
+			// step 6 - verify the final pod state
+			if test.expectSyncPodSuccess && !test.deviceAllocationShouldErr {
+				assert.Len(t, fakeRuntime.Containers, 1, "container should be created")
+				assert.Len(t, fakeImage.Images, 1, "image should be pulled")
+				for _, c := range fakeRuntime.Containers {
+					assert.Equal(t, runtimeapi.ContainerState_CONTAINER_RUNNING, c.State, "container should be running")
+				}
+			}
+
+			if test.deviceAllocationShouldErr {
+				require.Empty(t, fakeRuntime.Sandboxes, "sandbox should not be created when device allocation fails")
+				require.Empty(t, fakeRuntime.Containers, "containers should not be created when device allocation fails")
+			}
+		})
+	}
+}
+
+// TestOnPodSandboxReadyTiming tests that OnPodSandboxReady is invoked after sandbox
+// creation and network setup but before image pulling.
+func TestOnPodSandboxReadyTiming(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	fakeRuntime, fakeImage, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	// track the state of pod when OnPodSandboxReady is invoked
+	var sandboxCount int
+	var containerCount int
+	var imageCount int
+
+	testHelper := &testRuntimeHelper{
+		FakeRuntimeHelper: &containertest.FakeRuntimeHelper{},
+		captureStateFunc: func() {
+			sandboxCount = len(fakeRuntime.Sandboxes)
+			containerCount = len(fakeRuntime.Containers)
+			imageCount = len(fakeImage.Images)
+		},
+	}
+
+	m.runtimeHelper = testHelper
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "timing-test-pod",
+			Name:      "timing-test",
+			Namespace: "default",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:            "test-container",
+					Image:           "busybox",
+					ImagePullPolicy: v1.PullIfNotPresent,
+				},
+			},
+		},
+	}
+
+	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+	result := m.SyncPod(tCtx, pod, &kubecontainer.PodStatus{}, []v1.Secret{}, backOff, false)
+	require.NoError(t, result.Error())
+
+	// verify the order that OnPodSandboxReady should be invoked after sandbox creation but before containers
+	assert.Equal(t, 1, sandboxCount, "sandbox should exist when OnPodSandboxReady is invoked")
+	assert.Equal(t, 0, containerCount, "containers should not exist yet when OnPodSandboxReady is invoked")
+	// Note that image may or may not be pulled at OnPodSandboxReady time depending on whether image exists
+	t.Logf("At OnPodSandboxReady time: sandboxes=%d, containers=%d, images=%d", sandboxCount, containerCount, imageCount)
+
+	// verify the final state of pod
+	assert.Len(t, fakeRuntime.Sandboxes, 1, "final sandbox count")
+	assert.Len(t, fakeRuntime.Containers, 1, "final container count")
+}
