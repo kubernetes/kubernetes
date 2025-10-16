@@ -5481,6 +5481,10 @@ type NodeSystemInfo struct {
 	Architecture string
 	// Swap Info reported by the node.
 	Swap *NodeSwapStatus
+	// Whether the node is running in a user namespace.
+	// +featureGate=KubeletInUserNamespace
+	// +optional
+	RunningInUserNS *bool
 }
 
 // NodeSwapStatus represents swap memory information.
