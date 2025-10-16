@@ -488,12 +488,32 @@ func validateDeviceAllocationResult(allocation resource.DeviceAllocationResult, 
 func validateDeviceRequestAllocationResult(result resource.DeviceRequestAllocationResult, fldPath *field.Path, requestNames requestNames) field.ErrorList {
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, validateRequestNameRef(result.Request, fldPath.Child("request"), requestNames)...)
-	allErrs = append(allErrs, validateDriverName(result.Driver, fldPath.Child("driver"))...)
+	allErrs = append(allErrs, validateDeviceRequestAllocationResultDriver(result.Driver, fldPath.Child("driver"))...)
 	allErrs = append(allErrs, validatePoolName(result.Pool, fldPath.Child("pool")).MarkCoveredByDeclarative()...)
 	allErrs = append(allErrs, validateDeviceName(result.Device, fldPath.Child("device"))...)
 	allErrs = append(allErrs, validateDeviceBindingParameters(result.BindingConditions, result.BindingFailureConditions, fldPath)...)
 	if result.ShareID != nil {
 		allErrs = append(allErrs, validateUID(string(*result.ShareID), fldPath.Child("shareID")).MarkCoveredByDeclarative()...)
+	}
+	return allErrs
+}
+
+func validateDeviceRequestAllocationResultDriver(driverName string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if len(driverName) > resource.DriverNameMaxLength {
+		allErrs = append(allErrs, field.TooLong(fldPath, "" /*unused*/, resource.DriverNameMaxLength))
+	}
+
+	// +required is handled by declarative validation.
+	// +k8s:format=k8s-long-name-caseless is handled by declarative validation.
+	// If empty, IsDNS1123Subdomain returns an error, which matches declarative validation for +required +format.
+	for _, msg := range validation.IsDNS1123Subdomain(strings.ToLower(driverName)) {
+		if len(driverName) > resource.DriverNameMaxLength && strings.Contains(msg, "must be no more than") {
+			// Already covered by TooLong error.
+			continue
+		}
+		allErrs = append(allErrs, field.Invalid(fldPath, driverName, msg).WithOrigin("format=k8s-long-name-caseless").MarkCoveredByDeclarative())
 	}
 	return allErrs
 }
