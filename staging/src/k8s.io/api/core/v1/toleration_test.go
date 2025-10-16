@@ -114,6 +114,126 @@ func TestTolerationToleratesTaint(t *testing.T) {
 			},
 			expectTolerated: false,
 		},
+		{
+			description: "toleration with Gt operator and taint with numeric value, toleration value is greater, expect tolerated",
+			toleration: Toleration{
+				Key:      "node.kubernetes.io/sla",
+				Operator: TolerationOpGt,
+				Value:    "950",
+				Effect:   TaintEffectNoSchedule,
+			},
+			taint: Taint{
+				Key:    "node.kubernetes.io/sla",
+				Value:  "800",
+				Effect: TaintEffectNoSchedule,
+			},
+			expectTolerated: true,
+		},
+		{
+			description: "toleration with Gt operator and taint with numeric value, toleration value is less, expect not tolerated",
+			toleration: Toleration{
+				Key:      "node.kubernetes.io/sla",
+				Operator: TolerationOpGt,
+				Value:    "750",
+				Effect:   TaintEffectNoSchedule,
+			},
+			taint: Taint{
+				Key:    "node.kubernetes.io/sla",
+				Value:  "950",
+				Effect: TaintEffectNoSchedule,
+			},
+			expectTolerated: false,
+		},
+		{
+			description: "toleration with Lt operator and taint with numeric value, toleration value is less, expect tolerated",
+			toleration: Toleration{
+				Key:      "node.kubernetes.io/sla",
+				Operator: TolerationOpLt,
+				Value:    "800",
+				Effect:   TaintEffectNoSchedule,
+			},
+			taint: Taint{
+				Key:    "node.kubernetes.io/sla",
+				Value:  "950",
+				Effect: TaintEffectNoSchedule,
+			},
+			expectTolerated: true,
+		},
+		{
+			description: "toleration with Lt operator and taint with numeric value, toleration value is greater, expect not tolerated",
+			toleration: Toleration{
+				Key:      "node.kubernetes.io/sla",
+				Operator: TolerationOpLt,
+				Value:    "950",
+				Effect:   TaintEffectNoSchedule,
+			},
+			taint: Taint{
+				Key:    "node.kubernetes.io/sla",
+				Value:  "800",
+				Effect: TaintEffectNoSchedule,
+			},
+			expectTolerated: false,
+		},
+		{
+			description: "toleration with Gt operator and taint with equal numeric value, expect not tolerated",
+			toleration: Toleration{
+				Key:      "node.kubernetes.io/sla",
+				Operator: TolerationOpGt,
+				Value:    "950",
+				Effect:   TaintEffectNoSchedule,
+			},
+			taint: Taint{
+				Key:    "node.kubernetes.io/sla",
+				Value:  "950",
+				Effect: TaintEffectNoSchedule,
+			},
+			expectTolerated: false,
+		},
+		{
+			description: "toleration with Gt operator and taint with non-numeric value, expect not tolerated",
+			toleration: Toleration{
+				Key:      "node.kubernetes.io/sla",
+				Operator: TolerationOpGt,
+				Value:    "950",
+				Effect:   TaintEffectNoSchedule,
+			},
+			taint: Taint{
+				Key:    "node.kubernetes.io/sla",
+				Value:  "high",
+				Effect: TaintEffectNoSchedule,
+			},
+			expectTolerated: false,
+		},
+		{
+			description: "toleration with Gt operator and negative numeric values, expect correct comparison",
+			toleration: Toleration{
+				Key:      "test-key",
+				Operator: TolerationOpGt,
+				Value:    "-100",
+				Effect:   TaintEffectNoSchedule,
+			},
+			taint: Taint{
+				Key:    "test-key",
+				Value:  "-200",
+				Effect: TaintEffectNoSchedule,
+			},
+			expectTolerated: true,
+		},
+		{
+			description: "toleration with Gt operator and large int64 values, expect correct comparison",
+			toleration: Toleration{
+				Key:      "test-key",
+				Operator: TolerationOpGt,
+				Value:    "9223372036854775806",
+				Effect:   TaintEffectNoSchedule,
+			},
+			taint: Taint{
+				Key:    "test-key",
+				Value:  "100",
+				Effect: TaintEffectNoSchedule,
+			},
+			expectTolerated: true,
+		},
 	}
 	for _, tc := range testCases {
 		if tolerated := tc.toleration.ToleratesTaint(&tc.taint); tc.expectTolerated != tolerated {
