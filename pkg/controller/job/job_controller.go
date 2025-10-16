@@ -226,7 +226,7 @@ func newControllerWithClock(ctx context.Context, podInformer coreinformers.PodIn
 	jm.podStore = podInformer.Lister()
 	jm.podStoreSynced = podInformer.Informer().HasSynced
 
-	err := controller.AddPodControllerUIDIndexer(podInformer.Informer())
+	err := controller.AddPodControllerIndexer(podInformer.Informer())
 	if err != nil {
 		return nil, fmt.Errorf("adding Pod controller UID indexer: %w", err)
 	}
@@ -769,7 +769,7 @@ func (jm *Controller) getPodsForJob(ctx context.Context, j *batch.Job) ([]*v1.Po
 	}
 
 	// list all pods managed by this Job using the pod indexer
-	pods, err := controller.FilterPodsByOwner(jm.podIndexer, &j.ObjectMeta)
+	pods, err := controller.FilterPodsByOwner(jm.podIndexer, &j.ObjectMeta, "Job", true)
 	if err != nil {
 		return nil, err
 	}
