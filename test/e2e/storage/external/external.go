@@ -126,6 +126,29 @@ type driverDefinition struct {
 		FromExistingClassName string
 	}
 
+	// GroupSnapshotClass must be set to enable groupsnapshotting tests.
+	// The default is to not run those tests.
+	GroupSnapshotClass struct {
+		// FromName set to true enables the usage of a
+		// groupsnapshotter class with DriverInfo.Name as provisioner.
+		FromName bool
+
+		// FromFile is used only when FromName is false.  It
+		// loads a groupsnapshot class from the given .yaml or .json
+		// file. File names are resolved by the
+		// framework.testfiles package, which typically means
+		// that they can be absolute or relative to the test
+		// suite's --repo-root parameter.
+		//
+		// This can be used when the groupsnapshot class is meant to have
+		// additional parameters.
+		FromFile string
+
+		// FromExistingClassName specifies the name of a pre-installed
+		// GroupSnapshotClass that will be copied and used for the tests.
+		FromExistingClassName string
+	}
+
 	// InlineVolumes defines one or more volumes for use as inline
 	// ephemeral volumes. At least one such volume has to be
 	// defined to enable testing of inline ephemeral volumes.  If
@@ -392,6 +415,20 @@ func loadSnapshotClass(filename string) (*unstructured.Unstructured, error) {
 	return snapshotClass, nil
 }
 
+func loadGroupSnapshotClass(filename string) (*unstructured.Unstructured, error) {
+	data, err := os.ReadFile(filename)
+	if err != nil {
+		return nil, err
+	}
+	groupSnapshotClass := &unstructured.Unstructured{}
+
+	if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), data, groupSnapshotClass); err != nil {
+		return nil, fmt.Errorf("%s: %w", filename, err)
+	}
+
+	return groupSnapshotClass, nil
+}
+
 func (d *driverDefinition) GetSnapshotClass(ctx context.Context, e2econfig *storageframework.PerTestConfig, parameters map[string]string) *unstructured.Unstructured {
 	if !d.SnapshotClass.FromName && d.SnapshotClass.FromFile == "" && d.SnapshotClass.FromExistingClassName == "" {
 		e2eskipper.Skipf("Driver %q does not support snapshotting - skipping", d.DriverInfo.Name)
@@ -433,6 +470,49 @@ func (d *driverDefinition) GetSnapshotClass(ctx context.Context, e2econfig *stor
 	}
 
 	return utils.GenerateSnapshotClassSpec(snapshotter, parameters, ns)
+}
+
+func (d *driverDefinition) GetVolumeGroupSnapshotClass(ctx context.Context, e2econfig *storageframework.PerTestConfig, parameters map[string]string) *unstructured.Unstructured {
+	if !d.GroupSnapshotClass.FromName && d.GroupSnapshotClass.FromFile == "" && d.GroupSnapshotClass.FromExistingClassName == "" {
+		e2eskipper.Skipf("Driver %q does not support groupsnapshotting - skipping", d.DriverInfo.Name)
+	}
+
+	f := e2econfig.Framework
+	snapshotter := d.DriverInfo.Name
+	ns := e2econfig.Framework.Namespace.Name
+
+	switch {
+	case d.GroupSnapshotClass.FromName:
+		// Do nothing (just use empty parameters)
+	case d.GroupSnapshotClass.FromExistingClassName != "":
+		groupSnapshotClass, err := f.DynamicClient.Resource(utils.VolumeGroupSnapshotClassGVR).Get(ctx, d.GroupSnapshotClass.FromExistingClassName, metav1.GetOptions{})
+		framework.ExpectNoError(err, "getting snapshot class %s", d.SnapshotClass.FromExistingClassName)
+
+		if params, ok := groupSnapshotClass.Object["parameters"].(map[string]interface{}); ok {
+			for k, v := range params {
+				parameters[k] = v.(string)
+			}
+		}
+
+		if snapshotProvider, ok := groupSnapshotClass.Object["driver"]; ok {
+			snapshotter = snapshotProvider.(string)
+		}
+	case d.GroupSnapshotClass.FromFile != "":
+		groupSnapshotClass, err := loadGroupSnapshotClass(d.GroupSnapshotClass.FromFile)
+		framework.ExpectNoError(err, "load groupsnapshot class from %s", d.GroupSnapshotClass.FromFile)
+
+		if params, ok := groupSnapshotClass.Object["parameters"].(map[string]interface{}); ok {
+			for k, v := range params {
+				parameters[k] = v.(string)
+			}
+		}
+
+		if snapshotProvider, ok := groupSnapshotClass.Object["driver"]; ok {
+			snapshotter = snapshotProvider.(string)
+		}
+	}
+
+	return utils.GenerateVolumeGroupSnapshotClassSpec(snapshotter, parameters, ns)
 }
 
 func (d *driverDefinition) GetVolumeAttributesClass(ctx context.Context, e2econfig *storageframework.PerTestConfig) *storagev1.VolumeAttributesClass {
