@@ -19,5 +19,5 @@ ARG BINARY
 
 
 FROM "${BASEIMAGE}"
-COPY ${BINARY} /bin/
+COPY --chmod=755 ${BINARY} /bin/
 ENTRYPOINT ["/bin/kubectl"]
