@@ -994,6 +994,12 @@ const (
 	// if the system supports the systemd watchdog feature and has it configured properly.
 	SystemdWatchdog = featuregate.Feature("SystemdWatchdog")
 
+	// owner: @heelayot
+	// kep: https://kep.k8s.io/5471
+	//
+	// Enables numeric comparison operators (Lt, Gt) for tolerations to match taints with threshold-based values.
+	TaintTolerationComparisonOperators featuregate.Feature = "TaintTolerationComparisonOperators"
+
 	// owner: @robscott
 	// kep: https://kep.k8s.io/2433
 	//
@@ -1819,6 +1825,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	SystemdWatchdog: {
 		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remov in 1.37
+	},
+
+	TaintTolerationComparisonOperators: {
+		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	TopologyAwareHints: {

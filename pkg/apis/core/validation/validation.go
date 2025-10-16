@@ -27,6 +27,7 @@ import (
 	"reflect"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"unicode"
@@ -4371,6 +4372,20 @@ func ValidateTolerations(tolerations []core.Toleration, fldPath *field.Path) fie
 		case core.TolerationOpExists:
 			if len(toleration.Value) > 0 {
 				allErrors = append(allErrors, field.Invalid(idxPath.Child("operator"), toleration.Value, "value must be empty when `operator` is 'Exists'"))
+			}
+		case core.TolerationOpLt, core.TolerationOpGt:
+			// Numeric comparison operators require feature gate
+			if !utilfeature.DefaultFeatureGate.Enabled(features.TaintTolerationComparisonOperators) {
+				allErrors = append(allErrors, field.Invalid(idxPath.Child("operator"),
+					toleration.Operator, "numeric operators are forbidden when the TaintTolerationComparisonOperators feature gate is disabled"))
+				break
+			}
+
+			// Validate value is parseable as int64
+			if _, err := strconv.ParseInt(toleration.Value, 10, 64); err != nil {
+				allErrors = append(allErrors, field.Invalid(idxPath.Child("value"),
+					toleration.Value, "value must be a valid integer for numeric operators"))
+				break
 			}
 		default:
 			validValues := []core.TolerationOperator{core.TolerationOpEqual, core.TolerationOpExists}

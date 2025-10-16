@@ -16,6 +16,10 @@ limitations under the License.
 
 package v1
 
+import (
+	"strconv"
+)
+
 // MatchToleration checks if the toleration matches tolerationToMatch. Tolerations are unique by <key,effect,operator,value>,
 // if the two tolerations have same <key,effect,operator,value> combination, regard as they match.
 // TODO: uniqueness check for tolerations in api validations.
@@ -35,6 +39,8 @@ func (t *Toleration) MatchToleration(tolerationToMatch *Toleration) bool {
 //  3. Empty toleration.key means to match all taint keys.
 //     If toleration.key is empty, toleration.operator must be 'Exists';
 //     this combination means to match all taint values and all taint keys.
+//  4. If toleration.operator is 'Lt' or 'Gt', numeric comparison is performed
+//     between toleration.value and taint.value.
 func (t *Toleration) ToleratesTaint(taint *Taint) bool {
 	if len(t.Effect) > 0 && t.Effect != taint.Effect {
 		return false
@@ -51,6 +57,30 @@ func (t *Toleration) ToleratesTaint(taint *Taint) bool {
 		return t.Value == taint.Value
 	case TolerationOpExists:
 		return true
+	case TolerationOpLt, TolerationOpGt:
+		return compareNumericValues(t.Value, taint.Value, t.Operator)
+	default:
+		return false
+	}
+}
+
+// compareNumericValues performs numeric comparison between toleration and taint values
+func compareNumericValues(tolerationVal, taintVal string, op TolerationOperator) bool {
+	tVal, err := strconv.ParseInt(tolerationVal, 10, 64)
+	if err != nil {
+		return false
+	}
+
+	tnVal, err := strconv.ParseInt(taintVal, 10, 64)
+	if err != nil {
+		return false
+	}
+
+	switch op {
+	case TolerationOpLt:
+		return tVal < tnVal
+	case TolerationOpGt:
+		return tVal > tnVal
 	default:
 		return false
 	}
