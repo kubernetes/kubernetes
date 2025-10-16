@@ -30,7 +30,7 @@ import (
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
+	apicalls "k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 )
 
@@ -730,9 +730,13 @@ func (cache *cacheImpl) removeNodeImageStates(node *v1.Node) {
 }
 
 func (cache *cacheImpl) run(logger klog.Logger) {
-	go wait.Until(func() {
-		cache.cleanupAssumedPods(logger, time.Now())
-	}, cache.period, cache.stop)
+	go wait.UntilWithContext(
+		wait.ContextForChannel(cache.stop),
+		func(ctx context.Context) {
+			cache.cleanupAssumedPods(logger, time.Now())
+		},
+		cache.period,
+	)
 }
 
 // cleanupAssumedPods exists for making test deterministic by taking time as input argument.

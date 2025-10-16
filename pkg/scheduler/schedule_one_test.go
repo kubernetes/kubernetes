@@ -636,9 +636,8 @@ func TestSchedulerGuaranteeNonNilNodeInSchedulingCycle(t *testing.T) {
 	// 1) One is responsible for deleting several nodes in each round;
 	// 2) Another is creating several pods in each round to trigger scheduling;
 	// Those two goroutines will stop until ctx.Done() is called, which means all waiting pods are scheduled at least once.
-	go wait.Until(deleteNodesOneRound, 10*time.Millisecond, ctx.Done())
-	go wait.Until(createPodsOneRound, 9*time.Millisecond, ctx.Done())
-
+	go wait.UntilWithContext(ctx, func(context.Context) { deleteNodesOneRound() }, 10*time.Millisecond)
+	go wait.UntilWithContext(ctx, func(context.Context) { createPodsOneRound() }, 9*time.Millisecond)
 	// Capture the events to wait all pods to be scheduled at least once.
 	allWaitSchedulingPods := sets.New[string]()
 	for i := 0; i < waitSchedulingPodNumber; i++ {
