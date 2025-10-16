@@ -666,7 +666,7 @@ kube::golang::place_bins() {
         V=4 kube::log::status "Creating ${THIS_PLATFORM_BIN} symlink for non-dockerized build"
         rm -f "${THIS_PLATFORM_BIN}"
         mkdir -p "$(dirname "${THIS_PLATFORM_BIN}")"
-        ln -s "../${_KUBE_OUTPUT_SUBPATH}/${_KUBE_OUTPUT_BIN_SUBPATH}/${platform}" "${THIS_PLATFORM_BIN}"
+        ln -s "../${_KUBE_OUTPUT_SUBPATH:?}/${_KUBE_OUTPUT_BIN_SUBPATH:?}/${platform}" "${THIS_PLATFORM_BIN}"
       fi
     fi
 
