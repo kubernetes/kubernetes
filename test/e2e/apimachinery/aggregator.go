@@ -97,8 +97,9 @@ var _ = SIGDescribe("Aggregator", func() {
 		Testname: aggregator-supports-the-sample-apiserver
 		Description: Ensure that the sample-apiserver code from 1.17 and compiled against 1.17
 		will work on the current Aggregator/API-Server.
+		This test is marked LinuxOnly because etcd does not provide or support images for Windows.
 	*/
-	framework.ConformanceIt("Should be able to support the 1.17 Sample API Server using the current Aggregator", func(ctx context.Context) {
+	framework.ConformanceIt("Should be able to support the 1.17 Sample API Server using the current Aggregator [LinuxOnly]", func(ctx context.Context) {
 		// Testing a 1.17 version of the sample-apiserver
 		TestSampleAPIServer(ctx, f, aggrclient, imageutils.GetE2EImage(imageutils.APIServer), defaultApiServiceGroupName, defaultApiServiceVersion)
 	})
