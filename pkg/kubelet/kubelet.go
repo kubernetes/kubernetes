@@ -808,6 +808,18 @@ func NewMainKubelet(ctx context.Context,
 	klet.runner = runtime
 	klet.allocationManager.SetContainerRuntime(runtime)
 
+	// Register pod sandbox ready callback with runtime manager.
+	// The Type assertion is used because the `SetPodSandboxReadyCallback` method
+	// is not part of the Runtime interface.
+	if runtimeManager, ok := runtime.(interface {
+		SetPodSandboxReadyCallback(func(context.Context, *v1.Pod) error)
+	}); ok {
+		klog.V(2).InfoS("Registering sandbox ready callback with container runtime")
+		runtimeManager.SetPodSandboxReadyCallback(klet.onPodSandboxReady)
+	} else {
+		klog.V(2).InfoS("Container runtime does not support sandbox ready callback")
+	}
+
 	runtimeCache, err := kubecontainer.NewRuntimeCache(klet.containerRuntime, runtimeCacheRefreshPeriod)
 	if err != nil {
 		return nil, err
@@ -3269,4 +3281,34 @@ func (kl *Kubelet) fastStaticPodsRegistration(ctx context.Context) {
 
 func (kl *Kubelet) SetPodWatchCondition(podUID types.UID, conditionKey string, condition pleg.WatchCondition) {
 	kl.pleg.SetPodWatchCondition(podUID, conditionKey, condition)
+}
+
+// onPodSandboxReady is the callback implementation invoked by the container runtime after
+// all three requirements (sandbox, networking, volumes) are ready to immediately update
+// the `PodReadyToStartContainers` pod status condition to `True`.
+// Ref: https://github.com/kubernetes/kubernetes/issues/134460
+func (kl *Kubelet) onPodSandboxReady(ctx context.Context, pod *v1.Pod) error {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodReadyToStartContainersCondition) {
+		return nil
+	}
+
+	logger := klog.FromContext(ctx)
+	klog.V(3).InfoS("onPodSandboxReady callback invoked", "pod", klog.KObj(pod), "podUID", pod.UID)
+
+	podStatus, err := kl.containerRuntime.GetPodStatus(ctx, pod.UID, pod.Name, pod.Namespace)
+	if err != nil {
+		klog.V(2).InfoS("Failed to get pod status after sandbox creation", "pod", klog.KObj(pod), "err", err)
+		return err
+	}
+
+	apiPodStatus := kl.generateAPIPodStatus(pod, podStatus, false)
+
+	kl.statusManager.SetPodStatus(logger, pod, apiPodStatus)
+
+	klog.V(3).InfoS("Successfully updated PodReadyToStartContainers condition after sandbox creation",
+		"pod", klog.KObj(pod),
+		"podUID", pod.UID,
+		"podIP", apiPodStatus.PodIP)
+
+	return nil
 }
