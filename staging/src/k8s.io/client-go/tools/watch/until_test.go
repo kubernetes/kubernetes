@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/cache"
+	fcache "k8s.io/client-go/tools/cache/testing"
 )
 
 type fakePod struct {
@@ -189,7 +190,7 @@ func TestUntilWithSync(t *testing.T) {
 	// FIXME: test preconditions
 	tt := []struct {
 		name             string
-		lw               *cache.ListWatch
+		lw               cache.ListerWatcher
 		preconditionFunc PreconditionFunc
 		conditionFunc    ConditionFunc
 		expectedErr      error
@@ -197,14 +198,14 @@ func TestUntilWithSync(t *testing.T) {
 	}{
 		{
 			name: "doesn't wait for sync with no precondition",
-			lw: &cache.ListWatch{
+			lw: fcache.ToListWatcherWithUnSupportedWatchListSemantics(&cache.ListWatch{
 				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 					select {}
 				},
 				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 					select {}
 				},
-			},
+			}),
 			preconditionFunc: nil,
 			conditionFunc: func(e watch.Event) (bool, error) {
 				return true, nil
@@ -214,14 +215,14 @@ func TestUntilWithSync(t *testing.T) {
 		},
 		{
 			name: "waits indefinitely with precondition if it can't sync",
-			lw: &cache.ListWatch{
+			lw: fcache.ToListWatcherWithUnSupportedWatchListSemantics(&cache.ListWatch{
 				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 					select {}
 				},
 				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 					select {}
 				},
-			},
+			}),
 			preconditionFunc: func(store cache.Store) (bool, error) {
 				return true, nil
 			},
@@ -233,17 +234,17 @@ func TestUntilWithSync(t *testing.T) {
 		},
 		{
 			name: "precondition can stop the loop",
-			lw: func() *cache.ListWatch {
+			lw: func() cache.ListerWatcher {
 				fakeclient := fakeclient.NewSimpleClientset(&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "first"}})
 
-				return &cache.ListWatch{
+				return fcache.ToListWatcherWithUnSupportedWatchListSemantics(&cache.ListWatch{
 					ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 						return fakeclient.CoreV1().Secrets("").List(context.TODO(), options)
 					},
 					WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 						return fakeclient.CoreV1().Secrets("").Watch(context.TODO(), options)
 					},
-				}
+				})
 			}(),
 			preconditionFunc: func(store cache.Store) (bool, error) {
 				_, exists, err := store.Get(&metav1.ObjectMeta{Namespace: "", Name: "first"})
@@ -263,17 +264,17 @@ func TestUntilWithSync(t *testing.T) {
 		},
 		{
 			name: "precondition lets it proceed to regular condition",
-			lw: func() *cache.ListWatch {
+			lw: func() cache.ListerWatcher {
 				fakeclient := fakeclient.NewSimpleClientset(&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "first"}})
 
-				return &cache.ListWatch{
+				return fcache.ToListWatcherWithUnSupportedWatchListSemantics(&cache.ListWatch{
 					ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 						return fakeclient.CoreV1().Secrets("").List(context.TODO(), options)
 					},
 					WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 						return fakeclient.CoreV1().Secrets("").Watch(context.TODO(), options)
 					},
-				}
+				})
 			}(),
 			preconditionFunc: func(store cache.Store) (bool, error) {
 				return false, nil

@@ -56,7 +56,7 @@ func NewCustomResourceDefinitionInformer(client clientset.Interface, resyncPerio
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredCustomResourceDefinitionInformer(client clientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
+		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
@@ -81,7 +81,7 @@ func NewFilteredCustomResourceDefinitionInformer(client clientset.Interface, res
 				}
 				return client.ApiextensionsV1().CustomResourceDefinitions().Watch(ctx, options)
 			},
-		},
+		}, client),
 		&apisapiextensionsv1.CustomResourceDefinition{},
 		resyncPeriod,
 		indexers,

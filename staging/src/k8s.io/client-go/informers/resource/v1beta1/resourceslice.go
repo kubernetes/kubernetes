@@ -56,7 +56,7 @@ func NewResourceSliceInformer(client kubernetes.Interface, resyncPeriod time.Dur
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredResourceSliceInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
+		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
@@ -81,7 +81,7 @@ func NewFilteredResourceSliceInformer(client kubernetes.Interface, resyncPeriod 
 				}
 				return client.ResourceV1beta1().ResourceSlices().Watch(ctx, options)
 			},
-		},
+		}, client),
 		&apiresourcev1beta1.ResourceSlice{},
 		resyncPeriod,
 		indexers,

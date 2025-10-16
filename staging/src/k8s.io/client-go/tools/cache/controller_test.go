@@ -363,7 +363,7 @@ func TestUpdate(t *testing.T) {
 	// everything we've added has been deleted.
 	watchCh := make(chan struct{})
 	_, controller := NewInformer(
-		&ListWatch{
+		fcache.ToListWatcherWithUnSupportedWatchListSemantics(&ListWatch{
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				watch, err := source.Watch(options)
 				close(watchCh)
@@ -372,7 +372,7 @@ func TestUpdate(t *testing.T) {
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				return source.List(options)
 			},
-		},
+		}),
 		&v1.Pod{},
 		0,
 		ResourceEventHandlerFuncs{

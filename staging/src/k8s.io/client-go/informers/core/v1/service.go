@@ -57,7 +57,7 @@ func NewServiceInformer(client kubernetes.Interface, namespace string, resyncPer
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredServiceInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
+		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
@@ -82,7 +82,7 @@ func NewFilteredServiceInformer(client kubernetes.Interface, namespace string, r
 				}
 				return client.CoreV1().Services(namespace).Watch(ctx, options)
 			},
-		},
+		}, client),
 		&apicorev1.Service{},
 		resyncPeriod,
 		indexers,

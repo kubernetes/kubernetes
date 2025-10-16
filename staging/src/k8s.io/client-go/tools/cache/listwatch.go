@@ -161,6 +161,32 @@ func ToListWatcherWithWatchListSemantics(lw *ListWatch, client any) ListerWatche
 	}
 }
 
+type listWatcherWithWatchListSemanticsWrapper struct {
+	*ListWatch
+
+	// unsupportedWatchListSemantics indicates whether a client explicitly does NOT support
+	// WatchList semantics.
+	//
+	// Over the years, unit tests in kube have been written in many different ways.
+	// After enabling the WatchListClient feature by default, existing tests started failing.
+	// To avoid breaking lots of existing client-go users after upgrade,
+	// we introduced this field as an opt-in.
+	//
+	// When true, the reflector disables WatchList even if the feature gate is enabled.
+	unsupportedWatchListSemantics bool
+}
+
+func (lw *listWatcherWithWatchListSemanticsWrapper) IsWatchListSemanticsUnSupported() bool {
+	return lw.unsupportedWatchListSemantics
+}
+
+func ToListWatcherWithWatchListSemantics(lw *ListWatch, client any) ListerWatcher {
+	return &listWatcherWithWatchListSemanticsWrapper{
+		lw,
+		watchlist.DoesClientNotSupportWatchListSemantics(client),
+	}
+}
+
 // ListFunc knows how to list resources
 //
 // Deprecated: use ListWithContextFunc instead.
