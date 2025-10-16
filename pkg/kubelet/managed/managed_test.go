@@ -1,12 +1,14 @@
 package managed
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 func TestModifyStaticPodForPinnedManagementErrorStates(t *testing.T) {
@@ -1006,4 +1008,174 @@ func createPod(annotations map[string]string, initContainer, container *v1.Conta
 	}
 
 	return pod
+}
+
+func TestIsPodSandboxManagedPod(t *testing.T) {
+	testCases := []struct {
+		name        string
+		annotations map[string]string
+		expected    bool
+	}{
+		{
+			name:        "nil annotations",
+			annotations: nil,
+			expected:    false,
+		},
+		{
+			name:        "empty annotations",
+			annotations: map[string]string{},
+			expected:    false,
+		},
+		{
+			name: "regular pod annotations without workload annotations",
+			annotations: map[string]string{
+				"some.annotation":      "value",
+				"another.annotation":   "value2",
+				"io.kubernetes.pod.id": "12345",
+			},
+			expected: false,
+		},
+		{
+			name: "managed pod with workload management annotation",
+			annotations: map[string]string{
+				"some.annotation":                        "value",
+				WorkloadsAnnotationPrefix + "management": `{"effect": "PreferredDuringScheduling"}`,
+			},
+			expected: true,
+		},
+		{
+			name: "managed pod with workload throttle annotation",
+			annotations: map[string]string{
+				WorkloadsAnnotationPrefix + "throttle": `{"effect": "PreferredDuringScheduling"}`,
+			},
+			expected: true,
+		},
+		{
+			name: "pod with annotation similar to workload prefix but not matching",
+			annotations: map[string]string{
+				"target.workload.openshift.io": "value", // missing trailing slash
+				"some.other.annotation":        "value2",
+			},
+			expected: false,
+		},
+		{
+			name: "managed pod with multiple annotations",
+			annotations: map[string]string{
+				"io.kubernetes.pod.name":                 "test-pod",
+				"io.kubernetes.pod.namespace":            "default",
+				WorkloadsAnnotationPrefix + "management": `{"effect": "PreferredDuringScheduling"}`,
+				"custom.annotation":                      "custom-value",
+			},
+			expected: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := IsPodSandboxManagedPod(tc.annotations)
+			if result != tc.expected {
+				t.Errorf("IsPodSandboxManagedPod() = %v, expected %v for annotations: %v",
+					result, tc.expected, tc.annotations)
+			}
+		})
+	}
+}
+
+// mockRuntimeService is a simple mock for testing
+type mockRuntimeService struct {
+	sandboxStatus *runtimeapi.PodSandboxStatusResponse
+	err           error
+}
+
+func (m *mockRuntimeService) PodSandboxStatus(ctx context.Context, podSandboxID string, verbose bool) (*runtimeapi.PodSandboxStatusResponse, error) {
+	return m.sandboxStatus, m.err
+}
+
+func TestIsManagedPodFromRuntimeService(t *testing.T) {
+	ctx := context.Background()
+
+	testCases := []struct {
+		name          string
+		podSandboxID  string
+		sandboxStatus *runtimeapi.PodSandboxStatusResponse
+		err           error
+		expected      bool
+	}{
+		{
+			name:         "empty sandbox ID",
+			podSandboxID: "",
+			expected:     false,
+		},
+		{
+			name:         "runtime service returns error",
+			podSandboxID: "sandbox123",
+			err:          fmt.Errorf("runtime error"),
+			expected:     false,
+		},
+		{
+			name:          "nil sandbox response",
+			podSandboxID:  "sandbox123",
+			sandboxStatus: nil,
+			expected:      false,
+		},
+		{
+			name:         "nil status in response",
+			podSandboxID: "sandbox123",
+			sandboxStatus: &runtimeapi.PodSandboxStatusResponse{
+				Status: nil,
+			},
+			expected: false,
+		},
+		{
+			name:         "regular pod without workload annotations",
+			podSandboxID: "sandbox123",
+			sandboxStatus: &runtimeapi.PodSandboxStatusResponse{
+				Status: &runtimeapi.PodSandboxStatus{
+					Annotations: map[string]string{
+						"some.annotation": "value",
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name:         "managed pod with workload annotations",
+			podSandboxID: "sandbox123",
+			sandboxStatus: &runtimeapi.PodSandboxStatusResponse{
+				Status: &runtimeapi.PodSandboxStatus{
+					Annotations: map[string]string{
+						"some.annotation":                        "value",
+						WorkloadsAnnotationPrefix + "management": `{"effect": "PreferredDuringScheduling"}`,
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name:         "managed pod with empty annotations but has workload prefix",
+			podSandboxID: "sandbox123",
+			sandboxStatus: &runtimeapi.PodSandboxStatusResponse{
+				Status: &runtimeapi.PodSandboxStatus{
+					Annotations: map[string]string{
+						WorkloadsAnnotationPrefix + "throttle": "",
+					},
+				},
+			},
+			expected: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockService := &mockRuntimeService{
+				sandboxStatus: tc.sandboxStatus,
+				err:           tc.err,
+			}
+
+			result := IsManagedPodFromRuntimeService(ctx, mockService, tc.podSandboxID)
+			if result != tc.expected {
+				t.Errorf("IsManagedPodFromRuntimeService() = %v, expected %v", result, tc.expected)
+			}
+		})
+	}
 }

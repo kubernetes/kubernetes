@@ -17,6 +17,7 @@ limitations under the License.
 package managed
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -25,6 +26,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 var (
@@ -87,6 +89,40 @@ func IsPodManaged(pod *v1.Pod) (bool, string, string) {
 		}
 	}
 	return false, "", ""
+}
+
+// podSandboxStatusGetter is an interface for getting pod sandbox status
+type podSandboxStatusGetter interface {
+	PodSandboxStatus(ctx context.Context, podSandboxID string, verbose bool) (*runtimeapi.PodSandboxStatusResponse, error)
+}
+
+// IsPodSandboxManagedPod checks if a pod sandbox belongs to a managed pod
+// by looking for workload pinning annotations.
+func IsPodSandboxManagedPod(sandboxAnnotations map[string]string) bool {
+	if sandboxAnnotations == nil {
+		return false
+	}
+	for annotation := range sandboxAnnotations {
+		if strings.HasPrefix(annotation, WorkloadsAnnotationPrefix) {
+			return true
+		}
+	}
+	return false
+}
+
+// IsManagedPodFromRuntimeService checks if a pod is managed by fetching the pod sandbox
+// status and checking for workload pinning annotations.
+func IsManagedPodFromRuntimeService(ctx context.Context, runtimeService podSandboxStatusGetter, podSandboxID string) bool {
+	if podSandboxID == "" {
+		return false
+	}
+
+	sandboxResp, err := runtimeService.PodSandboxStatus(ctx, podSandboxID, false)
+	if err != nil || sandboxResp == nil || sandboxResp.GetStatus() == nil {
+		return false
+	}
+
+	return IsPodSandboxManagedPod(sandboxResp.GetStatus().Annotations)
 }
 
 // ModifyStaticPodForPinnedManagement will modify a pod for pod management
