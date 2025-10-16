@@ -38,23 +38,12 @@ KUBE_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")"/.. && pwd -P)
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 # Constants
-readonly KUBE_BUILD_IMAGE_REPO=kube-build
 KUBE_BUILD_IMAGE_CROSS_TAG="${KUBE_CROSS_VERSION:-"$(cat "${KUBE_ROOT}/build/build-image/cross/VERSION")"}"
 readonly KUBE_BUILD_IMAGE_CROSS_TAG
 
 readonly KUBE_DOCKER_REGISTRY="${KUBE_DOCKER_REGISTRY:-registry.k8s.io}"
 KUBE_BASE_IMAGE_REGISTRY="${KUBE_BASE_IMAGE_REGISTRY:-registry.k8s.io/build-image}"
 readonly KUBE_BASE_IMAGE_REGISTRY
-
-# This version number is used to cause everyone to rebuild their data containers
-# and build image.  This is especially useful for automated build systems like
-# Jenkins.
-#
-# Increment/change this number if you change the build image (anything under
-# build/build-image) or change the set of volumes in the data container.
-KUBE_BUILD_IMAGE_VERSION_BASE="$(cat "${KUBE_ROOT}/build/build-image/VERSION")"
-readonly KUBE_BUILD_IMAGE_VERSION_BASE
-readonly KUBE_BUILD_IMAGE_VERSION="${KUBE_BUILD_IMAGE_VERSION_BASE}-${KUBE_BUILD_IMAGE_CROSS_TAG}"
 
 # Make it possible to override the `kube-cross` image, and tag independent of `KUBE_BASE_IMAGE_REGISTRY`
 KUBE_CROSS_IMAGE="${KUBE_CROSS_IMAGE:-"${KUBE_BASE_IMAGE_REGISTRY}/kube-cross"}"
@@ -157,21 +146,16 @@ kube::build::get_docker_wrapped_binaries() {
 #
 # Vars set:
 #   KUBE_ROOT_HASH
-#   KUBE_BUILD_IMAGE_TAG_BASE
-#   KUBE_BUILD_IMAGE_TAG
-#   KUBE_BUILD_IMAGE
 #   KUBE_BUILD_CONTAINER_NAME_BASE
 #   KUBE_BUILD_CONTAINER_NAME
-#   LOCAL_OUTPUT_BUILD_CONTEXT
 function kube::build::setup_vars() {
   KUBE_GIT_BRANCH=$(git symbolic-ref --short -q HEAD 2>/dev/null || true)
   KUBE_ROOT_HASH=$(kube::build::short_hash "${HOSTNAME:-}:${KUBE_ROOT}:${KUBE_GIT_BRANCH}")
-  KUBE_BUILD_IMAGE_TAG_BASE="build-${KUBE_ROOT_HASH}"
-  KUBE_BUILD_IMAGE_TAG="${KUBE_BUILD_IMAGE_TAG_BASE}-${KUBE_BUILD_IMAGE_VERSION}"
-  KUBE_BUILD_IMAGE="${KUBE_BUILD_IMAGE_REPO}:${KUBE_BUILD_IMAGE_TAG}"
   KUBE_BUILD_CONTAINER_NAME_BASE="kube-build-${KUBE_ROOT_HASH}"
-  KUBE_BUILD_CONTAINER_NAME="${KUBE_BUILD_CONTAINER_NAME_BASE}-${KUBE_BUILD_IMAGE_VERSION}"
-  LOCAL_OUTPUT_BUILD_CONTEXT="${LOCAL_OUTPUT_IMAGE_STAGING}/${KUBE_BUILD_IMAGE}"
+  # 6 here is out of a wild excess of caution to match previous behavior where
+  # this was the kube-build image version which surfaced in the name of the container
+  # the last real image version was 5
+  KUBE_BUILD_CONTAINER_NAME="${KUBE_BUILD_CONTAINER_NAME_BASE}-6"
 }
 
 # Verify that the right utilities and such are installed for building Kube. Set
@@ -181,12 +165,8 @@ function kube::build::setup_vars() {
 #
 # Vars set:
 #   KUBE_ROOT_HASH
-#   KUBE_BUILD_IMAGE_TAG_BASE
-#   KUBE_BUILD_IMAGE_TAG
-#   KUBE_BUILD_IMAGE
 #   KUBE_BUILD_CONTAINER_NAME_BASE
 #   KUBE_BUILD_CONTAINER_NAME
-#   LOCAL_OUTPUT_BUILD_CONTEXT
 # shellcheck disable=SC2120 # optional parameters
 function kube::build::verify_prereqs() {
   local -r require_docker=${1:-true}
