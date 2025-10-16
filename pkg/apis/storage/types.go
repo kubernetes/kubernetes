@@ -33,6 +33,7 @@ import (
 type StorageClass struct {
 	metav1.TypeMeta
 	// +optional
+	// +k8s:optional
 	metav1.ObjectMeta
 
 	// provisioner is the driver expected to handle this StorageClass.
@@ -47,28 +48,33 @@ type StorageClass struct {
 	// not empty.  The maximum number of parameters is
 	// 512, with a cumulative max size of 256K
 	// +optional
+	// +k8s:optional
 	Parameters map[string]string
 
 	// reclaimPolicy is the reclaim policy that dynamically provisioned
 	// PersistentVolumes of this storage class are created with
 	// +optional
+	// +k8s:optional
 	ReclaimPolicy *api.PersistentVolumeReclaimPolicy
 
 	// mountOptions are the mount options that dynamically provisioned
 	// PersistentVolumes of this storage class are created with
 	// +optional
+	// +k8s:optional
 	MountOptions []string
 
 	// AllowVolumeExpansion shows whether the storage class allow volume expand
 	// If the field is nil or not set, it would amount to expansion disabled
 	// for all PVs created from this storageclass.
 	// +optional
+	// +k8s:optional
 	AllowVolumeExpansion *bool
 
 	// VolumeBindingMode indicates how PersistentVolumeClaims should be
 	// provisioned and bound.  When unset, VolumeBindingImmediate is used.
 	// This field is only honored by servers that enable the VolumeScheduling feature.
 	// +optional
+	// +k8s:optional
 	VolumeBindingMode *VolumeBindingMode
 
 	// Restrict the node topologies where volumes can be dynamically provisioned.
@@ -76,6 +82,7 @@ type StorageClass struct {
 	// An empty TopologySelectorTerm list means there is no topology restriction.
 	// This field is only honored by servers that enable the VolumeScheduling feature.
 	// +optional
+	// +k8s:optional
 	AllowedTopologies []api.TopologySelectorTerm
 }
 
@@ -87,6 +94,7 @@ type StorageClassList struct {
 	// Standard list metadata
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
+	// +k8s:optional
 	metav1.ListMeta
 
 	// Items is the list of StorageClasses
@@ -105,6 +113,7 @@ type VolumeAttachment struct {
 	// Standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
+	// +k8s:optional
 	metav1.ObjectMeta
 
 	// Specification of the desired attach/detach volume behavior.
@@ -115,6 +124,7 @@ type VolumeAttachment struct {
 	// Populated by the entity completing the attach or detach
 	// operation, i.e. the external-attacher.
 	// +optional
+	// +k8s:optional
 	Status VolumeAttachmentStatus
 }
 
@@ -126,6 +136,7 @@ type VolumeAttachmentList struct {
 	// Standard list metadata
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
+	// +k8s:optional
 	metav1.ListMeta
 
 	// Items is the list of VolumeAttachments
@@ -152,6 +163,7 @@ type VolumeAttachmentSpec struct {
 type VolumeAttachmentSource struct {
 	// Name of the persistent volume to attach.
 	// +optional
+	// +k8s:optional
 	PersistentVolumeName *string
 
 	// inlineVolumeSpec contains all the information necessary to attach
@@ -161,6 +173,7 @@ type VolumeAttachmentSource struct {
 	// PersistentVolumeSpec. This field is beta-level and is only
 	// honored by servers that enabled the CSIMigration feature.
 	// +optional
+	// +k8s:optional
 	InlineVolumeSpec *api.PersistentVolumeSpec
 }
 
@@ -177,18 +190,21 @@ type VolumeAttachmentStatus struct {
 	// This field must only be set by the entity completing the attach
 	// operation, i.e. the external-attacher.
 	// +optional
+	// +k8s:optional
 	AttachmentMetadata map[string]string
 
 	// The last error encountered during attach operation, if any.
 	// This field must only be set by the entity completing the attach
 	// operation, i.e. the external-attacher.
 	// +optional
+	// +k8s:optional
 	AttachError *VolumeError
 
 	// The last error encountered during detach operation, if any.
 	// This field must only be set by the entity completing the detach
 	// operation, i.e. the external-attacher.
 	// +optional
+	// +k8s:optional
 	DetachError *VolumeError
 }
 
@@ -196,12 +212,14 @@ type VolumeAttachmentStatus struct {
 type VolumeError struct {
 	// Time the error was encountered.
 	// +optional
+	// +k8s:optional
 	Time metav1.Time
 
 	// String detailing the error encountered during Attach or Detach operation.
 	// This string may be logged, so it should not contain sensitive
 	// information.
 	// +optional
+	// +k8s:optional
 	Message string
 
 	// errorCode is a numeric gRPC code representing the error encountered during Attach or Detach operations.
@@ -210,6 +228,7 @@ type VolumeError struct {
 	//
 	// +featureGate=MutableCSINodeAllocatableCount
 	// +optional
+	// +k8s:optional
 	ErrorCode *int32
 }
 
@@ -264,6 +283,7 @@ type CSIDriverList struct {
 	// Standard list metadata
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
+	// +k8s:optional
 	metav1.ListMeta
 
 	// items is the list of CSIDriver
@@ -285,6 +305,7 @@ type CSIDriverSpec struct {
 	// This field is immutable.
 	//
 	// +optional
+	// +k8s:optional
 	AttachRequired *bool
 
 	// Defines if the underlying volume supports changing ownership and
@@ -298,6 +319,7 @@ type CSIDriverSpec struct {
 	// With the default policy the defined fsGroup will only be applied
 	// if a fstype is defined and the volume's access mode contains ReadWriteOnce.
 	// +optional
+	// +k8s:optional
 	FSGroupPolicy *FSGroupPolicy
 
 	// If set to true, podInfoOnMount indicates this CSI volume driver
@@ -328,6 +350,7 @@ type CSIDriverSpec struct {
 	// This field was immutable in Kubernetes < 1.29 and now is mutable.
 	//
 	// +optional
+	// +k8s:optional
 	PodInfoOnMount *bool
 
 	// VolumeLifecycleModes defines what kind of volumes this CSI volume driver supports.
@@ -346,6 +369,7 @@ type CSIDriverSpec struct {
 	// This field is immutable.
 	//
 	// +optional
+	// +k8s:optional
 	VolumeLifecycleModes []VolumeLifecycleMode
 
 	// If set to true, storageCapacity indicates that the CSI
@@ -365,6 +389,7 @@ type CSIDriverSpec struct {
 	// This field was immutable in Kubernetes <= 1.22 and now is mutable.
 	//
 	// +optional
+	// +k8s:optional
 	StorageCapacity *bool
 
 	// TokenRequests indicates the CSI driver needs pods' service account
@@ -384,6 +409,7 @@ type CSIDriverSpec struct {
 	// RequiresRepublish can be used to trigger NodePublishVolume periodically.
 	//
 	// +optional
+	// +k8s:optional
 	// +listType=atomic
 	TokenRequests []TokenRequest
 
@@ -396,6 +422,7 @@ type CSIDriverSpec struct {
 	// mount points will not be seen by a running container.
 	//
 	// +optional
+	// +k8s:optional
 	RequiresRepublish *bool
 
 	// SELinuxMount specifies if the CSI driver supports "-o context"
@@ -418,6 +445,7 @@ type CSIDriverSpec struct {
 	//
 	// +featureGate=SELinuxMountReadWriteOncePod
 	// +optional
+	// +k8s:optional
 	SELinuxMount *bool
 
 	// nodeAllocatableUpdatePeriodSeconds specifies the interval between periodic updates of
@@ -432,6 +460,7 @@ type CSIDriverSpec struct {
 	//
 	// +featureGate=MutableCSINodeAllocatableCount
 	// +optional
+	// +k8s:optional
 	NodeAllocatableUpdatePeriodSeconds *int64
 }
 
@@ -482,6 +511,7 @@ type TokenRequest struct {
 	// It has the same default value of "ExpirationSeconds" in "TokenRequestSpec."
 	//
 	// +optional
+	// +k8s:optional
 	ExpirationSeconds *int64
 }
 
@@ -566,10 +596,12 @@ type CSINodeDriver struct {
 	// It is possible for different nodes to use different topology keys.
 	// This can be empty if driver does not support topology.
 	// +optional
+	// +k8s:optional
 	TopologyKeys []string
 
 	// allocatable represents the volume resources of a node that are available for scheduling.
 	// +optional
+	// +k8s:optional
 	Allocatable *VolumeNodeResources
 }
 
@@ -580,6 +612,7 @@ type VolumeNodeResources struct {
 	// The same rule applies for a unique volume that is shared among multiple pods on the same node.
 	// If this field is not specified, then the supported number of volumes on this node is unbounded.
 	// +optional
+	// +k8s:optional
 	Count *int32
 }
 
@@ -592,6 +625,7 @@ type CSINodeList struct {
 	// Standard list metadata
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
+	// +k8s:optional
 	metav1.ListMeta
 
 	// items is the list of CSINode
@@ -636,6 +670,7 @@ type CSIStorageCapacity struct {
 	//
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
+	// +k8s:optional
 	metav1.ObjectMeta
 
 	// NodeTopology defines which nodes have access to the storage
@@ -645,6 +680,7 @@ type CSIStorageCapacity struct {
 	// immutable.
 	//
 	// +optional
+	// +k8s:optional
 	NodeTopology *metav1.LabelSelector
 
 	// The name of the StorageClass that the reported capacity applies to.
@@ -665,6 +701,7 @@ type CSIStorageCapacity struct {
 	// unavailable.
 	//
 	// +optional
+	// +k8s:optional
 	Capacity *resource.Quantity
 
 	// MaximumVolumeSize is the value reported by the CSI driver in its GetCapacityResponse
@@ -679,6 +716,7 @@ type CSIStorageCapacity struct {
 	// API is ResourceRequirements.Requests in a volume claim.
 	//
 	// +optional
+	// +k8s:optional
 	MaximumVolumeSize *resource.Quantity
 }
 
@@ -690,6 +728,7 @@ type CSIStorageCapacityList struct {
 	// Standard list metadata
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
+	// +k8s:optional
 	metav1.ListMeta
 
 	// Items is the list of CSIStorageCapacity objects.
@@ -707,6 +746,7 @@ type VolumeAttributesClass struct {
 	// Standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
+	// +k8s:optional
 	metav1.ObjectMeta
 
 	// Name of the CSI driver
@@ -738,6 +778,7 @@ type VolumeAttributesClassList struct {
 	// Standard list metadata
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
+	//+k8s:optional
 	metav1.ListMeta
 
 	// items is the list of VolumeAttributesClass objects.
