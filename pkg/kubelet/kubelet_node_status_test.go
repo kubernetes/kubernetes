@@ -297,6 +297,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 						ContainerRuntimeVersion: "test://1.5.0",
 						KubeletVersion:          version.Get().String(),
 						KubeProxyVersion:        "",
+						RunningInUserNamespace:  kubelet.runningInUserNS(),
 					},
 					Capacity: v1.ResourceList{
 						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
@@ -477,6 +478,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 				ContainerRuntimeVersion: "test://1.5.0",
 				KubeletVersion:          version.Get().String(),
 				KubeProxyVersion:        "",
+				RunningInUserNamespace:  kubelet.runningInUserNS(),
 			},
 			Capacity: v1.ResourceList{
 				v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
@@ -683,6 +685,7 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 				ContainerRuntimeVersion: "test://1.5.0",
 				KubeletVersion:          version.Get().String(),
 				KubeProxyVersion:        "",
+				RunningInUserNamespace:  kubelet.runningInUserNS(),
 			},
 			Capacity: v1.ResourceList{
 				v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
@@ -917,6 +920,7 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 				ContainerRuntimeVersion: "test://1.5.0",
 				KubeletVersion:          version.Get().String(),
 				KubeProxyVersion:        "",
+				RunningInUserNamespace:  kubelet.runningInUserNS(),
 			},
 			Capacity: v1.ResourceList{
 				v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),

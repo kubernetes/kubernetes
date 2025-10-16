@@ -677,7 +677,7 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(context.Context, *v1.Node) er
 	setters = append(setters,
 		nodestatus.NodeAddress(kl.nodeIPs, kl.nodeIPValidator, kl.hostname, kl.externalCloudProvider, utilnet.ResolveBindAddress),
 		nodestatus.MachineInfo(string(kl.nodeName), kl.maxPods, kl.podsPerCore, kl.GetCachedMachineInfo, kl.containerManager.GetCapacity,
-			kl.containerManager.GetDevicePluginResourceCapacity, kl.containerManager.GetNodeAllocatableReservation, kl.recordEvent, kl.supportLocalStorageCapacityIsolation()),
+			kl.containerManager.GetDevicePluginResourceCapacity, kl.containerManager.GetNodeAllocatableReservation, kl.recordEvent, kl.runningInUserNS, kl.supportLocalStorageCapacityIsolation()),
 		nodestatus.VersionInfo(kl.cadvisor.VersionInfo, kl.containerRuntime.Type, kl.containerRuntime.Version),
 		nodestatus.DaemonEndpoints(kl.daemonEndpoints),
 		nodestatus.Images(kl.nodeStatusMaxImages, kl.imageManager.GetImageList),
