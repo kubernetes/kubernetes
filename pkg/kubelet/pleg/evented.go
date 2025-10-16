@@ -435,5 +435,31 @@ func (e *EventedPLEG) updateLatencyMetric(event *runtimeapi.ContainerEventRespon
 }
 
 func (e *EventedPLEG) RequestPodReSync(podUID types.UID) {
-	e.genericPleg.RequestPodReSync(podUID)
+	oldStatus, err := e.cache.Get(podUID)
+	if err != nil {
+		e.logger.Error(err, "Evented PLEG: failed to get pod status from cache for resync", "podUID", podUID)
+		return
+	}
+
+	status, err := e.runtime.GetPodStatus(context.TODO(), podUID, oldStatus.Name, oldStatus.Namespace)
+	if err != nil {
+		e.logger.Error(err, "Evented PLEG: failed to get pod status from runtime for resync", "podUID", podUID)
+	}
+
+	if status != nil {
+		// Preserve the pod IP across cache updates if the new IP is empty.
+		status.IPs = e.getPodIPs(podUID, status)
+	}
+
+	var timestamp time.Time
+	if status != nil {
+		timestamp = status.TimeStamp
+	}
+	if timestamp.IsZero() {
+		timestamp = e.clock.Now()
+	}
+
+	if e.cache.Set(podUID, status, err, timestamp) {
+		e.sendPodLifecycleEvent(&PodLifecycleEvent{ID: podUID, Type: PodSync})
+	}
 }

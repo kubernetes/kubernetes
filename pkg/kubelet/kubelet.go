@@ -3366,5 +3366,8 @@ func (kl *Kubelet) fastStaticPodsRegistration(ctx context.Context) {
 }
 
 func (kl *Kubelet) RequestPodReSync(podUID types.UID) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) {
+		kl.eventedPleg.RequestPodReSync(podUID)
+	}
 	kl.pleg.RequestPodReSync(podUID)
 }
