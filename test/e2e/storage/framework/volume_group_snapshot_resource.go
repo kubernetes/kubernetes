@@ -64,7 +64,7 @@ type VolumeGroupSnapshotResource struct {
 // CreateVolumeGroupSnapshot creates a VolumeGroupSnapshotClass with given SnapshotDeletionPolicy and a VolumeGroupSnapshot
 // from the VolumeGroupSnapshotClass using a dynamic client.
 // Returns the unstructured VolumeGroupSnapshotClass and VolumeGroupSnapshot objects.
-func CreateVolumeGroupSnapshot(ctx context.Context, sDriver VoulmeGroupSnapshottableTestDriver, config *PerTestConfig, pattern TestPattern, groupName string, pvcNamespace string, timeouts *framework.TimeoutContext, parameters map[string]string) (*unstructured.Unstructured, *unstructured.Unstructured, *unstructured.Unstructured) {
+func CreateVolumeGroupSnapshot(ctx context.Context, sDriver VolumeGroupSnapshottableTestDriver, config *PerTestConfig, pattern TestPattern, groupName string, pvcNamespace string, timeouts *framework.TimeoutContext, parameters map[string]string) (*unstructured.Unstructured, *unstructured.Unstructured, *unstructured.Unstructured) {
 	defer ginkgo.GinkgoRecover()
 	var err error
 	if pattern.SnapshotType != VolumeGroupSnapshot {
@@ -120,7 +120,7 @@ func (r *VolumeGroupSnapshotResource) CleanupResource(ctx context.Context, timeo
 }
 
 // CreateVolumeGroupSnapshotResource creates a VolumeGroupSnapshotResource object with the given parameters.
-func CreateVolumeGroupSnapshotResource(ctx context.Context, sDriver VoulmeGroupSnapshottableTestDriver, config *PerTestConfig, pattern TestPattern, pvcName string, pvcNamespace string, timeouts *framework.TimeoutContext, parameters map[string]string) *VolumeGroupSnapshotResource {
+func CreateVolumeGroupSnapshotResource(ctx context.Context, sDriver VolumeGroupSnapshottableTestDriver, config *PerTestConfig, pattern TestPattern, pvcName string, pvcNamespace string, timeouts *framework.TimeoutContext, parameters map[string]string) *VolumeGroupSnapshotResource {
 	vgsClass, snapshot, vgsc := CreateVolumeGroupSnapshot(ctx, sDriver, config, pattern, pvcName, pvcNamespace, timeouts, parameters)
 	vgs := &VolumeGroupSnapshotResource{
 		Config:     config,
