@@ -1614,27 +1614,37 @@ func TestFilterPodsByOwner(t *testing.T) {
 		return pod
 	}
 
+	ownerKind := "OwnerKind"
+	ownerName := "ownerName"
 	cases := map[string]struct {
 		owner        *metav1.ObjectMeta
+		ownedOnly    bool
 		allPods      []*v1.Pod
 		wantPodsKeys sets.Set[string]
 	}{
 		"multiple Pods, some are owned by the owner": {
 			owner: &metav1.ObjectMeta{
 				Namespace: "ns1",
+				Name:      ownerName,
 				UID:       "abc",
 			},
 			allPods: []*v1.Pod{
 				newPod("a", "ns1", &metav1.OwnerReference{
 					UID:        "abc",
+					Kind:       ownerKind,
+					Name:       ownerName,
 					Controller: ptr.To(true),
 				}),
 				newPod("b", "ns1", &metav1.OwnerReference{
 					UID:        "def",
+					Kind:       ownerKind,
+					Name:       ownerName,
 					Controller: ptr.To(true),
 				}),
 				newPod("c", "ns1", &metav1.OwnerReference{
 					UID:        "abc",
+					Kind:       ownerKind,
+					Name:       ownerName,
 					Controller: ptr.To(true),
 				}),
 			},
@@ -1643,6 +1653,8 @@ func TestFilterPodsByOwner(t *testing.T) {
 		"orphan Pods in multiple namespaces": {
 			owner: &metav1.ObjectMeta{
 				Namespace: "ns1",
+				Name:      ownerName,
+				UID:       "abc",
 			},
 			allPods: []*v1.Pod{
 				newPod("a", "ns1", nil),
@@ -1653,6 +1665,7 @@ func TestFilterPodsByOwner(t *testing.T) {
 		"owned Pods and orphan Pods in the owner's namespace": {
 			owner: &metav1.ObjectMeta{
 				Namespace: "ns1",
+				Name:      ownerName,
 				UID:       "abc",
 			},
 			allPods: []*v1.Pod{
@@ -1660,10 +1673,61 @@ func TestFilterPodsByOwner(t *testing.T) {
 				newPod("b", "ns2", nil),
 				newPod("c", "ns1", &metav1.OwnerReference{
 					UID:        "abc",
+					Kind:       ownerKind,
+					Name:       ownerName,
 					Controller: ptr.To(true),
 				}),
 			},
 			wantPodsKeys: sets.New("ns1/a", "ns1/c"),
+		},
+		"exclude orphan pods, pods in mismatched ns,uid,kind,name,controller": {
+			owner: &metav1.ObjectMeta{
+				Namespace: "ns1",
+				Name:      ownerName,
+				UID:       "abc",
+			},
+			allPods: []*v1.Pod{
+				newPod("a", "ns1", nil),
+				newPod("other-ns-orphan", "ns2", nil),
+				newPod("other-ns-owned", "ns2", &metav1.OwnerReference{
+					UID:        "abc",
+					Kind:       ownerKind,
+					Name:       ownerName,
+					Controller: ptr.To(true),
+				}),
+				newPod("c", "ns1", &metav1.OwnerReference{
+					UID:        "abc",
+					Kind:       ownerKind,
+					Name:       ownerName,
+					Controller: ptr.To(true),
+				}),
+				newPod("other-uid", "ns1", &metav1.OwnerReference{
+					UID:        "other-uid",
+					Kind:       ownerKind,
+					Name:       ownerName,
+					Controller: ptr.To(true),
+				}),
+				newPod("other-kind", "ns1", &metav1.OwnerReference{
+					UID:        "abc",
+					Kind:       "OtherKind",
+					Name:       ownerName,
+					Controller: ptr.To(true),
+				}),
+				newPod("other-name", "ns1", &metav1.OwnerReference{
+					UID:        "abc",
+					Kind:       ownerKind,
+					Name:       "otherName",
+					Controller: ptr.To(true),
+				}),
+				newPod("non-controller", "ns1", &metav1.OwnerReference{
+					UID:        "abc",
+					Kind:       ownerKind,
+					Name:       ownerName,
+					Controller: ptr.To(false),
+				}),
+			},
+			ownedOnly:    true,
+			wantPodsKeys: sets.New("ns1/c"),
 		},
 	}
 	for name, tc := range cases {
@@ -1672,7 +1736,7 @@ func TestFilterPodsByOwner(t *testing.T) {
 			sharedInformers := informers.NewSharedInformerFactory(fakeClient, 0)
 			podInformer := sharedInformers.Core().V1().Pods()
 
-			err := AddPodControllerUIDIndexer(podInformer.Informer())
+			err := AddPodControllerIndexer(podInformer.Informer())
 			if err != nil {
 				t.Fatalf("failed to register indexer: %v", err)
 			}
@@ -1682,7 +1746,10 @@ func TestFilterPodsByOwner(t *testing.T) {
 					t.Fatalf("failed adding Pod to indexer: %v", err)
 				}
 			}
-			gotPods, _ := FilterPodsByOwner(podIndexer, tc.owner)
+			gotPods, err := FilterPodsByOwner(podIndexer, tc.owner, ownerKind, !tc.ownedOnly)
+			if err != nil {
+				t.Fatal(err)
+			}
 			gotPodKeys := sets.New[string]()
 			for _, pod := range gotPods {
 				gotPodKeys.Insert(pod.Namespace + "/" + pod.Name)
