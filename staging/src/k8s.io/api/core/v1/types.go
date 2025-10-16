@@ -6661,6 +6661,10 @@ type NodeSystemInfo struct {
 	Architecture string `json:"architecture" protobuf:"bytes,10,opt,name=architecture"`
 	// Swap Info reported by the node.
 	Swap *NodeSwapStatus `json:"swap,omitempty" protobuf:"bytes,11,opt,name=swap"`
+	// Whether the node is running in a user namespace.
+	// +featureGate=KubeletInUserNamespace
+	// +optional
+	RunningInUserNamespace *bool `json:"runningInUserNamespace,omitempty" protobuf:"varint,12,opt,name=runningInUserNamespace"`
 }
 
 // NodeSwapStatus represents swap memory information.

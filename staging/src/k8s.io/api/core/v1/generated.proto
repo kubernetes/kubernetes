@@ -3046,6 +3046,11 @@ message NodeSystemInfo {
 
   // Swap Info reported by the node.
   optional NodeSwapStatus swap = 11;
+
+  // Whether the node is running in a user namespace.
+  // +featureGate=KubeletInUserNamespace
+  // +optional
+  optional bool runningInUserNamespace = 12;
 }
 
 // ObjectFieldSelector selects an APIVersioned field of an object.

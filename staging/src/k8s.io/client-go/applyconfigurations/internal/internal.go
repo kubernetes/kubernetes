@@ -6201,6 +6201,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+    - name: runningInUserNamespace
+      type:
+        scalar: boolean
     - name: swap
       type:
         namedType: io.k8s.api.core.v1.NodeSwapStatus
