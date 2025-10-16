@@ -1387,10 +1387,11 @@ func (m *kubeGenericRuntimeManager) computePodLevelResourcesResizeAction(ctx con
 //  2. Kill pod sandbox if necessary.
 //  3. Kill any containers that should not be running.
 //  4. Create sandbox if necessary.
-//  5. Create ephemeral containers.
-//  6. Create init containers.
-//  7. Resize running containers (if InPlacePodVerticalScaling==true)
-//  8. Create normal containers.
+//  5. Invoke OnPodSandboxReady to notify Kubelet to update pod status.
+//  6. Create ephemeral containers.
+//  7. Create init containers.
+//  8. Resize running containers (if InPlacePodVerticalScaling==true)
+//  9. Create normal containers.
 func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff, restartAllContainers bool) (result kubecontainer.PodSyncResult) {
 	logger := klog.FromContext(ctx)
 	// Step 1: Compute sandbox and container changes.
@@ -1588,6 +1589,16 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 			podIPs = m.determinePodSandboxIPs(ctx, pod.Namespace, pod.Name, resp.GetStatus())
 			logger.V(4).Info("Determined the ip for pod after sandbox changed", "IPs", podIPs, "pod", klog.KObj(pod))
 		}
+
+		// Step 5: invoke the sandbox ready callback before image pulling .
+		// At this point, dynamic resources are prepared (at PrepareDynamicResources() call above)
+		// and volumes are already mounted (at the kubelet SyncPod() level), so,
+		// all requirements (sandbox, networking, volumes) are met to set `PodReadyToStartContainers=True` condition.
+		logger.V(4).Info("Pod sandbox and network ready, invoking callback", "pod", klog.KObj(pod), "podIPs", podIPs)
+		if err := m.runtimeHelper.OnPodSandboxReady(ctx, pod); err != nil {
+			// log the error but continue the pod creation process, to retain the existing behaviour
+			logger.Error(err, "Failed to invoke sandbox ready callback, continuing with pod creation", "pod", klog.KObj(pod))
+		}
 	}
 
 	// the start containers routines depend on pod ip(as in primary pod ip)
@@ -1669,7 +1680,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		return nil
 	}
 
-	// Step 5: start ephemeral containers
+	// Step 6: start ephemeral containers
 	// These are started "prior" to init containers to allow running ephemeral containers even when there
 	// are errors starting an init container. In practice init containers will start first since ephemeral
 	// containers cannot be specified on pod creation.
@@ -1677,7 +1688,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		start(ctx, "ephemeral container", metrics.EphemeralContainer, ephemeralContainerStartSpec(&pod.Spec.EphemeralContainers[idx]))
 	}
 
-	// Step 6: start init containers.
+	// Step 7: start init containers.
 	for _, idx := range podContainerChanges.InitContainersToStart {
 		container := &pod.Spec.InitContainers[idx]
 		// Start the next init container.
@@ -1694,14 +1705,14 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		logger.V(4).Info("Completed init container for pod", "containerName", container.Name, "pod", klog.KObj(pod))
 	}
 
-	// Step 7: For containers in podContainerChanges.ContainersToUpdate[CPU,Memory] list, invoke UpdateContainerResources
+	// Step 8: For containers in podContainerChanges.ContainersToUpdate[CPU,Memory] list, invoke UpdateContainerResources
 	if resizable, _, _ := allocation.IsInPlacePodVerticalScalingAllowed(pod); resizable {
 		if len(podContainerChanges.ContainersToUpdate) > 0 || podContainerChanges.UpdatePodResources || podContainerChanges.UpdatePodLevelResources {
 			result.SyncResults = append(result.SyncResults, m.doPodResizeAction(ctx, pod, podStatus, podContainerChanges))
 		}
 	}
 
-	// Step 8: start containers in podContainerChanges.ContainersToStart.
+	// Step 9: start containers in podContainerChanges.ContainersToStart.
 	for _, idx := range podContainerChanges.ContainersToStart {
 		start(ctx, "container", metrics.Container, containerStartSpec(&pod.Spec.Containers[idx]))
 	}
