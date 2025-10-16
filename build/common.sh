@@ -423,7 +423,7 @@ function kube::build::run_build_command_ex() {
   # if host has localtime, mount it so we log in local time
   if [ -f /etc/localtime ]; then
     docker_run_opts+=(
-      --mount 'type=bind,source=/etc/localtime,target=/etc/localtime'
+      --mount 'type=bind,source=/etc/localtime,target=/etc/localtime,readonly'
     )
   fi
 
