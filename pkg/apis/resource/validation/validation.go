@@ -268,6 +268,9 @@ func validateDeviceAllocationMode(deviceAllocationMode resource.DeviceAllocation
 			allErrs = append(allErrs, field.Invalid(countFldPath, count, "must be greater than zero"))
 		}
 	default:
+		// NOTE: Declarative validation does not (yet) enforce the real requiredness of this field
+		// because v1beta1 uses a bespoke form of union which makes this field truly optional
+		// in some cases and truly required in others. DO NOT REMOVE THIS CODE UNLESS THAT IS RESOLVED.
 		allErrs = append(allErrs, field.NotSupported(allocModeFldPath, deviceAllocationMode, []resource.DeviceAllocationMode{resource.DeviceAllocationModeAll, resource.DeviceAllocationModeExactCount}).MarkCoveredByDeclarative())
 	}
 	return allErrs
