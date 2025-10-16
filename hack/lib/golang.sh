@@ -675,7 +675,7 @@ kube::golang::place_bins() {
     if [[ -d "${full_binpath_src}" ]]; then
       mkdir -p "${KUBE_OUTPUT_BIN}/${platform}"
       find "${full_binpath_src}" -maxdepth 1 -type f -exec \
-        rsync -pc {} "${KUBE_OUTPUT_BIN}/${platform}" \;
+        cp -p {} "${KUBE_OUTPUT_BIN}/${platform}" \;
     fi
   done
 }

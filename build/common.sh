@@ -38,23 +38,12 @@ KUBE_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")"/.. && pwd -P)
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 # Constants
-readonly KUBE_BUILD_IMAGE_REPO=kube-build
 KUBE_BUILD_IMAGE_CROSS_TAG="${KUBE_CROSS_VERSION:-"$(cat "${KUBE_ROOT}/build/build-image/cross/VERSION")"}"
 readonly KUBE_BUILD_IMAGE_CROSS_TAG
 
 readonly KUBE_DOCKER_REGISTRY="${KUBE_DOCKER_REGISTRY:-registry.k8s.io}"
 KUBE_BASE_IMAGE_REGISTRY="${KUBE_BASE_IMAGE_REGISTRY:-registry.k8s.io/build-image}"
 readonly KUBE_BASE_IMAGE_REGISTRY
-
-# This version number is used to cause everyone to rebuild their data containers
-# and build image.  This is especially useful for automated build systems like
-# Jenkins.
-#
-# Increment/change this number if you change the build image (anything under
-# build/build-image) or change the set of volumes in the data container.
-KUBE_BUILD_IMAGE_VERSION_BASE="$(cat "${KUBE_ROOT}/build/build-image/VERSION")"
-readonly KUBE_BUILD_IMAGE_VERSION_BASE
-readonly KUBE_BUILD_IMAGE_VERSION="${KUBE_BUILD_IMAGE_VERSION_BASE}-${KUBE_BUILD_IMAGE_CROSS_TAG}"
 
 # Make it possible to override the `kube-cross` image, and tag independent of `KUBE_BASE_IMAGE_REGISTRY`
 KUBE_CROSS_IMAGE="${KUBE_CROSS_IMAGE:-"${KUBE_BASE_IMAGE_REGISTRY}/kube-cross"}"
@@ -157,21 +146,16 @@ kube::build::get_docker_wrapped_binaries() {
 #
 # Vars set:
 #   KUBE_ROOT_HASH
-#   KUBE_BUILD_IMAGE_TAG_BASE
-#   KUBE_BUILD_IMAGE_TAG
-#   KUBE_BUILD_IMAGE
 #   KUBE_BUILD_CONTAINER_NAME_BASE
 #   KUBE_BUILD_CONTAINER_NAME
-#   LOCAL_OUTPUT_BUILD_CONTEXT
 function kube::build::setup_vars() {
   KUBE_GIT_BRANCH=$(git symbolic-ref --short -q HEAD 2>/dev/null || true)
   KUBE_ROOT_HASH=$(kube::build::short_hash "${HOSTNAME:-}:${KUBE_ROOT}:${KUBE_GIT_BRANCH}")
-  KUBE_BUILD_IMAGE_TAG_BASE="build-${KUBE_ROOT_HASH}"
-  KUBE_BUILD_IMAGE_TAG="${KUBE_BUILD_IMAGE_TAG_BASE}-${KUBE_BUILD_IMAGE_VERSION}"
-  KUBE_BUILD_IMAGE="${KUBE_BUILD_IMAGE_REPO}:${KUBE_BUILD_IMAGE_TAG}"
   KUBE_BUILD_CONTAINER_NAME_BASE="kube-build-${KUBE_ROOT_HASH}"
-  KUBE_BUILD_CONTAINER_NAME="${KUBE_BUILD_CONTAINER_NAME_BASE}-${KUBE_BUILD_IMAGE_VERSION}"
-  LOCAL_OUTPUT_BUILD_CONTEXT="${LOCAL_OUTPUT_IMAGE_STAGING}/${KUBE_BUILD_IMAGE}"
+  # 6 here is out of a wild excess of caution to match previous behavior where
+  # this was the kube-build image version which surfaced in the name of the container
+  # the last real image version was 5
+  KUBE_BUILD_CONTAINER_NAME="${KUBE_BUILD_CONTAINER_NAME_BASE}-6"
 }
 
 # Verify that the right utilities and such are installed for building Kube. Set
@@ -181,18 +165,13 @@ function kube::build::setup_vars() {
 #
 # Vars set:
 #   KUBE_ROOT_HASH
-#   KUBE_BUILD_IMAGE_TAG_BASE
-#   KUBE_BUILD_IMAGE_TAG
-#   KUBE_BUILD_IMAGE
 #   KUBE_BUILD_CONTAINER_NAME_BASE
 #   KUBE_BUILD_CONTAINER_NAME
-#   LOCAL_OUTPUT_BUILD_CONTEXT
 # shellcheck disable=SC2120 # optional parameters
 function kube::build::verify_prereqs() {
   local -r require_docker=${1:-true}
   kube::log::status "Verifying Prerequisites...."
   kube::build::ensure_tar || return 1
-  kube::build::ensure_rsync || return 1
   if ${require_docker}; then
     kube::build::ensure_docker_in_path || return 1
     if kube::build::is_osx; then
@@ -238,13 +217,6 @@ function kube::build::is_osx() {
 
 function kube::build::is_gnu_sed() {
   [[ $(sed --version 2>&1) == *GNU* ]]
-}
-
-function kube::build::ensure_rsync() {
-  if [[ -z "$(which rsync)" ]]; then
-    kube::log::error "Can't find 'rsync' in PATH, please fix and retry."
-    return 1
-  fi
 }
 
 function kube::build::ensure_docker_in_path() {
@@ -295,29 +267,6 @@ function kube::build::docker_image_exists() {
   }
 
   [[ $("${DOCKER[@]}" images -q "${1}:${2}") ]]
-}
-
-# Delete all images that match a tag prefix except for the "current" version
-#
-# $1: The image repo/name
-# $2: The tag base. We consider any image that matches $2*
-# $3: The current image not to delete if provided
-function kube::build::docker_delete_old_images() {
-  # In Docker 1.12, we can replace this with
-  #    docker images "$1" --format "{{.Tag}}"
-  for tag in $("${DOCKER[@]}" images "${1}" | tail -n +2 | awk '{print $2}') ; do
-    if [[ "${tag}" != "${2}"* ]] ; then
-      V=3 kube::log::status "Keeping image ${1}:${tag}"
-      continue
-    fi
-
-    if [[ -z "${3:-}" || "${tag}" != "${3}" ]] ; then
-      V=2 kube::log::status "Deleting image ${1}:${tag}"
-      "${DOCKER[@]}" rmi "${1}:${tag}" >/dev/null
-    else
-      V=3 kube::log::status "Keeping image ${1}:${tag}"
-    fi
-  done
 }
 
 # Stop and delete all containers that match a pattern
@@ -380,7 +329,6 @@ function kube::build::destroy_container() {
 function kube::build::clean() {
   if kube::build::has_docker ; then
     kube::build::docker_delete_old_containers "${KUBE_BUILD_CONTAINER_NAME_BASE}"
-    kube::build::docker_delete_old_images "${KUBE_BUILD_IMAGE_REPO}" "${KUBE_BUILD_IMAGE_TAG_BASE}"
 
     V=2 kube::log::status "Cleaning all untagged docker images"
     "${DOCKER[@]}" rmi "$("${DOCKER[@]}" images -q --filter 'dangling=true')" 2> /dev/null || true
@@ -475,7 +423,7 @@ function kube::build::run_build_command_ex() {
   # if host has localtime, mount it so we log in local time
   if [ -f /etc/localtime ]; then
     docker_run_opts+=(
-      --mount 'type=bind,source=/etc/localtime,target=/etc/localtime'
+      --mount 'type=bind,source=/etc/localtime,target=/etc/localtime,readonly'
     )
   fi
 
