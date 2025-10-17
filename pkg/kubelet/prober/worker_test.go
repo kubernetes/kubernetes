@@ -17,8 +17,8 @@ limitations under the License.
 package prober
 
 import (
-	"context"
 	"fmt"
+	"net/http"
 	"testing"
 	"time"
 
@@ -578,9 +578,9 @@ func TestStartupProbeDisabledByStarted(t *testing.T) {
 }
 
 func TestWorkerHTTPProbeRequestCaching(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	m := newTestManager()
-	pod := getTestPod()
+
 	httpGet := &v1.HTTPGetAction{
 		Host: "",
 		Path: "",
@@ -595,60 +595,78 @@ func TestWorkerHTTPProbeRequestCaching(t *testing.T) {
 		SuccessThreshold: 1,
 		FailureThreshold: 1,
 	}
+
+	tests := []struct {
+		name         string
+		podIP        string
+		containerID  string
+		expectNewReq bool
+	}{
+		{
+			name:         "initial probe",
+			podIP:        "10.0.0.1",
+			containerID:  "docker://abc123",
+			expectNewReq: true,
+		},
+		{
+			name:         "same pod IP and container ID",
+			podIP:        "10.0.0.1",
+			containerID:  "docker://abc123",
+			expectNewReq: false,
+		},
+		{
+			name:         "pod IP change",
+			podIP:        "10.0.0.2",
+			containerID:  "docker://abc123",
+			expectNewReq: true,
+		},
+		{
+			name:         "container restart",
+			podIP:        "10.0.0.2",
+			containerID:  "docker://def456",
+			expectNewReq: true,
+		},
+	}
+
+	// Create test pod with HTTP probe
+	pod := getTestPod()
 	pod.Spec.Containers[0].LivenessProbe = &probeSpec
-	// the test worker is always initialized with an exec probe , so we we call the newWorker function explicitly
 	w := newWorker(m, liveness, pod, pod.Spec.Containers[0])
-	podIP1 := "10.0.0.1"
-	containerID1 := "docker://abc123"
-	status := getTestRunningStatusWithStarted(true)
-	status.PodIP = podIP1
-	status.ContainerStatuses[0].ContainerID = containerID1
-	m.statusManager.SetPodStatus(logger, w.pod, status)
 
-	// First probe: should create a new request
-	req1, err := w.httpProbeRequest.getRequest(&w.container, status.PodIP)
-	if err != nil {
-		t.Fatalf("Expected no error when creating first request, got: %v", err)
-	}
-	if w.httpProbeRequest == nil || w.httpProbeRequest.request == nil {
-		t.Fatal("Expected httpProbeRequest and request to be initialized after first probe")
-	}
+	var prevReq *http.Request
+	for i, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// Update pod status
+			status := getTestRunningStatusWithStarted(true)
+			status.PodIP = test.podIP
+			status.ContainerStatuses[0].ContainerID = test.containerID
+			m.statusManager.SetPodStatus(logger, w.pod, status)
 
-	// Second probe with same podIP and containerID: should reuse request
-	req2, err := w.httpProbeRequest.getRequest(&w.container, status.PodIP)
-	if err != nil {
-		t.Fatalf("Expected no error when reusing request, got: %v", err)
-	}
-	if req2 != req1 {
-		t.Error("Expected cached request to be reused when podIP and containerID do not change")
-	}
+			// For container restart case, need to trigger restart logic
+			if i > 0 && test.containerID != tests[i-1].containerID {
+				w.doProbe(ctx)
+			}
 
-	// Simulate pod IP change
-	podIP2 := "10.0.0.2"
-	status.PodIP = podIP2
-	m.statusManager.SetPodStatus(logger, w.pod, status)
-	req3, err := w.httpProbeRequest.getRequest(&w.container, status.PodIP)
-	if err != nil {
-		t.Fatalf("Expected no error when creating request after pod IP change, got: %v", err)
-	}
-	if req3 == req1 {
-		t.Error("Expected new request after pod IP change")
-	}
-	if req3 == nil {
-		t.Fatal("Expected request to be initialized after pod IP change")
-	}
+			// Get HTTP probe request
+			req, err := w.httpProbeRequest.getRequest(&w.container, status.PodIP)
+			if err != nil {
+				t.Fatalf("Expected no error creating request, got: %v", err)
+			}
+			if req == nil {
+				t.Fatal("Expected request to be initialized")
+			}
 
-	// Simulate container restart by setting a new container ID
-	containerID2 := "docker://def456"
-	status.ContainerStatuses[0].ContainerID = containerID2
-	m.statusManager.SetPodStatus(logger, w.pod, status)
-	// Trigger container restart logic by calling doProbe
-	w.doProbe(context.Background()) // maybe refactor the getRequest logic to avoid needing to call doProbe here (include the container ID in the request creation logic)
-	// After container restart, the request should be reset
-	if w.httpProbeRequest.request == req3 {
-		t.Error("Expected request to be reset after container ID change (container restart)")
-	}
-	if w.httpProbeRequest.request == nil {
-		t.Fatal("Expected request to be recreated after container restart")
+			if test.expectNewReq {
+				if req == prevReq {
+					t.Error("Expected new request to be created")
+				}
+			} else {
+				if req != prevReq {
+					t.Error("Expected cached request to be reused")
+				}
+			}
+
+			prevReq = req
+		})
 	}
 }
