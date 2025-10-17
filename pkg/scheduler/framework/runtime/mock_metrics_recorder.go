@@ -27,14 +27,10 @@ type MockMetricsRecorder struct {
 
 	// Counters for method calls
 	pluginDurationCalls int
-	queueingHintCalls   int
-	inFlightEventsCalls int
 	flushMetricsCalls   int
 
 	// Records of calls for verification
 	pluginDurationRecords []PluginDurationRecord
-	queueingHintRecords   []QueueingHintRecord
-	inFlightEventsRecords []InFlightEventsRecord
 }
 
 // PluginDurationRecord stores the parameters of ObservePluginDurationAsync calls
@@ -45,27 +41,15 @@ type PluginDurationRecord struct {
 	Value          float64
 }
 
-// QueueingHintRecord stores the parameters of ObserveQueueingHintDurationAsync calls
-type QueueingHintRecord struct {
-	PluginName string
-	Event      string
-	Hint       string
-	Value      float64
-}
-
-// InFlightEventsRecord stores the parameters of ObserveInFlightEventsAsync calls
-type InFlightEventsRecord struct {
-	EventLabel string
-	ValueToAdd float64
-	ForceFlush bool
-}
+// Queueing hint and in-flight event metrics are intentionally not
+// recorded in this runtime mock. The methods exist as no-ops to satisfy
+// the interface; backend-specific tests should provide their own mocks
+// if they need to assert on those metrics.
 
 // NewMockMetricsRecorder creates a new MockMetricsRecorder
 func NewMockMetricsRecorder() *MockMetricsRecorder {
 	return &MockMetricsRecorder{
 		pluginDurationRecords: []PluginDurationRecord{},
-		queueingHintRecords:   []QueueingHintRecord{},
-		inFlightEventsRecords: []InFlightEventsRecord{},
 	}
 }
 
@@ -83,31 +67,12 @@ func (f *MockMetricsRecorder) ObservePluginDurationAsync(extensionPoint, pluginN
 	})
 }
 
-// ObserveQueueingHintDurationAsync records the queueing hint duration observation
+// ObserveQueueingHintDurationAsync is a no-op in the runtime mock.
 func (f *MockMetricsRecorder) ObserveQueueingHintDurationAsync(pluginName, event, hint string, value float64) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-
-	f.queueingHintCalls++
-	f.queueingHintRecords = append(f.queueingHintRecords, QueueingHintRecord{
-		PluginName: pluginName,
-		Event:      event,
-		Hint:       hint,
-		Value:      value,
-	})
 }
 
-// ObserveInFlightEventsAsync records the in-flight events observation
+// ObserveInFlightEventsAsync is a no-op in the runtime mock.
 func (f *MockMetricsRecorder) ObserveInFlightEventsAsync(eventLabel string, valueToAdd float64, forceFlush bool) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-
-	f.inFlightEventsCalls++
-	f.inFlightEventsRecords = append(f.inFlightEventsRecords, InFlightEventsRecord{
-		EventLabel: eventLabel,
-		ValueToAdd: valueToAdd,
-		ForceFlush: forceFlush,
-	})
 }
 
 // FlushMetrics records the flush operation
@@ -123,20 +88,6 @@ func (f *MockMetricsRecorder) PluginDurationCallCount() int {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.pluginDurationCalls
-}
-
-// QueueingHintCallCount returns the number of ObserveQueueingHintDurationAsync calls
-func (f *MockMetricsRecorder) QueueingHintCallCount() int {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	return f.queueingHintCalls
-}
-
-// InFlightEventsCallCount returns the number of ObserveInFlightEventsAsync calls
-func (f *MockMetricsRecorder) InFlightEventsCallCount() int {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	return f.inFlightEventsCalls
 }
 
 // FlushMetricsCallCount returns the number of FlushMetrics calls
@@ -156,25 +107,7 @@ func (f *MockMetricsRecorder) GetPluginDurationRecords() []PluginDurationRecord 
 	return records
 }
 
-// GetQueueingHintRecords returns a copy of the queueing hint records
-func (f *MockMetricsRecorder) GetQueueingHintRecords() []QueueingHintRecord {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-
-	records := make([]QueueingHintRecord, len(f.queueingHintRecords))
-	copy(records, f.queueingHintRecords)
-	return records
-}
-
-// GetInFlightEventsRecords returns a copy of the in-flight events records
-func (f *MockMetricsRecorder) GetInFlightEventsRecords() []InFlightEventsRecord {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-
-	records := make([]InFlightEventsRecord, len(f.inFlightEventsRecords))
-	copy(records, f.inFlightEventsRecords)
-	return records
-}
+// Get queueing hint and in-flight event records are intentionally absent.
 
 // Reset clears all counters and records
 func (f *MockMetricsRecorder) Reset() {
@@ -182,11 +115,7 @@ func (f *MockMetricsRecorder) Reset() {
 	defer f.mu.Unlock()
 
 	f.pluginDurationCalls = 0
-	f.queueingHintCalls = 0
-	f.inFlightEventsCalls = 0
 	f.flushMetricsCalls = 0
 
 	f.pluginDurationRecords = []PluginDurationRecord{}
-	f.queueingHintRecords = []QueueingHintRecord{}
-	f.inFlightEventsRecords = []InFlightEventsRecord{}
 }
