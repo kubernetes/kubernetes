@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	"fmt"
 	"strconv"
 )
 
@@ -41,47 +42,47 @@ func (t *Toleration) MatchToleration(tolerationToMatch *Toleration) bool {
 //     this combination means to match all taint values and all taint keys.
 //  4. If toleration.operator is 'Lt' or 'Gt', numeric comparison is performed
 //     between toleration.value and taint.value.
-func (t *Toleration) ToleratesTaint(taint *Taint) bool {
+func (t *Toleration) ToleratesTaint(taint *Taint) (bool, error) {
 	if len(t.Effect) > 0 && t.Effect != taint.Effect {
-		return false
+		return false, nil
 	}
 
 	if len(t.Key) > 0 && t.Key != taint.Key {
-		return false
+		return false, nil
 	}
 
 	// TODO: Use proper defaulting when Toleration becomes a field of PodSpec
 	switch t.Operator {
 	// empty operator means Equal
 	case "", TolerationOpEqual:
-		return t.Value == taint.Value
+		return t.Value == taint.Value, nil
 	case TolerationOpExists:
-		return true
+		return true, nil
 	case TolerationOpLt, TolerationOpGt:
 		return compareNumericValues(t.Value, taint.Value, t.Operator)
 	default:
-		return false
+		return false, nil
 	}
 }
 
 // compareNumericValues performs numeric comparison between toleration and taint values
-func compareNumericValues(tolerationVal, taintVal string, op TolerationOperator) bool {
+func compareNumericValues(tolerationVal, taintVal string, op TolerationOperator) (bool, error) {
 	tVal, err := strconv.ParseInt(tolerationVal, 10, 64)
 	if err != nil {
-		return false
+		return false, fmt.Errorf("failed to parse  toleration value %d as int64, err: %w ", tVal, err)
 	}
 
-	tnVal, err := strconv.ParseInt(taintVal, 10, 64)
+	tntVal, err := strconv.ParseInt(taintVal, 10, 64)
 	if err != nil {
-		return false
+		return false, fmt.Errorf("failed to parse  taint value %d as int64, err: %w ", tntVal, err)
 	}
 
 	switch op {
 	case TolerationOpLt:
-		return tVal < tnVal
+		return tntVal < tVal, nil
 	case TolerationOpGt:
-		return tVal > tnVal
+		return tntVal > tVal, nil
 	default:
-		return false
+		return false, nil
 	}
 }

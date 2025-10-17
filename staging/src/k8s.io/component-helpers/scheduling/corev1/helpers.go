@@ -60,13 +60,17 @@ func GetAvoidPodsFromNodeAnnotations(annotations map[string]string) (v1.AvoidPod
 }
 
 // TolerationsTolerateTaint checks if taint is tolerated by any of the tolerations.
-func TolerationsTolerateTaint(tolerations []v1.Toleration, taint *v1.Taint) bool {
+func TolerationsTolerateTaint(tolerations []v1.Toleration, taint *v1.Taint) (bool, error) {
 	for i := range tolerations {
-		if tolerations[i].ToleratesTaint(taint) {
-			return true
+		isTolerated, err := tolerations[i].ToleratesTaint(taint)
+		if err != nil {
+			return false, err
+		}
+		if isTolerated {
+			return true, nil
 		}
 	}
-	return false
+	return false, nil
 }
 
 type taintsFilterFunc func(*v1.Taint) bool
@@ -75,14 +79,18 @@ type taintsFilterFunc func(*v1.Taint) bool
 // all the filtered taints, and returns the first taint without a toleration
 // Returns true if there is an untolerated taint
 // Returns false if all taints are tolerated
-func FindMatchingUntoleratedTaint(taints []v1.Taint, tolerations []v1.Toleration, inclusionFilter taintsFilterFunc) (v1.Taint, bool) {
+func FindMatchingUntoleratedTaint(taints []v1.Taint, tolerations []v1.Toleration, inclusionFilter taintsFilterFunc) (v1.Taint, bool, error) {
 	filteredTaints := getFilteredTaints(taints, inclusionFilter)
 	for _, taint := range filteredTaints {
-		if !TolerationsTolerateTaint(tolerations, &taint) {
-			return taint, true
+		isTolerated, err := TolerationsTolerateTaint(tolerations, &taint)
+		if err != nil {
+			return v1.Taint{}, false, err
+		}
+		if !isTolerated {
+			return taint, true, nil
 		}
 	}
-	return v1.Taint{}, false
+	return v1.Taint{}, false, nil
 }
 
 // getFilteredTaints returns a list of taints satisfying the filter predicate

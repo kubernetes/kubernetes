@@ -166,8 +166,9 @@ func (pl *PodTopologySpread) PreScore(
 		}
 
 		for i, c := range state.Constraints {
-			if pl.enableNodeInclusionPolicyInPodTopologySpread &&
-				!c.matchNodeInclusionPolicies(pod, node, requiredNodeAffinity) {
+			// Ignore parsing errors for backwards compatibility.
+			isMatched, _ := c.matchNodeInclusionPolicies(pod, node, requiredNodeAffinity)
+			if pl.enableNodeInclusionPolicyInPodTopologySpread && !isMatched {
 				continue
 			}
 

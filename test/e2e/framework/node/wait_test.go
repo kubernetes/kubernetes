@@ -269,7 +269,10 @@ func TestReadyForTests(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.desc, func(t *testing.T) {
-			out := readyForTests(tc.node, tc.nonblockingTaints)
+			out, err := readyForTests(tc.node, tc.nonblockingTaints)
+			if err != nil {
+				t.Errorf("unexpected error %v", err)
+			}
 			if out != tc.expected {
 				t.Errorf("Expected %v but got %v", tc.expected, out)
 			}
