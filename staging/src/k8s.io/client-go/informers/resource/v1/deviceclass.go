@@ -56,7 +56,7 @@ func NewDeviceClassInformer(client kubernetes.Interface, resyncPeriod time.Durat
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredDeviceClassInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
+		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
@@ -81,7 +81,7 @@ func NewFilteredDeviceClassInformer(client kubernetes.Interface, resyncPeriod ti
 				}
 				return client.ResourceV1().DeviceClasses().Watch(ctx, options)
 			},
-		},
+		}, client),
 		&apiresourcev1.DeviceClass{},
 		resyncPeriod,
 		indexers,
