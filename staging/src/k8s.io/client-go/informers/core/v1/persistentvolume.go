@@ -56,7 +56,7 @@ func NewPersistentVolumeInformer(client kubernetes.Interface, resyncPeriod time.
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredPersistentVolumeInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
+		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
@@ -81,7 +81,7 @@ func NewFilteredPersistentVolumeInformer(client kubernetes.Interface, resyncPeri
 				}
 				return client.CoreV1().PersistentVolumes().Watch(ctx, options)
 			},
-		},
+		}, client),
 		&apicorev1.PersistentVolume{},
 		resyncPeriod,
 		indexers,

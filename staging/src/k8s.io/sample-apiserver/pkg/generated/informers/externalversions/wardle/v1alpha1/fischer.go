@@ -56,7 +56,7 @@ func NewFischerInformer(client versioned.Interface, resyncPeriod time.Duration, 
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredFischerInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
+		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
@@ -81,7 +81,7 @@ func NewFilteredFischerInformer(client versioned.Interface, resyncPeriod time.Du
 				}
 				return client.WardleV1alpha1().Fischers().Watch(ctx, options)
 			},
-		},
+		}, client),
 		&apiswardlev1alpha1.Fischer{},
 		resyncPeriod,
 		indexers,
