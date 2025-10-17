@@ -123,8 +123,8 @@ ERROR: some/relative/path/buggy.go:200: with spaces
 `
 	// Used by unittests/list-tests. It's sorted by test name, not source code location.
 	ListTestsOutput = `The following spec names can be used with 'ginkgo run --focus/skip':
-    ../bugs/bugs.go:101: [sig-testing] abc   space1 space2  [Feature:no-such-feature] [Feature:feature-foo] [Environment:no-such-env] [Environment:Linux] [FeatureGate:no-such-feature-gate] [Feature:OffByDefault] [FeatureGate:TestAlphaFeature] [Alpha] [Feature:OffByDefault] [FeatureGate:TestBetaFeature] [Beta] [FeatureGate:TestBetaDefaultOffFeature] [Beta] [Feature:OffByDefault] [FeatureGate:TestGAFeature] [Conformance] [NodeConformance] [Slow] [Serial] [Disruptive] [custom-label] xyz x [foo] should [bar]
-    ../bugs/bugs.go:96: [sig-testing] abc   space1 space2  [Feature:no-such-feature] [Feature:feature-foo] [Environment:no-such-env] [Environment:Linux] [FeatureGate:no-such-feature-gate] [Feature:OffByDefault] [FeatureGate:TestAlphaFeature] [Alpha] [Feature:OffByDefault] [FeatureGate:TestBetaFeature] [Beta] [FeatureGate:TestBetaDefaultOffFeature] [Beta] [Feature:OffByDefault] [FeatureGate:TestGAFeature] [Conformance] [NodeConformance] [Slow] [Serial] [Disruptive] [custom-label] xyz y [foo] should [bar]
+    ../bugs/bugs.go:101: [sig-testing] abc   space1 space2  [Feature:no-such-feature] [Feature:feature-foo] [Environment:no-such-env] [Environment:Linux] [FeatureGate:no-such-feature-gate] [FeatureGate:TestAlphaFeature] [FeatureGate:TestBetaFeature] [FeatureGate:TestBetaDefaultOffFeature] [FeatureGate:TestGAFeature] [custom-label] xyz x [foo] should [bar] [Alpha] [Beta] [Conformance] [Disruptive] [Feature:OffByDefault] [NodeConformance] [Serial] [Slow]
+    ../bugs/bugs.go:96: [sig-testing] abc   space1 space2  [Feature:no-such-feature] [Feature:feature-foo] [Environment:no-such-env] [Environment:Linux] [FeatureGate:no-such-feature-gate] [FeatureGate:TestAlphaFeature] [FeatureGate:TestBetaFeature] [FeatureGate:TestBetaDefaultOffFeature] [FeatureGate:TestGAFeature] [custom-label] xyz y [foo] should [bar] [Alpha] [Beta] [Conformance] [Disruptive] [Feature:OffByDefault] [NodeConformance] [Serial] [Slow]
 
 `
 
