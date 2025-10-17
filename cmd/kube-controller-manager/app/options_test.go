@@ -58,7 +58,7 @@ func TestOptions_ControllerListFormatter(t *testing.T) {
 				"controller_C": {},
 			},
 			controllers: []string{"controller_A", "controller_B"},
-			expected:    "\ncontroller_A\ncontroller_B [feature gates required: F1, F2]\n",
+			expected:    "\ncontroller_A\ncontroller_B (requires feature gates: F1, F2)\n",
 		},
 	}
 
@@ -77,7 +77,7 @@ func TestCommand_ControllerListFormatter(t *testing.T) {
 	// This can break, though, when no feature gate is actually required.
 	cmd := NewControllerManagerCommand()
 	usage := cmd.Flags().Lookup("controllers").Usage
-	if !strings.Contains(usage, "[feature gates required:") {
+	if !strings.Contains(usage, "(requires feature gates:") {
 		t.Error("unexpected usage:\n", usage)
 	}
 }
