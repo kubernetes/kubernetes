@@ -667,6 +667,12 @@ const (
 	// resume work after restarts.
 	NominatedNodeNameForExpectation featuregate.Feature = "NominatedNodeNameForExpectation"
 
+	// owner: @bwsalmon
+	// kep: https://kep.k8s.io/5598
+	//
+	// Enables opportunistic batching in the scheduler.
+	OpportunisticBatching featuregate.Feature = "OpportunisticBatching"
+
 	// owner: @cici37
 	// kep: https://kep.k8s.io/5080
 	//
@@ -1555,6 +1561,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	OpportunisticBatching: {
+		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
+	},
+
 	OrderedNamespaceDeletion: {
 		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
@@ -2309,6 +2319,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	NodeSwap: {},
 
 	NominatedNodeNameForExpectation: {},
+
+	OpportunisticBatching: {},
 
 	OrderedNamespaceDeletion: {},
 

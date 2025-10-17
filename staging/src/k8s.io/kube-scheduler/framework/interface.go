@@ -273,6 +273,9 @@ type NodePluginScores struct {
 	Scores []PluginScore
 	// TotalScore is the total score in Scores.
 	TotalScore int64
+	// We randomize nodes within a common score,
+	// this field is used to provide this randomness.
+	Randomizer int
 }
 
 // PluginScore is a struct with plugin/extender name and score.
@@ -693,6 +696,9 @@ type Handle interface {
 	// Use this to ensure the scheduler's view of the cluster remains consistent.
 	// This is non-nil if the SchedulerAsyncAPICalls feature gate is enabled.
 	APICacher() APICacher
+
+	// ProfileName returns the profile name associated to a profile.
+	ProfileName() string
 
 	// WorkloadManager can be used to provide workload-aware scheduling.
 	WorkloadManager() WorkloadManager

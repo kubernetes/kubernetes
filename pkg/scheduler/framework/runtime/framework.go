@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
@@ -36,6 +37,7 @@ import (
 	"k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	apidispatcher "k8s.io/kubernetes/pkg/scheduler/backend/api_dispatcher"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -94,6 +96,8 @@ type frameworkImpl struct {
 	apiCacher     fwk.APICacher
 
 	parallelizer fwk.Parallelizer
+
+	batch *OpportunisticBatch
 }
 
 // extensionPoint encapsulates desired and applied set of plugins at a specific extension
@@ -324,6 +328,10 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 		workloadManager:      options.workloadManager,
 		parallelizer:         options.parallelizer,
 		logger:               logger,
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.OpportunisticBatching) {
+		f.batch = newOpportunisticBatch(f, noBatchSignatures)
 	}
 
 	if len(f.extenders) > 0 {
@@ -1284,6 +1292,14 @@ func (f *frameworkImpl) runScoreExtension(ctx context.Context, pl fwk.ScorePlugi
 	return status
 }
 
+func (f *frameworkImpl) GetNodeHint(ctx context.Context, pod *v1.Pod, state fwk.CycleState, cycleCount int64) (hint string, signature string) {
+	return f.batch.GetNodeHint(ctx, pod, state, cycleCount)
+}
+
+func (f *frameworkImpl) StoreScheduleResults(ctx context.Context, signature string, hintedNode, chosenNode string, otherNodes framework.SortedScoredNodes, cycleCount int64) {
+	f.batch.StoreScheduleResults(ctx, signature, hintedNode, chosenNode, otherNodes, cycleCount)
+}
+
 // RunPreBindPlugins runs the set of configured prebind plugins. It returns a
 // failure (bool) if any of the plugins returns an error. It also returns an
 // error containing the rejection message or the error occurred in the plugin.
@@ -1806,4 +1822,9 @@ func (f *frameworkImpl) APICacher() fwk.APICacher {
 		return nil
 	}
 	return f.apiCacher
+}
+
+// Used only for tests
+func (f *frameworkImpl) TotalBatchedPods() int64 {
+	return f.batch.batchedPods
 }

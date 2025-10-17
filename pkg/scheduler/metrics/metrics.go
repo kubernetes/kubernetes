@@ -92,6 +92,25 @@ const (
 	PodPoppedInFlightEvent = "PodPopped"
 )
 
+// Possible batch attempt results
+const (
+	BatchAttemptNoHint      = "no_hint"
+	BatchAttemptHintUsed    = "hint_used"
+	BatchAttemptHintNotUsed = "hint_not_used"
+)
+
+// Possible batch cache flush reasons
+const (
+	BatchFlushPodFailed       = "pod_failed"
+	BatchFlushPodSkipped      = "pod_skipped"
+	BatchFlushNodeMissing     = "node_missing"
+	BatchFlushNodeNotFull     = "node_not_full"
+	BatchFlushEmptyList       = "empty_list"
+	BatchFlushExpired         = "expired"
+	BatchFlushPodIncompatible = "pod_incompatible"
+	BatchFlushPodNotBatchable = "pod_not_batchable"
+)
+
 // All the histogram based metrics have 1ms as size for the smallest bucket.
 var (
 	scheduleAttempts           *metrics.CounterVec
@@ -103,6 +122,8 @@ var (
 	pendingPods                *metrics.GaugeVec
 	InFlightEvents             *metrics.GaugeVec
 	Goroutines                 *metrics.GaugeVec
+	BatchAttemptStats          *metrics.CounterVec
+	BatchCacheFlushed          *metrics.CounterVec
 
 	PodSchedulingSLIDuration        *metrics.HistogramVec
 	PodSchedulingAttempts           *metrics.Histogram
@@ -236,6 +257,20 @@ func InitMetrics() {
 			Help:           "Number of running goroutines split by the work they do such as binding.",
 			StabilityLevel: metrics.ALPHA,
 		}, []string{"operation"})
+	BatchAttemptStats = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "batch_attempts_total",
+			Help:           "Counts of results when we attempt to use batching.",
+			StabilityLevel: metrics.ALPHA,
+		}, []string{"profile", "result"})
+	BatchCacheFlushed = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "batch_cache_flushed_total",
+			Help:           "Counts of cache flushes by reason.",
+			StabilityLevel: metrics.ALPHA,
+		}, []string{"profile", "reason"})
 
 	PodSchedulingSLIDuration = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
@@ -410,6 +445,8 @@ func InitMetrics() {
 		CacheSize,
 		unschedulableReasons,
 		PluginEvaluationTotal,
+		BatchAttemptStats,
+		BatchCacheFlushed,
 	}
 }
 
