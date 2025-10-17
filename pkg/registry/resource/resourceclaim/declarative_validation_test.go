@@ -30,6 +30,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apis/resource"
+	"k8s.io/kubernetes/pkg/apis/resource/validation"
 	pointer "k8s.io/utils/ptr"
 )
 
@@ -254,11 +255,37 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				field.Invalid(field.NewPath("spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("tolerations").Index(0).Child("key"), "a/b/c", "").WithOrigin("format=k8s-label-key"),
 			},
 		},
+		"valid DeviceAllocationMode - All": {
+			input: mkValidResourceClaim(tweakExactlyAllocationMode(resource.DeviceAllocationModeAll, 0)),
+		},
+		"invalid DeviceAllocationMode - Exactly": {
+			input: mkValidResourceClaim(tweakExactlyAllocationMode("InvalidMode", 1)),
+			expectedErrs: field.ErrorList{
+				field.NotSupported(
+					field.NewPath("spec", "devices", "requests").Index(0).Child("exactly", "allocationMode"),
+					resource.DeviceAllocationMode("InvalidMode"),
+					[]string{"All", "ExactCount"},
+				),
+			},
+		},
+		"valid DeviceAllocationMode - FirstAvailable": {
+			input: mkValidResourceClaim(tweakFirstAvailableAllocationMode(resource.DeviceAllocationModeAll, 0)),
+		},
+		"invalid DeviceAllocationMode - FirstAvailable": {
+			input: mkValidResourceClaim(tweakFirstAvailableAllocationMode("InvalidMode", 1)),
+			expectedErrs: field.ErrorList{
+				field.NotSupported(
+					field.NewPath("spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("allocationMode"),
+					resource.DeviceAllocationMode("InvalidMode"),
+					[]string{"All", "ExactCount"},
+				),
+			},
+		},
 		// TODO: Add more test cases
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
-			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, Strategy.Validate, tc.expectedErrs, apitesting.WithNormalizationRules(resourceClaimNormalizationRules...))
+			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, Strategy.Validate, tc.expectedErrs, apitesting.WithNormalizationRules(validation.ResourceNormalizationRules...))
 		})
 	}
 }
@@ -401,6 +428,32 @@ func tweakFirstAvailable(items int) func(*resource.ResourceClaim) {
 	}
 }
 
+func tweakExactlyAllocationMode(mode resource.DeviceAllocationMode, count int64) func(*resource.ResourceClaim) {
+	return func(rc *resource.ResourceClaim) {
+		if len(rc.Spec.Devices.Requests) > 0 && rc.Spec.Devices.Requests[0].Exactly != nil {
+			rc.Spec.Devices.Requests[0].Exactly.AllocationMode = mode
+			rc.Spec.Devices.Requests[0].Exactly.Count = count
+		}
+	}
+}
+
+func tweakFirstAvailableAllocationMode(mode resource.DeviceAllocationMode, count int64) func(*resource.ResourceClaim) {
+	return func(rc *resource.ResourceClaim) {
+		if len(rc.Spec.Devices.Requests) > 0 {
+			// Clear Exactly and set FirstAvailable
+			rc.Spec.Devices.Requests[0].Exactly = nil
+			rc.Spec.Devices.Requests[0].FirstAvailable = []resource.DeviceSubRequest{
+				{
+					Name:            "sub-0",
+					DeviceClassName: "class",
+					AllocationMode:  mode,
+					Count:           count,
+				},
+			}
+		}
+	}
+}
+
 func mkDeviceClaimConfiguration() resource.DeviceClaimConfiguration {
 	return resource.DeviceClaimConfiguration{
 		Requests: []string{"req-0"},
@@ -426,7 +479,8 @@ func mkDeviceRequest(name string) resource.DeviceRequest {
 		Name: name,
 		Exactly: &resource.ExactDeviceRequest{
 			DeviceClassName: "class",
-			AllocationMode:  resource.DeviceAllocationModeAll,
+			AllocationMode:  resource.DeviceAllocationModeExactCount,
+			Count:           1,
 		},
 	}
 }
@@ -542,7 +596,7 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		t.Run(k, func(t *testing.T) {
 			tc.old.ResourceVersion = "1"
 			tc.update.ResourceVersion = "2"
-			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, Strategy.ValidateUpdate, tc.expectedErrs, apitesting.WithNormalizationRules(resourceClaimNormalizationRules...))
+			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, Strategy.ValidateUpdate, tc.expectedErrs, apitesting.WithNormalizationRules(validation.ResourceNormalizationRules...))
 		})
 	}
 }
@@ -815,13 +869,7 @@ func mkValidResourceClaim(tweaks ...func(rc *resource.ResourceClaim)) resource.R
 		Spec: resource.ResourceClaimSpec{
 			Devices: resource.DeviceClaim{
 				Requests: []resource.DeviceRequest{
-					{
-						Name: "req-0",
-						Exactly: &resource.ExactDeviceRequest{
-							DeviceClassName: "class",
-							AllocationMode:  resource.DeviceAllocationModeAll,
-						},
-					},
+					mkDeviceRequest("req-0"),
 				},
 			},
 		},
@@ -834,34 +882,16 @@ func mkValidResourceClaim(tweaks ...func(rc *resource.ResourceClaim)) resource.R
 }
 
 func mkResourceClaimWithStatus(tweaks ...func(rc *resource.ResourceClaim)) resource.ResourceClaim {
-	rc := resource.ResourceClaim{
-		ObjectMeta: v1.ObjectMeta{
-			Name:      "valid-claim",
-			Namespace: "default",
-		},
-		Spec: resource.ResourceClaimSpec{
-			Devices: resource.DeviceClaim{
-				Requests: []resource.DeviceRequest{
+	rc := mkValidResourceClaim()
+	rc.Status = resource.ResourceClaimStatus{
+		Allocation: &resource.AllocationResult{
+			Devices: resource.DeviceAllocationResult{
+				Results: []resource.DeviceRequestAllocationResult{
 					{
-						Name: "req-0",
-						Exactly: &resource.ExactDeviceRequest{
-							DeviceClassName: "class",
-							AllocationMode:  resource.DeviceAllocationModeAll,
-						},
-					},
-				},
-			},
-		},
-		Status: resource.ResourceClaimStatus{
-			Allocation: &resource.AllocationResult{
-				Devices: resource.DeviceAllocationResult{
-					Results: []resource.DeviceRequestAllocationResult{
-						{
-							Request: "req-0",
-							Driver:  "dra.example.com",
-							Pool:    "pool-0",
-							Device:  "device-0",
-						},
+						Request: "req-0",
+						Driver:  "dra.example.com",
+						Pool:    "pool-0",
+						Device:  "device-0",
 					},
 				},
 			},
