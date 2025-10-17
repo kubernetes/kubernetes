@@ -60,6 +60,26 @@ type Struct struct {
 	// +k8s:listMapKey=key
 	// +k8s:customUnique
 	CustomUniqueListWithTypeMap []Item `json:"customUniqueListWithTypeMap"`
+
+	// unique=map with pointer key
+	// +k8s:listType=atomic
+	// +k8s:unique=map
+	// +k8s:listMapKey=key
+	SliceMapFieldWithPtrKey []PtrKeyStruct `json:"sliceMapFieldWithPtrKey"`
+
+	// unique=map with mixed (pointer and primitive) keys
+	// +k8s:listType=atomic
+	// +k8s:unique=map
+	// +k8s:listMapKey=key1
+	// +k8s:listMapKey=key2
+	SliceMapFieldWithMixedKeys []ItemWithMixedKeys `json:"sliceMapFieldWithMixedKeys"`
+
+	// unique=map with multiple pointer keys
+	// +k8s:listType=atomic
+	// +k8s:unique=map
+	// +k8s:listMapKey=key1
+	// +k8s:listMapKey=key2
+	SliceMapFieldWithMultiplePtrKeys []ItemWithMultiplePtrKeys `json:"sliceMapFieldWithMultiplePtrKeys"`
 }
 
 type Item struct {
@@ -71,4 +91,21 @@ type ItemWithMultipleKeys struct {
 	Key1 string `json:"key1"`
 	Key2 string `json:"key2"`
 	Data string `json:"data"`
+}
+
+type PtrKeyStruct struct {
+	Key  *string `json:"key"`
+	Data string  `json:"data"`
+}
+
+type ItemWithMixedKeys struct {
+	Key1 *string `json:"key1"`
+	Key2 string  `json:"key2"`
+	Data string  `json:"data"`
+}
+
+type ItemWithMultiplePtrKeys struct {
+	Key1 *string `json:"key1"`
+	Key2 *string `json:"key2"`
+	Data string  `json:"data"`
 }

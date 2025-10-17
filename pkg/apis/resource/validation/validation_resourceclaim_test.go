@@ -1340,7 +1340,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 		"invalid-device-status-duplicate": {
 			wantFailures: field.ErrorList{
 				field.Duplicate(field.NewPath("status", "devices").Index(0).Child("networkData", "ips").Index(1), "2001:db8::1/64"),
-				field.Duplicate(field.NewPath("status", "devices").Index(1), structured.MakeSharedDeviceID(structured.MakeDeviceID(goodName, goodName, goodName), nil)),
+				field.Duplicate(field.NewPath("status", "devices").Index(1), structured.MakeSharedDeviceID(structured.MakeDeviceID(goodName, goodName, goodName), nil)).MarkCoveredByDeclarative(),
 			},
 			oldClaim: func() *resource.ResourceClaim { return validAllocatedClaim }(),
 			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
@@ -1369,7 +1369,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 		"invalid-device-status-duplicate-with-share-id": {
 			wantFailures: field.ErrorList{
 				field.Duplicate(field.NewPath("status", "devices").Index(1),
-					structured.MakeSharedDeviceID(structured.MakeDeviceID(goodName, goodName, goodName), ptr.To(goodShareID))),
+					structured.MakeSharedDeviceID(structured.MakeDeviceID(goodName, goodName, goodName), ptr.To(goodShareID))).MarkCoveredByDeclarative(),
 			},
 			oldClaim: func() *resource.ResourceClaim {
 				claim := validAllocatedClaim.DeepCopy()
@@ -1503,7 +1503,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 		"invalid-device-status-duplicate-disabled-feature-gate": {
 			wantFailures: field.ErrorList{
 				field.Duplicate(field.NewPath("status", "devices").Index(0).Child("networkData", "ips").Index(1), "2001:db8::1/64"),
-				field.Duplicate(field.NewPath("status", "devices").Index(1), structured.MakeSharedDeviceID(structured.MakeDeviceID(goodName, goodName, goodName), nil)),
+				field.Duplicate(field.NewPath("status", "devices").Index(1), structured.MakeSharedDeviceID(structured.MakeDeviceID(goodName, goodName, goodName), nil)).MarkCoveredByDeclarative(),
 			},
 			oldClaim: func() *resource.ResourceClaim { return validAllocatedClaim }(),
 			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
@@ -1532,7 +1532,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 		"invalid-device-status-duplicate-with-share-id-disabled-feature-gate": {
 			wantFailures: field.ErrorList{
 				field.Duplicate(field.NewPath("status", "devices").Index(1),
-					structured.MakeSharedDeviceID(structured.MakeDeviceID(goodName, goodName, goodName), ptr.To(goodShareID))),
+					structured.MakeSharedDeviceID(structured.MakeDeviceID(goodName, goodName, goodName), ptr.To(goodShareID))).MarkCoveredByDeclarative(),
 			},
 			oldClaim: func() *resource.ResourceClaim {
 				claim := validAllocatedClaim.DeepCopy()
