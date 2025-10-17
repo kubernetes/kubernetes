@@ -461,7 +461,7 @@ func TestAddFlags(t *testing.T) {
 	// insertion order is random.
 	sort.Sort(sortedGCIgnoredResources(expected.GarbageCollectorController.GCIgnoredResources))
 
-	// We need to ignore unexported fields not to check formatControllers field.
+	// Ignore unexported fields when comparing.
 	ignoreUnexported := cmp.FilterPath(func(path cmp.Path) bool {
 		sf, ok := path.Last().(cmp.StructField)
 		if !ok {
@@ -799,7 +799,7 @@ Disabled-by-default controllers:
 			}
 
 			if tc.format != nil {
-				options.SetControllerListFormatter(tc.format)
+				options.Generic.ControllerListFormatter = tc.format
 			}
 
 			flags := options.Flags(tc.allControllers, tc.disabledByDefaultControllers, nil)
