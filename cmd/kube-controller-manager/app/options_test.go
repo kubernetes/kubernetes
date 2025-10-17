@@ -21,9 +21,6 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-
-	clientgofeaturegate "k8s.io/client-go/features"
-	"k8s.io/component-base/featuregate"
 )
 
 func TestOptions_ControllerListFormatter(t *testing.T) {
@@ -53,11 +50,9 @@ func TestOptions_ControllerListFormatter(t *testing.T) {
 			descriptors: map[string]*ControllerDescriptor{
 				"controller_A": {},
 				"controller_B": {
-					requiredFeatureGates: []featuregate.Feature{
-						featuregate.Feature("F1"),
-					},
-					requiredClientFeatureGates: []clientgofeaturegate.Feature{
-						clientgofeaturegate.Feature("F2"),
+					requiredFeatureGates: []string{
+						"F1",
+						"F2",
 					},
 				},
 				"controller_C": {},

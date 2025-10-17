@@ -24,23 +24,20 @@ import (
 	"k8s.io/client-go/dynamic"
 	clientgofeaturegate "k8s.io/client-go/features"
 	"k8s.io/client-go/metadata"
-	"k8s.io/component-base/featuregate"
-
-	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	svm "k8s.io/kubernetes/pkg/controller/storageversionmigrator"
 	"k8s.io/kubernetes/pkg/features"
+
+	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 )
 
 func newStorageVersionMigratorControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:        names.StorageVersionMigratorController,
 		constructor: newSVMController,
-		requiredFeatureGates: []featuregate.Feature{
-			features.StorageVersionMigrator,
-		},
-		requiredClientFeatureGates: []clientgofeaturegate.Feature{
-			clientgofeaturegate.InformerResourceVersion,
-			clientgofeaturegate.InOrderInformers,
+		requiredFeatureGates: []string{
+			string(features.StorageVersionMigrator),
+			string(clientgofeaturegate.InformerResourceVersion),
+			string(clientgofeaturegate.InOrderInformers),
 		},
 	}
 }

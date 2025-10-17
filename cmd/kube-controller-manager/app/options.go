@@ -34,7 +34,7 @@ func newControllerListFormatter(descriptors map[string]*ControllerDescriptor) fu
 				continue
 			}
 
-			gates := desc.GetAllRequiredFeatureGateStrings()
+			gates := desc.GetRequiredFeatureGates()
 			if len(gates) == 0 {
 				fmt.Fprintf(&out, "%s\n", name)
 			} else {

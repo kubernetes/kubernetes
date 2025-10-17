@@ -22,7 +22,6 @@ package app
 import (
 	"context"
 
-	"k8s.io/component-base/featuregate"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/controller/servicecidrs"
 	"k8s.io/kubernetes/pkg/features"
@@ -32,8 +31,8 @@ func newServiceCIDRsControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:        names.ServiceCIDRController,
 		constructor: newServiceCIDRsController,
-		requiredFeatureGates: []featuregate.Feature{
-			features.MultiCIDRServiceAllocator,
+		requiredFeatureGates: []string{
+			string(features.MultiCIDRServiceAllocator),
 		},
 	}
 }
