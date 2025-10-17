@@ -133,7 +133,7 @@ func SIGDescribe(sig string) func(...interface{}) bool {
 	}
 	return func(args ...interface{}) bool {
 		args = append([]interface{}{WithLabel("sig-" + sig)}, args...)
-		return registerInSuite(ginkgo.Describe, args)
+		return registerInSuite(false, ginkgo.Describe, args)
 	}
 }
 
@@ -152,12 +152,12 @@ func ConformanceIt(args ...interface{}) bool {
 // Text and arguments may be mixed. The final text is a concatenation
 // of the text arguments and special tags from the With functions.
 func It(args ...interface{}) bool {
-	return registerInSuite(ginkgo.It, args)
+	return registerInSuite(true, ginkgo.It, args)
 }
 
 // It is a shorthand for the corresponding package function.
 func (f *Framework) It(args ...interface{}) bool {
-	return registerInSuite(ginkgo.It, args)
+	return registerInSuite(true, ginkgo.It, args)
 }
 
 // Describe is a wrapper around [ginkgo.Describe] which supports framework
@@ -167,12 +167,12 @@ func (f *Framework) It(args ...interface{}) bool {
 // Text and arguments may be mixed. The final text is a concatenation
 // of the text arguments and special tags from the With functions.
 func Describe(args ...interface{}) bool {
-	return registerInSuite(ginkgo.Describe, args)
+	return registerInSuite(false, ginkgo.Describe, args)
 }
 
 // Describe is a shorthand for the corresponding package function.
 func (f *Framework) Describe(args ...interface{}) bool {
-	return registerInSuite(ginkgo.Describe, args)
+	return registerInSuite(false, ginkgo.Describe, args)
 }
 
 // Context is a wrapper around [ginkgo.Context] which supports framework With*
@@ -182,42 +182,59 @@ func (f *Framework) Describe(args ...interface{}) bool {
 // Text and arguments may be mixed. The final text is a concatenation
 // of the text arguments and special tags from the With functions.
 func Context(args ...interface{}) bool {
-	return registerInSuite(ginkgo.Context, args)
+	return registerInSuite(false, ginkgo.Context, args)
 }
 
 // Context is a shorthand for the corresponding package function.
 func (f *Framework) Context(args ...interface{}) bool {
-	return registerInSuite(ginkgo.Context, args)
+	return registerInSuite(false, ginkgo.Context, args)
+}
+
+// additionalLabels contains labels like Alpha that might get added indirectly
+// multiple times by registerInSuite. Instead of of injecting their tag
+// multiple times directly into the text at the place which triggers their
+// addition, they get only added as label (not visible) and the text then gets
+// added in the leaf node (= ginkgo.It).
+//
+// We have a fairly good idea what this will include (Alpha, Beta, ...,
+// OffByDefault), but collecting them during init is safe and avoids making
+// assumptions about what values a feature gate's PreRelease field might have.
+var additionalLabels = sets.New[string]()
+
+// This depends on leaf nodes being registered with the wrapper.
+// We enforce that for ginkgo.It via the forbidigo linter and
+// for the alias by changing it. PIt disables the test and does
+// not need to be handled. FIt focuses on the test, so we don't
+// need to change the test text.
+func init() {
+	// TODO: ginkgo.Specify = It
 }
 
 // registerInSuite is the common implementation of all wrapper functions. It
 // expects to be called through one intermediate wrapper.
-func registerInSuite(ginkgoCall func(string, ...interface{}) bool, args []interface{}) bool {
+func registerInSuite(leafNode bool, ginkgoCall func(string, ...interface{}) bool, args []interface{}) bool {
 	var ginkgoArgs []interface{}
 	var offset ginkgo.Offset
 	var texts []string
-
-	addLabel := func(label string) {
-		texts = append(texts, fmt.Sprintf("[%s]", label))
-		ginkgoArgs = append(ginkgoArgs, ginkgo.Label(label))
-	}
 
 	haveEmptyStrings := false
 	for _, arg := range args {
 		switch arg := arg.(type) {
 		case label:
 			fullLabel := strings.Join(arg.parts, ":")
-			addLabel(fullLabel)
+			texts = append(texts, fmt.Sprintf("[%s]", fullLabel))
+			ginkgoArgs = append(ginkgoArgs, ginkgo.Label(fullLabel))
 			if arg.alphaBetaLevel != "" {
-				texts = append(texts, fmt.Sprintf("[%[1]s]", arg.alphaBetaLevel))
+				additionalLabels.Insert(arg.alphaBetaLevel)
 				ginkgoArgs = append(ginkgoArgs, ginkgo.Label(arg.alphaBetaLevel))
 			}
 			if arg.offByDefault {
-				texts = append(texts, "[Feature:OffByDefault]")
+				additionalLabels.Insert("Feature:OffByDefault")
 				ginkgoArgs = append(ginkgoArgs, ginkgo.Label("Feature:OffByDefault"))
 				// Alphas are always off by default but we may want to select
 				// betas based on defaulted-ness.
 				if arg.alphaBetaLevel == "Beta" {
+					// Not embedded in text!
 					ginkgoArgs = append(ginkgoArgs, ginkgo.Label("BetaOffByDefault"))
 				}
 			}
@@ -247,6 +264,25 @@ func registerInSuite(ginkgoCall func(string, ...interface{}) bool, args []interf
 	for _, text := range texts {
 		if strings.HasPrefix(text, " ") || strings.HasSuffix(text, " ") {
 			RecordBug(NewBug(fmt.Sprintf("trailing or leading spaces are unnecessary and need to be removed: %q", text), int(offset)))
+		}
+	}
+
+	// Ensure that each leaf node text contains all additional labels collected so far.
+	// We get those labels from the set of labels associated with the container node(s).
+	if leafNode {
+		var currentAdditionalLabels []string
+		for _, label := range ginkgo.CurrentSpecReport().Labels() {
+			if additionalLabels.Has(label) {
+				currentAdditionalLabels = append(currentAdditionalLabels, label)
+			}
+
+		}
+
+		slices.Sort(currentAdditionalLabels)
+		for _, label := range currentAdditionalLabels {
+			texts = append(texts, fmt.Sprintf("[%s]", label))
+			// This keeps validateText happy.
+			ginkgoArgs = append(ginkgoArgs, ginkgo.Label(label))
 		}
 	}
 
