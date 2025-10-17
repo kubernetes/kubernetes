@@ -51,6 +51,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
+	utiltrace "k8s.io/utils/trace"
 )
 
 func TestSchedulingGates(t *testing.T) {
@@ -333,7 +334,10 @@ func TestCustomResourceEnqueue(t *testing.T) {
 		t.Fatalf("Cannot find the profile for Pod %v", podInfo.Pod.Name)
 	}
 	// Schedule the Pod manually.
-	_, fitError := testCtx.Scheduler.SchedulePod(ctx, schedFramework, framework.NewCycleState(), podInfo.Pod)
+	state := framework.NewCycleState()
+	trace := utiltrace.New("testTrace")
+	batch := testCtx.Scheduler.NewBatch(ctx, schedFramework, state, podInfo.Pod, trace)
+	_, fitError := testCtx.Scheduler.SchedulePod(ctx, schedFramework, state, podInfo.Pod, batch)
 	// The fitError is expected to be non-nil as it failed the fakeCRPlugin plugin.
 	if fitError == nil {
 		t.Fatalf("Expect Pod %v to fail at scheduling.", podInfo.Pod.Name)

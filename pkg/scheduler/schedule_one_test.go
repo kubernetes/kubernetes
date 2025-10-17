@@ -81,6 +81,7 @@ import (
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/utils/ptr"
+	utiltrace "k8s.io/utils/trace"
 )
 
 const (
@@ -1098,8 +1099,11 @@ func TestSchedulerScheduleOne(t *testing.T) {
 						}
 						queue.Add(logger, item.sendPod)
 
-						sched.SchedulePod = func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, pod *v1.Pod) (ScheduleResult, error) {
+						sched.SchedulePod = func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, pod *v1.Pod, batch *Batch) (ScheduleResult, error) {
 							return item.mockScheduleResult, item.injectSchedulingError
+						}
+						sched.NewBatch = func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, pod *v1.Pod, trace *utiltrace.Trace) *Batch {
+							return nil
 						}
 						sched.FailureHandler = func(ctx context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, ni *fwk.NominatingInfo, start time.Time) {
 							gotPod = p.Pod
@@ -1452,8 +1456,11 @@ func TestScheduleOneMarksPodAsProcessedBeforePreBind(t *testing.T) {
 					}
 					queue.Add(logger, item.sendPod)
 
-					sched.SchedulePod = func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, pod *v1.Pod) (ScheduleResult, error) {
+					sched.SchedulePod = func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, pod *v1.Pod, batch *Batch) (ScheduleResult, error) {
 						return item.mockScheduleResult, item.injectSchedulingError
+					}
+					sched.NewBatch = func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, pod *v1.Pod, trace *utiltrace.Trace) *Batch {
+						return nil
 					}
 					sched.FailureHandler = func(_ context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, _ *fwk.NominatingInfo, _ time.Time) {
 						gotCallsToFailureHandler++
@@ -3498,7 +3505,10 @@ func TestSchedulerSchedulePod(t *testing.T) {
 			informerFactory.Start(ctx.Done())
 			informerFactory.WaitForCacheSync(ctx.Done())
 
-			result, err := sched.SchedulePod(ctx, schedFramework, framework.NewCycleState(), test.pod)
+			state := framework.NewCycleState()
+			trace := utiltrace.New("testTrace")
+			batch := sched.NewBatch(ctx, schedFramework, state, test.pod, trace)
+			result, err := sched.SchedulePod(ctx, schedFramework, state, test.pod, batch)
 			if err != test.wErr {
 				gotFitErr, gotOK := err.(*framework.FitError)
 				wantFitErr, wantOK := test.wErr.(*framework.FitError)
@@ -4621,6 +4631,7 @@ func setupTestScheduler(ctx context.Context, t *testing.T, client clientset.Inte
 	}
 
 	sched.SchedulePod = sched.schedulePod
+	sched.NewBatch = sched.newBatch
 	sched.FailureHandler = func(_ context.Context, _ framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, _ *fwk.NominatingInfo, _ time.Time) {
 		err := status.AsError()
 		errChan <- err
