@@ -214,7 +214,7 @@ linters:
       
       # OptionalOrRequired is being enabled over time. For now, each API group should be added to this list until we comb through each group and fix the missing tags.
       - text: "must be marked as optional or required"
-        path: "staging/src/k8s.io/api/(admission|apidiscovery|apiserverinternal|apps|authentication|authorization|autoscaling|batch|certificates|coordination|core|discovery|events|extensions|flowcontrol|networking|rbac|resource|storage|storagemigration)"
+        path: "staging/src/k8s.io/api/(admission|apidiscovery|apps|authentication|authorization|autoscaling|batch|certificates|coordination|core|discovery|events|extensions|flowcontrol|networking|rbac|resource|storage|storagemigration)"
       
       # OptionalOrRequired - Existing fields that are marked as both optional and required (based on standard optional vs kubebuilder:validation:Required) and should not be fixed.
       - text: "field (PortStatus|IngressPortStatus)\\.Error must not be marked as both optional and required"
@@ -444,7 +444,6 @@ linters:
             # nomaps:
             #   policy: AllowStringToStringMaps # Determines how the linter should handle maps of basic types. Maps of objects are always disallowed.
             # optionalFields:
-            #   policy: AllowOptionalFields # Determines how the linter should handle optional fields.optionalfields:
             #  pointers:
             #    preference: Always | WhenRequired # Whether to always require pointers, or only when required. Defaults to `Always`.
             #    policy: SuggestFix | Warn # The policy for pointers in optional fields. Defaults to `SuggestFix`.
@@ -455,7 +454,6 @@ linters:
             # optionalOrRequired:
             #   preferredOptionalMarker: optional # The preferred optional marker to use, fixes will suggest to use this marker. Defaults to `optional`.
             #   preferredRequiredMarker: required # The preferred required marker to use, fixes will suggest to use this marker. Defaults to `required`. 
-            #   policy: AllowOptionalFields # Determines how the linter should handle optional fields.
             # requiredFields:
             #   pointers:
             #    policy: SuggestFix | Warn # The policy for pointers in required fields. Defaults to `SuggestFix`.

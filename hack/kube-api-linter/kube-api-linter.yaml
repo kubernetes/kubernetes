@@ -51,7 +51,6 @@ lintersConfig:
   # nomaps:
   #   policy: AllowStringToStringMaps # Determines how the linter should handle maps of basic types. Maps of objects are always disallowed.
   # optionalFields:
-  #   policy: AllowOptionalFields # Determines how the linter should handle optional fields.optionalfields:
   #  pointers:
   #    preference: Always | WhenRequired # Whether to always require pointers, or only when required. Defaults to `Always`.
   #    policy: SuggestFix | Warn # The policy for pointers in optional fields. Defaults to `SuggestFix`.
@@ -62,7 +61,6 @@ lintersConfig:
   # optionalOrRequired:
   #   preferredOptionalMarker: optional # The preferred optional marker to use, fixes will suggest to use this marker. Defaults to `optional`.
   #   preferredRequiredMarker: required # The preferred required marker to use, fixes will suggest to use this marker. Defaults to `required`. 
-  #   policy: AllowOptionalFields # Determines how the linter should handle optional fields.
   # requiredFields:
   #   pointers:
   #    policy: SuggestFix | Warn # The policy for pointers in required fields. Defaults to `SuggestFix`.
