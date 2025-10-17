@@ -56,6 +56,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/profile"
 	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
 	"k8s.io/utils/clock"
+	utiltrace "k8s.io/utils/trace"
 )
 
 const (
@@ -88,7 +89,9 @@ type Scheduler struct {
 	// SchedulePod tries to schedule the given pod to one of the nodes in the node list.
 	// Return a struct of ScheduleResult with the name of suggested host on success,
 	// otherwise will return a FitError with reasons.
-	SchedulePod func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, pod *v1.Pod) (ScheduleResult, error)
+	SchedulePod func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, pod *v1.Pod, batch *Batch) (ScheduleResult, error)
+
+	NewBatch func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, pod *v1.Pod, trace *utiltrace.Trace) *Batch
 
 	// Close this to shut down the scheduler.
 	StopEverything <-chan struct{}
@@ -127,6 +130,7 @@ type Scheduler struct {
 func (sched *Scheduler) applyDefaultHandlers() {
 	sched.SchedulePod = sched.schedulePod
 	sched.FailureHandler = sched.handleSchedulingFailure
+	sched.NewBatch = sched.newBatch
 }
 
 type schedulerOptions struct {

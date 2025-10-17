@@ -83,7 +83,7 @@ func (sched *Scheduler) ScheduleOne(ctx context.Context) {
 	ctx = klog.NewContext(ctx, logger)
 	logger.V(4).Info("About to try and schedule pod", "pod", klog.KObj(pod))
 
-	fwk, err := sched.frameworkForPod(pod)
+	podFwk, err := sched.frameworkForPod(pod)
 	if err != nil {
 		// This shouldn't happen, because we only accept for scheduling the pods
 		// which specify a scheduler name that matches one of the profiles.
@@ -91,7 +91,7 @@ func (sched *Scheduler) ScheduleOne(ctx context.Context) {
 		sched.SchedulingQueue.Done(pod.UID)
 		return
 	}
-	if sched.skipPodSchedule(ctx, fwk, pod) {
+	if sched.skipPodSchedule(ctx, podFwk, pod) {
 		// We don't put this Pod back to the queue, but we have to cleanup the in-flight pods/events.
 		sched.SchedulingQueue.Done(pod.UID)
 		return
@@ -114,9 +114,16 @@ func (sched *Scheduler) ScheduleOne(ctx context.Context) {
 	schedulingCycleCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	scheduleResult, assumedPodInfo, status := sched.schedulingCycle(schedulingCycleCtx, state, fwk, podInfo, start, podsToActivate)
+	trace := utiltrace.New("Scheduling", utiltrace.Field{Key: "namespace", Value: pod.Namespace}, utiltrace.Field{Key: "name", Value: pod.Name})
+	defer trace.LogIfLong(100 * time.Millisecond)
+
+	batch := sched.NewBatch(schedulingCycleCtx, podFwk, state, pod, trace)
+
+	// No batching now, but we would run the code after this line in a loop over as many pods (pulled from the queue) as have matching signatures.
+
+	scheduleResult, assumedPodInfo, status := sched.schedulingCycle(schedulingCycleCtx, state, podFwk, podInfo, start, podsToActivate, batch)
 	if !status.IsSuccess() {
-		sched.FailureHandler(schedulingCycleCtx, fwk, assumedPodInfo, status, scheduleResult.nominatingInfo, start)
+		sched.FailureHandler(schedulingCycleCtx, podFwk, assumedPodInfo, status, scheduleResult.nominatingInfo, start)
 		return
 	}
 
@@ -128,9 +135,9 @@ func (sched *Scheduler) ScheduleOne(ctx context.Context) {
 		metrics.Goroutines.WithLabelValues(metrics.Binding).Inc()
 		defer metrics.Goroutines.WithLabelValues(metrics.Binding).Dec()
 
-		status := sched.bindingCycle(bindingCycleCtx, state, fwk, scheduleResult, assumedPodInfo, start, podsToActivate)
+		status := sched.bindingCycle(bindingCycleCtx, state, podFwk, scheduleResult, assumedPodInfo, start, podsToActivate)
 		if !status.IsSuccess() {
-			sched.handleBindingCycleError(bindingCycleCtx, state, fwk, assumedPodInfo, start, scheduleResult, status)
+			sched.handleBindingCycleError(bindingCycleCtx, state, podFwk, assumedPodInfo, start, scheduleResult, status)
 			return
 		}
 	}()
@@ -154,10 +161,11 @@ func (sched *Scheduler) schedulingCycle(
 	podInfo *framework.QueuedPodInfo,
 	start time.Time,
 	podsToActivate *framework.PodsToActivate,
+	batch *Batch,
 ) (ScheduleResult, *framework.QueuedPodInfo, *fwk.Status) {
 	logger := klog.FromContext(ctx)
 	pod := podInfo.Pod
-	scheduleResult, err := sched.SchedulePod(ctx, schedFramework, state, pod)
+	scheduleResult, err := sched.SchedulePod(ctx, schedFramework, state, pod, batch)
 	if err != nil {
 		defer func() {
 			metrics.SchedulingAlgorithmLatency.Observe(metrics.SinceInSeconds(start))
@@ -424,33 +432,71 @@ func (sched *Scheduler) skipPodSchedule(ctx context.Context, fwk framework.Frame
 	return isAssumed
 }
 
-// schedulePod tries to schedule the given pod to one of the nodes in the node list.
-// If it succeeds, it will return the name of the node.
-// If it fails, it will return a FitError with reasons.
-func (sched *Scheduler) schedulePod(ctx context.Context, fwk framework.Framework, state fwk.CycleState, pod *v1.Pod) (result ScheduleResult, err error) {
-	trace := utiltrace.New("Scheduling", utiltrace.Field{Key: "namespace", Value: pod.Namespace}, utiltrace.Field{Key: "name", Value: pod.Name})
-	defer trace.LogIfLong(100 * time.Millisecond)
+type Batch struct {
+	feasibleNodes []fwk.NodeInfo
+	priorityList  []framework.NodePluginScores
+	diagnosis     framework.Diagnosis
+	trace         *utiltrace.Trace
+	err           error
+}
+
+// Create a batch structure using the node list.
+func (sched *Scheduler) newBatch(ctx context.Context, fwk framework.Framework, state fwk.CycleState, pod *v1.Pod, trace *utiltrace.Trace) *Batch {
 	if err := sched.Cache.UpdateSnapshot(klog.FromContext(ctx), sched.nodeInfoSnapshot); err != nil {
-		return result, err
+		return &Batch{trace: trace, err: err}
 	}
 	trace.Step("Snapshotting scheduler cache and node infos done")
 
 	if sched.nodeInfoSnapshot.NumNodes() == 0 {
-		return result, ErrNoNodesAvailable
+		return &Batch{trace: trace, err: ErrNoNodesAvailable}
 	}
 
 	feasibleNodes, diagnosis, err := sched.findNodesThatFitPod(ctx, fwk, state, pod)
 	if err != nil {
-		return result, err
+		return &Batch{trace: trace, err: err}
 	}
 	trace.Step("Computing predicates done")
 
 	if len(feasibleNodes) == 0 {
-		return result, &framework.FitError{
+		return &Batch{trace: trace, err: &framework.FitError{
 			Pod:         pod,
 			NumAllNodes: sched.nodeInfoSnapshot.NumNodes(),
 			Diagnosis:   diagnosis,
+		}}
+	}
+
+	// When only one node after predicate, don't create priorityList.
+	var priorityList []framework.NodePluginScores
+	if len(feasibleNodes) > 1 {
+		priorityList, err = prioritizeNodes(ctx, sched.Extenders, fwk, state, pod, feasibleNodes)
+		if err != nil {
+			return &Batch{trace: trace, err: err}
 		}
+	}
+
+	trace.Step("Prioritizing done")
+
+	return &Batch{
+		feasibleNodes: feasibleNodes,
+		priorityList:  priorityList,
+		diagnosis:     diagnosis,
+		trace:         trace,
+	}
+}
+
+// schedulePod tries to schedule the given pod to one of the nodes in the batch.
+// If it succeeds, it will return the name of the node.
+// If it fails, it will return a FitError with reasons.
+func (sched *Scheduler) schedulePod(ctx context.Context, fwk framework.Framework, state fwk.CycleState, pod *v1.Pod, batch *Batch) (result ScheduleResult, err error) {
+	feasibleNodes := batch.feasibleNodes
+	diagnosis := batch.diagnosis
+	priorityList := batch.priorityList
+
+	defer batch.trace.LogIfLong(100 * time.Millisecond)
+
+	// If we had an error in batch creation, throw the error on the first pod in the batch
+	if batch.err != nil {
+		return ScheduleResult{}, batch.err
 	}
 
 	// When only one node after predicate, just use it.
@@ -462,13 +508,8 @@ func (sched *Scheduler) schedulePod(ctx context.Context, fwk framework.Framework
 		}, nil
 	}
 
-	priorityList, err := prioritizeNodes(ctx, sched.Extenders, fwk, state, pod, feasibleNodes)
-	if err != nil {
-		return result, err
-	}
-
 	host, _, err := selectHost(priorityList, numberOfHighestScoredNodesToReport)
-	trace.Step("Prioritizing done")
+	batch.trace.Step("Selecting host done")
 
 	return ScheduleResult{
 		SuggestedHost:  host,
