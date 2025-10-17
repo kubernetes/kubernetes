@@ -1099,13 +1099,16 @@ func TestSchedulerScheduleOne(t *testing.T) {
 						}
 						queue.Add(logger, item.sendPod)
 
-						sched.SchedulePod = func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, pod *v1.Pod, batch *Batch) (ScheduleResult, error) {
+						sched.SchedulePod = func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, pod *v1.Pod, batch *Batch, batch *Batch) (ScheduleResult, error) {
 							return item.mockScheduleResult, item.injectSchedulingError
 						}
 						sched.NewBatch = func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, pod *v1.Pod, trace *utiltrace.Trace) *Batch {
 							return nil
 						}
-						sched.FailureHandler = func(ctx context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, ni *fwk.NominatingInfo, start time.Time) {
+						sched.NewBatch = func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, pod *v1.Pod, trace *utiltrace.Trace) *Batch {
+							return nil
+						}
+						sched.FailureHandler = func(ctx context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, ni *framework.NominatingInfo, start time.Time) {
 							gotPod = p.Pod
 							gotError = status.AsError()
 							gotNominatingInfo = ni
@@ -1456,13 +1459,16 @@ func TestScheduleOneMarksPodAsProcessedBeforePreBind(t *testing.T) {
 					}
 					queue.Add(logger, item.sendPod)
 
-					sched.SchedulePod = func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, pod *v1.Pod, batch *Batch) (ScheduleResult, error) {
+					sched.SchedulePod = func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, pod *v1.Pod, batch *Batch, batch *Batch) (ScheduleResult, error) {
 						return item.mockScheduleResult, item.injectSchedulingError
 					}
 					sched.NewBatch = func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, pod *v1.Pod, trace *utiltrace.Trace) *Batch {
 						return nil
 					}
-					sched.FailureHandler = func(_ context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, _ *fwk.NominatingInfo, _ time.Time) {
+					sched.NewBatch = func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, pod *v1.Pod, trace *utiltrace.Trace) *Batch {
+						return nil
+					}
+					sched.FailureHandler = func(_ context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, _ *framework.NominatingInfo, _ time.Time) {
 						gotCallsToFailureHandler++
 						gotPodIsInFlightAtFailureHandler = podListContainsPod(queue.InFlightPods(), p.Pod)
 
@@ -3509,6 +3515,10 @@ func TestSchedulerSchedulePod(t *testing.T) {
 			trace := utiltrace.New("testTrace")
 			batch := sched.NewBatch(ctx, fwk, state, test.pod, trace)
 			result, err := sched.SchedulePod(ctx, schedFramework, state, test.pod, batch)
+			state := framework.NewCycleState()
+			trace := utiltrace.New("testTrace")
+			batch := sched.NewBatch(ctx, fwk, state, test.pod, trace)
+			result, err := sched.SchedulePod(ctx, schedFramework, state, test.pod, batch)
 			if err != test.wErr {
 				gotFitErr, gotOK := err.(*framework.FitError)
 				wantFitErr, wantOK := test.wErr.(*framework.FitError)
@@ -4631,6 +4641,7 @@ func setupTestScheduler(ctx context.Context, t *testing.T, client clientset.Inte
 	}
 
 	sched.SchedulePod = sched.schedulePod
+	sched.NewBatch = sched.newBatch
 	sched.NewBatch = sched.newBatch
 	sched.FailureHandler = func(_ context.Context, _ framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, _ *fwk.NominatingInfo, _ time.Time) {
 		err := status.AsError()
