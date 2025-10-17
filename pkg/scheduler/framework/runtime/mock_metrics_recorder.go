@@ -75,12 +75,8 @@ func (f *MockMetricsRecorder) ObserveQueueingHintDurationAsync(pluginName, event
 func (f *MockMetricsRecorder) ObserveInFlightEventsAsync(eventLabel string, valueToAdd float64, forceFlush bool) {
 }
 
-// FlushMetrics records the flush operation
+// FlushMetrics records the flush operation is a no-op in the runtime mock.
 func (f *MockMetricsRecorder) FlushMetrics() {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-
-	f.flushMetricsCalls++
 }
 
 // PluginDurationCallCount returns the number of ObservePluginDurationAsync calls
