@@ -23,6 +23,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -30,6 +31,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/dynamic/fake"
+	clientfeatures "k8s.io/client-go/features"
+	clientfeaturestesting "k8s.io/client-go/features/testing"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -52,6 +55,28 @@ func handler(rcvCh chan<- *unstructured.Unstructured) *cache.ResourceEventHandle
 		AddFunc: func(obj interface{}) {
 			rcvCh <- obj.(*unstructured.Unstructured)
 		},
+	}
+}
+
+func TestUnSupportWatchListSemantics(t *testing.T) {
+	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.WatchListClient, true)
+	scheme := runtime.NewScheme()
+	if err := appsv1.AddToScheme(scheme); err != nil {
+		t.Fatalf("failed to add corev1 to scheme: %v", err)
+	}
+	// The fake client doesn’t support WatchList semantics,
+	// so we don’t need to prepare a response.
+	// The reflector will use ListWatch semantics instead.
+	fakeClient := fake.NewSimpleDynamicClient(scheme)
+	factory := dynamicinformer.NewFilteredDynamicSharedInformerFactory(fakeClient, 0, "ns", nil)
+	target := factory.ForResource(schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	factory.Start(ctx.Done())
+
+	if !cache.WaitForCacheSync(ctx.Done(), target.Informer().HasSynced) {
+		t.Fatalf("failed to wait for caches to sync")
 	}
 }
 
