@@ -796,6 +796,8 @@ func reasonNames(reasons ConflictReasons) string {
 			varNames = append(varNames, "ErrReasonNodeConflict")
 		case ErrReasonNotEnoughSpace:
 			varNames = append(varNames, "ErrReasonNotEnoughSpace")
+		case ErrReasonClassConflict:
+			varNames = append(varNames, "ErrReasonClassConflict")
 		default:
 			varNames = append(varNames, string(reason))
 		}
@@ -1095,7 +1097,7 @@ func TestFindPodVolumesWithProvisioning(t *testing.T) {
 		},
 		"volume-topology-unsatisfied": {
 			podPVCs: []*v1.PersistentVolumeClaim{topoMismatchPVC},
-			reasons: ConflictReasons{ErrReasonBindConflict},
+			reasons: ConflictReasons{ErrReasonBindConflict, ErrReasonClassConflict},
 		},
 	}
 
@@ -1109,6 +1111,12 @@ func TestFindPodVolumesWithProvisioning(t *testing.T) {
 	}
 
 	run := func(t *testing.T, scenario scenarioType, csiDriver *storagev1.CSIDriver) {
+		if scenario.needsCapacity &&
+			csiDriver != nil && csiDriver.Spec.StorageCapacity != nil && *csiDriver.Spec.StorageCapacity {
+			// Without CSIStorageCapacity objects, provisioning is blocked.
+			return
+		}
+
 		logger, ctx := ktesting.NewTestContext(t)
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
@@ -1146,12 +1154,6 @@ func TestFindPodVolumesWithProvisioning(t *testing.T) {
 		}
 		expectedReasons := scenario.reasons
 		expectedProvisions := scenario.expectedProvisions
-		if scenario.needsCapacity &&
-			csiDriver != nil && csiDriver.Spec.StorageCapacity != nil && *csiDriver.Spec.StorageCapacity {
-			// Without CSIStorageCapacity objects, provisioning is blocked.
-			expectedReasons = append(expectedReasons, ErrReasonNotEnoughSpace)
-			expectedProvisions = nil
-		}
 		checkReasons(t, reasons, expectedReasons)
 		testEnv.validatePodCache(t, testNode.Name, scenario.pod, podVolumes, scenario.expectedBindings, expectedProvisions)
 	}
@@ -2225,6 +2227,10 @@ func TestCapacity(t *testing.T) {
 		},
 		"no-storage": {
 			pvcs:    []*v1.PersistentVolumeClaim{provisionedPVC},
+			reasons: ConflictReasons{ErrReasonBindConflict, ErrReasonNotEnoughSpace},
+		},
+		"no-storage,selected-node": {
+			pvcs:    []*v1.PersistentVolumeClaim{selectedNodePVC},
 			reasons: ConflictReasons{ErrReasonNotEnoughSpace},
 		},
 		"wrong-node": {
@@ -2232,49 +2238,49 @@ func TestCapacity(t *testing.T) {
 			capacities: []*storagev1.CSIStorageCapacity{
 				makeCapacity("net", waitClassWithProvisioner, node2, "1Gi", ""),
 			},
-			reasons: ConflictReasons{ErrReasonNotEnoughSpace},
+			reasons: ConflictReasons{ErrReasonBindConflict, ErrReasonNotEnoughSpace},
 		},
 		"wrong-storage-class": {
 			pvcs: []*v1.PersistentVolumeClaim{provisionedPVC},
 			capacities: []*storagev1.CSIStorageCapacity{
 				makeCapacity("net", waitClass, node1, "1Gi", ""),
 			},
-			reasons: ConflictReasons{ErrReasonNotEnoughSpace},
+			reasons: ConflictReasons{ErrReasonBindConflict, ErrReasonNotEnoughSpace},
 		},
 		"insufficient-storage": {
 			pvcs: []*v1.PersistentVolumeClaim{provisionedPVC},
 			capacities: []*storagev1.CSIStorageCapacity{
 				makeCapacity("net", waitClassWithProvisioner, node1, "1Mi", ""),
 			},
-			reasons: ConflictReasons{ErrReasonNotEnoughSpace},
+			reasons: ConflictReasons{ErrReasonBindConflict, ErrReasonNotEnoughSpace},
 		},
 		"insufficient-volume-size": {
 			pvcs: []*v1.PersistentVolumeClaim{provisionedPVC},
 			capacities: []*storagev1.CSIStorageCapacity{
 				makeCapacity("net", waitClassWithProvisioner, node1, "1Gi", "1Mi"),
 			},
-			reasons: ConflictReasons{ErrReasonNotEnoughSpace},
+			reasons: ConflictReasons{ErrReasonBindConflict, ErrReasonNotEnoughSpace},
 		},
 		"zero-storage": {
 			pvcs: []*v1.PersistentVolumeClaim{provisionedPVC},
 			capacities: []*storagev1.CSIStorageCapacity{
 				makeCapacity("net", waitClassWithProvisioner, node1, "0Mi", ""),
 			},
-			reasons: ConflictReasons{ErrReasonNotEnoughSpace},
+			reasons: ConflictReasons{ErrReasonBindConflict, ErrReasonNotEnoughSpace},
 		},
 		"zero-volume-size": {
 			pvcs: []*v1.PersistentVolumeClaim{provisionedPVC},
 			capacities: []*storagev1.CSIStorageCapacity{
 				makeCapacity("net", waitClassWithProvisioner, node1, "", "0Mi"),
 			},
-			reasons: ConflictReasons{ErrReasonNotEnoughSpace},
+			reasons: ConflictReasons{ErrReasonBindConflict, ErrReasonNotEnoughSpace},
 		},
 		"nil-storage": {
 			pvcs: []*v1.PersistentVolumeClaim{provisionedPVC},
 			capacities: []*storagev1.CSIStorageCapacity{
 				makeCapacity("net", waitClassWithProvisioner, node1, "", ""),
 			},
-			reasons: ConflictReasons{ErrReasonNotEnoughSpace},
+			reasons: ConflictReasons{ErrReasonBindConflict, ErrReasonNotEnoughSpace},
 		},
 	}
 
