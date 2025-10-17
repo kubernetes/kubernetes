@@ -28,13 +28,16 @@ import (
 type StorageVersion struct {
 	metav1.TypeMeta `json:",inline"`
 	// The name is <group>.<resource>.
+	// +required
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Spec is an empty spec. It is here to comply with Kubernetes API style.
+	// +optional
 	Spec StorageVersionSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 
 	// API server instances report the version they can decode and the version they
 	// encode objects to when persisting objects in the backend.
+	// +optional
 	Status StorageVersionStatus `json:"status" protobuf:"bytes,3,opt,name=status"`
 }
 
@@ -67,20 +70,24 @@ type StorageVersionStatus struct {
 // encodes objects to when persisting objects in the backend.
 type ServerStorageVersion struct {
 	// The ID of the reporting API server.
-	APIServerID string `json:"apiServerID,omitempty" protobuf:"bytes,1,opt,name=apiServerID"`
+	// +required
+	APIServerID string `json:"apiServerID" protobuf:"bytes,1,opt,name=apiServerID"`
 
 	// The API server encodes the object to this version when persisting it in
 	// the backend (e.g., etcd).
-	EncodingVersion string `json:"encodingVersion,omitempty" protobuf:"bytes,2,opt,name=encodingVersion"`
+	// +required
+	EncodingVersion string `json:"encodingVersion" protobuf:"bytes,2,opt,name=encodingVersion"`
 
 	// The API server can decode objects encoded in these versions.
 	// The encodingVersion must be included in the decodableVersions.
 	// +listType=set
-	DecodableVersions []string `json:"decodableVersions,omitempty" protobuf:"bytes,3,opt,name=decodableVersions"`
+	// +required
+	DecodableVersions []string `json:"decodableVersions" protobuf:"bytes,3,opt,name=decodableVersions"`
 
 	// The API server can serve these versions.
 	// DecodableVersions must include all ServedVersions.
 	// +listType=set
+	// +optional
 	ServedVersions []string `json:"servedVersions,omitempty" protobuf:"bytes,4,opt,name=servedVersions"`
 }
 
@@ -111,6 +118,7 @@ type StorageVersionCondition struct {
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty" protobuf:"varint,3,opt,name=observedGeneration"`
 	// Last time the condition transitioned from one status to another.
+	// +optional
 	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty" protobuf:"bytes,4,opt,name=lastTransitionTime"`
 	// The reason for the condition's last transition.
 	// +required
