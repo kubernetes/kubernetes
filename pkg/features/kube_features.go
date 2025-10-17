@@ -2282,6 +2282,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	SystemdWatchdog: {},
 
+	TaintTolerationComparisonOperators: {},
+
 	TopologyAwareHints: {},
 
 	TopologyManagerPolicyAlphaOptions: {},
