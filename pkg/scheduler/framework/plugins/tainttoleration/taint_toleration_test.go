@@ -275,8 +275,8 @@ func TestTaintTolerationScore(t *testing.T) {
 				}}),
 			},
 			expectedList: []fwk.NodeScore{
-				{Name: "nodeA", Score: fwk.MaxNodeScore},
-				{Name: "nodeB", Score: 0},
+				{Name: "nodeA", Score: 0},
+				{Name: "nodeB", Score:  fwk.MaxNodeScore},
 			},
 		},
 	}
