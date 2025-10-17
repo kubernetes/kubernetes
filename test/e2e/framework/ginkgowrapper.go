@@ -210,6 +210,37 @@ func registerInSuite(ginkgoCall func(string, ...interface{}) bool, args []interf
 	// - GetCurrentSpec returns an empty spec.
 	additionalLabels := sets.New[string]()
 
+	// If a dependency was already specified through WithFeatureGate,
+	// it doesn't need to be added again.
+	manualFeatureGates := sets.New[featuregate.Feature]()
+
+	featureDependencies := utilfeature.DefaultMutableFeatureGate.Dependencies()
+	addFeatureGateDependencies := func(featureGate featuregate.Feature) {
+		for _, featureGate := range featureDependencies[featureGate] {
+			if manualFeatureGates.Has(featureGate) {
+				continue
+			}
+
+			spec := utilfeature.DefaultMutableFeatureGate.GetAll()[featureGate]
+			// This matches the behavior of top-level withFeatureGate and
+			// how that gets handled below.
+			//
+			// The difference is that all dependencies get added at the end
+			// and only once per node, not once per withFeatureGate.
+			if level := featureGateLevel(spec); level != "" {
+				additionalLabels.Insert(level)
+				if level == "Beta" && !spec.Default {
+					// Not embedded in text!
+					ginkgoArgs = append(ginkgoArgs, ginkgo.Label("BetaOffByDefault"))
+				}
+			}
+			additionalLabels.Insert("FeatureGate:" + string(featureGate))
+			if !spec.Default {
+				additionalLabels.Insert("Feature:OffByDefault")
+			}
+		}
+	}
+
 	haveEmptyStrings := false
 	for _, arg := range args {
 		switch arg := arg.(type) {
@@ -217,6 +248,11 @@ func registerInSuite(ginkgoCall func(string, ...interface{}) bool, args []interf
 			fullLabel := strings.Join(arg.parts, ":")
 			texts = append(texts, fmt.Sprintf("[%s]", fullLabel))
 			ginkgoArgs = append(ginkgoArgs, ginkgo.Label(fullLabel))
+			if len(arg.parts) == 2 && arg.parts[0] == "FeatureGate" {
+				featureGate := featuregate.Feature(arg.parts[1])
+				manualFeatureGates.Insert(featureGate)
+				addFeatureGateDependencies(featureGate)
+			}
 			if arg.alphaBetaLevel != "" {
 				additionalLabels.Insert(arg.alphaBetaLevel)
 			}
@@ -455,17 +491,20 @@ func withFeatureGate(featureGate featuregate.Feature) interface{} {
 		RecordBug(NewBug(fmt.Sprintf("WithFeatureGate: the feature gate %q is unknown", featureGate), 2))
 	}
 
+	l := newLabel("FeatureGate", string(featureGate))
+	l.offByDefault = !spec.Default
+	l.alphaBetaLevel = featureGateLevel(spec)
+	return l
+}
+
+func featureGateLevel(spec featuregate.FeatureSpec) string {
 	// We use mixed case (i.e. Beta instead of BETA). GA feature gates have no level string.
 	var level string
 	if spec.PreRelease != "" {
 		level = string(spec.PreRelease)
 		level = strings.ToUpper(level[0:1]) + strings.ToLower(level[1:])
 	}
-
-	l := newLabel("FeatureGate", string(featureGate))
-	l.offByDefault = !spec.Default
-	l.alphaBetaLevel = level
-	return l
+	return level
 }
 
 // WithEnvironment specifies that a certain test or group of tests only works
