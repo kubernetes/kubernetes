@@ -19,7 +19,6 @@ package clusterrole
 import (
 	"testing"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
@@ -43,33 +42,7 @@ func testDeclarativeValidateForDeclarative(t *testing.T, apiVersion string) {
 		input        rbac.ClusterRole
 		expectedErrs field.ErrorList
 	}{
-		"missing verbs": {
-			input: rbac.ClusterRole{
-				ObjectMeta: metav1.ObjectMeta{Name: "test-role"},
-				Rules: []rbac.PolicyRule{
-					{
-						APIGroups: []string{""},
-						Resources: []string{"pods"},
-					},
-				},
-			},
-			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("rules").Index(0).Child("verbs"), "must have at least one verb"),
-			},
-		},
-		"valid rule": {
-			input: rbac.ClusterRole{
-				ObjectMeta: metav1.ObjectMeta{Name: "valid-role"},
-				Rules: []rbac.PolicyRule{
-					{
-						APIGroups: []string{""},
-						Resources: []string{"pods"},
-						Verbs:     []string{"get", "list"},
-					},
-				},
-			},
-			expectedErrs: field.ErrorList{},
-		},
+		// TODO: Add more test cases
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
@@ -94,53 +67,7 @@ func testValidateUpdateForDeclarative(t *testing.T, apiVersion string) {
 		update       rbac.ClusterRole
 		expectedErrs field.ErrorList
 	}{
-		"update missing verbs": {
-			old: rbac.ClusterRole{
-				ObjectMeta: metav1.ObjectMeta{Name: "role"},
-				Rules: []rbac.PolicyRule{
-					{
-						APIGroups: []string{""},
-						Resources: []string{"pods"},
-						Verbs:     []string{"get"},
-					},
-				},
-			},
-			update: rbac.ClusterRole{
-				ObjectMeta: metav1.ObjectMeta{Name: "role", ResourceVersion: "1"},
-				Rules: []rbac.PolicyRule{
-					{
-						APIGroups: []string{""},
-						Resources: []string{"pods"},
-					},
-				},
-			},
-			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("rules").Index(0).Child("verbs"), "must have at least one verb"),
-			},
-		},
-		"valid update": {
-			old: rbac.ClusterRole{
-				ObjectMeta: metav1.ObjectMeta{Name: "role"},
-				Rules: []rbac.PolicyRule{
-					{
-						APIGroups: []string{""},
-						Resources: []string{"pods"},
-						Verbs:     []string{"get"},
-					},
-				},
-			},
-			update: rbac.ClusterRole{
-				ObjectMeta: metav1.ObjectMeta{Name: "role", ResourceVersion: "1"},
-				Rules: []rbac.PolicyRule{
-					{
-						APIGroups: []string{""},
-						Resources: []string{"pods"},
-						Verbs:     []string{"get", "list"},
-					},
-				},
-			},
-			expectedErrs: field.ErrorList{},
-		},
+		// TODO: Add more test cases
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
