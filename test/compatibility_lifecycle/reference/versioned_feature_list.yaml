@@ -1205,6 +1205,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.24"
+- name: OpportunisticBatching
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.35"
 - name: OrderedNamespaceDeletion
   versionedSpecs:
   - default: false
