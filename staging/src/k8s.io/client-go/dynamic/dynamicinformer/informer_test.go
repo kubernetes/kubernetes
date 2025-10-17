@@ -23,14 +23,23 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/json"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/dynamic/fake"
+	clientfeatures "k8s.io/client-go/features"
+	clientfeaturestesting "k8s.io/client-go/features/testing"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
+	"net/http"
+	"net/http/httptest"
 )
 
 type triggerFunc func(gvr schema.GroupVersionResource, ns string, fakeClient *fake.FakeDynamicClient, testObject *unstructured.Unstructured) *unstructured.Unstructured
@@ -52,6 +61,85 @@ func handler(rcvCh chan<- *unstructured.Unstructured) *cache.ResourceEventHandle
 		AddFunc: func(obj interface{}) {
 			rcvCh <- obj.(*unstructured.Unstructured)
 		},
+	}
+}
+
+func TestWatchListSemanticsSimple(t *testing.T) {
+	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.WatchListClient, true)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		obj := &appsv1.Deployment{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: "apps/v1",
+				Kind:       "Deployment",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					metav1.InitialEventsAnnotationKey: "true",
+				},
+			},
+		}
+		rawObj, err := json.Marshal(obj)
+		if err != nil {
+			t.Errorf("failed to marshal rawObj: %v", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		watchEvent := &metav1.WatchEvent{
+			Type:   string(watch.Bookmark),
+			Object: runtime.RawExtension{Raw: rawObj},
+		}
+		rawRsp, err := json.Marshal(watchEvent)
+		if err != nil {
+			t.Errorf("failed to marshal watchEvent: %v", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, err = w.Write(rawRsp)
+		if err != nil {
+			t.Fatalf("failed to write response: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	cfg := &rest.Config{Host: server.URL}
+	client, err := dynamic.NewForConfig(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	factory := dynamicinformer.NewFilteredDynamicSharedInformerFactory(client, 0, "ns", nil)
+	target := factory.ForResource(schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	factory.Start(ctx.Done())
+
+	if !cache.WaitForCacheSync(ctx.Done(), target.Informer().HasSynced) {
+		t.Fatalf("failed to wait for caches to sync")
+	}
+}
+
+func TestUnSupportWatchListSemantics(t *testing.T) {
+	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.WatchListClient, true)
+	scheme := runtime.NewScheme()
+	if err := appsv1.AddToScheme(scheme); err != nil {
+		t.Fatalf("failed to add corev1 to scheme: %v", err)
+	}
+	// The fake client doesn’t support WatchList semantics,
+	// so we don’t need to prepare a response.
+	fakeClient := fake.NewSimpleDynamicClient(scheme)
+	factory := dynamicinformer.NewFilteredDynamicSharedInformerFactory(fakeClient, 0, "ns", nil)
+	target := factory.ForResource(schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	factory.Start(ctx.Done())
+
+	if !cache.WaitForCacheSync(ctx.Done(), target.Informer().HasSynced) {
+		t.Fatalf("failed to wait for caches to sync")
 	}
 }
 
