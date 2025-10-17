@@ -47,6 +47,22 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 		}
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
+	// type ClusterRoleBinding
+	scheme.AddValidationFunc((*rbacv1beta1.ClusterRoleBinding)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_ClusterRoleBinding(ctx, op, nil /* fldPath */, obj.(*rbacv1beta1.ClusterRoleBinding), safe.Cast[*rbacv1beta1.ClusterRoleBinding](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
+	// type ClusterRoleBindingList
+	scheme.AddValidationFunc((*rbacv1beta1.ClusterRoleBindingList)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_ClusterRoleBindingList(ctx, op, nil /* fldPath */, obj.(*rbacv1beta1.ClusterRoleBindingList), safe.Cast[*rbacv1beta1.ClusterRoleBindingList](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
 	// type ClusterRoleList
 	scheme.AddValidationFunc((*rbacv1beta1.ClusterRoleList)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
 		switch op.Request.SubresourcePath() {
@@ -60,6 +76,22 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 		switch op.Request.SubresourcePath() {
 		case "/":
 			return Validate_Role(ctx, op, nil /* fldPath */, obj.(*rbacv1beta1.Role), safe.Cast[*rbacv1beta1.Role](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
+	// type RoleBinding
+	scheme.AddValidationFunc((*rbacv1beta1.RoleBinding)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_RoleBinding(ctx, op, nil /* fldPath */, obj.(*rbacv1beta1.RoleBinding), safe.Cast[*rbacv1beta1.RoleBinding](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
+	// type RoleBindingList
+	scheme.AddValidationFunc((*rbacv1beta1.RoleBindingList)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_RoleBindingList(ctx, op, nil /* fldPath */, obj.(*rbacv1beta1.RoleBindingList), safe.Cast[*rbacv1beta1.RoleBindingList](oldObj))
 		}
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
@@ -93,6 +125,60 @@ func Validate_ClusterRole(ctx context.Context, op operation.Operation, fldPath *
 		}(fldPath.Child("rules"), obj.Rules, safe.Field(oldObj, func(oldObj *rbacv1beta1.ClusterRole) []rbacv1beta1.PolicyRule { return oldObj.Rules }))...)
 
 	// field rbacv1beta1.ClusterRole.AggregationRule has no validation
+	return errs
+}
+
+// Validate_ClusterRoleBinding validates an instance of ClusterRoleBinding according
+// to declarative validation rules in the API schema.
+func Validate_ClusterRoleBinding(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *rbacv1beta1.ClusterRoleBinding) (errs field.ErrorList) {
+	// field rbacv1beta1.ClusterRoleBinding.TypeMeta has no validation
+	// field rbacv1beta1.ClusterRoleBinding.ObjectMeta has no validation
+
+	// field rbacv1beta1.ClusterRoleBinding.Subjects
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []rbacv1beta1.Subject) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// iterate the list and call the type's validation function
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_Subject)...)
+			return
+		}(fldPath.Child("subjects"), obj.Subjects, safe.Field(oldObj, func(oldObj *rbacv1beta1.ClusterRoleBinding) []rbacv1beta1.Subject { return oldObj.Subjects }))...)
+
+	// field rbacv1beta1.ClusterRoleBinding.RoleRef
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *rbacv1beta1.RoleRef) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_RoleRef(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("roleRef"), &obj.RoleRef, safe.Field(oldObj, func(oldObj *rbacv1beta1.ClusterRoleBinding) *rbacv1beta1.RoleRef { return &oldObj.RoleRef }))...)
+
+	return errs
+}
+
+// Validate_ClusterRoleBindingList validates an instance of ClusterRoleBindingList according
+// to declarative validation rules in the API schema.
+func Validate_ClusterRoleBindingList(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *rbacv1beta1.ClusterRoleBindingList) (errs field.ErrorList) {
+	// field rbacv1beta1.ClusterRoleBindingList.TypeMeta has no validation
+	// field rbacv1beta1.ClusterRoleBindingList.ListMeta has no validation
+
+	// field rbacv1beta1.ClusterRoleBindingList.Items
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []rbacv1beta1.ClusterRoleBinding) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// iterate the list and call the type's validation function
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_ClusterRoleBinding)...)
+			return
+		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *rbacv1beta1.ClusterRoleBindingList) []rbacv1beta1.ClusterRoleBinding { return oldObj.Items }))...)
+
 	return errs
 }
 
@@ -167,6 +253,60 @@ func Validate_Role(ctx context.Context, op operation.Operation, fldPath *field.P
 	return errs
 }
 
+// Validate_RoleBinding validates an instance of RoleBinding according
+// to declarative validation rules in the API schema.
+func Validate_RoleBinding(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *rbacv1beta1.RoleBinding) (errs field.ErrorList) {
+	// field rbacv1beta1.RoleBinding.TypeMeta has no validation
+	// field rbacv1beta1.RoleBinding.ObjectMeta has no validation
+
+	// field rbacv1beta1.RoleBinding.Subjects
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []rbacv1beta1.Subject) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// iterate the list and call the type's validation function
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_Subject)...)
+			return
+		}(fldPath.Child("subjects"), obj.Subjects, safe.Field(oldObj, func(oldObj *rbacv1beta1.RoleBinding) []rbacv1beta1.Subject { return oldObj.Subjects }))...)
+
+	// field rbacv1beta1.RoleBinding.RoleRef
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *rbacv1beta1.RoleRef) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_RoleRef(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("roleRef"), &obj.RoleRef, safe.Field(oldObj, func(oldObj *rbacv1beta1.RoleBinding) *rbacv1beta1.RoleRef { return &oldObj.RoleRef }))...)
+
+	return errs
+}
+
+// Validate_RoleBindingList validates an instance of RoleBindingList according
+// to declarative validation rules in the API schema.
+func Validate_RoleBindingList(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *rbacv1beta1.RoleBindingList) (errs field.ErrorList) {
+	// field rbacv1beta1.RoleBindingList.TypeMeta has no validation
+	// field rbacv1beta1.RoleBindingList.ListMeta has no validation
+
+	// field rbacv1beta1.RoleBindingList.Items
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []rbacv1beta1.RoleBinding) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// iterate the list and call the type's validation function
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_RoleBinding)...)
+			return
+		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *rbacv1beta1.RoleBindingList) []rbacv1beta1.RoleBinding { return oldObj.Items }))...)
+
+	return errs
+}
+
 // Validate_RoleList validates an instance of RoleList according
 // to declarative validation rules in the API schema.
 func Validate_RoleList(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *rbacv1beta1.RoleList) (errs field.ErrorList) {
@@ -185,5 +325,61 @@ func Validate_RoleList(ctx context.Context, op operation.Operation, fldPath *fie
 			return
 		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *rbacv1beta1.RoleList) []rbacv1beta1.Role { return oldObj.Items }))...)
 
+	return errs
+}
+
+// Validate_RoleRef validates an instance of RoleRef according
+// to declarative validation rules in the API schema.
+func Validate_RoleRef(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *rbacv1beta1.RoleRef) (errs field.ErrorList) {
+	// field rbacv1beta1.RoleRef.APIGroup has no validation
+
+	// field rbacv1beta1.RoleRef.Kind
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("kind"), &obj.Kind, safe.Field(oldObj, func(oldObj *rbacv1beta1.RoleRef) *string { return &oldObj.Kind }))...)
+
+	// field rbacv1beta1.RoleRef.Name has no validation
+	return errs
+}
+
+// Validate_Subject validates an instance of Subject according
+// to declarative validation rules in the API schema.
+func Validate_Subject(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *rbacv1beta1.Subject) (errs field.ErrorList) {
+	// field rbacv1beta1.Subject.Kind
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("kind"), &obj.Kind, safe.Field(oldObj, func(oldObj *rbacv1beta1.Subject) *string { return &oldObj.Kind }))...)
+
+	// field rbacv1beta1.Subject.APIGroup has no validation
+	// field rbacv1beta1.Subject.Name has no validation
+	// field rbacv1beta1.Subject.Namespace has no validation
 	return errs
 }
