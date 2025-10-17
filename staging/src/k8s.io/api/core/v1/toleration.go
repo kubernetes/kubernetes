@@ -71,16 +71,16 @@ func compareNumericValues(tolerationVal, taintVal string, op TolerationOperator)
 		return false
 	}
 
-	tnVal, err := strconv.ParseInt(taintVal, 10, 64)
+	tntVal, err := strconv.ParseInt(taintVal, 10, 64)
 	if err != nil {
 		return false
 	}
 
 	switch op {
 	case TolerationOpLt:
-		return tVal < tnVal
+		return tntVal < tVal
 	case TolerationOpGt:
-		return tVal > tnVal
+		return tntVal > tVal
 	default:
 		return false
 	}
