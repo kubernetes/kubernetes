@@ -185,7 +185,7 @@ func podLevelResourcesTests(f *framework.Framework) {
 			},
 		},
 		{
-			name:         "Guaranteed QoS pod with container resources",
+			name:         "Guaranteed QoS pod with other container resources",
 			podResources: &cgroups.ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "100Mi", MemLim: "100Mi"},
 			containers: []containerInfo{
 				{Name: "c1", Resources: &cgroups.ContainerResources{CPUReq: "50m", CPULim: "100m", MemReq: "50Mi", MemLim: "100Mi"}},
@@ -221,7 +221,7 @@ func podLevelResourcesTests(f *framework.Framework) {
 			},
 		},
 		{
-			name:         "Burstable QoS pod with container resources",
+			name:         "Burstable QoS pod with yet some other container resources",
 			podResources: &cgroups.ContainerResources{CPUReq: "50m", CPULim: "100m", MemReq: "50Mi", MemLim: "100Mi"},
 			containers: []containerInfo{
 				{Name: "c1", Resources: &cgroups.ContainerResources{CPUReq: "20m", CPULim: "100m", MemReq: "20Mi", MemLim: "100Mi"}},

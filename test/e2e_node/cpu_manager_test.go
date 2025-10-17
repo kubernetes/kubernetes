@@ -1619,7 +1619,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 			gomega.Expect(pod).To(HaveContainerQuota(ctnName, "max"))
 		})
 
-		ginkgo.It("should disable for guaranteed pod with exclusive CPUs assigned", func(ctx context.Context) {
+		ginkgo.It("should disable for guaranteed pod with exclusive single CPU assigned", func(ctx context.Context) {
 			cpuCount := 1
 			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
 
@@ -1639,7 +1639,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 			gomega.Expect(pod).To(HaveContainerQuota(ctnName, "max"))
 		})
 
-		ginkgo.It("should disable for guaranteed pod with exclusive CPUs assigned", func(ctx context.Context) {
+		ginkgo.It("should disable for guaranteed pod with exclusive four CPUs assigned", func(ctx context.Context) {
 			cpuCount := 4
 			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
 
