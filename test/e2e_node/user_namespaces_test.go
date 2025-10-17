@@ -64,6 +64,7 @@ var _ = SIGDescribe("UserNamespaces", "[LinuxOnly]", feature.UserNamespacesSuppo
 				initialConfig.FeatureGates = make(map[string]bool)
 			}
 			initialConfig.FeatureGates[string(kubefeatures.UserNamespacesSupport)] = false
+			initialConfig.FeatureGates[string(kubefeatures.ProcMountType)] = false
 		})
 		f.It("will fail to create a hostUsers=false pod", func(ctx context.Context) {
 			if on, ok := serviceFeatureGates[string(kubefeatures.UserNamespacesSupport)]; !ok || !on {
