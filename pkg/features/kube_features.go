@@ -994,7 +994,7 @@ const (
 	// if the system supports the systemd watchdog feature and has it configured properly.
 	SystemdWatchdog = featuregate.Feature("SystemdWatchdog")
 
-	// owner: @heelayot
+	// owner: @helayoty
 	// kep: https://kep.k8s.io/5471
 	//
 	// Enables numeric comparison operators (Lt, Gt) for tolerations to match taints with threshold-based values.

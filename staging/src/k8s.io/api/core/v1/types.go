@@ -4083,8 +4083,8 @@ type TolerationOperator string
 const (
 	TolerationOpExists TolerationOperator = "Exists"
 	TolerationOpEqual  TolerationOperator = "Equal"
-	TolerationOpLt     TolerationOperator = "Lt" // Less than (requires feature gate TaintTolerationComparisonOperators)
-	TolerationOpGt     TolerationOperator = "Gt" // Greater than (requires feature gate TaintTolerationComparisonOperators)
+	TolerationOpLt     TolerationOperator = "Lt"
+	TolerationOpGt     TolerationOperator = "Gt"
 )
 
 // PodReadinessGate contains the reference to a pod condition

@@ -29571,7 +29571,6 @@ func TestNumericTolerationsWithFeatureGate(t *testing.T) {
 		name          string
 		toleration    core.Toleration
 		featureGateOn bool
-		expectError   bool
 		errorMsg      string
 	}{
 		{
@@ -29583,7 +29582,6 @@ func TestNumericTolerationsWithFeatureGate(t *testing.T) {
 				Effect:   core.TaintEffectNoSchedule,
 			},
 			featureGateOn: true,
-			expectError:   false,
 		},
 		{
 			name: "Lt operator with valid numeric value and feature gate enabled",
@@ -29594,7 +29592,6 @@ func TestNumericTolerationsWithFeatureGate(t *testing.T) {
 				Effect:   core.TaintEffectNoSchedule,
 			},
 			featureGateOn: true,
-			expectError:   false,
 		},
 		{
 			name: "Gt operator with negative numeric value and feature gate enabled",
@@ -29605,7 +29602,6 @@ func TestNumericTolerationsWithFeatureGate(t *testing.T) {
 				Effect:   core.TaintEffectNoSchedule,
 			},
 			featureGateOn: true,
-			expectError:   false,
 		},
 		{
 			name: "Gt operator with non-numeric value and feature gate enabled",
@@ -29616,7 +29612,6 @@ func TestNumericTolerationsWithFeatureGate(t *testing.T) {
 				Effect:   core.TaintEffectNoSchedule,
 			},
 			featureGateOn: true,
-			expectError:   true,
 			errorMsg:      "value must be a valid integer for numeric operators",
 		},
 		{
@@ -29628,7 +29623,6 @@ func TestNumericTolerationsWithFeatureGate(t *testing.T) {
 				Effect:   core.TaintEffectNoSchedule,
 			},
 			featureGateOn: true,
-			expectError:   false,
 		},
 		{
 			name: "Gt operator with value '0' and feature gate enabled (valid)",
@@ -29639,7 +29633,6 @@ func TestNumericTolerationsWithFeatureGate(t *testing.T) {
 				Effect:   core.TaintEffectNoSchedule,
 			},
 			featureGateOn: true,
-			expectError:   false,
 		},
 		{
 			name: "Gt operator with decimal value and feature gate enabled",
@@ -29650,7 +29643,6 @@ func TestNumericTolerationsWithFeatureGate(t *testing.T) {
 				Effect:   core.TaintEffectNoSchedule,
 			},
 			featureGateOn: true,
-			expectError:   true,
 			errorMsg:      "value must be a valid integer for numeric operators",
 		},
 		{
@@ -29662,7 +29654,6 @@ func TestNumericTolerationsWithFeatureGate(t *testing.T) {
 				Effect:   core.TaintEffectNoSchedule,
 			},
 			featureGateOn: false,
-			expectError:   true,
 			errorMsg:      "numeric operators are forbidden when the TaintTolerationComparisonOperators feature gate is disabled",
 		},
 		{
@@ -29674,7 +29665,6 @@ func TestNumericTolerationsWithFeatureGate(t *testing.T) {
 				Effect:   core.TaintEffectNoSchedule,
 			},
 			featureGateOn: true,
-			expectError:   false,
 		},
 		{
 			name: "Gt operator with overflow value and feature gate enabled",
@@ -29685,7 +29675,6 @@ func TestNumericTolerationsWithFeatureGate(t *testing.T) {
 				Effect:   core.TaintEffectNoSchedule,
 			},
 			featureGateOn: true,
-			expectError:   true,
 			errorMsg:      "value must be a valid integer for numeric operators",
 		},
 	}
@@ -29696,10 +29685,10 @@ func TestNumericTolerationsWithFeatureGate(t *testing.T) {
 
 			errs := ValidateTolerations([]core.Toleration{tc.toleration}, field.NewPath("tolerations"))
 
-			if tc.expectError {
+			if tc.errorMsg != "" {
 				if len(errs) == 0 {
 					t.Errorf("Expected error but got none")
-				} else if tc.errorMsg != "" && !strings.Contains(errs.ToAggregate().Error(), tc.errorMsg) {
+				} else if !strings.Contains(errs.ToAggregate().Error(), tc.errorMsg) {
 					t.Errorf("Expected error message to contain %q, got %q", tc.errorMsg, errs.ToAggregate().Error())
 				}
 			} else {
