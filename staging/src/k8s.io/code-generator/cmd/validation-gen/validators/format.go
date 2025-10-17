@@ -52,13 +52,14 @@ var (
 	// TODO: uncomment the following when we've done the homework
 	// to be sure it works the current state of IP manual-ratcheting
 	// ipSloppyValidator         = types.Name{Package: libValidationPkg, Name: "IPSloppy"}
-	labelKeyValidator         = types.Name{Package: libValidationPkg, Name: "LabelKey"}
-	labelValueValidator       = types.Name{Package: libValidationPkg, Name: "LabelValue"}
-	longNameCaselessValidator = types.Name{Package: libValidationPkg, Name: "LongNameCaseless"}
-	longNameValidator         = types.Name{Package: libValidationPkg, Name: "LongName"}
-	resourcePoolNameValidator = types.Name{Package: libValidationPkg, Name: "ResourcePoolName"}
-	shortNameValidator        = types.Name{Package: libValidationPkg, Name: "ShortName"}
-	uuidValidator             = types.Name{Package: libValidationPkg, Name: "UUID"}
+	labelKeyValidator                   = types.Name{Package: libValidationPkg, Name: "LabelKey"}
+	labelValueValidator                 = types.Name{Package: libValidationPkg, Name: "LabelValue"}
+	longNameCaselessValidator           = types.Name{Package: libValidationPkg, Name: "LongNameCaseless"}
+	longNameValidator                   = types.Name{Package: libValidationPkg, Name: "LongName"}
+	resourceFullyQualifiedNameValidator = types.Name{Package: libValidationPkg, Name: "ResourceFullyQualifiedName"}
+	resourcePoolNameValidator           = types.Name{Package: libValidationPkg, Name: "ResourcePoolName"}
+	shortNameValidator                  = types.Name{Package: libValidationPkg, Name: "ShortName"}
+	uuidValidator                       = types.Name{Package: libValidationPkg, Name: "UUID"}
 )
 
 func (formatTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
@@ -99,6 +100,8 @@ func getFormatValidationFunction(format string) (FunctionGen, error) {
 		return Function(formatTagName, DefaultFlags, longNameValidator), nil
 	case "k8s-long-name-caseless":
 		return Function(formatTagName, DefaultFlags, longNameCaselessValidator), nil
+	case "k8s-resource-fully-qualified-name":
+		return Function(formatTagName, DefaultFlags, resourceFullyQualifiedNameValidator), nil
 	case "k8s-resource-pool-name":
 		return Function(formatTagName, DefaultFlags, resourcePoolNameValidator), nil
 	case "k8s-short-name":
@@ -132,6 +135,9 @@ func (ftv formatTagValidator) Docs() TagDoc {
 		}, {
 			Description: "k8s-long-name-caseless",
 			Docs:        "Deprecated: This field holds a case-insensitive Kubernetes \"long name\", aka a \"DNS subdomain\" value.",
+		}, {
+			Description: "k8s-resource-fully-qualified-name",
+			Docs:        "This field holds a Kubernetes resource \"fully qualified name\" value.",
 		}, {
 			Description: "k8s-resource-pool-name",
 			Docs:        "This field holds value with one or more Kubernetes \"long name\" parts separated by `/` and no longer than 253 characters.",
