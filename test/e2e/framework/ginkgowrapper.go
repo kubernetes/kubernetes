@@ -242,15 +242,24 @@ func init() {
 }
 
 func transformGinkgoNodeArgs(nodeType types.NodeType, offset ginkgo.Offset, text string, args []any) (string, []any, []error) {
-	text, args = expandGinkgoArgs(offset+1, text, args)
+	text, args = expandGinkgoArgs(nodeType == types.NodeTypeIt, offset+1, text, args)
 	return text, args, nil
 }
 
+// additionalLabels contains labels like Alpha that might get added indirectly
+// multiple times by registerInSuite. Instead of of injecting their tag
+// multiple times directly into the text at the place which triggers their
+// addition, they get only added as label (not visible) and the text then gets
+// added in the leaf node (= ginkgo.It).
+//
+// We have a fairly good idea what this will include (Alpha, Beta, ...,
+// OffByDefault), but collecting them during init is safe and avoids making
+// assumptions about what values a feature gate's PreRelease field might have.
+var additionalLabels = sets.New[string]()
+
 // expandGinkgoArgs concatenates all strings and translates our custom
 // arguments into something that Ginkgo can handle.
-func expandGinkgoArgs(offset ginkgo.Offset, text string, args []any) (string, []any) {
-	ginkgo.GinkgoHelper()
-
+func expandGinkgoArgs(leafNode bool, offset ginkgo.Offset, text string, args []any) (string, []any) {
 	var ginkgoArgs []interface{}
 	var texts []string
 
@@ -258,27 +267,24 @@ func expandGinkgoArgs(offset ginkgo.Offset, text string, args []any) (string, []
 		texts = append(texts, text)
 	}
 
-	addLabel := func(label string) {
-		texts = append(texts, fmt.Sprintf("[%s]", label))
-		ginkgoArgs = append(ginkgoArgs, ginkgo.Label(label))
-	}
-
 	haveEmptyStrings := false
 	for _, arg := range args {
 		switch arg := arg.(type) {
 		case label:
 			fullLabel := strings.Join(arg.parts, ":")
-			addLabel(fullLabel)
+			texts = append(texts, fmt.Sprintf("[%s]", fullLabel))
+			ginkgoArgs = append(ginkgoArgs, ginkgo.Label(fullLabel))
 			if arg.alphaBetaLevel != "" {
-				texts = append(texts, fmt.Sprintf("[%[1]s]", arg.alphaBetaLevel))
+				additionalLabels.Insert(arg.alphaBetaLevel)
 				ginkgoArgs = append(ginkgoArgs, ginkgo.Label(arg.alphaBetaLevel))
 			}
 			if arg.offByDefault {
-				texts = append(texts, "[Feature:OffByDefault]")
+				additionalLabels.Insert("Feature:OffByDefault")
 				ginkgoArgs = append(ginkgoArgs, ginkgo.Label("Feature:OffByDefault"))
 				// Alphas are always off by default but we may want to select
 				// betas based on defaulted-ness.
 				if arg.alphaBetaLevel == "Beta" {
+					// Not embedded in text!
 					ginkgoArgs = append(ginkgoArgs, ginkgo.Label("BetaOffByDefault"))
 				}
 			}
@@ -304,6 +310,25 @@ func expandGinkgoArgs(offset ginkgo.Offset, text string, args []any) (string, []
 	for _, text := range texts {
 		if strings.HasPrefix(text, " ") || strings.HasSuffix(text, " ") {
 			RecordBug(NewBug(fmt.Sprintf("trailing or leading spaces are unnecessary and need to be removed: %q", text), int(offset)))
+		}
+	}
+
+	// Ensure that each leaf node text contains all additional labels collected so far.
+	// We get those labels from the set of labels associated with the container node(s).
+	if leafNode {
+		var currentAdditionalLabels []string
+		for _, label := range ginkgo.CurrentSpecReport().Labels() {
+			if additionalLabels.Has(label) {
+				currentAdditionalLabels = append(currentAdditionalLabels, label)
+			}
+
+		}
+
+		slices.Sort(currentAdditionalLabels)
+		for _, label := range currentAdditionalLabels {
+			texts = append(texts, fmt.Sprintf("[%s]", label))
+			// This keeps validateText happy.
+			ginkgoArgs = append(ginkgoArgs, ginkgo.Label(label))
 		}
 	}
 
