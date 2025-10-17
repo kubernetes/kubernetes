@@ -748,7 +748,7 @@ func TestFindMatchingUntoleratedTaint(t *testing.T) {
 			expectTolerated: true,
 		},
 		{
-			description: "numeric Gt operator with matching SLA, expect tolerated",
+			description: "numeric Gt operator with taint value below threshold, expect not tolerated",
 			tolerations: []v1.Toleration{
 				{
 					Key:      "node.kubernetes.io/sla",
@@ -765,10 +765,10 @@ func TestFindMatchingUntoleratedTaint(t *testing.T) {
 				},
 			},
 			applyFilter:     func(t *v1.Taint) bool { return true },
-			expectTolerated: true,
+			expectTolerated: false,
 		},
 		{
-			description: "numeric Gt operator with non-matching SLA, expect not tolerated",
+			description: "numeric Gt operator with taint value above threshold, expect tolerated",
 			tolerations: []v1.Toleration{
 				{
 					Key:      "node.kubernetes.io/sla",
@@ -785,10 +785,10 @@ func TestFindMatchingUntoleratedTaint(t *testing.T) {
 				},
 			},
 			applyFilter:     func(t *v1.Taint) bool { return true },
-			expectTolerated: false,
+			expectTolerated: true,
 		},
 		{
-			description: "numeric Lt operator with matching threshold, expect tolerated",
+			description: "numeric Lt operator with taint value above threshold, expect not tolerated",
 			tolerations: []v1.Toleration{
 				{
 					Key:      "node.kubernetes.io/sla",
@@ -805,7 +805,7 @@ func TestFindMatchingUntoleratedTaint(t *testing.T) {
 				},
 			},
 			applyFilter:     func(t *v1.Taint) bool { return true },
-			expectTolerated: true,
+			expectTolerated: false,
 		},
 		{
 			description: "numeric Gt operator with non-numeric taint value, expect not tolerated",

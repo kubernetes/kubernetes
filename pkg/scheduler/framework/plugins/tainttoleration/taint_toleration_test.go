@@ -250,8 +250,8 @@ func TestTaintTolerationScore(t *testing.T) {
 				}}),
 			},
 			expectedList: []fwk.NodeScore{
-				{Name: "nodeA", Score: fwk.MaxNodeScore},
-				{Name: "nodeB", Score: 0},
+				{Name: "nodeA", Score: 0},
+				{Name: "nodeB", Score: fwk.MaxNodeScore},
 			},
 		},
 		{
@@ -276,7 +276,7 @@ func TestTaintTolerationScore(t *testing.T) {
 			},
 			expectedList: []fwk.NodeScore{
 				{Name: "nodeA", Score: 0},
-				{Name: "nodeB", Score:  fwk.MaxNodeScore},
+				{Name: "nodeB", Score: fwk.MaxNodeScore},
 			},
 		},
 	}
@@ -390,28 +390,28 @@ func TestTaintTolerationFilter(t *testing.T) {
 			node: nodeWithTaints("nodeA", []v1.Taint{{Key: "dedicated", Value: "user1", Effect: "PreferNoSchedule"}}),
 		},
 		{
-			name: "Pod with Gt toleration can be scheduled on node with matching numeric taint (toleration > taint)",
+			name: "Pod with Gt toleration cannot be scheduled on node when taint value is lower than threshold",
 			pod:  podWithTolerations("pod1", []v1.Toleration{{Key: "node.kubernetes.io/sla", Operator: "Gt", Value: "950", Effect: "NoSchedule"}}),
 			node: nodeWithTaints("nodeA", []v1.Taint{{Key: "node.kubernetes.io/sla", Value: "800", Effect: "NoSchedule"}}),
+			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable,
+				"node(s) had untolerated taint {node.kubernetes.io/sla: 800}"),
 		},
 		{
-			name: "Pod with Gt toleration cannot be scheduled on node when taint value is higher",
+			name: "Pod with Gt toleration can be scheduled on node when taint value is higher than threshold",
 			pod:  podWithTolerations("pod1", []v1.Toleration{{Key: "node.kubernetes.io/sla", Operator: "Gt", Value: "750", Effect: "NoSchedule"}}),
+			node: nodeWithTaints("nodeA", []v1.Taint{{Key: "node.kubernetes.io/sla", Value: "950", Effect: "NoSchedule"}}),
+		},
+		{
+			name: "Pod with Lt toleration cannot be scheduled on node when taint value is higher than threshold",
+			pod:  podWithTolerations("pod1", []v1.Toleration{{Key: "node.kubernetes.io/sla", Operator: "Lt", Value: "800", Effect: "NoSchedule"}}),
 			node: nodeWithTaints("nodeA", []v1.Taint{{Key: "node.kubernetes.io/sla", Value: "950", Effect: "NoSchedule"}}),
 			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable,
 				"node(s) had untolerated taint {node.kubernetes.io/sla: 950}"),
 		},
 		{
-			name: "Pod with Lt toleration can be scheduled on node with matching numeric taint (toleration < taint)",
-			pod:  podWithTolerations("pod1", []v1.Toleration{{Key: "node.kubernetes.io/sla", Operator: "Lt", Value: "800", Effect: "NoSchedule"}}),
-			node: nodeWithTaints("nodeA", []v1.Taint{{Key: "node.kubernetes.io/sla", Value: "950", Effect: "NoSchedule"}}),
-		},
-		{
-			name: "Pod with Lt toleration cannot be scheduled on node when taint value is lower",
+			name: "Pod with Lt toleration can be scheduled on node when taint value is lower than threshold",
 			pod:  podWithTolerations("pod1", []v1.Toleration{{Key: "node.kubernetes.io/sla", Operator: "Lt", Value: "950", Effect: "NoSchedule"}}),
 			node: nodeWithTaints("nodeA", []v1.Taint{{Key: "node.kubernetes.io/sla", Value: "800", Effect: "NoSchedule"}}),
-			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable,
-				"node(s) had untolerated taint {node.kubernetes.io/sla: 800}"),
 		},
 		{
 			name: "Pod with Gt toleration cannot be scheduled on node with non-numeric taint value",
