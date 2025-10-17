@@ -1846,7 +1846,7 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 		kl.eventedPleg.Start()
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.SystemdWatchdog) && kl.healthChecker != nil {
+	if kl.healthChecker != nil {
 		kl.healthChecker.SetHealthCheckers(kl, kl.containerManager.GetHealthCheckers())
 	}
 
