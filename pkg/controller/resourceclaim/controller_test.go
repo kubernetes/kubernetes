@@ -24,6 +24,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/onsi/gomega"
 	"github.com/stretchr/testify/assert"
 
@@ -61,6 +62,7 @@ var (
 	testClaimAllocated     = allocateClaim(testClaim)
 	testClaimReserved      = reserveClaim(testClaimAllocated, testPodWithResource)
 	testClaimReservedTwice = reserveClaim(testClaimReserved, otherTestPod)
+	testClaimKey           = claimKeyPrefix + testClaim.Namespace + "/" + testClaim.Name
 
 	generatedTestClaim          = makeGeneratedClaim(podResourceClaimName, testPodName+"-"+podResourceClaimName+"-", testNamespace, className, 1, makeOwnerReference(testPodWithResource, true), nil)
 	generatedTestClaimWithAdmin = makeGeneratedClaim(podResourceClaimName, testPodName+"-"+podResourceClaimName+"-", testNamespace, className, 1, makeOwnerReference(testPodWithResource, true), ptr.To(true))
@@ -496,7 +498,7 @@ func TestResourceClaimEventHandler(t *testing.T) {
 	templateInformer := informerFactory.Resource().V1beta1().ResourceClaimTemplates()
 	claimClient := fakeKubeClient.ResourceV1beta1().ResourceClaims(testNamespace)
 
-	_, err := NewController(tCtx.Logger(), Features{}, fakeKubeClient, podInformer, claimInformer, templateInformer)
+	ec, err := NewController(tCtx.Logger(), Features{}, fakeKubeClient, podInformer, claimInformer, templateInformer)
 	tCtx.ExpectNoError(err, "creating ephemeral controller")
 
 	informerFactory.Start(tCtx.Done())
@@ -508,11 +510,47 @@ func TestResourceClaimEventHandler(t *testing.T) {
 
 	var em numMetrics
 
+	expectQueue := func(tCtx ktesting.TContext, expectedKeys []string) {
+		g := gomega.NewWithT(tCtx)
+		tCtx.Helper()
+
+		lenDiffMessage := func() string {
+			actualKeys := []string{}
+			for ec.queue.Len() > 0 {
+				actual, _ := ec.queue.Get()
+				actualKeys = append(actualKeys, actual)
+				ec.queue.Forget(actual)
+				ec.queue.Done(actual)
+			}
+			return "Workqueue does not contain expected number of elements\n" +
+				"Diff of elements (- expected, + actual):\n" +
+				cmp.Diff(expectedKeys, actualKeys)
+		}
+
+		g.Eventually(ec.queue.Len).
+			WithTimeout(5*time.Second).
+			Should(gomega.Equal(len(expectedKeys)), lenDiffMessage)
+		g.Consistently(ec.queue.Len).
+			WithTimeout(1*time.Second).
+			Should(gomega.Equal(len(expectedKeys)), lenDiffMessage)
+
+		for _, expected := range expectedKeys {
+			actual, shuttingDown := ec.queue.Get()
+			g.Expect(shuttingDown).To(gomega.BeFalseBecause("workqueue is unexpectedly shutting down"))
+			g.Expect(actual).To(gomega.Equal(expected))
+			ec.queue.Forget(actual)
+			ec.queue.Done(actual)
+		}
+	}
+
+	expectQueue(tCtx, []string{})
+
 	_, err = claimClient.Create(tCtx, testClaim, metav1.CreateOptions{})
 	em.claims++
 	ktesting.Step(tCtx, "create claim", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Eventually(tCtx)
+		expectQueue(tCtx, []string{testClaimKey})
 	})
 
 	modifiedClaim := testClaim.DeepCopy()
@@ -521,6 +559,7 @@ func TestResourceClaimEventHandler(t *testing.T) {
 	ktesting.Step(tCtx, "modify claim", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Consistently(tCtx)
+		expectQueue(tCtx, []string{testClaimKey})
 	})
 
 	_, err = claimClient.Update(tCtx, testClaimAllocated, metav1.UpdateOptions{})
@@ -528,6 +567,7 @@ func TestResourceClaimEventHandler(t *testing.T) {
 	ktesting.Step(tCtx, "allocate claim", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Eventually(tCtx)
+		expectQueue(tCtx, []string{testClaimKey})
 	})
 
 	modifiedClaim = testClaimAllocated.DeepCopy()
@@ -536,6 +576,7 @@ func TestResourceClaimEventHandler(t *testing.T) {
 	ktesting.Step(tCtx, "modify claim", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Consistently(tCtx)
+		expectQueue(tCtx, []string{testClaimKey})
 	})
 
 	otherClaimAllocated := testClaimAllocated.DeepCopy()
@@ -546,6 +587,7 @@ func TestResourceClaimEventHandler(t *testing.T) {
 	ktesting.Step(tCtx, "create allocated claim", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Eventually(tCtx)
+		expectQueue(tCtx, []string{testClaimKey + "2"})
 	})
 
 	_, err = claimClient.Update(tCtx, testClaim, metav1.UpdateOptions{})
@@ -553,6 +595,7 @@ func TestResourceClaimEventHandler(t *testing.T) {
 	ktesting.Step(tCtx, "deallocate claim", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Eventually(tCtx)
+		expectQueue(tCtx, []string{testClaimKey})
 	})
 
 	err = claimClient.Delete(tCtx, testClaim.Name, metav1.DeleteOptions{})
@@ -560,6 +603,7 @@ func TestResourceClaimEventHandler(t *testing.T) {
 	ktesting.Step(tCtx, "delete deallocated claim", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Eventually(tCtx)
+		expectQueue(tCtx, []string{})
 	})
 
 	err = claimClient.Delete(tCtx, otherClaimAllocated.Name, metav1.DeleteOptions{})
@@ -568,6 +612,7 @@ func TestResourceClaimEventHandler(t *testing.T) {
 	ktesting.Step(tCtx, "delete allocated claim", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Eventually(tCtx)
+		expectQueue(tCtx, []string{})
 	})
 
 	em.Consistently(tCtx)
