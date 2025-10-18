@@ -639,6 +639,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.33"
+- name: ImageVolumeWithDigest
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.35"
 - name: InPlacePodVerticalScaling
   versionedSpecs:
   - default: false

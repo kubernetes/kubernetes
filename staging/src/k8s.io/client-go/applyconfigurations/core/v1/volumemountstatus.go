@@ -37,6 +37,10 @@ type VolumeMountStatusApplyConfiguration struct {
 	// An IfPossible value in the original VolumeMount must be translated to Disabled or Enabled,
 	// depending on the mount result.
 	RecursiveReadOnly *corev1.RecursiveReadOnlyMode `json:"recursiveReadOnly,omitempty"`
+	// ImageRef is the digest of the image used for this volume.
+	// It should have a value that's similar to the pod's status.containerStatuses[i].imageID.
+	// If the volume source is not an ImageVolume, this field will be empty.
+	ImageRef *string `json:"imageRef,omitempty"`
 }
 
 // VolumeMountStatusApplyConfiguration constructs a declarative configuration of the VolumeMountStatus type for use with
@@ -74,5 +78,13 @@ func (b *VolumeMountStatusApplyConfiguration) WithReadOnly(value bool) *VolumeMo
 // If called multiple times, the RecursiveReadOnly field is set to the value of the last call.
 func (b *VolumeMountStatusApplyConfiguration) WithRecursiveReadOnly(value corev1.RecursiveReadOnlyMode) *VolumeMountStatusApplyConfiguration {
 	b.RecursiveReadOnly = &value
+	return b
+}
+
+// WithImageRef sets the ImageRef field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ImageRef field is set to the value of the last call.
+func (b *VolumeMountStatusApplyConfiguration) WithImageRef(value string) *VolumeMountStatusApplyConfiguration {
+	b.ImageRef = &value
 	return b
 }

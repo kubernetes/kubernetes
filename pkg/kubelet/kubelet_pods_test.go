@@ -3588,6 +3588,7 @@ func TestConvertToAPIContainerStatuses(t *testing.T) {
 				test.currentStatus,
 				test.previousStatus,
 				test.containers,
+				nil,
 				test.hasInitContainers,
 				test.isInitContainer,
 			)
@@ -4906,7 +4907,7 @@ func TestConvertToAPIContainerStatusesDataRace(t *testing.T) {
 	// detection, so would catch a race condition consistently, despite only spawning 2 goroutines
 	for i := 0; i < 2; i++ {
 		go func() {
-			kl.convertToAPIContainerStatuses(pod, criStatus, []v1.ContainerStatus{}, []v1.Container{}, false, false)
+			kl.convertToAPIContainerStatuses(pod, criStatus, []v1.ContainerStatus{}, []v1.Container{}, nil, false, false)
 		}()
 	}
 }
@@ -5376,7 +5377,7 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 			}
 			podStatus := testPodStatus(state, resources)
 
-			cStatuses := kubelet.convertToAPIContainerStatuses(tPod, podStatus, []v1.ContainerStatus{tc.OldStatus}, tPod.Spec.Containers, false, false)
+			cStatuses := kubelet.convertToAPIContainerStatuses(tPod, podStatus, []v1.ContainerStatus{tc.OldStatus}, tPod.Spec.Containers, nil, false, false)
 			actual := cStatuses[0]
 			// Explicitly test AllocatedResources and Resources separately for debuggability.
 			assert.Equal(t, tc.Expected.AllocatedResources, actual.AllocatedResources, "AllocatedResources")
@@ -5500,7 +5501,7 @@ func TestConvertToAPIContainerStatusesForUser(t *testing.T) {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SupplementalGroupsPolicy, tc.featureEnabled)
 		tPod := testPod.DeepCopy()
 		t.Logf("TestCase: %q", tdesc)
-		cStatuses := kubelet.convertToAPIContainerStatuses(tPod, tc.testPodStatus, tPod.Status.ContainerStatuses, tPod.Spec.Containers, false, false)
+		cStatuses := kubelet.convertToAPIContainerStatuses(tPod, tc.testPodStatus, tPod.Status.ContainerStatuses, tPod.Spec.Containers, nil, false, false)
 		assert.Equal(t, tc.expectedContainerStatus, cStatuses)
 	}
 }

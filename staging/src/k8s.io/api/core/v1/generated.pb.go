@@ -14055,6 +14055,13 @@ func (m *VolumeMountStatus) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.ImageRef != nil {
+		i -= len(*m.ImageRef)
+		copy(dAtA[i:], *m.ImageRef)
+		i = encodeVarintGenerated(dAtA, i, uint64(len(*m.ImageRef)))
+		i--
+		dAtA[i] = 0x2a
+	}
 	if m.RecursiveReadOnly != nil {
 		i -= len(*m.RecursiveReadOnly)
 		copy(dAtA[i:], *m.RecursiveReadOnly)
@@ -19878,6 +19885,10 @@ func (m *VolumeMountStatus) Size() (n int) {
 		l = len(*m.RecursiveReadOnly)
 		n += 1 + l + sovGenerated(uint64(l))
 	}
+	if m.ImageRef != nil {
+		l = len(*m.ImageRef)
+		n += 1 + l + sovGenerated(uint64(l))
+	}
 	return n
 }
 
@@ -23915,6 +23926,7 @@ func (this *VolumeMountStatus) String() string {
 		`MountPath:` + fmt.Sprintf("%v", this.MountPath) + `,`,
 		`ReadOnly:` + fmt.Sprintf("%v", this.ReadOnly) + `,`,
 		`RecursiveReadOnly:` + valueToStringGenerated(this.RecursiveReadOnly) + `,`,
+		`ImageRef:` + valueToStringGenerated(this.ImageRef) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -67547,6 +67559,39 @@ func (m *VolumeMountStatus) Unmarshal(dAtA []byte) error {
 			}
 			s := RecursiveReadOnlyMode(dAtA[iNdEx:postIndex])
 			m.RecursiveReadOnly = &s
+			iNdEx = postIndex
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ImageRef", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			s := string(dAtA[iNdEx:postIndex])
+			m.ImageRef = &s
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
