@@ -33,6 +33,8 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
+	ndftesting "k8s.io/component-helpers/nodedeclaredfeatures/testing"
 	"k8s.io/component-helpers/storage/volume"
 	"k8s.io/kubernetes/pkg/features"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -2929,6 +2931,308 @@ func TestNodeAffinityFilter(t *testing.T) {
 					podUnschedulable(cs, testPod.Namespace, testPod.Name))
 				if err != nil {
 					t.Errorf("Test Failed: Expected pod %s/%s to be unschedulable but got error: %v", testPod.Namespace, testPod.Name, err)
+				}
+			}
+		})
+	}
+}
+
+func TestNodeDeclaredFeaturesFilter(t *testing.T) {
+
+	// Helper to create a pod that requires the feature.
+	podRequiringFeatureA := st.MakePod().Name("pod-req-feature-a").
+		UID("pod-req-feature").
+		Containers([]v1.Container{{Name: "container", Image: imageutils.GetPauseImageName()}}).Obj()
+
+	// Helper to create a pod that does NOT require the feature.
+
+	podWithoutRequirement := st.MakePod().Name("pod-no-req").UID("pod-no-req").
+		Containers([]v1.Container{{Name: "container", Image: imageutils.GetPauseImageName()}}).
+		Obj()
+
+	nodeWithFeatureA := st.MakeNode().Name("node-with-feature-a").Obj()
+	nodeWithFeatureA.Status.DeclaredFeatures = []string{"featureA"}
+
+	nodeWithFeatureB := st.MakeNode().Name("node-with-feature-b").Obj()
+	nodeWithFeatureB.Status.DeclaredFeatures = []string{"featureB"}
+
+	nodeWithoutFeatures := st.MakeNode().Name("node-without-features").Obj()
+	nodeWithoutFeatures.Status.DeclaredFeatures = []string{}
+
+	nodeWithMultipleFeatures := st.MakeNode().Name("node-with-multiple-features").Obj()
+	nodeWithMultipleFeatures.Status.DeclaredFeatures = []string{"featureA", "featureB"}
+
+	mockFeature := []ndf.Feature{&ndftesting.MockFeature{
+		NameFunc: func() string { return "featureA" },
+		InferFromCreateFunc: func(podInfo *ndf.PodInfo) bool {
+			return podInfo.Pod.Name == "pod-req-feature-a"
+		},
+	}}
+	mockHelper, _ := ndf.NewHelper(mockFeature)
+
+	tests := []struct {
+		name           string
+		pod            *v1.Pod
+		nodes          []*v1.Node
+		featureEnabled bool
+		fit            bool
+		expectedNode   string
+	}{
+		{
+			name:           "Feature gate disabled",
+			pod:            podRequiringFeatureA.DeepCopy(),
+			nodes:          []*v1.Node{nodeWithoutFeatures},
+			featureEnabled: false,
+			fit:            true,
+			expectedNode:   "node-without-features",
+		},
+		{
+			name:           "pod without feature requirement schedulable on node without features",
+			pod:            podWithoutRequirement.DeepCopy(),
+			nodes:          []*v1.Node{nodeWithoutFeatures},
+			featureEnabled: true,
+			fit:            true,
+			expectedNode:   "node-without-features",
+		},
+		{
+			name:           "pod without feature requirement schedulable on node with features",
+			pod:            podWithoutRequirement.DeepCopy(),
+			nodes:          []*v1.Node{nodeWithFeatureA},
+			featureEnabled: true,
+			fit:            true,
+			expectedNode:   "node-with-feature-a",
+		},
+		{
+			name:           "pod with feature requirement schedulable on node with the feature",
+			pod:            podRequiringFeatureA.DeepCopy(),
+			nodes:          []*v1.Node{nodeWithFeatureA, nodeWithFeatureB},
+			featureEnabled: true,
+			fit:            true,
+			expectedNode:   "node-with-feature-a",
+		},
+		{
+			name:           "pod with feature requirement not schedulable on node without features",
+			pod:            podRequiringFeatureA.DeepCopy(),
+			nodes:          []*v1.Node{nodeWithFeatureB},
+			featureEnabled: true,
+			fit:            false,
+			expectedNode:   "",
+		},
+		{
+			name:           "pod with feature requirement schedulable on node with multiple features",
+			pod:            podRequiringFeatureA.DeepCopy(),
+			nodes:          []*v1.Node{nodeWithMultipleFeatures, nodeWithoutFeatures},
+			featureEnabled: true,
+			fit:            true,
+			expectedNode:   "node-with-multiple-features",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, tt.featureEnabled)
+
+			var testCtx *testutils.TestContext
+			if tt.featureEnabled {
+				testCtx = testutils.InitTestSchedulerWithNodeDeclaredFeaturesHelper(t, "node-features-filter", mockHelper, "1.35.0")
+			} else {
+				testCtx = testutils.InitTestSchedulerWithNS(t, "node-features-filter")
+			}
+			cs := testCtx.ClientSet
+			ns := testCtx.NS.Name
+
+			for _, node := range tt.nodes {
+
+				_, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatalf("Failed to create node %v: %v", node.Name, err)
+				}
+			}
+
+			tt.pod.Namespace = ns
+			_, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, tt.pod, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("Failed to create pod %v: %v", tt.pod.Name, err)
+			}
+
+			// Assert the scheduling outcome.
+			if tt.fit {
+				if tt.expectedNode != "" {
+					err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false, testutils.PodScheduledIn(cs, tt.pod.Namespace, tt.pod.Name, []string{tt.expectedNode}))
+				} else {
+					err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
+						testutils.PodScheduled(cs, tt.pod.Namespace, tt.pod.Name))
+				}
+				if err != nil {
+					t.Errorf("Expected pod to be scheduled, but it was not: %v", err)
+				}
+			} else {
+				err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false, testutils.PodUnschedulable(cs, tt.pod.Namespace, tt.pod.Name))
+				if err != nil {
+					t.Errorf("Expected pod to be unschedulable, but it was not: %v", err)
+				}
+			}
+		})
+	}
+}
+
+func TestNodeDeclaredFeaturesUpdateEvents(t *testing.T) {
+
+	mockFeature := []ndf.Feature{&ndftesting.MockFeature{
+		NameFunc: func() string { return "featureA" },
+		InferFromCreateFunc: func(podInfo *ndf.PodInfo) bool {
+			if len(podInfo.Pod.Spec.Tolerations) > 0 && podInfo.Pod.Spec.Tolerations[0].TolerationSeconds != nil && *podInfo.Pod.Spec.Tolerations[0].TolerationSeconds > 0 {
+				return true
+			}
+			return false
+		},
+	}}
+	mockHelper, _ := ndf.NewHelper(mockFeature)
+
+	podRequiringFeatureA := st.MakePod().Name("pod1").
+		Containers([]v1.Container{{
+			Name:  "container",
+			Image: imageutils.GetPauseImageName(),
+		}}).Obj()
+	var tolerationsSeconds100 int64 = 100
+	podRequiringFeatureA.Spec.Tolerations = []v1.Toleration{{
+		Key:               "node.kubernetes.io/feature",
+		Effect:            v1.TaintEffectNoExecute,
+		TolerationSeconds: &tolerationsSeconds100,
+	}}
+
+	podWithoutRequiringFeatureA := podRequiringFeatureA.DeepCopy()
+	var tolerationsSeconds0 int64 = 0
+	podWithoutRequiringFeatureA.Spec.Tolerations[0].TolerationSeconds = &tolerationsSeconds0
+
+	podRequiringFeatureAUpdated := podRequiringFeatureA.DeepCopy()
+	var tolerationsSeconds200 int64 = 200
+	podRequiringFeatureAUpdated.Spec.Tolerations[0].TolerationSeconds = &tolerationsSeconds200
+
+	nodeName := "node-1"
+	capacity := map[v1.ResourceName]string{
+		v1.ResourceCPU:    "4",
+		v1.ResourceMemory: "1024Mi",
+	}
+	st.MakeNode().Name(nodeName).Capacity(capacity).Obj()
+	nodeWithoutFeatureA := st.MakeNode().Name(nodeName).Capacity(capacity).Obj()
+	nodeWithoutFeatureA.Status.DeclaredFeatures = []string{}
+
+	tests := []struct {
+		name                       string
+		pod                        *v1.Pod
+		updatedPod                 *v1.Pod
+		node                       *v1.Node
+		updateNodeDeclaredFeatures []string
+		initialfit                 bool
+		updatedfit                 bool
+	}{
+		{
+			name:                       "pod becomes schedulable after node update",
+			pod:                        podRequiringFeatureA,
+			node:                       nodeWithoutFeatureA,
+			initialfit:                 false,
+			updateNodeDeclaredFeatures: []string{"featureA"},
+			updatedfit:                 true,
+		},
+		{
+			name:                       "pod not schedulable after irrelevant node update",
+			pod:                        podRequiringFeatureA,
+			node:                       nodeWithoutFeatureA,
+			initialfit:                 false,
+			updateNodeDeclaredFeatures: []string{"featureB"},
+			updatedfit:                 false,
+		},
+		{
+			name:       "pod becomes schedulable after pod update",
+			pod:        podRequiringFeatureA,
+			updatedPod: podWithoutRequiringFeatureA,
+			node:       nodeWithoutFeatureA,
+			initialfit: false,
+			updatedfit: true,
+		},
+		{
+			name:       "pod not schedulable after irrelevant pod update",
+			pod:        podRequiringFeatureA,
+			updatedPod: podRequiringFeatureAUpdated,
+			node:       nodeWithoutFeatureA,
+			initialfit: false,
+			updatedfit: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
+
+			// Setup the test context.
+			testCtx := testutils.InitTestSchedulerWithNodeDeclaredFeaturesHelper(t, "node-features-filter", mockHelper, "1.35.0")
+
+			cs := testCtx.ClientSet
+			ns := testCtx.NS.Name
+
+			// Create the node object.
+			_, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, tt.node, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("Failed to create node %v: %v", tt.node.Name, err)
+			}
+
+			// Create the pod.
+			tt.pod.Namespace = ns
+			createdPod, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, tt.pod, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("Failed to create pod %v: %v", tt.pod.Name, err)
+			}
+
+			// Assert the initial scheduling outcome.
+			if tt.initialfit {
+				if err := wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false, testutils.PodScheduledIn(cs, tt.pod.Namespace, tt.pod.Name, []string{nodeName})); err != nil {
+					t.Errorf("Expected pod to be scheduled, but it was not: %v", err)
+				}
+			} else {
+				if err := wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false, testutils.PodUnschedulable(cs, tt.pod.Namespace, tt.pod.Name)); err != nil {
+					t.Errorf("Expected pod to be unschedulable, but it was not: %v", err)
+				}
+
+				// Perform an update (either to the pod or the node).
+				if tt.updatedPod != nil {
+					// Update the pod to remove the feature requirement.
+					err := wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+						podToUpdate, err := cs.CoreV1().Pods(ns).Get(ctx, createdPod.Name, metav1.GetOptions{})
+						if err != nil {
+							return false, err
+						}
+						podToUpdate.Spec.Tolerations = tt.updatedPod.Spec.Tolerations
+						_, err = cs.CoreV1().Pods(ns).Update(ctx, podToUpdate, metav1.UpdateOptions{})
+						if err == nil {
+							return true, nil
+						}
+						if apierrors.IsConflict(err) {
+							return false, nil // retry
+						}
+						return false, err
+					})
+					if err != nil {
+						t.Fatalf("Failed to update pod: %v", err)
+					}
+				} else {
+					// Update the node to add the feature.
+					updatedNode := tt.node.DeepCopy()
+					updatedNode.Status.DeclaredFeatures = tt.updateNodeDeclaredFeatures
+					if _, err := cs.CoreV1().Nodes().UpdateStatus(testCtx.Ctx, updatedNode, metav1.UpdateOptions{}); err != nil {
+						t.Fatalf("Failed to update node status: %v", err)
+					}
+				}
+
+				// Assert the final scheduling outcome.
+				if tt.updatedfit {
+					if err := wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false, testutils.PodScheduledIn(cs, tt.pod.Namespace, tt.pod.Name, []string{nodeName})); err != nil {
+						t.Errorf("Expected pod to be scheduled after update, but it was not: %v", err)
+					}
+				} else {
+					if err := wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false, testutils.PodUnschedulable(cs, tt.pod.Namespace, tt.pod.Name)); err != nil {
+						t.Errorf("Expected pod to remain unschedulable after update, but it was not: %v", err)
+					}
 				}
 			}
 		})

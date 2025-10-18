@@ -62,9 +62,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/nodestatus"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
 	kubeletvolume "k8s.io/kubernetes/pkg/kubelet/volumemanager"
-	taintutil "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/kubernetes/pkg/volume/util"
-	netutils "k8s.io/utils/net"
 )
 
 const (
@@ -237,7 +235,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 
 			kubeClient := testKubelet.fakeKubeClient
 			existingNode := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname}}
-			kubeClient.ReactionChain = fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{existingNode}}).ReactionChain
+			kubeClient.ReactionChain = fake.NewClientset(&v1.NodeList{Items: []v1.Node{existingNode}}).ReactionChain
 			kubelet.nodeLister = delegatingNodeLister{client: kubeClient}
 			machineInfo := &cadvisorapi.MachineInfo{
 				MachineID:      "123",
@@ -509,7 +507,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 	}
 
 	kubelet.updateRuntimeUp()
-	assert.NoError(t, kubelet.updateNodeStatus(ctx))
+	require.NoError(t, kubelet.updateNodeStatus(ctx))
 
 	actions := kubeClient.Actions()
 	assert.Len(t, actions, 2)
@@ -2010,416 +2008,20 @@ func TestUpdateDefaultResources(t *testing.T) {
 				},
 			},
 			needsUpdate: false,
-		}, {
-			name:        "no update needed when capacity and allocatable of the initial node are nil",
-			initialNode: &v1.Node{},
-			existingNode: &v1.Node{
-				Status: v1.NodeStatus{
-					Capacity: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-					},
-					Allocatable: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-					},
-				},
-			},
-			expectedNode: &v1.Node{
-				Status: v1.NodeStatus{
-					Capacity: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-					},
-					Allocatable: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-					},
-				},
-			},
-			needsUpdate: false,
-		}, {
-			name: "update needed when capacity and allocatable of the existing node are nil and capacity and allocatable of the initial node are not nil",
-			initialNode: &v1.Node{
-				Status: v1.NodeStatus{
-					Capacity: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-					},
-					Allocatable: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-					},
-				},
-			},
-			existingNode: &v1.Node{},
-			expectedNode: &v1.Node{
-				Status: v1.NodeStatus{
-					Capacity: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-					},
-					Allocatable: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-					},
-				},
-			},
-			needsUpdate: true,
-		}, {
-			name: "update needed when capacity of the existing node is nil and capacity of the initial node is not nil",
-			initialNode: &v1.Node{
-				Status: v1.NodeStatus{
-					Capacity: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-					},
-				},
-			},
-			existingNode: &v1.Node{
-				Status: v1.NodeStatus{
-					Allocatable: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-					},
-				},
-			},
-			expectedNode: &v1.Node{
-				Status: v1.NodeStatus{
-					Capacity: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-					},
-					Allocatable: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-					},
-				},
-			},
-			needsUpdate: true,
-		}, {
-			name: "update needed when allocatable of the existing node is nil and allocatable of the initial node is not nil",
-			initialNode: &v1.Node{
-				Status: v1.NodeStatus{
-					Allocatable: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-					},
-				},
-			},
-			existingNode: &v1.Node{
-				Status: v1.NodeStatus{
-					Capacity: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-					},
-				},
-			},
-			expectedNode: &v1.Node{
-				Status: v1.NodeStatus{
-					Capacity: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-					},
-					Allocatable: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-					},
-				},
-			},
-			needsUpdate: true,
-		}, {
-			name:         "no update needed but capacity and allocatable of existing node should be initialized",
-			initialNode:  &v1.Node{},
-			existingNode: &v1.Node{},
-			expectedNode: &v1.Node{
-				Status: v1.NodeStatus{
-					Capacity:    v1.ResourceList{},
-					Allocatable: v1.ResourceList{},
-				},
-			},
-			needsUpdate: false,
 		},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(T *testing.T) {
-			needsUpdate := updateDefaultResources(tc.initialNode, tc.existingNode)
-			assert.Equal(t, tc.needsUpdate, needsUpdate, tc.name)
-			assert.Equal(t, tc.expectedNode, tc.existingNode, tc.name)
-		})
-	}
-}
-
-func TestReconcileHugePageResource(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	hugePageResourceName64Ki := v1.ResourceName("hugepages-64Ki")
-	hugePageResourceName2Mi := v1.ResourceName("hugepages-2Mi")
-	hugePageResourceName1Gi := v1.ResourceName("hugepages-1Gi")
-
-	cases := []struct {
-		name         string
-		testKubelet  *TestKubelet
-		initialNode  *v1.Node
-		existingNode *v1.Node
-		expectedNode *v1.Node
-		needsUpdate  bool
-	}{
 		{
-			name:        "no update needed when all huge page resources are similar",
-			testKubelet: testKubelet,
-			needsUpdate: false,
+			name: "update needed when capacity and allocatable of the existing node are nil",
 			initialNode: &v1.Node{
 				Status: v1.NodeStatus{
 					Capacity: v1.ResourceList{
 						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
 						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
 						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-						hugePageResourceName2Mi:     resource.MustParse("100Mi"),
-						hugePageResourceName64Ki:    *resource.NewQuantity(0, resource.BinarySI),
 					},
 					Allocatable: v1.ResourceList{
 						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
 						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
 						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-						hugePageResourceName2Mi:     resource.MustParse("100Mi"),
-						hugePageResourceName64Ki:    *resource.NewQuantity(0, resource.BinarySI),
-					},
-				},
-			},
-			existingNode: &v1.Node{
-				Status: v1.NodeStatus{
-					Capacity: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-						hugePageResourceName2Mi:     resource.MustParse("100Mi"),
-						hugePageResourceName64Ki:    *resource.NewQuantity(0, resource.BinarySI),
-					},
-					Allocatable: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-						hugePageResourceName2Mi:     resource.MustParse("100Mi"),
-						hugePageResourceName64Ki:    *resource.NewQuantity(0, resource.BinarySI),
-					},
-				},
-			},
-			expectedNode: &v1.Node{
-				Status: v1.NodeStatus{
-					Capacity: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-						hugePageResourceName2Mi:     resource.MustParse("100Mi"),
-						hugePageResourceName64Ki:    *resource.NewQuantity(0, resource.BinarySI),
-					},
-					Allocatable: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-						hugePageResourceName2Mi:     resource.MustParse("100Mi"),
-						hugePageResourceName64Ki:    *resource.NewQuantity(0, resource.BinarySI),
-					},
-				},
-			},
-		}, {
-			name:        "update needed when new huge page resources is supported",
-			testKubelet: testKubelet,
-			needsUpdate: true,
-			initialNode: &v1.Node{
-				Status: v1.NodeStatus{
-					Capacity: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-						hugePageResourceName2Mi:     *resource.NewQuantity(0, resource.BinarySI),
-						hugePageResourceName1Gi:     resource.MustParse("2Gi"),
-					},
-					Allocatable: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-						hugePageResourceName2Mi:     *resource.NewQuantity(0, resource.BinarySI),
-						hugePageResourceName1Gi:     resource.MustParse("2Gi"),
-					},
-				},
-			},
-			existingNode: &v1.Node{
-				Status: v1.NodeStatus{
-					Capacity: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-						hugePageResourceName2Mi:     resource.MustParse("100Mi"),
-					},
-					Allocatable: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-						hugePageResourceName2Mi:     resource.MustParse("100Mi"),
-					},
-				},
-			},
-			expectedNode: &v1.Node{
-				Status: v1.NodeStatus{
-					Capacity: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-						hugePageResourceName2Mi:     *resource.NewQuantity(0, resource.BinarySI),
-						hugePageResourceName1Gi:     resource.MustParse("2Gi"),
-					},
-					Allocatable: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-						hugePageResourceName2Mi:     *resource.NewQuantity(0, resource.BinarySI),
-						hugePageResourceName1Gi:     resource.MustParse("2Gi"),
-					},
-				},
-			},
-		}, {
-			name:        "update needed when huge page resource quantity has changed",
-			testKubelet: testKubelet,
-			needsUpdate: true,
-			initialNode: &v1.Node{
-				Status: v1.NodeStatus{
-					Capacity: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-						hugePageResourceName1Gi:     resource.MustParse("4Gi"),
-					},
-					Allocatable: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-						hugePageResourceName1Gi:     resource.MustParse("4Gi"),
-					},
-				},
-			},
-			existingNode: &v1.Node{
-				Status: v1.NodeStatus{
-					Capacity: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-						hugePageResourceName1Gi:     resource.MustParse("2Gi"),
-					},
-					Allocatable: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-						hugePageResourceName1Gi:     resource.MustParse("2Gi"),
-					},
-				},
-			},
-			expectedNode: &v1.Node{
-				Status: v1.NodeStatus{
-					Capacity: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-						hugePageResourceName1Gi:     resource.MustParse("4Gi"),
-					},
-					Allocatable: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-						hugePageResourceName1Gi:     resource.MustParse("4Gi"),
-					},
-				},
-			},
-		}, {
-			name:        "update needed when a huge page resources is no longer supported",
-			testKubelet: testKubelet,
-			needsUpdate: true,
-			initialNode: &v1.Node{
-				Status: v1.NodeStatus{
-					Capacity: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-						hugePageResourceName1Gi:     resource.MustParse("2Gi"),
-					},
-					Allocatable: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-						hugePageResourceName1Gi:     resource.MustParse("2Gi"),
-					},
-				},
-			},
-			existingNode: &v1.Node{
-				Status: v1.NodeStatus{
-					Capacity: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-						hugePageResourceName2Mi:     *resource.NewQuantity(0, resource.BinarySI),
-						hugePageResourceName1Gi:     resource.MustParse("2Gi"),
-					},
-					Allocatable: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-						hugePageResourceName2Mi:     *resource.NewQuantity(0, resource.BinarySI),
-						hugePageResourceName1Gi:     resource.MustParse("2Gi"),
-					},
-				},
-			},
-			expectedNode: &v1.Node{
-				Status: v1.NodeStatus{
-					Capacity: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-						hugePageResourceName1Gi:     resource.MustParse("2Gi"),
-					},
-					Allocatable: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-						hugePageResourceName1Gi:     resource.MustParse("2Gi"),
-					},
-				},
-			},
-		}, {
-			name:        "not panic when capacity or allocatable of existing node is nil",
-			testKubelet: testKubelet,
-			needsUpdate: true,
-			initialNode: &v1.Node{
-				Status: v1.NodeStatus{
-					Capacity: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-						hugePageResourceName2Mi:     resource.MustParse("100Mi"),
-						hugePageResourceName64Ki:    *resource.NewQuantity(0, resource.BinarySI),
-					},
-					Allocatable: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-						hugePageResourceName2Mi:     resource.MustParse("100Mi"),
-						hugePageResourceName64Ki:    *resource.NewQuantity(0, resource.BinarySI),
 					},
 				},
 			},
@@ -2432,732 +2034,168 @@ func TestReconcileHugePageResource(t *testing.T) {
 						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
 						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
 						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-						hugePageResourceName2Mi:     resource.MustParse("100Mi"),
-						hugePageResourceName64Ki:    *resource.NewQuantity(0, resource.BinarySI),
 					},
 					Allocatable: v1.ResourceList{
 						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
 						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
 						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-						hugePageResourceName2Mi:     resource.MustParse("100Mi"),
-						hugePageResourceName64Ki:    *resource.NewQuantity(0, resource.BinarySI),
 					},
 				},
 			},
+			needsUpdate: true,
+		},
+		{
+			name: "update needed when capacity of the existing node is nil",
+			initialNode: &v1.Node{
+				Status: v1.NodeStatus{
+					Capacity: v1.ResourceList{
+						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
+						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+					},
+					Allocatable: v1.ResourceList{
+						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
+						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+					},
+				},
+			},
+			existingNode: &v1.Node{
+				Status: v1.NodeStatus{
+					Allocatable: v1.ResourceList{
+						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
+						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+					},
+				},
+			},
+			expectedNode: &v1.Node{
+				Status: v1.NodeStatus{
+					Capacity: v1.ResourceList{
+						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
+						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+					},
+					Allocatable: v1.ResourceList{
+						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
+						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+					},
+				},
+			},
+			needsUpdate: true,
+		},
+		{
+			name: "update needed when allocatable of the existing node is nil",
+			initialNode: &v1.Node{
+				Status: v1.NodeStatus{
+					Capacity: v1.ResourceList{
+						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
+						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+					},
+					Allocatable: v1.ResourceList{
+						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
+						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+					},
+				},
+			},
+			existingNode: &v1.Node{
+				Status: v1.NodeStatus{
+					Capacity: v1.ResourceList{
+						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
+						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+					},
+				},
+			},
+			expectedNode: &v1.Node{
+				Status: v1.NodeStatus{
+					Capacity: v1.ResourceList{
+						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
+						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+					},
+					Allocatable: v1.ResourceList{
+						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
+						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+					},
+				},
+			},
+			needsUpdate: true,
 		},
 	}
 
 	for _, tc := range cases {
-		t.Run(tc.name, func(T *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
+			needsUpdate := updateDefaultResources(tc.initialNode, tc.existingNode)
+			assert.Equal(t, tc.needsUpdate, needsUpdate)
+			assert.True(t, apiequality.Semantic.DeepEqual(tc.expectedNode, tc.existingNode), "%s", cmp.Diff(tc.expectedNode, tc.existingNode))
+		})
+	}
+}
+
+func TestSetNodeStatusDeclaredFeatures(t *testing.T) {
+	testCases := []struct {
+		name               string
+		featureGateEnabled bool
+		discoveredFeatures []string
+		expectedFeatures   []string
+	}{
+		{
+			name:               "Feature gate enabled, features discovered",
+			featureGateEnabled: true,
+			discoveredFeatures: []string{"feature1", "feature2"},
+			expectedFeatures:   []string{"feature1", "feature2"},
+		},
+		{
+			name:               "Feature gate disabled",
+			featureGateEnabled: false,
+			discoveredFeatures: []string{"feature1", "feature2"},
+			expectedFeatures:   nil,
+		},
+		{
+			name:               "Feature gate enabled, no features discovered",
+			featureGateEnabled: true,
+			discoveredFeatures: nil,
+			expectedFeatures:   nil,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, tc.featureGateEnabled)
+
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 			defer testKubelet.Cleanup()
 			kubelet := testKubelet.kubelet
+			kubelet.nodeDeclaredFeatures = tc.discoveredFeatures
+			kubelet.kubeClient = nil
 
-			needsUpdate := kubelet.reconcileHugePageResource(tc.initialNode, tc.existingNode)
-			assert.Equal(t, tc.needsUpdate, needsUpdate, tc.name)
-			assert.Equal(t, tc.expectedNode, tc.existingNode, tc.name)
-		})
-	}
+			kubeClient := testKubelet.fakeKubeClient
+			existingNode := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname}}
+			kubeClient.ReactionChain = fake.NewClientset(&v1.NodeList{Items: []v1.Node{existingNode}}).ReactionChain
+			kubelet.nodeLister = delegatingNodeLister{client: kubeClient}
+			machineInfo := &cadvisorapi.MachineInfo{}
+			kubelet.setCachedMachineInfo(machineInfo)
 
-}
-func TestReconcileExtendedResource(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	testKubelet.kubelet.kubeClient = nil // ensure only the heartbeat client is used
-	testKubelet.kubelet.containerManager = cm.NewStubContainerManagerWithExtendedResource(true /* shouldResetExtendedResourceCapacity*/)
-	testKubeletNoReset := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	defer testKubeletNoReset.Cleanup()
-	extendedResourceName1 := v1.ResourceName("test.com/resource1")
-	extendedResourceName2 := v1.ResourceName("test.com/resource2")
+			// We need to force a status update, so we make the last status report time old.
+			kubelet.lastStatusReportTime = time.Now().Add(-time.Hour)
 
-	cases := []struct {
-		name         string
-		testKubelet  *TestKubelet
-		initialNode  *v1.Node
-		existingNode *v1.Node
-		expectedNode *v1.Node
-		needsUpdate  bool
-	}{
-		{
-			name:        "no update needed without extended resource",
-			testKubelet: testKubelet,
-			initialNode: &v1.Node{
-				Status: v1.NodeStatus{
-					Capacity: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-					},
-					Allocatable: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-					},
-				},
-			},
-			existingNode: &v1.Node{
-				Status: v1.NodeStatus{
-					Capacity: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-					},
-					Allocatable: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-					},
-				},
-			},
-			expectedNode: &v1.Node{
-				Status: v1.NodeStatus{
-					Capacity: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-					},
-					Allocatable: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-					},
-				},
-			},
-			needsUpdate: false,
-		},
-		{
-			name:        "extended resource capacity is zeroed",
-			testKubelet: testKubeletNoReset,
-			initialNode: &v1.Node{
-				Status: v1.NodeStatus{
-					Capacity: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-						extendedResourceName1:       *resource.NewQuantity(int64(2), resource.DecimalSI),
-						extendedResourceName2:       *resource.NewQuantity(int64(10), resource.DecimalSI),
-					},
-					Allocatable: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-						extendedResourceName1:       *resource.NewQuantity(int64(2), resource.DecimalSI),
-						extendedResourceName2:       *resource.NewQuantity(int64(10), resource.DecimalSI),
-					},
-				},
-			},
-			existingNode: &v1.Node{
-				Status: v1.NodeStatus{
-					Capacity: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-						extendedResourceName1:       *resource.NewQuantity(int64(2), resource.DecimalSI),
-						extendedResourceName2:       *resource.NewQuantity(int64(10), resource.DecimalSI),
-					},
-					Allocatable: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-						extendedResourceName1:       *resource.NewQuantity(int64(2), resource.DecimalSI),
-						extendedResourceName2:       *resource.NewQuantity(int64(10), resource.DecimalSI),
-					},
-				},
-			},
-			expectedNode: &v1.Node{
-				Status: v1.NodeStatus{
-					Capacity: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-						extendedResourceName1:       *resource.NewQuantity(int64(0), resource.DecimalSI),
-						extendedResourceName2:       *resource.NewQuantity(int64(0), resource.DecimalSI),
-					},
-					Allocatable: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-						extendedResourceName1:       *resource.NewQuantity(int64(0), resource.DecimalSI),
-						extendedResourceName2:       *resource.NewQuantity(int64(0), resource.DecimalSI),
-					},
-				},
-			},
-			needsUpdate: true,
-		},
-		{
-			name:        "not panic when allocatable of existing node is nil",
-			testKubelet: testKubelet,
-			initialNode: &v1.Node{
-				Status: v1.NodeStatus{
-					Capacity: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-						extendedResourceName1:       *resource.NewQuantity(int64(2), resource.DecimalSI),
-						extendedResourceName2:       *resource.NewQuantity(int64(10), resource.DecimalSI),
-					},
-					Allocatable: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-						extendedResourceName1:       *resource.NewQuantity(int64(2), resource.DecimalSI),
-						extendedResourceName2:       *resource.NewQuantity(int64(10), resource.DecimalSI),
-					},
-				},
-			},
-			existingNode: &v1.Node{
-				Status: v1.NodeStatus{
-					Capacity: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-						extendedResourceName1:       *resource.NewQuantity(int64(2), resource.DecimalSI),
-						extendedResourceName2:       *resource.NewQuantity(int64(10), resource.DecimalSI),
-					},
-				},
-			},
-			expectedNode: &v1.Node{
-				Status: v1.NodeStatus{
-					Capacity: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-						extendedResourceName1:       *resource.NewQuantity(int64(0), resource.DecimalSI),
-						extendedResourceName2:       *resource.NewQuantity(int64(0), resource.DecimalSI),
-					},
-					Allocatable: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-						extendedResourceName1:       *resource.NewQuantity(int64(0), resource.DecimalSI),
-						extendedResourceName2:       *resource.NewQuantity(int64(0), resource.DecimalSI),
-					},
-				},
-			},
-			needsUpdate: true,
-		},
-	}
-
-	for _, tc := range cases {
-		defer testKubelet.Cleanup()
-		kubelet := testKubelet.kubelet
-
-		needsUpdate := kubelet.reconcileExtendedResource(tc.initialNode, tc.existingNode)
-		assert.Equal(t, tc.needsUpdate, needsUpdate, tc.name)
-		assert.Equal(t, tc.expectedNode, tc.existingNode, tc.name)
-	}
-
-}
-
-func TestValidateNodeIPParam(t *testing.T) {
-	type test struct {
-		nodeIP   string
-		success  bool
-		testName string
-	}
-	tests := []test{
-		{
-			nodeIP:   "",
-			success:  false,
-			testName: "IP not set",
-		},
-		{
-			nodeIP:   "127.0.0.1",
-			success:  false,
-			testName: "IPv4 loopback address",
-		},
-		{
-			nodeIP:   "::1",
-			success:  false,
-			testName: "IPv6 loopback address",
-		},
-		{
-			nodeIP:   "224.0.0.1",
-			success:  false,
-			testName: "multicast IPv4 address",
-		},
-		{
-			nodeIP:   "ff00::1",
-			success:  false,
-			testName: "multicast IPv6 address",
-		},
-		{
-			nodeIP:   "169.254.0.1",
-			success:  false,
-			testName: "IPv4 link-local unicast address",
-		},
-		{
-			nodeIP:   "fe80::0202:b3ff:fe1e:8329",
-			success:  false,
-			testName: "IPv6 link-local unicast address",
-		},
-		{
-			nodeIP:   "0.0.0.0",
-			success:  false,
-			testName: "Unspecified IPv4 address",
-		},
-		{
-			nodeIP:   "::",
-			success:  false,
-			testName: "Unspecified IPv6 address",
-		},
-		{
-			nodeIP:   "1.2.3.4",
-			success:  false,
-			testName: "IPv4 address that doesn't belong to host",
-		},
-	}
-	addrs, err := net.InterfaceAddrs()
-	if err != nil {
-		assert.Errorf(t, err, "Unable to obtain a list of the node's unicast interface addresses.")
-	}
-	for _, addr := range addrs {
-		var ip net.IP
-		switch v := addr.(type) {
-		case *net.IPNet:
-			ip = v.IP
-		case *net.IPAddr:
-			ip = v.IP
-		}
-		if ip.IsLoopback() || ip.IsLinkLocalUnicast() {
-			continue
-		}
-		successTest := test{
-			nodeIP:   ip.String(),
-			success:  true,
-			testName: fmt.Sprintf("Success test case for address %s", ip.String()),
-		}
-		tests = append(tests, successTest)
-	}
-	for _, test := range tests {
-		err := validateNodeIP(netutils.ParseIPSloppy(test.nodeIP))
-		if test.success {
-			assert.NoErrorf(t, err, "test %s", test.testName)
-		} else {
-			assert.Errorf(t, err, "test %s", test.testName)
-		}
-	}
-}
-
-func TestRegisterWithApiServerWithTaint(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	defer testKubelet.Cleanup()
-	kubelet := testKubelet.kubelet
-	kubeClient := testKubelet.fakeKubeClient
-
-	machineInfo := &cadvisorapi.MachineInfo{
-		MachineID:      "123",
-		SystemUUID:     "abc",
-		BootID:         "1b3",
-		NumCores:       2,
-		MemoryCapacity: 1024,
-	}
-	kubelet.setCachedMachineInfo(machineInfo)
-
-	var gotNode runtime.Object
-	kubeClient.AddReactor("create", "nodes", func(action core.Action) (bool, runtime.Object, error) {
-		createAction := action.(core.CreateAction)
-		gotNode = createAction.GetObject()
-		return true, gotNode, nil
-	})
-
-	addNotImplatedReaction(kubeClient)
-
-	unschedulableTaint := v1.Taint{
-		Key:    v1.TaintNodeUnschedulable,
-		Effect: v1.TaintEffectNoSchedule,
-	}
-	// Mark node with unschedulable taints
-	kubelet.registerWithTaints = []v1.Taint{unschedulableTaint}
-
-	// Reset kubelet status for each test.
-	kubelet.registrationCompleted = false
-
-	// Register node to apiserver.
-	kubelet.registerWithAPIServer()
-
-	// Check the unschedulable taint.
-	got := gotNode.(*v1.Node)
-
-	require.True(t,
-		taintutil.TaintExists(got.Spec.Taints, &unschedulableTaint),
-		"test unschedulable taint for TaintNodesByCondition")
-}
-
-func TestNodeStatusHasChanged(t *testing.T) {
-	fakeNow := metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC)
-	fakeFuture := metav1.Time{Time: fakeNow.Time.Add(time.Minute)}
-	readyCondition := v1.NodeCondition{
-		Type:               v1.NodeReady,
-		Status:             v1.ConditionTrue,
-		LastHeartbeatTime:  fakeNow,
-		LastTransitionTime: fakeNow,
-	}
-	readyConditionAtDiffHearbeatTime := v1.NodeCondition{
-		Type:               v1.NodeReady,
-		Status:             v1.ConditionTrue,
-		LastHeartbeatTime:  fakeFuture,
-		LastTransitionTime: fakeNow,
-	}
-	readyConditionAtDiffTransitionTime := v1.NodeCondition{
-		Type:               v1.NodeReady,
-		Status:             v1.ConditionTrue,
-		LastHeartbeatTime:  fakeFuture,
-		LastTransitionTime: fakeFuture,
-	}
-	notReadyCondition := v1.NodeCondition{
-		Type:               v1.NodeReady,
-		Status:             v1.ConditionFalse,
-		LastHeartbeatTime:  fakeNow,
-		LastTransitionTime: fakeNow,
-	}
-	memoryPressureCondition := v1.NodeCondition{
-		Type:               v1.NodeMemoryPressure,
-		Status:             v1.ConditionFalse,
-		LastHeartbeatTime:  fakeNow,
-		LastTransitionTime: fakeNow,
-	}
-	testcases := []struct {
-		name           string
-		originalStatus *v1.NodeStatus
-		status         *v1.NodeStatus
-		expectChange   bool
-	}{
-		{
-			name:           "Node status does not change with nil status.",
-			originalStatus: nil,
-			status:         nil,
-			expectChange:   false,
-		},
-		{
-			name:           "Node status does not change with default status.",
-			originalStatus: &v1.NodeStatus{},
-			status:         &v1.NodeStatus{},
-			expectChange:   false,
-		},
-		{
-			name:           "Node status changes with nil and default status.",
-			originalStatus: nil,
-			status:         &v1.NodeStatus{},
-			expectChange:   true,
-		},
-		{
-			name:           "Node status changes with nil and status.",
-			originalStatus: nil,
-			status: &v1.NodeStatus{
-				Conditions: []v1.NodeCondition{readyCondition, memoryPressureCondition},
-			},
-			expectChange: true,
-		},
-		{
-			name:           "Node status does not change with empty conditions.",
-			originalStatus: &v1.NodeStatus{Conditions: []v1.NodeCondition{}},
-			status:         &v1.NodeStatus{Conditions: []v1.NodeCondition{}},
-			expectChange:   false,
-		},
-		{
-			name: "Node status does not change",
-			originalStatus: &v1.NodeStatus{
-				Conditions: []v1.NodeCondition{readyCondition, memoryPressureCondition},
-			},
-			status: &v1.NodeStatus{
-				Conditions: []v1.NodeCondition{readyCondition, memoryPressureCondition},
-			},
-			expectChange: false,
-		},
-		{
-			name: "Node status does not change even if heartbeat time changes.",
-			originalStatus: &v1.NodeStatus{
-				Conditions: []v1.NodeCondition{readyCondition, memoryPressureCondition},
-			},
-			status: &v1.NodeStatus{
-				Conditions: []v1.NodeCondition{readyConditionAtDiffHearbeatTime, memoryPressureCondition},
-			},
-			expectChange: false,
-		},
-		{
-			name: "Node status does not change even if the orders of conditions are different.",
-			originalStatus: &v1.NodeStatus{
-				Conditions: []v1.NodeCondition{readyCondition, memoryPressureCondition},
-			},
-			status: &v1.NodeStatus{
-				Conditions: []v1.NodeCondition{memoryPressureCondition, readyConditionAtDiffHearbeatTime},
-			},
-			expectChange: false,
-		},
-		{
-			name: "Node status changes if condition status differs.",
-			originalStatus: &v1.NodeStatus{
-				Conditions: []v1.NodeCondition{readyCondition, memoryPressureCondition},
-			},
-			status: &v1.NodeStatus{
-				Conditions: []v1.NodeCondition{notReadyCondition, memoryPressureCondition},
-			},
-			expectChange: true,
-		},
-		{
-			name: "Node status changes if transition time changes.",
-			originalStatus: &v1.NodeStatus{
-				Conditions: []v1.NodeCondition{readyCondition, memoryPressureCondition},
-			},
-			status: &v1.NodeStatus{
-				Conditions: []v1.NodeCondition{readyConditionAtDiffTransitionTime, memoryPressureCondition},
-			},
-			expectChange: true,
-		},
-		{
-			name: "Node status changes with different number of conditions.",
-			originalStatus: &v1.NodeStatus{
-				Conditions: []v1.NodeCondition{readyCondition},
-			},
-			status: &v1.NodeStatus{
-				Conditions: []v1.NodeCondition{readyCondition, memoryPressureCondition},
-			},
-			expectChange: true,
-		},
-		{
-			name: "Node status changes with different phase.",
-			originalStatus: &v1.NodeStatus{
-				Phase:      v1.NodePending,
-				Conditions: []v1.NodeCondition{readyCondition},
-			},
-			status: &v1.NodeStatus{
-				Phase:      v1.NodeRunning,
-				Conditions: []v1.NodeCondition{readyCondition},
-			},
-			expectChange: true,
-		},
-	}
-	for _, tc := range testcases {
-		t.Run(tc.name, func(t *testing.T) {
-			originalStatusCopy := tc.originalStatus.DeepCopy()
-			statusCopy := tc.status.DeepCopy()
-			changed := nodeStatusHasChanged(tc.originalStatus, tc.status)
-			assert.Equal(t, tc.expectChange, changed, "Expect node status change to be %t, but got %t.", tc.expectChange, changed)
-			assert.True(t, apiequality.Semantic.DeepEqual(originalStatusCopy, tc.originalStatus), "%s", cmp.Diff(originalStatusCopy, tc.originalStatus))
-			assert.True(t, apiequality.Semantic.DeepEqual(statusCopy, tc.status), "%s", cmp.Diff(statusCopy, tc.status))
-		})
-	}
-}
-
-func TestUpdateNodeAddresses(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	defer testKubelet.Cleanup()
-	kubelet := testKubelet.kubelet
-	kubeClient := testKubelet.fakeKubeClient
-
-	existingNode := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname}}
-	kubeClient.ReactionChain = fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{existingNode}}).ReactionChain
-
-	tests := []struct {
-		Name   string
-		Before []v1.NodeAddress
-		After  []v1.NodeAddress
-	}{
-		{
-			Name:   "nil to populated",
-			Before: nil,
-			After: []v1.NodeAddress{
-				{Type: v1.NodeInternalIP, Address: "127.0.0.1"},
-				{Type: v1.NodeHostName, Address: testKubeletHostname},
-			},
-		},
-		{
-			Name:   "empty to populated",
-			Before: []v1.NodeAddress{},
-			After: []v1.NodeAddress{
-				{Type: v1.NodeInternalIP, Address: "127.0.0.1"},
-				{Type: v1.NodeHostName, Address: testKubeletHostname},
-			},
-		},
-		{
-			Name: "populated to nil",
-			Before: []v1.NodeAddress{
-				{Type: v1.NodeInternalIP, Address: "127.0.0.1"},
-				{Type: v1.NodeHostName, Address: testKubeletHostname},
-			},
-			After: nil,
-		},
-		{
-			Name: "populated to empty",
-			Before: []v1.NodeAddress{
-				{Type: v1.NodeInternalIP, Address: "127.0.0.1"},
-				{Type: v1.NodeHostName, Address: testKubeletHostname},
-			},
-			After: []v1.NodeAddress{},
-		},
-		{
-			Name: "multiple addresses of same type, no change",
-			Before: []v1.NodeAddress{
-				{Type: v1.NodeInternalIP, Address: "127.0.0.1"},
-				{Type: v1.NodeInternalIP, Address: "127.0.0.2"},
-				{Type: v1.NodeInternalIP, Address: "127.0.0.3"},
-				{Type: v1.NodeHostName, Address: testKubeletHostname},
-			},
-			After: []v1.NodeAddress{
-				{Type: v1.NodeInternalIP, Address: "127.0.0.1"},
-				{Type: v1.NodeInternalIP, Address: "127.0.0.2"},
-				{Type: v1.NodeInternalIP, Address: "127.0.0.3"},
-				{Type: v1.NodeHostName, Address: testKubeletHostname},
-			},
-		},
-		{
-			Name: "1 InternalIP to 2 InternalIP",
-			Before: []v1.NodeAddress{
-				{Type: v1.NodeInternalIP, Address: "127.0.0.1"},
-				{Type: v1.NodeHostName, Address: testKubeletHostname},
-			},
-			After: []v1.NodeAddress{
-				{Type: v1.NodeInternalIP, Address: "127.0.0.1"},
-				{Type: v1.NodeInternalIP, Address: "127.0.0.2"},
-				{Type: v1.NodeHostName, Address: testKubeletHostname},
-			},
-		},
-		{
-			Name: "2 InternalIP to 1 InternalIP",
-			Before: []v1.NodeAddress{
-				{Type: v1.NodeInternalIP, Address: "127.0.0.1"},
-				{Type: v1.NodeInternalIP, Address: "127.0.0.2"},
-				{Type: v1.NodeHostName, Address: testKubeletHostname},
-			},
-			After: []v1.NodeAddress{
-				{Type: v1.NodeInternalIP, Address: "127.0.0.1"},
-				{Type: v1.NodeHostName, Address: testKubeletHostname},
-			},
-		},
-		{
-			Name: "2 InternalIP to 2 different InternalIP",
-			Before: []v1.NodeAddress{
-				{Type: v1.NodeInternalIP, Address: "127.0.0.1"},
-				{Type: v1.NodeInternalIP, Address: "127.0.0.2"},
-				{Type: v1.NodeHostName, Address: testKubeletHostname},
-			},
-			After: []v1.NodeAddress{
-				{Type: v1.NodeInternalIP, Address: "127.0.0.3"},
-				{Type: v1.NodeInternalIP, Address: "127.0.0.4"},
-				{Type: v1.NodeHostName, Address: testKubeletHostname},
-			},
-		},
-		{
-			Name: "2 InternalIP to reversed order",
-			Before: []v1.NodeAddress{
-				{Type: v1.NodeInternalIP, Address: "127.0.0.1"},
-				{Type: v1.NodeInternalIP, Address: "127.0.0.2"},
-				{Type: v1.NodeHostName, Address: testKubeletHostname},
-			},
-			After: []v1.NodeAddress{
-				{Type: v1.NodeInternalIP, Address: "127.0.0.2"},
-				{Type: v1.NodeInternalIP, Address: "127.0.0.1"},
-				{Type: v1.NodeHostName, Address: testKubeletHostname},
-			},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.Name, func(t *testing.T) {
-			ctx := context.Background()
-			oldNode := &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
-				Spec:       v1.NodeSpec{},
-				Status: v1.NodeStatus{
-					Addresses: test.Before,
-				},
-			}
-			expectedNode := &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname, Labels: map[string]string{v1.LabelOSStable: goruntime.GOOS, v1.LabelArchStable: goruntime.GOARCH}},
-				Spec:       v1.NodeSpec{},
-				Status: v1.NodeStatus{
-					Addresses: test.After,
-				},
-			}
-
-			_, err := kubeClient.CoreV1().Nodes().Update(ctx, oldNode, metav1.UpdateOptions{})
-			assert.NoError(t, err)
-			kubelet.setNodeStatusFuncs = []func(context.Context, *v1.Node) error{
-				func(_ context.Context, node *v1.Node) error {
-					node.Status.Addresses = expectedNode.Status.Addresses
-					return nil
-				},
-			}
-			assert.NoError(t, kubelet.updateNodeStatus(ctx))
+			require.NoError(t, kubelet.updateNodeStatus(context.TODO()))
 
 			actions := kubeClient.Actions()
-			lastAction := actions[len(actions)-1]
-			assert.IsType(t, core.PatchActionImpl{}, lastAction)
-			patchAction := lastAction.(core.PatchActionImpl)
+			// We expect a get and a patch
+			require.Len(t, actions, 2)
+			require.True(t, actions[1].Matches("patch", "nodes"))
+			require.Equal(t, "status", actions[1].GetSubresource())
 
-			updatedNode, err := applyNodeStatusPatch(oldNode, patchAction.GetPatch())
+			updatedNode, err := applyNodeStatusPatch(&existingNode, actions[1].(core.PatchActionImpl).GetPatch())
 			require.NoError(t, err)
 
-			assert.True(t, apiequality.Semantic.DeepEqual(updatedNode, expectedNode), "%s", cmp.Diff(expectedNode, updatedNode))
+			assert.Equal(t, tc.expectedFeatures, updatedNode.Status.DeclaredFeatures)
 		})
-	}
-}
-
-func TestIsUpdateStatusPeriodExpired(t *testing.T) {
-	testcases := []struct {
-		name                       string
-		lastStatusReportTime       time.Time
-		delayAfterNodeStatusChange time.Duration
-		expectExpired              bool
-	}{
-		{
-			name:                       "no status update before and no delay",
-			lastStatusReportTime:       time.Time{},
-			delayAfterNodeStatusChange: 0,
-			expectExpired:              true,
-		},
-		{
-			name:                       "no status update before and existing delay",
-			lastStatusReportTime:       time.Time{},
-			delayAfterNodeStatusChange: 30 * time.Second,
-			expectExpired:              true,
-		},
-		{
-			name:                       "not expired and no delay",
-			lastStatusReportTime:       time.Now().Add(-4 * time.Minute),
-			delayAfterNodeStatusChange: 0,
-			expectExpired:              false,
-		},
-		{
-			name:                       "not expired",
-			lastStatusReportTime:       time.Now().Add(-5 * time.Minute),
-			delayAfterNodeStatusChange: time.Minute,
-			expectExpired:              false,
-		},
-		{
-			name:                       "expired",
-			lastStatusReportTime:       time.Now().Add(-4 * time.Minute),
-			delayAfterNodeStatusChange: -2 * time.Minute,
-			expectExpired:              true,
-		},
-		{
-			name:                       "Delay exactly at threshold",
-			lastStatusReportTime:       time.Now().Add(-5 * time.Minute),
-			delayAfterNodeStatusChange: 0,
-			expectExpired:              true,
-		},
-	}
-
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	defer testKubelet.Cleanup()
-	kubelet := testKubelet.kubelet
-	kubelet.nodeStatusReportFrequency = 5 * time.Minute
-
-	for _, tc := range testcases {
-		kubelet.lastStatusReportTime = tc.lastStatusReportTime
-		kubelet.delayAfterNodeStatusChange = tc.delayAfterNodeStatusChange
-		expired := kubelet.isUpdateStatusPeriodExpired()
-		assert.Equal(t, tc.expectExpired, expired, tc.name)
-	}
-}
-
-func TestCalculateDelay(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	defer testKubelet.Cleanup()
-	kubelet := testKubelet.kubelet
-	kubelet.nodeStatusReportFrequency = 5 * time.Minute
-
-	for i := 0; i < 100; i++ {
-		randomDelay := kubelet.calculateDelay()
-		assert.LessOrEqual(t, randomDelay.Abs(), kubelet.nodeStatusReportFrequency/2)
 	}
 }

@@ -52,6 +52,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
@@ -60,6 +61,8 @@ import (
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/testutil"
+	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
+	featuretesting "k8s.io/component-helpers/nodedeclaredfeatures/testing"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	remote "k8s.io/cri-client/pkg"
@@ -4683,6 +4686,138 @@ func TestHandlePodReconcile_RetryPendingResizes(t *testing.T) {
 			kubelet.allocationManager.RemovePod(pendingResizeDesired.UID)
 			kubelet.podManager.RemovePod((pendingResizeDesired))
 			kubelet.podManager.RemovePod(tc.oldPod)
+		})
+	}
+}
+
+func TestSyncPodNodeDeclaredFeaturesUpdate(t *testing.T) {
+
+	cpu1000m := resource.MustParse("1")
+	mem1000M := resource.MustParse("1Gi")
+	cpu2000m := resource.MustParse("2")
+	oldPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "1111",
+			Name:      "pod1",
+			Namespace: "ns1",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "c1",
+					Image: "i1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+					},
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodRunning,
+			ContainerStatuses: []v1.ContainerStatus{
+				{
+					Name:               "c1",
+					AllocatedResources: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+					Resources:          &v1.ResourceRequirements{},
+				},
+			},
+		},
+	}
+	newPod := oldPod.DeepCopy()
+	newPod.Spec.Containers[0].Resources.Requests[v1.ResourceCPU] = cpu2000m
+
+	testCases := []struct {
+		name               string
+		featureGateEnabled bool
+		nodeFeatures       []string
+		mockFeature        ndf.Feature
+		expectEvent        bool
+		expectedEventMsg   string
+	}{
+		{
+			name:               "Feature gate disabled",
+			featureGateEnabled: false,
+			mockFeature:        &featuretesting.MockFeature{},
+			expectEvent:        false,
+		},
+		{
+			name:               "Feature gate enabled, no requirements from update",
+			featureGateEnabled: true,
+			nodeFeatures:       []string{"feature1"},
+			mockFeature: &featuretesting.MockFeature{
+				InferFromUpdateFunc: func(old, new *ndf.PodInfo) bool {
+					return false
+				},
+			},
+			expectEvent: false,
+		},
+		{
+			name:               "Feature gate enabled, requirements met",
+			featureGateEnabled: true,
+			nodeFeatures:       []string{"feature1"},
+			mockFeature: &featuretesting.MockFeature{
+				InferFromUpdateFunc: func(old, new *ndf.PodInfo) bool {
+					return true
+				},
+				NameFunc: func() string {
+					return "feature1"
+				},
+			},
+			expectEvent: false,
+		},
+		{
+			name:               "Feature gate enabled, requirements not met",
+			featureGateEnabled: true,
+			nodeFeatures:       []string{"feature2"},
+			mockFeature: &featuretesting.MockFeature{
+				InferFromUpdateFunc: func(old, new *ndf.PodInfo) bool {
+					return true
+				},
+				NameFunc: func() string {
+					return "feature1"
+				},
+			},
+			expectEvent:      true,
+			expectedEventMsg: "Pod requires node features that are not available: feature1",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, tc.featureGateEnabled)
+
+			testKubelet := newTestKubelet(t, false)
+			defer testKubelet.Cleanup()
+			kubelet := testKubelet.kubelet
+
+			// Setup mocks
+			recorder := record.NewFakeRecorder(10)
+			kubelet.recorder = recorder
+			helper, err := ndf.NewHelper([]ndf.Feature{tc.mockFeature})
+			require.NoError(t, err)
+			kubelet.nodeDeclaredFeaturesHelper = helper
+			kubelet.nodeDeclaredFeatures = tc.nodeFeatures
+			kubelet.version = utilversion.MustParse("1.30.0")
+
+			kubelet.podManager.SetPods([]*v1.Pod{oldPod})
+			kubelet.statusManager.SetPodStatus(klog.TODO(), newPod, v1.PodStatus{Phase: v1.PodRunning})
+			kubelet.HandlePodUpdates([]*v1.Pod{newPod})
+
+			if tc.expectEvent {
+				select {
+				case event := <-recorder.Events:
+					assert.Contains(t, event, tc.expectedEventMsg)
+				default:
+					t.Errorf("Expected an event but did not receive one.")
+				}
+			} else {
+				select {
+				case event := <-recorder.Events:
+					t.Errorf("Expected no event, but received: %s", event)
+				default:
+					// No event received, which is correct.
+				}
+			}
 		})
 	}
 }

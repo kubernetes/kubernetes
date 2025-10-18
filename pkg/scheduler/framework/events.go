@@ -78,6 +78,9 @@ func PodSchedulingPropertiesChange(newPod *v1.Pod, oldPod *v1.Pod) (events []fwk
 	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
 		podChangeExtractors = append(podChangeExtractors, extractPodGeneratedResourceClaimChange)
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.NodeDeclaredFeatures) {
+		podChangeExtractors = append(podChangeExtractors, extractPodFeatureRequirementChange)
+	}
 
 	for _, fn := range podChangeExtractors {
 		if event := fn(newPod, oldPod); event != fwk.None {
@@ -157,6 +160,32 @@ func extractPodGeneratedResourceClaimChange(newPod *v1.Pod, oldPod *v1.Pod) fwk.
 	return fwk.None
 }
 
+func extractPodFeatureRequirementChange(newPod *v1.Pod, oldPod *v1.Pod) fwk.ActionType {
+	// We perform a high-level check for changes in any mutable field
+	// of a pending pod's spec that could possibly affect its node feature requirements.
+	// This serves as a fast preliminary filter before the full inference logic is
+	// run by the NodeDeclaredFeatures plugin.
+	// ValidatePodUpdate() in pkg/apis/core/validation/validation.go limits what fields of a pod spec are mutable.
+	// - We do not check resource requests/limits, as API validation prevents resource changes on unscheduled pods.
+	// - Pod image changes are also not checked, as they cannot affect node feature requirements.
+
+	if !equality.Semantic.DeepEqual(newPod.Spec.Tolerations, oldPod.Spec.Tolerations) ||
+		!equality.Semantic.DeepEqual(newPod.Spec.Affinity, oldPod.Spec.Affinity) {
+		return fwk.UpdatePodFeatureRequirement
+	}
+
+	if len(oldPod.Spec.SchedulingGates) > 0 && len(newPod.Spec.SchedulingGates) == 0 {
+		return fwk.UpdatePodFeatureRequirement
+	}
+
+	if !equality.Semantic.DeepEqual(newPod.Spec.ActiveDeadlineSeconds, oldPod.Spec.ActiveDeadlineSeconds) ||
+		!equality.Semantic.DeepEqual(newPod.Spec.TerminationGracePeriodSeconds, oldPod.Spec.TerminationGracePeriodSeconds) {
+		return fwk.UpdatePodFeatureRequirement
+	}
+
+	return fwk.None
+}
+
 // NodeSchedulingPropertiesChange interprets the update of a node and returns corresponding UpdateNodeXYZ event(s).
 func NodeSchedulingPropertiesChange(newNode *v1.Node, oldNode *v1.Node) (events []fwk.ClusterEvent) {
 	nodeChangeExtracters := []nodeChangeExtractor{
@@ -166,6 +195,10 @@ func NodeSchedulingPropertiesChange(newNode *v1.Node, oldNode *v1.Node) (events 
 		extractNodeTaintsChange,
 		extractNodeConditionsChange,
 		extractNodeAnnotationsChange,
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.NodeDeclaredFeatures) {
+		nodeChangeExtracters = append(nodeChangeExtracters, extractNodeFeaturesChange)
 	}
 
 	for _, fn := range nodeChangeExtracters {
@@ -228,6 +261,13 @@ func extractNodeSpecUnschedulableChange(newNode *v1.Node, oldNode *v1.Node) fwk.
 func extractNodeAnnotationsChange(newNode *v1.Node, oldNode *v1.Node) fwk.ActionType {
 	if !equality.Semantic.DeepEqual(oldNode.GetAnnotations(), newNode.GetAnnotations()) {
 		return fwk.UpdateNodeAnnotation
+	}
+	return fwk.None
+}
+
+func extractNodeFeaturesChange(newNode *v1.Node, oldNode *v1.Node) fwk.ActionType {
+	if !equality.Semantic.DeepEqual(oldNode.Status.DeclaredFeatures, newNode.Status.DeclaredFeatures) {
+		return fwk.UpdateNodeDeclaredFeature
 	}
 	return fwk.None
 }
