@@ -326,6 +326,7 @@ var _ = SIGDescribe("Job", func() {
 		framework.ExpectNoError(err, "failed to update job in namespace: %s", f.Namespace.Name)
 
 		ginkgo.By("Ensuring pods are deleted")
+		framework.Logf("Verifying that all Job pods are deleted after suspension...")
 		err = e2ejob.WaitForAllJobPodsGone(ctx, f.ClientSet, f.Namespace.Name, job.Name)
 		framework.ExpectNoError(err, "failed to ensure pods are deleted after suspend=true")
 
