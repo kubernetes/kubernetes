@@ -199,7 +199,7 @@ func (c *ConfigMapCAController) RunOnce(ctx context.Context) error {
 
 // Run starts the kube-apiserver and blocks until stopCh is closed.
 func (c *ConfigMapCAController) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 	defer c.queue.ShutDown()
 
 	klog.InfoS("Starting controller", "name", c.name)
