@@ -1,5 +1,8 @@
+//go:build windows
+// +build windows
+
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,10 +17,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2enode
+package builder
 
-import "k8s.io/kubernetes/test/e2e/framework"
+import (
+	"k8s.io/klog/v2"
+)
 
-// SIGDescribe annotates the test with the SIG label.
-var SIGDescribe = framework.SIGDescribe("node")
-var SIGWindowsDescribe = framework.SIGDescribe("windows")
+// GetKubeletServerBin returns the path of kubelet binary.
+func GetKubeletServerBin() string {
+	bin, err := getK8sBin("kubelet.exe")
+	if err != nil {
+		klog.Fatalf("Could not locate kubelet binary %v.", err)
+	}
+	return bin
+}

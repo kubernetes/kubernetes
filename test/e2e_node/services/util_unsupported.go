@@ -1,5 +1,8 @@
+//go:build !linux && !windows
+// +build !linux,!windows
+
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2025 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,10 +17,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2enode
+package services
 
-import "k8s.io/kubernetes/test/e2e/framework"
+import (
+	"fmt"
+	"os/exec"
+)
 
-// SIGDescribe annotates the test with the SIG label.
-var SIGDescribe = framework.SIGDescribe("node")
-var SIGWindowsDescribe = framework.SIGDescribe("windows")
+// func startProcess starts the process with the given command and arguments
+func startProcess(cmd *exec.Cmd, monitorParent bool) error {
+	return fmt.Errorf("failed to start process on an unsupported platform")
+}

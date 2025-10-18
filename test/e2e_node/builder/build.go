@@ -136,12 +136,3 @@ func getK8sBin(bin string) (string, error) {
 	// Give up with error
 	return "", fmt.Errorf("unable to locate %s, Can be defined using --k8s-path", bin)
 }
-
-// GetKubeletServerBin returns the path of kubelet binary.
-func GetKubeletServerBin() string {
-	bin, err := getK8sBin("kubelet")
-	if err != nil {
-		klog.Fatalf("Could not locate kubelet binary %v.", err)
-	}
-	return bin
-}
