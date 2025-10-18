@@ -18,6 +18,8 @@ package csistoragecapacity
 
 import (
 	"context"
+	"k8s.io/apimachinery/pkg/api/operation"
+	"k8s.io/apiserver/pkg/registry/rest"
 
 	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -53,7 +55,14 @@ func (csiStorageCapacityStrategy) Validate(ctx context.Context, obj runtime.Obje
 		AllowInvalidLabelValueInSelector: false,
 	}
 	errs := validation.ValidateCSIStorageCapacity(csiStorageCapacity, opts)
-	return errs
+	return rest.ValidateDeclarativelyWithMigrationChecks(
+		ctx,
+		legacyscheme.Scheme,
+		csiStorageCapacity,
+		nil,
+		errs,
+		operation.Create,
+	)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -80,7 +89,14 @@ func (csiStorageCapacityStrategy) ValidateUpdate(ctx context.Context, obj, old r
 		AllowInvalidLabelValueInSelector: hasInvalidLabelValueInLabelSelector(oldCSIStorageCapacityObj),
 	}
 	errorList := validation.ValidateCSIStorageCapacity(newCSIStorageCapacityObj, opts)
-	return append(errorList, validation.ValidateCSIStorageCapacityUpdate(newCSIStorageCapacityObj, oldCSIStorageCapacityObj)...)
+	return rest.ValidateDeclarativelyWithMigrationChecks(
+		ctx,
+		legacyscheme.Scheme,
+		newCSIStorageCapacityObj,
+		oldCSIStorageCapacityObj,
+		errorList,
+		operation.Update,
+	)
 }
 
 // WarningsOnUpdate returns warnings for the given update.

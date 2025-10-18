@@ -18,9 +18,10 @@ package csinode
 
 import (
 	"context"
-
+	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/storage"
@@ -53,7 +54,14 @@ func (csiNodeStrategy) Validate(ctx context.Context, obj runtime.Object) field.E
 
 	errs := validation.ValidateCSINode(csiNode, validateOptions)
 
-	return errs
+	return rest.ValidateDeclarativelyWithMigrationChecks(
+		ctx,
+		legacyscheme.Scheme,
+		csiNode,
+		nil,
+		errs,
+		operation.Create,
+	)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -79,7 +87,14 @@ func (csiNodeStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Obje
 	}
 
 	errorList := validation.ValidateCSINode(newCSINodeObj, validateOptions)
-	return append(errorList, validation.ValidateCSINodeUpdate(newCSINodeObj, oldCSINodeObj, validateOptions)...)
+	return rest.ValidateDeclarativelyWithMigrationChecks(
+		ctx,
+		legacyscheme.Scheme,
+		newCSINodeObj,
+		oldCSINodeObj,
+		errorList,
+		operation.Update,
+	)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
