@@ -1264,6 +1264,7 @@ func TestContainerHasRestartablePolicy(t *testing.T) {
 		name      string
 		container v1.Container
 		podSpec   v1.PodSpec
+		podStatus v1.PodStatus
 		exitCode  int32
 		expected  bool
 	}{
@@ -1299,6 +1300,23 @@ func TestContainerHasRestartablePolicy(t *testing.T) {
 				},
 			},
 			exitCode: 99,
+			expected: true,
+		},
+		{
+			name: "Rule: 'In' operator matches with 'RestartPod' action",
+			container: v1.Container{
+				RestartPolicy: &containerRestartPolicyNever,
+				RestartPolicyRules: []v1.ContainerRestartRule{
+					{
+						Action: v1.ContainerRestartRuleActionRestartPod,
+						ExitCodes: &v1.ContainerRestartRuleOnExitCodes{
+							Operator: v1.ContainerRestartRuleOnExitCodesOpIn,
+							Values:   []int32{42, 50, 60},
+						},
+					},
+				},
+			},
+			exitCode: 42,
 			expected: true,
 		},
 		{
@@ -1393,6 +1411,7 @@ func TestContainerHasRestartablePolicy(t *testing.T) {
 			expected:  true,
 		},
 	}
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletRestartPodInPlace, true)
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1402,6 +1421,90 @@ func TestContainerHasRestartablePolicy(t *testing.T) {
 			// Assert the result
 			if got != tc.expected {
 				t.Errorf("ContainerHasRestartablePolicy() = %v, want %v", got, tc.expected)
+			}
+		})
+	}
+}
+
+func TestPodCouldRestartInPlace(t *testing.T) {
+	restartPolicyAlways := v1.ContainerRestartPolicyAlways
+
+	testCases := []struct {
+		name     string
+		podSpec  *v1.PodSpec
+		expected bool
+	}{
+		{
+			name: "Pod with rules in init containers",
+			podSpec: &v1.PodSpec{
+				InitContainers: []v1.Container{
+					{
+						RestartPolicyRules: []v1.ContainerRestartRule{
+							{
+								Action: v1.ContainerRestartRuleActionRestartPod,
+								ExitCodes: &v1.ContainerRestartRuleOnExitCodes{
+									Operator: v1.ContainerRestartRuleOnExitCodesOpIn,
+									Values:   []int32{1},
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "Pod with rules in sidecar containers",
+			podSpec: &v1.PodSpec{
+				InitContainers: []v1.Container{
+					{
+						RestartPolicy: &restartPolicyAlways,
+						RestartPolicyRules: []v1.ContainerRestartRule{
+							{
+								Action: v1.ContainerRestartRuleActionRestartPod,
+								ExitCodes: &v1.ContainerRestartRuleOnExitCodes{
+									Operator: v1.ContainerRestartRuleOnExitCodesOpIn,
+									Values:   []int32{1},
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "Pod with rules in regular containers",
+			podSpec: &v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						RestartPolicy: &restartPolicyAlways,
+						RestartPolicyRules: []v1.ContainerRestartRule{
+							{
+								Action: v1.ContainerRestartRuleActionRestartPod,
+								ExitCodes: &v1.ContainerRestartRuleOnExitCodes{
+									Operator: v1.ContainerRestartRuleOnExitCodesOpIn,
+									Values:   []int32{1},
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name:     "Pod without rules",
+			podSpec:  &v1.PodSpec{},
+			expected: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := PodCouldRestartInPlace(tc.podSpec)
+			if got != tc.expected {
+				t.Errorf("PodRestartInPlace() = %v, want %v", got, tc.expected)
 			}
 		})
 	}
@@ -1485,7 +1588,7 @@ func TestFindMatchingContainerRestartRule(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			rule, found := findMatchingContainerRestartRule(tc.container, tc.exitCode)
+			rule, found := FindMatchingContainerRestartRule(tc.container, tc.exitCode)
 			if found != tc.expectedFound {
 				t.Errorf("FindMatchingContainerRestartRule() found = %v, want %v", found, tc.expectedFound)
 			}

@@ -103,6 +103,12 @@ func ShouldContainerBeRestarted(logger klog.Logger, container *v1.Container, pod
 	if utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) {
 		return podutil.ContainerShouldRestart(*container, pod.Spec, int32(status.ExitCode))
 	}
+	// If pod is marked for in-place restart, the container will be restarted.
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletRestartPodInPlace) {
+		if ShouldPodBeRestarted(pod, podStatus) {
+			return true
+		}
+	}
 	if pod.Spec.RestartPolicy == v1.RestartPolicyNever {
 		logger.V(4).Info("Already ran container, do nothing", "pod", klog.KObj(pod), "containerName", container.Name)
 		return false
@@ -115,6 +121,56 @@ func ShouldContainerBeRestarted(logger klog.Logger, container *v1.Container, pod
 		}
 	}
 	return true
+}
+
+func ShouldPodBeRestarted(pod *v1.Pod, podStatus *PodStatus) bool {
+	// allRemoved := true
+	// for _, initC := range pod.Spec.InitContainers {
+	// 	if podStatus.FindContainerStatusByName(initC.Name) != nil {
+	// 		allRemoved = false
+	// 		break
+	// 	}
+	// }
+	// for _, c := range pod.Spec.Containers {
+	// 	if podStatus.FindContainerStatusByName(c.Name) != nil {
+	// 		allRemoved = false
+	// 		break
+	// 	}
+	// }
+	// if allRemoved {
+	// 	return false
+	// }
+
+	for _, cond := range pod.Status.Conditions {
+		if cond.Type == v1.PodRestartInPlace && cond.Status == v1.ConditionTrue {
+			return true
+		}
+	}
+
+	for _, c := range pod.Spec.InitContainers {
+		status := podStatus.FindContainerStatusByName(c.Name)
+		if status == nil || status.State != ContainerStateExited {
+			continue
+		}
+		exitCode := int32(status.ExitCode)
+		rule, ok := podutil.FindMatchingContainerRestartRule(c, exitCode)
+		if ok && rule.Action == v1.ContainerRestartRuleActionRestartPod {
+			return true
+		}
+	}
+	for _, c := range pod.Spec.Containers {
+		status := podStatus.FindContainerStatusByName(c.Name)
+		if status == nil || status.State != ContainerStateExited {
+			continue
+		}
+		exitCode := int32(status.ExitCode)
+		rule, ok := podutil.FindMatchingContainerRestartRule(c, exitCode)
+		if ok && rule.Action == v1.ContainerRestartRuleActionRestartPod {
+			return true
+		}
+	}
+
+	return false
 }
 
 // HashContainer returns the hash of the container. It is used to compare

@@ -24,7 +24,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/utils/ptr"
 )
@@ -541,8 +544,27 @@ func TestGeneratePodInitializedCondition(t *testing.T) {
 				Status: v1.ConditionTrue,
 			},
 		},
+		{
+			spec: oneInitContainer,
+			containerStatuses: []v1.ContainerStatus{{
+				Name: "1234",
+				State: v1.ContainerState{
+					Waiting: &v1.ContainerStateWaiting{},
+				},
+			}, {
+				Name: "regular",
+				State: v1.ContainerState{
+					Terminated: &v1.ContainerStateTerminated{},
+				},
+			}},
+			podPhase: v1.PodRunning,
+			expected: v1.PodCondition{
+				Status: v1.ConditionTrue,
+			},
+		},
 	}
 
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletRestartPodInPlace, true)
 	for _, test := range tests {
 		test.expected.Type = v1.PodInitialized
 		pod := &v1.Pod{Spec: *test.spec}

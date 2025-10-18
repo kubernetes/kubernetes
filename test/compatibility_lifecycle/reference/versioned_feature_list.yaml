@@ -835,6 +835,12 @@
     lockToDefault: false
     preRelease: Deprecated
     version: "1.32"
+- name: KubeletRestartPodInPlace
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.35"
 - name: KubeletSeparateDiskGC
   versionedSpecs:
   - default: false

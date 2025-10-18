@@ -1516,3 +1516,153 @@ func TestHasAnyRegularContainerStarted(t *testing.T) {
 		})
 	}
 }
+
+func TestShouldPodBeRestarted(t *testing.T) {
+	restartPolicyNever := v1.ContainerRestartPolicyNever
+	restartPolicyAlways := v1.ContainerRestartPolicyAlways
+	restartRuleRestartPod := v1.ContainerRestartRule{
+		Action: v1.ContainerRestartRuleActionRestartPod,
+		ExitCodes: &v1.ContainerRestartRuleOnExitCodes{
+			Operator: v1.ContainerRestartRuleOnExitCodesOpIn,
+			Values:   []int32{42},
+		},
+	}
+	restartPodCondition := v1.PodCondition{
+		Type:   v1.PodRestartInPlace,
+		Status: v1.ConditionTrue,
+	}
+
+	testcases := []struct {
+		name      string
+		pod       *v1.Pod
+		podStatus *PodStatus
+		expected  bool
+	}{
+		{
+			"pod marked with condition",
+			&v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:          "regular",
+							RestartPolicy: &restartPolicyNever,
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					Conditions: []v1.PodCondition{restartPodCondition},
+				},
+			},
+			&PodStatus{
+				ContainerStatuses: []*Status{
+					{
+						Name:  "regular",
+						State: ContainerStateRunning,
+					},
+				},
+			},
+			true,
+		},
+		{
+			"regular container exited with matching rules",
+			&v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:               "regular",
+							RestartPolicy:      &restartPolicyNever,
+							RestartPolicyRules: []v1.ContainerRestartRule{restartRuleRestartPod},
+						},
+					},
+				},
+			},
+			&PodStatus{
+				ContainerStatuses: []*Status{
+					{
+						Name:     "regular",
+						State:    ContainerStateExited,
+						ExitCode: 42,
+					},
+				},
+			},
+			true,
+		},
+		{
+			"init container exited with matching rules",
+			&v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{
+							Name:               "init",
+							RestartPolicy:      &restartPolicyNever,
+							RestartPolicyRules: []v1.ContainerRestartRule{restartRuleRestartPod},
+						},
+					},
+				},
+			},
+			&PodStatus{
+				ContainerStatuses: []*Status{
+					{
+						Name:     "init",
+						State:    ContainerStateExited,
+						ExitCode: 42,
+					},
+				},
+			},
+			true,
+		},
+		{
+			"sidecar container exited with matching rules",
+			&v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{
+							Name:               "init",
+							RestartPolicy:      &restartPolicyAlways,
+							RestartPolicyRules: []v1.ContainerRestartRule{restartRuleRestartPod},
+						},
+					},
+				},
+			},
+			&PodStatus{
+				ContainerStatuses: []*Status{
+					{
+						Name:     "init",
+						State:    ContainerStateExited,
+						ExitCode: 42,
+					},
+				},
+			},
+			true,
+		},
+		{
+			"container exited without rules",
+			&v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "regular",
+						},
+					},
+				},
+			},
+			&PodStatus{
+				ContainerStatuses: []*Status{
+					{
+						Name:     "regular",
+						State:    ContainerStateExited,
+						ExitCode: 1,
+					},
+				},
+			},
+			false,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := ShouldPodBeRestarted(tc.pod, tc.podStatus)
+			assert.Equal(t, tc.expected, actual, "ShouldPodBeRestarted(%v, %v)", tc.pod, tc.podStatus)
+		})
+	}
+}
