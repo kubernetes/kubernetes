@@ -19,6 +19,7 @@ package node
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -254,6 +255,66 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 			e2epod.SetAffinity(&nodeSelection, targetNode)
 			e2epod.SetNodeSelection(&podWithHook.Spec, nodeSelection)
 			testPodWithHook(ctx, podWithHook)
+		})
+	})
+	ginkgo.Context("when using hostNetwork without explicit host in HTTPGet", func() {
+		/*
+			Release : v1.34
+			Testname: Pod Lifecycle, prestop http hook with hostNetwork and no host field (self request)
+			Description: When a pre-stop handler is specified in the container lifecycle using a 'HttpGet' action,
+			and the Pod uses hostNetwork but the HTTPGet Host field is not set, then the handler MUST be invoked
+			by sending an HTTP request to the Pod itself before the container is terminated.
+			A pod with hostNetwork is created with agnhost 'netexec' server running,
+			with a pre-stop hook that hits /echo?msg=prestop. The container logs MUST show the
+			request was received when the pod is deleted.
+		*/
+
+		f.It("should execute prestop http hook to itself with no host field", f.WithNodeConformance(), func(ctx context.Context) {
+			const (
+				podName       = "hostnetwork-pod-with-prestop-http-nohost"
+				containerName = "agnhost-container"
+			)
+			var (
+				port                   int32 = 8080
+				terminationGracePeriod       = 3
+				httpPorts                    = []v1.ContainerPort{
+					{
+						ContainerPort: port,
+						Protocol:      v1.ProtocolTCP,
+					},
+				}
+			)
+			podClient = e2epod.NewPodClient(f)
+			c := e2epod.NewAgnhostContainer(containerName, nil, httpPorts, "netexec", "--delay-shutdown", strconv.Itoa(terminationGracePeriod))
+			c.Lifecycle = &v1.Lifecycle{
+				PreStop: &v1.LifecycleHandler{
+					HTTPGet: &v1.HTTPGetAction{
+						Path: "/echo?msg=prestop",
+						Port: intstr.FromInt32(port),
+						// Host isn't set -> should resolve to "PodIP/HostIP"
+					},
+				},
+			}
+			podHandleHookRequest := e2epod.NewAgnhostPodFromContainers("", podName, nil, c)
+			podHandleHookRequest.Spec.HostNetwork = true
+			podHandleHookRequest.Spec.TerminationGracePeriodSeconds = ptr.To(int64(terminationGracePeriod))
+
+			node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
+			framework.ExpectNoError(err)
+			targetNode := node.Name
+			nodeSelection := e2epod.NodeSelection{}
+			e2epod.SetAffinity(&nodeSelection, targetNode)
+			e2epod.SetNodeSelection(&podHandleHookRequest.Spec, nodeSelection)
+
+			e2epod.NewPodClient(f).CreateSync(ctx, podHandleHookRequest)
+
+			ginkgo.By("delete the hostnetwork pod with lifecycle hook")
+			err = e2epod.NewPodClient(f).Delete(ctx, podName, metav1.DeleteOptions{})
+			framework.ExpectNoError(err)
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				return podClient.MatchContainerOutput(ctx, podName, containerName,
+					`GET /echo\?msg=prestop`)
+			}, preStopWaitTimeout, podCheckInterval).Should(gomega.Succeed())
 		})
 	})
 })
