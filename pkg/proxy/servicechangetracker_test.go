@@ -27,10 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/apimachinery/pkg/util/version"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 	netutils "k8s.io/utils/net"
 )
 
@@ -117,11 +113,10 @@ func TestServiceToServiceMap(t *testing.T) {
 	ipModeProxy := v1.LoadBalancerIPModeProxy
 
 	testCases := []struct {
-		desc          string
-		service       *v1.Service
-		expected      map[ServicePortName]*BaseServicePortInfo
-		ipFamily      v1.IPFamily
-		ipModeEnabled bool
+		desc     string
+		service  *v1.Service
+		expected map[ServicePortName]*BaseServicePortInfo
+		ipFamily v1.IPFamily
 	}{
 		{
 			desc:     "nothing",
@@ -214,7 +209,7 @@ func TestServiceToServiceMap(t *testing.T) {
 			},
 		},
 		{
-			desc:     "load balancer service ipMode VIP feature gate disable",
+			desc:     "load balancer service ipMode VIP",
 			ipFamily: v1.IPv4Protocol,
 
 			service: makeTestService("ns1", "load-balancer", func(svc *v1.Service) {
@@ -235,52 +230,8 @@ func TestServiceToServiceMap(t *testing.T) {
 			},
 		},
 		{
-			desc:     "load balancer service ipMode Proxy feature gate disable",
+			desc:     "load balancer service ipMode Proxy",
 			ipFamily: v1.IPv4Protocol,
-
-			service: makeTestService("ns1", "load-balancer", func(svc *v1.Service) {
-				svc.Spec.Type = v1.ServiceTypeLoadBalancer
-				svc.Spec.ClusterIP = "172.16.55.11"
-				svc.Spec.LoadBalancerIP = "5.6.7.8"
-				svc.Spec.Ports = addTestPort(svc.Spec.Ports, "port3", "UDP", 8675, 30061, 7000)
-				svc.Spec.Ports = addTestPort(svc.Spec.Ports, "port4", "UDP", 8676, 30062, 7001)
-				svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{IP: "10.1.2.4", IPMode: &ipModeProxy}}
-			}),
-			expected: map[ServicePortName]*BaseServicePortInfo{
-				makeServicePortName("ns1", "load-balancer", "port3", v1.ProtocolUDP): makeTestServiceInfo("172.16.55.11", 8675, "UDP", 0, func(bsvcPortInfo *BaseServicePortInfo) {
-					bsvcPortInfo.loadBalancerVIPs = makeIPs("10.1.2.4")
-				}),
-				makeServicePortName("ns1", "load-balancer", "port4", v1.ProtocolUDP): makeTestServiceInfo("172.16.55.11", 8676, "UDP", 0, func(bsvcPortInfo *BaseServicePortInfo) {
-					bsvcPortInfo.loadBalancerVIPs = makeIPs("10.1.2.4")
-				}),
-			},
-		},
-		{
-			desc:          "load balancer service ipMode VIP feature gate enabled",
-			ipFamily:      v1.IPv4Protocol,
-			ipModeEnabled: true,
-
-			service: makeTestService("ns1", "load-balancer", func(svc *v1.Service) {
-				svc.Spec.Type = v1.ServiceTypeLoadBalancer
-				svc.Spec.ClusterIP = "172.16.55.11"
-				svc.Spec.LoadBalancerIP = "5.6.7.8"
-				svc.Spec.Ports = addTestPort(svc.Spec.Ports, "port3", "UDP", 8675, 30061, 7000)
-				svc.Spec.Ports = addTestPort(svc.Spec.Ports, "port4", "UDP", 8676, 30062, 7001)
-				svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{IP: "10.1.2.4", IPMode: &ipModeVIP}}
-			}),
-			expected: map[ServicePortName]*BaseServicePortInfo{
-				makeServicePortName("ns1", "load-balancer", "port3", v1.ProtocolUDP): makeTestServiceInfo("172.16.55.11", 8675, "UDP", 0, func(bsvcPortInfo *BaseServicePortInfo) {
-					bsvcPortInfo.loadBalancerVIPs = makeIPs("10.1.2.4")
-				}),
-				makeServicePortName("ns1", "load-balancer", "port4", v1.ProtocolUDP): makeTestServiceInfo("172.16.55.11", 8676, "UDP", 0, func(bsvcPortInfo *BaseServicePortInfo) {
-					bsvcPortInfo.loadBalancerVIPs = makeIPs("10.1.2.4")
-				}),
-			},
-		},
-		{
-			desc:          "load balancer service ipMode Proxy feature gate enabled",
-			ipFamily:      v1.IPv4Protocol,
-			ipModeEnabled: true,
 
 			service: makeTestService("ns1", "load-balancer", func(svc *v1.Service) {
 				svc.Spec.Type = v1.ServiceTypeLoadBalancer
@@ -573,10 +524,6 @@ func TestServiceToServiceMap(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
-			if !tc.ipModeEnabled {
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.31"))
-			}
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, tc.ipModeEnabled)
 			svcTracker := NewServiceChangeTracker(tc.ipFamily, nil, nil)
 			// outputs
 			newServices := svcTracker.serviceToServiceMap(tc.service)
