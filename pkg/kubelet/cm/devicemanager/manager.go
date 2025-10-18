@@ -852,6 +852,9 @@ func (m *ManagerImpl) allocateContainerResources(ctx context.Context, pod *v1.Po
 		if !m.isDevicePluginResource(resource) {
 			continue
 		}
+		if needed == 0 {
+			continue
+		}
 		// Updates allocatedDevices to garbage collect any stranded resources
 		// before doing the device plugin allocation.
 		if !allocatedDevicesUpdated {
