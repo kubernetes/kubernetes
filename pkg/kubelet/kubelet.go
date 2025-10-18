@@ -642,6 +642,7 @@ func NewMainKubelet(ctx context.Context,
 		nodeStartupLatencyTracker:    kubeDeps.NodeStartupLatencyTracker,
 		healthChecker:                kubeDeps.HealthChecker,
 		flagz:                        kubeDeps.Flagz,
+		podCleanupTracker:            sync.Map{},
 	}
 
 	var secretManager secret.Manager
@@ -1481,6 +1482,10 @@ type Kubelet struct {
 
 	// flagz is the Reader interface to get flags for flagz page.
 	flagz flagz.Reader
+
+	// podCleanupTracker tracks pods that have already been processed for cleanup
+	// to avoid duplicate cleanup operations for the same pod
+	podCleanupTracker sync.Map
 }
 
 // ListPodStats is delegated to StatsProvider, which implements stats.Provider interface
@@ -2949,7 +2954,7 @@ func (kl *Kubelet) HandlePodReconcile(pods []*v1.Pod) {
 		// can do better. If it's about preserving pod status info we can also do better.
 		if eviction.PodIsEvicted(pod.Status) {
 			if podStatus, err := kl.podCache.Get(pod.UID); err == nil {
-				kl.containerDeletor.deleteContainersInPod("", podStatus, true)
+				kl.containerDeletor.deleteContainersInPod("", podStatus, false)
 			}
 		}
 	}
@@ -3118,9 +3123,35 @@ func (kl *Kubelet) ListenAndServePodResources(ctx context.Context) {
 // Delete the eligible dead container instances in a pod. Depending on the configuration, the latest dead containers may be kept around.
 func (kl *Kubelet) cleanUpContainersInPod(podID types.UID, exitedContainerID string) {
 	if podStatus, err := kl.podCache.Get(podID); err == nil {
-		// When an evicted or deleted pod has already synced, all containers can be removed.
-		removeAll := kl.podWorkers.ShouldPodContentBeRemoved(podID)
-		kl.containerDeletor.deleteContainersInPod(exitedContainerID, podStatus, removeAll)
+		for _, sandboxStatus := range podStatus.SandboxStatuses {
+			// If exitedContainerID is the ID of the sandbox container,
+			// we skip deleting this container to avoid duplicate RemoveContainer calls.
+			if sandboxStatus.GetId() == exitedContainerID {
+				klog.V(4).InfoS("exitedContainerID is a sandbox container, skipping container deletion", "exitedContainerID", exitedContainerID)
+				return
+			}
+		}
+
+		keepContainers := !kl.podWorkers.ShouldPodContentBeRemoved(podID)
+
+		// When the pod is terminating, use tracking mechanism to ensure only one full cleanup
+		if !keepContainers {
+			if _, alreadyCleaned := kl.podCleanupTracker.LoadOrStore(podID, struct{}{}); alreadyCleaned {
+				// If cleanup has already been performed, only clean the current exited container
+				klog.V(4).InfoS("Pod cleanup already in progress, only cleaning current container",
+					"pod", podID, "container", exitedContainerID)
+				kl.containerDeletor.deleteContainersInPod(exitedContainerID, podStatus, false)
+				return
+			}
+
+			// First time performing cleanup, clean all containers
+			klog.V(4).InfoS("Pod is terminating, cleaning up all containers", "pod", podID)
+			kl.containerDeletor.deleteContainersInPod("", podStatus, false)
+			return
+		}
+
+		// For non-terminating pods, only clean the current exited container
+		kl.containerDeletor.deleteContainersInPod(exitedContainerID, podStatus, keepContainers)
 	}
 }
 
