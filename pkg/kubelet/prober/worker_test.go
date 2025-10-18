@@ -18,11 +18,13 @@ package prober
 
 import (
 	"fmt"
+	"net/http"
 	"testing"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes/fake"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
@@ -573,4 +575,98 @@ func TestStartupProbeDisabledByStarted(t *testing.T) {
 	msg = "Started, probe failure, result success"
 	expectContinue(t, w, w.doProbe(ctx), msg)
 	expectResult(t, w, results.Success, msg)
+}
+
+func TestWorkerHTTPProbeRequestCaching(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	m := newTestManager()
+
+	httpGet := &v1.HTTPGetAction{
+		Host: "",
+		Path: "",
+		Port: intstr.FromInt32(8080),
+	}
+	probeSpec := v1.Probe{
+		ProbeHandler: v1.ProbeHandler{
+			HTTPGet: httpGet,
+		},
+		TimeoutSeconds:   1,
+		PeriodSeconds:    1,
+		SuccessThreshold: 1,
+		FailureThreshold: 1,
+	}
+
+	tests := []struct {
+		name         string
+		podIP        string
+		containerID  string
+		expectNewReq bool
+	}{
+		{
+			name:         "initial probe",
+			podIP:        "10.0.0.1",
+			containerID:  "docker://abc123",
+			expectNewReq: true,
+		},
+		{
+			name:         "same pod IP and container ID",
+			podIP:        "10.0.0.1",
+			containerID:  "docker://abc123",
+			expectNewReq: false,
+		},
+		{
+			name:         "pod IP change",
+			podIP:        "10.0.0.2",
+			containerID:  "docker://abc123",
+			expectNewReq: true,
+		},
+		{
+			name:         "container restart",
+			podIP:        "10.0.0.2",
+			containerID:  "docker://def456",
+			expectNewReq: true,
+		},
+	}
+
+	// Create test pod with HTTP probe
+	pod := getTestPod()
+	pod.Spec.Containers[0].LivenessProbe = &probeSpec
+	w := newWorker(m, liveness, pod, pod.Spec.Containers[0])
+
+	var prevReq *http.Request
+	for i, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// Update pod status
+			status := getTestRunningStatusWithStarted(true)
+			status.PodIP = test.podIP
+			status.ContainerStatuses[0].ContainerID = test.containerID
+			m.statusManager.SetPodStatus(logger, w.pod, status)
+
+			// For container restart case, need to trigger restart logic
+			if i > 0 && test.containerID != tests[i-1].containerID {
+				w.doProbe(ctx)
+			}
+
+			// Get HTTP probe request
+			req, err := w.httpProbeRequest.getRequest(&w.container, status.PodIP)
+			if err != nil {
+				t.Fatalf("Expected no error creating request, got: %v", err)
+			}
+			if req == nil {
+				t.Fatal("Expected request to be initialized")
+			}
+
+			if test.expectNewReq {
+				if req == prevReq {
+					t.Error("Expected new request to be created")
+				}
+			} else {
+				if req != prevReq {
+					t.Error("Expected cached request to be reused")
+				}
+			}
+
+			prevReq = req
+		})
+	}
 }
