@@ -3189,6 +3189,11 @@ func (in *NodeSystemInfo) DeepCopyInto(out *NodeSystemInfo) {
 		*out = new(NodeSwapStatus)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.RunningInUserNS != nil {
+		in, out := &in.RunningInUserNS, &out.RunningInUserNS
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 
