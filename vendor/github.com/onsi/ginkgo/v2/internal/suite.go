@@ -199,6 +199,11 @@ func (suite *Suite) PushNode(node Node) error {
 						err = types.GinkgoErrors.CaughtPanicDuringABuildPhase(e, node.CodeLocation)
 					}
 				}()
+
+				// Ensure that code running in the body of the container node
+				// has access to information about the current container node.
+				suite.currentSpecReport = initialReportForTreeNode(suite.tree)
+
 				node.Body(nil)
 				return err
 			}()

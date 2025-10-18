@@ -27,6 +27,10 @@ CurrentSpecReport returns information about the current running spec.
 The returned object is a types.SpecReport which includes helper methods
 to make extracting information about the spec easier.
 
+During construction of the test tree, the returned report provides
+information about the current container node. Fields related to
+a leaf node are not set in that case.
+
 You can learn more about SpecReport here: https://pkg.go.dev/github.com/onsi/ginkgo/types#SpecReport
 You can learn more about CurrentSpecReport() here: https://onsi.github.io/ginkgo/#getting-a-report-for-the-current-spec
 */
