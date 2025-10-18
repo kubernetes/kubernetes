@@ -20,9 +20,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
+
 	celgo "github.com/google/cel-go/cel"
 	celtypes "github.com/google/cel-go/common/types"
-	"strings"
 
 	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 	"sigs.k8s.io/structured-merge-diff/v6/schema"
@@ -33,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/managedfields"
+	"k8s.io/apiserver/pkg/admission/plugin/cel"
 	plugincel "k8s.io/apiserver/pkg/admission/plugin/cel"
 	"k8s.io/apiserver/pkg/cel/mutation/dynamic"
 )
@@ -69,12 +71,15 @@ func (e *applyConfigPatcher) Patch(ctx context.Context, r Request, runtimeCELCos
 		r.VersionedAttributes.Attributes,
 		metav1.GroupVersionResource(r.MatchedResource),
 		metav1.GroupVersionKind(r.VersionedAttributes.VersionedKind))
-
+	request, err := cel.ConvertObjectToUnstructured(admissionRequest)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert AdmissionRequest to unstructured: %w", err)
+	}
 	compileErrors := e.expressionEvaluator.CompilationErrors()
 	if len(compileErrors) > 0 {
 		return nil, errors.Join(compileErrors...)
 	}
-	eval, _, err := e.expressionEvaluator.ForInput(ctx, r.VersionedAttributes, admissionRequest, r.OptionalVariables, r.Namespace, runtimeCELCostBudget)
+	eval, _, err := e.expressionEvaluator.ForInput(ctx, r.VersionedAttributes, request, r.OptionalVariables, r.Namespace, runtimeCELCostBudget)
 	if err != nil {
 		return nil, err
 	}

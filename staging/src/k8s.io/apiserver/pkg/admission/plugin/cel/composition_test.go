@@ -234,7 +234,12 @@ func TestCompositedPolicies(t *testing.T) {
 			if costBudget == 0 {
 				costBudget = celconfig.RuntimeCELCostBudget
 			}
-			result, _, err := f.ForInput(context.Background(), versionedAttr, CreateAdmissionRequest(versionedAttr.Attributes, v1.GroupVersionResource(tc.attributes.GetResource()), v1.GroupVersionKind(versionedAttr.VersionedKind)), optionalVars, nil, costBudget)
+			aReq := CreateAdmissionRequest(versionedAttr.Attributes, v1.GroupVersionResource(tc.attributes.GetResource()), v1.GroupVersionKind(versionedAttr.VersionedKind))
+			uReq, err := ConvertObjectToUnstructured(aReq)
+			if err != nil {
+				t.Fatal(err)
+			}
+			result, _, err := f.ForInput(context.Background(), versionedAttr, uReq, optionalVars, nil, costBudget)
 			if !tc.expectErr && err != nil {
 				t.Fatalf("failed evaluation: %v", err)
 			}

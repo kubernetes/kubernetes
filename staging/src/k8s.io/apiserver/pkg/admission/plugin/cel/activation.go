@@ -19,12 +19,13 @@ package cel
 import (
 	"context"
 	"fmt"
-	"github.com/google/cel-go/interpreter"
 	"math"
 	"time"
 
-	admissionv1 "k8s.io/api/admission/v1"
+	"github.com/google/cel-go/interpreter"
+
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/library"
@@ -32,7 +33,7 @@ import (
 
 // newActivation creates an activation for CEL admission plugins from the given request, admission chain and
 // variable binding information.
-func newActivation(compositionCtx CompositionContext, versionedAttr *admission.VersionedAttributes, request *admissionv1.AdmissionRequest, inputs OptionalVariableBindings, namespace *v1.Namespace) (*evaluationActivation, error) {
+func newActivation(compositionCtx CompositionContext, versionedAttr *admission.VersionedAttributes, request *unstructured.Unstructured, inputs OptionalVariableBindings, namespace *v1.Namespace) (*evaluationActivation, error) {
 	oldObjectVal, err := objectToResolveVal(versionedAttr.VersionedOldObject)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare oldObject variable for evaluation: %w", err)
@@ -54,7 +55,6 @@ func newActivation(compositionCtx CompositionContext, versionedAttr *admission.V
 		requestResourceAuthorizerVal = library.NewResourceAuthorizerVal(versionedAttr.GetUserInfo(), inputs.Authorizer, versionedAttr)
 	}
 
-	requestVal, err := convertObjectToUnstructured(request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare request variable for evaluation: %w", err)
 	}
@@ -66,7 +66,7 @@ func newActivation(compositionCtx CompositionContext, versionedAttr *admission.V
 		object:                    objectVal,
 		oldObject:                 oldObjectVal,
 		params:                    paramsVal,
-		request:                   requestVal.Object,
+		request:                   request.Object,
 		namespace:                 namespaceVal,
 		authorizer:                authorizerVal,
 		requestResourceAuthorizer: requestResourceAuthorizerVal,

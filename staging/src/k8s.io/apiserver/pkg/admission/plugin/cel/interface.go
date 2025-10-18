@@ -23,8 +23,8 @@ import (
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types/ref"
 
-	v1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -94,7 +94,7 @@ type ConditionEvaluator interface {
 	// ForInput converts compiled CEL-typed values into evaluated CEL-typed value.
 	// runtimeCELCostBudget was added for testing purpose only. Callers should always use const RuntimeCELCostBudget from k8s.io/apiserver/pkg/apis/cel/config.go as input.
 	// If cost budget is calculated, the condition should return the remaining budget.
-	ForInput(ctx context.Context, versionedAttr *admission.VersionedAttributes, request *v1.AdmissionRequest, optionalVars OptionalVariableBindings, namespace *corev1.Namespace, runtimeCELCostBudget int64) ([]EvaluationResult, int64, error)
+	ForInput(ctx context.Context, versionedAttr *admission.VersionedAttributes, request *unstructured.Unstructured, optionalVars OptionalVariableBindings, namespace *corev1.Namespace, runtimeCELCostBudget int64) ([]EvaluationResult, int64, error)
 
 	// CompilationErrors returns a list of errors from the compilation of the mutatingEvaluator
 	CompilationErrors() []error
@@ -115,7 +115,7 @@ type MutatingEvaluator interface {
 	// ForInput converts compiled CEL-typed values into a CEL-typed value representing a mutation.
 	// runtimeCELCostBudget was added for testing purpose only. Callers should always use const RuntimeCELCostBudget from k8s.io/apiserver/pkg/apis/cel/config.go as input.
 	// If cost budget is calculated, the condition should return the remaining budget.
-	ForInput(ctx context.Context, versionedAttr *admission.VersionedAttributes, request *v1.AdmissionRequest, optionalVars OptionalVariableBindings, namespace *corev1.Namespace, runtimeCELCostBudget int64) (EvaluationResult, int64, error)
+	ForInput(ctx context.Context, versionedAttr *admission.VersionedAttributes, request *unstructured.Unstructured, optionalVars OptionalVariableBindings, namespace *corev1.Namespace, runtimeCELCostBudget int64) (EvaluationResult, int64, error)
 
 	// CompilationErrors returns a list of errors from the compilation of the mutatingEvaluator
 	CompilationErrors() []error
