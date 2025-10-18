@@ -3933,3 +3933,156 @@ func TestIsPodResizeInProgress(t *testing.T) {
 		})
 	}
 }
+
+// TestPodSandboxReadyCallback tests that the pod sandbox ready callback is invoked
+// at the correct time during SyncPod.
+func TestPodSandboxReadyCallback(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
+	tests := []struct {
+		name                  string
+		registerCallback      bool
+		callbackShouldSucceed bool
+		expectCallbackInvoked bool
+		expectSyncPodSuccess  bool
+	}{
+		{
+			name:                  "callback registered and succeeds",
+			registerCallback:      true,
+			callbackShouldSucceed: true,
+			expectCallbackInvoked: true,
+			expectSyncPodSuccess:  true,
+		},
+		{
+			name:                  "callback registered but fails",
+			registerCallback:      true,
+			callbackShouldSucceed: false,
+			expectCallbackInvoked: true,
+			expectSyncPodSuccess:  true, // SyncPod should still succeed even if callback fails
+		},
+		{
+			name:                  "callback not registered",
+			registerCallback:      false,
+			callbackShouldSucceed: false,
+			expectCallbackInvoked: false,
+			expectSyncPodSuccess:  true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeRuntime, fakeImage, m, err := createTestRuntimeManager(tCtx)
+			require.NoError(t, err)
+
+			callbackInvoked := false
+			var callbackPod *v1.Pod
+			var callbackCtx context.Context
+
+			if test.registerCallback {
+				m.SetPodSandboxReadyCallback(func(ctx context.Context, pod *v1.Pod) error {
+					callbackInvoked = true
+					callbackPod = pod
+					callbackCtx = ctx
+
+					if !test.callbackShouldSucceed {
+						return fmt.Errorf("callback intentionally failed for testing")
+					}
+					return nil
+				})
+			}
+
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:       "test-pod-uid",
+					Name:      "test-pod",
+					Namespace: "test-namespace",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:            "test-container",
+							Image:           "busybox",
+							ImagePullPolicy: v1.PullIfNotPresent,
+						},
+					},
+				},
+			}
+
+			backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+			result := m.SyncPod(tCtx, pod, &kubecontainer.PodStatus{}, []v1.Secret{}, backOff)
+
+			if test.expectSyncPodSuccess {
+				require.NoError(t, result.Error())
+			} else {
+				require.Error(t, result.Error())
+			}
+
+			assert.Equal(t, test.expectCallbackInvoked, callbackInvoked, "callback invocation mismatch")
+
+			if test.expectCallbackInvoked {
+				assert.NotNil(t, callbackPod, "callback should receive pod")
+				assert.Equal(t, pod.UID, callbackPod.UID, "callback should receive correct pod UID")
+				assert.Equal(t, pod.Name, callbackPod.Name, "callback should receive correct pod name")
+				assert.Equal(t, pod.Namespace, callbackPod.Namespace, "callback should receive correct pod namespace")
+				assert.NotNil(t, callbackCtx, "callback should receive context")
+
+				assert.Len(t, fakeRuntime.Sandboxes, 1, "sandbox should be created before callback")
+				for _, sandbox := range fakeRuntime.Sandboxes {
+					assert.Equal(t, runtimeapi.PodSandboxState_SANDBOX_READY, sandbox.State, "sandbox should be ready when callback is invoked")
+				}
+			}
+
+			assert.Len(t, fakeRuntime.Containers, 1, "container should be created")
+			assert.Len(t, fakeImage.Images, 1, "image should be pulled")
+			for _, c := range fakeRuntime.Containers {
+				assert.Equal(t, runtimeapi.ContainerState_CONTAINER_RUNNING, c.State, "container should be running")
+			}
+		})
+	}
+}
+
+func TestPodSandboxReadyCallbackTiming(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	fakeRuntime, fakeImage, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	var sandboxCount int
+	var containerCount int
+	var imageCount int
+
+	m.SetPodSandboxReadyCallback(func(ctx context.Context, pod *v1.Pod) error {
+		sandboxCount = len(fakeRuntime.Sandboxes)
+		containerCount = len(fakeRuntime.Containers)
+		imageCount = len(fakeImage.Images)
+		return nil
+	})
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "timing-test-pod",
+			Name:      "timing-test",
+			Namespace: "default",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:            "test-container",
+					Image:           "busybox",
+					ImagePullPolicy: v1.PullIfNotPresent,
+				},
+			},
+		},
+	}
+
+	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+	result := m.SyncPod(tCtx, pod, &kubecontainer.PodStatus{}, []v1.Secret{}, backOff)
+	require.NoError(t, result.Error())
+
+	assert.Equal(t, 1, sandboxCount, "sandbox should exist when callback is invoked")
+	assert.Equal(t, 0, containerCount, "containers should not exist yet when callback is invoked")
+	// Note - image may or may not be pulled at callback time depending on whether image already exists
+	t.Logf("At callback time: sandboxes=%d, containers=%d, images=%d", sandboxCount, containerCount, imageCount)
+
+	assert.Len(t, fakeRuntime.Sandboxes, 1, "final sandbox count")
+	assert.Len(t, fakeRuntime.Containers, 1, "final container count")
+}
