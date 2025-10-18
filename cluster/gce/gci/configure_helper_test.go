@@ -99,7 +99,7 @@ func (c *ManifestTestCase) mustCopyAuxFromTemplate() {
 }
 
 func (c *ManifestTestCase) mustCreateManifestDstDir() {
-	p := filepath.Join(filepath.Join(c.kubeHome, "etc", "kubernetes", "manifests"))
+	p := filepath.Join(c.kubeHome, "etc", "kubernetes", "manifests")
 	if err := os.MkdirAll(p, os.ModePerm); err != nil {
 		c.t.Fatalf("Failed to create designation folder for kube-apiserver.manifest: %v", err)
 	}
