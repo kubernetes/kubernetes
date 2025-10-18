@@ -227,3 +227,82 @@ func nearlyRemovedBetaMultipleVersionNoxuCRD(scope apiextensionsv1beta1.Resource
 		},
 	}
 }
+
+func nearlyRemovedBetaMultipleVersionNoxuCRDWithStatus(scope apiextensionsv1beta1.ResourceScope) *apiextensionsv1beta1.CustomResourceDefinition {
+	return &apiextensionsv1beta1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: "myresources.example.com"},
+		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
+			Group:   "example.com",
+			Version: "v1beta1",
+			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+				Plural:     "myresources",
+				Singular:   "myresource",
+				Kind:       "MyResource",
+				ShortNames: []string{"mr"},
+				ListKind:   "MyResourceList",
+			},
+			Scope: scope,
+			Versions: []apiextensionsv1beta1.CustomResourceDefinitionVersion{
+				{
+					Name:    "v1beta1",
+					Served:  true,
+					Storage: false,
+					Schema: &apiextensionsv1beta1.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensionsv1beta1.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+								"spec": {
+									Type: "object",
+									Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+										"a": {Type: "string"},
+										"b": {Type: "string"},
+									},
+								},
+								"status": {
+									Type: "object",
+									Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+										"a": {Type: "string"},
+									},
+								},
+							},
+						},
+					},
+					Subresources: &apiextensionsv1beta1.CustomResourceSubresources{
+						Status: &apiextensionsv1beta1.CustomResourceSubresourceStatus{},
+					},
+				},
+				{
+					Name:    "v1",
+					Served:  true,
+					Storage: true,
+					Schema: &apiextensionsv1beta1.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensionsv1beta1.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+								"spec": {
+									Type: "object",
+									Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+										"a": {Type: "string"},
+										"b": {Type: "string"},
+									},
+								},
+								"status": {
+									Type: "object",
+									Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+										"a": {Type: "string"},
+									},
+								},
+							},
+						},
+					},
+					Subresources: &apiextensionsv1beta1.CustomResourceSubresources{
+						Status: &apiextensionsv1beta1.CustomResourceSubresourceStatus{},
+					},
+				},
+			},
+			Subresources: &apiextensionsv1beta1.CustomResourceSubresources{
+				Status: &apiextensionsv1beta1.CustomResourceSubresourceStatus{},
+			},
+		},
+	}
+}

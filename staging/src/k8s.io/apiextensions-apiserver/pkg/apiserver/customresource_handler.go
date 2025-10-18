@@ -1039,30 +1039,6 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 
 		scaleScopes[v.Name] = &scaleScope
 
-		// override status subresource values
-		// shallow copy
-		statusScope := *requestScopes[v.Name]
-		statusScope.Subresource = "status"
-		statusScope.Namer = handlers.ContextBasedNaming{
-			Namer:         meta.NewAccessor(),
-			ClusterScoped: clusterScoped,
-		}
-
-		if subresources != nil && subresources.Status != nil {
-			resetFields := storages[v.Name].Status.GetResetFields()
-			statusScope, err = scopeWithFieldManager(
-				typeConverter,
-				statusScope,
-				resetFields,
-				"status",
-			)
-			if err != nil {
-				return nil, err
-			}
-		}
-
-		statusScopes[v.Name] = &statusScope
-
 		if v.Deprecated {
 			deprecated[v.Name] = true
 			if v.DeprecationWarning != nil {
@@ -1071,6 +1047,12 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 				warnings[v.Name] = append(warnings[v.Name], defaultDeprecationWarning(v.Name, crd.Spec))
 			}
 		}
+	}
+
+	statusResetFields := getStatusResetFields(crd, storages)
+	statusScopes, err = setStatusScope(crd, requestScopes, typeConverter, statusResetFields, statusScopes)
+	if err != nil {
+		return nil, err
 	}
 
 	ret := &crdInfo{
@@ -1094,6 +1076,57 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 	r.customStorage.Store(storageMap2)
 
 	return ret, nil
+}
+
+// getStatusResetFields returns the reset fields which include all versions for the status subresource of the CRD.
+func getStatusResetFields(crd *apiextensionsv1.CustomResourceDefinition, storages map[string]customresource.CustomResourceStorage) map[fieldpath.APIVersion]*fieldpath.Set {
+	var statusResetFields = make(map[fieldpath.APIVersion]*fieldpath.Set)
+	for _, value := range crd.Spec.Versions {
+		if storages[value.Name].Status == nil {
+			continue
+		}
+		resetField := storages[value.Name].Status.GetResetFields()
+		for apiVersion, set := range resetField {
+			statusResetFields[apiVersion] = set
+		}
+	}
+	return statusResetFields
+}
+
+// setStatusScope sets the status scope for each version of the CRD.
+func setStatusScope(crd *apiextensionsv1.CustomResourceDefinition, requestScopes map[string]*handlers.RequestScope, typeConverter managedfields.TypeConverter, resetFields map[fieldpath.APIVersion]*fieldpath.Set, statusScopes map[string]*handlers.RequestScope) (map[string]*handlers.RequestScope, error) {
+	for _, v := range crd.Spec.Versions {
+		clusterScoped := crd.Spec.Scope == apiextensionsv1.ClusterScoped
+		if requestScopes[v.Name] == nil {
+			continue
+		}
+		statusScope := *requestScopes[v.Name]
+		statusScope.Subresource = "status"
+		statusScope.Namer = handlers.ContextBasedNaming{
+			Namer:         meta.NewAccessor(),
+			ClusterScoped: clusterScoped,
+		}
+
+		subresources, err := apiextensionshelpers.GetSubresourcesForVersion(crd, v.Name)
+		if err != nil {
+			utilruntime.HandleError(err)
+			return nil, fmt.Errorf("the server could not properly serve the CR subresources")
+		}
+		if subresources != nil && subresources.Status != nil {
+			statusScope, err = scopeWithFieldManager(
+				typeConverter,
+				statusScope,
+				resetFields,
+				"status",
+			)
+			if err != nil {
+				return nil, err
+			}
+		}
+		statusScopes[v.Name] = &statusScope
+	}
+	return statusScopes, nil
+
 }
 
 func scopeWithFieldManager(typeConverter managedfields.TypeConverter, reqScope handlers.RequestScope, resetFields map[fieldpath.APIVersion]*fieldpath.Set, subresource string) (handlers.RequestScope, error) {
