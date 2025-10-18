@@ -182,6 +182,8 @@ message RoleRef {
   optional string apiGroup = 1;
 
   // Kind is the type of resource being referenced
+  // +required
+  // +k8s:required
   optional string kind = 2;
 
   // Name is the name of resource being referenced
@@ -194,6 +196,8 @@ message RoleRef {
 message Subject {
   // Kind of object being referenced. Values defined by this API group are "User", "Group", and "ServiceAccount".
   // If the Authorizer does not recognized the kind value, the Authorizer should report an error.
+  // +required
+  // +k8s:required
   optional string kind = 1;
 
   // APIGroup holds the API group of the referenced subject.
