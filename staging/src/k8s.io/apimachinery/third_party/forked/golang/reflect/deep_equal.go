@@ -16,15 +16,6 @@ import (
 // that type.
 type Equalities map[reflect.Type]reflect.Value
 
-// For convenience, panics on errors
-func EqualitiesOrDie(funcs ...interface{}) Equalities {
-	e := Equalities{}
-	if err := e.AddFuncs(funcs...); err != nil {
-		panic(err)
-	}
-	return e
-}
-
 // AddFuncs is a shortcut for multiple calls to AddFunc.
 func (e Equalities) AddFuncs(funcs ...interface{}) error {
 	for _, f := range funcs {
