@@ -494,7 +494,7 @@ func newResourceClaimController(ctx context.Context, controllerContext Controlle
 	}
 
 	return newControllerLoop(func(ctx context.Context) {
-		ephemeralController.Run(ctx, defaultResourceClaimControllerWorkers)
+		ephemeralController.Run(ctx, int(controllerContext.ComponentConfig.ResourceClaimController.ConcurrentResourceClaimSyncs))
 	}, controllerName), nil
 }
 

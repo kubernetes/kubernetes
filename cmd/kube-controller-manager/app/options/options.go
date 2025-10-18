@@ -95,6 +95,7 @@ type KubeControllerManagerOptions struct {
 	PodGCController                           *PodGCControllerOptions
 	ReplicaSetController                      *ReplicaSetControllerOptions
 	ReplicationController                     *ReplicationControllerOptions
+	ResourceClaimController                   *ResourceClaimControllerOptions
 	ResourceQuotaController                   *ResourceQuotaControllerOptions
 	SAController                              *SAControllerOptions
 	TTLAfterFinishedController                *TTLAfterFinishedControllerOptions
@@ -205,6 +206,9 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 		ReplicationController: &ReplicationControllerOptions{
 			&componentConfig.ReplicationController,
 		},
+		ResourceClaimController: &ResourceClaimControllerOptions{
+			&componentConfig.ResourceClaimController,
+		},
 		ResourceQuotaController: &ResourceQuotaControllerOptions{
 			&componentConfig.ResourceQuotaController,
 		},
@@ -291,6 +295,7 @@ func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledBy
 	s.PodGCController.AddFlags(fss.FlagSet(names.PodGarbageCollectorController))
 	s.ReplicaSetController.AddFlags(fss.FlagSet(names.ReplicaSetController))
 	s.ReplicationController.AddFlags(fss.FlagSet(names.ReplicationControllerController))
+	s.ResourceClaimController.AddFlags(fss.FlagSet(names.ResourceClaimController))
 	s.ResourceQuotaController.AddFlags(fss.FlagSet(names.ResourceQuotaController))
 	s.SAController.AddFlags(fss.FlagSet(names.ServiceAccountController))
 	s.TTLAfterFinishedController.AddFlags(fss.FlagSet(names.TTLAfterFinishedController))
@@ -395,6 +400,9 @@ func (s *KubeControllerManagerOptions) ApplyTo(c *kubecontrollerconfig.Config, a
 	if err := s.ReplicationController.ApplyTo(&c.ComponentConfig.ReplicationController); err != nil {
 		return err
 	}
+	if err := s.ResourceClaimController.ApplyTo(&c.ComponentConfig.ResourceClaimController); err != nil {
+		return err
+	}
 	if err := s.ResourceQuotaController.ApplyTo(&c.ComponentConfig.ResourceQuotaController); err != nil {
 		return err
 	}
@@ -458,6 +466,7 @@ func (s *KubeControllerManagerOptions) Validate(allControllers []string, disable
 	errs = append(errs, s.PodGCController.Validate()...)
 	errs = append(errs, s.ReplicaSetController.Validate()...)
 	errs = append(errs, s.ReplicationController.Validate()...)
+	errs = append(errs, s.ResourceClaimController.Validate()...)
 	errs = append(errs, s.ResourceQuotaController.Validate()...)
 	errs = append(errs, s.SAController.Validate()...)
 	errs = append(errs, s.ServiceController.Validate()...)

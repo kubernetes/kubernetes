@@ -153,6 +153,9 @@ type KubeControllerManagerConfiguration struct {
 	// ReplicationControllerConfiguration holds configuration for
 	// ReplicationController related features.
 	ReplicationController ReplicationControllerConfiguration
+	// ResourceClaimControllerConfiguration holds configuration for
+	// ResourceClaimController related features.
+	ResourceClaimController ResourceClaimControllerConfiguration
 	// ResourceQuotaControllerConfiguration holds configuration for
 	// ResourceQuotaController related features.
 	ResourceQuotaController ResourceQuotaControllerConfiguration
@@ -487,4 +490,12 @@ type ValidatingAdmissionPolicyStatusControllerConfiguration struct {
 	// but more CPU (and network) load.
 	// The default value is 5.
 	ConcurrentPolicySyncs int32
+}
+
+// ResourceClaimControllerConfiguration contains elements describing ResourceClaimController.
+type ResourceClaimControllerConfiguration struct {
+	// concurrentResourceClaimSyncs is the number of resource claim objects that are
+	// allowed to sync concurrently. Larger number = more responsive resource claims,
+	// but more CPU (and network) load.
+	ConcurrentResourceClaimSyncs int32
 }
