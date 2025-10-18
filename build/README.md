@@ -2,6 +2,8 @@
 
 Building Kubernetes is easy if you take advantage of the containerized build environment. This document will help guide you through understanding this build process.
 
+If you're starting fresh, please take a look at the [Contributing Documentation](https://github.com/kubernetes/kubernetes/blob/master/CONTRIBUTING.md) and learn how to set up [local development environment](https://github.com/kubernetes/community/tree/master/contributors/guide#setting-up-your-development-environment).
+
 ## Requirements
 
 1. Docker, using one of the following configurations:
