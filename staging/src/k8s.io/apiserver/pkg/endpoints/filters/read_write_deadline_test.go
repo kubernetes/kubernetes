@@ -470,7 +470,7 @@ func TestPerRequestWithClientReceivesContentFlushedBeforeDeadline(t *testing.T) 
 				// g) the client expects a response from the server since content
 				// has been written and flushed before the write deadline elapsed
 				if resp.StatusCode != http.StatusOK {
-					t.Errorf("expected staus code: %d, but got: %d", http.StatusOK, resp.StatusCode)
+					t.Errorf("expected status code: %d, but got: %d", http.StatusOK, resp.StatusCode)
 				}
 				defer closeResponseBody(t, resp)
 
@@ -685,7 +685,7 @@ func TestPerRequestWithBodyReadShouldTimeoutAfterDeadline(t *testing.T) {
 				// f) sine the handler wrote a response, we expect
 				// the client to read it successfully.
 				if resp.StatusCode != http.StatusOK {
-					t.Errorf("expected staus code: %d, but got: %d", http.StatusOK, resp.StatusCode)
+					t.Errorf("expected status code: %d, but got: %d", http.StatusOK, resp.StatusCode)
 				}
 				if got, err := io.ReadAll(resp.Body); err != nil || string(got) != msg {
 					t.Errorf("expected the client to read the response: want: %q, got: %q, error: %v", msg, string(got), err)
@@ -821,7 +821,7 @@ func TestPerRequestWithBodyReadShouldYieldPartialContentBeforeDeadline(t *testin
 
 			// i) the client receives a response since the handler terminates normally
 			if resp.StatusCode != http.StatusOK {
-				t.Errorf("expected staus code: %d, but got: %d", http.StatusOK, resp.StatusCode)
+				t.Errorf("expected status code: %d, but got: %d", http.StatusOK, resp.StatusCode)
 			}
 			defer closeResponseBody(t, resp)
 
@@ -909,7 +909,7 @@ func TestPerRequestWithReadingEmptyBodyShouldNotYieldErrorAfterDeadline(t *testi
 				}
 				defer closeResponseBody(t, resp)
 				if resp.StatusCode != http.StatusOK {
-					t.Errorf("expected staus code: %d, but got: %d", http.StatusOK, resp.StatusCode)
+					t.Errorf("expected status code: %d, but got: %d", http.StatusOK, resp.StatusCode)
 				}
 			}()
 
@@ -995,7 +995,7 @@ func TestPerRequestWithHijackedConnectionShouldResetDeadline(t *testing.T) {
 			return
 		}
 		if resp.StatusCode != http.StatusOK {
-			t.Errorf("expected staus code: %d, but got: %d", http.StatusOK, resp.StatusCode)
+			t.Errorf("expected status code: %d, but got: %d", http.StatusOK, resp.StatusCode)
 		}
 		defer closeResponseBody(t, resp)
 		// e) verify that the client receives the message as expected
@@ -1120,7 +1120,7 @@ func TestPerRequestWithConnectionIsReused(t *testing.T) {
 				}
 
 				if resp.StatusCode != http.StatusOK {
-					t.Errorf("expected staus code: %d, but got: %d", http.StatusOK, resp.StatusCode)
+					t.Errorf("expected status code: %d, but got: %d", http.StatusOK, resp.StatusCode)
 				}
 				defer closeResponseBody(t, resp)
 
@@ -1142,7 +1142,7 @@ func TestPerRequestWithConnectionIsReused(t *testing.T) {
 				}
 				defer closeResponseBody(t, resp)
 				if resp.StatusCode != http.StatusOK {
-					t.Errorf("expected staus code: %d, but got: %d", http.StatusOK, resp.StatusCode)
+					t.Errorf("expected status code: %d, but got: %d", http.StatusOK, resp.StatusCode)
 				}
 			}()
 		})
@@ -1247,7 +1247,7 @@ func TestPerRequestWithSlowReader(t *testing.T) {
 
 		// d) client expects a response from the server
 		if resp.StatusCode != http.StatusOK {
-			t.Errorf("expected staus code: %d, but got: %d", http.StatusOK, resp.StatusCode)
+			t.Errorf("expected status code: %d, but got: %d", http.StatusOK, resp.StatusCode)
 		}
 		defer closeResponseBody(t, resp)
 
