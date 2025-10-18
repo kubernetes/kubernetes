@@ -248,8 +248,12 @@ func asVersionedObjects(infos []*resource.Info, specifiedOutputVersion schema.Gr
 				if err != nil {
 					return nil, err
 				}
-				// TODO: Set ContentEncoding and ContentType.
-				objects = append(objects, &runtime.Unknown{Raw: data})
+				unknown := &runtime.Unknown{
+					Raw:             data,
+					ContentType:     runtime.ContentTypeJSON,
+					ContentEncoding: "",
+				}
+				objects = append(objects, unknown)
 				continue
 			}
 			targetVersions = append(targetVersions, specifiedOutputVersion)
