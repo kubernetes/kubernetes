@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: example-deployment
+  labels:
+    app.kubernetes.io/name: example-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: example-deployment
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: example-deployment
+    spec:
+      containers:
+        - name: example-deployment
+          image: nginx:stable
+          ports:
+            - containerPort: 80
