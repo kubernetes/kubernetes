@@ -27,27 +27,25 @@ import (
 
 /*
 
-The default /proc masks are set up to reduce attack surface, and should be required.
+The default /proc masks are set up to reduce attack surface, and should be required
+by the baseline policy unless the pod is in a user namespace ("hostUsers: false").
 
 **Restricted Fields:**
 spec.containers[*].securityContext.procMount
 spec.initContainers[*].securityContext.procMount
 
-**Allowed Values:** undefined/null, "Default"
-
-However, if the pod is in a user namespace (`hostUsers: false`), and the
-UserNamespacesPodSecurityStandards feature is enabled, all values are allowed.
-
+**Allowed Values:** undefined/null, "Default" (or any value if "hostUsers" is false)
 */
 
 func init() {
-	addCheck(CheckProcMount)
+	addCheck(CheckProcMountBaseline)
 }
 
 // CheckProcMount returns a baseline level check that restricts
 // setting the value of securityContext.procMount to DefaultProcMount
-// in 1.0+
-func CheckProcMount() Check {
+// in 1.0+.
+// Starting in 1.35+, any value is allowed if the pod is in a user namespace ("hostUsers: false").
+func CheckProcMountBaseline() Check {
 	return Check{
 		ID:    "procMount",
 		Level: api.LevelBaseline,
@@ -56,19 +54,16 @@ func CheckProcMount() Check {
 				MinimumVersion: api.MajorMinorVersion(1, 0),
 				CheckPod:       procMount_1_0,
 			},
+			{
+				MinimumVersion: api.MajorMinorVersion(1, 35),
+				CheckPod:       procMount1_35baseline,
+			},
 		},
 	}
 }
 
+// procMount_1_0 blocks unmasked procMount unconditionally
 func procMount_1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
-	// TODO: When we remove the UserNamespacesPodSecurityStandards feature gate (and GA this relaxation),
-	// create a new policy version.
-	// Note: pod validation will check for well formed procMount type, so avoid double validation and allow everything
-	// here.
-	if relaxPolicyForUserNamespacePod(podSpec) {
-		return CheckResult{Allowed: true}
-	}
-
 	var badContainers []string
 	forbiddenProcMountTypes := sets.NewString()
 	visitContainers(podSpec, func(container *corev1.Container) {
@@ -99,4 +94,13 @@ func procMount_1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) Chec
 		}
 	}
 	return CheckResult{Allowed: true}
+}
+
+// procMount1_35baseline blocks unmasked procMount for pods that are not in a user namespace
+func procMount1_35baseline(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
+	if relaxPolicyForUserNamespacePod(podSpec) {
+		return CheckResult{Allowed: true}
+	}
+	// If the pod is not in a user namespace, treat it as restricted.
+	return procMount_1_0(podMetadata, podSpec)
 }

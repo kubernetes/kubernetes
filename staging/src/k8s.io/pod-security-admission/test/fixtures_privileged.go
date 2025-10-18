@@ -33,7 +33,7 @@ containerFields: []string{
 
 func init() {
 	fixtureData_1_0 := fixtureGenerator{
-		generatePass: func(p *corev1.Pod) []*corev1.Pod {
+		generatePass: func(p *corev1.Pod, _ api.Level) []*corev1.Pod {
 			p = ensureSecurityContext(p)
 			return []*corev1.Pod{
 				// privileged explicitly set to false
