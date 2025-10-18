@@ -20,11 +20,13 @@ import (
 	"context"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 )
@@ -86,4 +88,21 @@ func buildContainerMapAndRunningSetFromRuntime(ctx context.Context, runtimeServi
 		}
 	}
 	return containerMap, runningSet
+}
+
+// GetAllocatableMemory returns memory capacity with out hugePage capacity.
+func GetAllocatableMemory(capacity v1.ResourceList) resource.Quantity {
+	allocatableMemory := capacity[v1.ResourceMemory].DeepCopy()
+	// for every huge page reservation, we need to remove it from allocatable memory
+	for k, v := range capacity {
+		if v1helper.IsHugePageResourceName(k) {
+			value := v.DeepCopy()
+			allocatableMemory.Sub(value)
+			if allocatableMemory.Sign() < 0 {
+				// Negative Allocatable resources don't make sense.
+				allocatableMemory.Set(0)
+			}
+		}
+	}
+	return allocatableMemory
 }
