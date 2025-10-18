@@ -1,0 +1,57 @@
+syntax = "proto3";
+package v1alpha1;
+
+option go_package = "k8s.io/kubelet/pkg/apis/pods/v1alpha1";
+
+import "k8s.io/api/core/v1/generated.proto";
+
+service Pods {
+    // WatchPods will return a WatchPodsEvent whenever a Pod is created,
+    // deleted, or one of its FieldMask-specified fields is updated
+    rpc WatchPods(WatchPodsRequest) returns (stream WatchPodsEvent) {}
+
+    // ListPods returns a of List of Pods
+    rpc ListPods(ListPodsRequest) returns (ListPodsResponse) {}
+
+    // GetPod returns a Pod for given pod's UID
+    rpc GetPod(GetPodRequest) returns (GetPodResponse) {}
+}
+
+enum EventType {
+    ADDED = 0;
+    MODIFIED = 1;
+    DELETED = 2;
+}
+
+// This is sent for each update in the Watch stream
+message WatchPodsEvent {
+    // ADDED, MODIFIED, DELETED
+    EventType type = 1;
+    k8s.io.api.core.v1.Pod pod = 2;
+}
+
+// ListPodsResponse returns a list of Pods.
+message ListPodsResponse {
+    repeated k8s.io.api.core.v1.Pod pods = 1;
+}
+
+// GetPodResponse returns a Pod.
+message GetPodResponse {
+    k8s.io.api.core.v1.Pod pod = 1;
+}
+
+//
+// FieldMask can be specified for any request via gRPC metadata
+//
+
+message WatchPodsRequest {}
+
+message ListPodsRequest {
+    string filter = 1;
+    string page_token = 2;
+    int32 page_size = 3;
+}
+
+message GetPodRequest {
+    string podUID = 1;
+}

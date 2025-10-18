@@ -1275,7 +1275,9 @@ func startKubelet(ctx context.Context, k kubelet.Bootstrap, podCfg *config.PodCo
 	if kubeCfg.ReadOnlyPort > 0 {
 		go k.ListenAndServeReadOnly(ctx, netutils.ParseIPSloppy(kubeCfg.Address), uint(kubeCfg.ReadOnlyPort), kubeDeps.TracerProvider)
 	}
+
 	go k.ListenAndServePodResources(ctx)
+	go k.ListenAndServePods(ctx)
 }
 
 func createAndInitKubelet(
