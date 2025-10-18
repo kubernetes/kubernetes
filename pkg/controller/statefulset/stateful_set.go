@@ -139,16 +139,20 @@ func NewStatefulSetController(
 	ssc.podIndexer = podInformer.Informer().GetIndexer()
 	setInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
-			AddFunc: ssc.enqueueStatefulSet,
+			AddFunc: func(obj interface{}) {
+				ssc.enqueueStatefulSet(logger, obj)
+			},
 			UpdateFunc: func(old, cur interface{}) {
 				oldPS := old.(*apps.StatefulSet)
 				curPS := cur.(*apps.StatefulSet)
 				if oldPS.Status.Replicas != curPS.Status.Replicas {
 					logger.V(4).Info("Observed updated replica count for StatefulSet", "statefulSet", klog.KObj(curPS), "oldReplicas", oldPS.Status.Replicas, "newReplicas", curPS.Status.Replicas)
 				}
-				ssc.enqueueStatefulSet(cur)
+				ssc.enqueueStatefulSet(logger, cur)
 			},
-			DeleteFunc: ssc.enqueueStatefulSet,
+			DeleteFunc: func(obj interface{}) {
+				ssc.enqueueStatefulSet(logger, obj)
+			},
 		},
 	)
 	ssc.setLister = setInformer.Lister()
@@ -160,7 +164,7 @@ func NewStatefulSetController(
 
 // Run runs the statefulset controller.
 func (ssc *StatefulSetController) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	// Start events processing pipeline.
 	ssc.eventBroadcaster.StartStructuredLogging(3)
@@ -202,19 +206,19 @@ func (ssc *StatefulSetController) addPod(logger klog.Logger, obj interface{}) {
 			return
 		}
 		logger.V(4).Info("Pod created with labels", "pod", klog.KObj(pod), "labels", pod.Labels)
-		ssc.enqueueStatefulSet(set)
+		ssc.enqueueStatefulSet(logger, set)
 		return
 	}
 
 	// Otherwise, it's an orphan. Get a list of all matching controllers and sync
 	// them to see if anyone wants to adopt it.
-	sets := ssc.getStatefulSetsForPod(pod)
+	sets := ssc.getStatefulSetsForPod(logger, pod)
 	if len(sets) == 0 {
 		return
 	}
 	logger.V(4).Info("Orphan Pod created with labels", "pod", klog.KObj(pod), "labels", pod.Labels)
 	for _, set := range sets {
-		ssc.enqueueStatefulSet(set)
+		ssc.enqueueStatefulSet(logger, set)
 	}
 }
 
@@ -236,7 +240,7 @@ func (ssc *StatefulSetController) updatePod(logger klog.Logger, old, cur interfa
 	if controllerRefChanged && oldControllerRef != nil {
 		// The ControllerRef was changed. Sync the old controller, if any.
 		if set := ssc.resolveControllerRef(oldPod.Namespace, oldControllerRef); set != nil {
-			ssc.enqueueStatefulSet(set)
+			ssc.enqueueStatefulSet(logger, set)
 		}
 	}
 
@@ -250,7 +254,7 @@ func (ssc *StatefulSetController) updatePod(logger klog.Logger, old, cur interfa
 		if oldPod.Status.Phase != curPod.Status.Phase {
 			logger.V(4).Info("StatefulSet Pod phase changed", "pod", klog.KObj(curPod), "statefulSet", klog.KObj(set), "podPhase", curPod.Status.Phase)
 		}
-		ssc.enqueueStatefulSet(set)
+		ssc.enqueueStatefulSet(logger, set)
 		// TODO: MinReadySeconds in the Pod will generate an Available condition to be added in
 		// the Pod status which in turn will trigger a requeue of the owning replica set thus
 		// having its status updated with the newly available replica.
@@ -258,7 +262,7 @@ func (ssc *StatefulSetController) updatePod(logger klog.Logger, old, cur interfa
 			logger.V(2).Info("StatefulSet will be enqueued after minReadySeconds for availability check", "statefulSet", klog.KObj(set), "minReadySeconds", set.Spec.MinReadySeconds)
 			// Add a second to avoid milliseconds skew in AddAfter.
 			// See https://github.com/kubernetes/kubernetes/issues/39785#issuecomment-279959133 for more info.
-			ssc.enqueueSSAfter(set, (time.Duration(set.Spec.MinReadySeconds)*time.Second)+time.Second)
+			ssc.enqueueSSAfter(logger, set, (time.Duration(set.Spec.MinReadySeconds)*time.Second)+time.Second)
 		}
 		return
 	}
@@ -266,13 +270,13 @@ func (ssc *StatefulSetController) updatePod(logger klog.Logger, old, cur interfa
 	// Otherwise, it's an orphan. If anything changed, sync matching controllers
 	// to see if anyone wants to adopt it now.
 	if labelChanged || controllerRefChanged {
-		sets := ssc.getStatefulSetsForPod(curPod)
+		sets := ssc.getStatefulSetsForPod(logger, curPod)
 		if len(sets) == 0 {
 			return
 		}
 		logger.V(4).Info("Orphan Pod objectMeta updated", "pod", klog.KObj(curPod), "oldObjectMeta", oldPod.ObjectMeta, "newObjectMeta", curPod.ObjectMeta)
 		for _, set := range sets {
-			ssc.enqueueStatefulSet(set)
+			ssc.enqueueStatefulSet(logger, set)
 		}
 	}
 }
@@ -287,12 +291,12 @@ func (ssc *StatefulSetController) deletePod(logger klog.Logger, obj interface{})
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %+v", obj))
+			utilruntime.HandleErrorWithLogger(logger, nil, "Couldn't get object from tombstone", "obj", obj)
 			return
 		}
 		pod, ok = tombstone.Obj.(*v1.Pod)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a pod %+v", obj))
+			utilruntime.HandleErrorWithLogger(logger, nil, "Tombstone contained object that is not a pod", "type", fmt.Sprintf("%T", obj))
 			return
 		}
 	}
@@ -307,7 +311,7 @@ func (ssc *StatefulSetController) deletePod(logger klog.Logger, obj interface{})
 		return
 	}
 	logger.V(4).Info("Pod deleted.", "pod", klog.KObj(pod), "caller", utilruntime.GetCaller())
-	ssc.enqueueStatefulSet(set)
+	ssc.enqueueStatefulSet(logger, set)
 }
 
 // getPodsForStatefulSet returns the Pods that a given StatefulSet should manage.
@@ -369,7 +373,7 @@ func (ssc *StatefulSetController) adoptOrphanRevisions(ctx context.Context, set 
 
 // getStatefulSetsForPod returns a list of StatefulSets that potentially match
 // a given pod.
-func (ssc *StatefulSetController) getStatefulSetsForPod(pod *v1.Pod) []*apps.StatefulSet {
+func (ssc *StatefulSetController) getStatefulSetsForPod(logger klog.Logger, pod *v1.Pod) []*apps.StatefulSet {
 	sets, err := ssc.setLister.GetPodStatefulSets(pod)
 	if err != nil {
 		return nil
@@ -382,10 +386,7 @@ func (ssc *StatefulSetController) getStatefulSetsForPod(pod *v1.Pod) []*apps.Sta
 		for _, s := range sets {
 			setNames = append(setNames, s.Name)
 		}
-		utilruntime.HandleError(
-			fmt.Errorf(
-				"user error: more than one StatefulSet is selecting pods with labels: %+v. Sets: %v",
-				pod.Labels, setNames))
+		utilruntime.HandleErrorWithLogger(logger, nil, "More than one StatefulSet is selecting pods with same labels", "podLabels", pod.Labels, "sets", setNames)
 	}
 	return sets
 }
@@ -412,20 +413,20 @@ func (ssc *StatefulSetController) resolveControllerRef(namespace string, control
 }
 
 // enqueueStatefulSet enqueues the given statefulset in the work queue.
-func (ssc *StatefulSetController) enqueueStatefulSet(obj interface{}) {
+func (ssc *StatefulSetController) enqueueStatefulSet(logger klog.Logger, obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %+v: %v", obj, err))
+		utilruntime.HandleErrorWithLogger(logger, err, "Couldn't get key for object", "object", obj)
 		return
 	}
 	ssc.queue.Add(key)
 }
 
 // enqueueStatefulSet enqueues the given statefulset in the work queue after given time
-func (ssc *StatefulSetController) enqueueSSAfter(ss *apps.StatefulSet, duration time.Duration) {
+func (ssc *StatefulSetController) enqueueSSAfter(logger klog.Logger, ss *apps.StatefulSet, duration time.Duration) {
 	key, err := controller.KeyFunc(ss)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", ss, err))
+		utilruntime.HandleErrorWithLogger(logger, err, "Couldn't get key for StatefulSet object", "statefulSet", klog.KObj(ss))
 		return
 	}
 	ssc.queue.AddAfter(key, duration)
@@ -440,7 +441,7 @@ func (ssc *StatefulSetController) processNextWorkItem(ctx context.Context) bool 
 	}
 	defer ssc.queue.Done(key)
 	if err := ssc.sync(ctx, key); err != nil {
-		utilruntime.HandleError(fmt.Errorf("error syncing StatefulSet %v, requeuing: %w", key, err))
+		utilruntime.HandleErrorWithContext(ctx, err, "Error syncing StatefulSet, requeuing", "key", key)
 		ssc.queue.AddRateLimited(key)
 	} else {
 		ssc.queue.Forget(key)
@@ -472,13 +473,13 @@ func (ssc *StatefulSetController) sync(ctx context.Context, key string) error {
 		return nil
 	}
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("unable to retrieve StatefulSet %v from store: %v", key, err))
+		utilruntime.HandleErrorWithContext(ctx, err, "Unable to retrieve StatefulSet from store", "key", key)
 		return err
 	}
 
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("error converting StatefulSet %v selector: %v", key, err))
+		utilruntime.HandleErrorWithContext(ctx, err, "Error converting StatefulSet selector", "key", key)
 		// This is a non-transient error, so don't retry.
 		return nil
 	}
@@ -508,7 +509,7 @@ func (ssc *StatefulSetController) syncStatefulSet(ctx context.Context, set *apps
 	logger.V(4).Info("Successfully synced StatefulSet", "statefulSet", klog.KObj(set))
 	// One more sync to handle the clock skew. This is also helping in requeuing right after status update
 	if set.Spec.MinReadySeconds > 0 && status != nil && status.AvailableReplicas != *set.Spec.Replicas {
-		ssc.enqueueSSAfter(set, time.Duration(set.Spec.MinReadySeconds)*time.Second)
+		ssc.enqueueSSAfter(logger, set, time.Duration(set.Spec.MinReadySeconds)*time.Second)
 	}
 
 	return nil
