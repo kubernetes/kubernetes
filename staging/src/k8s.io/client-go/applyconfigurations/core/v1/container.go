@@ -82,6 +82,7 @@ type ContainerApplyConfiguration struct {
 	// More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
 	Resources *ResourceRequirementsApplyConfiguration `json:"resources,omitempty"`
 	// Resources resize policy for the container.
+	// This field cannot be set on ephemeral containers.
 	ResizePolicy []ContainerResizePolicyApplyConfiguration `json:"resizePolicy,omitempty"`
 	// RestartPolicy defines the restart behavior of individual containers in a pod.
 	// This overrides the pod-level restart policy. When this field is not specified,

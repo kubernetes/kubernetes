@@ -2639,6 +2639,7 @@ type Container struct {
 	// +optional
 	Resources ResourceRequirements
 	// Resources resize policy for the container.
+	// This field cannot be set on ephemeral containers.
 	// +featureGate=InPlacePodVerticalScaling
 	// +optional
 	ResizePolicy []ContainerResizePolicy
