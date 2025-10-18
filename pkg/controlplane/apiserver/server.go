@@ -24,6 +24,7 @@ import (
 
 	coordinationapiv1 "k8s.io/api/coordination/v1"
 	apiv1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -75,6 +76,8 @@ const (
 	IdentityLeaseComponentLabelKey = "apiserver.kubernetes.io/identity"
 	// KubeAPIServer defines variable used internally when referring to kube-apiserver component
 	KubeAPIServer = "kube-apiserver"
+	// IdentityLeaseShutdownTimeout is the timeout for deleting the identity lease on shutdown.
+	IdentityLeaseShutdownTimeout = 5 * time.Second
 )
 
 // Server is a struct that contains a generic control plane apiserver instance
@@ -264,8 +267,16 @@ func (c completedConfig) New(name string, delegationTarget genericapiserver.Dele
 	if utilfeature.DefaultFeatureGate.Enabled(apiserverfeatures.APIServerIdentity) {
 		s.GenericAPIServer.AddPostStartHookOrDie("start-kube-apiserver-identity-lease-controller", func(hookContext genericapiserver.PostStartHookContext) error {
 			leaseName := s.GenericAPIServer.APIServerID
+			// We want to delete the lease if it already exists, to avoid having a stale lease from a previous run.
+			// This is to immediately remove a lease that may have been created by a previous apiserver instance
+			// that crashed and did not shut down gracefully.
+			klog.V(4).Infof("Attempting to delete old apiserver identity lease %s/%s", metav1.NamespaceSystem, leaseName)
+			err := client.CoordinationV1().Leases(metav1.NamespaceSystem).Delete(hookContext, leaseName, metav1.DeleteOptions{})
+			if err != nil && !errors.IsNotFound(err) {
+				// The lease controller will eventually take over and update the lease.
+				klog.Errorf("Error deleting old apiserver identity lease %s/%s: %v", metav1.NamespaceSystem, leaseName, err)
+			}
 			holderIdentity := s.GenericAPIServer.APIServerID + "_" + string(uuid.NewUUID())
-
 			peeraddress := getPeerAddress(c.Extra.PeerAdvertiseAddress, c.Generic.PublicAddress, publicServicePort)
 			// must replace ':,[]' in [ip:port] to be able to store this as a valid label value
 			controller := lease.NewController(
@@ -280,6 +291,17 @@ func (c completedConfig) New(name string, delegationTarget genericapiserver.Dele
 				// TODO: receive identity label value as a parameter when post start hook is moved to generic apiserver.
 				labelAPIServerHeartbeatFunc(name, peeraddress))
 			go controller.Run(hookContext)
+			return nil
+		})
+		s.GenericAPIServer.AddPreShutdownHookOrDie("stop-kube-apiserver-identity-lease-controller", func() error {
+			leaseName := s.GenericAPIServer.APIServerID
+			klog.Infof("cleaning up apiserver identity lease %s/%s", metav1.NamespaceSystem, leaseName)
+			ctx, cancel := context.WithTimeout(context.Background(), IdentityLeaseShutdownTimeout)
+			defer cancel()
+			err := client.CoordinationV1().Leases(metav1.NamespaceSystem).Delete(ctx, leaseName, metav1.DeleteOptions{})
+			if err != nil && !errors.IsNotFound(err) {
+				klog.Errorf("Error deleting apiserver identity lease %s/%s: %v", metav1.NamespaceSystem, leaseName, err)
+			}
 			return nil
 		})
 		// TODO: move this into generic apiserver and make the lease identity value configurable
