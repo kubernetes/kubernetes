@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/httpstream/wsstream"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/endpoints/responsewriter"
+	utiltrace "k8s.io/utils/trace"
 )
 
 const (
@@ -95,6 +96,9 @@ func BuildV4Options(ports []int32) (*V4Options, error) {
 // ERROR n+1). The associated port is written to each stream as a unsigned 16
 // bit integer in little endian format.
 func handleWebSocketStreams(req *http.Request, w http.ResponseWriter, portForwarder PortForwarder, podName string, uid types.UID, opts *V4Options, supportedPortForwardProtocols []string, idleTimeout, streamCreationTimeout time.Duration) error {
+	opTrace := utiltrace.New("handleWebSocketStreams")
+	defer opTrace.Log()
+
 	channels := make([]wsstream.ChannelType, 0, len(opts.Ports)*2)
 	for i := 0; i < len(opts.Ports); i++ {
 		channels = append(channels, wsstream.ReadWriteChannel, wsstream.WriteChannel)

@@ -45,6 +45,7 @@ import (
 	"k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
+	utiltrace "k8s.io/utils/trace"
 )
 
 // PortForwardOptions contains all the options for running the port-forward cli command.
@@ -420,6 +421,10 @@ func (o PortForwardOptions) RunPortForward() error {
 // It ends portforwarding when an error is received from the backend, or an os.Interrupt
 // signal is received, or the provided context is done.
 func (o PortForwardOptions) RunPortForwardContext(ctx context.Context) error {
+	opTrace := utiltrace.New("PortForwardOptions.RunPortForwardContext")
+	defer opTrace.Log()
+
+	opTrace.Step("PodClient.Pods.Get", utiltrace.Field{Key: "namespace", Value: o.Namespace}, utiltrace.Field{Key: "podname", Value: o.PodName})
 	pod, err := o.PodClient.Pods(o.Namespace).Get(ctx, o.PodName, metav1.GetOptions{})
 	if err != nil {
 		return err
@@ -452,5 +457,6 @@ func (o PortForwardOptions) RunPortForwardContext(ctx context.Context) error {
 		Name(pod.Name).
 		SubResource("portforward")
 
+	opTrace.Step("o.PortForwarder.ForwardPorts.POST", utiltrace.Field{Key: "url", Value: req.URL()})
 	return o.PortForwarder.ForwardPorts("POST", req.URL(), o)
 }
