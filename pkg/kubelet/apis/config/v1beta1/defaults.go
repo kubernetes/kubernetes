@@ -319,4 +319,8 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 			obj.ImagePullCredentialsVerificationPolicy = kubeletconfigv1beta1.NeverVerifyPreloadedImages
 		}
 	}
+
+	if obj.PodHousekeepingPeriod == nil {
+		obj.PodHousekeepingPeriod = &metav1.Duration{Duration: 2 * time.Second}
+	}
 }
