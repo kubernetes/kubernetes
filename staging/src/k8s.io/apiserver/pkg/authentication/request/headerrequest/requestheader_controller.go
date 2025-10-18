@@ -281,22 +281,22 @@ func (c *RequestHeaderAuthRequestController) hasRequestHeaderBundleChanged(cm *c
 }
 
 func (c *RequestHeaderAuthRequestController) getRequestHeaderBundleFromConfigMap(cm *corev1.ConfigMap) (*requestHeaderBundle, error) {
-	usernameHeaderCurrentValue, err := deserializeStrings(cm.Data[c.usernameHeadersKey])
+	usernameHeaderCurrentValue, err := uniqueHTTPHeaders(cm.Data[c.usernameHeadersKey])
 	if err != nil {
 		return nil, err
 	}
 
-	uidHeaderCurrentValue, err := deserializeStrings(cm.Data[c.uidHeadersKey])
+	uidHeaderCurrentValue, err := uniqueHTTPHeaders(cm.Data[c.uidHeadersKey])
 	if err != nil {
 		return nil, err
 	}
 
-	groupHeadersCurrentValue, err := deserializeStrings(cm.Data[c.groupHeadersKey])
+	groupHeadersCurrentValue, err := uniqueHTTPHeaders(cm.Data[c.groupHeadersKey])
 	if err != nil {
 		return nil, err
 	}
 
-	extraHeaderPrefixesCurrentValue, err := deserializeStrings(cm.Data[c.extraHeaderPrefixesKey])
+	extraHeaderPrefixesCurrentValue, err := uniqueHTTPHeaders(cm.Data[c.extraHeaderPrefixesKey])
 	if err != nil {
 		return nil, err
 
@@ -342,6 +342,20 @@ func (c *RequestHeaderAuthRequestController) loadRequestHeaderFor(key string) []
 func (c *RequestHeaderAuthRequestController) keyFn() string {
 	// this format matches DeletionHandlingMetaNamespaceKeyFunc for our single key
 	return c.configmapNamespace + "/" + c.configmapName
+}
+
+func uniqueHTTPHeaders(jsonArray string) ([]string, error) {
+	headers, err := deserializeStrings(jsonArray)
+	if err != nil {
+		return nil, err
+	}
+
+	headers, err = normalizeHeaders(headers...)
+	if err != nil {
+		return nil, err
+	}
+
+	return uniqueStrings(headers), nil
 }
 
 func deserializeStrings(in string) ([]string, error) {
