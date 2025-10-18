@@ -398,30 +398,42 @@ func TestKeySchema(t *testing.T) {
 }
 
 func TestWatch(t *testing.T) {
-	ctx, cacher, terminate := testSetup(t)
-	t.Cleanup(terminate)
-	storagetesting.RunTestWatch(ctx, t, cacher)
+	for _, watchWithoutPrevKV := range []bool{true, false} {
+		t.Run(fmt.Sprintf("WatchWithoutPrevKV=%v", watchWithoutPrevKV), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchFromStorageWithoutPrevKV, watchWithoutPrevKV)
+			t.Run("Watch", func(t *testing.T) {
+				t.Parallel()
+				ctx, cacher, terminate := testSetup(t)
+				t.Cleanup(terminate)
+				storagetesting.RunTestWatch(ctx, t, cacher)
+			})
+		})
+	}
 }
 
 func TestWatchFromZero(t *testing.T) {
+	// TODO(#131862): Test both WatchWithoutPrevKV=true and false
 	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestWatchFromZero(ctx, t, cacher, compactWatch(cacher, server.V3Client.Client))
 }
 
 func TestDeleteTriggerWatch(t *testing.T) {
+	// TODO(#131862):Test both WatchWithoutPrevKV=true and false
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestDeleteTriggerWatch(ctx, t, cacher)
 }
 
 func TestWatchFromNonZero(t *testing.T) {
+	// TODO(#131862): Test both WatchWithoutPrevKV=true and false
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestWatchFromNonZero(ctx, t, cacher)
 }
 
 func TestDelayedWatchDelivery(t *testing.T) {
+	// TODO(#131862): Test both WatchWithoutPrevKV=true and false
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestDelayedWatchDelivery(ctx, t, cacher)
@@ -436,66 +448,77 @@ func TestWatchContextCancel(t *testing.T) {
 }
 
 func TestWatcherTimeout(t *testing.T) {
+	// TODO(#131862): Test both WatchWithoutPrevKV=true and false
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestWatcherTimeout(ctx, t, cacher)
 }
 
 func TestWatchDeleteEventObjectHaveLatestRV(t *testing.T) {
+	// TODO(#131862): Test both WatchWithoutPrevKV=true and false
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestWatchDeleteEventObjectHaveLatestRV(ctx, t, cacher)
 }
 
 func TestWatchInitializationSignal(t *testing.T) {
+	// TODO(#131862): Test both WatchWithoutPrevKV=true and false
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestWatchInitializationSignal(ctx, t, cacher)
 }
 
 func TestClusterScopedWatch(t *testing.T) {
+	// TODO(#131862): Test both WatchWithoutPrevKV=true and false
 	ctx, cacher, terminate := testSetup(t, withClusterScopedKeyFunc, withNodeNameAndNamespaceIndex)
 	t.Cleanup(terminate)
 	storagetesting.RunTestClusterScopedWatch(ctx, t, cacher)
 }
 
 func TestNamespaceScopedWatch(t *testing.T) {
+	// TODO(#131862): Test both WatchWithoutPrevKV=true and false
 	ctx, cacher, terminate := testSetup(t, withNodeNameAndNamespaceIndex)
 	t.Cleanup(terminate)
 	storagetesting.RunTestNamespaceScopedWatch(ctx, t, cacher)
 }
 
 func TestWatchDispatchBookmarkEvents(t *testing.T) {
+	// TODO(#131862): Test both WatchWithoutPrevKV=true and false
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestWatchDispatchBookmarkEvents(ctx, t, cacher, true)
 }
 
 func TestWatchBookmarksWithCorrectResourceVersion(t *testing.T) {
+	// TODO(#131862): Test WatchWithoutPrevKV=true and false
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestOptionalWatchBookmarksWithCorrectResourceVersion(ctx, t, cacher)
 }
 
 func TestSendInitialEventsBackwardCompatibility(t *testing.T) {
+	// TODO(#131862): Test both WatchWithoutPrevKV=true and false
 	ctx, store, terminate := testSetup(t)
 	t.Cleanup(terminate)
 	storagetesting.RunSendInitialEventsBackwardCompatibility(ctx, t, store)
 }
 
 func TestWatchSemantics(t *testing.T) {
+	// TODO(#131862): Test both WatchWithoutPrevKV=true and false
 	store, terminate := testSetupWithEtcdAndCreateWrapper(t)
 	t.Cleanup(terminate)
 	storagetesting.RunWatchSemantics(context.TODO(), t, store)
 }
 
 func TestWatchSemanticInitialEventsExtended(t *testing.T) {
+	// TODO(#131862): Test both WatchWithoutPrevKV=true and false
 	store, terminate := testSetupWithEtcdAndCreateWrapper(t)
 	t.Cleanup(terminate)
 	storagetesting.RunWatchSemanticInitialEventsExtended(context.TODO(), t, store)
 }
 
 func TestWatchListMatchSingle(t *testing.T) {
+	// TODO(#131862): Test both WatchWithoutPrevKV=true and false
 	store, terminate := testSetupWithEtcdAndCreateWrapper(t)
 	t.Cleanup(terminate)
 	storagetesting.RunWatchListMatchSingle(context.TODO(), t, store)

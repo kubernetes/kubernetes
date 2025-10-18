@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/storage"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	"k8s.io/apiserver/pkg/storage/storagebackend/factory"
@@ -144,7 +145,7 @@ func TestPeerEndpointLeaseReconciler(t *testing.T) {
 			// use the same base key used by the controlplane, but add a random
 			// prefix so we can reuse the etcd instance for subtests independently.
 			baseKey := "/" + uuid.New().String() + "/peerserverleases/"
-			s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "endpoints"}), newFunc, newListFunc, baseKey)
+			s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "endpoints"}), newFunc, newListFunc, registry.NamespaceReverseKeyFunc(baseKey), baseKey)
 			if err != nil {
 				t.Fatalf("Error creating storage: %v", err)
 			}
@@ -248,7 +249,7 @@ func TestPeerLeaseRemoveEndpoints(t *testing.T) {
 			// use the same base key used by the controlplane, but add a random
 			// prefix so we can reuse the etcd instance for subtests independently.
 			baseKey := "/" + uuid.New().String() + "/peerserverleases/"
-			s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "pods"}), newFunc, newListFunc, baseKey)
+			s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "pods"}), newFunc, newListFunc, registry.NamespaceReverseKeyFunc(baseKey), baseKey)
 			if err != nil {
 				t.Fatalf("Error creating storage: %v", err)
 			}
