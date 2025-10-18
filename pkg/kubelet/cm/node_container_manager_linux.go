@@ -320,9 +320,10 @@ func (cm *containerManagerImpl) validateNodeAllocatable() error {
 // Using ObjectReference for events as the node maybe not cached; refer to #42701 for detail.
 func nodeRefFromNode(nodeName string) *v1.ObjectReference {
 	return &v1.ObjectReference{
-		Kind:      "Node",
-		Name:      nodeName,
-		UID:       types.UID(nodeName),
-		Namespace: "",
+		APIVersion: "v1",
+		Kind:       "Node",
+		Name:       nodeName,
+		UID:        types.UID(nodeName),
+		Namespace:  "",
 	}
 }
