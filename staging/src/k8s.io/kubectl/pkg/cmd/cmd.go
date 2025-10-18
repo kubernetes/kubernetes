@@ -306,6 +306,7 @@ func HandlePluginCommand(pluginHandler PluginHandler, cmdArgs []string, minArgs 
 func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 	warningHandler := rest.NewWarningWriter(o.IOStreams.ErrOut, rest.WarningWriterOptions{Deduplicate: true, Color: term.AllowsColorOutput(o.IOStreams.ErrOut)})
 	warningsAsErrors := false
+	var finishProfiling func() error
 	// Parent command to which all subcommands are added.
 	cmds := &cobra.Command{
 		Use:   "kubectl",
@@ -327,11 +328,15 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 				plugin.SetupPluginCompletion(cmd, args)
 			}
 
-			return initProfiling()
+			var err error
+			finishProfiling, err = initProfiling()
+			return err
 		},
 		PersistentPostRunE: func(*cobra.Command, []string) error {
-			if err := flushProfiling(); err != nil {
-				return err
+			if finishProfiling != nil {
+				if err := finishProfiling(); err != nil {
+					return err
+				}
 			}
 			if warningsAsErrors {
 				count := warningHandler.WarningCount()
