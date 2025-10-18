@@ -37,6 +37,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
+	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
 	timedworkers "k8s.io/kubernetes/pkg/controller/tainteviction" // TODO (?): move this common helper somewhere else?
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
@@ -95,6 +96,10 @@ type monitoredPlugin struct {
 
 	// connected is protected by store.mutex.
 	connected bool
+
+	// pluginCtx and pluginCancel are used for per-plugin operations like health monitoring
+	pluginCtx    context.Context
+	pluginCancel context.CancelFunc
 }
 
 var _ grpcstats.Handler = &monitoredPlugin{}
@@ -362,9 +367,14 @@ func (pm *DRAPluginManager) add(driverName string, endpoint string, chosenServic
 
 	logger := klog.FromContext(pm.backgroundCtx)
 
+	// Create a per-plugin context that can be cancelled when the plugin is removed
+	pluginCtx, pluginCancel := context.WithCancel(pm.backgroundCtx)
+
 	mp := &monitoredPlugin{
-		DRAPlugin: p,
-		pm:        pm,
+		DRAPlugin:    p,
+		pm:           pm,
+		pluginCtx:    pluginCtx,
+		pluginCancel: pluginCancel,
 	}
 
 	// The gRPC connection gets created once. gRPC then connects to the gRPC server on demand.
@@ -384,11 +394,20 @@ func (pm *DRAPluginManager) add(driverName string, endpoint string, chosenServic
 	}
 	p.conn = conn
 
+	// Ensure that gRPC tries to connect even if we don't call any gRPC method.
+	// This is necessary to detect early whether a plugin is really available.
+	// This is currently an experimental gRPC method. Should it be removed we
+	// would need to do something else, like sending a fake gRPC method call.
+	conn.Connect()
+
+	// Initialize the health client using the same connection
 	if utilfeature.DefaultFeatureGate.Enabled(features.ResourceHealthStatus) {
+		p.healthClient = drahealthv1alpha1.NewDRAResourceHealthClient(p.conn)
+		logger.V(4).Info("Initialized DRAResourceHealthClient", "driverName", driverName, "endpoint", endpoint)
 		pm.wg.Add(1)
 		go func() {
 			defer pm.wg.Done()
-			streamCtx, streamCancel := context.WithCancel(p.backgroundCtx)
+			streamCtx, streamCancel := context.WithCancel(mp.pluginCtx)
 			p.SetHealthStream(streamCtx, streamCancel)
 
 			wait.UntilWithContext(streamCtx, func(ctx context.Context) {
@@ -407,12 +426,6 @@ func (pm *DRAPluginManager) add(driverName string, endpoint string, chosenServic
 			}, 5*time.Second)
 		}()
 	}
-
-	// Ensure that gRPC tries to connect even if we don't call any gRPC method.
-	// This is necessary to detect early whether a plugin is really available.
-	// This is currently an experimental gRPC method. Should it be removed we
-	// would need to do something else, like sending a fake gRPC method call.
-	conn.Connect()
 
 	pm.store[p.driverName] = append(pm.store[p.driverName], mp)
 	logger.V(3).Info("Registered DRA plugin", "driverName", p.driverName, "endpoint", p.endpoint, "chosenService", p.chosenService, "numPlugins", len(pm.store[p.driverName]))
@@ -462,7 +475,13 @@ func (pm *DRAPluginManager) remove(driverName, endpoint string) {
 		pm.store[driverName] = slices.Delete(plugins, i, i+1)
 	}
 
-	// Cancel the plugin's health stream if it was active.
+	// Cancel the plugin's context, which will stop all plugin-specific operations including health monitoring
+	if p.pluginCancel != nil {
+		logger.V(4).Info("Canceling plugin context during deregistration")
+		p.pluginCancel()
+	}
+
+	// Also cancel the plugin's health stream if it was active (redundant but safe)
 	healthCancel := p.HealthStreamCancel()
 	if healthCancel != nil {
 		logger.V(4).Info("Canceling health stream during deregistration")
