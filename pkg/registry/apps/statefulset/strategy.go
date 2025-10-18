@@ -31,7 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/apps/validation"
 	"k8s.io/kubernetes/pkg/features"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 // statefulSetStrategy implements verification logic for Replication StatefulSets.
@@ -118,11 +118,6 @@ func (statefulSetStrategy) PrepareForUpdate(ctx context.Context, obj, old runtim
 //	    newSvc.Spec.MyFeature = nil
 //	}
 func dropStatefulSetDisabledFields(newSS *apps.StatefulSet, oldSS *apps.StatefulSet) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
-		if oldSS == nil || oldSS.Spec.PersistentVolumeClaimRetentionPolicy == nil {
-			newSS.Spec.PersistentVolumeClaimRetentionPolicy = nil
-		}
-	}
 	if !utilfeature.DefaultFeatureGate.Enabled(features.MaxUnavailableStatefulSet) && !maxUnavailableInUse(oldSS) {
 		if newSS.Spec.UpdateStrategy.RollingUpdate != nil {
 			newSS.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable = nil

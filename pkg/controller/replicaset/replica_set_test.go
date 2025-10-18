@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/onsi/gomega"
 	"math/rand"
 	"net/http/httptest"
 	"net/url"
@@ -54,7 +55,7 @@ import (
 	. "k8s.io/kubernetes/pkg/controller/testutil"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/test/utils/ktesting"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 var (
@@ -105,7 +106,7 @@ func newReplicaSet(replicas int, selectorMap map[string]string) *apps.ReplicaSet
 			ResourceVersion: "18",
 		},
 		Spec: apps.ReplicaSetSpec{
-			Replicas: pointer.Int32(int32(replicas)),
+			Replicas: ptr.To[int32](int32(replicas)),
 			Selector: &metav1.LabelSelector{MatchLabels: selectorMap},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
@@ -1616,6 +1617,87 @@ func TestDoNotAdoptOrCreateIfBeingDeletedRace(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestReplicaSetAvailabilityCheck(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+
+	labelMap := map[string]string{"foo": "bar"}
+	rs := newReplicaSet(4, labelMap)
+	rs.Spec.MinReadySeconds = 5
+	client := fake.NewClientset(rs)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+
+	manager, informers := testNewReplicaSetControllerFromClient(t, client, stopCh, BurstReplicas)
+	if err := informers.Apps().V1().ReplicaSets().Informer().GetIndexer().Add(rs); err != nil {
+		t.Fatal(err)
+	}
+
+	now := time.Now()
+	pod1 := newPod("foobar-1", rs, v1.PodPending, nil, true)
+	pod2 := newPod("foobar-2", rs, v1.PodRunning, &metav1.Time{Time: now}, true)
+	pod3 := newPod("foobar-3", rs, v1.PodRunning, &metav1.Time{Time: now.Add(-2 * time.Second)}, true)
+	pod4 := newPod("foobar-4", rs, v1.PodRunning, &metav1.Time{Time: now.Add(-4300 * time.Millisecond)}, true)
+	if err := informers.Core().V1().Pods().Informer().GetIndexer().Add(pod1); err != nil {
+		t.Fatal(err)
+	}
+	if err := informers.Core().V1().Pods().Informer().GetIndexer().Add(pod2); err != nil {
+		t.Fatal(err)
+	}
+	if err := informers.Core().V1().Pods().Informer().GetIndexer().Add(pod3); err != nil {
+		t.Fatal(err)
+	}
+	if err := informers.Core().V1().Pods().Informer().GetIndexer().Add(pod4); err != nil {
+		t.Fatal(err)
+	}
+	fakePodControl := controller.FakePodControl{}
+	manager.podControl = &fakePodControl
+
+	err := manager.syncReplicaSet(ctx, GetKey(rs, t))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var updatedRs *apps.ReplicaSet
+	for _, a := range client.Actions() {
+		if a.GetResource().Resource != "replicasets" {
+			t.Errorf("Unexpected action %+v", a)
+			continue
+		}
+
+		switch action := a.(type) {
+		case core.UpdateAction:
+			var ok bool
+			if updatedRs, ok = action.GetObject().(*apps.ReplicaSet); !ok {
+				t.Errorf("Expected a ReplicaSet as the argument to update, got %T", updatedRs)
+			}
+		default:
+			t.Errorf("Unexpected action %+v", a)
+		}
+	}
+
+	// one pod is not ready
+	if updatedRs.Status.ReadyReplicas != 3 {
+		t.Errorf("Expected updated ReplicaSet to contain ready replicas %v, got %v instead",
+			3, updatedRs.Status.ReadyReplicas)
+	}
+	if updatedRs.Status.AvailableReplicas != 0 {
+		t.Errorf("Expected updated ReplicaSet to contain available replicas %v, got %v instead",
+			0, updatedRs.Status.AvailableReplicas)
+	}
+
+	if got, want := manager.queue.Len(), 0; got != want {
+		t.Errorf("queue.Len() = %v, want %v", got, want)
+	}
+
+	// RS should be re-queued after 700ms to recompute .status.availableReplicas (200ms extra for the test).
+	ktesting.Eventually(ctx, func(tCtx ktesting.TContext) int {
+		return manager.queue.Len()
+	}).WithTimeout(900*time.Millisecond).
+		WithPolling(10*time.Millisecond).
+		Should(gomega.Equal(1), " RS should be re-queued to recompute .status.availableReplicas")
+
 }
 
 var (

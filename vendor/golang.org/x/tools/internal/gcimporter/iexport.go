@@ -236,6 +236,7 @@ import (
 	"io"
 	"math/big"
 	"reflect"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -246,15 +247,35 @@ import (
 
 // IExportShallow encodes "shallow" export data for the specified package.
 //
+// For types, we use "shallow" export data. Historically, the Go
+// compiler always produced a summary of the types for a given package
+// that included types from other packages that it indirectly
+// referenced: "deep" export data. This had the advantage that the
+// compiler (and analogous tools such as gopls) need only load one
+// file per direct import.  However, it meant that the files tended to
+// get larger based on the level of the package in the import
+// graph. For example, higher-level packages in the kubernetes module
+// have over 1MB of "deep" export data, even when they have almost no
+// content of their own, merely because they mention a major type that
+// references many others. In pathological cases the export data was
+// 300x larger than the source for a package due to this quadratic
+// growth.
+//
+// "Shallow" export data means that the serialized types describe only
+// a single package. If those types mention types from other packages,
+// the type checker may need to request additional packages beyond
+// just the direct imports. Type information for the entire transitive
+// closure of imports is provided (lazily) by the DAG.
+//
 // No promises are made about the encoding other than that it can be decoded by
 // the same version of IIExportShallow. If you plan to save export data in the
 // file system, be sure to include a cryptographic digest of the executable in
 // the key to avoid version skew.
 //
-// If the provided reportf func is non-nil, it will be used for reporting bugs
-// encountered during export.
-// TODO(rfindley): remove reportf when we are confident enough in the new
-// objectpath encoding.
+// If the provided reportf func is non-nil, it is used for reporting
+// bugs (e.g. recovered panics) encountered during export, enabling us
+// to obtain via telemetry the stack that would otherwise be lost by
+// merely returning an error.
 func IExportShallow(fset *token.FileSet, pkg *types.Package, reportf ReportFunc) ([]byte, error) {
 	// In principle this operation can only fail if out.Write fails,
 	// but that's impossible for bytes.Buffer---and as a matter of
@@ -263,13 +284,13 @@ func IExportShallow(fset *token.FileSet, pkg *types.Package, reportf ReportFunc)
 	// TODO(adonovan): use byte slices throughout, avoiding copying.
 	const bundle, shallow = false, true
 	var out bytes.Buffer
-	err := iexportCommon(&out, fset, bundle, shallow, iexportVersion, []*types.Package{pkg})
+	err := iexportCommon(&out, fset, bundle, shallow, iexportVersion, []*types.Package{pkg}, reportf)
 	return out.Bytes(), err
 }
 
 // IImportShallow decodes "shallow" types.Package data encoded by
-// IExportShallow in the same executable. This function cannot import data from
-// cmd/compile or gcexportdata.Write.
+// [IExportShallow] in the same executable. This function cannot import data
+// from cmd/compile or gcexportdata.Write.
 //
 // The importer calls getPackages to obtain package symbols for all
 // packages mentioned in the export data, including the one being
@@ -290,7 +311,7 @@ func IImportShallow(fset *token.FileSet, getPackages GetPackagesFunc, data []byt
 }
 
 // ReportFunc is the type of a function used to report formatted bugs.
-type ReportFunc = func(string, ...interface{})
+type ReportFunc = func(string, ...any)
 
 // Current bundled export format version. Increase with each format change.
 // 0: initial implementation
@@ -303,20 +324,27 @@ const bundleVersion = 0
 // so that calls to IImportData can override with a provided package path.
 func IExportData(out io.Writer, fset *token.FileSet, pkg *types.Package) error {
 	const bundle, shallow = false, false
-	return iexportCommon(out, fset, bundle, shallow, iexportVersion, []*types.Package{pkg})
+	return iexportCommon(out, fset, bundle, shallow, iexportVersion, []*types.Package{pkg}, nil)
 }
 
 // IExportBundle writes an indexed export bundle for pkgs to out.
 func IExportBundle(out io.Writer, fset *token.FileSet, pkgs []*types.Package) error {
 	const bundle, shallow = true, false
-	return iexportCommon(out, fset, bundle, shallow, iexportVersion, pkgs)
+	return iexportCommon(out, fset, bundle, shallow, iexportVersion, pkgs, nil)
 }
 
-func iexportCommon(out io.Writer, fset *token.FileSet, bundle, shallow bool, version int, pkgs []*types.Package) (err error) {
+func iexportCommon(out io.Writer, fset *token.FileSet, bundle, shallow bool, version int, pkgs []*types.Package, reportf ReportFunc) (err error) {
 	if !debug {
 		defer func() {
 			if e := recover(); e != nil {
+				// Report the stack via telemetry (see #71067).
+				if reportf != nil {
+					reportf("panic in exporter")
+				}
 				if ierr, ok := e.(internalError); ok {
+					// internalError usually means we exported a
+					// bad go/types data structure: a violation
+					// of an implicit precondition of Export.
 					err = ierr
 					return
 				}
@@ -438,7 +466,7 @@ func (p *iexporter) encodeFile(w *intWriter, file *token.File, needed []uint64) 
 	w.uint64(size)
 
 	// Sort the set of needed offsets. Duplicates are harmless.
-	sort.Slice(needed, func(i, j int) bool { return needed[i] < needed[j] })
+	slices.Sort(needed)
 
 	lines := file.Lines() // byte offset of each line start
 	w.uint64(uint64(len(lines)))
@@ -577,7 +605,7 @@ type filePositions struct {
 	needed []uint64 // unordered list of needed file offsets
 }
 
-func (p *iexporter) trace(format string, args ...interface{}) {
+func (p *iexporter) trace(format string, args ...any) {
 	if !trace {
 		// Call sites should also be guarded, but having this check here allows
 		// easily enabling/disabling debug trace statements.
@@ -792,7 +820,7 @@ func (p *iexporter) doDecl(obj types.Object) {
 
 		n := named.NumMethods()
 		w.uint64(uint64(n))
-		for i := 0; i < n; i++ {
+		for i := range n {
 			m := named.Method(i)
 			w.pos(m.Pos())
 			w.string(m.Name())
@@ -1069,7 +1097,7 @@ func (w *exportWriter) doTyp(t types.Type, pkg *types.Package) {
 		w.pkg(fieldPkg)
 		w.uint64(uint64(n))
 
-		for i := 0; i < n; i++ {
+		for i := range n {
 			f := t.Field(i)
 			if w.p.shallow {
 				w.objectPath(f)
@@ -1118,7 +1146,7 @@ func (w *exportWriter) doTyp(t types.Type, pkg *types.Package) {
 		w.startType(unionType)
 		nt := t.Len()
 		w.uint64(uint64(nt))
-		for i := 0; i < nt; i++ {
+		for i := range nt {
 			term := t.Term(i)
 			w.bool(term.Tilde())
 			w.typ(term.Type(), pkg)
@@ -1247,7 +1275,7 @@ func tparamName(exportName string) string {
 func (w *exportWriter) paramList(tup *types.Tuple) {
 	n := tup.Len()
 	w.uint64(uint64(n))
-	for i := 0; i < n; i++ {
+	for i := range n {
 		w.param(tup.At(i))
 	}
 }
@@ -1563,6 +1591,6 @@ func (e internalError) Error() string { return "gcimporter: " + string(e) }
 // "internalErrorf" as the former is used for bugs, whose cause is
 // internal inconsistency, whereas the latter is used for ordinary
 // situations like bad input, whose cause is external.
-func internalErrorf(format string, args ...interface{}) error {
+func internalErrorf(format string, args ...any) error {
 	return internalError(fmt.Sprintf(format, args...))
 }

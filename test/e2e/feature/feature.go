@@ -75,6 +75,10 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	ComprehensiveNamespaceDraining = framework.WithFeature(framework.ValidFeatures.Add("ComprehensiveNamespaceDraining"))
 
+	// Onwer: sig-node
+	// Enables configuring per-container restart policy and restart policy rules.
+	ContainerRestartRules = framework.WithFeature(framework.ValidFeatures.Add("ContainerRestartRules"))
+
 	// Owner: sig-node
 	// Enables configuring custom stop signals for containers from container lifecycle
 	ContainerStopSignals = framework.WithFeature(framework.ValidFeatures.Add("ContainerStopSignals"))
@@ -105,12 +109,6 @@ var (
 	// OWNER: sig-node
 	// Testing device plugins
 	DevicePlugin = framework.WithFeature(framework.ValidFeatures.Add("DevicePlugin"))
-
-	// owning-sig: sig-node
-	// kep: https://kep.k8s.io/4009
-	// DevicePluginCDIDevices tests the CDI feature which is GA.
-	// This label is used for https://testgrid.k8s.io/sig-node-cri-o#ci-crio-cdi-device-plugins
-	DevicePluginCDIDevices = framework.WithFeature(framework.ValidFeatures.Add("DevicePluginCDIDevices"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	Downgrade = framework.WithFeature(framework.ValidFeatures.Add("Downgrade"))
@@ -171,10 +169,6 @@ var (
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	GPUUpgrade = framework.WithFeature(framework.ValidFeatures.Add("GPUUpgrade"))
-
-	// OWNER: sig-node
-	// Testing garbage collection of images/containers
-	GarbageCollect = framework.WithFeature(framework.ValidFeatures.Add("GarbageCollect"))
 
 	// OWNER: sig-node
 	// Testing graceful node shutdown
@@ -243,6 +237,10 @@ var (
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	KubeletCredentialProviders = framework.WithFeature(framework.ValidFeatures.Add("KubeletCredentialProviders"))
+
+	// Owner: sig-node
+	// Testing kubelet PSI metrics KEP
+	KubeletPSI = framework.WithFeature(framework.ValidFeatures.Add("KubeletPSI"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	KubeletSecurity = framework.WithFeature(framework.ValidFeatures.Add("KubeletSecurity"))
@@ -325,19 +323,10 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	PodGarbageCollector = framework.WithFeature(framework.ValidFeatures.Add("PodGarbageCollector"))
 
-	PodIndexLabel = framework.WithFeature(framework.ValidFeatures.Add("PodIndexLabel"))
-
 	// owner: sig-node
 	// Marks a test for for pod-level resources feature that requires
 	// PodLevelResources feature gate to be enabled.
 	PodLevelResources = framework.WithFeature(framework.ValidFeatures.Add("PodLevelResources"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	PodLifecycleSleepAction = framework.WithFeature(framework.ValidFeatures.Add("PodLifecycleSleepAction"))
-
-	// Owner: sig-node
-	// Marks a single test that tests Pod Lifecycle Sleep action with zero duration. Requires feature gate PodLifecycleSleepActionAllowZero to be enabled.
-	PodLifecycleSleepActionAllowZero = framework.WithFeature(framework.ValidFeatures.Add("PodLifecycleSleepActionAllowZero"))
 
 	// Owner: sig-node
 	// Marks tests that require a cluster with PodLogsQuerySplitStreams
@@ -354,8 +343,10 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	PodReadyToStartContainersCondition = framework.WithFeature(framework.ValidFeatures.Add("PodReadyToStartContainersCondition"))
 
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	PodResources = framework.WithFeature(framework.ValidFeatures.Add("PodResources"))
+	// Owner: sig-node
+	// Marks tests which exercise or consume the kubelet-local Pod Resources API
+	// see: KEPs 606, 2043; see: pkg/kubelet/apis/podresources/
+	PodResourcesAPI = framework.WithFeature(framework.ValidFeatures.Add("PodResourcesAPI"))
 
 	// Owner: sig-node
 	// Verify ProcMount feature.
@@ -484,6 +475,10 @@ var (
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	ValidatingAdmissionPolicy = framework.WithFeature(framework.ValidFeatures.Add("ValidatingAdmissionPolicy"))
+
+	// Owner: sig-storage
+	// TODO: Remove it once the csi driver is promoted to GA and the manifest is updated.
+	VolumeAttributesClass = framework.WithFeature(framework.ValidFeatures.Add("VolumeAttributesClass"))
 
 	// Owner: sig-storage
 	// Volume group snapshot tests

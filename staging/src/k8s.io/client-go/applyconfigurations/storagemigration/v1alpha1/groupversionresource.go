@@ -20,9 +20,14 @@ package v1alpha1
 
 // GroupVersionResourceApplyConfiguration represents a declarative configuration of the GroupVersionResource type for use
 // with apply.
+//
+// The names of the group, the version, and the resource.
 type GroupVersionResourceApplyConfiguration struct {
-	Group    *string `json:"group,omitempty"`
-	Version  *string `json:"version,omitempty"`
+	// The name of the group.
+	Group *string `json:"group,omitempty"`
+	// The name of the version.
+	Version *string `json:"version,omitempty"`
+	// The name of the resource.
 	Resource *string `json:"resource,omitempty"`
 }
 

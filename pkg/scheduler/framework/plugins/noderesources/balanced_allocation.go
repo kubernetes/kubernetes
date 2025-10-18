@@ -26,7 +26,6 @@ import (
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
@@ -34,12 +33,12 @@ import (
 // BalancedAllocation is a score plugin that calculates the difference between the cpu and memory fraction
 // of capacity, and prioritizes the host based on how close the two metrics are to each other.
 type BalancedAllocation struct {
-	handle framework.Handle
+	handle fwk.Handle
 	resourceAllocationScorer
 }
 
-var _ framework.PreScorePlugin = &BalancedAllocation{}
-var _ framework.ScorePlugin = &BalancedAllocation{}
+var _ fwk.PreScorePlugin = &BalancedAllocation{}
+var _ fwk.ScorePlugin = &BalancedAllocation{}
 
 // BalancedAllocationName is the name of the plugin used in the plugin registry and configurations.
 const (
@@ -63,7 +62,7 @@ func (s *balancedAllocationPreScoreState) Clone() fwk.StateData {
 }
 
 // PreScore calculates incoming pod's resource requests and writes them to the cycle state used.
-func (ba *BalancedAllocation) PreScore(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) *fwk.Status {
+func (ba *BalancedAllocation) PreScore(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) *fwk.Status {
 	podRequests := ba.calculatePodResourceRequestList(pod, ba.resources)
 	if ba.isBestEffortPod(podRequests) {
 		// Skip BalancedAllocation scoring for best-effort pods to
@@ -97,7 +96,7 @@ func (ba *BalancedAllocation) Name() string {
 }
 
 // Score invoked at the score extension point.
-func (ba *BalancedAllocation) Score(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *fwk.Status) {
+func (ba *BalancedAllocation) Score(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) (int64, *fwk.Status) {
 	s, err := getBalancedAllocationPreScoreState(state)
 	if err != nil {
 		s = &balancedAllocationPreScoreState{podRequests: ba.calculatePodResourceRequestList(pod, ba.resources)}
@@ -115,12 +114,12 @@ func (ba *BalancedAllocation) Score(ctx context.Context, state fwk.CycleState, p
 }
 
 // ScoreExtensions of the Score plugin.
-func (ba *BalancedAllocation) ScoreExtensions() framework.ScoreExtensions {
+func (ba *BalancedAllocation) ScoreExtensions() fwk.ScoreExtensions {
 	return nil
 }
 
 // NewBalancedAllocation initializes a new plugin and returns it.
-func NewBalancedAllocation(_ context.Context, baArgs runtime.Object, h framework.Handle, fts feature.Features) (framework.Plugin, error) {
+func NewBalancedAllocation(_ context.Context, baArgs runtime.Object, h fwk.Handle, fts feature.Features) (fwk.Plugin, error) {
 	args, ok := baArgs.(*config.NodeResourcesBalancedAllocationArgs)
 	if !ok {
 		return nil, fmt.Errorf("want args to be of type NodeResourcesBalancedAllocationArgs, got %T", baArgs)
@@ -176,5 +175,5 @@ func balancedResourceScorer(requested, allocable []int64) int64 {
 
 	// STD (standard deviation) is always a positive value. 1-deviation lets the score to be higher for node which has least deviation and
 	// multiplying it with `MaxNodeScore` provides the scaling factor needed.
-	return int64((1 - std) * float64(framework.MaxNodeScore))
+	return int64((1 - std) * float64(fwk.MaxNodeScore))
 }

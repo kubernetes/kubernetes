@@ -41,7 +41,8 @@ import (
 
 var _ = SIGDescribe("Container Lifecycle Hook", func() {
 	f := framework.NewDefaultFramework("container-lifecycle-hook")
-	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
+	// FIXME: This test is being run in the privileged mode because of https://github.com/kubernetes/kubernetes/issues/133091
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var podClient *e2epod.PodClient
 	const (
 		podCheckInterval     = 1 * time.Second
@@ -259,7 +260,8 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 
 var _ = SIGDescribe(feature.SidecarContainers, framework.WithFeatureGate(features.SidecarContainers), "Restartable Init Container Lifecycle Hook", func() {
 	f := framework.NewDefaultFramework("restartable-init-container-lifecycle-hook")
-	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
+	// FIXME: This test is being run in the privileged mode because of https://github.com/kubernetes/kubernetes/issues/133091
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var podClient *e2epod.PodClient
 	const (
 		podCheckInterval     = 1 * time.Second
@@ -710,7 +712,7 @@ var _ = SIGDescribe("Lifecycle Sleep Hook", func() {
 	})
 })
 
-var _ = SIGDescribe(feature.PodLifecycleSleepActionAllowZero, framework.WithFeatureGate(features.PodLifecycleSleepActionAllowZero), func() {
+var _ = SIGDescribe("Lifecycle sleep action zero value", func() {
 	f := framework.NewDefaultFramework("pod-lifecycle-sleep-action-allow-zero")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	var podClient *e2epod.PodClient

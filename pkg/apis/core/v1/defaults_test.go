@@ -49,12 +49,7 @@ func TestWorkloadDefaults(t *testing.T) {
 	t.Run("disabled_features", func(t *testing.T) { testWorkloadDefaults(t, false) })
 }
 func testWorkloadDefaults(t *testing.T, featuresEnabled bool) {
-	allFeatures := utilfeature.DefaultFeatureGate.DeepCopy().GetAll()
-	for feature, featureSpec := range allFeatures {
-		if !featureSpec.LockToDefault {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, featuresEnabled)
-		}
-	}
+	setAllFeatures(t, featuresEnabled)
 	// New defaults under PodTemplateSpec are only acceptable if they would not be applied when reading data from a previous release.
 	// Forbidden: adding a new field `MyField *bool` and defaulting it to a non-nil value
 	// Forbidden: defaulting an existing field `MyField *bool` when it was previously not defaulted
@@ -62,6 +57,7 @@ func testWorkloadDefaults(t *testing.T, featuresEnabled bool) {
 	// Allowed: adding a new field `MyContainer *MyType` and defaulting a child of that type (e.g. `MyContainer.MyChildField`) if and only if MyContainer is non-nil
 	expectedDefaults := map[string]string{
 		".Spec.Containers[0].Env[0].ValueFrom.FieldRef.APIVersion":       `"v1"`,
+		".Spec.Containers[0].Env[0].ValueFrom.FileKeyRef.Optional":       "false",
 		".Spec.Containers[0].ImagePullPolicy":                            `"IfNotPresent"`,
 		".Spec.Containers[0].Lifecycle.PostStart.HTTPGet.Path":           `"/"`,
 		".Spec.Containers[0].Lifecycle.PostStart.HTTPGet.Scheme":         `"HTTP"`,
@@ -105,6 +101,7 @@ func testWorkloadDefaults(t *testing.T, featuresEnabled bool) {
 		".Spec.InitContainers[0].StartupProbe.ProbeHandler.HTTPGet.Path":                                   `"/"`,
 		".Spec.InitContainers[0].StartupProbe.ProbeHandler.HTTPGet.Scheme":                                 `"HTTP"`,
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.Env[0].ValueFrom.FieldRef.APIVersion":       `"v1"`,
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.Env[0].ValueFrom.FileKeyRef.Optional":       "false",
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.ImagePullPolicy":                            `"IfNotPresent"`,
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet.Path":           `"/"`,
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet.Scheme":         `"HTTP"`,
@@ -129,6 +126,7 @@ func testWorkloadDefaults(t *testing.T, featuresEnabled bool) {
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.TerminationMessagePath":                     `"/dev/termination-log"`,
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.TerminationMessagePolicy":                   `"File"`,
 		".Spec.InitContainers[0].Env[0].ValueFrom.FieldRef.APIVersion":                                     `"v1"`,
+		".Spec.InitContainers[0].Env[0].ValueFrom.FileKeyRef.Optional":                                     "false",
 		".Spec.InitContainers[0].ImagePullPolicy":                                                          `"IfNotPresent"`,
 		".Spec.InitContainers[0].Lifecycle.PostStart.HTTPGet.Path":                                         `"/"`,
 		".Spec.InitContainers[0].Lifecycle.PostStart.HTTPGet.Scheme":                                       `"HTTP"`,
@@ -237,12 +235,7 @@ func TestPodDefaults(t *testing.T) {
 	t.Run("disabled_features", func(t *testing.T) { testPodDefaults(t, false) })
 }
 func testPodDefaults(t *testing.T, featuresEnabled bool) {
-	features := utilfeature.DefaultFeatureGate.DeepCopy().GetAll()
-	for feature, featureSpec := range features {
-		if !featureSpec.LockToDefault {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, featuresEnabled)
-		}
-	}
+	setAllFeatures(t, featuresEnabled)
 	pod := &v1.Pod{}
 	// New defaults under PodSpec are only acceptable if they would not be applied when reading data from a previous release.
 	// Forbidden: adding a new field `MyField *bool` and defaulting it to a non-nil value
@@ -251,6 +244,7 @@ func testPodDefaults(t *testing.T, featuresEnabled bool) {
 	// Allowed: adding a new field `MyContainer *MyType` and defaulting a child of that type (e.g. `MyContainer.MyChildField`) if and only if MyContainer is non-nil
 	expectedDefaults := map[string]string{
 		".Spec.Containers[0].Env[0].ValueFrom.FieldRef.APIVersion":       `"v1"`,
+		".Spec.Containers[0].Env[0].ValueFrom.FileKeyRef.Optional":       "false",
 		".Spec.Containers[0].ImagePullPolicy":                            `"IfNotPresent"`,
 		".Spec.Containers[0].Lifecycle.PostStart.HTTPGet.Path":           `"/"`,
 		".Spec.Containers[0].Lifecycle.PostStart.HTTPGet.Scheme":         `"HTTP"`,
@@ -284,6 +278,7 @@ func testPodDefaults(t *testing.T, featuresEnabled bool) {
 		".Spec.DNSPolicy":          `"ClusterFirst"`,
 		".Spec.EnableServiceLinks": `true`,
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.Env[0].ValueFrom.FieldRef.APIVersion":       `"v1"`,
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.Env[0].ValueFrom.FileKeyRef.Optional":       "false",
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.ImagePullPolicy":                            `"IfNotPresent"`,
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet.Path":           `"/"`,
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet.Scheme":         `"HTTP"`,
@@ -305,6 +300,7 @@ func testPodDefaults(t *testing.T, featuresEnabled bool) {
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.TerminationMessagePath":                     `"/dev/termination-log"`,
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.TerminationMessagePolicy":                   `"File"`,
 		".Spec.InitContainers[0].Env[0].ValueFrom.FieldRef.APIVersion":                                     `"v1"`,
+		".Spec.InitContainers[0].Env[0].ValueFrom.FileKeyRef.Optional":                                     "false",
 		".Spec.InitContainers[0].ImagePullPolicy":                                                          `"IfNotPresent"`,
 		".Spec.InitContainers[0].Lifecycle.PostStart.HTTPGet.Path":                                         `"/"`,
 		".Spec.InitContainers[0].Lifecycle.PostStart.HTTPGet.Scheme":                                       `"HTTP"`,
@@ -1223,7 +1219,7 @@ func TestPodResourcesDefaults(t *testing.T) {
 				},
 			},
 		}, {
-			name:                     "pod hugepages requests=unset limits=unset, container hugepages requests=unset limits=set",
+			name:                     "pod has cpu limit with hugepages requests=unset limits=unset, container hugepages requests=unset limits=set",
 			podLevelResourcesEnabled: true,
 			podResources: &v1.ResourceRequirements{
 				Limits: v1.ResourceList{
@@ -1251,6 +1247,68 @@ func TestPodResourcesDefaults(t *testing.T) {
 				Resources: &v1.ResourceRequirements{
 					Requests: v1.ResourceList{
 						"cpu":                              resource.MustParse("3m"),
+						v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("6Mi"),
+					},
+					Limits: v1.ResourceList{
+						"cpu":                              resource.MustParse("5m"),
+						v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("6Mi"),
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								"cpu":                              resource.MustParse("2m"),
+								v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("4Mi"),
+							},
+							Limits: v1.ResourceList{
+								"cpu":                              resource.MustParse("2m"),
+								v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("4Mi"),
+							},
+						},
+					}, {
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								"cpu":                              resource.MustParse("1m"),
+								v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("2Mi"),
+							},
+							Limits: v1.ResourceList{
+								"cpu":                              resource.MustParse("1m"),
+								v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("2Mi"),
+							},
+						},
+					},
+				},
+			},
+		}, {
+			name:                     "pod has cpu request with hugepages requests=unset limits=unset, container hugepages requests=unset limits=set",
+			podLevelResourcesEnabled: true,
+			podResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					"cpu": resource.MustParse("5m"),
+				},
+			},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							"cpu":                              resource.MustParse("2m"),
+							v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("4Mi"),
+						},
+					},
+				}, {
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							"cpu":                              resource.MustParse("1m"),
+							v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("2Mi"),
+						},
+					},
+				},
+			},
+			expectedPodSpec: v1.PodSpec{
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						"cpu":                              resource.MustParse("5m"),
 						v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("6Mi"),
 					},
 					Limits: v1.ResourceList{
@@ -3326,4 +3384,14 @@ func TestSetDefaults_PodLogOptions(t *testing.T) {
 			}
 		})
 	}
+}
+
+func setAllFeatures(t *testing.T, featuresEnabled bool) {
+	features := featuregatetesting.FeatureOverrides{}
+	for feature, featureSpec := range utilfeature.DefaultFeatureGate.DeepCopy().GetAll() {
+		if !featureSpec.LockToDefault {
+			features[feature] = featuresEnabled
+		}
+	}
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, features)
 }

@@ -17,9 +17,9 @@ limitations under the License.
 package volume
 
 import (
+	"context"
 	"errors"
 	"fmt"
-	"net"
 	"strings"
 	"sync"
 
@@ -231,7 +231,7 @@ type AttachableVolumePlugin interface {
 	NewDetacher() (Detacher, error)
 	// CanAttach tests if provided volume spec is attachable
 	CanAttach(spec *Spec) (bool, error)
-	VerifyExhaustedResource(spec *Spec, nodeName types.NodeName)
+	VerifyExhaustedResource(spec *Spec) bool
 }
 
 // DeviceMountableVolumePlugin is an extended interface of VolumePlugin and is used
@@ -313,6 +313,9 @@ type KubeletVolumeHost interface {
 	// Returns trust anchors from the ClusterTrustBundles selected by signer
 	// name and label selector.
 	GetTrustAnchorsBySigner(signerName string, labelSelector *metav1.LabelSelector, allowMissing bool) ([]byte, error)
+
+	// Returns the credential bundle for the specified podCertificate projected volume source.
+	GetPodCertificateCredentialBundle(ctx context.Context, namespace, podName, podUID, volumeName string, sourceIndex int) ([]byte, []byte, error)
 }
 
 // CSIDriverVolumeHost is a volume host that has access to CSIDriverLister
@@ -389,9 +392,6 @@ type VolumeHost interface {
 
 	// Returns the hostname of the host kubelet is running on
 	GetHostName() string
-
-	// Returns host IP or nil in the case of error.
-	GetHostIP() (net.IP, error)
 
 	// Returns node allocatable.
 	GetNodeAllocatable() (v1.ResourceList, error)
@@ -997,7 +997,7 @@ func NewPersistentVolumeRecyclerPodTemplate() *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:    "pv-recycler",
-					Image:   "registry.k8s.io/build-image/debian-base:bookworm-v1.0.4",
+					Image:   "registry.k8s.io/build-image/debian-base:bookworm-v1.0.6",
 					Command: []string{"/bin/sh"},
 					Args:    []string{"-c", "test -e /scrub && find /scrub -mindepth 1 -delete && test -z \"$(ls -A /scrub)\" || exit 1"},
 					VolumeMounts: []v1.VolumeMount{

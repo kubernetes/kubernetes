@@ -346,8 +346,10 @@ func TestPrepareForCreate(t *testing.T) {
 		t.Run(testName, func(t *testing.T) {
 			// TODO: this will be removed in 1.36
 			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AnyVolumeDataSource, test.anyEnabled)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CrossNamespaceVolumeDataSource, test.xnsEnabled)
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.AnyVolumeDataSource:            test.anyEnabled,
+				features.CrossNamespaceVolumeDataSource: test.xnsEnabled,
+			})
 			pvc := api.PersistentVolumeClaim{
 				Spec: api.PersistentVolumeClaimSpec{
 					DataSource:    test.dataSource,

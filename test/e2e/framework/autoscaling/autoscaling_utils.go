@@ -40,15 +40,16 @@ import (
 	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edebug "k8s.io/kubernetes/test/e2e/framework/debug"
+	e2eendpointslice "k8s.io/kubernetes/test/e2e/framework/endpointslice"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
 	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	testutils "k8s.io/kubernetes/test/utils"
-	utilpointer "k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"k8s.io/utils/ptr"
 
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -62,8 +63,6 @@ const (
 	targetPort                      = 8080
 	sidecarTargetPort               = 8081
 	timeoutRC                       = 120 * time.Second
-	startServiceTimeout             = time.Minute
-	startServiceInterval            = 5 * time.Second
 	invalidKind                     = "ERROR: invalid workload kind for resource consumer"
 	customMetricName                = "QPS"
 	serviceInitializationTimeout    = 2 * time.Minute
@@ -131,9 +130,9 @@ type ResourceConsumer struct {
 }
 
 // NewDynamicResourceConsumer is a wrapper to create a new dynamic ResourceConsumer
-func NewDynamicResourceConsumer(ctx context.Context, name, nsName string, kind schema.GroupVersionKind, replicas, initCPUTotal, initMemoryTotal, initCustomMetric int, cpuLimit, memLimit int64, clientset clientset.Interface, scaleClient scaleclient.ScalesGetter, enableSidecar SidecarStatusType, sidecarType SidecarWorkloadType) *ResourceConsumer {
+func NewDynamicResourceConsumer(ctx context.Context, name, nsName string, kind schema.GroupVersionKind, replicas, initCPUTotal, initMemoryTotal, initCustomMetric int, cpuLimit, memLimit int64, clientset clientset.Interface, scaleClient scaleclient.ScalesGetter, enableSidecar SidecarStatusType, sidecarType SidecarWorkloadType, podResources *v1.ResourceRequirements) *ResourceConsumer {
 	return newResourceConsumer(ctx, name, nsName, kind, replicas, initCPUTotal, initMemoryTotal, initCustomMetric, dynamicConsumptionTimeInSeconds,
-		dynamicRequestSizeInMillicores, dynamicRequestSizeInMegabytes, dynamicRequestSizeCustomMetric, cpuLimit, memLimit, clientset, scaleClient, nil, nil, enableSidecar, sidecarType)
+		dynamicRequestSizeInMillicores, dynamicRequestSizeInMegabytes, dynamicRequestSizeCustomMetric, cpuLimit, memLimit, clientset, scaleClient, nil, nil, enableSidecar, sidecarType, podResources)
 }
 
 // getSidecarContainer returns sidecar container
@@ -171,7 +170,7 @@ memLimit argument is in megabytes, memLimit is a maximum amount of memory that c
 cpuLimit argument is in millicores, cpuLimit is a maximum amount of cpu that can be consumed by a single pod
 */
 func newResourceConsumer(ctx context.Context, name, nsName string, kind schema.GroupVersionKind, replicas, initCPUTotal, initMemoryTotal, initCustomMetric, consumptionTimeInSeconds, requestSizeInMillicores,
-	requestSizeInMegabytes int, requestSizeCustomMetric int, cpuLimit, memLimit int64, clientset clientset.Interface, scaleClient scaleclient.ScalesGetter, podAnnotations, serviceAnnotations map[string]string, sidecarStatus SidecarStatusType, sidecarType SidecarWorkloadType) *ResourceConsumer {
+	requestSizeInMegabytes int, requestSizeCustomMetric int, cpuLimit, memLimit int64, clientset clientset.Interface, scaleClient scaleclient.ScalesGetter, podAnnotations, serviceAnnotations map[string]string, sidecarStatus SidecarStatusType, sidecarType SidecarWorkloadType, podResources *v1.ResourceRequirements) *ResourceConsumer {
 	if podAnnotations == nil {
 		podAnnotations = make(map[string]string)
 	}
@@ -194,7 +193,7 @@ func newResourceConsumer(ctx context.Context, name, nsName string, kind schema.G
 	framework.ExpectNoError(err)
 	resourceClient := dynamicClient.Resource(schema.GroupVersionResource{Group: crdGroup, Version: crdVersion, Resource: crdNamePlural}).Namespace(nsName)
 
-	runServiceAndWorkloadForResourceConsumer(ctx, clientset, resourceClient, apiExtensionClient, nsName, name, kind, replicas, cpuLimit, memLimit, podAnnotations, serviceAnnotations, additionalContainers)
+	runServiceAndWorkloadForResourceConsumer(ctx, clientset, resourceClient, apiExtensionClient, nsName, name, kind, replicas, cpuLimit, memLimit, podAnnotations, serviceAnnotations, additionalContainers, podResources)
 	controllerName := name + "-ctrl"
 	// If sidecar is enabled and busy, run service and consumer for sidecar
 	if sidecarStatus == Enable && sidecarType == Busy {
@@ -613,11 +612,11 @@ func runServiceAndSidecarForResourceConsumer(ctx context.Context, c clientset.In
 
 	framework.ExpectNoError(e2erc.RunRC(ctx, controllerRcConfig))
 	// Wait for endpoints to propagate for the controller service.
-	framework.ExpectNoError(framework.WaitForServiceEndpointsNum(
-		ctx, c, ns, controllerName, 1, startServiceInterval, startServiceTimeout))
+	framework.ExpectNoError(e2eendpointslice.WaitForEndpointCount(
+		ctx, c, ns, controllerName, 1))
 }
 
-func runServiceAndWorkloadForResourceConsumer(ctx context.Context, c clientset.Interface, resourceClient dynamic.ResourceInterface, apiExtensionClient crdclientset.Interface, ns, name string, kind schema.GroupVersionKind, replicas int, cpuLimitMillis, memLimitMb int64, podAnnotations, serviceAnnotations map[string]string, additionalContainers []v1.Container) {
+func runServiceAndWorkloadForResourceConsumer(ctx context.Context, c clientset.Interface, resourceClient dynamic.ResourceInterface, apiExtensionClient crdclientset.Interface, ns, name string, kind schema.GroupVersionKind, replicas int, cpuLimitMillis, memLimitMb int64, podAnnotations, serviceAnnotations map[string]string, additionalContainers []v1.Container, podResources *v1.ResourceRequirements) {
 	ginkgo.By(fmt.Sprintf("Running consuming RC %s via %s with %v replicas", name, kind, replicas))
 	_, err := createService(ctx, c, name, ns, serviceAnnotations, map[string]string{"name": name}, port, targetPort)
 	framework.ExpectNoError(err)
@@ -629,12 +628,15 @@ func runServiceAndWorkloadForResourceConsumer(ctx context.Context, c clientset.I
 		Namespace:            ns,
 		Timeout:              timeoutRC,
 		Replicas:             replicas,
-		CpuRequest:           cpuLimitMillis,
-		CpuLimit:             cpuLimitMillis,
+		CPURequest:           cpuLimitMillis,
+		CPULimit:             cpuLimitMillis,
 		MemRequest:           memLimitMb * 1024 * 1024, // MemLimit is in bytes
 		MemLimit:             memLimitMb * 1024 * 1024,
 		Annotations:          podAnnotations,
 		AdditionalContainers: additionalContainers,
+	}
+	if podResources != nil {
+		rcConfig.PodResources = podResources.DeepCopy()
 	}
 
 	dpConfig := testutils.DeploymentConfig{
@@ -696,8 +698,8 @@ func runServiceAndWorkloadForResourceConsumer(ctx context.Context, c clientset.I
 
 	framework.ExpectNoError(e2erc.RunRC(ctx, controllerRcConfig))
 	// Wait for endpoints to propagate for the controller service.
-	framework.ExpectNoError(framework.WaitForServiceEndpointsNum(
-		ctx, c, ns, controllerName, 1, startServiceInterval, startServiceTimeout))
+	framework.ExpectNoError(e2eendpointslice.WaitForEndpointCount(
+		ctx, c, ns, controllerName, 1))
 }
 
 func CreateHorizontalPodAutoscaler(ctx context.Context, rc *ResourceConsumer, targetRef autoscalingv2.CrossVersionObjectReference, namespace string, metrics []autoscalingv2.MetricSpec, resourceType v1.ResourceName, metricTargetType autoscalingv2.MetricTargetType, metricTargetValue, minReplicas, maxReplicas int32) *autoscalingv2.HorizontalPodAutoscaler {
@@ -949,7 +951,7 @@ func CreateCustomResourceDefinition(ctx context.Context, c crdclientset.Interfac
 					Scale: &apiextensionsv1.CustomResourceSubresourceScale{
 						SpecReplicasPath:   ".spec.replicas",
 						StatusReplicasPath: ".status.replicas",
-						LabelSelectorPath:  utilpointer.String(".status.selector"),
+						LabelSelectorPath:  ptr.To(".status.selector"),
 					},
 				},
 			}},

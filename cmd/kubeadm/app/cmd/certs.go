@@ -49,6 +49,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
+	staticpodutil "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
 )
 
 var (
@@ -346,7 +347,10 @@ func getInternalCfg(cfgPath string, client kubernetes.Interface, cfg kubeadmapiv
 	// In case the user is not providing a custom config, try to get current config from the cluster.
 	// NB. this operation should not block, because we want to allow certificate renewal also in case of not-working clusters
 	if cfgPath == "" && client != nil {
-		internalcfg, err := configutil.FetchInitConfigurationFromCluster(client, printer, logPrefix, false, false)
+		getNodeRegistration := true
+		getAPIEndpoint := staticpodutil.IsControlPlaneNode()
+		getComponentConfigs := true
+		internalcfg, err := configutil.FetchInitConfigurationFromCluster(client, printer, logPrefix, getNodeRegistration, getAPIEndpoint, getComponentConfigs)
 		if err == nil {
 			printer.Println() // add empty line to separate the FetchInitConfigurationFromCluster output from the command output
 			// certificate renewal or expiration checking doesn't depend on a running cluster, which means the CertificatesDir

@@ -40,6 +40,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -54,7 +55,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -160,13 +160,19 @@ func InitHostPathCSIDriver() storageframework.TestDriver {
 		storageframework.CapReadWriteOncePod:               true,
 		storageframework.CapMultiplePVsSameID:              true,
 		storageframework.CapFSResizeFromSourceNotSupported: true,
-		storageframework.CapVolumeGroupSnapshot:            true,
+		// There are extensive tests that NodeStage / NodePublish are called with -o context in csimock/csi_selinux_mount.go,
+		// but the csi-driver-hostpath can't physically make -o context to appear in the mount table that the CapSELinuxMount tests expect.
+		storageframework.CapSELinuxMount: false,
 
 		// This is needed for the
 		// testsuites/volumelimits.go `should support volume limits`
 		// test. --maxvolumespernode=10 gets
 		// added when patching the deployment.
 		storageframework.CapVolumeLimits: true,
+	}
+	// TODO: It can be removed after the VolumeGroupSnapshot feature is default enabled
+	if os.Getenv("CSI_PROW_ENABLE_GROUP_SNAPSHOT") == "true" {
+		capabilities[storageframework.CapVolumeGroupSnapshot] = true
 	}
 	return initHostPathCSIDriver("csi-hostpath",
 		capabilities,
@@ -218,8 +224,8 @@ func (h *hostpathCSIDriver) GetSnapshotClass(ctx context.Context, config *storag
 	return utils.GenerateSnapshotClassSpec(snapshotter, parameters, ns)
 }
 
-func (h *hostpathCSIDriver) GetVolumeAttributesClass(_ context.Context, config *storageframework.PerTestConfig) *storagev1beta1.VolumeAttributesClass {
-	return storageframework.CopyVolumeAttributesClass(&storagev1beta1.VolumeAttributesClass{
+func (h *hostpathCSIDriver) GetVolumeAttributesClass(_ context.Context, config *storageframework.PerTestConfig) *storagev1.VolumeAttributesClass {
+	return storageframework.CopyVolumeAttributesClass(&storagev1.VolumeAttributesClass{
 		DriverName: config.GetUniqueDriverName(),
 		Parameters: map[string]string{
 			hostpathCSIDriverMutableParameterName: hostpathCSIDriverMutableParameterValue,
@@ -290,6 +296,15 @@ func (h *hostpathCSIDriver) PrepareTest(ctx context.Context, f *framework.Framew
 		DriverContainerName:      "csi-resizer",
 		DriverContainerArguments: []string{"--feature-gates=VolumeAttributesClass=true"},
 	})
+
+	// VGS E2E FeatureGate patches
+	// TODO: These can be removed after the VolumeGroupSnapshot feature is default enabled
+	if os.Getenv("CSI_PROW_ENABLE_GROUP_SNAPSHOT") == "true" {
+		patches = append(patches, utils.PatchCSIOptions{
+			DriverContainerName:      "csi-snapshotter",
+			DriverContainerArguments: []string{"--feature-gates=CSIVolumeGroupSnapshot=true"},
+		})
+	}
 
 	err = utils.CreateFromManifests(ctx, config.Framework, driverNamespace, func(item interface{}) error {
 		for _, o := range patches {

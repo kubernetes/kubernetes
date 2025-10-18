@@ -1367,8 +1367,8 @@ func TestSingleResourceType(t *testing.T) {
 		SingleResourceType().
 		ResourceTypeOrNameArgs(true, "pods,services")
 
-	if b.Do().Err() == nil {
-		t.Errorf("unexpected non-error")
+	if err := b.Do().Err(); !errors.Is(err, ErrMultipleResourceTypes) {
+		t.Errorf("unexpected error: %s", err)
 	}
 }
 

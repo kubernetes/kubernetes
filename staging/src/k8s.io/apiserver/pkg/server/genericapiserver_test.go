@@ -119,11 +119,11 @@ func buildTestOpenAPIDefinition() kubeopenapi.OpenAPIDefinition {
 
 func testGetOpenAPIDefinitions(_ kubeopenapi.ReferenceCallback) map[string]kubeopenapi.OpenAPIDefinition {
 	return map[string]kubeopenapi.OpenAPIDefinition{
-		"k8s.io/apimachinery/pkg/apis/meta/v1.Status":          {},
-		"k8s.io/apimachinery/pkg/apis/meta/v1.APIVersions":     {},
-		"k8s.io/apimachinery/pkg/apis/meta/v1.APIGroupList":    {},
-		"k8s.io/apimachinery/pkg/apis/meta/v1.APIGroup":        buildTestOpenAPIDefinition(),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.APIResourceList": {},
+		"io.k8s.apimachinery.pkg.apis.meta.v1.Status":          {},
+		"io.k8s.apimachinery.pkg.apis.meta.v1.APIVersions":     {},
+		"io.k8s.apimachinery.pkg.apis.meta.v1.APIGroupList":    {},
+		"io.k8s.apimachinery.pkg.apis.meta.v1.APIGroup":        buildTestOpenAPIDefinition(),
+		"io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList": {},
 	}
 }
 

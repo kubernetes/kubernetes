@@ -31,6 +31,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	netutils "k8s.io/utils/net"
 
 	"github.com/stretchr/testify/assert"
@@ -224,7 +225,8 @@ func TestFormDNSSearchFitsLimits(t *testing.T) {
 
 	for i, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
-			dnsSearch := configurer.formDNSSearchFitsLimits(tc.hostNames, pod)
+			logger, _ := ktesting.NewTestContext(t)
+			dnsSearch := configurer.formDNSSearchFitsLimits(logger, tc.hostNames, pod)
 			assert.EqualValues(t, tc.resultSearch, dnsSearch, "test [%d]", i)
 			for _, expectedEvent := range tc.events {
 				expected := fmt.Sprintf("%s %s %s", v1.EventTypeWarning, "DNSConfigForming", expectedEvent)
@@ -283,7 +285,8 @@ func TestFormDNSNameserversFitsLimits(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		appliedNameservers := configurer.formDNSNameserversFitsLimits(tc.nameservers, pod)
+		logger, _ := ktesting.NewTestContext(t)
+		appliedNameservers := configurer.formDNSNameserversFitsLimits(logger, tc.nameservers, pod)
 		assert.EqualValues(t, tc.expectedNameserver, appliedNameservers, tc.desc)
 		event := fetchEvent(recorder)
 		if tc.expectedEvent && len(event) == 0 {
@@ -445,6 +448,7 @@ func TestGetPodDNSType(t *testing.T) {
 }
 
 func TestGetPodDNS(t *testing.T) {
+	ctx := ktesting.Init(t)
 	recorder := record.NewFakeRecorder(20)
 	nodeRef := &v1.ObjectReference{
 		Kind:      "Node",
@@ -471,7 +475,7 @@ func TestGetPodDNS(t *testing.T) {
 	}, 4)
 	for i, pod := range pods {
 		var err error
-		dnsConfig, err := configurer.GetPodDNS(pod)
+		dnsConfig, err := configurer.GetPodDNS(ctx, pod)
 		if err != nil {
 			t.Fatalf("failed to generate container options: %v", err)
 		}
@@ -504,9 +508,10 @@ func TestGetPodDNS(t *testing.T) {
 
 	configurer = NewConfigurer(recorder, nodeRef, nil, testClusterDNS, testClusterDNSDomain, defaultResolvConf)
 	configurer.getHostDNSConfig = fakeGetHostDNSConfigCustom
+
 	for i, pod := range pods {
 		var err error
-		dnsConfig, err := configurer.GetPodDNS(pod)
+		dnsConfig, err := configurer.GetPodDNS(ctx, pod)
 		if err != nil {
 			t.Fatalf("failed to generate container options: %v", err)
 		}
@@ -665,11 +670,12 @@ func TestGetPodDNSCustom(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
+			ctx := ktesting.Init(t)
 			testPod.Spec.HostNetwork = tc.hostnetwork
 			testPod.Spec.DNSConfig = tc.dnsConfig
 			testPod.Spec.DNSPolicy = tc.dnsPolicy
 
-			resDNSConfig, err := configurer.GetPodDNS(testPod)
+			resDNSConfig, err := configurer.GetPodDNS(ctx, testPod)
 			if err != nil {
 				t.Errorf("%s: GetPodDNS(%v), unexpected error: %v", tc.desc, testPod, err)
 			}

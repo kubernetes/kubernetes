@@ -17,6 +17,7 @@ limitations under the License.
 package operationexecutor
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strconv"
@@ -27,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 const (
@@ -46,10 +48,10 @@ func init() {
 }
 
 func TestOperationExecutor_RegisterPlugin_ConcurrentRegisterPlugin(t *testing.T) {
-	ch, quit, oe := setup()
+	tCtx, ch, quit, oe := setup(t)
 	for i := 0; i < numPluginsToRegister; i++ {
 		socketPath := fmt.Sprintf("%s/plugin-%d.sock", socketDir, i)
-		err := oe.RegisterPlugin(socketPath, uuid.NewUUID(), nil /* plugin handlers */, nil /* actual state of the world updator */)
+		err := oe.RegisterPlugin(tCtx, socketPath, uuid.NewUUID(), nil /* plugin handlers */, nil /* actual state of the world updator */)
 		assert.NoError(t, err)
 	}
 	if !isOperationRunConcurrently(ch, quit, numPluginsToRegister) {
@@ -58,15 +60,15 @@ func TestOperationExecutor_RegisterPlugin_ConcurrentRegisterPlugin(t *testing.T)
 }
 
 func TestOperationExecutor_RegisterPlugin_SerialRegisterPlugin(t *testing.T) {
-	ch, quit, oe := setup()
+	tCtx, ch, quit, oe := setup(t)
 	socketPath := fmt.Sprintf("%s/plugin-serial.sock", socketDir)
 
 	// First registration should not fail.
-	err := oe.RegisterPlugin(socketPath, uuid.NewUUID(), nil /* plugin handlers */, nil /* actual state of the world updator */)
+	err := oe.RegisterPlugin(tCtx, socketPath, uuid.NewUUID(), nil /* plugin handlers */, nil /* actual state of the world updator */)
 	assert.NoError(t, err)
 
 	for i := 1; i < numPluginsToRegister; i++ {
-		err := oe.RegisterPlugin(socketPath, uuid.NewUUID(), nil /* plugin handlers */, nil /* actual state of the world updator */)
+		err := oe.RegisterPlugin(tCtx, socketPath, uuid.NewUUID(), nil /* plugin handlers */, nil /* actual state of the world updator */)
 		if err == nil {
 			t.Fatalf("RegisterPlugin did not fail. Expected: <Failed to create operation with name \"%s\". An operation with that name is already executing.> Actual: <no error>", socketPath)
 		}
@@ -78,12 +80,11 @@ func TestOperationExecutor_RegisterPlugin_SerialRegisterPlugin(t *testing.T) {
 }
 
 func TestOperationExecutor_UnregisterPlugin_ConcurrentUnregisterPlugin(t *testing.T) {
-	ch, quit, oe := setup()
+	tCtx, ch, quit, oe := setup(t)
 	for i := 0; i < numPluginsToUnregister; i++ {
 		socketPath := "socket-path" + strconv.Itoa(i)
 		pluginInfo := cache.PluginInfo{SocketPath: socketPath}
-		oe.UnregisterPlugin(pluginInfo, nil /* actual state of the world updator */)
-
+		_ = oe.UnregisterPlugin(tCtx, pluginInfo, nil /* actual state of the world updator */)
 	}
 	if !isOperationRunConcurrently(ch, quit, numPluginsToUnregister) {
 		t.Fatalf("Unable to start unregister operations in Concurrent for plugins")
@@ -91,12 +92,11 @@ func TestOperationExecutor_UnregisterPlugin_ConcurrentUnregisterPlugin(t *testin
 }
 
 func TestOperationExecutor_UnregisterPlugin_SerialUnregisterPlugin(t *testing.T) {
-	ch, quit, oe := setup()
+	tCtx, ch, quit, oe := setup(t)
 	socketPath := fmt.Sprintf("%s/plugin-serial.sock", socketDir)
 	for i := 0; i < numPluginsToUnregister; i++ {
 		pluginInfo := cache.PluginInfo{SocketPath: socketPath}
-		oe.UnregisterPlugin(pluginInfo, nil /* actual state of the world updator */)
-
+		_ = oe.UnregisterPlugin(tCtx, pluginInfo, nil /* actual state of the world updator */)
 	}
 	if !isOperationRunSerially(ch, quit) {
 		t.Fatalf("Unable to start unregister operations serially for plugins")
@@ -116,6 +116,7 @@ func newFakeOperationGenerator(ch chan interface{}, quit chan interface{}) Opera
 }
 
 func (fopg *fakeOperationGenerator) GenerateRegisterPluginFunc(
+	ctx context.Context,
 	socketPath string,
 	pluginUUID types.UID,
 	pluginHandlers map[string]cache.PluginHandler,
@@ -129,6 +130,7 @@ func (fopg *fakeOperationGenerator) GenerateRegisterPluginFunc(
 }
 
 func (fopg *fakeOperationGenerator) GenerateUnregisterPluginFunc(
+	ctx context.Context,
 	pluginInfo cache.PluginInfo,
 	actualStateOfWorldUpdater ActualStateOfWorldUpdater) func() error {
 	opFunc := func() error {
@@ -174,9 +176,10 @@ loop:
 	return false
 }
 
-func setup() (chan interface{}, chan interface{}, OperationExecutor) {
+func setup(t *testing.T) (context.Context, chan interface{}, chan interface{}, OperationExecutor) {
+	tCtx := ktesting.Init(t)
 	ch, quit := make(chan interface{}), make(chan interface{})
-	return ch, quit, NewOperationExecutor(newFakeOperationGenerator(ch, quit))
+	return tCtx, ch, quit, NewOperationExecutor(newFakeOperationGenerator(ch, quit))
 }
 
 // This function starts by writing to ch and blocks on the quit channel

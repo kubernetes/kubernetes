@@ -31,13 +31,16 @@ import (
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
 	"github.com/prometheus/common/model"
-	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	v1 "k8s.io/api/core/v1"
+	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage/cacher"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/testutil"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
@@ -116,7 +119,7 @@ func TestAPIServerMetrics(t *testing.T) {
 	t.Setenv("KUBE_APISERVER_SERVE_REMOVED_APIS_FOR_ONE_RELEASE", "true")
 
 	flags := framework.DefaultTestServerFlags()
-	flags = append(flags, fmt.Sprintf("--runtime-config=%s=true", admissionregistrationv1beta1.SchemeGroupVersion))
+	flags = append(flags, fmt.Sprintf("--runtime-config=%s=true", networkingv1beta1.SchemeGroupVersion))
 	s := kubeapiservertesting.StartTestServerOrDie(t, nil, flags, framework.SharedEtcd())
 	defer s.TearDownFn()
 
@@ -128,7 +131,7 @@ func TestAPIServerMetrics(t *testing.T) {
 	}
 
 	// Make a request to a deprecated API to ensure there's at least one data point
-	if _, err := client.AdmissionregistrationV1beta1().ValidatingAdmissionPolicies().List(context.TODO(), metav1.ListOptions{}); err != nil {
+	if _, err := client.NetworkingV1beta1().ServiceCIDRs().List(context.TODO(), metav1.ListOptions{}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -628,6 +631,7 @@ func sampleExistsInSamples(s *model.Sample, samples model.Samples) bool {
 
 func TestWatchCacheConsistencyCheckMetrics(t *testing.T) {
 	period := time.Second
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DetectCacheInconsistency, true)
 	clean := overrideConsistencyCheckerTimings(period)
 	defer clean()
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
@@ -641,8 +645,8 @@ func TestWatchCacheConsistencyCheckMetrics(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Do at least 2 scrape cycles to require 2 successes
-	delay := 2 * period
+	// wait 3 periods to for 2 scrape cycles (takes 1-1.5 period) and require 2 successes
+	delay := 3 * period
 	time.Sleep(delay)
 	resp, err := rt.RoundTrip(req)
 	if err != nil {
@@ -680,12 +684,9 @@ func TestWatchCacheConsistencyCheckMetrics(t *testing.T) {
 
 func overrideConsistencyCheckerTimings(period time.Duration) func() {
 	tmpPeriod := cacher.ConsistencyCheckPeriod
-	tmpEnabled := cacher.ConsistencyCheckerEnabled
 	cacher.ConsistencyCheckPeriod = period
-	cacher.ConsistencyCheckerEnabled = true
 	return func() {
 		cacher.ConsistencyCheckPeriod = tmpPeriod
-		cacher.ConsistencyCheckerEnabled = tmpEnabled
 	}
 }
 
@@ -721,7 +722,7 @@ type consistencyCheckStatus struct {
 }
 
 func parseMetric(r io.Reader, name string) (*dto.MetricFamily, error) {
-	var parser expfmt.TextParser
+	parser := expfmt.NewTextParser(model.UTF8Validation)
 	mfs, err := parser.TextToMetricFamilies(r)
 	if err != nil {
 		return nil, err

@@ -28,7 +28,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/features"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 var (
@@ -237,7 +237,7 @@ func TestVolumeAttachmentValidation(t *testing.T) {
 			AttachError: &storage.VolumeError{
 				Time:      metav1.Time{},
 				Message:   "hello world",
-				ErrorCode: utilpointer.Int32(7),
+				ErrorCode: ptr.To[int32](7),
 			},
 			DetachError: &storage.VolumeError{
 				Time:    metav1.Time{},
@@ -334,12 +334,12 @@ func TestVolumeAttachmentValidation(t *testing.T) {
 				AttachError: &storage.VolumeError{
 					Time:      metav1.Time{},
 					Message:   "hello world",
-					ErrorCode: utilpointer.Int32(-1),
+					ErrorCode: ptr.To[int32](-1),
 				},
 				DetachError: &storage.VolumeError{
 					Time:      metav1.Time{},
 					Message:   "hello world",
-					ErrorCode: utilpointer.Int32(5),
+					ErrorCode: ptr.To[int32](5),
 				},
 			},
 		},
@@ -1035,7 +1035,7 @@ func TestCSINodeValidation(t *testing.T) {
 				Name:         "io.kubernetes.storage.csi.driver",
 				NodeID:       nodeID,
 				TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
-				Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32(0)},
+				Allocatable:  &storage.VolumeNodeResources{Count: ptr.To[int32](0)},
 			}},
 		},
 	}, {
@@ -1046,7 +1046,7 @@ func TestCSINodeValidation(t *testing.T) {
 				Name:         "io.kubernetes.storage.csi.driver",
 				NodeID:       nodeID,
 				TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
-				Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32(1)},
+				Allocatable:  &storage.VolumeNodeResources{Count: ptr.To[int32](1)},
 			}},
 		},
 	}, {
@@ -1241,7 +1241,7 @@ func TestCSINodeValidation(t *testing.T) {
 				Name:         "io.kubernetes.storage.csi.driver",
 				NodeID:       nodeID,
 				TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
-				Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32(-1)},
+				Allocatable:  &storage.VolumeNodeResources{Count: ptr.To[int32](-1)},
 			}},
 		},
 	}, {
@@ -1270,7 +1270,8 @@ func TestCSINodeUpdateValidation(t *testing.T) {
 	//driverName2 := "1io.kubernetes-storage-2-csi-driver3"
 	//longName := "my-a-b-c-d-c-f-g-h-i-j-k-l-m-n-o-p-q-r-s-t-u-v-w-x-y-z-ABCDEFGHIJKLMNOPQRSTUVWXYZ-driver"
 	nodeID := "nodeA"
-
+	// Test with feature gate disabled
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MutableCSINodeAllocatableCount, false)
 	old := storage.CSINode{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo1"},
 		Spec: storage.CSINodeSpec{
@@ -1282,7 +1283,7 @@ func TestCSINodeUpdateValidation(t *testing.T) {
 				Name:         "io.kubernetes.storage.csi.driver-2",
 				NodeID:       nodeID,
 				TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
-				Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32(20)},
+				Allocatable:  &storage.VolumeNodeResources{Count: ptr.To[int32](20)},
 			}},
 		},
 	}
@@ -1299,7 +1300,7 @@ func TestCSINodeUpdateValidation(t *testing.T) {
 				Name:         "io.kubernetes.storage.csi.driver-2",
 				NodeID:       nodeID,
 				TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
-				Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32(20)},
+				Allocatable:  &storage.VolumeNodeResources{Count: ptr.To[int32](20)},
 			}},
 		},
 	}, {
@@ -1324,12 +1325,12 @@ func TestCSINodeUpdateValidation(t *testing.T) {
 				Name:         "io.kubernetes.storage.csi.driver-2",
 				NodeID:       nodeID,
 				TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
-				Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32(20)},
+				Allocatable:  &storage.VolumeNodeResources{Count: ptr.To[int32](20)},
 			}, {
 				Name:         "io.kubernetes.storage.csi.driver-3",
 				NodeID:       nodeID,
 				TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
-				Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32(30)},
+				Allocatable:  &storage.VolumeNodeResources{Count: ptr.To[int32](30)},
 			}},
 		},
 	}, {
@@ -1344,7 +1345,7 @@ func TestCSINodeUpdateValidation(t *testing.T) {
 				Name:         "io.kubernetes.storage.csi.new-driver",
 				NodeID:       nodeID,
 				TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
-				Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32(30)},
+				Allocatable:  &storage.VolumeNodeResources{Count: ptr.To[int32](30)},
 			}},
 		},
 	}}
@@ -1367,7 +1368,7 @@ func TestCSINodeUpdateValidation(t *testing.T) {
 				Name:         "io.kubernetes.storage.csi.driver-2",
 				NodeID:       nodeID,
 				TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
-				Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32(20)},
+				Allocatable:  &storage.VolumeNodeResources{Count: ptr.To[int32](20)},
 			}},
 		},
 	}, {
@@ -1382,7 +1383,7 @@ func TestCSINodeUpdateValidation(t *testing.T) {
 				Name:         "io.kubernetes.storage.csi.driver-2",
 				NodeID:       nodeID,
 				TopologyKeys: []string{"company.com/zone2"},
-				Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32(20)},
+				Allocatable:  &storage.VolumeNodeResources{Count: ptr.To[int32](20)},
 			}},
 		},
 	}, {
@@ -1393,12 +1394,12 @@ func TestCSINodeUpdateValidation(t *testing.T) {
 				Name:         "io.kubernetes.storage.csi.driver-1",
 				NodeID:       nodeID,
 				TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
-				Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32(10)},
+				Allocatable:  &storage.VolumeNodeResources{Count: ptr.To[int32](10)},
 			}, {
 				Name:         "io.kubernetes.storage.csi.driver-2",
 				NodeID:       nodeID,
 				TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
-				Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32(20)},
+				Allocatable:  &storage.VolumeNodeResources{Count: ptr.To[int32](20)},
 			}},
 		},
 	}, {
@@ -1413,7 +1414,7 @@ func TestCSINodeUpdateValidation(t *testing.T) {
 				Name:         "io.kubernetes.storage.csi.driver-2",
 				NodeID:       nodeID,
 				TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
-				Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32(21)},
+				Allocatable:  &storage.VolumeNodeResources{Count: ptr.To[int32](21)},
 			}},
 		},
 	}, {
@@ -1467,7 +1468,7 @@ func TestCSINodeUpdateValidation(t *testing.T) {
 				Name:         "io.kubernetes.storage.csi.driver-2",
 				NodeID:       nodeID,
 				TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
-				Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32(21)},
+				Allocatable:  &storage.VolumeNodeResources{Count: ptr.To[int32](21)},
 			}},
 		},
 	}}
@@ -1484,7 +1485,7 @@ func TestCSINodeUpdateValidation(t *testing.T) {
 				Name:         "io.kubernetes.storage.csi.driver-2",
 				NodeID:       nodeID,
 				TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
-				Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32(20)},
+				Allocatable:  &storage.VolumeNodeResources{Count: ptr.To[int32](20)},
 			}},
 		},
 	}, {
@@ -1499,7 +1500,7 @@ func TestCSINodeUpdateValidation(t *testing.T) {
 				Name:         "io.kubernetes.storage.csi.driver-2",
 				NodeID:       nodeID,
 				TopologyKeys: []string{"company.com/zone2"},
-				Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32(20)},
+				Allocatable:  &storage.VolumeNodeResources{Count: ptr.To[int32](20)},
 			}},
 		},
 	}}
@@ -2153,7 +2154,7 @@ func TestCSIServiceAccountToken(t *testing.T) {
 		csiDriver: &storage.CSIDriver{
 			ObjectMeta: metav1.ObjectMeta{Name: driverName},
 			Spec: storage.CSIDriverSpec{
-				TokenRequests:     []storage.TokenRequest{{Audience: gcp, ExpirationSeconds: utilpointer.Int64(10)}},
+				TokenRequests:     []storage.TokenRequest{{Audience: gcp, ExpirationSeconds: ptr.To[int64](10)}},
 				RequiresRepublish: &notRequiresRepublish,
 			},
 		},
@@ -2163,7 +2164,7 @@ func TestCSIServiceAccountToken(t *testing.T) {
 		csiDriver: &storage.CSIDriver{
 			ObjectMeta: metav1.ObjectMeta{Name: driverName},
 			Spec: storage.CSIDriverSpec{
-				TokenRequests:     []storage.TokenRequest{{Audience: gcp, ExpirationSeconds: utilpointer.Int64(1<<32 + 1)}},
+				TokenRequests:     []storage.TokenRequest{{Audience: gcp, ExpirationSeconds: ptr.To[int64](1<<32 + 1)}},
 				RequiresRepublish: &notRequiresRepublish,
 			},
 		},
@@ -2213,7 +2214,7 @@ func TestCSIDriverValidationSELinuxMountEnabledDisabled(t *testing.T) {
 	}, {
 		name:              "feature enabled, non-nil value",
 		featureEnabled:    true,
-		seLinuxMountValue: utilpointer.Bool(true),
+		seLinuxMountValue: ptr.To(true),
 		expectError:       false,
 	}, {
 		name:              "feature disabled, nil value",
@@ -2223,7 +2224,7 @@ func TestCSIDriverValidationSELinuxMountEnabledDisabled(t *testing.T) {
 	}, {
 		name:              "feature disabled, non-nil value",
 		featureEnabled:    false,
-		seLinuxMountValue: utilpointer.Bool(true),
+		seLinuxMountValue: ptr.To(true),
 		expectError:       false,
 	}}
 	for _, test := range tests {
@@ -2232,10 +2233,10 @@ func TestCSIDriverValidationSELinuxMountEnabledDisabled(t *testing.T) {
 			csiDriver := &storage.CSIDriver{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: storage.CSIDriverSpec{
-					AttachRequired:    utilpointer.Bool(true),
-					PodInfoOnMount:    utilpointer.Bool(true),
-					RequiresRepublish: utilpointer.Bool(true),
-					StorageCapacity:   utilpointer.Bool(true),
+					AttachRequired:    ptr.To(true),
+					PodInfoOnMount:    ptr.To(true),
+					RequiresRepublish: ptr.To(true),
+					StorageCapacity:   ptr.To(true),
 					SELinuxMount:      test.seLinuxMountValue,
 				},
 			}
@@ -2265,18 +2266,18 @@ func TestCSIDriverValidationSELinuxMountEnabledDisabled(t *testing.T) {
 		name:           "feature enabled, nil->set",
 		featureEnabled: true,
 		oldValue:       nil,
-		newValue:       utilpointer.Bool(true),
+		newValue:       ptr.To(true),
 		expectError:    false,
 	}, {
 		name:           "feature enabled, set->set",
 		featureEnabled: true,
-		oldValue:       utilpointer.Bool(true),
-		newValue:       utilpointer.Bool(true),
+		oldValue:       ptr.To(true),
+		newValue:       ptr.To(true),
 		expectError:    false,
 	}, {
 		name:           "feature enabled, set->nil",
 		featureEnabled: true,
-		oldValue:       utilpointer.Bool(true),
+		oldValue:       ptr.To(true),
 		newValue:       nil,
 		expectError:    true, // populated by defaulting and required when feature is enabled
 	}, {
@@ -2289,18 +2290,18 @@ func TestCSIDriverValidationSELinuxMountEnabledDisabled(t *testing.T) {
 		name:           "feature disabled, nil->set",
 		featureEnabled: false,
 		oldValue:       nil,
-		newValue:       utilpointer.Bool(true),
+		newValue:       ptr.To(true),
 		expectError:    false,
 	}, {
 		name:           "feature disabled, set->set",
 		featureEnabled: false,
-		oldValue:       utilpointer.Bool(true),
-		newValue:       utilpointer.Bool(true),
+		oldValue:       ptr.To(true),
+		newValue:       ptr.To(true),
 		expectError:    false,
 	}, {
 		name:           "feature disabled, set->nil",
 		featureEnabled: false,
-		oldValue:       utilpointer.Bool(true),
+		oldValue:       ptr.To(true),
 		newValue:       nil,
 		expectError:    false,
 	}}
@@ -2310,10 +2311,10 @@ func TestCSIDriverValidationSELinuxMountEnabledDisabled(t *testing.T) {
 			oldCSIDriver := &storage.CSIDriver{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 				Spec: storage.CSIDriverSpec{
-					AttachRequired:    utilpointer.Bool(true),
-					PodInfoOnMount:    utilpointer.Bool(true),
-					RequiresRepublish: utilpointer.Bool(true),
-					StorageCapacity:   utilpointer.Bool(true),
+					AttachRequired:    ptr.To(true),
+					PodInfoOnMount:    ptr.To(true),
+					RequiresRepublish: ptr.To(true),
+					StorageCapacity:   ptr.To(true),
 					SELinuxMount:      test.oldValue,
 				},
 			}

@@ -25,6 +25,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/tools/metrics"
+	"k8s.io/utils/ptr"
 )
 
 type mockExpiryGauge struct {
@@ -33,10 +34,6 @@ type mockExpiryGauge struct {
 
 func (m *mockExpiryGauge) Set(t *time.Time) {
 	m.v = t
-}
-
-func ptr(t time.Time) *time.Time {
-	return &t
 }
 
 func TestCertificateExpirationTracker(t *testing.T) {
@@ -60,25 +57,25 @@ func TestCertificateExpirationTracker(t *testing.T) {
 			desc: "ttl for one authenticator",
 			auth: firstAuthenticator,
 			time: now.Add(time.Minute * 10),
-			want: ptr(now.Add(time.Minute * 10)),
+			want: ptr.To(now.Add(time.Minute * 10)),
 		},
 		{
 			desc: "second authenticator shorter ttl",
 			auth: secondAuthenticator,
 			time: now.Add(time.Minute * 5),
-			want: ptr(now.Add(time.Minute * 5)),
+			want: ptr.To(now.Add(time.Minute * 5)),
 		},
 		{
 			desc: "update shorter to be longer",
 			auth: secondAuthenticator,
 			time: now.Add(time.Minute * 15),
-			want: ptr(now.Add(time.Minute * 10)),
+			want: ptr.To(now.Add(time.Minute * 10)),
 		},
 		{
 			desc: "update shorter to be zero time",
 			auth: firstAuthenticator,
 			time: time.Time{},
-			want: ptr(now.Add(time.Minute * 15)),
+			want: ptr.To(now.Add(time.Minute * 15)),
 		},
 		{
 			desc: "update last to be zero time records nil",
@@ -194,8 +191,8 @@ func TestCallsMetric(t *testing.T) {
 	callsMetricComparer := cmp.Comparer(func(a, b mockCallsMetric) bool {
 		return a.exitCode == b.exitCode && a.errorType == b.errorType
 	})
-	actuallCallsMetrics := callsMetricCounter.calls
-	if diff := cmp.Diff(wantCallsMetrics, actuallCallsMetrics, callsMetricComparer); diff != "" {
+	actualCallsMetrics := callsMetricCounter.calls
+	if diff := cmp.Diff(wantCallsMetrics, actualCallsMetrics, callsMetricComparer); diff != "" {
 		t.Fatalf("got unexpected metrics calls; -want, +got:\n%s", diff)
 	}
 }

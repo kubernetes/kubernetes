@@ -25,6 +25,7 @@ import (
 	"unsafe"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
+
 	"k8s.io/klog/v2"
 )
 
@@ -136,7 +137,7 @@ type processor struct {
 	NodeID   int
 }
 
-func processorInfo(relationShip relationType) (int, int, []cadvisorapi.Node, error) {
+func processorInfo(logger klog.Logger, relationShip relationType) (int, int, []cadvisorapi.Node, error) {
 	// Call once to get the length of data to return
 	var returnLength uint32 = 0
 	r1, _, err := procGetLogicalProcessorInformationEx.Call(
@@ -161,10 +162,10 @@ func processorInfo(relationShip relationType) (int, int, []cadvisorapi.Node, err
 		return 0, 0, nil, fmt.Errorf("call to GetLogicalProcessorInformationEx failed: %v", err)
 	}
 
-	return convertWinApiToCadvisorApi(buffer)
+	return convertWinApiToCadvisorApi(logger, buffer)
 }
 
-func convertWinApiToCadvisorApi(buffer []byte) (int, int, []cadvisorapi.Node, error) {
+func convertWinApiToCadvisorApi(logger klog.Logger, buffer []byte) (int, int, []cadvisorapi.Node, error) {
 	logicalProcessors := make(map[int]*processor)
 	numofSockets := 0
 	numOfcores := 0
@@ -233,7 +234,7 @@ func convertWinApiToCadvisorApi(buffer []byte) (int, int, []cadvisorapi.Node, er
 			}
 
 		default:
-			klog.V(4).Infof("Not using Windows CPU relationship type: %d", info.Relationship)
+			logger.V(4).Info("Not using Windows CPU relationship type", "relationship", info.Relationship)
 		}
 
 		// Move the offset to the next SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX struct

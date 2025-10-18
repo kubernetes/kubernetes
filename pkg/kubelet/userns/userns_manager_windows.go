@@ -17,31 +17,34 @@ limitations under the License.
 package userns
 
 import (
+	"context"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/klog/v2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 type UsernsManager struct{}
 
-func MakeUserNsManager(kl userNsPodsManager) (*UsernsManager, error) {
+func MakeUserNsManager(klog.Logger, userNsPodsManager, *int64) (*UsernsManager, error) {
 	return nil, nil
 }
 
 // Release releases the user namespace allocated to the specified pod.
-func (m *UsernsManager) Release(podUID types.UID) {
+func (m *UsernsManager) Release(klog.Logger, types.UID) {
 	return
 }
 
-func (m *UsernsManager) GetOrCreateUserNamespaceMappings(pod *v1.Pod, runtimeHandler string) (*runtimeapi.UserNamespace, error) {
+func (m *UsernsManager) GetOrCreateUserNamespaceMappings(context.Context, *v1.Pod, string) (*runtimeapi.UserNamespace, error) {
 	return nil, nil
 }
 
 // CleanupOrphanedPodUsernsAllocations reconciliates the state of user namespace
 // allocations with the pods actually running. It frees any user namespace
 // allocation for orphaned pods.
-func (m *UsernsManager) CleanupOrphanedPodUsernsAllocations(pods []*v1.Pod, runningPods []*kubecontainer.Pod) error {
+func (m *UsernsManager) CleanupOrphanedPodUsernsAllocations(context.Context, []*v1.Pod, []*kubecontainer.Pod) error {
 	return nil
 }
 

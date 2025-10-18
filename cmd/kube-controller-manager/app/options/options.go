@@ -21,13 +21,16 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/version"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/util/compatibility"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	clientgofeaturegate "k8s.io/client-go/features"
 	clientset "k8s.io/client-go/kubernetes"
 	clientgokubescheme "k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
@@ -38,6 +41,7 @@ import (
 	cpoptions "k8s.io/cloud-provider/options"
 	cliflag "k8s.io/component-base/cli/flag"
 	basecompatibility "k8s.io/component-base/compatibility"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/logs"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics"
@@ -104,6 +108,8 @@ type KubeControllerManagerOptions struct {
 
 	Master                      string
 	ShowHiddenMetricsForVersion string
+
+	ControllerShutdownTimeout time.Duration
 
 	// ComponentGlobalsRegistry is the registry where the effective versions and feature gates for all components are stored.
 	ComponentGlobalsRegistry basecompatibility.ComponentGlobalsRegistry
@@ -235,6 +241,8 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 	s.GarbageCollectorController.GCIgnoredResources = gcIgnoredResources
 	s.Generic.LeaderElection.ResourceName = "kube-controller-manager"
 	s.Generic.LeaderElection.ResourceNamespace = "kube-system"
+
+	s.ControllerShutdownTimeout = 10 * time.Second
 	return &s, nil
 }
 
@@ -294,6 +302,16 @@ func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledBy
 	fs := fss.FlagSet("misc")
 	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig).")
 	fs.StringVar(&s.Generic.ClientConnection.Kubeconfig, "kubeconfig", s.Generic.ClientConnection.Kubeconfig, "Path to kubeconfig file with authorization and master location information (the master location can be overridden by the master flag).")
+
+	fss.FlagSet("generic").DurationVar(&s.ControllerShutdownTimeout, "controller-shutdown-timeout",
+		s.ControllerShutdownTimeout, "Time to wait for the controllers to shut down before terminating the executable")
+
+	if !utilfeature.DefaultFeatureGate.Enabled(featuregate.Feature(clientgofeaturegate.WatchListClient)) {
+		ver := version.MustParse("1.34")
+		if err := utilfeature.DefaultMutableFeatureGate.OverrideDefaultAtVersion(featuregate.Feature(clientgofeaturegate.WatchListClient), true, ver); err != nil {
+			panic(fmt.Sprintf("unable to set %s feature gate, err: %v", clientgofeaturegate.WatchListClient, err))
+		}
+	}
 
 	s.ComponentGlobalsRegistry.AddFlags(fss.FlagSet("generic"))
 
@@ -403,6 +421,7 @@ func (s *KubeControllerManagerOptions) ApplyTo(c *kubecontrollerconfig.Config, a
 			return err
 		}
 	}
+	c.ControllerShutdownTimeout = s.ControllerShutdownTimeout
 	return nil
 }
 
@@ -492,11 +511,12 @@ func (s KubeControllerManagerOptions) Config(ctx context.Context, allControllers
 	eventRecorder := eventBroadcaster.NewRecorder(clientgokubescheme.Scheme, v1.EventSource{Component: KubeControllerManagerUserAgent})
 
 	c := &kubecontrollerconfig.Config{
-		Client:                   client,
-		Kubeconfig:               kubeconfig,
-		EventBroadcaster:         eventBroadcaster,
-		EventRecorder:            eventRecorder,
-		ComponentGlobalsRegistry: s.ComponentGlobalsRegistry,
+		Client:                    client,
+		Kubeconfig:                kubeconfig,
+		EventBroadcaster:          eventBroadcaster,
+		EventRecorder:             eventRecorder,
+		ControllerShutdownTimeout: s.ControllerShutdownTimeout,
+		ComponentGlobalsRegistry:  s.ComponentGlobalsRegistry,
 	}
 	if err := s.ApplyTo(c, allControllers, disabledByDefaultControllers, controllerAliases); err != nil {
 		return nil, err

@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/apitesting/roundtrip"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	resourcevalidation "k8s.io/kubernetes/pkg/apis/resource/validation"
 )
 
 // FIXME: Automatically finds all group/versions supporting declarative validation, or add
@@ -32,6 +33,12 @@ func TestVersionedValidationByFuzzing(t *testing.T) {
 	typesWithDeclarativeValidation := []schema.GroupVersion{
 		// Registered group versions for versioned validation fuzz testing:
 		{Group: "", Version: "v1"},
+		{Group: "certificates.k8s.io", Version: "v1"},
+		{Group: "certificates.k8s.io", Version: "v1alpha1"},
+		{Group: "certificates.k8s.io", Version: "v1beta1"},
+		{Group: "resource.k8s.io", Version: "v1beta1"},
+		{Group: "resource.k8s.io", Version: "v1beta2"},
+		{Group: "resource.k8s.io", Version: "v1"},
 	}
 
 	for _, gv := range typesWithDeclarativeValidation {
@@ -44,14 +51,18 @@ func TestVersionedValidationByFuzzing(t *testing.T) {
 						t.Fatalf("could not create a %v: %s", kind, err)
 					}
 					f.Fill(obj)
-					VerifyVersionedValidationEquivalence(t, obj, nil)
+
+					var opts []ValidationTestConfig
+					opts = append(opts, WithNormalizationRules(resourcevalidation.ResourceNormalizationRules...))
+
+					VerifyVersionedValidationEquivalence(t, obj, nil, opts...)
 
 					old, err := legacyscheme.Scheme.New(gv.WithKind(kind))
 					if err != nil {
 						t.Fatalf("could not create a %v: %s", kind, err)
 					}
 					f.Fill(old)
-					VerifyVersionedValidationEquivalence(t, obj, old)
+					VerifyVersionedValidationEquivalence(t, obj, old, opts...)
 				}
 			}
 		})

@@ -352,7 +352,7 @@ func TestStreamExitsAfterConnectionIsClosed(t *testing.T) {
 
 	errorChan := make(chan error)
 	go func() {
-		errorChan <- streamer.stream(conn)
+		errorChan <- streamer.stream(conn, nil)
 	}()
 
 	// Wait until stream goroutine starts.

@@ -36,6 +36,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -44,6 +45,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/features"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -975,6 +977,8 @@ var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 				framework.ExpectNoError(err)
 				gomega.Expect(livePC.Value).To(gomega.Equal(pc.Value))
 				gomega.Expect(livePC.Description).To(gomega.Equal(newDesc))
+				gomega.Expect(livePC).To(apimachineryutils.HaveValidResourceVersion())
+				gomega.Expect(resourceversion.CompareResourceVersion(pc.ResourceVersion, livePC.ResourceVersion)).To(gomega.BeNumerically("==", -1), "changed object should have a larger resource version")
 			}
 		})
 	})

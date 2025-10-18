@@ -29,10 +29,24 @@ import (
 
 // ValidatingAdmissionPolicyBindingApplyConfiguration represents a declarative configuration of the ValidatingAdmissionPolicyBinding type for use
 // with apply.
+//
+// ValidatingAdmissionPolicyBinding binds the ValidatingAdmissionPolicy with paramerized resources.
+// ValidatingAdmissionPolicyBinding and parameter CRDs together define how cluster administrators configure policies for clusters.
+//
+// For a given admission request, each binding will cause its policy to be
+// evaluated N times, where N is 1 for policies/bindings that don't use
+// params, otherwise N is the number of parameters selected by the binding.
+//
+// The CEL expressions of a policy must have a computed CEL cost below the maximum
+// CEL budget. Each evaluation of the policy is given an independent CEL cost budget.
+// Adding/removing policies, bindings, or params can not affect whether a
+// given (policy, binding, param) combination is within its own CEL budget.
 type ValidatingAdmissionPolicyBindingApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *ValidatingAdmissionPolicyBindingSpecApplyConfiguration `json:"spec,omitempty"`
+	// Specification of the desired behavior of the ValidatingAdmissionPolicyBinding.
+	Spec *ValidatingAdmissionPolicyBindingSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
 // ValidatingAdmissionPolicyBinding constructs a declarative configuration of the ValidatingAdmissionPolicyBinding type for use with
@@ -45,29 +59,14 @@ func ValidatingAdmissionPolicyBinding(name string) *ValidatingAdmissionPolicyBin
 	return b
 }
 
-// ExtractValidatingAdmissionPolicyBinding extracts the applied configuration owned by fieldManager from
-// validatingAdmissionPolicyBinding. If no managedFields are found in validatingAdmissionPolicyBinding for fieldManager, a
-// ValidatingAdmissionPolicyBindingApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractValidatingAdmissionPolicyBindingFrom extracts the applied configuration owned by fieldManager from
+// validatingAdmissionPolicyBinding for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // validatingAdmissionPolicyBinding must be a unmodified ValidatingAdmissionPolicyBinding API object that was retrieved from the Kubernetes API.
-// ExtractValidatingAdmissionPolicyBinding provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractValidatingAdmissionPolicyBindingFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
-func ExtractValidatingAdmissionPolicyBinding(validatingAdmissionPolicyBinding *admissionregistrationv1beta1.ValidatingAdmissionPolicyBinding, fieldManager string) (*ValidatingAdmissionPolicyBindingApplyConfiguration, error) {
-	return extractValidatingAdmissionPolicyBinding(validatingAdmissionPolicyBinding, fieldManager, "")
-}
-
-// ExtractValidatingAdmissionPolicyBindingStatus is the same as ExtractValidatingAdmissionPolicyBinding except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractValidatingAdmissionPolicyBindingStatus(validatingAdmissionPolicyBinding *admissionregistrationv1beta1.ValidatingAdmissionPolicyBinding, fieldManager string) (*ValidatingAdmissionPolicyBindingApplyConfiguration, error) {
-	return extractValidatingAdmissionPolicyBinding(validatingAdmissionPolicyBinding, fieldManager, "status")
-}
-
-func extractValidatingAdmissionPolicyBinding(validatingAdmissionPolicyBinding *admissionregistrationv1beta1.ValidatingAdmissionPolicyBinding, fieldManager string, subresource string) (*ValidatingAdmissionPolicyBindingApplyConfiguration, error) {
+func ExtractValidatingAdmissionPolicyBindingFrom(validatingAdmissionPolicyBinding *admissionregistrationv1beta1.ValidatingAdmissionPolicyBinding, fieldManager string, subresource string) (*ValidatingAdmissionPolicyBindingApplyConfiguration, error) {
 	b := &ValidatingAdmissionPolicyBindingApplyConfiguration{}
 	err := managedfields.ExtractInto(validatingAdmissionPolicyBinding, internal.Parser().Type("io.k8s.api.admissionregistration.v1beta1.ValidatingAdmissionPolicyBinding"), fieldManager, b, subresource)
 	if err != nil {
@@ -79,6 +78,21 @@ func extractValidatingAdmissionPolicyBinding(validatingAdmissionPolicyBinding *a
 	b.WithAPIVersion("admissionregistration.k8s.io/v1beta1")
 	return b, nil
 }
+
+// ExtractValidatingAdmissionPolicyBinding extracts the applied configuration owned by fieldManager from
+// validatingAdmissionPolicyBinding. If no managedFields are found in validatingAdmissionPolicyBinding for fieldManager, a
+// ValidatingAdmissionPolicyBindingApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// validatingAdmissionPolicyBinding must be a unmodified ValidatingAdmissionPolicyBinding API object that was retrieved from the Kubernetes API.
+// ExtractValidatingAdmissionPolicyBinding provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractValidatingAdmissionPolicyBinding(validatingAdmissionPolicyBinding *admissionregistrationv1beta1.ValidatingAdmissionPolicyBinding, fieldManager string) (*ValidatingAdmissionPolicyBindingApplyConfiguration, error) {
+	return ExtractValidatingAdmissionPolicyBindingFrom(validatingAdmissionPolicyBinding, fieldManager, "")
+}
+
 func (b ValidatingAdmissionPolicyBindingApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

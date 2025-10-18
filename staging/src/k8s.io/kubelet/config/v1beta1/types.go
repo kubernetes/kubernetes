@@ -888,7 +888,6 @@ type KubeletConfiguration struct {
 	// Tracing specifies the versioned configuration for OpenTelemetry tracing clients.
 	// See https://kep.k8s.io/2832 for more details.
 	// Default: nil
-	// +featureGate=KubeletTracing
 	// +optional
 	Tracing *tracingapi.TracingConfiguration `json:"tracing,omitempty"`
 
@@ -916,10 +915,10 @@ type KubeletConfiguration struct {
 	ImageServiceEndpoint string `json:"imageServiceEndpoint,omitempty"`
 
 	// FailCgroupV1 prevents the kubelet from starting on hosts
-	// that use cgroup v1. By default, this is set to 'false', meaning
-	// the kubelet is allowed to start on cgroup v1 hosts unless this
-	// option is explicitly enabled.
-	// Default: false
+	// that use cgroup v1. By default, this is set to 'true', meaning
+	// the kubelet will not start on cgroup v1 hosts unless this
+	// option is explicitly disabled.
+	// Default: true
 	// +optional
 	FailCgroupV1 *bool `json:"failCgroupV1,omitempty"`
 

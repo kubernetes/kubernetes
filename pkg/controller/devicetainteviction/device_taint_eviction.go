@@ -28,7 +28,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1beta1"
+	resourceapi "k8s.io/api/resource/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,9 +36,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
+	resourceinformers "k8s.io/client-go/informers/resource/v1"
 	resourcealphainformers "k8s.io/client-go/informers/resource/v1alpha3"
-	resourceinformers "k8s.io/client-go/informers/resource/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -51,6 +52,7 @@ import (
 	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/devicetainteviction/metrics"
 	"k8s.io/kubernetes/pkg/controller/tainteviction"
+	"k8s.io/kubernetes/pkg/features"
 	utilpod "k8s.io/kubernetes/pkg/util/pod"
 )
 
@@ -165,11 +167,7 @@ func (p pool) getTaintedDevices() []taintedDevice {
 			continue
 		}
 		for _, device := range slice.Spec.Devices {
-			if device.Basic == nil {
-				// Unknown device type, not supported.
-				continue
-			}
-			for _, taint := range device.Basic.Taints {
+			for _, taint := range device.Taints {
 				if taint.Effect != resourceapi.DeviceTaintEffectNoExecute {
 					continue
 				}
@@ -186,18 +184,14 @@ func (p pool) getTaintedDevices() []taintedDevice {
 }
 
 // getDevice looks up one device by name. Out-dated slices are ignored.
-func (p pool) getDevice(deviceName string) *resourceapi.BasicDevice {
+func (p pool) getDevice(deviceName string) *resourceapi.Device {
 	for slice := range p.slices {
 		if slice.Spec.Pool.Generation != p.maxGeneration {
 			continue
 		}
-		for _, device := range slice.Spec.Devices {
-			if device.Basic == nil {
-				// Unknown device type, not supported.
-				continue
-			}
-			if device.Name == deviceName {
-				return device.Basic
+		for i := range slice.Spec.Devices {
+			if slice.Spec.Devices[i].Name == deviceName {
+				return &slice.Spec.Devices[i]
 			}
 		}
 	}
@@ -466,11 +460,12 @@ func (tc *Controller) Run(ctx context.Context) error {
 	tc.haveSynced = append(tc.haveSynced, podHandler.HasSynced)
 
 	opts := resourceslicetracker.Options{
-		EnableDeviceTaints: true,
-		SliceInformer:      tc.sliceInformer,
-		TaintInformer:      tc.taintInformer,
-		ClassInformer:      tc.classInformer,
-		KubeClient:         tc.client,
+		EnableDeviceTaints:       true,
+		EnableConsumableCapacity: utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity),
+		SliceInformer:            tc.sliceInformer,
+		TaintInformer:            tc.taintInformer,
+		ClassInformer:            tc.classInformer,
+		KubeClient:               tc.client,
 	}
 	sliceTracker, err := resourceslicetracker.StartTracker(ctx, opts)
 	if err != nil {
@@ -562,7 +557,7 @@ func (tc *Controller) handleClaimChange(oldClaim, newClaim *resourceapi.Resource
 		}
 		tc.allocatedClaims[name] = allocatedClaim{
 			ResourceClaim: claim,
-			evictionTime:  tc.evictionTime(claim.Status.Allocation),
+			evictionTime:  tc.evictionTime(claim),
 		}
 		tc.handlePods(claim)
 		return
@@ -591,7 +586,7 @@ func (tc *Controller) handleClaimChange(oldClaim, newClaim *resourceapi.Resource
 	if oldClaim.Status.Allocation == nil && newClaim.Status.Allocation != nil {
 		tc.allocatedClaims[name] = allocatedClaim{
 			ResourceClaim: claim,
-			evictionTime:  tc.evictionTime(claim.Status.Allocation),
+			evictionTime:  tc.evictionTime(claim),
 		}
 		syncBothClaims()
 		return
@@ -620,12 +615,14 @@ func (tc *Controller) handleClaimChange(oldClaim, newClaim *resourceapi.Resource
 }
 
 // evictionTime returns the earliest TimeAdded of any NoExecute taint in any allocated device
-// unless that taint is tolerated, nil if none.
-func (tc *Controller) evictionTime(allocation *resourceapi.AllocationResult) *metav1.Time {
+// unless that taint is tolerated, nil if none. May only be called for allocated claims.
+func (tc *Controller) evictionTime(claim *resourceapi.ResourceClaim) *metav1.Time {
 	var evictionTime *metav1.Time
 
+	allocation := claim.Status.Allocation
 	for _, allocatedDevice := range allocation.Devices.Results {
-		device := tc.pools[poolID{driverName: allocatedDevice.Driver, poolName: allocatedDevice.Pool}].getDevice(allocatedDevice.Device)
+		id := poolID{driverName: allocatedDevice.Driver, poolName: allocatedDevice.Pool}
+		device := tc.pools[id].getDevice(allocatedDevice.Device)
 		if device == nil {
 			// Unknown device? Can't be tainted...
 			continue
@@ -663,10 +660,12 @@ func (tc *Controller) evictionTime(allocation *resourceapi.AllocationResult) *me
 
 			if evictionTime == nil {
 				evictionTime = newEvictionTime
+				tc.logger.V(5).Info("Claim is affected by device taint", "claim", klog.KObj(claim), "device", allocatedDevice, "taint", taint, "evictionTime", evictionTime)
 				continue
 			}
 			if newEvictionTime != nil && newEvictionTime.Before(evictionTime) {
 				evictionTime = newEvictionTime
+				tc.logger.V(5).Info("Claim is affected by device taint", "claim", klog.KObj(claim), "device", allocatedDevice, "taint", taint, "evictionTime", evictionTime)
 			}
 		}
 	}
@@ -750,7 +749,7 @@ func (tc *Controller) handleSliceChange(oldSlice, newSlice *resourceapi.Resource
 		if !usesDevice(claim.Status.Allocation, poolID, modifiedDevices) {
 			continue
 		}
-		newEvictionTime := tc.evictionTime(claim.ResourceClaim.Status.Allocation)
+		newEvictionTime := tc.evictionTime(claim.ResourceClaim)
 		if newEvictionTime.Equal(claim.evictionTime) {
 			// No change.
 			continue
@@ -868,6 +867,7 @@ func (tc *Controller) handlePod(pod *v1.Pod) {
 		if evictionTime == nil || allocatedClaim.evictionTime.Before(evictionTime) {
 			evictionTime = allocatedClaim.evictionTime
 		}
+		tc.logger.V(3).Info("Going to evict pod", "evictionTime", *evictionTime, "claim", klog.KObj(allocatedClaim))
 	}
 
 	podRef := newObject(pod)

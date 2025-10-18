@@ -31,6 +31,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
+	"k8s.io/utils/ptr"
 )
 
 // windowsNetworkStatsProvider creates an interface that allows for testing the logic without needing to create a container
@@ -51,12 +52,11 @@ func (s networkStats) GetHNSEndpointStats(endpointName string) (*hnslib.HNSEndpo
 }
 
 // listContainerNetworkStats returns the network stats of all the running containers.
-func (p *criStatsProvider) listContainerNetworkStats() (map[string]*statsapi.NetworkStats, error) {
+func (p *criStatsProvider) listContainerNetworkStats(logger klog.Logger) (map[string]*statsapi.NetworkStats, error) {
 	networkStatsProvider := newNetworkStatsProvider(p)
-
 	endpoints, err := networkStatsProvider.HNSListEndpointRequest()
 	if err != nil {
-		klog.ErrorS(err, "Failed to fetch current HNS endpoints")
+		logger.Error(err, "Failed to fetch current HNS endpoints")
 		return nil, err
 	}
 
@@ -64,7 +64,7 @@ func (p *criStatsProvider) listContainerNetworkStats() (map[string]*statsapi.Net
 	for _, endpoint := range endpoints {
 		endpointStats, err := networkStatsProvider.GetHNSEndpointStats(endpoint.Id)
 		if err != nil {
-			klog.V(2).InfoS("Failed to fetch statistics for endpoint, continue to get stats for other endpoints", "endpointId", endpoint.Id, "containers", endpoint.SharedContainers)
+			logger.V(2).Info("Failed to fetch statistics for endpoint, continue to get stats for other endpoints", "endpointId", endpoint.Id, "containers", endpoint.SharedContainers)
 			continue
 		}
 
@@ -83,7 +83,7 @@ func (p *criStatsProvider) listContainerNetworkStats() (map[string]*statsapi.Net
 	return networkStats, nil
 }
 
-func (p *criStatsProvider) addCRIPodContainerStats(criSandboxStat *runtimeapi.PodSandboxStats,
+func (p *criStatsProvider) addCRIPodContainerStats(logger klog.Logger, criSandboxStat *runtimeapi.PodSandboxStats,
 	ps *statsapi.PodStats, fsIDtoInfo map[string]*cadvisorapiv2.FsInfo,
 	containerMap map[string]*runtimeapi.Container,
 	podSandbox *runtimeapi.PodSandbox,
@@ -95,7 +95,7 @@ func (p *criStatsProvider) addCRIPodContainerStats(criSandboxStat *runtimeapi.Po
 			continue
 		}
 		// Fill available stats for full set of required pod stats
-		cs, err := p.makeWinContainerStats(criContainerStat, container, rootFsInfo, fsIDtoInfo, podSandbox.GetMetadata())
+		cs, err := p.makeWinContainerStats(logger, criContainerStat, container, rootFsInfo, fsIDtoInfo, podSandbox.GetMetadata())
 		if err != nil {
 			return fmt.Errorf("make container stats: %w", err)
 
@@ -107,6 +107,7 @@ func (p *criStatsProvider) addCRIPodContainerStats(criSandboxStat *runtimeapi.Po
 }
 
 func (p *criStatsProvider) makeWinContainerStats(
+	logger klog.Logger,
 	stats *runtimeapi.WindowsContainerStats,
 	container *runtimeapi.Container,
 	rootFsInfo *cadvisorapiv2.FsInfo,
@@ -131,8 +132,8 @@ func (p *criStatsProvider) makeWinContainerStats(
 		}
 	} else {
 		result.CPU.Time = metav1.NewTime(time.Unix(0, time.Now().UnixNano()))
-		result.CPU.UsageCoreNanoSeconds = uint64Ptr(0)
-		result.CPU.UsageNanoCores = uint64Ptr(0)
+		result.CPU.UsageCoreNanoSeconds = ptr.To[uint64](0)
+		result.CPU.UsageNanoCores = ptr.To[uint64](0)
 	}
 	if stats.Memory != nil {
 		result.Memory.Time = metav1.NewTime(time.Unix(0, stats.Memory.Timestamp))
@@ -147,9 +148,9 @@ func (p *criStatsProvider) makeWinContainerStats(
 		}
 	} else {
 		result.Memory.Time = metav1.NewTime(time.Unix(0, time.Now().UnixNano()))
-		result.Memory.WorkingSetBytes = uint64Ptr(0)
-		result.Memory.AvailableBytes = uint64Ptr(0)
-		result.Memory.PageFaults = uint64Ptr(0)
+		result.Memory.WorkingSetBytes = ptr.To[uint64](0)
+		result.Memory.AvailableBytes = ptr.To[uint64](0)
+		result.Memory.PageFaults = ptr.To[uint64](0)
 	}
 	if stats.WritableLayer != nil {
 		result.Rootfs.Time = metav1.NewTime(time.Unix(0, stats.WritableLayer.Timestamp))
@@ -162,7 +163,7 @@ func (p *criStatsProvider) makeWinContainerStats(
 	if fsID != nil {
 		imageFsInfo, found := fsIDtoInfo[fsID.Mountpoint]
 		if !found {
-			imageFsInfo, err = p.getFsInfo(fsID)
+			imageFsInfo, err = p.getFsInfo(logger, fsID)
 			if err != nil {
 				return nil, fmt.Errorf("get filesystem info: %w", err)
 			}
@@ -182,7 +183,7 @@ func (p *criStatsProvider) makeWinContainerStats(
 	// officially support in-place upgrade anyway.
 	result.Logs, err = p.hostStatsProvider.getPodContainerLogStats(meta.GetNamespace(), meta.GetName(), types.UID(meta.GetUid()), container.GetMetadata().GetName(), rootFsInfo)
 	if err != nil {
-		klog.ErrorS(err, "Unable to fetch container log stats", "containerName", container.GetMetadata().GetName())
+		logger.Error(err, "Unable to fetch container log stats", "containerName", container.GetMetadata().GetName())
 	}
 	return result, nil
 }

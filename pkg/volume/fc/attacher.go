@@ -75,7 +75,9 @@ func (attacher *fcAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName ty
 	return volumesAttachedCheck, nil
 }
 
-func (plugin *fcPlugin) VerifyExhaustedResource(spec *volume.Spec, nodeName types.NodeName) {}
+func (plugin *fcPlugin) VerifyExhaustedResource(spec *volume.Spec) bool {
+	return false
+}
 
 func (attacher *fcAttacher) WaitForAttach(spec *volume.Spec, devicePath string, _ *v1.Pod, timeout time.Duration) (string, error) {
 	mounter, err := volumeSpecToMounter(spec, attacher.host)

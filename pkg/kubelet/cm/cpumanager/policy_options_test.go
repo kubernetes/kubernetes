@@ -107,13 +107,13 @@ func TestPolicyOptionsAvailable(t *testing.T) {
 			expectedAvailable: false,
 		},
 		{
-			option:            StrictCPUReservationOption,
+			option:            PreferAlignByUnCoreCacheOption,
 			featureGate:       pkgfeatures.CPUManagerPolicyBetaOptions,
 			featureGateEnable: false,
 			expectedAvailable: false,
 		},
 		{
-			option:            StrictCPUReservationOption,
+			option:            PreferAlignByUnCoreCacheOption,
 			featureGate:       pkgfeatures.CPUManagerPolicyBetaOptions,
 			featureGateEnable: true,
 			expectedAvailable: true,
@@ -134,11 +134,14 @@ func TestPolicyOptionsAvailable(t *testing.T) {
 func TestPolicyOptionsAlwaysAvailableOnceGA(t *testing.T) {
 	options := []string{
 		FullPCPUsOnlyOption,
+		StrictCPUReservationOption,
 	}
 	for _, option := range options {
 		t.Run(option, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.CPUManagerPolicyAlphaOptions, false)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.CPUManagerPolicyBetaOptions, false)
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				pkgfeatures.CPUManagerPolicyAlphaOptions: false,
+				pkgfeatures.CPUManagerPolicyBetaOptions:  false,
+			})
 			if err := CheckPolicyOptionAvailable(option); err != nil {
 				t.Errorf("option %q should be available even with all featuregate disabled", option)
 			}
@@ -241,11 +244,56 @@ func TestPolicyOptionsCompatibility(t *testing.T) {
 			expectedErr: false,
 		},
 		{
+			description: "PreferAlignByUnCoreCache and StrictCPUReservation set to true",
+			featureGate: pkgfeatures.CPUManagerPolicyAlphaOptions,
+			policyOptions: map[string]string{
+				PreferAlignByUnCoreCacheOption: "true",
+				StrictCPUReservationOption:     "true",
+			},
+			expectedErr: false,
+		},
+		{
+			description: "PreferAlignByUnCoreCache and FullPCPUsOnly set to true",
+			featureGate: pkgfeatures.CPUManagerPolicyAlphaOptions,
+			policyOptions: map[string]string{
+				PreferAlignByUnCoreCacheOption: "true",
+				FullPCPUsOnlyOption:            "true",
+			},
+			expectedErr: false,
+		},
+		{
+			description: "PreferAlignByUnCoreCache and AlignBySocket set to true",
+			featureGate: pkgfeatures.CPUManagerPolicyAlphaOptions,
+			policyOptions: map[string]string{
+				PreferAlignByUnCoreCacheOption: "true",
+				AlignBySocketOption:            "true",
+			},
+			expectedErr: false,
+		},
+		{
 			description: "FullPhysicalCPUsOnly and DistributeCPUsAcrossCores options can not coexist",
 			featureGate: pkgfeatures.CPUManagerPolicyAlphaOptions,
 			policyOptions: map[string]string{
 				FullPCPUsOnlyOption:             "true",
 				DistributeCPUsAcrossCoresOption: "true",
+			},
+			expectedErr: true,
+		},
+		{
+			description: "PreferAlignByUnCoreCache and DistributeCPUsAcrossCores options can not coexist",
+			featureGate: pkgfeatures.CPUManagerPolicyAlphaOptions,
+			policyOptions: map[string]string{
+				PreferAlignByUnCoreCacheOption:  "true",
+				DistributeCPUsAcrossCoresOption: "true",
+			},
+			expectedErr: true,
+		},
+		{
+			description: "PreferAlignByUnCoreCache and DistributeCPUsAcrossNUMA options can not coexist",
+			featureGate: pkgfeatures.CPUManagerPolicyAlphaOptions,
+			policyOptions: map[string]string{
+				PreferAlignByUnCoreCacheOption: "true",
+				DistributeCPUsAcrossNUMAOption: "true",
 			},
 			expectedErr: true,
 		},

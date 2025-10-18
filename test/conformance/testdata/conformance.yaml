@@ -256,9 +256,10 @@
   file: test/e2e/apimachinery/aggregated_discovery.go
 - testname: aggregator-supports-the-sample-apiserver
   codename: '[sig-api-machinery] Aggregator Should be able to support the 1.17 Sample
-    API Server using the current Aggregator [Conformance]'
+    API Server using the current Aggregator [LinuxOnly] [Conformance]'
   description: Ensure that the sample-apiserver code from 1.17 and compiled against
-    1.17 will work on the current Aggregator/API-Server.
+    1.17 will work on the current Aggregator/API-Server. This test is marked LinuxOnly
+    because etcd does not provide or support images for Windows.
   release: v1.17, v1.21, v1.27
   file: test/e2e/apimachinery/aggregator.go
 - testname: Custom Resource Definition Conversion Webhook, convert mixed version list
@@ -600,6 +601,13 @@
   description: A Namespace is created. The Namespace is patched. The Namespace and
     MUST now include the new Label.
   release: v1.18
+  file: test/e2e/apimachinery/namespace.go
+- testname: Ordered Namespace Deletion
+  codename: '[sig-api-machinery] OrderedNamespaceDeletion namespace deletion should
+    delete pod first [Conformance]'
+  description: Pods must be deleted before other objects when deleting a namespace.
+    See https://kep.k8s.io/5080
+  release: v1.34
   file: test/e2e/apimachinery/namespace.go
 - testname: ResourceQuota, apply changes to a ResourceQuota status
   codename: '[sig-api-machinery] ResourceQuota should apply changes to a resourcequota
@@ -1489,9 +1497,9 @@
 - testname: Kubectl, diff Deployment
   codename: '[sig-cli] Kubectl client Kubectl diff should check if kubectl diff finds
     a difference for Deployments [Conformance]'
-  description: Create a Deployment with httpd image. Declare the same Deployment with
-    a different image, busybox. Diff of live Deployment with declared Deployment MUST
-    include the difference between live and declared image.
+  description: Create a Deployment with agnhost image. Declare the same Deployment
+    with a different image, busybox. Diff of live Deployment with declared Deployment
+    MUST include the difference between live and declared image.
   release: v1.19
   file: test/e2e/kubectl/kubectl.go
 - testname: Kubectl, create service, replication controller
@@ -1636,6 +1644,19 @@
     The event is deleted and MUST NOT show up when listing all events.
   release: v1.25
   file: test/e2e/instrumentation/core_events.go
+- testname: kubernetes.default Endpoints and EndpointSlices
+  codename: '[sig-network] API Server should have Endpoints and EndpointSlices pointing
+    to API Server [Conformance]'
+  description: The "kubernetes.default" service MUST have Endpoints and EndpointSlices
+    pointing to each API server instance.
+  release: v1.21
+  file: test/e2e/network/apiserver.go
+- testname: Kubernetes Service
+  codename: '[sig-network] API Server should provide secure master service [Conformance]'
+  description: By default when a kubernetes cluster is running there MUST be a 'kubernetes'
+    service running in the cluster.
+  release: v1.9
+  file: test/e2e/network/apiserver.go
 - testname: DNS, cluster
   codename: '[sig-network] DNS should provide /etc/hosts entries for the cluster [Conformance]'
   description: When a Pod is created, the pod MUST be able to resolve cluster dns
@@ -1696,36 +1717,35 @@
     DNS configuration MUST be configured in the Pod.
   release: v1.17
   file: test/e2e/network/dns.go
-- testname: EndpointSlice API
+- testname: EndpointSlice, creation/deletion
   codename: '[sig-network] EndpointSlice should create Endpoints and EndpointSlices
     for Pods matching a Service [Conformance]'
-  description: The discovery.k8s.io API group MUST exist in the /apis discovery document.
-    The discovery.k8s.io/v1 API group/version MUST exist in the /apis/discovery.k8s.io
-    discovery document. The endpointslices resource MUST exist in the /apis/discovery.k8s.io/v1
-    discovery document. The endpointslice controller must create EndpointSlices for
-    Pods mataching a Service.
-  release: v1.21
-  file: test/e2e/network/endpointslice.go
-- testname: EndpointSlice API
-  codename: '[sig-network] EndpointSlice should create and delete Endpoints and EndpointSlices
-    for a Service with a selector specified [Conformance]'
-  description: The discovery.k8s.io API group MUST exist in the /apis discovery document.
-    The discovery.k8s.io/v1 API group/version MUST exist in the /apis/discovery.k8s.io
-    discovery document. The endpointslices resource MUST exist in the /apis/discovery.k8s.io/v1
-    discovery document. The endpointslice controller should create and delete EndpointSlices
+  description: The endpointslice controller must create and delete EndpointSlices
     for Pods matching a Service.
-  release: v1.21
+  release: v1.21, v1.35
   file: test/e2e/network/endpointslice.go
-- testname: EndpointSlice API
-  codename: '[sig-network] EndpointSlice should have Endpoints and EndpointSlices
-    pointing to API Server [Conformance]'
-  description: The discovery.k8s.io API group MUST exist in the /apis discovery document.
-    The discovery.k8s.io/v1 API group/version MUST exist in the /apis/discovery.k8s.io
-    discovery document. The endpointslices resource MUST exist in the /apis/discovery.k8s.io/v1
-    discovery document. The cluster MUST have a service named "kubernetes" on the
-    default namespace referencing the API servers. The "kubernetes.default" service
-    MUST have Endpoints and EndpointSlices pointing to each API server instance.
-  release: v1.21
+- testname: EndpointSlice, "empty" Service
+  codename: '[sig-network] EndpointSlice should create and delete EndpointSlices for
+    a Service with a selector that matches no pods [Conformance]'
+  description: The EndpointSlice controller should create and delete empty EndpointSlices
+    for a Service that matches no pods.
+  release: v1.21, v1.35
+  file: test/e2e/network/endpointslice.go
+- testname: EndpointSlice, multiple IPs, multiple ports
+  codename: '[sig-network] EndpointSlice should support a Service with multiple endpoint
+    IPs specified in multiple EndpointSlices [Conformance]'
+  description: Given a selector-less Service with multiple manually-created EndpointSlices
+    (and no Endpoints) where the endpoints have different IPs and different Ports,
+    the service proxy MUST allow connections to both ports.
+  release: v1.34
+  file: test/e2e/network/endpointslice.go
+- testname: EndpointSlice, single IP, multiple ports
+  codename: '[sig-network] EndpointSlice should support a Service with multiple ports
+    specified in multiple EndpointSlices [Conformance]'
+  description: Given a selector-less Service with multiple manually-created EndpointSlices
+    (and no Endpoints) where the endpoints have the same IP but different Ports, the
+    service proxy MUST allow connections to both ports.
+  release: v1.34
   file: test/e2e/network/endpointslice.go
 - testname: EndpointSlice API
   codename: '[sig-network] EndpointSlice should support creating EndpointSlice API
@@ -1747,6 +1767,29 @@
     update, and delete actions.
   release: v1.21
   file: test/e2e/network/endpointslicemirroring.go
+- testname: Endpoint resource lifecycle
+  codename: '[sig-network] Endpoints should test the lifecycle of an Endpoint [Conformance]'
+  description: Create an endpoint, the endpoint MUST exist. The endpoint is updated
+    with a new label, a check after the update MUST find the changes. The endpoint
+    is then patched with a new IPv4 address and port, a check after the patch MUST
+    the changes. The endpoint is deleted by its label, a watch listens for the deleted
+    watch event.
+  release: v1.19
+  file: test/e2e/network/endpoints.go
+- testname: Endpoints, creation/deletion
+  codename: '[sig-network] EndpointsController should create Endpoints for Pods matching
+    a Service [Conformance]'
+  description: The Endpoints controller must create an Endpoints for Pods matching
+    a Service.
+  release: v1.21, v1.35
+  file: test/e2e/network/endpoints.go
+- testname: Endpoints, "empty" Service
+  codename: '[sig-network] EndpointsController should create and delete Endpoints
+    for a Service with a selector that matches no pods [Conformance]'
+  description: The Endpoints controller should create and delete an empty Endpoints
+    for a Service that matches no pods.
+  release: v1.21, v1.35
+  file: test/e2e/network/endpoints.go
 - testname: Scheduling, HostPort matching and HostIP and Protocol not-matching
   codename: '[sig-network] HostPort validates that there is no conflict between pods
     with same hostPort but different hostIP and protocol [LinuxOnly] [Conformance]'
@@ -1844,11 +1887,10 @@
     MUST be returned for each endpoint.
   release: v1.21
   file: test/e2e/network/proxy.go
-- testname: Proxy, logs service endpoint
+- testname: Proxy through apiserver to a Service
   codename: '[sig-network] Proxy version v1 should proxy through a service and a pod
     [Conformance]'
-  description: Select any node in the cluster to invoke  /logs endpoint  using the
-    /nodes/proxy subresource from the kubelet port. This endpoint MUST be reachable.
+  description: The apiserver will proxy a connection to a Service.
   release: v1.9
   file: test/e2e/network/proxy.go
 - testname: Service endpoint latency, thresholds
@@ -2020,12 +2062,6 @@
     Windows does not support session affinity.'
   release: v1.19
   file: test/e2e/network/service.go
-- testname: Kubernetes Service
-  codename: '[sig-network] Services should provide secure master service [Conformance]'
-  description: By default when a kubernetes cluster is running there MUST be a 'kubernetes'
-    service running in the cluster.
-  release: v1.9
-  file: test/e2e/network/service.go
 - testname: Service, endpoints
   codename: '[sig-network] Services should serve a basic endpoint from pods [Conformance]'
   description: Create a service with a endpoint without any Pods, the service MUST
@@ -2057,15 +2093,16 @@
     Pod and the service must now have empty set of endpoints.
   release: v1.9
   file: test/e2e/network/service.go
-- testname: Endpoint resource lifecycle
-  codename: '[sig-network] Services should test the lifecycle of an Endpoint [Conformance]'
-  description: Create an endpoint, the endpoint MUST exist. The endpoint is updated
-    with a new label, a check after the update MUST find the changes. The endpoint
-    is then patched with a new IPv4 address and port, a check after the patch MUST
-    the changes. The endpoint is deleted by it's label, a watch listens for the deleted
-    watch event.
-  release: v1.19
-  file: test/e2e/network/service.go
+- testname: ConfigMap, from environment field with various prefixes
+  codename: '[sig-node] ConfigMap should be consumable as environment variable names
+    with various prefixes [Conformance]'
+  description: Create a Pod with environment variable values set using values from
+    ConfigMap. Allows users to use envFrom to set prefixes with various printable
+    ASCII characters excluding '=' as environment variable names. This test verifies
+    that different prefixes including digits, special characters, and letters can
+    be correctly used.
+  release: v1.34
+  file: test/e2e/common/node/configmap.go
 - testname: ConfigMap, from environment field
   codename: '[sig-node] ConfigMap should be consumable via environment variable [NodeConformance]
     [Conformance]'
@@ -2093,6 +2130,12 @@
     selector it MUST find the ConfigMap by it's static label and updated value. The
     ConfigMap must be deleted by Collection.
   release: v1.19
+  file: test/e2e/common/node/configmap.go
+- testname: ConfigMap Update
+  codename: '[sig-node] ConfigMap should update ConfigMap successfully [NodeConformance]
+    [Conformance]'
+  description: Ensure that a ConfigMap object can be created and then updated successfully.
+  release: v1.32
   file: test/e2e/common/node/configmap.go
 - testname: Pod Lifecycle, post start exec hook
   codename: '[sig-node] Container Lifecycle Hook when create a pod with lifecycle
@@ -2638,6 +2681,16 @@
     patch, delete, and deletecollection.'
   release: v1.20
   file: test/e2e/common/node/runtimeclass.go
+- testname: Secrets, pod environment from source
+  codename: '[sig-node] Secrets should be consumable as environment variable names
+    variable names with various prefixes [Conformance]'
+  description: Create a Pod with environment variable values set using values from
+    Secret. Allows users to use envFrom to set prefixes with various printable ASCII
+    characters excluding '=' as environment variable names. This test verifies that
+    different prefixes including digits, special characters, and letters can be correctly
+    used.
+  release: v1.34
+  file: test/e2e/common/node/secrets.go
 - testname: Secrets, pod environment field
   codename: '[sig-node] Secrets should be consumable from pods in env vars [NodeConformance]
     [Conformance]'
@@ -3746,4 +3799,15 @@
     via deleteCollection MUST succeed and it MUST be confirmed.
   release: v1.30
   file: test/e2e/storage/volume_attachment.go
+- testname: VolumeAttributesClass, lifecycle
+  codename: '[sig-storage] VolumeAttributesClass [FeatureGate:VolumeAttributesClass]
+    should run through the lifecycle of a VolumeAttributesClass [Conformance]'
+  description: Creating a VolumeAttributesClass MUST succeed. Reading the VolumeAttributesClass
+    MUST succeed. Patching the VolumeAttributesClass MUST succeed with its new label
+    found. Deleting the VolumeAttributesClass MUST succeed and it MUST be confirmed.
+    Replacement VolumeAttributesClass MUST be created. Updating the VolumeAttributesClass
+    MUST succeed with its new label found. Deleting the VolumeAttributesClass via
+    deleteCollection MUST succeed and it MUST be confirmed.
+  release: v1.35
+  file: test/e2e/storage/volumeattributesclass.go
 

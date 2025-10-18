@@ -45,7 +45,7 @@ import (
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	registrypod "k8s.io/kubernetes/pkg/registry/core/pod"
 	podrest "k8s.io/kubernetes/pkg/registry/core/pod/rest"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 // PodStorage includes storage for pods and all sub resources
@@ -241,6 +241,10 @@ func (r *BindingREST) setPodNodeAndMetadata(ctx context.Context, podUID types.UI
 			return nil, fmt.Errorf("pod %v has non-empty .spec.schedulingGates", pod.Name)
 		}
 		pod.Spec.NodeName = machine
+		// Clear nomination hint to prevent stale information affecting external components.
+		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.ClearingNominatedNodeNameAfterBinding) {
+			pod.Status.NominatedNodeName = ""
+		}
 		if pod.Annotations == nil {
 			pod.Annotations = make(map[string]string)
 		}
@@ -256,6 +260,7 @@ func (r *BindingREST) setPodNodeAndMetadata(ctx context.Context, podUID types.UI
 			Type:   api.PodScheduled,
 			Status: api.ConditionTrue,
 		})
+
 		finalPod = pod
 		return pod, nil
 	}), dryRun, nil)

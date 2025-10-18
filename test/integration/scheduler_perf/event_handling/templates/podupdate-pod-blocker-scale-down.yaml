@@ -4,7 +4,7 @@ metadata:
   name: pod-blocker-{{ .Index }}
 spec:
   containers:
-  - image: registry.k8s.io/pause:3.10
+  - image: registry.k8s.io/pause:3.10.1
     name: pause
     resources:
       requests:

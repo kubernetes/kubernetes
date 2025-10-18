@@ -107,6 +107,7 @@ type MergeItem struct {
 	MergeItemPtr          *MergeItem           `json:"mergeItemPtr,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
 	SimpleMap             map[string]string    `json:"simpleMap,omitempty"`
 	ReplacingItem         runtime.RawExtension `json:"replacingItem,omitempty" patchStrategy:"replace"`
+	JSONItem              struct{ Raw []byte } `json:"jsonItem,omitempty"`
 	RetainKeysMap         RetainKeysMergeItem  `json:"retainKeysMap,omitempty" patchStrategy:"retainKeys"`
 	RetainKeysMergingList []MergeItem          `json:"retainKeysMergingList,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 }
@@ -6969,6 +6970,19 @@ func TestUnknownField(t *testing.T) {
 			ExpectedTwoWayErr:   `unable to find api field`,
 			ExpectedThreeWayErr: `unable to find api field`,
 		},
+
+		"json": {
+			Original: `{"name":"foo","jsonItem":{"nested":{"nested2":{"nested3":{}}}}}`,
+			Current:  `{"name":"foo","jsonItem":{"nested":{"nested2":{"nested3":{}}}}}`,
+			Modified: `{"name":"foo","jsonItem":{"nested":{"nested2":{"nested3":{"a":"b"}}}}}`,
+
+			ExpectedTwoWay:         `{"jsonItem":{"nested":{"nested2":{"nested3":{"a":"b"}}}}}`,
+			ExpectedTwoWayResult:   `{"jsonItem":{"nested":{"nested2":{"nested3":{"a":"b"}}}},"name":"foo"}`,
+			ExpectedThreeWay:       `{"jsonItem":{"nested":{"nested2":{"nested3":{"a":"b"}}}}}`,
+			ExpectedThreeWayResult: `{"jsonItem":{"nested":{"nested2":{"nested3":{"a":"b"}}}},"name":"foo"}`,
+			ExpectedTwoWayErr:      `unable to find api field`,
+			ExpectedThreeWayErr:    `unable to find api field`,
+		},
 	}
 
 	mergeItemOpenapiSchema := PatchMetaFromOpenAPI{
@@ -7032,7 +7046,7 @@ func TestUnknownField(t *testing.T) {
 						return
 					}
 
-					threeWayResult, err := StrategicMergePatch([]byte(tc.Current), threeWay, schema)
+					threeWayResult, err := StrategicMergePatchUsingLookupPatchMeta([]byte(tc.Current), threeWay, schema)
 					if err != nil {
 						t.Errorf("using %s in testcase %s: error applying three-way patch: %v", getSchemaType(schema), k, err)
 						return

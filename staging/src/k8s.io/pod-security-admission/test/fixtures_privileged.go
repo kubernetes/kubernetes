@@ -19,7 +19,7 @@ package test
 import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/pod-security-admission/api"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 /*
@@ -38,8 +38,8 @@ func init() {
 			return []*corev1.Pod{
 				// privileged explicitly set to false
 				tweak(p, func(p *corev1.Pod) {
-					p.Spec.Containers[0].SecurityContext.Privileged = pointer.BoolPtr(false)
-					p.Spec.InitContainers[0].SecurityContext.Privileged = pointer.BoolPtr(false)
+					p.Spec.Containers[0].SecurityContext.Privileged = ptr.To(false)
+					p.Spec.InitContainers[0].SecurityContext.Privileged = ptr.To(false)
 				}),
 			}
 		},
@@ -48,12 +48,12 @@ func init() {
 			return []*corev1.Pod{
 				// privileged set to true in container
 				tweak(p, func(p *corev1.Pod) {
-					p.Spec.Containers[0].SecurityContext.Privileged = pointer.BoolPtr(true)
+					p.Spec.Containers[0].SecurityContext.Privileged = ptr.To(true)
 					p.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation = nil
 				}),
 				// privileged set to true in init container
 				tweak(p, func(p *corev1.Pod) {
-					p.Spec.InitContainers[0].SecurityContext.Privileged = pointer.BoolPtr(true)
+					p.Spec.InitContainers[0].SecurityContext.Privileged = ptr.To(true)
 					p.Spec.InitContainers[0].SecurityContext.AllowPrivilegeEscalation = nil
 				}),
 			}

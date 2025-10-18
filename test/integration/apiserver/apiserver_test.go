@@ -1597,7 +1597,7 @@ func TestGetSubresourcesAsTables(t *testing.T) {
 						Name: "replicationcontroller-1",
 					},
 					Spec: v1.ReplicationControllerSpec{
-						Replicas: int32Ptr(2),
+						Replicas: ptr.To[int32](2),
 						Selector: map[string]string{
 							"label": "test-label",
 						},
@@ -1632,7 +1632,7 @@ func TestGetSubresourcesAsTables(t *testing.T) {
 						Name: "replicationcontroller-2",
 					},
 					Spec: v1.ReplicationControllerSpec{
-						Replicas: int32Ptr(2),
+						Replicas: ptr.To[int32](2),
 						Selector: map[string]string{
 							"label": "test-label",
 						},
@@ -1705,8 +1705,10 @@ func TestGetScaleSubresourceAsTableForAllBuiltins(t *testing.T) {
 	// Enable all features and apis for testing
 	flags := framework.DefaultTestServerFlags()
 	flags = append(flags, "--runtime-config=api/all=true")
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, "AllAlpha", true)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, "AllBeta", true)
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		"AllAlpha": true,
+		"AllBeta":  true,
+	})
 
 	testNamespace := "test-scale"
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, flags, framework.SharedEtcd())
@@ -3386,10 +3388,6 @@ func TestEnableEmulationVersion(t *testing.T) {
 			expectedStatusCode: 200,
 		},
 		{
-			path:               "/apis/flowcontrol.apiserver.k8s.io/v1beta3/flowschemas", // introduced at 1.26, removed at 1.32
-			expectedStatusCode: 200,
-		},
-		{
 			path:               "/apis/networking.k8s.io/v1beta1/servicecidrs", // introduced at 1.31, removed at 1.34
 			expectedStatusCode: 200,
 		},
@@ -3445,10 +3443,6 @@ func TestEnableEmulationVersionForwardCompatible(t *testing.T) {
 		},
 		{
 			path:               "/apis/flowcontrol.apiserver.k8s.io/v1/flowschemas",
-			expectedStatusCode: 200,
-		},
-		{
-			path:               "/apis/flowcontrol.apiserver.k8s.io/v1beta3/flowschemas", // introduced at 1.26, removed at 1.32
 			expectedStatusCode: 200,
 		},
 		{
@@ -3510,10 +3504,6 @@ func TestEnableRuntimeConfigEmulationVersionForwardCompatible(t *testing.T) {
 			expectedStatusCode: 200,
 		},
 		{
-			path:               "/apis/flowcontrol.apiserver.k8s.io/v1beta3/flowschemas", // introduced at 1.26, removed at 1.32
-			expectedStatusCode: 200,
-		},
-		{
 			path:               "/apis/networking.k8s.io/v1beta1/servicecidrs", // introduced at 1.31, removed at 1.34
 			expectedStatusCode: 200,
 		},
@@ -3544,9 +3534,9 @@ func TestEnableRuntimeConfigEmulationVersionForwardCompatible(t *testing.T) {
 }
 
 func TestDisableEmulationVersion(t *testing.T) {
-	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
 	server := kubeapiservertesting.StartTestServerOrDie(t,
-		&kubeapiservertesting.TestServerInstanceOptions{BinaryVersion: "1.32"},
+		&kubeapiservertesting.TestServerInstanceOptions{BinaryVersion: "1.34"},
 		[]string{}, framework.SharedEtcd())
 	defer server.TearDownFn()
 
@@ -3568,11 +3558,11 @@ func TestDisableEmulationVersion(t *testing.T) {
 			expectedStatusCode: 200,
 		},
 		{
-			path:               "/apis/flowcontrol.apiserver.k8s.io/v1/flowschemas",
+			path:               "/apis/networking.k8s.io/v1/servicecidrs",
 			expectedStatusCode: 200,
 		},
 		{
-			path:               "/apis/flowcontrol.apiserver.k8s.io/v1beta3/flowschemas", // introduced at 1.26, removed at 1.32
+			path:               "/apis/networking.k8s.io/v1beta1/servicecidrs", // introduced at 1.31, removed at 1.34
 			expectedStatusCode: 404,
 		},
 	}
@@ -3678,15 +3668,13 @@ func assertManagedFields(t *testing.T, obj *unstructured.Unstructured) {
 	}
 }
 
-func int32Ptr(i int32) *int32 {
-	return &i
-}
-
 // TestDefaultStorageEncoding verifies that the storage encoding for all built-in resources is
 // Protobuf.
 func TestDefaultStorageEncoding(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, "AllAlpha", true)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, "AllBeta", true)
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		"AllAlpha": true,
+		"AllBeta":  true,
+	})
 
 	protobufRecognizer := protobuf.NewSerializer(runtime.NewScheme(), runtime.NewScheme())
 	var recognizersByGroup map[string]recognizer.RecognizingDecoder

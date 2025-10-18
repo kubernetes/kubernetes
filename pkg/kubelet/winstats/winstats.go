@@ -27,6 +27,8 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+
+	"k8s.io/klog/v2"
 )
 
 var (
@@ -36,7 +38,7 @@ var (
 // Client is an interface that is used to get stats information.
 type Client interface {
 	WinContainerInfos() (map[string]cadvisorapiv2.ContainerInfo, error)
-	WinMachineInfo() (*cadvisorapi.MachineInfo, error)
+	WinMachineInfo(logger klog.Logger) (*cadvisorapi.MachineInfo, error)
 	WinVersionInfo() (*cadvisorapi.VersionInfo, error)
 	GetDirFsInfo(path string) (cadvisorapiv2.FsInfo, error)
 }
@@ -47,10 +49,10 @@ type StatsClient struct {
 }
 
 type winNodeStatsClient interface {
-	startMonitoring() error
+	startMonitoring(logger klog.Logger) error
 	getNodeMetrics() (nodeMetrics, error)
 	getNodeInfo() nodeInfo
-	getMachineInfo() (*cadvisorapi.MachineInfo, error)
+	getMachineInfo(logger klog.Logger) (*cadvisorapi.MachineInfo, error)
 	getVersionInfo() (*cadvisorapi.VersionInfo, error)
 }
 
@@ -77,11 +79,11 @@ type cpuUsageCoreNanoSecondsCache struct {
 }
 
 // newClient constructs a Client.
-func newClient(statsNodeClient winNodeStatsClient) (Client, error) {
+func newClient(logger klog.Logger, statsNodeClient winNodeStatsClient) (Client, error) {
 	statsClient := new(StatsClient)
 	statsClient.client = statsNodeClient
 
-	err := statsClient.client.startMonitoring()
+	err := statsClient.client.startMonitoring(logger)
 	if err != nil {
 		return nil, err
 	}
@@ -105,8 +107,8 @@ func (c *StatsClient) WinContainerInfos() (map[string]cadvisorapiv2.ContainerInf
 
 // WinMachineInfo returns a cadvisorapi.MachineInfo with details about the
 // node machine. Analogous to cadvisor MachineInfo method.
-func (c *StatsClient) WinMachineInfo() (*cadvisorapi.MachineInfo, error) {
-	return c.client.getMachineInfo()
+func (c *StatsClient) WinMachineInfo(logger klog.Logger) (*cadvisorapi.MachineInfo, error) {
+	return c.client.getMachineInfo(logger)
 }
 
 // WinVersionInfo returns a  cadvisorapi.VersionInfo with version info of

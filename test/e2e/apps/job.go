@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
@@ -42,7 +43,8 @@ import (
 	"k8s.io/client-go/util/retry"
 	"k8s.io/client-go/util/workqueue"
 	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
-	"k8s.io/kubernetes/test/e2e/feature"
+	"k8s.io/kubernetes/pkg/features"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ejob "k8s.io/kubernetes/test/e2e/framework/job"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -50,7 +52,6 @@ import (
 	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
 	"k8s.io/kubernetes/test/e2e/scheduling"
 	admissionapi "k8s.io/pod-security-admission/api"
-	"k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
 
 	"github.com/onsi/ginkgo/v2"
@@ -271,7 +272,7 @@ var _ = SIGDescribe("Job", func() {
 
 		ginkgo.By("Creating a job with suspend=true")
 		job := e2ejob.NewTestJob("succeed", "suspend-true-to-false", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
-		job.Spec.Suspend = pointer.BoolPtr(true)
+		job.Spec.Suspend = ptr.To(true)
 		job, err := e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
 
@@ -287,7 +288,7 @@ var _ = SIGDescribe("Job", func() {
 		ginkgo.By("Updating the job with suspend=false")
 		job, err = f.ClientSet.BatchV1().Jobs(f.Namespace.Name).Get(ctx, job.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to get job in namespace: %s", f.Namespace.Name)
-		job.Spec.Suspend = pointer.BoolPtr(false)
+		job.Spec.Suspend = ptr.To(false)
 		job, err = e2ejob.UpdateJob(ctx, f.ClientSet, f.Namespace.Name, job)
 		framework.ExpectNoError(err, "failed to update job in namespace: %s", f.Namespace.Name)
 
@@ -303,7 +304,7 @@ var _ = SIGDescribe("Job", func() {
 
 		ginkgo.By("Creating a job with suspend=false")
 		job := e2ejob.NewTestJob("notTerminate", "suspend-false-to-true", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
-		job.Spec.Suspend = pointer.Bool(false)
+		job.Spec.Suspend = ptr.To(false)
 		job, err := e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
 
@@ -315,7 +316,7 @@ var _ = SIGDescribe("Job", func() {
 		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
 			job, err = e2ejob.GetJob(ctx, f.ClientSet, f.Namespace.Name, job.Name)
 			framework.ExpectNoError(err, "unable to get job %s in namespace %s", job.Name, f.Namespace.Name)
-			job.Spec.Suspend = pointer.Bool(true)
+			job.Spec.Suspend = ptr.To(true)
 			updatedJob, err := e2ejob.UpdateJob(ctx, f.ClientSet, f.Namespace.Name, job)
 			if err == nil {
 				job = updatedJob
@@ -446,7 +447,7 @@ done`}
 	*/
 	// TODO: once this test is stable, squash the functionality into pre-existing conformance test called "should create
 	//   pods for an Indexed job with completion indexes and specified hostname" earlier in this file.
-	framework.It("should create pods with completion indexes for an Indexed Job", feature.PodIndexLabel, func(ctx context.Context) {
+	framework.It("should create pods with completion indexes for an Indexed Job", func(ctx context.Context) {
 		parallelism := int32(2)
 		completions := int32(4)
 		backoffLimit := int32(6) // default value
@@ -1180,14 +1181,16 @@ done`}
 		ginkgo.By("Creating a suspended job")
 		job := e2ejob.NewTestJob("succeed", jobName, v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
 		job.Labels = label
-		job.Spec.Suspend = pointer.BoolPtr(true)
+		job.Spec.Suspend = ptr.To(true)
 		job, err = e2ejob.CreateJob(ctx, f.ClientSet, ns, job)
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", ns)
+		gomega.Expect(job).To(apimachineryutils.HaveValidResourceVersion())
 
 		ginkgo.By("Patching the Job")
 		payload := "{\"metadata\":{\"labels\":{\"" + jobName + "\":\"patched\"}}}"
 		patchedJob, err := f.ClientSet.BatchV1().Jobs(ns).Patch(ctx, jobName, types.StrategicMergePatchType, []byte(payload), metav1.PatchOptions{})
 		framework.ExpectNoError(err, "failed to patch Job %s in namespace %s", jobName, ns)
+		gomega.Expect(resourceversion.CompareResourceVersion(job.ResourceVersion, patchedJob.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 
 		ginkgo.By("Watching for Job to be patched")
 		c := watchEventConfig{
@@ -1210,7 +1213,7 @@ done`}
 		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
 			patchedJob, err = jobClient.Get(ctx, jobName, metav1.GetOptions{})
 			framework.ExpectNoError(err, "Unable to get job %s", jobName)
-			patchedJob.Spec.Suspend = pointer.BoolPtr(false)
+			patchedJob.Spec.Suspend = ptr.To(false)
 			if patchedJob.Annotations == nil {
 				patchedJob.Annotations = map[string]string{}
 			}
@@ -1327,6 +1330,51 @@ done`}
 		gomega.Consistently(ctx, get).
 			WithPolling(time.Second).WithTimeout(3 * time.Second).
 			Should(gomega.HaveField("Status", gomega.BeEquivalentTo(batchv1.JobStatus{})))
+	})
+
+	framework.It("containers restarted by container restart policy should not trigger PodFailurePolicy", framework.WithFeature("ContainerRestartRules"), framework.WithFeatureGate(features.ContainerRestartRules), func(ctx context.Context) {
+		parallelism := int32(1)
+		completions := int32(1)
+		backoffLimit := int32(1)
+		containerRestartPolicyOnFailure := v1.ContainerRestartPolicyOnFailure
+
+		ginkgo.By("Looking for a node to schedule job pod")
+		node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Creating a job with container-level RestartPolicy and PodFailurePolicy")
+		job := e2ejob.NewTestJobOnNode("failOnce", "managed-by", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit, node.Name)
+		container := job.Spec.Template.Spec.Containers[0]
+		container.RestartPolicy = &containerRestartPolicyOnFailure
+		job.Spec.Template.Spec.Containers[0] = container
+		job.Spec.PodFailurePolicy = &batchv1.PodFailurePolicy{
+			Rules: []batchv1.PodFailurePolicyRule{{
+				Action: batchv1.PodFailurePolicyActionFailJob,
+				OnExitCodes: &batchv1.PodFailurePolicyOnExitCodesRequirement{
+					ContainerName: &container.Name,
+					Operator:      batchv1.PodFailurePolicyOnExitCodesOpIn,
+					Values:        []int32{1},
+				},
+			}},
+		}
+		job, err = e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
+		framework.ExpectNoError(err, "failed to create job in namespace: %s/%s", job.Namespace, job.Name)
+
+		ginkgo.By("Waiting for job to complete")
+		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, batchv1.JobReasonCompletionsReached, completions)
+		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Ensuring job succeeded")
+		job, err = e2ejob.GetJob(ctx, f.ClientSet, f.Namespace.Name, job.Name)
+		framework.ExpectNoError(err, "failed to get job")
+		for _, cond := range job.Status.Conditions {
+			if cond.Type == batchv1.JobComplete {
+				gomega.Expect(cond.Status).Should(gomega.Equal(v1.ConditionTrue))
+			}
+		}
+		gomega.Expect(job.Status.Active).Should(gomega.Equal(int32(0)))
+		gomega.Expect(job.Status.Ready).Should(gomega.Equal(ptr.To[int32](0)))
+		gomega.Expect(job.Status.Terminating).Should(gomega.Equal(ptr.To[int32](0)))
 	})
 })
 

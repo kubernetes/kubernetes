@@ -326,7 +326,7 @@ const (
 	MinExternalEtcdVersion = "3.5.21-0"
 
 	// DefaultEtcdVersion indicates the default etcd version that kubeadm uses
-	DefaultEtcdVersion = "3.6.1-1"
+	DefaultEtcdVersion = "3.6.5-0"
 
 	// Etcd defines variable used internally when referring to etcd component
 	Etcd = "etcd"
@@ -364,7 +364,7 @@ const (
 	CoreDNSImageName = "coredns"
 
 	// CoreDNSVersion is the version of CoreDNS to be deployed if it is used
-	CoreDNSVersion = "v1.12.1"
+	CoreDNSVersion = "v1.12.3"
 
 	// ClusterConfigurationKind is the string kind value for the ClusterConfiguration struct
 	ClusterConfigurationKind = "ClusterConfiguration"
@@ -442,7 +442,7 @@ const (
 	ModeNode string = "Node"
 
 	// PauseVersion indicates the default pause image version for kubeadm
-	PauseVersion = "3.10"
+	PauseVersion = "3.10.1"
 
 	// CgroupDriverSystemd holds the systemd driver type
 	CgroupDriverSystemd = "systemd"
@@ -466,6 +466,9 @@ const (
 	EnvVarJoinDryRunDir = "KUBEADM_JOIN_DRYRUN_DIR"
 	// EnvVarUpgradeDryRunDir has the environment variable for upgrade dry run directory override.
 	EnvVarUpgradeDryRunDir = "KUBEADM_UPGRADE_DRYRUN_DIR"
+
+	// ProbePort is a general named port to be used in pod manifests.
+	ProbePort = "probe-port"
 )
 
 var (
@@ -495,10 +498,10 @@ var (
 
 	// SupportedEtcdVersion lists officially supported etcd versions with corresponding Kubernetes releases
 	SupportedEtcdVersion = map[uint8]string{
-		31: "3.5.21-0",
-		32: "3.5.21-0",
-		33: "3.5.21-0",
-		34: "3.6.1-1",
+		31: "3.5.23-0",
+		32: "3.5.23-0",
+		33: "3.5.23-0",
+		34: "3.6.5-0",
 	}
 
 	// KubeadmCertsClusterRoleName sets the name for the ClusterRole that allows

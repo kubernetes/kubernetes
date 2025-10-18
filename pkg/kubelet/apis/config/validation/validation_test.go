@@ -76,7 +76,8 @@ var (
 			"KubeletCrashLoopBackOffMax": true,
 		},
 		Logging: logsapi.LoggingConfiguration{
-			Format: "text",
+			Format:         "text",
+			FlushFrequency: logsapi.TimeOrMetaDuration{Duration: metav1.Duration{Duration: logsapi.LogFlushFreqDefault}},
 		},
 		ContainerRuntimeEndpoint:    "unix:///run/containerd/containerd.sock",
 		ContainerLogMaxWorkers:      1,
@@ -360,7 +361,12 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 	}, {
 		name: "specify ShutdownGracePeriod without enabling GracefulNodeShutdown",
 		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
-			conf.FeatureGates = map[string]bool{"GracefulNodeShutdown": false}
+			conf.FeatureGates = map[string]bool{
+				"GracefulNodeShutdown": false,
+				// Disable dependents.
+				"GracefulNodeShutdownBasedOnPodPriority": false,
+				"WindowsGracefulNodeShutdown":            false,
+			}
 			conf.ShutdownGracePeriod = metav1.Duration{Duration: 1 * time.Second}
 			return conf
 		},
@@ -368,7 +374,12 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 	}, {
 		name: "specify ShutdownGracePeriodCriticalPods without enabling GracefulNodeShutdown",
 		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
-			conf.FeatureGates = map[string]bool{"GracefulNodeShutdown": false}
+			conf.FeatureGates = map[string]bool{
+				"GracefulNodeShutdown": false,
+				// Disable dependents.
+				"GracefulNodeShutdownBasedOnPodPriority": false,
+				"WindowsGracefulNodeShutdown":            false,
+			}
 			conf.ShutdownGracePeriodCriticalPods = metav1.Duration{Duration: 1 * time.Second}
 			return conf
 		},
@@ -381,14 +392,6 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			return conf
 		},
 		errMsg: "invalid configuration: memorySwap.swapBehavior \"invalid-behavior\" must be one of: \"\", \"LimitedSwap\" or \"NoSwap\"",
-	}, {
-		name: "specify MemorySwap.SwapBehavior without enabling NodeSwap",
-		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
-			conf.FeatureGates = map[string]bool{"NodeSwap": false}
-			conf.MemorySwap.SwapBehavior = string(kubetypes.LimitedSwap)
-			return conf
-		},
-		errMsg: "invalid configuration: memorySwap.swapBehavior cannot be set when NodeSwap feature flag is disabled",
 	}, {
 		name: "CrashLoopBackOff.MaxContainerRestartPeriod too low",
 		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
@@ -569,19 +572,9 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			},
 			errMsg: "invalid configuration: taint.TimeAdded is not nil",
 		}, {
-			name: "specify tracing with KubeletTracing disabled",
-			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
-				samplingRate := int32(99999)
-				conf.FeatureGates = map[string]bool{"KubeletTracing": false}
-				conf.Tracing = &tracingapi.TracingConfiguration{SamplingRatePerMillion: &samplingRate}
-				return conf
-			},
-			errMsg: "invalid configuration: tracing should not be configured if KubeletTracing feature flag is disabled.",
-		}, {
 			name: "specify tracing invalid sampling rate",
 			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
 				samplingRate := int32(-1)
-				conf.FeatureGates = map[string]bool{"KubeletTracing": true}
 				conf.Tracing = &tracingapi.TracingConfiguration{SamplingRatePerMillion: &samplingRate}
 				return conf
 			},
@@ -590,7 +583,6 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			name: "specify tracing invalid endpoint",
 			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
 				ep := "dn%2s://localhost:4317"
-				conf.FeatureGates = map[string]bool{"KubeletTracing": true}
 				conf.Tracing = &tracingapi.TracingConfiguration{Endpoint: &ep}
 				return conf
 			},
@@ -623,7 +615,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 				conf.EnableSystemLogQuery = true
 				return conf
 			},
-			errMsg: "invalid configuration: NodeLogQuery feature gate is required for enableSystemLogHandler",
+			errMsg: "invalid configuration: NodeLogQuery feature gate is required for enableSystemLogQuery",
 		}, {
 			name: "enableSystemLogQuery is enabled without enableSystemLogHandler",
 			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {

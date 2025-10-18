@@ -65,6 +65,14 @@ func (s *stateMemory) GetPodResourceInfoMap() PodResourceInfoMap {
 	return s.podResources.Clone()
 }
 
+func (s *stateMemory) GetPodResourceInfo(podUID types.UID) (PodResourceInfo, bool) {
+	s.RLock()
+	defer s.RUnlock()
+
+	resourceInfo, ok := s.podResources[podUID]
+	return resourceInfo, ok
+}
+
 func (s *stateMemory) SetContainerResources(podUID types.UID, containerName string, resources v1.ResourceRequirements) error {
 	s.Lock()
 	defer s.Unlock()

@@ -26,14 +26,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/network/common"
 	admissionapi "k8s.io/pod-security-admission/api"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -178,11 +180,11 @@ var _ = common.SIGDescribe("IngressClass", feature.Ingress, func() {
 			Spec: networkingv1.IngressClassSpec{
 				Controller: "example.com/controller",
 				Parameters: &networkingv1.IngressClassParametersReference{
-					Scope:     utilpointer.String("Namespace"),
-					Namespace: utilpointer.String("foo-ns"),
+					Scope:     ptr.To("Namespace"),
+					Namespace: ptr.To("foo-ns"),
 					Kind:      "fookind",
 					Name:      "fooname",
-					APIGroup:  utilpointer.String("example.com"),
+					APIGroup:  ptr.To("example.com"),
 				},
 			},
 		}
@@ -338,6 +340,7 @@ var _ = common.SIGDescribe("IngressClass API", func() {
 		framework.ExpectNoError(err)
 		gomega.Expect(gottenIC.UID).To(gomega.Equal(ingressClass1.UID))
 		gomega.Expect(gottenIC.UID).To(gomega.Equal(ingressClass1.UID))
+		gomega.Expect(gottenIC).To(apimachineryutils.HaveValidResourceVersion())
 
 		ginkgo.By("listing")
 		ics, err := icClient.List(ctx, metav1.ListOptions{LabelSelector: "special-label=generic"})
@@ -353,6 +356,7 @@ var _ = common.SIGDescribe("IngressClass API", func() {
 		patchedIC, err := icClient.Patch(ctx, ingressClass1.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"patched":"true"}}}`), metav1.PatchOptions{})
 		framework.ExpectNoError(err)
 		gomega.Expect(patchedIC.Annotations).To(gomega.HaveKeyWithValue("patched", "true"), "patched object should have the applied annotation")
+		gomega.Expect(resourceversion.CompareResourceVersion(ingressClass1.ResourceVersion, patchedIC.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 
 		ginkgo.By("updating")
 		icToUpdate := patchedIC.DeepCopy()

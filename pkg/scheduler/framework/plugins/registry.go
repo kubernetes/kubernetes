@@ -18,7 +18,6 @@ package plugins
 
 import (
 	"k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpreemption"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources"
@@ -45,24 +44,7 @@ import (
 // A scheduler that runs out of tree plugins can register additional plugins
 // through the WithFrameworkOutOfTreeRegistry option.
 func NewInTreeRegistry() runtime.Registry {
-	fts := plfeature.Features{
-		EnableDRAPrioritizedList:                     feature.DefaultFeatureGate.Enabled(features.DRAPrioritizedList),
-		EnableDRAAdminAccess:                         feature.DefaultFeatureGate.Enabled(features.DRAAdminAccess),
-		EnableDRADeviceTaints:                        feature.DefaultFeatureGate.Enabled(features.DRADeviceTaints),
-		EnableDynamicResourceAllocation:              feature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation),
-		EnableVolumeAttributesClass:                  feature.DefaultFeatureGate.Enabled(features.VolumeAttributesClass),
-		EnableCSIMigrationPortworx:                   feature.DefaultFeatureGate.Enabled(features.CSIMigrationPortworx),
-		EnableNodeInclusionPolicyInPodTopologySpread: feature.DefaultFeatureGate.Enabled(features.NodeInclusionPolicyInPodTopologySpread),
-		EnableMatchLabelKeysInPodTopologySpread:      feature.DefaultFeatureGate.Enabled(features.MatchLabelKeysInPodTopologySpread),
-		EnableInPlacePodVerticalScaling:              feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
-		EnableSidecarContainers:                      feature.DefaultFeatureGate.Enabled(features.SidecarContainers),
-		EnableSchedulingQueueHint:                    feature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints),
-		EnableAsyncPreemption:                        feature.DefaultFeatureGate.Enabled(features.SchedulerAsyncPreemption),
-		EnablePodLevelResources:                      feature.DefaultFeatureGate.Enabled(features.PodLevelResources),
-		EnablePartitionableDevices:                   feature.DefaultFeatureGate.Enabled(features.DRAPartitionableDevices),
-		EnableStorageCapacityScoring:                 feature.DefaultFeatureGate.Enabled(features.StorageCapacityScoring),
-	}
-
+	fts := plfeature.NewSchedulerFeaturesFromGates(feature.DefaultFeatureGate)
 	registry := runtime.Registry{
 		dynamicresources.Name:                runtime.FactoryAdapter(fts, dynamicresources.New),
 		imagelocality.Name:                   imagelocality.New,

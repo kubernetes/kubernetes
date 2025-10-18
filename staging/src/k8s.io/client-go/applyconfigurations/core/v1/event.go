@@ -29,23 +29,49 @@ import (
 
 // EventApplyConfiguration represents a declarative configuration of the Event type for use
 // with apply.
+//
+// Event is a report of an event somewhere in the cluster.  Events
+// have a limited retention time and triggers and messages may evolve
+// with time.  Event consumers should not rely on the timing of an event
+// with a given Reason reflecting a consistent underlying trigger, or the
+// continued existence of events with that Reason.  Events should be
+// treated as informative, best-effort, supplemental data.
 type EventApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	InvolvedObject                       *ObjectReferenceApplyConfiguration `json:"involvedObject,omitempty"`
-	Reason                               *string                            `json:"reason,omitempty"`
-	Message                              *string                            `json:"message,omitempty"`
-	Source                               *EventSourceApplyConfiguration     `json:"source,omitempty"`
-	FirstTimestamp                       *apismetav1.Time                   `json:"firstTimestamp,omitempty"`
-	LastTimestamp                        *apismetav1.Time                   `json:"lastTimestamp,omitempty"`
-	Count                                *int32                             `json:"count,omitempty"`
-	Type                                 *string                            `json:"type,omitempty"`
-	EventTime                            *apismetav1.MicroTime              `json:"eventTime,omitempty"`
-	Series                               *EventSeriesApplyConfiguration     `json:"series,omitempty"`
-	Action                               *string                            `json:"action,omitempty"`
-	Related                              *ObjectReferenceApplyConfiguration `json:"related,omitempty"`
-	ReportingController                  *string                            `json:"reportingComponent,omitempty"`
-	ReportingInstance                    *string                            `json:"reportingInstance,omitempty"`
+	// The object that this event is about.
+	InvolvedObject *ObjectReferenceApplyConfiguration `json:"involvedObject,omitempty"`
+	// This should be a short, machine understandable string that gives the reason
+	// for the transition into the object's current status.
+	// TODO: provide exact specification for format.
+	Reason *string `json:"reason,omitempty"`
+	// A human-readable description of the status of this operation.
+	// TODO: decide on maximum length.
+	Message *string `json:"message,omitempty"`
+	// The component reporting this event. Should be a short machine understandable string.
+	Source *EventSourceApplyConfiguration `json:"source,omitempty"`
+	// The time at which the event was first recorded. (Time of server receipt is in TypeMeta.)
+	FirstTimestamp *apismetav1.Time `json:"firstTimestamp,omitempty"`
+	// The time at which the most recent occurrence of this event was recorded.
+	LastTimestamp *apismetav1.Time `json:"lastTimestamp,omitempty"`
+	// The number of times this event has occurred.
+	Count *int32 `json:"count,omitempty"`
+	// Type of this event (Normal, Warning), new types could be added in the future
+	Type *string `json:"type,omitempty"`
+	// Time when this Event was first observed.
+	EventTime *apismetav1.MicroTime `json:"eventTime,omitempty"`
+	// Data about the Event series this event represents or nil if it's a singleton Event.
+	Series *EventSeriesApplyConfiguration `json:"series,omitempty"`
+	// What action was taken/failed regarding to the Regarding object.
+	Action *string `json:"action,omitempty"`
+	// Optional secondary object for more complex actions.
+	Related *ObjectReferenceApplyConfiguration `json:"related,omitempty"`
+	// Name of the controller that emitted this Event, e.g. `kubernetes.io/kubelet`.
+	ReportingController *string `json:"reportingComponent,omitempty"`
+	// ID of the controller instance, e.g. `kubelet-xyzf`.
+	ReportingInstance *string `json:"reportingInstance,omitempty"`
 }
 
 // Event constructs a declarative configuration of the Event type for use with
@@ -59,29 +85,14 @@ func Event(name, namespace string) *EventApplyConfiguration {
 	return b
 }
 
-// ExtractEvent extracts the applied configuration owned by fieldManager from
-// event. If no managedFields are found in event for fieldManager, a
-// EventApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractEventFrom extracts the applied configuration owned by fieldManager from
+// event for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // event must be a unmodified Event API object that was retrieved from the Kubernetes API.
-// ExtractEvent provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractEventFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
-func ExtractEvent(event *corev1.Event, fieldManager string) (*EventApplyConfiguration, error) {
-	return extractEvent(event, fieldManager, "")
-}
-
-// ExtractEventStatus is the same as ExtractEvent except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractEventStatus(event *corev1.Event, fieldManager string) (*EventApplyConfiguration, error) {
-	return extractEvent(event, fieldManager, "status")
-}
-
-func extractEvent(event *corev1.Event, fieldManager string, subresource string) (*EventApplyConfiguration, error) {
+func ExtractEventFrom(event *corev1.Event, fieldManager string, subresource string) (*EventApplyConfiguration, error) {
 	b := &EventApplyConfiguration{}
 	err := managedfields.ExtractInto(event, internal.Parser().Type("io.k8s.api.core.v1.Event"), fieldManager, b, subresource)
 	if err != nil {
@@ -94,6 +105,21 @@ func extractEvent(event *corev1.Event, fieldManager string, subresource string) 
 	b.WithAPIVersion("v1")
 	return b, nil
 }
+
+// ExtractEvent extracts the applied configuration owned by fieldManager from
+// event. If no managedFields are found in event for fieldManager, a
+// EventApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// event must be a unmodified Event API object that was retrieved from the Kubernetes API.
+// ExtractEvent provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractEvent(event *corev1.Event, fieldManager string) (*EventApplyConfiguration, error) {
+	return ExtractEventFrom(event, fieldManager, "")
+}
+
 func (b EventApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

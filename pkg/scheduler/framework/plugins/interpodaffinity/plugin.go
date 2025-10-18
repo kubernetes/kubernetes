@@ -28,8 +28,6 @@ import (
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/util"
@@ -38,17 +36,17 @@ import (
 // Name is the name of the plugin used in the plugin registry and configurations.
 const Name = names.InterPodAffinity
 
-var _ framework.PreFilterPlugin = &InterPodAffinity{}
-var _ framework.FilterPlugin = &InterPodAffinity{}
-var _ framework.PreScorePlugin = &InterPodAffinity{}
-var _ framework.ScorePlugin = &InterPodAffinity{}
-var _ framework.EnqueueExtensions = &InterPodAffinity{}
+var _ fwk.PreFilterPlugin = &InterPodAffinity{}
+var _ fwk.FilterPlugin = &InterPodAffinity{}
+var _ fwk.PreScorePlugin = &InterPodAffinity{}
+var _ fwk.ScorePlugin = &InterPodAffinity{}
+var _ fwk.EnqueueExtensions = &InterPodAffinity{}
 
 // InterPodAffinity is a plugin that checks inter pod affinity
 type InterPodAffinity struct {
-	parallelizer              parallelize.Parallelizer
+	parallelizer              fwk.Parallelizer
 	args                      config.InterPodAffinityArgs
-	sharedLister              framework.SharedLister
+	sharedLister              fwk.SharedLister
 	nsLister                  listersv1.NamespaceLister
 	enableSchedulingQueueHint bool
 }
@@ -84,7 +82,7 @@ func (pl *InterPodAffinity) EventsToRegister(_ context.Context) ([]fwk.ClusterEv
 }
 
 // New initializes a new plugin and returns it.
-func New(_ context.Context, plArgs runtime.Object, h framework.Handle, fts feature.Features) (framework.Plugin, error) {
+func New(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.Features) (fwk.Plugin, error) {
 	if h.SnapshotSharedLister() == nil {
 		return nil, fmt.Errorf("SnapshotSharedlister is nil")
 	}
@@ -121,7 +119,7 @@ func getArgs(obj runtime.Object) (config.InterPodAffinityArgs, error) {
 // is set to Nothing()) or is Empty(), which means match everything. Therefore,
 // there when matching against this term, there is no need to lookup the existing
 // pod's namespace labels to match them against term's namespaceSelector explicitly.
-func (pl *InterPodAffinity) mergeAffinityTermNamespacesIfNotEmpty(at *framework.AffinityTerm) error {
+func (pl *InterPodAffinity) mergeAffinityTermNamespacesIfNotEmpty(at fwk.AffinityTerm) error {
 	if at.NamespaceSelector.Empty() {
 		return nil
 	}
@@ -159,12 +157,12 @@ func (pl *InterPodAffinity) isSchedulableAfterPodChange(logger klog.Logger, pod 
 		return fwk.QueueSkip, nil
 	}
 
-	terms, err := framework.GetAffinityTerms(pod, framework.GetPodAffinityTerms(pod.Spec.Affinity))
+	terms, err := fwk.GetAffinityTerms(pod, fwk.GetPodAffinityTerms(pod.Spec.Affinity))
 	if err != nil {
 		return fwk.Queue, err
 	}
 
-	antiTerms, err := framework.GetAffinityTerms(pod, framework.GetPodAntiAffinityTerms(pod.Spec.Affinity))
+	antiTerms, err := fwk.GetAffinityTerms(pod, fwk.GetPodAntiAffinityTerms(pod.Spec.Affinity))
 	if err != nil {
 		return fwk.Queue, err
 	}
@@ -217,7 +215,7 @@ func (pl *InterPodAffinity) isSchedulableAfterNodeChange(logger klog.Logger, pod
 		return fwk.Queue, err
 	}
 
-	terms, err := framework.GetAffinityTerms(pod, framework.GetPodAffinityTerms(pod.Spec.Affinity))
+	terms, err := fwk.GetAffinityTerms(pod, fwk.GetPodAffinityTerms(pod.Spec.Affinity))
 	if err != nil {
 		return fwk.Queue, err
 	}
@@ -254,7 +252,7 @@ func (pl *InterPodAffinity) isSchedulableAfterNodeChange(logger klog.Logger, pod
 		}
 	}
 
-	antiTerms, err := framework.GetAffinityTerms(pod, framework.GetPodAntiAffinityTerms(pod.Spec.Affinity))
+	antiTerms, err := fwk.GetAffinityTerms(pod, fwk.GetPodAntiAffinityTerms(pod.Spec.Affinity))
 	if err != nil {
 		return fwk.Queue, err
 	}

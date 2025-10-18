@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/apps/validation"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 // daemonSetStrategy implements verification logic for daemon sets.
@@ -144,10 +144,7 @@ func (daemonSetStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Ob
 	opts := pod.GetValidationOptionsFromPodTemplate(&newDaemonSet.Spec.Template, &oldDaemonSet.Spec.Template)
 	opts.AllowInvalidLabelValueInSelector = opts.AllowInvalidLabelValueInSelector || metav1validation.LabelSelectorHasInvalidLabelValue(oldDaemonSet.Spec.Selector)
 
-	allErrs := validation.ValidateDaemonSet(obj.(*apps.DaemonSet), opts)
-	allErrs = append(allErrs, validation.ValidateDaemonSetUpdate(newDaemonSet, oldDaemonSet, opts)...)
-
-	return allErrs
+	return validation.ValidateDaemonSetUpdate(newDaemonSet, oldDaemonSet, opts)
 }
 
 // WarningsOnUpdate returns warnings for the given update.

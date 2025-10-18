@@ -45,7 +45,8 @@ import (
 const (
 	maxRespBodyLength = 10 * 1 << 10 // 10KB
 
-	AppArmorNotAdmittedReason = "AppArmor"
+	AppArmorNotAdmittedReason          = "AppArmor"
+	PodLevelResourcesNotAdmittedReason = "PodLevelResourcesNotSupported"
 )
 
 type handlerRunner struct {
@@ -70,6 +71,7 @@ func NewHandlerRunner(httpDoer kubetypes.HTTPDoer, commandRunner kubecontainer.C
 }
 
 func (hr *handlerRunner) Run(ctx context.Context, containerID kubecontainer.ContainerID, pod *v1.Pod, container *v1.Container, handler *v1.LifecycleHandler) (string, error) {
+	logger := klog.FromContext(ctx)
 	switch {
 	case handler.Exec != nil:
 		var msg string
@@ -77,7 +79,7 @@ func (hr *handlerRunner) Run(ctx context.Context, containerID kubecontainer.Cont
 		output, err := hr.commandRunner.RunInContainer(ctx, containerID, handler.Exec.Command, 0)
 		if err != nil {
 			msg = fmt.Sprintf("Exec lifecycle hook (%v) for Container %q in Pod %q failed - error: %v, message: %q", handler.Exec.Command, container.Name, format.Pod(pod), err, string(output))
-			klog.V(1).ErrorS(err, "Exec lifecycle hook for Container in Pod failed", "execCommand", handler.Exec.Command, "containerName", container.Name, "pod", klog.KObj(pod), "message", string(output))
+			logger.V(1).Error(err, "Exec lifecycle hook for Container in Pod failed", "execCommand", handler.Exec.Command, "containerName", container.Name, "pod", klog.KObj(pod), "message", string(output))
 		}
 		return msg, err
 	case handler.HTTPGet != nil:
@@ -85,7 +87,7 @@ func (hr *handlerRunner) Run(ctx context.Context, containerID kubecontainer.Cont
 		var msg string
 		if err != nil {
 			msg = fmt.Sprintf("HTTP lifecycle hook (%s) for Container %q in Pod %q failed - error: %v", handler.HTTPGet.Path, container.Name, format.Pod(pod), err)
-			klog.V(1).ErrorS(err, "HTTP lifecycle hook for Container in Pod failed", "path", handler.HTTPGet.Path, "containerName", container.Name, "pod", klog.KObj(pod))
+			logger.V(1).Error(err, "HTTP lifecycle hook for Container in Pod failed", "path", handler.HTTPGet.Path, "containerName", container.Name, "pod", klog.KObj(pod))
 		}
 		return msg, err
 	case handler.Sleep != nil:
@@ -93,13 +95,13 @@ func (hr *handlerRunner) Run(ctx context.Context, containerID kubecontainer.Cont
 		var msg string
 		if err != nil {
 			msg = fmt.Sprintf("Sleep lifecycle hook (%d) for Container %q in Pod %q failed - error: %v", handler.Sleep.Seconds, container.Name, format.Pod(pod), err)
-			klog.V(1).ErrorS(err, "Sleep lifecycle hook for Container in Pod failed", "sleepSeconds", handler.Sleep.Seconds, "containerName", container.Name, "pod", klog.KObj(pod))
+			logger.V(1).Error(err, "Sleep lifecycle hook for Container in Pod failed", "sleepSeconds", handler.Sleep.Seconds, "containerName", container.Name, "pod", klog.KObj(pod))
 		}
 		return msg, err
 	default:
 		err := fmt.Errorf("invalid handler: %v", handler)
 		msg := fmt.Sprintf("Cannot run handler: %v", err)
-		klog.ErrorS(err, "Cannot run handler")
+		logger.Error(err, "Cannot run handler")
 		return msg, err
 	}
 }
@@ -143,12 +145,13 @@ func (hr *handlerRunner) runSleepHandler(ctx context.Context, seconds int64) err
 }
 
 func (hr *handlerRunner) runHTTPHandler(ctx context.Context, pod *v1.Pod, container *v1.Container, handler *v1.LifecycleHandler, eventRecorder record.EventRecorder) error {
+	logger := klog.FromContext(ctx)
 	host := handler.HTTPGet.Host
 	podIP := host
 	if len(host) == 0 {
 		status, err := hr.containerManager.GetPodStatus(ctx, pod.UID, pod.Name, pod.Namespace)
 		if err != nil {
-			klog.ErrorS(err, "Unable to get pod info, event handlers may be invalid.", "pod", klog.KObj(pod))
+			logger.Error(err, "Unable to get pod info, event handlers may be invalid.", "pod", klog.KObj(pod))
 			return err
 		}
 		if len(status.IPs) == 0 {
@@ -166,9 +169,9 @@ func (hr *handlerRunner) runHTTPHandler(ctx context.Context, pod *v1.Pod, contai
 	discardHTTPRespBody(resp)
 
 	if isHTTPResponseError(err) {
-		klog.V(1).ErrorS(err, "HTTPS request to lifecycle hook got HTTP response, retrying with HTTP.", "pod", klog.KObj(pod), "host", req.URL.Host)
+		logger.V(1).Error(err, "HTTPS request to lifecycle hook got HTTP response, retrying with HTTP.", "pod", klog.KObj(pod), "host", req.URL.Host)
 
-		req := req.Clone(context.Background())
+		req := req.Clone(ctx)
 		req.URL.Scheme = "http"
 		req.Header.Del("Authorization")
 		resp, httpErr := hr.httpDoer.Do(req)
@@ -240,4 +243,16 @@ func isHTTPResponseError(err error) bool {
 		return false
 	}
 	return strings.Contains(urlErr.Err.Error(), "server gave HTTP response to HTTPS client")
+}
+
+// NewPodFeaturesAdmitHandler returns a PodAdmitHandler which is used to evaluate
+// if a pod can be admitted from the perspective of pod features compatibility.
+func NewPodFeaturesAdmitHandler() PodAdmitHandler {
+	return &podFeaturesAdmitHandler{}
+}
+
+type podFeaturesAdmitHandler struct{}
+
+func (h *podFeaturesAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult {
+	return isPodLevelResourcesSupported(attrs.Pod)
 }

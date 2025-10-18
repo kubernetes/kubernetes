@@ -18,6 +18,7 @@ package kubelet
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -27,9 +28,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/allocation"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
@@ -61,6 +65,17 @@ type KillPodOptions struct {
 	PodStatusFunc PodStatusFunc
 	// PodTerminationGracePeriodSecondsOverride is optional override to use if a pod is being killed as part of kill operation.
 	PodTerminationGracePeriodSecondsOverride *int64
+}
+
+func (k *KillPodOptions) MarshalJSON() ([]byte, error) {
+	t := struct {
+		Evict                                    bool
+		PodTerminationGracePeriodSecondsOverride *int64
+	}{
+		Evict:                                    k.Evict,
+		PodTerminationGracePeriodSecondsOverride: k.PodTerminationGracePeriodSecondsOverride,
+	}
+	return json.Marshal(t)
 }
 
 // UpdatePodOptions is an options struct to pass to a UpdatePod operation.
@@ -593,6 +608,9 @@ type podWorkers struct {
 	// podCache stores kubecontainer.PodStatus for all pods.
 	podCache kubecontainer.Cache
 
+	// allocationManager is used to allocate resources for pods
+	allocationManager allocation.Manager
+
 	// clock is used for testing timing
 	clock clock.PassiveClock
 }
@@ -603,6 +621,7 @@ func newPodWorkers(
 	workQueue queue.WorkQueue,
 	resyncInterval, backOffPeriod time.Duration,
 	podCache kubecontainer.Cache,
+	allocationManager allocation.Manager,
 ) PodWorkers {
 	return &podWorkers{
 		podSyncStatuses:                    map[types.UID]*podSyncStatus{},
@@ -615,6 +634,7 @@ func newPodWorkers(
 		resyncInterval:                     resyncInterval,
 		backOffPeriod:                      backOffPeriod,
 		podCache:                           podCache,
+		allocationManager:                  allocationManager,
 		clock:                              clock.RealClock{},
 	}
 }
@@ -959,6 +979,9 @@ func (p *podWorkers) UpdatePod(options UpdatePodOptions) {
 
 	// notify the pod worker there is a pending update
 	status.pendingUpdate = &options
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		status.pendingUpdate.Pod, _ = p.allocationManager.UpdatePodFromAllocation(options.Pod)
+	}
 	status.working = true
 	klog.V(4).InfoS("Notifying pod of pending update", "pod", klog.KRef(ns, name), "podUID", uid, "workType", status.WorkType())
 	select {

@@ -38,7 +38,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	zpagesfeatures "k8s.io/component-base/zpages/features"
 	"k8s.io/component-base/zpages/flagz"
-	"k8s.io/component-base/zpages/statusz"
 	"k8s.io/component-helpers/apimachinery/lease"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
@@ -160,10 +159,6 @@ func (c completedConfig) New(name string, delegationTarget genericapiserver.Dele
 		if c.Generic.Flagz != nil {
 			flagz.Install(s.GenericAPIServer.Handler.NonGoRestfulMux, name, c.Generic.Flagz)
 		}
-	}
-
-	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentStatusz) {
-		statusz.Install(s.GenericAPIServer.Handler.NonGoRestfulMux, name, statusz.NewRegistry(c.Generic.EffectiveVersion))
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(apiserverfeatures.CoordinatedLeaderElection) {
@@ -294,7 +289,7 @@ func (c completedConfig) New(name string, delegationTarget genericapiserver.Dele
 				IdentityLeaseGCPeriod,
 				metav1.NamespaceSystem,
 				IdentityLeaseComponentLabelKey+"="+name,
-			).Run(hookContext.Done())
+			).RunWithContext(hookContext)
 			return nil
 		})
 	}
@@ -304,7 +299,7 @@ func (c completedConfig) New(name string, delegationTarget genericapiserver.Dele
 	}
 
 	s.GenericAPIServer.AddPostStartHookOrDie("start-legacy-token-tracking-controller", func(hookContext genericapiserver.PostStartHookContext) error {
-		go legacytokentracking.NewController(client).Run(hookContext.Done())
+		go legacytokentracking.NewController(client).RunWithContext(hookContext)
 		return nil
 	})
 

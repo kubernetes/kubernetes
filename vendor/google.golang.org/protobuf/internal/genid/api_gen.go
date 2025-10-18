@@ -27,6 +27,7 @@ const (
 	Api_SourceContext_field_name protoreflect.Name = "source_context"
 	Api_Mixins_field_name        protoreflect.Name = "mixins"
 	Api_Syntax_field_name        protoreflect.Name = "syntax"
+	Api_Edition_field_name       protoreflect.Name = "edition"
 
 	Api_Name_field_fullname          protoreflect.FullName = "google.protobuf.Api.name"
 	Api_Methods_field_fullname       protoreflect.FullName = "google.protobuf.Api.methods"
@@ -35,6 +36,7 @@ const (
 	Api_SourceContext_field_fullname protoreflect.FullName = "google.protobuf.Api.source_context"
 	Api_Mixins_field_fullname        protoreflect.FullName = "google.protobuf.Api.mixins"
 	Api_Syntax_field_fullname        protoreflect.FullName = "google.protobuf.Api.syntax"
+	Api_Edition_field_fullname       protoreflect.FullName = "google.protobuf.Api.edition"
 )
 
 // Field numbers for google.protobuf.Api.
@@ -46,6 +48,7 @@ const (
 	Api_SourceContext_field_number protoreflect.FieldNumber = 5
 	Api_Mixins_field_number        protoreflect.FieldNumber = 6
 	Api_Syntax_field_number        protoreflect.FieldNumber = 7
+	Api_Edition_field_number       protoreflect.FieldNumber = 8
 )
 
 // Names for google.protobuf.Method.
@@ -63,6 +66,7 @@ const (
 	Method_ResponseStreaming_field_name protoreflect.Name = "response_streaming"
 	Method_Options_field_name           protoreflect.Name = "options"
 	Method_Syntax_field_name            protoreflect.Name = "syntax"
+	Method_Edition_field_name           protoreflect.Name = "edition"
 
 	Method_Name_field_fullname              protoreflect.FullName = "google.protobuf.Method.name"
 	Method_RequestTypeUrl_field_fullname    protoreflect.FullName = "google.protobuf.Method.request_type_url"
@@ -71,6 +75,7 @@ const (
 	Method_ResponseStreaming_field_fullname protoreflect.FullName = "google.protobuf.Method.response_streaming"
 	Method_Options_field_fullname           protoreflect.FullName = "google.protobuf.Method.options"
 	Method_Syntax_field_fullname            protoreflect.FullName = "google.protobuf.Method.syntax"
+	Method_Edition_field_fullname           protoreflect.FullName = "google.protobuf.Method.edition"
 )
 
 // Field numbers for google.protobuf.Method.
@@ -82,6 +87,7 @@ const (
 	Method_ResponseStreaming_field_number protoreflect.FieldNumber = 5
 	Method_Options_field_number           protoreflect.FieldNumber = 6
 	Method_Syntax_field_number            protoreflect.FieldNumber = 7
+	Method_Edition_field_number           protoreflect.FieldNumber = 8
 )
 
 // Names for google.protobuf.Mixin.

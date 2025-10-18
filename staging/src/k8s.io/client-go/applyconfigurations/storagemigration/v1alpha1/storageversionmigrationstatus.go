@@ -20,9 +20,15 @@ package v1alpha1
 
 // StorageVersionMigrationStatusApplyConfiguration represents a declarative configuration of the StorageVersionMigrationStatus type for use
 // with apply.
+//
+// Status of the storage version migration.
 type StorageVersionMigrationStatusApplyConfiguration struct {
-	Conditions      []MigrationConditionApplyConfiguration `json:"conditions,omitempty"`
-	ResourceVersion *string                                `json:"resourceVersion,omitempty"`
+	// The latest available observations of the migration's current state.
+	Conditions []MigrationConditionApplyConfiguration `json:"conditions,omitempty"`
+	// ResourceVersion to compare with the GC cache for performing the migration.
+	// This is the current resource version of given group, version and resource when
+	// kube-controller-manager first observes this StorageVersionMigration resource.
+	ResourceVersion *string `json:"resourceVersion,omitempty"`
 }
 
 // StorageVersionMigrationStatusApplyConfiguration constructs a declarative configuration of the StorageVersionMigrationStatus type for use with

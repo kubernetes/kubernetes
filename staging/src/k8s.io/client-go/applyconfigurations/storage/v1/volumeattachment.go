@@ -29,11 +29,23 @@ import (
 
 // VolumeAttachmentApplyConfiguration represents a declarative configuration of the VolumeAttachment type for use
 // with apply.
+//
+// VolumeAttachment captures the intent to attach or detach the specified volume
+// to/from the specified node.
+//
+// VolumeAttachment objects are non-namespaced.
 type VolumeAttachmentApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                                 *VolumeAttachmentSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                               *VolumeAttachmentStatusApplyConfiguration `json:"status,omitempty"`
+	// spec represents specification of the desired attach/detach volume behavior.
+	// Populated by the Kubernetes system.
+	Spec *VolumeAttachmentSpecApplyConfiguration `json:"spec,omitempty"`
+	// status represents status of the VolumeAttachment request.
+	// Populated by the entity completing the attach or detach
+	// operation, i.e. the external-attacher.
+	Status *VolumeAttachmentStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // VolumeAttachment constructs a declarative configuration of the VolumeAttachment type for use with
@@ -46,29 +58,14 @@ func VolumeAttachment(name string) *VolumeAttachmentApplyConfiguration {
 	return b
 }
 
-// ExtractVolumeAttachment extracts the applied configuration owned by fieldManager from
-// volumeAttachment. If no managedFields are found in volumeAttachment for fieldManager, a
-// VolumeAttachmentApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractVolumeAttachmentFrom extracts the applied configuration owned by fieldManager from
+// volumeAttachment for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // volumeAttachment must be a unmodified VolumeAttachment API object that was retrieved from the Kubernetes API.
-// ExtractVolumeAttachment provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractVolumeAttachmentFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
-func ExtractVolumeAttachment(volumeAttachment *storagev1.VolumeAttachment, fieldManager string) (*VolumeAttachmentApplyConfiguration, error) {
-	return extractVolumeAttachment(volumeAttachment, fieldManager, "")
-}
-
-// ExtractVolumeAttachmentStatus is the same as ExtractVolumeAttachment except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractVolumeAttachmentStatus(volumeAttachment *storagev1.VolumeAttachment, fieldManager string) (*VolumeAttachmentApplyConfiguration, error) {
-	return extractVolumeAttachment(volumeAttachment, fieldManager, "status")
-}
-
-func extractVolumeAttachment(volumeAttachment *storagev1.VolumeAttachment, fieldManager string, subresource string) (*VolumeAttachmentApplyConfiguration, error) {
+func ExtractVolumeAttachmentFrom(volumeAttachment *storagev1.VolumeAttachment, fieldManager string, subresource string) (*VolumeAttachmentApplyConfiguration, error) {
 	b := &VolumeAttachmentApplyConfiguration{}
 	err := managedfields.ExtractInto(volumeAttachment, internal.Parser().Type("io.k8s.api.storage.v1.VolumeAttachment"), fieldManager, b, subresource)
 	if err != nil {
@@ -80,6 +77,27 @@ func extractVolumeAttachment(volumeAttachment *storagev1.VolumeAttachment, field
 	b.WithAPIVersion("storage.k8s.io/v1")
 	return b, nil
 }
+
+// ExtractVolumeAttachment extracts the applied configuration owned by fieldManager from
+// volumeAttachment. If no managedFields are found in volumeAttachment for fieldManager, a
+// VolumeAttachmentApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// volumeAttachment must be a unmodified VolumeAttachment API object that was retrieved from the Kubernetes API.
+// ExtractVolumeAttachment provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractVolumeAttachment(volumeAttachment *storagev1.VolumeAttachment, fieldManager string) (*VolumeAttachmentApplyConfiguration, error) {
+	return ExtractVolumeAttachmentFrom(volumeAttachment, fieldManager, "")
+}
+
+// ExtractVolumeAttachmentStatus extracts the applied configuration owned by fieldManager from
+// volumeAttachment for the status subresource.
+func ExtractVolumeAttachmentStatus(volumeAttachment *storagev1.VolumeAttachment, fieldManager string) (*VolumeAttachmentApplyConfiguration, error) {
+	return ExtractVolumeAttachmentFrom(volumeAttachment, fieldManager, "status")
+}
+
 func (b VolumeAttachmentApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

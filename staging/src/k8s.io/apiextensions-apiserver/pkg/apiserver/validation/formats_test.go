@@ -138,3 +138,104 @@ func TestSupportedFormats(t *testing.T) {
 		})
 	}
 }
+
+func TestGetUnrecognizedFormats(t *testing.T) {
+	testCases := []struct {
+		name                 string
+		schema               *spec.Schema
+		compatibilityVersion *version.Version
+		expectedFormats      []string
+	}{
+		{
+			name:                 "empty format",
+			schema:               &spec.Schema{SchemaProps: spec.SchemaProps{Format: "", Type: []string{"string"}}},
+			compatibilityVersion: version.MajorMinor(1, 0),
+			expectedFormats:      []string{},
+		},
+		{
+			name:                 "recognized format at version 1.0",
+			schema:               &spec.Schema{SchemaProps: spec.SchemaProps{Format: "email", Type: []string{"string"}}},
+			compatibilityVersion: version.MajorMinor(1, 0),
+			expectedFormats:      []string{},
+		},
+		{
+			name:                 "unrecognized format at version 1.0",
+			schema:               &spec.Schema{SchemaProps: spec.SchemaProps{Format: "unknown-format", Type: []string{"string"}}},
+			compatibilityVersion: version.MajorMinor(1, 0),
+			expectedFormats:      []string{"unknown-format"},
+		},
+		{
+			name:                 "recognized format with normalization",
+			schema:               &spec.Schema{SchemaProps: spec.SchemaProps{Format: "k8s-short-name", Type: []string{"string"}}},
+			compatibilityVersion: version.MajorMinor(1, 34),
+			expectedFormats:      []string{},
+		},
+		{
+			name:                 "unrecognized format with normalization",
+			schema:               &spec.Schema{SchemaProps: spec.SchemaProps{Format: "k8s-long-name", Type: []string{"string"}}},
+			compatibilityVersion: version.MajorMinor(1, 33),
+			expectedFormats:      []string{"k8s-long-name"},
+		},
+		{
+			name:                 "format introduced in later version",
+			schema:               &spec.Schema{SchemaProps: spec.SchemaProps{Format: "k8s-short-name", Type: []string{"string"}}},
+			compatibilityVersion: version.MajorMinor(1, 0),
+			expectedFormats:      []string{"k8s-short-name"},
+		},
+		{
+			name:                 "format with dash normalization",
+			schema:               &spec.Schema{SchemaProps: spec.SchemaProps{Format: "k8sshortname", Type: []string{"string"}}},
+			compatibilityVersion: version.MajorMinor(1, 34),
+			expectedFormats:      []string{},
+		},
+		{
+			name:                 "recognized format at exact version",
+			schema:               &spec.Schema{SchemaProps: spec.SchemaProps{Format: "uuid", Type: []string{"string"}}},
+			compatibilityVersion: version.MajorMinor(1, 0),
+			expectedFormats:      []string{},
+		},
+		{
+			name:                 "recognized format at higher version",
+			schema:               &spec.Schema{SchemaProps: spec.SchemaProps{Format: "email", Type: []string{"string"}}},
+			compatibilityVersion: version.MajorMinor(1, 35),
+			expectedFormats:      []string{},
+		},
+		{
+			name:                 "unrecognized format for integer type is not reported",
+			schema:               &spec.Schema{SchemaProps: spec.SchemaProps{Format: "unknown-format", Type: []string{"integer"}}},
+			compatibilityVersion: version.MajorMinor(1, 0),
+			expectedFormats:      []string{},
+		},
+		{
+			name:                 "unrecognized format for string,null type is not reported",
+			schema:               &spec.Schema{SchemaProps: spec.SchemaProps{Format: "unknown-format", Type: []string{"string", "null"}}},
+			compatibilityVersion: version.MajorMinor(1, 0),
+			expectedFormats:      []string{},
+		},
+		{
+			name:                 "unrecognized format for no type is not reported",
+			schema:               &spec.Schema{SchemaProps: spec.SchemaProps{Format: "unknown-format"}},
+			compatibilityVersion: version.MajorMinor(1, 0),
+			expectedFormats:      []string{},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := GetUnrecognizedFormats(tc.schema, tc.compatibilityVersion)
+
+			if len(got) != len(tc.expectedFormats) {
+				t.Errorf("expected %d unrecognized formats, got %d", len(tc.expectedFormats), len(got))
+				return
+			}
+
+			// Convert to sets for comparison to handle order differences
+			gotSet := sets.New(got...)
+			expectedSet := sets.New(tc.expectedFormats...)
+
+			if !gotSet.Equal(expectedSet) {
+				t.Errorf("expected unrecognized formats %v, got %v", tc.expectedFormats, got)
+			}
+		})
+	}
+}

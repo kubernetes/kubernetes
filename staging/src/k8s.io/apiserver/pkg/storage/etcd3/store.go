@@ -25,6 +25,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"go.etcd.io/etcd/api/v3/mvccpb"
@@ -90,7 +91,10 @@ type store struct {
 
 	resourcePrefix string
 	newListFunc    func() runtime.Object
-	stats          *statsCache
+	compactor      Compactor
+
+	collectorMux          sync.RWMutex
+	resourceSizeEstimator *resourceSizeEstimator
 }
 
 var _ storage.Interface = (*store)(nil)
@@ -141,7 +145,7 @@ func (a *abortOnFirstError) Aggregate(key string, err error) bool {
 func (a *abortOnFirstError) Err() error { return a.err }
 
 // New returns an etcd3 implementation of storage.Interface.
-func New(c *kubernetes.Client, codec runtime.Codec, newFunc, newListFunc func() runtime.Object, prefix, resourcePrefix string, groupResource schema.GroupResource, transformer value.Transformer, leaseManagerConfig LeaseManagerConfig, decoder Decoder, versioner storage.Versioner) *store {
+func New(c *kubernetes.Client, compactor Compactor, codec runtime.Codec, newFunc, newListFunc func() runtime.Object, prefix, resourcePrefix string, groupResource schema.GroupResource, transformer value.Transformer, leaseManagerConfig LeaseManagerConfig, decoder Decoder, versioner storage.Versioner) (*store, error) {
 	// for compatibility with etcd2 impl.
 	// no-op for default prefix of '/registry'.
 	// keeps compatibility with etcd2 impl for custom prefixes that don't start with '/'
@@ -149,6 +153,15 @@ func New(c *kubernetes.Client, codec runtime.Codec, newFunc, newListFunc func() 
 	if !strings.HasSuffix(pathPrefix, "/") {
 		// Ensure the pathPrefix ends in "/" here to simplify key concatenation later.
 		pathPrefix += "/"
+	}
+	if resourcePrefix == "" {
+		return nil, fmt.Errorf("resourcePrefix cannot be empty")
+	}
+	if resourcePrefix == "/" {
+		return nil, fmt.Errorf("resourcePrefix cannot be /")
+	}
+	if !strings.HasPrefix(resourcePrefix, "/") {
+		return nil, fmt.Errorf("resourcePrefix needs to start from /")
 	}
 
 	listErrAggrFactory := defaultListErrorAggregatorFactory
@@ -183,20 +196,24 @@ func New(c *kubernetes.Client, codec runtime.Codec, newFunc, newListFunc func() 
 
 		resourcePrefix: resourcePrefix,
 		newListFunc:    newListFunc,
-	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.SizeBasedListCostEstimate) {
-		stats := newStatsCache(pathPrefix, s.getKeys)
-		s.stats = stats
-		w.stats = stats
+		compactor:      compactor,
 	}
 
+	w.getResourceSizeEstimator = s.getResourceSizeEstimator
 	w.getCurrentStorageRV = func(ctx context.Context) (uint64, error) {
 		return s.GetCurrentResourceVersion(ctx)
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) || utilfeature.DefaultFeatureGate.Enabled(features.WatchList) {
 		etcdfeature.DefaultFeatureSupportChecker.CheckClient(c.Ctx(), c, storage.RequestWatchProgress)
 	}
-	return s
+	return s, nil
+}
+
+func (s *store) CompactRevision() int64 {
+	if s.compactor == nil {
+		return 0
+	}
+	return s.compactor.CompactRevision()
 }
 
 // Versioner implements storage.Interface.Versioner.
@@ -205,14 +222,21 @@ func (s *store) Versioner() storage.Versioner {
 }
 
 func (s *store) Close() {
-	if s.stats != nil {
-		s.stats.Close()
+	stats := s.getResourceSizeEstimator()
+	if stats != nil {
+		stats.Close()
 	}
+}
+
+func (s *store) getResourceSizeEstimator() *resourceSizeEstimator {
+	s.collectorMux.RLock()
+	defer s.collectorMux.RUnlock()
+	return s.resourceSizeEstimator
 }
 
 // Get implements storage.Interface.Get.
 func (s *store) Get(ctx context.Context, key string, opts storage.GetOptions, out runtime.Object) error {
-	preparedKey, err := s.prepareKey(key)
+	preparedKey, err := s.prepareKey(key, false)
 	if err != nil {
 		return err
 	}
@@ -248,7 +272,7 @@ func (s *store) Get(ctx context.Context, key string, opts storage.GetOptions, ou
 
 // Create implements storage.Interface.Create.
 func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object, ttl uint64) error {
-	preparedKey, err := s.prepareKey(key)
+	preparedKey, err := s.prepareKey(key, false)
 	if err != nil {
 		return err
 	}
@@ -318,7 +342,7 @@ func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object,
 func (s *store) Delete(
 	ctx context.Context, key string, out runtime.Object, preconditions *storage.Preconditions,
 	validateDeletion storage.ValidateObjectFunc, cachedExistingObject runtime.Object, opts storage.DeleteOptions) error {
-	preparedKey, err := s.prepareKey(key)
+	preparedKey, err := s.prepareKey(key, false)
 	if err != nil {
 		return err
 	}
@@ -439,7 +463,7 @@ func (s *store) conditionalDelete(
 func (s *store) GuaranteedUpdate(
 	ctx context.Context, key string, destination runtime.Object, ignoreNotFound bool,
 	preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, cachedExistingObject runtime.Object) error {
-	preparedKey, err := s.prepareKey(key)
+	preparedKey, err := s.prepareKey(key, false)
 	if err != nil {
 		return err
 	}
@@ -620,12 +644,18 @@ func getNewItemFunc(listObj runtime.Object, v reflect.Value) func() runtime.Obje
 	}
 }
 
-func (s *store) Stats(ctx context.Context) (stats storage.Stats, err error) {
-	if s.stats != nil {
-		return s.stats.Stats(ctx)
+func (s *store) Stats(ctx context.Context) (storage.Stats, error) {
+	if collector := s.getResourceSizeEstimator(); collector != nil {
+		return collector.Stats(ctx)
 	}
+	// returning stats without resource size
+
 	startTime := time.Now()
-	count, err := s.client.Kubernetes.Count(ctx, s.pathPrefix, kubernetes.CountOptions{})
+	prefix, err := s.prepareKey(s.resourcePrefix, true)
+	if err != nil {
+		return storage.Stats{}, err
+	}
+	count, err := s.client.Kubernetes.Count(ctx, prefix, kubernetes.CountOptions{})
 	metrics.RecordEtcdRequest("listWithCount", s.groupResource, err, startTime)
 	if err != nil {
 		return storage.Stats{}, err
@@ -635,16 +665,30 @@ func (s *store) Stats(ctx context.Context) (stats storage.Stats, err error) {
 	}, nil
 }
 
-func (s *store) SetKeysFunc(keys storage.KeysFunc) {
-	if s.stats != nil {
-		s.stats.SetKeysFunc(keys)
+func (s *store) EnableResourceSizeEstimation(getKeys storage.KeysFunc) error {
+	if getKeys == nil {
+		return errors.New("KeysFunc cannot be nil")
 	}
+	s.collectorMux.Lock()
+	defer s.collectorMux.Unlock()
+	if s.resourceSizeEstimator != nil {
+		return errors.New("resourceSizeEstimator already enabled")
+	}
+	s.resourceSizeEstimator = newResourceSizeEstimator(s.pathPrefix, getKeys)
+	return nil
 }
 
 func (s *store) getKeys(ctx context.Context) ([]string, error) {
 	startTime := time.Now()
-	resp, err := s.client.KV.Get(ctx, s.pathPrefix, clientv3.WithPrefix(), clientv3.WithKeysOnly())
+	prefix, err := s.prepareKey(s.resourcePrefix, true)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := s.client.KV.Get(ctx, prefix, clientv3.WithPrefix(), clientv3.WithKeysOnly())
 	metrics.RecordEtcdRequest("listOnlyKeys", s.groupResource, err, startTime)
+	if err != nil {
+		return nil, err
+	}
 	keys := make([]string, 0, len(resp.Kvs))
 	for _, kv := range resp.Kvs {
 		keys = append(keys, string(kv.Key))
@@ -690,7 +734,7 @@ func (s *store) GetCurrentResourceVersion(ctx context.Context) (uint64, error) {
 
 // GetList implements storage.Interface.
 func (s *store) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
-	keyPrefix, err := s.prepareKey(key)
+	keyPrefix, err := s.prepareKey(key, opts.Recursive)
 	if err != nil {
 		return err
 	}
@@ -709,14 +753,6 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 	v, err := conversion.EnforcePtr(listPtr)
 	if err != nil || v.Kind() != reflect.Slice {
 		return fmt.Errorf("need ptr to slice: %v", err)
-	}
-
-	// For recursive lists, we need to make sure the key ended with "/" so that we only
-	// get children "directories". e.g. if we have key "/a", "/a/b", "/ab", getting keys
-	// with prefix "/a" will return all three, while with prefix "/a/" will return only
-	// "/a/b" which is the correct answer.
-	if opts.Recursive && !strings.HasSuffix(keyPrefix, "/") {
-		keyPrefix += "/"
 	}
 
 	// set the appropriate clientv3 options to filter the returned data set
@@ -742,20 +778,13 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		metrics.RecordStorageListMetrics(s.groupResource, numFetched, numEvald, numReturn)
 	}()
 
-	metricsOp := "get"
-	if opts.Recursive {
-		metricsOp = "list"
-	}
-
 	aggregator := s.listErrAggrFactory()
 	for {
-		startTime := time.Now()
 		getResp, err = s.getList(ctx, keyPrefix, opts.Recursive, kubernetes.ListOptions{
 			Revision: withRev,
 			Limit:    limit,
 			Continue: continueKey,
 		})
-		metrics.RecordEtcdRequest(metricsOp, s.groupResource, err, startTime)
 		if err != nil {
 			if errors.Is(err, etcdrpc.ErrFutureRev) {
 				currentRV, getRVErr := s.GetCurrentResourceVersion(ctx)
@@ -787,9 +816,6 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 			growSlice(v, len(getResp.Kvs))
 		} else {
 			growSlice(v, 2048, len(getResp.Kvs))
-		}
-		if s.stats != nil {
-			s.stats.Update(getResp.Kvs)
 		}
 
 		// take items from the response until the bucket is full, filtering as we go
@@ -872,22 +898,31 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 	return s.versioner.UpdateList(listObj, uint64(withRev), continueValue, remainingItemCount)
 }
 
-func (s *store) getList(ctx context.Context, keyPrefix string, recursive bool, options kubernetes.ListOptions) (kubernetes.ListResponse, error) {
+func (s *store) getList(ctx context.Context, keyPrefix string, recursive bool, options kubernetes.ListOptions) (resp kubernetes.ListResponse, err error) {
+	startTime := time.Now()
 	if recursive {
-		return s.client.Kubernetes.List(ctx, keyPrefix, options)
-	}
-	getResp, err := s.client.Kubernetes.Get(ctx, keyPrefix, kubernetes.GetOptions{
-		Revision: options.Revision,
-	})
-	var resp kubernetes.ListResponse
-	if getResp.KV != nil {
-		resp.Kvs = []*mvccpb.KeyValue{getResp.KV}
-		resp.Count = 1
-		resp.Revision = getResp.Revision
+		resp, err = s.client.Kubernetes.List(ctx, keyPrefix, options)
+		metrics.RecordEtcdRequest("list", s.groupResource, err, startTime)
 	} else {
-		resp.Kvs = []*mvccpb.KeyValue{}
-		resp.Count = 0
-		resp.Revision = getResp.Revision
+		var getResp kubernetes.GetResponse
+		getResp, err = s.client.Kubernetes.Get(ctx, keyPrefix, kubernetes.GetOptions{
+			Revision: options.Revision,
+		})
+		metrics.RecordEtcdRequest("get", s.groupResource, err, startTime)
+		if getResp.KV != nil {
+			resp.Kvs = []*mvccpb.KeyValue{getResp.KV}
+			resp.Count = 1
+			resp.Revision = getResp.Revision
+		} else {
+			resp.Kvs = []*mvccpb.KeyValue{}
+			resp.Count = 0
+			resp.Revision = getResp.Revision
+		}
+	}
+
+	stats := s.getResourceSizeEstimator()
+	if len(resp.Kvs) > 0 && stats != nil {
+		stats.Update(resp.Kvs)
 	}
 	return resp, err
 }
@@ -925,7 +960,7 @@ func growSlice(v reflect.Value, maxCapacity int, sizes ...int) {
 
 // Watch implements storage.Interface.Watch.
 func (s *store) Watch(ctx context.Context, key string, opts storage.ListOptions) (watch.Interface, error) {
-	preparedKey, err := s.prepareKey(key)
+	preparedKey, err := s.prepareKey(key, opts.Recursive)
 	if err != nil {
 		return nil, err
 	}
@@ -1072,21 +1107,10 @@ func (s *store) validateMinimumResourceVersion(minimumResourceVersion string, ac
 	return nil
 }
 
-func (s *store) prepareKey(key string) (string, error) {
-	if key == ".." ||
-		strings.HasPrefix(key, "../") ||
-		strings.HasSuffix(key, "/..") ||
-		strings.Contains(key, "/../") {
-		return "", fmt.Errorf("invalid key: %q", key)
-	}
-	if key == "." ||
-		strings.HasPrefix(key, "./") ||
-		strings.HasSuffix(key, "/.") ||
-		strings.Contains(key, "/./") {
-		return "", fmt.Errorf("invalid key: %q", key)
-	}
-	if key == "" || key == "/" {
-		return "", fmt.Errorf("empty key: %q", key)
+func (s *store) prepareKey(key string, recursive bool) (string, error) {
+	key, err := storage.PrepareKey(s.resourcePrefix, key, recursive)
+	if err != nil {
+		return "", err
 	}
 	// We ensured that pathPrefix ends in '/' in construction, so skip any leading '/' in the key now.
 	startIndex := 0

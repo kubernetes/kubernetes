@@ -48,7 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/node"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/kubernetes/test/utils/ktesting"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -95,7 +95,7 @@ func createNodeLease(nodeName string, renewTime metav1.MicroTime) *coordv1.Lease
 			Namespace: v1.NamespaceNodeLease,
 		},
 		Spec: coordv1.LeaseSpec{
-			HolderIdentity: pointer.String(nodeName),
+			HolderIdentity: ptr.To(nodeName),
 			RenewTime:      &renewTime,
 		},
 	}

@@ -101,7 +101,9 @@ func (plugin *flexVolumePlugin) Init(host volume.VolumeHost) error {
 	return nil
 }
 
-func (plugin *flexVolumePlugin) VerifyExhaustedResource(spec *volume.Spec, nodeName types.NodeName) {}
+func (plugin *flexVolumePlugin) VerifyExhaustedResource(spec *volume.Spec) bool {
+	return false
+}
 
 func (plugin *flexVolumePlugin) getExecutable() string {
 	parts := strings.Split(plugin.driverName, "/")

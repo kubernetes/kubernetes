@@ -29,10 +29,27 @@ import (
 
 // DeviceClassApplyConfiguration represents a declarative configuration of the DeviceClass type for use
 // with apply.
+//
+// DeviceClass is a vendor- or admin-provided resource that contains
+// device configuration and selectors. It can be referenced in
+// the device requests of a claim to apply these presets.
+// Cluster scoped.
+//
+// This is an alpha type and requires enabling the DynamicResourceAllocation
+// feature gate.
 type DeviceClassApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *DeviceClassSpecApplyConfiguration `json:"spec,omitempty"`
+	// Spec defines what can be allocated and how to configure it.
+	//
+	// This is mutable. Consumers have to be prepared for classes changing
+	// at any time, either because they get updated or replaced. Claim
+	// allocations are done once based on whatever was set in classes at
+	// the time of allocation.
+	//
+	// Changing the spec automatically increments the metadata.generation number.
+	Spec *DeviceClassSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
 // DeviceClass constructs a declarative configuration of the DeviceClass type for use with
@@ -45,29 +62,14 @@ func DeviceClass(name string) *DeviceClassApplyConfiguration {
 	return b
 }
 
-// ExtractDeviceClass extracts the applied configuration owned by fieldManager from
-// deviceClass. If no managedFields are found in deviceClass for fieldManager, a
-// DeviceClassApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractDeviceClassFrom extracts the applied configuration owned by fieldManager from
+// deviceClass for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // deviceClass must be a unmodified DeviceClass API object that was retrieved from the Kubernetes API.
-// ExtractDeviceClass provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractDeviceClassFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
-func ExtractDeviceClass(deviceClass *resourcev1beta1.DeviceClass, fieldManager string) (*DeviceClassApplyConfiguration, error) {
-	return extractDeviceClass(deviceClass, fieldManager, "")
-}
-
-// ExtractDeviceClassStatus is the same as ExtractDeviceClass except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractDeviceClassStatus(deviceClass *resourcev1beta1.DeviceClass, fieldManager string) (*DeviceClassApplyConfiguration, error) {
-	return extractDeviceClass(deviceClass, fieldManager, "status")
-}
-
-func extractDeviceClass(deviceClass *resourcev1beta1.DeviceClass, fieldManager string, subresource string) (*DeviceClassApplyConfiguration, error) {
+func ExtractDeviceClassFrom(deviceClass *resourcev1beta1.DeviceClass, fieldManager string, subresource string) (*DeviceClassApplyConfiguration, error) {
 	b := &DeviceClassApplyConfiguration{}
 	err := managedfields.ExtractInto(deviceClass, internal.Parser().Type("io.k8s.api.resource.v1beta1.DeviceClass"), fieldManager, b, subresource)
 	if err != nil {
@@ -79,6 +81,21 @@ func extractDeviceClass(deviceClass *resourcev1beta1.DeviceClass, fieldManager s
 	b.WithAPIVersion("resource.k8s.io/v1beta1")
 	return b, nil
 }
+
+// ExtractDeviceClass extracts the applied configuration owned by fieldManager from
+// deviceClass. If no managedFields are found in deviceClass for fieldManager, a
+// DeviceClassApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// deviceClass must be a unmodified DeviceClass API object that was retrieved from the Kubernetes API.
+// ExtractDeviceClass provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractDeviceClass(deviceClass *resourcev1beta1.DeviceClass, fieldManager string) (*DeviceClassApplyConfiguration, error) {
+	return ExtractDeviceClassFrom(deviceClass, fieldManager, "")
+}
+
 func (b DeviceClassApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

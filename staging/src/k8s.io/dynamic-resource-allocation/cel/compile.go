@@ -35,7 +35,7 @@ import (
 
 	"k8s.io/utils/ptr"
 
-	resourceapi "k8s.io/api/resource/v1beta1"
+	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/util/version"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	apiservercel "k8s.io/apiserver/pkg/cel"
@@ -46,13 +46,15 @@ import (
 const (
 	deviceVar     = "device"
 	driverVar     = "driver"
+	multiAllocVar = "allowMultipleAllocations"
 	attributesVar = "attributes"
 	capacityVar   = "capacity"
 )
 
 var (
-	lazyCompilerInit sync.Once
-	lazyCompiler     *compiler
+	layzCompilerMutex sync.Mutex
+	lazyCompiler      *compiler
+	lazyFeatures      Features
 
 	// A variant of AnyType = https://github.com/kubernetes/kubernetes/blob/ec2e0de35a298363872897e5904501b029817af3/staging/src/k8s.io/apiserver/pkg/cel/types.go#L550:
 	// unknown actual type (could be bool, int, string, etc.) but with a known maximum size.
@@ -63,6 +65,11 @@ var (
 	idType     = withMaxElements(apiservercel.StringType, resourceapi.DeviceMaxIDLength)
 	driverType = withMaxElements(apiservercel.StringType, resourceapi.DriverNameMaxLength)
 
+	// A variant of BoolType with a known cost. Usage of apiservercel.BoolType
+	// is underestimated without this (found when comparing estimated against
+	// actual cost in compile_test.go).
+	multiAllocType = withMaxElements(apiservercel.BoolType, 1)
+
 	// Each map is bound by the maximum number of different attributes.
 	innerAttributesMapType = apiservercel.NewMapType(idType, attributeType, resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice)
 	outerAttributesMapType = apiservercel.NewMapType(domainType, innerAttributesMapType, resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice)
@@ -72,10 +79,21 @@ var (
 	outerCapacityMapType = apiservercel.NewMapType(domainType, innerCapacityMapType, resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice)
 )
 
-func GetCompiler() *compiler {
-	lazyCompilerInit.Do(func() {
-		lazyCompiler = newCompiler()
-	})
+// Features contains feature gates supported by the package.
+type Features struct {
+	EnableConsumableCapacity bool
+}
+
+func GetCompiler(features Features) *compiler {
+	layzCompilerMutex.Lock()
+	defer layzCompilerMutex.Unlock()
+
+	// In practice, features should not change back and forth between calls,
+	// so only one compiler gets cached.
+	if lazyCompiler == nil || lazyFeatures != features {
+		lazyCompiler = newCompiler(features)
+		lazyFeatures = features
+	}
 	return lazyCompiler
 }
 
@@ -99,15 +117,17 @@ type Device struct {
 	// Driver gets used as domain for any attribute which does not already
 	// have a domain prefix. If set, then it is also made available as a
 	// string attribute.
-	Driver     string
-	Attributes map[resourceapi.QualifiedName]resourceapi.DeviceAttribute
-	Capacity   map[resourceapi.QualifiedName]resourceapi.DeviceCapacity
+	Driver                   string
+	AllowMultipleAllocations *bool
+	Attributes               map[resourceapi.QualifiedName]resourceapi.DeviceAttribute
+	Capacity                 map[resourceapi.QualifiedName]resourceapi.DeviceCapacity
 }
 
 type compiler struct {
-	// deviceType is a definition for the type of the `device` variable.
-	// This is needed for the cost estimator. Both are currently version-independent.
-	// If that ever changes, some additional logic might be needed to make
+	// deviceType is a definition for the latest type of the `device` variable.
+	// This is needed for the cost estimator.
+	// If that ever changes such as involving type-checking expressions,
+	// some additional logic might be needed to make
 	// cost estimates version-dependent.
 	deviceType *apiservercel.DeclType
 	envset     *environment.EnvSet
@@ -253,6 +273,7 @@ func (c CompilationResult) DeviceMatches(ctx context.Context, input Device) (boo
 	variables := map[string]any{
 		deviceVar: map[string]any{
 			driverVar:     input.Driver,
+			multiAllocVar: ptr.Deref(input.AllowMultipleAllocations, false),
 			attributesVar: newStringInterfaceMapWithDefault(c.Environment.CELTypeAdapter(), attributes, c.emptyMapVal),
 			capacityVar:   newStringInterfaceMapWithDefault(c.Environment.CELTypeAdapter(), capacity, c.emptyMapVal),
 		},
@@ -260,6 +281,11 @@ func (c CompilationResult) DeviceMatches(ctx context.Context, input Device) (boo
 
 	result, details, err := c.Program.ContextEval(ctx, variables)
 	if err != nil {
+		// CEL does not wrap the context error. We have to deduce why it failed.
+		// See https://github.com/google/cel-go/issues/1195.
+		if strings.Contains(err.Error(), "operation interrupted") && ctx.Err() != nil {
+			return false, details, fmt.Errorf("%w: %w", err, context.Cause(ctx))
+		}
 		return false, details, err
 	}
 	resultAny, err := result.ConvertToNative(boolType)
@@ -273,7 +299,7 @@ func (c CompilationResult) DeviceMatches(ctx context.Context, input Device) (boo
 	return resultBool, details, nil
 }
 
-func newCompiler() *compiler {
+func newCompiler(features Features) *compiler {
 	envset := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true /* strictCost */)
 	field := func(name string, declType *apiservercel.DeclType, required bool) *apiservercel.DeclField {
 		return apiservercel.NewDeclField(name, declType, required, nil, nil)
@@ -286,18 +312,22 @@ func newCompiler() *compiler {
 		return result
 	}
 
-	deviceType := apiservercel.NewObjectType("kubernetes.DRADevice", fields(
+	fieldsV131 := []*apiservercel.DeclField{
 		field(driverVar, driverType, true),
 		field(attributesVar, outerAttributesMapType, true),
 		field(capacityVar, outerCapacityMapType, true),
-	))
+	}
+	deviceTypeV131 := apiservercel.NewObjectType("kubernetes.DRADevice", fields(fieldsV131...))
+
+	// One additional field, feature-gated below.
+	fieldsV134ConsumableCapacity := []*apiservercel.DeclField{field(multiAllocVar, multiAllocType, true)}
+	fieldsV134ConsumableCapacity = append(fieldsV134ConsumableCapacity, fieldsV131...)
+	deviceTypeV134ConsumableCapacity := apiservercel.NewObjectType("kubernetes.DRADevice", fields(fieldsV134ConsumableCapacity...))
 
 	versioned := []environment.VersionedOptions{
 		{
 			IntroducedVersion: version.MajorMinor(1, 31),
 			EnvOptions: []cel.EnvOption{
-				cel.Variable(deviceVar, deviceType.CelType()),
-
 				// https://pkg.go.dev/github.com/google/cel-go/ext#Bindings
 				//
 				// This is useful to simplify attribute lookups because the
@@ -306,24 +336,31 @@ func newCompiler() *compiler {
 				//    cel.bind(dra, device.attributes["dra.example.com"], dra.oneBool && dra.anotherBool)
 				ext.Bindings(ext.BindingsVersion(0)),
 			},
+		},
+		// deviceTypeV131 and deviceTypeV134ConsumableCapacity are complimentary and picked
+		// based on the feature gate.
+		{
+			IntroducedVersion: version.MajorMinor(1, 31),
+			FeatureEnabled: func() bool {
+				return !features.EnableConsumableCapacity
+			},
+			EnvOptions: []cel.EnvOption{
+				cel.Variable(deviceVar, deviceTypeV131.CelType()),
+			},
 			DeclTypes: []*apiservercel.DeclType{
-				deviceType,
+				deviceTypeV131,
 			},
 		},
 		{
-			IntroducedVersion: version.MajorMinor(1, 31),
-			// This library has added to base environment of Kubernetes
-			// in 1.33 at version 1. It will continue to be available for
-			// use in this environment, but does not need to be included
-			// directly since it becomes available indirectly via the base
-			// environment shared across Kubernetes.
-			// In Kubernetes 1.34, version 1 feature of this library will
-			// become available, and will be rollback safe to 1.33.
-			// TODO: In Kubernetes 1.34: Add compile tests that demonstrate that
-			// `isSemver("v1.0.0", true)` and `semver("v1.0.0", true)` are supported.
-			RemovedVersion: version.MajorMinor(1, 33),
+			IntroducedVersion: version.MajorMinor(1, 34),
+			FeatureEnabled: func() bool {
+				return features.EnableConsumableCapacity
+			},
 			EnvOptions: []cel.EnvOption{
-				library.SemverLib(library.SemverVersion(0)),
+				cel.Variable(deviceVar, deviceTypeV134ConsumableCapacity.CelType()),
+			},
+			DeclTypes: []*apiservercel.DeclType{
+				deviceTypeV134ConsumableCapacity,
 			},
 		},
 	}
@@ -331,7 +368,8 @@ func newCompiler() *compiler {
 	if err != nil {
 		panic(fmt.Errorf("internal error building CEL environment: %w", err))
 	}
-	return &compiler{envset: envset, deviceType: deviceType}
+	// return with newest deviceType
+	return &compiler{envset: envset, deviceType: deviceTypeV134ConsumableCapacity}
 }
 
 func withMaxElements(in *apiservercel.DeclType, maxElements uint64) *apiservercel.DeclType {

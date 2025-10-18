@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -231,7 +232,7 @@ func rmdir(path string, retry bool) error {
 
 again:
 	err := unix.Rmdir(path)
-	switch err { // nolint:errorlint // unix errors are bare
+	switch err {
 	case nil, unix.ENOENT:
 		return nil
 	case unix.EINTR:
@@ -395,7 +396,7 @@ func WriteCgroupProc(dir string, pid int) error {
 	}
 	defer file.Close()
 
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		_, err = file.WriteString(strconv.Itoa(pid))
 		if err == nil {
 			return nil
@@ -413,16 +414,30 @@ func WriteCgroupProc(dir string, pid int) error {
 	return err
 }
 
-// Since the OCI spec is designed for cgroup v1, in some cases
-// there is need to convert from the cgroup v1 configuration to cgroup v2
-// the formula for cpuShares is y = (1 + ((x - 2) * 9999) / 262142)
-// convert from [2-262144] to [1-10000]
-// 262144 comes from Linux kernel definition "#define MAX_SHARES (1UL << 18)"
+// ConvertCPUSharesToCgroupV2Value converts CPU shares, used by cgroup v1,
+// to CPU weight, used by cgroup v2.
+//
+// Cgroup v1 CPU shares has a range of [2^1...2^18], i.e. [2...262144],
+// and the default value is 1024.
+//
+// Cgroup v2 CPU weight has a range of [10^0...10^4], i.e. [1...10000],
+// and the default value is 100.
 func ConvertCPUSharesToCgroupV2Value(cpuShares uint64) uint64 {
+	// The value of 0 means "unset".
 	if cpuShares == 0 {
 		return 0
 	}
-	return (1 + ((cpuShares-2)*9999)/262142)
+	if cpuShares <= 2 {
+		return 1
+	}
+	if cpuShares >= 262144 {
+		return 10000
+	}
+	l := math.Log2(float64(cpuShares))
+	// Quadratic function which fits min, max, and default.
+	exponent := (l*l+125*l)/612.0 - 7.0/34.0
+
+	return uint64(math.Ceil(math.Pow(10, exponent)))
 }
 
 // ConvertMemorySwapToCgroupV2Value converts MemorySwap value from OCI spec

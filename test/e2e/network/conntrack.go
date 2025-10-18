@@ -31,6 +31,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edaemonset "k8s.io/kubernetes/test/e2e/framework/daemonset"
+	e2eendpointslice "k8s.io/kubernetes/test/e2e/framework/endpointslice"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
@@ -172,9 +173,10 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		e2epod.SetNodeSelection(&serverPod1.Spec, nodeSelection)
 		e2epod.NewPodClient(fr).CreateSync(ctx, serverPod1)
 
-		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{podBackend1: {80}})
+		err = e2eendpointslice.WaitForEndpointPods(ctx, cs, ns, serviceName, podBackend1)
+		framework.ExpectNoError(err)
 
-		// Note that the fact that Endpoints object already exists, does NOT mean
+		// Note that the fact that EndpointSlice object already exists, does NOT mean
 		// that iptables (or whatever else is used) was already programmed.
 		// Additionally take into account that UDP conntract entries timeout is
 		// 30 seconds by default.
@@ -199,7 +201,8 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		framework.Logf("Cleaning up %s pod", podBackend1)
 		e2epod.NewPodClient(fr).DeleteSync(ctx, podBackend1, metav1.DeleteOptions{}, fr.Timeouts.PodDelete)
 
-		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{podBackend2: {80}})
+		err = e2eendpointslice.WaitForEndpointPods(ctx, cs, ns, serviceName, podBackend2)
+		framework.ExpectNoError(err)
 
 		// Check that the second pod keeps receiving traffic
 		// UDP conntrack entries timeout is 30 sec by default
@@ -248,9 +251,10 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		e2epod.SetNodeSelection(&serverPod1.Spec, nodeSelection)
 		e2epod.NewPodClient(fr).CreateSync(ctx, serverPod1)
 
-		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{podBackend1: {80}})
+		err = e2eendpointslice.WaitForEndpointPods(ctx, cs, ns, serviceName, podBackend1)
+		framework.ExpectNoError(err)
 
-		// Note that the fact that Endpoints object already exists, does NOT mean
+		// Note that the fact that EndpointSlice object already exists, does NOT mean
 		// that iptables (or whatever else is used) was already programmed.
 		// Additionally take into account that UDP conntract entries timeout is
 		// 30 seconds by default.
@@ -275,7 +279,8 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		framework.Logf("Cleaning up %s pod", podBackend1)
 		e2epod.NewPodClient(fr).DeleteSync(ctx, podBackend1, metav1.DeleteOptions{}, fr.Timeouts.PodDelete)
 
-		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{podBackend2: {80}})
+		err = e2eendpointslice.WaitForEndpointPods(ctx, cs, ns, serviceName, podBackend2)
+		framework.ExpectNoError(err)
 
 		// Check that the second pod keeps receiving traffic
 		// UDP conntrack entries timeout is 30 sec by default
@@ -343,7 +348,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 			framework.Failf("expected 1 pod, got %d pods", len(pods.Items))
 		}
 		podBackend1 := pods.Items[0].Name
-		// Note that the fact that Endpoints object already exists, does NOT mean
+		// Note that the fact that EndpointSlice object already exists, does NOT mean
 		// that iptables (or whatever else is used) was already programmed.
 		// Additionally take into account that UDP conntract entries timeout is
 		// 30 seconds by default.
@@ -420,9 +425,10 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		e2epod.SetNodeSelection(&serverPod1.Spec, nodeSelection)
 		e2epod.NewPodClient(fr).CreateSync(ctx, serverPod1)
 
-		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{podBackend1: {80}})
+		err = e2eendpointslice.WaitForEndpointPods(ctx, cs, ns, serviceName, podBackend1)
+		framework.ExpectNoError(err)
 
-		// Note that the fact that Endpoints object already exists, does NOT mean
+		// Note that the fact that EndpointSlice object already exists, does NOT mean
 		// that iptables (or whatever else is used) was already programmed.
 		// Additionally take into account that UDP conntract entries timeout is
 		// 30 seconds by default.
@@ -447,7 +453,8 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		framework.Logf("Cleaning up %s pod", podBackend1)
 		e2epod.NewPodClient(fr).DeleteSync(ctx, podBackend1, metav1.DeleteOptions{}, fr.Timeouts.PodDelete)
 
-		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{podBackend2: {80}})
+		err = e2eendpointslice.WaitForEndpointPods(ctx, cs, ns, serviceName, podBackend2)
+		framework.ExpectNoError(err)
 
 		// Check that the second pod keeps receiving traffic
 		// UDP conntrack entries timeout is 30 sec by default
@@ -516,9 +523,10 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		e2epod.NewPodClient(fr).CreateSync(ctx, serverPod1)
 
 		// wait until the endpoints are ready
-		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{podBackend1: {80}})
+		err = e2eendpointslice.WaitForEndpointPods(ctx, cs, ns, serviceName, podBackend1)
+		framework.ExpectNoError(err)
 
-		// Note that the fact that Endpoints object already exists, does NOT mean
+		// Note that the fact that EndpointSlice object already exists, does NOT mean
 		// that iptables (or whatever else is used) was already programmed.
 		// Additionally take into account that UDP conntract entries timeout is
 		// 30 seconds by default.
@@ -657,5 +665,100 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		}
 		framework.Logf("boom-server pod logs: %s", logs)
 		framework.Logf("boom-server OK: did not receive any RST packet")
+	})
+
+	// This test checks that conntrack entries for old target ports are cleaned up when a UDP Service’s target port changes.
+	// It also covers cases where it prints the serverport entries, to make sure cleanup works correctly.
+	// This verifies the fix in https://pr.k8s.io/130542
+	ginkgo.It("should be able to cleanup conntrack entries when UDP service target port changes for a NodePort service", func(ctx context.Context) {
+		// Create a NodePort service
+		udpJig := e2eservice.NewTestJig(cs, ns, serviceName)
+		ginkgo.By("creating a UDP service " + serviceName + " with type=NodePort in " + ns)
+		udpService, err := udpJig.CreateUDPService(ctx, func(svc *v1.Service) {
+			svc.Spec.Type = v1.ServiceTypeNodePort
+			svc.Spec.Ports = []v1.ServicePort{
+				{Port: 80, Name: "udp", Protocol: v1.ProtocolUDP, TargetPort: intstr.FromInt32(8080)},
+			}
+		})
+		framework.ExpectNoError(err)
+		framework.Logf("Older Target Port: %v", udpService.Spec.Ports[0].TargetPort)
+
+		// Create a pod in one node to create the UDP traffic against the NodePort service every 5 seconds
+		ginkgo.By("creating a client pod for probing the service " + serviceName)
+		clientPod := e2epod.NewAgnhostPod(ns, podClient, nil, nil, nil)
+		nodeSelection := e2epod.NodeSelection{Name: clientNodeInfo.name}
+		e2epod.SetNodeSelection(&clientPod.Spec, nodeSelection)
+		cmd := fmt.Sprintf(`date; for i in $(seq 1 3000); do echo "$(date) Try: ${i}"; echo serverport | nc -u -w 5 -p %d %s %d; echo; done`, srcPort, serverNodeInfo.nodeIP, udpService.Spec.Ports[0].NodePort)
+		clientPod.Spec.Containers[0].Command = []string{"/bin/sh", "-c", cmd}
+		clientPod.Spec.Containers[0].Name = podClient
+		e2epod.NewPodClient(fr).CreateSync(ctx, clientPod)
+
+		// Add a backend pod to the service in the other node
+		ginkgo.By("creating a backend pod " + podBackend1 + " for the service " + serviceName)
+
+		// Add a backend pod with containers port
+		port8080 := []v1.ContainerPort{
+			{
+				ContainerPort: 8080,
+				Protocol:      v1.ProtocolUDP,
+			},
+		}
+		port9090 := []v1.ContainerPort{
+			{
+				ContainerPort: 9090,
+				Protocol:      v1.ProtocolUDP,
+			},
+		}
+		serverPod := e2epod.NewAgnhostPodFromContainers(
+			"", "conntrack-handle-target-ports", nil,
+			e2epod.NewAgnhostContainer("container-handle-8080-request", nil, port8080, "netexec", "--http-port", "8080", "--udp-port", "8080"),
+			e2epod.NewAgnhostContainer("container-handle-9090-request", nil, port9090, "netexec", "--http-port", "9090", "--udp-port", "9090"),
+		)
+		serverPod.Labels = udpJig.Labels
+		nodeSelection = e2epod.NodeSelection{Name: serverNodeInfo.name}
+		e2epod.SetNodeSelection(&serverPod.Spec, nodeSelection)
+		e2epod.NewPodClient(fr).CreateSync(ctx, serverPod)
+
+		err = e2eendpointslice.WaitForEndpointPorts(ctx, cs, ns, serviceName,
+			[]e2eendpointslice.PortMapping{
+				{Name: "udp", Protocol: v1.ProtocolUDP, Target: serverPod.Name, TargetPort: 8080},
+			},
+		)
+		framework.ExpectNoError(err)
+
+		// Check that the first container of server pod keeps receiving traffic
+		// UDP conntrack entries timeout is 30 sec by default
+		ginkgo.By("checking client pod connected to the container 1 of backend pod on Node IP " + serverNodeInfo.nodeIP)
+		if err := wait.PollUntilContextTimeout(ctx, 5*time.Second, time.Minute, true, logContainsFn("8080", podClient)); err != nil {
+			logs, err := e2epod.GetPodLogs(ctx, cs, ns, podClient, podClient)
+			framework.ExpectNoError(err)
+			framework.Logf("Pod client logs: %s", logs)
+			framework.Failf("Failed to connect to backend 2")
+		}
+
+		// Update the NodePort Service TargetPort to 9090
+		service, err := udpJig.UpdateService(ctx, func(svc *v1.Service) {
+			svc.Spec.Ports[0].TargetPort = intstr.FromInt32(9090)
+		})
+		framework.ExpectNoError(err)
+		framework.Logf("Updated Target Port: %v", service.Spec.Ports[0].TargetPort)
+
+		err = e2eendpointslice.WaitForEndpointPorts(ctx, cs, ns, serviceName,
+			[]e2eendpointslice.PortMapping{
+				{Name: "udp", Protocol: v1.ProtocolUDP, Target: serverPod.Name, TargetPort: 9090},
+			},
+		)
+		framework.ExpectNoError(err)
+
+		// Check that the second container of server pod keeps receiving traffic after clearing up the conntrack entries
+		// UDP conntrack entries timeout is 30 sec by default
+		// After clearing entries it should validate it serverport on NodePort matches with the container port
+		ginkgo.By("checking client pod connected to the container 2 of backend pod on Node IP " + serverNodeInfo.nodeIP)
+		if err := wait.PollUntilContextTimeout(ctx, 5*time.Second, time.Minute, true, logContainsFn("9090", podClient)); err != nil {
+			logs, err := e2epod.GetPodLogs(ctx, cs, ns, podClient, podClient)
+			framework.ExpectNoError(err)
+			framework.Logf("Pod client logs: %s", logs)
+			framework.Failf("Failed to connect to backend 2")
+		}
 	})
 })

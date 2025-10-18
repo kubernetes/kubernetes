@@ -23,6 +23,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"text/template"
 	"time"
@@ -35,6 +36,7 @@ import (
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
@@ -278,12 +280,14 @@ func (w *KubeWaiter) WaitForControlPlaneComponents(podMap map[string]*v1.Pod, ap
 							Get().AbsPath(comp.endpoint).Do(ctx).StatusCode(&statusCode)
 						if err := result.Error(); err != nil {
 							lastError = errors.WithMessagef(err, "%s check failed at %s", comp.name, url)
+							klog.V(5).Info(lastError)
 							return false, nil
 						}
 					} else {
 						resp, err := client.Get(url)
 						if err != nil {
 							lastError = errors.WithMessagef(err, "%s check failed at %s", comp.name, url)
+							klog.V(5).Info(lastError)
 							return false, nil
 						}
 						defer func() {
@@ -295,6 +299,7 @@ func (w *KubeWaiter) WaitForControlPlaneComponents(podMap map[string]*v1.Pod, ap
 					if statusCode != http.StatusOK {
 						lastError = errors.Errorf("%s check failed at %s with status: %d",
 							comp.name, url, statusCode)
+						klog.V(5).Info(lastError)
 						return false, nil
 					}
 
@@ -327,7 +332,7 @@ func (w *KubeWaiter) WaitForPodsWithLabel(kvLabel string) error {
 		constants.KubernetesAPICallRetryInterval, w.timeout,
 		true, func(_ context.Context) (bool, error) {
 			listOpts := metav1.ListOptions{LabelSelector: kvLabel}
-			pods, err := w.client.CoreV1().Pods(metav1.NamespaceSystem).List(context.TODO(), listOpts)
+			pods, err := w.client.CoreV1().Pods(metav1.NamespaceSystem).List(context.Background(), listOpts)
 			if err != nil {
 				_, _ = fmt.Fprintf(w.writer, "[apiclient] Error getting Pods with label selector %q [%v]\n", kvLabel, err)
 				return false, nil
@@ -357,7 +362,8 @@ func (w *KubeWaiter) WaitForKubelet(healthzAddress string, healthzPort int32) er
 	var (
 		lastError       error
 		start           = time.Now()
-		healthzEndpoint = fmt.Sprintf("http://%s:%d/healthz", healthzAddress, healthzPort)
+		addrPort        = net.JoinHostPort(healthzAddress, strconv.Itoa(int(healthzPort)))
+		healthzEndpoint = fmt.Sprintf("http://%s/healthz", addrPort)
 	)
 
 	if healthzPort == 0 {
@@ -493,7 +499,7 @@ func (w *KubeWaiter) WaitForStaticPodHashChange(nodeName, component, previousHas
 func getStaticPodSingleHash(client clientset.Interface, nodeName string, component string) (string, error) {
 
 	staticPodName := fmt.Sprintf("%s-%s", component, nodeName)
-	staticPod, err := client.CoreV1().Pods(metav1.NamespaceSystem).Get(context.TODO(), staticPodName, metav1.GetOptions{})
+	staticPod, err := client.CoreV1().Pods(metav1.NamespaceSystem).Get(context.Background(), staticPodName, metav1.GetOptions{})
 	if err != nil {
 		return "", errors.Wrapf(err, "failed to obtain static Pod hash for component %s on Node %s", component, nodeName)
 	}

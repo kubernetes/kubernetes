@@ -26,6 +26,8 @@ import (
 
 // TestTypeApplyConfiguration represents a declarative configuration of the TestType type for use
 // with apply.
+//
+// TestType is a top-level type. A client is created for it.
 type TestTypeApplyConfiguration struct {
 	metav1.TypeMetaApplyConfiguration    `json:",inline"`
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
@@ -43,6 +45,7 @@ func TestType(name, namespace string) *TestTypeApplyConfiguration {
 	b.WithAPIVersion("conflicting.test.crd.code-generator.k8s.io/v1")
 	return b
 }
+
 func (b TestTypeApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

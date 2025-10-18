@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	// AlertNameLabel is the name of the label containing the an alert's name.
+	// AlertNameLabel is the name of the label containing the alert's name.
 	AlertNameLabel = "alertname"
 
 	// ExportedLabelPrefix is the prefix to prepend to the label names present in
@@ -32,6 +32,12 @@ const (
 	// MetricNameLabel is the label name indicating the metric name of a
 	// timeseries.
 	MetricNameLabel = "__name__"
+	// MetricTypeLabel is the label name indicating the metric type of
+	// timeseries as per the PROM-39 proposal.
+	MetricTypeLabel = "__type__"
+	// MetricUnitLabel is the label name indicating the metric unit of
+	// timeseries as per the PROM-39 proposal.
+	MetricUnitLabel = "__unit__"
 
 	// SchemeLabel is the name of the label that holds the scheme on which to
 	// scrape a target.
@@ -100,33 +106,21 @@ type LabelName string
 // IsValid returns true iff the name matches the pattern of LabelNameRE when
 // NameValidationScheme is set to LegacyValidation, or valid UTF-8 if
 // NameValidationScheme is set to UTF8Validation.
+//
+// Deprecated: This method should not be used and may be removed in the future.
+// Use [ValidationScheme.IsValidLabelName] instead.
 func (ln LabelName) IsValid() bool {
-	if len(ln) == 0 {
-		return false
-	}
-	switch NameValidationScheme {
-	case LegacyValidation:
-		return ln.IsValidLegacy()
-	case UTF8Validation:
-		return utf8.ValidString(string(ln))
-	default:
-		panic(fmt.Sprintf("Invalid name validation scheme requested: %d", NameValidationScheme))
-	}
+	return NameValidationScheme.IsValidLabelName(string(ln))
 }
 
 // IsValidLegacy returns true iff name matches the pattern of LabelNameRE for
 // legacy names. It does not use LabelNameRE for the check but a much faster
 // hardcoded implementation.
+//
+// Deprecated: This method should not be used and may be removed in the future.
+// Use [LegacyValidation.IsValidLabelName] instead.
 func (ln LabelName) IsValidLegacy() bool {
-	if len(ln) == 0 {
-		return false
-	}
-	for i, b := range ln {
-		if !((b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || b == '_' || (b >= '0' && b <= '9' && i > 0)) {
-			return false
-		}
-	}
-	return true
+	return LegacyValidation.IsValidLabelName(string(ln))
 }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.

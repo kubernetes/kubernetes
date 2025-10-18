@@ -31,9 +31,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
@@ -209,6 +211,25 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 				pv, pvc, err = e2epv.CreatePVPVC(ctx, c, f.Timeouts, pvConfig, pvcConfig, ns, true)
 				framework.ExpectNoError(err)
 				completeTest(ctx, f, c, ns, pv, pvc)
+			})
+
+			// The same as above, but with multiple volumes reference the same PVC in the pod.
+			ginkgo.It("create a PVC and use it multiple times in a single pod", func(ctx context.Context) {
+				pv, pvc, err = e2epv.CreatePVPVC(ctx, c, f.Timeouts, pvConfig, pvcConfig, ns, true)
+				framework.ExpectNoError(err)
+
+				framework.Logf("Creating nfs test pod")
+				pod := e2epod.MakePod(ns, nil, []*v1.PersistentVolumeClaim{pvc, pvc}, admissionapi.LevelPrivileged,
+					"touch /mnt/volume1/SUCCESS && cat /mnt/volume2/SUCCESS")
+				runPod, err := c.CoreV1().Pods(ns).Create(ctx, pod, metav1.CreateOptions{})
+				framework.ExpectNoError(err)
+				defer func() {
+					err := e2epod.DeletePodWithWait(ctx, c, runPod)
+					framework.ExpectNoError(err)
+				}()
+
+				err = testPodSuccessOrFail(ctx, c, f.Timeouts, ns, runPod)
+				framework.ExpectNoError(err)
 			})
 
 			// Create new PV without claim, verify it's in Available state and LastPhaseTransitionTime is set.
@@ -475,24 +496,28 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			framework.ExpectNoError(err, "Failed to list PVs with the labelSelector: %q", volLabel.AsSelector().String())
 			gomega.Expect(pvList.Items).To(gomega.HaveLen(1))
 			initialPV := pvList.Items[0]
+			gomega.Expect(&initialPV).To(apimachineryutils.HaveValidResourceVersion())
 
 			ginkgo.By(fmt.Sprintf("Listing PVCs in namespace %q", ns))
 			pvcList, err := pvcClient.List(ctx, metav1.ListOptions{})
 			framework.ExpectNoError(err, "Failed to list PVCs with the labelSelector: %q", volLabel.AsSelector().String())
 			gomega.Expect(pvcList.Items).To(gomega.HaveLen(1))
 			initialPVC := pvcList.Items[0]
+			gomega.Expect(&initialPVC).To(apimachineryutils.HaveValidResourceVersion())
 
 			ginkgo.By(fmt.Sprintf("Patching the PV %q", initialPV.Name))
 			payload := "{\"metadata\":{\"labels\":{\"" + initialPV.Name + "\":\"patched\"}}}"
 			patchedPV, err := pvClient.Patch(ctx, initialPV.Name, types.StrategicMergePatchType, []byte(payload), metav1.PatchOptions{})
 			framework.ExpectNoError(err, "Failed to patch PV %q", initialPV.Name)
 			gomega.Expect(patchedPV.Labels).To(gomega.HaveKeyWithValue(patchedPV.Name, "patched"), "Checking that patched label has been applied")
+			gomega.Expect(resourceversion.CompareResourceVersion(initialPV.ResourceVersion, patchedPV.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 
 			ginkgo.By(fmt.Sprintf("Patching the PVC %q", initialPVC.Name))
 			payload = "{\"metadata\":{\"labels\":{\"" + initialPVC.Name + "\":\"patched\"}}}"
 			patchedPVC, err := pvcClient.Patch(ctx, initialPVC.Name, types.StrategicMergePatchType, []byte(payload), metav1.PatchOptions{})
 			framework.ExpectNoError(err, "Failed to patch PVC %q", initialPVC.Name)
 			gomega.Expect(patchedPVC.Labels).To(gomega.HaveKeyWithValue(patchedPVC.Name, "patched"), "Checking that patched label has been applied")
+			gomega.Expect(resourceversion.CompareResourceVersion(initialPVC.ResourceVersion, patchedPVC.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 
 			ginkgo.By(fmt.Sprintf("Getting PV %q", patchedPV.Name))
 			retrievedPV, err := pvClient.Get(ctx, patchedPV.Name, metav1.GetOptions{})

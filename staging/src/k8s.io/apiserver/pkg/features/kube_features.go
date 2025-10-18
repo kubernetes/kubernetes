@@ -21,6 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
+	zpagesfeatures "k8s.io/component-base/zpages/features"
 )
 
 // Every feature gate should have an entry here following this template:
@@ -113,6 +114,34 @@ const (
 	//
 	// Enables coordinated leader election in the API server
 	CoordinatedLeaderElection featuregate.Feature = "CoordinatedLeaderElection"
+
+	// owner: @jpbetz @aaron-prindle @yongruilin
+	// kep: http://kep.k8s.io/5073
+	// beta: v1.33
+	//
+	// Enables running declarative validation of APIs, where declared. When enabled, APIs with
+	// declarative validation rules will validate objects using the generated
+	// declarative validation code and compare the results to the regular imperative validation.
+	// See DeclarativeValidationTakeover for more.
+	DeclarativeValidation featuregate.Feature = "DeclarativeValidation"
+
+	// owner: @jpbetz @aaron-prindle @yongruilin
+	// kep: http://kep.k8s.io/5073
+	// beta: v1.33
+	//
+	// When enabled, declarative validation errors are returned directly to the caller,
+	// replacing hand-written validation errors for rules that have declarative implementations.
+	// When disabled, hand-written validation errors are always returned, effectively putting
+	// declarative validation in a "shadow mode" that monitors but does not affect API responses.
+	// Note: Although declarative validation aims for functional equivalence with hand-written validation,
+	// the exact number, format, and content of error messages may differ between the two approaches.
+	DeclarativeValidationTakeover featuregate.Feature = "DeclarativeValidationTakeover"
+
+	// owner: @serathius
+	// kep: https://kep.k8s.io/4988
+	//
+	// Enabled cache inconsistency detection.
+	DetectCacheInconsistency featuregate.Feature = "DetectCacheInconsistency"
 
 	// owner: @aramase
 	// kep: https://kep.k8s.io/3299
@@ -210,11 +239,27 @@ const (
 	// Enables Structured Authentication Configuration
 	StructuredAuthenticationConfiguration featuregate.Feature = "StructuredAuthenticationConfiguration"
 
+	// owner: @aramase, @enj, @nabokihms
+	// kep: https://kep.k8s.io/3331
+	//
+	// Enables Egress Selector in Structured Authentication Configuration
+	StructuredAuthenticationConfigurationEgressSelector featuregate.Feature = "StructuredAuthenticationConfigurationEgressSelector"
+
 	// owner: @palnabarun
 	// kep: https://kep.k8s.io/3221
 	//
 	// Enables Structured Authorization Configuration
 	StructuredAuthorizationConfiguration featuregate.Feature = "StructuredAuthorizationConfiguration"
+
+	// owner: @aramase
+	//
+	// Enables validation of service account UID in TokenRequest API.
+	//
+	// This feature gate is used to ensure that the UID provided in the TokenRequest
+	// matches the UID of the service account for which the token is being requested.
+	// It helps prevent misuse of the TokenRequest API by ensuring that tokens are only
+	// issued for the correct service account.
+	TokenRequestServiceAccountUIDValidation featuregate.Feature = "TokenRequestServiceAccountUIDValidation"
 
 	// owner: @enj
 	//
@@ -251,6 +296,7 @@ const (
 
 func init() {
 	runtime.Must(utilfeature.DefaultMutableFeatureGate.AddVersioned(defaultVersionedKubernetesFeatureGates))
+	runtime.Must(zpagesfeatures.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
 }
 
 // defaultVersionedKubernetesFeatureGates consists of all known Kubernetes-specific feature keys with VersionedSpecs.
@@ -273,6 +319,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	APIServerTracing: {
 		{Version: version.MustParse("1.22"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.27"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.37
 	},
 
 	APIServingWithRoutine: {
@@ -301,6 +348,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	AuthorizeWithSelectors: {
 		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.37
 	},
 
 	BtreeWatchCache: {
@@ -319,11 +367,24 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	ConsistentListFromCache: {
 		{Version: version.MustParse("1.28"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	},
 
 	CoordinatedLeaderElection: {
 		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Beta},
+	},
+
+	DeclarativeValidation: {
+		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	DeclarativeValidationTakeover: {
+		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Beta},
+	},
+
+	DetectCacheInconsistency: {
+		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	KMSv1: {
@@ -334,10 +395,12 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	ListFromCacheSnapshot: {
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	MutatingAdmissionPolicy: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Beta},
 	},
 
 	OpenAPIEnums: {
@@ -405,10 +468,18 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA and LockToDefault in 1.34, remove in 1.37
 	},
 
+	StructuredAuthenticationConfigurationEgressSelector: {
+		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
+	},
+
 	StructuredAuthorizationConfiguration: {
 		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	},
+
+	TokenRequestServiceAccountUIDValidation: {
+		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	UnauthenticatedHTTP2DOSMitigation: {
@@ -430,5 +501,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
 		// switch this back to false because the json and proto streaming encoders appear to work better.
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
 	},
 }

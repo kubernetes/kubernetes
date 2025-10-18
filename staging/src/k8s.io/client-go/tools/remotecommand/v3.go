@@ -82,9 +82,14 @@ func (p *streamProtocolV3) handleResizes() {
 	}()
 }
 
-func (p *streamProtocolV3) stream(conn streamCreator) error {
+func (p *streamProtocolV3) stream(conn streamCreator, ready chan<- struct{}) error {
 	if err := p.createStreams(conn); err != nil {
 		return err
+	}
+
+	// Signal that all streams have been created.
+	if ready != nil {
+		close(ready)
 	}
 
 	// now that all the streams have been created, proceed with reading & copying

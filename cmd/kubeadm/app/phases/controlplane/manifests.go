@@ -64,11 +64,18 @@ func GetStaticPodSpecs(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmap
 			ImagePullPolicy: v1.PullIfNotPresent,
 			Command:         getAPIServerCommand(cfg, endpoint),
 			VolumeMounts:    staticpodutil.VolumeMountMapToSlice(mounts.GetVolumeMounts(kubeadmconstants.KubeAPIServer)),
-			LivenessProbe:   staticpodutil.LivenessProbe(staticpodutil.GetAPIServerProbeAddress(endpoint), "/livez", endpoint.BindPort, v1.URISchemeHTTPS),
-			ReadinessProbe:  staticpodutil.ReadinessProbe(staticpodutil.GetAPIServerProbeAddress(endpoint), "/readyz", endpoint.BindPort, v1.URISchemeHTTPS),
-			StartupProbe:    staticpodutil.StartupProbe(staticpodutil.GetAPIServerProbeAddress(endpoint), "/livez", endpoint.BindPort, v1.URISchemeHTTPS, componentHealthCheckTimeout),
+			LivenessProbe:   staticpodutil.LivenessProbe(staticpodutil.GetAPIServerProbeAddress(endpoint), "/livez", kubeadmconstants.ProbePort, v1.URISchemeHTTPS),
+			ReadinessProbe:  staticpodutil.ReadinessProbe(staticpodutil.GetAPIServerProbeAddress(endpoint), "/readyz", kubeadmconstants.ProbePort, v1.URISchemeHTTPS),
+			StartupProbe:    staticpodutil.StartupProbe(staticpodutil.GetAPIServerProbeAddress(endpoint), "/livez", kubeadmconstants.ProbePort, v1.URISchemeHTTPS, componentHealthCheckTimeout),
 			Resources:       staticpodutil.ComponentResources("250m"),
 			Env:             kubeadmutil.MergeKubeadmEnvVars(proxyEnvs, cfg.APIServer.ExtraEnvs),
+			Ports: []v1.ContainerPort{
+				{
+					Name:          kubeadmconstants.ProbePort,
+					ContainerPort: endpoint.BindPort,
+					Protocol:      v1.ProtocolTCP,
+				},
+			},
 		}, mounts.GetVolumes(kubeadmconstants.KubeAPIServer),
 			map[string]string{kubeadmconstants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey: endpoint.String()}),
 		kubeadmconstants.KubeControllerManager: staticpodutil.ComponentPod(v1.Container{
@@ -77,10 +84,17 @@ func GetStaticPodSpecs(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmap
 			ImagePullPolicy: v1.PullIfNotPresent,
 			Command:         getControllerManagerCommand(cfg),
 			VolumeMounts:    staticpodutil.VolumeMountMapToSlice(mounts.GetVolumeMounts(kubeadmconstants.KubeControllerManager)),
-			LivenessProbe:   staticpodutil.LivenessProbe(staticpodutil.GetControllerManagerProbeAddress(cfg), "/healthz", kubeadmconstants.KubeControllerManagerPort, v1.URISchemeHTTPS),
-			StartupProbe:    staticpodutil.StartupProbe(staticpodutil.GetControllerManagerProbeAddress(cfg), "/healthz", kubeadmconstants.KubeControllerManagerPort, v1.URISchemeHTTPS, componentHealthCheckTimeout),
+			LivenessProbe:   staticpodutil.LivenessProbe(staticpodutil.GetControllerManagerProbeAddress(cfg), "/healthz", kubeadmconstants.ProbePort, v1.URISchemeHTTPS),
+			StartupProbe:    staticpodutil.StartupProbe(staticpodutil.GetControllerManagerProbeAddress(cfg), "/healthz", kubeadmconstants.ProbePort, v1.URISchemeHTTPS, componentHealthCheckTimeout),
 			Resources:       staticpodutil.ComponentResources("200m"),
 			Env:             kubeadmutil.MergeKubeadmEnvVars(proxyEnvs, cfg.ControllerManager.ExtraEnvs),
+			Ports: []v1.ContainerPort{
+				{
+					Name:          kubeadmconstants.ProbePort,
+					ContainerPort: kubeadmconstants.KubeControllerManagerPort,
+					Protocol:      v1.ProtocolTCP,
+				},
+			},
 		}, mounts.GetVolumes(kubeadmconstants.KubeControllerManager), nil),
 		kubeadmconstants.KubeScheduler: staticpodutil.ComponentPod(v1.Container{
 			Name:            kubeadmconstants.KubeScheduler,
@@ -88,11 +102,18 @@ func GetStaticPodSpecs(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmap
 			ImagePullPolicy: v1.PullIfNotPresent,
 			Command:         getSchedulerCommand(cfg),
 			VolumeMounts:    staticpodutil.VolumeMountMapToSlice(mounts.GetVolumeMounts(kubeadmconstants.KubeScheduler)),
-			LivenessProbe:   staticpodutil.LivenessProbe(staticpodutil.GetSchedulerProbeAddress(cfg), "/livez", kubeadmconstants.KubeSchedulerPort, v1.URISchemeHTTPS),
-			ReadinessProbe:  staticpodutil.ReadinessProbe(staticpodutil.GetSchedulerProbeAddress(cfg), "/readyz", kubeadmconstants.KubeSchedulerPort, v1.URISchemeHTTPS),
-			StartupProbe:    staticpodutil.StartupProbe(staticpodutil.GetSchedulerProbeAddress(cfg), "/livez", kubeadmconstants.KubeSchedulerPort, v1.URISchemeHTTPS, componentHealthCheckTimeout),
+			LivenessProbe:   staticpodutil.LivenessProbe(staticpodutil.GetSchedulerProbeAddress(cfg), "/livez", kubeadmconstants.ProbePort, v1.URISchemeHTTPS),
+			ReadinessProbe:  staticpodutil.ReadinessProbe(staticpodutil.GetSchedulerProbeAddress(cfg), "/readyz", kubeadmconstants.ProbePort, v1.URISchemeHTTPS),
+			StartupProbe:    staticpodutil.StartupProbe(staticpodutil.GetSchedulerProbeAddress(cfg), "/livez", kubeadmconstants.ProbePort, v1.URISchemeHTTPS, componentHealthCheckTimeout),
 			Resources:       staticpodutil.ComponentResources("100m"),
 			Env:             kubeadmutil.MergeKubeadmEnvVars(proxyEnvs, cfg.Scheduler.ExtraEnvs),
+			Ports: []v1.ContainerPort{
+				{
+					Name:          kubeadmconstants.ProbePort,
+					ContainerPort: kubeadmconstants.KubeSchedulerPort,
+					Protocol:      v1.ProtocolTCP,
+				},
+			},
 		}, mounts.GetVolumes(kubeadmconstants.KubeScheduler), nil),
 	}
 	return staticPodSpecs
@@ -133,11 +154,9 @@ func CreateStaticPodFiles(manifestDir, patchesDir string, cfg *kubeadmapi.Cluste
 		if features.Enabled(cfg.FeatureGates, features.RootlessControlPlane) {
 			if isDryRun {
 				fmt.Printf("[control-plane] Would update static pod manifest for %q to run run as non-root\n", componentName)
-			} else {
-				if usersAndGroups != nil {
-					if err := staticpodutil.RunComponentAsNonRoot(componentName, &spec, usersAndGroups, cfg); err != nil {
-						return errors.Wrapf(err, "failed to run component %q as non-root", componentName)
-					}
+			} else if usersAndGroups != nil {
+				if err := staticpodutil.RunComponentAsNonRoot(componentName, &spec, usersAndGroups, cfg); err != nil {
+					return errors.Wrapf(err, "failed to run component %q as non-root", componentName)
 				}
 			}
 		}

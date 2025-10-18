@@ -56,6 +56,8 @@ import (
 	restclient "k8s.io/client-go/rest"
 	basecompatibility "k8s.io/component-base/compatibility"
 	"k8s.io/component-base/featuregate"
+	zpagesfeatures "k8s.io/component-base/zpages/features"
+	"k8s.io/component-base/zpages/statusz"
 	"k8s.io/klog/v2"
 	openapibuilder3 "k8s.io/kube-openapi/pkg/builder3"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
@@ -458,6 +460,10 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 	}
 	s.installReadyz()
 
+	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentStatusz) {
+		statusz.Install(s.Handler.NonGoRestfulMux, "apiserver", statusz.NewRegistry(s.EffectiveVersion, statusz.WithListedPaths(s.ListedPaths())))
+	}
+
 	return preparedGenericAPIServer{s}
 }
 
@@ -525,7 +531,7 @@ func (s preparedGenericAPIServer) RunWithContext(ctx context.Context) error {
 	if s.UnprotectedDebugSocket != nil {
 		go func() {
 			defer utilruntime.HandleCrash()
-			klog.Error(s.UnprotectedDebugSocket.Run(stopCh))
+			klog.Error(s.UnprotectedDebugSocket.RunWithContext(ctx))
 		}()
 	}
 

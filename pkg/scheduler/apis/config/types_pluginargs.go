@@ -17,6 +17,8 @@ limitations under the License.
 package config
 
 import (
+	"time"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -216,3 +218,45 @@ type RequestedToCapacityRatioParam struct {
 	// Shape is a list of points defining the scoring function shape.
 	Shape []UtilizationShapePoint
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// DynamicResourcesArgs holds arguments used to configure the DynamicResources plugin.
+type DynamicResourcesArgs struct {
+	metav1.TypeMeta
+
+	// FilterTimeout limits the amount of time that the filter operation may
+	// take per node to search for devices that can be allocated to scheduler
+	// a pod to that node.
+	//
+	// In typical scenarios, this operation should complete in 10 to 200
+	// milliseconds, but could also be longer depending on the number of
+	// requests per ResourceClaim, number of ResourceClaims, number of
+	// published devices in ResourceSlices, and the complexity of the
+	// requests. Other checks besides CEL evaluation also take time (usage
+	// checks, match attributes, etc.).
+	//
+	// Therefore the scheduler plugin applies this timeout. If the timeout
+	// is reached, the Pod is considered unschedulable for the node.
+	// If filtering succeeds for some other node(s), those are picked instead.
+	// If filtering fails for all of them, the Pod is placed in the
+	// unschedulable queue. It will get checked again if changes in
+	// e.g. ResourceSlices or ResourceClaims indicate that
+	// another scheduling attempt might succeed. If this fails repeatedly,
+	// exponential backoff slows down future attempts.
+	//
+	// The default is 10 seconds.
+	// This is sufficient to prevent worst-case scenarios while not impacting normal
+	// usage of DRA. However, slow filtering can slow down Pod scheduling
+	// also for Pods not using DRA. Administators can reduce the timeout
+	// after checking the
+	// `scheduler_plugin_execution_duration_seconds` metrics.
+	// That tracks the time spend in each Filter operation.
+	// There's also `scheduler_framework_extension_point_duration_seconds`
+	// which tracks the duration of filtering overall.
+	//
+	// Setting it to zero completely disables the timeout.
+	FilterTimeout *metav1.Duration
+}
+
+const DynamicResourcesFilterTimeoutDefault = 10 * time.Second

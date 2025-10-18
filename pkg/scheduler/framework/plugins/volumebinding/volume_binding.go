@@ -35,7 +35,6 @@ import (
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
@@ -79,13 +78,13 @@ type VolumeBinding struct {
 	fts         feature.Features
 }
 
-var _ framework.PreFilterPlugin = &VolumeBinding{}
-var _ framework.FilterPlugin = &VolumeBinding{}
-var _ framework.ReservePlugin = &VolumeBinding{}
-var _ framework.PreBindPlugin = &VolumeBinding{}
-var _ framework.PreScorePlugin = &VolumeBinding{}
-var _ framework.ScorePlugin = &VolumeBinding{}
-var _ framework.EnqueueExtensions = &VolumeBinding{}
+var _ fwk.PreFilterPlugin = &VolumeBinding{}
+var _ fwk.FilterPlugin = &VolumeBinding{}
+var _ fwk.ReservePlugin = &VolumeBinding{}
+var _ fwk.PreBindPlugin = &VolumeBinding{}
+var _ fwk.PreScorePlugin = &VolumeBinding{}
+var _ fwk.ScorePlugin = &VolumeBinding{}
+var _ fwk.EnqueueExtensions = &VolumeBinding{}
 
 // Name is the name of the plugin used in Registry and configurations.
 const Name = names.VolumeBinding
@@ -350,7 +349,7 @@ func (pl *VolumeBinding) podHasPVCs(pod *v1.Pod) (bool, error) {
 // PreFilter invoked at the prefilter extension point to check if pod has all
 // immediate PVCs bound. If not all immediate PVCs are bound, an
 // UnschedulableAndUnresolvable is returned.
-func (pl *VolumeBinding) PreFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
+func (pl *VolumeBinding) PreFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
 	logger := klog.FromContext(ctx)
 	// If pod does not reference any PVC, we don't need to do anything.
 	if hasPVC, err := pl.podHasPVCs(pod); err != nil {
@@ -383,7 +382,7 @@ func (pl *VolumeBinding) PreFilter(ctx context.Context, state fwk.CycleState, po
 }
 
 // PreFilterExtensions returns prefilter extensions, pod add and remove.
-func (pl *VolumeBinding) PreFilterExtensions() framework.PreFilterExtensions {
+func (pl *VolumeBinding) PreFilterExtensions() fwk.PreFilterExtensions {
 	return nil
 }
 
@@ -414,7 +413,7 @@ func getStateData(cs fwk.CycleState) (*stateData, error) {
 //
 // The predicate returns true if all bound PVCs have compatible PVs with the node, and if all unbound
 // PVCs can be matched with an available and node-compatible PV.
-func (pl *VolumeBinding) Filter(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *fwk.Status {
+func (pl *VolumeBinding) Filter(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
 	logger := klog.FromContext(ctx)
 	node := nodeInfo.Node()
 
@@ -446,7 +445,7 @@ func (pl *VolumeBinding) Filter(ctx context.Context, cs fwk.CycleState, pod *v1.
 }
 
 // PreScore invoked at the preScore extension point. It checks whether volumeBinding can skip Score
-func (pl *VolumeBinding) PreScore(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) *fwk.Status {
+func (pl *VolumeBinding) PreScore(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) *fwk.Status {
 	if pl.scorer == nil {
 		return fwk.NewStatus(fwk.Skip)
 	}
@@ -461,7 +460,7 @@ func (pl *VolumeBinding) PreScore(ctx context.Context, cs fwk.CycleState, pod *v
 }
 
 // Score invoked at the score extension point.
-func (pl *VolumeBinding) Score(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *fwk.Status) {
+func (pl *VolumeBinding) Score(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) (int64, *fwk.Status) {
 	if pl.scorer == nil {
 		return 0, nil
 	}
@@ -516,7 +515,7 @@ func (pl *VolumeBinding) Score(ctx context.Context, cs fwk.CycleState, pod *v1.P
 }
 
 // ScoreExtensions of the Score plugin.
-func (pl *VolumeBinding) ScoreExtensions() framework.ScoreExtensions {
+func (pl *VolumeBinding) ScoreExtensions() fwk.ScoreExtensions {
 	return nil
 }
 
@@ -541,6 +540,26 @@ func (pl *VolumeBinding) Reserve(ctx context.Context, cs fwk.CycleState, pod *v1
 	return nil
 }
 
+var errNoPodVolumeForNode = fmt.Errorf("no pod volume found for node")
+
+// PreBindPreFlight is called before PreBind, and determines whether PreBind is going to do something for this pod, or not.
+// It checks state.podVolumesByNode to determine whether there are any pod volumes for the node and hence the plugin has to handle them at PreBind.
+func (pl *VolumeBinding) PreBindPreFlight(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
+	s, err := getStateData(state)
+	if err != nil {
+		return fwk.AsStatus(err)
+	}
+	if s.allBound {
+		// no need to bind volumes
+		return fwk.NewStatus(fwk.Skip)
+	}
+
+	if _, ok := s.podVolumesByNode[nodeName]; !ok {
+		return fwk.AsStatus(fmt.Errorf("%w %q", errNoPodVolumeForNode, nodeName))
+	}
+	return nil
+}
+
 // PreBind will make the API update with the assumed bindings and wait until
 // the PV controller has completely finished the binding operation.
 //
@@ -558,7 +577,7 @@ func (pl *VolumeBinding) PreBind(ctx context.Context, cs fwk.CycleState, pod *v1
 	// we don't need to hold the lock as only one node will be pre-bound for the given pod
 	podVolumes, ok := s.podVolumesByNode[nodeName]
 	if !ok {
-		return fwk.AsStatus(fmt.Errorf("no pod volumes found for node %q", nodeName))
+		return fwk.AsStatus(fmt.Errorf("%w %q", errNoPodVolumeForNode, nodeName))
 	}
 	logger := klog.FromContext(ctx)
 	logger.V(5).Info("Trying to bind volumes for pod", "pod", klog.KObj(pod))
@@ -587,7 +606,7 @@ func (pl *VolumeBinding) Unreserve(ctx context.Context, cs fwk.CycleState, pod *
 }
 
 // New initializes a new plugin and returns it.
-func New(ctx context.Context, plArgs runtime.Object, fh framework.Handle, fts feature.Features) (framework.Plugin, error) {
+func New(ctx context.Context, plArgs runtime.Object, fh fwk.Handle, fts feature.Features) (fwk.Plugin, error) {
 	args, ok := plArgs.(*config.VolumeBindingArgs)
 	if !ok {
 		return nil, fmt.Errorf("want args to be of type VolumeBindingArgs, got %T", plArgs)
@@ -607,7 +626,10 @@ func New(ctx context.Context, plArgs runtime.Object, fh framework.Handle, fts fe
 		CSIDriverInformer:          fh.SharedInformerFactory().Storage().V1().CSIDrivers(),
 		CSIStorageCapacityInformer: fh.SharedInformerFactory().Storage().V1().CSIStorageCapacities(),
 	}
-	binder := NewVolumeBinder(klog.FromContext(ctx), fh.ClientSet(), fts, podInformer, nodeInformer, csiNodeInformer, pvcInformer, pvInformer, storageClassInformer, capacityCheck, time.Duration(args.BindTimeoutSeconds)*time.Second)
+	binder, err := NewVolumeBinder(klog.FromContext(ctx), fh.ClientSet(), fts, podInformer, nodeInformer, csiNodeInformer, pvcInformer, pvInformer, storageClassInformer, capacityCheck, time.Duration(args.BindTimeoutSeconds)*time.Second)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build volume binder: %w", err)
+	}
 
 	// build score function
 	var scorer volumeCapacityScorer
@@ -616,7 +638,7 @@ func New(ctx context.Context, plArgs runtime.Object, fh framework.Handle, fts fe
 		for _, point := range args.Shape {
 			shape = append(shape, helper.FunctionShapePoint{
 				Utilization: int64(point.Utilization),
-				Score:       int64(point.Score) * (framework.MaxNodeScore / config.MaxCustomPriorityScore),
+				Score:       int64(point.Score) * (fwk.MaxNodeScore / config.MaxCustomPriorityScore),
 			})
 		}
 		scorer = buildScorerFunction(shape)

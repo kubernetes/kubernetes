@@ -17,20 +17,23 @@ limitations under the License.
 package v1beta1
 
 import (
+	"context"
+
+	"k8s.io/klog/v2"
 	api "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 )
 
 // RegistrationHandler is an interface for handling device plugin registration
 // and plugin directory cleanup.
 type RegistrationHandler interface {
-	CleanupPluginDirectory(string) error
+	CleanupPluginDirectory(klog.Logger, string) error
 }
 
 // ClientHandler is an interface for handling device plugin connections.
 type ClientHandler interface {
-	PluginConnected(string, DevicePlugin) error
-	PluginDisconnected(string)
-	PluginListAndWatchReceiver(string, *api.ListAndWatchResponse)
+	PluginConnected(context.Context, string, DevicePlugin) error
+	PluginDisconnected(klog.Logger, string)
+	PluginListAndWatchReceiver(klog.Logger, string, *api.ListAndWatchResponse)
 }
 
 // TODO: evaluate whether we need these error definitions.

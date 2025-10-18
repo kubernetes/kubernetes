@@ -25,11 +25,8 @@ import (
 	externalexternal "k8s.io/code-generator/cmd/defaulter-gen/output_tests/marker/external/external"
 	"k8s.io/code-generator/cmd/defaulter-gen/output_tests/marker/external2"
 	"k8s.io/code-generator/cmd/defaulter-gen/output_tests/marker/external3"
+	"k8s.io/utils/ptr"
 )
-
-func getPointerFromString(s string) *string {
-	return &s
-}
 
 var (
 	defaultInt32 int32 = 32
@@ -49,7 +46,7 @@ func Test_Marker(t *testing.T) {
 				StringDefault:      "bar",
 				StringEmptyDefault: "",
 				StringEmpty:        "",
-				StringPointer:      getPointerFromString("default"),
+				StringPointer:      ptr.To("default"),
 				Int64:              &defaultInt64,
 				Int32:              &defaultInt32,
 				IntDefault:         1,
@@ -59,8 +56,8 @@ func Test_Marker(t *testing.T) {
 				FloatEmptyDefault:  0.0,
 				FloatEmpty:         0.0,
 				List: []Item{
-					getPointerFromString("foo"),
-					getPointerFromString("bar"),
+					ptr.To("foo"),
+					ptr.To("bar"),
 				},
 				Sub: &SubStruct{
 					S: "foo",
@@ -94,7 +91,7 @@ func Test_Marker(t *testing.T) {
 					"foo",
 				},
 				Map: map[string]Item{
-					"foo": getPointerFromString("bar"),
+					"foo": ptr.To("bar"),
 				},
 				StructMap: map[string]SubStruct{
 					"foo": {
@@ -108,7 +105,7 @@ func Test_Marker(t *testing.T) {
 						I: 1,
 					},
 				},
-				AliasPtr: getPointerFromString("banana"),
+				AliasPtr: ptr.To("banana"),
 			},
 		},
 		{
@@ -121,7 +118,7 @@ func Test_Marker(t *testing.T) {
 				StringDefault:      "changed",
 				StringEmptyDefault: "",
 				StringEmpty:        "",
-				StringPointer:      getPointerFromString("default"),
+				StringPointer:      ptr.To("default"),
 				Int64:              &defaultInt64,
 				Int32:              &defaultInt32,
 				IntDefault:         5,
@@ -131,8 +128,8 @@ func Test_Marker(t *testing.T) {
 				FloatEmptyDefault:  0.0,
 				FloatEmpty:         0.0,
 				List: []Item{
-					getPointerFromString("foo"),
-					getPointerFromString("bar"),
+					ptr.To("foo"),
+					ptr.To("bar"),
 				},
 				Sub: &SubStruct{
 					S: "foo",
@@ -166,7 +163,7 @@ func Test_Marker(t *testing.T) {
 					I: 1,
 				},
 				Map: map[string]Item{
-					"foo": getPointerFromString("bar"),
+					"foo": ptr.To("bar"),
 				},
 				StructMap: map[string]SubStruct{
 					"foo": {
@@ -180,7 +177,7 @@ func Test_Marker(t *testing.T) {
 						I: 1,
 					},
 				},
-				AliasPtr: getPointerFromString("banana"),
+				AliasPtr: ptr.To("banana"),
 			},
 		},
 		{
@@ -188,14 +185,14 @@ func Test_Marker(t *testing.T) {
 			in: Defaulted{
 				List: []Item{
 					nil,
-					getPointerFromString("bar"),
+					ptr.To("bar"),
 				},
 			},
 			out: Defaulted{
 				StringDefault:      "bar",
 				StringEmptyDefault: "",
 				StringEmpty:        "",
-				StringPointer:      getPointerFromString("default"),
+				StringPointer:      ptr.To("default"),
 				Int64:              &defaultInt64,
 				Int32:              &defaultInt32,
 				IntDefault:         1,
@@ -205,8 +202,8 @@ func Test_Marker(t *testing.T) {
 				FloatEmptyDefault:  0.0,
 				FloatEmpty:         0.0,
 				List: []Item{
-					getPointerFromString("apple"),
-					getPointerFromString("bar"),
+					ptr.To("apple"),
+					ptr.To("bar"),
 				},
 				Sub: &SubStruct{
 					S: "foo",
@@ -240,7 +237,7 @@ func Test_Marker(t *testing.T) {
 					I: 1,
 				},
 				Map: map[string]Item{
-					"foo": getPointerFromString("bar"),
+					"foo": ptr.To("bar"),
 				},
 				StructMap: map[string]SubStruct{
 					"foo": {
@@ -254,7 +251,7 @@ func Test_Marker(t *testing.T) {
 						I: 1,
 					},
 				},
-				AliasPtr: getPointerFromString("banana"),
+				AliasPtr: ptr.To("banana"),
 			},
 		},
 		{
@@ -262,14 +259,14 @@ func Test_Marker(t *testing.T) {
 			in: Defaulted{
 				Map: map[string]Item{
 					"foo": nil,
-					"bar": getPointerFromString("banana"),
+					"bar": ptr.To("banana"),
 				},
 			},
 			out: Defaulted{
 				StringDefault:      "bar",
 				StringEmptyDefault: "",
 				StringEmpty:        "",
-				StringPointer:      getPointerFromString("default"),
+				StringPointer:      ptr.To("default"),
 				Int64:              &defaultInt64,
 				Int32:              &defaultInt32,
 				IntDefault:         1,
@@ -279,8 +276,8 @@ func Test_Marker(t *testing.T) {
 				FloatEmptyDefault:  0.0,
 				FloatEmpty:         0.0,
 				List: []Item{
-					getPointerFromString("foo"),
-					getPointerFromString("bar"),
+					ptr.To("foo"),
+					ptr.To("bar"),
 				},
 				Sub: &SubStruct{
 					S: "foo",
@@ -314,8 +311,8 @@ func Test_Marker(t *testing.T) {
 					I: 1,
 				},
 				Map: map[string]Item{
-					"foo": getPointerFromString("apple"),
-					"bar": getPointerFromString("banana"),
+					"foo": ptr.To("apple"),
+					"bar": ptr.To("banana"),
 				},
 				StructMap: map[string]SubStruct{
 					"foo": {
@@ -329,7 +326,7 @@ func Test_Marker(t *testing.T) {
 						I: 1,
 					},
 				},
-				AliasPtr: getPointerFromString("banana"),
+				AliasPtr: ptr.To("banana"),
 			},
 		},
 	}
@@ -387,7 +384,7 @@ func Test_DefaultingReference(t *testing.T) {
 				AliasOverride:                   Item(&SomeDefault),
 				AliasConvertDefaultPointer:      &dv,
 				AliasPointerDefault:             &dv,
-				PointerAliasDefault:             Item(getPointerFromString("apple")),
+				PointerAliasDefault:             Item(ptr.To("apple")),
 				AliasNonPointer:                 SomeValue,
 				AliasPointer:                    &SomeValue,
 				SymbolReference:                 SomeDefault,

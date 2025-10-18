@@ -126,14 +126,14 @@ func (t *Time) UnmarshalJSON(b []byte) error {
 	p := strings.Split(string(b), ".")
 	switch len(p) {
 	case 1:
-		v, err := strconv.ParseInt(string(p[0]), 10, 64)
+		v, err := strconv.ParseInt(p[0], 10, 64)
 		if err != nil {
 			return err
 		}
 		*t = Time(v * second)
 
 	case 2:
-		v, err := strconv.ParseInt(string(p[0]), 10, 64)
+		v, err := strconv.ParseInt(p[0], 10, 64)
 		if err != nil {
 			return err
 		}
@@ -143,7 +143,7 @@ func (t *Time) UnmarshalJSON(b []byte) error {
 		if prec < 0 {
 			p[1] = p[1][:dotPrecision]
 		} else if prec > 0 {
-			p[1] = p[1] + strings.Repeat("0", prec)
+			p[1] += strings.Repeat("0", prec)
 		}
 
 		va, err := strconv.ParseInt(p[1], 10, 32)
@@ -170,15 +170,15 @@ func (t *Time) UnmarshalJSON(b []byte) error {
 // This type should not propagate beyond the scope of input/output processing.
 type Duration time.Duration
 
-// Set implements pflag/flag.Value
+// Set implements pflag/flag.Value.
 func (d *Duration) Set(s string) error {
 	var err error
 	*d, err = ParseDuration(s)
 	return err
 }
 
-// Type implements pflag.Value
-func (d *Duration) Type() string {
+// Type implements pflag.Value.
+func (*Duration) Type() string {
 	return "duration"
 }
 
@@ -201,6 +201,7 @@ var unitMap = map[string]struct {
 
 // ParseDuration parses a string into a time.Duration, assuming that a year
 // always has 365d, a week always has 7d, and a day always has 24h.
+// Negative durations are not supported.
 func ParseDuration(s string) (Duration, error) {
 	switch s {
 	case "0":
@@ -253,16 +254,34 @@ func ParseDuration(s string) (Duration, error) {
 			return 0, errors.New("duration out of range")
 		}
 	}
+
 	return Duration(dur), nil
+}
+
+// ParseDurationAllowNegative is like ParseDuration but also accepts negative durations.
+func ParseDurationAllowNegative(s string) (Duration, error) {
+	if s == "" || s[0] != '-' {
+		return ParseDuration(s)
+	}
+
+	d, err := ParseDuration(s[1:])
+
+	return -d, err
 }
 
 func (d Duration) String() string {
 	var (
-		ms = int64(time.Duration(d) / time.Millisecond)
-		r  = ""
+		ms   = int64(time.Duration(d) / time.Millisecond)
+		r    = ""
+		sign = ""
 	)
+
 	if ms == 0 {
 		return "0s"
+	}
+
+	if ms < 0 {
+		sign, ms = "-", -ms
 	}
 
 	f := func(unit string, mult int64, exact bool) {
@@ -286,7 +305,7 @@ func (d Duration) String() string {
 	f("s", 1000, false)
 	f("ms", 1, false)
 
-	return r
+	return sign + r
 }
 
 // MarshalJSON implements the json.Marshaler interface.

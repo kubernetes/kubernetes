@@ -22,18 +22,17 @@ import (
 	"reflect"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/code-generator/cmd/validation-gen/util"
 	"k8s.io/gengo/v2"
 	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/types"
-
-	"k8s.io/code-generator/cmd/validation-gen/util"
 )
 
 const (
 	requiredTagName  = "k8s:required"
 	optionalTagName  = "k8s:optional"
 	forbiddenTagName = "k8s:forbidden"
-	defaultTagName   = "default" // TODO: this should evenually be +k8s:default
+	defaultTagName   = "default" // TODO: this should eventually be +k8s:default
 )
 
 func init() {
@@ -310,10 +309,13 @@ func (rtv requirednessTagValidator) Docs() TagDoc {
 
 	switch rtv.mode {
 	case requirednessRequired:
+		doc.StabilityLevel = Beta
 		doc.Description = "Indicates that a field must be specified by clients."
 	case requirednessOptional:
+		doc.StabilityLevel = Beta
 		doc.Description = "Indicates that a field is optional to clients."
 	case requirednessForbidden:
+		doc.StabilityLevel = Alpha
 		doc.Description = "Indicates that a field may not be specified."
 	default:
 		panic(fmt.Sprintf("unknown requiredness mode: %q", rtv.mode))

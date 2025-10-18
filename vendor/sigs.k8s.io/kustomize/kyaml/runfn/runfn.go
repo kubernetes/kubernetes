@@ -281,8 +281,8 @@ func (r RunFns) getFunctionsFromFunctions() ([]kio.Filter, error) {
 	return r.getFunctionFilters(true, r.Functions...)
 }
 
-// mergeContainerEnv will merge the envs specified by command line (imperative) and config
-// file (declarative). If they have same key, the imperative value will be respected.
+// mergeContainerEnv is container-specific and will merge the envs specified by command line (imperative)
+// and config file (declarative). If they have same key, the imperative value will be respected.
 func (r RunFns) mergeContainerEnv(envs []string) []string {
 	imperative := runtimeutil.NewContainerEnvFromStringSlice(r.Env)
 	declarative := runtimeutil.NewContainerEnvFromStringSlice(envs)
@@ -295,6 +295,28 @@ func (r RunFns) mergeContainerEnv(envs []string) []string {
 	}
 
 	return declarative.Raw()
+}
+
+// mergeExecEnv will merge the envs specified by command line (imperative) and config
+// file (declarative). If they have same key, the imperative value will be respected.
+func (r RunFns) mergeExecEnv(envs []string) []string {
+	envMap := map[string]string{}
+
+	for _, env := range append(envs, r.Env...) {
+		res := strings.Split(env, "=")
+		//nolint:gomnd
+		if len(res) == 2 {
+			envMap[res[0]] = res[1]
+		}
+	}
+
+	mergedEnv := []string{}
+	for key, value := range envMap {
+		mergedEnv = append(mergedEnv, fmt.Sprintf("%s=%s", key, value))
+	}
+	// Sort the envs to make the output deterministic
+	sort.Strings(mergedEnv)
+	return mergedEnv
 }
 
 func (r RunFns) getFunctionFilters(global bool, fns ...*yaml.RNode) (
@@ -494,6 +516,8 @@ func (r *RunFns) ffp(spec runtimeutil.FunctionSpec, api *yaml.RNode, currentUser
 	if r.EnableExec && spec.Exec.Path != "" {
 		ef := &exec.Filter{
 			Path:       spec.Exec.Path,
+			Args:       spec.Exec.Args,
+			Env:        r.mergeExecEnv(spec.Exec.Env),
 			WorkingDir: r.WorkingDir,
 		}
 

@@ -22,6 +22,7 @@ import (
 	"hash"
 	"sync"
 
+	"k8s.io/apiserver/pkg/util/configmetrics"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 )
@@ -53,10 +54,20 @@ var (
 		},
 		[]string{"status", "apiserver_id_hash"},
 	)
+
+	authorizationConfigLastConfigInfo = metrics.NewDesc(
+		metrics.BuildFQName(namespace, subsystem, "last_config_info"),
+		"Information about the last applied authorization configuration with hash as label, split by apiserver identity.",
+		[]string{"apiserver_id_hash", "hash"},
+		nil,
+		metrics.ALPHA,
+		"",
+	)
 )
 
 var registerMetrics sync.Once
 var hashPool *sync.Pool
+var configHashProvider = configmetrics.NewAtomicHashProvider()
 
 func RegisterMetrics() {
 	registerMetrics.Do(func() {
@@ -67,6 +78,7 @@ func RegisterMetrics() {
 		}
 		legacyregistry.MustRegister(authorizationConfigAutomaticReloadsTotal)
 		legacyregistry.MustRegister(authorizationConfigAutomaticReloadLastTimestampSeconds)
+		legacyregistry.CustomMustRegister(configmetrics.NewConfigInfoCustomCollector(authorizationConfigLastConfigInfo, configHashProvider))
 	})
 }
 
@@ -81,10 +93,16 @@ func RecordAuthorizationConfigAutomaticReloadFailure(apiServerID string) {
 	authorizationConfigAutomaticReloadLastTimestampSeconds.WithLabelValues("failure", apiServerIDHash).SetToCurrentTime()
 }
 
-func RecordAuthorizationConfigAutomaticReloadSuccess(apiServerID string) {
+func RecordAuthorizationConfigAutomaticReloadSuccess(apiServerID, authzConfigData string) {
 	apiServerIDHash := getHash(apiServerID)
 	authorizationConfigAutomaticReloadsTotal.WithLabelValues("success", apiServerIDHash).Inc()
 	authorizationConfigAutomaticReloadLastTimestampSeconds.WithLabelValues("success", apiServerIDHash).SetToCurrentTime()
+
+	RecordAuthorizationConfigLastConfigInfo(apiServerID, authzConfigData)
+}
+
+func RecordAuthorizationConfigLastConfigInfo(apiServerID, authzConfigData string) {
+	configHashProvider.SetHashes(getHash(apiServerID), getHash(authzConfigData))
 }
 
 func getHash(data string) string {

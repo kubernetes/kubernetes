@@ -19,9 +19,11 @@ package scheme
 import (
 	"bytes"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	v1 "k8s.io/kube-scheduler/config/v1"
@@ -52,6 +54,9 @@ profiles:
     args:
       minCandidateNodesPercentage: 50
       minCandidateNodesAbsolute: 500
+  - name: DynamicResources
+    args:
+      filterTimeout: 10s
   - name: InterPodAffinity
     args:
       hardPodAffinityWeight: 5
@@ -99,6 +104,10 @@ profiles:
 						{
 							Name: "DefaultPreemption",
 							Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 50, MinCandidateNodesAbsolute: 500},
+						},
+						{
+							Name: "DynamicResources",
+							Args: &config.DynamicResourcesArgs{FilterTimeout: &metav1.Duration{Duration: 10 * time.Second}},
 						},
 						{
 							Name: "InterPodAffinity",
@@ -223,6 +232,10 @@ profiles:
 						{
 							Name: "DefaultPreemption",
 							Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 50, MinCandidateNodesAbsolute: 100},
+						},
+						{
+							Name: "DynamicResources",
+							Args: &config.DynamicResourcesArgs{FilterTimeout: &metav1.Duration{Duration: 10 * time.Second}},
 						},
 						{
 							Name: "InterPodAffinity",
@@ -351,6 +364,8 @@ profiles:
 - pluginConfig:
   - name: DefaultPreemption
     args:
+  - name: DynamicResources
+    args:
   - name: InterPodAffinity
     args:
   - name: NodeResourcesFit
@@ -370,6 +385,10 @@ profiles:
 						{
 							Name: "DefaultPreemption",
 							Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 10, MinCandidateNodesAbsolute: 100},
+						},
+						{
+							Name: "DynamicResources",
+							Args: &config.DynamicResourcesArgs{FilterTimeout: &metav1.Duration{Duration: 10 * time.Second}},
 						},
 						{
 							Name: "InterPodAffinity",
@@ -442,6 +461,10 @@ profiles:
 						{
 							Name: "DefaultPreemption",
 							Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 10, MinCandidateNodesAbsolute: 100},
+						},
+						{
+							Name: "DynamicResources",
+							Args: &config.DynamicResourcesArgs{FilterTimeout: &metav1.Duration{Duration: 10 * time.Second}},
 						},
 						{
 							Name: "NodeAffinity",

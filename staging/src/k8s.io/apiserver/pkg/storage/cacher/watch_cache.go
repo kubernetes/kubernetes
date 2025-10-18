@@ -22,6 +22,7 @@ import (
 	"math"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -155,7 +156,8 @@ type watchCache struct {
 	waitingUntilFresh *progress.ConditionalProgressRequester
 
 	// Stores previous snapshots of orderedLister to allow serving requests from previous revisions.
-	snapshots Snapshotter
+	snapshots           Snapshotter
+	snapshottingEnabled atomic.Bool
 
 	getCurrentRV func(context.Context) (uint64, error)
 }
@@ -193,6 +195,7 @@ func newWatchCache(
 		getCurrentRV:        getCurrentRV,
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+		wc.snapshottingEnabled.Store(true)
 		wc.snapshots = newStoreSnapshotter()
 	}
 	metrics.WatchCacheCapacity.WithLabelValues(groupResource.Group, groupResource.Resource).Set(float64(wc.capacity))
@@ -327,7 +330,7 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 		if err != nil {
 			return err
 		}
-		if w.snapshots != nil {
+		if w.snapshots != nil && w.snapshottingEnabled.Load() {
 			if orderedLister, ordered := w.store.(orderedLister); ordered {
 				if w.isCacheFullLocked() {
 					oldestRV := w.cache[w.startIndex%w.capacity].ResourceVersion
@@ -774,7 +777,7 @@ func (w *watchCache) Replace(objs []interface{}, resourceVersion string) error {
 	}
 	if w.snapshots != nil {
 		w.snapshots.Reset()
-		if orderedLister, ordered := w.store.(orderedLister); ordered {
+		if orderedLister, ordered := w.store.(orderedLister); ordered && w.snapshottingEnabled.Load() {
 			w.snapshots.Add(version, orderedLister)
 		}
 	}
@@ -934,4 +937,20 @@ func (w *watchCache) getIntervalFromStoreLocked(key string, matchesSingle bool) 
 		return nil, err
 	}
 	return ci, nil
+}
+
+func (w *watchCache) Compact(rev uint64) {
+	if w.snapshots == nil {
+		return
+	}
+	w.snapshots.RemoveLess(rev)
+}
+
+func (w *watchCache) MarkConsistent(consistent bool) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+		w.snapshottingEnabled.Store(consistent)
+		if !consistent && w.snapshots != nil {
+			w.snapshots.Reset()
+		}
+	}
 }

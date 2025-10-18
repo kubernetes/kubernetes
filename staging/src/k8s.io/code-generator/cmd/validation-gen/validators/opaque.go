@@ -38,7 +38,7 @@ func (opaqueTypeTagValidator) TagName() string {
 }
 
 func (opaqueTypeTagValidator) ValidScopes() sets.Set[Scope] {
-	return sets.New(ScopeAny)
+	return sets.New(ScopeType, ScopeField, ScopeListVal, ScopeMapKey, ScopeMapVal)
 }
 
 func (opaqueTypeTagValidator) GetValidations(_ Context, _ codetags.Tag) (Validations, error) {
@@ -47,8 +47,9 @@ func (opaqueTypeTagValidator) GetValidations(_ Context, _ codetags.Tag) (Validat
 
 func (opaqueTypeTagValidator) Docs() TagDoc {
 	doc := TagDoc{
-		Tag:    opaqueTypeTagName,
-		Scopes: []Scope{ScopeField},
+		Tag:            opaqueTypeTagName,
+		StabilityLevel: Alpha,
+		Scopes:         []Scope{ScopeField},
 		Description: "Indicates that any validations declared on the referenced type will be ignored. " +
 			"If a referenced type's package is not included in the generator's current " +
 			"flags, this tag must be set, or code generation will fail (preventing silent " +

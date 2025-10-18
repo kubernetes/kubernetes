@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	jsonserializer "k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apiserver/pkg/admission"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/audit"
@@ -42,7 +43,6 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 
-	"k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
 )
 
@@ -80,7 +80,7 @@ func TestDeleteResourceAuditLogRequestObject(t *testing.T) {
 
 	policy := metav1.DeletePropagationBackground
 	deleteOption := &metav1.DeleteOptions{
-		GracePeriodSeconds: pointer.Int64Ptr(30),
+		GracePeriodSeconds: ptr.To[int64](30),
 		PropagationPolicy:  &policy,
 	}
 
@@ -102,7 +102,7 @@ func TestDeleteResourceAuditLogRequestObject(t *testing.T) {
 		{
 			name: "meta built-in Codec encode v1.DeleteOptions",
 			object: &metav1.DeleteOptions{
-				GracePeriodSeconds: pointer.Int64Ptr(30),
+				GracePeriodSeconds: ptr.To[int64](30),
 				PropagationPolicy:  &policy,
 			},
 			gv:         metav1.SchemeGroupVersion,
@@ -112,7 +112,7 @@ func TestDeleteResourceAuditLogRequestObject(t *testing.T) {
 		{
 			name: "fake corev1 registered codec encode v1 DeleteOptions",
 			object: &metav1.DeleteOptions{
-				GracePeriodSeconds: pointer.Int64Ptr(30),
+				GracePeriodSeconds: ptr.To[int64](30),
 				PropagationPolicy:  &policy,
 			},
 			gv:         metav1.SchemeGroupVersion,
@@ -146,6 +146,73 @@ func TestDeleteResourceAuditLogRequestObject(t *testing.T) {
 			}
 		})
 	}
+}
+
+// For issue https://github.com/kubernetes/kubernetes/issues/132359
+func TestDeleteResourceDeleteOptions(t *testing.T) {
+	ctx := t.Context()
+	fakeDeleterFn := func(ctx context.Context, _ rest.ValidateObjectFunc, _ *metav1.DeleteOptions) (runtime.Object, bool, error) {
+		return nil, false, nil
+	}
+	js := jsonserializer.NewSerializerWithOptions(jsonserializer.DefaultMetaFactory, nil, nil, jsonserializer.SerializerOptions{})
+	scope := &RequestScope{
+		Namer: &mockNamer{},
+		Serializer: &fakeSerializer{
+			serializer: runtime.NewCodec(js, js),
+		},
+	}
+	handler := DeleteResource(fakeDeleterFunc(fakeDeleterFn), true, scope, nil)
+
+	tests := []struct {
+		name       string
+		body       string
+		expectCode int
+	}{
+		{
+			name:       "valid delete options",
+			body:       "{}",
+			expectCode: 200,
+		},
+		{
+			name:       "orphanDependents invalid Go type",
+			body:       `{"orphanDependents": "randomString"}`,
+			expectCode: 400,
+		},
+		{
+			name:       "apiVersion/kind mismatch",
+			body:       `{ "apiVersion": "v1", "kind": "APIResourceList" }`,
+			expectCode: 400,
+		},
+		{
+			name:       "apiVersion invalid type",
+			body:       `{ "apiVersion": false, "kind": "DeleteOptions" }`,
+			expectCode: 400,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			req, err := http.NewRequestWithContext(ctx, request.MethodDelete, "/api/v1/namespaces/default/pods/testpod", strings.NewReader(test.body))
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Accept", "*/*")
+
+			recorder := httptest.NewRecorder()
+			handler.ServeHTTP(recorder, req)
+			gotCode := recorder.Code
+			if gotCode != test.expectCode {
+				t.Fatalf("expected status %v but got %v", test.expectCode, gotCode)
+			}
+		})
+	}
+}
+
+type fakeDeleterFunc func(ctx context.Context, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions) (runtime.Object, bool, error)
+
+func (f fakeDeleterFunc) Delete(ctx context.Context, name string, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
+	return f(ctx, deleteValidation, options)
 }
 
 func TestDeleteCollection(t *testing.T) {
@@ -212,6 +279,67 @@ func TestDeleteCollection(t *testing.T) {
 				if !strings.Contains(err.Error(), test.expectErr) {
 					t.Fatalf("expect %s but got %s", test.expectErr, err.Error())
 				}
+			}
+		})
+	}
+}
+
+// For issue https://github.com/kubernetes/kubernetes/issues/132359
+func TestDeleteCollectionDeleteOptions(t *testing.T) {
+	ctx := t.Context()
+	fakeDeleterFn := func(ctx context.Context, _ rest.ValidateObjectFunc, _ *metav1.DeleteOptions, _ *metainternalversion.ListOptions) (runtime.Object, error) {
+		return nil, nil
+	}
+	js := jsonserializer.NewSerializerWithOptions(jsonserializer.DefaultMetaFactory, nil, nil, jsonserializer.SerializerOptions{})
+	scope := &RequestScope{
+		Namer: &mockNamer{},
+		Serializer: &fakeSerializer{
+			serializer: runtime.NewCodec(js, js),
+		},
+	}
+	handler := DeleteCollection(fakeCollectionDeleterFunc(fakeDeleterFn), true, scope, nil)
+
+	tests := []struct {
+		name       string
+		body       string
+		expectCode int
+	}{
+		{
+			name:       "valid delete options",
+			body:       "{}",
+			expectCode: 200,
+		},
+		{
+			name:       "orphanDependents invalid Go type",
+			body:       `{"orphanDependents": "randomString"}`,
+			expectCode: 400,
+		},
+		{
+			name:       "apiVersion/kind mismatch",
+			body:       `{ "apiVersion": "v1", "kind": "APIResourceList" }`,
+			expectCode: 400,
+		},
+		{
+			name:       "apiVersion invalid type",
+			body:       `{ "apiVersion": false, "kind": "DeleteOptions" }`,
+			expectCode: 400,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			req, err := http.NewRequestWithContext(ctx, request.MethodDelete, "/api/v1/namespaces/default/pods/testpod", strings.NewReader(test.body))
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Accept", "*/*")
+
+			recorder := httptest.NewRecorder()
+			handler.ServeHTTP(recorder, req)
+			gotCode := recorder.Code
+			if gotCode != test.expectCode {
+				t.Fatalf("expected status %v but got %v", test.expectCode, gotCode)
 			}
 		})
 	}

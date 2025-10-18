@@ -22,6 +22,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -95,21 +96,9 @@ func UnupgradedControlPlaneInstances(client clientset.Interface, nodeName string
 }
 
 // WriteKubeletConfigFiles writes the kubelet config file to disk, but first creates a backup of any existing one.
-func WriteKubeletConfigFiles(cfg *kubeadmapi.InitConfiguration, kubeletConfigDir string, patchesDir string, dryRun bool, out io.Writer) error {
-	var (
-		err        error
-		kubeletDir = kubeadmconstants.KubeletRunDirectory
-	)
-	// If dry-running, this will return a directory under /etc/kubernetes/tmp or kubeletConfigDir.
-	if dryRun {
-		kubeletDir, err = kubeadmconstants.CreateTempDir(kubeletConfigDir, "kubeadm-upgrade-dryrun")
-	}
-	if err != nil {
-		// The error here should never occur in reality, would only be thrown if /tmp doesn't exist on the machine.
-		return err
-	}
-	// Create a copy of the kubelet config file in the /etc/kubernetes/tmp or kubeletConfigDir.
-	backupDir, err := kubeadmconstants.CreateTempDir(kubeletConfigDir, "kubeadm-kubelet-config")
+func WriteKubeletConfigFiles(cfg *kubeadmapi.InitConfiguration, kubeletDir string, kubeConfigDir string, patchesDir string, dryRun bool, out io.Writer) error {
+	// Create a copy of the kubelet config file in the /etc/kubernetes/tmp or kubeConfigDir.
+	backupDir, err := kubeadmconstants.CreateTimestampDir(kubeConfigDir, "kubeadm-kubelet-config")
 	if err != nil {
 		return err
 	}
@@ -120,13 +109,13 @@ func WriteKubeletConfigFiles(cfg *kubeadmapi.InitConfiguration, kubeletConfigDir
 	dest := filepath.Join(backupDir, kubeadmconstants.KubeletConfigurationFileName)
 
 	if !dryRun {
-		fmt.Printf("[upgrade] Backing up kubelet config file to %s\n", dest)
+		_, _ = fmt.Fprintf(out, "[upgrade] Backing up kubelet config file to %s\n", dest)
 		err := kubeadmutil.CopyFile(src, dest)
 		if err != nil {
 			return errors.Wrap(err, "error backing up the kubelet config file")
 		}
 	} else {
-		fmt.Printf("[dryrun] Would back up kubelet config file to %s\n", dest)
+		_, _ = fmt.Fprintf(out, "[dryrun] Would back up kubelet config file to %s\n", dest)
 	}
 
 	if features.Enabled(cfg.FeatureGates, features.NodeLocalCRISocket) {
@@ -154,7 +143,7 @@ func WriteKubeletConfigFiles(cfg *kubeadmapi.InitConfiguration, kubeletConfigDir
 					}
 				}
 			} else if dryRun {
-				fmt.Fprintf(os.Stdout, "[dryrun] would read the flag --container-runtime-endpoint value from %q, which is missing. "+
+				_, _ = fmt.Fprintf(out, "[dryrun] would read the flag --container-runtime-endpoint value from %q, which is missing. "+
 					"Using default socket %q instead", kubeadmconstants.KubeletEnvFileName, kubeadmconstants.DefaultCRISocket)
 				containerRuntimeEndpoint = kubeadmconstants.DefaultCRISocket
 			} else {
@@ -170,7 +159,7 @@ func WriteKubeletConfigFiles(cfg *kubeadmapi.InitConfiguration, kubeletConfigDir
 			}
 
 			if dryRun { // Print what contents would be written
-				err = dryrunutil.PrintDryRunFile(kubeadmconstants.KubeletInstanceConfigurationFileName, kubeletDir, kubeadmconstants.KubeletRunDirectory, os.Stdout)
+				err = dryrunutil.PrintDryRunFile(kubeadmconstants.KubeletInstanceConfigurationFileName, kubeletDir, kubeadmconstants.KubeletRunDirectory, out)
 				if err != nil {
 					return errors.Wrap(err, "error printing kubelet instance configuration file on dryrun")
 				}
@@ -184,7 +173,7 @@ func WriteKubeletConfigFiles(cfg *kubeadmapi.InitConfiguration, kubeletConfigDir
 	}
 
 	if dryRun { // Print what contents would be written
-		err := dryrunutil.PrintDryRunFile(kubeadmconstants.KubeletConfigurationFileName, kubeletDir, kubeadmconstants.KubeletRunDirectory, os.Stdout)
+		err := dryrunutil.PrintDryRunFile(kubeadmconstants.KubeletConfigurationFileName, kubeletDir, kubeadmconstants.KubeletRunDirectory, out)
 		if err != nil {
 			return errors.Wrap(err, "error printing kubelet configuration file on dryrun")
 		}
@@ -192,10 +181,59 @@ func WriteKubeletConfigFiles(cfg *kubeadmapi.InitConfiguration, kubeletConfigDir
 	return nil
 }
 
-// UpdateKubeletKubeconfigServer changes the Server URL in the kubelets kubeconfig if necessary depending on the
-// ControlPlaneKubeletLocalMode feature gate.
-// TODO: remove this function once ControlPlaneKubeletLocalMode goes GA and is hardcoded to be enabled by default:
-// https://github.com/kubernetes/kubeadm/issues/2271
+// RemoveKubeletArgsFromFile removes unwanted kubelet flags from the existing KubeletEnvFile file,
+// but first creates a backup of the existing file.
+func RemoveKubeletArgsFromFile(kubeletDir string, kubeConfigDir string, unwantedFlags []string, dryRun bool, out io.Writer) error {
+	// If there are no unwanted flags, do nothing.
+	if len(unwantedFlags) == 0 {
+		return nil
+	}
+
+	// For dry run mode, we can not access the real kubelet env file in the dry-run directory, so we only print the unwanted flags instead.
+	if dryRun {
+		_, _ = fmt.Fprintf(out, "[dryrun] Would remove unwanted kubelet flags %v from %s\n", unwantedFlags, kubeadmconstants.KubeletEnvFileName)
+		return nil
+	}
+
+	// Create a copy of the KubeletEnvFile in the /etc/kubernetes/tmp or kubeConfigDir.
+	backupDir, err := kubeadmconstants.CreateTempDir(kubeConfigDir, "kubeadm-kubelet-env")
+	if err != nil {
+		return err
+	}
+	klog.Warningf("Using temporary directory %s for kubelet env file. To override it set the environment variable %s",
+		backupDir, kubeadmconstants.EnvVarUpgradeDryRunDir)
+
+	src := filepath.Join(kubeletDir, kubeadmconstants.KubeletEnvFileName)
+	dest := filepath.Join(backupDir, kubeadmconstants.KubeletEnvFileName)
+
+	_, _ = fmt.Fprintf(out, "[upgrade] Backing up kubelet env file to %s\n", dest)
+	err = kubeadmutil.CopyFile(src, dest)
+	if err != nil {
+		return errors.Wrap(err, "error backing up the kubelet env file")
+	}
+
+	var kubeletFlags []kubeadmapi.Arg
+	command, err := kubeletphase.ReadKubeletDynamicEnvFile(src)
+	if err != nil {
+		return errors.Wrap(err, "error reading kubelet env file")
+	}
+	args := kubeadmutil.ArgumentsFromCommand(command)
+	for _, arg := range args {
+		if slices.Contains(unwantedFlags, arg.Name) {
+			continue
+		}
+		kubeletFlags = append(kubeletFlags, arg)
+	}
+	// Rewrite env file if needed
+	if len(args) != len(kubeletFlags) {
+		if err := kubeletphase.WriteKubeletArgsToFile(kubeletFlags, nil, kubeletDir); err != nil {
+			return errors.Wrap(err, "error writing kubelet env file")
+		}
+	}
+	return nil
+}
+
+// UpdateKubeletKubeconfigServer changes the Server URL in the kubelet's kubeconfig if necessary.
 func UpdateKubeletKubeconfigServer(cfg *kubeadmapi.InitConfiguration, dryRun bool) error {
 	kubeletKubeConfigFilePath := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)
 
@@ -228,21 +266,12 @@ func UpdateKubeletKubeconfigServer(cfg *kubeadmapi.InitConfiguration, dryRun boo
 	}
 
 	var targetServer string
-	if features.Enabled(cfg.FeatureGates, features.ControlPlaneKubeletLocalMode) {
-		// Skip changing kubeconfig file if Server does not match the ControlPlaneEndpoint.
-		if config.Clusters[configContext.Cluster].Server != controlPlaneAPIEndpoint || controlPlaneAPIEndpoint == localAPIEndpoint {
-			klog.V(2).Infof("Skipping update of the Server URL in %s, because it's already not equal to %q or already matches the localAPIEndpoint", kubeletKubeConfigFilePath, controlPlaneAPIEndpoint)
-			return nil
-		}
-		targetServer = localAPIEndpoint
-	} else {
-		// Skip changing kubeconfig file if Server does not match the localAPIEndpoint.
-		if config.Clusters[configContext.Cluster].Server != localAPIEndpoint {
-			klog.V(2).Infof("Skipping update of the Server URL in %s, because it already matches the controlPlaneAPIEndpoint", kubeletKubeConfigFilePath)
-			return nil
-		}
-		targetServer = controlPlaneAPIEndpoint
+	// Skip changing kubeconfig file if Server does not match the ControlPlaneEndpoint.
+	if config.Clusters[configContext.Cluster].Server != controlPlaneAPIEndpoint || controlPlaneAPIEndpoint == localAPIEndpoint {
+		klog.V(2).Infof("Skipping update of the Server URL in %s, because it's already not equal to %q or already matches the localAPIEndpoint", kubeletKubeConfigFilePath, controlPlaneAPIEndpoint)
+		return nil
 	}
+	targetServer = localAPIEndpoint
 
 	if dryRun {
 		fmt.Printf("[dryrun] Would change the Server URL from %q to %q in %s and try to restart kubelet\n", config.Clusters[configContext.Cluster].Server, targetServer, kubeletKubeConfigFilePath)

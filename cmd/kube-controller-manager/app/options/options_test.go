@@ -447,9 +447,10 @@ func TestAddFlags(t *testing.T) {
 			AlwaysAllowPaths:             []string{"/healthz", "/readyz", "/livez"}, // note: this does not match /healthz/ or /healthz/*
 			AlwaysAllowGroups:            []string{"system:masters"},
 		},
-		Master:  "192.168.4.20",
-		Metrics: &metrics.Options{},
-		Logs:    logs.NewOptions(),
+		Master:                    "192.168.4.20",
+		ControllerShutdownTimeout: 10 * time.Second,
+		Metrics:                   &metrics.Options{},
+		Logs:                      logs.NewOptions(),
 		// ignores comparing ComponentGlobalsRegistry in this test.
 		ComponentGlobalsRegistry: s.ComponentGlobalsRegistry,
 	}
@@ -722,6 +723,7 @@ func TestApplyTo(t *testing.T) {
 				ConcurrentPolicySyncs: 9,
 			},
 		},
+		ControllerShutdownTimeout: 10 * time.Second,
 	}
 
 	// Sort GCIgnoredResources because it's built from a map, which means the
@@ -1469,8 +1471,6 @@ func TestControllerManagerAliases(t *testing.T) {
 }
 
 func TestWatchListClientFlagUsage(t *testing.T) {
-	t.Skip("skip this test until we either bring back WatchListClient or remove it")
-
 	fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
 	s, _ := NewKubeControllerManagerOptions()
 	for _, f := range s.Flags([]string{""}, []string{""}, nil).FlagSets {
@@ -1482,8 +1482,6 @@ func TestWatchListClientFlagUsage(t *testing.T) {
 }
 
 func TestWatchListClientFlagChange(t *testing.T) {
-	t.Skip("skip this test until we either bring back WatchListClient or remove it")
-
 	fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
 	s, err := NewKubeControllerManagerOptions()
 	if err != nil {

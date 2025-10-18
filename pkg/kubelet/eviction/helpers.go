@@ -26,10 +26,13 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	resourcehelper "k8s.io/component-helpers/resource"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	v1resource "k8s.io/kubernetes/pkg/api/v1/resource"
+	"k8s.io/kubernetes/pkg/features"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	volumeutils "k8s.io/kubernetes/pkg/volume/util"
@@ -45,6 +48,8 @@ const (
 	nodeConditionMessageFmt = "The node had condition: %v. "
 	// containerMessageFmt provides additional information for containers exceeding requests
 	containerMessageFmt = "Container %s was using %s, request is %s, has larger consumption of %v. "
+	// podMessageFmt provides additional information for pods exceeding requests
+	podMessageFmt = "Pod %s was using %s, request is %s, has larger consumption of %v. "
 	// containerEphemeralStorageMessageFmt provides additional information for containers which have exceeded their ES limit
 	containerEphemeralStorageMessageFmt = "Container %s exceeded its local ephemeral storage limit %q. "
 	// podEphemeralStorageMessageFmt provides additional information for pods which have exceeded their ES limit
@@ -59,6 +64,10 @@ const (
 	OffendingContainersKey = "offending_containers"
 	// OffendingContainersUsageKey is the key in eviction event annotations for the list of usage of containers which exceeded their requests
 	OffendingContainersUsageKey = "offending_containers_usage"
+	// OffendingPodKey is the key in eviction event annotations for the pod name which exceeded its requests
+	OffendingPodKey = "offending_pod"
+	// OffendingPodUsageKey is the key in eviction event annotations for the pod usage which exceeded its requests
+	OffendingPodUsageKey = "offending_pod_usage"
 	// StarvedResourceKey is the key for the starved resource in eviction event annotations
 	StarvedResourceKey = "starved_resource"
 	// thresholdMetMessageFmt is the message for evictions due to resource pressure.
@@ -1243,6 +1252,18 @@ func evictionMessage(resourceToReclaim v1.ResourceName, pod *v1.Pod, stats stats
 	if !ok {
 		return
 	}
+
+	// Pod level resources will be included in eviction message, along container resources
+	if resourceToReclaim == v1.ResourceMemory && utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
+		if podRequest, ok := pod.Spec.Resources.Requests[resourceToReclaim]; ok && podStats.Memory != nil {
+			podUsage := memoryUsage(podStats.Memory)
+			message += fmt.Sprintf(podMessageFmt, pod.Name, podUsage.String(), podRequest.String(), resourceToReclaim)
+
+			annotations[OffendingPodKey] = pod.Name
+			annotations[OffendingPodUsageKey] = podUsage.String()
+		}
+	}
+
 	// Since the resources field cannot be specified for ephemeral containers,
 	// they will always be blamed for resource overuse when an eviction occurs.
 	// That’s why only regular, init and restartable init containers are considered

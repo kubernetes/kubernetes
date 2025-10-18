@@ -1679,6 +1679,217 @@ func TestStaticPolicyAddWithUncoreAlignment(t *testing.T) {
 			),
 			expUncoreCache: cpuset.New(0, 1), // best-effort across uncore cache 0 and 1
 		},
+		{
+			// odd integer cpu required on smt-disabled processor
+			description:     "odd integer cpu required on smt-disabled",
+			topo:            topoSmallSingleSocketSingleNumaPerSocketNoSMTUncore, // 8 cpus per uncore
+			numReservedCPUs: 4,
+			reserved:        cpuset.New(0, 1, 2, 3), // note 4 cpus taken from uncore 0
+			cpuPolicyOptions: map[string]string{
+				FullPCPUsOnlyOption:            "true",
+				PreferAlignByUnCoreCacheOption: "true",
+			},
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: topoSmallSingleSocketSingleNumaPerSocketNoSMTUncore.CPUDetails.CPUs(),
+			pod: WithPodUID(
+				makeMultiContainerPod(
+					[]struct{ request, limit string }{}, // init container
+					[]struct{ request, limit string }{ // app container
+						{"5000m", "5000m"}, // full uncore cache worth of cpus
+					},
+				),
+				"with-single-container",
+			),
+			expCPUAlloc: true,
+			expCSet:     cpuset.New(8, 9, 10, 11, 12),
+		},
+		{
+			// odd integer cpu requirement on smt-enabled
+			description:     "odd integer required on smt-enabled",
+			topo:            topoSingleSocketSingleNumaPerSocketSMTSmallUncore, // 8 cpus per uncore
+			numReservedCPUs: 4,
+			reserved:        cpuset.New(0, 1, 64, 65), // note 4 cpus taken from uncore 0
+			cpuPolicyOptions: map[string]string{
+				PreferAlignByUnCoreCacheOption: "true",
+			},
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: topoSingleSocketSingleNumaPerSocketSMTSmallUncore.CPUDetails.CPUs(),
+			pod: WithPodUID(
+				makeMultiContainerPod(
+					[]struct{ request, limit string }{}, // init container
+					[]struct{ request, limit string }{ // app container
+						{"3000m", "3000m"},
+					},
+				),
+				"with-single-container",
+			),
+			expCPUAlloc: true,
+			expCSet:     cpuset.New(2, 3, 66),
+		},
+		{
+			// odd integer cpu required on smt-enabled and odd integer free cpus available on uncore
+			description:     "odd integer required on odd integer partial uncore",
+			topo:            topoSingleSocketSingleNumaPerSocketSMTSmallUncore, // 8 cpus per uncore
+			numReservedCPUs: 3,
+			reserved:        cpuset.New(0, 1, 64), // note 3 cpus taken from uncore 0
+			cpuPolicyOptions: map[string]string{
+				PreferAlignByUnCoreCacheOption: "true",
+			},
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: topoSingleSocketSingleNumaPerSocketSMTSmallUncore.CPUDetails.CPUs(),
+			pod: WithPodUID(
+				makeMultiContainerPod(
+					[]struct{ request, limit string }{}, // init container
+					[]struct{ request, limit string }{ // app container
+						{"3000m", "3000m"},
+					},
+				),
+				"with-single-container",
+			),
+			expCPUAlloc: true,
+			expCSet:     cpuset.New(2, 65, 66),
+		},
+		{
+			// even integer requested on smt-enabled processor with odd integer available cpus on uncore
+			// even integer cpu containers will not be placed on uncore caches with odd integer free cpus
+			description:     "even integer required on odd integer partial uncore",
+			topo:            topoSingleSocketSingleNumaPerSocketSMTSmallUncore, // 8 cpus per uncore
+			numReservedCPUs: 3,
+			reserved:        cpuset.New(0, 1, 64), // note 3 cpus taken from uncore 0
+			cpuPolicyOptions: map[string]string{
+				PreferAlignByUnCoreCacheOption: "true",
+			},
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: topoSingleSocketSingleNumaPerSocketSMTSmallUncore.CPUDetails.CPUs(),
+			pod: WithPodUID(
+				makeMultiContainerPod(
+					[]struct{ request, limit string }{}, // init container
+					[]struct{ request, limit string }{ // app container
+						{"4000m", "4000m"},
+					},
+				),
+				"with-single-container",
+			),
+			expCPUAlloc: true,
+			expCSet:     cpuset.New(4, 5, 68, 69),
+		},
+		{
+			// large odd integer cpu required on smt-enabled
+			description:     "large odd integer required on smt-enabled",
+			topo:            topoSingleSocketSingleNumaPerSocketSMTSmallUncore, // 8 cpus per uncore
+			numReservedCPUs: 3,
+			reserved:        cpuset.New(0, 1, 64), // note 3 cpus taken from uncore 0
+			cpuPolicyOptions: map[string]string{
+				PreferAlignByUnCoreCacheOption: "true",
+			},
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: topoSingleSocketSingleNumaPerSocketSMTSmallUncore.CPUDetails.CPUs(),
+			pod: WithPodUID(
+				makeMultiContainerPod(
+					[]struct{ request, limit string }{}, // init container
+					[]struct{ request, limit string }{ // app container
+						{"11000m", "11000m"},
+					},
+				),
+				"with-single-container",
+			),
+			expCPUAlloc: true,
+			expCSet:     cpuset.New(2, 65, 66, 4, 5, 6, 7, 68, 69, 70, 71), // full uncore 1 and partial uncore 0
+		},
+		{
+			// odd integer cpu required on hyperthread-enabled and monolithic uncore cache
+			description:     "odd integer required on HT monolithic uncore",
+			topo:            topoDualSocketSubNumaPerSocketHTMonolithicUncore,
+			numReservedCPUs: 3,
+			reserved:        cpuset.New(0, 1, 120), // note 3 cpus taken from uncore 0
+			cpuPolicyOptions: map[string]string{
+				PreferAlignByUnCoreCacheOption: "true",
+			},
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: topoSingleSocketSingleNumaPerSocketSMTSmallUncore.CPUDetails.CPUs(),
+			pod: WithPodUID(
+				makeMultiContainerPod(
+					[]struct{ request, limit string }{}, // init container
+					[]struct{ request, limit string }{ // app container
+						{"5000m", "5000m"},
+					},
+				),
+				"with-single-container",
+			),
+			expCPUAlloc: true,
+			expCSet:     cpuset.New(2, 3, 121, 122, 123),
+		},
+		{
+			// even integer cpu required on hyperthread-enabled and monolithic uncore cache
+			description:     "even integer required on HT monolithic uncore",
+			topo:            topoDualSocketSubNumaPerSocketHTMonolithicUncore,
+			numReservedCPUs: 3,
+			reserved:        cpuset.New(0, 1, 120), // note 3 cpus taken from uncore 0
+			cpuPolicyOptions: map[string]string{
+				PreferAlignByUnCoreCacheOption: "true",
+			},
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: topoSingleSocketSingleNumaPerSocketSMTSmallUncore.CPUDetails.CPUs(),
+			pod: WithPodUID(
+				makeMultiContainerPod(
+					[]struct{ request, limit string }{}, // init container
+					[]struct{ request, limit string }{ // app container
+						{"4000m", "4000m"},
+					},
+				),
+				"with-single-container",
+			),
+			expCPUAlloc: true,
+			expCSet:     cpuset.New(2, 3, 122, 123), // takeFullCores
+		},
+		{
+			// test feature compatibility with strict-cpu-reservation on split cache architecture
+			description:     "GuPodSingleContainer, SingleSocketSMTSmallUncore, StrictReserveCompatability",
+			topo:            topoSingleSocketSingleNumaPerSocketSMTSmallUncore,
+			numReservedCPUs: 4,
+			reserved:        cpuset.New(0, 1, 64, 65), // note 4 cpus taken from uncore 0
+			cpuPolicyOptions: map[string]string{
+				StrictCPUReservationOption:     "true",
+				PreferAlignByUnCoreCacheOption: "true",
+			},
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: topoSingleSocketSingleNumaPerSocketSMTSmallUncore.CPUDetails.CPUs(),
+			pod: WithPodUID(
+				makeMultiContainerPod(
+					[]struct{ request, limit string }{}, // init container
+					[]struct{ request, limit string }{ // app container
+						{"2000m", "2000m"},
+					},
+				),
+				"with-single-container",
+			),
+			expCPUAlloc: true,
+			expCSet:     cpuset.New(2, 66), // should avoid reserved cpuset
+		},
+		{
+			// test feature compatibility with strict-cpu-reservation on monolithic uncore architecture
+			description:     "GuPodSingleContainer, DualSocketHTMonoUncore, StrictReserveCompatability",
+			topo:            topoDualSocketSubNumaPerSocketHTMonolithicUncore,
+			numReservedCPUs: 4,
+			reserved:        cpuset.New(0, 1, 120, 121), // first two cores reserved
+			cpuPolicyOptions: map[string]string{
+				StrictCPUReservationOption:     "true",
+				PreferAlignByUnCoreCacheOption: "true",
+			},
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: topoDualSocketSubNumaPerSocketHTMonolithicUncore.CPUDetails.CPUs(),
+			pod: WithPodUID(
+				makeMultiContainerPod(
+					[]struct{ request, limit string }{}, // init container
+					[]struct{ request, limit string }{ // app container
+						{"4000m", "4000m"},
+					},
+				),
+				"with-single-container",
+			),
+			expCPUAlloc: true,
+			expCSet:     cpuset.New(2, 3, 122, 123), // packed assignment avoid reserved cpuset
+		},
 	}
 
 	for _, testCase := range testCases {

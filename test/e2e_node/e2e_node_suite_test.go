@@ -61,6 +61,7 @@ import (
 	_ "k8s.io/kubernetes/test/e2e/framework/metrics/init"
 	_ "k8s.io/kubernetes/test/e2e/framework/node/init"
 	_ "k8s.io/kubernetes/test/utils/format"
+	"k8s.io/kubernetes/test/utils/ktesting"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -158,6 +159,7 @@ func TestMain(m *testing.M) {
 const rootfs = "/rootfs"
 
 func TestE2eNode(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	// Make sure we are not limited by sshd when it comes to open files
 	if err := rlimit.SetNumFiles(1000000); err != nil {
 		klog.Infof("failed to set rlimit on max file handles: %v", err)
@@ -170,7 +172,7 @@ func TestE2eNode(t *testing.T) {
 	}
 	if *runKubeletMode {
 		// If run-kubelet-mode is specified, only start kubelet.
-		services.RunKubelet(featureGates)
+		services.RunKubelet(tCtx, featureGates)
 		return
 	}
 	if *systemValidateMode {
@@ -268,7 +270,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func(ctx context.Context) []byte {
 		// If the services are expected to stop after test, they should monitor the test process.
 		// If the services are expected to keep running after test, they should not monitor the test process.
 		e2es = services.NewE2EServices(*stopServices)
-		gomega.Expect(e2es.Start(featureGates)).To(gomega.Succeed(), "should be able to start node services.")
+		gomega.Expect(e2es.Start(ctx, featureGates)).To(gomega.Succeed(), "should be able to start node services.")
 	} else {
 		klog.Infof("Running tests without starting services.")
 	}
@@ -433,16 +435,6 @@ func loadSystemSpecFromFile(filename string) (*system.SysSpec, error) {
 		return nil, err
 	}
 	return spec, nil
-}
-
-// isNodeReady returns true if a node is ready; false otherwise.
-func isNodeReady(node *v1.Node) bool {
-	for _, c := range node.Status.Conditions {
-		if c.Type == v1.NodeReady {
-			return c.Status == v1.ConditionTrue
-		}
-	}
-	return false
 }
 
 func setExtraEnvs() {

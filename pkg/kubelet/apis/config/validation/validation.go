@@ -59,6 +59,9 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 	if err := localFeatureGate.SetFromMap(kc.FeatureGates); err != nil {
 		return err
 	}
+	if errs := localFeatureGate.Validate(); len(errs) > 0 {
+		allErrors = append(allErrors, errs...)
+	}
 
 	if kc.NodeLeaseDurationSeconds <= 0 {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: nodeLeaseDurationSeconds must be greater than 0"))
@@ -334,12 +337,8 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 		allErrors = append(allErrors, errs.ToAggregate().Errors()...)
 	}
 
-	if localFeatureGate.Enabled(features.KubeletTracing) {
-		if errs := tracingapi.ValidateTracingConfiguration(kc.Tracing, localFeatureGate, field.NewPath("tracing")); len(errs) > 0 {
-			allErrors = append(allErrors, errs.ToAggregate().Errors()...)
-		}
-	} else if kc.Tracing != nil {
-		allErrors = append(allErrors, fmt.Errorf("invalid configuration: tracing should not be configured if KubeletTracing feature flag is disabled."))
+	if errs := tracingapi.ValidateTracingConfiguration(kc.Tracing, localFeatureGate, field.NewPath("tracing")); len(errs) > 0 {
+		allErrors = append(allErrors, errs.ToAggregate().Errors()...)
 	}
 
 	if localFeatureGate.Enabled(features.MemoryQoS) && kc.MemoryThrottlingFactor == nil {
@@ -354,7 +353,7 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 	}
 
 	if kc.EnableSystemLogQuery && !localFeatureGate.Enabled(features.NodeLogQuery) {
-		allErrors = append(allErrors, fmt.Errorf("invalid configuration: NodeLogQuery feature gate is required for enableSystemLogHandler"))
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: NodeLogQuery feature gate is required for enableSystemLogQuery"))
 	}
 	if kc.EnableSystemLogQuery && !kc.EnableSystemLogHandler {
 		allErrors = append(allErrors,

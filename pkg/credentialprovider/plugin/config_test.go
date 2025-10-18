@@ -35,12 +35,13 @@ import (
 
 func Test_readCredentialProviderConfig(t *testing.T) {
 	testcases := []struct {
-		name       string
-		configData []string // Array to support multiple files for directory tests
-		fileNames  []string // Optional file names for directory tests
-		isDir      bool     // Whether to create a directory with multiple files
-		config     *kubeletconfig.CredentialProviderConfig
-		expectErr  string
+		name               string
+		configData         []string // Array to support multiple files for directory tests
+		fileNames          []string // Optional file names for directory tests
+		isDir              bool     // Whether to create a directory with multiple files
+		config             *kubeletconfig.CredentialProviderConfig
+		expectErr          string
+		expectedConfigHash string // Expected hash of the config
 	}{
 		{
 			name:       "empty directory with no JSON or YAML files",
@@ -96,6 +97,7 @@ providers:
 					},
 				},
 			},
+			expectedConfigHash: "sha256:8a62755289ba50c4ca9495baab69eb861068503f8bd49b853e8ba6cf95c72bb8",
 		},
 		{
 			name: "config with 1 plugin and 1 image matcher (JSON!)",
@@ -140,6 +142,7 @@ providers:
 					},
 				},
 			},
+			expectedConfigHash: "sha256:fd0946c206cc5b8735cd57816f21e139cfe480f27119f1d1f80e7c2fd9dc4636",
 		},
 		{
 			name: "config with 1 plugin and a wildcard image match",
@@ -174,6 +177,7 @@ providers:
 					},
 				},
 			},
+			expectedConfigHash: "sha256:5272b0ed7da9c85912217bb9e5293549d7a03cdd510cb73df8d06bd8db363921",
 		},
 		{
 			name: "config with 1 plugin and multiple image matchers",
@@ -209,6 +213,7 @@ providers:
 					},
 				},
 			},
+			expectedConfigHash: "sha256:e167993fa14ef8a799aebe1ebca7177478f93b8ada2b61286479641a4266d75e",
 		},
 		{
 			name: "config with multiple providers",
@@ -255,6 +260,7 @@ providers:
 					},
 				},
 			},
+			expectedConfigHash: "sha256:04d747035e475d4fed4f2e2ec061941d401172e4447e2262a6269f22a670418b",
 		},
 		{
 			name: "v1beta1 config with multiple providers",
@@ -301,6 +307,7 @@ providers:
 					},
 				},
 			},
+			expectedConfigHash: "sha256:5d6e9671b548ddcaf4674cfa5e13257bcff06c931a8a4ef13f2577f94ff4cff3",
 		},
 		{
 			name: "v1 config with multiple providers",
@@ -347,6 +354,7 @@ providers:
 					},
 				},
 			},
+			expectedConfigHash: "sha256:ea93e932f6b7f0ab45cecd6e7141cf5d3a6a037868b59725a60e99a2b702e2a7",
 		},
 		{
 			name: "config with wrong Kind",
@@ -487,6 +495,7 @@ providers:
 					},
 				},
 			},
+			expectedConfigHash: "sha256:efef09979a19eee4802fe4b7aa46d5122f16687a8419443647182c1920f76ac9",
 		},
 		{
 			name: "directory with mixed API versions in config files",
@@ -547,6 +556,7 @@ providers:
 					},
 				},
 			},
+			expectedConfigHash: "sha256:292a674763a5b34f4e51bd0d4c5736375f31a04cb1bed519ca3fcd033ce3e20e",
 		},
 		{
 			name: "directory with duplicate provider names, throw error",
@@ -624,6 +634,7 @@ providers:
 					},
 				},
 			},
+			expectedConfigHash: "sha256:70b4a5afe55ad1045c14f427e33ef10d1bbd82fb0c5b6c944e2c9f8ad2b5d180",
 		},
 		{
 			name: "directory with one invalid config file",
@@ -713,22 +724,26 @@ providers:
 				configPath = file.Name()
 			}
 
-			authConfig, err := readCredentialProviderConfig(configPath)
-			if err != nil {
-				if len(testcase.expectErr) == 0 {
+			authConfig, configHash, err := readCredentialProviderConfig(configPath)
+			if len(testcase.expectErr) == 0 {
+				if err != nil {
 					t.Fatal(err)
+				}
+			} else {
+				if err == nil {
+					t.Fatalf("expected error %q but got none", testcase.expectErr)
 				}
 				if !strings.Contains(err.Error(), testcase.expectErr) {
 					t.Fatalf("expected error %q but got %q", testcase.expectErr, err.Error())
 				}
-			} else if len(testcase.expectErr) > 0 {
-				t.Fatalf("expected error %q but got none", testcase.expectErr)
+			}
+
+			if configHash != testcase.expectedConfigHash {
+				t.Fatalf("expected config hash %q, got %q", testcase.expectedConfigHash, configHash)
 			}
 
 			if !reflect.DeepEqual(authConfig, testcase.config) {
-				t.Logf("actual auth config: %#v", authConfig)
-				t.Logf("expected auth config: %#v", testcase.config)
-				t.Error("credential provider config did not match")
+				t.Fatalf("expected auth config: %v, got: %v", testcase.config, authConfig)
 			}
 		})
 	}
@@ -889,7 +904,7 @@ func Test_validateCredentialProviderConfig(t *testing.T) {
 					},
 				},
 			},
-			expectErr: "providers.defaultCacheDuration: Invalid value: \"-1m0s\": defaultCacheDuration must be greater than or equal to 0",
+			expectErr: "providers.defaultCacheDuration: Invalid value: \"-1m0s\": must be greater than or equal to 0",
 		},
 		{
 			name: "invalid match image",
@@ -929,6 +944,7 @@ func Test_validateCredentialProviderConfig(t *testing.T) {
 						APIVersion:           "credentialprovider.kubelet.k8s.io/v1",
 						TokenAttributes: &kubeletconfig.ServiceAccountTokenAttributes{
 							ServiceAccountTokenAudience: "audience",
+							CacheType:                   kubeletconfig.ServiceAccountServiceAccountTokenCacheType,
 							RequireServiceAccount:       ptr.To(true),
 						},
 					},
@@ -946,6 +962,7 @@ func Test_validateCredentialProviderConfig(t *testing.T) {
 						DefaultCacheDuration: &metav1.Duration{Duration: time.Minute},
 						APIVersion:           "credentialprovider.kubelet.k8s.io/v1",
 						TokenAttributes: &kubeletconfig.ServiceAccountTokenAttributes{
+							CacheType:                            kubeletconfig.TokenServiceAccountTokenCacheType,
 							RequiredServiceAccountAnnotationKeys: []string{"prefix.io/annotation-1", "prefix.io/annotation-2"},
 							RequireServiceAccount:                ptr.To(true),
 						},
@@ -954,6 +971,45 @@ func Test_validateCredentialProviderConfig(t *testing.T) {
 			},
 			saTokenForCredentialProviders: true,
 			expectErr:                     `providers.tokenAttributes.serviceAccountTokenAudience: Required value`,
+		},
+		{
+			name: "token attributes not nil but empty CacheType",
+			config: &kubeletconfig.CredentialProviderConfig{
+				Providers: []kubeletconfig.CredentialProvider{
+					{
+						Name:                 "foobar",
+						MatchImages:          []string{"foobar.registry.io"},
+						DefaultCacheDuration: &metav1.Duration{Duration: time.Minute},
+						APIVersion:           "credentialprovider.kubelet.k8s.io/v1",
+						TokenAttributes: &kubeletconfig.ServiceAccountTokenAttributes{
+							ServiceAccountTokenAudience: "audience",
+							RequireServiceAccount:       ptr.To(true),
+						},
+					},
+				},
+			},
+			saTokenForCredentialProviders: true,
+			expectErr:                     `providers.tokenAttributes.cacheType: Required value: cacheType is required to be set when tokenAttributes is specified. Supported values are: ServiceAccount, Token`,
+		},
+		{
+			name: "token attributes not nil, invalid CacheType",
+			config: &kubeletconfig.CredentialProviderConfig{
+				Providers: []kubeletconfig.CredentialProvider{
+					{
+						Name:                 "foobar",
+						MatchImages:          []string{"foobar.registry.io"},
+						DefaultCacheDuration: &metav1.Duration{Duration: time.Minute},
+						APIVersion:           "credentialprovider.kubelet.k8s.io/v1",
+						TokenAttributes: &kubeletconfig.ServiceAccountTokenAttributes{
+							ServiceAccountTokenAudience: "audience",
+							CacheType:                   "invalid-cache-type",
+							RequireServiceAccount:       ptr.To(true),
+						},
+					},
+				},
+			},
+			saTokenForCredentialProviders: true,
+			expectErr:                     `providers.tokenAttributes.cacheType: Unsupported value: "invalid-cache-type": supported values: "ServiceAccount", "Token"`,
 		},
 		{
 			name: "token attributes not nil but empty ServiceAccountTokenRequired",
@@ -966,6 +1022,7 @@ func Test_validateCredentialProviderConfig(t *testing.T) {
 						APIVersion:           "credentialprovider.kubelet.k8s.io/v1",
 						TokenAttributes: &kubeletconfig.ServiceAccountTokenAttributes{
 							ServiceAccountTokenAudience:          "audience",
+							CacheType:                            kubeletconfig.ServiceAccountServiceAccountTokenCacheType,
 							RequiredServiceAccountAnnotationKeys: []string{"prefix.io/annotation-1", "prefix.io/annotation-2"},
 						},
 					},
@@ -985,6 +1042,7 @@ func Test_validateCredentialProviderConfig(t *testing.T) {
 						APIVersion:           "credentialprovider.kubelet.k8s.io/v1",
 						TokenAttributes: &kubeletconfig.ServiceAccountTokenAttributes{
 							ServiceAccountTokenAudience:          "audience",
+							CacheType:                            kubeletconfig.TokenServiceAccountTokenCacheType,
 							RequireServiceAccount:                ptr.To(true),
 							RequiredServiceAccountAnnotationKeys: []string{"cantendwithadash-", "now-with-dashes/simple"}, // first key is invalid
 						},
@@ -1005,6 +1063,7 @@ func Test_validateCredentialProviderConfig(t *testing.T) {
 						APIVersion:           "credentialprovider.kubelet.k8s.io/v1",
 						TokenAttributes: &kubeletconfig.ServiceAccountTokenAttributes{
 							ServiceAccountTokenAudience:          "audience",
+							CacheType:                            kubeletconfig.ServiceAccountServiceAccountTokenCacheType,
 							RequireServiceAccount:                ptr.To(true),
 							OptionalServiceAccountAnnotationKeys: []string{"cantendwithadash-", "now-with-dashes/simple"}, // first key is invalid
 						},
@@ -1025,6 +1084,7 @@ func Test_validateCredentialProviderConfig(t *testing.T) {
 						APIVersion:           "credentialprovider.kubelet.k8s.io/v1",
 						TokenAttributes: &kubeletconfig.ServiceAccountTokenAttributes{
 							ServiceAccountTokenAudience:          "audience",
+							CacheType:                            kubeletconfig.TokenServiceAccountTokenCacheType,
 							RequireServiceAccount:                ptr.To(true),
 							RequiredServiceAccountAnnotationKeys: []string{"now-with-dashes/simple", "now-with-dashes/simple"},
 						},
@@ -1045,6 +1105,7 @@ func Test_validateCredentialProviderConfig(t *testing.T) {
 						APIVersion:           "credentialprovider.kubelet.k8s.io/v1",
 						TokenAttributes: &kubeletconfig.ServiceAccountTokenAttributes{
 							ServiceAccountTokenAudience:          "audience",
+							CacheType:                            kubeletconfig.ServiceAccountServiceAccountTokenCacheType,
 							RequireServiceAccount:                ptr.To(true),
 							OptionalServiceAccountAnnotationKeys: []string{"now-with-dashes/simple", "now-with-dashes/simple"},
 						},
@@ -1065,6 +1126,7 @@ func Test_validateCredentialProviderConfig(t *testing.T) {
 						APIVersion:           "credentialprovider.kubelet.k8s.io/v1",
 						TokenAttributes: &kubeletconfig.ServiceAccountTokenAttributes{
 							ServiceAccountTokenAudience:          "audience",
+							CacheType:                            kubeletconfig.TokenServiceAccountTokenCacheType,
 							RequireServiceAccount:                ptr.To(true),
 							RequiredServiceAccountAnnotationKeys: []string{"now-with-dashes/simple-1", "now-with-dashes/simple-2"},
 							OptionalServiceAccountAnnotationKeys: []string{"now-with-dashes/simple-2", "now-with-dashes/simple-3"},
@@ -1086,6 +1148,7 @@ func Test_validateCredentialProviderConfig(t *testing.T) {
 						APIVersion:           "credentialprovider.kubelet.k8s.io/v1",
 						TokenAttributes: &kubeletconfig.ServiceAccountTokenAttributes{
 							ServiceAccountTokenAudience:          "audience",
+							CacheType:                            kubeletconfig.ServiceAccountServiceAccountTokenCacheType,
 							RequireServiceAccount:                ptr.To(false),
 							RequiredServiceAccountAnnotationKeys: []string{"now-with-dashes/simple-1", "now-with-dashes/simple-2"},
 						},
@@ -1106,6 +1169,7 @@ func Test_validateCredentialProviderConfig(t *testing.T) {
 						APIVersion:           "credentialprovider.kubelet.k8s.io/v1",
 						TokenAttributes: &kubeletconfig.ServiceAccountTokenAttributes{
 							ServiceAccountTokenAudience:          "audience",
+							CacheType:                            kubeletconfig.TokenServiceAccountTokenCacheType,
 							RequireServiceAccount:                ptr.To(true),
 							RequiredServiceAccountAnnotationKeys: []string{"now-with-dashes/simple-1", "now-with-dashes/simple-2"},
 							OptionalServiceAccountAnnotationKeys: []string{"now-with-dashes/simple-3"},
@@ -1126,6 +1190,7 @@ func Test_validateCredentialProviderConfig(t *testing.T) {
 						APIVersion:           "credentialprovider.kubelet.k8s.io/v1alpha1",
 						TokenAttributes: &kubeletconfig.ServiceAccountTokenAttributes{
 							ServiceAccountTokenAudience:          "audience",
+							CacheType:                            kubeletconfig.TokenServiceAccountTokenCacheType,
 							RequireServiceAccount:                ptr.To(true),
 							RequiredServiceAccountAnnotationKeys: []string{"now-with-dashes/simple"},
 						},
@@ -1146,6 +1211,7 @@ func Test_validateCredentialProviderConfig(t *testing.T) {
 						APIVersion:           "credentialprovider.kubelet.k8s.io/v1beta1",
 						TokenAttributes: &kubeletconfig.ServiceAccountTokenAttributes{
 							ServiceAccountTokenAudience:          "audience",
+							CacheType:                            kubeletconfig.ServiceAccountServiceAccountTokenCacheType,
 							RequireServiceAccount:                ptr.To(true),
 							RequiredServiceAccountAnnotationKeys: []string{"now-with-dashes/simple"},
 						},

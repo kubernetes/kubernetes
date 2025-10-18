@@ -28,11 +28,12 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
-	resourceapi "k8s.io/api/resource/v1beta1"
+	resourceapi "k8s.io/api/resource/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -83,26 +84,27 @@ type ShutdownFunc func()
 // StartScheduler configures and starts a scheduler given a handle to the clientSet interface
 // and event broadcaster. It returns the running scheduler and podInformer. Background goroutines
 // will keep running until the context is canceled.
-func StartScheduler(ctx context.Context, clientSet clientset.Interface, kubeConfig *restclient.Config, cfg *kubeschedulerconfig.KubeSchedulerConfiguration, outOfTreePluginRegistry frameworkruntime.Registry) (*scheduler.Scheduler, informers.SharedInformerFactory) {
+func StartScheduler(tCtx ktesting.TContext, cfg *kubeschedulerconfig.KubeSchedulerConfiguration, outOfTreePluginRegistry frameworkruntime.Registry) (*scheduler.Scheduler, informers.SharedInformerFactory) {
+	clientSet := tCtx.Client()
 	informerFactory := scheduler.NewInformerFactory(clientSet, 0)
 	evtBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{
 		Interface: clientSet.EventsV1()})
 	go func() {
-		<-ctx.Done()
+		<-tCtx.Done()
 		evtBroadcaster.Shutdown()
 	}()
 
-	evtBroadcaster.StartRecordingToSink(ctx.Done())
+	evtBroadcaster.StartRecordingToSink(tCtx.Done())
 
-	logger := klog.FromContext(ctx)
+	logger := tCtx.Logger()
 
 	sched, err := scheduler.New(
-		ctx,
+		tCtx,
 		clientSet,
 		informerFactory,
 		nil,
 		profile.NewRecorderFactory(evtBroadcaster),
-		scheduler.WithKubeConfig(kubeConfig),
+		scheduler.WithKubeConfig(tCtx.RESTConfig()),
 		scheduler.WithProfiles(cfg.Profiles...),
 		scheduler.WithPercentageOfNodesToScore(cfg.PercentageOfNodesToScore),
 		scheduler.WithPodMaxBackoffSeconds(cfg.PodMaxBackoffSeconds),
@@ -111,27 +113,22 @@ func StartScheduler(ctx context.Context, clientSet clientset.Interface, kubeConf
 		scheduler.WithParallelism(cfg.Parallelism),
 		scheduler.WithFrameworkOutOfTreeRegistry(outOfTreePluginRegistry),
 	)
-	if err != nil {
-		logger.Error(err, "Error creating scheduler")
-		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
-	}
+	tCtx.ExpectNoError(err, "creating scheduler")
 
-	informerFactory.Start(ctx.Done())
-	informerFactory.WaitForCacheSync(ctx.Done())
-	if err = sched.WaitForHandlersSync(ctx); err != nil {
-		logger.Error(err, "Failed waiting for handlers to sync")
-		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
-	}
+	informerFactory.Start(tCtx.Done())
+	informerFactory.WaitForCacheSync(tCtx.Done())
+	err = sched.WaitForHandlersSync(tCtx)
+	tCtx.ExpectNoError(err, "waiting for handlers to sync")
 	logger.V(3).Info("Handlers synced")
-	go sched.Run(ctx)
+	go sched.Run(tCtx)
 
 	return sched, informerFactory
 }
 
 func CreateResourceClaimController(ctx context.Context, tb ktesting.TB, clientSet clientset.Interface, informerFactory informers.SharedInformerFactory) func() {
 	podInformer := informerFactory.Core().V1().Pods()
-	claimInformer := informerFactory.Resource().V1beta1().ResourceClaims()
-	claimTemplateInformer := informerFactory.Resource().V1beta1().ResourceClaimTemplates()
+	claimInformer := informerFactory.Resource().V1().ResourceClaims()
+	claimTemplateInformer := informerFactory.Resource().V1().ResourceClaimTemplates()
 	features := resourceclaim.Features{
 		AdminAccess:     true,
 		PrioritizedList: true,
@@ -516,6 +513,11 @@ func InitTestAPIServer(t *testing.T, nsPrefix string, admission admission.Interf
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
 				options.APIEnablement.RuntimeConfig = cliflag.ConfigurationMap{
 					resourceapi.SchemeGroupVersion.String(): "true",
+				}
+				if utilfeature.DefaultMutableFeatureGate.EmulationVersion().LessThan(version.MustParse("v1.34.0")) {
+					// Cannot enable the resourceapi.SchemeGroupVersion when emulating < 1.34 unless
+					// we enable --runtime-config-emulation-forward-compatible.
+					options.GenericServerRunOptions.RuntimeConfigEmulationForwardCompatible = true
 				}
 			}
 		},

@@ -15,6 +15,8 @@ limitations under the License.
 */
 
 // +k8s:deepcopy-gen=package
+// +k8s:openapi-gen=true
+// +k8s:openapi-model-package=io.k8s.component-base.tracing.api.v1
 
 // Package v1 contains the configuration API for tracing.
 //

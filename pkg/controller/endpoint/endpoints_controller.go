@@ -38,6 +38,7 @@ import (
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/endpointslice"
 	endpointsliceutil "k8s.io/endpointslice/util"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/api/v1/endpoints"
@@ -187,7 +188,7 @@ func (e *Controller) Run(ctx context.Context, workers int) {
 	logger.Info("Starting endpoint controller")
 	defer logger.Info("Shutting down endpoint controller")
 
-	if !cache.WaitForNamedCacheSync("endpoint", ctx.Done(), e.podsSynced, e.servicesSynced, e.endpointsSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, e.podsSynced, e.servicesSynced, e.endpointsSynced) {
 		return
 	}
 
@@ -430,7 +431,7 @@ func (e *Controller) syncService(ctx context.Context, key string) error {
 		} else {
 			for i := range service.Spec.Ports {
 				servicePort := &service.Spec.Ports[i]
-				portNum, err := podutil.FindPort(pod, servicePort)
+				portNum, err := endpointslice.FindPort(pod, servicePort)
 				if err != nil {
 					logger.V(4).Info("Failed to find port for service", "service", klog.KObj(service), "error", err)
 					continue

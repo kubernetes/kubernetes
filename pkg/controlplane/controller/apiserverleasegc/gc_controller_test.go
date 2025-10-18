@@ -26,7 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	testingclock "k8s.io/utils/clock/testing"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 // Test_Controller validates the garbage collection logic for the apiserverleasegc controller.
@@ -48,8 +48,8 @@ func Test_Controller(t *testing.T) {
 					},
 				},
 				Spec: coordinationv1.LeaseSpec{
-					HolderIdentity:       pointer.StringPtr("kube-apiserver-12345"),
-					LeaseDurationSeconds: pointer.Int32Ptr(10),
+					HolderIdentity:       ptr.To("kube-apiserver-12345"),
+					LeaseDurationSeconds: ptr.To[int32](10),
 					RenewTime:            &metav1.MicroTime{Time: fakeClock.Now()},
 				},
 			},
@@ -66,8 +66,8 @@ func Test_Controller(t *testing.T) {
 					},
 				},
 				Spec: coordinationv1.LeaseSpec{
-					HolderIdentity:       pointer.StringPtr("kube-apiserver-12345"),
-					LeaseDurationSeconds: pointer.Int32Ptr(10),
+					HolderIdentity:       ptr.To("kube-apiserver-12345"),
+					LeaseDurationSeconds: ptr.To[int32](10),
 					RenewTime:            &metav1.MicroTime{Time: fakeClock.Now().Add(-time.Minute)},
 				},
 			},
@@ -84,8 +84,8 @@ func Test_Controller(t *testing.T) {
 					},
 				},
 				Spec: coordinationv1.LeaseSpec{
-					HolderIdentity:       pointer.StringPtr("kube-apiserver-12345"),
-					LeaseDurationSeconds: pointer.Int32Ptr(10),
+					HolderIdentity:       ptr.To("kube-apiserver-12345"),
+					LeaseDurationSeconds: ptr.To[int32](10),
 					RenewTime:            &metav1.MicroTime{Time: fakeClock.Now().Add(-time.Minute)},
 				},
 			},
@@ -102,8 +102,8 @@ func Test_Controller(t *testing.T) {
 					},
 				},
 				Spec: coordinationv1.LeaseSpec{
-					HolderIdentity:       pointer.StringPtr("kube-apiserver-12345"),
-					LeaseDurationSeconds: pointer.Int32Ptr(10),
+					HolderIdentity:       ptr.To("kube-apiserver-12345"),
+					LeaseDurationSeconds: ptr.To[int32](10),
 					RenewTime:            nil,
 				},
 			},
@@ -120,7 +120,7 @@ func Test_Controller(t *testing.T) {
 					},
 				},
 				Spec: coordinationv1.LeaseSpec{
-					HolderIdentity:       pointer.StringPtr("kube-apiserver-12345"),
+					HolderIdentity:       ptr.To("kube-apiserver-12345"),
 					LeaseDurationSeconds: nil,
 					RenewTime:            &metav1.MicroTime{Time: fakeClock.Now().Add(-time.Minute)},
 				},

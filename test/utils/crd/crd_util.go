@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	crdclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -157,7 +157,7 @@ func CreateTestCRD(f *framework.Framework, opts ...Option) (*TestCrd, error) {
 				Storage: true,
 				Schema: &apiextensionsv1.CustomResourceValidation{
 					OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
-						XPreserveUnknownFields: pointer.BoolPtr(true),
+						XPreserveUnknownFields: ptr.To(true),
 						Type:                   "object",
 					},
 				},

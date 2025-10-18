@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/authentication/user"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/registry/rest/resttest"
@@ -53,6 +54,10 @@ func (t *Tester) TestNamespace() string {
 func (t *Tester) ClusterScope() *Tester {
 	t.tester = t.tester.ClusterScope()
 	return t
+}
+
+func (t *Tester) SetUserInfo(userInfo user.Info) {
+	t.tester.SetUserInfo(userInfo)
 }
 
 func (t *Tester) Namer(namer func(int) string) *Tester {

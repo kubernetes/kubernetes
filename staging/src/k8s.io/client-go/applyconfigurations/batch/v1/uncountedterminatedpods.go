@@ -24,9 +24,14 @@ import (
 
 // UncountedTerminatedPodsApplyConfiguration represents a declarative configuration of the UncountedTerminatedPods type for use
 // with apply.
+//
+// UncountedTerminatedPods holds UIDs of Pods that have terminated but haven't
+// been accounted in Job status counters.
 type UncountedTerminatedPodsApplyConfiguration struct {
+	// succeeded holds UIDs of succeeded Pods.
 	Succeeded []types.UID `json:"succeeded,omitempty"`
-	Failed    []types.UID `json:"failed,omitempty"`
+	// failed holds UIDs of failed Pods.
+	Failed []types.UID `json:"failed,omitempty"`
 }
 
 // UncountedTerminatedPodsApplyConfiguration constructs a declarative configuration of the UncountedTerminatedPods type for use with

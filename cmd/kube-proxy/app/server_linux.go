@@ -33,13 +33,6 @@ import (
 	"github.com/google/cadvisor/utils/sysfs"
 
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/watch"
-	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/cache"
-	toolswatch "k8s.io/client-go/tools/watch"
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/proxy"
@@ -52,10 +45,6 @@ import (
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 )
-
-// timeoutForNodePodCIDR is the time to wait for allocators to assign a PodCIDR to the
-// node after it is registered.
-var timeoutForNodePodCIDR = 5 * time.Minute
 
 // platformApplyDefaults is called after parsing command-line flags and/or reading the
 // config file, to apply platform-specific default values to config.
@@ -80,17 +69,6 @@ func (o *Options) platformApplyDefaults(config *proxyconfigapi.KubeProxyConfigur
 // Proxier. It should fill in any platform-specific fields and perform other
 // platform-specific setup.
 func (s *ProxyServer) platformSetup(ctx context.Context) error {
-	logger := klog.FromContext(ctx)
-	if s.Config.DetectLocalMode == proxyconfigapi.LocalModeNodeCIDR {
-		logger.Info("Watching for node, awaiting podCIDR allocation", "node", s.NodeName)
-		node, err := waitForPodCIDR(ctx, s.Client, s.NodeName)
-		if err != nil {
-			return err
-		}
-		s.podCIDRs = node.Spec.PodCIDRs
-		logger.Info("NodeInfo", "podCIDRs", node.Spec.PodCIDRs)
-	}
-
 	ct := &realConntracker{}
 	err := s.setupConntrack(ctx, ct)
 	if err != nil {
@@ -112,18 +90,21 @@ func (s *ProxyServer) platformCheckSupported(ctx context.Context) (ipv4Supported
 
 	if isIPTablesBased(s.Config.Mode) {
 		// Check for the iptables and ip6tables binaries.
-		var ipts map[v1.IPFamily]utiliptables.Interface
-		ipts, err = utiliptables.NewDualStack()
+		errv4 := utiliptables.New(utiliptables.ProtocolIPv4).Present()
+		errv6 := utiliptables.New(utiliptables.ProtocolIPv6).Present()
 
-		ipv4Supported = ipts[v1.IPv4Protocol] != nil
-		ipv6Supported = ipts[v1.IPv6Protocol] != nil
+		ipv4Supported = errv4 == nil
+		ipv6Supported = errv6 == nil
 
 		if !ipv4Supported && !ipv6Supported {
-			err = fmt.Errorf("iptables is not available on this host : %w", err)
+			// errv4 and errv6 are almost certainly the same underlying error
+			// ("iptables isn't installed" or "kernel modules not available")
+			// so it doesn't make sense to try to combine them.
+			err = fmt.Errorf("iptables is not available on this host : %w", errv4)
 		} else if !ipv4Supported {
-			logger.Info("No iptables support for family", "ipFamily", v1.IPv4Protocol, "error", err)
+			logger.Info("No iptables support for family", "ipFamily", v1.IPv4Protocol, "error", errv4)
 		} else if !ipv6Supported {
-			logger.Info("No iptables support for family", "ipFamily", v1.IPv6Protocol, "error", err)
+			logger.Info("No iptables support for family", "ipFamily", v1.IPv6Protocol, "error", errv6)
 		}
 	} else {
 		// The nft CLI always supports both families.
@@ -153,7 +134,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 
 	if config.Mode == proxyconfigapi.ProxyModeIPTables {
 		logger.Info("Using iptables Proxier")
-		ipts, _ := utiliptables.NewDualStack()
+		ipts := utiliptables.NewBestEffort()
 
 		if dualStack {
 			// TODO this has side effects that should only happen when Run() is invoked.
@@ -207,7 +188,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 		if err := ipvs.CanUseIPVSProxier(ctx, ipvsInterface, ipsetInterface, config.IPVS.Scheduler); err != nil {
 			return nil, fmt.Errorf("can't use the IPVS proxier: %v", err)
 		}
-		ipts, _ := utiliptables.NewDualStack()
+		ipts := utiliptables.NewBestEffort()
 
 		logger.Info("Using ipvs Proxier")
 		if dualStack {
@@ -323,13 +304,9 @@ func (s *ProxyServer) setupConntrack(ctx context.Context, ct Conntracker) error 
 			if err != errReadOnlySysFS {
 				return err
 			}
-			// errReadOnlySysFS is caused by a known docker issue (https://github.com/docker/docker/issues/24000),
-			// the only remediation we know is to restart the docker daemon.
-			// Here we'll send an node event with specific reason and message, the
-			// administrator should decide whether and how to handle this issue,
-			// whether to drain the node and restart docker.  Occurs in other container runtimes
-			// as well.
-			// TODO(random-liu): Remove this when the docker bug is fixed.
+			// errReadOnlySysFS means we ran into a known container runtim bug
+			// (https://issues.k8s.io/134108). For historical reasons we ignore
+			// this problem and just alert the admin that it occurred.
 			const message = "CRI error: /sys is read-only: " +
 				"cannot modify conntrack limits, problems may arise later (If running Docker, see docker issue #24000)"
 			s.Recorder.Eventf(s.NodeRef, nil, v1.EventTypeWarning, err.Error(), "StartKubeProxy", message)
@@ -389,50 +366,6 @@ func getConntrackMax(ctx context.Context, config proxyconfigapi.KubeProxyConntra
 		return floor, nil
 	}
 	return 0, nil
-}
-
-func waitForPodCIDR(ctx context.Context, client clientset.Interface, nodeName string) (*v1.Node, error) {
-	// since allocators can assign the podCIDR after the node registers, we do a watch here to wait
-	// for podCIDR to be assigned, instead of assuming that the Get() on startup will have it.
-	ctx, cancelFunc := context.WithTimeout(ctx, timeoutForNodePodCIDR)
-	defer cancelFunc()
-
-	fieldSelector := fields.OneTermEqualSelector("metadata.name", nodeName).String()
-	lw := &cache.ListWatch{
-		ListFunc: func(options metav1.ListOptions) (object runtime.Object, e error) {
-			options.FieldSelector = fieldSelector
-			return client.CoreV1().Nodes().List(ctx, options)
-		},
-		WatchFunc: func(options metav1.ListOptions) (i watch.Interface, e error) {
-			options.FieldSelector = fieldSelector
-			return client.CoreV1().Nodes().Watch(ctx, options)
-		},
-	}
-	condition := func(event watch.Event) (bool, error) {
-		// don't process delete events
-		if event.Type != watch.Modified && event.Type != watch.Added {
-			return false, nil
-		}
-
-		n, ok := event.Object.(*v1.Node)
-		if !ok {
-			return false, fmt.Errorf("event object not of type Node")
-		}
-		// don't consider the node if is going to be deleted and keep waiting
-		if !n.DeletionTimestamp.IsZero() {
-			return false, nil
-		}
-		return n.Spec.PodCIDR != "" && len(n.Spec.PodCIDRs) > 0, nil
-	}
-
-	evt, err := toolswatch.UntilWithSync(ctx, lw, &v1.Node{}, nil, condition)
-	if err != nil {
-		return nil, fmt.Errorf("timeout waiting for PodCIDR allocation to configure detect-local-mode %v: %v", proxyconfigapi.LocalModeNodeCIDR, err)
-	}
-	if n, ok := evt.Object.(*v1.Node); ok {
-		return n, nil
-	}
-	return nil, fmt.Errorf("event object not of type node")
 }
 
 func detectNumCPU() int {

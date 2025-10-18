@@ -23,7 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestMixinRestrictedPodSecurity(t *testing.T) {
@@ -83,7 +83,7 @@ func TestMixinRestrictedPodSecurity(t *testing.T) {
 				Name:  "pause",
 				Image: "pause",
 				SecurityContext: &v1.SecurityContext{
-					Privileged: pointer.Bool(true),
+					Privileged: ptr.To(true),
 				},
 			}},
 		},

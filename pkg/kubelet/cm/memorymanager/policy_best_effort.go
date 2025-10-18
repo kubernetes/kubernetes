@@ -17,6 +17,8 @@ limitations under the License.
 package memorymanager
 
 import (
+	"context"
+
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 
 	v1 "k8s.io/api/core/v1"
@@ -39,8 +41,8 @@ type bestEffortPolicy struct {
 
 var _ Policy = &bestEffortPolicy{}
 
-func NewPolicyBestEffort(machineInfo *cadvisorapi.MachineInfo, reserved systemReservedMemory, affinity topologymanager.Store) (Policy, error) {
-	p, err := NewPolicyStatic(machineInfo, reserved, affinity)
+func NewPolicyBestEffort(ctx context.Context, machineInfo *cadvisorapi.MachineInfo, reserved systemReservedMemory, affinity topologymanager.Store) (Policy, error) {
+	p, err := NewPolicyStatic(ctx, machineInfo, reserved, affinity)
 
 	if err != nil {
 		return nil, err
@@ -55,26 +57,26 @@ func (p *bestEffortPolicy) Name() string {
 	return string(policyTypeBestEffort)
 }
 
-func (p *bestEffortPolicy) Start(s state.State) error {
-	return p.static.Start(s)
+func (p *bestEffortPolicy) Start(ctx context.Context, s state.State) error {
+	return p.static.Start(ctx, s)
 }
 
-func (p *bestEffortPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Container) (rerr error) {
-	return p.static.Allocate(s, pod, container)
+func (p *bestEffortPolicy) Allocate(ctx context.Context, s state.State, pod *v1.Pod, container *v1.Container) (rerr error) {
+	return p.static.Allocate(ctx, s, pod, container)
 }
 
-func (p *bestEffortPolicy) RemoveContainer(s state.State, podUID string, containerName string) {
-	p.static.RemoveContainer(s, podUID, containerName)
+func (p *bestEffortPolicy) RemoveContainer(ctx context.Context, s state.State, podUID string, containerName string) {
+	p.static.RemoveContainer(ctx, s, podUID, containerName)
 }
 
-func (p *bestEffortPolicy) GetPodTopologyHints(s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
-	return p.static.GetPodTopologyHints(s, pod)
+func (p *bestEffortPolicy) GetPodTopologyHints(ctx context.Context, s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
+	return p.static.GetPodTopologyHints(ctx, s, pod)
 }
 
-func (p *bestEffortPolicy) GetTopologyHints(s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
-	return p.static.GetTopologyHints(s, pod, container)
+func (p *bestEffortPolicy) GetTopologyHints(ctx context.Context, s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
+	return p.static.GetTopologyHints(ctx, s, pod, container)
 }
 
-func (p *bestEffortPolicy) GetAllocatableMemory(s state.State) []state.Block {
-	return p.static.GetAllocatableMemory(s)
+func (p *bestEffortPolicy) GetAllocatableMemory(ctx context.Context, s state.State) []state.Block {
+	return p.static.GetAllocatableMemory(ctx, s)
 }

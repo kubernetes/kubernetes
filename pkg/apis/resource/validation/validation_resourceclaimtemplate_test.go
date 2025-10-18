@@ -22,7 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/apis/resource"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func testClaimTemplate(name, namespace string, spec resource.ResourceClaimSpec) *resource.ResourceClaimTemplate {
@@ -98,7 +98,7 @@ func TestValidateClaimTemplate(t *testing.T) {
 		"deletion-grace-period-seconds": {
 			template: func() *resource.ResourceClaimTemplate {
 				template := testClaimTemplate(goodName, goodNS, validClaimSpec)
-				template.DeletionGracePeriodSeconds = pointer.Int64(10)
+				template.DeletionGracePeriodSeconds = ptr.To[int64](10)
 				return template
 			}(),
 		},
@@ -203,7 +203,7 @@ func TestValidateClaimTemplate(t *testing.T) {
 			}(),
 		},
 		"prioritized-list-bad-class-name-on-subrequest": {
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("deviceClassName"), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')")},
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("deviceClassName"), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')").MarkCoveredByDeclarative()},
 			template: func() *resource.ResourceClaimTemplate {
 				template := testClaimTemplate(goodName, goodNS, validClaimSpecWithFirstAvailable)
 				template.Spec.Spec.Devices.Requests[0].FirstAvailable[0].DeviceClassName = badName

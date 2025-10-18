@@ -36,7 +36,6 @@ import (
 	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
-	discoveryv1 "k8s.io/api/discovery/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -408,44 +407,6 @@ func CheckTestingNSDeletedExcept(ctx context.Context, c clientset.Interface, ski
 		}
 	}
 	return fmt.Errorf("Waiting for terminating namespaces to be deleted timed out")
-}
-
-// WaitForServiceEndpointsNum waits until there are EndpointSlices for serviceName
-// containing a total of expectNum endpoints. (If the service is dual-stack, expectNum
-// must count the endpoints of both IP families.)
-func WaitForServiceEndpointsNum(ctx context.Context, c clientset.Interface, namespace, serviceName string, expectNum int, interval, timeout time.Duration) error {
-	return wait.PollUntilContextTimeout(ctx, interval, timeout, false, func(ctx context.Context) (bool, error) {
-		Logf("Waiting for amount of service:%s endpoints to be %d", serviceName, expectNum)
-		esList, err := c.DiscoveryV1().EndpointSlices(namespace).List(ctx, metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", discoveryv1.LabelServiceName, serviceName)})
-		if err != nil {
-			Logf("Unexpected error trying to get EndpointSlices for %s : %v", serviceName, err)
-			return false, nil
-		}
-
-		if len(esList.Items) == 0 {
-			Logf("Waiting for at least 1 EndpointSlice to exist")
-			return false, nil
-		}
-
-		if countEndpointsSlicesNum(esList) != expectNum {
-			Logf("Unexpected number of Endpoints on Slices, got %d, expected %d", countEndpointsSlicesNum(esList), expectNum)
-			return false, nil
-		}
-		return true, nil
-	})
-}
-
-func countEndpointsSlicesNum(epList *discoveryv1.EndpointSliceList) int {
-	// EndpointSlices can contain the same address on multiple Slices
-	addresses := sets.Set[string]{}
-	for _, epSlice := range epList.Items {
-		for _, ep := range epSlice.Endpoints {
-			if len(ep.Addresses) > 0 {
-				addresses.Insert(ep.Addresses[0])
-			}
-		}
-	}
-	return addresses.Len()
 }
 
 // restclientConfig returns a config holds the information needed to build connection to kubernetes clusters.

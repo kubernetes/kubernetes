@@ -39,8 +39,10 @@ import (
 )
 
 func TestEndpointHandlers(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ComponentFlagz, true)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ComponentStatusz, true)
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.ComponentFlagz:   true,
+		features.ComponentStatusz: true,
+	})
 
 	server, configStr, _, err := startTestAPIServer(t)
 	if err != nil {
@@ -136,10 +138,11 @@ func TestEndpointHandlers(t *testing.T) {
 			path:             "/statusz",
 			requestHeader:    map[string]string{"Accept": "text/plain"},
 			wantResponseCode: http.StatusOK,
-			wantResponseBodyRegx: `^\n` +
+			wantResponseBodyRegx: `(?s)^\n` +
 				`kube-scheduler statusz\n` +
 				`Warning: This endpoint is not meant to be machine parseable, ` +
-				`has no formatting compatibility guarantees and is for debugging purposes only.`,
+				`has no formatting compatibility guarantees and is for debugging purposes only.+` +
+				`Paths([:=\s]+)/configz /flagz /healthz /livez /metrics /readyz\n$`,
 		},
 	}
 
@@ -183,8 +186,9 @@ func TestEndpointHandlers(t *testing.T) {
 					// the endpoint /readyz/sched-handler-sync needs some time to finish
 					// the initialization, so we need to retry
 					return !tt.useBrokenConfig &&
-						(tt.path == "/readyz" || tt.path == "/readyz/sched-handler-sync") &&
-						strings.Contains(err.Error(), "handlers are not fully synchronized")
+						// The message differ depending on endpoint
+						(tt.path == "/readyz" && strings.Contains(err.Error(), "sched-handler-sync failed: reason withheld") ||
+							tt.path == "/readyz/sched-handler-sync" && strings.Contains(err.Error(), "handlers are not fully synchronized"))
 				},
 				func() error {
 					r, err := client.Do(req)

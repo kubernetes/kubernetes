@@ -88,15 +88,9 @@ type ResourceAttributes struct {
 	// Name is the name of the resource being requested for a "get" or deleted for a "delete". "" (empty) means all.
 	Name string
 	// fieldSelector describes the limitation on access based on field.  It can only limit access, not broaden it.
-	//
-	// This field  is alpha-level. To use this field, you must enable the
-	// `AuthorizeWithSelectors` feature gate (disabled by default).
 	// +optional
 	FieldSelector *FieldSelectorAttributes
 	// labelSelector describes the limitation on access based on labels.  It can only limit access, not broaden it.
-	//
-	// This field  is alpha-level. To use this field, you must enable the
-	// `AuthorizeWithSelectors` feature gate (disabled by default).
 	// +optional
 	LabelSelector *LabelSelectorAttributes
 }

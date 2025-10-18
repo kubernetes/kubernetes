@@ -174,10 +174,6 @@
         {
           "groupVersion": "storage.k8s.io/v1beta1",
           "version": "v1beta1"
-        },
-        {
-          "groupVersion": "storage.k8s.io/v1alpha1",
-          "version": "v1alpha1"
         }
       ]
     },
@@ -278,10 +274,14 @@
     {
       "name": "resource.k8s.io",
       "preferredVersion": {
-        "groupVersion": "resource.k8s.io/v1beta2",
-        "version": "v1beta2"
+        "groupVersion": "resource.k8s.io/v1",
+        "version": "v1"
       },
       "versions": [
+        {
+          "groupVersion": "resource.k8s.io/v1",
+          "version": "v1"
+        },
         {
           "groupVersion": "resource.k8s.io/v1beta2",
           "version": "v1beta2"

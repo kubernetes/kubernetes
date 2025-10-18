@@ -22,6 +22,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	corev1 "k8s.io/api/core/v1"
+	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -127,6 +128,48 @@ var objWithPrioritizedList = &resource.ResourceClaimTemplate{
 	},
 }
 
+var testCapacity = map[resource.QualifiedName]apiresource.Quantity{
+	resource.QualifiedName("test-capacity"): apiresource.MustParse("1"),
+}
+
+var objWithCapacityRequests = func() *resource.ResourceClaimTemplate {
+	obj := obj.DeepCopy()
+	addSpecDeviceRequestWithCapacityRequests(obj, testCapacity, false)
+	return obj
+}()
+
+func addSpecDeviceRequestWithCapacityRequests(resourceClaimTemplate *resource.ResourceClaimTemplate,
+	capacity map[resource.QualifiedName]apiresource.Quantity, prioritizedListFeature bool) {
+	r := resource.DeviceRequest{
+		Name: "req-0",
+		Exactly: &resource.ExactDeviceRequest{
+			DeviceClassName: "class",
+			AllocationMode:  resource.DeviceAllocationModeAll,
+		},
+	}
+	if prioritizedListFeature {
+		r.FirstAvailable = []resource.DeviceSubRequest{
+			{
+				Name:            "subreq-0",
+				DeviceClassName: "class",
+				AllocationMode:  resource.DeviceAllocationModeExactCount,
+				Count:           1,
+			},
+		}
+	}
+	if capacity != nil {
+		r.Exactly.Capacity = &resource.CapacityRequirements{
+			Requests: capacity,
+		}
+		if prioritizedListFeature {
+			r.FirstAvailable[0].Capacity = &resource.CapacityRequirements{
+				Requests: capacity,
+			}
+		}
+	}
+	resourceClaimTemplate.Spec.Spec.Devices.Requests = append(resourceClaimTemplate.Spec.Spec.Devices.Requests, r)
+}
+
 var ns1 = &corev1.Namespace{
 	ObjectMeta: metav1.ObjectMeta{
 		Name:   "default",
@@ -165,6 +208,7 @@ func TestClaimTemplateStrategyCreate(t *testing.T) {
 		adminAccess           bool
 		expectValidationError string
 		prioritizedList       bool
+		consumableCapacity    bool
 		expectObj             *resource.ResourceClaimTemplate
 		verify                func(*testing.T, []testclient.Action)
 	}{
@@ -266,14 +310,59 @@ func TestClaimTemplateStrategyCreate(t *testing.T) {
 				}
 			},
 		},
+		"keep-consumable-capacity-fields": {
+			obj:                objWithCapacityRequests,
+			consumableCapacity: true,
+			expectObj:          objWithCapacityRequests,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"drop-consumable-capacity-fields-disabled-feature": {
+			obj:                objWithCapacityRequests,
+			consumableCapacity: false,
+			expectObj: func() *resource.ResourceClaimTemplate {
+				obj := obj.DeepCopy()
+				addSpecDeviceRequestWithCapacityRequests(obj, nil, false)
+				return obj
+			}(),
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"drop-consumable-capacity-fields-disabled-feature-with-prioritized-list": {
+			obj: func() *resource.ResourceClaimTemplate {
+				obj := obj.DeepCopy()
+				addSpecDeviceRequestWithCapacityRequests(obj, testCapacity, true)
+				return obj
+			}(),
+			consumableCapacity: false,
+			prioritizedList:    true,
+			expectObj: func() *resource.ResourceClaimTemplate {
+				obj := obj.DeepCopy()
+				addSpecDeviceRequestWithCapacityRequests(obj, nil, true)
+				return obj
+			}(),
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
 	}
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
 			fakeClient := fake.NewSimpleClientset(ns1, ns2)
 			mockNSClient := fakeClient.CoreV1().Namespaces()
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAAdminAccess, tc.adminAccess)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPrioritizedList, tc.prioritizedList)
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.DRAAdminAccess:     tc.adminAccess,
+				features.DRAPrioritizedList: tc.prioritizedList,
+			})
 			strategy := NewStrategy(mockNSClient)
 
 			obj := tc.obj.DeepCopy()

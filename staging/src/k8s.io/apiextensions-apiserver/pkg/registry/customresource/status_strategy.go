@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel/model"
@@ -105,7 +105,9 @@ func (a statusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Obj
 	var correlatedObject *common.CorrelatedObject
 	if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CRDValidationRatcheting) {
 		correlatedObject = common.NewCorrelatedObject(uNew.Object, uOld.Object, &model.Structural{Structural: a.structuralSchema})
-		options = append(options, validation.WithRatcheting(correlatedObject.Key("status")))
+		if a.structuralSchema != nil {
+			options = append(options, validation.WithRatcheting(correlatedObject.Key("status")))
+		}
 		celOptions = append(celOptions, cel.WithRatcheting(correlatedObject))
 	}
 
