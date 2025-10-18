@@ -492,7 +492,7 @@ var _ = SIGDescribe("kubelet", func() {
 			returns the kubelet logs
 		*/
 
-		ginkgo.It("should return the kubelet logs ", func(ctx context.Context) {
+		ginkgo.It("should return the kubelet logs", func(ctx context.Context) {
 			ginkgo.By("Starting the command")
 			tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, ns)
 
@@ -507,7 +507,7 @@ var _ = SIGDescribe("kubelet", func() {
 			returns kubelet logs from the current boot
 		*/
 
-		ginkgo.It("should return the kubelet logs for the current boot", func(ctx context.Context) {
+		ginkgo.It("should return the kubelet logsfor the current boot", func(ctx context.Context) {
 			ginkgo.By("Starting the command")
 			tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, ns)
 
@@ -541,7 +541,7 @@ var _ = SIGDescribe("kubelet", func() {
 			returns kubelet logs for the current boot with the pattern container
 		*/
 
-		ginkgo.It("should return the kubelet logs for the current boot with the pattern container", func(ctx context.Context) {
+		ginkgo.It("should return the kubelet logsfor the current boot with the pattern container", func(ctx context.Context) {
 			e2eskipper.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
 			ginkgo.By("Starting the command")
 			tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, ns)
@@ -560,7 +560,7 @@ var _ = SIGDescribe("kubelet", func() {
 			returns the kubelet logs since the current date and time. This can be "-- No entries --" which is correct.
 		*/
 
-		ginkgo.It("should return the kubelet logs since the current date and time", func() {
+		ginkgo.It("should return the kubelet logssince the current date and time", func() {
 			ginkgo.By("Starting the command")
 			start := time.Now().UTC()
 			tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, ns)
