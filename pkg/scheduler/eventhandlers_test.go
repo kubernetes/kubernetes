@@ -228,18 +228,18 @@ func TestUpdatePodInCache(t *testing.T) {
 
 	tests := []struct {
 		name   string
-		oldObj interface{}
-		newObj interface{}
+		oldPod *v1.Pod
+		newPod *v1.Pod
 	}{
 		{
 			name:   "pod updated with the same UID",
-			oldObj: withPodName(podWithPort("oldUID", nodeName, 80), "pod"),
-			newObj: withPodName(podWithPort("oldUID", nodeName, 8080), "pod"),
+			oldPod: withPodName(podWithPort("oldUID", nodeName, 80), "pod"),
+			newPod: withPodName(podWithPort("oldUID", nodeName, 8080), "pod"),
 		},
 		{
 			name:   "pod updated with different UIDs",
-			oldObj: withPodName(podWithPort("oldUID", nodeName, 80), "pod"),
-			newObj: withPodName(podWithPort("newUID", nodeName, 8080), "pod"),
+			oldPod: withPodName(podWithPort("oldUID", nodeName, 80), "pod"),
+			newPod: withPodName(podWithPort("newUID", nodeName, 8080), "pod"),
 		},
 	}
 	for _, tt := range tests {
@@ -252,20 +252,20 @@ func TestUpdatePodInCache(t *testing.T) {
 				SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
 				logger:          logger,
 			}
-			sched.addPodToCache(tt.oldObj)
-			sched.updatePodInCache(tt.oldObj, tt.newObj)
+			sched.addPodToCache(tt.oldPod)
+			sched.updatePodInCache(tt.oldPod, tt.newPod)
 
-			if tt.oldObj.(*v1.Pod).UID != tt.newObj.(*v1.Pod).UID {
-				if pod, err := sched.Cache.GetPod(tt.oldObj.(*v1.Pod)); err == nil {
+			if tt.oldPod.UID != tt.newPod.UID {
+				if pod, err := sched.Cache.GetPod(tt.oldPod); err == nil {
 					t.Errorf("Get pod UID %v from cache but it should not happen", pod.UID)
 				}
 			}
-			pod, err := sched.Cache.GetPod(tt.newObj.(*v1.Pod))
+			pod, err := sched.Cache.GetPod(tt.newPod)
 			if err != nil {
 				t.Errorf("Failed to get pod from scheduler: %v", err)
 			}
-			if pod.UID != tt.newObj.(*v1.Pod).UID {
-				t.Errorf("Want pod UID %v, got %v", tt.newObj.(*v1.Pod).UID, pod.UID)
+			if pod.UID != tt.newPod.UID {
+				t.Errorf("Want pod UID %v, got %v", tt.newPod.UID, pod.UID)
 			}
 		})
 	}
