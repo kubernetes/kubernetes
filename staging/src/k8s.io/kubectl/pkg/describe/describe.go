@@ -85,7 +85,6 @@ import (
 	"k8s.io/kubectl/pkg/util/qos"
 	"k8s.io/kubectl/pkg/util/rbac"
 	resourcehelper "k8s.io/kubectl/pkg/util/resource"
-	"k8s.io/kubectl/pkg/util/slice"
 	storageutil "k8s.io/kubectl/pkg/util/storage"
 )
 
@@ -322,7 +321,7 @@ func printUnstructuredContent(w PrefixWriter, level int, content map[string]inte
 		switch typedValue := value.(type) {
 		case map[string]interface{}:
 			skipExpr := fmt.Sprintf("%s.%s", skipPrefix, field)
-			if slice.Contains[string](skip, skipExpr, nil) {
+			if slices.Contains(skip, skipExpr) {
 				continue
 			}
 			w.Write(level, "%s:\n", smartLabelFor(field))
@@ -330,7 +329,7 @@ func printUnstructuredContent(w PrefixWriter, level int, content map[string]inte
 
 		case []interface{}:
 			skipExpr := fmt.Sprintf("%s.%s", skipPrefix, field)
-			if slice.Contains[string](skip, skipExpr, nil) {
+			if slices.Contains(skip, skipExpr) {
 				continue
 			}
 			w.Write(level, "%s:\n", smartLabelFor(field))
@@ -345,7 +344,7 @@ func printUnstructuredContent(w PrefixWriter, level int, content map[string]inte
 
 		default:
 			skipExpr := fmt.Sprintf("%s.%s", skipPrefix, field)
-			if slice.Contains[string](skip, skipExpr, nil) {
+			if slices.Contains(skip, skipExpr) {
 				continue
 			}
 			w.Write(level, "%s:\t%v\n", smartLabelFor(field), typedValue)
@@ -370,7 +369,7 @@ func smartLabelFor(field string) string {
 			continue
 		}
 
-		if slice.Contains[string](commonAcronyms, strings.ToUpper(part), nil) {
+		if slices.Contains(commonAcronyms, strings.ToUpper(part)) {
 			part = strings.ToUpper(part)
 		} else {
 			part = cases.Title(language.English).String(part)
