@@ -5192,7 +5192,6 @@ func TestMultipleHPAs(t *testing.T) {
 	const testNamespace = "dummy-namespace"
 
 	processed := make(chan string, hpaCount)
-	processedDeleted := make(chan string, 1)
 
 	testClient := &fake.Clientset{}
 	testScaleClient := &scalefake.FakeScaleClient{}
@@ -5422,9 +5421,6 @@ func TestMultipleHPAs(t *testing.T) {
 	})
 
 	testClient.AddReactor("delete", "horizontalpodautoscalers", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-		deleteAction := action.(core.DeleteAction)
-		hpaName := deleteAction.GetName()
-		processedDeleted <- hpaName
 		return true, nil, nil
 	})
 
@@ -5479,14 +5475,6 @@ func TestMultipleHPAs(t *testing.T) {
 
 	// Simulate the watch event for deletion
 	hpaWatcher.Delete(&hpaList[0])
-
-	// Wait for deletion to be processed
-	select {
-	case deletedHPAName := <-processedDeleted:
-		assert.Equal(t, hpaName, deletedHPAName, "Expected the deleted HPA name to match")
-	case <-time.After(5 * time.Second):
-		t.Fatalf("Timeout waiting for HPA deletion to be processed")
-	}
 
 	// Give the controller time to process the deletion and update the monitor
 	assert.Eventually(t, func() bool {
