@@ -186,6 +186,7 @@ func TestCSINodeStrategy(t *testing.T) {
 	Strategy.PrepareForUpdate(ctx, newCSINode, csiNode)
 
 	errs = Strategy.ValidateUpdate(ctx, newCSINode, csiNode)
+
 	if len(errs) == 0 {
 		t.Errorf("expected validation error")
 	}
