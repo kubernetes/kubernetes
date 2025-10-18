@@ -492,7 +492,7 @@ var _ = SIGDescribe("kubelet", func() {
 			returns the kubelet logs
 		*/
 
-		ginkgo.It("should return the kubelet logs ", func(ctx context.Context) {
+		ginkgo.It("should return the kubelet logs", func(ctx context.Context) {
 			ginkgo.By("Starting the command")
 			tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, ns)
 
