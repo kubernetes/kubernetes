@@ -161,3 +161,71 @@ func TestCreateDeploymentNoImage(t *testing.T) {
 	err = options.Run()
 	assert.Error(t, err, "at least one image must be specified")
 }
+
+func TestCreateDeploymentWithPodLabels(t *testing.T) {
+	depName := "test-dep"
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	ns := scheme.Codecs.WithoutConversion()
+	fakeDiscovery := "{\"kind\":\"APIResourceList\",\"apiVersion\":\"v1\",\"groupVersion\":\"apps/v1\",\"resources\":[{\"name\":\"deployments\",\"singularName\":\"\",\"namespaced\":true,\"kind\":\"Deployment\",\"verbs\":[\"create\",\"delete\",\"deletecollection\",\"get\",\"list\",\"patch\",\"update\",\"watch\"],\"shortNames\":[\"deploy\"],\"categories\":[\"all\"]}]}"
+	tf.Client = &fake.RESTClient{
+		NegotiatedSerializer: ns,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(bytes.NewBuffer([]byte(fakeDiscovery))),
+			}, nil
+		}),
+	}
+	tf.ClientConfigVal = &restclient.Config{}
+
+	ioStreams, _, buf, _ := genericiooptions.NewTestIOStreams()
+	cmd := NewCmdCreateDeployment(tf, ioStreams)
+	cmd.Flags().Set("dry-run", "client")
+	cmd.Flags().Set("output", "yaml")
+	cmd.Flags().Set("image", "nginx:latest")
+	cmd.Flags().Set("pod-labels", "app=frontend,version=v1,env=prod")
+	cmd.Run(cmd, []string{depName})
+
+	output := buf.String()
+	// Check that the custom labels are present in the output
+	expectedLabels := []string{"app: frontend", "version: v1", "env: prod"}
+	for _, label := range expectedLabels {
+		if !strings.Contains(output, label) {
+			t.Errorf("expected output to contain label %s, but got: %s", label, output)
+		}
+	}
+
+	// Check that the custom app label overrides the default one
+	if strings.Contains(output, "app: "+depName) {
+		t.Errorf("expected output to NOT contain default app label %s, but got: %s", "app: "+depName, output)
+	}
+}
+
+func TestCreateDeploymentWithInvalidPodLabels(t *testing.T) {
+	depName := "test-dep"
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	ioStreams := genericiooptions.NewTestIOStreamsDiscard()
+	cmd := NewCmdCreateDeployment(tf, ioStreams)
+	cmd.Flags().Set("image", "nginx:latest")
+	cmd.Flags().Set("pod-labels", "invalid-label-format")
+
+	options := &CreateDeploymentOptions{
+		PrintFlags:     genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
+		DryRunStrategy: cmdutil.DryRunClient,
+		IOStreams:      ioStreams,
+		PodLabels:      "invalid-label-format",
+	}
+
+	err := options.Complete(tf, cmd, []string{depName})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	err = options.Validate()
+	assert.Error(t, err, "should reject invalid pod labels")
+	assert.Contains(t, err.Error(), "invalid pod labels")
+}
