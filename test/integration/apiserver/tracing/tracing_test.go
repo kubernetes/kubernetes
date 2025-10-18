@@ -403,6 +403,9 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 					},
 				},
 				{
+					name: "authorization",
+				},
+				{
 					name: "Create",
 					attributes: map[string]func(*commonv1.AnyValue) bool{
 						"url": func(v *commonv1.AnyValue) bool {
@@ -522,6 +525,9 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 					},
 				},
 				{
+					name: "authorization",
+				},
+				{
 					name: "Get",
 					attributes: map[string]func(*commonv1.AnyValue) bool{
 						"url": func(v *commonv1.AnyValue) bool {
@@ -629,6 +635,9 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 					},
 				},
 				{
+					name: "authorization",
+				},
+				{
 					name: "List",
 					attributes: map[string]func(*commonv1.AnyValue) bool{
 						"url": func(v *commonv1.AnyValue) bool {
@@ -722,6 +731,9 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 							return v.GetStringValue() != ""
 						},
 					},
+				},
+				{
+					name: "authorization",
 				},
 				{
 					name: "Update",
@@ -868,6 +880,9 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 					},
 				},
 				{
+					name: "authorization",
+				},
+				{
 					name: "Patch",
 					attributes: map[string]func(*commonv1.AnyValue) bool{
 						"url": func(v *commonv1.AnyValue) bool {
@@ -987,6 +1002,9 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 							return v.GetStringValue() != ""
 						},
 					},
+				},
+				{
+					name: "authorization",
 				},
 				{
 					name: "Delete",
