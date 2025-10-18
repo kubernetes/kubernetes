@@ -303,8 +303,16 @@ func setupInMemRecordsAccessor(t testing.TB, cacheSize int, authoritative bool) 
 
 	fsAccessor := setupFSRecordsAccessor(t)
 	memcacheAccessor := NewCachedPullRecordsAccessor(fsAccessor, int32(cacheSize), int32(cacheSize), int32(runtime.NumCPU()))
-	memcacheAccessor.intents.authoritative.Store(authoritative)
-	memcacheAccessor.pulledRecords.authoritative.Store(authoritative)
+	gotMeteredAccessor, ok := memcacheAccessor.(*meteringRecordsAccessor)
+	if !ok {
+		t.Fatalf("the tested accessor must be a metered records accessor, got %T", memcacheAccessor)
+	}
+	inMemAccessor, ok := gotMeteredAccessor.sizeExposedPullRecordsAccessor.(*cachedPullRecordsAccessor)
+	if !ok {
+		t.Fatalf("the metered accessor's delegate is not an inMemAccesor: %T", gotMeteredAccessor.sizeExposedPullRecordsAccessor)
+	}
+	inMemAccessor.intents.authoritative.Store(authoritative)
+	inMemAccessor.pulledRecords.authoritative.Store(authoritative)
 
 	return memcacheAccessor
 }
