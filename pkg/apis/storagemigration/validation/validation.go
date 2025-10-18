@@ -17,9 +17,8 @@ limitations under the License.
 package validation
 
 import (
-	"fmt"
 	"regexp"
-	"strconv"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -37,8 +36,14 @@ func ValidateStorageVersionMigration(svm *storagemigration.StorageVersionMigrati
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&svm.ObjectMeta, false, apimachineryvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))...)
 
-	allErrs = checkAndAppendError(allErrs, field.NewPath("spec", "resource", "resource"), svm.Spec.Resource.Resource, "resource is required")
-	allErrs = checkAndAppendError(allErrs, field.NewPath("spec", "resource", "version"), svm.Spec.Resource.Version, "version is required")
+	resourcePath := field.NewPath("spec", "resource", "resource")
+	versionPath := field.NewPath("spec", "resource", "version")
+
+	// Resource field should be a valid DNS1123 Subdomain
+	allErrs = append(allErrs, apivalidation.ValidateDNS1123Subdomain(svm.Spec.Resource.Resource, resourcePath)...)
+	if errs := validation.IsDNS1035Label(svm.Spec.Resource.Version); len(errs) != 0 {
+		allErrs = append(allErrs, field.Invalid(versionPath, svm.Spec.Resource.Version, strings.Join(errs, ",")))
+	}
 
 	return allErrs
 }
@@ -65,13 +70,6 @@ func ValidateStorageVersionMigrationStatusUpdate(newSVMBundle, oldSVMBundle *sto
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&newSVMBundle.ObjectMeta, &oldSVMBundle.ObjectMeta, field.NewPath("metadata"))
 
 	fldPath := field.NewPath("status")
-
-	// resource version should be a non-negative integer
-	rvInt, err := convertResourceVersionToInt(newSVMBundle.Status.ResourceVersion)
-	if err != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("resourceVersion"), newSVMBundle.Status.ResourceVersion, err.Error()))
-	}
-	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(rvInt, fldPath.Child("resourceVersion"))...)
 
 	// TODO: after switching to metav1.Conditions in beta replace this validation with metav1.ValidateConditions
 	allErrs = append(allErrs, validateConditions(newSVMBundle.Status.Conditions, fldPath.Child("conditions"))...)
@@ -203,25 +201,4 @@ func isValidConditionReason(value string) []string {
 		return []string{validation.RegexError(conditionReasonErrMsg, conditionReasonFmt, "my_name", "MY_NAME", "MyName", "ReasonA,ReasonB", "ReasonA:ReasonB")}
 	}
 	return nil
-}
-
-func checkAndAppendError(allErrs field.ErrorList, fieldPath *field.Path, value string, message string) field.ErrorList {
-	if len(value) == 0 {
-		allErrs = append(allErrs, field.Required(fieldPath, message))
-	}
-	return allErrs
-}
-
-func convertResourceVersionToInt(rv string) (int64, error) {
-	// initial value of RV is expected to be empty, which means the resource version is not set
-	if len(rv) == 0 {
-		return 0, nil
-	}
-
-	resourceVersion, err := strconv.ParseInt(rv, 10, 64)
-	if err != nil {
-		return 0, fmt.Errorf("failed to parse resource version %q: %w", rv, err)
-	}
-
-	return resourceVersion, nil
 }
