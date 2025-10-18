@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"hash/fnv"
 	"strings"
+	"time"
 
 	"k8s.io/klog/v2"
 
@@ -70,11 +71,11 @@ type RuntimeHelper interface {
 	// UnprepareDynamicResources unprepares resources for a a pod.
 	UnprepareDynamicResources(ctx context.Context, pod *v1.Pod) error
 
-	// SetPodWatchCondition flags a pod to be inspected until the condition is met.
-	SetPodWatchCondition(types.UID, string, func(*PodStatus) bool)
-
 	// PodCPUAndMemoryStats reads the latest CPU & memory usage stats.
 	PodCPUAndMemoryStats(context.Context, *v1.Pod, *PodStatus) (*statsapi.PodStats, error)
+
+	// RequestPodReSync flags a pod to be inspected.
+	RequestPodReSync(types.UID)
 }
 
 // ShouldContainerBeRestarted checks whether a container needs to be restarted.
@@ -115,6 +116,15 @@ func ShouldContainerBeRestarted(logger klog.Logger, container *v1.Container, pod
 		}
 	}
 	return true
+}
+
+// IsContainerPendingStart determines if a container is in the Created state
+// but has not started within a specified grace period.
+func IsContainerPendingStart(status *Status) bool {
+	if status.State == ContainerStateCreated && status.StartedAt.IsZero() && status.FinishedAt.IsZero() {
+		return time.Since(status.CreatedAt) < ContainerStartupThreshold
+	}
+	return false
 }
 
 // HashContainer returns the hash of the container. It is used to compare
