@@ -3402,6 +3402,14 @@
             "x-kubernetes-list-type": "map",
             "x-kubernetes-patch-merge-key": "name",
             "x-kubernetes-patch-strategy": "merge,retainKeys"
+          },
+          "workload": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.WorkloadReference"
+              }
+            ],
+            "description": "Workload provides a reference to the Workload object that this Pod belongs to. This field is used by the scheduler to identify the PodGroup and apply the correct group scheduling policies. This field is immutable."
           }
         },
         "required": [
@@ -4731,6 +4739,30 @@
             "type": "string"
           }
         },
+        "type": "object"
+      },
+      "io.k8s.api.core.v1.WorkloadReference": {
+        "description": "WorkloadReference identifies the Workload object and PodGroup membership that a Pod belongs to. The scheduler uses this information to apply workload-aware scheduling semantics.",
+        "properties": {
+          "name": {
+            "default": "",
+            "description": "Name defines the name of the Workload object this pod belongs to. Workload must be in the same namespace as the pod.",
+            "type": "string"
+          },
+          "podGroup": {
+            "default": "",
+            "description": "PodGroup is the name of the PodGroup within the Workload that this pod belongs to.",
+            "type": "string"
+          },
+          "podGroupReplicaIndex": {
+            "description": "PodGroupReplicaIndex specifies the replica index of the PodGroup that this pod belongs to. It is only set when the Workload uses a replicated scheduling mode. This index differentiates pods belonging to different replicas of the same PodGroup.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "podGroup"
+        ],
         "type": "object"
       },
       "io.k8s.apimachinery.pkg.api.resource.Quantity": {

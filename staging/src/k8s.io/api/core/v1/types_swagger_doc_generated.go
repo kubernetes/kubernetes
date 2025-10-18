@@ -1922,6 +1922,7 @@ var map_PodSpec = map[string]string{
 	"resourceClaims":                "ResourceClaims defines which ResourceClaims must be allocated and reserved before the Pod is allowed to start. The resources will be made available to those containers which consume them by name.\n\nThis is a stable field but requires that the DynamicResourceAllocation feature gate is enabled.\n\nThis field is immutable.",
 	"resources":                     "Resources is the total amount of CPU and Memory resources required by all containers in the pod. It supports specifying Requests and Limits for \"cpu\", \"memory\" and \"hugepages-\" resource names only. ResourceClaims are not supported.\n\nThis field enables fine-grained control over resource allocation for the entire pod, allowing resource sharing among containers in a pod.\n\nThis is an alpha field and requires enabling the PodLevelResources feature gate.",
 	"hostnameOverride":              "HostnameOverride specifies an explicit override for the pod's hostname as perceived by the pod. This field only specifies the pod's hostname and does not affect its DNS records. When this field is set to a non-empty string: - It takes precedence over the values set in `hostname` and `subdomain`. - The Pod's hostname will be set to this value. - `setHostnameAsFQDN` must be nil or set to false. - `hostNetwork` must be set to false.\n\nThis field must be a valid DNS subdomain as defined in RFC 1123 and contain at most 64 characters. Requires the HostnameOverride feature gate to be enabled.",
+	"workload":                      "Workload provides a reference to the Workload object that this Pod belongs to. This field is used by the scheduler to identify the PodGroup and apply the correct group scheduling policies. This field is immutable.",
 }
 
 func (PodSpec) SwaggerDoc() map[string]string {
@@ -2886,6 +2887,17 @@ var map_WindowsSecurityContextOptions = map[string]string{
 
 func (WindowsSecurityContextOptions) SwaggerDoc() map[string]string {
 	return map_WindowsSecurityContextOptions
+}
+
+var map_WorkloadReference = map[string]string{
+	"":                     "WorkloadReference identifies the Workload object and PodGroup membership that a Pod belongs to. The scheduler uses this information to apply workload-aware scheduling semantics.",
+	"name":                 "Name defines the name of the Workload object this pod belongs to. Workload must be in the same namespace as the pod.",
+	"podGroup":             "PodGroup is the name of the PodGroup within the Workload that this pod belongs to.",
+	"podGroupReplicaIndex": "PodGroupReplicaIndex specifies the replica index of the PodGroup that this pod belongs to. It is only set when the Workload uses a replicated scheduling mode. This index differentiates pods belonging to different replicas of the same PodGroup.",
+}
+
+func (WorkloadReference) SwaggerDoc() map[string]string {
+	return map_WorkloadReference
 }
 
 // AUTO-GENERATED FUNCTIONS END HERE

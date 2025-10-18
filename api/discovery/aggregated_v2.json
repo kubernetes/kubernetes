@@ -1627,6 +1627,32 @@
             }
           ],
           "version": "v1"
+        },
+        {
+          "freshness": "Current",
+          "resources": [
+            {
+              "resource": "workloads",
+              "responseKind": {
+                "group": "",
+                "kind": "Workload",
+                "version": ""
+              },
+              "scope": "Namespaced",
+              "singularResource": "workload",
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            }
+          ],
+          "version": "v1alpha1"
         }
       ]
     },

@@ -32,6 +32,10 @@ func (c *FakeSchedulingV1alpha1) PriorityClasses() v1alpha1.PriorityClassInterfa
 	return newFakePriorityClasses(c)
 }
 
+func (c *FakeSchedulingV1alpha1) Workloads(namespace string) v1alpha1.WorkloadInterface {
+	return newFakeWorkloads(c, namespace)
+}
+
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeSchedulingV1alpha1) RESTClient() rest.Interface {

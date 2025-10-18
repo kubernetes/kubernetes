@@ -72,3 +72,132 @@ type PriorityClassList struct {
 	// items is the list of PriorityClasses
 	Items []PriorityClass `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
+
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// Workload allows for expressing scheduling constraints that should be used
+// when managing lifecycle of workloads from scheduling perspective,
+// including scheduling, preemption, eviction and other phases.
+type Workload struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard object's metadata.
+	//
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Spec defines the desired behavior of a Workload.
+	//
+	// +required
+	Spec WorkloadSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// WorkloadList contains a list of Workload resources.
+type WorkloadList struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard list metadata.
+	//
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Items is the list of Workloads.
+	Items []Workload `json:"items" protobuf:"bytes,2,rep,name=items"`
+}
+
+// WorkloadSpec defines the desired state of a Workload.
+type WorkloadSpec struct {
+	// ControllerRef is an optional reference to the controlling object, such as a
+	// Deployment or Job. This field is intended for use by tools like CLIs
+	// to provide a link back to the original workload definition.
+	// When set, it cannot be changed.
+	//
+	// +optional
+	ControllerRef *apiv1.ObjectReference `json:"controllerRef,omitempty" protobuf:"bytes,1,opt,name=controllerRef"`
+
+	// PodGroups is the list of pod groups that make up the Workload.
+	// Number of pod groups cannot be changed.
+	//
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	PodGroups []PodGroup `json:"podGroups,omitempty" protobuf:"bytes,2,rep,name=podGroups"`
+}
+
+// PodGroup represents a set of pods with a common scheduling policy.
+type PodGroup struct {
+	// Name is a unique identifier for the PodGroup within the Workload.
+	// This field is immutable.
+	//
+	// +required
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
+
+	// Replicas specifies the number of identical instances of this PodGroup.
+	// For example, a PodGroup with Replicas=2 will result in two identical
+	// sets of pods being scheduled based on the policy.
+	// Defaults to 1.
+	//
+	// +optional
+	// +default=1
+	Replicas *int32 `json:"replicas,omitempty" protobuf:"varint,2,opt,name=replicas"`
+
+	// Policy defines the scheduling policy for this PodGroup.
+	//
+	// +required
+	Policy PodGroupPolicy `json:"policy" protobuf:"bytes,3,opt,name=policy"`
+}
+
+// PodGroupPolicy defines the scheduling configuration for a PodGroup.
+//
+// +union
+type PodGroupPolicy struct {
+	// Kind indicates which scheduling policy is in use.
+	//
+	// +required
+	// +unionDiscriminator
+	Kind PodGroupPolicyKind `json:"kind" protobuf:"bytes,1,opt,name=kind,casttype=PodGroupPolicyKind"`
+
+	// Default specifies that the pods in this group should be scheduled using
+	// standard Kubernetes scheduling behavior.
+	//
+	// +optional
+	// +oneOf=PolicySelection
+	Default *DefaultSchedulingPolicy `json:"default,omitempty" protobuf:"bytes,2,opt,name=default"`
+
+	// Gang specifies that the pods in this group should be scheduled using
+	// all-or-nothing semantics.
+	//
+	// +optional
+	// +oneOf=PolicySelection
+	Gang *GangSchedulingPolicy `json:"gang,omitempty" protobuf:"bytes,3,opt,name=gang"`
+}
+
+// PodGroupPolicyKind is an enumeration of the available PodGroup policies.
+//
+// +enum
+type PodGroupPolicyKind string
+
+// Supported PodGroupPolicy kinds.
+const (
+	// PodGroupPolicyKindDefault uses the standard Kubernetes scheduler.
+	PodGroupPolicyKindDefault PodGroupPolicyKind = "Default"
+	// PodGroupPolicyKindGang uses gang scheduling (all-or-nothing).
+	PodGroupPolicyKindGang PodGroupPolicyKind = "Gang"
+)
+
+// DefaultSchedulingPolicy indicates that standard Kubernetes
+// scheduling behavior should be used.
+type DefaultSchedulingPolicy struct {
+	// This is intentionally empty. Its presence indicates that the default
+	// scheduling policy should be applied.
+}
+
+// GangSchedulingPolicy defines the parameters for gang scheduling.
+type GangSchedulingPolicy struct {
+	// MinCount is the minimum number of pods that must be schedulable
+	// at the same time for the scheduler to admit the entire group.
+	//
+	// +required
+	MinCount int32 `json:"minCount" protobuf:"varint,1,opt,name=minCount"`
+}

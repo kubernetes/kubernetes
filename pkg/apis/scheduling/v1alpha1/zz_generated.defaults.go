@@ -34,6 +34,8 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&schedulingv1alpha1.PriorityClassList{}, func(obj interface{}) {
 		SetObjectDefaults_PriorityClassList(obj.(*schedulingv1alpha1.PriorityClassList))
 	})
+	scheme.AddTypeDefaultingFunc(&schedulingv1alpha1.Workload{}, func(obj interface{}) { SetObjectDefaults_Workload(obj.(*schedulingv1alpha1.Workload)) })
+	scheme.AddTypeDefaultingFunc(&schedulingv1alpha1.WorkloadList{}, func(obj interface{}) { SetObjectDefaults_WorkloadList(obj.(*schedulingv1alpha1.WorkloadList)) })
 	return nil
 }
 
@@ -45,5 +47,22 @@ func SetObjectDefaults_PriorityClassList(in *schedulingv1alpha1.PriorityClassLis
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_PriorityClass(a)
+	}
+}
+
+func SetObjectDefaults_Workload(in *schedulingv1alpha1.Workload) {
+	for i := range in.Spec.PodGroups {
+		a := &in.Spec.PodGroups[i]
+		if a.Replicas == nil {
+			var ptrVar1 int32 = 1
+			a.Replicas = &ptrVar1
+		}
+	}
+}
+
+func SetObjectDefaults_WorkloadList(in *schedulingv1alpha1.WorkloadList) {
+	for i := range in.Items {
+		a := &in.Items[i]
+		SetObjectDefaults_Workload(a)
 	}
 }

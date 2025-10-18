@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	schedulingapiv1 "k8s.io/kubernetes/pkg/apis/scheduling/v1"
+	"k8s.io/utils/ptr"
 )
 
 func TestValidatePriorityClass(t *testing.T) {
@@ -177,6 +178,494 @@ func TestValidatePriorityClassUpdate(t *testing.T) {
 			if errs[i].Type != v.T {
 				t.Errorf("%s: expected errors to have type %s: %v", k, v.T, errs[i])
 			}
+		}
+	}
+}
+
+func TestValidateWorkload(t *testing.T) {
+	successCases := map[string]*scheduling.Workload{
+		"default": {
+			ObjectMeta: metav1.ObjectMeta{Name: "workload", Namespace: "ns"},
+			Spec: scheduling.WorkloadSpec{
+				PodGroups: []scheduling.PodGroup{{
+					Name:     "group1",
+					Replicas: ptr.To[int32](1),
+					Policy: scheduling.PodGroupPolicy{
+						Kind:    scheduling.PodGroupPolicyKindDefault,
+						Default: &scheduling.DefaultSchedulingPolicy{},
+					},
+				}},
+			},
+		},
+		"default with controllerRef": {
+			ObjectMeta: metav1.ObjectMeta{Name: "workload", Namespace: "ns"},
+			Spec: scheduling.WorkloadSpec{
+				ControllerRef: &core.ObjectReference{
+					Kind:      "foo",
+					Namespace: "bar",
+					Name:      "baz",
+				},
+				PodGroups: []scheduling.PodGroup{{
+					Name:     "group1",
+					Replicas: ptr.To[int32](1),
+					Policy: scheduling.PodGroupPolicy{
+						Kind:    scheduling.PodGroupPolicyKindDefault,
+						Default: &scheduling.DefaultSchedulingPolicy{},
+					},
+				}},
+			},
+		},
+		"gang": {
+			ObjectMeta: metav1.ObjectMeta{Name: "workload", Namespace: "ns"},
+			Spec: scheduling.WorkloadSpec{
+				PodGroups: []scheduling.PodGroup{{
+					Name:     "group1",
+					Replicas: ptr.To[int32](1),
+					Policy: scheduling.PodGroupPolicy{
+						Kind: scheduling.PodGroupPolicyKindGang,
+						Gang: &scheduling.GangSchedulingPolicy{
+							MinCount: 2,
+						},
+					},
+				}},
+			},
+		},
+		"two unique pod groups": {
+			ObjectMeta: metav1.ObjectMeta{Name: "workload", Namespace: "ns"},
+			Spec: scheduling.WorkloadSpec{
+				PodGroups: []scheduling.PodGroup{
+					{
+						Name:     "group1",
+						Replicas: ptr.To[int32](1),
+						Policy: scheduling.PodGroupPolicy{
+							Kind:    scheduling.PodGroupPolicyKindDefault,
+							Default: &scheduling.DefaultSchedulingPolicy{},
+						},
+					},
+					{
+						Name:     "group2",
+						Replicas: ptr.To[int32](2),
+						Policy: scheduling.PodGroupPolicy{
+							Kind: scheduling.PodGroupPolicyKindGang,
+							Gang: &scheduling.GangSchedulingPolicy{
+								MinCount: 2,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	for name, workload := range successCases {
+		errs := ValidateWorkload(workload)
+		if len(errs) != 0 {
+			t.Errorf("Expected success for %q: %v", name, errs)
+		}
+	}
+
+	failureCases := map[string]*scheduling.Workload{
+		"no name": {
+			ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: "ns"},
+			Spec: scheduling.WorkloadSpec{
+				PodGroups: []scheduling.PodGroup{{
+					Name:     "group1",
+					Replicas: ptr.To[int32](1),
+					Policy: scheduling.PodGroupPolicy{
+						Kind:    scheduling.PodGroupPolicyKindDefault,
+						Default: &scheduling.DefaultSchedulingPolicy{},
+					},
+				}},
+			},
+		},
+		"invalid name": {
+			ObjectMeta: metav1.ObjectMeta{Name: ".workload", Namespace: "ns"},
+			Spec: scheduling.WorkloadSpec{
+				PodGroups: []scheduling.PodGroup{{
+					Name:     "group1",
+					Replicas: ptr.To[int32](1),
+					Policy: scheduling.PodGroupPolicy{
+						Kind:    scheduling.PodGroupPolicyKindDefault,
+						Default: &scheduling.DefaultSchedulingPolicy{},
+					},
+				}},
+			},
+		},
+		"no namespace": {
+			ObjectMeta: metav1.ObjectMeta{Name: "workload", Namespace: ""},
+			Spec: scheduling.WorkloadSpec{
+				PodGroups: []scheduling.PodGroup{{
+					Name:     "group1",
+					Replicas: ptr.To[int32](1),
+					Policy: scheduling.PodGroupPolicy{
+						Kind:    scheduling.PodGroupPolicyKindDefault,
+						Default: &scheduling.DefaultSchedulingPolicy{},
+					},
+				}},
+			},
+		},
+		"no pod group name": {
+			ObjectMeta: metav1.ObjectMeta{Name: "workload", Namespace: "ns"},
+			Spec: scheduling.WorkloadSpec{
+				PodGroups: []scheduling.PodGroup{{
+					Name:     "",
+					Replicas: ptr.To[int32](1),
+					Policy: scheduling.PodGroupPolicy{
+						Kind:    scheduling.PodGroupPolicyKindDefault,
+						Default: &scheduling.DefaultSchedulingPolicy{},
+					},
+				}},
+			},
+		},
+		"invalid pod group name": {
+			ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: "ns"},
+			Spec: scheduling.WorkloadSpec{
+				PodGroups: []scheduling.PodGroup{{
+					Name:     ".group1",
+					Replicas: ptr.To[int32](1),
+					Policy: scheduling.PodGroupPolicy{
+						Kind:    scheduling.PodGroupPolicyKindDefault,
+						Default: &scheduling.DefaultSchedulingPolicy{},
+					},
+				}},
+			},
+		},
+		"nil replicas": {
+			ObjectMeta: metav1.ObjectMeta{Name: "workload", Namespace: "ns"},
+			Spec: scheduling.WorkloadSpec{
+				PodGroups: []scheduling.PodGroup{{
+					Name:     "group1",
+					Replicas: nil,
+					Policy: scheduling.PodGroupPolicy{
+						Kind:    scheduling.PodGroupPolicyKindDefault,
+						Default: &scheduling.DefaultSchedulingPolicy{},
+					},
+				}},
+			},
+		},
+		"negative replicas": {
+			ObjectMeta: metav1.ObjectMeta{Name: "workload", Namespace: "ns"},
+			Spec: scheduling.WorkloadSpec{
+				PodGroups: []scheduling.PodGroup{{
+					Name:     "group1",
+					Replicas: ptr.To[int32](-1),
+					Policy: scheduling.PodGroupPolicy{
+						Kind:    scheduling.PodGroupPolicyKindDefault,
+						Default: &scheduling.DefaultSchedulingPolicy{},
+					},
+				}},
+			},
+		},
+		"no policy kind": {
+			ObjectMeta: metav1.ObjectMeta{Name: "workload", Namespace: "ns"},
+			Spec: scheduling.WorkloadSpec{
+				PodGroups: []scheduling.PodGroup{{
+					Name:     "group1",
+					Replicas: ptr.To[int32](1),
+					Policy:   scheduling.PodGroupPolicy{},
+				}},
+			},
+		},
+		"default with no policy set": {
+			ObjectMeta: metav1.ObjectMeta{Name: "workload", Namespace: "ns"},
+			Spec: scheduling.WorkloadSpec{
+				PodGroups: []scheduling.PodGroup{{
+					Name:     "group1",
+					Replicas: ptr.To[int32](1),
+					Policy: scheduling.PodGroupPolicy{
+						Kind: scheduling.PodGroupPolicyKindDefault,
+					},
+				}},
+			},
+		},
+		"default with gang policy": {
+			ObjectMeta: metav1.ObjectMeta{Name: "workload", Namespace: "ns"},
+			Spec: scheduling.WorkloadSpec{
+				PodGroups: []scheduling.PodGroup{{
+					Name:     "group1",
+					Replicas: ptr.To[int32](1),
+					Policy: scheduling.PodGroupPolicy{
+						Kind: scheduling.PodGroupPolicyKindDefault,
+						Gang: &scheduling.GangSchedulingPolicy{
+							MinCount: 2,
+						},
+					},
+				}},
+			},
+		},
+		"default with two policies": {
+			ObjectMeta: metav1.ObjectMeta{Name: "workload", Namespace: "ns"},
+			Spec: scheduling.WorkloadSpec{
+				PodGroups: []scheduling.PodGroup{{
+					Name:     "group1",
+					Replicas: ptr.To[int32](1),
+					Policy: scheduling.PodGroupPolicy{
+						Kind:    scheduling.PodGroupPolicyKindDefault,
+						Default: &scheduling.DefaultSchedulingPolicy{},
+						Gang: &scheduling.GangSchedulingPolicy{
+							MinCount: 2,
+						},
+					},
+				}},
+			},
+		},
+		"gang with no policy set": {
+			ObjectMeta: metav1.ObjectMeta{Name: "workload", Namespace: "ns"},
+			Spec: scheduling.WorkloadSpec{
+				PodGroups: []scheduling.PodGroup{{
+					Name:     "group1",
+					Replicas: ptr.To[int32](1),
+					Policy: scheduling.PodGroupPolicy{
+						Kind: scheduling.PodGroupPolicyKindGang,
+					},
+				}},
+			},
+		},
+		"gang with default policy": {
+			ObjectMeta: metav1.ObjectMeta{Name: "workload", Namespace: "ns"},
+			Spec: scheduling.WorkloadSpec{
+				PodGroups: []scheduling.PodGroup{{
+					Name:     "group1",
+					Replicas: ptr.To[int32](1),
+					Policy: scheduling.PodGroupPolicy{
+						Kind:    scheduling.PodGroupPolicyKindGang,
+						Default: &scheduling.DefaultSchedulingPolicy{},
+					},
+				}},
+			},
+		},
+		"gang with two policies": {
+			ObjectMeta: metav1.ObjectMeta{Name: "workload", Namespace: "ns"},
+			Spec: scheduling.WorkloadSpec{
+				PodGroups: []scheduling.PodGroup{{
+					Name:     "group1",
+					Replicas: ptr.To[int32](1),
+					Policy: scheduling.PodGroupPolicy{
+						Kind:    scheduling.PodGroupPolicyKindGang,
+						Default: &scheduling.DefaultSchedulingPolicy{},
+						Gang: &scheduling.GangSchedulingPolicy{
+							MinCount: 2,
+						},
+					},
+				}},
+			},
+		},
+		"zero min count in gang": {
+			ObjectMeta: metav1.ObjectMeta{Name: "workload", Namespace: "ns"},
+			Spec: scheduling.WorkloadSpec{
+				PodGroups: []scheduling.PodGroup{{
+					Name:     "group1",
+					Replicas: ptr.To[int32](1),
+					Policy: scheduling.PodGroupPolicy{
+						Kind: scheduling.PodGroupPolicyKindGang,
+						Gang: &scheduling.GangSchedulingPolicy{
+							MinCount: 0,
+						},
+					},
+				}},
+			},
+		},
+		"negative min count in gang": {
+			ObjectMeta: metav1.ObjectMeta{Name: "workload", Namespace: "ns"},
+			Spec: scheduling.WorkloadSpec{
+				PodGroups: []scheduling.PodGroup{{
+					Name:     "group1",
+					Replicas: ptr.To[int32](1),
+					Policy: scheduling.PodGroupPolicy{
+						Kind: scheduling.PodGroupPolicyKindGang,
+						Gang: &scheduling.GangSchedulingPolicy{
+							MinCount: -1,
+						},
+					},
+				}},
+			},
+		},
+		"two pod groups with the same name": {
+			ObjectMeta: metav1.ObjectMeta{Name: "workload", Namespace: "ns"},
+			Spec: scheduling.WorkloadSpec{
+				PodGroups: []scheduling.PodGroup{
+					{
+						Name:     "group1",
+						Replicas: ptr.To[int32](1),
+						Policy: scheduling.PodGroupPolicy{
+							Kind:    scheduling.PodGroupPolicyKindDefault,
+							Default: &scheduling.DefaultSchedulingPolicy{},
+						},
+					},
+					{
+						Name:     "group1",
+						Replicas: ptr.To[int32](2),
+						Policy: scheduling.PodGroupPolicy{
+							Kind: scheduling.PodGroupPolicyKindGang,
+							Gang: &scheduling.GangSchedulingPolicy{
+								MinCount: 2,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	for name, workload := range failureCases {
+		errs := ValidateWorkload(workload)
+		if len(errs) == 0 {
+			t.Errorf("Expected failure for %q", name)
+		}
+	}
+}
+
+func TestValidateWorkloadUpdate(t *testing.T) {
+	oldWorkload := &scheduling.Workload{
+		ObjectMeta: metav1.ObjectMeta{Name: "workload", Namespace: "ns", ResourceVersion: "1"},
+		Spec: scheduling.WorkloadSpec{
+			PodGroups: []scheduling.PodGroup{{
+				Name:     "group1",
+				Replicas: ptr.To[int32](1),
+				Policy: scheduling.PodGroupPolicy{
+					Kind:    scheduling.PodGroupPolicyKindDefault,
+					Default: &scheduling.DefaultSchedulingPolicy{},
+				},
+			}, {
+				Name:     "group2",
+				Replicas: ptr.To[int32](2),
+				Policy: scheduling.PodGroupPolicy{
+					Kind: scheduling.PodGroupPolicyKindGang,
+					Gang: &scheduling.GangSchedulingPolicy{
+						MinCount: 4,
+					},
+				},
+			}},
+		},
+	}
+	oldWorkloadWithRef := oldWorkload.DeepCopy()
+	oldWorkloadWithRef.Spec.ControllerRef = &core.ObjectReference{
+		Kind:      "foo",
+		Namespace: "bar",
+		Name:      "baz",
+	}
+
+	successCases := map[string]struct {
+		old    *scheduling.Workload
+		update func(*scheduling.Workload) *scheduling.Workload
+	}{
+		"no change": {
+			old: oldWorkload,
+			update: func(w *scheduling.Workload) *scheduling.Workload {
+				return w
+			},
+		},
+		"change pod group replicas": {
+			old: oldWorkload,
+			update: func(w *scheduling.Workload) *scheduling.Workload {
+				w.Spec.PodGroups[0].Replicas = ptr.To[int32](5)
+				return w
+			},
+		},
+		"change pod group policy": {
+			old: oldWorkload,
+			update: func(w *scheduling.Workload) *scheduling.Workload {
+				w.Spec.PodGroups[0].Policy.Kind = scheduling.PodGroupPolicyKindGang
+				w.Spec.PodGroups[0].Policy.Default = nil
+				w.Spec.PodGroups[0].Policy.Gang = &scheduling.GangSchedulingPolicy{
+					MinCount: 2,
+				}
+				return w
+			},
+		},
+		"change gang min count": {
+			old: oldWorkload,
+			update: func(w *scheduling.Workload) *scheduling.Workload {
+				w.Spec.PodGroups[1].Policy.Gang.MinCount = 5
+				return w
+			},
+		},
+		"set controller ref": {
+			old: oldWorkload,
+			update: func(w *scheduling.Workload) *scheduling.Workload {
+				w.Spec.ControllerRef = &core.ObjectReference{
+					Kind:      "foo",
+					Namespace: "bar",
+					Name:      "baz",
+				}
+				return w
+			},
+		},
+	}
+	for name, tc := range successCases {
+		errs := ValidateWorkloadUpdate(tc.update(tc.old.DeepCopy()), tc.old)
+		if len(errs) != 0 {
+			t.Errorf("Expected success for %q: %v", name, errs)
+		}
+	}
+
+	failureCases := map[string]struct {
+		old    *scheduling.Workload
+		update func(*scheduling.Workload) *scheduling.Workload
+	}{
+		"change name": {
+			old: oldWorkload,
+			update: func(w *scheduling.Workload) *scheduling.Workload {
+				w.Name += "bar"
+				return w
+			},
+		},
+		"change namespace": {
+			old: oldWorkload,
+			update: func(w *scheduling.Workload) *scheduling.Workload {
+				w.Namespace += "bar"
+				return w
+			},
+		},
+		"change pod group name": {
+			old: oldWorkload,
+			update: func(w *scheduling.Workload) *scheduling.Workload {
+				w.Spec.PodGroups[0].Name += "bar"
+				return w
+			},
+		},
+		"add pod group": {
+			old: oldWorkload,
+			update: func(w *scheduling.Workload) *scheduling.Workload {
+				w.Spec.PodGroups = append(w.Spec.PodGroups, scheduling.PodGroup{
+					Name:     "group3",
+					Replicas: ptr.To[int32](2),
+					Policy: scheduling.PodGroupPolicy{
+						Kind:    scheduling.PodGroupPolicyKindDefault,
+						Default: &scheduling.DefaultSchedulingPolicy{},
+					},
+				})
+				return w
+			},
+		},
+		"delete pod group": {
+			old: oldWorkload,
+			update: func(w *scheduling.Workload) *scheduling.Workload {
+				w.Spec.PodGroups = w.Spec.PodGroups[:1]
+				return w
+			},
+		},
+		"change controllerRef": {
+			old: oldWorkloadWithRef,
+			update: func(w *scheduling.Workload) *scheduling.Workload {
+				w.Spec.ControllerRef = &core.ObjectReference{
+					Kind:      "foo2",
+					Namespace: "bar2",
+					Name:      "baz2",
+				}
+				return w
+			},
+		},
+		"delete controllerRef": {
+			old: oldWorkloadWithRef,
+			update: func(w *scheduling.Workload) *scheduling.Workload {
+				w.Spec.ControllerRef = nil
+				return w
+			},
+		},
+	}
+	for name, tc := range failureCases {
+		errs := ValidateWorkloadUpdate(tc.update(tc.old.DeepCopy()), tc.old)
+		if len(errs) == 0 {
+			t.Errorf("Expected failure for %q", name)
 		}
 	}
 }

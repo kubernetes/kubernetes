@@ -4711,6 +4711,15 @@ message PodSpec {
   // +featureGate=HostnameOverride
   // +optional
   optional string hostnameOverride = 41;
+
+  // Workload provides a reference to the Workload object that this Pod belongs to.
+  // This field is used by the scheduler to identify the PodGroup and apply the
+  // correct group scheduling policies.
+  // This field is immutable.
+  //
+  // +featureGate=GenericWorkload
+  // +optional
+  optional WorkloadReference workload = 42;
 }
 
 // PodStatus represents information about the status of a pod. Status may trail the actual
@@ -7197,5 +7206,30 @@ message WindowsSecurityContextOptions {
   // In addition, if HostProcess is true then HostNetwork must also be set to true.
   // +optional
   optional bool hostProcess = 4;
+}
+
+// WorkloadReference identifies the Workload object and PodGroup membership
+// that a Pod belongs to. The scheduler uses this information to apply
+// workload-aware scheduling semantics.
+message WorkloadReference {
+  // Name defines the name of the Workload object this pod belongs to.
+  // Workload must be in the same namespace as the pod.
+  //
+  // +required
+  optional string name = 1;
+
+  // PodGroup is the name of the PodGroup within the Workload that this pod
+  // belongs to.
+  //
+  // +required
+  optional string podGroup = 2;
+
+  // PodGroupReplicaIndex specifies the replica index of the PodGroup that this
+  // pod belongs to. It is only set when the Workload uses a replicated
+  // scheduling mode. This index differentiates pods belonging to different replicas
+  // of the same PodGroup.
+  //
+  // +optional
+  optional string podGroupReplicaIndex = 3;
 }
 

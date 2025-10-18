@@ -20,6 +20,7 @@ import (
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/randfill"
 )
 
@@ -31,6 +32,23 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			if s.PreemptionPolicy == nil {
 				preemptLowerPriority := core.PreemptLowerPriority
 				s.PreemptionPolicy = &preemptLowerPriority
+			}
+		},
+		func(p *scheduling.PodGroupPolicy, c randfill.Continue) {
+			c.FillNoCustom(p)
+
+			if p.Kind == "" {
+				p.Kind = []scheduling.PodGroupPolicyKind{
+					scheduling.PodGroupPolicyKindDefault,
+					scheduling.PodGroupPolicyKindGang,
+				}[c.Int31n(2)]
+			}
+		},
+		func(p *scheduling.PodGroup, c randfill.Continue) {
+			c.FillNoCustom(p)
+
+			if p.Replicas == nil {
+				p.Replicas = ptr.To[int32](1)
 			}
 		},
 	}

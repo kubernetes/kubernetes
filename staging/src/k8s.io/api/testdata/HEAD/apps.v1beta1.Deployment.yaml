@@ -1277,6 +1277,10 @@ spec:
           storagePolicyID: storagePolicyIDValue
           storagePolicyName: storagePolicyNameValue
           volumePath: volumePathValue
+      workload:
+        name: nameValue
+        podGroup: podGroupValue
+        podGroupReplicaIndex: podGroupReplicaIndexValue
 status:
   availableReplicas: 4
   collisionCount: 8
