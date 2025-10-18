@@ -27,6 +27,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -50,6 +51,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	authenticationconfigmetrics "k8s.io/apiserver/pkg/server/options/authenticationconfig/metrics"
+	"k8s.io/apiserver/plugin/pkg/authenticator/token/oidc"
 	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
 	"k8s.io/client-go/rest"
@@ -58,6 +60,7 @@ import (
 	kubeapiserverapptesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/kubeapiserver/options"
+	"k8s.io/kubernetes/pkg/util/slice"
 	"k8s.io/kubernetes/test/integration/framework"
 	utilsoidc "k8s.io/kubernetes/test/utils/oidc"
 	"k8s.io/kubernetes/test/utils/oidc/handlers"
@@ -133,6 +136,8 @@ func TestStructuredAuthenticationConfig(t *testing.T) {
 }
 
 func runTests(t *testing.T, useAuthenticationConfig bool) {
+	genericapiserver.SetHostnameFuncForTests("testAPIServerID")
+
 	var tests = []singleTest[*rsa.PrivateKey, *rsa.PublicKey]{
 		{
 			name: "ID token is ok",
@@ -1744,6 +1749,9 @@ jwt:
 }
 
 func TestMultipleJWTAuthenticators(t *testing.T) {
+	genericapiserver.SetHostnameFuncForTests("testAPIServerID")
+	oidc.ResetMetrics()
+
 	caCertContent1, _, caFilePath1, caKeyFilePath1 := generateCert(t)
 	signingPrivateKey1, publicKey1 := rsaGenerateKey(t)
 	oidcServer1 := utilsoidc.BuildAndRunTestServer(t, caFilePath1, caKeyFilePath1, "")
@@ -1846,6 +1854,72 @@ jwt:
 		Groups:   []string{"system:role1", "system:role2", "system:role3", "system:role4", "system:authenticated"},
 		UID:      "1234",
 	}, res.Status.UserInfo)
+
+	jwtIssuerHash1 := fmt.Sprintf("sha256:%x", sha256.Sum256([]byte(oidcServer1.URL())))
+	jwtIssuerHash2 := fmt.Sprintf("sha256:%x", sha256.Sum256([]byte("https://example.com")))
+
+	// Fetch the actual JWKS response bodies to compute the hash the same way the authenticator does
+	caCertPool1 := x509.NewCertPool()
+	caCertPool1.AppendCertsFromPEM(caCertContent1)
+	httpClient1 := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{RootCAs: caCertPool1},
+		},
+	}
+
+	resp1, err := httpClient1.Get(oidcServer1.URL() + "/jwks")
+	require.NoError(t, err)
+	defer func() {
+		_ = resp1.Body.Close()
+	}()
+	keySet1Bytes, err := io.ReadAll(resp1.Body)
+	require.NoError(t, err)
+	keySetHash1 := fmt.Sprintf("sha256:%x", sha256.Sum256(keySet1Bytes))
+
+	caCertPool2 := x509.NewCertPool()
+	caCertPool2.AppendCertsFromPEM(caCertContent2)
+	httpClient2 := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{RootCAs: caCertPool2},
+		},
+	}
+
+	resp2, err := httpClient2.Get(oidcServer2.URL() + "/jwks")
+	require.NoError(t, err)
+	defer func() {
+		_ = resp2.Body.Close()
+	}()
+	keySet2Bytes, err := io.ReadAll(resp2.Body)
+	require.NoError(t, err)
+	keySetHash2 := fmt.Sprintf("sha256:%x", sha256.Sum256(keySet2Bytes))
+
+	wantMetricStrings := []string{
+		fmt.Sprintf(`apiserver_authentication_jwt_authenticator_jwks_fetch_last_key_set_info{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",hash="%s",jwt_issuer_hash="%s"} 1`, keySetHash1, jwtIssuerHash1),
+		fmt.Sprintf(`apiserver_authentication_jwt_authenticator_jwks_fetch_last_key_set_info{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",hash="%s",jwt_issuer_hash="%s"} 1`, keySetHash2, jwtIssuerHash2),
+		fmt.Sprintf(`apiserver_authentication_jwt_authenticator_jwks_fetch_last_timestamp_seconds{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",jwt_issuer_hash="%s",result="success"} FP`, jwtIssuerHash1),
+		fmt.Sprintf(`apiserver_authentication_jwt_authenticator_jwks_fetch_last_timestamp_seconds{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",jwt_issuer_hash="%s",result="success"} FP`, jwtIssuerHash2),
+	}
+	adminClient := kubernetes.NewForConfigOrDie(apiServer.ClientConfig)
+	body, err := adminClient.RESTClient().Get().AbsPath("/metrics").DoRaw(ctx)
+	require.NoError(t, err)
+	var gotMetricStrings []string
+	trimFP := regexp.MustCompile(`(.*)(} \d+\.\d+.*)`)
+	for _, line := range strings.Split(string(body), "\n") {
+		if strings.HasPrefix(line, "apiserver_authentication_jwt_authenticator_jwks_") {
+			if strings.Contains(line, "_seconds") {
+				line = trimFP.ReplaceAllString(line, `$1`) + "} FP" // ignore floating point metric values
+			}
+
+			gotMetricStrings = append(gotMetricStrings, line)
+		}
+	}
+
+	wantMetricStrings = slice.SortStrings(wantMetricStrings)
+	gotMetricStrings = slice.SortStrings(gotMetricStrings)
+
+	if diff := cmp.Diff(wantMetricStrings, gotMetricStrings); diff != "" {
+		t.Errorf("unexpected metrics diff (-want +got): %s", diff)
+	}
 }
 
 func rsaGenerateKey(t *testing.T) (*rsa.PrivateKey, *rsa.PublicKey) {
