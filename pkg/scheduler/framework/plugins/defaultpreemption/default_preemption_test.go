@@ -52,12 +52,12 @@ import (
 	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	configv1 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1"
-	"k8s.io/kubernetes/pkg/scheduler/backend/api_cache"
-	"k8s.io/kubernetes/pkg/scheduler/backend/api_dispatcher"
+	apicache "k8s.io/kubernetes/pkg/scheduler/backend/api_cache"
+	apidispatcher "k8s.io/kubernetes/pkg/scheduler/backend/api_dispatcher"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/backend/queue"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
+	apicalls "k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
@@ -174,6 +174,7 @@ func TestPostFilter(t *testing.T) {
 		nodes                 []*v1.Node
 		filteredNodesStatuses *framework.NodeToStatus
 		extender              fwk.Extender
+		setupPreemptingPods   bool // indicates if this test needs special preempting pod setup
 		wantResult            *fwk.PostFilterResult
 		wantStatus            *fwk.Status
 	}{
@@ -391,6 +392,34 @@ func TestPostFilter(t *testing.T) {
 			wantResult: framework.NewPostFilterResultWithNominatedNode("node2"),
 			wantStatus: fwk.NewStatus(fwk.Success),
 		},
+		{
+			name: "pod leverages ongoing preemption via EarlyNominate",
+			pod:  st.MakePod().Name("waiting-pod").UID("waiting-pod").Namespace(v1.NamespaceDefault).Priority(midPriority).Req(mediumRes).Obj(),
+			pods: []*v1.Pod{
+				// A pod that's already preempting
+				st.MakePod().Name("preempting-pod").UID("preempting-pod-uid").Namespace(v1.NamespaceDefault).Node("node1").Priority(highPriority).Req(smallRes).Obj(),
+				// A victim pod being preempted
+				func() *v1.Pod {
+					pod := st.MakePod().Name("victim-pod").UID("victim-pod-uid").Namespace(v1.NamespaceDefault).Node("node1").Priority(lowPriority).Req(largeRes).Obj()
+					now := metav1.Now()
+					pod.DeletionTimestamp = &now
+					pod.Status.Reason = v1.PodReasonPreemptionByScheduler
+					return pod
+				}(),
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{
+					v1.ResourceCPU:    "1000m",
+					v1.ResourceMemory: "1000",
+				}).Obj(),
+			},
+			filteredNodesStatuses: framework.NewNodeToStatus(map[string]*fwk.Status{
+				"node1": fwk.NewStatus(fwk.Unschedulable),
+			}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable)),
+			setupPreemptingPods: true,                                                    // Enable special preempting pod setup for this test
+			wantResult:          framework.NewPostFilterResultWithNominatedNode("node1"), // Should nominate using EarlyNominate due to ongoing preemption
+			wantStatus:          fwk.NewStatus(fwk.Success, "preemption: "),
+		},
 	}
 
 	for _, asyncAPICallsEnabled := range []bool{true, false} {
@@ -462,6 +491,15 @@ func TestPostFilter(t *testing.T) {
 				p, err := New(ctx, getDefaultDefaultPreemptionArgs(), f, feature.Features{})
 				if err != nil {
 					t.Fatal(err)
+				}
+
+				// Add preempting pods to evaluator's state if needed.
+				if tt.setupPreemptingPods {
+					for _, pod := range tt.pods {
+						if pod.Name == "preempting-pod" {
+							p.Evaluator.AddPreemptingPodForTest(pod.UID)
+						}
+					}
 				}
 
 				state := framework.NewCycleState()
@@ -2332,6 +2370,145 @@ func TestPreempt(t *testing.T) {
 				})
 			}
 		}
+	}
+}
+
+// TestEarlyNominate tests that EarlyNominate works as part of the preemption system
+func TestEarlyNominate(t *testing.T) {
+	// For convenience, a preempting pod is identified by name "preempting-pod", so that it could be added to the evaluator's state
+	tests := []struct {
+		name           string
+		pod            *v1.Pod
+		existingPods   []*v1.Pod
+		nodes          []*v1.Node
+		expectedStatus fwk.Code
+		description    string
+	}{
+		{
+			name: "EarlyNominate returns Unschedulable with no preempting pods",
+			pod:  st.MakePod().Name("test-pod").UID("test-pod").Namespace(v1.NamespaceDefault).Req(smallRes).Obj(),
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("regular-pod").UID("regular-pod").Namespace(v1.NamespaceDefault).Node("node1").Req(smallRes).Obj(),
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(mediumRes).Obj(),
+			},
+			expectedStatus: fwk.Unschedulable,
+			description:    "EarlyNominate should return Unschedulable when no pods are actively preempting and the pod setup is minimal",
+		},
+		{
+			name: "EarlyNominate successfully nominates to node with ongoing preemption",
+			pod:  st.MakePod().Name("waiting-pod").UID("waiting-pod").Namespace(v1.NamespaceDefault).Req(mediumRes).Obj(),
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("preempting-pod").UID("preempting-pod-uid").Namespace(v1.NamespaceDefault).Node("node1").Req(smallRes).Obj(),
+				func() *v1.Pod {
+					pod := st.MakePod().Name("victim-pod").UID("victim-pod-uid").Namespace(v1.NamespaceDefault).Node("node1").Req(largeRes).Obj()
+					now := metav1.Now()
+					pod.DeletionTimestamp = &now
+					pod.Status.Reason = v1.PodReasonPreemptionByScheduler
+					return pod
+				}(),
+				st.MakePod().Name("staying-pod").UID("staying-pod-uid").Namespace(v1.NamespaceDefault).Node("node1").Req(smallRes).Obj(),
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{
+					v1.ResourceCPU:    "1000m",
+					v1.ResourceMemory: "1000Mi",
+				}).Obj(),
+			},
+			expectedStatus: fwk.Success,
+			description:    "EarlyNominate should attempt to nominate pod to node where resources are being freed by ongoing async preemption",
+		},
+		{
+			name: "EarlyNominate doesn't nominate to a node with ongoing preemption when resources are insufficient",
+			pod:  st.MakePod().Name("waiting-pod").UID("waiting-pod").Namespace(v1.NamespaceDefault).Req(largeRes).Obj(),
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("preempting-pod").UID("preempting-pod-uid").Namespace(v1.NamespaceDefault).Node("node1").Req(smallRes).Obj(),
+				func() *v1.Pod {
+					pod := st.MakePod().Name("victim-pod").UID("victim-pod-uid").Namespace(v1.NamespaceDefault).Node("node1").Req(largeRes).Obj()
+					now := metav1.Now()
+					pod.DeletionTimestamp = &now
+					pod.Status.Reason = v1.PodReasonPreemptionByScheduler
+					return pod
+				}(),
+				st.MakePod().Name("staying-pod").UID("staying-pod-uid").Namespace(v1.NamespaceDefault).Node("node1").Req(largeRes).Obj(),
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{
+					v1.ResourceCPU:    "1000m",
+					v1.ResourceMemory: "1000Mi",
+				}).Obj(),
+				// Available after victim removal: 1000m - 500m (preempting) - 300m (staying) = 200m
+				// Waiting pod needs 300m, so it shouldn't fit
+			},
+			expectedStatus: fwk.Success, // EarlyNominate is optimistic and may still nominate
+			description:    "EarlyNominate should attempt to nominate pod to node where resources are being freed by ongoing async preemption",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			cs := clientsetfake.NewClientset()
+			informerFactory := informers.NewSharedInformerFactory(cs, 0)
+			podInformer := informerFactory.Core().V1().Pods()
+
+			_, err := cs.CoreV1().Pods(tt.pod.Namespace).Create(ctx, tt.pod, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("Failed to create test pod %s: %v", tt.pod.Name, err)
+			}
+			err = podInformer.Informer().GetStore().Add(tt.pod)
+			if err != nil {
+				t.Fatalf("Failed to add test pod %s to informer: %v", tt.pod.Name, err)
+			}
+
+			for _, pod := range tt.existingPods {
+				_, err = cs.CoreV1().Pods(pod.Namespace).Create(ctx, pod, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatalf("Failed to create test pod %s: %v", pod.Name, err)
+				}
+				err = podInformer.Informer().GetStore().Add(pod)
+				if err != nil {
+					t.Fatalf("Failed to add test pod %s to informer: %v", pod.Name, err)
+				}
+			}
+
+			registeredPlugins := []tf.RegisterPluginFunc{
+				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			}
+
+			fh, err := tf.NewFramework(ctx, registeredPlugins, "test-scheduler",
+				frameworkruntime.WithInformerFactory(informerFactory),
+				frameworkruntime.WithClientSet(cs),
+				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(tt.existingPods, tt.nodes)),
+				frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)))
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			evaluator := preemption.NewEvaluator(Name, fh, &DefaultPreemption{}, true)
+
+			// Add actively preempting pod to the evaluator's state
+			for _, pod := range tt.existingPods {
+				if pod.Name == "preempting-pod" { // For convenience, we identify the preempting pod by name
+					evaluator.AddPreemptingPodForTest(pod.UID)
+				}
+			}
+
+			state := framework.NewCycleState()
+			result, status := evaluator.EarlyNominate(ctx, state, tt.pod)
+
+			if status.Code() != tt.expectedStatus {
+				t.Errorf("Expected status %v, got %v. %s", tt.expectedStatus, status.Code(), tt.description)
+			}
+
+			if result != nil {
+				t.Logf("EarlyNominate result: nominated node = %s", result.NominatedNodeName)
+			} else {
+				t.Logf("EarlyNominate result: nil (no nomination)")
+			}
+		})
 	}
 }
 
