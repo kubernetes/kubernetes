@@ -322,6 +322,10 @@ function kube::build::destroy_container() {
   "${DOCKER[@]}" rm -f -v "$1" >/dev/null 2>&1 || true
 }
 
+function kube::build::is_docker_rootless() {
+  "${DOCKER[@]}" info --format '{{json .SecurityOptions}}' | grep -q "name=rootless"
+}
+
 # ---------------------------------------------------------------------------
 # Building
 
@@ -367,10 +371,11 @@ function kube::build::run_build_command_ex() {
 
   local -a docker_run_opts=(
     "--name=${container_name}"
-    "--user=$(id -u):$(id -g)"
     "--hostname=${HOSTNAME}"
     "-e=GOPROXY=${GOPROXY}"
   )
+
+  kube::build::is_docker_rootless || docker_run_opts+=("--user=$(id -u):$(id -g)")
 
   local detach=false
 
