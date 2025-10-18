@@ -68,6 +68,7 @@ import (
 	podgcconfig "k8s.io/kubernetes/pkg/controller/podgc/config"
 	replicasetconfig "k8s.io/kubernetes/pkg/controller/replicaset/config"
 	replicationconfig "k8s.io/kubernetes/pkg/controller/replication/config"
+	resourceclaimconfig "k8s.io/kubernetes/pkg/controller/resourceclaim/config"
 	resourcequotaconfig "k8s.io/kubernetes/pkg/controller/resourcequota/config"
 	serviceaccountconfig "k8s.io/kubernetes/pkg/controller/serviceaccount/config"
 	statefulsetconfig "k8s.io/kubernetes/pkg/controller/statefulset/config"
@@ -114,6 +115,7 @@ var args = []string{
 	"--concurrent-serviceaccount-token-syncs=10",
 	"--concurrent_rc_syncs=10",
 	"--concurrent-validating-admission-policy-status-syncs=9",
+	"--concurrent-resourceclaim-syncs=25",
 	"--configure-cloud-routes=false",
 	"--contention-profiling=true",
 	"--controller-start-interval=2m",
@@ -413,6 +415,11 @@ func TestAddFlags(t *testing.T) {
 		ValidatingAdmissionPolicyStatusController: &ValidatingAdmissionPolicyStatusControllerOptions{
 			&validatingadmissionpolicystatusconfig.ValidatingAdmissionPolicyStatusControllerConfiguration{
 				ConcurrentPolicySyncs: 9,
+			},
+		},
+		ResourceClaimController: &ResourceClaimControllerOptions{
+			&resourceclaimconfig.ResourceClaimControllerConfiguration{
+				ConcurrentResourceClaimSyncs: 25,
 			},
 		},
 		SecureServing: (&apiserveroptions.SecureServingOptions{
@@ -721,6 +728,9 @@ func TestApplyTo(t *testing.T) {
 			},
 			ValidatingAdmissionPolicyStatusController: validatingadmissionpolicystatusconfig.ValidatingAdmissionPolicyStatusControllerConfiguration{
 				ConcurrentPolicySyncs: 9,
+			},
+			ResourceClaimController: resourceclaimconfig.ResourceClaimControllerConfiguration{
+				ConcurrentResourceClaimSyncs: 25,
 			},
 		},
 		ControllerShutdownTimeout: 10 * time.Second,
@@ -1234,6 +1244,16 @@ func TestValidateControllersOptions(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:                   "ResourceClaimControllerOptions ConcurrentResourceClaimSyncs equal 0",
+			expectErrors:           true,
+			expectedErrorSubString: "concurrent-resourceclaim-syncs must be greater than 0",
+			options: &ResourceClaimControllerOptions{
+				&resourceclaimconfig.ResourceClaimControllerConfiguration{
+					ConcurrentResourceClaimSyncs: 0,
+				},
+			},
+		},
 		/* empty errs */
 		{
 			name:         "CronJobControllerOptions",
@@ -1387,6 +1407,15 @@ func TestValidateControllersOptions(t *testing.T) {
 			options: &TTLAfterFinishedControllerOptions{
 				&ttlafterfinishedconfig.TTLAfterFinishedControllerConfiguration{
 					ConcurrentTTLSyncs: 8,
+				},
+			},
+		},
+		{
+			name:         "ResourceClaimControllerOptions",
+			expectErrors: false,
+			options: &ResourceClaimControllerOptions{
+				&resourceclaimconfig.ResourceClaimControllerConfiguration{
+					ConcurrentResourceClaimSyncs: 50,
 				},
 			},
 		},
