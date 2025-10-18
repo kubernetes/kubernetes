@@ -67,19 +67,19 @@ func (s *fsResourceAnalyzer) Start(ctx context.Context) {
 			return
 		}
 		logger.Info("Starting FS ResourceAnalyzer")
-		go wait.Forever(func() { s.updateCachedPodVolumeStats(logger) }, s.calcPeriod)
+		go wait.Forever(func() { s.updateCachedPodVolumeStats(ctx) }, s.calcPeriod)
 	})
 }
 
 // updateCachedPodVolumeStats calculates and caches the PodVolumeStats for every Pod known to the kubelet.
-func (s *fsResourceAnalyzer) updateCachedPodVolumeStats(logger klog.Logger) {
+func (s *fsResourceAnalyzer) updateCachedPodVolumeStats(ctx context.Context) {
 	oldCache := s.cachedVolumeStats.Load().(statCache)
 	newCache := make(statCache)
 
 	// Copy existing entries to new map, creating/starting new entries for pods missing from the cache
 	for _, pod := range s.statsProvider.GetPods() {
 		if value, found := oldCache[pod.GetUID()]; !found {
-			newCache[pod.GetUID()] = newVolumeStatCalculator(s.statsProvider, s.calcPeriod, pod, s.eventRecorder).StartOnce(logger)
+			newCache[pod.GetUID()] = newVolumeStatCalculator(ctx, s.statsProvider, s.calcPeriod, pod, s.eventRecorder).StartOnce()
 		} else {
 			newCache[pod.GetUID()] = value
 		}
