@@ -28,8 +28,11 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	quota "k8s.io/apiserver/pkg/quota/v1"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/dynamic-resource-allocation/deviceclass/cache"
 	resourceinternal "k8s.io/kubernetes/pkg/apis/resource"
 	resourceversioned "k8s.io/kubernetes/pkg/apis/resource/v1"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // The name used for object count quota. This evaluator takes over counting
@@ -42,10 +45,20 @@ func V1ResourceByDeviceClass(className string) corev1.ResourceName {
 	return corev1.ResourceName(className + corev1.ResourceClaimsPerClass)
 }
 
+// V1ExtendedResourceByDeviceClass returns a quota extended resource name by device class.
+func V1ExtendedResourceByDeviceClass(extendedResourceName string) corev1.ResourceName {
+	return corev1.ResourceName(corev1.DefaultResourceRequestsPrefix + extendedResourceName)
+}
+
+// V1ImplicitExtendedResourceByDeviceClass returns a quota implicit extended resource name by device class.
+func V1ImplicitExtendedResourceByDeviceClass(className string) corev1.ResourceName {
+	return corev1.ResourceName(corev1.ResourceImplicitExtendedClaimsPerClass + className)
+}
+
 // NewResourceClaimEvaluator returns an evaluator that can evaluate resource claims
-func NewResourceClaimEvaluator(f quota.ListerForResourceFunc) quota.Evaluator {
+func NewResourceClaimEvaluator(f quota.ListerForResourceFunc, m *cache.DeviceClassMapping) quota.Evaluator {
 	listFuncByNamespace := generic.ListResourceUsingListerFunc(f, resourceapi.SchemeGroupVersion.WithResource("resourceclaims"))
-	claimEvaluator := &claimEvaluator{listFuncByNamespace: listFuncByNamespace}
+	claimEvaluator := &claimEvaluator{listFuncByNamespace: listFuncByNamespace, deviceClassMapping: m}
 	return claimEvaluator
 }
 
@@ -53,6 +66,8 @@ func NewResourceClaimEvaluator(f quota.ListerForResourceFunc) quota.Evaluator {
 type claimEvaluator struct {
 	// listFuncByNamespace knows how to list resource claims
 	listFuncByNamespace generic.ListFuncByNamespace
+	// a global cache of device class and extended resource mapping
+	deviceClassMapping *cache.DeviceClassMapping
 }
 
 // Constraints verifies that all required resources are present on the item.
@@ -99,8 +114,51 @@ func (p *claimEvaluator) MatchingResources(items []corev1.ResourceName) []corev1
 			strings.HasSuffix(string(item), corev1.ResourceClaimsPerClass /* by device class */) {
 			result = append(result, item)
 		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
+			if strings.HasPrefix(string(item), corev1.ResourceImplicitExtendedClaimsPerClass /* by implicit extended resource name */) ||
+				isExtendedResourceNameForQuota(item) /* by extended resource name */ {
+				result = append(result, item)
+			}
+		}
 	}
 	return result
+}
+
+func (p *claimEvaluator) extendedResourceQuota(dcName string) corev1.ResourceName {
+	resource := corev1.ResourceName("")
+	if name, ok := p.deviceClassMapping.Get(dcName); ok {
+		resource = V1ExtendedResourceByDeviceClass(name)
+	}
+	return resource
+}
+
+func isImplicitRequestName(name string) bool {
+	return strings.HasSuffix(name, "-i")
+}
+
+func (p *claimEvaluator) setResourceQuantity(resourceMap map[corev1.ResourceName]resource.Quantity, quantity resource.Quantity, deviceClassName, name string, isExtendedResourceClaim bool) {
+	deviceClassClaim := V1ResourceByDeviceClass(deviceClassName)
+	q := resourceMap[deviceClassClaim]
+	q.Add(quantity)
+	resourceMap[deviceClassClaim] = q
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
+		return
+	}
+	implicitExtendedResourceClaim := V1ImplicitExtendedResourceByDeviceClass(deviceClassName)
+	isImplicitExtendedResourceRequest := isImplicitRequestName(name)
+	if !isExtendedResourceClaim || !isImplicitExtendedResourceRequest {
+		q := resourceMap[implicitExtendedResourceClaim]
+		q.Add(quantity)
+		resourceMap[implicitExtendedResourceClaim] = q
+	}
+	extendedResourceClaim := p.extendedResourceQuota(deviceClassName)
+	if extendedResourceClaim != "" {
+		if !isExtendedResourceClaim || isImplicitExtendedResourceRequest {
+			q := resourceMap[extendedResourceClaim]
+			q.Add(quantity)
+			resourceMap[extendedResourceClaim] = q
+		}
+	}
 }
 
 // Usage knows how to measure usage associated with item.
@@ -111,6 +169,7 @@ func (p *claimEvaluator) Usage(item runtime.Object) (corev1.ResourceList, error)
 		return result, err
 	}
 
+	isExtendedResourceClaim := claim.Annotations[resourceapi.ExtendedResourceClaimAnnotation] == "true"
 	// charge for claim
 	result[ClaimObjectCountName] = *(resource.NewQuantity(1, resource.DecimalSI))
 	for _, request := range claim.Spec.Devices.Requests {
@@ -134,10 +193,10 @@ func (p *claimEvaluator) Usage(item runtime.Object) (corev1.ResourceList, error)
 					// don't count towards the quota and users shouldn't
 					// expect that when downgrading.
 				}
-
 				q := resource.NewQuantity(numDevices, resource.DecimalSI)
+
 				if q.Cmp(maxQuantityByDeviceClassClaim[deviceClassClaim]) > 0 {
-					maxQuantityByDeviceClassClaim[deviceClassClaim] = *q
+					p.setResourceQuantity(maxQuantityByDeviceClassClaim, *q, subrequest.DeviceClassName, subrequest.Name, isExtendedResourceClaim)
 				}
 			}
 			for deviceClassClaim, q := range maxQuantityByDeviceClassClaim {
@@ -147,7 +206,6 @@ func (p *claimEvaluator) Usage(item runtime.Object) (corev1.ResourceList, error)
 			}
 			continue
 		case request.Exactly != nil:
-			deviceClassClaim := V1ResourceByDeviceClass(request.Exactly.DeviceClassName)
 			var numDevices int64
 			switch request.Exactly.AllocationMode {
 			case resourceapi.DeviceAllocationModeExactCount:
@@ -160,9 +218,8 @@ func (p *claimEvaluator) Usage(item runtime.Object) (corev1.ResourceList, error)
 				// don't count towards the quota and users shouldn't
 				// expect that when downgrading.
 			}
-			quantity := result[deviceClassClaim]
-			quantity.Add(*(resource.NewQuantity(numDevices, resource.DecimalSI)))
-			result[deviceClassClaim] = quantity
+			q := resource.NewQuantity(numDevices, resource.DecimalSI)
+			p.setResourceQuantity(result, *q, request.Exactly.DeviceClassName, request.Name, isExtendedResourceClaim)
 		default:
 			// Some unknown, future request type. Cannot do quota for it.
 		}
