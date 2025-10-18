@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/controller/certificates/approver"
@@ -233,8 +232,8 @@ func newPodCertificateRequestCleanerControllerDescriptor() *ControllerDescriptor
 	return &ControllerDescriptor{
 		name:        names.PodCertificateRequestCleanerController,
 		constructor: newPodCertificateRequestCleanerController,
-		requiredFeatureGates: []featuregate.Feature{
-			features.PodCertificateRequest,
+		requiredFeatureGates: []string{
+			string(features.PodCertificateRequest),
 		},
 	}
 }
@@ -288,9 +287,11 @@ func newRootCACertificatePublisherController(ctx context.Context, controllerCont
 
 func newKubeAPIServerSignerClusterTrustBundledPublisherDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
-		name:                 names.KubeAPIServerClusterTrustBundlePublisherController,
-		constructor:          newKubeAPIServerSignerClusterTrustBundledPublisherController,
-		requiredFeatureGates: []featuregate.Feature{features.ClusterTrustBundle},
+		name:        names.KubeAPIServerClusterTrustBundlePublisherController,
+		constructor: newKubeAPIServerSignerClusterTrustBundledPublisherController,
+		requiredFeatureGates: []string{
+			string(features.ClusterTrustBundle),
+		},
 	}
 }
 
