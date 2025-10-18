@@ -22,11 +22,14 @@ import (
 	"net/http"
 	"net/url"
 
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -45,7 +48,6 @@ import (
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	registrypod "k8s.io/kubernetes/pkg/registry/core/pod"
 	podrest "k8s.io/kubernetes/pkg/registry/core/pod/rest"
-	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 // PodStorage includes storage for pods and all sub resources
@@ -71,7 +73,7 @@ type REST struct {
 }
 
 // NewStorage returns a RESTStorage object that will work against pods.
-func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGetter, proxyTransport http.RoundTripper, podDisruptionBudgetClient policyclient.PodDisruptionBudgetsGetter) (PodStorage, error) {
+func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGetter, proxyTransport http.RoundTripper, podDisruptionBudgetClient policyclient.PodDisruptionBudgetsGetter, authorizer authorizer.Authorizer) (PodStorage, error) {
 
 	store := &genericregistry.Store{
 		NewFunc:                   func() runtime.Object { return &api.Pod{} },
@@ -117,9 +119,9 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGet
 		Resize:              &ResizeREST{store: &resizeStore},
 		Log:                 &podrest.LogREST{Store: store, KubeletConn: k},
 		Proxy:               &podrest.ProxyREST{Store: store, ProxyTransport: proxyTransport},
-		Exec:                &podrest.ExecREST{Store: store, KubeletConn: k},
-		Attach:              &podrest.AttachREST{Store: store, KubeletConn: k},
-		PortForward:         &podrest.PortForwardREST{Store: store, KubeletConn: k},
+		Exec:                &podrest.ExecREST{Store: store, KubeletConn: k, Authorizer: authorizer},
+		Attach:              &podrest.AttachREST{Store: store, KubeletConn: k, Authorizer: authorizer},
+		PortForward:         &podrest.PortForwardREST{Store: store, KubeletConn: k, Authorizer: authorizer},
 	}, nil
 }
 
