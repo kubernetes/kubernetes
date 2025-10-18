@@ -23,7 +23,6 @@ import (
 	fmt "fmt"
 
 	io "io"
-	"sort"
 
 	v11 "k8s.io/api/core/v1"
 	resource "k8s.io/apimachinery/pkg/api/resource"
@@ -31,6 +30,7 @@ import (
 
 	math_bits "math/bits"
 	reflect "reflect"
+	"sort"
 	strings "strings"
 )
 

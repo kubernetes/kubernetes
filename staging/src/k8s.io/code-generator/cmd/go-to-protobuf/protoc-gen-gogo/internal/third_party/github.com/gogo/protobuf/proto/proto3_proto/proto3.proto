@@ -1,0 +1,97 @@
+// Go support for Protocol Buffers - Google's data interchange format
+//
+// Copyright 2014 The Go Authors.  All rights reserved.
+// https://github.com/golang/protobuf
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met:
+//
+//     * Redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer.
+//     * Redistributions in binary form must reproduce the above
+// copyright notice, this list of conditions and the following disclaimer
+// in the documentation and/or other materials provided with the
+// distribution.
+//     * Neither the name of Google Inc. nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+syntax = "proto3";
+
+import "google/protobuf/any.proto";
+import "test_proto/test.proto";
+
+package proto3_proto;
+
+message Message {
+  enum Humour {
+    UNKNOWN = 0;
+    PUNS = 1;
+    SLAPSTICK = 2;
+    BILL_BAILEY = 3;
+  }
+
+  string name = 1;
+  Humour hilarity = 2;
+  uint32 height_in_cm = 3;
+  bytes data = 4;
+  int64 result_count = 7;
+  bool true_scotsman = 8;
+  float score = 9;
+
+  repeated uint64 key = 5;
+  repeated int32 short_key = 19;
+  Nested nested = 6;
+  repeated Humour r_funny = 16;
+
+  map<string, Nested> terrain = 10;
+  test_proto.SubDefaults proto2_field = 11;
+  map<string, test_proto.SubDefaults> proto2_value = 13;
+
+  google.protobuf.Any anything = 14;
+  repeated google.protobuf.Any many_things = 15;
+
+  Message submessage = 17;
+  repeated Message children = 18;
+
+  map<string, string> string_map = 20;
+}
+
+message Nested {
+  string bunny = 1;
+  bool cute = 2;
+}
+
+message MessageWithMap {
+  map<bool, bytes> byte_mapping = 1;
+}
+
+
+message IntMap {
+  map<int32, int32> rtt = 1;
+}
+
+message IntMaps {
+  repeated IntMap maps = 1;
+}
+
+message TestUTF8 {
+  string scalar = 1;
+  repeated string vector = 2;
+  oneof oneof { string field = 3; }
+  map<string, int64> map_key = 4;
+  map<int64, string> map_value = 5;
+}

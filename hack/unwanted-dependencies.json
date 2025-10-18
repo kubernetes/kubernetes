@@ -146,8 +146,7 @@
         "go.etcd.io/etcd/api/v3",
         "go.etcd.io/etcd/client/v3",
         "go.etcd.io/etcd/server/v3",
-        "go.etcd.io/raft/v3",
-        "k8s.io/code-generator"
+        "go.etcd.io/raft/v3"
       ],
       "github.com/golang/groupcache": [
         "go.etcd.io/etcd/server/v3"
