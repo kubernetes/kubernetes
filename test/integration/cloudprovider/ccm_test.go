@@ -117,7 +117,7 @@ func Test_RemoveExternalCloudProviderTaint(t *testing.T) {
 			return fakeCloud, nil
 		})
 
-	ccm := ccmservertesting.StartTestServerOrDie(ctx, args)
+	ccm := ccmservertesting.StartTestServerOrDie(t, ctx, args)
 	defer ccm.TearDownFn()
 
 	// There should be only the taint TaintNodeNotReady, added by the admission plugin TaintNodesByCondition
@@ -223,7 +223,7 @@ func Test_ExternalCloudProviderNodeAddresses(t *testing.T) {
 		func(config io.Reader) (cloudprovider.Interface, error) {
 			return fakeCloud, nil
 		})
-	ccm := ccmservertesting.StartTestServerOrDie(ctx, args)
+	ccm := ccmservertesting.StartTestServerOrDie(t, ctx, args)
 	defer ccm.TearDownFn()
 
 	testCases := []struct {

@@ -156,7 +156,7 @@ func TestEndpointHandlers(t *testing.T) {
 				configFile = brokenConfig.Name()
 			}
 			result, err := kubeschedulertesting.StartTestServer(
-				ctx,
+				t, ctx,
 				[]string{"--kubeconfig", configFile, "--leader-elect=false", "--authorization-always-allow-paths", tt.path})
 
 			if err != nil {
