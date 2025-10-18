@@ -52,22 +52,6 @@ func NewMaxResourceSlice() *resourceapi.ResourceSlice {
 			// every device and therefore will be the most expensive option in terms of
 			// object size.
 			PerDeviceNodeSelection: ptr.To(true),
-			// The validation caps the total number of counters across all CounterSets. So
-			// the most expensive option is to have a single counter per CounterSet.
-			SharedCounters: func() []resourceapi.CounterSet {
-				var counterSets []resourceapi.CounterSet
-				for i := 0; i < resourceapi.ResourceSliceMaxSharedCounters; i++ {
-					counterSets = append(counterSets, resourceapi.CounterSet{
-						Name: maxDNSLabel(i),
-						Counters: map[string]resourceapi.Counter{
-							maxDNSLabel(0): {
-								Value: resource.MustParse("80Gi"),
-							},
-						},
-					})
-				}
-				return counterSets
-			}(),
 			Devices: func() []resourceapi.Device {
 				var devices []resourceapi.Device
 				for i := 0; i < resourceapi.ResourceSliceMaxDevices; i++ {
@@ -85,14 +69,20 @@ func NewMaxResourceSlice() *resourceapi.ResourceSlice {
 						}(),
 						ConsumesCounters: func() []resourceapi.DeviceCounterConsumption {
 							var consumesCounters []resourceapi.DeviceCounterConsumption
-							for i := 0; i < resourceapi.ResourceSliceMaxDeviceCountersPerSlice/resourceapi.ResourceSliceMaxDevices; i++ {
+							for i := 0; i < resourceapi.ResourceSliceMaxDeviceCounterConsumptionsPerDevice; i++ {
 								consumesCounters = append(consumesCounters, resourceapi.DeviceCounterConsumption{
 									CounterSet: maxDNSLabel(i),
-									Counters: map[string]resourceapi.Counter{
-										maxDNSLabel(0): {
-											Value: resource.MustParse("80Gi"),
-										},
-									},
+									Counters: func() map[string]resourceapi.Counter {
+										counters := make(map[string]resourceapi.Counter)
+										// With 128 devices, each consuming counters from 4 different counter sets, the maximum number
+										// of consumed counters per device counter consumption is 2048 / (128 * 2) = 8
+										for i := 0; i < resourceapi.ResourceSliceMaxConsumedCountersPerResourceSlice/(resourceapi.ResourceSliceMaxDeviceCounterConsumptionsPerDevice*resourceapi.ResourceSliceMaxDevices); i++ {
+											counters[maxDNSLabel(i)] = resourceapi.Counter{
+												Value: resource.MustParse("80Gi"),
+											}
+										}
+										return counters
+									}(),
 								})
 							}
 							return consumesCounters
@@ -113,6 +103,50 @@ func NewMaxResourceSlice() *resourceapi.ResourceSlice {
 					})
 				}
 				return devices
+			}(),
+		},
+	}
+	return slice
+}
+
+func NewMaxResourceSliceWithSharedCounters() *resourceapi.ResourceSlice {
+	slice := &resourceapi.ResourceSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: maxSubDomain(1),
+			// Number of labels is not restricted.
+			Labels: maxKeyValueMap(10),
+			// Total size of annotations is limited to TotalAnnotationSizeLimitB = 256 KB.
+			// Let's be a bit more realistic.
+			Annotations: maxKeyValueMap(10),
+		},
+
+		Spec: resourceapi.ResourceSliceSpec{
+			Driver: strings.Repeat("x", resourceapi.DriverNameMaxLength),
+			Pool: resourceapi.ResourcePool{
+				Name:               strings.Repeat("x", resourceapi.PoolNameMaxLength),
+				Generation:         math.MaxInt64,
+				ResourceSliceCount: math.MaxInt64,
+			},
+			NodeName: ptr.To(maxSubDomain(0)),
+			// The validation caps the total number of counters across all CounterSets. So
+			// the most expensive option is to have a single counter per CounterSet.
+			SharedCounters: func() []resourceapi.CounterSet {
+				var counterSets []resourceapi.CounterSet
+				for i := 0; i < resourceapi.ResourceSliceMaxCounterSets; i++ {
+					counterSets = append(counterSets, resourceapi.CounterSet{
+						Name: maxDNSLabel(i),
+						Counters: func() map[string]resourceapi.Counter {
+							counters := make(map[string]resourceapi.Counter)
+							for i := 0; i < resourceapi.ResourceSliceMaxCountersPerCounterSet; i++ {
+								counters[maxDNSLabel(i)] = resourceapi.Counter{
+									Value: resource.MustParse("80Gi"),
+								}
+							}
+							return counters
+						}(),
+					})
+				}
+				return counterSets
 			}(),
 		},
 	}
