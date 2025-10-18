@@ -74,7 +74,9 @@ func (s *containerScope) Admit(ctx context.Context, pod *v1.Pod) lifecycle.PodAd
 			metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedNUMANode).Inc()
 		}
 	}
-	return admission.GetPodAdmitResult(nil)
+	result := admission.GetPodAdmitResult(nil)
+	result.Warnings = s.getWarnings(pod)
+	return result
 }
 
 func (s *containerScope) accumulateProvidersHints(logger klog.Logger, pod *v1.Pod, container *v1.Container) []map[string][]TopologyHint {
