@@ -176,6 +176,13 @@ const (
 	PodInfeasibleResizesKey          = "pod_infeasible_resizes_total"
 	PodInProgressResizesKey          = "pod_in_progress_resizes"
 	PodDeferredAcceptedResizesKey    = "pod_deferred_accepted_resizes_total"
+
+	// Metric key for goroutines.
+	GoroutinesKey = "goroutines"
+	// Below are possible values for the operation label of goroutines metric.
+	PodWorkerOperation         = "pod_worker"
+	ImagePullingOperation      = "image_pulling"
+	ContainerDeletionOperation = "container_deletion"
 )
 
 type imageSizeBucket struct {
@@ -1190,6 +1197,17 @@ var (
 		},
 		[]string{"retry_trigger"},
 	)
+
+	// Goroutines tracks the number of running goroutines split by the work they do.
+	Goroutines = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           GoroutinesKey,
+			Help:           "Number of running goroutines split by the work they do such as pod workers, image pulling, and container deletion.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"operation"},
+	)
 )
 
 var registerMetrics sync.Once
@@ -1308,6 +1326,8 @@ func Register() {
 			legacyregistry.MustRegister(PodInProgressResizes)
 			legacyregistry.MustRegister(PodDeferredAcceptedResizes)
 		}
+
+		legacyregistry.MustRegister(Goroutines)
 	})
 }
 

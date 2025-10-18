@@ -967,6 +967,8 @@ func (p *podWorkers) UpdatePod(options UpdatePodOptions) {
 			// accept a context for shutdown
 			defer runtime.HandleCrash()
 			defer klog.V(3).InfoS("Pod worker has stopped", "podUID", uid)
+			metrics.Goroutines.WithLabelValues(metrics.PodWorkerOperation).Inc()
+			defer metrics.Goroutines.WithLabelValues(metrics.PodWorkerOperation).Dec()
 			p.podWorkerLoop(uid, outCh)
 		}()
 	}

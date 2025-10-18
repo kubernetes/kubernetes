@@ -56,6 +56,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
@@ -757,6 +758,8 @@ func (m *kubeGenericRuntimeManager) executePreStopHook(ctx context.Context, pod 
 	start := metav1.Now()
 	done := make(chan struct{})
 	go func() {
+		metrics.Goroutines.WithLabelValues(metrics.ContainerDeletionOperation).Inc()
+		defer metrics.Goroutines.WithLabelValues(metrics.ContainerDeletionOperation).Dec()
 		defer close(done)
 		defer utilruntime.HandleCrash()
 		if _, err := m.runner.Run(ctx, containerID, pod, containerSpec, containerSpec.Lifecycle.PreStop); err != nil {
@@ -914,6 +917,8 @@ func (m *kubeGenericRuntimeManager) killContainersWithSyncResult(ctx context.Con
 	}
 	for _, container := range runningPod.Containers {
 		go func(container *kubecontainer.Container) {
+			metrics.Goroutines.WithLabelValues(metrics.ContainerDeletionOperation).Inc()
+			defer metrics.Goroutines.WithLabelValues(metrics.ContainerDeletionOperation).Dec()
 			defer utilruntime.HandleCrash()
 			defer wg.Done()
 
