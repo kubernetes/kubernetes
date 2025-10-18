@@ -136,6 +136,19 @@ func ValidateAnnotations(annotations map[string]string, fldPath *field.Path) fie
 	return apimachineryvalidation.ValidateAnnotations(annotations, fldPath)
 }
 
+// ValidateUserAnnotations validates that the UserAnnotations are correctly defined.
+func ValidateUserAnnotations(userAnnotations map[string]string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for k := range userAnnotations {
+		// The case doesn't matter, so convert to lowercase before checking.
+		allErrs = append(allErrs, validation.IsDomainPrefixedKey(fldPath, strings.ToLower(k))...)
+	}
+	if err := apimachineryvalidation.ValidateAnnotationsSize(userAnnotations); err != nil {
+		allErrs = append(allErrs, field.TooLong(fldPath, "" /*unused*/, apimachineryvalidation.TotalAnnotationSizeLimitB))
+	}
+	return allErrs
+}
+
 func ValidateDNS1123Label(value string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for _, msg := range validation.IsDNS1123Label(value) {
@@ -1265,6 +1278,11 @@ func validateProjectionSources(projection *core.ProjectedVolumeSource, projectio
 			numSources++
 
 			allErrs = append(allErrs, ValidateSignerName(projPath.Child("signerName"), source.PodCertificate.SignerName)...)
+
+			if source.PodCertificate.UserAnnotations != nil {
+				userAnnotationsErrors := ValidateUserAnnotations(source.PodCertificate.UserAnnotations, projPath.Child("userAnnotations"))
+				allErrs = append(allErrs, userAnnotationsErrors...)
+			}
 
 			switch source.PodCertificate.KeyType {
 			case "RSA3072", "RSA4096", "ECDSAP256", "ECDSAP384", "ECDSAP521", "ED25519":

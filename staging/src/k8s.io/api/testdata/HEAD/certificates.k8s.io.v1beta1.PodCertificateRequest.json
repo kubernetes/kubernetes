@@ -1,6 +1,6 @@
 {
   "kind": "PodCertificateRequest",
-  "apiVersion": "certificates.k8s.io/v1alpha1",
+  "apiVersion": "certificates.k8s.io/v1beta1",
   "metadata": {
     "name": "nameValue",
     "generateName": "generateNameValue",
@@ -53,7 +53,10 @@
     "nodeUID": "nodeUIDValue",
     "maxExpirationSeconds": 8,
     "pkixPublicKey": "CQ==",
-    "proofOfPossession": "Cg=="
+    "proofOfPossession": "Cg==",
+    "unverifiedUserAnnotations": {
+      "unverifiedUserAnnotationsKey": "unverifiedUserAnnotationsValue"
+    }
   },
   "status": {
     "conditions": [

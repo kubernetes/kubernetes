@@ -1,4 +1,4 @@
-apiVersion: certificates.k8s.io/v1alpha1
+apiVersion: certificates.k8s.io/v1beta1
 kind: PodCertificateRequest
 metadata:
   annotations:
@@ -43,6 +43,8 @@ spec:
   serviceAccountName: serviceAccountNameValue
   serviceAccountUID: serviceAccountUIDValue
   signerName: signerNameValue
+  unverifiedUserAnnotations:
+    unverifiedUserAnnotationsKey: unverifiedUserAnnotationsValue
 status:
   beginRefreshAt: "2005-01-01T01:01:01Z"
   certificateChain: certificateChainValue

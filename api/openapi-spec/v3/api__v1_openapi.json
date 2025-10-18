@@ -5326,6 +5326,14 @@
           "signerName": {
             "description": "Kubelet's generated CSRs will be addressed to this signer.",
             "type": "string"
+          },
+          "userAnnotations": {
+            "additionalProperties": {
+              "default": "",
+              "type": "string"
+            },
+            "description": "userAnnotations allow pod authors to pass additional information to the signer implementation.  Kubernetes does not restrict or validate this metadata in any way.\n\nThese values are copied verbatim into the `spec.unverifiedUserAnnotations` field of the PodCertificateRequest objects that Kubelet creates.\n\nEntries are subject to the same validation as object metadata annotations, with the addition that all keys must be domain-prefixed. No restrictions are placed on values, except an overall size limitation on the entire field.\n\nSigners should document the keys and values they support. Signers should deny requests that contain keys they do not recognize.",
+            "type": "object"
           }
         },
         "required": [
