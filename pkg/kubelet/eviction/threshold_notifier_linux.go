@@ -17,6 +17,7 @@ limitations under the License.
 package eviction
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -46,7 +47,7 @@ var _ CgroupNotifier = &linuxCgroupNotifier{}
 
 // NewCgroupNotifier returns a linuxCgroupNotifier, which performs cgroup control operations required
 // to receive notifications from the cgroup when the threshold is crossed in either direction.
-func NewCgroupNotifier(path, attribute string, threshold int64) (CgroupNotifier, error) {
+func NewCgroupNotifier(logger klog.Logger, path, attribute string, threshold int64) (CgroupNotifier, error) {
 	// cgroupv2 does not support monitoring cgroup memory thresholds using cgroup.event_control.
 	// Instead long term, on cgroupv2 kubelet should rely on combining usage of memory.low on root pods cgroup with inotify notifications on memory.events and or PSI pressure.
 	// For now, let's return a fake "disabled" cgroup notifier on cgroupv2.
@@ -107,13 +108,14 @@ func NewCgroupNotifier(path, attribute string, threshold int64) (CgroupNotifier,
 	}, nil
 }
 
-func (n *linuxCgroupNotifier) Start(eventCh chan<- struct{}) {
+func (n *linuxCgroupNotifier) Start(ctx context.Context, eventCh chan<- struct{}) {
+	logger := klog.FromContext(ctx)
 	err := unix.EpollCtl(n.epfd, unix.EPOLL_CTL_ADD, n.eventfd, &unix.EpollEvent{
 		Fd:     int32(n.eventfd),
 		Events: unix.EPOLLIN,
 	})
 	if err != nil {
-		klog.InfoS("Eviction manager: error adding epoll eventfd", "err", err)
+		logger.Info("Eviction manager: error adding epoll eventfd", "err", err)
 		return
 	}
 	buf := make([]byte, eventSize)
@@ -125,7 +127,7 @@ func (n *linuxCgroupNotifier) Start(eventCh chan<- struct{}) {
 		}
 		event, err := wait(n.epfd, n.eventfd, notifierRefreshInterval)
 		if err != nil {
-			klog.InfoS("Eviction manager: error while waiting for memcg events", "err", err)
+			logger.Info("Eviction manager: error while waiting for memcg events", "err", err)
 			return
 		} else if !event {
 			// Timeout on wait.  This is expected if the threshold was not crossed
@@ -134,7 +136,7 @@ func (n *linuxCgroupNotifier) Start(eventCh chan<- struct{}) {
 		// Consume the event from the eventfd
 		_, err = unix.Read(n.eventfd, buf)
 		if err != nil {
-			klog.InfoS("Eviction manager: error reading memcg events", "err", err)
+			logger.Info("Eviction manager: error reading memcg events", "err", err)
 			return
 		}
 		eventCh <- struct{}{}
@@ -196,5 +198,5 @@ func (n *linuxCgroupNotifier) Stop() {
 // disabledThresholdNotifier is a fake diasbled threshold notifier that performs no-ops.
 type disabledThresholdNotifier struct{}
 
-func (*disabledThresholdNotifier) Start(_ chan<- struct{}) {}
-func (*disabledThresholdNotifier) Stop()                   {}
+func (*disabledThresholdNotifier) Start(context.Context, chan<- struct{}) {}
+func (*disabledThresholdNotifier) Stop()                                  {}

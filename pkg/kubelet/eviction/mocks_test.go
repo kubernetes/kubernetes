@@ -21,7 +21,10 @@ limitations under the License.
 package eviction
 
 import (
+	"context"
+
 	mock "github.com/stretchr/testify/mock"
+	"k8s.io/klog/v2"
 	"k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 )
 
@@ -53,8 +56,8 @@ func (_m *MockCgroupNotifier) EXPECT() *MockCgroupNotifier_Expecter {
 }
 
 // Start provides a mock function for the type MockCgroupNotifier
-func (_mock *MockCgroupNotifier) Start(eventCh chan<- struct{}) {
-	_mock.Called(eventCh)
+func (_mock *MockCgroupNotifier) Start(ctx context.Context, eventCh chan<- struct{}) {
+	_mock.Called(ctx, eventCh)
 	return
 }
 
@@ -64,19 +67,25 @@ type MockCgroupNotifier_Start_Call struct {
 }
 
 // Start is a helper method to define mock.On call
+//   - ctx context.Context
 //   - eventCh chan<- struct{}
-func (_e *MockCgroupNotifier_Expecter) Start(eventCh interface{}) *MockCgroupNotifier_Start_Call {
-	return &MockCgroupNotifier_Start_Call{Call: _e.mock.On("Start", eventCh)}
+func (_e *MockCgroupNotifier_Expecter) Start(ctx interface{}, eventCh interface{}) *MockCgroupNotifier_Start_Call {
+	return &MockCgroupNotifier_Start_Call{Call: _e.mock.On("Start", ctx, eventCh)}
 }
 
-func (_c *MockCgroupNotifier_Start_Call) Run(run func(eventCh chan<- struct{})) *MockCgroupNotifier_Start_Call {
+func (_c *MockCgroupNotifier_Start_Call) Run(run func(ctx context.Context, eventCh chan<- struct{})) *MockCgroupNotifier_Start_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 chan<- struct{}
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(chan<- struct{})
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 chan<- struct{}
+		if args[1] != nil {
+			arg1 = args[1].(chan<- struct{})
 		}
 		run(
 			arg0,
+			arg1,
 		)
 	})
 	return _c
@@ -87,7 +96,7 @@ func (_c *MockCgroupNotifier_Start_Call) Return() *MockCgroupNotifier_Start_Call
 	return _c
 }
 
-func (_c *MockCgroupNotifier_Start_Call) RunAndReturn(run func(eventCh chan<- struct{})) *MockCgroupNotifier_Start_Call {
+func (_c *MockCgroupNotifier_Start_Call) RunAndReturn(run func(ctx context.Context, eventCh chan<- struct{})) *MockCgroupNotifier_Start_Call {
 	_c.Run(run)
 	return _c
 }
@@ -153,8 +162,8 @@ func (_m *MockNotifierFactory) EXPECT() *MockNotifierFactory_Expecter {
 }
 
 // NewCgroupNotifier provides a mock function for the type MockNotifierFactory
-func (_mock *MockNotifierFactory) NewCgroupNotifier(path string, attribute string, threshold int64) (CgroupNotifier, error) {
-	ret := _mock.Called(path, attribute, threshold)
+func (_mock *MockNotifierFactory) NewCgroupNotifier(logger klog.Logger, path string, attribute string, threshold int64) (CgroupNotifier, error) {
+	ret := _mock.Called(logger, path, attribute, threshold)
 
 	if len(ret) == 0 {
 		panic("no return value specified for NewCgroupNotifier")
@@ -162,18 +171,18 @@ func (_mock *MockNotifierFactory) NewCgroupNotifier(path string, attribute strin
 
 	var r0 CgroupNotifier
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(string, string, int64) (CgroupNotifier, error)); ok {
-		return returnFunc(path, attribute, threshold)
+	if returnFunc, ok := ret.Get(0).(func(klog.Logger, string, string, int64) (CgroupNotifier, error)); ok {
+		return returnFunc(logger, path, attribute, threshold)
 	}
-	if returnFunc, ok := ret.Get(0).(func(string, string, int64) CgroupNotifier); ok {
-		r0 = returnFunc(path, attribute, threshold)
+	if returnFunc, ok := ret.Get(0).(func(klog.Logger, string, string, int64) CgroupNotifier); ok {
+		r0 = returnFunc(logger, path, attribute, threshold)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(CgroupNotifier)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(string, string, int64) error); ok {
-		r1 = returnFunc(path, attribute, threshold)
+	if returnFunc, ok := ret.Get(1).(func(klog.Logger, string, string, int64) error); ok {
+		r1 = returnFunc(logger, path, attribute, threshold)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -186,31 +195,37 @@ type MockNotifierFactory_NewCgroupNotifier_Call struct {
 }
 
 // NewCgroupNotifier is a helper method to define mock.On call
+//   - logger klog.Logger
 //   - path string
 //   - attribute string
 //   - threshold int64
-func (_e *MockNotifierFactory_Expecter) NewCgroupNotifier(path interface{}, attribute interface{}, threshold interface{}) *MockNotifierFactory_NewCgroupNotifier_Call {
-	return &MockNotifierFactory_NewCgroupNotifier_Call{Call: _e.mock.On("NewCgroupNotifier", path, attribute, threshold)}
+func (_e *MockNotifierFactory_Expecter) NewCgroupNotifier(logger interface{}, path interface{}, attribute interface{}, threshold interface{}) *MockNotifierFactory_NewCgroupNotifier_Call {
+	return &MockNotifierFactory_NewCgroupNotifier_Call{Call: _e.mock.On("NewCgroupNotifier", logger, path, attribute, threshold)}
 }
 
-func (_c *MockNotifierFactory_NewCgroupNotifier_Call) Run(run func(path string, attribute string, threshold int64)) *MockNotifierFactory_NewCgroupNotifier_Call {
+func (_c *MockNotifierFactory_NewCgroupNotifier_Call) Run(run func(logger klog.Logger, path string, attribute string, threshold int64)) *MockNotifierFactory_NewCgroupNotifier_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 string
+		var arg0 klog.Logger
 		if args[0] != nil {
-			arg0 = args[0].(string)
+			arg0 = args[0].(klog.Logger)
 		}
 		var arg1 string
 		if args[1] != nil {
 			arg1 = args[1].(string)
 		}
-		var arg2 int64
+		var arg2 string
 		if args[2] != nil {
-			arg2 = args[2].(int64)
+			arg2 = args[2].(string)
+		}
+		var arg3 int64
+		if args[3] != nil {
+			arg3 = args[3].(int64)
 		}
 		run(
 			arg0,
 			arg1,
 			arg2,
+			arg3,
 		)
 	})
 	return _c
@@ -221,7 +236,7 @@ func (_c *MockNotifierFactory_NewCgroupNotifier_Call) Return(cgroupNotifier Cgro
 	return _c
 }
 
-func (_c *MockNotifierFactory_NewCgroupNotifier_Call) RunAndReturn(run func(path string, attribute string, threshold int64) (CgroupNotifier, error)) *MockNotifierFactory_NewCgroupNotifier_Call {
+func (_c *MockNotifierFactory_NewCgroupNotifier_Call) RunAndReturn(run func(logger klog.Logger, path string, attribute string, threshold int64) (CgroupNotifier, error)) *MockNotifierFactory_NewCgroupNotifier_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -298,8 +313,8 @@ func (_c *MockThresholdNotifier_Description_Call) RunAndReturn(run func() string
 }
 
 // Start provides a mock function for the type MockThresholdNotifier
-func (_mock *MockThresholdNotifier) Start() {
-	_mock.Called()
+func (_mock *MockThresholdNotifier) Start(ctx context.Context) {
+	_mock.Called(ctx)
 	return
 }
 
@@ -309,13 +324,20 @@ type MockThresholdNotifier_Start_Call struct {
 }
 
 // Start is a helper method to define mock.On call
-func (_e *MockThresholdNotifier_Expecter) Start() *MockThresholdNotifier_Start_Call {
-	return &MockThresholdNotifier_Start_Call{Call: _e.mock.On("Start")}
+//   - ctx context.Context
+func (_e *MockThresholdNotifier_Expecter) Start(ctx interface{}) *MockThresholdNotifier_Start_Call {
+	return &MockThresholdNotifier_Start_Call{Call: _e.mock.On("Start", ctx)}
 }
 
-func (_c *MockThresholdNotifier_Start_Call) Run(run func()) *MockThresholdNotifier_Start_Call {
+func (_c *MockThresholdNotifier_Start_Call) Run(run func(ctx context.Context)) *MockThresholdNotifier_Start_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run()
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		run(
+			arg0,
+		)
 	})
 	return _c
 }
@@ -325,22 +347,22 @@ func (_c *MockThresholdNotifier_Start_Call) Return() *MockThresholdNotifier_Star
 	return _c
 }
 
-func (_c *MockThresholdNotifier_Start_Call) RunAndReturn(run func()) *MockThresholdNotifier_Start_Call {
+func (_c *MockThresholdNotifier_Start_Call) RunAndReturn(run func(ctx context.Context)) *MockThresholdNotifier_Start_Call {
 	_c.Run(run)
 	return _c
 }
 
 // UpdateThreshold provides a mock function for the type MockThresholdNotifier
-func (_mock *MockThresholdNotifier) UpdateThreshold(summary *v1alpha1.Summary) error {
-	ret := _mock.Called(summary)
+func (_mock *MockThresholdNotifier) UpdateThreshold(ctx context.Context, summary *v1alpha1.Summary) error {
+	ret := _mock.Called(ctx, summary)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UpdateThreshold")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*v1alpha1.Summary) error); ok {
-		r0 = returnFunc(summary)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *v1alpha1.Summary) error); ok {
+		r0 = returnFunc(ctx, summary)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -353,19 +375,25 @@ type MockThresholdNotifier_UpdateThreshold_Call struct {
 }
 
 // UpdateThreshold is a helper method to define mock.On call
+//   - ctx context.Context
 //   - summary *v1alpha1.Summary
-func (_e *MockThresholdNotifier_Expecter) UpdateThreshold(summary interface{}) *MockThresholdNotifier_UpdateThreshold_Call {
-	return &MockThresholdNotifier_UpdateThreshold_Call{Call: _e.mock.On("UpdateThreshold", summary)}
+func (_e *MockThresholdNotifier_Expecter) UpdateThreshold(ctx interface{}, summary interface{}) *MockThresholdNotifier_UpdateThreshold_Call {
+	return &MockThresholdNotifier_UpdateThreshold_Call{Call: _e.mock.On("UpdateThreshold", ctx, summary)}
 }
 
-func (_c *MockThresholdNotifier_UpdateThreshold_Call) Run(run func(summary *v1alpha1.Summary)) *MockThresholdNotifier_UpdateThreshold_Call {
+func (_c *MockThresholdNotifier_UpdateThreshold_Call) Run(run func(ctx context.Context, summary *v1alpha1.Summary)) *MockThresholdNotifier_UpdateThreshold_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *v1alpha1.Summary
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*v1alpha1.Summary)
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *v1alpha1.Summary
+		if args[1] != nil {
+			arg1 = args[1].(*v1alpha1.Summary)
 		}
 		run(
 			arg0,
+			arg1,
 		)
 	})
 	return _c
@@ -376,7 +404,7 @@ func (_c *MockThresholdNotifier_UpdateThreshold_Call) Return(err error) *MockThr
 	return _c
 }
 
-func (_c *MockThresholdNotifier_UpdateThreshold_Call) RunAndReturn(run func(summary *v1alpha1.Summary) error) *MockThresholdNotifier_UpdateThreshold_Call {
+func (_c *MockThresholdNotifier_UpdateThreshold_Call) RunAndReturn(run func(ctx context.Context, summary *v1alpha1.Summary) error) *MockThresholdNotifier_UpdateThreshold_Call {
 	_c.Call.Return(run)
 	return _c
 }
