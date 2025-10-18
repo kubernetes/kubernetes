@@ -48,6 +48,11 @@ func (f *fakeDRAManager) DeviceClasses() fwk.DeviceClassLister {
 	return f.deviceClassLister
 }
 
+func (f *fakeDRAManager) DeviceClassResolver() fwk.DeviceClassResolver {
+	// Return a fake cache that calls DeviceClassMapping directly for testing
+	return &fakeDeviceClassResolver{draManager: f}
+}
+
 type deviceClassLister struct {
 	classLister resourcelisters.DeviceClassLister
 }
@@ -58,6 +63,25 @@ func (l *deviceClassLister) Get(className string) (*resourceapi.DeviceClass, err
 
 func (l *deviceClassLister) List() ([]*resourceapi.DeviceClass, error) {
 	return l.classLister.List(labels.Everything())
+}
+
+type fakeDeviceClassResolver struct {
+	draManager fwk.SharedDRAManager
+}
+
+func (f *fakeDeviceClassResolver) GetDeviceClass(resourceName v1.ResourceName) string {
+	classes, err := f.draManager.DeviceClasses().List()
+	if err != nil {
+		return ""
+	}
+	mapping := make(map[v1.ResourceName]string)
+	for _, c := range classes {
+		if c.Spec.ExtendedResourceName != nil {
+			mapping[v1.ResourceName(*c.Spec.ExtendedResourceName)] = c.Name
+		}
+		mapping[v1.ResourceName(resourceapi.ResourceDeviceClassPrefix+c.Name)] = c.Name
+	}
+	return mapping[resourceName]
 }
 
 func TestDeviceClassMapping(t *testing.T) {
@@ -104,9 +128,16 @@ func TestDeviceClassMapping(t *testing.T) {
 
 	informerFactory.WaitForCacheSync(tCtx.Done())
 
-	rm, err := DeviceClassMapping(draManager)
+	classes, err := draManager.DeviceClasses().List()
 	if err != nil {
-		t.Fatalf("calling DeviceClassMapping: %v", err)
+		t.Fatalf("listing device classes: %v", err)
+	}
+	rm := make(map[v1.ResourceName]string)
+	for _, c := range classes {
+		if c.Spec.ExtendedResourceName != nil {
+			rm[v1.ResourceName(*c.Spec.ExtendedResourceName)] = c.Name
+		}
+		rm[v1.ResourceName(resourceapi.ResourceDeviceClassPrefix+c.Name)] = c.Name
 	}
 	c, ok := rm[v1.ResourceName(ern1)]
 	if !ok {
@@ -153,9 +184,16 @@ func TestNoDeviceClassMapping(t *testing.T) {
 
 	informerFactory.WaitForCacheSync(tCtx.Done())
 
-	rm, err := DeviceClassMapping(draManager)
+	classes, err := draManager.DeviceClasses().List()
 	if err != nil {
-		t.Fatalf("calling DeviceClassMapping: %v", err)
+		t.Fatalf("listing device classes: %v", err)
+	}
+	rm := make(map[v1.ResourceName]string)
+	for _, c := range classes {
+		if c.Spec.ExtendedResourceName != nil {
+			rm[v1.ResourceName(*c.Spec.ExtendedResourceName)] = c.Name
+		}
+		rm[v1.ResourceName(resourceapi.ResourceDeviceClassPrefix+c.Name)] = c.Name
 	}
 	if len(rm) != 0 {
 		t.Errorf("result should not contain extended resource")
