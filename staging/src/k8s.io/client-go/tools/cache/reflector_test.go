@@ -57,6 +57,8 @@ import (
 
 var nevererrc chan error
 
+var testMetrics = newReflectorMetrics("reflector_test", "pod", globalReflectorMetricsProvider)
+
 func TestCloseWatchChannelOnError(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	r := NewReflector(&ListWatch{}, &v1.Pod{}, NewStore(MetaNamespaceKeyFunc), 0)
@@ -233,7 +235,7 @@ func TestReflectorHandleWatchStoppedBefore(t *testing.T) {
 			return resultCh
 		},
 	}
-	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, g.setLastSyncResourceVersion, g.clock, nevererrc)
+	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, g.setLastSyncResourceVersion, g.clock, testMetrics, nevererrc)
 	require.Equal(t, err, errorStopRequested)
 	// Ensure handleWatch calls ResultChan and Stop
 	assert.Equal(t, []string{"ResultChan", "Stop"}, calls)
@@ -266,7 +268,7 @@ func TestReflectorHandleWatchStoppedAfter(t *testing.T) {
 			return resultCh
 		},
 	}
-	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, g.setLastSyncResourceVersion, g.clock, nevererrc)
+	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, g.setLastSyncResourceVersion, g.clock, testMetrics, nevererrc)
 	require.Equal(t, err, errorStopRequested)
 	// Ensure handleWatch calls ResultChan and Stop
 	assert.Equal(t, []string{"ResultChan", "Stop"}, calls)
@@ -292,7 +294,7 @@ func TestReflectorHandleWatchResultChanClosedBefore(t *testing.T) {
 	}
 	// Simulate the result channel being closed by the producer before handleWatch is called.
 	close(resultCh)
-	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, g.setLastSyncResourceVersion, g.clock, nevererrc)
+	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, g.setLastSyncResourceVersion, g.clock, testMetrics, nevererrc)
 	require.Equal(t, &VeryShortWatchError{Name: g.name}, err)
 	// Ensure handleWatch calls ResultChan and Stop
 	assert.Equal(t, []string{"ResultChan", "Stop"}, calls)
@@ -323,7 +325,7 @@ func TestReflectorHandleWatchResultChanClosedAfter(t *testing.T) {
 			return resultCh
 		},
 	}
-	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, g.setLastSyncResourceVersion, g.clock, nevererrc)
+	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, g.setLastSyncResourceVersion, g.clock, testMetrics, nevererrc)
 	require.Equal(t, &VeryShortWatchError{Name: g.name}, err)
 	// Ensure handleWatch calls ResultChan and Stop
 	assert.Equal(t, []string{"ResultChan", "Stop"}, calls)
@@ -353,7 +355,7 @@ func TestReflectorWatchHandler(t *testing.T) {
 		// Stop means that the consumer is done reading events.
 		// So let handleWatch call fw.Stop, after the Context is cancelled.
 	}()
-	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, setLastSyncResourceVersion, g.clock, nevererrc)
+	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, setLastSyncResourceVersion, g.clock, testMetrics, nevererrc)
 	require.Equal(t, err, errorStopRequested)
 
 	mkPod := func(id string, rv string) *v1.Pod {
@@ -396,7 +398,7 @@ func TestReflectorStopWatch(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancelCause(ctx)
 	cancel(errors.New("don't run"))
-	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, g.setLastSyncResourceVersion, g.clock, nevererrc)
+	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, g.setLastSyncResourceVersion, g.clock, testMetrics, nevererrc)
 	require.Equal(t, err, errorStopRequested)
 }
 
@@ -780,6 +782,7 @@ func TestReflectorListAndWatchInitConnBackoff(t *testing.T) {
 				}
 				r := &Reflector{
 					name:              "test-reflector",
+					metrics:           testMetrics,
 					listerWatcher:     lw,
 					store:             NewFIFO(MetaNamespaceKeyFunc),
 					backoffManager:    bm,
@@ -841,6 +844,7 @@ func TestBackoffOnTooManyRequests(t *testing.T) {
 
 	r := &Reflector{
 		name:              "test-reflector",
+		metrics:           testMetrics,
 		listerWatcher:     lw,
 		store:             NewFIFO(MetaNamespaceKeyFunc),
 		backoffManager:    bm,
@@ -882,6 +886,7 @@ func TestNoRelistOnTooManyRequests(t *testing.T) {
 
 	r := &Reflector{
 		name:              "test-reflector",
+		metrics:           testMetrics,
 		listerWatcher:     lw,
 		store:             NewFIFO(MetaNamespaceKeyFunc),
 		backoffManager:    bm,
@@ -957,6 +962,7 @@ func TestRetryInternalError(t *testing.T) {
 
 		r := &Reflector{
 			name:              "test-reflector",
+			metrics:           testMetrics,
 			listerWatcher:     lw,
 			store:             NewFIFO(MetaNamespaceKeyFunc),
 			backoffManager:    bm,
@@ -2412,5 +2418,283 @@ func TestIsUnsupportedTableObject(t *testing.T) {
 				t.Errorf("Expected %v, got %v", tt.expected, result)
 			}
 		})
+	}
+}
+
+// mockMetric implements GaugeMetric, CounterMetric, and HistogramMetric
+type mockMetric struct {
+	value        float64
+	count        int
+	name         string
+	resourceType string
+}
+
+func (m *mockMetric) Inc()                    { m.count++ }
+func (m *mockMetric) Set(v float64)           { m.value = v }
+func (m *mockMetric) Observe(v float64)       { m.value = v }
+func (m *mockMetric) GetValue() float64       { return m.value }
+func (m *mockMetric) GetCount() int           { return m.count }
+func (m *mockMetric) GetName() string         { return m.name }
+func (m *mockMetric) GetResourceType() string { return m.resourceType }
+
+// mockMetricsProvider implements ReflectorMetricsProvider
+type mockMetricsProvider struct {
+	listsMetric         CounterMetric
+	listDurationMetric  HistogramMetric
+	itemsInListMetric   GaugeMetric
+	lastResourceVersion GaugeMetric
+	watchesMetric       CounterMetric
+	shortWatchesMetric  CounterMetric
+	watchDurationMetric HistogramMetric
+	itemsInWatchMetric  GaugeMetric
+
+	// Track the label values passed to metric creation methods
+	createdMetrics []struct {
+		metricType   string
+		name         string
+		resourceType string
+	}
+}
+
+func newMockMetricsProvider() *mockMetricsProvider {
+	return &mockMetricsProvider{
+		listsMetric:         &mockMetric{},
+		listDurationMetric:  &mockMetric{},
+		itemsInListMetric:   &mockMetric{},
+		lastResourceVersion: &mockMetric{},
+		watchesMetric:       &mockMetric{},
+		shortWatchesMetric:  &mockMetric{},
+		watchDurationMetric: &mockMetric{},
+		itemsInWatchMetric:  &mockMetric{},
+		createdMetrics:      make([]struct{ metricType, name, resourceType string }, 0),
+	}
+}
+
+// Implement ReflectorMetricsProvider interface
+func (m *mockMetricsProvider) NewListsMetric(name string, resourceType string) CounterMetric {
+	m.createdMetrics = append(m.createdMetrics, struct{ metricType, name, resourceType string }{"lists", name, resourceType})
+	metric := &mockMetric{name: name, resourceType: resourceType}
+	m.listsMetric = metric
+	return metric
+}
+
+func (m *mockMetricsProvider) NewListDurationMetric(name string, resourceType string) HistogramMetric {
+	m.createdMetrics = append(m.createdMetrics, struct{ metricType, name, resourceType string }{"listDuration", name, resourceType})
+	metric := &mockMetric{name: name, resourceType: resourceType}
+	m.listDurationMetric = metric
+	return metric
+}
+
+func (m *mockMetricsProvider) NewItemsInListMetric(name string, resourceType string) GaugeMetric {
+	m.createdMetrics = append(m.createdMetrics, struct{ metricType, name, resourceType string }{"itemsInList", name, resourceType})
+	metric := &mockMetric{name: name, resourceType: resourceType}
+	m.itemsInListMetric = metric
+	return metric
+}
+
+func (m *mockMetricsProvider) NewLastResourceVersionMetric(name string, resourceType string) GaugeMetric {
+	m.createdMetrics = append(m.createdMetrics, struct{ metricType, name, resourceType string }{"lastResourceVersion", name, resourceType})
+	metric := &mockMetric{name: name, resourceType: resourceType}
+	m.lastResourceVersion = metric
+	return metric
+}
+
+func (m *mockMetricsProvider) NewWatchesMetric(name string, resourceType string) CounterMetric {
+	m.createdMetrics = append(m.createdMetrics, struct{ metricType, name, resourceType string }{"watches", name, resourceType})
+	metric := &mockMetric{name: name, resourceType: resourceType}
+	m.watchesMetric = metric
+	return metric
+}
+
+func (m *mockMetricsProvider) NewShortWatchesMetric(name string, resourceType string) CounterMetric {
+	m.createdMetrics = append(m.createdMetrics, struct{ metricType, name, resourceType string }{"shortWatches", name, resourceType})
+	metric := &mockMetric{name: name, resourceType: resourceType}
+	m.shortWatchesMetric = metric
+	return metric
+}
+
+func (m *mockMetricsProvider) NewWatchDurationMetric(name string, resourceType string) HistogramMetric {
+	m.createdMetrics = append(m.createdMetrics, struct{ metricType, name, resourceType string }{"watchDuration", name, resourceType})
+	metric := &mockMetric{name: name, resourceType: resourceType}
+	m.watchDurationMetric = metric
+	return metric
+}
+
+func (m *mockMetricsProvider) NewItemsInWatchMetric(name string, resourceType string) GaugeMetric {
+	m.createdMetrics = append(m.createdMetrics, struct{ metricType, name, resourceType string }{"itemsInWatch", name, resourceType})
+	metric := &mockMetric{name: name, resourceType: resourceType}
+	m.itemsInWatchMetric = metric
+	return metric
+}
+
+// GetCreatedMetrics returns the list of metrics created with their label values
+func (m *mockMetricsProvider) GetCreatedMetrics() []struct {
+	metricType   string
+	name         string
+	resourceType string
+} {
+	return m.createdMetrics
+}
+
+func TestReflectorMetrics(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	mockProvider := newMockMetricsProvider()
+
+	pods := []*v1.Pod{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            "test-pod-1",
+				ResourceVersion: "1",
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            "test-pod-2",
+				ResourceVersion: "1",
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            "test-pod-3",
+				ResourceVersion: "1",
+			},
+		},
+	}
+
+	fw := watch.NewFake()
+	lw := &ListWatch{
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			return fw, nil
+		},
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			return &v1.PodList{
+				ListMeta: metav1.ListMeta{ResourceVersion: "1"},
+				Items:    []v1.Pod{*pods[0], *pods[1], *pods[2]},
+			}, nil
+		},
+	}
+
+	store := NewStore(MetaNamespaceKeyFunc)
+
+	expectedReflectorName := "test-reflector"
+	expectedResourceType := "v1.Pod"
+
+	reflector := NewReflectorWithOptions(lw, &v1.Pod{}, store, ReflectorOptions{
+		Name:            expectedReflectorName,
+		MetricsProvider: mockProvider,
+	})
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	reflectorDone := make(chan error)
+	go func() {
+		reflectorDone <- reflector.ListAndWatchWithContext(ctx)
+	}()
+
+	time.Sleep(100 * time.Millisecond)
+
+	// Add more watch events to generate richer metrics
+	fw.Add(&v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "test-pod-4",
+			ResourceVersion: "2",
+		},
+	})
+
+	fw.Modify(&v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "test-pod-1",
+			ResourceVersion: "3",
+		},
+	})
+
+	fw.Delete(pods[1]) // Delete test-pod-2
+
+	fw.Add(&v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "test-pod-5",
+			ResourceVersion: "4",
+		},
+	})
+
+	fw.Modify(&v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "test-pod-3",
+			ResourceVersion: "5",
+		},
+	})
+
+	time.Sleep(100 * time.Millisecond)
+	cancel()
+
+	select {
+	case err := <-reflectorDone:
+		if err != nil && !errors.Is(err, context.Canceled) {
+			t.Errorf("unexpected error: %v", err)
+		}
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatal("timeout waiting for reflector to finish")
+	}
+
+	createdMetrics := mockProvider.GetCreatedMetrics()
+	expectedMetricTypes := []string{
+		"lists", "listDuration", "itemsInList", "lastResourceVersion",
+		"watches", "shortWatches", "watchDuration", "itemsInWatch",
+	}
+
+	if len(createdMetrics) != len(expectedMetricTypes) {
+		t.Errorf("Expected %d metrics to be created, got %d", len(expectedMetricTypes), len(createdMetrics))
+	}
+
+	for _, metric := range createdMetrics {
+		if metric.name != expectedReflectorName {
+			t.Errorf("Expected metric name to be '%s', got '%s'", expectedReflectorName, metric.name)
+		}
+		if metric.resourceType != expectedResourceType {
+			t.Errorf("Expected metric resourceType to be '%s', got '%s'", expectedResourceType, metric.resourceType)
+		}
+	}
+
+	createdMetricTypes := make(map[string]bool)
+	for _, metric := range createdMetrics {
+		createdMetricTypes[metric.metricType] = true
+	}
+
+	for _, expectedType := range expectedMetricTypes {
+		if !createdMetricTypes[expectedType] {
+			t.Errorf("Expected metric type '%s' to be created, but it wasn't", expectedType)
+		}
+	}
+
+	if mockProvider.listsMetric.(*mockMetric).GetCount() == 0 {
+		t.Error("Expected at least one list operation")
+	}
+
+	if mockProvider.watchesMetric.(*mockMetric).GetCount() == 0 {
+		t.Error("Expected at least one watch operation")
+	}
+
+	// Check if the initial list operation returned 3 items
+	if mockProvider.itemsInListMetric.(*mockMetric).GetValue() != 3 {
+		t.Errorf("Expected 3 items in list, got %v", mockProvider.itemsInListMetric.(*mockMetric).GetValue())
+	}
+
+	// Watch events: 2 adds + 2 modifies + 1 delete = 5 events
+	if mockProvider.itemsInWatchMetric.(*mockMetric).GetValue() < 5 {
+		t.Errorf("Expected at least 5 items in watch (2 adds, 2 modifies, 1 delete), got %v", mockProvider.itemsInWatchMetric.(*mockMetric).GetValue())
+	}
+
+	// Last resource version should be 5
+	if mockProvider.lastResourceVersion.(*mockMetric).GetValue() != 5 {
+		t.Errorf("Expected last resource version to be 5, got %v", mockProvider.lastResourceVersion.(*mockMetric).GetValue())
+	}
+
+	if mockProvider.listDurationMetric.(*mockMetric).GetValue() == 0 {
+		t.Error("Expected non-zero list duration")
+	}
+
+	if mockProvider.watchDurationMetric.(*mockMetric).GetValue() == 0 {
+		t.Error("Expected non-zero watch duration")
 	}
 }
