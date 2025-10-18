@@ -2066,3 +2066,74 @@ func TestFeatureGateResourceHealthStatus(t *testing.T) {
 		}, u)
 	}
 }
+
+// TestAdmitPodWithDRAResources verifies the behavior of admission
+// of the pods referring DRA extended resources depending on whether
+// the DRAExtendedResource feature gate is enabled or disabled.
+func TestAdmitPodWithDRAResources(t *testing.T) {
+	testCases := map[string]struct {
+		enableFeatureGate bool
+		checkError        func(t require.TestingT, err error, msgAndArgs ...interface{})
+	}{
+		"DRAExtendedResource enabled": {
+			enableFeatureGate: true,
+			checkError:        require.NoError,
+		},
+		"DRAExtendedResource disabled": {
+			enableFeatureGate: false,
+			checkError:        require.Error,
+		},
+	}
+
+	containerName := "container1"
+	resourceName := "domain1.com/resource1"
+
+	for description, test := range testCases {
+		t.Run(description, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, test.enableFeatureGate)
+
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID: uuid.NewUUID(),
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: containerName,
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName(resourceName): resource.MustParse("1"),
+								},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					ExtendedResourceClaimStatus: &v1.PodExtendedResourceClaimStatus{
+						RequestMappings: []v1.ContainerExtendedResourceRequest{
+							{
+								ContainerName: containerName,
+								ResourceName:  resourceName,
+							},
+						},
+					},
+				},
+			}
+
+			require.True(t, isDRAExtendedResource(pod, containerName, resourceName))
+
+			testManager := &ManagerImpl{
+				devicesToReuse: make(PodReusableDevices),
+				podDevices:     newPodDevices(),
+				allocatedDevices: map[string]sets.Set[string]{
+					resourceName: sets.New("Dev"),
+				},
+				activePods:   func() []*v1.Pod { return nil },
+				sourcesReady: &sourcesReadyStub{},
+			}
+
+			err := testManager.Allocate(pod, &pod.Spec.Containers[0])
+			test.checkError(t, err)
+		})
+	}
+}
