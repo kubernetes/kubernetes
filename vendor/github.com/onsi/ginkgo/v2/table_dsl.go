@@ -309,11 +309,11 @@ func generateTable(description string, isSubtree bool, args ...interface{}) {
 				internalNodeType = types.NodeTypeContainer
 			}
 
-			pushNode(internal.NewNode(deprecationTracker, internalNodeType, description, internalNodeArgs...))
+			pushNode(internal.NewNode(transformNewNodeArgs(deprecationTracker, internalNodeType, description, internalNodeArgs...)))
 		}
 	})
 
-	pushNode(internal.NewNode(deprecationTracker, types.NodeTypeContainer, description, containerNodeArgs...))
+	pushNode(internal.NewNode(transformNewNodeArgs(deprecationTracker, types.NodeTypeContainer, description, containerNodeArgs...)))
 }
 
 func invokeFunction(function interface{}, parameters []interface{}) []reflect.Value {

@@ -184,7 +184,7 @@ func isSliceOfDecorations(slice interface{}) bool {
 var contextType = reflect.TypeOf(new(context.Context)).Elem()
 var specContextType = reflect.TypeOf(new(SpecContext)).Elem()
 
-func NewNode(deprecationTracker *types.DeprecationTracker, nodeType types.NodeType, text string, args ...interface{}) (Node, []error) {
+func NewNode(deprecationTracker *types.DeprecationTracker, nodeType types.NodeType, text string, args []interface{}) (Node, []error) {
 	baseOffset := 2
 	node := Node{
 		ID:                   UniqueNodeID(),
@@ -205,7 +205,7 @@ func NewNode(deprecationTracker *types.DeprecationTracker, nodeType types.NodeTy
 		}
 	}
 
-	args = unrollInterfaceSlice(args)
+	args = UnrollInterfaceSlice(args)
 
 	remainingArgs := []interface{}{}
 	// First get the CodeLocation up-to-date
@@ -596,7 +596,7 @@ func NewCleanupNode(deprecationTracker *types.DeprecationTracker, fail func(stri
 		})
 	}
 
-	return NewNode(deprecationTracker, types.NodeTypeCleanupInvalid, "", finalArgs...)
+	return NewNode(deprecationTracker, types.NodeTypeCleanupInvalid, "", finalArgs)
 }
 
 func (n Node) IsZero() bool {
@@ -917,7 +917,7 @@ func (n Nodes) GetMaxMustPassRepeatedly() int {
 	return maxMustPassRepeatedly
 }
 
-func unrollInterfaceSlice(args interface{}) []interface{} {
+func UnrollInterfaceSlice(args interface{}) []interface{} {
 	v := reflect.ValueOf(args)
 	if v.Kind() != reflect.Slice {
 		return []interface{}{args}
@@ -926,7 +926,7 @@ func unrollInterfaceSlice(args interface{}) []interface{} {
 	for i := 0; i < v.Len(); i++ {
 		el := reflect.ValueOf(v.Index(i).Interface())
 		if el.Kind() == reflect.Slice && el.Type() != reflect.TypeOf(Labels{}) {
-			out = append(out, unrollInterfaceSlice(el.Interface())...)
+			out = append(out, UnrollInterfaceSlice(el.Interface())...)
 		} else {
 			out = append(out, v.Index(i).Interface())
 		}

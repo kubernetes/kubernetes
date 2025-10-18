@@ -481,6 +481,48 @@ func pushNode(node internal.Node, errors []error) bool {
 	return true
 }
 
+// TransformNodeArgs is a hook which is called by the test construction DSL methods
+// before creating the new node. If it returns any error, the test suite
+// prints those errors and exits. The text and arguments can be modified. The
+// node type is provided for information and remains the same.
+//
+// Arguments have been flattened already, i.e. none of the entries in args is another []any.
+//
+// Custom frameworks may wrap it, for example to add support for new argument types.
+// Each wrapper should call ginkgo.GinkgoHelper to skip itself when generating
+// a location for some incorrect call. Unwinding then needs to skip one additional
+// level for the top DSL functions which don't call GinkgoHelper.
+//
+//	var origTransformNodeArgs func(nodeType types.NodeType, text string, args []any) (string, []any, []error)
+//
+//	func init() {
+//	    origTransformNodeArgs = ginkgo.TransformNodeArgs
+//	    ginkgo.TransformNodeArgs = transformNodeArgs
+//	}
+//
+//	func transformNodeArgs(nodeType types.NodeType, text string, args []any) (string, []any, []error) {
+//	    ginkgo.GinkgoHelper()
+//	    ... replace custom arguments ...
+//	    return origTransformNodeArgs(nodeType, text, args)
+//	}
+var TransformNodeArgs = func(nodeType types.NodeType, text string, args []any) (string, []any, []error) {
+	return text, args, nil
+}
+
+// transformNewNodeArgs is the helper for DSL functions which handles TransformNodeArgs.
+//
+// It's return valus are intentionally the same as the internal.NewNode parameters,
+// which makes it possible to chain the invocations:
+//
+//	NewNode(transformNewNodeArgs(...))
+func transformNewNodeArgs(deprecationTracker *types.DeprecationTracker, nodeType types.NodeType, text string, args ...any) (*types.DeprecationTracker, types.NodeType, string, []any) {
+	GinkgoHelper()
+	args = internal.UnrollInterfaceSlice(args)
+	text, args, errs := TransformNodeArgs(nodeType, text, args)
+	exitIfErrors(errs)
+	return deprecationTracker, nodeType, text, args
+}
+
 /*
 Describe nodes are Container nodes that allow you to organize your specs.  A Describe node's closure can contain any number of
 Setup nodes (e.g. BeforeEach, AfterEach, JustBeforeEach), and Subject nodes (i.e. It).
@@ -492,7 +534,7 @@ You can learn more at https://onsi.github.io/ginkgo/#organizing-specs-with-conta
 In addition, container nodes can be decorated with a variety of decorators.  You can learn more here: https://onsi.github.io/ginkgo/#decorator-reference
 */
 func Describe(text string, args ...interface{}) bool {
-	return pushNode(internal.NewNode(deprecationTracker, types.NodeTypeContainer, text, args...))
+	return pushNode(internal.NewNode(transformNewNodeArgs(deprecationTracker, types.NodeTypeContainer, text, args...)))
 }
 
 /*
@@ -500,7 +542,7 @@ FDescribe focuses specs within the Describe block.
 */
 func FDescribe(text string, args ...interface{}) bool {
 	args = append(args, internal.Focus)
-	return pushNode(internal.NewNode(deprecationTracker, types.NodeTypeContainer, text, args...))
+	return pushNode(internal.NewNode(transformNewNodeArgs(deprecationTracker, types.NodeTypeContainer, text, args...)))
 }
 
 /*
@@ -508,7 +550,7 @@ PDescribe marks specs within the Describe block as pending.
 */
 func PDescribe(text string, args ...interface{}) bool {
 	args = append(args, internal.Pending)
-	return pushNode(internal.NewNode(deprecationTracker, types.NodeTypeContainer, text, args...))
+	return pushNode(internal.NewNode(transformNewNodeArgs(deprecationTracker, types.NodeTypeContainer, text, args...)))
 }
 
 /*
@@ -521,21 +563,21 @@ var XDescribe = PDescribe
 /* Context is an alias for Describe - it generates the exact same kind of Container node */
 var Context, FContext, PContext, XContext = Describe, FDescribe, PDescribe, XDescribe
 
-/* When is an alias for Describe - it generates the exact same kind of Container node */
+/* When is an alias for Describe - it generates the exact same kind of Container node with "when " as prefix for the text. */
 func When(text string, args ...interface{}) bool {
-	return pushNode(internal.NewNode(deprecationTracker, types.NodeTypeContainer, "when "+text, args...))
+	return pushNode(internal.NewNode(transformNewNodeArgs(deprecationTracker, types.NodeTypeContainer, "when "+text, args...)))
 }
 
-/* When is an alias for Describe - it generates the exact same kind of Container node */
+/* When is an alias for Describe - it generates the exact same kind of Container node with "when " as prefix for the text. */
 func FWhen(text string, args ...interface{}) bool {
 	args = append(args, internal.Focus)
-	return pushNode(internal.NewNode(deprecationTracker, types.NodeTypeContainer, "when "+text, args...))
+	return pushNode(internal.NewNode(transformNewNodeArgs(deprecationTracker, types.NodeTypeContainer, "when "+text, args...)))
 }
 
 /* When is an alias for Describe - it generates the exact same kind of Container node */
 func PWhen(text string, args ...interface{}) bool {
 	args = append(args, internal.Pending)
-	return pushNode(internal.NewNode(deprecationTracker, types.NodeTypeContainer, "when "+text, args...))
+	return pushNode(internal.NewNode(transformNewNodeArgs(deprecationTracker, types.NodeTypeContainer, "when "+text, args...)))
 }
 
 var XWhen = PWhen
@@ -551,7 +593,7 @@ You can learn more at https://onsi.github.io/ginkgo/#spec-subjects-it
 In addition, subject nodes can be decorated with a variety of decorators.  You can learn more here: https://onsi.github.io/ginkgo/#decorator-reference
 */
 func It(text string, args ...interface{}) bool {
-	return pushNode(internal.NewNode(deprecationTracker, types.NodeTypeIt, text, args...))
+	return pushNode(internal.NewNode(transformNewNodeArgs(deprecationTracker, types.NodeTypeIt, text, args...)))
 }
 
 /*
@@ -559,7 +601,7 @@ FIt allows you to focus an individual It.
 */
 func FIt(text string, args ...interface{}) bool {
 	args = append(args, internal.Focus)
-	return pushNode(internal.NewNode(deprecationTracker, types.NodeTypeIt, text, args...))
+	return pushNode(internal.NewNode(transformNewNodeArgs(deprecationTracker, types.NodeTypeIt, text, args...)))
 }
 
 /*
@@ -567,7 +609,7 @@ PIt allows you to mark an individual It as pending.
 */
 func PIt(text string, args ...interface{}) bool {
 	args = append(args, internal.Pending)
-	return pushNode(internal.NewNode(deprecationTracker, types.NodeTypeIt, text, args...))
+	return pushNode(internal.NewNode(transformNewNodeArgs(deprecationTracker, types.NodeTypeIt, text, args...)))
 }
 
 /*
@@ -614,7 +656,7 @@ You can learn more here: https://onsi.github.io/ginkgo/#suite-setup-and-cleanup-
 func BeforeSuite(body interface{}, args ...interface{}) bool {
 	combinedArgs := []interface{}{body}
 	combinedArgs = append(combinedArgs, args...)
-	return pushNode(internal.NewNode(deprecationTracker, types.NodeTypeBeforeSuite, "", combinedArgs...))
+	return pushNode(internal.NewNode(transformNewNodeArgs(deprecationTracker, types.NodeTypeBeforeSuite, "", combinedArgs...)))
 }
 
 /*
@@ -633,7 +675,7 @@ You can learn more here: https://onsi.github.io/ginkgo/#suite-setup-and-cleanup-
 func AfterSuite(body interface{}, args ...interface{}) bool {
 	combinedArgs := []interface{}{body}
 	combinedArgs = append(combinedArgs, args...)
-	return pushNode(internal.NewNode(deprecationTracker, types.NodeTypeAfterSuite, "", combinedArgs...))
+	return pushNode(internal.NewNode(transformNewNodeArgs(deprecationTracker, types.NodeTypeAfterSuite, "", combinedArgs...)))
 }
 
 /*
@@ -671,7 +713,7 @@ func SynchronizedBeforeSuite(process1Body interface{}, allProcessBody interface{
 	combinedArgs := []interface{}{process1Body, allProcessBody}
 	combinedArgs = append(combinedArgs, args...)
 
-	return pushNode(internal.NewNode(deprecationTracker, types.NodeTypeSynchronizedBeforeSuite, "", combinedArgs...))
+	return pushNode(internal.NewNode(transformNewNodeArgs(deprecationTracker, types.NodeTypeSynchronizedBeforeSuite, "", combinedArgs...)))
 }
 
 /*
@@ -691,7 +733,7 @@ func SynchronizedAfterSuite(allProcessBody interface{}, process1Body interface{}
 	combinedArgs := []interface{}{allProcessBody, process1Body}
 	combinedArgs = append(combinedArgs, args...)
 
-	return pushNode(internal.NewNode(deprecationTracker, types.NodeTypeSynchronizedAfterSuite, "", combinedArgs...))
+	return pushNode(internal.NewNode(transformNewNodeArgs(deprecationTracker, types.NodeTypeSynchronizedAfterSuite, "", combinedArgs...)))
 }
 
 /*
@@ -704,7 +746,7 @@ You cannot nest any other Ginkgo nodes within a BeforeEach node's closure.
 You can learn more here: https://onsi.github.io/ginkgo/#extracting-common-setup-beforeeach
 */
 func BeforeEach(args ...interface{}) bool {
-	return pushNode(internal.NewNode(deprecationTracker, types.NodeTypeBeforeEach, "", args...))
+	return pushNode(internal.NewNode(transformNewNodeArgs(deprecationTracker, types.NodeTypeBeforeEach, "", args...)))
 }
 
 /*
@@ -717,7 +759,7 @@ You cannot nest any other Ginkgo nodes within a JustBeforeEach node's closure.
 You can learn more and see some examples here: https://onsi.github.io/ginkgo/#separating-creation-and-configuration-justbeforeeach
 */
 func JustBeforeEach(args ...interface{}) bool {
-	return pushNode(internal.NewNode(deprecationTracker, types.NodeTypeJustBeforeEach, "", args...))
+	return pushNode(internal.NewNode(transformNewNodeArgs(deprecationTracker, types.NodeTypeJustBeforeEach, "", args...)))
 }
 
 /*
@@ -732,7 +774,7 @@ You cannot nest any other Ginkgo nodes within an AfterEach node's closure.
 You can learn more here: https://onsi.github.io/ginkgo/#spec-cleanup-aftereach-and-defercleanup
 */
 func AfterEach(args ...interface{}) bool {
-	return pushNode(internal.NewNode(deprecationTracker, types.NodeTypeAfterEach, "", args...))
+	return pushNode(internal.NewNode(transformNewNodeArgs(deprecationTracker, types.NodeTypeAfterEach, "", args...)))
 }
 
 /*
@@ -744,7 +786,7 @@ You cannot nest any other Ginkgo nodes within a JustAfterEach node's closure.
 You can learn more and see some examples here: https://onsi.github.io/ginkgo/#separating-diagnostics-collection-and-teardown-justaftereach
 */
 func JustAfterEach(args ...interface{}) bool {
-	return pushNode(internal.NewNode(deprecationTracker, types.NodeTypeJustAfterEach, "", args...))
+	return pushNode(internal.NewNode(transformNewNodeArgs(deprecationTracker, types.NodeTypeJustAfterEach, "", args...)))
 }
 
 /*
@@ -759,7 +801,7 @@ You can learn more about Ordered Containers at: https://onsi.github.io/ginkgo/#o
 And you can learn more about BeforeAll at: https://onsi.github.io/ginkgo/#setup-in-ordered-containers-beforeall-and-afterall
 */
 func BeforeAll(args ...interface{}) bool {
-	return pushNode(internal.NewNode(deprecationTracker, types.NodeTypeBeforeAll, "", args...))
+	return pushNode(internal.NewNode(transformNewNodeArgs(deprecationTracker, types.NodeTypeBeforeAll, "", args...)))
 }
 
 /*
@@ -776,7 +818,8 @@ You can learn more about Ordered Containers at: https://onsi.github.io/ginkgo/#o
 And you can learn more about AfterAll at: https://onsi.github.io/ginkgo/#setup-in-ordered-containers-beforeall-and-afterall
 */
 func AfterAll(args ...interface{}) bool {
-	return pushNode(internal.NewNode(deprecationTracker, types.NodeTypeAfterAll, "", args...))
+
+	return pushNode(internal.NewNode(transformNewNodeArgs(deprecationTracker, types.NodeTypeAfterAll, "", args...)))
 }
 
 /*
