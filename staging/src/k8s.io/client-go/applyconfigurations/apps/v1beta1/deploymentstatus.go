@@ -40,7 +40,7 @@ type DeploymentStatusApplyConfiguration struct {
 	// Total number of terminating pods targeted by this deployment. Terminating pods have a non-null
 	// .metadata.deletionTimestamp and have not yet reached the Failed or Succeeded .status.phase.
 	//
-	// This is an alpha field. Enable DeploymentReplicaSetTerminatingReplicas to be able to use this field.
+	// This is a beta field and requires enabling DeploymentReplicaSetTerminatingReplicas feature (enabled by default).
 	TerminatingReplicas *int32 `json:"terminatingReplicas,omitempty"`
 	// Represents the latest available observations of a deployment's current state.
 	Conditions []DeploymentConditionApplyConfiguration `json:"conditions,omitempty"`
