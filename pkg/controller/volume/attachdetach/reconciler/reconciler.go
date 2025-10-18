@@ -33,7 +33,6 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/metrics"
-	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/statusupdater"
 	kevents "k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
@@ -73,7 +72,6 @@ func NewReconciler(
 	desiredStateOfWorld cache.DesiredStateOfWorld,
 	actualStateOfWorld cache.ActualStateOfWorld,
 	attacherDetacher operationexecutor.OperationExecutor,
-	nodeStatusUpdater statusupdater.NodeStatusUpdater,
 	nodeLister corelisters.NodeLister,
 	recorder record.EventRecorder) Reconciler {
 	return &reconciler{
@@ -85,7 +83,6 @@ func NewReconciler(
 		desiredStateOfWorld:         desiredStateOfWorld,
 		actualStateOfWorld:          actualStateOfWorld,
 		attacherDetacher:            attacherDetacher,
-		nodeStatusUpdater:           nodeStatusUpdater,
 		nodeLister:                  nodeLister,
 		timeOfLastSync:              time.Now(),
 		recorder:                    recorder,
@@ -99,7 +96,6 @@ type reconciler struct {
 	desiredStateOfWorld         cache.DesiredStateOfWorld
 	actualStateOfWorld          cache.ActualStateOfWorld
 	attacherDetacher            operationexecutor.OperationExecutor
-	nodeStatusUpdater           statusupdater.NodeStatusUpdater
 	nodeLister                  corelisters.NodeLister
 	timeOfLastSync              time.Time
 	disableReconciliationSync   bool
@@ -243,25 +239,12 @@ func (rc *reconciler) reconcile(ctx context.Context) {
 			}
 
 			// Before triggering volume detach, mark volume as detached and update the node status
-			// If it fails to update node status, skip detach volume
-			// If volume detach operation fails, the volume needs to be added back to report as attached so that node status
-			// has the correct volume attachment information.
-			err = rc.actualStateOfWorld.RemoveVolumeFromReportAsAttached(attachedVolume.VolumeName, attachedVolume.NodeName)
-			if err != nil {
-				logger.V(5).Info("RemoveVolumeFromReportAsAttached failed while removing volume from node",
+			// Wait until the update is propagated to Node object.
+			removed := rc.actualStateOfWorld.RemoveVolumeFromReportAsAttached(logger, attachedVolume.VolumeName, attachedVolume.NodeName)
+			if !removed {
+				logger.V(5).Info("waiting RemoveVolumeFromReportAsAttached",
 					"node", klog.KRef("", string(attachedVolume.NodeName)),
-					"volumeName", attachedVolume.VolumeName,
-					"err", err)
-			}
-
-			// Update Node Status to indicate volume is no longer safe to mount.
-			err = rc.nodeStatusUpdater.UpdateNodeStatusForNode(logger, attachedVolume.NodeName)
-			if err != nil {
-				// Skip detaching this volume if unable to update node status
-				logger.Error(err, "UpdateNodeStatusForNode failed while attempting to report volume as attached", "node", klog.KRef("", string(attachedVolume.NodeName)), "volumeName", attachedVolume.VolumeName)
-				// Add volume back to ReportAsAttached if UpdateNodeStatusForNode call failed so that node status updater will add it back to VolumeAttached list.
-				// It is needed here too because DetachVolume is not call actually and we keep the data consistency for every reconcile.
-				rc.actualStateOfWorld.AddVolumeToReportAsAttached(logger, attachedVolume.VolumeName, attachedVolume.NodeName)
+					"volumeName", attachedVolume.VolumeName)
 				continue
 			}
 
@@ -308,12 +291,6 @@ func (rc *reconciler) reconcile(ctx context.Context) {
 	}
 
 	rc.attachDesiredVolumes(logger)
-
-	// Update Node Status
-	err := rc.nodeStatusUpdater.UpdateNodeStatuses(logger)
-	if err != nil {
-		logger.Info("UpdateNodeStatuses failed", "err", err)
-	}
 }
 
 func (rc *reconciler) attachDesiredVolumes(logger klog.Logger) {
@@ -340,9 +317,10 @@ func (rc *reconciler) attachDesiredVolumes(logger klog.Logger) {
 		// See https://github.com/kubernetes/kubernetes/issues/93902
 		attachState := rc.actualStateOfWorld.GetAttachState(volumeToAttach.VolumeName, volumeToAttach.NodeName)
 		if attachState == cache.AttachStateAttached {
-			// Volume/Node exists, touch it to reset detachRequestedTime
+			// Volume/Node exists, touch it to reset detachRequestedTime/volumesAttached
 			logger.V(10).Info("Volume attached--touching", "volume", volumeToAttach)
 			rc.actualStateOfWorld.ResetDetachRequestTime(logger, volumeToAttach.VolumeName, volumeToAttach.NodeName)
+			rc.actualStateOfWorld.AddVolumeToReportAsAttached(logger, volumeToAttach.VolumeName, volumeToAttach.NodeName)
 			continue
 		}
 

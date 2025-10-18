@@ -19,12 +19,17 @@ limitations under the License.
 package statusupdater
 
 import (
-	"fmt"
-	"k8s.io/api/core/v1"
+	"context"
+	"slices"
+	"time"
+
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/util/workqueue"
 	nodeutil "k8s.io/component-helpers/node/util"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
@@ -33,11 +38,10 @@ import (
 // NodeStatusUpdater defines a set of operations for updating the
 // VolumesAttached field in the Node Status.
 type NodeStatusUpdater interface {
-	// Gets a list of node statuses that should be updated from the actual state
-	// of the world and updates them.
-	UpdateNodeStatuses(logger klog.Logger) error
-	// Update any pending status change for the given node
-	UpdateNodeStatusForNode(logger klog.Logger, nodeName types.NodeName) error
+	// Run starts asynchronous updates queued by [QueueUpdate].
+	Run(ctx context.Context, workers int)
+	// Queue updating any pending status change for the given node
+	QueueUpdate(nodeName types.NodeName)
 }
 
 // NewNodeStatusUpdater returns a new instance of NodeStatusUpdater.
@@ -45,45 +49,62 @@ func NewNodeStatusUpdater(
 	kubeClient clientset.Interface,
 	nodeLister corelisters.NodeLister,
 	actualStateOfWorld cache.ActualStateOfWorld) NodeStatusUpdater {
-	return &nodeStatusUpdater{
+	u := &nodeStatusUpdater{
 		actualStateOfWorld: actualStateOfWorld,
 		nodeLister:         nodeLister,
 		kubeClient:         kubeClient,
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[types.NodeName](),
+			workqueue.TypedRateLimitingQueueConfig[types.NodeName]{Name: "node-attachedVolumes"},
+		),
 	}
+	actualStateOfWorld.SetNodeUpdateHook(u.QueueUpdate)
+	return u
 }
 
 type nodeStatusUpdater struct {
 	kubeClient         clientset.Interface
 	nodeLister         corelisters.NodeLister
 	actualStateOfWorld cache.ActualStateOfWorld
+	queue              workqueue.TypedRateLimitingInterface[types.NodeName]
 }
 
-func (nsu *nodeStatusUpdater) UpdateNodeStatuses(logger klog.Logger) error {
-	var nodeIssues int
-	// TODO: investigate right behavior if nodeName is empty
-	// kubernetes/kubernetes/issues/37777
-	nodesToUpdate := nsu.actualStateOfWorld.GetVolumesToReportAttached(logger)
-	for nodeName, attachedVolumes := range nodesToUpdate {
-		err := nsu.processNodeVolumes(logger, nodeName, attachedVolumes)
-		if err != nil {
-			nodeIssues += 1
-		}
+func (nsu *nodeStatusUpdater) Run(ctx context.Context, worker int) {
+	defer nsu.queue.ShutDown()
+	for range worker {
+		go wait.UntilWithContext(ctx, nsu.worker, time.Second)
 	}
-	if nodeIssues > 0 {
-		return fmt.Errorf("unable to update %d nodes", nodeIssues)
-	}
-	return nil
+	<-ctx.Done()
 }
 
-func (nsu *nodeStatusUpdater) UpdateNodeStatusForNode(logger klog.Logger, nodeName types.NodeName) error {
-	needsUpdate, attachedVolumes := nsu.actualStateOfWorld.GetVolumesToReportAttachedForNode(logger, nodeName)
-	if !needsUpdate {
-		return nil
-	}
-	return nsu.processNodeVolumes(logger, nodeName, attachedVolumes)
+func (nsu *nodeStatusUpdater) QueueUpdate(nodeName types.NodeName) {
+	nsu.queue.Add(nodeName)
 }
 
-func (nsu *nodeStatusUpdater) processNodeVolumes(logger klog.Logger, nodeName types.NodeName, attachedVolumes []v1.AttachedVolume) error {
+func (nsu *nodeStatusUpdater) worker(ctx context.Context) {
+	logger := klog.FromContext(ctx)
+	for nsu.syncNode(logger) {
+	}
+	logger.Info("NodeStatusUpdater worker shutting down")
+}
+
+func (nsu *nodeStatusUpdater) syncNode(logger klog.Logger) bool {
+	nodeName, quit := nsu.queue.Get()
+	if quit {
+		return false
+	}
+	defer nsu.queue.Done(nodeName)
+
+	err := nsu.processNodeVolumes(logger, nodeName)
+	if err != nil {
+		nsu.queue.AddRateLimited(nodeName)
+	} else {
+		nsu.queue.Forget(nodeName)
+	}
+	return true
+}
+
+func (nsu *nodeStatusUpdater) processNodeVolumes(logger klog.Logger, nodeName types.NodeName) error {
 	nodeObj, err := nsu.nodeLister.Get(string(nodeName))
 	if errors.IsNotFound(err) {
 		// If node does not exist, its status cannot be updated.
@@ -92,14 +113,15 @@ func (nsu *nodeStatusUpdater) processNodeVolumes(logger klog.Logger, nodeName ty
 			"Could not update node status. Failed to find node in NodeInformer cache", "node", klog.KRef("", string(nodeName)), "err", err)
 		return nil
 	} else if err != nil {
-		// For all other errors, log error and reset flag statusUpdateNeeded
-		// back to true to indicate this node status needs to be updated again.
 		logger.V(2).Info("Error retrieving nodes from node lister", "err", err)
-		nsu.actualStateOfWorld.SetNodeStatusUpdateNeeded(logger, nodeName)
 		return err
 	}
 
-	err = nsu.updateNodeStatus(logger, nodeName, nodeObj, attachedVolumes)
+	attachedVolumes, generation := nsu.actualStateOfWorld.GetVolumesToReportAttachedForNode(logger, nodeName)
+	if attachedVolumes == nil { // we know nothing about this node
+		return nil
+	}
+	err = nsu.updateNodeStatus(nodeName, nodeObj, attachedVolumes)
 	if errors.IsNotFound(err) {
 		// If node does not exist, its status cannot be updated.
 		// Do nothing so that there is no retry until node is created.
@@ -107,25 +129,25 @@ func (nsu *nodeStatusUpdater) processNodeVolumes(logger klog.Logger, nodeName ty
 			"Could not update node status, node does not exist - skipping", "node", klog.KObj(nodeObj))
 		return nil
 	} else if err != nil {
-		// If update node status fails, reset flag statusUpdateNeeded back to true
-		// to indicate this node status needs to be updated again
-		nsu.actualStateOfWorld.SetNodeStatusUpdateNeeded(logger, nodeName)
-
 		logger.V(2).Info("Could not update node status; re-marking for update", "node", klog.KObj(nodeObj), "err", err)
-
 		return err
 	}
+	logger.V(4).Info("Updating status for node succeeded",
+		"node", klog.KRef("", string(nodeName)), "generation", generation, "attachedVolumes", attachedVolumes)
+	nsu.actualStateOfWorld.SetNodeStatusUpdateFinished(logger, nodeName, generation)
 	return nil
 }
 
-func (nsu *nodeStatusUpdater) updateNodeStatus(logger klog.Logger, nodeName types.NodeName, nodeObj *v1.Node, attachedVolumes []v1.AttachedVolume) error {
+func (nsu *nodeStatusUpdater) updateNodeStatus(nodeName types.NodeName, nodeObj *v1.Node, attachedVolumes []v1.AttachedVolume) error {
+	if slices.Equal(attachedVolumes, nodeObj.Status.VolumesAttached) {
+		return nil
+	}
+
 	node := nodeObj.DeepCopy()
 	node.Status.VolumesAttached = attachedVolumes
-	_, patchBytes, err := nodeutil.PatchNodeStatus(nsu.kubeClient.CoreV1(), nodeName, nodeObj, node)
+	_, _, err := nodeutil.PatchNodeStatus(nsu.kubeClient.CoreV1(), nodeName, nodeObj, node)
 	if err != nil {
 		return err
 	}
-
-	logger.V(4).Info("Updating status for node succeeded", "node", klog.KObj(node), "patchBytes", patchBytes, "attachedVolumes", attachedVolumes)
 	return nil
 }
