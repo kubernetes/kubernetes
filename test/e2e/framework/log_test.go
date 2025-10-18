@@ -64,10 +64,10 @@ var _ = ginkgo.Describe("log", func() {
 		err := errors.New("an error with a long, useless description")
 		framework.ExpectNoError(err, "hard-coded error")
 	})
-	ginkgo.It("equal", func() {
+	framework.It("equal", framework.WithSerial(), func() {
 		gomega.Expect(0).To(gomega.Equal(1), "of course it's not equal...")
 	})
-	ginkgo.It("fails with helper", func() {
+	ginkgo.It("fails with helper", framework.WithSlow(), func() {
 		failHelper("I'm failing with helper.")
 	})
 	ginkgo.It("redirects klog", func() {
@@ -168,7 +168,7 @@ In [AfterEach] at: log_test.go:53 <time>
 `,
 				},
 				{
-					Name:   "[It] log equal",
+					Name:   "[It] log equal [Serial]",
 					Status: "failed",
 					Failure: &reporters.JUnitFailure{
 						Type: "failed",
@@ -185,14 +185,14 @@ There were additional failures detected after the initial failure. These are vis
 					SystemErr: `> Enter [BeforeEach] log - log_test.go:48 <time>
 <klog> log_test.go:49] before
 < Exit [BeforeEach] log - log_test.go:48 <time>
-> Enter [It] equal - log_test.go:67 <time>
+> Enter [It] equal [Serial] - log_test.go:67 <time>
 [FAILED] of course it's not equal...
 Expected
     <int>: 0
 to equal
     <int>: 1
 In [It] at: log_test.go:68 <time>
-< Exit [It] equal - log_test.go:67 <time>
+< Exit [It] equal [Serial] - log_test.go:67 <time>
 > Enter [AfterEach] log - log_test.go:51 <time>
 <klog> log_test.go:52] after
 [FAILED] artificial assertion failure
@@ -201,7 +201,7 @@ In [AfterEach] at: log_test.go:53 <time>
 `,
 				},
 				{
-					Name:   "[It] log fails with helper",
+					Name:   "[It] log fails with helper [Slow]",
 					Status: "failed",
 					Failure: &reporters.JUnitFailure{
 						Type: "failed",
@@ -214,10 +214,10 @@ There were additional failures detected after the initial failure. These are vis
 					SystemErr: `> Enter [BeforeEach] log - log_test.go:48 <time>
 <klog> log_test.go:49] before
 < Exit [BeforeEach] log - log_test.go:48 <time>
-> Enter [It] fails with helper - log_test.go:70 <time>
+> Enter [It] fails with helper [Slow] - log_test.go:70 <time>
 [FAILED] I'm failing with helper.
 In [It] at: log_test.go:44 <time>
-< Exit [It] fails with helper - log_test.go:70 <time>
+< Exit [It] fails with helper [Slow] - log_test.go:70 <time>
 > Enter [AfterEach] log - log_test.go:51 <time>
 <klog> log_test.go:52] after
 [FAILED] artificial assertion failure

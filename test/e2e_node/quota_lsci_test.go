@@ -57,7 +57,7 @@ func runOneQuotaTest(f *framework.Framework, quotasRequested bool, userNamespace
 	if quotasRequested {
 		priority = 1
 	}
-	ginkgo.Context(fmt.Sprintf(testContextFmt, fmt.Sprintf("use quotas for LSCI monitoring (quotas enabled: %v)", quotasRequested)), func() {
+	ginkgo.Context(fmt.Sprintf(testContextFmt, fmt.Sprintf("use quotas for LSCI monitoring (quotas enabled: %v, userNamespacesEnabled: %v)", quotasRequested, userNamespacesEnabled)), func() {
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 			defer withFeatureGate(LSCIQuotaFeature, quotasRequested)()
 			// TODO: remove hardcoded kubelet volume directory path

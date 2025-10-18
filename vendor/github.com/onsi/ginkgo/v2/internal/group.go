@@ -110,6 +110,7 @@ func newGroup(suite *Suite) *group {
 	}
 }
 
+// initialReportForSpec constructs a new SpecReport right before running the spec.
 func (g *group) initialReportForSpec(spec Spec) types.SpecReport {
 	return types.SpecReport{
 		ContainerHierarchyTexts:     spec.Nodes.WithType(types.NodeTypeContainer).Texts(),
@@ -126,6 +127,36 @@ func (g *group) initialReportForSpec(spec Spec) types.SpecReport {
 		MaxFlakeAttempts:            spec.Nodes.GetMaxFlakeAttempts(),
 		MaxMustPassRepeatedly:       spec.Nodes.GetMaxMustPassRepeatedly(),
 	}
+}
+
+// initialReportForTreeNode constructs a new SpecReport right before invoking the body
+// of a container node during construction of the full tree.
+func initialReportForTreeNode(node *TreeNode) types.SpecReport {
+	report := types.SpecReport{
+		// ContainerHierarchyTexts:     spec.Nodes.WithType(types.NodeTypeContainer).Texts(),
+		// ContainerHierarchyLocations: spec.Nodes.WithType(types.NodeTypeContainer).CodeLocations(),
+		// ContainerHierarchyLabels:    spec.Nodes.WithType(types.NodeTypeContainer).Labels(),
+		// ParallelProcess:   g.suite.config.ParallelProcess,
+		// RunningInParallel: g.suite.isRunningInParallel(),
+		// IsSerial:                    spec.Nodes.HasNodeMarkedSerial(),
+		// IsInOrderedContainer:        !spec.Nodes.FirstNodeMarkedOrdered().IsZero(),
+		// MaxFlakeAttempts:            spec.Nodes.GetMaxFlakeAttempts(),
+		// MaxMustPassRepeatedly:       spec.Nodes.GetMaxMustPassRepeatedly(),
+	}
+	// Walk up the tree and set attributes accordingly.
+	addNodeToReportForNode(&report, node)
+	return report
+}
+
+func addNodeToReportForNode(report *types.SpecReport, node *TreeNode) {
+	if node.Parent != nil {
+		// First add the parent node, then the current one.
+		addNodeToReportForNode(report, node.Parent)
+	}
+	report.ContainerHierarchyTexts = append(report.ContainerHierarchyTexts, node.Node.Text)
+	report.ContainerHierarchyLocations = append(report.ContainerHierarchyLocations, node.Node.CodeLocation)
+	report.ContainerHierarchyLabels = append(report.ContainerHierarchyLabels, node.Node.Labels)
+	// TODO: IsSerial, IsInOrderContainer, MaxFlakeattempts, MaxMustPassRepeatedly
 }
 
 func (g *group) evaluateSkipStatus(spec Spec) (types.SpecState, types.Failure) {
