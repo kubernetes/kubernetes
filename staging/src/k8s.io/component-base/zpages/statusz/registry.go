@@ -20,9 +20,9 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/component-base/compatibility"
 	"k8s.io/klog/v2"
 
-	"k8s.io/component-base/compatibility"
 	compbasemetrics "k8s.io/component-base/metrics"
 	utilversion "k8s.io/component-base/version"
 )
@@ -33,6 +33,7 @@ type statuszRegistry interface {
 	binaryVersion() *version.Version
 	emulationVersion() *version.Version
 	paths() []string
+	deprecatedVersions() map[string]bool
 }
 
 type registry struct {
@@ -40,6 +41,8 @@ type registry struct {
 	effectiveVersion compatibility.EffectiveVersion
 	// listedPaths is an alphabetically sorted list of paths to be reported at /.
 	listedPaths []string
+	// deprecatedVersionsMap is a map of deprecated statusz versions.
+	deprecatedVersionsMap map[string]bool
 }
 
 // Option is a function to configure registry.
@@ -87,4 +90,8 @@ func (r *registry) paths() []string {
 	}
 
 	return nil
+}
+
+func (r *registry) deprecatedVersions() map[string]bool {
+	return r.deprecatedVersionsMap
 }
