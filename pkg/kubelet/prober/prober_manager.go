@@ -18,16 +18,19 @@ package prober
 
 import (
 	"context"
+
 	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/component-base/metrics"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/status"
@@ -278,6 +281,10 @@ func (m *manager) isContainerStarted(pod *v1.Pod, containerStatus *v1.ContainerS
 		return result == results.Success
 	}
 
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ChangeContainerStatusOnKubeletRestart) && containerStatus.Started != nil && *containerStatus.Started {
+		return true
+	}
+
 	// if there is a startup probe which hasn't run yet, the container is not
 	// started.
 	if _, exists := m.getWorker(pod.UID, containerStatus.Name, startup); exists {
@@ -313,6 +320,35 @@ func (m *manager) UpdatePodStatus(ctx context.Context, pod *v1.Pod, podStatus *v
 				case w.manualTriggerCh <- struct{}{}:
 				default: // Non-blocking.
 					logger.Info("Failed to trigger a manual run", "probe", w.probeType.String())
+				}
+			}
+
+			if !utilfeature.DefaultFeatureGate.Enabled(features.ChangeContainerStatusOnKubeletRestart) {
+				var containerStartTime time.Time
+				if c.State.Running != nil {
+					containerStartTime = c.State.Running.StartedAt.Time
+				}
+
+				if !containerStartTime.IsZero() && containerStartTime.Before(m.start) {
+					hasReadinessProbe := false
+					for _, container := range pod.Spec.Containers {
+						if container.Name == c.Name {
+							hasReadinessProbe = container.ReadinessProbe != nil
+							break
+						}
+					}
+					if hasReadinessProbe {
+						podIsReady := false
+						for _, c := range pod.Status.Conditions {
+							if c.Type == v1.PodReady && c.Status == v1.ConditionTrue {
+								podIsReady = true
+								break
+							}
+						}
+						if !podIsReady {
+							ready = false
+						}
+					}
 				}
 			}
 		}
