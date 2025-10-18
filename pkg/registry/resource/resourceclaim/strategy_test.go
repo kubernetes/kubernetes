@@ -221,6 +221,27 @@ var objWithAdminAccessStatusInNonAdminNamespace = &resource.ResourceClaim{
 	},
 }
 
+var objWithDeviceTaints = &resource.ResourceClaim{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:      "valid-claim",
+		Namespace: "kube-system",
+	},
+	Spec: resource.ResourceClaimSpec{
+		Devices: resource.DeviceClaim{
+			Requests: []resource.DeviceRequest{
+				{
+					Name: "req-0",
+					Exactly: &resource.ExactDeviceRequest{
+						DeviceClassName: "class",
+						AllocationMode:  resource.DeviceAllocationModeAll,
+						Tolerations:     []resource.DeviceToleration{{Key: "some-key", Operator: resource.DeviceTolerationOpExists}},
+					},
+				},
+			},
+		},
+	},
+}
+
 var objWithPrioritizedList = &resource.ResourceClaim{
 	ObjectMeta: metav1.ObjectMeta{
 		Name:      "valid-claim",
@@ -237,6 +258,31 @@ var objWithPrioritizedList = &resource.ResourceClaim{
 							DeviceClassName: "class",
 							AllocationMode:  resource.DeviceAllocationModeExactCount,
 							Count:           1,
+						},
+					},
+				},
+			},
+		},
+	},
+}
+
+var objWithDeviceTaintsInPrioritizedList = &resource.ResourceClaim{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:      "valid-claim",
+		Namespace: "default",
+	},
+	Spec: resource.ResourceClaimSpec{
+		Devices: resource.DeviceClaim{
+			Requests: []resource.DeviceRequest{
+				{
+					Name: "req-0",
+					FirstAvailable: []resource.DeviceSubRequest{
+						{
+							Name:            "subreq-0",
+							DeviceClassName: "class",
+							AllocationMode:  resource.DeviceAllocationModeExactCount,
+							Count:           1,
+							Tolerations:     []resource.DeviceToleration{{Key: "some-key", Operator: resource.DeviceTolerationOpExists}},
 						},
 					},
 				},
@@ -375,6 +421,7 @@ func TestStrategyCreate(t *testing.T) {
 	testcases := map[string]struct {
 		obj                   *resource.ResourceClaim
 		adminAccess           bool
+		deviceTaints          bool
 		prioritizedList       bool
 		bindingConditions     bool
 		deviceStatus          bool
@@ -427,6 +474,48 @@ func TestStrategyCreate(t *testing.T) {
 				ns := as[0].(testclient.GetAction).GetName()
 				if ns != "kube-system" {
 					t.Errorf("expected to get the kube-system namespace but got '%s'", ns)
+				}
+			},
+		},
+		"drop-fields-device-taints": {
+			obj:          objWithDeviceTaints,
+			deviceTaints: false,
+			expectObj:    obj,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"keep-fields-device-taints": {
+			obj:          objWithDeviceTaints,
+			deviceTaints: true,
+			expectObj:    objWithDeviceTaints,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"drop-fields-device-taints-in-prioritized-list": {
+			obj:             objWithDeviceTaintsInPrioritizedList,
+			deviceTaints:    false,
+			prioritizedList: true,
+			expectObj:       objWithPrioritizedList,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"keep-fields-device-taints-in-prioritized-list": {
+			obj:             objWithDeviceTaintsInPrioritizedList,
+			deviceTaints:    true,
+			prioritizedList: true,
+			expectObj:       objWithDeviceTaintsInPrioritizedList,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
 				}
 			},
 		},
@@ -532,6 +621,7 @@ func TestStrategyCreate(t *testing.T) {
 			mockNSClient := fakeClient.CoreV1().Namespaces()
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.DRAAdminAccess:        tc.adminAccess,
+				features.DRADeviceTaints:       tc.deviceTaints,
 				features.DRAPrioritizedList:    tc.prioritizedList,
 				features.DRAConsumableCapacity: tc.consumableCapacity,
 			})
@@ -562,9 +652,10 @@ func TestStrategyUpdate(t *testing.T) {
 		oldObj                *resource.ResourceClaim
 		newObj                *resource.ResourceClaim
 		adminAccess           bool
-		expectValidationError string
+		deviceTaints          bool
 		prioritizedList       bool
 		consumableCapacity    bool
+		expectValidationError string
 		expectObj             *resource.ResourceClaim
 		verify                func(*testing.T, []testclient.Action)
 	}{
@@ -748,6 +839,102 @@ func TestStrategyUpdate(t *testing.T) {
 				}
 			},
 		},
+		"drop-fields-device-taints": {
+			oldObj:          obj,
+			newObj:          objWithDeviceTaints,
+			deviceTaints:    false,
+			prioritizedList: true,
+			expectObj:       obj,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"keep-fields-device-taints": {
+			oldObj:                obj,
+			newObj:                objWithDeviceTaints,
+			deviceTaints:          true,
+			prioritizedList:       true,
+			expectValidationError: fieldImmutableError, // Spec is immutable, cannot add tolerations.
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"keep-existing-fields-device-taints": {
+			oldObj:          objWithDeviceTaints,
+			newObj:          objWithDeviceTaints,
+			deviceTaints:    true,
+			prioritizedList: true,
+			expectObj:       objWithDeviceTaints,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"keep-existing-fields-device-taints-disabled-feature": {
+			oldObj:          objWithDeviceTaints,
+			newObj:          objWithDeviceTaints,
+			deviceTaints:    false,
+			prioritizedList: true,
+			expectObj:       objWithDeviceTaints,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"drop-fields-device-taints-in-prioritized-list": {
+			oldObj:          objWithPrioritizedList,
+			newObj:          objWithDeviceTaintsInPrioritizedList,
+			deviceTaints:    false,
+			prioritizedList: true,
+			expectObj:       objWithPrioritizedList,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"keep-fields-device-taints-in-prioritized-list": {
+			oldObj:                objWithPrioritizedList,
+			newObj:                objWithDeviceTaintsInPrioritizedList,
+			deviceTaints:          true,
+			prioritizedList:       true,
+			expectValidationError: fieldImmutableError, // Spec is immutable, cannot add tolerations.
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"keep-existing-fields-device-taints-in-prioritized-list": {
+			oldObj:          objWithDeviceTaintsInPrioritizedList,
+			newObj:          objWithDeviceTaintsInPrioritizedList,
+			deviceTaints:    true,
+			prioritizedList: true,
+			expectObj:       objWithDeviceTaintsInPrioritizedList,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"keep-existing-fields-device-taints-in-prioritized-list-disabled-feature": {
+			oldObj:          objWithDeviceTaintsInPrioritizedList,
+			newObj:          objWithDeviceTaintsInPrioritizedList,
+			deviceTaints:    false,
+			prioritizedList: true,
+			expectObj:       objWithDeviceTaintsInPrioritizedList,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
 	}
 
 	for name, tc := range testcases {
@@ -757,6 +944,7 @@ func TestStrategyUpdate(t *testing.T) {
 
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.DRAAdminAccess:        tc.adminAccess,
+				features.DRADeviceTaints:       tc.deviceTaints,
 				features.DRAPrioritizedList:    tc.prioritizedList,
 				features.DRAConsumableCapacity: tc.consumableCapacity,
 			})
