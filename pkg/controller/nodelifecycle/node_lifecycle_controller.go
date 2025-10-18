@@ -383,7 +383,7 @@ func NewNodeLifecycleController(
 					return
 				}
 			}
-			nc.podUpdated(pod, nil)
+			nc.podDeleted(pod)
 		},
 	})
 	nc.podInformerSynced = podInformer.Informer().HasSynced
@@ -1079,6 +1079,14 @@ func (nc *Controller) podUpdated(oldPod, newPod *v1.Pod) {
 		podItem := podUpdateItem{newPod.Namespace, newPod.Name}
 		nc.podUpdateQueue.Add(podItem)
 	}
+}
+
+func (nc *Controller) podDeleted(pod *v1.Pod) {
+	if pod == nil {
+		return
+	}
+	podItem := podUpdateItem{pod.Namespace, pod.Name}
+	nc.podUpdateQueue.Add(podItem)
 }
 
 func (nc *Controller) doPodProcessingWorker(ctx context.Context) {
