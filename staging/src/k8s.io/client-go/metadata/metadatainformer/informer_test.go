@@ -23,20 +23,45 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"k8s.io/klog/v2"
 
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	clientfeatures "k8s.io/client-go/features"
+	clientfeaturestesting "k8s.io/client-go/features/testing"
 	"k8s.io/client-go/metadata/fake"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog/v2"
 )
 
 func init() {
 	klog.InitFlags(flag.CommandLine)
 	flag.CommandLine.Lookup("v").Value.Set("5")
 	flag.CommandLine.Lookup("alsologtostderr").Value.Set("true")
+}
+
+func TestUnSupportWatchListSemantics(t *testing.T) {
+	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.WatchListClient, true)
+	scheme := runtime.NewScheme()
+	if err := appsv1.AddToScheme(scheme); err != nil {
+		t.Fatalf("failed to add appsv1 to scheme: %v", err)
+	}
+	// The fake client doesn’t support WatchList semantics,
+	// so we don’t need to prepare a response.
+	// The reflector will use ListWatch semantics instead.
+	fakeClient := fake.NewSimpleMetadataClient(scheme)
+	factory := NewFilteredSharedInformerFactory(fakeClient, 0, "ns", nil)
+	target := factory.ForResource(schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	factory.Start(ctx.Done())
+
+	if !cache.WaitForCacheSync(ctx.Done(), target.Informer().HasSynced) {
+		t.Fatalf("failed to wait for caches to sync")
+	}
 }
 
 func TestMetadataSharedInformerFactory(t *testing.T) {
