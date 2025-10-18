@@ -145,6 +145,9 @@ type Reflector struct {
 	//
 	// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-api-machinery/3157-watch-list#design-details
 	useWatchList bool
+
+	// metrics tracks basic metric information about the reflector.
+	metrics *reflectorMetrics
 }
 
 func (r *Reflector) Name() string {
@@ -248,6 +251,14 @@ type ReflectorOptions struct {
 
 	// Clock allows tests to control time. If unset defaults to clock.RealClock{}
 	Clock clock.Clock
+
+	// MetricsProvider is the metrics provider for the reflector. If unset/unspecified,
+	// the global metrics provider is used. This allows for custom metrics collection
+	// for specific reflector instances.
+	MetricsProvider MetricsProvider
+
+	// Scheme is used to extract GroupVersionKind and GroupVersionResource from typed objects.
+	Scheme *runtime.Scheme
 }
 
 // NewReflectorWithOptions creates a new Reflector object which will keep the
@@ -309,6 +320,9 @@ func NewReflectorWithOptions(lw ListerWatcher, expectedType interface{}, store R
 		r.useWatchList = false
 	}
 
+	gvr := getExpectedGVRFromObject(expectedType, options.Scheme)
+	r.metrics = newReflectorMetrics(r.name, gvr.Group, gvr.Resource, options.MetricsProvider)
+
 	return r
 }
 
@@ -344,6 +358,45 @@ func getExpectedGVKFromObject(expectedType interface{}) *schema.GroupVersionKind
 	}
 
 	return &gvk
+}
+
+func getExpectedGVRFromObject(expectedType interface{}, scheme *runtime.Scheme) schema.GroupVersionResource {
+	if expectedType == nil {
+		return schema.GroupVersionResource{}
+	}
+
+	obj, ok := expectedType.(runtime.Object)
+	if !ok {
+		return schema.GroupVersionResource{}
+	}
+
+	var gvk schema.GroupVersionKind
+
+	// For unstructured objects, get GVK directly from the object
+	if unstructuredObj, ok := obj.(*unstructured.Unstructured); ok {
+		gvk = unstructuredObj.GroupVersionKind()
+		if gvk.Empty() {
+			return schema.GroupVersionResource{}
+		}
+		gvr, _ := meta.UnsafeGuessKindToResource(gvk)
+		return gvr
+	}
+
+	// For typed objects (e.g., &v1.Pod{}), use the scheme to look up GVK.
+	// This works because typed objects are registered in the scheme during initialization,
+	// and the scheme maintains a type -> GVK mapping that doesn't depend on TypeMeta being populated.
+	if scheme == nil {
+		return schema.GroupVersionResource{}
+	}
+
+	gvks, _, err := scheme.ObjectKinds(obj)
+	if err != nil || len(gvks) == 0 {
+		return schema.GroupVersionResource{}
+	}
+
+	// Use the first (preferred) GVK and convert to GVR
+	gvr, _ := meta.UnsafeGuessKindToResource(gvks[0])
+	return gvr
 }
 
 // internalPackages are packages that ignored when creating a default reflector name. These packages are in the common
@@ -586,6 +639,7 @@ func (r *Reflector) list(ctx context.Context) error {
 	var resourceVersion string
 	options := metav1.ListOptions{ResourceVersion: r.relistResourceVersion()}
 
+	start := r.clock.Now()
 	initTrace := trace.New("Reflector ListAndWatch", trace.Field{Key: "name", Value: r.name})
 	defer initTrace.LogIfLong(10 * time.Second)
 	var list runtime.Object
@@ -651,6 +705,7 @@ func (r *Reflector) list(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to list %v: %w", r.typeDescription, err)
 	}
+	r.metrics.listDuration.Observe(r.clock.Since(start).Seconds())
 
 	// We check if the list was paginated and if so set the paginatedResult based on that.
 	// However, we want to do that only for the initial list (which is the only case
