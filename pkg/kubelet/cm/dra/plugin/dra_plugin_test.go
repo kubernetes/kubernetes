@@ -35,17 +35,27 @@ import (
 	drapbv1 "k8s.io/kubelet/pkg/apis/dra/v1"
 	drapbv1beta1 "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 	"k8s.io/kubernetes/test/utils/ktesting"
+
+	grpccodes "google.golang.org/grpc/codes"
+	grpcstatus "google.golang.org/grpc/status"
 )
 
 type fakeGRPCServer struct {
 	drapbv1beta1.UnimplementedDRAPluginServer
 	drahealthv1alpha1.UnimplementedDRAResourceHealthServer
 	drapbv1.UnsafeDRAPluginServer
+
+	// if provided, the fake GRPC server will call prepare
+	// to return a custom response to the caller
+	prepare func(ctx context.Context, in *drapbv1.NodePrepareResourcesRequest) (*drapbv1.NodePrepareResourcesResponse, error)
 }
 
 var _ drapbv1.DRAPluginServer = &fakeGRPCServer{}
 
 func (f *fakeGRPCServer) NodePrepareResources(ctx context.Context, in *drapbv1.NodePrepareResourcesRequest) (*drapbv1.NodePrepareResourcesResponse, error) {
+	if f.prepare != nil {
+		return f.prepare(ctx, in)
+	}
 	return &drapbv1.NodePrepareResourcesResponse{Claims: map[string]*drapbv1.NodePrepareResourceResponse{"claim-uid": {
 		Devices: []*drapbv1.Device{
 			{
@@ -82,7 +92,7 @@ func (f *fakeGRPCServer) NodeWatchResources(in *drahealthv1alpha1.NodeWatchResou
 // tearDown is an idempotent cleanup function.
 type tearDown func()
 
-func setupFakeGRPCServer(service, addr string) (tearDown, error) {
+func setupGRPCServerWithFake(service, addr string, fakeGRPCServer *fakeGRPCServer) (tearDown, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	teardown := func() {
 		cancel()
@@ -95,7 +105,6 @@ func setupFakeGRPCServer(service, addr string) (tearDown, error) {
 	}
 
 	s := grpc.NewServer()
-	fakeGRPCServer := &fakeGRPCServer{}
 
 	switch service {
 	case drapbv1.DRAPluginService:
@@ -125,6 +134,10 @@ func setupFakeGRPCServer(service, addr string) (tearDown, error) {
 	}()
 
 	return teardown, nil
+}
+
+func setupFakeGRPCServer(service, addr string) (tearDown, error) {
+	return setupGRPCServerWithFake(service, addr, &fakeGRPCServer{})
 }
 
 func TestGRPCConnIsReused(t *testing.T) {
@@ -323,6 +336,95 @@ func TestGRPCMethods(t *testing.T) {
 			assertError(t, test.expectError, err)
 		})
 	}
+}
+
+func TestGRPCWithTimeoutEnforced(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
+	service := drapbv1.DRAPluginService
+	addr := path.Join(t.TempDir(), "dra.sock")
+
+	// we force NodePrepareResources to block, this will cause the timeout
+	// to elapse, as a consequence the client should abort.
+	// once the client aborts, we unblock NodePrepareResources
+	blocked, done := make(chan struct{}), make(chan struct{})
+	prepare := func(ctx context.Context, _ *drapbv1.NodePrepareResourcesRequest) (*drapbv1.NodePrepareResourcesResponse, error) {
+		defer close(done)
+		now := time.Now()
+		deadline, ok := ctx.Deadline()
+		t.Logf("request context has deadline: %t, after: %s", ok, deadline.Sub(now))
+		if !ok {
+			t.Errorf("expected the request context to have a deadline")
+		}
+		t.Logf("NodePrepareResources: blocking so the client times out before the server sends a reply")
+		<-blocked
+		t.Logf("NodePrepareResources: blocked for: %s", time.Since(now))
+		return &drapbv1.NodePrepareResourcesResponse{}, nil
+	}
+
+	teardown, err := setupGRPCServerWithFake(service, addr, &fakeGRPCServer{prepare: prepare})
+	require.NoError(t, err, "failed to setup grpc server")
+	defer teardown()
+
+	driverName := "dummy-driver"
+	timeout := time.Second
+	manager := NewDRAPluginManager(tCtx, nil, nil, nil, 0)
+	err = manager.add(driverName, addr, service, timeout)
+	require.NoError(t, err, "unexpected error while adding the plugin")
+
+	plugin, err := manager.GetPlugin(driverName)
+	require.NoError(t, err, "unexpected error while retrieving the plugin")
+
+	// we will invoke the method on a new gorouinte, in case there
+	// is no timeout enforced it might block forever
+	errCh := make(chan error, 1)
+	go func() {
+		defer close(errCh)
+		req := &drapbv1.NodePrepareResourcesRequest{
+			Claims: []*drapbv1.Claim{
+				{
+					Namespace: "dummy-namespace",
+					Uid:       "dummy-uid",
+					Name:      "dummy-claim",
+				},
+			},
+		}
+		_, err := plugin.NodePrepareResources(tCtx, req)
+		errCh <- err
+	}()
+
+	// wait for the grpc caller to timeout
+	select {
+	// not using wait.ForeverTestTimeout, we will wait at most
+	// 3*timeout to account for flakes in CI
+	case <-time.After(3 * timeout):
+		t.Errorf("expected the grpc caller to return after the timeout had elapsed")
+	case err = <-errCh:
+		// the grpc call returned
+	}
+
+	// unblock the request handler on the server, and wait for it to
+	// return, this ensures that the server method was invoked.
+	// if the timeout is not enforced, we don't leak any goroutine
+	close(blocked)
+	select {
+	case <-done:
+	// not using wait.ForeverTestTimeout, we will wait at most
+	// 3*timeout to account for flakes in CI
+	case <-time.After(3 * timeout):
+		t.Errorf("expected the grpc method to have been invoked")
+	}
+
+	require.Error(t, err, "expected the grpc method to return an error")
+	status, ok := grpcstatus.FromError(err)
+	// if it is not a gRPC error then the operation may have failed before
+	// the gRPC method was called, otherwise we would get gRPC error.
+	require.True(t, ok, "expected an error of type: %T, but got: %T", &grpcstatus.Status{}, err)
+
+	// DeadlineExceeded means operation expired before completion. The gRPC
+	// framework will generate this error code when the deadline is exceeded.
+	// More here: https://github.com/grpc/grpc/blob/master/doc/statuscodes.md
+	assert.Equal(t, grpccodes.DeadlineExceeded, status.Code(), "expected status code to match")
 }
 
 func assertError(t *testing.T, expectError string, err error) {
