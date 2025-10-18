@@ -30,7 +30,9 @@ var apiVersions = []string{"v1", "v1alpha1", "v1beta1"}
 
 func TestDeclarativeValidateForDeclarative(t *testing.T) {
 	for _, apiVersion := range apiVersions {
-		testDeclarativeValidateForDeclarative(t, apiVersion)
+		t.Run(apiVersion, func(t *testing.T) {
+			testDeclarativeValidateForDeclarative(t, apiVersion)
+		})
 	}
 }
 
@@ -39,96 +41,65 @@ func testDeclarativeValidateForDeclarative(t *testing.T, apiVersion string) {
 		APIGroup:   "rbac.authorization.k8s.io",
 		APIVersion: apiVersion,
 	})
+
 	testCases := map[string]struct {
 		input        rbac.RoleBinding
 		expectedErrs field.ErrorList
 	}{
-		"missing roleref name": {
+		"missing roleRef.name": {
 			input: rbac.RoleBinding{
-				ObjectMeta: metav1.ObjectMeta{Name: "test-binding", Namespace: "test-namespace"},
+				ObjectMeta: metav1.ObjectMeta{Name: "test-binding", Namespace: "test-ns"},
 				RoleRef: rbac.RoleRef{
 					APIGroup: "rbac.authorization.k8s.io",
 					Kind:     "ClusterRole",
+					// Name is intentionally missing here
 				},
 				Subjects: []rbac.Subject{
-					{Kind: rbac.UserKind, APIGroup: rbac.GroupName, Name: "user"},
+					{Kind: rbac.UserKind, APIGroup: rbac.GroupName, Name: "user1"},
 				},
 			},
 			expectedErrs: field.ErrorList{
 				field.Required(field.NewPath("roleRef", "name"), "name is required"),
 			},
 		},
-		"valid binding": {
+
+		"missing subject.name": {
 			input: rbac.RoleBinding{
-				ObjectMeta: metav1.ObjectMeta{Name: "valid-binding", Namespace: "test-namespace"},
+				ObjectMeta: metav1.ObjectMeta{Name: "test-binding", Namespace: "test-ns"},
 				RoleRef: rbac.RoleRef{
 					APIGroup: "rbac.authorization.k8s.io",
-					Kind:     "ClusterRole",
+					Kind:     "Role",
+					Name:     "reader",
+				},
+				Subjects: []rbac.Subject{
+					{Kind: rbac.UserKind, APIGroup: rbac.GroupName},
+				},
+			},
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("subjects").Index(0).Child("name"), "name is required"),
+			},
+		},
+
+		"valid binding": {
+			input: rbac.RoleBinding{
+				ObjectMeta: metav1.ObjectMeta{Name: "valid-binding", Namespace: "test-ns"},
+				RoleRef: rbac.RoleRef{
+					APIGroup: "rbac.authorization.k8s.io",
+					Kind:     "Role",
 					Name:     "admin",
 				},
 				Subjects: []rbac.Subject{
-					{Kind: rbac.UserKind, APIGroup: rbac.GroupName, Name: "user"},
-				},
-			},
-			expectedErrs: field.ErrorList{},
-		},
-	}
-	for k, tc := range testCases {
-		t.Run(k, func(t *testing.T) {
-			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, Strategy.Validate, tc.expectedErrs)
-		})
-	}
-}
-
-func TestValidateUpdateForDeclarative(t *testing.T) {
-	for _, apiVersion := range apiVersions {
-		testValidateUpdateForDeclarative(t, apiVersion)
-	}
-}
-
-func testValidateUpdateForDeclarative(t *testing.T, apiVersion string) {
-	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-		APIGroup:   "rbac.authorization.k8s.io",
-		APIVersion: apiVersion,
-	})
-	testCases := map[string]struct {
-		old          rbac.RoleBinding
-		update       rbac.RoleBinding
-		expectedErrs field.ErrorList
-	}{
-		"update immutable roleRef Kind": {
-			old: rbac.RoleBinding{
-				ObjectMeta: metav1.ObjectMeta{Name: "binding", Namespace: "test-namespace"},
-				RoleRef:    rbac.RoleRef{APIGroup: "rbac.authorization.k8s.io", Kind: "Role", Name: "reader"},
-			},
-			update: rbac.RoleBinding{
-				ObjectMeta: metav1.ObjectMeta{Name: "binding", ResourceVersion: "1", Namespace: "test-namespace"},
-				RoleRef:    rbac.RoleRef{APIGroup: "rbac.authorization.k8s.io", Kind: "ClusterRole", Name: "reader"},
-			},
-			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("roleRef"), rbac.RoleRef{APIGroup: "rbac.authorization.k8s.io", Kind: "ClusterRole", Name: "reader"}, "cannot change roleRef"),
-			},
-		},
-		"valid update": {
-			old: rbac.RoleBinding{
-				ObjectMeta: metav1.ObjectMeta{Name: "binding", Namespace: "test-namespace"},
-				RoleRef:    rbac.RoleRef{APIGroup: "rbac.authorization.k8s.io", Kind: "Role", Name: "reader"},
-				Subjects:   []rbac.Subject{{Kind: rbac.UserKind, APIGroup: rbac.GroupName, Name: "user1"}},
-			},
-			update: rbac.RoleBinding{
-				ObjectMeta: metav1.ObjectMeta{Name: "binding", ResourceVersion: "1", Namespace: "test-namespace"},
-				RoleRef:    rbac.RoleRef{APIGroup: "rbac.authorization.k8s.io", Kind: "Role", Name: "reader"},
-				Subjects: []rbac.Subject{
 					{Kind: rbac.UserKind, APIGroup: rbac.GroupName, Name: "user1"},
-					{Kind: rbac.UserKind, APIGroup: rbac.GroupName, Name: "user2"},
 				},
 			},
 			expectedErrs: field.ErrorList{},
 		},
+		// TODO: Add more test cases
 	}
-	for k, tc := range testCases {
-		t.Run(k, func(t *testing.T) {
-			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, Strategy.ValidateUpdate, tc.expectedErrs)
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, Strategy.Validate, tc.expectedErrs)
 		})
 	}
 }

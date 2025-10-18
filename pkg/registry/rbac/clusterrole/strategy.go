@@ -78,7 +78,7 @@ func (strategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorLis
 	}
 	allErrs := validation.ValidateClusterRole(clusterRole, opts)
 
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx,legacyscheme.Scheme,clusterRole,nil,allErrs,operation.Create)
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, clusterRole, nil, allErrs, operation.Create)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -98,7 +98,7 @@ func (strategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) fie
 	}
 	errs := validation.ValidateClusterRoleUpdate(newObj, oldObj, opts)
 
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx,legacyscheme.Scheme,newObj,oldObj,errs,operation.Update)
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newObj, oldObj, errs, operation.Update)
 }
 
 // WarningsOnUpdate returns warnings for the given update.

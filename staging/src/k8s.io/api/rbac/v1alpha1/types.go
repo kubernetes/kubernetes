@@ -78,8 +78,6 @@ type PolicyRule struct {
 type Subject struct {
 	// Kind of object being referenced. Values defined by this API group are "User", "Group", and "ServiceAccount".
 	// If the Authorizer does not recognized the kind value, the Authorizer should report an error.
-	// +required
-	// +k8s:required
 	Kind string `json:"kind" protobuf:"bytes,1,opt,name=kind"`
 	// APIVersion holds the API group and version of the referenced subject.
 	// Defaults to "v1" for ServiceAccount subjects.
@@ -88,6 +86,8 @@ type Subject struct {
 	// +optional
 	APIVersion string `json:"apiVersion,omitempty" protobuf:"bytes,2,opt,name=apiVersion"`
 	// Name of the object being referenced.
+	// +required
+	// +k8s:required
 	Name string `json:"name" protobuf:"bytes,3,opt,name=name"`
 	// Namespace of the referenced object.  If the object kind is non-namespace, such as "User" or "Group", and this value is not empty
 	// the Authorizer should report an error.
@@ -100,10 +100,10 @@ type RoleRef struct {
 	// APIGroup is the group for the resource being referenced
 	APIGroup string `json:"apiGroup" protobuf:"bytes,1,opt,name=apiGroup"`
 	// Kind is the type of resource being referenced
-	// +required
-	// +k8s:required
 	Kind string `json:"kind" protobuf:"bytes,2,opt,name=kind"`
 	// Name is the name of resource being referenced
+	// +required
+	// +k8s:required
 	Name string `json:"name" protobuf:"bytes,3,opt,name=name"`
 }
 

@@ -186,8 +186,9 @@ func Validate_RoleBindingList(ctx context.Context, op operation.Operation, fldPa
 // to declarative validation rules in the API schema.
 func Validate_RoleRef(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *rbacv1.RoleRef) (errs field.ErrorList) {
 	// field rbacv1.RoleRef.APIGroup has no validation
+	// field rbacv1.RoleRef.Kind has no validation
 
-	// field rbacv1.RoleRef.Kind
+	// field rbacv1.RoleRef.Name
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
 			// don't revalidate unchanged data
@@ -204,16 +205,18 @@ func Validate_RoleRef(ctx context.Context, op operation.Operation, fldPath *fiel
 				return // do not proceed
 			}
 			return
-		}(fldPath.Child("kind"), &obj.Kind, safe.Field(oldObj, func(oldObj *rbacv1.RoleRef) *string { return &oldObj.Kind }))...)
+		}(fldPath.Child("name"), &obj.Name, safe.Field(oldObj, func(oldObj *rbacv1.RoleRef) *string { return &oldObj.Name }))...)
 
-	// field rbacv1.RoleRef.Name has no validation
 	return errs
 }
 
 // Validate_Subject validates an instance of Subject according
 // to declarative validation rules in the API schema.
 func Validate_Subject(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *rbacv1.Subject) (errs field.ErrorList) {
-	// field rbacv1.Subject.Kind
+	// field rbacv1.Subject.Kind has no validation
+	// field rbacv1.Subject.APIGroup has no validation
+
+	// field rbacv1.Subject.Name
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
 			// don't revalidate unchanged data
@@ -230,10 +233,8 @@ func Validate_Subject(ctx context.Context, op operation.Operation, fldPath *fiel
 				return // do not proceed
 			}
 			return
-		}(fldPath.Child("kind"), &obj.Kind, safe.Field(oldObj, func(oldObj *rbacv1.Subject) *string { return &oldObj.Kind }))...)
+		}(fldPath.Child("name"), &obj.Name, safe.Field(oldObj, func(oldObj *rbacv1.Subject) *string { return &oldObj.Name }))...)
 
-	// field rbacv1.Subject.APIGroup has no validation
-	// field rbacv1.Subject.Name has no validation
 	// field rbacv1.Subject.Namespace has no validation
 	return errs
 }
