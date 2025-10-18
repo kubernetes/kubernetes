@@ -924,6 +924,10 @@ func (m *kubeGenericRuntimeManager) killContainersWithSyncResult(ctx context.Con
 				logger.Error(err, "Kill container failed", "pod", klog.KRef(runningPod.Namespace, runningPod.Name), "podUID", runningPod.ID,
 					"containerName", container.Name, "containerID", container.ID)
 			}
+			// if the container is killed, the container must not be ready for readiness. #129552
+			if gracePeriodOverride != nil {
+				m.readinessManager.Set(container.ID, proberesults.Failure, pod)
+			}
 			containerResults <- killContainerResult
 		}(container)
 	}
