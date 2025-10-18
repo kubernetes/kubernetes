@@ -32,6 +32,7 @@ import (
 const (
 	waitInterval = 1 * time.Second
 	waitTimeout  = 30 * time.Second
+	isVerbose    = true
 )
 
 // prettyPrint a networkPolicy
@@ -42,7 +43,7 @@ func prettyPrint(policy *networkingv1.NetworkPolicy) string {
 }
 
 // CreatePolicy creates a policy in the given namespace
-func CreatePolicy(ctx context.Context, k8s *kubeManager, policy *networkingv1.NetworkPolicy, namespace string) {
+func CreatePolicy(ctx context.Context, k8s *KubeManager, policy *networkingv1.NetworkPolicy, namespace string) {
 	if isVerbose {
 		framework.Logf("****************************************************************")
 		framework.Logf("Network Policy creating %s/%s \n%s", namespace, policy.Name, prettyPrint(policy))
@@ -54,7 +55,7 @@ func CreatePolicy(ctx context.Context, k8s *kubeManager, policy *networkingv1.Ne
 }
 
 // UpdatePolicy updates a networkpolicy
-func UpdatePolicy(ctx context.Context, k8s *kubeManager, policy *networkingv1.NetworkPolicy, namespace string) {
+func UpdatePolicy(ctx context.Context, k8s *KubeManager, policy *networkingv1.NetworkPolicy, namespace string) {
 	if isVerbose {
 		framework.Logf("****************************************************************")
 		framework.Logf("Network Policy updating %s/%s \n%s", namespace, policy.Name, prettyPrint(policy))
@@ -65,8 +66,8 @@ func UpdatePolicy(ctx context.Context, k8s *kubeManager, policy *networkingv1.Ne
 	framework.ExpectNoError(err, "Unable to update netpol %s/%s", namespace, policy.Name)
 }
 
-// waitForHTTPServers waits for all webservers to be up, on all protocols sent in the input,  and then validates them using the same probe logic as the rest of the suite.
-func waitForHTTPServers(k *kubeManager, model *Model) error {
+// WaitForHTTPServers waits for all webservers to be up, on all protocols sent in the input,  and then validates them using the same probe logic as the rest of the suite.
+func WaitForHTTPServers(k *KubeManager, model *Model) error {
 	const maxTries = 10
 	framework.Logf("waiting for HTTP servers (ports 80 and/or 81) to become ready")
 
@@ -108,7 +109,7 @@ func waitForHTTPServers(k *kubeManager, model *Model) error {
 }
 
 // ValidateOrFail validates connectivity
-func ValidateOrFail(k8s *kubeManager, testCase *TestCase) {
+func ValidateOrFail(k8s *KubeManager, testCase *TestCase) {
 	ginkgo.By("Validating reachability matrix...")
 
 	// 1st try, exponential backoff (starting at 1s) will happen for every probe to accommodate infra that might be
@@ -135,7 +136,7 @@ func ValidateOrFail(k8s *kubeManager, testCase *TestCase) {
 }
 
 // AddNamespaceLabels adds a new label to a namespace
-func AddNamespaceLabel(ctx context.Context, k8s *kubeManager, name string, key string, val string) {
+func AddNamespaceLabel(ctx context.Context, k8s *KubeManager, name string, key string, val string) {
 	ns, err := k8s.getNamespace(ctx, name)
 	framework.ExpectNoError(err, "Unable to get namespace %s", name)
 	ns.Labels[key] = val
@@ -144,7 +145,7 @@ func AddNamespaceLabel(ctx context.Context, k8s *kubeManager, name string, key s
 }
 
 // DeleteNamespaceLabel deletes a label from a namespace (if present)
-func DeleteNamespaceLabel(ctx context.Context, k8s *kubeManager, name string, key string) {
+func DeleteNamespaceLabel(ctx context.Context, k8s *KubeManager, name string, key string) {
 	ns, err := k8s.getNamespace(ctx, name)
 	framework.ExpectNoError(err, "Unable to get namespace %s", name)
 	if _, ok := ns.Labels[key]; !ok {
@@ -157,7 +158,7 @@ func DeleteNamespaceLabel(ctx context.Context, k8s *kubeManager, name string, ke
 }
 
 // AddPodLabels adds new labels to a running pod
-func AddPodLabels(ctx context.Context, k8s *kubeManager, namespace string, name string, newPodLabels map[string]string) {
+func AddPodLabels(ctx context.Context, k8s *KubeManager, namespace string, name string, newPodLabels map[string]string) {
 	kubePod, err := k8s.clientSet.CoreV1().Pods(namespace).Get(ctx, name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "Unable to get pod %s/%s", namespace, name)
 	if kubePod.Labels == nil {
@@ -185,7 +186,7 @@ func AddPodLabels(ctx context.Context, k8s *kubeManager, namespace string, name 
 }
 
 // ResetPodLabels resets the labels for a deployment's template
-func ResetPodLabels(ctx context.Context, k8s *kubeManager, namespace string, name string) {
+func ResetPodLabels(ctx context.Context, k8s *KubeManager, namespace string, name string) {
 	kubePod, err := k8s.clientSet.CoreV1().Pods(namespace).Get(ctx, name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "Unable to get pod %s/%s", namespace, name)
 	labels := map[string]string{
