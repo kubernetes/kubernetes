@@ -303,6 +303,63 @@ func doBurstablePodResizeTests(f *framework.Framework) {
 			},
 			true,
 		),
+		ginkgo.Entry("remove limits and requests)",
+			[]podresize.ResizableContainerInfo{
+				{
+					// c1 starts with CPU and memory requests; remove CPU limits
+					Name:      "c1",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
+				},
+				{
+					// c2 starts with CPU and memory requests; remove memory limits
+					Name:      "c2",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
+				},
+				{
+					// c3 starts with CPU and memory requests; remove CPU requests
+					Name:      "c3",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, MemReq: originalMem, MemLim: originalMemLimit},
+				},
+				{
+					// c4 starts with CPU and memory requests; remove memory limits
+					Name:      "c4",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem},
+				},
+				{
+					// c5 starts with CPU and memory requests; remove CPU&memory limits
+					Name:      "c5",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
+				},
+			},
+			[]podresize.ResizableContainerInfo{
+				{
+					// c1 starts with CPU and memory requests; remove CPU limits
+					Name:      "c1",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, MemReq: originalMem, MemLim: originalMemLimit},
+				},
+				{
+					// c2 starts with CPU and memory requests; remove memory limits
+					Name:      "c2",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem},
+				},
+				{
+					// c3 starts with CPU and memory requests; remove CPU requests
+					Name:      "c3",
+					Resources: &cgroups.ContainerResources{MemReq: originalMem, MemLim: originalMemLimit},
+				},
+				{
+					// c4 starts with CPU and memory requests; remove memory limits
+					Name:      "c4",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit},
+				},
+				{
+					// c5 starts with CPU and memory requests; remove CPU&memory limits
+					Name:      "c5",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, MemReq: originalMem},
+				},
+			},
+			false,
+		),
 	)
 }
 
@@ -370,70 +427,6 @@ func doPodResizePatchErrorTests(f *framework.Framework) {
 				},
 			},
 			"Pod QOS Class may not change as a result of resizing",
-			true,
-		),
-		ginkgo.Entry("Guaranteed pod - remove cpu & memory limits",
-			[]podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
-				},
-			},
-			[]podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, MemReq: originalMem},
-				},
-			},
-			"resource limits cannot be removed",
-			true,
-		),
-		ginkgo.Entry("Burstable pod - remove cpu & memory limits + increase requests",
-			[]podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: increasedCPULimit, MemReq: originalMem, MemLim: increasedMemLimit},
-				},
-			},
-			[]podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: increasedCPU, MemReq: increasedMem},
-				},
-			},
-			"resource limits cannot be removed",
-			true,
-		),
-		ginkgo.Entry("Burstable pod - remove memory requests",
-			[]podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{MemReq: originalMem},
-				},
-			},
-			[]podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{},
-				},
-			},
-			"resource requests cannot be removed",
-			true,
-		),
-		ginkgo.Entry("Burstable pod - remove cpu requests",
-			[]podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU},
-				},
-			},
-			[]podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{},
-				},
-			},
-			"resource requests cannot be removed",
 			true,
 		),
 		ginkgo.Entry("Burstable pod - reorder containers",
