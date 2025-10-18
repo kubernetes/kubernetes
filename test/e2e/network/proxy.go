@@ -84,13 +84,13 @@ var _ = common.SIGDescribe("Proxy", func() {
 			Test for Proxy, logs port endpoint
 			Select any node in the cluster to invoke /proxy/nodes/<nodeip>:10250/logs endpoint. This endpoint MUST be reachable.
 		*/
-		ginkgo.It("should proxy logs on node with explicit kubelet port using proxy subresource ", func(ctx context.Context) { nodeProxyTest(ctx, f, prefix+"/nodes/", ":10250/proxy/logs/") })
+		ginkgo.It("should proxy logs on node with explicit kubelet port using proxy subresource", func(ctx context.Context) { nodeProxyTest(ctx, f, prefix+"/nodes/", ":10250/proxy/logs/") })
 
 		/*
 			Test for Proxy, logs endpoint
 			Select any node in the cluster to invoke /proxy/nodes/<nodeip>//logs endpoint. This endpoint MUST be reachable.
 		*/
-		ginkgo.It("should proxy logs on node using proxy subresource ", func(ctx context.Context) { nodeProxyTest(ctx, f, prefix+"/nodes/", "/proxy/logs/") })
+		ginkgo.It("should proxy logs on node using proxy subresource", func(ctx context.Context) { nodeProxyTest(ctx, f, prefix+"/nodes/", "/proxy/logs/") })
 
 		/*
 			Release: v1.9

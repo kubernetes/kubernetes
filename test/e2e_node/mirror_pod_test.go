@@ -51,7 +51,7 @@ import (
 var _ = SIGDescribe("MirrorPod", func() {
 	f := framework.NewDefaultFramework("mirror-pod")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
-	ginkgo.Context("when create a mirror pod ", func() {
+	ginkgo.Context("when create a mirror pod", func() {
 		var ns, podPath, staticPodName, mirrorPodName string
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			ns = f.Namespace.Name
@@ -148,7 +148,7 @@ var _ = SIGDescribe("MirrorPod", func() {
 			}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
 		})
 	})
-	ginkgo.Context("when create a mirror pod without changes ", func() {
+	ginkgo.Context("when create a mirror pod without changes", func() {
 		var ns, podPath, staticPodName, mirrorPodName string
 		ginkgo.BeforeEach(func() {
 		})
