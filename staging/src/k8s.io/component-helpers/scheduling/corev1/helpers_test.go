@@ -747,6 +747,86 @@ func TestFindMatchingUntoleratedTaint(t *testing.T) {
 			applyFilter:     func(t *v1.Taint) bool { return t.Effect == v1.TaintEffectNoExecute },
 			expectTolerated: true,
 		},
+		{
+			description: "numeric Gt operator with taint value below threshold, expect not tolerated",
+			tolerations: []v1.Toleration{
+				{
+					Key:      "node.kubernetes.io/sla",
+					Operator: "Gt",
+					Value:    "950",
+					Effect:   v1.TaintEffectNoSchedule,
+				},
+			},
+			taints: []v1.Taint{
+				{
+					Key:    "node.kubernetes.io/sla",
+					Value:  "800",
+					Effect: v1.TaintEffectNoSchedule,
+				},
+			},
+			applyFilter:     func(t *v1.Taint) bool { return true },
+			expectTolerated: false,
+		},
+		{
+			description: "numeric Gt operator with taint value above threshold, expect tolerated",
+			tolerations: []v1.Toleration{
+				{
+					Key:      "node.kubernetes.io/sla",
+					Operator: "Gt",
+					Value:    "750",
+					Effect:   v1.TaintEffectNoSchedule,
+				},
+			},
+			taints: []v1.Taint{
+				{
+					Key:    "node.kubernetes.io/sla",
+					Value:  "950",
+					Effect: v1.TaintEffectNoSchedule,
+				},
+			},
+			applyFilter:     func(t *v1.Taint) bool { return true },
+			expectTolerated: true,
+		},
+		{
+			description: "numeric Lt operator with taint value above threshold, expect not tolerated",
+			tolerations: []v1.Toleration{
+				{
+					Key:      "node.kubernetes.io/sla",
+					Operator: "Lt",
+					Value:    "800",
+					Effect:   v1.TaintEffectNoSchedule,
+				},
+			},
+			taints: []v1.Taint{
+				{
+					Key:    "node.kubernetes.io/sla",
+					Value:  "950",
+					Effect: v1.TaintEffectNoSchedule,
+				},
+			},
+			applyFilter:     func(t *v1.Taint) bool { return true },
+			expectTolerated: false,
+		},
+		{
+			description: "numeric Gt operator with non-numeric taint value, expect not tolerated",
+			tolerations: []v1.Toleration{
+				{
+					Key:      "node.kubernetes.io/sla",
+					Operator: "Gt",
+					Value:    "950",
+					Effect:   v1.TaintEffectNoSchedule,
+				},
+			},
+			taints: []v1.Taint{
+				{
+					Key:    "node.kubernetes.io/sla",
+					Value:  "high",
+					Effect: v1.TaintEffectNoSchedule,
+				},
+			},
+			applyFilter:     func(t *v1.Taint) bool { return true },
+			expectTolerated: false,
+		},
 	}
 
 	for _, tc := range testCases {
