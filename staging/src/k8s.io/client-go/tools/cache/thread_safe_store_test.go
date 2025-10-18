@@ -37,7 +37,7 @@ func TestThreadSafeStoreDeleteRemovesEmptySetsFromIndex(t *testing.T) {
 	}
 
 	indices := Indices{}
-	store := NewThreadSafeStore(indexers, indices).(*threadSafeMap)
+	store := NewThreadSafeStore(indexers, indices).(*threadSafeMap[any])
 
 	testKey := "testKey"
 
@@ -71,7 +71,7 @@ func TestThreadSafeStoreAddKeepsNonEmptySetPostDeleteFromIndex(t *testing.T) {
 	}
 
 	indices := Indices{}
-	store := NewThreadSafeStore(indexers, indices).(*threadSafeMap)
+	store := NewThreadSafeStore(indexers, indices).(*threadSafeMap[any])
 
 	store.Add("retain", "retain")
 	store.Add("delete", "delete")
@@ -107,7 +107,7 @@ func TestThreadSafeStoreIndexingFunctionsWithMultipleValues(t *testing.T) {
 	}
 
 	indices := Indices{}
-	store := NewThreadSafeStore(indexers, indices).(*threadSafeMap)
+	store := NewThreadSafeStore(indexers, indices).(*threadSafeMap[any])
 
 	store.Add("key1", "foo")
 	store.Add("key2", "bar")
@@ -177,7 +177,7 @@ func BenchmarkIndexer(b *testing.B) {
 	}
 
 	indices := Indices{}
-	store := NewThreadSafeStore(indexers, indices).(*threadSafeMap)
+	store := NewThreadSafeStore(indexers, indices).(*threadSafeMap[any])
 
 	// The following benchmark imitates what is happening in indexes
 	// used in storage layer, where indexing is mostly static (e.g.
