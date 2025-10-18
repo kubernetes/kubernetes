@@ -57,6 +57,9 @@ func (strategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 		"storagemigration.k8s.io/v1alpha1": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("status"),
 		),
+		"storagemigration.k8s.io/v1beta1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
 	}
 
 	return fields
@@ -114,6 +117,10 @@ var StatusStrategy = statusStrategy{Strategy}
 func (statusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	fields := map[fieldpath.APIVersion]*fieldpath.Set{
 		"storagemigration.k8s.io/v1alpha1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("metadata"),
+			fieldpath.MakePathOrDie("spec"),
+		),
+		"storagemigration.k8s.io/v1beta1": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("metadata"),
 			fieldpath.MakePathOrDie("spec"),
 		),

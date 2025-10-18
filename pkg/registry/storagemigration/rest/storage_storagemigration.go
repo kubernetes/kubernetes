@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 
 	svmv1alpha1 "k8s.io/api/storagemigration/v1alpha1"
+	svmv1beta1 "k8s.io/api/storagemigration/v1beta1"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -42,6 +43,12 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 		apiGroupInfo.VersionedResourcesStorageMap[svmv1alpha1.SchemeGroupVersion.Version] = storageMap
 	}
 
+	if storageMap, err := p.v1beta1Storage(apiResourceConfigSource, restOptionsGetter); err != nil {
+		return genericapiserver.APIGroupInfo{}, err
+	} else if len(storageMap) > 0 {
+		apiGroupInfo.VersionedResourcesStorageMap[svmv1beta1.SchemeGroupVersion.Version] = storageMap
+	}
+
 	return apiGroupInfo, nil
 }
 
@@ -49,6 +56,25 @@ func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstora
 	storage := map[string]rest.Storage{}
 
 	if resource := "storageversionmigrations"; apiResourceConfigSource.ResourceEnabled(svmv1alpha1.SchemeGroupVersion.WithResource(resource)) {
+		if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionMigrator) {
+			svm, svmStatus, err := storagemigrationstore.NewREST(restOptionsGetter)
+			if err != nil {
+				return nil, err
+			}
+			storage[resource] = svm
+			storage[resource+"/status"] = svmStatus
+		} else {
+			klog.Warning("StorageVersionMigrator storage is disabled because the StorageVersionMigrator feature gate is disabled")
+		}
+	}
+
+	return storage, nil
+}
+
+func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
+	storage := map[string]rest.Storage{}
+
+	if resource := "storageversionmigrations"; apiResourceConfigSource.ResourceEnabled(svmv1beta1.SchemeGroupVersion.WithResource(resource)) {
 		if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionMigrator) {
 			svm, svmStatus, err := storagemigrationstore.NewREST(restOptionsGetter)
 			if err != nil {

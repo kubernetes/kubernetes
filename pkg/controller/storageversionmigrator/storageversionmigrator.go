@@ -34,12 +34,12 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
 
-	svmv1alpha1 "k8s.io/api/storagemigration/v1alpha1"
+	svmv1beta1 "k8s.io/api/storagemigration/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	svminformers "k8s.io/client-go/informers/storagemigration/v1alpha1"
-	svmlisters "k8s.io/client-go/listers/storagemigration/v1alpha1"
+	svminformers "k8s.io/client-go/informers/storagemigration/v1beta1"
+	svmlisters "k8s.io/client-go/listers/storagemigration/v1beta1"
 )
 
 const (
@@ -102,19 +102,19 @@ func (svmc *SVMController) Name() string {
 }
 
 func (svmc *SVMController) addSVM(logger klog.Logger, obj interface{}) {
-	svm := obj.(*svmv1alpha1.StorageVersionMigration)
+	svm := obj.(*svmv1beta1.StorageVersionMigration)
 	logger.V(4).Info("Adding", "svm", klog.KObj(svm))
 	svmc.enqueue(svm)
 }
 
 func (svmc *SVMController) updateSVM(logger klog.Logger, oldObj, newObj interface{}) {
-	oldSVM := oldObj.(*svmv1alpha1.StorageVersionMigration)
-	newSVM := newObj.(*svmv1alpha1.StorageVersionMigration)
+	oldSVM := oldObj.(*svmv1beta1.StorageVersionMigration)
+	newSVM := newObj.(*svmv1beta1.StorageVersionMigration)
 	logger.V(4).Info("Updating", "svm", klog.KObj(oldSVM))
 	svmc.enqueue(newSVM)
 }
 
-func (svmc *SVMController) enqueue(svm *svmv1alpha1.StorageVersionMigration) {
+func (svmc *SVMController) enqueue(svm *svmv1beta1.StorageVersionMigration) {
 	key, err := controller.KeyFunc(svm)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %w", svm, err))
@@ -193,7 +193,8 @@ func (svmc *SVMController) sync(ctx context.Context, key string) error {
 	// working with a copy to avoid race condition between this and resource version controller
 	toBeProcessedSVM := svm.DeepCopy()
 
-	if IsConditionTrue(toBeProcessedSVM, svmv1alpha1.MigrationSucceeded) || IsConditionTrue(toBeProcessedSVM, svmv1alpha1.MigrationFailed) {
+	if meta.IsStatusConditionTrue(toBeProcessedSVM.Status.Conditions, string(svmv1beta1.MigrationSucceeded)) ||
+		meta.IsStatusConditionTrue(toBeProcessedSVM.Status.Conditions, string(svmv1beta1.MigrationFailed)) {
 		logger.V(4).Info("Migration has already succeeded or failed previously, skipping", "svm", name)
 		return nil
 	}
@@ -202,7 +203,7 @@ func (svmc *SVMController) sync(ctx context.Context, key string) error {
 		logger.V(4).Info("The latest resource version is empty. We will attempt to migrate once the resource version is available.")
 		return nil
 	}
-	gvr := getGVRFromResource(toBeProcessedSVM)
+	gvr := getGRFromResource(toBeProcessedSVM)
 
 	// prevent unsynced monitor from blocking forever
 	// use a short timeout so that we can fail quickly and possibly handle other migrations while this monitor gets ready.
@@ -224,11 +225,11 @@ func (svmc *SVMController) sync(ctx context.Context, key string) error {
 		}
 
 		// we can't migrate a resource that doesn't exist in the GC
-		_, errStatus := svmc.kubeClient.StoragemigrationV1alpha1().
+		_, errStatus := svmc.kubeClient.StoragemigrationV1beta1().
 			StorageVersionMigrations().
 			UpdateStatus(
 				ctx,
-				setStatusConditions(toBeProcessedSVM, svmv1alpha1.MigrationFailed, migrationFailedStatusReason, "resource not found"),
+				setStatusConditions(toBeProcessedSVM, svmv1beta1.MigrationFailed, migrationFailedStatusReason, "resource not found"),
 				metav1.UpdateOptions{},
 			)
 
@@ -248,11 +249,11 @@ func (svmc *SVMController) sync(ctx context.Context, key string) error {
 		return fmt.Errorf("GC cache is not up to date, requeuing to attempt again. gcListResourceVersion: %d, listResourceVersion: %d", gcListResourceVersion, listResourceVersion)
 	}
 
-	toBeProcessedSVM, err = svmc.kubeClient.StoragemigrationV1alpha1().
+	toBeProcessedSVM, err = svmc.kubeClient.StoragemigrationV1beta1().
 		StorageVersionMigrations().
 		UpdateStatus(
 			ctx,
-			setStatusConditions(toBeProcessedSVM, svmv1alpha1.MigrationRunning, migrationRunningStatusReason, ""),
+			setStatusConditions(toBeProcessedSVM, svmv1beta1.MigrationRunning, migrationRunningStatusReason, ""),
 			metav1.UpdateOptions{},
 		)
 	if err != nil {
@@ -310,11 +311,11 @@ func (svmc *SVMController) sync(ctx context.Context, key string) error {
 		if errPatch != nil {
 			logger.V(4).Error(errPatch, "Failed to migrate the resource", "namespace", accessor.GetNamespace(), "name", accessor.GetName(), "gvr", gvr.String(), "reason", apierrors.ReasonForError(errPatch))
 
-			_, errStatus := svmc.kubeClient.StoragemigrationV1alpha1().
+			_, errStatus := svmc.kubeClient.StoragemigrationV1beta1().
 				StorageVersionMigrations().
 				UpdateStatus(
 					ctx,
-					setStatusConditions(toBeProcessedSVM, svmv1alpha1.MigrationFailed, migrationFailedStatusReason, "migration encountered unhandled error"),
+					setStatusConditions(toBeProcessedSVM, svmv1beta1.MigrationFailed, migrationFailedStatusReason, "migration encountered unhandled error"),
 					metav1.UpdateOptions{},
 				)
 
@@ -324,11 +325,11 @@ func (svmc *SVMController) sync(ctx context.Context, key string) error {
 		logger.V(4).Info("Successfully migrated the resource", "namespace", accessor.GetNamespace(), "name", accessor.GetName(), "gvr", gvr.String())
 	}
 
-	_, err = svmc.kubeClient.StoragemigrationV1alpha1().
+	_, err = svmc.kubeClient.StoragemigrationV1beta1().
 		StorageVersionMigrations().
 		UpdateStatus(
 			ctx,
-			setStatusConditions(toBeProcessedSVM, svmv1alpha1.MigrationSucceeded, migrationSuccessStatusReason, ""),
+			setStatusConditions(toBeProcessedSVM, svmv1beta1.MigrationSucceeded, migrationSuccessStatusReason, ""),
 			metav1.UpdateOptions{},
 		)
 	if err != nil {
