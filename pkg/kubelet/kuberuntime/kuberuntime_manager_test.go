@@ -113,7 +113,8 @@ type containerTemplate struct {
 // makeAndSetFakePod is a helper function to create and set one fake sandbox for a pod and
 // one fake container for each of its container.
 func makeAndSetFakePod(t *testing.T, m *kubeGenericRuntimeManager, fakeRuntime *apitest.FakeRuntimeService,
-	pod *v1.Pod) (*apitest.FakePodSandbox, []*apitest.FakeContainer) {
+	pod *v1.Pod,
+) (*apitest.FakePodSandbox, []*apitest.FakeContainer) {
 	sandbox := makeFakePodSandbox(t, m, sandboxTemplate{
 		pod:       pod,
 		createdAt: fakeCreatedAt,
@@ -170,7 +171,6 @@ func makeFakePodSandbox(t *testing.T, m *kubeGenericRuntimeManager, template san
 		podSandBoxStatus.Network.AdditionalIps = additionalPodIPs
 	}
 	return podSandBoxStatus
-
 }
 
 // makeFakePodSandboxes creates a group of fake pod sandboxes based on the sandbox templates.
@@ -2976,7 +2976,6 @@ func TestToKubeContainerImageVolumes(t *testing.T) {
 
 func TestGetImageVolumes(t *testing.T) {
 	tCtx := ktesting.Init(t)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ImageVolume, true)
 
 	_, _, manager, err := createTestRuntimeManager(tCtx)
 	require.NoError(t, err)
@@ -3252,7 +3251,8 @@ func TestDoPodResizeAction(t *testing.T) {
 								UsageBytes: ptr.To[uint64](10),
 							},
 						}},
-					}},
+					},
+				},
 			}
 
 			updateInfo := containerToUpdateInfo{
@@ -3543,10 +3543,9 @@ func TestValidatePodResizeAction(t *testing.T) {
 }
 
 func TestIncrementImageVolumeMetrics(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ImageVolume, true)
-	legacyregistry.MustRegister(metrics.ImageVolumeRequestedTotal)
-	legacyregistry.MustRegister(metrics.ImageVolumeMountedSucceedTotal)
-	legacyregistry.MustRegister(metrics.ImageVolumeMountedErrorsTotal)
+	legacyregistry.Register(metrics.ImageVolumeRequestedTotal)      //nolint:errcheck
+	legacyregistry.Register(metrics.ImageVolumeMountedSucceedTotal) //nolint:errcheck
+	legacyregistry.Register(metrics.ImageVolumeMountedErrorsTotal)  //nolint:errcheck
 
 	testCases := map[string]struct {
 		err          error
@@ -3566,13 +3565,13 @@ func TestIncrementImageVolumeMetrics(t *testing.T) {
 				"mount3": {Image: "image3"},
 			},
 			wants: `
-				# HELP kubelet_image_volume_mounted_errors_total [ALPHA] Number of failed image volume mounts.
+				# HELP kubelet_image_volume_mounted_errors_total [STABLE] Number of failed image volume mounts.
 				# TYPE kubelet_image_volume_mounted_errors_total counter
         		kubelet_image_volume_mounted_errors_total 0
-        		# HELP kubelet_image_volume_mounted_succeed_total [ALPHA] Number of successful image volume mounts.
+        		# HELP kubelet_image_volume_mounted_succeed_total [STABLE] Number of successful image volume mounts.
         		# TYPE kubelet_image_volume_mounted_succeed_total counter
         		kubelet_image_volume_mounted_succeed_total 2
-        		# HELP kubelet_image_volume_requested_total [ALPHA] Number of requested image volumes.
+        		# HELP kubelet_image_volume_requested_total [STABLE] Number of requested image volumes.
         		# TYPE kubelet_image_volume_requested_total counter
         		kubelet_image_volume_requested_total 3
 			`,
@@ -3590,13 +3589,13 @@ func TestIncrementImageVolumeMetrics(t *testing.T) {
 				"mount3": {Image: "image3"},
 			},
 			wants: `
-				# HELP kubelet_image_volume_mounted_errors_total [ALPHA] Number of failed image volume mounts.
+				# HELP kubelet_image_volume_mounted_errors_total [STABLE] Number of failed image volume mounts.
 				# TYPE kubelet_image_volume_mounted_errors_total counter
         		kubelet_image_volume_mounted_errors_total 2
-        		# HELP kubelet_image_volume_mounted_succeed_total [ALPHA] Number of successful image volume mounts.
+        		# HELP kubelet_image_volume_mounted_succeed_total [STABLE] Number of successful image volume mounts.
         		# TYPE kubelet_image_volume_mounted_succeed_total counter
         		kubelet_image_volume_mounted_succeed_total 0
-        		# HELP kubelet_image_volume_requested_total [ALPHA] Number of requested image volumes.
+        		# HELP kubelet_image_volume_requested_total [STABLE] Number of requested image volumes.
         		# TYPE kubelet_image_volume_requested_total counter
         		kubelet_image_volume_requested_total 3
 			`,
@@ -3614,13 +3613,13 @@ func TestIncrementImageVolumeMetrics(t *testing.T) {
 				"mount3": {Image: "image3"},
 			},
 			wants: `
-				# HELP kubelet_image_volume_mounted_errors_total [ALPHA] Number of failed image volume mounts.
+				# HELP kubelet_image_volume_mounted_errors_total [STABLE] Number of failed image volume mounts.
 				# TYPE kubelet_image_volume_mounted_errors_total counter
         		kubelet_image_volume_mounted_errors_total 0
-        		# HELP kubelet_image_volume_mounted_succeed_total [ALPHA] Number of successful image volume mounts.
+        		# HELP kubelet_image_volume_mounted_succeed_total [STABLE] Number of successful image volume mounts.
         		# TYPE kubelet_image_volume_mounted_succeed_total counter
         		kubelet_image_volume_mounted_succeed_total 2
-        		# HELP kubelet_image_volume_requested_total [ALPHA] Number of requested image volumes.
+        		# HELP kubelet_image_volume_requested_total [STABLE] Number of requested image volumes.
         		# TYPE kubelet_image_volume_requested_total counter
         		kubelet_image_volume_requested_total 3
 			`,
@@ -3631,13 +3630,13 @@ func TestIncrementImageVolumeMetrics(t *testing.T) {
 			},
 			imageVolumes: kubecontainer.ImageVolumes{},
 			wants: `
-				# HELP kubelet_image_volume_mounted_errors_total [ALPHA] Number of failed image volume mounts.
+				# HELP kubelet_image_volume_mounted_errors_total [STABLE] Number of failed image volume mounts.
 				# TYPE kubelet_image_volume_mounted_errors_total counter
         		kubelet_image_volume_mounted_errors_total 0
-        		# HELP kubelet_image_volume_mounted_succeed_total [ALPHA] Number of successful image volume mounts.
+        		# HELP kubelet_image_volume_mounted_succeed_total [STABLE] Number of successful image volume mounts.
         		# TYPE kubelet_image_volume_mounted_succeed_total counter
         		kubelet_image_volume_mounted_succeed_total 0
-        		# HELP kubelet_image_volume_requested_total [ALPHA] Number of requested image volumes.
+        		# HELP kubelet_image_volume_requested_total [STABLE] Number of requested image volumes.
         		# TYPE kubelet_image_volume_requested_total counter
         		kubelet_image_volume_requested_total 0
 			`,
@@ -3659,6 +3658,7 @@ func TestIncrementImageVolumeMetrics(t *testing.T) {
 				"kubelet_"+metrics.ImageVolumeMountedSucceedTotalKey,
 				"kubelet_"+metrics.ImageVolumeMountedErrorsTotalKey,
 			); err != nil {
+				fmt.Printf("::: FOOO: %v\n", err)
 				t.Error(err)
 			}
 		})

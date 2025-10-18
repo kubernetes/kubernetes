@@ -3333,7 +3333,8 @@ func TestSetDefaultServiceInternalTrafficPolicy(t *testing.T) {
 }
 
 func TestSetDefaults_Volume(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ImageVolume, true)
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+
 	for desc, tc := range map[string]struct {
 		given, expected *v1.Volume
 	}{
