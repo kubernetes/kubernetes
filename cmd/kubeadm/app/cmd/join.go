@@ -692,7 +692,10 @@ func fetchInitConfigurationFromJoinConfiguration(cfg *kubeadmapi.JoinConfigurati
 	}
 
 	// Create the final KubeConfig file with the cluster name discovered after fetching the cluster configuration
-	_, clusterinfo := kubeconfigutil.GetClusterFromKubeConfig(tlsBootstrapCfg)
+	_, clusterinfo, err := kubeconfigutil.GetClusterFromKubeConfig(tlsBootstrapCfg)
+	if err != nil {
+		return nil, errors.Wrap(err, "the TLS bootstrap kubeconfig is malformed")
+	}
 	tlsBootstrapCfg.Clusters = map[string]*clientcmdapi.Cluster{
 		initConfiguration.ClusterName: clusterinfo,
 	}
