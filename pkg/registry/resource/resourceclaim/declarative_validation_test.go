@@ -653,11 +653,54 @@ func testValidateStatusUpdateForDeclarative(t *testing.T, apiVersion string) {
 	})
 	poolPath := field.NewPath("status", "allocation", "devices", "results").Index(0).Child("pool")
 	configSourcePath := field.NewPath("status", "allocation", "devices", "config").Index(0).Child("source")
+	driverPath := field.NewPath("status", "allocation", "devices", "results").Index(0).Child("driver")
+
 	testCases := map[string]struct {
 		old          resource.ResourceClaim
 		update       resource.ResourceClaim
 		expectedErrs field.ErrorList
 	}{
+		// .Status.Allocation.Devices.Results[%d].Driver
+		"valid driver name, lowercase": {
+			old:    mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(tweakStatusDeviceRequestAllocationResultDriver("dra.example.com")),
+		},
+		"valid driver name, mixed case": {
+			old:    mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(tweakStatusDeviceRequestAllocationResultDriver("DRA.Example.COM")),
+		},
+		"valid driver name, max length": {
+			old:    mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(tweakStatusDeviceRequestAllocationResultDriver(strings.Repeat("a", 63))),
+		},
+		"invalid driver name, empty": {
+			old:    mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(tweakStatusDeviceRequestAllocationResultDriver("")),
+			expectedErrs: field.ErrorList{
+				field.Required(driverPath, ""),
+			},
+		},
+		"invalid driver name, too long": {
+			old:    mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(tweakStatusDeviceRequestAllocationResultDriver(strings.Repeat("a", 64))),
+			expectedErrs: field.ErrorList{
+				field.TooLong(driverPath, "", 63),
+			},
+		},
+		"invalid driver name, invalid character": {
+			old:    mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(tweakStatusDeviceRequestAllocationResultDriver("dra_example.com")),
+			expectedErrs: field.ErrorList{
+				field.Invalid(driverPath, "dra_example.com", "").WithOrigin("format=k8s-long-name-caseless"),
+			},
+		},
+		"invalid driver name, invalid DNS name (leading dot)": {
+			old:    mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(tweakStatusDeviceRequestAllocationResultDriver(".example.com")),
+			expectedErrs: field.ErrorList{
+				field.Invalid(driverPath, ".example.com", "").WithOrigin("format=k8s-long-name-caseless"),
+			},
+		},
 		// .Status.Allocation.Devices.Results[%d].Pool
 		"valid pool name": {
 			old:    mkValidResourceClaim(),
@@ -1034,6 +1077,14 @@ func tweakStatusDeviceRequestAllocationResultPool(pool string) func(rc *resource
 	return func(rc *resource.ResourceClaim) {
 		for i := range rc.Status.Allocation.Devices.Results {
 			rc.Status.Allocation.Devices.Results[i].Pool = pool
+		}
+	}
+}
+
+func tweakStatusDeviceRequestAllocationResultDriver(driver string) func(rc *resource.ResourceClaim) {
+	return func(rc *resource.ResourceClaim) {
+		for i := range rc.Status.Allocation.Devices.Results {
+			rc.Status.Allocation.Devices.Results[i].Driver = driver
 		}
 	}
 }

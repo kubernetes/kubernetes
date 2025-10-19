@@ -616,7 +616,26 @@ func Validate_DeviceRequest(ctx context.Context, op operation.Operation, fldPath
 // to declarative validation rules in the API schema.
 func Validate_DeviceRequestAllocationResult(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta2.DeviceRequestAllocationResult) (errs field.ErrorList) {
 	// field resourcev1beta2.DeviceRequestAllocationResult.Request has no validation
-	// field resourcev1beta2.DeviceRequestAllocationResult.Driver has no validation
+
+	// field resourcev1beta2.DeviceRequestAllocationResult.Driver
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			errs = append(errs, validate.LongNameCaseless(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("driver"), &obj.Driver, safe.Field(oldObj, func(oldObj *resourcev1beta2.DeviceRequestAllocationResult) *string { return &oldObj.Driver }))...)
 
 	// field resourcev1beta2.DeviceRequestAllocationResult.Pool
 	errs = append(errs,
