@@ -1,0 +1,14 @@
+coverage:
+  range: 80..100
+  round: down
+  precision: 2
+
+  status:
+    project:                   # measuring the overall project coverage
+      default:                 # context, you can create multiple ones with custom titles
+        enabled: yes           # must be yes|true to enable this status
+        target: 90%            # specify the target coverage for each commit status
+                               #   option: "auto" (must increase from parent commit or pull request base)
+                               #   option: "X%" a static target percentage to hit
+        if_not_found: success  # if parent is not found report status as success, error, or failure
+        if_ci_failed: error    # if ci fails report status as success, error, or failure

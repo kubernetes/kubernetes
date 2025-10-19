@@ -15,17 +15,17 @@ type BeTemporallyMatcher struct {
 	Threshold  []time.Duration
 }
 
-func (matcher *BeTemporallyMatcher) FailureMessage(actual interface{}) (message string) {
+func (matcher *BeTemporallyMatcher) FailureMessage(actual any) (message string) {
 	return format.Message(actual, fmt.Sprintf("to be %s", matcher.Comparator), matcher.CompareTo)
 }
 
-func (matcher *BeTemporallyMatcher) NegatedFailureMessage(actual interface{}) (message string) {
+func (matcher *BeTemporallyMatcher) NegatedFailureMessage(actual any) (message string) {
 	return format.Message(actual, fmt.Sprintf("not to be %s", matcher.Comparator), matcher.CompareTo)
 }
 
-func (matcher *BeTemporallyMatcher) Match(actual interface{}) (bool, error) {
+func (matcher *BeTemporallyMatcher) Match(actual any) (bool, error) {
 	// predicate to test for time.Time type
-	isTime := func(t interface{}) bool {
+	isTime := func(t any) bool {
 		_, ok := t.(time.Time)
 		return ok
 	}

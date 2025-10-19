@@ -8,10 +8,10 @@ import (
 
 type HaveSuffixMatcher struct {
 	Suffix string
-	Args   []interface{}
+	Args   []any
 }
 
-func (matcher *HaveSuffixMatcher) Match(actual interface{}) (success bool, err error) {
+func (matcher *HaveSuffixMatcher) Match(actual any) (success bool, err error) {
 	actualString, ok := toString(actual)
 	if !ok {
 		return false, fmt.Errorf("HaveSuffix matcher requires a string or stringer.  Got:\n%s", format.Object(actual, 1))
@@ -27,10 +27,10 @@ func (matcher *HaveSuffixMatcher) suffix() string {
 	return matcher.Suffix
 }
 
-func (matcher *HaveSuffixMatcher) FailureMessage(actual interface{}) (message string) {
+func (matcher *HaveSuffixMatcher) FailureMessage(actual any) (message string) {
 	return format.Message(actual, "to have suffix", matcher.suffix())
 }
 
-func (matcher *HaveSuffixMatcher) NegatedFailureMessage(actual interface{}) (message string) {
+func (matcher *HaveSuffixMatcher) NegatedFailureMessage(actual any) (message string) {
 	return format.Message(actual, "not to have suffix", matcher.suffix())
 }

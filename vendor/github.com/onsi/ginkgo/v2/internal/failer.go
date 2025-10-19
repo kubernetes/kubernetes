@@ -32,7 +32,7 @@ func (f *Failer) GetFailure() types.Failure {
 	return f.failure
 }
 
-func (f *Failer) Panic(location types.CodeLocation, forwardedPanic interface{}) {
+func (f *Failer) Panic(location types.CodeLocation, forwardedPanic any) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
