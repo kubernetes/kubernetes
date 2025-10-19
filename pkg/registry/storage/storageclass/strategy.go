@@ -48,7 +48,7 @@ func (storageClassStrategy) PrepareForCreate(ctx context.Context, obj runtime.Ob
 
 func (storageClassStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	storageClass := obj.(*storage.StorageClass)
-	return validation.ValidateStorageClass(storageClass)
+	return validation.ValidateStorageClass(storageClass, ctx)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -69,8 +69,8 @@ func (storageClassStrategy) PrepareForUpdate(ctx context.Context, obj, old runti
 }
 
 func (storageClassStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	errorList := validation.ValidateStorageClass(obj.(*storage.StorageClass))
-	return append(errorList, validation.ValidateStorageClassUpdate(obj.(*storage.StorageClass), old.(*storage.StorageClass))...)
+	errorList := validation.ValidateStorageClass(obj.(*storage.StorageClass), ctx)
+	return append(errorList, validation.ValidateStorageClassUpdate(obj.(*storage.StorageClass), old.(*storage.StorageClass), ctx)...)
 }
 
 // WarningsOnUpdate returns warnings for the given update.

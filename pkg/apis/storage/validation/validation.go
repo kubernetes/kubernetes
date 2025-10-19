@@ -58,19 +58,25 @@ type CSINodeValidationOptions struct {
 }
 
 // ValidateStorageClass validates a StorageClass.
-func ValidateStorageClass(storageClass *storage.StorageClass) field.ErrorList {
+func ValidateStorageClass(storageClass *storage.StorageClass, ctx context.Context) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&storageClass.ObjectMeta, false, apivalidation.ValidateClassName, field.NewPath("metadata"))
 	allErrs = append(allErrs, validateProvisioner(storageClass.Provisioner, field.NewPath("provisioner"))...)
 	allErrs = append(allErrs, validateParameters(storageClass.Parameters, true, field.NewPath("parameters"))...)
 	allErrs = append(allErrs, validateReclaimPolicy(storageClass.ReclaimPolicy, field.NewPath("reclaimPolicy"))...)
 	allErrs = append(allErrs, validateVolumeBindingMode(storageClass.VolumeBindingMode, field.NewPath("volumeBindingMode"))...)
 	allErrs = append(allErrs, validateAllowedTopologies(storageClass.AllowedTopologies, field.NewPath("allowedTopologies"))...)
-
-	return allErrs
+	return rest.ValidateDeclarativelyWithMigrationChecks(
+		ctx,
+		legacyscheme.Scheme,
+		storageClass,
+		nil,
+		allErrs,
+		operation.Create,
+	)
 }
 
 // ValidateStorageClassUpdate tests if an update to StorageClass is valid.
-func ValidateStorageClassUpdate(storageClass, oldStorageClass *storage.StorageClass) field.ErrorList {
+func ValidateStorageClassUpdate(storageClass, oldStorageClass *storage.StorageClass, ctx context.Context) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&storageClass.ObjectMeta, &oldStorageClass.ObjectMeta, field.NewPath("metadata"))
 	if !reflect.DeepEqual(oldStorageClass.Parameters, storageClass.Parameters) {
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("parameters"), "updates to parameters are forbidden."))
@@ -85,7 +91,14 @@ func ValidateStorageClassUpdate(storageClass, oldStorageClass *storage.StorageCl
 	}
 
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(storageClass.VolumeBindingMode, oldStorageClass.VolumeBindingMode, field.NewPath("volumeBindingMode"))...)
-	return allErrs
+	return rest.ValidateDeclarativelyWithMigrationChecks(
+		ctx,
+		legacyscheme.Scheme,
+		storageClass,
+		oldStorageClass,
+		allErrs,
+		operation.Update,
+	)
 }
 
 // validateProvisioner tests if provisioner is a valid qualified name.
@@ -254,7 +267,7 @@ func validateVolumeError(e *storage.VolumeError, fldPath *field.Path) field.Erro
 }
 
 // ValidateVolumeAttachmentUpdate validates a VolumeAttachment.
-func ValidateVolumeAttachmentUpdate(new, old *storage.VolumeAttachment) field.ErrorList {
+func ValidateVolumeAttachmentUpdate(new, old *storage.VolumeAttachment, ctx context.Context) field.ErrorList {
 	allErrs := ValidateVolumeAttachment(new)
 
 	// Spec is read-only
@@ -262,7 +275,14 @@ func ValidateVolumeAttachmentUpdate(new, old *storage.VolumeAttachment) field.Er
 	if !apiequality.Semantic.DeepEqual(old.Spec, new.Spec) {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("spec"), new.Spec, "field is immutable"))
 	}
-	return allErrs
+	return rest.ValidateDeclarativelyWithMigrationChecks(
+		ctx,
+		legacyscheme.Scheme,
+		new,
+		old,
+		allErrs,
+		operation.Update,
+	)
 }
 
 var supportedVolumeBindingModes = sets.NewString(string(storage.VolumeBindingImmediate), string(storage.VolumeBindingWaitForFirstConsumer))
@@ -621,15 +641,22 @@ func ValidateCSIStorageCapacityUpdate(capacity, oldCapacity *storage.CSIStorageC
 }
 
 // ValidateVolumeAttributesClass validates a VolumeAttributesClass.
-func ValidateVolumeAttributesClass(volumeAttributesClass *storage.VolumeAttributesClass) field.ErrorList {
+func ValidateVolumeAttributesClass(ctx context.Context, volumeAttributesClass *storage.VolumeAttributesClass) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&volumeAttributesClass.ObjectMeta, false, apivalidation.ValidateClassName, field.NewPath("metadata"))
 	allErrs = append(allErrs, validateProvisioner(volumeAttributesClass.DriverName, field.NewPath("driverName"))...)
 	allErrs = append(allErrs, validateParameters(volumeAttributesClass.Parameters, false, field.NewPath("parameters"))...)
-	return allErrs
+	return rest.ValidateDeclarativelyWithMigrationChecks(
+		ctx,
+		legacyscheme.Scheme,
+		volumeAttributesClass,
+		nil,
+		allErrs,
+		operation.Create,
+	)
 }
 
 // ValidateVolumeAttributesClassUpdate tests if an update to VolumeAttributesClass is valid.
-func ValidateVolumeAttributesClassUpdate(volumeAttributesClass, oldVolumeAttributesClass *storage.VolumeAttributesClass) field.ErrorList {
+func ValidateVolumeAttributesClassUpdate(ctx context.Context, volumeAttributesClass, oldVolumeAttributesClass *storage.VolumeAttributesClass) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&volumeAttributesClass.ObjectMeta, &oldVolumeAttributesClass.ObjectMeta, field.NewPath("metadata"))
 	if volumeAttributesClass.DriverName != oldVolumeAttributesClass.DriverName {
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("driverName"), "updates to driverName are forbidden."))
@@ -637,6 +664,13 @@ func ValidateVolumeAttributesClassUpdate(volumeAttributesClass, oldVolumeAttribu
 	if !reflect.DeepEqual(oldVolumeAttributesClass.Parameters, volumeAttributesClass.Parameters) {
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("parameters"), "updates to parameters are forbidden."))
 	}
-	allErrs = append(allErrs, ValidateVolumeAttributesClass(volumeAttributesClass)...)
-	return allErrs
+	allErrs = append(allErrs, ValidateVolumeAttributesClass(ctx, volumeAttributesClass)...)
+	return rest.ValidateDeclarativelyWithMigrationChecks(
+		ctx,
+		legacyscheme.Scheme,
+		volumeAttributesClass,
+		oldVolumeAttributesClass,
+		allErrs,
+		operation.Create,
+	)
 }

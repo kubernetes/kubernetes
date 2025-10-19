@@ -47,7 +47,7 @@ func (volumeAttributesClassStrategy) PrepareForCreate(ctx context.Context, obj r
 
 func (volumeAttributesClassStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	volumeAttributesClass := obj.(*storage.VolumeAttributesClass)
-	return validation.ValidateVolumeAttributesClass(volumeAttributesClass)
+	return validation.ValidateVolumeAttributesClass(ctx, volumeAttributesClass)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -68,7 +68,7 @@ func (volumeAttributesClassStrategy) PrepareForUpdate(ctx context.Context, obj, 
 }
 
 func (volumeAttributesClassStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidateVolumeAttributesClassUpdate(obj.(*storage.VolumeAttributesClass), old.(*storage.VolumeAttributesClass))
+	return validation.ValidateVolumeAttributesClassUpdate(ctx, obj.(*storage.VolumeAttributesClass), old.(*storage.VolumeAttributesClass))
 }
 
 // WarningsOnUpdate returns warnings for the given update.
