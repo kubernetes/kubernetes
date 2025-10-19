@@ -56,9 +56,9 @@ func getJoinCommand(kubeConfigFile, token, key string, controlPlane, skipTokenPr
 	}
 
 	// load the default cluster config
-	_, clusterConfig := kubeconfigutil.GetClusterFromKubeConfig(config)
-	if clusterConfig == nil {
-		return "", errors.New("failed to get default cluster config")
+	_, clusterConfig, err := kubeconfigutil.GetClusterFromKubeConfig(config)
+	if err != nil {
+		return "", errors.Wrapf(err, "malformed kubeconfig file: %s", kubeConfigFile)
 	}
 
 	// load CA certificates from the kubeconfig (either from PEM data or by file path)
