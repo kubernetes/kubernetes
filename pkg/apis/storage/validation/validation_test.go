@@ -1712,7 +1712,7 @@ func TestCSIDriverValidation(t *testing.T) {
 	}}
 
 	for _, csiDriver := range successCases {
-		if errs := ValidateCSIDriver(&csiDriver); len(errs) != 0 {
+		if errs := ValidateCSIDriver(&csiDriver, nil); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
@@ -1802,7 +1802,7 @@ func TestCSIDriverValidation(t *testing.T) {
 	}}
 
 	for _, csiDriver := range errorCases {
-		if errs := ValidateCSIDriver(&csiDriver); len(errs) == 0 {
+		if errs := ValidateCSIDriver(&csiDriver, nil); len(errs) == 0 {
 			t.Errorf("Expected failure for test: %v", csiDriver)
 		}
 	}
@@ -2240,7 +2240,7 @@ func TestCSIDriverValidationSELinuxMountEnabledDisabled(t *testing.T) {
 					SELinuxMount:      test.seLinuxMountValue,
 				},
 			}
-			err := ValidateCSIDriver(csiDriver)
+			err := ValidateCSIDriver(csiDriver, nil)
 			if test.expectError && err == nil {
 				t.Error("Expected validation error, got nil")
 			}

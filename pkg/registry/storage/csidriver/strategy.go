@@ -58,7 +58,7 @@ func (csiDriverStrategy) PrepareForCreate(ctx context.Context, obj runtime.Objec
 func (csiDriverStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	csiDriver := obj.(*storage.CSIDriver)
 
-	return validation.ValidateCSIDriver(csiDriver)
+	return validation.ValidateCSIDriver(csiDriver, ctx)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.

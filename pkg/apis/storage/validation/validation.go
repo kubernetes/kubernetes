@@ -17,7 +17,11 @@ limitations under the License.
 package validation
 
 import (
+	"context"
 	"fmt"
+	"k8s.io/apimachinery/pkg/api/operation"
+	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"math"
 	"reflect"
 	"strings"
@@ -424,11 +428,17 @@ func validateCSINodeDriver(driver storage.CSINodeDriver, driverNamesInSpecs sets
 var ValidateCSIDriverName = apimachineryvalidation.NameIsDNSSubdomain
 
 // ValidateCSIDriver validates a CSIDriver.
-func ValidateCSIDriver(csiDriver *storage.CSIDriver) field.ErrorList {
+func ValidateCSIDriver(csiDriver *storage.CSIDriver, ctx context.Context) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&csiDriver.ObjectMeta, false, ValidateCSIDriverName, field.NewPath("metadata"))
-
 	allErrs = append(allErrs, validateCSIDriverSpec(&csiDriver.Spec, field.NewPath("spec"))...)
-	return allErrs
+	return rest.ValidateDeclarativelyWithMigrationChecks(
+		ctx,
+		legacyscheme.Scheme,
+		csiDriver,
+		nil,
+		allErrs,
+		operation.Create,
+	)
 }
 
 // ValidateCSIDriverUpdate validates a CSIDriver.
