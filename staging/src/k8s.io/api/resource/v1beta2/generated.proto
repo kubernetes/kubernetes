@@ -844,6 +844,8 @@ message DeviceRequestAllocationResult {
   // vendor of the driver. It should use only lower case characters.
   //
   // +required
+  // +k8s:format=k8s-long-name-caseless
+  // +k8s:required
   optional string driver = 2;
 
   // This name together with the driver name and the device name field

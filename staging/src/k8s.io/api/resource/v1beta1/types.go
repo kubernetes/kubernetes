@@ -1546,6 +1546,8 @@ type DeviceRequestAllocationResult struct {
 	// vendor of the driver. It should use only lower case characters.
 	//
 	// +required
+	// +k8s:format=k8s-long-name-caseless
+	// +k8s:required
 	Driver string `json:"driver" protobuf:"bytes,2,name=driver"`
 
 	// This name together with the driver name and the device name field
