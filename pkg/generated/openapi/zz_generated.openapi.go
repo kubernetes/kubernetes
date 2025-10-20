@@ -7099,6 +7099,7 @@ func schema_k8sio_api_apiserverinternal_v1alpha1_ServerStorageVersion(ref common
 					"apiServerID": {
 						SchemaProps: spec.SchemaProps{
 							Description: "The ID of the reporting API server.",
+							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -7106,6 +7107,7 @@ func schema_k8sio_api_apiserverinternal_v1alpha1_ServerStorageVersion(ref common
 					"encodingVersion": {
 						SchemaProps: spec.SchemaProps{
 							Description: "The API server encodes the object to this version when persisting it in the backend (e.g., etcd).",
+							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -7151,6 +7153,7 @@ func schema_k8sio_api_apiserverinternal_v1alpha1_ServerStorageVersion(ref common
 						},
 					},
 				},
+				Required: []string{"apiServerID", "encodingVersion", "decodableVersions"},
 			},
 		},
 	}
@@ -7199,7 +7202,7 @@ func schema_k8sio_api_apiserverinternal_v1alpha1_StorageVersion(ref common.Refer
 						},
 					},
 				},
-				Required: []string{"spec", "status"},
+				Required: []string{"metadata"},
 			},
 		},
 		Dependencies: []string{
@@ -18240,7 +18243,6 @@ func schema_k8sio_api_batch_v1_JobCondition(ref common.ReferenceCallback) common
 						},
 					},
 				},
-				Required: []string{"type", "status"},
 			},
 		},
 		Dependencies: []string{
@@ -18585,7 +18587,6 @@ func schema_k8sio_api_batch_v1_PodFailurePolicy(ref common.ReferenceCallback) co
 						},
 					},
 				},
-				Required: []string{"rules"},
 			},
 		},
 		Dependencies: []string{
