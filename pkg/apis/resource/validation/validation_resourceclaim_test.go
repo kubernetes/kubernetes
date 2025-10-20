@@ -1828,7 +1828,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 			},
 		},
 		"too-many-binding-conditions": {
-			wantFailures: field.ErrorList{field.TooMany(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("bindingConditions"), 5, 4)},
+			wantFailures: field.ErrorList{field.TooMany(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("bindingConditions"), 5, 4).MarkCoveredByDeclarative()},
 			oldClaim:     validClaim,
 			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
 				claim.Status.Allocation = &resource.AllocationResult{
@@ -1848,7 +1848,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 			},
 		},
 		"too-many-binding-failure-conditions": {
-			wantFailures: field.ErrorList{field.TooMany(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("bindingFailureConditions"), 5, 4)},
+			wantFailures: field.ErrorList{field.TooMany(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("bindingFailureConditions"), 5, 4).MarkCoveredByDeclarative()},
 			oldClaim:     validClaim,
 			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
 				claim.Status.Allocation = &resource.AllocationResult{

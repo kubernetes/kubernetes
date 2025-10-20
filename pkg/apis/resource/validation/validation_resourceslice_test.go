@@ -818,11 +818,11 @@ func TestValidateResourceSlice(t *testing.T) {
 			slice: testResourceSliceWithBindingConditions(goodName, goodName, driverName, 1, []string{"example.com/condition1", "condition2"}, []string{"example.com/condition3", "condition4"}),
 		},
 		"too-many-binding-conditions": {
-			wantFailures: field.ErrorList{field.TooMany(field.NewPath("spec", "devices").Index(0).Child("bindingConditions"), resourceapi.BindingConditionsMaxSize+1, resourceapi.BindingConditionsMaxSize)},
+			wantFailures: field.ErrorList{field.TooMany(field.NewPath("spec", "devices").Index(0).Child("bindingConditions"), resourceapi.BindingConditionsMaxSize+1, resourceapi.BindingConditionsMaxSize).MarkCoveredByDeclarative()},
 			slice:        testResourceSliceWithBindingConditions(goodName, goodName, driverName, 1, []string{"condition1", "condition2", "condition3", "condition4", "condition5"}, []string{"condition6", "condition7"}),
 		},
 		"too-many-binding-failure-conditions": {
-			wantFailures: field.ErrorList{field.TooMany(field.NewPath("spec", "devices").Index(0).Child("bindingFailureConditions"), resourceapi.BindingConditionsMaxSize+1, resourceapi.BindingConditionsMaxSize)},
+			wantFailures: field.ErrorList{field.TooMany(field.NewPath("spec", "devices").Index(0).Child("bindingFailureConditions"), resourceapi.BindingConditionsMaxSize+1, resourceapi.BindingConditionsMaxSize).MarkCoveredByDeclarative()},
 			slice:        testResourceSliceWithBindingConditions(goodName, goodName, driverName, 1, []string{"condition1", "condition2"}, []string{"condition3", "condition4", "condition5", "condition6", "condition7"}),
 		},
 		"invalid-binding-conditions": {
