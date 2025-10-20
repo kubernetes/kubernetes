@@ -68495,6 +68495,12 @@ func schema_k8sio_kube_scheduler_config_v1_DynamicResourcesArgs(ref common.Refer
 							Ref:         ref(metav1.Duration{}.OpenAPIModelName()),
 						},
 					},
+					"bindingTimeout": {
+						SchemaProps: spec.SchemaProps{
+							Description: "BindingTimeout limits how long the PreBind extension point may wait for ResourceClaim device BindingConditions to become satisfied when such conditions are present. While waiting, the scheduler periodically checks device status. If the timeout elapses before all required conditions are true (or any bindingFailureConditions become true), the allocation is cleared and the Pod re-enters scheduling queue. Note that the same or other node may be chosen if feasible; otherwise the Pod is placed in the unschedulable queue and retried based on cluster changes and backoff.\n\nDefaults & feature gates:\n  - Defaults to 10 minutes when the DRADeviceBindingConditions feature gate is enabled.\n  - Has effect only when BOTH DRADeviceBindingConditions and\n    DRAResourceClaimDeviceStatus are enabled; otherwise omit this field.\n  - When DRADeviceBindingConditions is disabled, setting this field is considered an error.\n\nValid values:\n  - >=1s (non-zero). No upper bound is enforced.\n\nTuning guidance:\n  - Lower values reduce time-to-retry when devices aren’t ready but can\n    increase churn if drivers typically need longer to report readiness.\n  - Review scheduler latency metrics (e.g. PreBind duration in\n    `scheduler_framework_extension_point_duration_seconds`) and driver\n    readiness behavior before tightening this timeout.",
+							Ref:         ref(metav1.Duration{}.OpenAPIModelName()),
+						},
+					},
 				},
 				Required: []string{"filterTimeout"},
 			},
