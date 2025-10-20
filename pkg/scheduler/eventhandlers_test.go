@@ -30,6 +30,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	resourcealphaapi "k8s.io/api/resource/v1alpha3"
+	schedulingapi "k8s.io/api/scheduling/v1alpha1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -440,6 +441,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 		gvkMap                 map[fwk.EventResource]fwk.ActionType
 		enableDRA              bool
 		enableDRADeviceTaints  bool
+		enableGenericWorkload  bool
 		expectStaticInformers  map[reflect.Type]bool
 		expectDynamicInformers map[schema.GroupVersionResource]bool
 	}{
@@ -506,6 +508,35 @@ func TestAddAllEventHandlers(t *testing.T) {
 			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
 		},
 		{
+			name: "Workload events disabled",
+			gvkMap: map[fwk.EventResource]fwk.ActionType{
+				fwk.Workload: fwk.Add,
+			},
+			expectStaticInformers: map[reflect.Type]bool{
+				reflect.TypeOf(&v1.Pod{}):       true,
+				reflect.TypeOf(&v1.Node{}):      true,
+				reflect.TypeOf(&v1.Namespace{}): true,
+			},
+			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
+		},
+		{
+			name: "Workload events enabled",
+			gvkMap: map[fwk.EventResource]fwk.ActionType{
+				fwk.Workload: fwk.Add,
+			},
+			enableDRA:             true,
+			enableGenericWorkload: true,
+			expectStaticInformers: map[reflect.Type]bool{
+				reflect.TypeOf(&v1.Pod{}):                    true,
+				reflect.TypeOf(&v1.Node{}):                   true,
+				reflect.TypeOf(&v1.Namespace{}):              true,
+				reflect.TypeOf(&resourceapi.ResourceClaim{}): true,
+				reflect.TypeOf(&resourceapi.ResourceSlice{}): true,
+				reflect.TypeOf(&schedulingapi.Workload{}):    true,
+			},
+			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
+		},
+		{
 			name: "add GVKs handlers defined in framework dynamically",
 			gvkMap: map[fwk.EventResource]fwk.ActionType{
 				"Pod":                               fwk.Add | fwk.Delete,
@@ -565,6 +596,8 @@ func TestAddAllEventHandlers(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if !tt.enableDRA {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
+			} else {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, tt.enableGenericWorkload)
 			}
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.DynamicResourceAllocation: tt.enableDRA,
