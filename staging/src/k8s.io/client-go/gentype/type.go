@@ -23,9 +23,9 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	rest "k8s.io/client-go/rest"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/apply"
 )
 
@@ -318,7 +318,7 @@ func (a *alsoApplier[T, C]) Apply(ctx context.Context, obj C, opts metav1.ApplyO
 	return result, err
 }
 
-// Apply takes the given apply declarative configuration, applies it to the status subresource and returns the applied resource.
+// ApplyStatus takes the given apply declarative configuration, applies it to the status subresource and returns the applied resource.
 func (a *alsoApplier[T, C]) ApplyStatus(ctx context.Context, obj C, opts metav1.ApplyOptions) (T, error) {
 	if obj == *new(C) {
 		return *new(T), fmt.Errorf("object provided to Apply must not be nil")
