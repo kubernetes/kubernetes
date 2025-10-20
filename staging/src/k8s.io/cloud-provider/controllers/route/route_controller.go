@@ -24,6 +24,7 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/time/rate"
 	"k8s.io/klog/v2"
 	netutils "k8s.io/utils/net"
 
@@ -53,7 +54,8 @@ import (
 const (
 	// Maximal number of concurrent route operation API calls.
 	// TODO: This should be per-provider.
-	maxConcurrentRouteOperations int = 200
+	maxConcurrentRouteOperations int           = 200
+	minRouteResyncInterval       time.Duration = 10 * time.Second
 )
 
 var updateNetworkConditionBackoff = wait.Backoff{
@@ -98,7 +100,7 @@ func New(
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.CloudControllerManagerWatchBasedRoutesReconciliation) {
 		rc.workqueue = workqueue.NewTypedRateLimitingQueueWithConfig(
-			workqueue.DefaultTypedControllerRateLimiter[string](),
+			&workqueue.TypedBucketRateLimiter[string]{Limiter: rate.NewLimiter(rate.Every(minRouteResyncInterval), 1)},
 			workqueue.TypedRateLimitingQueueConfig[string]{Name: "Routes"},
 		)
 
