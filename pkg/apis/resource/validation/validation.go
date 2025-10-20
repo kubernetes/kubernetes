@@ -1368,7 +1368,7 @@ func validateDeviceTaint(taint resource.DeviceTaint, fldPath *field.Path) field.
 	case taint.Effect == "":
 		allErrs = append(allErrs, field.Required(fldPath.Child("effect"), "")) // Required in a taint.
 	case !validDeviceTaintEffects.Has(taint.Effect):
-		allErrs = append(allErrs, field.NotSupported(fldPath.Child("effect"), taint.Effect, sets.List(validDeviceTaintEffects)).MarkCoveredByDeclarative())
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("effect"), taint.Effect, sets.List(validDeviceTaintEffects)))
 	}
 
 	return allErrs
