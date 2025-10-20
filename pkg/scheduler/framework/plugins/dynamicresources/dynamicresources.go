@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"iter"
-	"math"
 	"slices"
 	"sort"
 	"strings"
@@ -55,6 +54,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources/extended"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
@@ -1102,7 +1102,7 @@ func (pl *DynamicResources) Score(ctx context.Context, cs fwk.CycleState, pod *v
 	}
 
 	// Do we need to hold the mutex here? We don't write anything, but are
-	// we guaranteeed to see data written by another thread without syncronization?
+	// we guaranteeed to see data written by another thread without synchronization?
 	allocations, found := state.nodeAllocations[nodeInfo.Node().Name]
 	if !found {
 		return 0, nil
@@ -1154,32 +1154,7 @@ func (pl *DynamicResources) NormalizeScore(ctx context.Context, cs fwk.CycleStat
 	if !pl.enabled {
 		return nil
 	}
-	normalizeScore(scores)
-	return nil
-}
-
-func normalizeScore(scores fwk.NodeScoreList) {
-	maxScore := int64(0)
-	minScore := int64(math.MaxInt64)
-	for _, s := range scores {
-		if s.Score > maxScore {
-			maxScore = s.Score
-		}
-		if s.Score < minScore {
-			minScore = s.Score
-		}
-	}
-
-	// This means all scores are the same, so no need to normalize. Also,
-	// return early so we don't end up dividing by zero.
-	if maxScore == minScore {
-		return
-	}
-
-	for i := range scores {
-		score := int64(float64(scores[i].Score-minScore) / float64(maxScore-minScore) * 100)
-		scores[i].Score = score
-	}
+	return helper.DefaultNormalizeScore(fwk.MaxNodeScore, false, scores)
 }
 
 // Reserve reserves claims for the pod.

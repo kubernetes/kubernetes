@@ -2124,7 +2124,7 @@ func TestPlugin(t *testing.T) {
 					},
 					{
 						Name:  node2Name,
-						Score: 0,
+						Score: 87,
 					},
 				},
 				reserve: result{
@@ -2180,7 +2180,7 @@ func TestPlugin(t *testing.T) {
 					},
 					{
 						Name:  workerNode2.Name,
-						Score: 0,
+						Score: 86,
 					},
 				},
 				reserve: result{
@@ -2239,11 +2239,11 @@ func TestPlugin(t *testing.T) {
 					},
 					{
 						Name:  workerNode2.Name,
-						Score: 50,
+						Score: 93,
 					},
 					{
 						Name:  workerNode3.Name,
-						Score: 0,
+						Score: 87,
 					},
 				},
 				reserve: result{
@@ -3613,7 +3613,7 @@ func Test_computesScore(t *testing.T) {
 	}
 }
 
-func Test_normalizeScore(t *testing.T) {
+func TestNormalizeScore(t *testing.T) {
 	testcases := map[string]struct {
 		scores         fwk.NodeScoreList
 		expectedScores fwk.NodeScoreList
@@ -3632,7 +3632,7 @@ func Test_normalizeScore(t *testing.T) {
 			expectedScores: fwk.NodeScoreList{
 				{
 					Name:  "node-1",
-					Score: 42,
+					Score: 100,
 				},
 			},
 		},
@@ -3650,11 +3650,33 @@ func Test_normalizeScore(t *testing.T) {
 			expectedScores: fwk.NodeScoreList{
 				{
 					Name:  "node-1",
-					Score: 8,
+					Score: 100,
 				},
 				{
 					Name:  "node-2",
-					Score: 8,
+					Score: 100,
+				},
+			},
+		},
+		"all-same-very-large": {
+			scores: fwk.NodeScoreList{
+				{
+					Name:  "node-1",
+					Score: math.MaxInt32,
+				},
+				{
+					Name:  "node-2",
+					Score: math.MaxInt32,
+				},
+			},
+			expectedScores: fwk.NodeScoreList{
+				{
+					Name:  "node-1",
+					Score: 100,
+				},
+				{
+					Name:  "node-2",
+					Score: 100,
 				},
 			},
 		},
@@ -3662,7 +3684,7 @@ func Test_normalizeScore(t *testing.T) {
 			scores: fwk.NodeScoreList{
 				{
 					Name:  "node-1",
-					Score: math.MaxInt64,
+					Score: math.MaxInt32,
 				},
 				{
 					Name:  "node-2",
@@ -3702,11 +3724,11 @@ func Test_normalizeScore(t *testing.T) {
 				},
 				{
 					Name:  "node-2",
-					Score: 50,
+					Score: 98,
 				},
 				{
 					Name:  "node-3",
-					Score: 0,
+					Score: 97,
 				},
 			},
 		},
@@ -3714,11 +3736,11 @@ func Test_normalizeScore(t *testing.T) {
 			scores: fwk.NodeScoreList{
 				{
 					Name:  "node-1",
-					Score: math.MaxInt64,
+					Score: math.MaxInt32,
 				},
 				{
 					Name:  "node-2",
-					Score: math.MaxInt64 - 1,
+					Score: math.MaxInt32 - 1,
 				},
 				{
 					Name:  "node-3",
@@ -3736,7 +3758,7 @@ func Test_normalizeScore(t *testing.T) {
 				},
 				{
 					Name:  "node-2",
-					Score: 100,
+					Score: 99,
 				},
 				{
 					Name:  "node-3",
@@ -3752,8 +3774,11 @@ func Test_normalizeScore(t *testing.T) {
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
+			pl := &DynamicResources{
+				enabled: true,
+			}
 			scores := tc.scores
-			normalizeScore(scores)
+			_ = pl.NormalizeScore(context.Background(), nil, nil, scores)
 			assert.Equal(t, tc.expectedScores, scores)
 		})
 	}
