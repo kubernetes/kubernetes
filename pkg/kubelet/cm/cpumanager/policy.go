@@ -43,4 +43,8 @@ type Policy interface {
 	GetPodTopologyHints(logger logr.Logger, s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint
 	// GetAllocatableCPUs returns the total set of CPUs available for allocation.
 	GetAllocatableCPUs(m state.State) cpuset.CPUSet
+	// Release pod leaked CPUs
+	ReleaseLeakedCPUs(logger logr.Logger, s state.State, pod *v1.Pod) cpuset.CPUSet
+	// Reallocate the leaked CPUs for InitContainer
+	UpdateCPUsForInitC(logger logr.Logger, s state.State, pod *v1.Pod, containerName string, leakedCPUs cpuset.CPUSet)
 }
