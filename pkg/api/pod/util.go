@@ -419,15 +419,16 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		AllowNamespacedSysctlsForHostNetAndHostIPC:          false,
 		AllowNonLocalProjectedTokenPath:                     false,
 		AllowPodLifecycleSleepActionZeroValue:               utilfeature.DefaultFeatureGate.Enabled(features.PodLifecycleSleepActionAllowZero),
-		PodLevelResourcesEnabled:                            utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
 		AllowInvalidLabelValueInRequiredNodeAffinity:        false,
 		AllowSidecarResizePolicy:                            utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
 		AllowMatchLabelKeysInPodTopologySpread:              utilfeature.DefaultFeatureGate.Enabled(features.MatchLabelKeysInPodTopologySpread),
 		AllowMatchLabelKeysInPodTopologySpreadSelectorMerge: utilfeature.DefaultFeatureGate.Enabled(features.MatchLabelKeysInPodTopologySpreadSelectorMerge),
+		InPlacePodLevelResourcesVerticalScalingEnabled:      utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling),
 		OldPodViolatesMatchLabelKeysValidation:              false,
 		OldPodViolatesLegacyMatchLabelKeysValidation:        false,
 		AllowContainerRestartPolicyRules:                    utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules),
 		AllowUserNamespacesWithVolumeDevices:                false,
+		PodLevelResourcesEnabled:                            utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
 	}
 
 	// If old spec uses relaxed validation or enabled the RelaxedEnvironmentVariableValidation feature gate,
