@@ -1022,6 +1022,23 @@ func testValidateStatusUpdateForDeclarative(t *testing.T, apiVersion string) {
 				field.TooMany(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("bindingConditions"), resource.BindingConditionsMaxSize+1, resource.BindingConditionsMaxSize).WithOrigin("maxItems"),
 			},
 		},
+		"valid binding failure conditions, max items": {
+			old: mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(
+				tweakStatusBindingConditions(1),
+				tweakStatusBindingFailureConditions(resource.BindingFailureConditionsMaxSize),
+			),
+		},
+		"invalid binding failure conditions, too many": {
+			old: mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(
+				tweakStatusBindingConditions(1),
+				tweakStatusBindingFailureConditions(resource.BindingFailureConditionsMaxSize+1),
+			),
+			expectedErrs: field.ErrorList{
+				field.TooMany(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("bindingFailureConditions"), resource.BindingFailureConditionsMaxSize+1, resource.BindingFailureConditionsMaxSize).WithOrigin("maxItems"),
+			},
+		},
 	}
 
 	for k, tc := range testCases {
