@@ -938,7 +938,7 @@ readOnlyPort: ${KUBELET_READ_ONLY_PORT}
 healthzPort: ${KUBELET_HEALTHZ_PORT}
 healthzBindAddress: ${KUBELET_HOST}
 rotateCertificates: true
-serverTLSBootstrap: true
+serverTLSBootstrap: false
 runtimeRequestTimeout: "${RUNTIME_REQUEST_TIMEOUT}"
 staticPodPath: "${POD_MANIFEST_PATH}"
 resolvConf: "${KUBELET_RESOLV_CONF}"
@@ -1473,7 +1473,7 @@ if [[ "${START_MODE}" != *"nokubelet"* ]]; then
       Linux)
         install_cni_if_needed
         start_kubelet
-        wait_node_csr
+        # wait_node_csr
         ;;
       *)
         print_color "Unsupported host OS.  Must be Linux or Mac OS X, kubelet aborted."

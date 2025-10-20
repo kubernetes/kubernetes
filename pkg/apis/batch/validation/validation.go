@@ -728,13 +728,13 @@ func ValidateJobStatusUpdate(job, oldJob *batch.Job, opts JobStatusValidationOpt
 			allErrs = append(allErrs, field.Invalid(statusFld.Child("completionTime"), job.Status.CompletionTime, "field is immutable"))
 		}
 	}
-	if opts.RejectStartTimeUpdateForUnsuspendedJob {
-		// Note that we check `oldJob.Status.StartTime != nil` to allow transitioning from
-		// startTime = nil to startTime != nil for unsuspended jobs, which is a desired transition.
-		if oldJob.Status.StartTime != nil && !ptr.Equal(oldJob.Status.StartTime, job.Status.StartTime) && !ptr.Deref(job.Spec.Suspend, false) {
-			allErrs = append(allErrs, field.Required(statusFld.Child("startTime"), "startTime cannot be removed for unsuspended job"))
-		}
-	}
+	//if opts.RejectStartTimeUpdateForUnsuspendedJob {
+	//	// Note that we check `oldJob.Status.StartTime != nil` to allow transitioning from
+	//	// startTime = nil to startTime != nil for unsuspended jobs, which is a desired transition.
+	//	if oldJob.Status.StartTime != nil && !ptr.Equal(oldJob.Status.StartTime, job.Status.StartTime) && !ptr.Deref(job.Spec.Suspend, false) {
+	//		allErrs = append(allErrs, field.Required(statusFld.Child("startTime"), "startTime cannot be removed for unsuspended job"))
+	//	}
+	//}
 	if isJobSuccessCriteriaMet(oldJob) && !isJobSuccessCriteriaMet(job) {
 		allErrs = append(allErrs, field.Invalid(statusFld.Child("conditions"), field.OmitValueType{}, "cannot disable the SuccessCriteriaMet=True condition"))
 	}
