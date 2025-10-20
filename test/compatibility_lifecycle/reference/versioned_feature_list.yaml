@@ -719,6 +719,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.35"
+- name: InPlacePodLevelResourcesVerticalScaling
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.35"    
 - name: InPlacePodVerticalScaling
   versionedSpecs:
   - default: false
