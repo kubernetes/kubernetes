@@ -79,3 +79,11 @@ func (p *nonePolicy) AllocatePod(_ logr.Logger, s state.State, pod *v1.Pod) erro
 func (p *nonePolicy) GetAllocatableCPUs(m state.State) cpuset.CPUSet {
 	return cpuset.New()
 }
+
+func (p *nonePolicy) ReleaseLeakedCPUs(logger logr.Logger, s state.State, pod *v1.Pod) cpuset.CPUSet {
+	return cpuset.New()
+}
+
+func (p *nonePolicy) UpdateCPUsForInitC(logger logr.Logger, s state.State, pod *v1.Pod, containerName string, leakedCPUs cpuset.CPUSet) {
+	// Do nothing
+}
