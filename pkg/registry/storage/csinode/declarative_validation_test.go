@@ -12,3 +12,62 @@ limitations under the License.
 */
 
 package csinode
+
+import (
+	storage "k8s.io/api/storage/v1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	"testing"
+)
+
+var apiVersions = []string{"v1", "v1alpha1", "v1beta1"}
+
+func TestDeclarativeValidateForDeclarative(t *testing.T) {
+	for _, apiVersion := range apiVersions {
+		testDeclarativeValidateForDeclarative(t, apiVersion)
+	}
+}
+
+func testDeclarativeValidateForDeclarative(t *testing.T, apiVersion string) {
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+		APIGroup:   "storage.k8s.io",
+		APIVersion: apiVersion,
+	})
+	testCases := map[string]struct {
+		input        storage.CSINode
+		expectedErrs field.ErrorList
+	}{
+		// TODO: Add more test cases
+	}
+	for k, tc := range testCases {
+		t.Run(k, func(t *testing.T) {
+			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, Strategy.Validate, tc.expectedErrs)
+		})
+	}
+}
+
+func TestValidateUpdateForDeclarative(t *testing.T) {
+	for _, apiVersion := range apiVersions {
+		testValidateUpdateForDeclarative(t, apiVersion)
+	}
+}
+
+func testValidateUpdateForDeclarative(t *testing.T, apiVersion string) {
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+		APIGroup:   "storage.k8s.io",
+		APIVersion: apiVersion,
+	})
+	testCases := map[string]struct {
+		old          storage.CSINode
+		update       storage.CSINode
+		expectedErrs field.ErrorList
+	}{
+		// TODO: Add more test cases
+	}
+	for k, tc := range testCases {
+		t.Run(k, func(t *testing.T) {
+			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, Strategy.ValidateUpdate, tc.expectedErrs)
+		})
+	}
+}
