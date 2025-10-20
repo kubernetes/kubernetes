@@ -96,7 +96,6 @@ type JobList struct {
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// items is the list of Jobs.
-	// +required
 	Items []Job `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
@@ -256,7 +255,7 @@ type PodFailurePolicy struct {
 	// counter of pod failures is incremented and it is checked against
 	// the backoffLimit. At most 20 elements are allowed.
 	// +listType=atomic
-	// +required
+	// +optional
 	Rules []PodFailurePolicyRule `json:"rules" protobuf:"bytes,1,opt,name=rules"`
 }
 
@@ -407,7 +406,7 @@ type JobSpec struct {
 	// Describes the pod that will be created when executing a job.
 	// The only allowed template.spec.restartPolicy values are "Never" or "OnFailure".
 	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/
-	// +required
+	// +optional
 	Template corev1.PodTemplateSpec `json:"template" protobuf:"bytes,6,opt,name=template"`
 
 	// ttlSecondsAfterFinished limits the lifetime of a Job that has finished
@@ -654,10 +653,10 @@ const (
 // JobCondition describes current state of a job.
 type JobCondition struct {
 	// Type of job condition, Complete or Failed.
-	// +required
+	// +optional
 	Type JobConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=JobConditionType"`
 	// Status of the condition, one of True, False, Unknown.
-	// +required
+	// +optional
 	Status corev1.ConditionStatus `json:"status" protobuf:"bytes,2,opt,name=status,casttype=k8s.io/api/core/v1.ConditionStatus"`
 	// Last time the condition was checked.
 	// +optional
@@ -765,7 +764,7 @@ type CronJobSpec struct {
 	Suspend *bool `json:"suspend,omitempty" protobuf:"varint,4,opt,name=suspend"`
 
 	// Specifies the job that will be created when executing a CronJob.
-	// +required
+	// +optional
 	JobTemplate JobTemplateSpec `json:"jobTemplate" protobuf:"bytes,5,opt,name=jobTemplate"`
 
 	// The number of successful finished jobs to retain. Value must be non-negative integer.

@@ -77,7 +77,6 @@ type CronJobList struct {
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// items is the list of CronJobs.
-	// +required
 	Items []CronJob `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
