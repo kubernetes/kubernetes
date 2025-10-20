@@ -61,6 +61,9 @@ func applyFeatureGates(config *v1.Plugins) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
 		applyDynamicResources(config)
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.GangScheduling) {
+		applyGangScheduling(config)
+	}
 }
 
 func applyDynamicResources(config *v1.Plugins) {
@@ -79,6 +82,10 @@ func applyDynamicResources(config *v1.Plugins) {
 			break
 		}
 	}
+}
+
+func applyGangScheduling(config *v1.Plugins) {
+	config.MultiPoint.Enabled = append(config.MultiPoint.Enabled, v1.Plugin{Name: names.GangScheduling})
 }
 
 // mergePlugins merges the custom set into the given default one, handling disabled sets.
