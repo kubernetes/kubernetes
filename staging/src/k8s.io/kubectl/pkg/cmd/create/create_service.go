@@ -65,6 +65,8 @@ type ServiceOptions struct {
 
 	Name         string
 	TCP          []string
+	UDP          []string
+	SCTP         []string
 	Type         corev1.ServiceType
 	ClusterIP    string
 	NodePort     int
@@ -140,8 +142,8 @@ func (o *ServiceOptions) Validate() error {
 	if o.ClusterIP == corev1.ClusterIPNone && o.Type != corev1.ServiceTypeClusterIP {
 		return fmt.Errorf("ClusterIP=None can only be used with ClusterIP service type")
 	}
-	if o.ClusterIP != corev1.ClusterIPNone && len(o.TCP) == 0 && o.Type != corev1.ServiceTypeExternalName {
-		return fmt.Errorf("at least one tcp port specifier must be provided")
+	if o.ClusterIP != corev1.ClusterIPNone && (len(o.TCP)+len(o.UDP)+len(o.SCTP) == 0) && o.Type != corev1.ServiceTypeExternalName {
+		return fmt.Errorf("at least one port specifier must be provided")
 	}
 	if o.Type == corev1.ServiceTypeExternalName {
 		if errs := validation.IsDNS1123Subdomain(o.ExternalName); len(errs) != 0 {
@@ -151,23 +153,45 @@ func (o *ServiceOptions) Validate() error {
 	return nil
 }
 
-func (o *ServiceOptions) createService() (*corev1.Service, error) {
-	ports := []corev1.ServicePort{}
-	for _, tcpString := range o.TCP {
-		port, targetPort, err := parsePorts(tcpString)
+func collectServicePorts(proto corev1.Protocol, specs []string, nodePort int) ([]corev1.ServicePort, error) {
+	var ports []corev1.ServicePort
+	for _, spec := range specs {
+		port, targetPort, err := parsePorts(spec)
 		if err != nil {
 			return nil, err
 		}
 
-		portName := strings.Replace(tcpString, ":", "-", -1)
+		// prepend protocol in the port name to avoid collisions between same port numbers for different protocols,
+		// except for TCP to maintain backward compatibility
+		portName := strings.ReplaceAll(spec, ":", "-")
+		if proto != corev1.ProtocolTCP {
+			portName = strings.ToLower(string(proto) + "-" + portName)
+		}
 		ports = append(ports, corev1.ServicePort{
 			Name:       portName,
 			Port:       port,
 			TargetPort: targetPort,
-			Protocol:   corev1.Protocol("TCP"),
-			NodePort:   int32(o.NodePort),
+			Protocol:   proto,
+			NodePort:   int32(nodePort),
 		})
 	}
+	return ports, nil
+}
+
+func (o *ServiceOptions) createService() (*corev1.Service, error) {
+	tcpPorts, err := collectServicePorts(corev1.ProtocolTCP, o.TCP, o.NodePort)
+	if err != nil {
+		return nil, err
+	}
+	udpPorts, err := collectServicePorts(corev1.ProtocolUDP, o.UDP, o.NodePort)
+	if err != nil {
+		return nil, err
+	}
+	sctpPorts, err := collectServicePorts(corev1.ProtocolSCTP, o.SCTP, o.NodePort)
+	if err != nil {
+		return nil, err
+	}
+	ports := append(append(tcpPorts, udpPorts...), sctpPorts...)
 
 	// setup default label and selector
 	labels := map[string]string{}
@@ -245,7 +269,7 @@ func NewCmdCreateServiceClusterIP(f cmdutil.Factory, ioStreams genericiooptions.
 	o := NewServiceOptions(ioStreams, corev1.ServiceTypeClusterIP)
 
 	cmd := &cobra.Command{
-		Use:                   "clusterip NAME [--tcp=<port>:<targetPort>] [--dry-run=server|client|none]",
+		Use:                   "clusterip NAME [--tcp=<port>:<targetPort>] [--udp=<port>:<targetPort>] [--sctp=<port>:<targetPort>] [--dry-run=server|client|none]",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Create a ClusterIP service"),
 		Long:                  serviceClusterIPLong,
@@ -261,7 +285,9 @@ func NewCmdCreateServiceClusterIP(f cmdutil.Factory, ioStreams genericiooptions.
 
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
-	cmd.Flags().StringSliceVar(&o.TCP, "tcp", o.TCP, "Port pairs can be specified as '<port>:<targetPort>'.")
+	cmd.Flags().StringSliceVar(&o.TCP, "tcp", o.TCP, "TCP port pairs can be specified as '<port>:<targetPort>'.")
+	cmd.Flags().StringSliceVar(&o.UDP, "udp", o.UDP, "UDP port pairs can be specified as '<port>:<targetPort>'.")
+	cmd.Flags().StringSliceVar(&o.SCTP, "sctp", o.SCTP, "SCTP port pairs can be specified as '<port>:<targetPort>'.")
 	cmd.Flags().StringVar(&o.ClusterIP, "clusterip", o.ClusterIP, i18n.T("Assign your own ClusterIP or set to 'None' for a 'headless' service (no loadbalancing)."))
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
 	cmdutil.AddDryRunFlag(cmd)
@@ -283,7 +309,7 @@ func NewCmdCreateServiceNodePort(f cmdutil.Factory, ioStreams genericiooptions.I
 	o := NewServiceOptions(ioStreams, corev1.ServiceTypeNodePort)
 
 	cmd := &cobra.Command{
-		Use:                   "nodeport NAME [--tcp=port:targetPort] [--dry-run=server|client|none]",
+		Use:                   "nodeport NAME [--tcp=port:targetPort] [--udp=port:targetPort] [--sctp=port:targetPort] [--dry-run=server|client|none]",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Create a NodePort service"),
 		Long:                  serviceNodePortLong,
@@ -301,7 +327,9 @@ func NewCmdCreateServiceNodePort(f cmdutil.Factory, ioStreams genericiooptions.I
 	cmdutil.AddValidateFlags(cmd)
 	cmd.Flags().IntVar(&o.NodePort, "node-port", o.NodePort, "Port used to expose the service on each node in a cluster.")
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
-	cmd.Flags().StringSliceVar(&o.TCP, "tcp", o.TCP, "Port pairs can be specified as '<port>:<targetPort>'.")
+	cmd.Flags().StringSliceVar(&o.TCP, "tcp", o.TCP, "TCP port pairs can be specified as '<port>:<targetPort>'.")
+	cmd.Flags().StringSliceVar(&o.UDP, "udp", o.UDP, "UDP port pairs can be specified as '<port>:<targetPort>'.")
+	cmd.Flags().StringSliceVar(&o.SCTP, "sctp", o.SCTP, "SCTP port pairs can be specified as '<port>:<targetPort>'.")
 	cmdutil.AddDryRunFlag(cmd)
 	return cmd
 }
@@ -320,7 +348,7 @@ func NewCmdCreateServiceLoadBalancer(f cmdutil.Factory, ioStreams genericiooptio
 	o := NewServiceOptions(ioStreams, corev1.ServiceTypeLoadBalancer)
 
 	cmd := &cobra.Command{
-		Use:                   "loadbalancer NAME [--tcp=port:targetPort] [--dry-run=server|client|none]",
+		Use:                   "loadbalancer NAME [--tcp=port:targetPort] [--udp=port:targetPort] [--sctp=port:targetPort] [--dry-run=server|client|none]",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Create a LoadBalancer service"),
 		Long:                  serviceLoadBalancerLong,
@@ -336,7 +364,9 @@ func NewCmdCreateServiceLoadBalancer(f cmdutil.Factory, ioStreams genericiooptio
 
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
-	cmd.Flags().StringSliceVar(&o.TCP, "tcp", o.TCP, "Port pairs can be specified as '<port>:<targetPort>'.")
+	cmd.Flags().StringSliceVar(&o.TCP, "tcp", o.TCP, "TCP port pairs can be specified as '<port>:<targetPort>'.")
+	cmd.Flags().StringSliceVar(&o.UDP, "udp", o.UDP, "UDP port pairs can be specified as '<port>:<targetPort>'.")
+	cmd.Flags().StringSliceVar(&o.SCTP, "sctp", o.SCTP, "SCTP port pairs can be specified as '<port>:<targetPort>'.")
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
 	cmdutil.AddDryRunFlag(cmd)
 	return cmd
@@ -360,7 +390,7 @@ func NewCmdCreateServiceExternalName(f cmdutil.Factory, ioStreams genericiooptio
 	o := NewServiceOptions(ioStreams, corev1.ServiceTypeExternalName)
 
 	cmd := &cobra.Command{
-		Use:                   "externalname NAME --external-name external.name [--dry-run=server|client|none]",
+		Use:                   "externalname NAME --external-name external.name [--tcp=<port>:<targetPort>] [--udp=<port>:<targetPort>] [--sctp=<port>:<targetPort>] [--dry-run=server|client|none]",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Create an ExternalName service"),
 		Long:                  serviceExternalNameLong,
@@ -376,7 +406,9 @@ func NewCmdCreateServiceExternalName(f cmdutil.Factory, ioStreams genericiooptio
 
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
-	cmd.Flags().StringSliceVar(&o.TCP, "tcp", o.TCP, "Port pairs can be specified as '<port>:<targetPort>'.")
+	cmd.Flags().StringSliceVar(&o.TCP, "tcp", o.TCP, "TCP port pairs can be specified as '<port>:<targetPort>'.")
+	cmd.Flags().StringSliceVar(&o.UDP, "udp", o.UDP, "UDP port pairs can be specified as '<port>:<targetPort>'.")
+	cmd.Flags().StringSliceVar(&o.SCTP, "sctp", o.SCTP, "SCTP port pairs can be specified as '<port>:<targetPort>'.")
 	cmd.Flags().StringVar(&o.ExternalName, "external-name", o.ExternalName, i18n.T("External name of service"))
 	cmd.MarkFlagRequired("external-name")
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
