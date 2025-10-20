@@ -178,7 +178,7 @@ func NewFilteredMetadataInformer(client metadata.Interface, gvr schema.GroupVers
 	return &metadataInformer{
 		gvr: gvr,
 		informer: cache.NewSharedIndexInformer(
-			&cache.ListWatch{
+			cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 					if tweakListOptions != nil {
 						tweakListOptions(&options)
@@ -203,7 +203,7 @@ func NewFilteredMetadataInformer(client metadata.Interface, gvr schema.GroupVers
 					}
 					return client.Resource(gvr).Namespace(namespace).Watch(ctx, options)
 				},
-			},
+			}, client),
 			&metav1.PartialObjectMetadata{},
 			resyncPeriod,
 			indexers,
