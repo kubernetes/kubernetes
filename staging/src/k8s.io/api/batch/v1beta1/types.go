@@ -77,6 +77,7 @@ type CronJobList struct {
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// items is the list of CronJobs.
+	// +required
 	Items []CronJob `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
@@ -84,6 +85,7 @@ type CronJobList struct {
 type CronJobSpec struct {
 
 	// The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
+	// +required
 	Schedule string `json:"schedule" protobuf:"bytes,1,opt,name=schedule"`
 
 	// The time zone name for the given schedule, see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones.
@@ -118,6 +120,7 @@ type CronJobSpec struct {
 	Suspend *bool `json:"suspend,omitempty" protobuf:"varint,4,opt,name=suspend"`
 
 	// Specifies the job that will be created when executing a CronJob.
+	// +required
 	JobTemplate JobTemplateSpec `json:"jobTemplate" protobuf:"bytes,5,opt,name=jobTemplate"`
 
 	// The number of successful finished jobs to retain.
