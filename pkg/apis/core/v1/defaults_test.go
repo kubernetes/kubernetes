@@ -49,12 +49,7 @@ func TestWorkloadDefaults(t *testing.T) {
 	t.Run("disabled_features", func(t *testing.T) { testWorkloadDefaults(t, false) })
 }
 func testWorkloadDefaults(t *testing.T, featuresEnabled bool) {
-	allFeatures := utilfeature.DefaultFeatureGate.DeepCopy().GetAll()
-	for feature, featureSpec := range allFeatures {
-		if !featureSpec.LockToDefault {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, featuresEnabled)
-		}
-	}
+	setAllFeatures(t, featuresEnabled)
 	// New defaults under PodTemplateSpec are only acceptable if they would not be applied when reading data from a previous release.
 	// Forbidden: adding a new field `MyField *bool` and defaulting it to a non-nil value
 	// Forbidden: defaulting an existing field `MyField *bool` when it was previously not defaulted
@@ -240,12 +235,7 @@ func TestPodDefaults(t *testing.T) {
 	t.Run("disabled_features", func(t *testing.T) { testPodDefaults(t, false) })
 }
 func testPodDefaults(t *testing.T, featuresEnabled bool) {
-	features := utilfeature.DefaultFeatureGate.DeepCopy().GetAll()
-	for feature, featureSpec := range features {
-		if !featureSpec.LockToDefault {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, featuresEnabled)
-		}
-	}
+	setAllFeatures(t, featuresEnabled)
 	pod := &v1.Pod{}
 	// New defaults under PodSpec are only acceptable if they would not be applied when reading data from a previous release.
 	// Forbidden: adding a new field `MyField *bool` and defaulting it to a non-nil value
@@ -3394,4 +3384,14 @@ func TestSetDefaults_PodLogOptions(t *testing.T) {
 			}
 		})
 	}
+}
+
+func setAllFeatures(t *testing.T, featuresEnabled bool) {
+	features := featuregatetesting.FeatureOverrides{}
+	for feature, featureSpec := range utilfeature.DefaultFeatureGate.DeepCopy().GetAll() {
+		if !featureSpec.LockToDefault {
+			features[feature] = featuresEnabled
+		}
+	}
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, features)
 }

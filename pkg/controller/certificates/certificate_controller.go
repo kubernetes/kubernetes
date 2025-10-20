@@ -120,7 +120,7 @@ func (cc *CertificateController) Run(ctx context.Context, workers int) {
 	logger.Info("Starting certificate controller", "name", cc.name)
 	defer logger.Info("Shutting down certificate controller", "name", cc.name)
 
-	if !cache.WaitForNamedCacheSync(fmt.Sprintf("certificate-%s", cc.name), ctx.Done(), cc.csrsSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, cc.csrsSynced) {
 		return
 	}
 

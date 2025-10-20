@@ -29,10 +29,15 @@ import (
 
 // LeaseApplyConfiguration represents a declarative configuration of the Lease type for use
 // with apply.
+//
+// Lease defines a lease concept.
 type LeaseApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                                 *LeaseSpecApplyConfiguration `json:"spec,omitempty"`
+	// spec contains the specification of the Lease.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Spec *LeaseSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
 // Lease constructs a declarative configuration of the Lease type for use with
@@ -53,7 +58,6 @@ func Lease(name, namespace string) *LeaseApplyConfiguration {
 // ExtractLeaseFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractLeaseFrom(lease *coordinationv1.Lease, fieldManager string, subresource string) (*LeaseApplyConfiguration, error) {
 	b := &LeaseApplyConfiguration{}
 	err := managedfields.ExtractInto(lease, internal.Parser().Type("io.k8s.api.coordination.v1.Lease"), fieldManager, b, subresource)
@@ -78,7 +82,6 @@ func ExtractLeaseFrom(lease *coordinationv1.Lease, fieldManager string, subresou
 // ExtractLease provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractLease(lease *coordinationv1.Lease, fieldManager string) (*LeaseApplyConfiguration, error) {
 	return ExtractLeaseFrom(lease, fieldManager, "")
 }

@@ -20,11 +20,27 @@ package v1
 
 // VolumeAttachmentStatusApplyConfiguration represents a declarative configuration of the VolumeAttachmentStatus type for use
 // with apply.
+//
+// VolumeAttachmentStatus is the status of a VolumeAttachment request.
 type VolumeAttachmentStatusApplyConfiguration struct {
-	Attached           *bool                          `json:"attached,omitempty"`
-	AttachmentMetadata map[string]string              `json:"attachmentMetadata,omitempty"`
-	AttachError        *VolumeErrorApplyConfiguration `json:"attachError,omitempty"`
-	DetachError        *VolumeErrorApplyConfiguration `json:"detachError,omitempty"`
+	// attached indicates the volume is successfully attached.
+	// This field must only be set by the entity completing the attach
+	// operation, i.e. the external-attacher.
+	Attached *bool `json:"attached,omitempty"`
+	// attachmentMetadata is populated with any
+	// information returned by the attach operation, upon successful attach, that must be passed
+	// into subsequent WaitForAttach or Mount calls.
+	// This field must only be set by the entity completing the attach
+	// operation, i.e. the external-attacher.
+	AttachmentMetadata map[string]string `json:"attachmentMetadata,omitempty"`
+	// attachError represents the last error encountered during attach operation, if any.
+	// This field must only be set by the entity completing the attach
+	// operation, i.e. the external-attacher.
+	AttachError *VolumeErrorApplyConfiguration `json:"attachError,omitempty"`
+	// detachError represents the last error encountered during detach operation, if any.
+	// This field must only be set by the entity completing the detach
+	// operation, i.e. the external-attacher.
+	DetachError *VolumeErrorApplyConfiguration `json:"detachError,omitempty"`
 }
 
 // VolumeAttachmentStatusApplyConfiguration constructs a declarative configuration of the VolumeAttachmentStatus type for use with

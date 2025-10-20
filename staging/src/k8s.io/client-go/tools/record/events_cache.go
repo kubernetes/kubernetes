@@ -223,7 +223,7 @@ func NewEventAggregator(lruCacheSize int, keyFunc EventAggregatorKeyFunc, messag
 type aggregateRecord struct {
 	// we track the number of unique local keys we have seen in the aggregate set to know when to actually aggregate
 	// if the size of this set exceeds the max, we know we need to aggregate
-	localKeys sets.String
+	localKeys sets.Set[string]
 	// The last time at which the aggregate was recorded
 	lastTimestamp metav1.Time
 }
@@ -257,7 +257,7 @@ func (e *EventAggregator) EventAggregate(newEvent *v1.Event) (*v1.Event, string)
 	maxInterval := time.Duration(e.maxIntervalInSeconds) * time.Second
 	interval := now.Time.Sub(record.lastTimestamp.Time)
 	if interval > maxInterval {
-		record = aggregateRecord{localKeys: sets.NewString()}
+		record = aggregateRecord{localKeys: sets.New[string]()}
 	}
 
 	// Write the new event into the aggregation record and put it on the cache

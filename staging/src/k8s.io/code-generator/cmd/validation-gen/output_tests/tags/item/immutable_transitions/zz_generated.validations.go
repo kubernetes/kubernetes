@@ -38,6 +38,7 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
+	// type Struct
 	scheme.AddValidationFunc((*Struct)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
 		switch op.Request.SubresourcePath() {
 		case "/":
@@ -48,19 +49,43 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 	return nil
 }
 
+// Validate_Struct validates an instance of Struct according
+// to declarative validation rules in the API schema.
 func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Struct) (errs field.ErrorList) {
 	// field Struct.TypeMeta has no validation
 
 	// field Struct.ListField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj []Item) (errs field.ErrorList) {
+			// don't revalidate unchanged data
 			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil // no changes
+				return nil
 			}
-			errs = append(errs, validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *Item) bool { return item.Key1 == "a" }, validate.DirectEqual, validate.ImmutableByCompare)...)
-			errs = append(errs, validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *Item) bool { return item.Key1 == "b" }, validate.DirectEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Item) field.ErrorList {
-				return validate.Subfield(ctx, op, fldPath, obj, oldObj, "stringField", func(o *Item) *string { return &o.StringField }, validate.ImmutableByCompare)
-			})...)
+			// call field-attached validations
+			// lists with map semantics require unique keys
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a Item, b Item) bool { return a.Key1 == b.Key1 })...)
+			func() { // cohort {"key1": "a"}
+				earlyReturn := false
+				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *Item) bool { return item.Key1 == "a" }, validate.DirectEqual, validate.Immutable); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
+			}()
+			func() { // cohort {"key1": "b"}
+				earlyReturn := false
+				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *Item) bool { return item.Key1 == "b" }, validate.DirectEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Item) field.ErrorList {
+					return validate.Subfield(ctx, op, fldPath, obj, oldObj, "stringField", func(o *Item) *string { return &o.StringField }, validate.DirectEqualPtr, validate.Immutable)
+				}); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
+			}()
 			return
 		}(fldPath.Child("listField"), obj.ListField, safe.Field(oldObj, func(oldObj *Struct) []Item { return oldObj.ListField }))...)
 

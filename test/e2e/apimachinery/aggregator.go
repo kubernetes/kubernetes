@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/discovery"
 	clientset "k8s.io/client-go/kubernetes"
@@ -44,6 +45,7 @@ import (
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	aggregatorclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
 	rbacv1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eauth "k8s.io/kubernetes/test/e2e/framework/auth"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
@@ -95,8 +97,9 @@ var _ = SIGDescribe("Aggregator", func() {
 		Testname: aggregator-supports-the-sample-apiserver
 		Description: Ensure that the sample-apiserver code from 1.17 and compiled against 1.17
 		will work on the current Aggregator/API-Server.
+		This test is marked LinuxOnly because etcd does not provide or support images for Windows.
 	*/
-	framework.ConformanceIt("Should be able to support the 1.17 Sample API Server using the current Aggregator", func(ctx context.Context) {
+	framework.ConformanceIt("Should be able to support the 1.17 Sample API Server using the current Aggregator [LinuxOnly]", func(ctx context.Context) {
 		// Testing a 1.17 version of the sample-apiserver
 		TestSampleAPIServer(ctx, f, aggrclient, imageutils.GetE2EImage(imageutils.APIServer), defaultApiServiceGroupName, defaultApiServiceVersion)
 	})
@@ -526,9 +529,11 @@ func TestSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclient
 
 	var jr *apiregistrationv1.APIService
 	err = json.Unmarshal([]byte(statusContent), &jr)
+	gomega.Expect(jr).To(apimachineryutils.HaveValidResourceVersion())
 	framework.ExpectNoError(err, "Failed to process statusContent: %v | err: %v ", string(statusContent), err)
 	gomega.Expect(jr.Status.Conditions[0].Message).To(gomega.Equal("all checks passed"), "The Message returned was %v", jr.Status.Conditions[0].Message)
 
+	oldRV := jr.ResourceVersion
 	ginkgo.By("kubectl patch apiservice " + apiServiceName + " -p '{\"spec\":{\"versionPriority\": 400}}'")
 	patchContent, err := restClient.Patch(types.MergePatchType).
 		AbsPath("/apis/apiregistration.k8s.io/v1/apiservices/"+apiServiceName).
@@ -539,6 +544,7 @@ func TestSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclient
 	err = json.Unmarshal([]byte(patchContent), &jr)
 	framework.ExpectNoError(err, "Failed to process patchContent: %v | err: %v ", string(patchContent), err)
 	gomega.Expect(jr.Spec.VersionPriority).To(gomega.Equal(int32(400)), "The VersionPriority returned was %d", jr.Spec.VersionPriority)
+	gomega.Expect(resourceversion.CompareResourceVersion(oldRV, jr.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 
 	ginkgo.By("List APIServices")
 	listApiservices, err := restClient.Get().

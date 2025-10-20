@@ -156,6 +156,10 @@ func (c *FakeDynamicClient) Resource(resource schema.GroupVersionResource) dynam
 	return &dynamicResourceClient{client: c, resource: resource, listKind: c.gvrToListKind[resource]}
 }
 
+func (c *FakeDynamicClient) IsWatchListSemanticsUnSupported() bool {
+	return true
+}
+
 func (c *dynamicResourceClient) Namespace(ns string) dynamic.ResourceInterface {
 	ret := *c
 	ret.namespace = ns

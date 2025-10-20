@@ -95,6 +95,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/images"
+	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig"
 	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/logs"
@@ -290,8 +291,8 @@ type Bootstrap interface {
 	GetConfiguration() kubeletconfiginternal.KubeletConfiguration
 	BirthCry()
 	StartGarbageCollection()
-	ListenAndServe(kubeCfg *kubeletconfiginternal.KubeletConfiguration, tlsOptions *server.TLSOptions, auth server.AuthInterface, tp trace.TracerProvider)
-	ListenAndServeReadOnly(address net.IP, port uint, tp trace.TracerProvider)
+	ListenAndServe(ctx context.Context, kubeCfg *kubeletconfiginternal.KubeletConfiguration, tlsOptions *server.TLSOptions, auth server.AuthInterface, tp trace.TracerProvider)
+	ListenAndServeReadOnly(ctx context.Context, address net.IP, port uint, tp trace.TracerProvider)
 	ListenAndServePodResources(ctx context.Context)
 	Run(<-chan kubetypes.PodUpdate)
 }
@@ -415,7 +416,7 @@ func PreInitRuntimeService(kubeCfg *kubeletconfiginternal.KubeletConfiguration, 
 func NewMainKubelet(ctx context.Context,
 	kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	kubeDeps *Dependencies,
-	crOptions *config.ContainerRuntimeOptions,
+	crOptions *kubeletconfig.ContainerRuntimeOptions,
 	hostname string,
 	nodeName types.NodeName,
 	nodeIPs []net.IP,
@@ -698,7 +699,7 @@ func NewMainKubelet(ctx context.Context,
 		kubeDeps.Recorder,
 	)
 
-	klet.resourceAnalyzer = serverstats.NewResourceAnalyzer(klet, kubeCfg.VolumeStatsAggPeriod.Duration, kubeDeps.Recorder)
+	klet.resourceAnalyzer = serverstats.NewResourceAnalyzer(ctx, klet, kubeCfg.VolumeStatsAggPeriod.Duration, kubeDeps.Recorder)
 
 	klet.runtimeService = kubeDeps.RemoteRuntimeService
 
@@ -790,7 +791,6 @@ func NewMainKubelet(ctx context.Context,
 		kubeDeps.ContainerManager,
 		klet.containerLogManager,
 		klet.runtimeClassManager,
-		klet.allocationManager,
 		seccompDefault,
 		kubeCfg.MemorySwap.SwapBehavior,
 		kubeDeps.ContainerManager.GetNodeAllocatableAbsolute,
@@ -1076,12 +1076,17 @@ func NewMainKubelet(ctx context.Context,
 		StateDirectory:                   rootDirectory,
 	})
 	klet.shutdownManager = shutdownManager
-	klet.usernsManager, err = userns.MakeUserNsManager(logger, klet)
+	handlers = append(handlers, shutdownManager)
+	klet.allocationManager.AddPodAdmitHandlers(handlers)
+
+	var usernsIDsPerPod *int64
+	if kubeCfg.UserNamespaces != nil {
+		usernsIDsPerPod = kubeCfg.UserNamespaces.IDsPerPod
+	}
+	klet.usernsManager, err = userns.MakeUserNsManager(logger, klet, usernsIDsPerPod)
 	if err != nil {
 		return nil, fmt.Errorf("create user namespace manager: %w", err)
 	}
-	handlers = append(handlers, shutdownManager)
-	klet.allocationManager.AddPodAdmitHandlers(handlers)
 
 	// Finally, put the most recent version of the config on the Kubelet, so
 	// people can see how it was configured.
@@ -1563,11 +1568,11 @@ func (kl *Kubelet) setupDataDirs() error {
 		}
 	}
 	if selinux.GetEnabled() {
-		err := selinux.SetFileLabel(pluginRegistrationDir, config.KubeletPluginsDirSELinuxLabel)
+		err := selinux.SetFileLabel(pluginRegistrationDir, kubeletconfig.KubeletPluginsDirSELinuxLabel)
 		if err != nil {
 			klog.InfoS("Unprivileged containerized plugins might not work, could not set selinux context on plugin registration dir", "path", pluginRegistrationDir, "err", err)
 		}
-		err = selinux.SetFileLabel(pluginsDir, config.KubeletPluginsDirSELinuxLabel)
+		err = selinux.SetFileLabel(pluginsDir, kubeletconfig.KubeletPluginsDirSELinuxLabel)
 		if err != nil {
 			klog.InfoS("Unprivileged containerized plugins might not work, could not set selinux context on plugins dir", "path", pluginsDir, "err", err)
 		}
@@ -1676,7 +1681,7 @@ func (kl *Kubelet) initializeModules(ctx context.Context) error {
 	}
 
 	// Start resource analyzer
-	kl.resourceAnalyzer.Start()
+	kl.resourceAnalyzer.Start(ctx)
 
 	return nil
 }
@@ -1944,8 +1949,16 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		// Check whether a resize is in progress so we can set the PodResizeInProgressCondition accordingly.
-		kl.allocationManager.CheckPodResizeInProgress(pod, podStatus)
-		// TODO(#132851): There is a race condition here, where the goroutine in the
+		if kl.containerRuntime.IsPodResizeInProgress(pod, podStatus) {
+			kl.statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", pod.Generation)
+		} else if kl.statusManager.ClearPodResizeInProgressCondition(pod.UID) {
+			// (Allocated == Actual) => clear the resize in-progress status.
+			if kl.recorder != nil {
+				msg := events.PodResizeCompletedMsg(pod)
+				kl.recorder.Eventf(pod, v1.EventTypeNormal, events.ResizeCompleted, msg)
+			}
+		}
+		// TODO(natasha41575): There is a race condition here, where the goroutine in the
 		// allocation manager may allocate a new resize and unconditionally set the
 		// PodResizeInProgressCondition before we set the status below.
 	}
@@ -2120,19 +2133,28 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 // during eviction). This method is not guaranteed to be called if a pod is force deleted from the
 // configuration and the kubelet is restarted - SyncTerminatingRuntimePod handles those orphaned
 // pods.
-func (kl *Kubelet) SyncTerminatingPod(_ context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, gracePeriod *int64, podStatusFn func(*v1.PodStatus)) error {
+func (kl *Kubelet) SyncTerminatingPod(_ context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, gracePeriod *int64, podStatusFn func(*v1.PodStatus)) (err error) {
 	// TODO(#113606): connect this with the incoming context parameter, which comes from the pod worker.
 	// Currently, using that context causes test failures.
-	ctx, otelSpan := kl.tracer.Start(context.Background(), "syncTerminatingPod", trace.WithAttributes(
+	ctx := context.Background()
+
+	logger := klog.FromContext(ctx)
+	klog.V(4).InfoS("SyncTerminatingPod enter", "pod", klog.KObj(pod), "podUID", pod.UID)
+
+	ctx, otelSpan := kl.tracer.Start(ctx, "syncTerminatingPod", trace.WithAttributes(
 		semconv.K8SPodUIDKey.String(string(pod.UID)),
 		attribute.String("k8s.pod", klog.KObj(pod).String()),
 		semconv.K8SPodNameKey.String(pod.Name),
 		semconv.K8SNamespaceNameKey.String(pod.Namespace),
 	))
-	logger := klog.FromContext(ctx)
-	defer otelSpan.End()
-	klog.V(4).InfoS("SyncTerminatingPod enter", "pod", klog.KObj(pod), "podUID", pod.UID)
-	defer klog.V(4).InfoS("SyncTerminatingPod exit", "pod", klog.KObj(pod), "podUID", pod.UID)
+	defer func() {
+		if err != nil {
+			otelSpan.RecordError(err)
+			otelSpan.SetStatus(codes.Error, err.Error())
+		}
+		otelSpan.End()
+		klog.V(4).InfoS("SyncTerminatingPod exit", "pod", klog.KObj(pod), "podUID", pod.UID)
+	}()
 
 	apiPodStatus := kl.generateAPIPodStatus(pod, podStatus, false)
 	if podStatusFn != nil {
@@ -3048,14 +3070,14 @@ func (kl *Kubelet) BirthCry() {
 }
 
 // ListenAndServe runs the kubelet HTTP server.
-func (kl *Kubelet) ListenAndServe(kubeCfg *kubeletconfiginternal.KubeletConfiguration, tlsOptions *server.TLSOptions,
+func (kl *Kubelet) ListenAndServe(ctx context.Context, kubeCfg *kubeletconfiginternal.KubeletConfiguration, tlsOptions *server.TLSOptions,
 	auth server.AuthInterface, tp trace.TracerProvider) {
-	server.ListenAndServeKubeletServer(kl, kl.resourceAnalyzer, kl.containerManager.GetHealthCheckers(), kl.flagz, kubeCfg, tlsOptions, auth, tp)
+	server.ListenAndServeKubeletServer(ctx, kl, kl.resourceAnalyzer, kl.containerManager.GetHealthCheckers(), kl.flagz, kubeCfg, tlsOptions, auth, tp)
 }
 
 // ListenAndServeReadOnly runs the kubelet HTTP server in read-only mode.
-func (kl *Kubelet) ListenAndServeReadOnly(address net.IP, port uint, tp trace.TracerProvider) {
-	server.ListenAndServeKubeletReadOnlyServer(kl, kl.resourceAnalyzer, kl.containerManager.GetHealthCheckers(), kl.flagz, address, port, tp)
+func (kl *Kubelet) ListenAndServeReadOnly(ctx context.Context, address net.IP, port uint, tp trace.TracerProvider) {
+	server.ListenAndServeKubeletReadOnlyServer(ctx, kl, kl.resourceAnalyzer, kl.containerManager.GetHealthCheckers(), kl.flagz, address, port, tp)
 }
 
 type kubeletPodsProvider struct {

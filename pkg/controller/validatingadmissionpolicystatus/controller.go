@@ -54,7 +54,7 @@ type Controller struct {
 func (c *Controller) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 
-	if !cache.WaitForNamedCacheSync(ControllerName, ctx.Done(), c.policySynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, c.policySynced) {
 		return
 	}
 

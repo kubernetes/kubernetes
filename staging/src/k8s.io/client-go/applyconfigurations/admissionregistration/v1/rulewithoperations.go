@@ -24,8 +24,17 @@ import (
 
 // RuleWithOperationsApplyConfiguration represents a declarative configuration of the RuleWithOperations type for use
 // with apply.
+//
+// RuleWithOperations is a tuple of Operations and Resources. It is recommended to make
+// sure that all the tuple expansions are valid.
 type RuleWithOperationsApplyConfiguration struct {
-	Operations             []admissionregistrationv1.OperationType `json:"operations,omitempty"`
+	// Operations is the operations the admission hook cares about - CREATE, UPDATE, DELETE, CONNECT or *
+	// for all of those operations and any future admission operations that are added.
+	// If '*' is present, the length of the slice must be one.
+	// Required.
+	Operations []admissionregistrationv1.OperationType `json:"operations,omitempty"`
+	// Rule is embedded, it describes other criteria of the rule, like
+	// APIGroups, APIVersions, Resources, etc.
 	RuleApplyConfiguration `json:",inline"`
 }
 

@@ -105,7 +105,7 @@ func (sc ServiceCheck) Name() string {
 	if sc.Label != "" {
 		return sc.Label
 	}
-	return fmt.Sprintf("Service-%s", strings.Title(sc.Service))
+	return fmt.Sprintf("Service-%s", sc.Service)
 }
 
 // Check validates if the service is enabled and active.
@@ -464,11 +464,8 @@ func (subnet HTTPProxyCIDRCheck) Check() (warnings, errorList []error) {
 		return nil, []error{errors.Wrapf(err, "unable to get first IP address from the given CIDR (%s)", cidr.String())}
 	}
 
-	testIPstring := testIP.String()
-	if len(testIP) == net.IPv6len {
-		testIPstring = fmt.Sprintf("[%s]:1234", testIP)
-	}
-	url := fmt.Sprintf("%s://%s/", subnet.Proto, testIPstring)
+	testHostString := net.JoinHostPort(testIP.String(), "1234")
+	url := fmt.Sprintf("%s://%s/", subnet.Proto, testHostString)
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {

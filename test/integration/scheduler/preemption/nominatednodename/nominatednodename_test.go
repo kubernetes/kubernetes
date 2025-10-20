@@ -119,10 +119,10 @@ func TestNominatedNode(t *testing.T) {
 					st.MakePod().Name("low-4").Priority(lowPriority).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
 				},
 				{
-					st.MakePod().Name("medium").Priority(mediumPriority).Req(map[v1.ResourceName]string{v1.ResourceCPU: "3"}).Obj(),
+					st.MakePod().Name("medium").Priority(mediumPriority).Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj(),
 				},
 				{
-					st.MakePod().Name("high").Priority(highPriority).Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj(),
+					st.MakePod().Name("high").Priority(highPriority).Req(map[v1.ResourceName]string{v1.ResourceCPU: "3"}).Obj(),
 				},
 			},
 			postChecks: []func(ctx context.Context, cs clientset.Interface, pod *v1.Pod) error{
@@ -130,7 +130,6 @@ func TestNominatedNode(t *testing.T) {
 				testutils.WaitForNominatedNodeName,
 				testutils.WaitForNominatedNodeName,
 			},
-			podNamesToDelete:           []string{"low-1", "low-2", "low-3", "low-4"},
 			expectNilNominatedNodeName: true,
 		},
 		{
@@ -236,9 +235,11 @@ func TestNominatedNode(t *testing.T) {
 			for _, nominatedNodeNameForExpectationEnabled := range []bool{false} {
 				for _, tt := range tests {
 					t.Run(fmt.Sprintf("%s (Async preemption: %v, Async API calls: %v, NNN for expectation: %v)", tt.name, asyncPreemptionEnabled, asyncAPICallsEnabled, nominatedNodeNameForExpectationEnabled), func(t *testing.T) {
-						featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerAsyncPreemption, asyncPreemptionEnabled)
-						featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerAsyncAPICalls, asyncAPICallsEnabled)
-						featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NominatedNodeNameForExpectation, nominatedNodeNameForExpectationEnabled)
+						featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+							features.SchedulerAsyncPreemption:        asyncPreemptionEnabled,
+							features.SchedulerAsyncAPICalls:          asyncAPICallsEnabled,
+							features.NominatedNodeNameForExpectation: nominatedNodeNameForExpectationEnabled,
+						})
 
 						cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 							Profiles: []configv1.KubeSchedulerProfile{{

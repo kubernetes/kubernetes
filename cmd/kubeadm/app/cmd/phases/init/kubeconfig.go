@@ -24,7 +24,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
@@ -158,11 +157,9 @@ func runKubeConfigFile(kubeConfigFileName string) func(workflow.RunData) error {
 
 		initConfiguration := data.Cfg().DeepCopy()
 
-		if features.Enabled(cfg.FeatureGates, features.ControlPlaneKubeletLocalMode) {
-			if kubeConfigFileName == kubeadmconstants.KubeletKubeConfigFileName {
-				// Unset the ControlPlaneEndpoint so the creation falls back to the LocalAPIEndpoint for the kubelet's kubeconfig.
-				initConfiguration.ControlPlaneEndpoint = ""
-			}
+		if kubeConfigFileName == kubeadmconstants.KubeletKubeConfigFileName {
+			// Unset the ControlPlaneEndpoint so the creation falls back to the LocalAPIEndpoint for the kubelet's kubeconfig.
+			initConfiguration.ControlPlaneEndpoint = ""
 		}
 
 		// creates the KubeConfig file (or use existing)

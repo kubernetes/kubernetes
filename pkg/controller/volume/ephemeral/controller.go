@@ -173,7 +173,7 @@ func (ec *ephemeralController) Run(ctx context.Context, workers int) {
 	logger.Info("Starting ephemeral volume controller")
 	defer logger.Info("Shutting down ephemeral volume controller")
 
-	if !cache.WaitForNamedCacheSync("ephemeral", ctx.Done(), ec.podSynced, ec.pvcsSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, ec.podSynced, ec.pvcsSynced) {
 		return
 	}
 

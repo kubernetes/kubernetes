@@ -830,8 +830,10 @@ func TestSuccessPolicy(t *testing.T) {
 				// TODO: this will be removed in 1.36
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.32"))
 			}
-			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobSuccessPolicy, tc.enableJobSuccessPolicy)
-			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobBackoffLimitPerIndex, tc.enableBackoffLimitPerIndex)
+			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.JobSuccessPolicy:        tc.enableJobSuccessPolicy,
+				features.JobBackoffLimitPerIndex: tc.enableBackoffLimitPerIndex,
+			})
 
 			ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
 			t.Cleanup(cancel)
@@ -1592,9 +1594,11 @@ func TestDelayTerminalPhaseCondition(t *testing.T) {
 				// TODO: this will be removed in 1.37.
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.33"))
 			}
-			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodReplacementPolicy, test.enableJobPodReplacementPolicy)
-			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobManagedBy, test.enableJobManagedBy)
-			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobSuccessPolicy, test.enableJobSuccessPolicy)
+			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.JobPodReplacementPolicy: test.enableJobPodReplacementPolicy,
+				features.JobManagedBy:            test.enableJobManagedBy,
+				features.JobSuccessPolicy:        test.enableJobSuccessPolicy,
+			})
 
 			ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
 			t.Cleanup(cancel)

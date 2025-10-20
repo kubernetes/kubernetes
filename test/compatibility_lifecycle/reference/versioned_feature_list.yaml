@@ -539,6 +539,10 @@
     lockToDefault: false
     preRelease: GA
     version: "1.20"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.35"
 - name: ExternalServiceAccountTokenSigner
   versionedSpecs:
   - default: false
@@ -605,6 +609,10 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.33"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.35"
 - name: HPAScaleToZero
   versionedSpecs:
   - default: false
@@ -957,6 +965,10 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.24"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.35"
 - name: MemoryManager
   versionedSpecs:
   - default: false
@@ -1123,16 +1135,6 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.22"
-- name: PodIndexLabel
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: "1.28"
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: "1.32"
 - name: PodLevelResources
   versionedSpecs:
   - default: false
@@ -1242,12 +1244,6 @@
   - default: true
     lockToDefault: false
     preRelease: Beta
-    version: "1.34"
-- name: ProbeHostPodSecurityStandards
-  versionedSpecs:
-  - default: true
-    lockToDefault: true
-    preRelease: GA
     version: "1.34"
 - name: ProcMountType
   versionedSpecs:
@@ -1401,7 +1397,7 @@
     version: "1.29"
 - name: SchedulerAsyncAPICalls
   versionedSpecs:
-  - default: true
+  - default: false
     lockToDefault: false
     preRelease: Beta
     version: "1.34"

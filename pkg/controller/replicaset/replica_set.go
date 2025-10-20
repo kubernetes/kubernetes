@@ -220,7 +220,7 @@ func NewBaseController(logger klog.Logger, rsInformer appsinformers.ReplicaSetIn
 	})
 	rsc.podLister = podInformer.Lister()
 	rsc.podListerSynced = podInformer.Informer().HasSynced
-	controller.AddPodControllerUIDIndexer(podInformer.Informer()) //nolint:errcheck
+	controller.AddPodControllerIndexer(podInformer.Informer()) //nolint:errcheck
 	rsc.podIndexer = podInformer.Informer().GetIndexer()
 	rsc.syncHandler = rsc.syncReplicaSet
 
@@ -243,7 +243,7 @@ func (rsc *ReplicaSetController) Run(ctx context.Context, workers int) {
 	logger.Info("Starting controller", "name", controllerName)
 	defer logger.Info("Shutting down controller", "name", controllerName)
 
-	if !cache.WaitForNamedCacheSync(rsc.Kind, ctx.Done(), rsc.podListerSynced, rsc.rsListerSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, rsc.podListerSynced, rsc.rsListerSynced) {
 		return
 	}
 
@@ -728,7 +728,7 @@ func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string)
 	}
 
 	// List all pods indexed to RS UID and Orphan pods
-	allRSPods, err := controller.FilterPodsByOwner(rsc.podIndexer, &rs.ObjectMeta)
+	allRSPods, err := controller.FilterPodsByOwner(rsc.podIndexer, &rs.ObjectMeta, rsc.Kind, true)
 	if err != nil {
 		return err
 	}

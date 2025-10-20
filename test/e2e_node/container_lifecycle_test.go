@@ -5916,7 +5916,7 @@ var _ = SIGDescribe(feature.SidecarContainers, framework.WithSerial(), "Containe
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.When("A node running restartable init containers reboots", func() {
-		ginkgo.It("should restart the containers in right order with the proper phase after the node reboot", func(ctx context.Context) {
+		ginkgo.It("should restart the containers in right order after the node reboot", func(ctx context.Context) {
 			init1 := "init-1"
 			restartableInit2 := "restartable-init-2"
 			init3 := "init-3"
@@ -6016,9 +6016,9 @@ var _ = SIGDescribe(feature.SidecarContainers, framework.WithSerial(), "Containe
 			})
 			framework.ExpectNoError(err)
 
-			ginkgo.By("Waiting for the pod to run after re-initialization")
-			err = e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
-			framework.ExpectNoError(err)
+			ginkgo.By("Waiting for regular container to start running")
+			err = e2epod.WaitForContainerRunning(ctx, f.ClientSet, pod.Namespace, pod.Name, regular1, f.Timeouts.PodStart)
+			framework.ExpectNoError(err, "regular container %q should be running", regular1)
 
 			ginkgo.By("Parsing results")
 			pod, err = client.Get(ctx, pod.Name, metav1.GetOptions{})

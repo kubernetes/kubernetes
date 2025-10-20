@@ -122,6 +122,15 @@ func TestDeviceClassMapping(t *testing.T) {
 	if c != "class2" {
 		t.Errorf("result does not match device class name %s", "class2")
 	}
+	for _, c := range []string{"class1", "class2", "class3"} {
+		n, ok := rm[v1.ResourceName("deviceclass.resource.kubernetes.io/"+c)]
+		if !ok {
+			t.Errorf("result does not contain implicit extended resource for device class %s", c)
+		}
+		if n != c {
+			t.Errorf("result %s does not match device class name %s", n, c)
+		}
+	}
 }
 
 func TestNoDeviceClassMapping(t *testing.T) {

@@ -20,7 +20,7 @@ import (
 	"errors"
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -63,6 +63,9 @@ func GetReference(scheme *runtime.Scheme, obj runtime.Object) (*v1.ObjectReferen
 	//
 	// TODO: This doesn't work for CRDs, which are not registered in scheme.
 	if gvk.Empty() {
+		if scheme == nil {
+			return nil, errors.New("scheme is required to look up gvk")
+		}
 		gvks, _, err := scheme.ObjectKinds(obj)
 		if err != nil {
 			return nil, err

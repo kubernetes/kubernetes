@@ -26,13 +26,21 @@ import (
 
 // DeploymentConditionApplyConfiguration represents a declarative configuration of the DeploymentCondition type for use
 // with apply.
+//
+// DeploymentCondition describes the state of a deployment at a certain point.
 type DeploymentConditionApplyConfiguration struct {
-	Type               *appsv1.DeploymentConditionType `json:"type,omitempty"`
-	Status             *corev1.ConditionStatus         `json:"status,omitempty"`
-	LastUpdateTime     *metav1.Time                    `json:"lastUpdateTime,omitempty"`
-	LastTransitionTime *metav1.Time                    `json:"lastTransitionTime,omitempty"`
-	Reason             *string                         `json:"reason,omitempty"`
-	Message            *string                         `json:"message,omitempty"`
+	// Type of deployment condition.
+	Type *appsv1.DeploymentConditionType `json:"type,omitempty"`
+	// Status of the condition, one of True, False, Unknown.
+	Status *corev1.ConditionStatus `json:"status,omitempty"`
+	// The last time this condition was updated.
+	LastUpdateTime *metav1.Time `json:"lastUpdateTime,omitempty"`
+	// Last time the condition transitioned from one status to another.
+	LastTransitionTime *metav1.Time `json:"lastTransitionTime,omitempty"`
+	// The reason for the condition's last transition.
+	Reason *string `json:"reason,omitempty"`
+	// A human readable message indicating details about the transition.
+	Message *string `json:"message,omitempty"`
 }
 
 // DeploymentConditionApplyConfiguration constructs a declarative configuration of the DeploymentCondition type for use with

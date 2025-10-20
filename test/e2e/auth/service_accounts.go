@@ -32,12 +32,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	watch "k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -689,6 +691,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		}
 		createdServiceAccount, err := f.ClientSet.CoreV1().ServiceAccounts(testNamespaceName).Create(ctx, &testServiceAccount, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create a ServiceAccount")
+		gomega.Expect(createdServiceAccount).To(apimachineryutils.HaveValidResourceVersion())
 
 		getServiceAccount, err := f.ClientSet.CoreV1().ServiceAccounts(testNamespaceName).Get(ctx, testServiceAccountName, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to fetch the created ServiceAccount")
@@ -719,8 +722,10 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			AutomountServiceAccountToken: &boolFalse,
 		})
 		framework.ExpectNoError(err, "failed to marshal JSON patch for the ServiceAccount")
-		_, err = f.ClientSet.CoreV1().ServiceAccounts(testNamespaceName).Patch(ctx, testServiceAccountName, types.StrategicMergePatchType, []byte(testServiceAccountPatchData), metav1.PatchOptions{})
+		patchedServiceAccount, err := f.ClientSet.CoreV1().ServiceAccounts(testNamespaceName).Patch(ctx, testServiceAccountName, types.StrategicMergePatchType, []byte(testServiceAccountPatchData), metav1.PatchOptions{})
 		framework.ExpectNoError(err, "failed to patch the ServiceAccount")
+		gomega.Expect(resourceversion.CompareResourceVersion(createdServiceAccount.ResourceVersion, patchedServiceAccount.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
+
 		eventFound = false
 		for watchEvent := range resourceWatchChan {
 			if watchEvent.Type == watch.Modified {

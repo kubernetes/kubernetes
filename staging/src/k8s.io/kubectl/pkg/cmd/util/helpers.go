@@ -437,12 +437,6 @@ const (
 	// Separate kubectl user preferences.
 	KubeRC FeatureGate = "KUBECTL_KUBERC"
 
-	// owner: @soltysh
-	// kep: https://kep.k8s.io/3515
-	//
-	// Improved kubectl apply --prune behavior.
-	OpenAPIV3Patch FeatureGate = "KUBECTL_OPENAPIV3_PATCH"
-
 	// owner: @justinb
 	// kep: https://kep.k8s.io/3659
 	//
@@ -544,7 +538,7 @@ func AddApplyAnnotationVarFlags(cmd *cobra.Command, applyAnnotation *bool) {
 
 func AddChunkSizeFlag(cmd *cobra.Command, value *int64) {
 	cmd.Flags().Int64Var(value, "chunk-size", *value,
-		"Return large lists in chunks rather than all at once. Pass 0 to disable. This flag is beta and may change in the future.")
+		"Return large lists in chunks rather than all at once. Pass 0 to disable.")
 }
 
 func AddLabelSelectorFlagVar(cmd *cobra.Command, p *string) {

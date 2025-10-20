@@ -86,6 +86,9 @@
           },
           "x-kubernetes-patch-merge-key": "name",
           "x-kubernetes-patch-strategy": "merge,retainKeys"
+        },
+        "jsonItem": {
+          "description": "JSON field",
         }
       },
       "x-kubernetes-group-version-kind": [

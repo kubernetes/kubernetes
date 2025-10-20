@@ -16,6 +16,8 @@ limitations under the License.
 
 // +k8s:deepcopy-gen=package
 // +k8s:openapi-gen=true
+// +k8s:openapi-model-package=io.k8s.kube-scheduler.config.v1
+
 // +groupName=kubescheduler.config.k8s.io
 
 package v1

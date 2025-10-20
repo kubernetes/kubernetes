@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -38,12 +39,14 @@ import (
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	cgotesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/events"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
+	"k8s.io/dynamic-resource-allocation/structured"
 	kubeschedulerconfigv1 "k8s.io/kube-scheduler/config/v1"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -60,21 +63,22 @@ import (
 var (
 	podKind = v1.SchemeGroupVersion.WithKind("Pod")
 
-	nodeName             = "worker"
-	node2Name            = "worker-2"
-	node3Name            = "worker-3"
-	driver               = "some-driver"
-	driver2              = "some-driver-2"
-	podName              = "my-pod"
-	podUID               = "1234"
-	resourceName         = "my-resource"
-	resourceName2        = resourceName + "-2"
-	claimName            = podName + "-" + resourceName
-	claimName2           = podName + "-" + resourceName2
-	className            = "my-resource-class"
-	namespace            = "default"
-	attrName             = resourceapi.QualifiedName("healthy") // device attribute only available on non-default node
-	extendedResourceName = "example.com/gpu"
+	nodeName                     = "worker"
+	node2Name                    = "worker-2"
+	node3Name                    = "worker-3"
+	driver                       = "some-driver"
+	driver2                      = "some-driver-2"
+	podName                      = "my-pod"
+	podUID                       = "1234"
+	resourceName                 = "my-resource"
+	resourceName2                = resourceName + "-2"
+	claimName                    = podName + "-" + resourceName
+	claimName2                   = podName + "-" + resourceName2
+	className                    = "my-resource-class"
+	namespace                    = "default"
+	attrName                     = resourceapi.QualifiedName("healthy") // device attribute only available on non-default node
+	extendedResourceName         = "example.com/gpu"
+	implicitExtendedResourceName = "deviceclass.resource.kubernetes.io/my-resource-class"
 
 	deviceClass = &resourceapi.DeviceClass{
 		ObjectMeta: metav1.ObjectMeta{
@@ -122,6 +126,22 @@ var (
 					UID(podUID).
 					Req(map[v1.ResourceName]string{
 			v1.ResourceName(extendedResourceName): "1",
+		}).
+		Obj()
+	podWithImplicitExtendedResourceName = st.MakePod().Name(podName).Namespace(namespace).
+						UID(podUID).
+						Req(map[v1.ResourceName]string{
+			v1.ResourceName(implicitExtendedResourceName): "1",
+			v1.ResourceName(extendedResourceName):         "2",
+		}).
+		Obj()
+	podWithImplicitExtendedResourceNameTwoContainers = st.MakePod().Name(podName).Namespace(namespace).
+								UID(podUID).
+								Req(map[v1.ResourceName]string{
+			v1.ResourceName(implicitExtendedResourceName): "1",
+		}).
+		Req(map[v1.ResourceName]string{
+			v1.ResourceName(extendedResourceName): "2",
 		}).
 		Obj()
 
@@ -213,6 +233,60 @@ var (
 				Device:  "instance-1",
 				Request: "container-0-request-0",
 			}},
+		},
+		NodeSelector: func() *v1.NodeSelector {
+			return st.MakeNodeSelector().In("metadata.name", []string{nodeName}, st.NodeSelectorTypeMatchFields).Obj()
+		}(),
+	}
+	implicitExtendedResourceAllocationResult = &resourceapi.AllocationResult{
+		Devices: resourceapi.DeviceAllocationResult{
+			Results: []resourceapi.DeviceRequestAllocationResult{
+				{
+					Driver:  driver,
+					Pool:    nodeName,
+					Device:  "instance-1",
+					Request: "container-0-request-0",
+				},
+				{
+					Driver:  driver,
+					Pool:    nodeName,
+					Device:  "instance-2",
+					Request: "container-0-request-1",
+				},
+				{
+					Driver:  driver,
+					Pool:    nodeName,
+					Device:  "instance-3",
+					Request: "container-0-request-1",
+				},
+			},
+		},
+		NodeSelector: func() *v1.NodeSelector {
+			return st.MakeNodeSelector().In("metadata.name", []string{nodeName}, st.NodeSelectorTypeMatchFields).Obj()
+		}(),
+	}
+	implicitExtendedResourceAllocationResultTwoContainers = &resourceapi.AllocationResult{
+		Devices: resourceapi.DeviceAllocationResult{
+			Results: []resourceapi.DeviceRequestAllocationResult{
+				{
+					Driver:  driver,
+					Pool:    nodeName,
+					Device:  "instance-1",
+					Request: "container-0-request-0",
+				},
+				{
+					Driver:  driver,
+					Pool:    nodeName,
+					Device:  "instance-2",
+					Request: "container-1-request-0",
+				},
+				{
+					Driver:  driver,
+					Pool:    nodeName,
+					Device:  "instance-3",
+					Request: "container-1-request-0",
+				},
+			},
 		},
 		NodeSelector: func() *v1.NodeSelector {
 			return st.MakeNodeSelector().In("metadata.name", []string{nodeName}, st.NodeSelectorTypeMatchFields).Obj()
@@ -311,7 +385,78 @@ var (
 		RequestWithName("container-0-request-0", className).
 		Allocation(extendedResourceAllocationResult).
 		Obj()
-
+	implicitExtendedResourceClaim = st.MakeResourceClaim().
+					Name("my-pod-extended-resources-0").
+					GenerateName("my-pod-extended-resources-").
+					Namespace(namespace).
+					Annotations(map[string]string{"resource.kubernetes.io/extended-resource-claim": "true"}).
+					OwnerRef(
+			metav1.OwnerReference{
+				APIVersion:         "v1",
+				Kind:               "Pod",
+				Name:               podName,
+				UID:                types.UID(podUID),
+				Controller:         ptr.To(true),
+				BlockOwnerDeletion: ptr.To(true),
+			}).
+		RequestWithName("container-0-request-0", className).
+		RequestWithNameCount("container-0-request-1", className, 2).
+		Allocation(implicitExtendedResourceAllocationResult).
+		Obj()
+	implicitExtendedResourceClaimNoName = st.MakeResourceClaim().
+						Name(specialClaimInMemName).
+						GenerateName("my-pod-extended-resources-").
+						Namespace(namespace).
+						Annotations(map[string]string{"resource.kubernetes.io/extended-resource-claim": "true"}).
+						OwnerRef(
+			metav1.OwnerReference{
+				APIVersion:         "v1",
+				Kind:               "Pod",
+				Name:               podName,
+				UID:                types.UID(podUID),
+				Controller:         ptr.To(true),
+				BlockOwnerDeletion: ptr.To(true),
+			}).
+		RequestWithName("container-0-request-0", className).
+		RequestWithNameCount("container-0-request-1", className, 2).
+		Allocation(implicitExtendedResourceAllocationResult).
+		Obj()
+	implicitExtendedResourceClaimTwoContainers = st.MakeResourceClaim().
+							Name("my-pod-extended-resources-0").
+							GenerateName("my-pod-extended-resources-").
+							Namespace(namespace).
+							Annotations(map[string]string{"resource.kubernetes.io/extended-resource-claim": "true"}).
+							OwnerRef(
+			metav1.OwnerReference{
+				APIVersion:         "v1",
+				Kind:               "Pod",
+				Name:               podName,
+				UID:                types.UID(podUID),
+				Controller:         ptr.To(true),
+				BlockOwnerDeletion: ptr.To(true),
+			}).
+		RequestWithName("container-0-request-0", className).
+		RequestWithNameCount("container-1-request-0", className, 2).
+		Allocation(implicitExtendedResourceAllocationResultTwoContainers).
+		Obj()
+	implicitExtendedResourceClaimNoNameTwoContainers = st.MakeResourceClaim().
+								Name(specialClaimInMemName).
+								GenerateName("my-pod-extended-resources-").
+								Namespace(namespace).
+								Annotations(map[string]string{"resource.kubernetes.io/extended-resource-claim": "true"}).
+								OwnerRef(
+			metav1.OwnerReference{
+				APIVersion:         "v1",
+				Kind:               "Pod",
+				Name:               podName,
+				UID:                types.UID(podUID),
+				Controller:         ptr.To(true),
+				BlockOwnerDeletion: ptr.To(true),
+			}).
+		RequestWithName("container-0-request-0", className).
+		RequestWithNameCount("container-1-request-0", className, 2).
+		Allocation(implicitExtendedResourceAllocationResultTwoContainers).
+		Obj()
 	extendedResourceClaimNode2 = st.MakeResourceClaim().
 					Name("my-pod-extended-resources-0").
 					GenerateName("my-pod-extended-resources-").
@@ -1311,6 +1456,42 @@ func TestPlugin(t *testing.T) {
 				},
 			},
 		},
+		"implicit-extended-resource-name-with-resources": {
+			enableDRAExtendedResource: true,
+			pod:                       podWithImplicitExtendedResourceName,
+			classes:                   []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
+			objs:                      []apiruntime.Object{largeWorkerNodeSlice, podWithImplicitExtendedResourceName},
+			want: want{
+				reserve: result{
+					inFlightClaim: implicitExtendedResourceClaimNoName,
+				},
+				prebind: result{
+					assumedClaim: reserve(implicitExtendedResourceClaim, podWithImplicitExtendedResourceName),
+					added:        []metav1.Object{reserve(implicitExtendedResourceClaim, podWithImplicitExtendedResourceName)},
+				},
+				postbind: result{
+					assumedClaim: reserve(implicitExtendedResourceClaim, podWithImplicitExtendedResourceName),
+				},
+			},
+		},
+		"implicit-extended-resource-name-two-containers-with-resources": {
+			enableDRAExtendedResource: true,
+			pod:                       podWithImplicitExtendedResourceNameTwoContainers,
+			classes:                   []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
+			objs:                      []apiruntime.Object{largeWorkerNodeSlice, podWithImplicitExtendedResourceNameTwoContainers},
+			want: want{
+				reserve: result{
+					inFlightClaim: implicitExtendedResourceClaimNoNameTwoContainers,
+				},
+				prebind: result{
+					assumedClaim: reserve(implicitExtendedResourceClaimTwoContainers, podWithImplicitExtendedResourceNameTwoContainers),
+					added:        []metav1.Object{reserve(implicitExtendedResourceClaimTwoContainers, podWithImplicitExtendedResourceNameTwoContainers)},
+				},
+				postbind: result{
+					assumedClaim: reserve(implicitExtendedResourceClaimTwoContainers, podWithImplicitExtendedResourceNameTwoContainers),
+				},
+			},
+		},
 		"extended-resource-name-with-resources-fail-patch": {
 			enableDRAExtendedResource: true,
 			failPatch:                 true,
@@ -1938,6 +2119,8 @@ func (tc *testContext) verify(t *testing.T, expected result, initialObjects []me
 	ignoreFieldsInResourceClaims := []cmp.Option{
 		cmpopts.IgnoreFields(metav1.ObjectMeta{}, "UID", "ResourceVersion"),
 		cmpopts.IgnoreFields(resourceapi.AllocationResult{}, "AllocationTimestamp"),
+		// It does not matter which specific device is allocated for the testing purpose.
+		cmpopts.IgnoreFields(resourceapi.DeviceRequestAllocationResult{}, "Device"),
 	}
 	if diff := cmp.Diff(wantObjects, objects, ignoreFieldsInResourceClaims...); diff != "" {
 		t.Errorf("Stored objects are different (- expected, + actual):\n%s", diff)
@@ -2754,6 +2937,54 @@ func Test_createRequestMappings(t *testing.T) {
 				if r.ResourceName != gotReqMappings[i].ResourceName {
 					t.Fatalf("different resource name, want %#v, got %#v", r, gotReqMappings[i])
 				}
+			}
+		})
+	}
+}
+
+// TestAllocatorSelection covers the selection of a structured allocation implementation
+// based on actual Kubernetes feature gates. This test lives here instead of
+// k8s.io/dynamic-resource-allocation/structured because that code has no access
+// to feature gate definitions.
+func TestAllocatorSelection(t *testing.T) {
+	for name, tc := range map[string]struct {
+		features             string
+		expectImplementation string
+	}{
+		// The most conservative implementation: only used when explicitly asking
+		// for the most stable Kubernetes (no alpha or beta features).
+		"only-GA": {
+			features:             "AllAlpha=false,AllBeta=false",
+			expectImplementation: "stable",
+		},
+
+		// By default, some beta features are on and the incubating implementation
+		// is used.
+		"default": {
+			features:             "",
+			expectImplementation: "incubating",
+		},
+
+		// Alpha features need the experimental implementation.
+		"alpha": {
+			features:             "AllAlpha=true,AllBeta=true",
+			expectImplementation: "experimental",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			featureGate := utilfeature.DefaultFeatureGate.DeepCopy()
+			tCtx.ExpectNoError(featureGate.Set(tc.features), "set features")
+			fts := feature.NewSchedulerFeaturesFromGates(featureGate)
+			features := allocatorFeatures(fts)
+
+			// Slightly hacky: most arguments are not valid and the constructor
+			// is expected to not use them yet.
+			allocator, err := structured.NewAllocator(tCtx, features, structured.AllocatedState{}, nil, nil, nil)
+			tCtx.ExpectNoError(err, "create allocator")
+			allocatorType := fmt.Sprintf("%T", allocator)
+			if !strings.Contains(allocatorType, tc.expectImplementation) {
+				tCtx.Fatalf("Expected allocator implementation %q, got %s", tc.expectImplementation, allocatorType)
 			}
 		})
 	}

@@ -18,7 +18,6 @@ package apiserverleasegc
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	v1 "k8s.io/api/coordination/v1"
@@ -71,29 +70,38 @@ func NewAPIServerLeaseGC(clientset kubernetes.Interface, gcCheckPeriod time.Dura
 }
 
 // Run starts one worker.
+//
+//logcheck:context // RunWithContext should be used instead of Run in code which supports contextual logging.
 func (c *Controller) Run(stopCh <-chan struct{}) {
-	defer utilruntime.HandleCrash()
-	defer klog.Infof("Shutting down apiserver lease garbage collector")
+	c.RunWithContext(wait.ContextForChannel(stopCh))
+}
 
-	klog.Infof("Starting apiserver lease garbage collector")
+// RunWithContext starts one worker with a context.
+func (c *Controller) RunWithContext(ctx context.Context) {
+	logger := klog.FromContext(ctx)
+	defer utilruntime.HandleCrashWithContext(ctx)
+	defer logger.Info("Shutting down apiserver lease garbage collector")
+
+	logger.Info("Starting apiserver lease garbage collector")
 
 	// we have a personal informer that is narrowly scoped, start it.
-	go c.leaseInformer.Run(stopCh)
+	go c.leaseInformer.RunWithContext(ctx)
 
-	if !cache.WaitForCacheSync(stopCh, c.leasesSynced) {
-		utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, c.leasesSynced) {
+		utilruntime.HandleErrorWithContext(ctx, nil, "Timed out waiting for caches to sync")
 		return
 	}
 
-	go wait.Until(c.gc, c.gcCheckPeriod, stopCh)
+	go wait.UntilWithContext(ctx, c.gc, c.gcCheckPeriod)
 
-	<-stopCh
+	<-ctx.Done()
 }
 
-func (c *Controller) gc() {
+func (c *Controller) gc(ctx context.Context) {
 	leases, err := c.leaseLister.Leases(c.leaseNamespace).List(labels.Everything())
+	logger := klog.FromContext(ctx)
 	if err != nil {
-		klog.ErrorS(err, "Error while listing apiserver leases")
+		logger.Error(err, "Error while listing apiserver leases")
 		return
 	}
 	for _, lease := range leases {
@@ -102,16 +110,16 @@ func (c *Controller) gc() {
 			continue
 		}
 		// double check latest lease from apiserver before deleting
-		lease, err := c.kubeclientset.CoordinationV1().Leases(c.leaseNamespace).Get(context.TODO(), lease.Name, metav1.GetOptions{})
+		lease, err := c.kubeclientset.CoordinationV1().Leases(c.leaseNamespace).Get(ctx, lease.Name, metav1.GetOptions{})
 		if err != nil && !errors.IsNotFound(err) {
-			klog.ErrorS(err, "Error getting lease")
+			logger.Error(err, "Error getting lease")
 			continue
 		}
 		if errors.IsNotFound(err) || lease == nil {
 			// In an HA cluster, this can happen if the lease was deleted
 			// by the same GC controller in another apiserver, which is legit.
 			// We don't expect other components to delete the lease.
-			klog.V(4).InfoS("Cannot find apiserver lease", "err", err)
+			logger.V(4).Info("Cannot find apiserver lease", "err", err)
 			continue
 		}
 		// evaluate lease from apiserver
@@ -119,14 +127,14 @@ func (c *Controller) gc() {
 			continue
 		}
 		if err := c.kubeclientset.CoordinationV1().Leases(c.leaseNamespace).Delete(
-			context.TODO(), lease.Name, metav1.DeleteOptions{}); err != nil {
+			ctx, lease.Name, metav1.DeleteOptions{}); err != nil {
 			if errors.IsNotFound(err) {
 				// In an HA cluster, this can happen if the lease was deleted
 				// by the same GC controller in another apiserver, which is legit.
 				// We don't expect other components to delete the lease.
-				klog.V(4).InfoS("Apiserver lease is gone already", "err", err)
+				logger.V(4).Info("Apiserver lease is gone already", "err", err)
 			} else {
-				klog.ErrorS(err, "Error deleting lease")
+				logger.Error(err, "Error deleting lease")
 			}
 		}
 	}

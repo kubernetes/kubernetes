@@ -25,10 +25,21 @@ import (
 
 // PodsMetricSourceApplyConfiguration represents a declarative configuration of the PodsMetricSource type for use
 // with apply.
+//
+// PodsMetricSource indicates how to scale on a metric describing each pod in
+// the current scale target (for example, transactions-processed-per-second).
+// The values will be averaged together before being compared to the target
+// value.
 type PodsMetricSourceApplyConfiguration struct {
-	MetricName         *string                             `json:"metricName,omitempty"`
-	TargetAverageValue *resource.Quantity                  `json:"targetAverageValue,omitempty"`
-	Selector           *v1.LabelSelectorApplyConfiguration `json:"selector,omitempty"`
+	// metricName is the name of the metric in question
+	MetricName *string `json:"metricName,omitempty"`
+	// targetAverageValue is the target value of the average of the
+	// metric across all relevant pods (as a quantity)
+	TargetAverageValue *resource.Quantity `json:"targetAverageValue,omitempty"`
+	// selector is the string-encoded form of a standard kubernetes label selector for the given metric
+	// When set, it is passed as an additional parameter to the metrics server for more specific metrics scoping
+	// When unset, just the metricName will be used to gather metrics.
+	Selector *v1.LabelSelectorApplyConfiguration `json:"selector,omitempty"`
 }
 
 // PodsMetricSourceApplyConfiguration constructs a declarative configuration of the PodsMetricSource type for use with

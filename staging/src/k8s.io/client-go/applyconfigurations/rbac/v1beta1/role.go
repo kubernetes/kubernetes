@@ -29,10 +29,15 @@ import (
 
 // RoleApplyConfiguration represents a declarative configuration of the Role type for use
 // with apply.
+//
+// Role is a namespaced, logical grouping of PolicyRules that can be referenced as a unit by a RoleBinding.
+// Deprecated in v1.17 in favor of rbac.authorization.k8s.io/v1 Role, and will no longer be served in v1.22.
 type RoleApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Rules                            []PolicyRuleApplyConfiguration `json:"rules,omitempty"`
+	// Rules holds all the PolicyRules for this Role
+	Rules []PolicyRuleApplyConfiguration `json:"rules,omitempty"`
 }
 
 // Role constructs a declarative configuration of the Role type for use with
@@ -53,7 +58,6 @@ func Role(name, namespace string) *RoleApplyConfiguration {
 // ExtractRoleFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractRoleFrom(role *rbacv1beta1.Role, fieldManager string, subresource string) (*RoleApplyConfiguration, error) {
 	b := &RoleApplyConfiguration{}
 	err := managedfields.ExtractInto(role, internal.Parser().Type("io.k8s.api.rbac.v1beta1.Role"), fieldManager, b, subresource)
@@ -78,7 +82,6 @@ func ExtractRoleFrom(role *rbacv1beta1.Role, fieldManager string, subresource st
 // ExtractRole provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractRole(role *rbacv1beta1.Role, fieldManager string) (*RoleApplyConfiguration, error) {
 	return ExtractRoleFrom(role, fieldManager, "")
 }

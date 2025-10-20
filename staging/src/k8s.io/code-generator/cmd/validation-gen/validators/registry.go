@@ -58,6 +58,14 @@ func (reg *registry) addTagValidator(tv TagValidator) {
 	if _, exists := globalRegistry.tagValidators[name]; exists {
 		panic(fmt.Sprintf("tag %q was registered twice", name))
 	}
+	switch level := tv.Docs().StabilityLevel; level {
+	case Alpha, Beta, Stable:
+		// valid
+	case "":
+		panic(fmt.Sprintf("tag %q is missing stability level", name))
+	default:
+		panic(fmt.Sprintf("tag %q has invalid stability level %q", name, level))
+	}
 	globalRegistry.tagValidators[name] = tv
 }
 

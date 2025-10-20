@@ -24,7 +24,9 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -140,8 +142,12 @@ var _ = SIGDescribe("ConfigMap", func() {
 		configMap, err := newConfigMapWithEmptyKey(ctx, f)
 		gomega.Expect(err).To(gomega.HaveOccurred(), "created configMap %q with empty key in namespace %q", configMap.Name, f.Namespace.Name)
 	})
-
-	ginkgo.It("should update ConfigMap successfully", func(ctx context.Context) {
+	/*
+		Release : v1.32
+		Testname: ConfigMap Update
+		Description: Ensure that a ConfigMap object can be created and then updated successfully.
+	*/
+	framework.ConformanceIt("should update ConfigMap successfully", f.WithNodeConformance(), func(ctx context.Context) {
 		name := "configmap-test-" + string(uuid.NewUUID())
 		configMap := newConfigMap(f, name)
 		ginkgo.By(fmt.Sprintf("Creating ConfigMap %v/%v", f.Namespace.Name, configMap.Name))
@@ -192,6 +198,7 @@ var _ = SIGDescribe("ConfigMap", func() {
 		framework.ExpectNoError(err, "failed to get ConfigMap")
 		gomega.Expect(configMap.Data["valueName"]).To(gomega.Equal(testConfigMap.Data["valueName"]))
 		gomega.Expect(configMap.Labels["test-configmap-static"]).To(gomega.Equal(testConfigMap.Labels["test-configmap-static"]))
+		gomega.Expect(configMap).To(apimachineryutils.HaveValidResourceVersion())
 
 		configMapPatchPayload, err := json.Marshal(v1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
@@ -206,8 +213,9 @@ var _ = SIGDescribe("ConfigMap", func() {
 		framework.ExpectNoError(err, "failed to marshal patch data")
 
 		ginkgo.By("patching the ConfigMap")
-		_, err = f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).Patch(ctx, testConfigMapName, types.StrategicMergePatchType, []byte(configMapPatchPayload), metav1.PatchOptions{})
+		patchedConfigMap, err := f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).Patch(ctx, testConfigMapName, types.StrategicMergePatchType, []byte(configMapPatchPayload), metav1.PatchOptions{})
 		framework.ExpectNoError(err, "failed to patch ConfigMap")
+		gomega.Expect(resourceversion.CompareResourceVersion(configMap.ResourceVersion, patchedConfigMap.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 
 		ginkgo.By("listing all ConfigMaps in all namespaces with a label selector")
 		configMapList, err := f.ClientSet.CoreV1().ConfigMaps("").List(ctx, metav1.ListOptions{

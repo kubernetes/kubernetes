@@ -29,11 +29,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/network/common"
@@ -58,52 +60,12 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 	})
 
 	/*
-		Release: v1.21
-		Testname: EndpointSlice API
-		Description: The discovery.k8s.io API group MUST exist in the /apis discovery document.
-		The discovery.k8s.io/v1 API group/version MUST exist in the /apis/discovery.k8s.io discovery document.
-		The endpointslices resource MUST exist in the /apis/discovery.k8s.io/v1 discovery document.
-		The cluster MUST have a service named "kubernetes" on the default namespace referencing the API servers.
-		The "kubernetes.default" service MUST have Endpoints and EndpointSlices pointing to each API server instance.
+		Release: v1.21, v1.35
+		Testname: EndpointSlice, "empty" Service
+		Description: The EndpointSlice controller should create and delete empty EndpointSlices for a Service that matches no pods.
 	*/
-	framework.ConformanceIt("should have Endpoints and EndpointSlices pointing to API Server", func(ctx context.Context) {
-		namespace := "default"
-		name := "kubernetes"
-		// verify "kubernetes.default" service exist
-		_, err := cs.CoreV1().Services(namespace).Get(ctx, name, metav1.GetOptions{})
-		framework.ExpectNoError(err, "error obtaining API server \"kubernetes\" Service resource on \"default\" namespace")
-
-		// verify Endpoints for the API servers exist
-		endpoints, err := cs.CoreV1().Endpoints(namespace).Get(ctx, name, metav1.GetOptions{})
-		framework.ExpectNoError(err, "error obtaining API server \"kubernetes\" Endpoint resource on \"default\" namespace")
-		if len(endpoints.Subsets) == 0 {
-			framework.Failf("Expected at least 1 subset in endpoints, got %d: %#v", len(endpoints.Subsets), endpoints.Subsets)
-		}
-		// verify EndpointSlices for the API servers exist
-		endpointSliceList, err := cs.DiscoveryV1().EndpointSlices(namespace).List(ctx, metav1.ListOptions{
-			LabelSelector: "kubernetes.io/service-name=" + name,
-		})
-		framework.ExpectNoError(err, "error obtaining API server \"kubernetes\" EndpointSlice resource on \"default\" namespace")
-		if len(endpointSliceList.Items) == 0 {
-			framework.Failf("Expected at least 1 EndpointSlice, got %d: %#v", len(endpoints.Subsets), endpoints.Subsets)
-		}
-
-		if !endpointSlicesEqual(endpoints, endpointSliceList) {
-			framework.Failf("Expected EndpointSlice to have same addresses and port as Endpoints, got %#v: %#v", endpoints, endpointSliceList)
-		}
-
-	})
-
-	/*
-		Release: v1.21
-		Testname: EndpointSlice API
-		Description: The discovery.k8s.io API group MUST exist in the /apis discovery document.
-		The discovery.k8s.io/v1 API group/version MUST exist in the /apis/discovery.k8s.io discovery document.
-		The endpointslices resource MUST exist in the /apis/discovery.k8s.io/v1 discovery document.
-		The endpointslice controller should create and delete EndpointSlices for Pods matching a Service.
-	*/
-	framework.ConformanceIt("should create and delete Endpoints and EndpointSlices for a Service with a selector specified", func(ctx context.Context) {
-		svc := createServiceReportErr(ctx, cs, f.Namespace.Name, &v1.Service{
+	framework.ConformanceIt("should create and delete EndpointSlices for a Service with a selector that matches no pods", func(ctx context.Context) {
+		svc := &v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "example-empty-selector",
 			},
@@ -117,22 +79,13 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 					Protocol: v1.ProtocolTCP,
 				}},
 			},
-		})
-
-		// Expect Endpoints resource to be created.
-		if err := wait.PollImmediate(2*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
-			_, err := cs.CoreV1().Endpoints(svc.Namespace).Get(ctx, svc.Name, metav1.GetOptions{})
-			if err != nil {
-				return false, nil
-			}
-			return true, nil
-		}); err != nil {
-			framework.Failf("No Endpoints found for Service %s/%s: %s", svc.Namespace, svc.Name, err)
 		}
+		svc, err := cs.CoreV1().Services(f.Namespace.Name).Create(ctx, svc, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "error creating Service")
 
 		// Expect EndpointSlice resource to be created.
 		var endpointSlice discoveryv1.EndpointSlice
-		if err := wait.PollImmediate(2*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+		if err := wait.PollUntilContextTimeout(ctx, 2*time.Second, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 			endpointSliceList, err := cs.DiscoveryV1().EndpointSlices(svc.Namespace).List(ctx, metav1.ListOptions{
 				LabelSelector: "kubernetes.io/service-name=" + svc.Name,
 			})
@@ -160,28 +113,14 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 			framework.Failf("Expected EndpointSlice to have 0 endpoints, got %d: %#v", len(endpointSlice.Endpoints), endpointSlice.Endpoints)
 		}
 
-		err := cs.CoreV1().Services(svc.Namespace).Delete(ctx, svc.Name, metav1.DeleteOptions{})
+		err = cs.CoreV1().Services(svc.Namespace).Delete(ctx, svc.Name, metav1.DeleteOptions{})
 		framework.ExpectNoError(err, "error deleting Service")
-
-		// Expect Endpoints resource to be deleted when Service is.
-		if err := wait.PollImmediate(2*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
-			_, err := cs.CoreV1().Endpoints(svc.Namespace).Get(ctx, svc.Name, metav1.GetOptions{})
-			if err != nil {
-				if apierrors.IsNotFound(err) {
-					return true, nil
-				}
-				return false, err
-			}
-			return false, nil
-		}); err != nil {
-			framework.Failf("Endpoints resource not deleted after Service %s/%s was deleted: %s", svc.Namespace, svc.Name, err)
-		}
 
 		// Expect EndpointSlice resource to be deleted when Service is. Wait for
 		// up to 90 seconds since garbage collector only polls every 30 seconds
 		// and may need to retry informer resync at some point during an e2e
 		// run.
-		if err := wait.PollImmediate(2*time.Second, 90*time.Second, func() (bool, error) {
+		if err := wait.PollUntilContextTimeout(ctx, 2*time.Second, 90*time.Second, true, func(ctx context.Context) (bool, error) {
 			endpointSliceList, err := cs.DiscoveryV1().EndpointSlices(svc.Namespace).List(ctx, metav1.ListOptions{
 				LabelSelector: "kubernetes.io/service-name=" + svc.Name,
 			})
@@ -198,17 +137,13 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 	})
 
 	/*
-		Release: v1.21
-		Testname: EndpointSlice API
-		Description: The discovery.k8s.io API group MUST exist in the /apis discovery document.
-		The discovery.k8s.io/v1 API group/version MUST exist in the /apis/discovery.k8s.io discovery document.
-		The endpointslices resource MUST exist in the /apis/discovery.k8s.io/v1 discovery document.
-		The endpointslice controller must create EndpointSlices for Pods mataching a Service.
+		Release: v1.21, v1.35
+		Testname: EndpointSlice, creation/deletion
+		Description: The endpointslice controller must create and delete EndpointSlices for Pods matching a Service.
 	*/
 	framework.ConformanceIt("should create Endpoints and EndpointSlices for Pods matching a Service", func(ctx context.Context) {
 		labelPod1 := "pod1"
 		labelPod2 := "pod2"
-		labelPod3 := "pod3"
 		labelShared12 := "shared12"
 		labelValue := "on"
 
@@ -259,7 +194,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 			},
 		})
 
-		svc1 := createServiceReportErr(ctx, cs, f.Namespace.Name, &v1.Service{
+		svc1 := &v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "example-int-port",
 			},
@@ -273,9 +208,11 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 					Protocol:   v1.ProtocolTCP,
 				}},
 			},
-		})
+		}
+		svc1, err := cs.CoreV1().Services(f.Namespace.Name).Create(ctx, svc1, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "error creating Service")
 
-		svc2 := createServiceReportErr(ctx, cs, f.Namespace.Name, &v1.Service{
+		svc2 := &v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "example-named-port",
 			},
@@ -289,25 +226,11 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 					Protocol:   v1.ProtocolTCP,
 				}},
 			},
-		})
+		}
+		svc2, err = cs.CoreV1().Services(f.Namespace.Name).Create(ctx, svc2, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "error creating Service")
 
-		svc3 := createServiceReportErr(ctx, cs, f.Namespace.Name, &v1.Service{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "example-no-match",
-			},
-			Spec: v1.ServiceSpec{
-				Selector:                 map[string]string{labelPod3: labelValue},
-				PublishNotReadyAddresses: true,
-				Ports: []v1.ServicePort{{
-					Name:       "example-no-match",
-					Port:       80,
-					TargetPort: intstr.FromInt32(8080),
-					Protocol:   v1.ProtocolTCP,
-				}},
-			},
-		})
-
-		err := wait.PollUntilContextTimeout(ctx, 2*time.Second, 3*time.Minute, true, func(ctx context.Context) (bool, error) {
+		err = wait.PollUntilContextTimeout(ctx, 2*time.Second, 3*time.Minute, true, func(ctx context.Context) (bool, error) {
 			var err error
 			pod1, err = podClient.Get(ctx, pod1.Name, metav1.GetOptions{})
 			if err != nil {
@@ -330,19 +253,14 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		framework.ExpectNoError(err, "timed out waiting for Pods to have IPs assigned")
 
 		ginkgo.By("referencing a single matching pod")
-		expectEndpointsAndSlices(ctx, cs, f.Namespace.Name, svc1, []*v1.Pod{pod1}, 1, 1, false)
+		expectEndpointSlices(ctx, cs, f.Namespace.Name, svc1, []*v1.Pod{pod1}, 1, false)
 
 		ginkgo.By("referencing matching pods with named port")
-		expectEndpointsAndSlices(ctx, cs, f.Namespace.Name, svc2, []*v1.Pod{pod1, pod2}, 2, 2, true)
+		expectEndpointSlices(ctx, cs, f.Namespace.Name, svc2, []*v1.Pod{pod1, pod2}, 2, true)
 
-		ginkgo.By("creating empty Endpoints and EndpointSlices for no matching Pods")
-		expectEndpointsAndSlices(ctx, cs, f.Namespace.Name, svc3, []*v1.Pod{}, 0, 1, false)
-
-		// TODO: Update test to cover Endpoints recreation after deletes once it
-		// actually works.
 		ginkgo.By("recreating EndpointSlices after they've been deleted")
 		deleteEndpointSlices(ctx, cs, f.Namespace.Name, svc2)
-		expectEndpointsAndSlices(ctx, cs, f.Namespace.Name, svc2, []*v1.Pod{pod1, pod2}, 2, 2, true)
+		expectEndpointSlices(ctx, cs, f.Namespace.Name, svc2, []*v1.Pod{pod1, pod2}, 2, true)
 	})
 
 	/*
@@ -437,6 +355,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		queriedEPS, err := epsClient.Get(ctx, createdEPS.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		gomega.Expect(queriedEPS.UID).To(gomega.Equal(createdEPS.UID))
+		gomega.Expect(queriedEPS).To(apimachineryutils.HaveValidResourceVersion())
 
 		ginkgo.By("listing")
 		epsList, err := epsClient.List(ctx, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
@@ -464,6 +383,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		patchedEPS, err := epsClient.Patch(ctx, createdEPS.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"patched":"true"}}}`), metav1.PatchOptions{})
 		framework.ExpectNoError(err)
 		gomega.Expect(patchedEPS.Annotations).To(gomega.HaveKeyWithValue("patched", "true"), "patched object should have the applied annotation")
+		gomega.Expect(resourceversion.CompareResourceVersion(createdEPS.ResourceVersion, patchedEPS.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 
 		ginkgo.By("updating")
 		var epsToUpdate, updatedEPS *discoveryv1.EndpointSlice
@@ -537,7 +457,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 	*/
 	framework.ConformanceIt("should support a Service with multiple ports specified in multiple EndpointSlices", func(ctx context.Context) {
 		ns := f.Namespace.Name
-		svc := createServiceReportErr(ctx, cs, f.Namespace.Name, &v1.Service{
+		svc := &v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "example-custom-endpoints",
 			},
@@ -555,7 +475,9 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 					},
 				},
 			},
-		})
+		}
+		svc, err := cs.CoreV1().Services(ns).Create(ctx, svc, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "error creating Service")
 
 		// Add a backend pod to the service in the other node
 		port8090 := []v1.ContainerPort{
@@ -614,7 +536,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 			Protocol: &tcpProtocol,
 		}}
 
-		_, err := f.ClientSet.DiscoveryV1().EndpointSlices(ns).Create(ctx, eps1, metav1.CreateOptions{})
+		_, err = f.ClientSet.DiscoveryV1().EndpointSlices(ns).Create(ctx, eps1, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 		eps2 := epsTemplate.DeepCopy()
 		eps2.Ports = []discoveryv1.EndpointPort{{
@@ -647,7 +569,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 	*/
 	framework.ConformanceIt("should support a Service with multiple endpoint IPs specified in multiple EndpointSlices", func(ctx context.Context) {
 		ns := f.Namespace.Name
-		svc := createServiceReportErr(ctx, cs, f.Namespace.Name, &v1.Service{
+		svc := &v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "example-custom-endpoints",
 			},
@@ -665,7 +587,9 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 					},
 				},
 			},
-		})
+		}
+		svc, err := cs.CoreV1().Services(ns).Create(ctx, svc, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "error creating Service")
 
 		// Add a backend pod to the service in the other node
 		port8090 := []v1.ContainerPort{
@@ -726,7 +650,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 			Protocol: &tcpProtocol,
 		}}
 
-		_, err := f.ClientSet.DiscoveryV1().EndpointSlices(ns).Create(context.TODO(), eps1, metav1.CreateOptions{})
+		_, err = f.ClientSet.DiscoveryV1().EndpointSlices(ns).Create(context.TODO(), eps1, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 		eps2 := epsTemplate.DeepCopy()
 		eps2.Endpoints = []discoveryv1.Endpoint{
@@ -757,13 +681,12 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 
 })
 
-// expectEndpointsAndSlices verifies that Endpoints and EndpointSlices exist for
-// a given Service and Namespace with the appropriate attributes set. This is a
-// relatively complex function as the order of attributes or resources is not
-// necessarily consistent. It is used as a helper function for the tests above
-// and takes some shortcuts with the assumption that those test cases will be
-// the only caller of this function.
-func expectEndpointsAndSlices(ctx context.Context, cs clientset.Interface, ns string, svc *v1.Service, pods []*v1.Pod, numSubsets, numSlices int, namedPort bool) {
+// expectEndpointSlices verifies that EndpointSlices exist for a given Service and
+// Namespace with the appropriate attributes set. This is a relatively complex function as
+// the order of attributes or resources is not necessarily consistent. It is used as a
+// helper function for the tests above and takes some shortcuts with the assumption that
+// those test cases will be the only caller of this function.
+func expectEndpointSlices(ctx context.Context, cs clientset.Interface, ns string, svc *v1.Service, pods []*v1.Pod, numSlices int, namedPort bool) {
 	endpointSlices := []discoveryv1.EndpointSlice{}
 	if err := wait.PollUntilContextTimeout(ctx, 2*time.Second, 2*time.Minute, true, func(ctx context.Context) (bool, error) {
 		endpointSlicesFound, hasMatchingSlices := hasMatchingEndpointSlices(ctx, cs, ns, svc.Name, len(pods), numSlices)
@@ -776,86 +699,12 @@ func expectEndpointsAndSlices(ctx context.Context, cs clientset.Interface, ns st
 		framework.Failf("Timed out waiting for EndpointSlices to match expectations: %v", err)
 	}
 
-	endpoints := &v1.Endpoints{}
-	if err := wait.PollUntilContextTimeout(ctx, 2*time.Second, 2*time.Minute, true, func(ctx context.Context) (bool, error) {
-		endpointsFound, hasMatchingEndpoints := hasMatchingEndpoints(ctx, cs, ns, svc.Name, len(pods), numSubsets)
-		if !hasMatchingEndpoints {
-			framework.Logf("Matching Endpoints not found")
-			return false, nil
-		}
-		endpoints = endpointsFound
-		return true, nil
-	}); err != nil {
-		framework.Failf("Timed out waiting for Endpoints to match expectations: %v", err)
-	}
-
 	podsByIP := map[string]*v1.Pod{}
 	for _, pod := range pods {
 		podsByIP[pod.Status.PodIP] = pod
 		if len(pod.Spec.Containers) != 1 {
 			framework.Failf("Expected pod to have 1 container, got %d", len(pod.Spec.Containers))
 		}
-	}
-
-	if endpoints.Name != svc.Name {
-		framework.Failf("Expected Endpoints name to be %s, got %s", svc.Name, endpoints.Name)
-	}
-
-	totalEndpointAddresses := 0
-	for _, subset := range endpoints.Subsets {
-		addresses := append(subset.Addresses, subset.NotReadyAddresses...)
-		totalEndpointAddresses += len(addresses)
-
-		if len(subset.Ports) != len(svc.Spec.Ports) {
-			framework.Failf("Expected subset to have %d ports, got %d", len(svc.Spec.Ports), len(subset.Ports))
-		}
-
-		// If not a named port, the subset ports should directly correspond with
-		// the Service ports.
-		if !namedPort {
-			for i, subsetPort := range subset.Ports {
-				svcPort := svc.Spec.Ports[i]
-				if subsetPort.Name != svcPort.Name {
-					framework.Failf("Expected port name to be %s, got %s", svcPort.Name, subsetPort.Name)
-				}
-				if subsetPort.Protocol != svcPort.Protocol {
-					framework.Failf("Expected protocol to be %s, got %s", svcPort.Protocol, subsetPort.Protocol)
-				}
-				if subsetPort.Port != svcPort.TargetPort.IntVal {
-					framework.Failf("Expected port to be %d, got %d", svcPort.TargetPort.IntVal, subsetPort.Port)
-				}
-			}
-		}
-
-		for _, address := range addresses {
-			pod, ok := podsByIP[address.IP]
-			if !ok {
-				framework.Failf("Unexpected address with IP: %s", address.IP)
-			}
-
-			ensurePodTargetRef(pod, address.TargetRef)
-
-			// If a named port, the subset ports should directly correspond with
-			// each individual pod.
-			if namedPort {
-				container := pod.Spec.Containers[0]
-				for _, port := range container.Ports {
-					if port.Name == svc.Spec.Ports[0].TargetPort.String() {
-						subsetPort := subset.Ports[0]
-						if subsetPort.Port != port.ContainerPort {
-							framework.Failf("Expected subset port to be %d, got %d", port.ContainerPort, subsetPort.Port)
-						}
-						if subsetPort.Name != svc.Spec.Ports[0].Name {
-							framework.Failf("Expected subset port name to be %s, got %s", svc.Spec.Ports[0].Name, subsetPort.Name)
-						}
-					}
-				}
-			}
-		}
-	}
-
-	if len(pods) != totalEndpointAddresses {
-		framework.Failf("Expected %d addresses, got %d", len(pods), totalEndpointAddresses)
 	}
 
 	if len(pods) == 0 && len(endpointSlices) != 1 {
@@ -985,34 +834,6 @@ func hasMatchingEndpointSlices(ctx context.Context, cs clientset.Interface, ns, 
 	return esList.Items, true
 }
 
-// hasMatchingEndpoints returns any Endpoints that match the conditions along
-// with a boolean indicating if all the conditions have been met.
-func hasMatchingEndpoints(ctx context.Context, cs clientset.Interface, ns, svcName string, numIPs, numSubsets int) (*v1.Endpoints, bool) {
-	endpoints, err := cs.CoreV1().Endpoints(ns).Get(ctx, svcName, metav1.GetOptions{})
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			framework.Logf("Endpoints for %s/%s Service not found", ns, svcName)
-			return nil, false
-		}
-		framework.ExpectNoError(err, "Error fetching Endpoints for %s/%s Service", ns, svcName)
-	}
-	if len(endpoints.Subsets) != numSubsets {
-		framework.Logf("Endpoints for %s/%s Service with %d/%d Subsets", ns, svcName, len(endpoints.Subsets), numSubsets)
-		return nil, false
-	}
-
-	actualNumIPs := 0
-	for _, endpointSubset := range endpoints.Subsets {
-		actualNumIPs += len(endpointSubset.Addresses) + len(endpointSubset.NotReadyAddresses)
-	}
-	if actualNumIPs != numIPs {
-		framework.Logf("Endpoints for %s/%s Service with %d/%d IPs", ns, svcName, actualNumIPs, numIPs)
-		return nil, false
-	}
-
-	return endpoints, true
-}
-
 // ensurePodTargetRef ensures that a Pod matches the provided target reference.
 func ensurePodTargetRef(pod *v1.Pod, targetRef *v1.ObjectReference) {
 	if targetRef == nil {
@@ -1030,65 +851,4 @@ func ensurePodTargetRef(pod *v1.Pod, targetRef *v1.ObjectReference) {
 	if targetRef.UID != pod.UID {
 		framework.Failf("Expected TargetRef.UID to be %s, got %s", pod.UID, targetRef.UID)
 	}
-}
-
-// createServiceReportErr creates a Service and reports any associated error.
-func createServiceReportErr(ctx context.Context, cs clientset.Interface, ns string, service *v1.Service) *v1.Service {
-	svc, err := cs.CoreV1().Services(ns).Create(ctx, service, metav1.CreateOptions{})
-	framework.ExpectNoError(err, "error deleting Service")
-	return svc
-}
-
-// endpointSlicesEqual compare if the Endpoint and the EndpointSliceList contains the same endpoints values
-// as in addresses and ports, considering Ready and Unready addresses
-func endpointSlicesEqual(endpoints *v1.Endpoints, endpointSliceList *discoveryv1.EndpointSliceList) bool {
-	// get the apiserver endpoint addresses
-	epAddresses := sets.NewString()
-	epPorts := sets.NewInt32()
-	for _, subset := range endpoints.Subsets {
-		for _, addr := range subset.Addresses {
-			epAddresses.Insert(addr.IP)
-		}
-		for _, addr := range subset.NotReadyAddresses {
-			epAddresses.Insert(addr.IP)
-		}
-		for _, port := range subset.Ports {
-			epPorts.Insert(port.Port)
-		}
-	}
-	framework.Logf("Endpoints addresses: %v , ports: %v", epAddresses.List(), epPorts.List())
-
-	// Endpoints are single stack, and must match the primary IP family of the Service kubernetes.default
-	// However, EndpointSlices can be IPv4 or IPv6, we can only compare the Slices that match the same IP family
-	// framework.TestContext.ClusterIsIPv6() reports the IP family of the kubernetes.default service
-	var addrType discoveryv1.AddressType
-	if framework.TestContext.ClusterIsIPv6() {
-		addrType = discoveryv1.AddressTypeIPv6
-	} else {
-		addrType = discoveryv1.AddressTypeIPv4
-	}
-
-	// get the apiserver addresses from the endpoint slice list
-	sliceAddresses := sets.NewString()
-	slicePorts := sets.NewInt32()
-	for _, slice := range endpointSliceList.Items {
-		if slice.AddressType != addrType {
-			framework.Logf("Skipping slice %s: wanted %s family, got %s", slice.Name, addrType, slice.AddressType)
-			continue
-		}
-		for _, s := range slice.Endpoints {
-			sliceAddresses.Insert(s.Addresses...)
-		}
-		for _, ports := range slice.Ports {
-			if ports.Port != nil {
-				slicePorts.Insert(*ports.Port)
-			}
-		}
-	}
-
-	framework.Logf("EndpointSlices addresses: %v , ports: %v", sliceAddresses.List(), slicePorts.List())
-	if sliceAddresses.Equal(epAddresses) && slicePorts.Equal(epPorts) {
-		return true
-	}
-	return false
 }
