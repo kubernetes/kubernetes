@@ -742,7 +742,26 @@ func Validate_DeviceRequestAllocationResult(ctx context.Context, op operation.Op
 			return
 		}(fldPath.Child("bindingConditions"), obj.BindingConditions, safe.Field(oldObj, func(oldObj *resourcev1beta1.DeviceRequestAllocationResult) []string { return oldObj.BindingConditions }))...)
 
-	// field resourcev1beta1.DeviceRequestAllocationResult.BindingFailureConditions has no validation
+	// field resourcev1beta1.DeviceRequestAllocationResult.BindingFailureConditions
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []string) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 4); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("bindingFailureConditions"), obj.BindingFailureConditions, safe.Field(oldObj, func(oldObj *resourcev1beta1.DeviceRequestAllocationResult) []string {
+			return oldObj.BindingFailureConditions
+		}))...)
 
 	// field resourcev1beta1.DeviceRequestAllocationResult.ShareID
 	errs = append(errs,
