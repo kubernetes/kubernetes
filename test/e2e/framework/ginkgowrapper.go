@@ -234,22 +234,16 @@ func iterArgs(args []any, yield func(arg any) bool) bool {
 // the test tree construction. Therefore it doesn't matter anymore whether
 // ginkgo.It or framework.It is used.
 //
-// This is thread-safe because test registration is single-threaded.
 // It is guaranteed to happen before our special argument functions
 // can be called because this is the init code of their package.
-// It cooperates with other packages which might do the same by
-// wrapping the original function.
-
-var origTransformNodeArgs func(nodeType types.NodeType, offset ginkgo.Offset, text string, args []any) (string, []any, []error)
 
 func init() {
-	origTransformNodeArgs = ginkgo.TransformNodeArgs
-	ginkgo.TransformNodeArgs = transformGinkgoNodeArgs
+	ginkgo.AddTreeConstructionNodeArgsTransformer(transformGinkgoNodeArgs)
 }
 
 func transformGinkgoNodeArgs(nodeType types.NodeType, offset ginkgo.Offset, text string, args []any) (string, []any, []error) {
 	text, args = expandGinkgoArgs(offset+1, text, args)
-	return origTransformNodeArgs(nodeType, offset+1, text, args)
+	return text, args, nil
 }
 
 // expandGinkgoArgs concatenates all strings and translates our custom

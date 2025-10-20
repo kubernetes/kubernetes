@@ -559,7 +559,11 @@ func transformNewNodeArgs(deprecationTracker *types.DeprecationTracker, nodeType
 	var errs []error
 
 	// Most recent first...
-	for _, transformer := range slices.Backward(nodeArgsTransformers) {
+	//
+	// This intentionally doesn't use slices.Backward because
+	// using iterators influences stack unwinding.
+	for i := len(nodeArgsTransformers) - 1; i >= 0; i-- {
+		transformer := nodeArgsTransformers[i].transformer
 		args = internal.UnrollInterfaceSlice(args)
 
 		// We do not really need to recompute this on additional loop iterations,
@@ -572,7 +576,7 @@ func transformNewNodeArgs(deprecationTracker *types.DeprecationTracker, nodeType
 		}
 		offset += 3 // The DSL function, this helper, and the TransformNodeArgs implementation.
 
-		text, args, errs = transformer.transformer(nodeType, offset, text, args)
+		text, args, errs = transformer(nodeType, offset, text, args)
 		exitIfErrors(errs)
 	}
 	return deprecationTracker, nodeType, text, args
