@@ -148,7 +148,7 @@ func NewFilteredDynamicInformer(client dynamic.Interface, gvr schema.GroupVersio
 	return &dynamicInformer{
 		gvr: gvr,
 		informer: cache.NewSharedIndexInformerWithOptions(
-			&cache.ListWatch{
+			cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 					if tweakListOptions != nil {
 						tweakListOptions(&options)
@@ -173,7 +173,7 @@ func NewFilteredDynamicInformer(client dynamic.Interface, gvr schema.GroupVersio
 					}
 					return client.Resource(gvr).Namespace(namespace).Watch(ctx, options)
 				},
-			},
+			}, client),
 			&unstructured.Unstructured{},
 			cache.SharedIndexInformerOptions{
 				ResyncPeriod:      resyncPeriod,
