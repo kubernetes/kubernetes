@@ -666,13 +666,6 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		standaloneMode = false
 	}
 
-	if kubeDeps == nil {
-		kubeDeps, err = UnsecuredDependencies(ctx, s, featureGate)
-		if err != nil {
-			return err
-		}
-	}
-
 	hostName, err := nodeutil.GetHostname(s.HostnameOverride)
 	if err != nil {
 		return err
