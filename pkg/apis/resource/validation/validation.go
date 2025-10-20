@@ -1412,7 +1412,7 @@ func validateDeviceBindingParameters(bindingConditions, bindingFailureConditions
 		metav1validation.ValidateLabelName, fldPath.Child("bindingConditions"), sizeCovered)...)
 
 	allErrs = append(allErrs, validateSlice(bindingFailureConditions, resource.BindingFailureConditionsMaxSize,
-		metav1validation.ValidateLabelName, fldPath.Child("bindingFailureConditions"))...)
+		metav1validation.ValidateLabelName, fldPath.Child("bindingFailureConditions"), sizeCovered)...)
 
 	// ensure BindingConditions and BindingFailureConditions contain no duplicate items and do not overlap with each other
 	conditionsSet := sets.New[string]()
