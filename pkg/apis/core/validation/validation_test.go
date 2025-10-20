@@ -27763,7 +27763,6 @@ func TestValidateSELinuxChangePolicy(t *testing.T) {
 		})
 	}
 }
-
 func TestValidatePodResize(t *testing.T) {
 	mkPod := func(req, lim core.ResourceList, tweaks ...podtest.Tweak) *core.Pod {
 		allTweaks := []podtest.Tweak{
@@ -27834,7 +27833,7 @@ func TestValidatePodResize(t *testing.T) {
 					}))),
 				podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("100m", "200Mi", "", "")}),
 			),
-			err: "pods with pod-level resources cannot be resized",
+			err: "",
 		}, {
 			test: "pod-level resources with container memory limit change",
 			new: podtest.MakePod("pod",
@@ -27851,7 +27850,7 @@ func TestValidatePodResize(t *testing.T) {
 					}))),
 				podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("100m", "200Mi", "", "")}),
 			),
-			err: "pods with pod-level resources cannot be resized",
+			err: "",
 		},
 		{
 			test: "pod-level resources with container cpu request change",
@@ -27869,7 +27868,7 @@ func TestValidatePodResize(t *testing.T) {
 					}))),
 				podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("100m", "200Mi", "", "")}),
 			),
-			err: "pods with pod-level resources cannot be resized",
+			err: "",
 		}, {
 			test: "pod-level resources with container memory request change",
 			new: podtest.MakePod("pod",
@@ -27886,7 +27885,7 @@ func TestValidatePodResize(t *testing.T) {
 					}))),
 				podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("100m", "200Mi", "", "")}),
 			),
-			err: "pods with pod-level resources cannot be resized",
+			err: "",
 		},
 		{
 			test: "pod-level resources with pod-level memory limit change",
@@ -27904,7 +27903,7 @@ func TestValidatePodResize(t *testing.T) {
 					}))),
 				podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("200m", "100Mi", "", "")}),
 			),
-			err: "pods with pod-level resources cannot be resized",
+			err: "",
 		},
 		{
 			test: "pod-level resources with pod-level memory request change",
@@ -27922,7 +27921,7 @@ func TestValidatePodResize(t *testing.T) {
 					}))),
 				podtest.SetPodResources(&core.ResourceRequirements{Requests: getResources("200m", "100Mi", "", "")}),
 			),
-			err: "pods with pod-level resources cannot be resized",
+			err: "",
 		},
 		{
 			test: "pod-level resources with pod-level cpu limit change",
@@ -27940,7 +27939,7 @@ func TestValidatePodResize(t *testing.T) {
 					}))),
 				podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("100m", "200Mi", "", "")}),
 			),
-			err: "pods with pod-level resources cannot be resized",
+			err: "",
 		},
 		{
 			test: "pod-level resources with pod-level cpu request change",
@@ -27958,7 +27957,31 @@ func TestValidatePodResize(t *testing.T) {
 					}))),
 				podtest.SetPodResources(&core.ResourceRequirements{Requests: getResources("200m", "200Mi", "", "")}),
 			),
-			err: "pods with pod-level resources cannot be resized",
+			err: "",
+		},
+		{
+			test: "pod-level resources with pod-level storage changes",
+			new: podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{Requests: getResources("100m", "100Mi", "", "")}),
+					podtest.SetContainerResizePolicy(core.ContainerResizePolicy{ResourceName: core.ResourceMemory, RestartPolicy: core.NotRequired}),
+				)),
+				podtest.SetPodResources(&core.ResourceRequirements{
+					Requests: getResources("100m", "100Mi", "", "200Mi"),
+					Limits:   getResources("100m", "100Mi", "", ""),
+				}),
+			),
+			old: podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{Requests: getResources("100m", "100Mi", "", "")}),
+					podtest.SetContainerResizePolicy(core.ContainerResizePolicy{ResourceName: core.ResourceMemory, RestartPolicy: core.NotRequired}),
+				)),
+				podtest.SetPodResources(&core.ResourceRequirements{
+					Requests: getResources("200m", "100Mi", "", "100Mi"),
+					Limits:   getResources("100m", "200Mi", "", ""),
+				}),
+			),
+			err: "spec: Forbidden: only cpu and memory resources are mutable",
 		},
 		{
 			test: "cpu limit change",
@@ -28203,6 +28226,11 @@ func TestValidatePodResize(t *testing.T) {
 			new:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "100Mi", "", ""), core.ContainerRestartPolicyAlways),
 			err:  "",
 		}, {
+			test: "memory limit decrease for sidecar containers, resize policy RestartContainer",
+			old:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "200Mi", "", ""), core.ContainerRestartPolicyAlways, resizePolicy(core.ResourceMemory, core.RestartContainer)),
+			new:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "100Mi", "", ""), core.ContainerRestartPolicyAlways, resizePolicy(core.ResourceMemory, core.RestartContainer)),
+			err:  "",
+		}, {
 			test: "storage limit change for sidecar containers",
 			old:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "100Mi", "2Gi", ""), core.ContainerRestartPolicyAlways),
 			new:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "100Mi", "1Gi", ""), core.ContainerRestartPolicyAlways),
@@ -28339,7 +28367,8 @@ func TestValidatePodResize(t *testing.T) {
 				test.old.Spec.RestartPolicy = "Always"
 			}
 
-			errs := ValidatePodResize(test.new, test.old, PodValidationOptions{AllowSidecarResizePolicy: true})
+			errs := ValidatePodResize(test.new, test.old, PodValidationOptions{AllowSidecarResizePolicy: true, InPlacePodLevelResourcesVerticalScalingEnabled: true, PodLevelResourcesEnabled: true})
+
 			if test.err == "" {
 				if len(errs) != 0 {
 					t.Errorf("unexpected invalid: (%+v)\nA: %+v\nB: %+v", errs, test.new, test.old)
