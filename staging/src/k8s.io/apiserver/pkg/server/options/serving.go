@@ -231,12 +231,12 @@ func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 			"for the kernel to release sockets in TIME_WAIT state. [default=false]")
 
 	fs.DurationVar(&s.HTTP2ReadIdleTimeout, "http2-read-idle-timeout", s.HTTP2ReadIdleTimeout,
-		"The duration that server waits until server sends PING frame to client."+
+		"The duration that server waits until server sends PING frame to client. "+
 			"Zero means to use golang's default.")
 
 	fs.DurationVar(&s.HTTP2PingTimeout, "http2-ping-timeout", s.HTTP2PingTimeout,
-		"The duration to wait for sent PING request's response from server to client."+
-			"After the duration, if no response received connection will be closed."+
+		"The duration to wait for sent PING request's response from server to client. "+
+			"After the duration, if no response received connection will be closed. "+
 			"Zero means to use golang's default, has no effect without --http2-read-idle-timeout")
 }
 
