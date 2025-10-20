@@ -78,6 +78,7 @@ type frameworkImpl struct {
 	eventRecorder    events.EventRecorder
 	informerFactory  informers.SharedInformerFactory
 	sharedDRAManager fwk.SharedDRAManager
+	workloadManager  fwk.WorkloadManager
 	logger           klog.Logger
 
 	sharedCSIManager fwk.CSIManager
@@ -145,6 +146,7 @@ type frameworkOptions struct {
 	parallelizer           parallelize.Parallelizer
 	waitingPods            *waitingPodsMap
 	apiDispatcher          *apidispatcher.APIDispatcher
+	workloadManager        fwk.WorkloadManager
 	logger                 *klog.Logger
 }
 
@@ -244,6 +246,13 @@ func WithAPIDispatcher(apiDispatcher *apidispatcher.APIDispatcher) Option {
 	}
 }
 
+// WithWorkloadManager sets Workload manager for the scheduling frameworkImpl.
+func WithWorkloadManager(workloadManager fwk.WorkloadManager) Option {
+	return func(o *frameworkOptions) {
+		o.workloadManager = workloadManager
+	}
+}
+
 // CaptureProfile is a callback to capture a finalized profile.
 type CaptureProfile func(config.KubeSchedulerProfile)
 
@@ -312,6 +321,7 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 		PodNominator:         options.podNominator,
 		PodActivator:         options.podActivator,
 		apiDispatcher:        options.apiDispatcher,
+		workloadManager:      options.workloadManager,
 		parallelizer:         options.parallelizer,
 		logger:               logger,
 	}
@@ -1735,6 +1745,11 @@ func (f *frameworkImpl) SharedDRAManager() fwk.SharedDRAManager {
 // SharedCSIManager returns the SharedCSIManager of the framework.
 func (f *frameworkImpl) SharedCSIManager() fwk.CSIManager {
 	return f.sharedCSIManager
+}
+
+// WorkloadManager returns the WorkloadManager of the framework.
+func (f *frameworkImpl) WorkloadManager() fwk.WorkloadManager {
+	return f.workloadManager
 }
 
 func (f *frameworkImpl) pluginsNeeded(plugins *config.Plugins) sets.Set[string] {
