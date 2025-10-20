@@ -131,6 +131,51 @@ func (p *mockPolicy) GetAllocatableCPUs(m state.State) cpuset.CPUSet {
 	return cpuset.New()
 }
 
+func (p *mockPolicy) ReleaseLeakedCPUs(logger logr.Logger, s state.State, pod *v1.Pod) cpuset.CPUSet {
+	// If pod has no init containers, no leaked CPUs to release
+	if len(pod.Spec.InitContainers) == 0 {
+		return cpuset.New()
+	}
+
+	// Simulate releasing leaked CPUs from init containers
+	leakedCPUs := cpuset.New()
+	if assignments, exists := s.GetCPUAssignments()[string(pod.UID)]; exists {
+		for containerName, cset := range assignments {
+			// Check if this is an init container
+			for _, initC := range pod.Spec.InitContainers {
+				if initC.Name == containerName {
+					// If this is a sidecar container, keep all its CPUs
+					if initC.RestartPolicy != nil && *initC.RestartPolicy == v1.ContainerRestartPolicyAlways {
+						// Sidecar containers keep all their CPUs, no leakage
+						continue
+					}
+
+					// Simulate some leaked CPUs (remove some from the assignment)
+					if cset.Size() > 2 {
+						// Get the first 2 CPUs to keep, release the rest
+						cpus := cset.List()
+						if len(cpus) > 2 {
+							keepCPUs := cpuset.New(cpus[0], cpus[1])
+							leakedFromContainer := cset.Difference(keepCPUs)
+							leakedCPUs = leakedCPUs.Union(leakedFromContainer)
+						}
+					}
+					break
+				}
+			}
+		}
+	}
+
+	// Update default CPUSet to include leaked CPUs
+	defaultSet := s.GetDefaultCPUSet()
+	s.SetDefaultCPUSet(defaultSet.Union(leakedCPUs))
+
+	return leakedCPUs
+}
+
+func (p *mockPolicy) UpdateCPUsForInitC(logger logr.Logger, s state.State, pod *v1.Pod, containerName string, leakedCPUs cpuset.CPUSet) {
+}
+
 type mockRuntimeService struct {
 	err error
 }
@@ -1473,6 +1518,213 @@ func TestCPUManagerHandlePolicyOptions(t *testing.T) {
 			}
 		})
 
+	}
+}
+
+func TestReleasePodUnallocatedCPUs(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
+	testCases := []struct {
+		description     string
+		activePods      []*v1.Pod
+		podStatus       v1.PodStatus
+		podStatusFound  bool
+		stAssignments   state.ContainerCPUAssignments
+		stDefaultCPUSet cpuset.CPUSet
+		expAssignments  state.ContainerCPUAssignments
+		expDefaultSet   cpuset.CPUSet
+	}{
+		{
+			description: "Pod with terminated init containers - leaked CPUs released",
+			activePods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-pod",
+						UID:  "test-pod-uid",
+					},
+					Spec: v1.PodSpec{
+						InitContainers: []v1.Container{{Name: "init-1"}},
+						Containers:     []v1.Container{{Name: "app-1"}},
+					},
+				},
+			},
+			podStatus: v1.PodStatus{
+				InitContainerStatuses: []v1.ContainerStatus{
+					{
+						Name:  "init-1",
+						State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{}},
+					},
+				},
+			},
+			podStatusFound: true,
+			stAssignments: state.ContainerCPUAssignments{
+				"test-pod-uid": {
+					"init-1": cpuset.New(0, 2, 4, 6), // 4 CPUs - has leaked CPUs
+					"app-1":  cpuset.New(1, 5),
+				},
+			},
+			stDefaultCPUSet: cpuset.New(3, 7),
+			expAssignments: state.ContainerCPUAssignments{
+				"test-pod-uid": {
+					"init-1": cpuset.New(0, 2, 4, 6), // should be updated after releasing leaked CPUs
+					"app-1":  cpuset.New(1, 5),
+				},
+			},
+			expDefaultSet: cpuset.New(3, 4, 6, 7), // leaked CPUs returned to default
+		},
+		{
+			description: "Pod with running init containers - no CPU release",
+			activePods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-pod",
+						UID:  "test-pod-uid",
+					},
+					Spec: v1.PodSpec{
+						InitContainers: []v1.Container{{Name: "init-1"}},
+						Containers:     []v1.Container{{Name: "app-1"}},
+					},
+				},
+			},
+			podStatus: v1.PodStatus{
+				InitContainerStatuses: []v1.ContainerStatus{
+					{
+						Name:  "init-1",
+						State: v1.ContainerState{Running: &v1.ContainerStateRunning{}},
+					},
+				},
+			},
+			podStatusFound: true,
+			stAssignments: state.ContainerCPUAssignments{
+				"test-pod-uid": {
+					"init-1": cpuset.New(0, 2, 4, 6),
+					"app-1":  cpuset.New(1, 5),
+				},
+			},
+			stDefaultCPUSet: cpuset.New(3, 7),
+			expAssignments: state.ContainerCPUAssignments{
+				"test-pod-uid": {
+					"init-1": cpuset.New(0, 2, 4, 6), // should remain unchanged
+					"app-1":  cpuset.New(1, 5),
+				},
+			},
+			expDefaultSet: cpuset.New(3, 7), // should remain unchanged
+		},
+		{
+			description: "Pod with restartable init containers - no CPU release",
+			activePods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-pod",
+						UID:  "test-pod-uid",
+					},
+					Spec: v1.PodSpec{
+						InitContainers: []v1.Container{
+							{
+								Name:          "init-1",
+								RestartPolicy: &[]v1.ContainerRestartPolicy{v1.ContainerRestartPolicyAlways}[0],
+							},
+						},
+						Containers: []v1.Container{{Name: "app-1"}},
+					},
+				},
+			},
+			podStatus: v1.PodStatus{
+				InitContainerStatuses: []v1.ContainerStatus{
+					{
+						Name:  "init-1",
+						State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{}},
+					},
+				},
+			},
+			podStatusFound: true,
+			stAssignments: state.ContainerCPUAssignments{
+				"test-pod-uid": {
+					"init-1": cpuset.New(0, 4, 2, 6),
+					"app-1":  cpuset.New(1, 5),
+				},
+			},
+			stDefaultCPUSet: cpuset.New(3, 7),
+			expAssignments: state.ContainerCPUAssignments{
+				"test-pod-uid": {
+					"init-1": cpuset.New(0, 2, 4, 6),
+					"app-1":  cpuset.New(1, 5),
+				},
+			},
+			expDefaultSet: cpuset.New(3, 7), // leaked CPUs returned to default
+		},
+		{
+			description: "Pod status not found - no CPU release",
+			activePods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-pod",
+						UID:  "test-pod-uid",
+					},
+					Spec: v1.PodSpec{
+						InitContainers: []v1.Container{{Name: "init-1"}},
+						Containers:     []v1.Container{{Name: "app-1"}},
+					},
+				},
+			},
+			podStatus:      v1.PodStatus{},
+			podStatusFound: false,
+			stAssignments: state.ContainerCPUAssignments{
+				"test-pod-uid": {
+					"init-1": cpuset.New(0, 4, 2, 6),
+					"app-1":  cpuset.New(1, 5),
+				},
+			},
+			stDefaultCPUSet: cpuset.New(3, 7),
+			expAssignments: state.ContainerCPUAssignments{
+				"test-pod-uid": {
+					"init-1": cpuset.New(0, 4, 2, 6), // should remain unchanged
+					"app-1":  cpuset.New(1, 5),
+				},
+			},
+			expDefaultSet: cpuset.New(3, 7), // should remain unchanged
+		},
+		{
+			description:     "No active pods - no changes",
+			activePods:      []*v1.Pod{},
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: cpuset.New(3, 7),
+			expAssignments:  state.ContainerCPUAssignments{},
+			expDefaultSet:   cpuset.New(3, 7),
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			mockState := &mockState{
+				assignments:   testCase.stAssignments.Clone(),
+				defaultCPUSet: testCase.stDefaultCPUSet.Clone(),
+			}
+
+			mgr := &manager{
+				policy: &mockPolicy{},
+				state:  mockState,
+				activePods: func() []*v1.Pod {
+					return testCase.activePods
+				},
+				podStatusProvider: mockPodStatusProvider{
+					podStatus: testCase.podStatus,
+					found:     testCase.podStatusFound,
+				},
+			}
+
+			// Call the function under test
+			mgr.releasePodUnallocatedCPUs(logger)
+
+			// Verify the results
+			if !reflect.DeepEqual(testCase.expAssignments, mgr.state.GetCPUAssignments()) {
+				t.Errorf("Expected assignments %v, but got %v", testCase.expAssignments, mgr.state.GetCPUAssignments())
+			}
+
+			if !testCase.expDefaultSet.Equals(mgr.state.GetDefaultCPUSet()) {
+				t.Errorf("Expected default CPUSet %v, but got %v", testCase.expDefaultSet, mgr.state.GetDefaultCPUSet())
+			}
+		})
 	}
 }
 
