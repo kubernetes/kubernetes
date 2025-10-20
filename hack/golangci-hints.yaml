@@ -144,7 +144,6 @@ linters:
       - text: "Conditions field in AllocatedDeviceStatus has incorrect tags, should be: `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,5,rep,name=conditions\"`"
         path: "staging/src/k8s.io/api/resource/"
       
-      
       # Pre-existing issues from the conflictmarkers linter
       # The Error field in some older API types is marked as both optional and required.
       # This is incorrect, but cannot be changed without breaking changes.
@@ -156,6 +155,14 @@ linters:
         path: "staging/src/k8s.io/api/networking/v1/types.go"
       - text: "field IngressPortStatus.Error has conflicting markers: optional_vs_required: {\\[optional\\], \\[kubebuilder:validation:Required\\]}. fields cannot be both optional and required"
         path: "staging/src/k8s.io/api/networking/v1beta1/types.go"
+      
+      # Duplicate markers seems to flag markdown table as duplicate entries
+      - text: "duplicatemarkers: MaxSkew has duplicated markers -------+-------+-------+"
+        path: "staging/src/k8s.io/api/core/v1/"
+      - text: "duplicatemarkers: WhenUnsatisfiable has duplicated markers -------+-------+-------+"
+        path: "staging/src/k8s.io/api/core/v1/"
+      - text: "duplicatemarkers: MinDomains has duplicated markers -------+-------+-------+"
+        path: "staging/src/k8s.io/api/core/v1/"
 
   default: standard
   enable: # please keep this alphabetized
@@ -321,6 +328,7 @@ linters:
               # - "requiredfields" # Required fields should only be pointers when required based on the validity of the zero value, they should always have `omitempty`.
               - "ssatags" # Ensure lists have a listType tag.
               # - "uniquemarkers" # Ensure markers are not duplicated across field and type definitions.
+              - "duplicatemarkers" #Prevent identical markers from being present on types and fields
           lintersConfig:
             conditions:
               isFirstField: Ignore
