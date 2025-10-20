@@ -1004,6 +1004,24 @@ func testValidateStatusUpdateForDeclarative(t *testing.T, apiVersion string) {
 				field.Duplicate(field.NewPath("status", "devices").Index(1), "driver1/pool1/device1"),
 			},
 		},
+		// .Status.Allocation.Devices.Results[%d].BindingConditions
+		"valid binding conditions, max items": {
+			old: mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(
+				tweakStatusBindingConditions(resource.BindingConditionsMaxSize),
+				tweakStatusBindingFailureConditions(1),
+			),
+		},
+		"invalid binding conditions, too many": {
+			old: mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(
+				tweakStatusBindingConditions(resource.BindingConditionsMaxSize+1),
+				tweakStatusBindingFailureConditions(1),
+			),
+			expectedErrs: field.ErrorList{
+				field.TooMany(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("bindingConditions"), resource.BindingConditionsMaxSize+1, resource.BindingConditionsMaxSize).WithOrigin("maxItems"),
+			},
+		},
 	}
 
 	for k, tc := range testCases {
@@ -1123,6 +1141,34 @@ func tweakSpecRemoveRequest(index int) func(rc *resource.ResourceClaim) {
 	return func(rc *resource.ResourceClaim) {
 		if index >= 0 && index < len(rc.Spec.Devices.Requests) {
 			rc.Spec.Devices.Requests = append(rc.Spec.Devices.Requests[:index], rc.Spec.Devices.Requests[index+1:]...)
+		}
+	}
+}
+
+func tweakStatusBindingConditions(count int) func(rc *resource.ResourceClaim) {
+	return func(rc *resource.ResourceClaim) {
+		if rc.Status.Allocation == nil {
+			return
+		}
+		for i := range rc.Status.Allocation.Devices.Results {
+			rc.Status.Allocation.Devices.Results[i].BindingConditions = []string{}
+			for j := 0; j < count; j++ {
+				rc.Status.Allocation.Devices.Results[i].BindingConditions = append(rc.Status.Allocation.Devices.Results[i].BindingConditions, fmt.Sprintf("condition-%d", j))
+			}
+		}
+	}
+}
+
+func tweakStatusBindingFailureConditions(count int) func(rc *resource.ResourceClaim) {
+	return func(rc *resource.ResourceClaim) {
+		if rc.Status.Allocation == nil {
+			return
+		}
+		for i := range rc.Status.Allocation.Devices.Results {
+			rc.Status.Allocation.Devices.Results[i].BindingFailureConditions = []string{}
+			for j := 0; j < count; j++ {
+				rc.Status.Allocation.Devices.Results[i].BindingFailureConditions = append(rc.Status.Allocation.Devices.Results[i].BindingFailureConditions, fmt.Sprintf("failure-condition-%d", j))
+			}
 		}
 	}
 }
