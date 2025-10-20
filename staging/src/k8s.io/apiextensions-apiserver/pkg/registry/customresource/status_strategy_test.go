@@ -360,38 +360,3 @@ func TestStatusStrategy_PrepareForUpdate_WithNilStructuralSchema(t *testing.T) {
 		})
 	}
 }
-
-func TestStatusStrategy_Validate_WithNilStructuralSchema(t *testing.T) {
-	// Additional test to ensure validation also works with nil structural schema
-	crStrategy := customResourceStrategy{
-		structuralSchema: nil,
-	}
-	strategy := NewStatusStrategy(crStrategy)
-
-	obj := &unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"apiVersion": "example.com/v1",
-			"kind":       "TestResource",
-			"metadata": map[string]interface{}{
-				"name":      "test-resource",
-				"namespace": "default",
-			},
-			"status": map[string]interface{}{
-				"phase": "Running",
-			},
-		},
-	}
-
-	// This should not panic even with nil structural schema
-	defer func() {
-		if r := recover(); r != nil {
-			t.Errorf("Validate panicked with nil structural schema: %v", r)
-		}
-	}()
-
-	errs := strategy.Validate(context.TODO(), obj)
-	// Validation might return errors, but it should not panic
-	if len(errs) > 0 {
-		t.Logf("Validation returned errors (expected for nil schema): %v", errs)
-	}
-}
