@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
@@ -661,7 +662,7 @@ func TestRetryPendingResizes(t *testing.T) {
 	))
 }
 
-func TestHandlePodResourcesResizeForGuanteedQOSPods(t *testing.T) {
+func TestRetryPendingResizesGuanteedQOSPods(t *testing.T) {
 	if goruntime.GOOS == "windows" {
 		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
 	}
@@ -907,7 +908,7 @@ func TestHandlePodResourcesResizeForGuanteedQOSPods(t *testing.T) {
 	}
 }
 
-func TestHandlePodResourcesResizeWithSwap(t *testing.T) {
+func TestRetryPendingResizesWithSwap(t *testing.T) {
 	if goruntime.GOOS == "windows" {
 		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
 	}
@@ -1079,7 +1080,7 @@ func TestHandlePodResourcesResizeWithSwap(t *testing.T) {
 	}
 }
 
-func TestHandlePodResourcesResizeMultipleConditions(t *testing.T) {
+func TestRetryPendingResizesMultipleConditions(t *testing.T) {
 	if goruntime.GOOS == "windows" {
 		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
 	}
@@ -1148,6 +1149,7 @@ func TestHandlePodResourcesResizeMultipleConditions(t *testing.T) {
 		mem                resource.Quantity
 		generation         int64
 		expectedConditions []*v1.PodCondition
+		expectedEvent      string
 	}{
 		{
 			name:       "allocated != actuated, pod resize should be in progress",
@@ -1159,9 +1161,31 @@ func TestHandlePodResourcesResizeMultipleConditions(t *testing.T) {
 				Status:             "True",
 				ObservedGeneration: 1,
 			}},
+			expectedEvent: `Normal ResizeInProgress Pod resize in progress: {"observedGeneration":1,"actual":{"containers":[{"name":"c1","resources":{}}]},"allocated":{"containers":[{"name":"c1","resources":{"requests":{"cpu":"500m","memory":"500Mi"}}}]}}`,
 		},
 		{
 			name:       "desired != allocated != actuated, both conditions should be present in the pod status",
+			cpu:        cpu5000m,
+			mem:        mem4500M,
+			generation: 2,
+			expectedConditions: []*v1.PodCondition{
+				{
+					Type:               v1.PodResizePending,
+					Status:             "True",
+					Reason:             v1.PodReasonInfeasible,
+					Message:            "Node didn't have enough capacity: memory, requested: 4718592000, capacity: 4294967296",
+					ObservedGeneration: 2,
+				},
+				{
+					Type:               v1.PodResizeInProgress,
+					Status:             "True",
+					ObservedGeneration: 1,
+				},
+			},
+			expectedEvent: `Warning ResizeInfeasible Pod resize Infeasible: {"observedGeneration":2,"allocated":{"containers":[{"name":"c1","resources":{"requests":{"cpu":"1","memory":"1Gi"}}}]},"desired":{"containers":[{"name":"c1","resources":{"requests":{"cpu":"5","memory":"4500Mi"}}}]}}`,
+		},
+		{
+			name:       "same as previous case to ensure no new event is generated",
 			cpu:        cpu5000m,
 			mem:        mem4500M,
 			generation: 2,
@@ -1213,6 +1237,7 @@ func TestHandlePodResourcesResizeMultipleConditions(t *testing.T) {
 				Status:             "True",
 				ObservedGeneration: 5,
 			}},
+			expectedEvent: `Normal ResizeInProgress Pod resize in progress: {"observedGeneration":5,"actual":{"containers":[{"name":"c1","resources":{}}]},"allocated":{"containers":[{"name":"c1","resources":{"requests":{"cpu":"1","memory":"1Gi"}}}]}}`,
 		},
 	}
 
@@ -1239,6 +1264,15 @@ func TestHandlePodResourcesResizeMultipleConditions(t *testing.T) {
 				c.LastTransitionTime = metav1.Time{}
 			}
 			require.Equal(t, tc.expectedConditions, conditions)
+
+			fakeRecorder := allocationManager.(*manager).recorder.(*record.FakeRecorder)
+			if tc.expectedEvent != "" {
+				require.Len(t, fakeRecorder.Events, 1)
+				event := <-fakeRecorder.Events
+				require.Equal(t, tc.expectedEvent, event)
+			} else {
+				require.Len(t, fakeRecorder.Events, 0)
+			}
 		})
 	}
 }
@@ -1710,10 +1744,12 @@ func TestRecordPodDeferredAcceptedResizes(t *testing.T) {
 		trigger             string
 		hasPendingCondition bool
 		expectedMetrics     string
+		expectedEvent       string
 	}{
 		{
-			name:    "trigger reason: pod updated, no pending condition",
-			trigger: TriggerReasonPodUpdated,
+			name:          "trigger reason: pod updated, no pending condition",
+			trigger:       TriggerReasonPodUpdated,
+			expectedEvent: `Normal ResizeInProgress Pod resize in progress: {"observedGeneration":0,"actual":{"containers":[{"name":"c1","resources":{}}]},"allocated":{"containers":[{"name":"c1","resources":{"requests":{"cpu":"1","memory":"1Gi"}}}]}}`,
 		},
 		{
 			name:                "trigger reason: pod resized, pending condition",
@@ -1724,6 +1760,7 @@ func TestRecordPodDeferredAcceptedResizes(t *testing.T) {
 					# TYPE kubelet_pod_deferred_accepted_resizes_total counter
 					kubelet_pod_deferred_accepted_resizes_total{retry_trigger="pod_resized"} 1
 			`,
+			expectedEvent: `Normal ResizeInProgress Pod resize in progress: {"observedGeneration":0,"actual":{"containers":[{"name":"c1","resources":{}}]},"allocated":{"containers":[{"name":"c1","resources":{"requests":{"cpu":"1","memory":"1Gi"}}}]}}`,
 		},
 		{
 			name:                "trigger reason: periodic retry, pending condition",
@@ -1735,6 +1772,7 @@ func TestRecordPodDeferredAcceptedResizes(t *testing.T) {
 					kubelet_pod_deferred_accepted_resizes_total{retry_trigger="periodic_retry"} 1
 					kubelet_pod_deferred_accepted_resizes_total{retry_trigger="pod_resized"} 1
 			`,
+			expectedEvent: `Normal ResizeInProgress Pod resize in progress: {"observedGeneration":0,"actual":{"containers":[{"name":"c1","resources":{}}]},"allocated":{"containers":[{"name":"c1","resources":{"requests":{"cpu":"1","memory":"1Gi"}}}]}}`,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1788,9 +1826,13 @@ func TestRecordPodDeferredAcceptedResizes(t *testing.T) {
 			require.NoError(t, testutil.GatherAndCompare(
 				legacyregistry.DefaultGatherer, strings.NewReader(tc.expectedMetrics), "kubelet_pod_deferred_accepted_resizes_total",
 			))
+
+			fakeRecorder := am.(*manager).recorder.(*record.FakeRecorder)
+			require.Len(t, fakeRecorder.Events, 1)
+			event := <-fakeRecorder.Events
+			require.Equal(t, tc.expectedEvent, event)
 		})
 	}
-
 }
 
 func makeAllocationManager(t *testing.T, runtime *containertest.FakeRuntime, allocatedPods []*v1.Pod, nodeConfig *cm.NodeConfig) Manager {
@@ -1823,6 +1865,7 @@ func makeAllocationManager(t *testing.T, runtime *containertest.FakeRuntime, all
 			return nil, false
 		},
 		config.NewSourcesReady(func(_ sets.Set[string]) bool { return true }),
+		record.NewFakeRecorder(20),
 	)
 	allocationManager.SetContainerRuntime(runtime)
 
