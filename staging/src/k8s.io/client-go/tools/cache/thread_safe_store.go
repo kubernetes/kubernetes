@@ -21,6 +21,8 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utiltrace "k8s.io/utils/trace"
 )
@@ -43,13 +45,17 @@ import (
 type ThreadSafeStore interface {
 	Add(key string, obj interface{})
 	Update(key string, obj interface{})
+	// Delete is equivalent to calling DeleteWithObject(key, nil)
 	Delete(key string)
+	DeleteWithObject(key string, obj interface{})
 	Get(key string) (item interface{}, exists bool)
 	List() []interface{}
 	ListKeys() []string
 	Replace(map[string]interface{}, string)
 	Index(indexName string, obj interface{}) ([]interface{}, error)
 	IndexKeys(indexName, indexedValue string) ([]string, error)
+	ObserveResourceVersion(rv string)
+	GetObservedResourceVersion() string
 	ListIndexFuncValues(name string) []string
 	ByIndex(indexName, indexedValue string) ([]interface{}, error)
 	GetIndexers() Indexers
@@ -242,6 +248,7 @@ type threadSafeMap struct {
 
 	// index implements the indexing functionality
 	index *storeIndex
+	rv    string
 }
 
 func (c *threadSafeMap) Transaction(txns ...ThreadSafeStoreTransaction) {
@@ -253,6 +260,13 @@ func (c *threadSafeMap) Transaction(txns ...ThreadSafeStoreTransaction) {
 	defer trace.LogIfLong(min(500*time.Millisecond*time.Duration(len(txns)), 5*time.Second))
 
 	for _, txn := range txns {
+		if txn.Object != nil {
+			rv, rvErr := c.rvFromObject(txn.Object)
+			if rvErr == nil {
+				c.raiseRV(rv)
+			}
+		}
+
 		switch txn.Type {
 		case TransactionTypeAdd:
 			c.addLocked(txn.Key, txn.Object)
@@ -273,8 +287,12 @@ func (c *threadSafeMap) addLocked(key string, obj interface{}) {
 }
 
 func (c *threadSafeMap) Update(key string, obj interface{}) {
+	rv, rvErr := c.rvFromObject(obj)
 	c.lock.Lock()
 	defer c.lock.Unlock()
+	if rvErr == nil {
+		c.raiseRV(rv)
+	}
 	c.updateLocked(key, obj)
 }
 
@@ -285,8 +303,20 @@ func (c *threadSafeMap) updateLocked(key string, obj interface{}) {
 }
 
 func (c *threadSafeMap) Delete(key string) {
+	c.DeleteWithObject(key, nil)
+}
+
+func (c *threadSafeMap) DeleteWithObject(key string, obj interface{}) {
+	var rv string
+	var rvErr error
+	if obj != nil {
+		rv, rvErr = c.rvFromObject(obj)
+	}
 	c.lock.Lock()
 	defer c.lock.Unlock()
+	if obj != nil && rvErr == nil {
+		c.raiseRV(rv)
+	}
 	c.deleteLocked(key)
 }
 
@@ -327,14 +357,45 @@ func (c *threadSafeMap) ListKeys() []string {
 }
 
 func (c *threadSafeMap) Replace(items map[string]interface{}, resourceVersion string) {
+	_, rvErr := resourceversion.CompareResourceVersion(resourceVersion, resourceVersion)
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	c.items = items
+	if rvErr == nil {
+		c.rv = resourceVersion
+	} else {
+		c.rv = ""
+	}
 
 	// rebuild any index
 	c.index.reset()
 	for key, item := range c.items {
 		c.index.updateIndices(nil, item, key)
+	}
+}
+
+func (c *threadSafeMap) rvFromObject(obj interface{}) (rv string, err error) {
+	meta, err := meta.Accessor(obj)
+	if err != nil {
+		return
+	}
+	rv = meta.GetResourceVersion()
+	return rv, nil
+}
+
+// raiseRV updates the threadSafeMaps RV if and only if it is greater than
+// the currently stored RV.
+func (c *threadSafeMap) raiseRV(rv string) {
+	if c.rv == "" {
+		c.rv = rv
+		return
+	}
+	cmp, err := resourceversion.CompareResourceVersion(c.rv, rv)
+	if err != nil {
+		return
+	}
+	if cmp < 0 {
+		c.rv = rv
 	}
 }
 
@@ -354,6 +415,33 @@ func (c *threadSafeMap) Index(indexName string, obj interface{}) ([]interface{},
 		list = append(list, c.items[storeKey])
 	}
 	return list, nil
+}
+
+// GetObservedResourceVersion returns the latest resource version that the store has seen.
+func (c *threadSafeMap) GetObservedResourceVersion() string {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	return c.rv
+}
+
+// ObserveResourceVersion sets the latest resource version that the store has seen.
+func (c *threadSafeMap) ObserveResourceVersion(rv string) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	if c.rv == "" {
+		_, err := resourceversion.CompareResourceVersion(rv, rv)
+		if err == nil {
+			c.rv = rv
+		}
+		return
+	}
+	cmp, err := resourceversion.CompareResourceVersion(c.rv, rv)
+	if err != nil {
+		return
+	}
+	if cmp < 0 {
+		c.rv = rv
+	}
 }
 
 // ByIndex returns a list of the items whose indexed values in the given index include the given indexed value
