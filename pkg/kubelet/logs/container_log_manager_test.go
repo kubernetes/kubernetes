@@ -200,7 +200,11 @@ func TestHighThroughputContainerDetection(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	dir, err := os.MkdirTemp("", "test-high-throughput-detection")
 	require.NoError(t, err)
-	defer os.RemoveAll(dir)
+	defer func() {
+		if err := os.RemoveAll(dir); err != nil {
+			t.Errorf("Failed to remove test directory: %v", err)
+		}
+	}()
 
 	const (
 		testMaxFiles = 3
@@ -241,7 +245,8 @@ func TestHighThroughputContainerDetection(t *testing.T) {
 	}
 	_, err = fd.Write(content)
 	require.NoError(t, err)
-	fd.Close()
+	err = fd.Close()
+	require.NoError(t, err)
 
 	testContainers := []*critest.FakeContainer{
 		{
