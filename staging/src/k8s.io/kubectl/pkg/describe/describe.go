@@ -4878,8 +4878,8 @@ type PodDisruptionBudgetDescriber struct {
 
 func (p *PodDisruptionBudgetDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	var (
-		pdbv1      *policyv1.PodDisruptionBudget
-		err        error
+		pdbv1 *policyv1.PodDisruptionBudget
+		err   error
 	)
 
 	pdbv1, err = p.PolicyV1().PodDisruptionBudgets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
