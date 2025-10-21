@@ -307,10 +307,11 @@ func (rc *RouteController) reconcile(ctx context.Context, nodes []*v1.Node, rout
 						if rc.recorder != nil {
 							rc.recorder.Eventf(
 								&v1.ObjectReference{
-									Kind:      "Node",
-									Name:      string(nodeName),
-									UID:       types.UID(nodeName),
-									Namespace: "",
+									APIVersion: "v1",
+									Kind:       "Node",
+									Name:       string(nodeName),
+									UID:        node.UID,
+									Namespace:  "",
 								}, v1.EventTypeWarning, "FailedToCreateRoute", msg)
 							klog.V(4).Info(msg)
 							return err

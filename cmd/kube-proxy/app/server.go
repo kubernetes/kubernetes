@@ -34,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
-	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -236,10 +235,10 @@ func newProxyServer(ctx context.Context, config *kubeproxyconfig.KubeProxyConfig
 	s.Recorder = s.Broadcaster.NewRecorder(proxyconfigscheme.Scheme, kubeProxy)
 
 	s.NodeRef = &v1.ObjectReference{
-		Kind:      "Node",
-		Name:      s.NodeName,
-		UID:       types.UID(s.NodeName),
-		Namespace: "",
+		APIVersion: "v1",
+		Kind:       "Node",
+		Name:       s.NodeName,
+		Namespace:  "",
 	}
 
 	if len(config.HealthzBindAddress) > 0 {

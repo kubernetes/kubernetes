@@ -27,7 +27,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/kubernetes/scheme"
 	core "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
 	fakecloud "k8s.io/cloud-provider/fake"
 	nodeutil "k8s.io/component-helpers/node/util"
@@ -93,6 +95,7 @@ func TestReconcile(t *testing.T) {
 
 	node3 := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-3", UID: "03"}, Spec: v1.NodeSpec{PodCIDR: "10.120.0.0/24", PodCIDRs: []string{"10.120.0.0/24", "a00:100::/24"}}, Status: v1.NodeStatus{Addresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.3.1"}}}}
 	node4 := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-4", UID: "04"}, Spec: v1.NodeSpec{PodCIDR: "10.120.1.0/24", PodCIDRs: []string{"10.120.1.0/24", "a00:200::/24"}}, Status: v1.NodeStatus{Addresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.4.1"}}}}
+	nodeDuplicateCIDR := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-4", UID: "04"}, Spec: v1.NodeSpec{PodCIDR: "10.120.1.0/24", PodCIDRs: []string{"10.120.1.0/24", "10.120.1.0/24"}}, Status: v1.NodeStatus{Addresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.4.1"}}}}
 
 	testCases := []struct {
 		description                string
@@ -102,6 +105,7 @@ func TestReconcile(t *testing.T) {
 		expectedNetworkUnavailable []bool
 		clientset                  *fake.Clientset
 		dualStack                  bool
+		expectError                bool
 	}{
 		{
 			description: "routes have no TargetNodeAddresses at the beginning",
@@ -414,6 +418,17 @@ func TestReconcile(t *testing.T) {
 			expectedNetworkUnavailable: []bool{true, true},
 			clientset:                  fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{node1, node2}}),
 		},
+		{
+			description: "duplicate pod cidr",
+			nodes: []*v1.Node{
+				&nodeDuplicateCIDR,
+			},
+			initialRoutes:              []*cloudprovider.Route{},
+			expectedRoutes:             []*cloudprovider.Route{},
+			expectedNetworkUnavailable: []bool{true, false},
+			expectError:                true,
+			clientset:                  fake.NewClientset(&v1.NodeList{Items: []v1.Node{nodeDuplicateCIDR}}),
+		},
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
@@ -439,6 +454,16 @@ func TestReconcile(t *testing.T) {
 
 			informerFactory := informers.NewSharedInformerFactory(testCase.clientset, 0)
 			rc := New(routes, testCase.clientset, informerFactory.Core().V1().Nodes(), cluster, cidrs)
+
+			recorder := record.NewBroadcaster(record.WithContext(ctx))
+			rc.recorder = recorder.NewRecorder(scheme.Scheme, v1.EventSource{Component: "route_controller"})
+			e := recorder.StartEventWatcher(func(e *v1.Event) {
+				if e.InvolvedObject.APIVersion == "" {
+					t.Fatalf("event involvedObject.apiVersion is empty")
+				}
+			})
+			defer e.Stop()
+
 			rc.nodeListerSynced = alwaysReady
 			require.NoError(t, rc.reconcile(ctx, testCase.nodes, testCase.initialRoutes), "failed to reconcile")
 			for _, action := range testCase.clientset.Actions() {
@@ -476,8 +501,10 @@ func TestReconcile(t *testing.T) {
 						break poll
 					}
 				case <-timeoutChan:
-					t.Errorf("rc.reconcile() err is %v,\nfound routes:\n%v\nexpected routes:\n%v\n",
-						err, flatten(finalRoutes), flatten(testCase.expectedRoutes))
+					if !testCase.expectError {
+						t.Errorf("rc.reconcile() err is %v,\nfound routes:\n%v\nexpected routes:\n%v\n",
+							err, flatten(finalRoutes), flatten(testCase.expectedRoutes))
+					}
 					break poll
 				}
 			}

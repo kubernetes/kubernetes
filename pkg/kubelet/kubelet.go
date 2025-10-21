@@ -548,10 +548,10 @@ func NewMainKubelet(ctx context.Context,
 
 	// construct a node reference used for events
 	nodeRef := &v1.ObjectReference{
-		Kind:      "Node",
-		Name:      string(nodeName),
-		UID:       types.UID(nodeName),
-		Namespace: "",
+		APIVersion: "v1",
+		Kind:       "Node",
+		Name:       string(nodeName),
+		Namespace:  "",
 	}
 
 	oomWatcher, err := oomwatcher.NewWatcher(kubeDeps.Recorder)
