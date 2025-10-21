@@ -52,6 +52,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
+	testutils "k8s.io/kubernetes/test/utils"
 )
 
 var (
@@ -866,6 +867,13 @@ func testDevicePluginNodeReboot(f *framework.Framework, pluginSockDir string) {
 			}
 
 			devicePluginPod = e2epod.NewPodClient(f).CreateSync(ctx, dp)
+
+			framework.Logf("Waiting for device plugin pod to be Running")
+			err = e2epod.WaitForPodCondition(ctx, f.ClientSet, devicePluginPod.Namespace, devicePluginPod.Name, "Ready", 2*time.Minute, testutils.PodRunningReady)
+			if err != nil {
+				framework.Logf("Sample Device Pod %v took too long to enter running/ready: %v", dp.Name, err)
+			}
+			framework.ExpectNoError(err, "WaitForPodCondition() failed err: %v", err)
 
 			go func() {
 				// Since autoregistration is disabled for the device plugin (as REGISTER_CONTROL_FILE
