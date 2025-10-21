@@ -572,3 +572,90 @@ func TestResourcePoolName(t *testing.T) {
 		})
 	}
 }
+
+func TestExtendedResourceName(t *testing.T) {
+	ctx := context.Background()
+	fldPath := field.NewPath("test")
+
+	testCases := []struct {
+		name     string
+		input    string
+		wantErrs field.ErrorList
+	}{
+		{
+			name:     "valid",
+			input:    "example-kub.io/foo",
+			wantErrs: nil,
+		},
+		{
+			name:  "invalid: name too long",
+			input: strings.Repeat("a", 64),
+			wantErrs: field.ErrorList{
+				field.Invalid(fldPath, strings.Repeat("a", 64), "a name must be a domain-prefixed path, such as 'example.com/my-prop").WithOrigin("format=k8s-extended-resource-name"),
+				field.Invalid(fldPath, strings.Repeat("a", 64), "name part must be no more than 63 bytes").WithOrigin("format=k8s-extended-resource-name"),
+			},
+		},
+		{
+			name:  "invalid: empty",
+			input: "",
+			wantErrs: field.ErrorList{
+				field.Invalid(fldPath, "", "a name must be a domain-prefixed path, such as 'example.com/my-prop").WithOrigin("format=k8s-extended-resource-name"),
+				field.Invalid(fldPath, "", "name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')").WithOrigin("format=k8s-extended-resource-name"),
+			},
+		},
+		{
+			name:  "invalid: no domain",
+			input: "foo",
+			wantErrs: field.ErrorList{
+				field.Invalid(fldPath, "foo", "a name must be a domain-prefixed path, such as 'example.com/my-prop'").WithOrigin("format=k8s-extended-resource-name"),
+			},
+		},
+		{
+			name:  "invalid: no domain and no name",
+			input: "/",
+			wantErrs: field.ErrorList{
+				field.Invalid(fldPath, "/", "name part must be non-empty").WithOrigin("format=k8s-extended-resource-name"),
+				field.Invalid(fldPath, "/", "name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')").WithOrigin("format=k8s-extended-resource-name"),
+				field.Invalid(fldPath, "/", "prefix part a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')").WithOrigin("format=k8s-extended-resource-name"),
+			},
+		},
+		{
+			name:  "invalid: something.kubernetes.io domain",
+			input: "something.kubernetes.io/foo",
+			wantErrs: field.ErrorList{
+				field.Invalid(fldPath, "something.kubernetes.io/foo", "must not have \"kubernetes.io/\" domain").WithOrigin("format=k8s-extended-resource-name"),
+			},
+		},
+		{
+			name:  "invalid: kubernetes.io domain",
+			input: "kubernetes.io/foo",
+			wantErrs: field.ErrorList{
+				field.Invalid(fldPath, "kubernetes.io/foo", "must not have \"kubernetes.io/\" domain").WithOrigin("format=k8s-extended-resource-name"),
+			},
+		},
+		{
+			name:  "invalid: requests prefix",
+			input: "requests.example.com/foo",
+			wantErrs: field.ErrorList{
+				field.Invalid(fldPath, "requests.example.com/foo", "must not have \"requests.\" prefix").WithOrigin("format=k8s-extended-resource-name"),
+			},
+		},
+		{
+			name:  "invalid: name too long",
+			input: "example.com/" + strings.Repeat("a", 64),
+			wantErrs: field.ErrorList{
+				field.Invalid(fldPath, "example.com/"+strings.Repeat("a", 64), "name part must be no more than 63 bytes").WithOrigin("format=k8s-extended-resource-name"),
+			},
+		},
+	}
+
+	exactMatcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin().ByDetailSubstring()
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			value := &tc.input
+			gotErrs := ExtendedResourceName(ctx, operation.Operation{}, fldPath, value, nil)
+			exactMatcher.Test(t, tc.wantErrs, gotErrs)
+		})
+	}
+}

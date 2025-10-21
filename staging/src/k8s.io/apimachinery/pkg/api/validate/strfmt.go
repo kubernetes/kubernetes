@@ -27,7 +27,10 @@ import (
 )
 
 const (
-	uuidErrorMessage = "must be a lowercase UUID in 8-4-4-4-12 format"
+	uuidErrorMessage              = "must be a lowercase UUID in 8-4-4-4-12 format"
+	defaultResourceRequestsPrefix = "requests."
+	// Default namespace prefix.
+	resourceDefaultNamespacePrefix = "kubernetes.io/"
 )
 
 // ShortName verifies that the specified value is a valid "short name"
@@ -179,4 +182,39 @@ func ResourcePoolName[T ~string](ctx context.Context, op operation.Operation, fl
 		allErrs = append(allErrs, LongName(ctx, op, fldPath, &part, nil).PrefixDetail(fmt.Sprintf("segment %d: ", i))...)
 	}
 	return allErrs.WithOrigin("format=k8s-resource-pool-name")
+}
+
+// ExtendedResourceName verifies that the specified value is a valid extended resource name.
+// An extended resource name is a domain-prefixed name that does not use the "kubernetes.io"
+// or "requests." prefixes. Must be a valid label key when appended to "requests.", as in quota.
+//
+//   - must have slash domain and name.
+//   - must not have the "kubernetes.io" domain
+//   - must not have the "requests." prefix
+//   - name must be 63 characters or less
+//   - must be a valid label key when appended to "requests.", as in quota
+//     -- must contain only alphanumeric characters, dashes, underscores, or dots
+//     -- must end with an alphanumeric character
+func ExtendedResourceName[T ~string](_ context.Context, op operation.Operation, fldPath *field.Path, value, _ *T) field.ErrorList {
+	if value == nil {
+		return nil
+	}
+	val := string(*value)
+	allErrs := field.ErrorList{}
+	if !strings.Contains(val, "/") {
+		allErrs = append(allErrs, field.Invalid(fldPath, val, "a name must be a domain-prefixed path, such as 'example.com/my-prop'"))
+	} else if strings.Contains(val, resourceDefaultNamespacePrefix) {
+		allErrs = append(allErrs, field.Invalid(fldPath, val, fmt.Sprintf("must not have %q domain", resourceDefaultNamespacePrefix)))
+	}
+	// Ensure extended resource is not type of quota.
+	if strings.HasPrefix(val, defaultResourceRequestsPrefix) {
+		allErrs = append(allErrs, field.Invalid(fldPath, val, fmt.Sprintf("must not have %q prefix", defaultResourceRequestsPrefix)))
+	}
+
+	// Ensure it satisfies the rules in IsLabelKey() after converted into quota resource name
+	nameForQuota := fmt.Sprintf("%s%s", defaultResourceRequestsPrefix, val)
+	for _, msg := range content.IsLabelKey(nameForQuota) {
+		allErrs = append(allErrs, field.Invalid(fldPath, val, msg))
+	}
+	return allErrs.WithOrigin("format=k8s-extended-resource-name")
 }

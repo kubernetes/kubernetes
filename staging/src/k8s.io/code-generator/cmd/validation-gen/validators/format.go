@@ -52,13 +52,14 @@ var (
 	// TODO: uncomment the following when we've done the homework
 	// to be sure it works the current state of IP manual-ratcheting
 	// ipSloppyValidator         = types.Name{Package: libValidationPkg, Name: "IPSloppy"}
-	labelKeyValidator         = types.Name{Package: libValidationPkg, Name: "LabelKey"}
-	labelValueValidator       = types.Name{Package: libValidationPkg, Name: "LabelValue"}
-	longNameCaselessValidator = types.Name{Package: libValidationPkg, Name: "LongNameCaseless"}
-	longNameValidator         = types.Name{Package: libValidationPkg, Name: "LongName"}
-	resourcePoolNameValidator = types.Name{Package: libValidationPkg, Name: "ResourcePoolName"}
-	shortNameValidator        = types.Name{Package: libValidationPkg, Name: "ShortName"}
-	uuidValidator             = types.Name{Package: libValidationPkg, Name: "UUID"}
+	extendedResourceNameValidator = types.Name{Package: libValidationPkg, Name: "ExtendedResourceName"}
+	labelKeyValidator             = types.Name{Package: libValidationPkg, Name: "LabelKey"}
+	labelValueValidator           = types.Name{Package: libValidationPkg, Name: "LabelValue"}
+	longNameCaselessValidator     = types.Name{Package: libValidationPkg, Name: "LongNameCaseless"}
+	longNameValidator             = types.Name{Package: libValidationPkg, Name: "LongName"}
+	resourcePoolNameValidator     = types.Name{Package: libValidationPkg, Name: "ResourcePoolName"}
+	shortNameValidator            = types.Name{Package: libValidationPkg, Name: "ShortName"}
+	uuidValidator                 = types.Name{Package: libValidationPkg, Name: "UUID"}
 )
 
 func (formatTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
@@ -85,6 +86,8 @@ func getFormatValidationFunction(format string) (FunctionGen, error) {
 
 	switch format {
 	// Keep this sequence alphabetized.
+	case "k8s-extended-resource-name":
+		return Function(formatTagName, DefaultFlags, extendedResourceNameValidator), nil
 	// TODO: uncomment the following when we've done the homework
 	// to be sure it works the current state of IP manual-ratcheting
 	/*
@@ -118,6 +121,9 @@ func (ftv formatTagValidator) Docs() TagDoc {
 		Scopes:         ftv.ValidScopes().UnsortedList(),
 		Description:    "Indicates that a string field has a particular format.",
 		Payloads: []TagPayloadDoc{{ // Keep this list alphabetized.
+			Description: "k8s-extended-resource-name",
+			Docs:        "This field holds a Kubernetes extended resource name. This is a domain-prefixed name that must not have a `kubernetes.io` or `requests.` prefix. When `requests.` is prepended, the result must be a valid label key, as used by quota.",
+		}, {
 			Description: "k8s-ip",
 			Docs:        "This field holds an IPv4 or IPv6 address value. IPv4 octets may have leading zeros.",
 		}, {
