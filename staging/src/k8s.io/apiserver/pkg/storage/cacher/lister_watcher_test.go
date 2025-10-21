@@ -28,9 +28,24 @@ import (
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/watchlist"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/utils/ptr"
 )
+
+func TestDoesClientSupportWatchListSemanticsForKubeClient(t *testing.T) {
+	target1 := &dummyStorage{}
+	if !watchlist.DoesClientNotSupportWatchListSemantics(target1) {
+		t.Fatalf("dummyStorage should NOT support WatchList semantics")
+	}
+
+	server, target2 := newEtcdTestStorage(t, "/pods/")
+	defer server.Terminate(t)
+
+	if watchlist.DoesClientNotSupportWatchListSemantics(target2) {
+		t.Fatalf("etcd should support WatchList semantics")
+	}
+}
 
 func TestCacherListerWatcher(t *testing.T) {
 	prefix := "/pods/"
