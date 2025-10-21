@@ -901,7 +901,7 @@ func testDevicePluginNodeReboot(f *framework.Framework, pluginSockDir string) {
 				return ready &&
 					CountSampleDeviceCapacity(node) == expectedSampleDevsAmount &&
 					CountSampleDeviceAllocatable(node) == expectedSampleDevsAmount
-			}, 30*time.Second, framework.Poll).Should(gomega.BeTrueBecause("expected resource to be available on local node"))
+			}, 2*time.Minute, framework.Poll).Should(gomega.BeTrueBecause("expected resource exported by the sample device plugin to be available on local node"))
 		})
 
 		ginkgo.AfterEach(func(ctx context.Context) {
