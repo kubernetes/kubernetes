@@ -44,7 +44,7 @@ func newTestPod(namespace string) *v1.Pod {
 				{
 					Name:    "test-pod-hostname-override",
 					Image:   imageutils.GetE2EImage(imageutils.Agnhost),
-					Command: []string{"sh", "-c", "echo $(hostname)';'$(hostname -f)';'"},
+					Command: []string{"sh", "-c", "echo $(hostname)';'$(hostname -f)';'; echo '--- /etc/hosts ---'; cat /etc/hosts; echo '--- /etc/nsswitch.conf ---'; cat /etc/nsswitch.conf"},
 				},
 			},
 			RestartPolicy: v1.RestartPolicyNever,
