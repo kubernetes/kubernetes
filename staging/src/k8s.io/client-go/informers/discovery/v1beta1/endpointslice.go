@@ -57,7 +57,7 @@ func NewEndpointSliceInformer(client kubernetes.Interface, namespace string, res
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredEndpointSliceInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
+		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
@@ -82,7 +82,7 @@ func NewFilteredEndpointSliceInformer(client kubernetes.Interface, namespace str
 				}
 				return client.DiscoveryV1beta1().EndpointSlices(namespace).Watch(ctx, options)
 			},
-		},
+		}, client),
 		&apidiscoveryv1beta1.EndpointSlice{},
 		resyncPeriod,
 		indexers,

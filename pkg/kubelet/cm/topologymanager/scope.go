@@ -17,6 +17,7 @@ limitations under the License.
 package topologymanager
 
 import (
+	"context"
 	"sync"
 
 	"k8s.io/api/core/v1"
@@ -41,7 +42,7 @@ type podTopologyHints map[string]map[string]TopologyHint
 type Scope interface {
 	Name() string
 	GetPolicy() Policy
-	Admit(pod *v1.Pod) lifecycle.PodAdmitResult
+	Admit(ctx context.Context, pod *v1.Pod) lifecycle.PodAdmitResult
 	// AddHintProvider adds a hint provider to manager to indicate the hint provider
 	// wants to be consoluted with when making topology hints
 	AddHintProvider(h HintProvider)
@@ -111,10 +112,14 @@ func (s *scope) AddContainer(pod *v1.Pod, container *v1.Container, containerID s
 // It would be better to implement this function in topologymanager instead of scope
 // but topologymanager do not track mapping anymore
 func (s *scope) RemoveContainer(containerID string) error {
+	// Use context.TODO() because we currently do not have a proper context to pass in.
+	// Replace this with an appropriate context when refactoring this function to accept a context parameter.
+	ctx := context.TODO()
+	logger := klog.FromContext(ctx)
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	klog.InfoS("RemoveContainer", "containerID", containerID)
+	logger.Info("RemoveContainer", "containerID", containerID)
 	// Get the podUID and containerName associated with the containerID to be removed and remove it
 	podUIDString, containerName, err := s.podMap.GetContainerRef(containerID)
 	if err != nil {

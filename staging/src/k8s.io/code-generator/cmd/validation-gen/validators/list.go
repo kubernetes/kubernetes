@@ -68,10 +68,10 @@ const (
 
 // listMetadata collects information about a single list with map or set semantics.
 type listMetadata struct {
-	ownership listOwnership // For now we don't use it for generation.
-	semantic  listSemantic
-	keyFields []string // For semantic == map.
-	keyNames  []string // For semantic == map.
+	ownership  listOwnership // For now we don't use it for generation.
+	semantic   listSemantic
+	keyMembers []*types.Member // For semantic == map.
+	keyNames   []string        // For semantic == map.
 
 	// customUnique indicates that k8s:customUnique is set on this list.
 	// It disables generation of uniqueness validation for this list.
@@ -92,13 +92,23 @@ func (lm *listMetadata) makeListMapMatchFunc(t *types.Type) FunctionLiteral {
 	}
 	buf := strings.Builder{}
 	buf.WriteString("return ")
-	// Note: this does not handle pointer fields, which are not
-	// supposed to be used as listMap keys.
-	for i, fld := range lm.keyFields {
+
+	for i, memb := range lm.keyMembers {
 		if i > 0 {
 			buf.WriteString(" && ")
 		}
-		buf.WriteString(fmt.Sprintf("a.%s == b.%s", fld, fld))
+		fldName := memb.Name
+
+		if memb.Type.Kind == types.Pointer {
+			// Dereference pointers for comparison.
+			// This is tricky because they could be nil.
+			// Two keys are equal if all their fields are equal.
+			// For pointer fields, that means either both are nil,
+			// or neither is nil and the pointed-to values are equal.
+			buf.WriteString(fmt.Sprintf("((a.%s == nil && b.%s == nil) || (a.%s != nil && b.%s != nil && *a.%s == *b.%s))", fldName, fldName, fldName, fldName, fldName, fldName))
+		} else {
+			buf.WriteString(fmt.Sprintf("a.%s == b.%s", fldName, fldName))
+		}
 	}
 	matchFn.Body = buf.String()
 	return matchFn
@@ -171,9 +181,10 @@ func (lttv listTypeTagValidator) GetValidations(context Context, tag codetags.Ta
 
 func (lttv listTypeTagValidator) Docs() TagDoc {
 	doc := TagDoc{
-		Tag:         lttv.TagName(),
-		Scopes:      lttv.ValidScopes().UnsortedList(),
-		Description: "Declares a list field's semantic type and ownership behavior. atomic: single ownership, set: shared ownership with uniqueness, map: shared ownership with key-based uniqueness.",
+		Tag:            lttv.TagName(),
+		StabilityLevel: Beta,
+		Scopes:         lttv.ValidScopes().UnsortedList(),
+		Description:    "Declares a list field's semantic type and ownership behavior. atomic: single ownership, set: shared ownership with uniqueness, map: shared ownership with key-based uniqueness.",
 		Payloads: []TagPayloadDoc{{
 			Description: "<type>",
 			Docs:        "atomic | map | set",
@@ -209,13 +220,18 @@ func (lmktv listMapKeyTagValidator) GetValidations(context Context, tag codetags
 		return Validations{}, fmt.Errorf("only lists of structs can be list-maps")
 	}
 
-	var fieldName string
-	if memb := util.GetMemberByJSON(util.NativeType(t.Elem), tag.Value); memb == nil {
+	var memb *types.Member
+	if m := util.GetMemberByJSON(util.NativeType(t.Elem), tag.Value); m == nil {
 		return Validations{}, fmt.Errorf("no field for JSON name %q", tag.Value)
-	} else if k := util.NativeType(memb.Type).Kind; k != types.Builtin {
-		return Validations{}, fmt.Errorf("only primitive types can be list-map keys (%s)", k)
 	} else {
-		fieldName = memb.Name
+		keyType := m.Type
+		if keyType.Kind == types.Pointer {
+			keyType = keyType.Elem
+		}
+		if util.NativeType(keyType).Kind != types.Builtin {
+			return Validations{}, fmt.Errorf("only primitive types and pointers to primitive types can be list-map keys, not %s", m.Type.String())
+		}
+		memb = m
 	}
 
 	lm := lmktv.byPath[context.Path.String()]
@@ -223,7 +239,7 @@ func (lmktv listMapKeyTagValidator) GetValidations(context Context, tag codetags
 		lm = &listMetadata{}
 		lmktv.byPath[context.Path.String()] = lm
 	}
-	lm.keyFields = append(lm.keyFields, fieldName)
+	lm.keyMembers = append(lm.keyMembers, memb)
 	lm.keyNames = append(lm.keyNames, tag.Value)
 
 	// This tag doesn't generate any validations.  It just accumulates
@@ -233,9 +249,10 @@ func (lmktv listMapKeyTagValidator) GetValidations(context Context, tag codetags
 
 func (lmktv listMapKeyTagValidator) Docs() TagDoc {
 	doc := TagDoc{
-		Tag:         lmktv.TagName(),
-		Scopes:      lmktv.ValidScopes().UnsortedList(),
-		Description: "Declares a named sub-field of a list's value-type to be part of the list-map key.",
+		Tag:            lmktv.TagName(),
+		StabilityLevel: Beta,
+		Scopes:         lmktv.ValidScopes().UnsortedList(),
+		Description:    "Declares a named sub-field of a list's value-type to be part of the list-map key.",
 		Payloads: []TagPayloadDoc{{
 			Description: "<field-json-name>",
 			Docs:        "The name of the field.",
@@ -301,9 +318,10 @@ func (utv uniqueTagValidator) GetValidations(context Context, tag codetags.Tag) 
 
 func (utv uniqueTagValidator) Docs() TagDoc {
 	doc := TagDoc{
-		Tag:         utv.TagName(),
-		Scopes:      utv.ValidScopes().UnsortedList(),
-		Description: "Declares that a list field's elements are unique. This tag can be used with listType=atomic to add uniqueness constraints, or independently to specify uniqueness semantics.",
+		Tag:            utv.TagName(),
+		StabilityLevel: Alpha,
+		Scopes:         utv.ValidScopes().UnsortedList(),
+		Description:    "Declares that a list field's elements are unique. This tag can be used with listType=atomic to add uniqueness constraints, or independently to specify uniqueness semantics.",
 		Payloads: []TagPayloadDoc{{
 			Description: "<type>",
 			Docs:        "map | set",
@@ -350,10 +368,11 @@ func (cutv customUniqueTagValidator) GetValidations(context Context, tag codetag
 
 func (cutv customUniqueTagValidator) Docs() TagDoc {
 	doc := TagDoc{
-		Tag:         cutv.TagName(),
-		Scopes:      cutv.ValidScopes().UnsortedList(),
-		Description: "Indicates that uniqueness validation for this list is implemented via custom, handwritten validation. This disables generation of uniqueness validation for this list.",
-		Payloads:    nil,
+		Tag:            cutv.TagName(),
+		StabilityLevel: Alpha,
+		Scopes:         cutv.ValidScopes().UnsortedList(),
+		Description:    "Indicates that uniqueness validation for this list is implemented via custom, handwritten validation. This disables generation of uniqueness validation for this list.",
+		Payloads:       nil,
 	}
 	return doc
 }
@@ -457,12 +476,12 @@ func (lv listValidator) check(lm *listMetadata) error {
 	// Check some fundamental constraints on list tags.
 
 	// If we have listMapKey but no map semantics, that's an error
-	if len(lm.keyFields) > 0 && lm.semantic != semanticMap {
+	if len(lm.keyMembers) > 0 && lm.semantic != semanticMap {
 		return fmt.Errorf("found listMapKey without listType=map or unique=map")
 	}
 
 	// If we have map semantics but no keys, that's an error
-	if lm.semantic == semanticMap && len(lm.keyFields) == 0 {
+	if lm.semantic == semanticMap && len(lm.keyMembers) == 0 {
 		return fmt.Errorf("found listType=map or unique=map without listMapKey")
 	}
 

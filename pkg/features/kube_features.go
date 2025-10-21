@@ -299,7 +299,7 @@ const (
 	//
 	// Ensure kubelet respects exec probe timeouts. Feature gate exists in-case existing workloads
 	// may depend on old behavior where exec probe timeouts were ignored.
-	// Lock to default and remove after v1.22 based on user feedback that should be reflected in KEP #1972 update
+	// Locked to default, will remove in v1.38. Progress is reflected in KEP #1972 update
 	ExecProbeTimeout featuregate.Feature = "ExecProbeTimeout"
 
 	// owner: @HarshalNeelkamal
@@ -553,6 +553,7 @@ const (
 	MatchLabelKeysInPodTopologySpreadSelectorMerge featuregate.Feature = "MatchLabelKeysInPodTopologySpreadSelectorMerge"
 
 	// owner: @krmayankk
+	// kep: https://kep.k8s.io/961
 	//
 	// Enables maxUnavailable for StatefulSet
 	MaxUnavailableStatefulSet featuregate.Feature = "MaxUnavailableStatefulSet"
@@ -1210,7 +1211,8 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	},
 
 	ExecProbeTimeout: {
-		{Version: version.MustParse("1.20"), Default: true, PreRelease: featuregate.GA}, // lock to default and remove after v1.22 based on KEP #1972 update
+		{Version: version.MustParse("1.20"), Default: true, PreRelease: featuregate.GA},
+		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in v1.38
 	},
 
 	ExternalServiceAccountTokenSigner: {
@@ -1235,6 +1237,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	HPAConfigurableTolerance: {
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	HPAScaleToZero: {
@@ -1249,6 +1252,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	HostnameOverride: {
 		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	ImageMaximumGCAge: {
@@ -1404,6 +1408,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	MaxUnavailableStatefulSet: {
 		{Version: version.MustParse("1.24"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	MemoryManager: {
@@ -1999,9 +2004,387 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 //
 // Entries are alphabetized.
 var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]featuregate.Feature{
+	AllowDNSOnlyNodeCSR: {},
+
+	AllowInsecureKubeletCertificateSigningRequests: {},
+
+	AllowOverwriteTerminationGracePeriodSeconds: {},
+
+	AllowServiceLBStatusOnNonLB: {},
+
+	AnyVolumeDataSource: {},
+
+	AuthorizeNodeWithSelectors: {genericfeatures.AuthorizeWithSelectors},
+
+	CPUCFSQuotaPeriod: {},
+
+	CPUManagerPolicyAlphaOptions: {},
+
+	CPUManagerPolicyBetaOptions: {},
+
+	CPUManagerPolicyOptions: {},
+
+	CSIMigrationPortworx: {},
+
+	CSIVolumeHealth: {},
+
+	ClearingNominatedNodeNameAfterBinding: {},
+
+	ClusterTrustBundle: {},
+
+	ClusterTrustBundleProjection: {ClusterTrustBundle},
+
+	ContainerCheckpoint: {},
+
+	ContainerRestartRules: {},
+
+	ContainerStopSignals: {},
+
+	CoordinatedLeaderElection: {},
+
+	CrossNamespaceVolumeDataSource: {},
+
+	DRAAdminAccess: {DynamicResourceAllocation},
+
+	DRAConsumableCapacity: {DynamicResourceAllocation},
+
+	DRADeviceBindingConditions: {DynamicResourceAllocation, DRAResourceClaimDeviceStatus},
+
+	DRADeviceTaints: {DynamicResourceAllocation},
+
+	DRAExtendedResource: {DynamicResourceAllocation},
+
+	DRAPartitionableDevices: {DynamicResourceAllocation},
+
+	DRAPrioritizedList: {DynamicResourceAllocation},
+
+	DRAResourceClaimDeviceStatus: {}, // Soft dependency on DynamicResourceAllocation due to on/off-by-default conflict.
+
+	DRASchedulerFilterTimeout: {DynamicResourceAllocation},
+
+	DeploymentReplicaSetTerminatingReplicas: {},
+
+	DisableAllocatorDualWrite: {MultiCIDRServiceAllocator},
+
+	DisableCPUQuotaWithExclusiveCPUs: {},
+
+	DisableNodeKubeProxyVersion: {},
+
+	DynamicResourceAllocation: {},
+
+	EnvFiles: {},
+
+	EventedPLEG: {},
+
+	ExecProbeTimeout: {},
+
+	ExternalServiceAccountTokenSigner: {},
+
+	GitRepoVolumeDriver: {},
+
+	GracefulNodeShutdown: {},
+
+	GracefulNodeShutdownBasedOnPodPriority: {GracefulNodeShutdown},
+
+	HPAConfigurableTolerance: {},
+
+	HPAScaleToZero: {},
+
+	HonorPVReclaimPolicy: {},
+
+	HostnameOverride: {},
+
+	ImageMaximumGCAge: {},
+
+	ImageVolume: {},
+
+	InPlacePodVerticalScaling: {},
+
 	InPlacePodVerticalScalingAllocatedStatus: {InPlacePodVerticalScaling},
-	InPlacePodVerticalScalingExclusiveCPUs:   {InPlacePodVerticalScaling},
+
+	InPlacePodVerticalScalingExclusiveCPUs: {InPlacePodVerticalScaling},
+
 	InPlacePodVerticalScalingExclusiveMemory: {InPlacePodVerticalScaling, MemoryManager},
+
+	InTreePluginPortworxUnregister: {},
+
+	JobBackoffLimitPerIndex: {},
+
+	JobManagedBy: {},
+
+	JobPodReplacementPolicy: {},
+
+	JobSuccessPolicy: {},
+
+	KubeletCgroupDriverFromCRI: {},
+
+	KubeletCrashLoopBackOffMax: {},
+
+	KubeletEnsureSecretPulledImages: {},
+
+	KubeletFineGrainedAuthz: {},
+
+	KubeletInUserNamespace: {},
+
+	KubeletPSI: {},
+
+	KubeletPodResourcesDynamicResources: {},
+
+	KubeletPodResourcesGet: {},
+
+	KubeletPodResourcesListUseActivePods: {},
+
+	KubeletRegistrationGetOnExistsOnly: {},
+
+	KubeletSeparateDiskGC: {},
+
+	KubeletServiceAccountTokenForCredentialProviders: {},
+
+	KubeletTracing: {},
+
+	LoadBalancerIPMode: {},
+
+	LocalStorageCapacityIsolationFSQuotaMonitoring: {},
+
+	LogarithmicScaleDown: {},
+
+	MatchLabelKeysInPodAffinity: {},
+
+	MatchLabelKeysInPodTopologySpread: {},
+
+	MatchLabelKeysInPodTopologySpreadSelectorMerge: {MatchLabelKeysInPodTopologySpread},
+
+	MaxUnavailableStatefulSet: {},
+
+	MemoryManager: {},
+
+	MemoryQoS: {},
+
+	MultiCIDRServiceAllocator: {},
+
+	MutableCSINodeAllocatableCount: {},
+
+	NFTablesProxyMode: {},
+
+	NodeInclusionPolicyInPodTopologySpread: {},
+
+	NodeLogQuery: {},
+
+	NodeSwap: {},
+
+	NominatedNodeNameForExpectation: {},
+
+	OrderedNamespaceDeletion: {},
+
+	PodAndContainerStatsFromCRI: {},
+
+	PodCertificateRequest: {AuthorizeNodeWithSelectors},
+
+	PodDeletionCost: {},
+
+	PodLevelResources: {},
+
+	PodLifecycleSleepAction: {},
+
+	PodLifecycleSleepActionAllowZero: {PodLifecycleSleepAction},
+
+	PodLogsQuerySplitStreams: {},
+
+	PodObservedGenerationTracking: {},
+
+	PodReadyToStartContainersCondition: {},
+
+	PodSchedulingReadiness: {},
+
+	PodTopologyLabelsAdmission: {},
+
+	PortForwardWebsockets: {},
+
+	PreferSameTrafficDistribution: {},
+
+	PreventStaticPodAPIReferences: {},
+
+	ProcMountType: {UserNamespacesSupport},
+
+	QOSReserved: {},
+
+	RecoverVolumeExpansionFailure: {},
+
+	RecursiveReadOnlyMounts: {},
+
+	ReduceDefaultCrashLoopBackOffDecay: {},
+
+	RelaxedDNSSearchValidation: {},
+
+	RelaxedEnvironmentVariableValidation: {},
+
+	RelaxedServiceNameValidation: {},
+
+	ReloadKubeletServerCertificateFile: {},
+
+	ResourceHealthStatus: {DynamicResourceAllocation},
+
+	RotateKubeletServerCertificate: {},
+
+	RuntimeClassInImageCriAPI: {},
+
+	SELinuxChangePolicy: {},
+
+	SELinuxMount: {},
+
+	SELinuxMountReadWriteOncePod: {},
+
+	SchedulerAsyncAPICalls: {},
+
+	SchedulerAsyncPreemption: {},
+
+	SchedulerPopFromBackoffQ: {},
+
+	SchedulerQueueingHints: {},
+
+	SeparateTaintEvictionController: {},
+
+	ServiceAccountNodeAudienceRestriction: {},
+
+	ServiceAccountTokenJTI: {},
+
+	ServiceAccountTokenNodeBinding: {ServiceAccountTokenNodeBindingValidation},
+
+	ServiceAccountTokenNodeBindingValidation: {},
+
+	ServiceAccountTokenPodNodeInfo: {},
+
+	ServiceTrafficDistribution: {},
+
+	SidecarContainers: {},
+
+	StorageCapacityScoring: {},
+
+	StorageNamespaceIndex: {},
+
+	StorageVersionMigrator: {},
+
+	StreamingCollectionEncodingToJSON: {},
+
+	StreamingCollectionEncodingToProtobuf: {},
+
+	StrictIPCIDRValidation: {},
+
+	SupplementalGroupsPolicy: {},
+
+	SystemdWatchdog: {},
+
+	TopologyAwareHints: {},
+
+	TopologyManagerPolicyAlphaOptions: {},
+
+	TopologyManagerPolicyBetaOptions: {},
+
+	TopologyManagerPolicyOptions: {},
+
+	TranslateStreamCloseWebsocketRequests: {},
+
+	UnknownVersionInteroperabilityProxy: {},
+
+	UserNamespacesPodSecurityStandards: {},
+
+	UserNamespacesSupport: {},
+
+	VolumeAttributesClass: {},
+
+	WinDSR: {},
+
+	WinOverlay: {},
+
+	WindowsCPUAndMemoryAffinity: {MemoryManager},
+
+	WindowsGracefulNodeShutdown: {GracefulNodeShutdown},
+
+	WindowsHostNetwork: {},
+
+	apiextensionsfeatures.CRDValidationRatcheting: {},
+
+	apiextensionsfeatures.CustomResourceFieldSelectors: {},
+
+	genericfeatures.APIResponseCompression: {},
+
+	genericfeatures.APIServerIdentity: {},
+
+	genericfeatures.APIServerTracing: {},
+
+	genericfeatures.APIServingWithRoutine: {},
+
+	genericfeatures.AggregatedDiscoveryRemoveBetaType: {},
+
+	genericfeatures.AllowParsingUserUIDFromCertAuth: {},
+
+	genericfeatures.AllowUnsafeMalformedObjectDeletion: {},
+
+	genericfeatures.AnonymousAuthConfigurableEndpoints: {},
+
+	genericfeatures.AuthorizeWithSelectors: {},
+
+	genericfeatures.BtreeWatchCache: {},
+
+	genericfeatures.CBORServingAndStorage: {},
+
+	genericfeatures.ConcurrentWatchObjectDecode: {},
+
+	genericfeatures.ConsistentListFromCache: {},
+
+	genericfeatures.DeclarativeValidation: {},
+
+	genericfeatures.DeclarativeValidationTakeover: {genericfeatures.DeclarativeValidation},
+
+	genericfeatures.DetectCacheInconsistency: {},
+
+	genericfeatures.KMSv1: {},
+
+	genericfeatures.ListFromCacheSnapshot: {},
+
+	genericfeatures.MutatingAdmissionPolicy: {},
+
+	genericfeatures.OpenAPIEnums: {},
+
+	genericfeatures.RemoteRequestHeaderUID: {},
+
+	genericfeatures.ResilientWatchCacheInitialization: {},
+
+	genericfeatures.RetryGenerateName: {},
+
+	genericfeatures.SeparateCacheWatchRPC: {},
+
+	genericfeatures.SizeBasedListCostEstimate: {},
+
+	genericfeatures.StorageVersionAPI: {genericfeatures.APIServerIdentity},
+
+	genericfeatures.StorageVersionHash: {},
+
+	genericfeatures.StrictCostEnforcementForVAP: {},
+
+	genericfeatures.StrictCostEnforcementForWebhooks: {},
+
+	genericfeatures.StructuredAuthenticationConfiguration: {},
+
+	genericfeatures.StructuredAuthenticationConfigurationEgressSelector: {genericfeatures.StructuredAuthenticationConfiguration},
+
+	genericfeatures.StructuredAuthorizationConfiguration: {},
+
+	genericfeatures.TokenRequestServiceAccountUIDValidation: {},
+
+	genericfeatures.UnauthenticatedHTTP2DOSMitigation: {},
+
+	genericfeatures.WatchCacheInitializationPostStartHook: {},
+
+	genericfeatures.WatchFromStorageWithoutResourceVersion: {},
+
+	genericfeatures.WatchList: {},
+
+	kcmfeatures.CloudControllerManagerWebhook: {},
+
+	zpagesfeatures.ComponentFlagz: {},
+
+	zpagesfeatures.ComponentStatusz: {},
 }
 
 func init() {

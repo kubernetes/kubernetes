@@ -1705,8 +1705,10 @@ func TestGetScaleSubresourceAsTableForAllBuiltins(t *testing.T) {
 	// Enable all features and apis for testing
 	flags := framework.DefaultTestServerFlags()
 	flags = append(flags, "--runtime-config=api/all=true")
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, "AllAlpha", true)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, "AllBeta", true)
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		"AllAlpha": true,
+		"AllBeta":  true,
+	})
 
 	testNamespace := "test-scale"
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, flags, framework.SharedEtcd())
@@ -3669,8 +3671,10 @@ func assertManagedFields(t *testing.T, obj *unstructured.Unstructured) {
 // TestDefaultStorageEncoding verifies that the storage encoding for all built-in resources is
 // Protobuf.
 func TestDefaultStorageEncoding(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, "AllAlpha", true)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, "AllBeta", true)
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		"AllAlpha": true,
+		"AllBeta":  true,
+	})
 
 	protobufRecognizer := protobuf.NewSerializer(runtime.NewScheme(), runtime.NewScheme())
 	var recognizersByGroup map[string]recognizer.RecognizingDecoder

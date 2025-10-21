@@ -53,6 +53,18 @@ type Struct struct {
 	// +k8s:listMapKey=key2Field
 	// +k8s:eachVal=+k8s:validateFalse="field Struct.ListNonComparableField[*]"
 	ListNonComparableField []NonComparableStruct `json:"listNonComparableField"`
+
+	// +k8s:listType=map
+	// +k8s:listMapKey=key1Field
+	// +k8s:listMapKey=key2Field
+	// +k8s:item(key1Field: "target-ptr", key2Field: 42)=+k8s:validateFalse="item ListPtrKeyField[key1Field=target-ptr,key2Field=42]"
+	ListPtrKeyField []PtrKeyStruct `json:"listPtrKeyField"`
+
+	// +k8s:listType=map
+	// +k8s:listMapKey=stringPtrKey
+	// +k8s:listMapKey=stringKey
+	// +k8s:item(stringPtrKey: "target-ptr", stringKey: "target")=+k8s:validateFalse="item ListMixedPtrKeyField"
+	ListMixedPtrKeyField []MixedPtrKeyStruct `json:"listMixedPtrKeyField"`
 }
 
 type OtherStruct struct {
@@ -73,3 +85,15 @@ type NonComparableStruct struct {
 // +k8s:listMapKey=key1Field
 // +k8s:listMapKey=key2Field
 type ListType []OtherStruct
+
+type PtrKeyStruct struct {
+	Key1Field *string `json:"key1Field"`
+	Key2Field int     `json:"key2Field"`
+	DataField string  `json:"dataField"`
+}
+
+type MixedPtrKeyStruct struct {
+	StringPtrKey *string `json:"stringPtrKey"`
+	StringKey    string  `json:"stringKey"`
+	DataField    string  `json:"dataField"`
+}

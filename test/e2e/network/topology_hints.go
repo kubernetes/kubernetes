@@ -61,7 +61,7 @@ var _ = common.SIGDescribe("Topology Hints", func() {
 		ds, err := c.AppsV1().DaemonSets(f.Namespace.Name).Create(ctx, dsConf, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "error creating DaemonSet")
 
-		svc := createServiceReportErr(ctx, c, f.Namespace.Name, &v1.Service{
+		svc := &v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "topology-hints",
 				Annotations: map[string]string{
@@ -78,7 +78,9 @@ var _ = common.SIGDescribe("Topology Hints", func() {
 					Protocol:   v1.ProtocolTCP,
 				}},
 			},
-		})
+		}
+		svc, err = c.CoreV1().Services(f.Namespace.Name).Create(ctx, svc, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "error creating Service")
 
 		err = wait.PollUntilContextTimeout(ctx, 5*time.Second, framework.PodStartTimeout, false, func(ctx context.Context) (bool, error) {
 			return e2edaemonset.CheckRunningOnAllNodes(ctx, f, ds)

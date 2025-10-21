@@ -1117,11 +1117,7 @@ func setupTestCase(t testing.TB, tc *testCase, featureGates map[featuregate.Feat
 		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
 	}
 
-	// Iterate by sorted feature name, to make it deterministic and put AllAlpha/Beta first to enable
-	// overriding that choice.
-	for _, name := range slices.Sorted(maps.Keys(featureGates)) {
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, name, featureGates[name])
-	}
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featureGates)
 
 	// 30 minutes should be plenty enough even for the 5000-node tests.
 	timeout := 30 * time.Minute

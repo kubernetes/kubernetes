@@ -58,8 +58,10 @@ func TestSchedulerPerf(t *testing.T) {
 			// - "ga-only": keep disabling optional features
 			// - "default": don't change features
 			if allocatorName == "stable" {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAAdminAccess, false)
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPrioritizedList, false)
+				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+					features.DRAAdminAccess:     false,
+					features.DRAPrioritizedList: false,
+				})
 			}
 
 			perf.RunIntegrationPerfScheduling(t, "performance-config.yaml")

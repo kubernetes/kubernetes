@@ -8544,7 +8544,7 @@ func schema_k8sio_api_apps_v1_RollingUpdateStatefulSetStrategy(ref common.Refere
 					},
 					"maxUnavailable": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The maximum number of pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). Absolute number is calculated from percentage by rounding up. This can not be 0. Defaults to 1. This field is alpha-level and is only honored by servers that enable the MaxUnavailableStatefulSet feature. The field applies to all pods in the range 0 to Replicas-1. That means if there is any unavailable pod in the range 0 to Replicas-1, it will be counted towards MaxUnavailable.",
+							Description: "The maximum number of pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). Absolute number is calculated from percentage by rounding up. This can not be 0. Defaults to 1. This field is beta-level and is enabled by default. The field applies to all pods in the range 0 to Replicas-1. That means if there is any unavailable pod in the range 0 to Replicas-1, it will be counted towards MaxUnavailable. This setting might not be effective for the OrderedReady podManagementPolicy. That policy ensures pods are created and become ready one at a time.",
 							Ref:         ref(intstr.IntOrString{}.OpenAPIModelName()),
 						},
 					},
@@ -9585,7 +9585,7 @@ func schema_k8sio_api_apps_v1beta1_RollingUpdateStatefulSetStrategy(ref common.R
 					},
 					"maxUnavailable": {
 						SchemaProps: spec.SchemaProps{
-							Description: "maxUnavailable is the maximum number of pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). Absolute number is calculated from percentage by rounding up. This can not be 0. Defaults to 1. This field is alpha-level and is only honored by servers that enable the MaxUnavailableStatefulSet feature. The field applies to all pods in the range 0 to Replicas-1. That means if there is any unavailable pod in the range 0 to Replicas-1, it will be counted towards MaxUnavailable.",
+							Description: "maxUnavailable is the maximum number of pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). Absolute number is calculated from percentage by rounding up. This can not be 0. Defaults to 1. This field is beta-level and is enabled by default. The field applies to all pods in the range 0 to Replicas-1. That means if there is any unavailable pod in the range 0 to Replicas-1, it will be counted towards MaxUnavailable. This setting might not be effective for the OrderedReady podManagementPolicy. That policy ensures pods are created and become ready one at a time.",
 							Ref:         ref(intstr.IntOrString{}.OpenAPIModelName()),
 						},
 					},
@@ -11294,7 +11294,7 @@ func schema_k8sio_api_apps_v1beta2_RollingUpdateStatefulSetStrategy(ref common.R
 					},
 					"maxUnavailable": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The maximum number of pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). Absolute number is calculated from percentage by rounding up. This can not be 0. Defaults to 1. This field is alpha-level and is only honored by servers that enable the MaxUnavailableStatefulSet feature. The field applies to all pods in the range 0 to Replicas-1. That means if there is any unavailable pod in the range 0 to Replicas-1, it will be counted towards MaxUnavailable.",
+							Description: "The maximum number of pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). Absolute number is calculated from percentage by rounding up. This can not be 0. Defaults to 1. This field is beta-level and is enabled by default. The field applies to all pods in the range 0 to Replicas-1. That means if there is any unavailable pod in the range 0 to Replicas-1, it will be counted towards MaxUnavailable. This setting might not be effective for the OrderedReady podManagementPolicy. That policy ensures pods are created and become ready one at a time.",
 							Ref:         ref(intstr.IntOrString{}.OpenAPIModelName()),
 						},
 					},
@@ -15276,7 +15276,7 @@ func schema_k8sio_api_autoscaling_v2_HPAScalingRules(ref common.ReferenceCallbac
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "HPAScalingRules configures the scaling behavior for one direction via scaling Policy Rules and a configurable metric tolerance.\n\nScaling Policy Rules are applied after calculating DesiredReplicas from metrics for the HPA. They can limit the scaling velocity by specifying scaling policies. They can prevent flapping by specifying the stabilization window, so that the number of replicas is not set instantly, instead, the safest value from the stabilization window is chosen.\n\nThe tolerance is applied to the metric values and prevents scaling too eagerly for small metric variations. (Note that setting a tolerance requires enabling the alpha HPAConfigurableTolerance feature gate.)",
+				Description: "HPAScalingRules configures the scaling behavior for one direction via scaling Policy Rules and a configurable metric tolerance.\n\nScaling Policy Rules are applied after calculating DesiredReplicas from metrics for the HPA. They can limit the scaling velocity by specifying scaling policies. They can prevent flapping by specifying the stabilization window, so that the number of replicas is not set instantly, instead, the safest value from the stabilization window is chosen.\n\nThe tolerance is applied to the metric values and prevents scaling too eagerly for small metric variations. (Note that setting a tolerance requires the beta HPAConfigurableTolerance feature gate to be enabled.)",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"stabilizationWindowSeconds": {
@@ -15314,7 +15314,7 @@ func schema_k8sio_api_autoscaling_v2_HPAScalingRules(ref common.ReferenceCallbac
 					},
 					"tolerance": {
 						SchemaProps: spec.SchemaProps{
-							Description: "tolerance is the tolerance on the ratio between the current and desired metric value under which no updates are made to the desired number of replicas (e.g. 0.01 for 1%). Must be greater than or equal to zero. If not set, the default cluster-wide tolerance is applied (by default 10%).\n\nFor example, if autoscaling is configured with a memory consumption target of 100Mi, and scale-down and scale-up tolerances of 5% and 1% respectively, scaling will be triggered when the actual consumption falls below 95Mi or exceeds 101Mi.\n\nThis is an alpha field and requires enabling the HPAConfigurableTolerance feature gate.",
+							Description: "tolerance is the tolerance on the ratio between the current and desired metric value under which no updates are made to the desired number of replicas (e.g. 0.01 for 1%). Must be greater than or equal to zero. If not set, the default cluster-wide tolerance is applied (by default 10%).\n\nFor example, if autoscaling is configured with a memory consumption target of 100Mi, and scale-down and scale-up tolerances of 5% and 1% respectively, scaling will be triggered when the actual consumption falls below 95Mi or exceeds 101Mi.\n\nThis is an beta field and requires the HPAConfigurableTolerance feature gate to be enabled.",
 							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
 						},
 					},
@@ -48461,10 +48461,11 @@ func schema_k8sio_api_resource_v1_DeviceAllocationConfiguration(ref common.Refer
 				Properties: map[string]spec.Schema{
 					"source": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Source records whether the configuration comes from a class and thus is not something that a normal user would have been able to set or from a claim.",
+							Description: "Source records whether the configuration comes from a class and thus is not something that a normal user would have been able to set or from a claim.\n\n\nPossible enum values:\n - `\"FromClaim\"`\n - `\"FromClass\"`",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
+							Enum:        []interface{}{"FromClaim", "FromClass"},
 						},
 					},
 					"requests": {
@@ -50950,10 +50951,11 @@ func schema_k8sio_api_resource_v1beta1_DeviceAllocationConfiguration(ref common.
 				Properties: map[string]spec.Schema{
 					"source": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Source records whether the configuration comes from a class and thus is not something that a normal user would have been able to set or from a claim.",
+							Description: "Source records whether the configuration comes from a class and thus is not something that a normal user would have been able to set or from a claim.\n\n\nPossible enum values:\n - `\"FromClaim\"`\n - `\"FromClass\"`",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
+							Enum:        []interface{}{"FromClaim", "FromClass"},
 						},
 					},
 					"requests": {
@@ -53121,10 +53123,11 @@ func schema_k8sio_api_resource_v1beta2_DeviceAllocationConfiguration(ref common.
 				Properties: map[string]spec.Schema{
 					"source": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Source records whether the configuration comes from a class and thus is not something that a normal user would have been able to set or from a claim.",
+							Description: "Source records whether the configuration comes from a class and thus is not something that a normal user would have been able to set or from a claim.\n\n\nPossible enum values:\n - `\"FromClaim\"`\n - `\"FromClass\"`",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
+							Enum:        []interface{}{"FromClaim", "FromClass"},
 						},
 					},
 					"requests": {
@@ -71931,7 +71934,7 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 					},
 					"failCgroupV1": {
 						SchemaProps: spec.SchemaProps{
-							Description: "FailCgroupV1 prevents the kubelet from starting on hosts that use cgroup v1. By default, this is set to 'false', meaning the kubelet is allowed to start on cgroup v1 hosts unless this option is explicitly enabled. Default: false",
+							Description: "FailCgroupV1 prevents the kubelet from starting on hosts that use cgroup v1. By default, this is set to 'true', meaning the kubelet will not start on cgroup v1 hosts unless this option is explicitly disabled. Default: true",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},

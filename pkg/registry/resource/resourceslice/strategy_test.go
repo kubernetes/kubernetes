@@ -258,16 +258,6 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 				return obj
 			}(),
 		},
-		"drop-fields-binding-conditions-with-device-status": {
-			obj:               sliceWithBindingConditions,
-			bindingConditions: true,
-			deviceStatus:      false,
-			expectObj: func() *resource.ResourceSlice {
-				obj := slice.DeepCopy()
-				obj.Generation = 1
-				return obj
-			}(),
-		},
 		"drop-fields-binding-conditions-with-binding-conditions": {
 			obj:               sliceWithBindingConditions,
 			bindingConditions: false,
@@ -310,11 +300,13 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRADeviceTaints, tc.deviceTaints)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPartitionableDevices, tc.partitionableDevices)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRADeviceBindingConditions, tc.bindingConditions)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAResourceClaimDeviceStatus, tc.deviceStatus)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAConsumableCapacity, tc.consumableCapacity)
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.DRADeviceTaints:              tc.deviceTaints,
+				features.DRAPartitionableDevices:      tc.partitionableDevices,
+				features.DRADeviceBindingConditions:   tc.bindingConditions,
+				features.DRAResourceClaimDeviceStatus: tc.deviceStatus,
+				features.DRAConsumableCapacity:        tc.consumableCapacity,
+			})
 
 			obj := tc.obj.DeepCopy()
 
@@ -528,22 +520,6 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 			bindingConditions: false,
 			deviceStatus:      false,
 		},
-		"drop-fields-binding-conditions-with-device-status": {
-			oldObj: slice,
-			newObj: func() *resource.ResourceSlice {
-				obj := sliceWithBindingConditions.DeepCopy()
-				obj.ResourceVersion = "4"
-				return obj
-			}(),
-			expectObj: func() *resource.ResourceSlice {
-				obj := slice.DeepCopy()
-				obj.ResourceVersion = "4"
-				obj.Generation = 1
-				return obj
-			}(),
-			bindingConditions: true,
-			deviceStatus:      false,
-		},
 		"drop-fields-binding-conditions-with-binding-conditions": {
 			oldObj: slice,
 			newObj: func() *resource.ResourceSlice {
@@ -641,11 +617,13 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRADeviceTaints, tc.deviceTaints)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPartitionableDevices, tc.partitionableDevices)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRADeviceBindingConditions, tc.bindingConditions)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAResourceClaimDeviceStatus, tc.deviceStatus)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAConsumableCapacity, tc.consumableCapacity)
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.DRADeviceTaints:              tc.deviceTaints,
+				features.DRAPartitionableDevices:      tc.partitionableDevices,
+				features.DRADeviceBindingConditions:   tc.bindingConditions,
+				features.DRAResourceClaimDeviceStatus: tc.deviceStatus,
+				features.DRAConsumableCapacity:        tc.consumableCapacity,
+			})
 
 			oldObj := tc.oldObj.DeepCopy()
 			newObj := tc.newObj.DeepCopy()

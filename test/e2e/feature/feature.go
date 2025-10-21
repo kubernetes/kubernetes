@@ -171,10 +171,6 @@ var (
 	GPUUpgrade = framework.WithFeature(framework.ValidFeatures.Add("GPUUpgrade"))
 
 	// OWNER: sig-node
-	// Testing garbage collection of images/containers
-	GarbageCollect = framework.WithFeature(framework.ValidFeatures.Add("GarbageCollect"))
-
-	// OWNER: sig-node
 	// Testing graceful node shutdown
 	GracefulNodeShutdown = framework.WithFeature(framework.ValidFeatures.Add("GracefulNodeShutdown"))
 

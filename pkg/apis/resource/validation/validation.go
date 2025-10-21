@@ -48,6 +48,15 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 )
 
+// ResourceNormalizationRules handles the structural differences between v1beta1
+// (flattened fields) and v1/v1beta2 (fields under 'exactly') for validation error paths.
+var ResourceNormalizationRules = []field.NormalizationRule{
+	{
+		Regexp:      regexp.MustCompile(`spec.devices\.requests\[(\d+)\]\.(deviceClassName|selectors|allocationMode|count|adminAccess|tolerations)`),
+		Replacement: "spec.devices.requests[$1].exactly.$2",
+	},
+}
+
 var (
 	// validateResourceDriverName reuses the validation of a CSI driver because
 	// the allowed values are exactly the same.
@@ -84,7 +93,7 @@ func validateUID(uid string, fldPath *field.Path) field.ErrorList {
 	} else if len(uid) != 36 || uid != strings.ToLower(uid) {
 		allErrs = append(allErrs, field.Invalid(fldPath, uid, "uid must be in RFC 4122 normalized form, `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` with lowercase hexadecimal characters"))
 	}
-	return allErrs
+	return allErrs.WithOrigin("format=k8s-uuid")
 }
 
 // ValidateResourceClaim validates a ResourceClaim.
@@ -96,11 +105,12 @@ func ValidateResourceClaim(resourceClaim *resource.ResourceClaim) field.ErrorLis
 
 // ValidateResourceClaimUpdate tests if an update to ResourceClaim is valid.
 func ValidateResourceClaimUpdate(resourceClaim, oldClaim *resource.ResourceClaim) field.ErrorList {
-	allErrs := corevalidation.ValidateObjectMetaUpdate(&resourceClaim.ObjectMeta, &oldClaim.ObjectMeta, field.NewPath("metadata"))
+	allErrs := corevalidation.ValidateObjectMeta(&resourceClaim.ObjectMeta, true, corevalidation.ValidateResourceClaimName, field.NewPath("metadata"))
+	allErrs = append(allErrs, corevalidation.ValidateObjectMetaUpdate(&resourceClaim.ObjectMeta, &oldClaim.ObjectMeta, field.NewPath("metadata"))...)
 	// The spec is immutable. On update, we only check for immutability.
 	// Re-validating other fields is skipped because the user cannot change them;
 	// the only actionable error is for the immutability violation.
-	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(resourceClaim.Spec, oldClaim.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(resourceClaim.Spec, oldClaim.Spec, field.NewPath("spec")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
 	return allErrs
 }
 
@@ -125,10 +135,10 @@ func validateDeviceClaim(deviceClaim *resource.DeviceClaim, fldPath *field.Path,
 		func(request resource.DeviceRequest, fldPath *field.Path) field.ErrorList {
 			return validateDeviceRequest(request, fldPath, stored)
 		},
-		func(request resource.DeviceRequest) (string, string) {
-			return request.Name, "name"
+		func(request resource.DeviceRequest) string {
+			return request.Name
 		},
-		fldPath.Child("requests"), sizeCovered)...)
+		fldPath.Child("requests"), sizeCovered, uniquenessCovered)...)
 	allErrs = append(allErrs, validateSlice(deviceClaim.Constraints, resource.DeviceConstraintsMaxSize,
 		func(constraint resource.DeviceConstraint, fldPath *field.Path) field.ErrorList {
 			return validateDeviceConstraint(constraint, fldPath, requestNames)
@@ -192,38 +202,41 @@ func gatherAllocatedDevices(allocationResult *resource.DeviceAllocationResult) s
 
 func validateDeviceRequest(request resource.DeviceRequest, fldPath *field.Path, stored bool) field.ErrorList {
 	allErrs := validateRequestName(request.Name, fldPath.Child("name"))
-
 	numDeviceRequestType := 0
-	if len(request.FirstAvailable) > 0 {
+
+	hasFirstAvailable := len(request.FirstAvailable) > 0
+	hasExactly := request.Exactly != nil
+
+	if hasFirstAvailable {
 		numDeviceRequestType++
+	}
+	if hasExactly {
+		numDeviceRequestType++
+	}
+
+	switch {
+	case numDeviceRequestType == 0:
+		allErrs = append(allErrs, field.Required(fldPath, "exactly one of `exactly` or `firstAvailable` is required"))
+	case numDeviceRequestType > 1:
+		allErrs = append(allErrs, field.Invalid(fldPath, nil, "exactly one of `exactly` or `firstAvailable` is required, but multiple fields are set"))
+	case hasFirstAvailable:
 		allErrs = append(allErrs, validateSet(request.FirstAvailable, resource.FirstAvailableDeviceRequestMaxSize,
 			func(subRequest resource.DeviceSubRequest, fldPath *field.Path) field.ErrorList {
 				return validateDeviceSubRequest(subRequest, fldPath, stored)
 			},
-			func(subRequest resource.DeviceSubRequest) (string, string) {
-				return subRequest.Name, "name"
+			func(subRequest resource.DeviceSubRequest) string {
+				return subRequest.Name
 			},
-			fldPath.Child("firstAvailable"))...)
-	}
-
-	if request.Exactly != nil {
-		numDeviceRequestType++
+			fldPath.Child("firstAvailable"), sizeCovered, uniquenessCovered)...)
+	case hasExactly:
 		allErrs = append(allErrs, validateExactDeviceRequest(*request.Exactly, fldPath.Child("exactly"), stored)...)
-	}
-
-	switch numDeviceRequestType {
-	case 0:
-		allErrs = append(allErrs, field.Required(fldPath, "exactly one of `exactly` or `firstAvailable` is required"))
-	case 1:
-	default:
-		allErrs = append(allErrs, field.Invalid(fldPath, nil, "exactly one of `exactly` or `firstAvailable` is required, but multiple fields are set"))
 	}
 	return allErrs
 }
 
 func validateDeviceSubRequest(subRequest resource.DeviceSubRequest, fldPath *field.Path, stored bool) field.ErrorList {
 	allErrs := validateRequestName(subRequest.Name, fldPath.Child("name"))
-	allErrs = append(allErrs, validateDeviceClass(subRequest.DeviceClassName, fldPath.Child("deviceClassName"))...)
+	allErrs = append(allErrs, validateDeviceClass(subRequest.DeviceClassName, fldPath.Child("deviceClassName")).MarkCoveredByDeclarative()...)
 	allErrs = append(allErrs, validateSelectorSlice(subRequest.Selectors, fldPath.Child("selectors"), stored)...)
 	allErrs = append(allErrs, validateDeviceAllocationMode(subRequest.AllocationMode, subRequest.Count, fldPath.Child("allocationMode"), fldPath.Child("count"))...)
 	for i, toleration := range subRequest.Tolerations {
@@ -255,7 +268,10 @@ func validateDeviceAllocationMode(deviceAllocationMode resource.DeviceAllocation
 			allErrs = append(allErrs, field.Invalid(countFldPath, count, "must be greater than zero"))
 		}
 	default:
-		allErrs = append(allErrs, field.NotSupported(allocModeFldPath, deviceAllocationMode, []resource.DeviceAllocationMode{resource.DeviceAllocationModeAll, resource.DeviceAllocationModeExactCount}))
+		// NOTE: Declarative validation does not (yet) enforce the real requiredness of this field
+		// because v1beta1 uses a bespoke form of union which makes this field truly optional
+		// in some cases and truly required in others. DO NOT REMOVE THIS CODE UNLESS THAT IS RESOLVED.
+		allErrs = append(allErrs, field.NotSupported(allocModeFldPath, deviceAllocationMode, []resource.DeviceAllocationMode{resource.DeviceAllocationModeAll, resource.DeviceAllocationModeExactCount}).MarkCoveredByDeclarative())
 	}
 	return allErrs
 }
@@ -275,7 +291,7 @@ func validateSelectorSlice(selectors []resource.DeviceSelector, fldPath *field.P
 		func(selector resource.DeviceSelector, fldPath *field.Path) field.ErrorList {
 			return validateSelector(selector, fldPath, stored)
 		},
-		fldPath)
+		fldPath, sizeCovered)
 }
 
 func validateSelector(selector resource.DeviceSelector, fldPath *field.Path, stored bool) field.ErrorList {
@@ -331,7 +347,7 @@ func validateDeviceConstraint(constraint resource.DeviceConstraint, fldPath *fie
 		func(name string, fldPath *field.Path) field.ErrorList {
 			return validateRequestNameRef(name, fldPath, requestNames)
 		},
-		stringKey, fldPath.Child("requests"))...)
+		stringKey, fldPath.Child("requests"), sizeCovered, uniquenessCovered)...)
 	if constraint.MatchAttribute != nil {
 		allErrs = append(allErrs, validateFullyQualifiedName(*constraint.MatchAttribute, fldPath.Child("matchAttribute"))...)
 	} else if constraint.DistinctAttribute != nil {
@@ -349,7 +365,7 @@ func validateDeviceClaimConfiguration(config resource.DeviceClaimConfiguration, 
 	allErrs = append(allErrs, validateSet(config.Requests, resource.DeviceRequestsMaxSize,
 		func(name string, fldPath *field.Path) field.ErrorList {
 			return validateRequestNameRef(name, fldPath, requestNames)
-		}, stringKey, fldPath.Child("requests"))...)
+		}, stringKey, fldPath.Child("requests"), sizeCovered, uniquenessCovered)...)
 	allErrs = append(allErrs, validateDeviceConfiguration(config.DeviceConfiguration, fldPath, stored)...)
 	return allErrs
 }
@@ -384,7 +400,7 @@ func validateDeviceConfiguration(config resource.DeviceConfiguration, fldPath *f
 
 func validateOpaqueConfiguration(config resource.OpaqueDeviceConfiguration, fldPath *field.Path, stored bool) field.ErrorList {
 	var allErrs field.ErrorList
-	allErrs = append(allErrs, validateDriverName(config.Driver, fldPath.Child("driver"))...)
+	allErrs = append(allErrs, validateDriverName(config.Driver, fldPath.Child("driver"), corevalidation.RequiredCovered, corevalidation.FormatCovered)...)
 	allErrs = append(allErrs, validateRawExtension(config.Parameters, fldPath.Child("parameters"), stored, resource.OpaqueParametersMaxLength)...)
 	return allErrs
 }
@@ -393,8 +409,8 @@ func validateResourceClaimStatusUpdate(status, oldStatus *resource.ResourceClaim
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, validateSet(status.ReservedFor, resource.ResourceClaimReservedForMaxSize,
 		validateResourceClaimUserReference,
-		func(consumer resource.ResourceClaimConsumerReference) (types.UID, string) { return consumer.UID, "uid" },
-		fldPath.Child("reservedFor"))...)
+		func(consumer resource.ResourceClaimConsumerReference) types.UID { return consumer.UID },
+		fldPath.Child("reservedFor"), sizeCovered, uniquenessCovered)...)
 
 	var allocatedDevices sets.Set[structured.SharedDeviceID]
 	if status.Allocation != nil {
@@ -404,11 +420,11 @@ func validateResourceClaimStatusUpdate(status, oldStatus *resource.ResourceClaim
 		func(device resource.AllocatedDeviceStatus, fldPath *field.Path) field.ErrorList {
 			return validateDeviceStatus(device, fldPath, allocatedDevices)
 		},
-		func(device resource.AllocatedDeviceStatus) (structured.SharedDeviceID, string) {
+		func(device resource.AllocatedDeviceStatus) structured.SharedDeviceID {
 			deviceID := structured.MakeDeviceID(device.Driver, device.Pool, device.Device)
-			return structured.MakeSharedDeviceID(deviceID, (*types.UID)(device.ShareID)), "deviceID"
+			return structured.MakeSharedDeviceID(deviceID, (*types.UID)(device.ShareID))
 		},
-		fldPath.Child("devices"))...)
+		fldPath.Child("devices"), uniquenessCovered)...)
 
 	// Now check for invariants that must be valid for a ResourceClaim.
 	if len(status.ReservedFor) > 0 {
@@ -433,7 +449,7 @@ func validateResourceClaimStatusUpdate(status, oldStatus *resource.ResourceClaim
 	// in this particular case, must not be validated again because
 	// validation for new results is tighter than it was before.
 	if oldStatus.Allocation != nil && status.Allocation != nil {
-		allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(status.Allocation, oldStatus.Allocation, fldPath.Child("allocation"))...)
+		allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(status.Allocation, oldStatus.Allocation, fldPath.Child("allocation")).WithOrigin("update").MarkCoveredByDeclarative()...)
 	} else if status.Allocation != nil {
 		allErrs = append(allErrs, validateAllocationResult(status.Allocation, fldPath.Child("allocation"), requestNames, false)...)
 	}
@@ -472,11 +488,11 @@ func validateDeviceAllocationResult(allocation resource.DeviceAllocationResult, 
 	allErrs = append(allErrs, validateSlice(allocation.Results, resource.AllocationResultsMaxSize,
 		func(result resource.DeviceRequestAllocationResult, fldPath *field.Path) field.ErrorList {
 			return validateDeviceRequestAllocationResult(result, fldPath, requestNames)
-		}, fldPath.Child("results"))...)
+		}, fldPath.Child("results"), sizeCovered)...)
 	allErrs = append(allErrs, validateSlice(allocation.Config, 2*resource.DeviceConfigMaxSize, /* class + claim */
 		func(config resource.DeviceAllocationConfiguration, fldPath *field.Path) field.ErrorList {
 			return validateDeviceAllocationConfiguration(config, fldPath, requestNames, stored)
-		}, fldPath.Child("config"))...)
+		}, fldPath.Child("config"), sizeCovered)...)
 
 	return allErrs
 }
@@ -484,12 +500,12 @@ func validateDeviceAllocationResult(allocation resource.DeviceAllocationResult, 
 func validateDeviceRequestAllocationResult(result resource.DeviceRequestAllocationResult, fldPath *field.Path, requestNames requestNames) field.ErrorList {
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, validateRequestNameRef(result.Request, fldPath.Child("request"), requestNames)...)
-	allErrs = append(allErrs, validateDriverName(result.Driver, fldPath.Child("driver"))...)
+	allErrs = append(allErrs, validateDriverName(result.Driver, fldPath.Child("driver"), corevalidation.RequiredCovered, corevalidation.FormatCovered)...)
 	allErrs = append(allErrs, validatePoolName(result.Pool, fldPath.Child("pool")).MarkCoveredByDeclarative()...)
 	allErrs = append(allErrs, validateDeviceName(result.Device, fldPath.Child("device"))...)
 	allErrs = append(allErrs, validateDeviceBindingParameters(result.BindingConditions, result.BindingFailureConditions, fldPath)...)
 	if result.ShareID != nil {
-		allErrs = append(allErrs, validateUID(string(*result.ShareID), fldPath.Child("shareID"))...)
+		allErrs = append(allErrs, validateUID(string(*result.ShareID), fldPath.Child("shareID")).MarkCoveredByDeclarative()...)
 	}
 	return allErrs
 }
@@ -509,10 +525,10 @@ func validateAllocationConfigSource(source resource.AllocationConfigSource, fldP
 	var allErrs field.ErrorList
 	switch source {
 	case "":
-		allErrs = append(allErrs, field.Required(fldPath, ""))
+		allErrs = append(allErrs, field.Required(fldPath, "").MarkCoveredByDeclarative())
 	case resource.AllocationConfigSourceClaim, resource.AllocationConfigSourceClass:
 	default:
-		allErrs = append(allErrs, field.NotSupported(fldPath, source, []resource.AllocationConfigSource{resource.AllocationConfigSourceClaim, resource.AllocationConfigSourceClass}))
+		allErrs = append(allErrs, field.NotSupported(fldPath, source, []resource.AllocationConfigSource{resource.AllocationConfigSourceClaim, resource.AllocationConfigSourceClass}).MarkCoveredByDeclarative())
 	}
 	return allErrs
 }
@@ -673,8 +689,8 @@ func validateResourceSliceSpec(spec, oldSpec *resource.ResourceSliceSpec, fldPat
 		func(device resource.Device, fldPath *field.Path) field.ErrorList {
 			return validateDevice(device, fldPath, sharedCounterToCounterNames, spec.PerDeviceNodeSelection)
 		},
-		func(device resource.Device) (string, string) {
-			return device.Name, "name"
+		func(device resource.Device) string {
+			return device.Name
 		}, fldPath.Child("devices"))...)
 
 	// Size limit for total number of counters in devices enforced here.
@@ -698,8 +714,8 @@ func validateResourceSliceSpec(spec, oldSpec *resource.ResourceSliceSpec, fldPat
 	}
 	allErrs = append(allErrs, validateSet(spec.SharedCounters, -1,
 		validateCounterSet,
-		func(counterSet resource.CounterSet) (string, string) {
-			return counterSet.Name, "name"
+		func(counterSet resource.CounterSet) string {
+			return counterSet.Name
 		}, fldPath.Child("sharedCounters"))...)
 
 	return allErrs
@@ -768,8 +784,8 @@ func validateDevice(device resource.Device, fldPath *field.Path, sharedCounterTo
 
 	allErrs = append(allErrs, validateSet(device.ConsumesCounters, -1,
 		validateDeviceCounterConsumption,
-		func(deviceCapacityConsumption resource.DeviceCounterConsumption) (string, string) {
-			return deviceCapacityConsumption.CounterSet, "counterSet"
+		func(deviceCapacityConsumption resource.DeviceCounterConsumption) string {
+			return deviceCapacityConsumption.CounterSet
 		}, fldPath.Child("consumesCounters"))...)
 
 	var countersLength int
@@ -1138,17 +1154,14 @@ func validateSlice[T any](slice []T, maxSize int, validateItem func(T, *field.Pa
 
 // validateSet ensures that a slice contains no duplicates, does not
 // exceed a certain maximum size and that all entries are valid.
-func validateSet[T any, K comparable](slice []T, maxSize int, validateItem func(item T, fldPath *field.Path) field.ErrorList, itemKey func(T) (K, string), fldPath *field.Path, opts ...validationOption) field.ErrorList {
+func validateSet[T any, K comparable](slice []T, maxSize int, validateItem func(item T, fldPath *field.Path) field.ErrorList, itemKey func(T) K, fldPath *field.Path, opts ...validationOption) field.ErrorList {
 	allErrs := validateSlice(slice, maxSize, validateItem, fldPath, opts...)
 
 	allItems := sets.New[K]()
 	for i, item := range slice {
 		idxPath := fldPath.Index(i)
-		key, fieldName := itemKey(item)
+		key := itemKey(item)
 		childPath := idxPath
-		if fieldName != "" {
-			childPath = childPath.Child(fieldName)
-		}
 		if allItems.Has(key) {
 			err := field.Duplicate(childPath, key)
 			if slices.Contains(opts, uniquenessCovered) {
@@ -1163,13 +1176,13 @@ func validateSet[T any, K comparable](slice []T, maxSize int, validateItem func(
 }
 
 // stringKey uses the item itself as a key for validateSet.
-func stringKey(item string) (string, string) {
-	return item, ""
+func stringKey(item string) string {
+	return item
 }
 
 // quantityKey uses the item itself as a key for validateSet.
-func quantityKey(item apiresource.Quantity) (string, string) {
-	return strconv.FormatInt(item.Value(), 10), ""
+func quantityKey(item apiresource.Quantity) string {
+	return strconv.FormatInt(item.Value(), 10)
 }
 
 // validateMap validates keys, items and the maximum length of a map.
@@ -1212,7 +1225,7 @@ func validateDeviceStatus(device resource.AllocatedDeviceStatus, fldPath *field.
 	allErrs = append(allErrs, validatePoolName(device.Pool, fldPath.Child("pool"))...)
 	allErrs = append(allErrs, validateDeviceName(device.Device, fldPath.Child("device"))...)
 	if device.ShareID != nil {
-		allErrs = append(allErrs, validateUID(*device.ShareID, fldPath.Child("shareID"))...)
+		allErrs = append(allErrs, validateUID(*device.ShareID, fldPath.Child("shareID")).MarkCoveredByDeclarative()...)
 	}
 	deviceID := structured.MakeDeviceID(device.Driver, device.Pool, device.Device)
 	sharedDeviceID := structured.MakeSharedDeviceID(deviceID, (*types.UID)(device.ShareID))
@@ -1358,7 +1371,7 @@ func validateDeviceToleration(toleration resource.DeviceToleration, fldPath *fie
 	var allErrs field.ErrorList
 
 	if toleration.Key != "" {
-		allErrs = append(allErrs, metav1validation.ValidateLabelName(toleration.Key, fldPath.Child("key"))...)
+		allErrs = append(allErrs, metav1validation.ValidateLabelName(toleration.Key, fldPath.Child("key")).MarkCoveredByDeclarative()...)
 	}
 	switch toleration.Operator {
 	case resource.DeviceTolerationOpExists:
@@ -1396,10 +1409,10 @@ func validateLabelValue(value string, fldPath *field.Path) field.ErrorList {
 func validateDeviceBindingParameters(bindingConditions, bindingFailureConditions []string, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, validateSlice(bindingConditions, resource.BindingConditionsMaxSize,
-		metav1validation.ValidateLabelName, fldPath.Child("bindingConditions"))...)
+		metav1validation.ValidateLabelName, fldPath.Child("bindingConditions"), sizeCovered)...)
 
 	allErrs = append(allErrs, validateSlice(bindingFailureConditions, resource.BindingFailureConditionsMaxSize,
-		metav1validation.ValidateLabelName, fldPath.Child("bindingFailureConditions"))...)
+		metav1validation.ValidateLabelName, fldPath.Child("bindingFailureConditions"), sizeCovered)...)
 
 	// ensure BindingConditions and BindingFailureConditions contain no duplicate items and do not overlap with each other
 	conditionsSet := sets.New[string]()

@@ -178,8 +178,10 @@ func TestBootstrapClusterRoles(t *testing.T) {
 }
 
 func TestBootstrapClusterRolesWithFeatureGatesEnabled(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, "AllAlpha", true)
-	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, "AllBeta", true)
+	featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		"AllAlpha": true,
+		"AllBeta":  true,
+	})
 
 	bootstrapRoles := bootstrappolicy.ClusterRoles()
 	featureGateList := &api.List{}
