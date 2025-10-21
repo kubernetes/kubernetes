@@ -41,12 +41,15 @@ func TestVersionedValidationByFuzzing(t *testing.T) {
 		{Group: "resource.k8s.io", Version: "v1"},
 	}
 
+	fuzzIters := *roundtrip.FuzzIters / 10 // TODO: Find a better way to manage test running time
+	f := fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(rand.Int63()), legacyscheme.Codecs)
+
 	for _, gv := range typesWithDeclarativeValidation {
-		t.Run(gv.String(), func(t *testing.T) {
-			for i := 0; i < *roundtrip.FuzzIters; i++ {
-				f := fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(rand.Int63()), legacyscheme.Codecs)
-				for kind := range legacyscheme.Scheme.KnownTypes(gv) {
-					obj, err := legacyscheme.Scheme.New(gv.WithKind(kind))
+		for kind := range legacyscheme.Scheme.KnownTypes(gv) {
+			gvk := gv.WithKind(kind)
+			t.Run(gvk.String(), func(t *testing.T) {
+				for i := 0; i < fuzzIters; i++ {
+					obj, err := legacyscheme.Scheme.New(gvk)
 					if err != nil {
 						t.Fatalf("could not create a %v: %s", kind, err)
 					}
@@ -64,7 +67,7 @@ func TestVersionedValidationByFuzzing(t *testing.T) {
 					f.Fill(old)
 					VerifyVersionedValidationEquivalence(t, obj, old, opts...)
 				}
-			}
-		})
+			})
+		}
 	}
 }
