@@ -371,8 +371,8 @@ func TestInitialPendingVolumesForPodAndGetVolumesInUse(t *testing.T) {
 	// delayed claim binding
 	go delayClaimBecomesBound(t, kubeClient, claim.GetNamespace(), claim.Name)
 
-	err = wait.Poll(100*time.Millisecond, 1*time.Second, func() (bool, error) {
-		err = manager.WaitForAttachAndMount(tCtx, pod)
+	err = wait.PollUntilContextTimeout(tCtx, 100*time.Millisecond, 1*time.Second, true, func(ctx context.Context) (bool, error) {
+		err = manager.WaitForAttachAndMount(ctx, pod)
 		if err != nil {
 			// Few "PVC not bound" errors are expected
 			return false, nil
