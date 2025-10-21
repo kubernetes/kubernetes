@@ -24,7 +24,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/events"
@@ -76,10 +75,10 @@ func NewHollowProxy(
 			Broadcaster: broadcaster,
 			Recorder:    recorder,
 			NodeRef: &v1.ObjectReference{
-				Kind:      "Node",
-				Name:      nodeName,
-				UID:       types.UID(nodeName),
-				Namespace: "",
+				APIVersion: "v1",
+				Kind:       "Node",
+				Name:       nodeName,
+				Namespace:  "",
 			},
 		},
 	}

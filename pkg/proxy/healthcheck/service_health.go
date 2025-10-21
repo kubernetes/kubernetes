@@ -136,10 +136,10 @@ func (hcs *server) SyncServices(newServices map[types.NamespacedName]uint16) err
 			if hcs.recorder != nil {
 				hcs.recorder.Eventf(
 					&v1.ObjectReference{
-						Kind:      "Service",
-						Namespace: nsn.Namespace,
-						Name:      nsn.Name,
-						UID:       types.UID(nsn.String()),
+						APIVersion: "v1",
+						Kind:       "Service",
+						Namespace:  nsn.Namespace,
+						Name:       nsn.Name,
 					}, nil, api.EventTypeWarning, "FailedToStartServiceHealthcheck", "Listen", msg)
 			}
 			klog.ErrorS(err, "Failed to start healthcheck", "node", hcs.nodeName, "service", nsn, "port", port)
