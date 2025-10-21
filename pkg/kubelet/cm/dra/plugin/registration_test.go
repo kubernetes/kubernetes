@@ -17,7 +17,7 @@ limitations under the License.
 package plugin
 
 import (
-	"path"
+	"path/filepath"
 	"sort"
 	"strings"
 	"testing"
@@ -201,12 +201,12 @@ func TestRegistrationHandler(t *testing.T) {
 
 			service := drapb.DRAPluginService
 			tmp := t.TempDir()
-			endpointA := path.Join(tmp, socketFileA)
+			endpointA := filepath.Join(tmp, socketFileA)
 			teardownA, err := setupFakeGRPCServer(service, endpointA)
 			require.NoError(t, err)
 			tCtx.Cleanup(teardownA)
 
-			endpoint := path.Join(tmp, test.socketFile)
+			endpoint := filepath.Join(tmp, test.socketFile)
 			teardown, err := setupFakeGRPCServer(service, endpoint)
 			require.NoError(t, err)
 			tCtx.Cleanup(teardown)
@@ -314,7 +314,7 @@ func TestConnectionHandling(t *testing.T) {
 			requireNoSlices(tCtx)
 
 			// Run GRPC service.
-			endpoint := path.Join(t.TempDir(), "dra.sock")
+			endpoint := filepath.Join(t.TempDir(), "dra.sock")
 			teardown, err := setupFakeGRPCServer(service, endpoint)
 			require.NoError(t, err)
 			defer teardown()

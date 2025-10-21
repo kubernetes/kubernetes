@@ -21,7 +21,7 @@ import (
 	"errors"
 	"io"
 	"net"
-	"path"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -30,7 +30,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
-
 	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
 	drapbv1 "k8s.io/kubelet/pkg/apis/dra/v1"
 	drapbv1beta1 "k8s.io/kubelet/pkg/apis/dra/v1beta1"
@@ -84,13 +83,16 @@ type tearDown func()
 
 func setupFakeGRPCServer(service, addr string) (tearDown, error) {
 	ctx, cancel := context.WithCancel(context.Background())
+	stopped := make(chan struct{})
 	teardown := func() {
 		cancel()
+		<-stopped // Wait for server to fully stop
 	}
 
 	listener, err := net.Listen("unix", addr)
 	if err != nil {
-		teardown()
+		cancel()
+		close(stopped)
 		return nil, err
 	}
 
@@ -110,11 +112,14 @@ func setupFakeGRPCServer(service, addr string) (tearDown, error) {
 			drapbv1beta1.RegisterDRAPluginServer(s, drapbv1beta1.V1ServerWrapper{DRAPluginServer: fakeGRPCServer})
 			drahealthv1alpha1.RegisterDRAResourceHealthServer(s, fakeGRPCServer)
 		} else {
+			cancel()
+			close(stopped)
 			return nil, err
 		}
 	}
 
 	go func() {
+		defer close(stopped)
 		go func() {
 			if err := s.Serve(listener); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
 				panic(err)
@@ -130,7 +135,7 @@ func setupFakeGRPCServer(service, addr string) (tearDown, error) {
 func TestGRPCConnIsReused(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	service := drapbv1.DRAPluginService
-	addr := path.Join(t.TempDir(), "dra.sock")
+	addr := filepath.Join(t.TempDir(), "dra.sock")
 	teardown, err := setupFakeGRPCServer(service, addr)
 	require.NoError(t, err)
 	defer teardown()
@@ -189,7 +194,7 @@ func TestGRPCConnIsReused(t *testing.T) {
 func TestGRPCConnUsableAfterIdle(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	service := drapbv1.DRAPluginService
-	addr := path.Join(t.TempDir(), "dra.sock")
+	addr := filepath.Join(t.TempDir(), "dra.sock")
 	teardown, err := setupFakeGRPCServer(service, addr)
 	require.NoError(t, err)
 	defer teardown()
@@ -300,7 +305,7 @@ func TestGRPCMethods(t *testing.T) {
 	} {
 		t.Run(test.description, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
-			addr := path.Join(t.TempDir(), "dra.sock")
+			addr := filepath.Join(t.TempDir(), "dra.sock")
 			teardown, err := setupFakeGRPCServer(test.service, addr)
 			if err != nil {
 				t.Fatal(err)
@@ -343,7 +348,7 @@ func TestPlugin_WatchResources(t *testing.T) {
 	defer cancel()
 
 	driverName := "test-driver"
-	addr := path.Join(t.TempDir(), "dra.sock")
+	addr := filepath.Join(t.TempDir(), "dra.sock")
 
 	teardown, err := setupFakeGRPCServer("", addr)
 	require.NoError(t, err)
