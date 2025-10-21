@@ -89,10 +89,10 @@ type unlockedActiveQueue struct {
 	queue           *heap.Heap[*framework.QueuedPodInfo]
 	inFlightPods    map[types.UID]*list.Element
 	inFlightEvents  *list.List
-	metricsRecorder *metrics.MetricAsyncRecorder
+	metricsRecorder MetricAsyncRecorder
 }
 
-func newUnlockedActiveQueue(queue *heap.Heap[*framework.QueuedPodInfo], inFlightPods map[types.UID]*list.Element, inFlightEvents *list.List, metricsRecorder *metrics.MetricAsyncRecorder) *unlockedActiveQueue {
+func newUnlockedActiveQueue(queue *heap.Heap[*framework.QueuedPodInfo], inFlightPods map[types.UID]*list.Element, inFlightEvents *list.List, metricsRecorder MetricAsyncRecorder) *unlockedActiveQueue {
 	return &unlockedActiveQueue{
 		queue:           queue,
 		inFlightPods:    inFlightPods,

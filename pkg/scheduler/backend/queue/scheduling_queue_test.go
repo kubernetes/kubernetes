@@ -3596,7 +3596,7 @@ func TestPendingPodsMetricWithMocks(t *testing.T) {
 					QueueingHintFn: queueHintReturnQueue,
 				},
 			}
-			preenq := map[string]map[string]framework.PreEnqueuePlugin{"": {(&preEnqueuePlugin{}).Name(): &preEnqueuePlugin{allowlists: []string{queueable}}}}
+			preenq := map[string]map[string]fwk.PreEnqueuePlugin{"": {(&preEnqueuePlugin{}).Name(): &preEnqueuePlugin{allowlists: []string{queueable}}}}
 
 			// Create fake recorder that tracks calls
 			mockRecorder := NewMockMetricAsyncRecorder()
