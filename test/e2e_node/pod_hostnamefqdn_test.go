@@ -30,6 +30,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -227,3 +228,72 @@ func checkPodIsPending(ctx context.Context, f *framework.Framework, podName, nam
 		return false, nil
 	})
 }
+
+var _ = SIGDescribe("Override hostname of Pod", framework.WithFeatureGate(features.HostnameOverride), func() {
+	f := framework.NewDefaultFramework("hostfqdn")
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
+
+	ginkgo.It("a pod has hostnameOverride field with value that is a valid DNS subdomain.", func(ctx context.Context) {
+		pod := testPod(f.Namespace.Name)
+		hostnameOverride := "override.example.host"
+		pod.Spec.HostnameOverride = &hostnameOverride
+		output := []string{fmt.Sprintf("%s;%s;", hostnameOverride, hostnameOverride)}
+		e2eoutput.TestContainerOutput(ctx, f, "hostnameOverride overrides hostname", pod, 0, output)
+	})
+
+	ginkgo.It("a pod with hostname and hostnameOverride fields will have hostnameOverride as hostname", func(ctx context.Context) {
+		pod := testPod(f.Namespace.Name)
+		hostname := "custom-host"
+		hostnameOverride := "override-host"
+		pod.Spec.Hostname = hostname
+		pod.Spec.HostnameOverride = &hostnameOverride
+		output := []string{fmt.Sprintf("%s;%s;", hostnameOverride, hostnameOverride)}
+		e2eoutput.TestContainerOutput(ctx, f, "hostnameOverride overrides hostname", pod, 0, output)
+	})
+
+	ginkgo.It("a pod with only hostnameOverride field will have hostnameOverride as hostname", func(ctx context.Context) {
+		pod := testPod(f.Namespace.Name)
+		hostnameOverride := "override-host"
+		pod.Spec.HostnameOverride = &hostnameOverride
+		output := []string{fmt.Sprintf("%s;%s;", hostnameOverride, hostnameOverride)}
+		e2eoutput.TestContainerOutput(ctx, f, "hostnameOverride only", pod, 0, output)
+	})
+
+	ginkgo.It("a pod with subdomain and hostnameOverride fields will have hostnameOverride as hostname", func(ctx context.Context) {
+		pod := testPod(f.Namespace.Name)
+		subdomain := "t"
+		hostnameOverride := "override-host"
+		pod.Spec.Subdomain = subdomain
+		pod.Spec.HostnameOverride = &hostnameOverride
+		output := []string{fmt.Sprintf("%s;%s;", hostnameOverride, hostnameOverride)}
+		e2eoutput.TestContainerOutput(ctx, f, "subdomain and hostnameOverride", pod, 0, output)
+	})
+
+	ginkgo.It("a pod with setHostnameAsFQDN and hostnameOverride fields will fail to be created", func(ctx context.Context) {
+		pod := testPod(f.Namespace.Name)
+		setHostnameAsFQDN := true
+		hostnameOverride := "override-host"
+		pod.Spec.SetHostnameAsFQDN = &setHostnameAsFQDN
+		pod.Spec.HostnameOverride = &hostnameOverride
+		_, err := e2epod.NewPodClient(f).TryCreate(ctx, pod)
+		gomega.Expect(err).To(gomega.HaveOccurred(), "Pod creation should fail when both setHostnameAsFQDN and hostnameOverride are set")
+	})
+
+	ginkgo.It("a pod with hostNetwork and hostnameOverride fields will fail to be created", func(ctx context.Context) {
+		pod := testPod(f.Namespace.Name)
+		hostnameOverride := "override-host"
+		pod.Spec.HostNetwork = true
+		pod.Spec.HostnameOverride = &hostnameOverride
+		_, err := e2epod.NewPodClient(f).TryCreate(ctx, pod)
+		gomega.Expect(err).To(gomega.HaveOccurred(), "Pod creation should fail when both hostNetwork and hostnameOverride are set")
+	})
+
+	ginkgo.It("a pod with non-RFC1123 subdomain string for hostnameOverride field will fail to be created", func(ctx context.Context) {
+		pod := testPod(f.Namespace.Name)
+		hostnameOverride := "Not-RFC1123"
+		pod.Spec.HostNetwork = false
+		pod.Spec.HostnameOverride = &hostnameOverride
+		_, err := e2epod.NewPodClient(f).TryCreate(ctx, pod)
+		gomega.Expect(err).To(gomega.HaveOccurred(), "Pod creation should fail when non-RFC1123 subdomain string for hostnameOverride field are set")
+	})
+})
