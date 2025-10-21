@@ -204,17 +204,17 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		// spec.Devices.Requests[%d].Exactly.Tolerations.Key
 		"valid Exactly.Tolerations.Key": {
 			input: mkValidResourceClaim(tweakExactlyTolerations([]resource.DeviceToleration{
-				{Key: "valid-key", Operator: resource.DeviceTolerationOpExists},
+				{Key: "valid-key", Operator: resource.DeviceTolerationOpExists, Effect: resource.DeviceTaintEffectNoSchedule},
 			})),
 		},
 		"valid Exactly.Tolerations.Key empty": {
 			input: mkValidResourceClaim(tweakExactlyTolerations([]resource.DeviceToleration{
-				{Key: "", Operator: resource.DeviceTolerationOpExists},
+				{Key: "", Operator: resource.DeviceTolerationOpExists, Effect: resource.DeviceTaintEffectNoSchedule},
 			})),
 		},
 		"invalid Exactly.Tolerations.Key": {
 			input: mkValidResourceClaim(tweakExactlyTolerations([]resource.DeviceToleration{
-				{Key: "invalid_key!", Operator: resource.DeviceTolerationOpExists},
+				{Key: "invalid_key!", Operator: resource.DeviceTolerationOpExists, Effect: resource.DeviceTaintEffectNoSchedule},
 			})),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "devices", "requests").Index(0).Child("exactly", "tolerations").Index(0).Child("key"), "invalid_key!", "").WithOrigin("format=k8s-label-key"),
@@ -222,7 +222,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		},
 		"invalid  Exactly.Tolerations.Key - multiple slashes": {
 			input: mkValidResourceClaim(tweakExactlyTolerations([]resource.DeviceToleration{
-				{Key: "a/b/c", Operator: resource.DeviceTolerationOpExists},
+				{Key: "a/b/c", Operator: resource.DeviceTolerationOpExists, Effect: resource.DeviceTaintEffectNoSchedule},
 			})),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "devices", "requests").Index(0).Child("exactly", "tolerations").Index(0).Child("key"), "a/b/c", "").WithOrigin("format=k8s-label-key"),
@@ -231,17 +231,17 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		// spec.Devices.Requests[%d].FirsAvailable[%d].Tolerations.Key
 		"valid FirstAvailable.Tolerations.Key": {
 			input: mkValidResourceClaim(tweakFirstAvailable(1), tweakFirstAvailableTolerations([]resource.DeviceToleration{
-				{Key: "valid-key", Operator: resource.DeviceTolerationOpExists},
+				{Key: "valid-key", Operator: resource.DeviceTolerationOpExists, Effect: resource.DeviceTaintEffectNoSchedule},
 			})),
 		},
 		"valid FirstAvailable.Tolerations.Key empty": {
 			input: mkValidResourceClaim(tweakFirstAvailable(1), tweakFirstAvailableTolerations([]resource.DeviceToleration{
-				{Key: "", Operator: resource.DeviceTolerationOpExists},
+				{Key: "", Operator: resource.DeviceTolerationOpExists, Effect: resource.DeviceTaintEffectNoSchedule},
 			})),
 		},
 		"invalid FirstAvailable.Tolerations.Key": {
 			input: mkValidResourceClaim(tweakFirstAvailable(1), tweakFirstAvailableTolerations([]resource.DeviceToleration{
-				{Key: "invalid_key!", Operator: resource.DeviceTolerationOpExists},
+				{Key: "invalid_key!", Operator: resource.DeviceTolerationOpExists, Effect: resource.DeviceTaintEffectNoSchedule},
 			})),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("tolerations").Index(0).Child("key"), "invalid_key!", "").WithOrigin("format=k8s-label-key"),
@@ -249,7 +249,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		},
 		"invalid FirstAvailable.Tolerations.Key - multiple slashes": {
 			input: mkValidResourceClaim(tweakFirstAvailable(1), tweakFirstAvailableTolerations([]resource.DeviceToleration{
-				{Key: "a/b/c", Operator: resource.DeviceTolerationOpExists},
+				{Key: "a/b/c", Operator: resource.DeviceTolerationOpExists, Effect: resource.DeviceTaintEffectNoSchedule},
 			})),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("tolerations").Index(0).Child("key"), "a/b/c", "").WithOrigin("format=k8s-label-key"),
@@ -302,6 +302,94 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			input: mkValidResourceClaim(tweakFirstAvailableDeviceClassName("")),
 			expectedErrs: field.ErrorList{
 				field.Required(field.NewPath("spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("deviceClassName"), ""),
+			},
+		},
+		"valid DeviceTolerationOperator/Effect - Exactly": {
+			input: mkValidResourceClaim(tweakExactlyTolerations([]resource.DeviceToleration{
+				{
+					Key:      "key",
+					Operator: resource.DeviceTolerationOpEqual,
+					Value:    "value",
+					Effect:   resource.DeviceTaintEffectNoSchedule,
+				},
+			})),
+		},
+		"invalid DeviceTolerationOperator - Exactly": {
+			input: mkValidResourceClaim(tweakExactlyTolerations([]resource.DeviceToleration{
+				{
+					Key:      "key",
+					Operator: "InvalidOp",
+					Value:    "value",
+					Effect:   resource.DeviceTaintEffectNoSchedule,
+				},
+			})),
+			expectedErrs: field.ErrorList{
+				field.NotSupported(
+					field.NewPath("spec", "devices", "requests").Index(0).Child("exactly", "tolerations").Index(0).Child("operator"),
+					resource.DeviceTolerationOperator("InvalidOp"),
+					[]string{"Equal", "Exists"},
+				),
+			},
+		},
+		"invalid DeviceTaintEffect - Exactly": {
+			input: mkValidResourceClaim(tweakExactlyTolerations([]resource.DeviceToleration{
+				{
+					Key:      "key",
+					Operator: resource.DeviceTolerationOpEqual,
+					Value:    "value",
+					Effect:   "InvalidEffect",
+				},
+			})),
+			expectedErrs: field.ErrorList{
+				field.NotSupported(
+					field.NewPath("spec", "devices", "requests").Index(0).Child("exactly", "tolerations").Index(0).Child("effect"),
+					resource.DeviceTaintEffect("InvalidEffect"),
+					[]string{"NoExecute", "NoSchedule"},
+				),
+			},
+		},
+		"valid DeviceTolerationOperator/Effect - FirstAvailable": {
+			input: mkValidResourceClaim(tweakFirstAvailable(1), tweakFirstAvailableTolerations([]resource.DeviceToleration{
+				{
+					Key:      "key",
+					Operator: resource.DeviceTolerationOpEqual,
+					Value:    "value",
+					Effect:   resource.DeviceTaintEffectNoSchedule,
+				},
+			})),
+		},
+		"invalid DeviceTolerationOperator - FirstAvailable": {
+			input: mkValidResourceClaim(tweakFirstAvailable(1), tweakFirstAvailableTolerations([]resource.DeviceToleration{
+				{
+					Key:      "key",
+					Operator: "InvalidOp",
+					Value:    "value",
+					Effect:   resource.DeviceTaintEffectNoSchedule,
+				},
+			})),
+			expectedErrs: field.ErrorList{
+				field.NotSupported(
+					field.NewPath("spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("tolerations").Index(0).Child("operator"),
+					resource.DeviceTolerationOperator("InvalidOp"),
+					[]string{"Equal", "Exists"},
+				),
+			},
+		},
+		"invalid DeviceTaintEffect - FirstAvailable": {
+			input: mkValidResourceClaim(tweakFirstAvailable(1), tweakFirstAvailableTolerations([]resource.DeviceToleration{
+				{
+					Key:      "key",
+					Operator: resource.DeviceTolerationOpEqual,
+					Value:    "value",
+					Effect:   "InvalidEffect",
+				},
+			})),
+			expectedErrs: field.ErrorList{
+				field.NotSupported(
+					field.NewPath("spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("tolerations").Index(0).Child("effect"),
+					resource.DeviceTaintEffect("InvalidEffect"),
+					[]string{"NoExecute", "NoSchedule"},
+				),
 			},
 		},
 		// TODO: Add more test cases
@@ -574,7 +662,7 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		},
 		"spec immutable: add Exactly.Tolerations": {
 			update: mkValidResourceClaim(tweakExactlyTolerations([]resource.DeviceToleration{
-				{Key: "valid-key", Operator: resource.DeviceTolerationOpExists},
+				{Key: "valid-key", Operator: resource.DeviceTolerationOpExists, Effect: resource.DeviceTaintEffectNoSchedule},
 			})),
 			old: validClaim,
 			expectedErrs: field.ErrorList{
@@ -583,10 +671,10 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		},
 		"spec immutable: change Exactly.Tolerations.Key": {
 			update: mkValidResourceClaim(tweakExactlyTolerations([]resource.DeviceToleration{
-				{Key: "another-valid-key", Operator: resource.DeviceTolerationOpExists},
+				{Key: "another-valid-key", Operator: resource.DeviceTolerationOpExists, Effect: resource.DeviceTaintEffectNoSchedule},
 			})),
 			old: mkValidResourceClaim(tweakExactlyTolerations([]resource.DeviceToleration{
-				{Key: "valid-key", Operator: resource.DeviceTolerationOpExists},
+				{Key: "valid-key", Operator: resource.DeviceTolerationOpExists, Effect: resource.DeviceTaintEffectNoSchedule},
 			})),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("spec"), "field is immutable", "").WithOrigin("immutable"),
@@ -595,7 +683,7 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		// spec.Devices.Requests[%d].FirsAvailable[%d].Tolerations.Key
 		"spec immutable: add FirstAvailable.Tolerations": {
 			update: mkValidResourceClaim(tweakFirstAvailable(1), tweakFirstAvailableTolerations([]resource.DeviceToleration{
-				{Key: "valid-key", Operator: resource.DeviceTolerationOpExists},
+				{Key: "valid-key", Operator: resource.DeviceTolerationOpExists, Effect: resource.DeviceTaintEffectNoSchedule},
 			})),
 			old: mkValidResourceClaim(tweakFirstAvailable(1)),
 			expectedErrs: field.ErrorList{
@@ -604,10 +692,10 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		},
 		"spec immutable: change FirstAvailable.Tolerations.Key": {
 			update: mkValidResourceClaim(tweakFirstAvailable(1), tweakFirstAvailableTolerations([]resource.DeviceToleration{
-				{Key: "another-valid-key", Operator: resource.DeviceTolerationOpExists},
+				{Key: "another-valid-key", Operator: resource.DeviceTolerationOpExists, Effect: resource.DeviceTaintEffectNoSchedule},
 			})),
 			old: mkValidResourceClaim(tweakFirstAvailable(1), tweakFirstAvailableTolerations([]resource.DeviceToleration{
-				{Key: "valid-key", Operator: resource.DeviceTolerationOpExists},
+				{Key: "valid-key", Operator: resource.DeviceTolerationOpExists, Effect: resource.DeviceTaintEffectNoSchedule},
 			})),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("spec"), "field is immutable", "").WithOrigin("immutable"),
