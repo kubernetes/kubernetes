@@ -241,7 +241,6 @@ linters:
       enabled-checks:
         - equalFold
         - boolExprSimplify
-        - deprecatedComment
     {{- end}}
     revive:
       # Only these rules are enabled.
