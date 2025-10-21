@@ -42,6 +42,7 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 
+	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -236,6 +237,96 @@ func TestPeerProxy(t *testing.T) {
 		})
 	}
 
+}
+
+func TestGetPeerResources(t *testing.T) {
+	testCases := []struct {
+		name      string
+		peerCache map[string]PeerDiscoveryCacheEntry
+		want      map[string][]apidiscoveryv2.APIGroupDiscovery
+	}{
+		{
+			name:      "empty peer cache",
+			peerCache: nil,
+			want:      map[string][]apidiscoveryv2.APIGroupDiscovery{},
+		},
+		{
+			name: "peer cache with local server, should be skipped",
+			peerCache: map[string]PeerDiscoveryCacheEntry{
+				localServerID: {
+					GroupDiscovery: []apidiscoveryv2.APIGroupDiscovery{
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "core"},
+						},
+					},
+				},
+				remoteServerID1: {
+					GroupDiscovery: []apidiscoveryv2.APIGroupDiscovery{
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "apps"},
+						},
+					},
+				},
+			},
+			want: map[string][]apidiscoveryv2.APIGroupDiscovery{
+				remoteServerID1: {
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "apps"},
+					},
+				},
+			},
+		},
+		{
+			name: "peer cache with multiple peers",
+			peerCache: map[string]PeerDiscoveryCacheEntry{
+				remoteServerID1: {
+					GroupDiscovery: []apidiscoveryv2.APIGroupDiscovery{
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "apps"},
+						},
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+						},
+					},
+				},
+				remoteServerID2: {
+					GroupDiscovery: []apidiscoveryv2.APIGroupDiscovery{
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "batch"},
+						},
+					},
+				},
+			},
+			want: map[string][]apidiscoveryv2.APIGroupDiscovery{
+				remoteServerID1: {
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "apps"},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+					},
+				},
+				remoteServerID2: {
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "batch"},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			s := serializer.NewCodecFactory(runtime.NewScheme()).WithoutConversion()
+			handler, err := newFakePeerProxyHandler(true, nil, localServerID, s, nil, tt.peerCache)
+			if err != nil {
+				t.Fatalf("Error creating peer proxy handler: %v", err)
+			}
+
+			got := handler.GetPeerResources()
+			assert.Equal(t, tt.want, got)
+		})
+	}
 }
 
 func newFakePeerEndpointReconciler(t *testing.T) reconcilers.PeerEndpointLeaseReconciler {

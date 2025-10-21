@@ -40,8 +40,8 @@ const aggregatedV2Beta1JSONAccept = jsonAccept + aggregatedV2Beta1AcceptSuffix
 const aggregatedV2Beta1ProtoAccept = protobufAccept + aggregatedV2Beta1AcceptSuffix
 const aggregatedJSONAccept = jsonAccept + aggregatedAcceptSuffix
 const aggregatedProtoAccept = protobufAccept + aggregatedAcceptSuffix
-const aggregatedMergedJSONAccept = jsonAccept + aggregatedAcceptSuffix + ";profile=merged"
-const aggregatedMergedProtoAccept = protobufAccept + aggregatedAcceptSuffix + ";profile=merged"
+const aggregatedLocalJSONAccept = jsonAccept + aggregatedAcceptSuffix + ";profile=local"
+const aggregatedLocalProtoAccept = protobufAccept + aggregatedAcceptSuffix + ";profile=local"
 
 func fetchPath(handler http.Handler, path, accept string) string {
 	w := httptest.NewRecorder()
@@ -64,14 +64,14 @@ func (f fakeHTTPHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) 
 
 func TestAggregationEnabled(t *testing.T) {
 	unaggregated := fakeHTTPHandler{data: "unaggregated"}
-	aggregated := fakeHTTPHandler{data: "aggregated"}
-	merged := fakeHTTPHandler{data: "merged"}
-	wrapped := WrapAggregatedDiscoveryToHandler(unaggregated, aggregated, merged)
+	aggregated := fakeHTTPHandler{data: "aggregated-local"}
+	peerAggregated := fakeHTTPHandler{data: "peer-aggregated"}
+	wrapped := WrapAggregatedDiscoveryToHandler(unaggregated, aggregated, peerAggregated)
 
 	testCases := []struct {
-		accept       string
-		expected     string
-		enableMerged bool
+		accept               string
+		expected             string
+		enablePeerAggregated bool
 	}{
 		{
 			// Misconstructed/incorrect accept headers should be passed to the unaggregated handler to return an error
@@ -83,16 +83,16 @@ func TestAggregationEnabled(t *testing.T) {
 			expected: "unaggregated",
 		}, {
 			accept:   aggregatedV2Beta1JSONAccept,
-			expected: "aggregated",
+			expected: "aggregated-local",
 		}, {
 			accept:   aggregatedV2Beta1ProtoAccept,
-			expected: "aggregated",
+			expected: "aggregated-local",
 		}, {
 			accept:   aggregatedJSONAccept,
-			expected: "aggregated",
+			expected: "aggregated-local",
 		}, {
 			accept:   aggregatedProtoAccept,
-			expected: "aggregated",
+			expected: "aggregated-local",
 		}, {
 			accept:   jsonAccept,
 			expected: "unaggregated",
@@ -102,33 +102,38 @@ func TestAggregationEnabled(t *testing.T) {
 		}, {
 			// Server should return the first accepted type
 			accept:   aggregatedJSONAccept + "," + jsonAccept,
-			expected: "aggregated",
+			expected: "aggregated-local",
 		}, {
 			// Server should return the first accepted type
 			accept:   aggregatedProtoAccept + "," + protobufAccept,
-			expected: "aggregated",
+			expected: "aggregated-local",
 		},
 		// Peer Agg discovery cases.
+		// profile is not set (should default to peer-aggregated)
 		{
-			accept:       aggregatedMergedJSONAccept,
-			expected:     "merged",
-			enableMerged: true,
+			accept:               aggregatedJSONAccept,
+			expected:             "peer-aggregated",
+			enablePeerAggregated: true,
 		}, {
-			accept:       aggregatedMergedProtoAccept,
-			expected:     "merged",
-			enableMerged: true,
+			accept:               aggregatedProtoAccept,
+			expected:             "peer-aggregated",
+			enablePeerAggregated: true,
 		},
-		// profile is not set (should default to merged)
+		// profile=local (should return local)
 		{
-			accept:       aggregatedJSONAccept,
-			expected:     "merged",
-			enableMerged: true,
+			accept:               aggregatedLocalJSONAccept,
+			expected:             "aggregated-local",
+			enablePeerAggregated: true,
+		}, {
+			accept:               aggregatedLocalProtoAccept,
+			expected:             "aggregated-local",
+			enablePeerAggregated: true,
 		},
-		// profile is set to something other than unmerged (should default to merged)
+		// profile is set to something other than local (should default to peer-aggregated)
 		{
-			accept:       aggregatedJSONAccept + ";profile=foo",
-			expected:     "merged",
-			enableMerged: true,
+			accept:               aggregatedJSONAccept + ";profile=foo",
+			expected:             "peer-aggregated",
+			enablePeerAggregated: true,
 		},
 	}
 
@@ -136,7 +141,7 @@ func TestAggregationEnabled(t *testing.T) {
 		if tc.accept == aggregatedV2Beta1JSONAccept || tc.accept == aggregatedV2Beta1ProtoAccept {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AggregatedDiscoveryRemoveBetaType, false)
 		}
-		if tc.enableMerged {
+		if tc.enablePeerAggregated {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.UnknownVersionInteroperabilityProxy, true)
 		}
 		body := fetchPath(wrapped, discoveryPath, tc.accept)

@@ -155,7 +155,7 @@ type GenericAPIServer struct {
 	// AggregatedDiscoveryGroupManager serves /apis in an aggregated form.
 	AggregatedDiscoveryGroupManager discoveryendpoint.ResourceManager
 
-	// PeerAggregatedDiscoveryManager serves /apis merged from all peer apiservers.
+	// PeerAggregatedDiscoveryManager serves /apis aggregated from all peer apiservers.
 	PeerAggregatedDiscoveryManager discoveryendpoint.PeerAggResourceManager
 
 	// AggregatedLegacyDiscoveryGroupManager serves /api in an aggregated form.

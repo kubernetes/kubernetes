@@ -168,7 +168,7 @@ type MediaTypeOptions struct {
 	// has set
 	Export bool
 
-	// profile controls the discovery profile (e.g., "unmerged" for unmerged discovery)
+	// profile controls the discovery profile (e.g., "local" for local (non peer-aggregated) discovery)
 	Profile string
 
 	// unrecognized is a list of all unrecognized keys
@@ -230,7 +230,7 @@ func acceptMediaTypeOptions(params map[string]string, accepts *runtime.Serialize
 		case "pretty":
 			options.Pretty = v == "1"
 
-		// controls the discovery profile (merged vs unmerged)
+		// controls the discovery profile (eg local vs peer-aggregated)
 		case "profile":
 			options.Profile = v
 

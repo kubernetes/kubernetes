@@ -57,34 +57,34 @@ func TestPeerAggDiscovery(t *testing.T) {
 		wantGroupNames         []string
 	}{
 		{
-			name:                   "Peer aggregated discovery disabled (should get unmerged)",
+			name:                   "Peer aggregated discovery disabled (should get local discovery)",
 			enablePeerAggDiscovery: false,
-			acceptHeader:           "application/json;g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList;profile=unmerged",
+			acceptHeader:           "application/json;g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList;profile=local",
 			wantGroupNames:         []string{"local.example.com"},
 		},
 		{
-			name:                   "Merged request without profile (should default to merged)",
+			name:                   "Request without profile (should default to peer-aggregated)",
 			enablePeerAggDiscovery: true,
 			acceptHeader:           "application/json;g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList",
 			peerProvider:           peerProvider,
 			wantGroupNames:         []string{"local.example.com", "peer.example.com"},
 		},
 		{
-			name:                   "Merged request with unknown profile (should default to merged)",
+			name:                   "Request with unknown profile (should default to peer-aggregated)",
 			enablePeerAggDiscovery: true,
 			acceptHeader:           "application/json;g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList;profile=foo",
 			peerProvider:           peerProvider,
 			wantGroupNames:         []string{"local.example.com", "peer.example.com"},
 		},
 		{
-			name:                   "Merged request with profile=unmerged (should get unmerged)",
+			name:                   "Request with profile=local (should get local discovery)",
 			enablePeerAggDiscovery: true,
-			acceptHeader:           "application/json;g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList;profile=unmerged",
+			acceptHeader:           "application/json;g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList;profile=local",
 			peerProvider:           peerProvider,
 			wantGroupNames:         []string{"local.example.com"},
 		},
 		{
-			name:                   "Peer provider nil (should get unmerged)",
+			name:                   "Peer provider nil (should get local discovery)",
 			enablePeerAggDiscovery: true,
 			acceptHeader:           "application/json;g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList",
 			peerProvider:           nil,
@@ -129,7 +129,7 @@ func TestPeerAggDiscovery(t *testing.T) {
 	}
 }
 
-func TestMergedDiscoveryMetrics(t *testing.T) {
+func TestPeerAggregatedDiscoveryMetrics(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.UnknownVersionInteroperabilityProxy, true)
 	manager := discoveryendpoint.NewResourceManager("apis")
 	localGroup := newAPIGroup("local.example.com", "v1", "local-resource")
@@ -144,46 +144,53 @@ func TestMergedDiscoveryMetrics(t *testing.T) {
 	peerAggDiscoveryManager := discoveryendpoint.NewPeerAggDiscoveryHandler(manager, peerProvider, "apis")
 	wrapped := discoveryendpoint.WrapAggregatedDiscoveryToHandler(manager, manager, peerAggDiscoveryManager)
 
-	legacyregistry.MustRegister(discoveryendpoint.MergedRequestCounter)
-	legacyregistry.MustRegister(discoveryendpoint.UnmergedRequestCounter)
+	legacyregistry.MustRegister(discoveryendpoint.PeerAggCacheHitsCounter)
+	legacyregistry.MustRegister(discoveryendpoint.PeerAggCacheMissesCounter)
+	legacyregistry.MustRegister(discoveryendpoint.LocalDiscoveryRequestCounter)
 
-	// Make 4 merged requests.
+	// Make 3 peer-aggregated requests.
 	fetchPath(wrapped, "application/json", "/apis", "")
-	peerAggDiscoveryManager.InvalidateCache()
-	fetchPath(wrapped, "application/json;profile=merged", "/apis", "")
-	peerAggDiscoveryManager.InvalidateCache()
 	fetchPath(wrapped, "application/json;profile=foo", "/apis", "")
-	peerAggDiscoveryManager.InvalidateCache()
 	fetchPath(wrapped, "application/json;g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList", "/apis", "")
 
-	// Make 2 unmerged requests.
-	fetchPath(wrapped, "application/json;profile=unmerged", "/apis", "")
+	// Make 2 local-discovery requests.
+	fetchPath(wrapped, "application/json;profile=local", "/apis", "")
 	peerAggDiscoveryManager.InvalidateCache()
-	fetchPath(wrapped, "application/json;profile=unmerged", "/apis", "")
+	fetchPath(wrapped, "application/json;profile=local", "/apis", "")
 	peerAggDiscoveryManager.InvalidateCache()
 
-	mergedCountTotalMetric := `
-# HELP aggregator_discovery_merged_count_total [ALPHA] Counter of number of times discovery was merged across all API servers
-# TYPE aggregator_discovery_merged_count_total counter
-aggregator_discovery_merged_count_total 4
+	cacheHitsTotalMetric := `
+# HELP aggregator_discovery_peer_aggregated_cache_hits_total [ALPHA] Counter of number of times discovery was served from peer-aggregated cache
+# TYPE aggregator_discovery_peer_aggregated_cache_hits_total counter
+aggregator_discovery_peer_aggregated_cache_hits_total 2
 `
 
-	unmergedCountTotalMetric := `
-# HELP aggregator_discovery_unmerged_count_total [ALPHA] Counter of number of times unmerged discovery was requested
-# TYPE aggregator_discovery_unmerged_count_total counter
-aggregator_discovery_unmerged_count_total 2
+	cacheMissesTotalMetric := `
+# HELP aggregator_discovery_peer_aggregated_cache_misses_total [ALPHA] Counter of number of times discovery was aggregated across all API servers
+# TYPE aggregator_discovery_peer_aggregated_cache_misses_total counter
+aggregator_discovery_peer_aggregated_cache_misses_total 1
 `
 
-	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(mergedCountTotalMetric), "aggregator_discovery_merged_count_total"); err != nil {
+	localDiscoveryTotalMetric := `
+# HELP aggregator_discovery_local_requests_total [ALPHA] Counter of number of times local (non peer-aggregated) discovery was requested
+# TYPE aggregator_discovery_local_requests_total counter
+aggregator_discovery_local_requests_total 2
+`
+
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(cacheHitsTotalMetric), "aggregator_discovery_peer_aggregated_cache_hits_total"); err != nil {
 		t.Errorf("unexpected metrics output: %v", err)
 	}
 
-	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(unmergedCountTotalMetric), "aggregator_discovery_unmerged_count_total"); err != nil {
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(cacheMissesTotalMetric), "aggregator_discovery_peer_aggregated_cache_misses_total"); err != nil {
+		t.Errorf("unexpected metrics output: %v", err)
+	}
+
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(localDiscoveryTotalMetric), "aggregator_discovery_local_requests_total"); err != nil {
 		t.Errorf("unexpected metrics output: %v", err)
 	}
 }
 
-func TestMergedDiscovery_ETagHandling(t *testing.T) {
+func TestPeerAggDiscovery_ETagHandling(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.UnknownVersionInteroperabilityProxy, true)
 	manager := discoveryendpoint.NewResourceManager("apis")
 	localGroup := newAPIGroup("local.example.com", "v1", "local-resource")

@@ -31,23 +31,23 @@ import (
 	utilsort "k8s.io/apimachinery/pkg/util/sort"
 )
 
-// PeerDiscoveryProvider defines an interface to get peer resources for merged discovery.
+// PeerDiscoveryProvider defines an interface to get peer resources for peer-aggregated discovery.
 type PeerDiscoveryProvider interface {
 	GetPeerResources() map[string][]apidiscoveryv2.APIGroupDiscovery
 }
 
-// PeerAggResourceManager defines the interface for managing merged discovery resources
+// PeerAggResourceManager defines the interface for managing peer-aggregated discovery resources
 // that combines both local and peer server resources.
 type PeerAggResourceManager interface {
-	// InvalidateCache invalidates the merged discovery caches
+	// InvalidateCache invalidates the peer-aggregated discovery caches
 	// This should be called when peer discovery data changes.
 	InvalidateCache()
 
-	// ServeHTTP handles merged discovery HTTP requests.
+	// ServeHTTP handles peer-aggregated discovery HTTP requests.
 	http.Handler
 }
 
-// peerAggDiscoveryHandler handles merged discovery requests that include both local and peer resources.
+// peerAggDiscoveryHandler handles peer-aggregated discovery requests that include both local and peer resources.
 type peerAggDiscoveryHandler struct {
 	localResourceManager  ResourceManager
 	peerDiscoveryProvider PeerDiscoveryProvider
@@ -56,7 +56,7 @@ type peerAggDiscoveryHandler struct {
 	serveHTTPFunc         func(http.ResponseWriter, *http.Request)
 }
 
-// NewPeerAggDiscoveryHandler creates a new handler for merged discovery.
+// NewPeerAggDiscoveryHandler creates a new handler for peer-aggregated discovery.
 func NewPeerAggDiscoveryHandler(localDiscoveryProvider ResourceManager, peerDiscoveryProvider PeerDiscoveryProvider, path string) PeerAggResourceManager {
 	scheme := runtime.NewScheme()
 	utilruntime.Must(apidiscoveryv2.AddToScheme(scheme))
@@ -82,11 +82,11 @@ func NewPeerAggDiscoveryHandler(localDiscoveryProvider ResourceManager, peerDisc
 	return h
 }
 
-// InvalidateCache invalidates the merged discovery caches.
+// InvalidateCache invalidates the peer-aggregated discovery caches.
 // This should be called when peer discovery data changes.
 func (h *peerAggDiscoveryHandler) InvalidateCache() {
 	h.cache.Store(nil)
-	klog.V(4).Info("Invalidated merged discovery caches")
+	klog.V(4).Info("Invalidated peer-aggregated discovery caches")
 }
 
 func (h *peerAggDiscoveryHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
@@ -104,6 +104,7 @@ func (h *peerAggDiscoveryHandler) serveHTTP(resp http.ResponseWriter, req *http.
 func (h *peerAggDiscoveryHandler) fetchFromCache() *cachedGroupList {
 	cacheLoad := h.cache.Load()
 	if cacheLoad != nil {
+		PeerAggCacheHitsCounter.Inc()
 		return cacheLoad
 	}
 
@@ -179,7 +180,7 @@ func (h *peerAggDiscoveryHandler) mergeResources(
 		allGroups = append(allGroups, peerGroupNames)
 	}
 
-	MergedRequestCounter.Inc()
+	PeerAggCacheMissesCounter.Inc()
 	return h.mergeGroups(groupMap, allGroups)
 }
 

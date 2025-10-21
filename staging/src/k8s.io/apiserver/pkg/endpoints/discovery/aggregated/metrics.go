@@ -32,18 +32,26 @@ var (
 		},
 	)
 
-	MergedRequestCounter = metrics.NewCounter(
+	PeerAggCacheHitsCounter = metrics.NewCounter(
 		&metrics.CounterOpts{
-			Name:           "aggregator_discovery_merged_count_total",
-			Help:           "Counter of number of times discovery was merged across all API servers",
+			Name:           "aggregator_discovery_peer_aggregated_cache_hits_total",
+			Help:           "Counter of number of times discovery was served from peer-aggregated cache",
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
 
-	UnmergedRequestCounter = metrics.NewCounter(
+	PeerAggCacheMissesCounter = metrics.NewCounter(
 		&metrics.CounterOpts{
-			Name:           "aggregator_discovery_unmerged_count_total",
-			Help:           "Counter of number of times unmerged discovery was requested",
+			Name:           "aggregator_discovery_peer_aggregated_cache_misses_total",
+			Help:           "Counter of number of times discovery was aggregated across all API servers",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
+	LocalDiscoveryRequestCounter = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Name:           "aggregator_discovery_local_requests_total",
+			Help:           "Counter of number of times local (non peer-aggregated) discovery was requested",
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
@@ -52,7 +60,8 @@ var (
 func init() {
 	legacyregistry.MustRegister(regenerationCounter)
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.UnknownVersionInteroperabilityProxy) {
-		legacyregistry.MustRegister(MergedRequestCounter)
-		legacyregistry.MustRegister(UnmergedRequestCounter)
+		legacyregistry.MustRegister(PeerAggCacheHitsCounter)
+		legacyregistry.MustRegister(PeerAggCacheMissesCounter)
+		legacyregistry.MustRegister(LocalDiscoveryRequestCounter)
 	}
 }

@@ -25,9 +25,9 @@ import (
 // SortDiscoveryGroupsTopo performs a topological consensus sort of API discovery group names.
 //
 // This is needed in Kubernetes API discovery merging logic, where multiple peers (apiserver instances)
-// may report different groups. To present a consistent merged discovery response,
+// may report different groups. To present a consistent peer-aggregated discovery response,
 // we use this function to compute a consensus ordering that respects the relative orderings
-// reported by all peers. This is called from the merged discovery handler when constructing
+// reported by all peers. This is called from the peer-aggregated discovery handler when constructing
 // the final APIGroupDiscoveryList for clients.
 func SortDiscoveryGroupsTopo(peers [][]string) []string {
 	items := []string{}

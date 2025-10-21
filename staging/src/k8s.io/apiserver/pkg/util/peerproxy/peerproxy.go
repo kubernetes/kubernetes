@@ -105,8 +105,8 @@ func NewPeerProxyHandler(
 		return nil, fmt.Errorf("error creating discovery client: %w", err)
 	}
 
-	// Always use unmerged discovery to get local view of resources.
-	discoveryClient.ForceUnmergedDiscovery = true
+	// Always use local discovery to get local view of resources.
+	discoveryClient.ForceLocalDiscovery = true
 	h.discoveryClient = discoveryClient
 	h.localDiscoveryInfoCache.Store(map[schema.GroupVersionResource]bool{})
 	h.peerDiscoveryInfoCache.Store(map[string]PeerDiscoveryCacheEntry{})

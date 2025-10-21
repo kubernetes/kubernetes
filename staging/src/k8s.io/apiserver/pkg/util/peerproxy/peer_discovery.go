@@ -157,7 +157,7 @@ func (h *peerProxyHandler) fetchNewDiscoveryFor(ctx context.Context, serverID st
 			}
 			// Skip core/v1 group from peer-aggregated discovery since its not served from /apis.
 			// We still want to re-route core/v1 requests to the peer, but we don't want it
-			// to appear in the merged discovery document.
+			// to appear in the peer-aggregated discovery document.
 			if groupDiscovery.Name == "" {
 				continue
 			}
@@ -192,8 +192,8 @@ func (h *peerProxyHandler) aggregateDiscovery(ctx context.Context, path string, 
 	ctx = apirequest.WithUser(ctx, apiServerUser)
 	req = req.WithContext(ctx)
 
-	// Fallback to V2 and V1 in that order if V2Unmerged is not recognized.
-	req.Header.Add("Accept", discovery.AcceptV2Unmerged+","+discovery.AcceptV2+","+discovery.AcceptV1)
+	// Fallback to V2 and V1 in that order if V2Local is not recognized.
+	req.Header.Add("Accept", discovery.AcceptV2Local+","+discovery.AcceptV2+","+discovery.AcceptV1)
 
 	writer := responsewriterutil.NewInMemoryResponseWriter()
 	h.proxyRequestToDestinationAPIServer(req, writer, hostport)

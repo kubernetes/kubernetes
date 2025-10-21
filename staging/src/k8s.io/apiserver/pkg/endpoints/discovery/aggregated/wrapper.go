@@ -44,12 +44,12 @@ func (wrapped *WrappedHandler) ServeHTTP(resp http.ResponseWriter, req *http.Req
 	mediaType, _ := negotiation.NegotiateMediaTypeOptions(req.Header.Get("Accept"), wrapped.s.SupportedMediaTypes(), DiscoveryEndpointRestrictions)
 	if IsAggregatedDiscoveryGVK(mediaType.Convert) {
 		if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.UnknownVersionInteroperabilityProxy) && mediaType.Convert.Version == "v2" {
-			if mediaType.Profile == "unmerged" {
-				UnmergedRequestCounter.Inc()
+			if mediaType.Profile == "local" {
+				LocalDiscoveryRequestCounter.Inc()
 				wrapped.aggHandler.ServeHTTP(resp, req)
 				return
 			}
-			// Serve merged discovery by default.
+			// Serve peer-aggregated discovery by default.
 			wrapped.peerAggHandler.ServeHTTP(resp, req)
 			return
 		}

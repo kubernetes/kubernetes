@@ -38,11 +38,11 @@ import (
 	testutil "k8s.io/kubernetes/test/utils"
 )
 
-func TestMergedDiscoveryAggregated(t *testing.T) {
+func TestPeerAggDiscovery(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
-	// Enable feature gates for merged discovery and peer proxy.
+	// Enable feature gates for peer-aggregated discovery and peer proxy.
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.APIServerIdentity, true)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.UnknownVersionInteroperabilityProxy, true)
 
@@ -89,22 +89,22 @@ func TestMergedDiscoveryAggregated(t *testing.T) {
 		}
 	})
 
-	t.Run("UnmergedDiscoveryWorks", func(t *testing.T) {
-		testUnmergedDiscovery(t, ctx, clientA, clientB)
+	t.Run("LocalDiscoveryWorks", func(t *testing.T) {
+		testLocalDiscovery(t, ctx, clientA, clientB)
 	})
 
-	t.Run("MergedDiscoveryEndpoint", func(t *testing.T) {
-		testMergedDiscoveryEndpoint(t, ctx, clientA, clientB)
+	t.Run("PeerAggDiscoveryEndpoint", func(t *testing.T) {
+		testPeerAggDiscoveryEndpoint(t, ctx, clientA, clientB)
 	})
 }
 
-func testUnmergedDiscovery(t *testing.T, ctx context.Context, clientA, clientB kubernetes.Interface) {
+func testLocalDiscovery(t *testing.T, ctx context.Context, clientA, clientB kubernetes.Interface) {
 	testClientA := testClientSet{kubeClientSet: clientA}
 	testClientB := testClientSet{kubeClientSet: clientB}
 
-	// Verify serverA does NOT have apps/v1 in unmerged discovery (disabled via runtime-config)
-	resultA, err := FetchUnmergedAggregatedDiscovery(ctx, testClientA)
-	require.NoError(t, err, "Should be able to fetch unmerged discovery from serverA")
+	// Verify serverA does NOT have apps/v1 in local discovery (disabled via runtime-config)
+	resultA, err := FetchLocalDiscovery(ctx, testClientA)
+	require.NoError(t, err, "Should be able to fetch local discovery from serverA")
 
 	hasAppsV1InA := false
 	for _, group := range resultA.Items {
@@ -117,11 +117,11 @@ func testUnmergedDiscovery(t *testing.T, ctx context.Context, clientA, clientB k
 			}
 		}
 	}
-	require.False(t, hasAppsV1InA, "ServerA should NOT have apps/v1 in unmerged discovery (disabled via runtime-config)")
+	require.False(t, hasAppsV1InA, "ServerA should NOT have apps/v1 in local discovery (disabled via runtime-config)")
 
-	// Verify serverB does NOT have batch/v1 in unmerged discovery (disabled via runtime-config)
-	resultB, err := FetchUnmergedAggregatedDiscovery(ctx, testClientB)
-	require.NoError(t, err, "Should be able to fetch unmerged discovery from serverB")
+	// Verify serverB does NOT have batch/v1 in local discovery (disabled via runtime-config)
+	resultB, err := FetchLocalDiscovery(ctx, testClientB)
+	require.NoError(t, err, "Should be able to fetch local discovery from serverB")
 
 	hasBatchV1InB := false
 	for _, group := range resultB.Items {
@@ -134,9 +134,9 @@ func testUnmergedDiscovery(t *testing.T, ctx context.Context, clientA, clientB k
 			}
 		}
 	}
-	require.False(t, hasBatchV1InB, "ServerB should NOT have batch/v1 in unmerged discovery (disabled via runtime-config)")
+	require.False(t, hasBatchV1InB, "ServerB should NOT have batch/v1 in local discovery (disabled via runtime-config)")
 
-	// Verify serverA HAS batch/v1 in unmerged discovery (should be enabled by default)
+	// Verify serverA HAS batch/v1 in local discovery (should be enabled by default)
 	hasBatchV1InA := false
 	var foundGroupsA []string
 	for _, group := range resultA.Items {
@@ -150,10 +150,10 @@ func testUnmergedDiscovery(t *testing.T, ctx context.Context, clientA, clientB k
 			}
 		}
 	}
-	t.Logf("ServerA unmerged discovery has groups: %v", foundGroupsA)
-	require.True(t, hasBatchV1InA, "ServerA should have batch/v1 in unmerged discovery (enabled by default)")
+	t.Logf("ServerA local discovery has groups: %v", foundGroupsA)
+	require.True(t, hasBatchV1InA, "ServerA should have batch/v1 in local discovery (enabled by default)")
 
-	// Verify serverB HAS apps/v1 in unmerged discovery (should be enabled by default)
+	// Verify serverB HAS apps/v1 in local discovery (should be enabled by default)
 	hasAppsV1InB := false
 	var foundGroupsB []string
 	for _, group := range resultB.Items {
@@ -167,15 +167,15 @@ func testUnmergedDiscovery(t *testing.T, ctx context.Context, clientA, clientB k
 			}
 		}
 	}
-	t.Logf("ServerB unmerged discovery has groups: %v", foundGroupsB)
-	require.True(t, hasAppsV1InB, "ServerB should have apps/v1 in unmerged discovery (enabled by default)")
+	t.Logf("ServerB local discovery has groups: %v", foundGroupsB)
+	require.True(t, hasAppsV1InB, "ServerB should have apps/v1 in local discovery (enabled by default)")
 
-	t.Log("Unmerged discovery validation complete:")
+	t.Log("Local discovery validation complete:")
 	t.Log("  ServerA: has batch/v1, missing apps/v1 ✓")
 	t.Log("  ServerB: has apps/v1, missing batch/v1 ✓")
 }
 
-func testMergedDiscoveryEndpoint(t *testing.T, ctx context.Context, clientA, clientB kubernetes.Interface) {
+func testPeerAggDiscoveryEndpoint(t *testing.T, ctx context.Context, clientA, clientB kubernetes.Interface) {
 	testCases := []struct {
 		name   string
 		client kubernetes.Interface
@@ -185,13 +185,13 @@ func testMergedDiscoveryEndpoint(t *testing.T, ctx context.Context, clientA, cli
 	}
 
 	for _, tc := range testCases {
-		t.Run(fmt.Sprintf("%s_merged_discovery", tc.name), func(t *testing.T) {
+		t.Run(fmt.Sprintf("%s_peer_aggregated_discovery", tc.name), func(t *testing.T) {
 			testClientSet := testClientSet{kubeClientSet: tc.client}
 			testCtx, cancel := context.WithTimeout(ctx, 1*time.Minute)
 			defer cancel()
 
-			// Wait for merged discovery to contain both apps and batch groups.
-			err := WaitForMergedDiscoveryWithCondition(testCtx, testClientSet, func(result apidiscoveryv2.APIGroupDiscoveryList) bool {
+			// Wait for peer-aggregated discovery to contain both apps and batch groups.
+			err := WaitForPeerAggDiscoveryWithCondition(testCtx, testClientSet, func(result apidiscoveryv2.APIGroupDiscoveryList) bool {
 				hasApps, hasBatch := false, false
 
 				for _, group := range result.Items {
@@ -211,7 +211,7 @@ func testMergedDiscoveryEndpoint(t *testing.T, ctx context.Context, clientA, cli
 			}
 
 			require.NoError(t, err, "Failed to get expected groups from %s within timeout", tc.name)
-			t.Logf("Successfully validated %s merged discovery contains both apps and batch groups", tc.name)
+			t.Logf("Successfully validated %s peer-aggregated discovery contains both apps and batch groups", tc.name)
 		})
 	}
 }

@@ -44,7 +44,7 @@ import (
 
 const acceptV1JSON = "application/json"
 const acceptV2JSON = "application/json;g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList"
-const acceptV2JSONUnmerged = "application/json;g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList;profile=unmerged"
+const acceptV2JSONLocal = "application/json;g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList;profile=local"
 
 const maxTimeout = 10 * time.Second
 
@@ -719,32 +719,32 @@ func FindGroupVersionV2(discovery apidiscoveryv2.APIGroupDiscoveryList, gv metav
 	return nil
 }
 
-// FetchUnmergedAggregatedDiscovery explicitly requests unmerged aggregated discovery
-func FetchUnmergedAggregatedDiscovery(ctx context.Context, client testClient) (apidiscoveryv2.APIGroupDiscoveryList, error) {
+// FetchLocalDiscovery explicitly requests local discovery
+func FetchLocalDiscovery(ctx context.Context, client testClient) (apidiscoveryv2.APIGroupDiscoveryList, error) {
 	result, err := client.
 		Discovery().
 		RESTClient().
 		Get().
 		AbsPath("/apis").
-		SetHeader("Accept", acceptV2JSONUnmerged).
+		SetHeader("Accept", acceptV2JSONLocal).
 		Do(ctx).
 		Raw()
 
 	if err != nil {
-		return apidiscoveryv2.APIGroupDiscoveryList{}, fmt.Errorf("failed to fetch unmerged aggregated discovery: %w", err)
+		return apidiscoveryv2.APIGroupDiscoveryList{}, fmt.Errorf("failed to fetch local discovery: %w", err)
 	}
 
 	groupList := apidiscoveryv2.APIGroupDiscoveryList{}
 	err = json.Unmarshal(result, &groupList)
 	if err != nil {
-		return apidiscoveryv2.APIGroupDiscoveryList{}, fmt.Errorf("failed to parse unmerged aggregated discovery: %w", err)
+		return apidiscoveryv2.APIGroupDiscoveryList{}, fmt.Errorf("failed to parse local discovery: %w", err)
 	}
 
 	return groupList, nil
 }
 
-// FetchMergedAggregatedDiscovery explicitly requests merged aggregated discovery
-func FetchMergedAggregatedDiscovery(ctx context.Context, client testClient) (apidiscoveryv2.APIGroupDiscoveryList, error) {
+// FetchPeerAggDiscovery explicitly requests peer-aggregated discovery
+func FetchPeerAggDiscovery(ctx context.Context, client testClient) (apidiscoveryv2.APIGroupDiscoveryList, error) {
 	result, err := client.
 		Discovery().
 		RESTClient().
@@ -755,27 +755,27 @@ func FetchMergedAggregatedDiscovery(ctx context.Context, client testClient) (api
 		Raw()
 
 	if err != nil {
-		return apidiscoveryv2.APIGroupDiscoveryList{}, fmt.Errorf("failed to fetch merged aggregated discovery: %w", err)
+		return apidiscoveryv2.APIGroupDiscoveryList{}, fmt.Errorf("failed to fetch peer-aggregated discovery: %w", err)
 	}
 
 	groupList := apidiscoveryv2.APIGroupDiscoveryList{}
 	err = json.Unmarshal(result, &groupList)
 	if err != nil {
-		return apidiscoveryv2.APIGroupDiscoveryList{}, fmt.Errorf("failed to parse merged aggregated discovery: %w", err)
+		return apidiscoveryv2.APIGroupDiscoveryList{}, fmt.Errorf("failed to parse peer-aggregated discovery: %w", err)
 	}
 
 	return groupList, nil
 }
 
-// WaitForMergedDiscoveryWithCondition waits for merged discovery to satisfy a condition.
-func WaitForMergedDiscoveryWithCondition(ctx context.Context, client testClient, condition func(result apidiscoveryv2.APIGroupDiscoveryList) bool) error {
+// WaitForPeerAggDiscoveryWithCondition waits for peer-aggregated discovery to satisfy a condition.
+func WaitForPeerAggDiscoveryWithCondition(ctx context.Context, client testClient, condition func(result apidiscoveryv2.APIGroupDiscoveryList) bool) error {
 	return wait.PollUntilContextTimeout(
 		ctx,
 		5*time.Second,
 		30*time.Second,
 		true,
 		func(ctx context.Context) (done bool, err error) {
-			groupList, err := FetchMergedAggregatedDiscovery(ctx, client)
+			groupList, err := FetchPeerAggDiscovery(ctx, client)
 			if err != nil {
 				return false, err
 			}
