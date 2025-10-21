@@ -989,17 +989,14 @@ func testDevicePluginNodeReboot(f *framework.Framework, pluginSockDir string) {
 				return err
 			}, 30*time.Second, framework.Poll).ShouldNot(gomega.HaveOccurred(), "cannot fetch the compute resource assignment after kubelet restart")
 
-			// if we got this far, podresources API will now report 2 entries:
-			// - sample device plugin pod, running and doing fine
-			// - our test pod, in failed state. Pods in terminal state will still be reported, see https://github.com/kubernetes/kubernetes/issues/119423
-			// so we care about our test pod, and it will be present in the returned list till 119423 is fixed, but since it failed admission it must not have
-			// any device allocated to it, hence we check for empty device set in the podresources response. So, we check that
-			// A. our test pod must be present in the list response *and*
-			// B. it has no devices assigned to it.
-			// anything else is unexpected and thus makes the test fail. Once 119423 is fixed, a better, simpler and more intuitive check will be for the
-			// test pod to not be present in the podresources list response, but till that time we're stuck with this approach.
+			// if we got this far, podresources API will now report only the sample device plugin pod,
+			// because pods that failed admission are no longer reported in the list
+			// (see https://github.com/kubernetes/kubernetes/pull/132028).
+			// Hence, we verify that our test pod is NOT present in the podresources response.
+
 			_, found := checkPodResourcesAssignment(v1PodResources, pod1.Namespace, pod1.Name, pod1.Spec.Containers[0].Name, SampleDeviceResourceName, []string{})
-			gomega.Expect(found).To(gomega.BeTrueBecause("%s/%s/%s failed admission, should not have devices registered", pod1.Namespace, pod1.Name, pod1.Spec.Containers[0].Name))
+			framework.ExpectNoError(err, "unexpected device assignment mismatch for %s/%s", pod1.Namespace, pod1.Name)
+			gomega.Expect(found).To(gomega.BeFalseBecause("%s/%s/%s failed admission, so it must not appear in podresources list", pod1.Namespace, pod1.Name, pod1.Spec.Containers[0].Name))
 		})
 	})
 }
