@@ -31,23 +31,26 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/watchlist"
 )
 
 // listerWatcher opaques storage.Interface to expose cache.ListerWatcher.
 type listerWatcher struct {
-	storage         storage.Interface
-	resourcePrefix  string
-	newListFunc     func() runtime.Object
-	contextMetadata metadata.MD
+	storage                       storage.Interface
+	resourcePrefix                string
+	newListFunc                   func() runtime.Object
+	contextMetadata               metadata.MD
+	unsupportedWatchListSemantics bool
 }
 
 // NewListerWatcher returns a storage.Interface backed ListerWatcher.
 func NewListerWatcher(storage storage.Interface, resourcePrefix string, newListFunc func() runtime.Object, contextMetadata metadata.MD) cache.ListerWatcher {
 	return &listerWatcher{
-		storage:         storage,
-		resourcePrefix:  resourcePrefix,
-		newListFunc:     newListFunc,
-		contextMetadata: contextMetadata,
+		storage:                       storage,
+		resourcePrefix:                resourcePrefix,
+		newListFunc:                   newListFunc,
+		contextMetadata:               contextMetadata,
+		unsupportedWatchListSemantics: watchlist.DoesClientNotSupportWatchListSemantics(storage),
 	}
 }
 
@@ -104,4 +107,8 @@ func (lw *listerWatcher) Watch(options metav1.ListOptions) (watch.Interface, err
 	}
 
 	return lw.storage.Watch(ctx, lw.resourcePrefix, opts)
+}
+
+func (lw *listerWatcher) IsWatchListSemanticsUnSupported() bool {
+	return lw.unsupportedWatchListSemantics
 }
