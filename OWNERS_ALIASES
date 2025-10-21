@@ -1,4 +1,12 @@
 aliases:
+  sig-api-machinery-approvers:
+    - deads2k
+    - jpbetz
+    - sttts
+  sig-api-machinery-reviewers:
+    - deads2k
+    - jpbetz
+    - sttts
   # Note: sig-architecture-approvers has approval on root files (including go.mod/go.sum) until https://github.com/kubernetes/test-infra/pull/21398 is resolved.
   # People with approve rights via this alias should defer dependency update PRs to dep-approvers.
   sig-architecture-approvers:
