@@ -27,7 +27,8 @@ const mountsFilePath = ""
 
 // CgroupsValidator validates cgroup configuration.
 type CgroupsValidator struct {
-	Reporter Reporter
+	Reporter       Reporter
+	KubeletVersion string
 }
 
 // Validate is part of the system.Validator interface.
