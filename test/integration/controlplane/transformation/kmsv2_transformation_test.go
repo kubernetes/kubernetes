@@ -405,13 +405,14 @@ resources:
 // 7. when kms-plugin is down, no-op update for a pod should succeed and not result in RV change even once the DEK/seed is valid
 func TestKMSv2ProviderKeyIDStaleness(t *testing.T) {
 	t.Parallel()
-	// testKMSv2ProviderKeyIDStaleness modifies global state (kmsv2.NowFunc) and thus the following two tests
-	// have to run sequentially. No other test is allowed to change kmsv2.NowFunc.
+
 	t.Run("regular gcm", func(t *testing.T) {
+		t.Parallel()
 		kmsName := "kms-provider-key-id-stale-false"
 		testKMSv2ProviderKeyIDStaleness(t, kmsName, encryptionconfig.SetKDFForTests(kmsName, false))
 	})
 	t.Run("extended nonce gcm", func(t *testing.T) {
+		t.Parallel()
 		testKMSv2ProviderKeyIDStaleness(t, "kms-provider-key-id-stale-true", func() {})
 	})
 }
@@ -605,9 +606,10 @@ resources:
 	}
 
 	// Invalidate the DEK by moving the current time forward
-	origNowFunc := kmsv2.NowFunc
-	t.Cleanup(func() { kmsv2.NowFunc = origNowFunc })
-	kmsv2.NowFunc = func() time.Time { return origNowFunc().Add(5 * time.Minute) }
+	origNowFunc := kmsv2.GetNowFunc(kmsName)
+	t.Cleanup(kmsv2.SetNowFuncForTests(kmsName, func() time.Time {
+		return origNowFunc().Add(5 * time.Minute)
+	}))
 
 	// 6. when kms-plugin is down, expect creation of new pod and encryption to fail because the DEK is invalid
 	_, err = test.createPod(testNamespace, dynamicClient)
@@ -630,7 +632,7 @@ resources:
 	)
 
 	// fix plugin and wait for new writes to start working again
-	kmsv2.NowFunc = origNowFunc
+	t.Cleanup(kmsv2.SetNowFuncForTests(kmsName, origNowFunc))
 	pluginMock.ExitFailedState()
 	err = wait.Poll(time.Second, 3*time.Minute,
 		func() (bool, error) {
@@ -1441,7 +1443,7 @@ resources:
 		t.Fatal(err)
 	}
 	if !proto.Equal(expectedDEKSourceHKDFSHA256XNonceAESGCMSeedObject, legacyDEKSourceHKDFSHA256XNonceAESGCMSeedObject) {
-		t.Errorf("kms v2 legacy encrypted object diff, want: %+v; got: %+v", expectedDEKSourceAESGCMKeyObject, legacyDEKSourceAESGCMKeyObject)
+		t.Errorf("kms v2 legacy encrypted object diff, want: %+v; got: %+v", expectedDEKSourceHKDFSHA256XNonceAESGCMSeedObject, legacyDEKSourceHKDFSHA256XNonceAESGCMSeedObject)
 	}
 
 	ctx := testContext(t)

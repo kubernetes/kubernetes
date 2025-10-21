@@ -24,8 +24,13 @@ import (
 
 // NamespaceStatusApplyConfiguration represents a declarative configuration of the NamespaceStatus type for use
 // with apply.
+//
+// NamespaceStatus is information about the current status of a Namespace.
 type NamespaceStatusApplyConfiguration struct {
-	Phase      *corev1.NamespacePhase                 `json:"phase,omitempty"`
+	// Phase is the current lifecycle phase of the namespace.
+	// More info: https://kubernetes.io/docs/tasks/administer-cluster/namespaces/
+	Phase *corev1.NamespacePhase `json:"phase,omitempty"`
+	// Represents the latest available observations of a namespace's current state.
 	Conditions []NamespaceConditionApplyConfiguration `json:"conditions,omitempty"`
 }
 

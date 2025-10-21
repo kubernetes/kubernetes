@@ -280,7 +280,7 @@ func (p *ClusterTrustBundlePublisher[T]) Run(ctx context.Context) {
 
 	go p.ctbInformer.Run(ctx.Done())
 
-	if !cache.WaitForNamedCacheSync("cluster trust bundle", ctx.Done(), p.ctbListerSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, p.ctbListerSynced) {
 		return
 	}
 

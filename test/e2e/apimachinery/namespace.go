@@ -32,10 +32,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/util/retry"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -277,6 +279,7 @@ var _ = SIGDescribe("Namespaces", framework.WithSerial(), func() {
 		ns, err := f.CreateNamespace(ctx, namespaceName, nil)
 		framework.ExpectNoError(err, "failed creating Namespace")
 		namespaceName = ns.ObjectMeta.Name
+		gomega.Expect(ns).To(apimachineryutils.HaveValidResourceVersion())
 
 		ginkgo.By("patching the Namespace")
 		nspatch, err := json.Marshal(map[string]interface{}{
@@ -285,8 +288,9 @@ var _ = SIGDescribe("Namespaces", framework.WithSerial(), func() {
 			},
 		})
 		framework.ExpectNoError(err, "failed to marshal JSON patch data")
-		_, err = f.ClientSet.CoreV1().Namespaces().Patch(ctx, namespaceName, types.StrategicMergePatchType, nspatch, metav1.PatchOptions{})
+		patchedNS, err := f.ClientSet.CoreV1().Namespaces().Patch(ctx, namespaceName, types.StrategicMergePatchType, nspatch, metav1.PatchOptions{})
 		framework.ExpectNoError(err, "failed to patch Namespace")
+		gomega.Expect(resourceversion.CompareResourceVersion(ns.ResourceVersion, patchedNS.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 
 		ginkgo.By("get the Namespace and ensuring it has the label")
 		namespace, err := f.ClientSet.CoreV1().Namespaces().Get(ctx, namespaceName, metav1.GetOptions{})

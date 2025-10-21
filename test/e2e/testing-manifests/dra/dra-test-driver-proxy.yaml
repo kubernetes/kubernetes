@@ -47,7 +47,7 @@ spec:
 
       containers:
         - name: pause
-          image: registry.k8s.io/sig-storage/hostpathplugin:v1.7.3
+          image: registry.k8s.io/sig-storage/hostpathplugin:v1.16.1
           command:
             - /bin/sh
             - -c

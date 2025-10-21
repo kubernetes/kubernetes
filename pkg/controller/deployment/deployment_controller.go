@@ -173,7 +173,7 @@ func (dc *DeploymentController) Run(ctx context.Context, workers int) {
 	logger.Info("Starting controller", "controller", "deployment")
 	defer logger.Info("Shutting down controller", "controller", "deployment")
 
-	if !cache.WaitForNamedCacheSync("deployment", ctx.Done(), dc.dListerSynced, dc.rsListerSynced, dc.podListerSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, dc.dListerSynced, dc.rsListerSynced, dc.podListerSynced) {
 		return
 	}
 

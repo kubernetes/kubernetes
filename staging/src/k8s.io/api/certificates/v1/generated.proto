@@ -111,7 +111,6 @@ message CertificateSigningRequestList {
 message CertificateSigningRequestSpec {
   // request contains an x509 certificate signing request encoded in a "CERTIFICATE REQUEST" PEM block.
   // When serialized as JSON or YAML, the data is additionally base64-encoded.
-  // +listType=atomic
   optional bytes request = 1;
 
   // signerName indicates the requested signer, and is a qualified name.
@@ -207,6 +206,7 @@ message CertificateSigningRequestStatus {
   // +optional
   // +k8s:listType=map
   // +k8s:listMapKey=type
+  // +k8s:customUnique
   // +k8s:optional
   // +k8s:item(type: "Approved")=+k8s:zeroOrOneOfMember
   // +k8s:item(type: "Denied")=+k8s:zeroOrOneOfMember
@@ -239,7 +239,6 @@ message CertificateSigningRequestStatus {
   //     -----END CERTIFICATE-----
   //     )
   //
-  // +listType=atomic
   // +optional
   optional bytes certificate = 2;
 }

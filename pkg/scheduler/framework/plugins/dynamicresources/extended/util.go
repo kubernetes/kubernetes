@@ -18,22 +18,21 @@ package extended
 
 import (
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/api/resource/v1beta1"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
+	resourceapi "k8s.io/api/resource/v1"
+	fwk "k8s.io/kube-scheduler/framework"
 )
 
-func DeviceClassMapping(draManager framework.SharedDRAManager) (map[v1.ResourceName]string, error) {
+func DeviceClassMapping(draManager fwk.SharedDRAManager) (map[v1.ResourceName]string, error) {
 	classes, err := draManager.DeviceClasses().List()
 	extendedResources := make(map[v1.ResourceName]string, len(classes))
 	if err != nil {
 		return nil, err
 	}
 	for _, c := range classes {
-		if c.Spec.ExtendedResourceName == nil {
-			extendedResources[v1.ResourceName(v1beta1.ResourceDeviceClassPrefix+c.Name)] = c.Name
-		} else {
+		if c.Spec.ExtendedResourceName != nil {
 			extendedResources[v1.ResourceName(*c.Spec.ExtendedResourceName)] = c.Name
 		}
+		extendedResources[v1.ResourceName(resourceapi.ResourceDeviceClassPrefix+c.Name)] = c.Name
 	}
 	return extendedResources, nil
 }

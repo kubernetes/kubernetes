@@ -96,6 +96,9 @@
             },
             "x-kubernetes-patch-merge-key": "name",
             "x-kubernetes-patch-strategy": "merge,retainKeys"
+          },
+          "jsonItem": {
+            "description": "Values are the chart values."
           }
         },
         "x-kubernetes-group-version-kind": [

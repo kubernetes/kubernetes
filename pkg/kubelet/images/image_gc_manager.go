@@ -328,7 +328,7 @@ func (im *realImageGCManager) handleImageVolumes(ctx context.Context, imagesInUs
 		return nil
 	}
 
-	status, err := im.runtime.GetContainerStatus(ctx, container.ID)
+	status, err := im.runtime.GetContainerStatus(ctx, pod.ID, container.ID)
 	if err != nil {
 		return fmt.Errorf("get container status: %w", err)
 	}
@@ -393,7 +393,6 @@ func (im *realImageGCManager) GarbageCollect(ctx context.Context, beganGC time.T
 		amountToFree := capacity*int64(100-im.policy.LowThresholdPercent)/100 - available
 		logger.Info("Disk usage on image filesystem is over the high threshold, trying to free bytes down to the low threshold", "usage", usagePercent, "highThreshold", im.policy.HighThresholdPercent, "amountToFree", amountToFree, "lowThreshold", im.policy.LowThresholdPercent)
 		remainingImages, freed, err := im.freeSpace(ctx, amountToFree, freeTime, images)
-		logger.Info("Disk usage on image filesystem is over the high threshold, trying to free bytes down to the low threshold", "usage", usagePercent, "highThreshold", im.policy.HighThresholdPercent, "amountToFree", amountToFree, "lowThreshold", im.policy.LowThresholdPercent)
 		if err != nil {
 			// Failed to delete images, eg due to a read-only filesystem.
 			return err

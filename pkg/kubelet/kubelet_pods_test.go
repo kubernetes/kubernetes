@@ -5346,7 +5346,7 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 				ImageID:            "img1234",
 				State:              v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: metav1.NewTime(nowTime)}},
 				AllocatedResources: CPU2AndMem2GAndStorage2G,
-				Resources:          &v1.ResourceRequirements{Limits: CPU1AndMem1GAndStorage2G, Requests: CPU1AndMem2GAndStorage2G},
+				Resources:          &v1.ResourceRequirements{Limits: CPU1AndMem1GAndStorage2G, Requests: CPU1AndMem1GAndStorage2G},
 			},
 		},
 	} {
@@ -5364,9 +5364,10 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 			resources := tc.ActualResources
 			if resources == nil {
 				resources = &kubecontainer.ContainerResources{
-					MemoryLimit: tc.Resources.Limits.Memory(),
-					CPULimit:    tc.Resources.Limits.Cpu(),
-					CPURequest:  tc.Resources.Requests.Cpu(),
+					MemoryLimit:   tc.Resources.Limits.Memory(),
+					CPULimit:      tc.Resources.Limits.Cpu(),
+					MemoryRequest: tc.Resources.Requests.Memory(),
+					CPURequest:    tc.Resources.Requests.Cpu(),
 				}
 			}
 			state := kubecontainer.ContainerStateRunning
@@ -5376,6 +5377,11 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 			podStatus := testPodStatus(state, resources)
 
 			cStatuses := kubelet.convertToAPIContainerStatuses(tPod, podStatus, []v1.ContainerStatus{tc.OldStatus}, tPod.Spec.Containers, false, false)
+			actual := cStatuses[0]
+			// Explicitly test AllocatedResources and Resources separately for debuggability.
+			assert.Equal(t, tc.Expected.AllocatedResources, actual.AllocatedResources, "AllocatedResources")
+			assert.Equal(t, tc.Expected.Resources, actual.Resources, "Resources")
+			// Catch-all for any other status changes.
 			assert.Equal(t, tc.Expected, cStatuses[0])
 		})
 	}

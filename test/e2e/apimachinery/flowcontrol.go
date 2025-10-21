@@ -37,6 +37,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/util/apihelpers"
@@ -44,6 +45,7 @@ import (
 	"k8s.io/client-go/rest"
 	clientsideflowcontrol "k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/retry"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/ptr"
@@ -384,6 +386,7 @@ var _ = SIGDescribe("API priority and fairness", func() {
 		fsRead, err := client.Get(ctx, fsCreated.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		gomega.Expect(fsRead.UID).To(gomega.Equal(fsCreated.UID))
+		gomega.Expect(fsRead).To(apimachineryutils.HaveValidResourceVersion())
 
 		ginkgo.By("listing")
 		list, err := client.List(ctx, metav1.ListOptions{LabelSelector: label})
@@ -401,6 +404,7 @@ var _ = SIGDescribe("API priority and fairness", func() {
 		framework.ExpectNoError(err)
 		gomega.Expect(fsPatched.Annotations).To(gomega.HaveKeyWithValue("patched", "true"), "patched object should have the applied annotation")
 		gomega.Expect(fsPatched.Spec.MatchingPrecedence).To(gomega.Equal(int32(9999)), "patched object should have the applied spec")
+		gomega.Expect(resourceversion.CompareResourceVersion(fsCreated.ResourceVersion, fsPatched.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 
 		ginkgo.By("updating")
 		var fsUpdated *flowcontrol.FlowSchema
@@ -610,6 +614,7 @@ var _ = SIGDescribe("API priority and fairness", func() {
 		plRead, err := client.Get(ctx, plCreated.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		gomega.Expect(plRead.UID).To(gomega.Equal(plCreated.UID))
+		gomega.Expect(plRead).To(apimachineryutils.HaveValidResourceVersion())
 
 		ginkgo.By("listing")
 		list, err := client.List(ctx, metav1.ListOptions{LabelSelector: label})
@@ -627,6 +632,7 @@ var _ = SIGDescribe("API priority and fairness", func() {
 		framework.ExpectNoError(err)
 		gomega.Expect(plPatched.Annotations).To(gomega.HaveKeyWithValue("patched", "true"), "patched object should have the applied annotation")
 		gomega.Expect(plPatched.Spec.Limited.NominalConcurrencyShares).To(gomega.Equal(ptr.To(int32(4))), "patched object should have the applied spec")
+		gomega.Expect(resourceversion.CompareResourceVersion(plCreated.ResourceVersion, plPatched.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 
 		ginkgo.By("updating")
 		var plUpdated *flowcontrol.PriorityLevelConfiguration

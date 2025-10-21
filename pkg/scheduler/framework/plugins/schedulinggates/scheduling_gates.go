@@ -25,7 +25,6 @@ import (
 	"k8s.io/klog/v2"
 
 	fwk "k8s.io/kube-scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/util"
@@ -39,8 +38,8 @@ type SchedulingGates struct {
 	enableSchedulingQueueHint bool
 }
 
-var _ framework.PreEnqueuePlugin = &SchedulingGates{}
-var _ framework.EnqueueExtensions = &SchedulingGates{}
+var _ fwk.PreEnqueuePlugin = &SchedulingGates{}
+var _ fwk.EnqueueExtensions = &SchedulingGates{}
 
 func (pl *SchedulingGates) Name() string {
 	return Name
@@ -74,7 +73,7 @@ func (pl *SchedulingGates) EventsToRegister(_ context.Context) ([]fwk.ClusterEve
 }
 
 // New initializes a new plugin and returns it.
-func New(_ context.Context, _ runtime.Object, _ framework.Handle, fts feature.Features) (framework.Plugin, error) {
+func New(_ context.Context, _ runtime.Object, _ fwk.Handle, fts feature.Features) (fwk.Plugin, error) {
 	return &SchedulingGates{
 		enableSchedulingQueueHint: fts.EnableSchedulingQueueHint,
 	}, nil

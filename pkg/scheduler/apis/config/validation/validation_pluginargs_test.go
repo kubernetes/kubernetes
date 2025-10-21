@@ -656,9 +656,7 @@ func TestValidateVolumeBindingArgs(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			for k, v := range tc.features {
-				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, k, v)
-			}
+			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, tc.features)
 			err := ValidateVolumeBindingArgs(nil, &tc.args)
 			if diff := cmp.Diff(tc.wantErr, err, ignoreBadValueDetail); diff != "" {
 				t.Errorf("ValidateVolumeBindingArgs returned err (-want,+got):\n%s", diff)
@@ -686,7 +684,7 @@ func TestValidateFitArgs(t *testing.T) {
 				IgnoredResources: []string{fmt.Sprintf("longvalue%s", strings.Repeat("a", 64))},
 				ScoringStrategy:  defaultScoringStrategy,
 			},
-			expect: "name part must be no more than 63 characters",
+			expect: "name part must be no more than 63 bytes",
 		},
 		{
 			name: "IgnoredResources: name is empty",
@@ -702,7 +700,7 @@ func TestValidateFitArgs(t *testing.T) {
 				IgnoredResources: []string{"example.com/aaa/bbb"},
 				ScoringStrategy:  defaultScoringStrategy,
 			},
-			expect: "a qualified name must consist of alphanumeric characters",
+			expect: "a valid label key must consist of",
 		},
 		{
 			name: "IgnoredResources: valid args",
@@ -732,7 +730,7 @@ func TestValidateFitArgs(t *testing.T) {
 				IgnoredResourceGroups: []string{strings.Repeat("a", 64)},
 				ScoringStrategy:       defaultScoringStrategy,
 			},
-			expect: "name part must be no more than 63 characters",
+			expect: "name part must be no more than 63 bytes",
 		},
 		{
 			name: "IgnoredResourceGroups: name cannot be contain slash",

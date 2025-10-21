@@ -670,6 +670,7 @@ EOF
       --egress-selector-config-file="${EGRESS_SELECTOR_CONFIG_FILE:-}" \
       --client-ca-file="${CERT_DIR}/client-ca.crt" \
       --kubelet-client-certificate="${CERT_DIR}/client-kube-apiserver.crt" \
+      --kubelet-certificate-authority="${CLUSTER_SIGNING_CERT_FILE}" \
       --kubelet-client-key="${CERT_DIR}/client-kube-apiserver.key" \
       --kubelet-port="${KUBELET_PORT}" \
       --kubelet-read-only-port="${KUBELET_READ_ONLY_PORT}" \
@@ -792,6 +793,20 @@ function start_cloud_controller_manager {
       --leader-elect="${LEADER_ELECT}" \
       --master="https://${API_HOST}:${API_SECURE_PORT}" >"${CLOUD_CTLRMGR_LOG}" 2>&1 &
     export CLOUD_CTLRMGR_PID=$!
+}
+
+function wait_node_csr() {
+  local interval_time=2
+  local csr_approved_time=300
+  local newline='"\n"'
+  local unapproved_csr_names="--field-selector='spec.signerName=kubernetes.io/kubelet-serving' -o go-template='{{range .items}}{{if not .status}}{{.metadata.name}}{{${newline}}}{{end}}{{end}}"
+  local csr_approved="${KUBECTL} --kubeconfig '${CERT_DIR}/admin.kubeconfig' get csr ${unapproved_csr_names}' | xargs --no-run-if-empty ${KUBECTL} --kubeconfig '${CERT_DIR}/admin.kubeconfig' certificate approve | grep csr"
+  kube::util::wait_for_success "$csr_approved_time" "$interval_time" "$csr_approved"
+  if [ $? == "1" ]; then
+    echo "time out on waiting for CSR approval"
+    exit 1
+  fi
+  echo "kubelet CSR approved"
 }
 
 function wait_node_ready(){
@@ -923,6 +938,7 @@ readOnlyPort: ${KUBELET_READ_ONLY_PORT}
 healthzPort: ${KUBELET_HEALTHZ_PORT}
 healthzBindAddress: ${KUBELET_HOST}
 rotateCertificates: true
+serverTLSBootstrap: true
 runtimeRequestTimeout: "${RUNTIME_REQUEST_TIMEOUT}"
 staticPodPath: "${POD_MANIFEST_PATH}"
 resolvConf: "${KUBELET_RESOLV_CONF}"
@@ -1457,6 +1473,7 @@ if [[ "${START_MODE}" != *"nokubelet"* ]]; then
       Linux)
         install_cni_if_needed
         start_kubelet
+        wait_node_csr
         ;;
       *)
         print_color "Unsupported host OS.  Must be Linux or Mac OS X, kubelet aborted."

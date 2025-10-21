@@ -20,7 +20,12 @@ package v1
 
 // DeviceConfigurationApplyConfiguration represents a declarative configuration of the DeviceConfiguration type for use
 // with apply.
+//
+// DeviceConfiguration must have exactly one field set. It gets embedded
+// inline in some other structs which have other fields, so field names must
+// not conflict with those.
 type DeviceConfigurationApplyConfiguration struct {
+	// Opaque provides driver-specific configuration parameters.
 	Opaque *OpaqueDeviceConfigurationApplyConfiguration `json:"opaque,omitempty"`
 }
 

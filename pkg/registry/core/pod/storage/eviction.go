@@ -273,7 +273,7 @@ func (r *EvictionREST) Create(ctx context.Context, name string, obj runtime.Obje
 		})
 		return err
 	}()
-	if err == wait.ErrWaitTimeout {
+	if wait.Interrupted(err) {
 		err = errors.NewTimeoutError(fmt.Sprintf("couldn't update PodDisruptionBudget %q due to conflicts", pdbName), 10)
 	}
 	if err != nil {

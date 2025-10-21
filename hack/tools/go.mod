@@ -1,11 +1,10 @@
 module k8s.io/kubernetes/hack/tools
 
-go 1.24.0
+go 1.25.0
 
-godebug default=go1.24
+godebug default=go1.25
 
 require (
-	go.uber.org/automaxprocs v1.6.0
 	golang.org/x/mod v0.27.0
 	k8s.io/publishing-bot v0.5.0
 )
@@ -74,7 +73,6 @@ tool (
 	github.com/golangci/misspell
 	github.com/jcchavezs/porto/cmd/porto
 	github.com/vektra/mockery/v3
-	go.uber.org/automaxprocs
 	golang.org/x/mod/modfile
 	golang.org/x/tools/cmd/goimports
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc

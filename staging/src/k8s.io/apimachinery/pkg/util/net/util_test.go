@@ -24,7 +24,6 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
-	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
@@ -109,7 +108,6 @@ type tcpLB struct {
 	t         *testing.T
 	ln        net.Listener
 	serverURL string
-	dials     int32
 }
 
 func (lb *tcpLB) handleConnection(in net.Conn, stopCh chan struct{}) {
@@ -131,8 +129,7 @@ func (lb *tcpLB) serve(stopCh chan struct{}) {
 	if err != nil {
 		lb.t.Fatalf("failed to accept: %v", err)
 	}
-	atomic.AddInt32(&lb.dials, 1)
-	go lb.handleConnection(conn, stopCh)
+	lb.handleConnection(conn, stopCh)
 }
 
 func newLB(t *testing.T, serverURL string) *tcpLB {
@@ -162,8 +159,11 @@ func TestIsConnectionReset(t *testing.T) {
 	}
 	lb := newLB(t, u.Host)
 	defer lb.ln.Close()
-	stopCh := make(chan struct{})
-	go lb.serve(stopCh)
+	stopCh, stoppedCh := make(chan struct{}), make(chan struct{})
+	go func() {
+		defer close(stoppedCh)
+		lb.serve(stopCh)
+	}()
 
 	c := ts.Client()
 	transport, ok := ts.Client().Transport.(*http.Transport)
@@ -176,7 +176,6 @@ func TestIsConnectionReset(t *testing.T) {
 	}
 	t2.ReadIdleTimeout = time.Second
 	t2.PingTimeout = time.Second
-	// Create an HTTP2 connection to reuse later
 	resp, err := c.Get("https://" + lb.ln.Addr().String())
 	if err != nil {
 		t.Fatalf("unexpected error: %+v", err)
@@ -194,6 +193,7 @@ func TestIsConnectionReset(t *testing.T) {
 	// connection. This mimics a broken TCP connection that's not properly
 	// closed.
 	close(stopCh)
+	<-stoppedCh
 	_, err = c.Get("https://" + lb.ln.Addr().String())
 	if !IsHTTP2ConnectionLost(err) {
 		t.Fatalf("expected HTTP2ConnectionLost error, got %v", err)

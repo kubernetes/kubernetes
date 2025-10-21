@@ -387,7 +387,11 @@ func (t *Tracker) resourceSliceAdd(ctx context.Context) func(obj any) {
 		if !ok {
 			return
 		}
-		logger.V(5).Info("ResourceSlice add", "slice", klog.KObj(slice))
+		if loggerV := logger.V(6); loggerV.Enabled() {
+			loggerV.Info("ResourceSlice added", "slice", klog.Format(slice))
+		} else {
+			logger.V(5).Info("ResourceSlice added", "slice", klog.KObj(slice))
+		}
 		t.syncSlice(ctx, slice.Name, true)
 	}
 }
@@ -406,9 +410,9 @@ func (t *Tracker) resourceSliceUpdate(ctx context.Context) func(oldObj, newObj a
 		if loggerV := logger.V(6); loggerV.Enabled() {
 			// While debugging, one needs a full dump of the objects for context *and*
 			// a diff because otherwise small changes would be hard to spot.
-			loggerV.Info("ResourceSlice update", "slice", klog.Format(oldSlice), "oldSlice", klog.Format(newSlice), "diff", diff.Diff(oldSlice, newSlice))
+			loggerV.Info("ResourceSlice updated", "diff", diff.Diff(oldSlice, newSlice), "slice", klog.Format(newSlice))
 		} else {
-			logger.V(5).Info("ResourceSlice update", "slice", klog.KObj(newSlice))
+			logger.V(5).Info("ResourceSlice updated", "slice", klog.KObj(newSlice))
 		}
 		t.syncSlice(ctx, newSlice.Name, true)
 	}
@@ -424,7 +428,7 @@ func (t *Tracker) resourceSliceDelete(ctx context.Context) func(obj any) {
 		if !ok {
 			return
 		}
-		logger.V(5).Info("ResourceSlice delete", "slice", klog.KObj(slice))
+		logger.V(5).Info("ResourceSlice deleted", "slice", klog.KObj(slice))
 		t.syncSlice(ctx, slice.Name, true)
 	}
 }
@@ -432,12 +436,16 @@ func (t *Tracker) resourceSliceDelete(ctx context.Context) func(obj any) {
 func (t *Tracker) deviceTaintAdd(ctx context.Context) func(obj any) {
 	logger := klog.FromContext(ctx)
 	return func(obj any) {
-		patch, ok := obj.(*resourcealphaapi.DeviceTaintRule)
+		rule, ok := obj.(*resourcealphaapi.DeviceTaintRule)
 		if !ok {
 			return
 		}
-		logger.V(5).Info("DeviceTaintRule add", "patch", klog.KObj(patch))
-		for _, sliceName := range t.sliceNamesForPatch(ctx, patch) {
+		if loggerV := logger.V(6); loggerV.Enabled() {
+			loggerV.Info("DeviceTaintRule added", "deviceTaintRule", klog.Format(rule))
+		} else {
+			logger.V(5).Info("DeviceTaintRule added", "deviceTaintRule", klog.KObj(rule))
+		}
+		for _, sliceName := range t.sliceNamesForPatch(ctx, rule) {
 			t.syncSlice(ctx, sliceName, false)
 		}
 	}
@@ -446,26 +454,26 @@ func (t *Tracker) deviceTaintAdd(ctx context.Context) func(obj any) {
 func (t *Tracker) deviceTaintUpdate(ctx context.Context) func(oldObj, newObj any) {
 	logger := klog.FromContext(ctx)
 	return func(oldObj, newObj any) {
-		oldPatch, ok := oldObj.(*resourcealphaapi.DeviceTaintRule)
+		oldRule, ok := oldObj.(*resourcealphaapi.DeviceTaintRule)
 		if !ok {
 			return
 		}
-		newPatch, ok := newObj.(*resourcealphaapi.DeviceTaintRule)
+		newRule, ok := newObj.(*resourcealphaapi.DeviceTaintRule)
 		if !ok {
 			return
 		}
 		if loggerV := logger.V(6); loggerV.Enabled() {
-			loggerV.Info("DeviceTaintRule update", "patch", klog.KObj(newPatch), "diff", diff.Diff(oldPatch, newPatch))
+			loggerV.Info("DeviceTaintRule updated", "diff", diff.Diff(oldRule, newRule), "deviceTaintRule", klog.KObj(newRule))
 		} else {
-			logger.V(5).Info("DeviceTaintRule update", "patch", klog.KObj(newPatch))
+			logger.V(5).Info("DeviceTaintRule updated", "deviceTaintRule", klog.KObj(newRule))
 		}
 
 		// Slices that matched the old patch may need to be updated, in
 		// case they no longer match the new patch and need to have the
 		// patch's changes reverted.
 		slicesToSync := sets.New[string]()
-		slicesToSync.Insert(t.sliceNamesForPatch(ctx, oldPatch)...)
-		slicesToSync.Insert(t.sliceNamesForPatch(ctx, newPatch)...)
+		slicesToSync.Insert(t.sliceNamesForPatch(ctx, oldRule)...)
+		slicesToSync.Insert(t.sliceNamesForPatch(ctx, newRule)...)
 		for _, sliceName := range slicesToSync.UnsortedList() {
 			t.syncSlice(ctx, sliceName, false)
 		}
@@ -482,7 +490,7 @@ func (t *Tracker) deviceTaintDelete(ctx context.Context) func(obj any) {
 		if !ok {
 			return
 		}
-		logger.V(5).Info("DeviceTaintRule delete", "patch", klog.KObj(patch))
+		logger.V(5).Info("DeviceTaintRule deleted", "patch", klog.KObj(patch))
 		for _, sliceName := range t.sliceNamesForPatch(ctx, patch) {
 			t.syncSlice(ctx, sliceName, false)
 		}

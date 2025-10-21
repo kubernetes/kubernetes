@@ -50,13 +50,11 @@
       initPods: 1
       measurePods: 4
   - name: 500Nodes
-    labels: [performance, short]
     params:
       initNodes: 500
       initPods: 100
       measurePods: 400
   - name: 5000Nodes
-    labels: [performance, short]
     params:
       initNodes: 5000
       initPods: 1000
@@ -117,7 +115,6 @@
       initPods: 5
       measurePods: 10
   - name: 500Nodes
-    labels: [performance, short]
     params:
       initNodes: 500
       initPods: 500
@@ -180,13 +177,11 @@
       initPods: 5
       measurePods: 10
   - name: 500Nodes
-    labels: [performance, short]
     params:
       initNodes: 500
       initPods: 500
       measurePods: 1000
   - name: 5000Nodes
-    labels: [performance]
     params:
       initNodes: 5000
       initPods: 5000
@@ -243,7 +238,6 @@
       initPods: 5
       measurePods: 10
   - name: 500Nodes
-    labels: [performance, short]
     params:
       initNodes: 500
       initPods: 500
@@ -305,13 +299,11 @@
       initPods: 5
       measurePods: 10
   - name: 500Nodes
-    labels: [performance, short]
     params:
       initNodes: 500
       initPods: 500
       measurePods: 1000
   - name: 5000Nodes
-    labels: [performance, short]
     params:
       initNodes: 5000
       initPods: 5000
@@ -387,13 +379,11 @@
       initPods: 2
       measurePods: 10
   - name: 500Nodes
-    labels: [performance, short]
     params:
       initNodes: 500
       initPods: 200
       measurePods: 1000
   - name: 5000Nodes
-    labels: [performance]
     params:
       initNodes: 5000
       initPods: 2000
@@ -460,7 +450,6 @@
       initNamespaces: 2
       measurePods: 6
   - name: 500Nodes
-    labels: [performance, short]
     params:
       initNodes: 500
       initPodsPerNamespace: 4
@@ -537,7 +526,6 @@
       initNamespaces: 2
       measurePods: 10
   - name: 500Nodes
-    labels: [performance, short]
     params:
       initNodes: 500
       initPodsPerNamespace: 4
@@ -617,7 +605,6 @@
       initNamespaces: 2
       measurePods: 10
   - name: 500Nodes
-    labels: [performance, short]
     params:
       initNodes: 500
       initPodsPerNamespace: 4
@@ -694,14 +681,12 @@
       initNamespaces: 2
       measurePods: 10
   - name: 500Nodes
-    labels: [performance, short]
     params:
       initNodes: 500
       initPodsPerNamespace: 4
       initNamespaces: 10
       measurePods: 100
   - name: 5000Nodes
-    labels: [performance]
     params:
       initNodes: 5000
       initPodsPerNamespace: 50

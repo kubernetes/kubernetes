@@ -32,12 +32,11 @@ const (
 )
 
 var (
-	alphaOptions = sets.New[string]()
-	betaOptions  = sets.New[string](
-		MaxAllowableNUMANodes,
-	)
+	alphaOptions  = sets.New[string]()
+	betaOptions   = sets.New[string]()
 	stableOptions = sets.New[string](
 		PreferClosestNUMANodes,
+		MaxAllowableNUMANodes,
 	)
 )
 
@@ -62,7 +61,7 @@ type PolicyOptions struct {
 	MaxAllowableNUMANodes int
 }
 
-func NewPolicyOptions(policyOptions map[string]string) (PolicyOptions, error) {
+func NewPolicyOptions(logger klog.Logger, policyOptions map[string]string) (PolicyOptions, error) {
 	opts := PolicyOptions{
 		// Set MaxAllowableNUMANodes to the default. This will be overwritten
 		// if the user has specified a policy option for MaxAllowableNUMANodes.
@@ -92,7 +91,7 @@ func NewPolicyOptions(policyOptions map[string]string) (PolicyOptions, error) {
 			}
 
 			if optValue > defaultMaxAllowableNUMANodes {
-				klog.InfoS("WARNING: the value of max-allowable-numa-nodes is more than the default recommended value", "max-allowable-numa-nodes", optValue, "defaultMaxAllowableNUMANodes", defaultMaxAllowableNUMANodes)
+				logger.Info("WARNING: the value of max-allowable-numa-nodes is more than the default recommended value", "max-allowable-numa-nodes", optValue, "defaultMaxAllowableNUMANodes", defaultMaxAllowableNUMANodes)
 			}
 			opts.MaxAllowableNUMANodes = optValue
 		default:

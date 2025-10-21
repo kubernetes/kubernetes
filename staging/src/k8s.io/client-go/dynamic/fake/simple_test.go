@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/watchlist"
 )
 
 const (
@@ -60,6 +61,12 @@ func newUnstructuredWithSpec(spec map[string]interface{}) *unstructured.Unstruct
 	return u
 }
 
+func TestDoesClientSupportWatchListSemantics(t *testing.T) {
+	target := &FakeDynamicClient{}
+	if !watchlist.DoesClientNotSupportWatchListSemantics(target) {
+		t.Fatalf("FakeDynamicClient should NOT support WatchList semantics")
+	}
+}
 func TestGet(t *testing.T) {
 	scheme := runtime.NewScheme()
 

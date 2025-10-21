@@ -159,7 +159,7 @@ func (e *Signer) Run(ctx context.Context) {
 	defer utilruntime.HandleCrash()
 	defer e.syncQueue.ShutDown()
 
-	if !cache.WaitForNamedCacheSync("bootstrap_signer", ctx.Done(), e.configMapSynced, e.secretSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, e.configMapSynced, e.secretSynced) {
 		return
 	}
 

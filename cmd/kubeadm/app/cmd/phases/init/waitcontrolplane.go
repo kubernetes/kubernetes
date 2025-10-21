@@ -58,8 +58,7 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 		}
 	}
 
-	// Both Wait* calls below use a /healthz endpoint, thus a client without permissions works fine
-	client, err := data.ClientWithoutBootstrap()
+	client, err := data.WaitControlPlaneClient()
 	if err != nil {
 		return errors.Wrap(err, "cannot obtain client without bootstrap")
 	}

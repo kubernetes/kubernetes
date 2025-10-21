@@ -62,6 +62,7 @@ func TestGetWarningsForService(t *testing.T) {
 			s.Spec.Type = api.ServiceTypeClusterIP
 			s.Spec.ClusterIP = api.ClusterIPNone
 			s.Spec.LoadBalancerIP = "1.2.3.4"
+			s.Spec.SessionAffinity = api.ServiceAffinityNone // default value
 		},
 		numWarnings: 1,
 	}, {
@@ -70,10 +71,11 @@ func TestGetWarningsForService(t *testing.T) {
 			s.Spec.Type = api.ServiceTypeClusterIP
 			s.Spec.ClusterIP = api.ClusterIPNone
 			s.Spec.ExternalIPs = []string{"1.2.3.4"}
+			s.Spec.SessionAffinity = api.ServiceAffinityNone // default value
 		},
 		numWarnings: 1,
 	}, {
-		name: "SessionAffinity set when headless service",
+		name: "SessionAffinity Client IP set when headless service",
 		tweakSvc: func(s *api.Service) {
 			s.Spec.Type = api.ServiceTypeClusterIP
 			s.Spec.ClusterIP = api.ClusterIPNone
@@ -81,16 +83,25 @@ func TestGetWarningsForService(t *testing.T) {
 		},
 		numWarnings: 1,
 	}, {
-		name: "ExternalIPs, LoadBalancerIP and SessionAffinity set when headless service",
+		name: "SessionAffinity None set when headless service",
 		tweakSvc: func(s *api.Service) {
 			s.Spec.Type = api.ServiceTypeClusterIP
 			s.Spec.ClusterIP = api.ClusterIPNone
-			s.Spec.ExternalIPs = []string{"1.2.3.4"}
-			s.Spec.LoadBalancerIP = "1.2.3.4"
-			s.Spec.SessionAffinity = api.ServiceAffinityClientIP
+			s.Spec.SessionAffinity = api.ServiceAffinityNone
 		},
-		numWarnings: 3,
-	}}
+		numWarnings: 0,
+	},
+		{
+			name: "ExternalIPs, LoadBalancerIP and SessionAffinity set when headless service",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeClusterIP
+				s.Spec.ClusterIP = api.ClusterIPNone
+				s.Spec.ExternalIPs = []string{"1.2.3.4"}
+				s.Spec.LoadBalancerIP = "1.2.3.4"
+				s.Spec.SessionAffinity = api.ServiceAffinityClientIP
+			},
+			numWarnings: 3,
+		}}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {

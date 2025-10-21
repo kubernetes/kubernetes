@@ -3895,7 +3895,7 @@ message PodCondition {
   optional string type = 1;
 
   // If set, this represents the .metadata.generation that the pod condition was set based upon.
-  // This is an alpha field. Enable PodObservedGenerationTracking to be able to use this field.
+  // The PodObservedGenerationTracking feature gate must be enabled to use this field.
   // +featureGate=PodObservedGenerationTracking
   // +optional
   optional int64 observedGeneration = 7;
@@ -4718,7 +4718,7 @@ message PodSpec {
 // plane.
 message PodStatus {
   // If set, this represents the .metadata.generation that the pod status was set based upon.
-  // This is an alpha field. Enable PodObservedGenerationTracking to be able to use this field.
+  // The PodObservedGenerationTracking feature gate must be enabled to use this field.
   // +featureGate=PodObservedGenerationTracking
   // +optional
   optional int64 observedGeneration = 17;
@@ -5251,6 +5251,8 @@ message ReplicationController {
   // be the same as the Pod(s) that the replication controller manages.
   // Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
+  // +k8s:subfield(name)=+k8s:optional
+  // +k8s:subfield(name)=+k8s:format=k8s-long-name
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec defines the specification of the desired behavior of the replication controller.

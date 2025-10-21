@@ -14,6 +14,7 @@
 package model
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"regexp"
@@ -23,6 +24,7 @@ import (
 	"unicode/utf8"
 
 	dto "github.com/prometheus/client_model/go"
+	"go.yaml.in/yaml/v2"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -62,15 +64,150 @@ var (
 type ValidationScheme int
 
 const (
+	// UnsetValidation represents an undefined ValidationScheme.
+	// Should not be used in practice.
+	UnsetValidation ValidationScheme = iota
+
 	// LegacyValidation is a setting that requires that all metric and label names
 	// conform to the original Prometheus character requirements described by
 	// MetricNameRE and LabelNameRE.
-	LegacyValidation ValidationScheme = iota
+	LegacyValidation
 
 	// UTF8Validation only requires that metric and label names be valid UTF-8
 	// strings.
 	UTF8Validation
 )
+
+var _ interface {
+	yaml.Marshaler
+	yaml.Unmarshaler
+	json.Marshaler
+	json.Unmarshaler
+	fmt.Stringer
+} = new(ValidationScheme)
+
+// String returns the string representation of s.
+func (s ValidationScheme) String() string {
+	switch s {
+	case UnsetValidation:
+		return "unset"
+	case LegacyValidation:
+		return "legacy"
+	case UTF8Validation:
+		return "utf8"
+	default:
+		panic(fmt.Errorf("unhandled ValidationScheme: %d", s))
+	}
+}
+
+// MarshalYAML implements the yaml.Marshaler interface.
+func (s ValidationScheme) MarshalYAML() (any, error) {
+	switch s {
+	case UnsetValidation:
+		return "", nil
+	case LegacyValidation, UTF8Validation:
+		return s.String(), nil
+	default:
+		panic(fmt.Errorf("unhandled ValidationScheme: %d", s))
+	}
+}
+
+// UnmarshalYAML implements the yaml.Unmarshaler interface.
+func (s *ValidationScheme) UnmarshalYAML(unmarshal func(any) error) error {
+	var scheme string
+	if err := unmarshal(&scheme); err != nil {
+		return err
+	}
+	return s.Set(scheme)
+}
+
+// MarshalJSON implements the json.Marshaler interface.
+func (s ValidationScheme) MarshalJSON() ([]byte, error) {
+	switch s {
+	case UnsetValidation:
+		return json.Marshal("")
+	case UTF8Validation, LegacyValidation:
+		return json.Marshal(s.String())
+	default:
+		return nil, fmt.Errorf("unhandled ValidationScheme: %d", s)
+	}
+}
+
+// UnmarshalJSON implements the json.Unmarshaler interface.
+func (s *ValidationScheme) UnmarshalJSON(bytes []byte) error {
+	var repr string
+	if err := json.Unmarshal(bytes, &repr); err != nil {
+		return err
+	}
+	return s.Set(repr)
+}
+
+// Set implements the pflag.Value interface.
+func (s *ValidationScheme) Set(text string) error {
+	switch text {
+	case "":
+		// Don't change the value.
+	case LegacyValidation.String():
+		*s = LegacyValidation
+	case UTF8Validation.String():
+		*s = UTF8Validation
+	default:
+		return fmt.Errorf("unrecognized ValidationScheme: %q", text)
+	}
+	return nil
+}
+
+// IsValidMetricName returns whether metricName is valid according to s.
+func (s ValidationScheme) IsValidMetricName(metricName string) bool {
+	switch s {
+	case LegacyValidation:
+		if len(metricName) == 0 {
+			return false
+		}
+		for i, b := range metricName {
+			if !isValidLegacyRune(b, i) {
+				return false
+			}
+		}
+		return true
+	case UTF8Validation:
+		if len(metricName) == 0 {
+			return false
+		}
+		return utf8.ValidString(metricName)
+	default:
+		panic(fmt.Sprintf("Invalid name validation scheme requested: %s", s.String()))
+	}
+}
+
+// IsValidLabelName returns whether labelName is valid according to s.
+func (s ValidationScheme) IsValidLabelName(labelName string) bool {
+	switch s {
+	case LegacyValidation:
+		if len(labelName) == 0 {
+			return false
+		}
+		for i, b := range labelName {
+			// TODO: Apply De Morgan's law. Make sure there are tests for this.
+			if !((b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || b == '_' || (b >= '0' && b <= '9' && i > 0)) { //nolint:staticcheck
+				return false
+			}
+		}
+		return true
+	case UTF8Validation:
+		if len(labelName) == 0 {
+			return false
+		}
+		return utf8.ValidString(labelName)
+	default:
+		panic(fmt.Sprintf("Invalid name validation scheme requested: %s", s))
+	}
+}
+
+// Type implements the pflag.Value interface.
+func (ValidationScheme) Type() string {
+	return "validationScheme"
+}
 
 type EscapingScheme int
 
@@ -101,7 +238,7 @@ const (
 	// Accept header, the default NameEscapingScheme will be used.
 	EscapingKey = "escaping"
 
-	// Possible values for Escaping Key:
+	// Possible values for Escaping Key.
 	AllowUTF8         = "allow-utf-8" // No escaping required.
 	EscapeUnderscores = "underscores"
 	EscapeDots        = "dots"
@@ -175,34 +312,22 @@ func (m Metric) FastFingerprint() Fingerprint {
 // IsValidMetricName returns true iff name matches the pattern of MetricNameRE
 // for legacy names, and iff it's valid UTF-8 if the UTF8Validation scheme is
 // selected.
+//
+// Deprecated: This function should not be used and might be removed in the future.
+// Use [ValidationScheme.IsValidMetricName] instead.
 func IsValidMetricName(n LabelValue) bool {
-	switch NameValidationScheme {
-	case LegacyValidation:
-		return IsValidLegacyMetricName(string(n))
-	case UTF8Validation:
-		if len(n) == 0 {
-			return false
-		}
-		return utf8.ValidString(string(n))
-	default:
-		panic(fmt.Sprintf("Invalid name validation scheme requested: %d", NameValidationScheme))
-	}
+	return NameValidationScheme.IsValidMetricName(string(n))
 }
 
 // IsValidLegacyMetricName is similar to IsValidMetricName but always uses the
 // legacy validation scheme regardless of the value of NameValidationScheme.
 // This function, however, does not use MetricNameRE for the check but a much
 // faster hardcoded implementation.
+//
+// Deprecated: This function should not be used and might be removed in the future.
+// Use [LegacyValidation.IsValidMetricName] instead.
 func IsValidLegacyMetricName(n string) bool {
-	if len(n) == 0 {
-		return false
-	}
-	for i, b := range n {
-		if !isValidLegacyRune(b, i) {
-			return false
-		}
-	}
-	return true
+	return LegacyValidation.IsValidMetricName(n)
 }
 
 // EscapeMetricFamily escapes the given metric names and labels with the given
@@ -310,13 +435,14 @@ func EscapeName(name string, scheme EscapingScheme) string {
 	case DotsEscaping:
 		// Do not early return for legacy valid names, we still escape underscores.
 		for i, b := range name {
-			if b == '_' {
+			switch {
+			case b == '_':
 				escaped.WriteString("__")
-			} else if b == '.' {
+			case b == '.':
 				escaped.WriteString("_dot_")
-			} else if isValidLegacyRune(b, i) {
+			case isValidLegacyRune(b, i):
 				escaped.WriteRune(b)
-			} else {
+			default:
 				escaped.WriteString("__")
 			}
 		}
@@ -327,13 +453,14 @@ func EscapeName(name string, scheme EscapingScheme) string {
 		}
 		escaped.WriteString("U__")
 		for i, b := range name {
-			if b == '_' {
+			switch {
+			case b == '_':
 				escaped.WriteString("__")
-			} else if isValidLegacyRune(b, i) {
+			case isValidLegacyRune(b, i):
 				escaped.WriteRune(b)
-			} else if !utf8.ValidRune(b) {
+			case !utf8.ValidRune(b):
 				escaped.WriteString("_FFFD_")
-			} else {
+			default:
 				escaped.WriteRune('_')
 				escaped.WriteString(strconv.FormatInt(int64(b), 16))
 				escaped.WriteRune('_')
@@ -345,7 +472,7 @@ func EscapeName(name string, scheme EscapingScheme) string {
 	}
 }
 
-// lower function taken from strconv.atoi
+// lower function taken from strconv.atoi.
 func lower(c byte) byte {
 	return c | ('x' - 'X')
 }
@@ -409,11 +536,12 @@ func UnescapeName(name string, scheme EscapingScheme) string {
 				}
 				r := lower(escapedName[i])
 				utf8Val *= 16
-				if r >= '0' && r <= '9' {
+				switch {
+				case r >= '0' && r <= '9':
 					utf8Val += uint(r) - '0'
-				} else if r >= 'a' && r <= 'f' {
+				case r >= 'a' && r <= 'f':
 					utf8Val += uint(r) - 'a' + 10
-				} else {
+				default:
 					return name
 				}
 				i++

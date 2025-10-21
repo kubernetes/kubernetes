@@ -23,6 +23,7 @@ import (
 	"reflect"
 	"sync"
 
+	"github.com/onsi/gomega"
 	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
@@ -38,6 +39,7 @@ import (
 	"k8s.io/dynamic-resource-allocation/cel"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/dynamic-resource-allocation/structured"
+	"k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources"
 	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
@@ -141,7 +143,6 @@ type createResourceDriverOp struct {
 }
 
 var _ realOp = &createResourceDriverOp{}
-var _ runnableOp = &createResourceDriverOp{}
 
 func (op *createResourceDriverOp) isValid(allowParameterization bool) error {
 	if !isValidCount(allowParameterization, op.MaxClaimsPerNode, op.MaxClaimsPerNodeParam) {
@@ -170,9 +171,7 @@ func (op *createResourceDriverOp) patchParams(w *workload) (realOp, error) {
 	return op, op.isValid(false)
 }
 
-func (op *createResourceDriverOp) requiredNamespaces() []string { return nil }
-
-func (op *createResourceDriverOp) run(tCtx ktesting.TContext) {
+func (op *createResourceDriverOp) run(tCtx ktesting.TContext, draManager framework.SharedDRAManager) {
 	tCtx.Logf("creating resource driver %q for nodes matching %q", op.DriverName, op.Nodes)
 
 	var driverNodes []string
@@ -191,11 +190,20 @@ func (op *createResourceDriverOp) run(tCtx ktesting.TContext) {
 		}
 	}
 
+	numSlices := 0
 	for _, nodeName := range driverNodes {
 		slice := resourceSlice(op.DriverName, nodeName, op.MaxClaimsPerNode)
 		_, err := tCtx.Client().ResourceV1().ResourceSlices().Create(tCtx, slice, metav1.CreateOptions{})
 		tCtx.ExpectNoError(err, "create node resource slice")
+		numSlices++
 	}
+
+	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) int {
+		slices, err := draManager.ResourceSlices().ListWithDeviceTaintRules()
+		tCtx.ExpectNoError(err, "list ResourceSlices")
+		return len(slices)
+	}).Should(gomega.Equal(numSlices), "informer has received all ResourceSlices")
+
 	tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
 		err := tCtx.Client().ResourceV1().ResourceSlices().DeleteCollection(tCtx,
 			metav1.DeleteOptions{},

@@ -724,7 +724,58 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		replicasPathInCustomResource[schema.GroupVersion{Group: crd.Spec.Group, Version: v.Name}.String()] = path
 	}
 
+	// ensure accepted names are valid
+	if len(crd.Status.AcceptedNames.Plural) == 0 {
+		utilruntime.HandleError(fmt.Errorf("CustomResourceDefinition %s has unexpected empty status.acceptedNames.plural", crd.Name))
+		return nil, fmt.Errorf("the server could not properly serve the resource")
+	}
+	if len(crd.Status.AcceptedNames.Singular) == 0 {
+		utilruntime.HandleError(fmt.Errorf("CustomResourceDefinition %s has unexpected empty status.acceptedNames.singular", crd.Name))
+		return nil, fmt.Errorf("the server could not properly serve the resource")
+	}
+	if len(crd.Status.AcceptedNames.Kind) == 0 {
+		utilruntime.HandleError(fmt.Errorf("CustomResourceDefinition %s has unexpected empty status.acceptedNames.kind", crd.Name))
+		return nil, fmt.Errorf("the server could not properly serve the kind")
+	}
+	if len(crd.Status.AcceptedNames.ListKind) == 0 {
+		utilruntime.HandleError(fmt.Errorf("CustomResourceDefinition %s has unexpected empty status.acceptedNames.listKind", crd.Name))
+		return nil, fmt.Errorf("the server could not properly serve the list kind")
+	}
+
+	var (
+		versionToResource         = map[string]schema.GroupVersionResource{}
+		versionToSingularResource = map[string]schema.GroupVersionResource{}
+		versionToKind             = map[string]schema.GroupVersionKind{}
+		versionToSubresources     = map[string]*apiextensionsv1.CustomResourceSubresources{}
+	)
 	for _, v := range crd.Spec.Versions {
+		versionToResource[v.Name] = schema.GroupVersionResource{Group: crd.Spec.Group, Version: v.Name, Resource: crd.Status.AcceptedNames.Plural}
+		versionToSingularResource[v.Name] = schema.GroupVersionResource{Group: crd.Spec.Group, Version: v.Name, Resource: crd.Status.AcceptedNames.Singular}
+		versionToKind[v.Name] = schema.GroupVersionKind{Group: crd.Spec.Group, Version: v.Name, Kind: crd.Status.AcceptedNames.Kind}
+		versionToSubresources[v.Name], err = apiextensionshelpers.GetSubresourcesForVersion(crd, v.Name)
+		if err != nil {
+			utilruntime.HandleError(err)
+			return nil, fmt.Errorf("the server could not properly serve the CR subresources")
+		}
+
+		// Register equivalent kinds
+		equivalentResourceRegistry.RegisterKindFor(versionToResource[v.Name], "", versionToKind[v.Name])
+		if versionToSubresources[v.Name] != nil {
+			if versionToSubresources[v.Name].Status != nil {
+				equivalentResourceRegistry.RegisterKindFor(versionToResource[v.Name], "status", versionToKind[v.Name])
+			}
+			if versionToSubresources[v.Name].Scale != nil {
+				equivalentResourceRegistry.RegisterKindFor(versionToResource[v.Name], "scale", autoscalingv1.SchemeGroupVersion.WithKind("Scale"))
+			}
+		}
+	}
+
+	for _, v := range crd.Spec.Versions {
+		// Do not construct storage if version is neither served nor stored
+		if !v.Storage && !v.Served {
+			continue
+		}
+
 		// In addition to Unstructured objects (Custom Resources), we also may sometimes need to
 		// decode unversioned Options objects, so we delegate to parameterScheme for such types.
 		parameterScheme := runtime.NewScheme()
@@ -735,22 +786,9 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		)
 		parameterCodec := runtime.NewParameterCodec(parameterScheme)
 
-		resource := schema.GroupVersionResource{Group: crd.Spec.Group, Version: v.Name, Resource: crd.Status.AcceptedNames.Plural}
-		if len(resource.Resource) == 0 {
-			utilruntime.HandleError(fmt.Errorf("CustomResourceDefinition %s has unexpected empty status.acceptedNames.plural", crd.Name))
-			return nil, fmt.Errorf("the server could not properly serve the resource")
-		}
-		singularResource := schema.GroupVersionResource{Group: crd.Spec.Group, Version: v.Name, Resource: crd.Status.AcceptedNames.Singular}
-		if len(singularResource.Resource) == 0 {
-			utilruntime.HandleError(fmt.Errorf("CustomResourceDefinition %s has unexpected empty status.acceptedNames.singular", crd.Name))
-			return nil, fmt.Errorf("the server could not properly serve the resource")
-		}
-		kind := schema.GroupVersionKind{Group: crd.Spec.Group, Version: v.Name, Kind: crd.Status.AcceptedNames.Kind}
-		if len(kind.Kind) == 0 {
-			utilruntime.HandleError(fmt.Errorf("CustomResourceDefinition %s has unexpected empty status.acceptedNames.kind", crd.Name))
-			return nil, fmt.Errorf("the server could not properly serve the kind")
-		}
-		equivalentResourceRegistry.RegisterKindFor(resource, "", kind)
+		singularResource := versionToSingularResource[v.Name]
+		resource := versionToResource[v.Name]
+		kind := versionToKind[v.Name]
 
 		typer := newUnstructuredObjectTyper(parameterScheme)
 		creator := unstructuredCreator{}
@@ -776,13 +814,9 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 
 		var statusSpec *apiextensionsinternal.CustomResourceSubresourceStatus
 		var statusValidator apiservervalidation.SchemaValidator
-		subresources, err := apiextensionshelpers.GetSubresourcesForVersion(crd, v.Name)
-		if err != nil {
-			utilruntime.HandleError(err)
-			return nil, fmt.Errorf("the server could not properly serve the CR subresources")
-		}
+		subresources := versionToSubresources[v.Name]
+
 		if subresources != nil && subresources.Status != nil {
-			equivalentResourceRegistry.RegisterKindFor(resource, "status", kind)
 			statusSpec = &apiextensionsinternal.CustomResourceSubresourceStatus{}
 			if err := apiextensionsv1.Convert_v1_CustomResourceSubresourceStatus_To_apiextensions_CustomResourceSubresourceStatus(subresources.Status, statusSpec, nil); err != nil {
 				return nil, fmt.Errorf("failed converting CRD status subresource to internal version: %v", err)
@@ -800,7 +834,6 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 
 		var scaleSpec *apiextensionsinternal.CustomResourceSubresourceScale
 		if subresources != nil && subresources.Scale != nil {
-			equivalentResourceRegistry.RegisterKindFor(resource, "scale", autoscalingv1.SchemeGroupVersion.WithKind("Scale"))
 			scaleSpec = &apiextensionsinternal.CustomResourceSubresourceScale{}
 			if err := apiextensionsv1.Convert_v1_CustomResourceSubresourceScale_To_apiextensions_CustomResourceSubresourceScale(subresources.Scale, scaleSpec, nil); err != nil {
 				return nil, fmt.Errorf("failed converting CRD status subresource to internal version: %v", err)
@@ -818,10 +851,6 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		}
 
 		listKind := schema.GroupVersionKind{Group: crd.Spec.Group, Version: v.Name, Kind: crd.Status.AcceptedNames.ListKind}
-		if len(listKind.Kind) == 0 {
-			utilruntime.HandleError(fmt.Errorf("CustomResourceDefinition %s has unexpected empty status.acceptedNames.listKind", crd.Name))
-			return nil, fmt.Errorf("the server could not properly serve the list kind")
-		}
 
 		storages[v.Name], err = customresource.NewStorage(
 			resource.GroupResource(),

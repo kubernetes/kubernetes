@@ -24,32 +24,119 @@ import (
 
 // EphemeralContainerCommonApplyConfiguration represents a declarative configuration of the EphemeralContainerCommon type for use
 // with apply.
+//
+// EphemeralContainerCommon is a copy of all fields in Container to be inlined in
+// EphemeralContainer. This separate type allows easy conversion from EphemeralContainer
+// to Container and allows separate documentation for the fields of EphemeralContainer.
+// When a new field is added to Container it must be added here as well.
 type EphemeralContainerCommonApplyConfiguration struct {
-	Name                     *string                                   `json:"name,omitempty"`
-	Image                    *string                                   `json:"image,omitempty"`
-	Command                  []string                                  `json:"command,omitempty"`
-	Args                     []string                                  `json:"args,omitempty"`
-	WorkingDir               *string                                   `json:"workingDir,omitempty"`
-	Ports                    []ContainerPortApplyConfiguration         `json:"ports,omitempty"`
-	EnvFrom                  []EnvFromSourceApplyConfiguration         `json:"envFrom,omitempty"`
-	Env                      []EnvVarApplyConfiguration                `json:"env,omitempty"`
-	Resources                *ResourceRequirementsApplyConfiguration   `json:"resources,omitempty"`
-	ResizePolicy             []ContainerResizePolicyApplyConfiguration `json:"resizePolicy,omitempty"`
-	RestartPolicy            *corev1.ContainerRestartPolicy            `json:"restartPolicy,omitempty"`
-	RestartPolicyRules       []ContainerRestartRuleApplyConfiguration  `json:"restartPolicyRules,omitempty"`
-	VolumeMounts             []VolumeMountApplyConfiguration           `json:"volumeMounts,omitempty"`
-	VolumeDevices            []VolumeDeviceApplyConfiguration          `json:"volumeDevices,omitempty"`
-	LivenessProbe            *ProbeApplyConfiguration                  `json:"livenessProbe,omitempty"`
-	ReadinessProbe           *ProbeApplyConfiguration                  `json:"readinessProbe,omitempty"`
-	StartupProbe             *ProbeApplyConfiguration                  `json:"startupProbe,omitempty"`
-	Lifecycle                *LifecycleApplyConfiguration              `json:"lifecycle,omitempty"`
-	TerminationMessagePath   *string                                   `json:"terminationMessagePath,omitempty"`
-	TerminationMessagePolicy *corev1.TerminationMessagePolicy          `json:"terminationMessagePolicy,omitempty"`
-	ImagePullPolicy          *corev1.PullPolicy                        `json:"imagePullPolicy,omitempty"`
-	SecurityContext          *SecurityContextApplyConfiguration        `json:"securityContext,omitempty"`
-	Stdin                    *bool                                     `json:"stdin,omitempty"`
-	StdinOnce                *bool                                     `json:"stdinOnce,omitempty"`
-	TTY                      *bool                                     `json:"tty,omitempty"`
+	// Name of the ephemeral container specified as a DNS_LABEL.
+	// This name must be unique among all containers, init containers and ephemeral containers.
+	Name *string `json:"name,omitempty"`
+	// Container image name.
+	// More info: https://kubernetes.io/docs/concepts/containers/images
+	Image *string `json:"image,omitempty"`
+	// Entrypoint array. Not executed within a shell.
+	// The image's ENTRYPOINT is used if this is not provided.
+	// Variable references $(VAR_NAME) are expanded using the container's environment. If a variable
+	// cannot be resolved, the reference in the input string will be unchanged. Double $$ are reduced
+	// to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will
+	// produce the string literal "$(VAR_NAME)". Escaped references will never be expanded, regardless
+	// of whether the variable exists or not. Cannot be updated.
+	// More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell
+	Command []string `json:"command,omitempty"`
+	// Arguments to the entrypoint.
+	// The image's CMD is used if this is not provided.
+	// Variable references $(VAR_NAME) are expanded using the container's environment. If a variable
+	// cannot be resolved, the reference in the input string will be unchanged. Double $$ are reduced
+	// to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will
+	// produce the string literal "$(VAR_NAME)". Escaped references will never be expanded, regardless
+	// of whether the variable exists or not. Cannot be updated.
+	// More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell
+	Args []string `json:"args,omitempty"`
+	// Container's working directory.
+	// If not specified, the container runtime's default will be used, which
+	// might be configured in the container image.
+	// Cannot be updated.
+	WorkingDir *string `json:"workingDir,omitempty"`
+	// Ports are not allowed for ephemeral containers.
+	Ports []ContainerPortApplyConfiguration `json:"ports,omitempty"`
+	// List of sources to populate environment variables in the container.
+	// The keys defined within a source may consist of any printable ASCII characters except '='.
+	// When a key exists in multiple
+	// sources, the value associated with the last source will take precedence.
+	// Values defined by an Env with a duplicate key will take precedence.
+	// Cannot be updated.
+	EnvFrom []EnvFromSourceApplyConfiguration `json:"envFrom,omitempty"`
+	// List of environment variables to set in the container.
+	// Cannot be updated.
+	Env []EnvVarApplyConfiguration `json:"env,omitempty"`
+	// Resources are not allowed for ephemeral containers. Ephemeral containers use spare resources
+	// already allocated to the pod.
+	Resources *ResourceRequirementsApplyConfiguration `json:"resources,omitempty"`
+	// Resources resize policy for the container.
+	ResizePolicy []ContainerResizePolicyApplyConfiguration `json:"resizePolicy,omitempty"`
+	// Restart policy for the container to manage the restart behavior of each
+	// container within a pod.
+	// You cannot set this field on ephemeral containers.
+	RestartPolicy *corev1.ContainerRestartPolicy `json:"restartPolicy,omitempty"`
+	// Represents a list of rules to be checked to determine if the
+	// container should be restarted on exit. You cannot set this field on
+	// ephemeral containers.
+	RestartPolicyRules []ContainerRestartRuleApplyConfiguration `json:"restartPolicyRules,omitempty"`
+	// Pod volumes to mount into the container's filesystem. Subpath mounts are not allowed for ephemeral containers.
+	// Cannot be updated.
+	VolumeMounts []VolumeMountApplyConfiguration `json:"volumeMounts,omitempty"`
+	// volumeDevices is the list of block devices to be used by the container.
+	VolumeDevices []VolumeDeviceApplyConfiguration `json:"volumeDevices,omitempty"`
+	// Probes are not allowed for ephemeral containers.
+	LivenessProbe *ProbeApplyConfiguration `json:"livenessProbe,omitempty"`
+	// Probes are not allowed for ephemeral containers.
+	ReadinessProbe *ProbeApplyConfiguration `json:"readinessProbe,omitempty"`
+	// Probes are not allowed for ephemeral containers.
+	StartupProbe *ProbeApplyConfiguration `json:"startupProbe,omitempty"`
+	// Lifecycle is not allowed for ephemeral containers.
+	Lifecycle *LifecycleApplyConfiguration `json:"lifecycle,omitempty"`
+	// Optional: Path at which the file to which the container's termination message
+	// will be written is mounted into the container's filesystem.
+	// Message written is intended to be brief final status, such as an assertion failure message.
+	// Will be truncated by the node if greater than 4096 bytes. The total message length across
+	// all containers will be limited to 12kb.
+	// Defaults to /dev/termination-log.
+	// Cannot be updated.
+	TerminationMessagePath *string `json:"terminationMessagePath,omitempty"`
+	// Indicate how the termination message should be populated. File will use the contents of
+	// terminationMessagePath to populate the container status message on both success and failure.
+	// FallbackToLogsOnError will use the last chunk of container log output if the termination
+	// message file is empty and the container exited with an error.
+	// The log output is limited to 2048 bytes or 80 lines, whichever is smaller.
+	// Defaults to File.
+	// Cannot be updated.
+	TerminationMessagePolicy *corev1.TerminationMessagePolicy `json:"terminationMessagePolicy,omitempty"`
+	// Image pull policy.
+	// One of Always, Never, IfNotPresent.
+	// Defaults to Always if :latest tag is specified, or IfNotPresent otherwise.
+	// Cannot be updated.
+	// More info: https://kubernetes.io/docs/concepts/containers/images#updating-images
+	ImagePullPolicy *corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
+	// Optional: SecurityContext defines the security options the ephemeral container should be run with.
+	// If set, the fields of SecurityContext override the equivalent fields of PodSecurityContext.
+	SecurityContext *SecurityContextApplyConfiguration `json:"securityContext,omitempty"`
+	// Whether this container should allocate a buffer for stdin in the container runtime. If this
+	// is not set, reads from stdin in the container will always result in EOF.
+	// Default is false.
+	Stdin *bool `json:"stdin,omitempty"`
+	// Whether the container runtime should close the stdin channel after it has been opened by
+	// a single attach. When stdin is true the stdin stream will remain open across multiple attach
+	// sessions. If stdinOnce is set to true, stdin is opened on container start, is empty until the
+	// first client attaches to stdin, and then remains open and accepts data until the client disconnects,
+	// at which time stdin is closed and remains closed until the container is restarted. If this
+	// flag is false, a container processes that reads from stdin will never receive an EOF.
+	// Default is false
+	StdinOnce *bool `json:"stdinOnce,omitempty"`
+	// Whether this container should allocate a TTY for itself, also requires 'stdin' to be true.
+	// Default is false.
+	TTY *bool `json:"tty,omitempty"`
 }
 
 // EphemeralContainerCommonApplyConfiguration constructs a declarative configuration of the EphemeralContainerCommon type for use with

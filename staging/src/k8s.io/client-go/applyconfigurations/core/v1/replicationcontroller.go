@@ -29,11 +29,23 @@ import (
 
 // ReplicationControllerApplyConfiguration represents a declarative configuration of the ReplicationController type for use
 // with apply.
+//
+// ReplicationController represents the configuration of a replication controller.
 type ReplicationControllerApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// If the Labels of a ReplicationController are empty, they are defaulted to
+	// be the same as the Pod(s) that the replication controller manages.
+	// Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                                 *ReplicationControllerSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                               *ReplicationControllerStatusApplyConfiguration `json:"status,omitempty"`
+	// Spec defines the specification of the desired behavior of the replication controller.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Spec *ReplicationControllerSpecApplyConfiguration `json:"spec,omitempty"`
+	// Status is the most recently observed status of the replication controller.
+	// This data may be out of date by some window of time.
+	// Populated by the system.
+	// Read-only.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Status *ReplicationControllerStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // ReplicationController constructs a declarative configuration of the ReplicationController type for use with
@@ -54,7 +66,6 @@ func ReplicationController(name, namespace string) *ReplicationControllerApplyCo
 // ExtractReplicationControllerFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractReplicationControllerFrom(replicationController *corev1.ReplicationController, fieldManager string, subresource string) (*ReplicationControllerApplyConfiguration, error) {
 	b := &ReplicationControllerApplyConfiguration{}
 	err := managedfields.ExtractInto(replicationController, internal.Parser().Type("io.k8s.api.core.v1.ReplicationController"), fieldManager, b, subresource)
@@ -79,21 +90,18 @@ func ExtractReplicationControllerFrom(replicationController *corev1.ReplicationC
 // ExtractReplicationController provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractReplicationController(replicationController *corev1.ReplicationController, fieldManager string) (*ReplicationControllerApplyConfiguration, error) {
 	return ExtractReplicationControllerFrom(replicationController, fieldManager, "")
 }
 
 // ExtractReplicationControllerScale extracts the applied configuration owned by fieldManager from
 // replicationController for the scale subresource.
-// Experimental!
 func ExtractReplicationControllerScale(replicationController *corev1.ReplicationController, fieldManager string) (*ReplicationControllerApplyConfiguration, error) {
 	return ExtractReplicationControllerFrom(replicationController, fieldManager, "scale")
 }
 
 // ExtractReplicationControllerStatus extracts the applied configuration owned by fieldManager from
 // replicationController for the status subresource.
-// Experimental!
 func ExtractReplicationControllerStatus(replicationController *corev1.ReplicationController, fieldManager string) (*ReplicationControllerApplyConfiguration, error) {
 	return ExtractReplicationControllerFrom(replicationController, fieldManager, "status")
 }

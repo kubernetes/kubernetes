@@ -23,6 +23,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 func TestThreadSafeStoreDeleteRemovesEmptySetsFromIndex(t *testing.T) {
@@ -114,7 +115,7 @@ func TestThreadSafeStoreIndexingFunctionsWithMultipleValues(t *testing.T) {
 	assert := assert.New(t)
 
 	compare := func(key string, expected []string) error {
-		values := store.index.indices[testIndexer][key].List()
+		values := sets.List(store.index.indices[testIndexer][key])
 		if cmp.Equal(values, expected) {
 			return nil
 		}

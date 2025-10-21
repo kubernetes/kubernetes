@@ -260,7 +260,7 @@ var _ = SIGDescribe("Probing container", func() {
 	/*
 		Release: v1.21
 		Testname: Pod liveness probe, container exec timeout, restart
-		Description: A Pod is created with liveness probe with a Exec action on the Pod. If the liveness probe call does not return within the timeout specified, liveness probe MUST restart the Pod. When ExecProbeTimeout feature gate is disabled and cluster is using dockershim, the timeout is ignored BUT a failing liveness probe MUST restart the Pod.
+		Description: A Pod is created with liveness probe with a Exec action on the Pod. If the liveness probe call does not return within the timeout specified, liveness probe MUST restart the Pod.
 	*/
 	ginkgo.It("should be restarted with a failing exec liveness probe that took longer than the timeout", func(ctx context.Context) {
 		cmd := []string{"/bin/sh", "-c", "sleep 600"}
@@ -968,9 +968,7 @@ var _ = SIGDescribe(feature.SidecarContainers, framework.WithFeatureGate(feature
 		Testname: Pod restartalbe init container liveness probe, container exec timeout, restart
 		Description: A Pod is created with liveness probe with a Exec action on the
 		Pod. If the liveness probe call does not return within the timeout
-		specified, liveness probe MUST restart the Pod. When ExecProbeTimeout
-		feature gate is disabled and cluster is using dockershim, the timeout is
-		ignored BUT a failing liveness probe MUST restart the Pod.
+		specified, liveness probe MUST restart the Pod.
 	*/
 	ginkgo.It("should be restarted with a failing exec liveness probe that took longer than the timeout", func(ctx context.Context) {
 		cmd := []string{"/bin/sh", "-c", "sleep 600"}

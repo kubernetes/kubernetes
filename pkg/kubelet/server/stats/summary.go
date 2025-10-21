@@ -53,12 +53,13 @@ var _ SummaryProvider = &summaryProviderImpl{}
 
 // NewSummaryProvider returns a SummaryProvider using the stats provided by the
 // specified statsProvider.
-func NewSummaryProvider(statsProvider Provider) SummaryProvider {
+func NewSummaryProvider(ctx context.Context, statsProvider Provider) SummaryProvider {
+	logger := klog.FromContext(ctx)
 	kubeletCreationTime := metav1.Now()
 	bootTime, err := util.GetBootTime()
 	if err != nil {
 		// bootTime will be zero if we encounter an error getting the boot time.
-		klog.InfoS("Error getting system boot time. Node metrics will have an incorrect start time", "err", err)
+		logger.Info("Error getting system boot time. Node metrics will have an incorrect start time", "err", err)
 	}
 
 	return &summaryProviderImpl{
@@ -113,7 +114,7 @@ func (sp *summaryProviderImpl) Get(ctx context.Context, updateStats bool) (*stat
 		Fs:               rootFsStats,
 		Runtime:          &statsapi.RuntimeStats{ContainerFs: containerFsStats, ImageFs: imageFsStats},
 		Rlimit:           rlimit,
-		SystemContainers: sp.GetSystemContainersStats(nodeConfig, podStats, updateStats),
+		SystemContainers: sp.GetSystemContainersStats(ctx, nodeConfig, podStats, updateStats),
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPSI) {
 		nodeStats.IO = rootStats.IO
@@ -149,7 +150,7 @@ func (sp *summaryProviderImpl) GetCPUAndMemoryStats(ctx context.Context) (*stats
 		Memory:           rootStats.Memory,
 		Swap:             rootStats.Swap,
 		StartTime:        rootStats.StartTime,
-		SystemContainers: sp.GetSystemContainersCPUAndMemoryStats(nodeConfig, podStats, false),
+		SystemContainers: sp.GetSystemContainersCPUAndMemoryStats(ctx, nodeConfig, podStats, false),
 	}
 	summary := statsapi.Summary{
 		Node: nodeStats,

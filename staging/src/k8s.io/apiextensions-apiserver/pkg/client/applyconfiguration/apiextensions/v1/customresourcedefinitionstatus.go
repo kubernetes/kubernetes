@@ -20,10 +20,21 @@ package v1
 
 // CustomResourceDefinitionStatusApplyConfiguration represents a declarative configuration of the CustomResourceDefinitionStatus type for use
 // with apply.
+//
+// CustomResourceDefinitionStatus indicates the state of the CustomResourceDefinition
 type CustomResourceDefinitionStatusApplyConfiguration struct {
-	Conditions     []CustomResourceDefinitionConditionApplyConfiguration `json:"conditions,omitempty"`
-	AcceptedNames  *CustomResourceDefinitionNamesApplyConfiguration      `json:"acceptedNames,omitempty"`
-	StoredVersions []string                                              `json:"storedVersions,omitempty"`
+	// conditions indicate state for particular aspects of a CustomResourceDefinition
+	Conditions []CustomResourceDefinitionConditionApplyConfiguration `json:"conditions,omitempty"`
+	// acceptedNames are the names that are actually being used to serve discovery.
+	// They may be different than the names in spec.
+	AcceptedNames *CustomResourceDefinitionNamesApplyConfiguration `json:"acceptedNames,omitempty"`
+	// storedVersions lists all versions of CustomResources that were ever persisted. Tracking these
+	// versions allows a migration path for stored versions in etcd. The field is mutable
+	// so a migration controller can finish a migration to another version (ensuring
+	// no old objects are left in storage), and then remove the rest of the
+	// versions from this list.
+	// Versions may not be removed from `spec.versions` while they exist in this list.
+	StoredVersions []string `json:"storedVersions,omitempty"`
 }
 
 // CustomResourceDefinitionStatusApplyConfiguration constructs a declarative configuration of the CustomResourceDefinitionStatus type for use with

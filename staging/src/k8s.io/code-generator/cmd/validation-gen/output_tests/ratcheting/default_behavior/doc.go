@@ -127,18 +127,18 @@ type DirectComparableStruct struct {
 
 // +k8s:validateFalse="type NonDirectComparableStruct"
 type NonDirectComparableStruct struct {
-	// +k8s:validateFalse="field intField"
+	// +k8s:validateFalse="field intPtrField"
 	IntPtrField *int `json:"intPtrField"`
 }
 
 // +k8s:validateFalse="type NestedDirectComparableStruct"
 type NestedDirectComparableStruct struct {
-	// +k8s:validateFalse="field intField"
+	// +k8s:validateFalse="field directComparableStructField"
 	DirectComparableStructField DirectComparableStruct `json:"directComparableStructField"`
 }
 
 // +k8s:validateFalse="type NestedNonDirectComparableStruct"
 type NestedNonDirectComparableStruct struct {
-	// +k8s:validateFalse="field intField"
+	// +k8s:validateFalse="field nonDirectComparableStructField"
 	NonDirectComparableStructField NonDirectComparableStruct `json:"nonDirectComparableStructField"`
 }

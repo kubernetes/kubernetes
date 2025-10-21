@@ -107,7 +107,7 @@ func (c *Publisher) Run(ctx context.Context, workers int) {
 	logger.Info("Starting root CA cert publisher controller")
 	defer logger.Info("Shutting down root CA cert publisher controller")
 
-	if !cache.WaitForNamedCacheSync("crt configmap", ctx.Done(), c.cmListerSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, c.cmListerSynced) {
 		return
 	}
 

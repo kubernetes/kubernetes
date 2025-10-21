@@ -722,7 +722,7 @@ type consistencyCheckStatus struct {
 }
 
 func parseMetric(r io.Reader, name string) (*dto.MetricFamily, error) {
-	var parser expfmt.TextParser
+	parser := expfmt.NewTextParser(model.UTF8Validation)
 	mfs, err := parser.TextToMetricFamilies(r)
 	if err != nil {
 		return nil, err

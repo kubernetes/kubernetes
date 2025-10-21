@@ -101,6 +101,10 @@ func TestNestedMarshalToWriter(t *testing.T) {
 
 type copyMarshaler []byte
 
+func (c copyMarshaler) Size() int {
+	return len(c)
+}
+
 func (c copyMarshaler) MarshalTo(dest []byte) (int, error) {
 	n := copy(dest, []byte(c))
 	return n, nil

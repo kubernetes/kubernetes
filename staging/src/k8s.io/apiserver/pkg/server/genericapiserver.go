@@ -531,7 +531,7 @@ func (s preparedGenericAPIServer) RunWithContext(ctx context.Context) error {
 	if s.UnprotectedDebugSocket != nil {
 		go func() {
 			defer utilruntime.HandleCrash()
-			klog.Error(s.UnprotectedDebugSocket.Run(stopCh))
+			klog.Error(s.UnprotectedDebugSocket.RunWithContext(ctx))
 		}()
 	}
 

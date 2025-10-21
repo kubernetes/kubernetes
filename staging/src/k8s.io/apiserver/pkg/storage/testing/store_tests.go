@@ -193,12 +193,12 @@ func RunTestGet(ctx context.Context, t *testing.T, store storage.Interface) {
 		rv:               strconv.FormatInt(math.MaxInt64, 10),
 	}, {
 		name:              "get non-existing",
-		key:               "/non-existing",
+		key:               "/pods/non-existing",
 		ignoreNotFound:    false,
 		expectNotFoundErr: true,
 	}, {
 		name:              "get non-existing, ignore not found",
-		key:               "/non-existing",
+		key:               "/pods/non-existing",
 		ignoreNotFound:    true,
 		expectNotFoundErr: false,
 		expectedOut:       &example.Pod{},
@@ -258,7 +258,7 @@ func RunTestUnconditionalDelete(ctx context.Context, t *testing.T, store storage
 		expectNotFoundErr: false,
 	}, {
 		name:              "non-existing key",
-		key:               "/non-existing",
+		key:               "/pods/non-existing",
 		expectedObj:       nil,
 		expectNotFoundErr: true,
 	}}
@@ -640,16 +640,14 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 		Predicate:       storage.Everything,
 		Recursive:       true,
 	}
-	if err := store.GetList(ctx, "/second", storageOpts, list); err != nil {
+	if err := store.GetList(ctx, "/pods/second", storageOpts, list); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	continueRV, _ := strconv.Atoi(list.ResourceVersion)
-	secondContinuation, err := storage.EncodeContinue("/second/foo", "/second/", int64(continueRV))
+	continueRV := mustParseResourceVersion(t, list.ResourceVersion)
+	secondContinuation, err := storage.EncodeContinue("/pods/second/foo", "/pods/second/", int64(continueRV))
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	initialRV2, _ := strconv.Atoi(initialRV)
 
 	getAttrs := func(obj runtime.Object) (labels.Set, fields.Set, error) {
 		pod := obj.(*example.Pod)
@@ -677,18 +675,18 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 		expectContinueTooOld       bool
 		expectRV                   string
 		expectRVFunc               func(string) error
-		expectEtcdRequest          func() []RecordedList
+		expectCacherRequestsToEtcd func() []RecordedList
 	}{
 		{
 			name:        "rejects invalid resource version",
-			prefix:      "/pods",
+			prefix:      "/pods/",
 			pred:        storage.Everything,
 			rv:          "abc",
 			expectError: true,
 		},
 		{
 			name:   "rejects resource version and continue token",
-			prefix: "/pods",
+			prefix: "/pods/",
 			pred: storage.SelectionPredicate{
 				Label:    labels.Everything(),
 				Field:    fields.Everything(),
@@ -700,7 +698,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 		},
 		{
 			name:             "rejects resource version set too high",
-			prefix:           "/pods",
+			prefix:           "/pods/",
 			pred:             storage.Everything,
 			rv:               strconv.FormatInt(math.MaxInt64, 10),
 			expectRVTooLarge: true,
@@ -710,6 +708,16 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			prefix:      "/pods/first/",
 			pred:        storage.Everything,
 			expectedOut: []example.Pod{*updatedPod},
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key: "/registry/pods/first/",
+					},
+				}
+			},
 		},
 		{
 			name:                 "test List on existing key with resource version set to 0",
@@ -726,6 +734,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			rv:          createdPods[0].ResourceVersion,
 			rvMatch:     metav1.ResourceVersionMatchExact,
 			expectRV:    createdPods[0].ResourceVersion,
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:         "/registry/pods/first/",
+						ListOptions: kubernetes.ListOptions{Revision: mustParseResourceVersion(t, createdPods[0].ResourceVersion)},
+					},
+				}
+			},
 		},
 		{
 			name:        "test List on existing key with resource version set before creation, match=Exact",
@@ -735,6 +754,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			rv:          createdPods[0].ResourceVersion,
 			rvMatch:     metav1.ResourceVersionMatchExact,
 			expectRV:    createdPods[0].ResourceVersion,
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:         "/registry/pods/second/",
+						ListOptions: kubernetes.ListOptions{Revision: mustParseResourceVersion(t, createdPods[0].ResourceVersion)},
+					},
+				}
+			},
 		},
 		{
 			name:        "test List on existing key with resource version set after creation, match=Exact",
@@ -744,6 +774,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			rv:          createdPods[1].ResourceVersion,
 			rvMatch:     metav1.ResourceVersionMatchExact,
 			expectRV:    createdPods[1].ResourceVersion,
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:         "/registry/pods/second/",
+						ListOptions: kubernetes.ListOptions{Revision: mustParseResourceVersion(t, createdPods[1].ResourceVersion)},
+					},
+				}
+			},
 		},
 		{
 			name:           "test List on existing key with resource version set before first write, match=Exact",
@@ -752,6 +793,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			rv:             initialRV,
 			rvMatch:        metav1.ResourceVersionMatchExact,
 			expectRVTooOld: true,
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:         "/registry/pods/first/",
+						ListOptions: kubernetes.ListOptions{Revision: mustParseResourceVersion(t, initialRV)},
+					},
+				}
+			},
 		},
 		{
 			name:                 "test List on existing key with resource version set to 0, match=NotOlderThan",
@@ -800,6 +852,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			rv:          list.ResourceVersion,
 			rvMatch:     metav1.ResourceVersionMatchExact,
 			expectRV:    list.ResourceVersion,
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:         "/registry/pods/first/",
+						ListOptions: kubernetes.ListOptions{Revision: int64(continueRV)},
+					},
+				}
+			},
 		},
 		{
 			name:        "test List on existing key with resource version set to current resource version, match=NotOlderThan",
@@ -814,6 +877,16 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			prefix:      "/pods/non-existing/",
 			pred:        storage.Everything,
 			expectedOut: []example.Pod{},
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key: "/registry/pods/non-existing/",
+					},
+				}
+			},
 		},
 		{
 			name:   "test List with pod name matching",
@@ -823,6 +896,16 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				Field: fields.ParseSelectorOrDie("metadata.name!=bar"),
 			},
 			expectedOut: []example.Pod{},
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key: "/registry/pods/first/",
+					},
+				}
+			},
 		},
 		{
 			name:   "test List with pod name matching with resource version set to current resource version, match=NotOlderThan",
@@ -848,7 +931,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			expectContinue:             true,
 			expectContinueExact:        encodeContinueOrDie(createdPods[1].Name+"\x00", int64(mustAtoi(currentRV))),
 			expectedRemainingItemCount: ptr.To[int64](1),
-			expectEtcdRequest: func() []RecordedList {
+			expectCacherRequestsToEtcd: func() []RecordedList {
 				if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) {
 					return nil
 				}
@@ -874,6 +957,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			expectedRemainingItemCount: ptr.To[int64](1),
 			rv:                         list.ResourceVersion,
 			expectRV:                   list.ResourceVersion,
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:         "/registry/pods/second/",
+						ListOptions: kubernetes.ListOptions{Revision: int64(continueRV), Limit: 1},
+					},
+				}
+			},
 		},
 		{
 			name:   "test List with limit at current resource version and match=Exact",
@@ -890,6 +984,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			rv:                         list.ResourceVersion,
 			rvMatch:                    metav1.ResourceVersionMatchExact,
 			expectRV:                   list.ResourceVersion,
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:         "/registry/pods/second/",
+						ListOptions: kubernetes.ListOptions{Revision: int64(continueRV), Limit: 1},
+					},
+				}
+			},
 		},
 		{
 			name:   "test List with limit at current resource version and match=NotOlderThan",
@@ -958,6 +1063,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			rv:             createdPods[0].ResourceVersion,
 			rvMatch:        metav1.ResourceVersionMatchExact,
 			expectRV:       createdPods[0].ResourceVersion,
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:         "/registry/pods/second/",
+						ListOptions: kubernetes.ListOptions{Revision: mustParseResourceVersion(t, createdPods[0].ResourceVersion), Limit: 1},
+					},
+				}
+			},
 		},
 		{
 			name:   "test List with limit at resource version after created and match=Exact",
@@ -972,6 +1088,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			rv:             createdPods[1].ResourceVersion,
 			rvMatch:        metav1.ResourceVersionMatchExact,
 			expectRV:       createdPods[1].ResourceVersion,
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:         "/registry/pods/second/",
+						ListOptions: kubernetes.ListOptions{Revision: mustParseResourceVersion(t, createdPods[1].ResourceVersion), Limit: 1},
+					},
+				}
+			},
 		},
 		{
 			name:   "test List with pregenerated continue token",
@@ -983,6 +1110,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				Continue: secondContinuation,
 			},
 			expectedOut: []example.Pod{*createdPods[2]},
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:         "/registry/pods/second/",
+						ListOptions: kubernetes.ListOptions{Revision: int64(continueRV), Limit: 1, Continue: "/registry/pods/second/foo"},
+					},
+				}
+			},
 		},
 		{
 			name:   "ignores resource version 0 for List with pregenerated continue token",
@@ -995,12 +1133,33 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			},
 			rv:          "0",
 			expectedOut: []example.Pod{*createdPods[2]},
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:         "/registry/pods/second/",
+						ListOptions: kubernetes.ListOptions{Revision: int64(continueRV), Limit: 1, Continue: "/registry/pods/second/foo"},
+					},
+				}
+			},
 		},
 		{
 			name:        "test List with multiple levels of directories and expect flattened result",
 			prefix:      "/pods/second/",
 			pred:        storage.Everything,
 			expectedOut: []example.Pod{*createdPods[1], *createdPods[2]},
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key: "/registry/pods/second/",
+					},
+				}
+			},
 		},
 		{
 			name:        "test List with multiple levels of directories and expect flattened result with current resource version and match=NotOlderThan",
@@ -1012,7 +1171,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 		},
 		{
 			name:   "test List with filter returning only one item, ensure only a single page returned",
-			prefix: "/pods",
+			prefix: "/pods/",
 			pred: storage.SelectionPredicate{
 				Field: fields.OneTermEqualSelector("metadata.name", "barfoo"),
 				Label: labels.Everything(),
@@ -1020,10 +1179,29 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			},
 			expectedOut:    []example.Pod{*createdPods[3]},
 			expectContinue: true,
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:         "/registry/pods/",
+						ListOptions: kubernetes.ListOptions{Limit: 1},
+					},
+					{
+						Key:         "/registry/pods/",
+						ListOptions: kubernetes.ListOptions{Revision: int64(continueRV) + 1, Limit: 2, Continue: "/registry/pods/first/bar\x00"},
+					},
+					{
+						Key:         "/registry/pods/",
+						ListOptions: kubernetes.ListOptions{Revision: int64(continueRV) + 1, Limit: 4, Continue: "/registry/pods/second/foo\x00"},
+					},
+				}
+			},
 		},
 		{
 			name:   "test List with filter returning only one item, ensure only a single page returned with current resource version and match=NotOlderThan",
-			prefix: "/pods",
+			prefix: "/pods/",
 			pred: storage.SelectionPredicate{
 				Field: fields.OneTermEqualSelector("metadata.name", "barfoo"),
 				Label: labels.Everything(),
@@ -1037,7 +1215,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 		},
 		{
 			name:   "test List with filter returning only one item, covers the entire list",
-			prefix: "/pods",
+			prefix: "/pods/",
 			pred: storage.SelectionPredicate{
 				Field: fields.OneTermEqualSelector("metadata.name", "barfoo"),
 				Label: labels.Everything(),
@@ -1045,10 +1223,25 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			},
 			expectedOut:    []example.Pod{*createdPods[3]},
 			expectContinue: false,
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:         "/registry/pods/",
+						ListOptions: kubernetes.ListOptions{Revision: 0, Limit: 2},
+					},
+					{
+						Key:         "/registry/pods/",
+						ListOptions: kubernetes.ListOptions{Revision: int64(continueRV) + 1, Limit: 4, Continue: "/registry/pods/second/bar\x00"},
+					},
+				}
+			},
 		},
 		{
 			name:   "test List with filter returning only one item, covers the entire list with current resource version and match=NotOlderThan",
-			prefix: "/pods",
+			prefix: "/pods/",
 			pred: storage.SelectionPredicate{
 				Field: fields.OneTermEqualSelector("metadata.name", "barfoo"),
 				Label: labels.Everything(),
@@ -1062,7 +1255,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 		},
 		{
 			name:   "test List with filter returning only one item, covers the entire list, with resource version 0",
-			prefix: "/pods",
+			prefix: "/pods/",
 			pred: storage.SelectionPredicate{
 				Field: fields.OneTermEqualSelector("metadata.name", "barfoo"),
 				Label: labels.Everything(),
@@ -1074,7 +1267,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 		},
 		{
 			name:   "test List with filter returning two items, more pages possible",
-			prefix: "/pods",
+			prefix: "/pods/",
 			pred: storage.SelectionPredicate{
 				Field: fields.OneTermEqualSelector("metadata.name", "bar"),
 				Label: labels.Everything(),
@@ -1082,10 +1275,21 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			},
 			expectContinue: true,
 			expectedOut:    []example.Pod{*updatedPod, *createdPods[1]},
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:         "/registry/pods/",
+						ListOptions: kubernetes.ListOptions{Revision: 0, Limit: 2},
+					},
+				}
+			},
 		},
 		{
 			name:   "test List with filter returning two items, more pages possible with current resource version and match=NotOlderThan",
-			prefix: "/pods",
+			prefix: "/pods/",
 			pred: storage.SelectionPredicate{
 				Field: fields.OneTermEqualSelector("metadata.name", "bar"),
 				Label: labels.Everything(),
@@ -1098,17 +1302,32 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 		},
 		{
 			name:   "filter returns two items split across multiple pages",
-			prefix: "/pods",
+			prefix: "/pods/",
 			pred: storage.SelectionPredicate{
 				Field: fields.OneTermEqualSelector("metadata.name", "foo"),
 				Label: labels.Everything(),
 				Limit: 2,
 			},
 			expectedOut: []example.Pod{*createdPods[2], *createdPods[4]},
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:         "/registry/pods/",
+						ListOptions: kubernetes.ListOptions{Revision: 0, Limit: 2},
+					},
+					{
+						Key:         "/registry/pods/",
+						ListOptions: kubernetes.ListOptions{Revision: int64(continueRV) + 1, Limit: 4, Continue: "/registry/pods/second/bar\x00"},
+					},
+				}
+			},
 		},
 		{
 			name:   "filter returns two items split across multiple pages with current resource version and match=NotOlderThan",
-			prefix: "/pods",
+			prefix: "/pods/",
 			pred: storage.SelectionPredicate{
 				Field: fields.OneTermEqualSelector("metadata.name", "foo"),
 				Label: labels.Everything(),
@@ -1120,7 +1339,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 		},
 		{
 			name:   "filter returns one item for last page, ends on last item, not full",
-			prefix: "/pods",
+			prefix: "/pods/",
 			pred: storage.SelectionPredicate{
 				Field:    fields.OneTermEqualSelector("metadata.name", "foo"),
 				Label:    labels.Everything(),
@@ -1128,10 +1347,21 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				Continue: encodeContinueOrDie("third/barfoo", int64(continueRV)),
 			},
 			expectedOut: []example.Pod{*createdPods[4]},
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:         "/registry/pods/",
+						ListOptions: kubernetes.ListOptions{Revision: int64(continueRV), Limit: 2, Continue: "/registry/pods/third/barfoo"},
+					},
+				}
+			},
 		},
 		{
 			name:   "filter returns one item for last page, starts on last item, full",
-			prefix: "/pods",
+			prefix: "/pods/",
 			pred: storage.SelectionPredicate{
 				Field:    fields.OneTermEqualSelector("metadata.name", "foo"),
 				Label:    labels.Everything(),
@@ -1139,10 +1369,25 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				Continue: encodeContinueOrDie("third/barfoo", int64(continueRV)),
 			},
 			expectedOut: []example.Pod{*createdPods[4]},
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:         "/registry/pods/",
+						ListOptions: kubernetes.ListOptions{Revision: int64(continueRV), Limit: 1, Continue: "/registry/pods/third/barfoo"},
+					},
+					{
+						Key:         "/registry/pods/",
+						ListOptions: kubernetes.ListOptions{Revision: int64(continueRV), Limit: 2, Continue: "/registry/pods/third/barfoo\x00"},
+					},
+				}
+			},
 		},
 		{
 			name:   "filter returns one item for last page, starts on last item, partial page",
-			prefix: "/pods",
+			prefix: "/pods/",
 			pred: storage.SelectionPredicate{
 				Field:    fields.OneTermEqualSelector("metadata.name", "foo"),
 				Label:    labels.Everything(),
@@ -1150,20 +1395,42 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				Continue: encodeContinueOrDie("third/barfoo", int64(continueRV)),
 			},
 			expectedOut: []example.Pod{*createdPods[4]},
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:         "/registry/pods/",
+						ListOptions: kubernetes.ListOptions{Revision: int64(continueRV), Limit: 2, Continue: "/registry/pods/third/barfoo"},
+					},
+				}
+			},
 		},
 		{
 			name:   "filter returns two items, page size equal to total list size",
-			prefix: "/pods",
+			prefix: "/pods/",
 			pred: storage.SelectionPredicate{
 				Field: fields.OneTermEqualSelector("metadata.name", "foo"),
 				Label: labels.Everything(),
 				Limit: 5,
 			},
 			expectedOut: []example.Pod{*createdPods[2], *createdPods[4]},
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:         "/registry/pods/",
+						ListOptions: kubernetes.ListOptions{Revision: 0, Limit: 5},
+					},
+				}
+			},
 		},
 		{
 			name:   "filter returns two items, page size equal to total list size with current resource version and match=NotOlderThan",
-			prefix: "/pods",
+			prefix: "/pods/",
 			pred: storage.SelectionPredicate{
 				Field: fields.OneTermEqualSelector("metadata.name", "foo"),
 				Label: labels.Everything(),
@@ -1175,17 +1442,28 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 		},
 		{
 			name:   "filter returns one item, page size equal to total list size",
-			prefix: "/pods",
+			prefix: "/pods/",
 			pred: storage.SelectionPredicate{
 				Field: fields.OneTermEqualSelector("metadata.name", "barfoo"),
 				Label: labels.Everything(),
 				Limit: 5,
 			},
 			expectedOut: []example.Pod{*createdPods[3]},
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:         "/registry/pods/",
+						ListOptions: kubernetes.ListOptions{Revision: 0, Limit: 5},
+					},
+				}
+			},
 		},
 		{
 			name:   "filter returns one item, page size equal to total list size with current resource version and match=NotOlderThan",
-			prefix: "/pods",
+			prefix: "/pods/",
 			pred: storage.SelectionPredicate{
 				Field: fields.OneTermEqualSelector("metadata.name", "barfoo"),
 				Label: labels.Everything(),
@@ -1197,13 +1475,23 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 		},
 		{
 			name:        "list all items",
-			prefix:      "/pods",
+			prefix:      "/pods/",
 			pred:        storage.Everything,
 			expectedOut: []example.Pod{*updatedPod, *createdPods[1], *createdPods[2], *createdPods[3], *createdPods[4]},
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key: "/registry/pods/",
+					},
+				}
+			},
 		},
 		{
 			name:        "list all items with current resource version and match=NotOlderThan",
-			prefix:      "/pods",
+			prefix:      "/pods/",
 			pred:        storage.Everything,
 			rv:          list.ResourceVersion,
 			rvMatch:     metav1.ResourceVersionMatchNotOlderThan,
@@ -1211,7 +1499,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 		},
 		{
 			name:   "verify list returns updated version of object; filter returns one item, page size equal to total list size with current resource version and match=NotOlderThan",
-			prefix: "/pods",
+			prefix: "/pods/",
 			pred: storage.SelectionPredicate{
 				Field: fields.OneTermEqualSelector("spec.nodeName", "fakeNode"),
 				Label: labels.Everything(),
@@ -1223,7 +1511,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 		},
 		{
 			name:   "verify list does not return deleted object; filter for deleted object, page size equal to total list size with current resource version and match=NotOlderThan",
-			prefix: "/pods",
+			prefix: "/pods/",
 			pred: storage.SelectionPredicate{
 				Field: fields.OneTermEqualSelector("metadata.name", "baz"),
 				Label: labels.Everything(),
@@ -1240,6 +1528,16 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			rv:          "",
 			expectRV:    currentRV,
 			expectedOut: []example.Pod{},
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key: "/registry/pods/empty/",
+					},
+				}
+			},
 		},
 		{
 			name:         "test non-consistent List",
@@ -1266,6 +1564,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			rv:          createdPods[0].ResourceVersion,
 			rvMatch:     metav1.ResourceVersionMatchExact,
 			expectRV:    createdPods[0].ResourceVersion,
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:         "/registry/pods/",
+						ListOptions: kubernetes.ListOptions{Revision: 2},
+					},
+				}
+			},
 		},
 		{
 			name:        "test List with resource version of second write, match=Exact",
@@ -1275,6 +1584,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			rv:          createdPods[1].ResourceVersion,
 			rvMatch:     metav1.ResourceVersionMatchExact,
 			expectRV:    createdPods[1].ResourceVersion,
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:         "/registry/pods/",
+						ListOptions: kubernetes.ListOptions{Revision: 3},
+					},
+				}
+			},
 		},
 		{
 			name:        "test List with resource version of third write, match=Exact",
@@ -1284,6 +1604,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			rv:          createdPods[2].ResourceVersion,
 			rvMatch:     metav1.ResourceVersionMatchExact,
 			expectRV:    createdPods[2].ResourceVersion,
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:         "/registry/pods/",
+						ListOptions: kubernetes.ListOptions{Revision: 4},
+					},
+				}
+			},
 		},
 		{
 			name:        "test List with resource version of fourth write, match=Exact",
@@ -1293,6 +1624,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			rv:          createdPods[3].ResourceVersion,
 			rvMatch:     metav1.ResourceVersionMatchExact,
 			expectRV:    createdPods[3].ResourceVersion,
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:         "/registry/pods/",
+						ListOptions: kubernetes.ListOptions{Revision: 5},
+					},
+				}
+			},
 		},
 		{
 			name:        "test List with resource version of fifth write, match=Exact",
@@ -1302,6 +1644,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			rv:          createdPods[4].ResourceVersion,
 			rvMatch:     metav1.ResourceVersionMatchExact,
 			expectRV:    createdPods[4].ResourceVersion,
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:         "/registry/pods/",
+						ListOptions: kubernetes.ListOptions{Revision: 6},
+					},
+				}
+			},
 		},
 		{
 			name:        "test List with resource version of six write, match=Exact",
@@ -1311,6 +1664,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			rv:          createdPods[5].ResourceVersion,
 			rvMatch:     metav1.ResourceVersionMatchExact,
 			expectRV:    createdPods[5].ResourceVersion,
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:         "/registry/pods/",
+						ListOptions: kubernetes.ListOptions{Revision: 7},
+					},
+				}
+			},
 		},
 		{
 			name:        "test List with resource version of seventh write, match=Exact",
@@ -1320,6 +1684,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			rv:          updatedPod.ResourceVersion,
 			rvMatch:     metav1.ResourceVersionMatchExact,
 			expectRV:    updatedPod.ResourceVersion,
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:         "/registry/pods/",
+						ListOptions: kubernetes.ListOptions{Revision: 8},
+					},
+				}
+			},
 		},
 		{
 			name:        "test List with resource version of eight write, match=Exact",
@@ -1329,6 +1704,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			rv:          fmt.Sprint(continueRV),
 			rvMatch:     metav1.ResourceVersionMatchExact,
 			expectRV:    fmt.Sprint(continueRV),
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:         "/registry/pods/",
+						ListOptions: kubernetes.ListOptions{Revision: int64(continueRV)},
+					},
+				}
+			},
 		},
 		{
 			name:        "test List with resource version after writes, match=Exact",
@@ -1338,6 +1724,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			rv:          fmt.Sprint(continueRV + 1),
 			rvMatch:     metav1.ResourceVersionMatchExact,
 			expectRV:    fmt.Sprint(continueRV + 1),
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) && utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:         "/registry/pods/",
+						ListOptions: kubernetes.ListOptions{Revision: int64(continueRV) + 1},
+					},
+				}
+			},
 		},
 		{
 			name:             "test List with future resource version, match=Exact",
@@ -1346,6 +1743,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			rv:               fmt.Sprint(continueRV + 2),
 			rvMatch:          metav1.ResourceVersionMatchExact,
 			expectRVTooLarge: true,
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:         "/registry/pods/",
+						ListOptions: kubernetes.ListOptions{Revision: int64(continueRV) + 2},
+					},
+				}
+			},
 		},
 		// limit, match=Exact
 		{
@@ -1363,6 +1771,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			rvMatch:                    metav1.ResourceVersionMatchExact,
 			expectRV:                   createdPods[1].ResourceVersion,
 			expectedRemainingItemCount: ptr.To[int64](1),
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:         "/registry/pods/",
+						ListOptions: kubernetes.ListOptions{Revision: mustParseResourceVersion(t, createdPods[1].ResourceVersion), Limit: 1},
+					},
+				}
+			},
 		},
 		{
 			name:   "test List with limit, resource version of third write, match=Exact",
@@ -1379,6 +1798,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			expectContinueExact:        encodeContinueOrDie(createdPods[1].Namespace+"/"+createdPods[1].Name+"\x00", int64(mustAtoi(createdPods[2].ResourceVersion))),
 			expectRV:                   createdPods[2].ResourceVersion,
 			expectedRemainingItemCount: ptr.To[int64](1),
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:         "/registry/pods/",
+						ListOptions: kubernetes.ListOptions{Revision: mustParseResourceVersion(t, createdPods[2].ResourceVersion), Limit: 2},
+					},
+				}
+			},
 		},
 		{
 			name:   "test List with limit, resource version of fourth write, match=Exact",
@@ -1392,6 +1822,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			rvMatch:     metav1.ResourceVersionMatchExact,
 			expectedOut: []example.Pod{*createdPods[0], *createdPods[1], *createdPods[2], *createdPods[3]},
 			expectRV:    createdPods[3].ResourceVersion,
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:         "/registry/pods/",
+						ListOptions: kubernetes.ListOptions{Revision: mustParseResourceVersion(t, createdPods[3].ResourceVersion), Limit: 4},
+					},
+				}
+			},
 		},
 		{
 			name:   "test List with limit, resource version of fifth write, match=Exact",
@@ -1408,6 +1849,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			expectContinue:             true,
 			expectContinueExact:        encodeContinueOrDie(createdPods[0].Namespace+"/"+createdPods[0].Name+"\x00", int64(mustAtoi(createdPods[4].ResourceVersion))),
 			expectedRemainingItemCount: ptr.To[int64](4),
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:         "/registry/pods/",
+						ListOptions: kubernetes.ListOptions{Revision: mustParseResourceVersion(t, createdPods[4].ResourceVersion), Limit: 1},
+					},
+				}
+			},
 		},
 		{
 			name:   "test List with limit, resource version of six write, match=Exact",
@@ -1424,6 +1876,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			expectContinue:             true,
 			expectContinueExact:        encodeContinueOrDie(createdPods[1].Namespace+"/"+createdPods[1].Name+"\x00", int64(mustAtoi(createdPods[5].ResourceVersion))),
 			expectedRemainingItemCount: ptr.To[int64](4),
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:         "/registry/pods/",
+						ListOptions: kubernetes.ListOptions{Revision: mustParseResourceVersion(t, createdPods[5].ResourceVersion), Limit: 2},
+					},
+				}
+			},
 		},
 		{
 			name:   "test List with limit, resource version of seventh write, match=Exact",
@@ -1440,6 +1903,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			expectContinue:             true,
 			expectContinueExact:        encodeContinueOrDie(createdPods[2].Namespace+"/"+createdPods[2].Name+"\x00", int64(mustAtoi(updatedPod.ResourceVersion))),
 			expectedRemainingItemCount: ptr.To[int64](2),
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:         "/registry/pods/",
+						ListOptions: kubernetes.ListOptions{Revision: mustParseResourceVersion(t, updatedPod.ResourceVersion), Limit: 4},
+					},
+				}
+			},
 		},
 		{
 			name:   "test List with limit, resource version of eight write, match=Exact",
@@ -1453,6 +1927,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			rv:          fmt.Sprint(continueRV),
 			rvMatch:     metav1.ResourceVersionMatchExact,
 			expectRV:    fmt.Sprint(continueRV),
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:         "/registry/pods/",
+						ListOptions: kubernetes.ListOptions{Revision: int64(continueRV), Limit: 8},
+					},
+				}
+			},
 		},
 		{
 			name:   "test List with limit, resource version after writes, match=Exact",
@@ -1469,6 +1954,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			expectContinue:             true,
 			expectContinueExact:        encodeContinueOrDie(updatedPod.Namespace+"/"+updatedPod.Name+"\x00", int64(continueRV+1)),
 			expectedRemainingItemCount: ptr.To[int64](4),
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) && utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:         "/registry/pods/",
+						ListOptions: kubernetes.ListOptions{Revision: int64(continueRV) + 1, Limit: 1},
+					},
+				}
+			},
 		},
 		// Continue
 		{
@@ -1478,9 +1974,20 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				Label:    labels.Everything(),
 				Field:    fields.Everything(),
 				Limit:    1,
-				Continue: encodeContinueOrDie(createdPods[0].Namespace+"/"+createdPods[0].Name+"\x00", int64(initialRV2)),
+				Continue: encodeContinueOrDie(createdPods[0].Namespace+"/"+createdPods[0].Name+"\x00", mustParseResourceVersion(t, initialRV)),
 			},
 			expectContinueTooOld: true,
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:         "/registry/pods/",
+						ListOptions: kubernetes.ListOptions{Revision: mustParseResourceVersion(t, initialRV), Limit: 4},
+					},
+				}
+			},
 		},
 		{
 			name:   "test List with continue, resource version of first write",
@@ -1493,6 +2000,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			},
 			expectedOut: []example.Pod{},
 			expectRV:    createdPods[0].ResourceVersion,
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:         "/registry/pods/",
+						ListOptions: kubernetes.ListOptions{Revision: mustParseResourceVersion(t, createdPods[0].ResourceVersion), Limit: 1, Continue: "/registry/pods/first/bar\x00"},
+					},
+				}
+			},
 		},
 		{
 			name:   "test List with continue, resource version of second write",
@@ -1505,6 +2023,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			},
 			expectedOut: []example.Pod{*createdPods[1]},
 			expectRV:    createdPods[1].ResourceVersion,
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:         "/registry/pods/",
+						ListOptions: kubernetes.ListOptions{Revision: mustParseResourceVersion(t, createdPods[1].ResourceVersion), Limit: 1, Continue: "/registry/pods/first/bar\x00"},
+					},
+				}
+			},
 		},
 		{
 			name:   "test List with continue, resource version of third write",
@@ -1517,6 +2046,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			},
 			expectedOut: []example.Pod{*createdPods[2]},
 			expectRV:    createdPods[2].ResourceVersion,
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:         "/registry/pods/",
+						ListOptions: kubernetes.ListOptions{Revision: mustParseResourceVersion(t, createdPods[2].ResourceVersion), Limit: 2, Continue: "/registry/pods/second/bar\x00"},
+					},
+				}
+			},
 		},
 		{
 			name:   "test List with continue, resource version of fifth write",
@@ -1532,6 +2072,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			expectContinue:             true,
 			expectContinueExact:        encodeContinueOrDie(createdPods[1].Namespace+"/"+createdPods[1].Name+"\x00", int64(mustAtoi(createdPods[4].ResourceVersion))),
 			expectedRemainingItemCount: ptr.To[int64](3),
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:         "/registry/pods/",
+						ListOptions: kubernetes.ListOptions{Revision: mustParseResourceVersion(t, createdPods[4].ResourceVersion), Limit: 1, Continue: "/registry/pods/first/bar\x00"},
+					},
+				}
+			},
 		},
 		{
 			name:   "test List with continue, resource version of six write",
@@ -1547,6 +2098,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			expectContinue:             true,
 			expectContinueExact:        encodeContinueOrDie(createdPods[2].Namespace+"/"+createdPods[2].Name+"\x00", int64(mustAtoi(createdPods[5].ResourceVersion))),
 			expectedRemainingItemCount: ptr.To[int64](2),
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:         "/registry/pods/",
+						ListOptions: kubernetes.ListOptions{Revision: mustParseResourceVersion(t, createdPods[5].ResourceVersion), Limit: 2, Continue: "/registry/pods/second/bar\x00"},
+					},
+				}
+			},
 		},
 		{
 			name:   "test List with continue, resource version of seventh write",
@@ -1559,6 +2121,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			},
 			expectedOut: []example.Pod{*createdPods[3], *createdPods[4]},
 			expectRV:    updatedPod.ResourceVersion,
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:         "/registry/pods/",
+						ListOptions: kubernetes.ListOptions{Revision: mustParseResourceVersion(t, updatedPod.ResourceVersion), Limit: 4, Continue: "/registry/pods/second/foo\x00"},
+					},
+				}
+			},
 		},
 		{
 			name:   "test List with continue, resource version after writes",
@@ -1574,6 +2147,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			expectContinue:             true,
 			expectContinueExact:        encodeContinueOrDie(createdPods[1].Namespace+"/"+createdPods[1].Name+"\x00", int64(continueRV+1)),
 			expectedRemainingItemCount: ptr.To[int64](3),
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) && utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:         "/registry/pods/",
+						ListOptions: kubernetes.ListOptions{Revision: int64(continueRV) + 1, Limit: 1, Continue: "/registry/pods/first/bar\x00"},
+					},
+				}
+			},
 		},
 		{
 			name:   "test List with continue from second pod, negative resource version gives consistent read",
@@ -1585,6 +2169,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			},
 			expectedOut: []example.Pod{*createdPods[1], *createdPods[2], *createdPods[3], *createdPods[4]},
 			expectRV:    currentRV,
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) && utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:         "/registry/pods/",
+						ListOptions: kubernetes.ListOptions{Continue: "/registry/pods/first/bar\x00"},
+					},
+				}
+			},
 		},
 		{
 			name:   "test List with continue from second pod and limit, negative resource version gives consistent read",
@@ -1600,6 +2195,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			expectContinueExact:        encodeContinueOrDie(createdPods[2].Namespace+"/"+createdPods[2].Name+"\x00", int64(continueRV+1)),
 			expectRV:                   currentRV,
 			expectedRemainingItemCount: ptr.To[int64](2),
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) && utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:         "/registry/pods/",
+						ListOptions: kubernetes.ListOptions{Continue: "/registry/pods/first/bar\x00", Limit: 2},
+					},
+				}
+			},
 		},
 		{
 			name:   "test List with continue from third pod, negative resource version gives consistent read",
@@ -1611,6 +2217,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			},
 			expectedOut: []example.Pod{*createdPods[3], *createdPods[4]},
 			expectRV:    currentRV,
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) && utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:         "/registry/pods/",
+						ListOptions: kubernetes.ListOptions{Continue: "/registry/pods/second/foo\x00"},
+					},
+				}
+			},
 		},
 		{
 			name:   "test List with continue from empty fails",
@@ -1731,11 +2348,14 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			if !cmp.Equal(tt.expectedRemainingItemCount, out.RemainingItemCount) {
 				t.Fatalf("unexpected remainingItemCount, diff: %s", cmp.Diff(tt.expectedRemainingItemCount, out.RemainingItemCount))
 			}
-			if watchCacheEnabled && tt.expectEtcdRequest != nil {
-				expectEtcdLists := tt.expectEtcdRequest()
-				etcdLists := recorder.ListRequestForKey(recorderKey)
-				if !cmp.Equal(expectEtcdLists, etcdLists) {
-					t.Fatalf("unexpected etcd requests, diff: %s", cmp.Diff(expectEtcdLists, etcdLists))
+			if watchCacheEnabled {
+				var expectedListRequests []RecordedList
+				if tt.expectCacherRequestsToEtcd != nil {
+					expectedListRequests = tt.expectCacherRequestsToEtcd()
+				}
+				gotListRequests := recorder.ListRequestForKey(recorderKey)
+				if !cmp.Equal(expectedListRequests, gotListRequests) {
+					t.Fatalf("unexpected etcd list requests, diff: %s", cmp.Diff(expectedListRequests, gotListRequests))
 				}
 			}
 		})
@@ -1909,7 +2529,7 @@ func seedMultiLevelData(ctx context.Context, store storage.Interface) (initialRV
 
 	// we want to figure out the resourceVersion before we create anything
 	initialList := &example.PodList{}
-	if err := store.GetList(ctx, "/pods", storage.ListOptions{Predicate: storage.Everything, Recursive: true}, initialList); err != nil {
+	if err := store.GetList(ctx, "/pods/", storage.ListOptions{Predicate: storage.Everything, Recursive: true}, initialList); err != nil {
 		return "", nil, nil, fmt.Errorf("failed to determine starting resourceVersion: %w", err)
 	}
 	initialRV = initialList.ResourceVersion
@@ -2037,12 +2657,12 @@ func RunTestGetListNonRecursive(ctx context.Context, t *testing.T, increaseRV In
 		expectRVTooLarge: true,
 	}, {
 		name:        "non-existing key",
-		key:         "/non-existing",
+		key:         "/pods/non-existing",
 		pred:        storage.Everything,
 		expectedOut: []example.Pod{},
 	}, {
 		name: "with matching pod name",
-		key:  "/non-existing",
+		key:  "/pods/non-existing",
 		pred: storage.SelectionPredicate{
 			Label: labels.Everything(),
 			Field: fields.ParseSelectorOrDie("metadata.name!=" + storedObj.Name),
@@ -2283,7 +2903,7 @@ func RunTestListContinuation(ctx context.Context, t *testing.T, store storage.In
 		Predicate:       pred(1, ""),
 		Recursive:       true,
 	}
-	if err := store.GetList(ctx, "/pods", options, out); err != nil {
+	if err := store.GetList(ctx, "/pods/", options, out); err != nil {
 		t.Fatalf("Unable to get initial list: %v", err)
 	}
 	if len(out.Continue) == 0 {
@@ -2307,13 +2927,13 @@ func RunTestListContinuation(ctx context.Context, t *testing.T, store storage.In
 		Predicate:       pred(0, continueFromSecondItem),
 		Recursive:       true,
 	}
-	if err := store.GetList(ctx, "/pods", options, out); err != nil {
+	if err := store.GetList(ctx, "/pods/", options, out); err != nil {
 		t.Fatalf("Unable to get second page: %v", err)
 	}
 	if len(out.Continue) != 0 {
 		t.Fatalf("Unexpected continuation token set")
 	}
-	key, rv, err := storage.DecodeContinue(continueFromSecondItem, "/pods")
+	key, rv, err := storage.DecodeContinue(continueFromSecondItem, "/pods/")
 	t.Logf("continue token was %d %s %v", rv, key, err)
 	expectNoDiff(t, "incorrect second page", []example.Pod{*preset[1].storedObj, *preset[2].storedObj}, out.Items)
 	if out.ResourceVersion != currentRV {
@@ -2331,7 +2951,7 @@ func RunTestListContinuation(ctx context.Context, t *testing.T, store storage.In
 		Predicate:       pred(1, continueFromSecondItem),
 		Recursive:       true,
 	}
-	if err := store.GetList(ctx, "/pods", options, out); err != nil {
+	if err := store.GetList(ctx, "/pods/", options, out); err != nil {
 		t.Fatalf("Unable to get second page: %v", err)
 	}
 	if len(out.Continue) == 0 {
@@ -2354,7 +2974,7 @@ func RunTestListContinuation(ctx context.Context, t *testing.T, store storage.In
 		Predicate:       pred(1, continueFromThirdItem),
 		Recursive:       true,
 	}
-	if err := store.GetList(ctx, "/pods", options, out); err != nil {
+	if err := store.GetList(ctx, "/pods/", options, out); err != nil {
 		t.Fatalf("Unable to get second page: %v", err)
 	}
 	if len(out.Continue) != 0 {
@@ -2396,7 +3016,7 @@ func RunTestListPaginationRareObject(ctx context.Context, t *testing.T, store st
 		},
 		Recursive: true,
 	}
-	if err := store.GetList(ctx, "/pods", options, out); err != nil {
+	if err := store.GetList(ctx, "/pods/", options, out); err != nil {
 		t.Fatalf("Unable to get initial list: %v", err)
 	}
 	if len(out.Continue) != 0 {
@@ -2472,7 +3092,7 @@ func RunTestListContinuationWithFilter(ctx context.Context, t *testing.T, store 
 		Predicate:       pred(2, ""),
 		Recursive:       true,
 	}
-	if err := store.GetList(ctx, "/pods", options, out); err != nil {
+	if err := store.GetList(ctx, "/pods/", options, out); err != nil {
 		t.Errorf("Unable to get initial list: %v", err)
 	}
 	if len(out.Continue) == 0 {
@@ -2503,7 +3123,7 @@ func RunTestListContinuationWithFilter(ctx context.Context, t *testing.T, store 
 		Predicate:       pred(2, cont),
 		Recursive:       true,
 	}
-	if err := store.GetList(ctx, "/pods", options, out); err != nil {
+	if err := store.GetList(ctx, "/pods/", options, out); err != nil {
 		t.Errorf("Unable to get second page: %v", err)
 	}
 	if len(out.Continue) != 0 {
@@ -2519,7 +3139,7 @@ func RunTestListContinuationWithFilter(ctx context.Context, t *testing.T, store 
 }
 
 type Compaction func(ctx context.Context, t *testing.T, resourceVersion string)
-type IncreaseRVFunc func(ctx context.Context, t *testing.T)
+type IncreaseRVFunc func(ctx context.Context, t *testing.T) (revision int64)
 
 func RunTestListInconsistentContinuation(ctx context.Context, t *testing.T, store storage.Interface, compaction Compaction) {
 	// Setup storage with the following structure:
@@ -2578,7 +3198,7 @@ func RunTestListInconsistentContinuation(ctx context.Context, t *testing.T, stor
 		Predicate:       pred(1, ""),
 		Recursive:       true,
 	}
-	if err := store.GetList(ctx, "/pods", options, out); err != nil {
+	if err := store.GetList(ctx, "/pods/", options, out); err != nil {
 		t.Fatalf("Unable to get initial list: %v", err)
 	}
 	if len(out.Continue) == 0 {
@@ -2615,7 +3235,7 @@ func RunTestListInconsistentContinuation(ctx context.Context, t *testing.T, stor
 		Predicate:       pred(0, continueFromSecondItem),
 		Recursive:       true,
 	}
-	err := store.GetList(ctx, "/pods", options, out)
+	err := store.GetList(ctx, "/pods/", options, out)
 	if err == nil {
 		t.Fatalf("unexpected no error")
 	}
@@ -2637,7 +3257,7 @@ func RunTestListInconsistentContinuation(ctx context.Context, t *testing.T, stor
 		Predicate:       pred(1, inconsistentContinueFromSecondItem),
 		Recursive:       true,
 	}
-	if err := store.GetList(ctx, "/pods", options, out); err != nil {
+	if err := store.GetList(ctx, "/pods/", options, out); err != nil {
 		t.Fatalf("Unable to get second page: %v", err)
 	}
 	if len(out.Continue) == 0 {
@@ -2656,7 +3276,7 @@ func RunTestListInconsistentContinuation(ctx context.Context, t *testing.T, stor
 		Predicate:       pred(1, continueFromThirdItem),
 		Recursive:       true,
 	}
-	if err := store.GetList(ctx, "/pods", options, out); err != nil {
+	if err := store.GetList(ctx, "/pods/", options, out); err != nil {
 		t.Fatalf("Unable to get second page: %v", err)
 	}
 	if len(out.Continue) != 0 {
@@ -2730,7 +3350,7 @@ func RunTestListResourceVersionMatch(ctx context.Context, t *testing.T, store In
 		Predicate: predicate,
 		Recursive: true,
 	}
-	if err := store.GetList(ctx, "/pods", options, &result1); err != nil {
+	if err := store.GetList(ctx, "/pods/", options, &result1); err != nil {
 		t.Fatalf("failed to list objects: %v", err)
 	}
 
@@ -2743,7 +3363,7 @@ func RunTestListResourceVersionMatch(ctx context.Context, t *testing.T, store In
 	}
 
 	result2 := example.PodList{}
-	if err := store.GetList(ctx, "/pods", options, &result2); err != nil {
+	if err := store.GetList(ctx, "/pods/", options, &result2); err != nil {
 		t.Fatalf("failed to list objects: %v", err)
 	}
 
@@ -2753,7 +3373,7 @@ func RunTestListResourceVersionMatch(ctx context.Context, t *testing.T, store In
 	options.ResourceVersionMatch = metav1.ResourceVersionMatchNotOlderThan
 
 	result3 := example.PodList{}
-	if err := store.GetList(ctx, "/pods", options, &result3); err != nil {
+	if err := store.GetList(ctx, "/pods/", options, &result3); err != nil {
 		t.Fatalf("failed to list objects: %v", err)
 	}
 
@@ -2761,7 +3381,7 @@ func RunTestListResourceVersionMatch(ctx context.Context, t *testing.T, store In
 	options.ResourceVersionMatch = metav1.ResourceVersionMatchExact
 
 	result4 := example.PodList{}
-	if err := store.GetList(ctx, "/pods", options, &result4); err != nil {
+	if err := store.GetList(ctx, "/pods/", options, &result4); err != nil {
 		t.Fatalf("failed to list objects: %v", err)
 	}
 
@@ -2784,7 +3404,7 @@ func RunTestGuaranteedUpdate(ctx context.Context, t *testing.T, store InterfaceW
 		hasSelfLink         bool
 	}{{
 		name:                "non-existing key, ignoreNotFound=false",
-		key:                 "/non-existing",
+		key:                 "/pods/non-existing",
 		ignoreNotFound:      false,
 		precondition:        nil,
 		expectNotFoundErr:   true,
@@ -2792,7 +3412,7 @@ func RunTestGuaranteedUpdate(ctx context.Context, t *testing.T, store InterfaceW
 		expectNoUpdate:      false,
 	}, {
 		name:                "non-existing key, ignoreNotFound=true",
-		key:                 "/non-existing",
+		key:                 "/pods/non-existing",
 		ignoreNotFound:      true,
 		precondition:        nil,
 		expectNotFoundErr:   false,
@@ -3175,7 +3795,7 @@ func RunTestTransformationFailure(ctx context.Context, t *testing.T, store Inter
 		Predicate: storage.Everything,
 		Recursive: true,
 	}
-	if err := store.GetList(ctx, "/pods", storageOpts, &got); !storage.IsInternalError(err) {
+	if err := store.GetList(ctx, "/pods/", storageOpts, &got); !storage.IsInternalError(err) {
 		t.Errorf("Unexpected error %v", err)
 	}
 
@@ -3256,7 +3876,7 @@ func RunTestStats(ctx context.Context, t *testing.T, store storage.Interface, co
 func assertStats(t *testing.T, store storage.Interface, sizeEnabled bool, expectStats storage.Stats) {
 	t.Helper()
 	// Execute consistent LIST to refresh state of cache.
-	err := store.GetList(t.Context(), "/pods", storage.ListOptions{Recursive: true, Predicate: storage.Everything}, &example.PodList{})
+	err := store.GetList(t.Context(), "/pods/", storage.ListOptions{Recursive: true, Predicate: storage.Everything}, &example.PodList{})
 	if err != nil {
 		t.Fatalf("GetList failed: %v", err)
 	}
@@ -3309,7 +3929,7 @@ func RunTestListPaging(ctx context.Context, t *testing.T, store storage.Interfac
 	for {
 		calls++
 		listOut := &example.PodList{}
-		err := store.GetList(ctx, "/pods", opts, listOut)
+		err := store.GetList(ctx, "/pods/", opts, listOut)
 		if err != nil {
 			t.Fatalf("Unexpected error %s", err)
 		}
@@ -3739,7 +4359,7 @@ func RunTestNamespaceScopedList(ctx context.Context, t *testing.T, store storage
 
 func RunTestCompactRevision(ctx context.Context, t *testing.T, store storage.Interface, increaseRV IncreaseRVFunc, compact Compaction) {
 	listOut := &example.PodList{}
-	if err := store.GetList(ctx, "/pods", storage.ListOptions{
+	if err := store.GetList(ctx, "/pods/", storage.ListOptions{
 		Predicate: storage.Everything,
 		Recursive: true,
 	}, listOut); err != nil {
@@ -3753,7 +4373,7 @@ func RunTestCompactRevision(ctx context.Context, t *testing.T, store storage.Int
 	if compactedRV >= int64(currentRV) {
 		t.Fatalf("Expected current RV not be compacted, current: %d, compacted: %d", currentRV, compactedRV)
 	}
-	if err := store.GetList(ctx, "/pods", storage.ListOptions{
+	if err := store.GetList(ctx, "/pods/", storage.ListOptions{
 		Predicate:            storage.Everything,
 		Recursive:            true,
 		ResourceVersion:      listOut.ResourceVersion,
@@ -3764,7 +4384,7 @@ func RunTestCompactRevision(ctx context.Context, t *testing.T, store storage.Int
 	increaseRV(ctx, t)
 	expectCompactedRV := currentRV + 1
 	compact(ctx, t, fmt.Sprintf("%d", expectCompactedRV))
-	if err := store.GetList(ctx, "/pods", storage.ListOptions{
+	if err := store.GetList(ctx, "/pods/", storage.ListOptions{
 		Predicate:            storage.Everything,
 		Recursive:            true,
 		ResourceVersion:      listOut.ResourceVersion,
@@ -3776,4 +4396,123 @@ func RunTestCompactRevision(ctx context.Context, t *testing.T, store storage.Int
 	if compactedRV != int64(expectCompactedRV) {
 		t.Errorf("CompactRevision()=%d, expected: %d", store.CompactRevision(), expectCompactedRV)
 	}
+}
+
+func RunTestKeySchema(ctx context.Context, t *testing.T, store storage.Interface) {
+	createObj := &example.Pod{}
+	createOut := &example.Pod{}
+	require.ErrorContains(t, store.Create(ctx, "", createObj, createOut, 0), "empty key")
+	require.ErrorContains(t, store.Create(ctx, "/", createObj, createOut, 0), "empty key")
+	require.ErrorContains(t, store.Create(ctx, ".", createObj, createOut, 0), "invalid key")
+	require.ErrorContains(t, store.Create(ctx, "..", createObj, createOut, 0), "invalid key")
+	require.ErrorContains(t, store.Create(ctx, "pods", createObj, createOut, 0), "lacks resource prefix")
+	require.ErrorContains(t, store.Create(ctx, "/pods", createObj, createOut, 0), "lacks resource prefix")
+	require.ErrorContains(t, store.Create(ctx, "/pods.apps", createObj, createOut, 0), "lacks resource prefix")
+	require.ErrorContains(t, store.Create(ctx, "/foo/", createObj, createOut, 0), "lacks resource prefix")
+	require.NoError(t, store.Create(ctx, "/pods/", createObj, createOut, 0))
+	require.NoError(t, store.Create(ctx, "/pods/name", createObj, createOut, 0))
+	require.NoError(t, store.Create(ctx, "/pods/namespace", createObj, createOut, 0))
+	require.NoError(t, store.Create(ctx, "/pods/namespace/name", createObj, createOut, 0))
+
+	listOut := &example.PodList{}
+	recursiveListOpts := storage.ListOptions{Predicate: storage.Everything, Recursive: true}
+	nonRecursiveListOpts := storage.ListOptions{Predicate: storage.Everything, Recursive: false}
+	require.ErrorContains(t, store.GetList(ctx, "", recursiveListOpts, listOut), "empty key")
+	require.ErrorContains(t, store.GetList(ctx, "/", recursiveListOpts, listOut), "empty key")
+	require.ErrorContains(t, store.GetList(ctx, ".", recursiveListOpts, listOut), "invalid key")
+	require.ErrorContains(t, store.GetList(ctx, "..", recursiveListOpts, listOut), "invalid key")
+	require.ErrorContains(t, store.GetList(ctx, "pods", recursiveListOpts, listOut), "lacks resource prefix")
+	require.ErrorContains(t, store.GetList(ctx, "/pods.apps", recursiveListOpts, listOut), "lacks resource prefix")
+	require.ErrorContains(t, store.GetList(ctx, "/foo/", recursiveListOpts, listOut), "lacks resource prefix")
+	require.ErrorContains(t, store.GetList(ctx, "/pods", nonRecursiveListOpts, listOut), "lacks resource prefix")
+	require.NoError(t, store.GetList(ctx, "/pods", recursiveListOpts, listOut))
+	require.NoError(t, store.GetList(ctx, "/pods/", recursiveListOpts, listOut))
+	require.NoError(t, store.GetList(ctx, "/pods/namespace", recursiveListOpts, listOut))
+	require.NoError(t, store.GetList(ctx, "/pods/namespace/name", recursiveListOpts, listOut))
+
+	getOut := &example.Pod{}
+	getOpts := storage.GetOptions{}
+	require.ErrorContains(t, store.Get(ctx, "", getOpts, getOut), "empty key")
+	require.ErrorContains(t, store.Get(ctx, "/", getOpts, getOut), "empty key")
+	require.ErrorContains(t, store.Get(ctx, ".", getOpts, getOut), "invalid key")
+	require.ErrorContains(t, store.Get(ctx, "..", getOpts, getOut), "invalid key")
+	require.ErrorContains(t, store.Get(ctx, "pods", getOpts, getOut), "lacks resource prefix")
+	require.ErrorContains(t, store.Get(ctx, "/pods", getOpts, getOut), "lacks resource prefix")
+	require.ErrorContains(t, store.Get(ctx, "/pods.apps", getOpts, getOut), "lacks resource prefix")
+	require.ErrorContains(t, store.Get(ctx, "/foo/", getOpts, getOut), "lacks resource prefix")
+	require.NoError(t, store.Get(ctx, "/pods/", getOpts, getOut))
+	require.NoError(t, store.Get(ctx, "/pods/namespace", getOpts, getOut))
+	require.NoError(t, store.Get(ctx, "/pods/namespace/name", getOpts, getOut))
+
+	_, err := store.Watch(ctx, "", recursiveListOpts)
+	require.ErrorContains(t, err, "empty key")
+	_, err = store.Watch(ctx, "/", recursiveListOpts)
+	require.ErrorContains(t, err, "empty key")
+	_, err = store.Watch(ctx, ".", recursiveListOpts)
+	require.ErrorContains(t, err, "invalid key")
+	_, err = store.Watch(ctx, "..", recursiveListOpts)
+	require.ErrorContains(t, err, "invalid key")
+	_, err = store.Watch(ctx, "pods", recursiveListOpts)
+	require.ErrorContains(t, err, "lacks resource prefix")
+	_, err = store.Watch(ctx, "/pods.apps", recursiveListOpts)
+	require.ErrorContains(t, err, "lacks resource prefix")
+	_, err = store.Watch(ctx, "/foo/", recursiveListOpts)
+	require.ErrorContains(t, err, "lacks resource prefix")
+	_, err = store.Watch(ctx, "/pods", nonRecursiveListOpts)
+	require.ErrorContains(t, err, "lacks resource prefix")
+	w, err := store.Watch(ctx, "/pods", recursiveListOpts)
+	require.NoError(t, err)
+	w.Stop()
+	require.NoError(t, err)
+	w.Stop()
+	w, err = store.Watch(ctx, "/pods/namespace", recursiveListOpts)
+	require.NoError(t, err)
+	w.Stop()
+	w, err = store.Watch(ctx, "/pods/namespace/name", recursiveListOpts)
+	require.NoError(t, err)
+	w.Stop()
+
+	updateIn := &example.Pod{}
+	updateOut := &example.Pod{}
+	updateFunc := func(input runtime.Object, res storage.ResponseMeta) (output runtime.Object, ttl *uint64, err error) {
+		return updateIn, nil, nil
+	}
+	require.ErrorContains(t, store.GuaranteedUpdate(ctx, "", updateOut, false, nil, updateFunc, nil), "empty key")
+	require.ErrorContains(t, store.GuaranteedUpdate(ctx, "/", updateOut, false, nil, updateFunc, nil), "empty key")
+	require.ErrorContains(t, store.GuaranteedUpdate(ctx, ".", updateOut, false, nil, updateFunc, nil), "invalid key")
+	require.ErrorContains(t, store.GuaranteedUpdate(ctx, "..", updateOut, false, nil, updateFunc, nil), "invalid key")
+	require.ErrorContains(t, store.GuaranteedUpdate(ctx, "pods", updateOut, false, nil, updateFunc, nil), "lacks resource prefix")
+	require.ErrorContains(t, store.GuaranteedUpdate(ctx, "/pods", updateOut, false, nil, updateFunc, nil), "lacks resource prefix")
+	require.ErrorContains(t, store.GuaranteedUpdate(ctx, "/pods.apps", updateOut, false, nil, updateFunc, nil), "lacks resource prefix")
+	require.ErrorContains(t, store.GuaranteedUpdate(ctx, "/foo/", updateOut, false, nil, updateFunc, nil), "lacks resource prefix")
+	require.NoError(t, store.GuaranteedUpdate(ctx, "/pods/", updateOut, false, nil, updateFunc, nil))
+	require.NoError(t, store.GuaranteedUpdate(ctx, "/pods/namespace", updateOut, false, nil, updateFunc, nil))
+	require.NoError(t, store.GuaranteedUpdate(ctx, "/pods/namespace/name", updateOut, false, nil, updateFunc, nil))
+
+	deleteOut := &example.Pod{}
+	deleteFunc := func(ctx context.Context, obj runtime.Object) error {
+		return nil
+	}
+	deleteOpts := storage.DeleteOptions{}
+	require.ErrorContains(t, store.Delete(ctx, "", deleteOut, nil, deleteFunc, nil, deleteOpts), "empty key")
+	require.ErrorContains(t, store.Delete(ctx, "/", deleteOut, nil, deleteFunc, nil, deleteOpts), "empty key")
+	require.ErrorContains(t, store.Delete(ctx, ".", deleteOut, nil, deleteFunc, nil, deleteOpts), "invalid key")
+	require.ErrorContains(t, store.Delete(ctx, "..", deleteOut, nil, deleteFunc, nil, deleteOpts), "invalid key")
+	require.ErrorContains(t, store.Delete(ctx, "pods", deleteOut, nil, deleteFunc, nil, deleteOpts), "lacks resource prefix")
+	require.ErrorContains(t, store.Delete(ctx, "/pods", deleteOut, nil, deleteFunc, nil, deleteOpts), "lacks resource prefix")
+	require.ErrorContains(t, store.Delete(ctx, "/pods.apps", deleteOut, nil, deleteFunc, nil, deleteOpts), "lacks resource prefix")
+	require.ErrorContains(t, store.Delete(ctx, "/foo", deleteOut, nil, deleteFunc, nil, deleteOpts), "lacks resource prefix")
+	require.NoError(t, store.Delete(ctx, "/pods/", deleteOut, nil, deleteFunc, nil, deleteOpts))
+	require.NoError(t, store.Delete(ctx, "/pods/namespace", deleteOut, nil, deleteFunc, nil, deleteOpts))
+	require.NoError(t, store.Delete(ctx, "/pods/namespace/name", deleteOut, nil, deleteFunc, nil, deleteOpts))
+}
+
+func mustParseResourceVersion(t *testing.T, resourceVersion string) int64 {
+	t.Helper()
+	versioner := storage.APIObjectVersioner{}
+	rv, err := versioner.ParseResourceVersion(resourceVersion)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return int64(rv)
 }

@@ -28,12 +28,12 @@ func Test(t *testing.T) {
 	st.Value(&Struct{M1: &M1{}}).ExpectValid()
 	st.Value(&Struct{M2: &M2{}}).ExpectValid()
 
-	st.Value(&Struct{M1: &M1{}, M2: &M2{}}).ExpectInvalid(
-		field.Invalid(nil, "{m1, m2}", "must specify exactly one of: `m1`, `m2`"),
-	)
-	st.Value(&Struct{}).ExpectInvalid(
-		field.Invalid(nil, "", "must specify one of: `m1`, `m2`"),
-	)
+	st.Value(&Struct{M1: &M1{}, M2: &M2{}}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
+		field.Invalid(nil, nil, "must specify exactly one of"),
+	})
+	st.Value(&Struct{}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
+		field.Invalid(nil, nil, "must specify one of"),
+	})
 
 	// Test validation ratcheting
 	st.Value(&Struct{M1: &M1{}, M2: &M2{}}).OldValue(&Struct{M1: &M1{}, M2: &M2{}}).ExpectValid()

@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/metadata"
@@ -46,11 +47,13 @@ const (
 	ResourceVersionControllerName string = "resource-version-controller"
 )
 
+var verbsRequiredForMigration = []string{"update", "patch", "list"}
+
 // ResourceVersionController adds the resource version obtained from a randomly nonexistent namespace
 // to the SVM status before the migration is initiated. This resource version is utilized for checking
 // freshness of GC cache before the migration is initiated.
 type ResourceVersionController struct {
-	discoveryClient *discovery.DiscoveryClient
+	discoveryClient discovery.DiscoveryInterface
 	metadataClient  metadata.Interface
 	svmListers      svmlisters.StorageVersionMigrationLister
 	svmSynced       cache.InformerSynced
@@ -62,7 +65,7 @@ type ResourceVersionController struct {
 func NewResourceVersionController(
 	ctx context.Context,
 	kubeClient clientset.Interface,
-	discoveryClient *discovery.DiscoveryClient,
+	discoveryClient discovery.DiscoveryInterface,
 	metadataClient metadata.Interface,
 	svmInformer svminformers.StorageVersionMigrationInformer,
 	mapper meta.ResettableRESTMapper,
@@ -125,7 +128,7 @@ func (rv *ResourceVersionController) Run(ctx context.Context) {
 	logger.Info("Starting", "controller", ResourceVersionControllerName)
 	defer logger.Info("Shutting down", "controller", ResourceVersionControllerName)
 
-	if !cache.WaitForNamedCacheSync(ResourceVersionControllerName, ctx.Done(), rv.svmSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, rv.svmSynced) {
 		return
 	}
 
@@ -195,18 +198,18 @@ func (rv *ResourceVersionController) sync(ctx context.Context, key string) error
 		return err
 	}
 	if !exists {
-		_, err = rv.kubeClient.StoragemigrationV1alpha1().
-			StorageVersionMigrations().
-			UpdateStatus(
-				ctx,
-				setStatusConditions(toBeProcessedSVM, svmv1alpha1.MigrationFailed, migrationFailedStatusReason, "resource does not exist in discovery"),
-				metav1.UpdateOptions{},
-			)
-		if err != nil {
-			return err
-		}
+		return rv.failMigration(ctx, toBeProcessedSVM, "resource does not exist in discovery")
+	}
 
-		return nil
+	isMigratable, err := rv.isResourceMigratable(gvr)
+	if err != nil {
+		return err
+	}
+
+	if !isMigratable {
+		err := fmt.Errorf("resource %q does not support discovery operations: %v", gvr.String(), verbsRequiredForMigration)
+		logger.Error(err, "resource is not able to be migrated, not retrying", "gvr", gvr.String())
+		return rv.failMigration(ctx, toBeProcessedSVM, err.Error())
 	}
 
 	toBeProcessedSVM.Status.ResourceVersion, err = rv.getLatestResourceVersion(gvr, ctx)
@@ -283,4 +286,47 @@ func (rv *ResourceVersionController) isResourceNamespaceScoped(gvr schema.GroupV
 	}
 
 	return false, fmt.Errorf("resource %q not found", gvr.String())
+}
+
+// isResourceMigratable checks if the GVR has the list of verbs required for
+// migration. Returns true if all verbs are in the discovery document and false
+// otherwise. If there is an error querying the discovery client or we fail to
+// get the GVR, return an error.
+func (rv *ResourceVersionController) isResourceMigratable(gvr schema.GroupVersionResource) (bool, error) {
+	resourceList, err := rv.discoveryClient.ServerResourcesForGroupVersion(gvr.GroupVersion().String())
+	if apierrors.IsNotFound(err) {
+		return false, nil
+	}
+
+	if resourceList != nil {
+		// even in case of an error above there might be a partial list for APIs that
+		// were already successfully discovered.
+		for _, resource := range resourceList.APIResources {
+			if resource.Name == gvr.Resource {
+				if resource.Verbs != nil && sets.NewString(resource.Verbs...).HasAll(verbsRequiredForMigration...) {
+					return true, nil
+				}
+				return false, nil
+			}
+		}
+	}
+
+	if err != nil {
+		return false, err
+	}
+	return false, fmt.Errorf("resource %q not found in discovery", gvr.String())
+}
+
+func (rv *ResourceVersionController) failMigration(ctx context.Context, svm *svmv1alpha1.StorageVersionMigration, message string) error {
+	_, err := rv.kubeClient.StoragemigrationV1alpha1().
+		StorageVersionMigrations().
+		UpdateStatus(
+			ctx,
+			setStatusConditions(svm, svmv1alpha1.MigrationFailed, migrationFailedStatusReason, message),
+			metav1.UpdateOptions{},
+		)
+	if err != nil {
+		return err
+	}
+	return nil
 }

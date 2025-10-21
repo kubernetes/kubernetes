@@ -187,8 +187,10 @@ func TestClusterServiceIPRange(t *testing.T) {
 			if !tc.ipAllocatorGate {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
 			}
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MultiCIDRServiceAllocator, tc.ipAllocatorGate)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DisableAllocatorDualWrite, tc.disableDualWriteGate)
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.MultiCIDRServiceAllocator: tc.ipAllocatorGate,
+				features.DisableAllocatorDualWrite: tc.disableDualWriteGate,
+			})
 
 			errs := validateClusterIPFlags(tc.options.Extra)
 			if len(errs) > 0 && !tc.expectErrors {

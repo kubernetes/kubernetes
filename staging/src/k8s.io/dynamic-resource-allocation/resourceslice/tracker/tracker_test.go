@@ -67,17 +67,35 @@ func update[T any](oldObj, newObj *T) [2]*T {
 	return [2]*T{oldObj, newObj}
 }
 
-func runInputEvents(tCtx *testContext, events []any) {
-	for _, event := range events {
-		switch event := event.(type) {
-		case []any:
-			for _, event := range event {
-				applyEventPair(tCtx, event)
+func runInputEvents(tCtx *testContext, events []any, permutation []int) {
+	for _, i := range permutation {
+		event, name := lookupEvent(events, i)
+		stepCtx := tCtx.withLoggerName(fmt.Sprintf("event #%s", name))
+		applyEventPair(stepCtx, event)
+	}
+}
+
+// lookupEvent is the opposite of flatten: it takes an index
+// after flattening and maps it back to the event in the original
+// event hierarchy. To do so, it descends into the second level where necessary.
+func lookupEvent(events []any, index int) (any, string) {
+	numEvents := 0
+	for i := range events {
+		if e, ok := events[i].([]any); ok {
+			for j := range e {
+				if numEvents == index {
+					return e[j], fmt.Sprintf("%d/%d", i, j)
+				}
+				numEvents++
 			}
-		default:
-			applyEventPair(tCtx, event)
+		} else {
+			if numEvents == index {
+				return events[i], fmt.Sprintf("%d", i)
+			}
+			numEvents++
 		}
 	}
+	panic(fmt.Sprintf("invalid event index #%d", index))
 }
 
 func applyEventPair(tCtx *testContext, event any) {
@@ -138,6 +156,18 @@ type testContext struct {
 	context.Context
 	*Tracker
 	*fake.Clientset
+}
+
+func (t *testContext) withLoggerName(name string) *testContext {
+	logger := klog.FromContext(t.Context)
+	logger = klog.LoggerWithName(logger, name)
+	t = &testContext{
+		T:         t.T,
+		Context:   klog.NewContext(t.Context, logger),
+		Tracker:   t.Tracker,
+		Clientset: t.Clientset,
+	}
+	return t
 }
 
 var (
@@ -335,6 +365,11 @@ func TestListPatchedResourceSlices(t *testing.T) {
 		// the order in those nested lists is preserved.
 		events                []any
 		expectedPatchedSlices []*resourceapi.ResourceSlice
+		// The exact events that are emitted for a sequence of events is
+		// highly dependent on the order in which those events are received.
+		// We punt on determining a set of validation criteria for every
+		// possible sequence and only check them against the first
+		// permutation: the order in which the events are defined.
 		expectedHandlerEvents []handlerEvent
 		expectEvents          func(t *assert.CollectT, events *v1.EventList)
 		expectUnhandledErrors func(t *testing.T, errs []error)
@@ -643,7 +678,15 @@ func TestListPatchedResourceSlices(t *testing.T) {
 		}
 	}
 
-	testHandlers := func(tCtx *testContext, test test, testExpectedEmittedEvents bool) {
+	testHandlers := func(tCtx *testContext, test test, permutation []int) {
+		isPermutated := false
+		for i, j := range permutation {
+			if i != j {
+				isPermutated = true
+				break
+			}
+		}
+
 		var handlerEvents []handlerEvent
 		handler := cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
@@ -663,9 +706,9 @@ func TestListPatchedResourceSlices(t *testing.T) {
 			unhandledErrors = append(unhandledErrors, err)
 		}
 
-		runInputEvents(tCtx, test.events)
+		runInputEvents(tCtx, test.events, permutation)
 
-		if testExpectedEmittedEvents {
+		if !isPermutated {
 			assert.Equal(tCtx, test.expectedHandlerEvents, handlerEvents)
 		}
 
@@ -709,60 +752,47 @@ func TestListPatchedResourceSlices(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			// The exact events that are emitted for a sequence of events is
-			// highly dependent on the order in which those events are received.
-			// We punt on determining a set of validation criteria for every
-			// possible sequence and only check them against the first
-			// permutation: the order in which the events are defined.
-			testExpectedEmittedEvents := true
-
-			numEvents := len(tc.events)
-			if numEvents <= 1 {
-				// No permutations.
-				tContext := setup(t)
-				testHandlers(tContext, tc, testExpectedEmittedEvents)
-				return
-			}
-
-			// flatten does one level of flattening of events. It also returns
-			// another slice of pairs of indices representing ranges which were
-			// flattened.
-			flatten := func(events []any) ([]any, [][2]int) {
-				var ret []any
+			// flatten does one level of flattening of events, counting all events.
+			// It also returns a slice of pairs of indices representing ranges which were
+			// flattened (= came from the second level) and which therefore must
+			// remain in that order.
+			flatten := func(events []any) (int, [][2]int) {
+				numEvents := 0
 				var ranges [][2]int
 				for _, e := range events {
 					switch e := e.(type) {
 					case []any:
-						ranges = append(ranges, [2]int{len(ret), len(ret) + len(e)})
-						ret = append(ret, e...)
+						ranges = append(ranges, [2]int{numEvents, numEvents + len(e)})
+						numEvents += len(e)
 					default:
-						ret = append(ret, e)
+						numEvents++
 					}
 				}
-				return ret, ranges
+				return numEvents, ranges
 			}
+			numEvents, constraints := flatten(tc.events)
 
-			var constraints [][2]int
-			tc.events, constraints = flatten(tc.events)
-			numEvents = len(tc.events)
+			if len(tc.events) <= 1 {
+				// No permutations possible.
+				var permutation []int
+				for i := 0; i < numEvents; i++ {
+					permutation = append(permutation, i)
+				}
+				tContext := setup(t)
+				testHandlers(tContext, tc, permutation)
+				return
+			}
 
 			permutation := make([]int, numEvents)
 			var permutate func(depth int)
 			permutate = func(depth int) {
 				if depth >= numEvents {
 					// Define a sub-test which runs the current permutation of events.
-					events := make([]any, numEvents)
-					for i := range numEvents {
-						events[i] = tc.events[permutation[i]]
-					}
-					tc := tc
-					tc.events = events
 					name := strings.Trim(fmt.Sprintf("%v", permutation), "[]")
 					t.Run(name, func(t *testing.T) {
 						tContext := setup(t)
-						testHandlers(tContext, tc, testExpectedEmittedEvents)
-
-						testExpectedEmittedEvents = false
+						// No need to clone the slice, we don't run in parallel.
+						testHandlers(tContext, tc, permutation)
 					})
 					return
 				}
@@ -778,10 +808,13 @@ func TestListPatchedResourceSlices(t *testing.T) {
 						}
 						for j := i + 1; j < constraint[1]; j++ {
 							if slices.Contains(permutation[0:depth], j) {
+								// Invalid permutation, would change order
+								// of sub-events.
 								continue nexti
 							}
 						}
 					}
+
 					// Pick it for the current position in permutation,
 					// continue with next position.
 					permutation[depth] = i

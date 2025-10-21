@@ -17,6 +17,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package users contains utilities for managing the users.
 package users
 
 import (
@@ -238,12 +239,17 @@ func addUsersAndGroupsImpl(pathLoginDef, pathUsers, pathGroups string) (*UsersAn
 	}
 
 	// Prepare the maps of users and groups.
-	usersConcat := append(users, usersToCreate...)
+	var usersConcat []*entry
+	usersConcat = append(usersConcat, users...)
+	usersConcat = append(usersConcat, usersToCreate...)
 	mapUsers, err := entriesToEntryMap(usersConcat, usersToCreateSpec)
 	if err != nil {
 		return nil, err
 	}
-	groupsConcat := append(groups, groupsToCreate...)
+
+	var groupsConcat []*entry
+	groupsConcat = append(groupsConcat, groups...)
+	groupsConcat = append(groupsConcat, groupsToCreate...)
 	mapGroups, err := entriesToEntryMap(groupsConcat, groupsToCreateSpec)
 	if err != nil {
 		return nil, err
@@ -593,15 +599,15 @@ func openFileWithLock(path string) (f *os.File, close func(), err error) {
 		}
 	}
 	if err != nil {
-		f.Close()
+		_ = f.Close()
 		return nil, nil, err
 	}
 	close = func() {
 		// This function should be called once operations with the file are finished.
 		// It unlocks the file and closes it.
 		unlock := syscall.Flock_t{Type: syscall.F_UNLCK}
-		syscall.FcntlFlock(f.Fd(), syscall.F_SETLK, &unlock)
-		f.Close()
+		_ = syscall.FcntlFlock(f.Fd(), syscall.F_SETLK, &unlock)
+		_ = f.Close()
 	}
 	return f, close, nil
 }

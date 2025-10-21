@@ -4,7 +4,8 @@ linters:
     - '*'
   enable:
     # - "commentstart" # Ensure comments start with the serialized version of the field name.
-    # - "conditions" # Ensure conditions have the correct json tags and markers.
+    - "conditions" # Ensure conditions have the correct json tags and markers.
+    # - "conflictingmarkers" - Detect mutually exclusive markers on the same field.
     # - "integers" # Ensure only int32 and int64 are used for integers.
     # - "jsontags" # Ensure every field has a json tag.
     # - "maxlength" # Ensure all strings and arrays have maximum lengths/maximum items. ONLY for CRDs until declarative markers exist in core types.
@@ -12,19 +13,52 @@ linters:
     # - "nofloats" # Ensure floats are not used.
     # - "nomaps" # Ensure maps are not used, unless they are `map[string]string` (for labels/annotations/etc).
     # - "nophase" # Ensure field names do not have the word "phase" in them.
+    # - "notimestamp" # Ensure fields are not named "timestamp", prefer "time".
+    # - "optionalfields" # Ensure fields marked optional have omitempty and pointers.
     # - "optionalorrequired" # Every field should be marked as `+optional` xor `+required`.
-    # - "requiredfields" # Required fields should not be pointers, and should not have `omitempty`.
+    # - "requiredfields" # Required fields should only be pointers when required based on the validity of the zero value, they should always have `omitempty`.
+    - "ssatags" # Ensure lists have a listType tag.
+    # - "uniquemarkers" # Ensure markers are not duplicated across field and type definitions.
 lintersConfig:
-  # conditions:
-  #   isFirstField: Warn # Require conditions to be the first field in the status struct.
-  #   usePatchStrategy: SuggestFix # Conditions should not use the patch strategy on CRDs.
-  #   useProtobuf: SuggestFix # We don't use protobuf, so protobuf tags are not required.
+  conditions:
+    isFirstField: Ignore
+    usePatchStrategy: SuggestFix
+    useProtobuf: SuggestFix
+  # conflictingMarkers:
+  #   conflicts:
+  #   - name: "default_vs_required"
+  #     sets:
+  #     - ["default", "kubebuilder:default"]
+  #     - ["required", "kubebuilder:validation:Required", "k8s:required"]
+  #     description: "A field with a default value cannot be required"
   # jsonTags:
   #   jsonTagRegex: "^[a-z][a-z0-9]*(?:[A-Z][a-z0-9]*)*$" # The default regex is appropriate for our use case.
   # nomaps:
   #   policy: AllowStringToStringMaps # Determines how the linter should handle maps of basic types. Maps of objects are always disallowed.
+  # optionalFields:
+  #   policy: AllowOptionalFields # Determines how the linter should handle optional fields.optionalfields:
+  #  pointers:
+  #    preference: Always | WhenRequired # Whether to always require pointers, or only when required. Defaults to `Always`.
+  #    policy: SuggestFix | Warn # The policy for pointers in optional fields. Defaults to `SuggestFix`.
+  #  omitempty:
+  #      policy: SuggestFix | Warn | Ignore # The policy for omitempty in optional fields. Defaults to `SuggestFix`.
+  #  omitzero:
+  #      policy: SuggestFix | Warn | Forbid # The policy for omitzero in optional fields. Defaults to `SuggestFix`.
   # optionalOrRequired:
   #   preferredOptionalMarker: optional # The preferred optional marker to use, fixes will suggest to use this marker. Defaults to `optional`.
-  #   preferredRequiredMarker: required # The preferred required marker to use, fixes will suggest to use this marker. Defaults to `required`.
+  #   preferredRequiredMarker: required # The preferred required marker to use, fixes will suggest to use this marker. Defaults to `required`. 
+  #   policy: AllowOptionalFields # Determines how the linter should handle optional fields.
   # requiredFields:
-  #   pointerPolicy: SuggestFix # Defaults to `SuggestFix`. We want our required fields to not be pointers.
+  #   pointers:
+  #    policy: SuggestFix | Warn # The policy for pointers in required fields. Defaults to `SuggestFix`.
+  #  omitempty:
+  #      policy: SuggestFix | Warn | Ignore # The policy for omitempty in required fields. Defaults to `SuggestFix`.
+  #  omitzero:
+  #      policy: SuggestFix | Warn | Forbid # The policy for omitzero in required fields. Defaults to `SuggestFix`.
+  ssatags:
+   listTypeSetUsage: Ignore # The policy for listType=set usage on object arrays. Defaults to `Warn`.
+  # uniquemarkers:
+  #   customMarkers:
+  #     - identifier: custom:SomeCustomMarker
+  #       attributes:
+  #         - fruit

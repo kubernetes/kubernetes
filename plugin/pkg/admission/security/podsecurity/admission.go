@@ -43,6 +43,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	corev1listers "k8s.io/client-go/listers/core/v1"
+	"k8s.io/component-base/compatibility"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -71,6 +72,9 @@ type Plugin struct {
 	*admission.Handler
 
 	inspectedFeatureGates bool
+
+	inspectedEffectiveVersion bool
+	emulationVersion          *podsecurityadmissionapi.Version
 
 	client          kubernetes.Interface
 	namespaceLister corev1listers.NamespaceLister
@@ -104,16 +108,10 @@ func newPlugin(reader io.Reader) (*Plugin, error) {
 		return nil, err
 	}
 
-	evaluator, err := policy.NewEvaluator(policy.DefaultChecks())
-	if err != nil {
-		return nil, fmt.Errorf("could not create PodSecurityRegistry: %w", err)
-	}
-
 	return &Plugin{
 		Handler: admission.NewHandler(admission.Create, admission.Update),
 		delegate: &podsecurityadmission.Admission{
 			Configuration:    config,
-			Evaluator:        evaluator,
 			Metrics:          getDefaultRecorder(),
 			PodSpecExtractor: podsecurityadmission.DefaultPodSpecExtractor{},
 		},
@@ -146,23 +144,47 @@ func (p *Plugin) updateDelegate() {
 	if p.client == nil {
 		return
 	}
-	p.delegate.PodLister = podsecurityadmission.PodListerFromInformer(p.podLister)
-	p.delegate.NamespaceGetter = podsecurityadmission.NamespaceGetterFromListerAndClient(p.namespaceLister, p.client)
+	if !p.inspectedEffectiveVersion {
+		return
+	}
+	if p.delegate.PodLister == nil {
+		p.delegate.PodLister = podsecurityadmission.PodListerFromInformer(p.podLister)
+	}
+	if p.delegate.NamespaceGetter == nil {
+		p.delegate.NamespaceGetter = podsecurityadmission.NamespaceGetterFromListerAndClient(p.namespaceLister, p.client)
+	}
+	if p.delegate.Evaluator == nil {
+		evaluator, err := policy.NewEvaluator(policy.DefaultChecks(), p.emulationVersion)
+		if err != nil {
+			panic(fmt.Errorf("could not create PodSecurityRegistry: %w", err))
+		}
+		p.delegate.Evaluator = evaluator
+	}
 }
 
-func (c *Plugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
-	c.inspectedFeatureGates = true
-	policy.RelaxPolicyForUserNamespacePods(featureGates.Enabled(features.UserNamespacesPodSecurityStandards))
-
-	if !featureGates.Enabled(features.ProbeHostPodSecurityStandards) {
-		policy.SkipProbeHostEnforcement()
+func (p *Plugin) InspectEffectiveVersion(version compatibility.EffectiveVersion) {
+	p.inspectedEffectiveVersion = true
+	binaryVersion := version.BinaryVersion()
+	emulationVersion := version.EmulationVersion()
+	binaryMajorMinor := podsecurityadmissionapi.MajorMinorVersion(int(binaryVersion.Major()), int(binaryVersion.Minor()))
+	emulationMajorMinor := podsecurityadmissionapi.MajorMinorVersion(int(emulationVersion.Major()), int(emulationVersion.Minor()))
+	if binaryMajorMinor != emulationMajorMinor {
+		p.emulationVersion = &emulationMajorMinor
 	}
+}
+
+func (p *Plugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
+	p.inspectedFeatureGates = true
+	policy.RelaxPolicyForUserNamespacePods(featureGates.Enabled(features.UserNamespacesPodSecurityStandards))
 }
 
 // ValidateInitialization ensures all required options are set
 func (p *Plugin) ValidateInitialization() error {
 	if !p.inspectedFeatureGates {
 		return fmt.Errorf("%s did not see feature gates", PluginName)
+	}
+	if !p.inspectedEffectiveVersion {
+		return fmt.Errorf("%s did not see effective version", PluginName)
 	}
 	if err := p.delegate.CompleteConfiguration(); err != nil {
 		return fmt.Errorf("%s configuration error: %w", PluginName, err)

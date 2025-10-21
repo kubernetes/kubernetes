@@ -17,13 +17,13 @@
 # Combining `performance` and `short` selects suitable workloads for a local
 # before/after comparisons with benchstat.
 
-# SteadyStateClusterResourceClaimTemplateConsumableCapacity is a variant of
+# ConsumableCapacity is a variant of
 # SchedulingWithResourceClaimTemplate. It creates a single ResourceSlice that have two devices, 
 # one preallocate device slice and one basic device. Both allows multiple allocations and contain consumable capacity.
 # And, it creates a resource claim template with two requests.
 # Each requests half of this capacity for two count.
 # The first request checks distinctAttribute which the other checks matchAttribute.
-- name: SteadyStateClusterResourceClaimTemplateConsumableCapacity
+- name: ConsumableCapacity
   featureGates:
     DynamicResourceAllocation: true
     DRAConsumableCapacity: true
@@ -48,7 +48,7 @@
   - opcode: createPods
     namespace: test
     countParam: $measurePods
-    steadyState: true
+    steadyStateParam: $steadyState
     durationParam: $duration
     podTemplatePath: ../templates/pod-with-claim-template.yaml
     collectMetrics: true
@@ -60,7 +60,8 @@
       nodesWithoutDRA: 1
       resourceSlices: 1
       measurePods: 1
-      duration: 2s
+      steadyState: false
+      duration: 0s # unused
       maxClaimsPerNode: 2
   - name: fast_with_DRAPartitionableDevices
     featureGates:
@@ -72,7 +73,8 @@
       nodesWithoutDRA: 1
       resourceSlices: 1
       measurePods: 1
-      duration: 2s
+      steadyState: false
+      duration: 0s # unused
       maxClaimsPerNode: 2
   - name: 2000pods_100nodes
     params:
@@ -80,5 +82,6 @@
       nodesWithoutDRA: 0
       resourceSlices: 2000
       measurePods: 2000
+      steadyState: true
       duration: 10s
       maxClaimsPerNode: 20

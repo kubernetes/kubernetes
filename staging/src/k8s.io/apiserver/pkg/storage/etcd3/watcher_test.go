@@ -108,7 +108,7 @@ func TestProgressNotify(t *testing.T) {
 	clusterConfig.WatchProgressNotifyInterval = time.Second
 	ctx, store, client := testSetup(t, withClientConfig(clusterConfig))
 
-	storagetesting.RunOptionalTestProgressNotify(ctx, t, store, increaseRV(client.Client))
+	storagetesting.RunOptionalTestProgressNotify(ctx, t, store, increaseRVFunc(client.Client))
 }
 
 func TestWatchWithUnsafeDelete(t *testing.T) {
@@ -227,7 +227,7 @@ func TestTooLargeResourceVersionErrorForWatchList(t *testing.T) {
 		t.Fatalf("Unable to convert NewTooLargeResourceVersionError to apierrors.StatusError")
 	}
 
-	w, err := store.watcher.Watch(ctx, "/abc", int64(102), requestOpts)
+	w, err := store.watcher.Watch(ctx, "/abc/", int64(102), requestOpts)
 	if err != nil {
 		t.Fatal(err)
 	}

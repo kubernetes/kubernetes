@@ -23,6 +23,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -803,55 +804,7 @@ func TestApplyOverride(t *testing.T) {
 				},
 			},
 		},
-		{
-			name: "alias ignores command override",
-			nestedCmds: []fakeCmds[string]{
-				{
-					name: "command1",
-					flags: []fakeFlag[string]{
-						{
-							name:  "firstflag",
-							value: "test",
-						},
-					},
-				},
-			},
-			args: []string{
-				"root",
-				"alias",
-			},
-			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
-				return &config.Preference{
-					TypeMeta: metav1.TypeMeta{
-						Kind:       "Preference",
-						APIVersion: "kubectl.config.k8s.io/v1alpha1",
-					},
-					Defaults: []config.CommandDefaults{
-						{
-							Command: "command1",
-							Options: []config.CommandOptionDefault{
-								{
-									Name:    "firstflag",
-									Default: "changed",
-								},
-							},
-						},
-					},
-					Aliases: []config.AliasOverride{
-						{
-							Name:    "alias",
-							Command: "command1",
-						},
-					},
-				}, nil
-			},
-			expectedFlags: []fakeFlag[string]{
-				{
-					name:  "firstflag",
-					value: "test",
-				},
-			},
-		},
+
 		{
 			name: "alias command override",
 			nestedCmds: []fakeCmds[string]{
@@ -912,10 +865,12 @@ func TestApplyOverride(t *testing.T) {
 			addCommands(rootCmd, test.nestedCmds)
 			pref.getPreferencesFunc = test.getPreferencesFunc
 			errWriter := &bytes.Buffer{}
+
 			_, err := pref.Apply(rootCmd, test.args, errWriter)
 			if test.expectedErr == nil && err != nil {
 				t.Fatalf("unexpected error %v\n", err)
 			}
+
 			if test.expectedErr != nil {
 				if test.expectedErr.Error() != err.Error() {
 					t.Fatalf("error %s expected but actual is %s", test.expectedErr, err)
@@ -936,18 +891,25 @@ func TestApplyOverride(t *testing.T) {
 			if errWriter.String() != "" {
 				t.Fatalf("unexpected error message %s\n", errWriter.String())
 			}
-
+			// Verify annotation and the original command
+			originalCommand := actualCmd.Annotations[KubeRCOriginalCommandAnnotation]
+			if !strings.Contains(originalCommand, actualCmd.Name()) {
+				t.Fatalf("missing command '%s' in original command '%s'", originalCommand, actualCmd.Name())
+			}
 			for _, expectedFlag := range test.expectedFlags {
 				actualFlag := actualCmd.Flag(expectedFlag.name)
 				if actualFlag.Value.String() != expectedFlag.value {
 					t.Fatalf("unexpected flag value expected %s actual %s", expectedFlag.value, actualFlag.Value.String())
+				}
+				if !strings.Contains(originalCommand, expectedFlag.value) {
+					t.Fatalf("missing flag '%s' in original command '%s'", expectedFlag.value, originalCommand)
 				}
 			}
 		})
 	}
 }
 
-func TestApplOverrideBool(t *testing.T) {
+func TestApplyOverrideBool(t *testing.T) {
 	tests := []testApplyOverride[bool]{
 		{
 			name: "command override",
@@ -1160,16 +1122,17 @@ func TestApplOverrideBool(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unable to find the command %v\n", err)
 			}
-
 			err = actualCmd.ParseFlags(test.args[1:])
 			if err != nil {
 				t.Fatalf("unexpected error %v\n", err)
 			}
-
 			if errWriter.String() != "" {
 				t.Fatalf("unexpected error message %s\n", errWriter.String())
 			}
-
+			originalCommand := actualCmd.Annotations[KubeRCOriginalCommandAnnotation]
+			if !strings.Contains(originalCommand, actualCmd.Name()) {
+				t.Fatalf("missing command '%s' in original command '%s'", actualCmd.Name(), originalCommand)
+			}
 			for _, expectedFlag := range test.expectedFlags {
 				actualFlag := actualCmd.Flag(expectedFlag.name)
 				actualValue, err := strconv.ParseBool(actualFlag.Value.String())
@@ -1178,6 +1141,9 @@ func TestApplOverrideBool(t *testing.T) {
 				}
 				if actualValue != expectedFlag.value {
 					t.Fatalf("unexpected flag value expected %t actual %s", expectedFlag.value, actualFlag.Value.String())
+				}
+				if !strings.Contains(originalCommand, actualFlag.Shorthand) {
+					t.Fatalf("missing flag '%s' in original command '%s'", actualFlag.Name, originalCommand)
 				}
 			}
 		})
@@ -1465,7 +1431,7 @@ func TestApplyAliasBool(t *testing.T) {
 			if test.expectedCmd != actualCmd.Name() {
 				t.Fatalf("unexpected command expected %s actual %s", test.expectedCmd, actualCmd.Name())
 			}
-
+			var originalCommand string
 			for _, expectedFlag := range test.expectedFlags {
 				actualFlag := actualCmd.Flag(expectedFlag.name)
 				actualValue, err := strconv.ParseBool(actualFlag.Value.String())
@@ -1474,6 +1440,10 @@ func TestApplyAliasBool(t *testing.T) {
 				}
 				if actualValue != expectedFlag.value {
 					t.Fatalf("unexpected flag value expected %t actual %s", expectedFlag.value, actualFlag.Value.String())
+				}
+				originalCommand = actualCmd.Annotations[KubeRCOriginalCommandAnnotation]
+				if !strings.Contains(originalCommand, expectedFlag.shorthand) {
+					t.Fatalf("missing command '%s' in original command '%s'", expectedFlag.shorthand, originalCommand)
 				}
 			}
 
@@ -1487,6 +1457,9 @@ func TestApplyAliasBool(t *testing.T) {
 				}
 				if !found {
 					t.Fatalf("expected arg %s can not be found", expectedArg)
+				}
+				if !strings.Contains(originalCommand, expectedArg) {
+					t.Fatalf("missing command '%s' in original command '%s'", expectedArg, originalCommand)
 				}
 			}
 		})
@@ -1779,7 +1752,7 @@ func TestApplyAlias(t *testing.T) {
 			},
 		},
 		{
-			name: "command override prependArgs with appendArgs with args with flagas",
+			name: "command override prependArgs with appendArgs with args with flags",
 			nestedCmds: []fakeCmds[string]{
 				{
 					name: "command1",
@@ -2564,6 +2537,59 @@ func TestApplyAlias(t *testing.T) {
 				"nodes",
 			},
 		},
+		{
+			name: "alias ignores command override",
+			nestedCmds: []fakeCmds[string]{
+				{
+					name: "command1",
+					flags: []fakeFlag[string]{
+						{
+							name:  "firstflag",
+							value: "test",
+						},
+					},
+				},
+			},
+			args: []string{
+				"root",
+				"alias",
+				"--firstflag",
+				"test",
+			},
+			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+				return &config.Preference{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "Preference",
+						APIVersion: "kubectl.config.k8s.io/v1alpha1",
+					},
+					Defaults: []config.CommandDefaults{
+						{
+							Command: "command1",
+							Options: []config.CommandOptionDefault{
+								{
+									Name:    "firstflag",
+									Default: "changed",
+								},
+							},
+						},
+					},
+					Aliases: []config.AliasOverride{
+						{
+							Name:    "alias",
+							Command: "command1",
+						},
+					},
+				}, nil
+			},
+			expectedFlags: []fakeFlag[string]{
+				{
+					name:  "firstflag",
+					value: "test",
+				},
+			},
+			expectedCmd:  "alias",
+			expectedArgs: []string{},
+		},
 	}
 
 	for _, test := range tests {
@@ -2608,11 +2634,15 @@ func TestApplyAlias(t *testing.T) {
 			if test.expectedCmd != actualCmd.Name() {
 				t.Fatalf("unexpected command expected %s actual %s", test.expectedCmd, actualCmd.Name())
 			}
-
+			var originalCommand string
 			for _, expectedFlag := range test.expectedFlags {
 				actualFlag := actualCmd.Flag(expectedFlag.name)
 				if actualFlag.Value.String() != expectedFlag.value {
 					t.Fatalf("unexpected flag value expected %s actual %s", expectedFlag.value, actualFlag.Value.String())
+				}
+				originalCommand = actualCmd.Annotations[KubeRCOriginalCommandAnnotation]
+				if !strings.Contains(originalCommand, actualFlag.Value.String()) {
+					t.Fatalf("missing flag '%s' in original command '%s'", actualFlag.Value.String(), originalCommand)
 				}
 			}
 
@@ -2626,6 +2656,9 @@ func TestApplyAlias(t *testing.T) {
 				}
 				if !found {
 					t.Fatalf("expected arg %s can not be found", expectedArg)
+				}
+				if !strings.Contains(originalCommand, expectedArg) {
+					t.Fatalf("missing command '%s' in original command '%s'", expectedArg, originalCommand)
 				}
 			}
 		})
@@ -2709,7 +2742,6 @@ func addCommands[T supportedTypes](rootCmd *cobra.Command, commands []fakeCmds[T
 				subCmd.Flags().Bool(flg.name, v, "")
 			}
 		}
-
 	}
 	rootCmd.AddCommand(subCmd)
 

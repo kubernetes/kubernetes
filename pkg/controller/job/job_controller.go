@@ -226,7 +226,7 @@ func newControllerWithClock(ctx context.Context, podInformer coreinformers.PodIn
 	jm.podStore = podInformer.Lister()
 	jm.podStoreSynced = podInformer.Informer().HasSynced
 
-	err := controller.AddPodControllerUIDIndexer(podInformer.Informer())
+	err := controller.AddPodControllerIndexer(podInformer.Informer())
 	if err != nil {
 		return nil, fmt.Errorf("adding Pod controller UID indexer: %w", err)
 	}
@@ -257,7 +257,7 @@ func (jm *Controller) Run(ctx context.Context, workers int) {
 	logger.Info("Starting job controller")
 	defer logger.Info("Shutting down job controller")
 
-	if !cache.WaitForNamedCacheSync("job", ctx.Done(), jm.podStoreSynced, jm.jobStoreSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, jm.podStoreSynced, jm.jobStoreSynced) {
 		return
 	}
 
@@ -769,7 +769,7 @@ func (jm *Controller) getPodsForJob(ctx context.Context, j *batch.Job) ([]*v1.Po
 	}
 
 	// list all pods managed by this Job using the pod indexer
-	pods, err := controller.FilterPodsByOwner(jm.podIndexer, &j.ObjectMeta)
+	pods, err := controller.FilterPodsByOwner(jm.podIndexer, &j.ObjectMeta, "Job", true)
 	if err != nil {
 		return nil, err
 	}
@@ -1782,10 +1782,7 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 					if completionIndex != unknownCompletionIndex {
 						template = podTemplate.DeepCopy()
 						addCompletionIndexAnnotation(template, completionIndex)
-
-						if feature.DefaultFeatureGate.Enabled(features.PodIndexLabel) {
-							addCompletionIndexLabel(template, completionIndex)
-						}
+						addCompletionIndexLabel(template, completionIndex)
 						template.Spec.Hostname = fmt.Sprintf("%s-%d", job.Name, completionIndex)
 						generateName = podGenerateNameWithIndex(job.Name, completionIndex)
 						if hasBackoffLimitPerIndex(job) {

@@ -19,6 +19,7 @@ package zerodefaults
 import (
 	"testing"
 
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/utils/ptr"
 )
 
@@ -27,13 +28,13 @@ func Test(t *testing.T) {
 
 	st.Value(&Struct{
 		// All zero-values.
-	}).ExpectRegexpsByPath(map[string][]string{
+	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
 		// "stringField": optional value fields with zero defaults are just docs
 		// "intField": optional value fields with zero defaults are just docs
 		// "boolField": optional value fields with zero defaults are just docs
-		"stringPtrField": {"Required value"},
-		"intPtrField":    {"Required value"},
-		"boolPtrField":   {"Required value"},
+		field.Required(field.NewPath("stringPtrField"), ""),
+		field.Required(field.NewPath("intPtrField"), ""),
+		field.Required(field.NewPath("boolPtrField"), ""),
 	})
 
 	st.Value(&Struct{

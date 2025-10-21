@@ -353,7 +353,7 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount", func() {
 					} else {
 						// There is nothing blocking the second pod from starting, wait for the second pod to fullly start.
 						reason = string(events.StartedContainer)
-						msg = "Started container"
+						msg = "" // the message has changed in Kubernetes 1.35, the Reason must be enough.
 					}
 				}
 				eventSelector := fields.Set{
@@ -361,6 +361,7 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount", func() {
 					"involvedObject.name":      pod2.Name,
 					"involvedObject.namespace": pod2.Namespace,
 					"reason":                   reason,
+					"source":                   "kubelet",
 				}.AsSelector().String()
 				err = e2eevents.WaitTimeoutForEvent(ctx, m.cs, pod2.Namespace, eventSelector, msg, f.Timeouts.PodStart)
 				framework.ExpectNoError(err, "waiting for event %q in the second test pod", msg)

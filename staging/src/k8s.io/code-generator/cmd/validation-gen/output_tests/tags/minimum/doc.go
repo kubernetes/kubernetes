@@ -53,9 +53,7 @@ type Struct struct {
 	// +k8s:minimum=1
 	Uint64Field uint64 `json:"uint64Field"`
 
-	// +k8s:minimum=1
-	TypedefField IntType `json:"typedefField"`
-	// +k8s:minimum=1
+	TypedefField    IntType  `json:"typedefField"`
 	TypedefPtrField *IntType `json:"typedefPtrField"`
 }
 

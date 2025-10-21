@@ -18,8 +18,6 @@ package e2enode
 
 import (
 	"context"
-	"fmt"
-	"strings"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -76,22 +74,17 @@ type updateKubeletOptions struct {
 func updateKubeletConfigWithOptions(ctx context.Context, f *framework.Framework, kubeletConfig *kubeletconfig.KubeletConfiguration, opts updateKubeletOptions) {
 	ginkgo.GinkgoHelper()
 
-	nodeIdent := identifyNode(getLocalNode(ctx, f))
-
 	// Update the Kubelet configuration.
-	ginkgo.By("Stopping the kubelet on " + nodeIdent)
 	restartKubelet := mustStopKubelet(ctx, f)
 
 	// Delete CPU and memory manager state files to be sure it will not prevent the kubelet restart
 	if opts.deleteStateFiles {
-		ginkgo.By("Deleting the kubelet state files on " + nodeIdent)
 		deleteStateFile(cpuManagerStateFile)
 		deleteStateFile(memoryManagerStateFile)
 	}
 
 	framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(kubeletConfig))
 
-	ginkgo.By("Restarting the kubelet on " + nodeIdent)
 	restartKubelet(ctx)
 
 	if opts.ensureConsistentReadyNode {
@@ -99,21 +92,6 @@ func updateKubeletConfigWithOptions(ctx context.Context, f *framework.Framework,
 			return getNodeReadyStatus(ctx, f) && kubeletHealthCheck(kubeletHealthCheckURL)
 		}).WithTimeout(2 * time.Minute).WithPolling(2 * time.Second).Should(gomega.BeTrueBecause("node keeps reporting ready status"))
 	}
-}
-
-func identifyNode(node *v1.Node) string {
-	if node == nil {
-		return "localhost"
-	}
-	var addrs string
-	if len(node.Status.Addresses) > 0 {
-		var sb strings.Builder
-		for _, addr := range node.Status.Addresses {
-			fmt.Fprintf(&sb, " %v=%v", addr.Type, addr.Address)
-		}
-		addrs = " <" + sb.String()[1:] + ">"
-	}
-	return node.Name + addrs
 }
 
 func updateKubeletConfig(ctx context.Context, f *framework.Framework, kubeletConfig *kubeletconfig.KubeletConfiguration, deleteStateFiles bool) {

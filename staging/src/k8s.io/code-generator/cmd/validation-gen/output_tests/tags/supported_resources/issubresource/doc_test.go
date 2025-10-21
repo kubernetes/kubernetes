@@ -27,13 +27,13 @@ func TestRegisterValidations(t *testing.T) {
 	st := localSchemeBuilder.Test(t)
 
 	t1 := &T1{}
-	st.Value(t1).ExpectInvalid(
-		field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", t1, "/")),
-	)
+	st.Value(t1).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
+		field.InternalError(nil, fmt.Errorf("")),
+	})
 
 	st.Value(t1).Subresources([]string{"scale"}).ExpectValid()
 
-	st.Value(t1).Subresources([]string{"unknown"}).ExpectInvalid(
-		field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", t1, "/unknown")),
-	)
+	st.Value(t1).Subresources([]string{"unknown"}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
+		field.InternalError(nil, fmt.Errorf("")),
+	})
 }

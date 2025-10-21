@@ -262,7 +262,7 @@ func CollectAndFormat(c prometheus.Collector, format expfmt.FormatType, metricNa
 // convertReaderToMetricFamily would read from a io.Reader object and convert it to a slice of
 // dto.MetricFamily.
 func convertReaderToMetricFamily(reader io.Reader) ([]*dto.MetricFamily, error) {
-	var tp expfmt.TextParser
+	tp := expfmt.NewTextParser(model.UTF8Validation)
 	notNormalized, err := tp.TextToMetricFamilies(reader)
 	if err != nil {
 		return nil, fmt.Errorf("converting reader to metric families failed: %w", err)

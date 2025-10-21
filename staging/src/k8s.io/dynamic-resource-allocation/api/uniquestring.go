@@ -17,6 +17,7 @@ limitations under the License.
 package api
 
 import (
+	"encoding/json"
 	"unique"
 )
 
@@ -33,6 +34,11 @@ func (us UniqueString) String() string {
 		return ""
 	}
 	return unique.Handle[string](us).Value()
+}
+
+// MarshalJSON is primarily useful for pretty-printing as JSON or YAML.
+func (us UniqueString) MarshalJSON() ([]byte, error) {
+	return json.Marshal(us.String())
 }
 
 // MakeUniqueString constructs a new unique string.

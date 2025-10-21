@@ -98,8 +98,8 @@ func NewDetectLocalByBridgeInterface(interfaceName string) LocalTrafficDetector 
 	return &detectLocal{
 		ifLocal:       []string{"-i", interfaceName},
 		ifNotLocal:    []string{"!", "-i", interfaceName},
-		ifLocalNFT:    []string{"iif", interfaceName},
-		ifNotLocalNFT: []string{"iif", "!=", interfaceName},
+		ifLocalNFT:    []string{"iifname", interfaceName},
+		ifNotLocalNFT: []string{"iifname", "!=", interfaceName},
 	}
 }
 
@@ -110,7 +110,7 @@ func NewDetectLocalByInterfaceNamePrefix(interfacePrefix string) LocalTrafficDet
 	return &detectLocal{
 		ifLocal:       []string{"-i", interfacePrefix + "+"},
 		ifNotLocal:    []string{"!", "-i", interfacePrefix + "+"},
-		ifLocalNFT:    []string{"iif", interfacePrefix + "*"},
-		ifNotLocalNFT: []string{"iif", "!=", interfacePrefix + "*"},
+		ifLocalNFT:    []string{"iifname", interfacePrefix + "*"},
+		ifNotLocalNFT: []string{"iifname", "!=", interfacePrefix + "*"},
 	}
 }

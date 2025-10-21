@@ -147,15 +147,7 @@
         "go.etcd.io/etcd/client/v3",
         "go.etcd.io/etcd/server/v3",
         "go.etcd.io/raft/v3",
-        "k8s.io/api",
-        "k8s.io/apiextensions-apiserver",
-        "k8s.io/apimachinery",
-        "k8s.io/apiserver",
-        "k8s.io/client-go",
-        "k8s.io/code-generator",
-        "k8s.io/kube-aggregator",
-        "k8s.io/kubernetes",
-        "k8s.io/metrics"
+        "k8s.io/code-generator"
       ],
       "github.com/golang/groupcache": [
         "go.etcd.io/etcd/server/v3"
@@ -228,10 +220,6 @@
         "github.com/antlr4-go/antlr/v4",
         "github.com/google/cel-go",
         "github.com/grpc-ecosystem/go-grpc-middleware/v2"
-      ],
-      "gopkg.in/yaml.v2": [
-        "github.com/prometheus/client_golang",
-        "github.com/prometheus/common"
       ],
       "gopkg.in/yaml.v3": [
         "github.com/containerd/containerd/api",

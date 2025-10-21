@@ -17,7 +17,6 @@ limitations under the License.
 package stats
 
 import (
-	"context"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -51,6 +50,7 @@ import (
 	kubepodtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
 	serverstats "k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -100,7 +100,7 @@ const testPodLogDirectory = "/var/log/kube/pods/" // Use non-default path to ens
 
 func TestCRIListPodStats(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletPSI, true)
-	ctx := context.Background()
+	tCtx := ktesting.Init(t)
 	var (
 		imageFsMountpoint = "/test/mount/point"
 		unknownMountpoint = "/unknown/mount/point"
@@ -248,7 +248,7 @@ func TestCRIListPodStats(t *testing.T) {
 		fakeContainerStatsProvider{},
 	)
 
-	stats, err := provider.ListPodStats(ctx)
+	stats, err := provider.ListPodStats(tCtx)
 	assert := assert.New(t)
 	assert.NoError(err)
 	assert.Len(stats, 4)
@@ -351,12 +351,12 @@ func TestCRIListPodStats(t *testing.T) {
 }
 
 func TestListPodStatsStrictlyFromCRI(t *testing.T) {
+	logger, tCtx := ktesting.NewTestContext(t)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletPSI, true)
 	if runtime.GOOS == "windows" {
 		// TODO: remove skip once the failing test has been fixed.
 		t.Skip("Skip failing test on Windows.")
 	}
-	ctx := context.Background()
 	var (
 		imageFsMountpoint = "/test/mount/point"
 		unknownMountpoint = "/unknown/mount/point"
@@ -483,11 +483,11 @@ func TestListPodStatsStrictlyFromCRI(t *testing.T) {
 		fakeContainerStatsProvider{},
 	)
 
-	cadvisorInfos, err := getCadvisorContainerInfo(mockCadvisor)
+	cadvisorInfos, err := getCadvisorContainerInfo(logger, mockCadvisor)
 	if err != nil {
 		t.Errorf("failed to get container info from cadvisor: %v", err)
 	}
-	stats, err := provider.ListPodStats(ctx)
+	stats, err := provider.ListPodStats(tCtx)
 	assert := assert.New(t)
 	assert.NoError(err)
 	assert.Len(stats, 2)
@@ -552,7 +552,7 @@ func TestListPodStatsStrictlyFromCRI(t *testing.T) {
 }
 func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletPSI, true)
-	ctx := context.Background()
+	tCtx := ktesting.Init(t)
 
 	var (
 		imageFsMountpoint = "/test/mount/point"
@@ -661,7 +661,7 @@ func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
 		fakeContainerStatsProvider{},
 	)
 
-	stats, err := provider.ListPodCPUAndMemoryStats(ctx)
+	stats, err := provider.ListPodCPUAndMemoryStats(tCtx)
 	assert := assert.New(t)
 	assert.NoError(err)
 	assert.Len(stats, 5)
@@ -765,7 +765,7 @@ func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
 }
 
 func TestCRIPodCPUAndMemoryStats(t *testing.T) {
-	ctx := context.Background()
+	tCtx := ktesting.Init(t)
 
 	const (
 		podName      = "test-pod"
@@ -830,7 +830,7 @@ func TestCRIPodCPUAndMemoryStats(t *testing.T) {
 		},
 	}
 
-	stats, err := provider.PodCPUAndMemoryStats(ctx, pod, podStatus)
+	stats, err := provider.PodCPUAndMemoryStats(tCtx, pod, podStatus)
 	assert := assert.New(t)
 	require.NoError(t, err)
 
@@ -866,7 +866,7 @@ func TestCRIPodCPUAndMemoryStats(t *testing.T) {
 }
 
 func TestCRIImagesFsStats(t *testing.T) {
-	ctx := context.Background()
+	tCtx := ktesting.Init(t)
 	var (
 		imageFsMountpoint = "/test/mount/point"
 		imageFsInfo       = getTestFsInfo(2000)
@@ -896,7 +896,7 @@ func TestCRIImagesFsStats(t *testing.T) {
 		fakeContainerStatsProvider{},
 	)
 
-	stats, containerStats, err := provider.ImageFsStats(ctx)
+	stats, containerStats, err := provider.ImageFsStats(tCtx)
 	assert := assert.New(t)
 	assert.NoError(err)
 
@@ -1513,6 +1513,7 @@ func TestGetContainerUsageNanoCores(t *testing.T) {
 			expected: nil,
 		},
 	}
+	logger, _ := ktesting.NewTestContext(t)
 	for _, test := range tests {
 		provider := &criStatsProvider{cpuUsageCache: test.cpuUsageCache}
 		// Before the update, the cached value should be nil
@@ -1520,7 +1521,7 @@ func TestGetContainerUsageNanoCores(t *testing.T) {
 		assert.Nil(t, cached)
 
 		// Update the cache and get the latest value.
-		real := provider.getAndUpdateContainerUsageNanoCores(test.stats)
+		real := provider.getAndUpdateContainerUsageNanoCores(logger, test.stats)
 		assert.Equal(t, test.expected, real, test.desc)
 
 		// After the update, the cached value should be up-to-date

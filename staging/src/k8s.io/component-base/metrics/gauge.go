@@ -161,6 +161,17 @@ func (v *GaugeVec) WithLabelValuesChecked(lvs ...string) (GaugeMetric, error) {
 	return v.GetMetricWithLabelValues(lvs...)
 }
 
+func (v *GaugeVec) DeleteLabelValuesChecked(lvs ...string) (bool, error) {
+	if !v.IsCreated() {
+		if v.IsHidden() {
+			return false, nil
+		}
+		return false, errNotRegistered
+	}
+
+	return v.GaugeVec.DeleteLabelValues(lvs...), nil
+}
+
 // Default Prometheus Vec behavior is that member extraction results in creation of a new element
 // if one with the unique label values is not found in the underlying stored metricMap.
 // This means  that if this function is called but the underlying metric is not registered
@@ -178,6 +189,14 @@ func (v *GaugeVec) WithLabelValuesChecked(lvs ...string) (GaugeMetric, error) {
 // has been registered to a metrics registry.
 func (v *GaugeVec) WithLabelValues(lvs ...string) GaugeMetric {
 	ans, err := v.WithLabelValuesChecked(lvs...)
+	if err == nil || ErrIsNotRegistered(err) {
+		return ans
+	}
+	panic(err)
+}
+
+func (v *GaugeVec) DeleteLabelValues(lvs ...string) bool {
+	ans, err := v.DeleteLabelValuesChecked(lvs...)
 	if err == nil || ErrIsNotRegistered(err) {
 		return ans
 	}

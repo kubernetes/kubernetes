@@ -296,7 +296,7 @@ func (tc *Controller) Run(ctx context.Context) {
 	defer tc.podUpdateQueue.ShutDown()
 
 	// wait for the cache to be synced
-	if !cache.WaitForNamedCacheSync(tc.name, ctx.Done(), tc.podListerSynced, tc.nodeListerSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, tc.podListerSynced, tc.nodeListerSynced) {
 		return
 	}
 

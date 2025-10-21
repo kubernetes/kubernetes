@@ -24,21 +24,28 @@ import (
 	"k8s.io/component-base/metrics/testutil"
 )
 
+const testIdentifier = "test_validation_identifier"
+const anotherTestIdentifier = "another_test_validation_identifier"
+
 // TestDeclarativeValidationMismatchMetric tests that the mismatch metric correctly increments once
 func TestDeclarativeValidationMismatchMetric(t *testing.T) {
 	defer legacyregistry.Reset()
 	defer ResetValidationMetricsInstance()
 
 	// Increment the metric once
-	Metrics.IncDeclarativeValidationMismatchMetric()
+	Metrics.IncDeclarativeValidationMismatchMetric(testIdentifier)
 
 	expected := `
+	# HELP apiserver_validation_declarative_validation_parity_discrepancies_total [ALPHA] Number of discrepancies between declarative and handwritten validation, broken down by validation identifier.
+	# TYPE apiserver_validation_declarative_validation_parity_discrepancies_total counter
+	apiserver_validation_declarative_validation_parity_discrepancies_total{validation_identifier="test_validation_identifier"} 1
 	# HELP apiserver_validation_declarative_validation_mismatch_total [BETA] Number of times declarative validation results differed from handwritten validation results for core types.
 	# TYPE apiserver_validation_declarative_validation_mismatch_total counter
 	apiserver_validation_declarative_validation_mismatch_total 1
+	
 	`
 
-	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), "apiserver_validation_declarative_validation_mismatch_total"); err != nil {
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), "apiserver_validation_declarative_validation_parity_discrepancies_total", "apiserver_validation_declarative_validation_mismatch_total"); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -49,15 +56,19 @@ func TestDeclarativeValidationPanicMetric(t *testing.T) {
 	defer ResetValidationMetricsInstance()
 
 	// Increment the metric once
-	Metrics.IncDeclarativeValidationPanicMetric()
+	Metrics.IncDeclarativeValidationPanicMetric(testIdentifier)
 
 	expected := `
+	# HELP apiserver_validation_declarative_validation_panics_total [ALPHA] Number of panics in declarative validation, broken down by validation identifier.
+	# TYPE apiserver_validation_declarative_validation_panics_total counter
+	apiserver_validation_declarative_validation_panics_total{validation_identifier="test_validation_identifier"} 1
 	# HELP apiserver_validation_declarative_validation_panic_total [BETA] Number of times declarative validation has panicked during validation.
 	# TYPE apiserver_validation_declarative_validation_panic_total counter
 	apiserver_validation_declarative_validation_panic_total 1
 	`
 
-	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), "apiserver_validation_declarative_validation_panic_total"); err != nil {
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected),
+		"apiserver_validation_declarative_validation_panic_total", "apiserver_validation_declarative_validation_panics_total"); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -87,17 +98,21 @@ func TestDeclarativeValidationMismatchMetricMultiple(t *testing.T) {
 	defer ResetValidationMetricsInstance()
 
 	// Increment the metric three times
-	Metrics.IncDeclarativeValidationMismatchMetric()
-	Metrics.IncDeclarativeValidationMismatchMetric()
-	Metrics.IncDeclarativeValidationMismatchMetric()
+	Metrics.IncDeclarativeValidationMismatchMetric(testIdentifier)
+	Metrics.IncDeclarativeValidationMismatchMetric(testIdentifier)
+	Metrics.IncDeclarativeValidationMismatchMetric(anotherTestIdentifier)
 
 	expected := `
+	# HELP apiserver_validation_declarative_validation_parity_discrepancies_total [ALPHA] Number of discrepancies between declarative and handwritten validation, broken down by validation identifier.
+	# TYPE apiserver_validation_declarative_validation_parity_discrepancies_total counter
+	apiserver_validation_declarative_validation_parity_discrepancies_total{validation_identifier="test_validation_identifier"} 2
+	apiserver_validation_declarative_validation_parity_discrepancies_total{validation_identifier="another_test_validation_identifier"} 1
 	# HELP apiserver_validation_declarative_validation_mismatch_total [BETA] Number of times declarative validation results differed from handwritten validation results for core types.
 	# TYPE apiserver_validation_declarative_validation_mismatch_total counter
 	apiserver_validation_declarative_validation_mismatch_total 3
 	`
 
-	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), "apiserver_validation_declarative_validation_mismatch_total"); err != nil {
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), "apiserver_validation_declarative_validation_parity_discrepancies_total", "apiserver_validation_declarative_validation_mismatch_total"); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -108,17 +123,21 @@ func TestDeclarativeValidationPanicMetricMultiple(t *testing.T) {
 	defer ResetValidationMetricsInstance()
 
 	// Increment the metric three times
-	Metrics.IncDeclarativeValidationPanicMetric()
-	Metrics.IncDeclarativeValidationPanicMetric()
-	Metrics.IncDeclarativeValidationPanicMetric()
+	Metrics.IncDeclarativeValidationPanicMetric(testIdentifier)
+	Metrics.IncDeclarativeValidationPanicMetric(testIdentifier)
+	Metrics.IncDeclarativeValidationPanicMetric(anotherTestIdentifier)
 
 	expected := `
+	# HELP apiserver_validation_declarative_validation_panics_total [ALPHA] Number of panics in declarative validation, broken down by validation identifier.
+	# TYPE apiserver_validation_declarative_validation_panics_total counter
+	apiserver_validation_declarative_validation_panics_total{validation_identifier="test_validation_identifier"} 2
+	apiserver_validation_declarative_validation_panics_total{validation_identifier="another_test_validation_identifier"} 1
 	# HELP apiserver_validation_declarative_validation_panic_total [BETA] Number of times declarative validation has panicked during validation.
 	# TYPE apiserver_validation_declarative_validation_panic_total counter
 	apiserver_validation_declarative_validation_panic_total 3
 	`
 
-	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), "apiserver_validation_declarative_validation_panic_total"); err != nil {
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), "apiserver_validation_declarative_validation_panic_total", "apiserver_validation_declarative_validation_panics_total"); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -150,8 +169,8 @@ func TestDeclarativeValidationMetricsReset(t *testing.T) {
 	defer ResetValidationMetricsInstance()
 
 	// Increment both metrics
-	Metrics.IncDeclarativeValidationMismatchMetric()
-	Metrics.IncDeclarativeValidationPanicMetric()
+	Metrics.IncDeclarativeValidationMismatchMetric(testIdentifier)
+	Metrics.IncDeclarativeValidationPanicMetric(testIdentifier)
 	Metrics.IncDuplicateValidationErrorMetric()
 
 	// Reset the metrics
@@ -178,8 +197,8 @@ func TestDeclarativeValidationMetricsReset(t *testing.T) {
 	}
 
 	// Increment the metrics again to ensure they're still functional
-	Metrics.IncDeclarativeValidationMismatchMetric()
-	Metrics.IncDeclarativeValidationPanicMetric()
+	Metrics.IncDeclarativeValidationMismatchMetric(testIdentifier)
+	Metrics.IncDeclarativeValidationPanicMetric(testIdentifier)
 	Metrics.IncDuplicateValidationErrorMetric()
 
 	// Verify they've been incremented correctly
@@ -193,11 +212,19 @@ func TestDeclarativeValidationMetricsReset(t *testing.T) {
 	# HELP apiserver_validation_duplicate_validation_error_total [INTERNAL] Number of duplicate validation errors during validation.
 	# TYPE apiserver_validation_duplicate_validation_error_total counter
 	apiserver_validation_duplicate_validation_error_total 1
+	# HELP apiserver_validation_declarative_validation_parity_discrepancies_total [ALPHA] Number of discrepancies between declarative and handwritten validation, broken down by validation identifier.
+	# TYPE apiserver_validation_declarative_validation_parity_discrepancies_total counter
+	apiserver_validation_declarative_validation_parity_discrepancies_total{validation_identifier="test_validation_identifier"} 1
+	# HELP apiserver_validation_declarative_validation_panics_total [ALPHA] Number of panics in declarative validation, broken down by validation identifier.
+	# TYPE apiserver_validation_declarative_validation_panics_total counter
+	apiserver_validation_declarative_validation_panics_total{validation_identifier="test_validation_identifier"} 1
 	`
 
 	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected),
 		"apiserver_validation_declarative_validation_mismatch_total",
+		"apiserver_validation_declarative_validation_parity_discrepancies_total",
 		"apiserver_validation_declarative_validation_panic_total",
+		"apiserver_validation_declarative_validation_panics_total",
 		"apiserver_validation_duplicate_validation_error_total"); err != nil {
 		t.Fatal(err)
 	}

@@ -71,7 +71,7 @@ func makeTestPodDetails(name string, resourceVersion uint64, nodeName string, la
 
 func makeTestStoreElement(pod *v1.Pod) *storeElement {
 	return &storeElement{
-		Key:    "prefix/ns/" + pod.Name,
+		Key:    "/prefix/ns/" + pod.Name,
 		Object: pod,
 		Labels: labels.Set(pod.Labels),
 		Fields: fields.Set{"spec.nodeName": pod.Spec.NodeName},
@@ -116,7 +116,7 @@ func (w *testWatchCache) getCacheIntervalForEvents(resourceVersion uint64, opts 
 // newTestWatchCache just adds a fake clock.
 func newTestWatchCache(capacity int, eventFreshDuration time.Duration, indexers *cache.Indexers) *testWatchCache {
 	keyFunc := func(obj runtime.Object) (string, error) {
-		return storage.NamespaceKeyFunc("prefix", obj)
+		return storage.NamespaceKeyFunc("/prefix/", obj)
 	}
 	getAttrsFunc := func(obj runtime.Object) (labels.Set, fields.Set, error) {
 		pod, ok := obj.(*v1.Pod)
@@ -244,9 +244,9 @@ func TestWatchCacheBasic(t *testing.T) {
 	store.Add(makeTestPod("pod3", 6))
 	{
 		expected := map[string]storeElement{
-			"prefix/ns/pod1": *makeTestStoreElement(makeTestPod("pod1", 4)),
-			"prefix/ns/pod2": *makeTestStoreElement(makeTestPod("pod2", 5)),
-			"prefix/ns/pod3": *makeTestStoreElement(makeTestPod("pod3", 6)),
+			"/prefix/ns/pod1": *makeTestStoreElement(makeTestPod("pod1", 4)),
+			"/prefix/ns/pod2": *makeTestStoreElement(makeTestPod("pod2", 5)),
+			"/prefix/ns/pod3": *makeTestStoreElement(makeTestPod("pod3", 6)),
 		}
 		items := make(map[string]storeElement)
 		for _, item := range store.List() {
@@ -265,8 +265,8 @@ func TestWatchCacheBasic(t *testing.T) {
 	}, "8")
 	{
 		expected := map[string]storeElement{
-			"prefix/ns/pod4": *makeTestStoreElement(makeTestPod("pod4", 7)),
-			"prefix/ns/pod5": *makeTestStoreElement(makeTestPod("pod5", 8)),
+			"/prefix/ns/pod4": *makeTestStoreElement(makeTestPod("pod4", 7)),
+			"/prefix/ns/pod5": *makeTestStoreElement(makeTestPod("pod5", 8)),
 		}
 		items := make(map[string]storeElement)
 		for _, item := range store.List() {
@@ -470,7 +470,7 @@ func TestWaitUntilFreshAndGetList(t *testing.T) {
 	}()
 
 	// list by empty MatchValues.
-	resp, indexUsed, err := store.WaitUntilFreshAndGetList(ctx, "prefix/", storage.ListOptions{ResourceVersion: "5", Recursive: true, Predicate: storage.Everything})
+	resp, indexUsed, err := store.WaitUntilFreshAndGetList(ctx, "/prefix/", storage.ListOptions{ResourceVersion: "5", Recursive: true, Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -485,7 +485,7 @@ func TestWaitUntilFreshAndGetList(t *testing.T) {
 	}
 
 	// list by label index.
-	resp, indexUsed, err = store.WaitUntilFreshAndGetList(ctx, "prefix/", storage.ListOptions{ResourceVersion: "5", Recursive: true, Predicate: storage.SelectionPredicate{
+	resp, indexUsed, err = store.WaitUntilFreshAndGetList(ctx, "/prefix/", storage.ListOptions{ResourceVersion: "5", Recursive: true, Predicate: storage.SelectionPredicate{
 		Label: labels.SelectorFromSet(map[string]string{
 			"label": "value1",
 		}),
@@ -508,7 +508,7 @@ func TestWaitUntilFreshAndGetList(t *testing.T) {
 	}
 
 	// list with spec.nodeName index.
-	resp, indexUsed, err = store.WaitUntilFreshAndGetList(ctx, "prefix/", storage.ListOptions{ResourceVersion: "5", Recursive: true, Predicate: storage.SelectionPredicate{
+	resp, indexUsed, err = store.WaitUntilFreshAndGetList(ctx, "/prefix/", storage.ListOptions{ResourceVersion: "5", Recursive: true, Predicate: storage.SelectionPredicate{
 		Label: labels.SelectorFromSet(map[string]string{
 			"not-exist-label": "whatever",
 		}),
@@ -531,7 +531,7 @@ func TestWaitUntilFreshAndGetList(t *testing.T) {
 	}
 
 	// list with index not exists.
-	resp, indexUsed, err = store.WaitUntilFreshAndGetList(ctx, "prefix/", storage.ListOptions{ResourceVersion: "5", Recursive: true, Predicate: storage.SelectionPredicate{
+	resp, indexUsed, err = store.WaitUntilFreshAndGetList(ctx, "/prefix/", storage.ListOptions{ResourceVersion: "5", Recursive: true, Predicate: storage.SelectionPredicate{
 		Label: labels.SelectorFromSet(map[string]string{
 			"not-exist-label": "whatever",
 		}),
@@ -565,7 +565,7 @@ func TestWaitUntilFreshAndListFromCache(t *testing.T) {
 	}()
 
 	// list from future revision. Requires watch cache to request bookmark to get it.
-	resp, indexUsed, err := store.WaitUntilFreshAndGetList(ctx, "prefix/", storage.ListOptions{ResourceVersion: "3", Recursive: true, Predicate: storage.Everything})
+	resp, indexUsed, err := store.WaitUntilFreshAndGetList(ctx, "/prefix/", storage.ListOptions{ResourceVersion: "3", Recursive: true, Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -591,7 +591,7 @@ func TestWaitUntilFreshAndGet(t *testing.T) {
 		store.Add(makeTestPod("bar", 5))
 	}()
 
-	obj, exists, resourceVersion, err := store.WaitUntilFreshAndGet(ctx, 5, "prefix/ns/bar")
+	obj, exists, resourceVersion, err := store.WaitUntilFreshAndGet(ctx, 5, "/prefix/ns/bar")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

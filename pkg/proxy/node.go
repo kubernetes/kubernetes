@@ -81,7 +81,7 @@ func newNodeManager(ctx context.Context, client clientset.Interface, resyncInter
 
 	// initialize the informer and wait for cache sync
 	thisNodeInformerFactory.Start(wait.NeverStop)
-	if !cache.WaitForNamedCacheSync("node informer cache", ctx.Done(), nodeInformer.Informer().HasSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, nodeInformer.Informer().HasSynced) {
 		return nil, fmt.Errorf("can not sync node informer")
 	}
 

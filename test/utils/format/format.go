@@ -28,6 +28,7 @@ import (
 
 	"github.com/onsi/gomega/format"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/yaml"
 )
 
@@ -59,7 +60,18 @@ func handleYAML(object interface{}) (string, bool) {
 	return "\n" + strings.TrimSpace(string(y)), true
 }
 
+var unstructuredObjectType = reflect.TypeOf(unstructured.Unstructured{})
+
 func useYAML(t reflect.Type) bool {
+	if t == unstructuredObjectType {
+		// It looks nicer as YAML.
+		//
+		// unstructured.Unstructured is a map, but because
+		// it's wrapped in a struct it does not get recognized
+		// as one by the code below and thus needs a direct check.
+		return true
+	}
+
 	switch t.Kind() {
 	case reflect.Pointer, reflect.Slice, reflect.Array:
 		return useYAML(t.Elem())

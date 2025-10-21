@@ -79,6 +79,7 @@ import (
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/images"
+	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig"
 	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/logs"
@@ -206,7 +207,7 @@ func newTestKubeletWithImageList(
 	excludeAdmitHandlers bool,
 	enableResizing bool,
 ) *TestKubelet {
-	logger, _ := ktesting.NewTestContext(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 
 	fakeRuntime := &containertest.FakeRuntime{
 		ImageList: imageList,
@@ -336,7 +337,7 @@ func newTestKubeletWithImageList(
 	)
 	kubelet.allocationManager.SetContainerRuntime(fakeRuntime)
 	volumeStatsAggPeriod := time.Second * 10
-	kubelet.resourceAnalyzer = serverstats.NewResourceAnalyzer(kubelet, volumeStatsAggPeriod, kubelet.recorder)
+	kubelet.resourceAnalyzer = serverstats.NewResourceAnalyzer(tCtx, kubelet, volumeStatsAggPeriod, kubelet.recorder)
 
 	fakeHostStatsProvider := stats.NewFakeHostStatsProvider(&containertest.FakeOS{})
 
@@ -404,7 +405,7 @@ func newTestKubeletWithImageList(
 		ShutdownGracePeriodCriticalPods: 0,
 	})
 	kubelet.shutdownManager = shutdownManager
-	kubelet.usernsManager, err = userns.MakeUserNsManager(logger, kubelet)
+	kubelet.usernsManager, err = userns.MakeUserNsManager(logger, kubelet, nil)
 	if err != nil {
 		t.Fatalf("Failed to create UserNsManager: %v", err)
 	}
@@ -3303,7 +3304,7 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 		DynamicPluginProber:  prober,
 		TLSOptions:           tlsOptions,
 	}
-	crOptions := &config.ContainerRuntimeOptions{}
+	crOptions := &kubeletconfig.ContainerRuntimeOptions{}
 
 	testMainKubelet, err := NewMainKubelet(
 		tCtx,
@@ -3437,7 +3438,6 @@ func TestSyncPodSpans(t *testing.T) {
 		kubelet.containerManager,
 		kubelet.containerLogManager,
 		kubelet.runtimeClassManager,
-		kubelet.allocationManager,
 		false,
 		kubeCfg.MemorySwap.SwapBehavior,
 		kubelet.containerManager.GetNodeAllocatableAbsolute,

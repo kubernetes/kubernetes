@@ -23,6 +23,7 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/operation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -32,7 +33,6 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
@@ -40,7 +40,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/autoscaling/validation"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	extensionsv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
@@ -315,24 +314,7 @@ func (i *scaleUpdatedObjectInfo) UpdatedObject(ctx context.Context, oldObj runti
 	}
 
 	errs := validation.ValidateScale(scale)
-
-	// If DeclarativeValidation feature gate is enabled, also run declarative validation
-	if utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidation) {
-		// Determine if takeover is enabled
-		takeover := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationTakeover)
-
-		// Run declarative validation with panic recovery
-		declarativeErrs := rest.ValidateUpdateDeclaratively(
-			ctx, legacyscheme.Scheme, scale, oldScale, rest.WithTakeover(takeover), rest.WithSubresourceMapper(i.scaleGVKMapper))
-
-		// Compare imperative and declarative errors and log + emit metric if there's a mismatch
-		rest.CompareDeclarativeErrorsAndEmitMismatches(ctx, errs, declarativeErrs, takeover)
-
-		// Only apply declarative errors if takeover is enabled
-		if takeover {
-			errs = append(errs.RemoveCoveredByDeclarative(), declarativeErrs...)
-		}
-	}
+	errs = rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, scale, oldScale, errs, operation.Update, rest.WithSubresourceMapper(i.scaleGVKMapper))
 
 	if len(errs) > 0 {
 		return nil, errors.NewInvalid(autoscaling.Kind("Scale"), replicationcontroller.Name, errs)

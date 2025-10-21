@@ -50,6 +50,6 @@ func (t *testInitData) KubeletDir() string                                   { r
 func (t *testInitData) ExternalCA() bool                                     { return false }
 func (t *testInitData) OutputWriter() io.Writer                              { return nil }
 func (t *testInitData) Client() (clientset.Interface, error)                 { return nil, nil }
-func (t *testInitData) ClientWithoutBootstrap() (clientset.Interface, error) { return nil, nil }
+func (t *testInitData) WaitControlPlaneClient() (clientset.Interface, error) { return nil, nil }
 func (t *testInitData) Tokens() []string                                     { return nil }
 func (t *testInitData) PatchesDir() string                                   { return "" }

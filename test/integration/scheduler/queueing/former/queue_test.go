@@ -27,10 +27,10 @@ import (
 	"k8s.io/kubernetes/test/integration/scheduler/queueing"
 )
 
-// TestCoreResourceEnqueueWithQueueingHints verify Pods failed by in-tree default plugins can be
+// TestCoreResourceEnqueueWithoutQueueingHints verify Pods failed by in-tree default plugins can be
 // moved properly upon their registered events.
 // Here, we run only the test cases where the EnableSchedulingQueueHint is disabled.
-func TestCoreResourceEnqueueWithQueueingHints(t *testing.T) {
+func TestCoreResourceEnqueueWithoutQueueingHints(t *testing.T) {
 	for _, tt := range queueing.CoreResourceEnqueueTestCases {
 		if tt.EnableSchedulingQueueHint != nil && !tt.EnableSchedulingQueueHint.Has(false) {
 			continue

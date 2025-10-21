@@ -255,13 +255,8 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 			framework.Failf("no valid conntrack entry for port %d on node %s: %v", testDaemonTCPPort, serverNodeInfo.nodeIP, err)
 		}
 	})
-})
 
-var _ = common.SIGDescribe("KubeProxyNFAcct", feature.KubeProxyNFAcct, func() {
-	fr := framework.NewDefaultFramework("kube-proxy-nfacct")
-	fr.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
-
-	ginkgo.It("should update metric for tracking accepted packets destined for localhost nodeports", func(ctx context.Context) {
+	framework.It("should update metric for tracking accepted packets destined for localhost nodeports", feature.KubeProxyNFAcct, func(ctx context.Context) {
 		if framework.TestContext.ClusterIsIPv6() {
 			e2eskipper.Skipf("test requires IPv4 cluster")
 		}

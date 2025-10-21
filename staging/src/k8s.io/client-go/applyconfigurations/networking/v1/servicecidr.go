@@ -29,11 +29,20 @@ import (
 
 // ServiceCIDRApplyConfiguration represents a declarative configuration of the ServiceCIDR type for use
 // with apply.
+//
+// ServiceCIDR defines a range of IP addresses using CIDR format (e.g. 192.168.0.0/24 or 2001:db2::/64).
+// This range is used to allocate ClusterIPs to Service objects.
 type ServiceCIDRApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                                 *ServiceCIDRSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                               *ServiceCIDRStatusApplyConfiguration `json:"status,omitempty"`
+	// spec is the desired state of the ServiceCIDR.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Spec *ServiceCIDRSpecApplyConfiguration `json:"spec,omitempty"`
+	// status represents the current state of the ServiceCIDR.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Status *ServiceCIDRStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // ServiceCIDR constructs a declarative configuration of the ServiceCIDR type for use with
@@ -53,7 +62,6 @@ func ServiceCIDR(name string) *ServiceCIDRApplyConfiguration {
 // ExtractServiceCIDRFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractServiceCIDRFrom(serviceCIDR *networkingv1.ServiceCIDR, fieldManager string, subresource string) (*ServiceCIDRApplyConfiguration, error) {
 	b := &ServiceCIDRApplyConfiguration{}
 	err := managedfields.ExtractInto(serviceCIDR, internal.Parser().Type("io.k8s.api.networking.v1.ServiceCIDR"), fieldManager, b, subresource)
@@ -77,14 +85,12 @@ func ExtractServiceCIDRFrom(serviceCIDR *networkingv1.ServiceCIDR, fieldManager 
 // ExtractServiceCIDR provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractServiceCIDR(serviceCIDR *networkingv1.ServiceCIDR, fieldManager string) (*ServiceCIDRApplyConfiguration, error) {
 	return ExtractServiceCIDRFrom(serviceCIDR, fieldManager, "")
 }
 
 // ExtractServiceCIDRStatus extracts the applied configuration owned by fieldManager from
 // serviceCIDR for the status subresource.
-// Experimental!
 func ExtractServiceCIDRStatus(serviceCIDR *networkingv1.ServiceCIDR, fieldManager string) (*ServiceCIDRApplyConfiguration, error) {
 	return ExtractServiceCIDRFrom(serviceCIDR, fieldManager, "status")
 }

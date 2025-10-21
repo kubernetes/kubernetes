@@ -50,10 +50,19 @@ func ElementsMatchf(t TestingT, listA interface{}, listB interface{}, msg string
 	return ElementsMatch(t, listA, listB, append([]interface{}{msg}, args...)...)
 }
 
-// Emptyf asserts that the specified object is empty.  I.e. nil, "", false, 0 or either
-// a slice or a channel with len == 0.
+// Emptyf asserts that the given value is "empty".
+//
+// [Zero values] are "empty".
+//
+// Arrays are "empty" if every element is the zero value of the type (stricter than "empty").
+//
+// Slices, maps and channels with zero length are "empty".
+//
+// Pointer values are "empty" if the pointer is nil or if the pointed value is "empty".
 //
 //	assert.Emptyf(t, obj, "error message %s", "formatted")
+//
+// [Zero values]: https://go.dev/ref/spec#The_zero_value
 func Emptyf(t TestingT, object interface{}, msg string, args ...interface{}) bool {
 	if h, ok := t.(tHelper); ok {
 		h.Helper()
@@ -117,10 +126,8 @@ func EqualValuesf(t TestingT, expected interface{}, actual interface{}, msg stri
 
 // Errorf asserts that a function returned an error (i.e. not `nil`).
 //
-//	  actualObj, err := SomeFunction()
-//	  if assert.Errorf(t, err, "error message %s", "formatted") {
-//		   assert.Equal(t, expectedErrorf, err)
-//	  }
+//	actualObj, err := SomeFunction()
+//	assert.Errorf(t, err, "error message %s", "formatted")
 func Errorf(t TestingT, err error, msg string, args ...interface{}) bool {
 	if h, ok := t.(tHelper); ok {
 		h.Helper()
@@ -438,7 +445,19 @@ func IsNonIncreasingf(t TestingT, object interface{}, msg string, args ...interf
 	return IsNonIncreasing(t, object, append([]interface{}{msg}, args...)...)
 }
 
+// IsNotTypef asserts that the specified objects are not of the same type.
+//
+//	assert.IsNotTypef(t, &NotMyStruct{}, &MyStruct{}, "error message %s", "formatted")
+func IsNotTypef(t TestingT, theType interface{}, object interface{}, msg string, args ...interface{}) bool {
+	if h, ok := t.(tHelper); ok {
+		h.Helper()
+	}
+	return IsNotType(t, theType, object, append([]interface{}{msg}, args...)...)
+}
+
 // IsTypef asserts that the specified objects are of the same type.
+//
+//	assert.IsTypef(t, &MyStruct{}, &MyStruct{}, "error message %s", "formatted")
 func IsTypef(t TestingT, expectedType interface{}, object interface{}, msg string, args ...interface{}) bool {
 	if h, ok := t.(tHelper); ok {
 		h.Helper()
@@ -585,8 +604,7 @@ func NotElementsMatchf(t TestingT, listA interface{}, listB interface{}, msg str
 	return NotElementsMatch(t, listA, listB, append([]interface{}{msg}, args...)...)
 }
 
-// NotEmptyf asserts that the specified object is NOT empty.  I.e. not nil, "", false, 0 or either
-// a slice or a channel with len == 0.
+// NotEmptyf asserts that the specified object is NOT [Empty].
 //
 //	if assert.NotEmptyf(t, obj, "error message %s", "formatted") {
 //	  assert.Equal(t, "two", obj[1])
@@ -693,12 +711,15 @@ func NotSamef(t TestingT, expected interface{}, actual interface{}, msg string, 
 	return NotSame(t, expected, actual, append([]interface{}{msg}, args...)...)
 }
 
-// NotSubsetf asserts that the specified list(array, slice...) or map does NOT
-// contain all elements given in the specified subset list(array, slice...) or
-// map.
+// NotSubsetf asserts that the list (array, slice, or map) does NOT contain all
+// elements given in the subset (array, slice, or map).
+// Map elements are key-value pairs unless compared with an array or slice where
+// only the map key is evaluated.
 //
 //	assert.NotSubsetf(t, [1, 3, 4], [1, 2], "error message %s", "formatted")
 //	assert.NotSubsetf(t, {"x": 1, "y": 2}, {"z": 3}, "error message %s", "formatted")
+//	assert.NotSubsetf(t, [1, 3, 4], {1: "one", 2: "two"}, "error message %s", "formatted")
+//	assert.NotSubsetf(t, {"x": 1, "y": 2}, ["z"], "error message %s", "formatted")
 func NotSubsetf(t TestingT, list interface{}, subset interface{}, msg string, args ...interface{}) bool {
 	if h, ok := t.(tHelper); ok {
 		h.Helper()
@@ -782,11 +803,15 @@ func Samef(t TestingT, expected interface{}, actual interface{}, msg string, arg
 	return Same(t, expected, actual, append([]interface{}{msg}, args...)...)
 }
 
-// Subsetf asserts that the specified list(array, slice...) or map contains all
-// elements given in the specified subset list(array, slice...) or map.
+// Subsetf asserts that the list (array, slice, or map) contains all elements
+// given in the subset (array, slice, or map).
+// Map elements are key-value pairs unless compared with an array or slice where
+// only the map key is evaluated.
 //
 //	assert.Subsetf(t, [1, 2, 3], [1, 2], "error message %s", "formatted")
 //	assert.Subsetf(t, {"x": 1, "y": 2}, {"x": 1}, "error message %s", "formatted")
+//	assert.Subsetf(t, [1, 2, 3], {1: "one", 2: "two"}, "error message %s", "formatted")
+//	assert.Subsetf(t, {"x": 1, "y": 2}, ["x"], "error message %s", "formatted")
 func Subsetf(t TestingT, list interface{}, subset interface{}, msg string, args ...interface{}) bool {
 	if h, ok := t.(tHelper); ok {
 		h.Helper()

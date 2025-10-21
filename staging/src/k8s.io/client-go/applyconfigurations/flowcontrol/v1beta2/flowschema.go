@@ -29,11 +29,20 @@ import (
 
 // FlowSchemaApplyConfiguration represents a declarative configuration of the FlowSchema type for use
 // with apply.
+//
+// FlowSchema defines the schema of a group of flows. Note that a flow is made up of a set of inbound API requests with
+// similar attributes and is identified by a pair of strings: the name of the FlowSchema and a "flow distinguisher".
 type FlowSchemaApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// `metadata` is the standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *FlowSchemaSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                           *FlowSchemaStatusApplyConfiguration `json:"status,omitempty"`
+	// `spec` is the specification of the desired behavior of a FlowSchema.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Spec *FlowSchemaSpecApplyConfiguration `json:"spec,omitempty"`
+	// `status` is the current status of a FlowSchema.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Status *FlowSchemaStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // FlowSchema constructs a declarative configuration of the FlowSchema type for use with
@@ -53,7 +62,6 @@ func FlowSchema(name string) *FlowSchemaApplyConfiguration {
 // ExtractFlowSchemaFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractFlowSchemaFrom(flowSchema *flowcontrolv1beta2.FlowSchema, fieldManager string, subresource string) (*FlowSchemaApplyConfiguration, error) {
 	b := &FlowSchemaApplyConfiguration{}
 	err := managedfields.ExtractInto(flowSchema, internal.Parser().Type("io.k8s.api.flowcontrol.v1beta2.FlowSchema"), fieldManager, b, subresource)
@@ -77,14 +85,12 @@ func ExtractFlowSchemaFrom(flowSchema *flowcontrolv1beta2.FlowSchema, fieldManag
 // ExtractFlowSchema provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractFlowSchema(flowSchema *flowcontrolv1beta2.FlowSchema, fieldManager string) (*FlowSchemaApplyConfiguration, error) {
 	return ExtractFlowSchemaFrom(flowSchema, fieldManager, "")
 }
 
 // ExtractFlowSchemaStatus extracts the applied configuration owned by fieldManager from
 // flowSchema for the status subresource.
-// Experimental!
 func ExtractFlowSchemaStatus(flowSchema *flowcontrolv1beta2.FlowSchema, fieldManager string) (*FlowSchemaApplyConfiguration, error) {
 	return ExtractFlowSchemaFrom(flowSchema, fieldManager, "status")
 }

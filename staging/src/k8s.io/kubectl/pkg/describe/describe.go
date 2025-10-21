@@ -35,6 +35,8 @@ import (
 	"unicode"
 
 	"github.com/fatih/camelcase"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
@@ -371,7 +373,7 @@ func smartLabelFor(field string) string {
 		if slice.Contains[string](commonAcronyms, strings.ToUpper(part), nil) {
 			part = strings.ToUpper(part)
 		} else {
-			part = strings.Title(part)
+			part = cases.Title(language.English).String(part)
 		}
 		result = append(result, part)
 	}
@@ -4359,12 +4361,16 @@ func DescribeEvents(el *corev1.EventList, w PrefixWriter) {
 		if source == "" {
 			source = e.ReportingController
 		}
+		message := strings.TrimSpace(e.Message)
+		if len(e.InvolvedObject.FieldPath) > 0 {
+			message = fmt.Sprintf("%s: %s", e.InvolvedObject.FieldPath, message)
+		}
 		w.Write(LEVEL_1, "%v\t%v\t%s\t%v\t%v\n",
 			e.Type,
 			e.Reason,
 			interval,
 			source,
-			strings.TrimSpace(e.Message),
+			message,
 		)
 	}
 }

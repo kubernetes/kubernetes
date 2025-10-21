@@ -247,37 +247,17 @@ func New(protocol Protocol) Interface {
 	return newInternal(utilexec.New(), protocol, "", "")
 }
 
-func newDualStackInternal(exec utilexec.Interface) (map[v1.IPFamily]Interface, error) {
-	var err error
+func newDualStackInternal(exec utilexec.Interface) map[v1.IPFamily]Interface {
 	interfaces := map[v1.IPFamily]Interface{}
-
 	iptv4 := newInternal(exec, ProtocolIPv4, "", "")
-	if presentErr := iptv4.Present(); presentErr != nil {
-		err = presentErr
-	} else {
+	if presentErr := iptv4.Present(); presentErr == nil {
 		interfaces[v1.IPv4Protocol] = iptv4
 	}
 	iptv6 := newInternal(exec, ProtocolIPv6, "", "")
-	if presentErr := iptv6.Present(); presentErr != nil {
-		// If we get an error for both IPv4 and IPv6 Present() calls, it's virtually guaranteed that
-		// they're going to be the same error. We ignore the error for IPv6 if IPv4 has already failed.
-		if err == nil {
-			err = presentErr
-		}
-	} else {
+	if presentErr := iptv6.Present(); presentErr == nil {
 		interfaces[v1.IPv6Protocol] = iptv6
 	}
-
-	return interfaces, err
-}
-
-// NewDualStack returns a map containing an IPv4 Interface (if IPv4 iptables is supported)
-// and an IPv6 Interface (if IPv6 iptables is supported). If only one family is supported,
-// it will return a map with one Interface *and* an error (indicating the problem with the
-// other family). If neither family is supported, it will return an empty map and an
-// error.
-func NewDualStack() (map[v1.IPFamily]Interface, error) {
-	return newDualStackInternal(utilexec.New())
+	return interfaces
 }
 
 // NewBestEffort returns a map containing an IPv4 Interface (if IPv4 iptables is
@@ -286,8 +266,7 @@ func NewDualStack() (map[v1.IPFamily]Interface, error) {
 // simple for callers that just want "best-effort" iptables support, where neither partial
 // nor complete lack of iptables support is considered an error.
 func NewBestEffort() map[v1.IPFamily]Interface {
-	ipts, _ := newDualStackInternal(utilexec.New())
-	return ipts
+	return newDualStackInternal(utilexec.New())
 }
 
 // EnsureChain is part of Interface.

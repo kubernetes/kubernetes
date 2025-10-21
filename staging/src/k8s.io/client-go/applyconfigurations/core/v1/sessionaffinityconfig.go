@@ -20,7 +20,10 @@ package v1
 
 // SessionAffinityConfigApplyConfiguration represents a declarative configuration of the SessionAffinityConfig type for use
 // with apply.
+//
+// SessionAffinityConfig represents the configurations of session affinity.
 type SessionAffinityConfigApplyConfiguration struct {
+	// clientIP contains the configurations of Client IP based session affinity.
 	ClientIP *ClientIPConfigApplyConfiguration `json:"clientIP,omitempty"`
 }
 

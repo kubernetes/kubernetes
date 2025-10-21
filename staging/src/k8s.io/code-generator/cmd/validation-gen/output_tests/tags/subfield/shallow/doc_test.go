@@ -41,15 +41,15 @@ func Test(t *testing.T) {
 			MapField:     map[string]string{},
 		},
 	}).ExpectValidateFalseByPath(map[string][]string{
-		"structField.stringField":     {"subfield Struct.StructField.StringField"},
-		"structPtrField.stringField":  {"subfield Struct.StructPtrField.StringField"},
+		"structField.stringField":     {"subfield Struct.StructField.StringField 1", "subfield Struct.StructField.StringField 2"},
 		"structField.pointerField":    {"subfield Struct.StructField.PointerField"},
-		"structPtrField.pointerField": {"subfield Struct.StructPtrField.PointerField"},
 		"structField.structField":     {"subfield Struct.StructField.StructField"},
-		"structPtrField.structField":  {"subfield Struct.StructPtrField.StructField"},
 		"structField.sliceField":      {"subfield Struct.StructField.SliceField"},
-		"structPtrField.sliceField":   {"subfield Struct.StructPtrField.SliceField"},
 		"structField.mapField":        {"subfield Struct.StructField.MapField"},
+		"structPtrField.stringField":  {"subfield Struct.StructPtrField.StringField 1", "subfield Struct.StructPtrField.StringField 2"},
+		"structPtrField.pointerField": {"subfield Struct.StructPtrField.PointerField"},
+		"structPtrField.structField":  {"subfield Struct.StructPtrField.StructField"},
+		"structPtrField.sliceField":   {"subfield Struct.StructPtrField.SliceField"},
 		"structPtrField.mapField":     {"subfield Struct.StructPtrField.MapField"},
 	})
 }

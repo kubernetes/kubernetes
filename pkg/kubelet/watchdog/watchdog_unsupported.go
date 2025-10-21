@@ -23,6 +23,7 @@ import (
 	"context"
 
 	"k8s.io/apiserver/pkg/server/healthz"
+	"k8s.io/klog/v2"
 )
 
 type healthCheckerUnsupported struct{}
@@ -36,7 +37,7 @@ func WithExtendedCheckers([]healthz.HealthChecker) Option {
 }
 
 // NewHealthChecker creates a fake one here
-func NewHealthChecker(...Option) (HealthChecker, error) {
+func NewHealthChecker(klog.Logger, ...Option) (HealthChecker, error) {
 	return &healthCheckerUnsupported{}, nil
 }
 

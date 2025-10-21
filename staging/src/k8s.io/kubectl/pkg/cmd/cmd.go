@@ -234,7 +234,6 @@ func Command(name string, arg ...string) *exec.Cmd {
 
 // Execute implements PluginHandler
 func (h *DefaultPluginHandler) Execute(executablePath string, cmdArgs, environment []string) error {
-
 	// Windows does not support exec syscall.
 	if runtime.GOOS == "windows" {
 		cmd := Command(executablePath, cmdArgs...)
@@ -496,6 +495,14 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 	cmds.SetGlobalNormalizationFunc(cliflag.WordSepNormalizeFunc)
 
 	if !cmdutil.KubeRC.IsDisabled() {
+		existingPreRunE := cmds.PersistentPreRunE
+		cmds.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
+			if originalCommandArgs, ok := cmd.Annotations[kuberc.KubeRCOriginalCommandAnnotation]; ok {
+				originalCommand := fmt.Sprintf("%s %s", cmd.Root().Name(), originalCommandArgs)
+				klog.V(1).Info(fmt.Sprintf("original command: %q", originalCommand))
+			}
+			return existingPreRunE(cmd, args)
+		}
 		_, err := pref.Apply(cmds, o.Arguments, o.IOStreams.ErrOut)
 		if err != nil {
 			fmt.Fprintf(o.IOStreams.ErrOut, "error occurred while applying preferences %v\n", err)

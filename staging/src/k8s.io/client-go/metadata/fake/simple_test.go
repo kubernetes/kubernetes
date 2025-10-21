@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/watchlist"
 )
 
 const (
@@ -56,6 +57,13 @@ func newPartialObjectMetadataWithAnnotations(annotations map[string]string) *met
 	u := newPartialObjectMetadata(testAPIVersion, testKind, testNamespace, testName)
 	u.Annotations = annotations
 	return u
+}
+
+func TestDoesClientSupportWatchListSemantics(t *testing.T) {
+	target := &FakeMetadataClient{}
+	if !watchlist.DoesClientNotSupportWatchListSemantics(target) {
+		t.Fatalf("FakeMetadataClient should NOT support WatchList semantics")
+	}
 }
 
 func TestList(t *testing.T) {

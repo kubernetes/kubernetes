@@ -54,17 +54,12 @@ var errReadOnlySysFS = errors.New("readOnlySysFS")
 
 func (rct realConntracker) SetMax(ctx context.Context, max int) error {
 	logger := klog.FromContext(ctx)
+	logger.Info("Setting nf_conntrack_max", "nfConntrackMax", max)
 	if err := rct.setIntSysCtl(ctx, "nf_conntrack_max", max); err != nil {
 		return err
 	}
-	logger.Info("Setting nf_conntrack_max", "nfConntrackMax", max)
 
-	// Linux does not support writing to /sys/module/nf_conntrack/parameters/hashsize
-	// when the writer process is not in the initial network namespace
-	// (https://github.com/torvalds/linux/blob/v4.10/net/netfilter/nf_conntrack_core.c#L1795-L1796).
-	// Usually that's fine. But in some configurations such as with github.com/kinvolk/kubeadm-nspawn,
-	// kube-proxy is in another netns.
-	// Therefore, check if writing in hashsize is necessary and skip the writing if not.
+	// Check if hashsize is large enough for the nf_conntrack_max value.
 	hashsize, err := readIntStringFile("/sys/module/nf_conntrack/parameters/hashsize")
 	if err != nil {
 		return err
@@ -73,13 +68,12 @@ func (rct realConntracker) SetMax(ctx context.Context, max int) error {
 		return nil
 	}
 
-	// sysfs is expected to be mounted as 'rw'. However, it may be
-	// unexpectedly mounted as 'ro' by docker because of a known docker
-	// issue (https://github.com/docker/docker/issues/24000). Setting
-	// conntrack will fail when sysfs is readonly. When that happens, we
-	// don't set conntrack hashsize and return a special error
-	// errReadOnlySysFS here. The caller should deal with
-	// errReadOnlySysFS differently.
+	// sysfs is expected to be mounted as 'rw'. However, it may be unexpectedly
+	// mounted as 'ro' by docker because of known bugs (https://issues.k8s.io/134108).
+	// In that case we return a special error errReadOnlySysFS here, which the caller
+	// should deal with specially.
+	//
+	// TODO: this workaround can go away once we no longer support containerd 1.7.
 	writable, err := rct.isSysFSWritable(ctx)
 	if err != nil {
 		return err
@@ -87,7 +81,7 @@ func (rct realConntracker) SetMax(ctx context.Context, max int) error {
 	if !writable {
 		return errReadOnlySysFS
 	}
-	// TODO: generify this and sysctl to a new sysfs.WriteInt()
+
 	logger.Info("Setting conntrack hashsize", "conntrackHashsize", max/4)
 	return writeIntStringFile("/sys/module/nf_conntrack/parameters/hashsize", max/4)
 }

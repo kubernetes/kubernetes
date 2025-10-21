@@ -17,17 +17,16 @@ limitations under the License.
 package replicationcontroller
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
 )
 
@@ -44,8 +43,117 @@ func TestDeclarativeValidateForDeclarative(t *testing.T) {
 		"empty resource": {
 			input: mkValidReplicationController(),
 		},
+		// metadata.name
+		"name: empty": {
+			input: mkValidReplicationController(func(rc *api.ReplicationController) {
+				rc.Name = ""
+			}),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("metadata.name"), ""),
+			},
+		},
+		"name: label format": {
+			input: mkValidReplicationController(func(rc *api.ReplicationController) {
+				rc.Name = "this-is-a-label"
+			}),
+		},
+		"name: subdomain format": {
+			input: mkValidReplicationController(func(rc *api.ReplicationController) {
+				rc.Name = "this.is.a.subdomain"
+			}),
+		},
+		"name: invalid label format": {
+			input: mkValidReplicationController(func(rc *api.ReplicationController) {
+				rc.Name = "-this-is-not-a-label"
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("metadata.name"), nil, "").WithOrigin("format=k8s-long-name"),
+			},
+		},
+		"name: invalid subdomain format": {
+			input: mkValidReplicationController(func(rc *api.ReplicationController) {
+				rc.Name = ".this.is.not.a.subdomain"
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("metadata.name"), nil, "").WithOrigin("format=k8s-long-name"),
+			},
+		},
+		"name: label format with trailing dash": {
+			input: mkValidReplicationController(func(rc *api.ReplicationController) {
+				rc.Name = "this-is-a-label-"
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("metadata.name"), nil, "").WithOrigin("format=k8s-long-name"),
+			},
+		},
+		"name: subdomain format with trailing dash": {
+			input: mkValidReplicationController(func(rc *api.ReplicationController) {
+				rc.Name = "this.is.a.subdomain-"
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("metadata.name"), nil, "").WithOrigin("format=k8s-long-name"),
+			},
+		},
+		"name: long label format": {
+			input: mkValidReplicationController(func(rc *api.ReplicationController) {
+				rc.Name = strings.Repeat("x", 253)
+			}),
+		},
+		"name: long subdomain format": {
+			input: mkValidReplicationController(func(rc *api.ReplicationController) {
+				rc.Name = strings.Repeat("x.", 126) + "x"
+			}),
+		},
+		"name: too long label format": {
+			input: mkValidReplicationController(func(rc *api.ReplicationController) {
+				rc.Name = strings.Repeat("x", 254)
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("metadata.name"), nil, "").WithOrigin("format=k8s-long-name"),
+			},
+		},
+		"name: too long subdomain format": {
+			input: mkValidReplicationController(func(rc *api.ReplicationController) {
+				rc.Name = strings.Repeat("x.", 126) + "xx"
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("metadata.name"), nil, "").WithOrigin("format=k8s-long-name"),
+			},
+		},
+		// metadata.generateName (note: it's is not really validated)
+		"generateName: valid with empty name": {
+			input: mkValidReplicationController(func(rc *api.ReplicationController) {
+				rc.Name = ""
+				rc.GenerateName = "name"
+			}),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("metadata.name"), ""),
+				field.InternalError(field.NewPath("metadata.name"), fmt.Errorf("")),
+			},
+		},
+
+		"generateName: label format": {
+			input: mkValidReplicationController(func(rc *api.ReplicationController) {
+				rc.GenerateName = "this-is-a-label"
+			}),
+		},
+		"generateName: subdomain format": {
+			input: mkValidReplicationController(func(rc *api.ReplicationController) {
+				rc.GenerateName = "this.is.a.subdomain"
+			}),
+		},
+		"generateName: invalid format": {
+			input: mkValidReplicationController(func(rc *api.ReplicationController) {
+				rc.GenerateName = "Obviously not a valid generateName!!"
+			}),
+		},
+		"generateName: too long": {
+			input: mkValidReplicationController(func(rc *api.ReplicationController) {
+				rc.GenerateName = strings.Repeat("x", 4096)
+			}),
+		},
 		// spec.replicas
-		"nil replicas": {
+		"replicas: nil": {
 			input: mkValidReplicationController(func(rc *api.ReplicationController) {
 				rc.Spec.Replicas = nil
 			}),
@@ -53,32 +161,26 @@ func TestDeclarativeValidateForDeclarative(t *testing.T) {
 				field.Required(field.NewPath("spec.replicas"), ""),
 			},
 		},
-		"0 replicas": {
+		"replicas: 0": {
 			input: mkValidReplicationController(setSpecReplicas(0)),
 		},
-		"1 replicas": {
-			input: mkValidReplicationController(setSpecReplicas(1)),
-		},
-		"positive replicas": {
+		"replicas: positive": {
 			input: mkValidReplicationController(setSpecReplicas(100)),
 		},
-		"negative replicas": {
+		"replicas: negative": {
 			input: mkValidReplicationController(setSpecReplicas(-1)),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("spec.replicas"), nil, "").WithOrigin("minimum"),
 			},
 		},
 		// spec.minReadySeconds
-		"0 minReadySeconds": {
+		"minReadySeconds: 0": {
 			input: mkValidReplicationController(setSpecMinReadySeconds(0)),
 		},
-		"1 minReadySeconds": {
-			input: mkValidReplicationController(setSpecMinReadySeconds(1)),
-		},
-		"positive minReadySeconds": {
+		"minReadySeconds: positive": {
 			input: mkValidReplicationController(setSpecMinReadySeconds(100)),
 		},
-		"negative minReadySeconds": {
+		"minReadySeconds: negative": {
 			input: mkValidReplicationController(setSpecMinReadySeconds(-1)),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("spec.minReadySeconds"), nil, "").WithOrigin("minimum"),
@@ -87,35 +189,7 @@ func TestDeclarativeValidateForDeclarative(t *testing.T) {
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
-			var declarativeTakeoverErrs field.ErrorList
-			var imperativeErrs field.ErrorList
-			for _, gateVal := range []bool{true, false} {
-				// We only need to test both gate enabled and disabled together, because
-				// 1) the DeclarativeValidationTakeover won't take effect if DeclarativeValidation is disabled.
-				// 2) the validation output, when only DeclarativeValidation is enabled, is the same as when both gates are disabled.
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeclarativeValidation, gateVal)
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeclarativeValidationTakeover, gateVal)
-
-				errs := Strategy.Validate(ctx, &tc.input)
-				if gateVal {
-					declarativeTakeoverErrs = errs
-				} else {
-					imperativeErrs = errs
-				}
-				// The errOutputMatcher is used to verify the output matches the expected errors in test cases.
-				errOutputMatcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin()
-				if len(tc.expectedErrs) > 0 {
-					errOutputMatcher.Test(t, tc.expectedErrs, errs)
-				} else if len(errs) != 0 {
-					t.Errorf("expected no errors, but got: %v", errs)
-				}
-			}
-			// The equivalenceMatcher is used to verify the output errors from hand-written imperative validation
-			// are equivalent to the output errors when DeclarativeValidationTakeover is enabled.
-			equivalenceMatcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin()
-			equivalenceMatcher.Test(t, imperativeErrs, declarativeTakeoverErrs)
-
-			apitesting.VerifyVersionedValidationEquivalence(t, &tc.input, nil)
+			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, Strategy.Validate, tc.expectedErrs)
 		})
 	}
 }
@@ -131,12 +205,31 @@ func TestValidateUpdateForDeclarative(t *testing.T) {
 		expectedErrs field.ErrorList
 	}{
 		// baseline
-		"baseline": {
+		"no change": {
 			old:    mkValidReplicationController(),
 			update: mkValidReplicationController(),
 		},
+		// metadata.name
+		"name: changed": {
+			old: mkValidReplicationController(),
+			update: mkValidReplicationController(func(rc *api.ReplicationController) {
+				rc.Name += "x"
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("metadata.name"), nil, ""),
+			},
+		},
+		// metadata.generateName
+		"generateName: changed": {
+			old: mkValidReplicationController(),
+			update: mkValidReplicationController(func(rc *api.ReplicationController) {
+				rc.GenerateName += "x"
+			}),
+			// This is, oddly, mutable.  We should probably ratchet this off
+			// and make it immutable.
+		},
 		// spec.replicas
-		"nil replicas": {
+		"replicas: nil": {
 			old: mkValidReplicationController(),
 			update: mkValidReplicationController(func(rc *api.ReplicationController) {
 				rc.Spec.Replicas = nil
@@ -145,19 +238,15 @@ func TestValidateUpdateForDeclarative(t *testing.T) {
 				field.Required(field.NewPath("spec.replicas"), ""),
 			},
 		},
-		"0 replicas": {
+		"replicas: 0": {
 			old:    mkValidReplicationController(),
 			update: mkValidReplicationController(setSpecReplicas(0)),
 		},
-		"1 replicas": {
-			old:    mkValidReplicationController(),
-			update: mkValidReplicationController(setSpecReplicas(1)),
-		},
-		"positive replicas": {
+		"replicas: positive": {
 			old:    mkValidReplicationController(),
 			update: mkValidReplicationController(setSpecReplicas(100)),
 		},
-		"negative replicas": {
+		"replicas: negative": {
 			old:    mkValidReplicationController(),
 			update: mkValidReplicationController(setSpecReplicas(-1)),
 			expectedErrs: field.ErrorList{
@@ -165,19 +254,15 @@ func TestValidateUpdateForDeclarative(t *testing.T) {
 			},
 		},
 		// spec.minReadySeconds
-		"0 minReadySeconds": {
+		"minReadySeconds: 0": {
 			old:    mkValidReplicationController(),
 			update: mkValidReplicationController(setSpecMinReadySeconds(0)),
 		},
-		"1 minReadySeconds": {
-			old:    mkValidReplicationController(),
-			update: mkValidReplicationController(setSpecMinReadySeconds(1)),
-		},
-		"positive minReadySeconds": {
+		"minReadySeconds: positive": {
 			old:    mkValidReplicationController(),
 			update: mkValidReplicationController(setSpecMinReadySeconds(3)),
 		},
-		"negative minReadySeconds": {
+		"minReadySeconds: negative": {
 			old:    mkValidReplicationController(),
 			update: mkValidReplicationController(setSpecMinReadySeconds(-1)),
 			expectedErrs: field.ErrorList{
@@ -189,49 +274,7 @@ func TestValidateUpdateForDeclarative(t *testing.T) {
 		t.Run(k, func(t *testing.T) {
 			tc.old.ObjectMeta.ResourceVersion = "1"
 			tc.update.ObjectMeta.ResourceVersion = "1"
-			var declarativeTakeoverErrs field.ErrorList
-			var imperativeErrs field.ErrorList
-			for _, gateVal := range []bool{true, false} {
-				// We only need to test both gate enabled and disabled together, because
-				// 1) the DeclarativeValidationTakeover won't take effect if DeclarativeValidation is disabled.
-				// 2) the validation output, when only DeclarativeValidation is enabled, is the same as when both gates are disabled.
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeclarativeValidation, gateVal)
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeclarativeValidationTakeover, gateVal)
-				errs := Strategy.ValidateUpdate(ctx, &tc.update, &tc.old)
-				if gateVal {
-					declarativeTakeoverErrs = errs
-				} else {
-					imperativeErrs = errs
-				}
-				// The errOutputMatcher is used to verify the output matches the expected errors in test cases.
-				errOutputMatcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin()
-
-				if len(tc.expectedErrs) > 0 {
-					errOutputMatcher.Test(t, tc.expectedErrs, errs)
-				} else if len(errs) != 0 {
-					t.Errorf("expected no errors, but got: %v", errs)
-				}
-			}
-			// The equivalenceMatcher is used to verify the output errors from hand-written imperative validation
-			// are equivalent to the output errors when DeclarativeValidationTakeover is enabled.
-			equivalenceMatcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin()
-			// TODO: remove this once RC's validation is fixed to not return duplicate errors.
-			dedupedImperativeErrs := field.ErrorList{}
-			for _, err := range imperativeErrs {
-				found := false
-				for _, existingErr := range dedupedImperativeErrs {
-					if equivalenceMatcher.Matches(existingErr, err) {
-						found = true
-						break
-					}
-				}
-				if !found {
-					dedupedImperativeErrs = append(dedupedImperativeErrs, err)
-				}
-			}
-			equivalenceMatcher.Test(t, dedupedImperativeErrs, declarativeTakeoverErrs)
-
-			apitesting.VerifyVersionedValidationEquivalence(t, &tc.update, &tc.old)
+			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, Strategy.ValidateUpdate, tc.expectedErrs)
 		})
 	}
 }

@@ -84,13 +84,10 @@ type tearDown func()
 
 func setupFakeGRPCServer(service, addr string) (tearDown, error) {
 	ctx, cancel := context.WithCancel(context.Background())
-	teardown := func() {
-		cancel()
-	}
 
 	listener, err := net.Listen("unix", addr)
 	if err != nil {
-		teardown()
+		cancel()
 		return nil, err
 	}
 
@@ -110,19 +107,30 @@ func setupFakeGRPCServer(service, addr string) (tearDown, error) {
 			drapbv1beta1.RegisterDRAPluginServer(s, drapbv1beta1.V1ServerWrapper{DRAPluginServer: fakeGRPCServer})
 			drahealthv1alpha1.RegisterDRAResourceHealthServer(s, fakeGRPCServer)
 		} else {
+			cancel()
 			return nil, err
 		}
 	}
 
+	var wg sync.WaitGroup
+	wg.Add(1)
+
 	go func() {
-		go func() {
-			if err := s.Serve(listener); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
-				panic(err)
-			}
-		}()
+		defer wg.Done()
+		if err := s.Serve(listener); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
+			panic(err)
+		}
+	}()
+
+	go func() {
 		<-ctx.Done()
 		s.GracefulStop()
 	}()
+
+	teardown := func() {
+		cancel()
+		wg.Wait() // wait for Serve() to finish
+	}
 
 	return teardown, nil
 }
@@ -184,6 +192,44 @@ func TestGRPCConnIsReused(t *testing.T) {
 	// We should have only one entry otherwise it means another gRPC connection has been created
 	require.Len(t, reusedConns, 1, "expected length to be 1 but got %d", len(reusedConns))
 	require.Equal(t, 2, reusedConns[conn], "expected counter to be 2 but got %d", reusedConns[conn])
+}
+
+func TestGRPCConnUsableAfterIdle(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	service := drapbv1.DRAPluginService
+	addr := path.Join(t.TempDir(), "dra.sock")
+	teardown, err := setupFakeGRPCServer(service, addr)
+	require.NoError(t, err)
+	defer teardown()
+
+	driverName := "dummy-driver"
+
+	// ensure the plugin we are using is registered
+	draPlugins := NewDRAPluginManager(tCtx, nil, nil, &mockStreamHandler{}, 0)
+	draPlugins.withIdleTimeout = 5 * time.Second
+	tCtx.ExpectNoError(draPlugins.add(driverName, addr, service, defaultClientCallTimeout), "add plugin")
+	plugin, err := draPlugins.GetPlugin(driverName)
+	tCtx.ExpectNoError(err, "get plugin")
+
+	// The connection doesn't really become idle because HandleConn
+	// kicks it back to ready by calling Connect. Just sleep long
+	// enough here, the code should be reached...
+	tCtx.Log("Waiting for idle timeout...")
+	time.Sleep(2 * draPlugins.withIdleTimeout)
+
+	req := &drapbv1.NodePrepareResourcesRequest{
+		Claims: []*drapbv1.Claim{
+			{
+				Namespace: "dummy-namespace",
+				Uid:       "dummy-uid",
+				Name:      "dummy-claim",
+			},
+		},
+	}
+
+	callCtx := ktesting.WithTimeout(tCtx, 10*time.Second, "call timed out")
+	_, err = plugin.NodePrepareResources(callCtx, req)
+	tCtx.ExpectNoError(err, "NodePrepareResources")
 }
 
 func TestGetDRAPlugin(t *testing.T) {

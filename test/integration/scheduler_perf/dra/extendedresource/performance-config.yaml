@@ -17,8 +17,8 @@
 # Combining `performance` and `short` selects suitable workloads for a local
 # before/after comparisons with benchstat.
 
-# SchedulingWithExtendedResource uses pods with extended resources requests.
-- name: SchedulingWithExtendedResource
+# ExtendedResource uses pods with extended resources requests.
+- name: ExtendedResource
   featureGates:
     DynamicResourceAllocation: true
     DRAExtendedResource: true

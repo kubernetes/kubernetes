@@ -124,10 +124,6 @@ var ExpandedPluginsV1 = &config.Plugins{
 			// - This is a score coming from user preference.
 			{Name: names.NodeAffinity, Weight: 2},
 			{Name: names.NodeResourcesFit, Weight: 1},
-			// Weight is tripled because:
-			// - This is a score coming from user preference.
-			// - Usage of node tainting to group nodes in the cluster is increasing becoming a use-case
-			//	 for many user workloads
 			{Name: names.VolumeBinding, Weight: 1},
 			// Weight is doubled because:
 			// - This is a score coming from user preference.

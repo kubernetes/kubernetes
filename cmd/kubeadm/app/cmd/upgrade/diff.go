@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
+	staticpodutil "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
 )
 
 type diffFlags struct {
@@ -106,7 +107,7 @@ func validateManifestsPath(manifests ...string) (err error) {
 }
 
 // FetchInitConfigurationFunc defines the signature of the function which will fetch InitConfiguration from cluster.
-type FetchInitConfigurationFunc func(client clientset.Interface, printer output.Printer, logPrefix string, newControlPlane, skipComponentConfigs bool) (*kubeadmapi.InitConfiguration, error)
+type FetchInitConfigurationFunc func(client clientset.Interface, printer output.Printer, logPrefix string, getNodeRegistration, getAPIEndpoint, getComponentConfigs bool) (*kubeadmapi.InitConfiguration, error)
 
 func runDiff(fs *pflag.FlagSet, flags *diffFlags, args []string, fetchInitConfigurationFromCluster FetchInitConfigurationFunc) error {
 	externalCfg := &v1beta4.UpgradeConfiguration{}
@@ -119,7 +120,10 @@ func runDiff(fs *pflag.FlagSet, flags *diffFlags, args []string, fetchInitConfig
 	if err != nil {
 		return errors.Wrapf(err, "couldn't create a Kubernetes client from file %q", flags.kubeConfigPath)
 	}
-	initCfg, err := fetchInitConfigurationFromCluster(client, &output.TextPrinter{}, "upgrade/diff", false, true)
+	getNodeRegistration := true
+	getAPIEndpoint := staticpodutil.IsControlPlaneNode()
+	getComponentConfigs := false
+	initCfg, err := fetchInitConfigurationFromCluster(client, &output.TextPrinter{}, "upgrade/diff", getNodeRegistration, getAPIEndpoint, getComponentConfigs)
 	if err != nil {
 		return err
 	}

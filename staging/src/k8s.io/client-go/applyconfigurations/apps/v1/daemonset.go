@@ -29,11 +29,22 @@ import (
 
 // DaemonSetApplyConfiguration represents a declarative configuration of the DaemonSet type for use
 // with apply.
+//
+// DaemonSet represents the configuration of a daemon set.
 type DaemonSetApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                                 *DaemonSetSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                               *DaemonSetStatusApplyConfiguration `json:"status,omitempty"`
+	// The desired behavior of this daemon set.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Spec *DaemonSetSpecApplyConfiguration `json:"spec,omitempty"`
+	// The current status of this daemon set. This data may be
+	// out of date by some window of time.
+	// Populated by the system.
+	// Read-only.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Status *DaemonSetStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // DaemonSet constructs a declarative configuration of the DaemonSet type for use with
@@ -54,7 +65,6 @@ func DaemonSet(name, namespace string) *DaemonSetApplyConfiguration {
 // ExtractDaemonSetFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractDaemonSetFrom(daemonSet *appsv1.DaemonSet, fieldManager string, subresource string) (*DaemonSetApplyConfiguration, error) {
 	b := &DaemonSetApplyConfiguration{}
 	err := managedfields.ExtractInto(daemonSet, internal.Parser().Type("io.k8s.api.apps.v1.DaemonSet"), fieldManager, b, subresource)
@@ -79,14 +89,12 @@ func ExtractDaemonSetFrom(daemonSet *appsv1.DaemonSet, fieldManager string, subr
 // ExtractDaemonSet provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractDaemonSet(daemonSet *appsv1.DaemonSet, fieldManager string) (*DaemonSetApplyConfiguration, error) {
 	return ExtractDaemonSetFrom(daemonSet, fieldManager, "")
 }
 
 // ExtractDaemonSetStatus extracts the applied configuration owned by fieldManager from
 // daemonSet for the status subresource.
-// Experimental!
 func ExtractDaemonSetStatus(daemonSet *appsv1.DaemonSet, fieldManager string) (*DaemonSetApplyConfiguration, error) {
 	return ExtractDaemonSetFrom(daemonSet, fieldManager, "status")
 }

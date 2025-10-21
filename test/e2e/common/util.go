@@ -57,11 +57,11 @@ var CurrentSuite Suite
 // See also updateImageAllowList() in ../../e2e_node/image_list.go
 // TODO(random-liu): Change the image puller pod to use similar mechanism.
 var PrePulledImages = sets.NewString(
+	imageutils.GetE2EImage(imageutils.AgnhostPrev),
 	imageutils.GetE2EImage(imageutils.Agnhost),
 	imageutils.GetE2EImage(imageutils.BusyBox),
 	imageutils.GetE2EImage(imageutils.IpcUtils),
 	imageutils.GetE2EImage(imageutils.Nginx),
-	imageutils.GetE2EImage(imageutils.Httpd),
 	imageutils.GetE2EImage(imageutils.VolumeNFSServer),
 	imageutils.GetE2EImage(imageutils.NonRoot),
 )
@@ -70,36 +70,34 @@ var PrePulledImages = sets.NewString(
 // before tests starts, so that the tests won't fail due image pulling flakes. These images also have
 // Windows support. Currently, this is only used by E2E tests.
 var WindowsPrePulledImages = sets.NewString(
+	imageutils.GetE2EImage(imageutils.AgnhostPrev),
 	imageutils.GetE2EImage(imageutils.Agnhost),
 	imageutils.GetE2EImage(imageutils.BusyBox),
 	imageutils.GetE2EImage(imageutils.Nginx),
-	imageutils.GetE2EImage(imageutils.Httpd),
 )
 
 type testImagesStruct struct {
-	AgnhostImage  string
-	BusyBoxImage  string
-	KittenImage   string
-	NautilusImage string
-	NginxImage    string
-	NginxNewImage string
-	HttpdImage    string
-	HttpdNewImage string
-	PauseImage    string
+	AgnhostPrevImage string
+	AgnhostImage     string
+	BusyBoxImage     string
+	KittenImage      string
+	NautilusImage    string
+	NginxImage       string
+	NginxNewImage    string
+	PauseImage       string
 }
 
 var testImages testImagesStruct
 
 func init() {
 	testImages = testImagesStruct{
+		imageutils.GetE2EImage(imageutils.AgnhostPrev),
 		imageutils.GetE2EImage(imageutils.Agnhost),
 		imageutils.GetE2EImage(imageutils.BusyBox),
 		imageutils.GetE2EImage(imageutils.Kitten),
 		imageutils.GetE2EImage(imageutils.Nautilus),
 		imageutils.GetE2EImage(imageutils.Nginx),
 		imageutils.GetE2EImage(imageutils.NginxNew),
-		imageutils.GetE2EImage(imageutils.Httpd),
-		imageutils.GetE2EImage(imageutils.HttpdNew),
 		imageutils.GetE2EImage(imageutils.Pause),
 	}
 }

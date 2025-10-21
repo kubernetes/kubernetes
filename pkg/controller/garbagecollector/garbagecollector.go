@@ -146,7 +146,11 @@ func (gc *GarbageCollector) Run(ctx context.Context, workers int, initialSyncTim
 
 	go gc.dependencyGraphBuilder.Run(ctx)
 
-	if !cache.WaitForNamedCacheSync("garbage collector", waitForStopOrTimeout(ctx.Done(), initialSyncTimeout), func() bool {
+	// Create a new context that is cancelled after the initialSyncTimeout.
+	syncCtx, cancel := context.WithTimeout(ctx, initialSyncTimeout)
+	defer cancel()
+
+	if !cache.WaitForNamedCacheSyncWithContext(syncCtx, func() bool {
 		return gc.dependencyGraphBuilder.IsSynced(logger)
 	}) {
 		logger.Info("Garbage collector: not all resource monitors could be synced, proceeding anyways")
@@ -227,8 +231,11 @@ func (gc *GarbageCollector) Sync(ctx context.Context, discoveryClient discovery.
 		}
 		logger.V(4).Info("resynced monitors")
 
+		syncCtx, cancel := context.WithTimeout(ctx, period)
+		defer cancel()
+
 		// gc worker no longer waits for cache to be synced, but we will keep the periodical check to provide logs & metrics
-		cacheSynced := cache.WaitForNamedCacheSync("garbage collector", waitForStopOrTimeout(ctx.Done(), period), func() bool {
+		cacheSynced := cache.WaitForNamedCacheSyncWithContext(syncCtx, func() bool {
 			return gc.dependencyGraphBuilder.IsSynced(logger)
 		})
 		if cacheSynced {
@@ -260,19 +267,6 @@ func printDiff(oldResources, newResources map[schema.GroupVersionResource]struct
 		}
 	}
 	return fmt.Sprintf("added: %v, removed: %v", added.List(), removed.List())
-}
-
-// waitForStopOrTimeout returns a stop channel that closes when the provided stop channel closes or when the specified timeout is reached
-func waitForStopOrTimeout(stopCh <-chan struct{}, timeout time.Duration) <-chan struct{} {
-	stopChWithTimeout := make(chan struct{})
-	go func() {
-		select {
-		case <-stopCh:
-		case <-time.After(timeout):
-		}
-		close(stopChWithTimeout)
-	}()
-	return stopChWithTimeout
 }
 
 // IsSynced returns true if dependencyGraphBuilder is synced.

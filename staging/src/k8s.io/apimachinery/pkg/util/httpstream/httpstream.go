@@ -160,18 +160,30 @@ func commaSeparatedHeaderValues(header []string) []string {
 
 // Handshake performs a subprotocol negotiation. If the client did request a
 // subprotocol, Handshake will select the first common value found in
-// serverProtocols. If a match is found, Handshake adds a response header
-// indicating the chosen subprotocol. If no match is found, HTTP forbidden is
-// returned, along with a response header containing the list of protocols the
-// server can accept.
+// serverProtocols, otherwise it will return an error and write an HTTP BadRequest to the response.
+// If a match is found, Handshake adds a response header indicating the chosen subprotocol.
+// If no match is found, HTTP forbidden is returned, along with a response header containing
+// the list of protocols the server can accept.
 func Handshake(req *http.Request, w http.ResponseWriter, serverProtocols []string) (string, error) {
-	clientProtocols := commaSeparatedHeaderValues(req.Header[http.CanonicalHeaderKey(HeaderProtocolVersion)])
-	if len(clientProtocols) == 0 {
-		return "", fmt.Errorf("unable to upgrade: %s is required", HeaderProtocolVersion)
-	}
-
 	if len(serverProtocols) == 0 {
 		panic(fmt.Errorf("unable to upgrade: serverProtocols is required"))
+	}
+	values, ok := req.Header[http.CanonicalHeaderKey(HeaderProtocolVersion)]
+	if !ok {
+		err := fmt.Errorf("unable to upgrade: header %s does not exist in request with %d headers", HeaderProtocolVersion, len(req.Header))
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return "", err
+	}
+	if len(values) == 0 {
+		err := fmt.Errorf("unable to upgrade: header %s is empty", HeaderProtocolVersion)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return "", err
+	}
+	clientProtocols := commaSeparatedHeaderValues(values)
+	if len(clientProtocols) == 0 {
+		err := fmt.Errorf("unable to upgrade: header %s contains %s, but no valid protocols", HeaderProtocolVersion, values)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return "", err
 	}
 
 	negotiatedProtocol := negotiateProtocol(clientProtocols, serverProtocols)
