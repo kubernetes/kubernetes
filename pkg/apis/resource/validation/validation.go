@@ -1409,10 +1409,10 @@ func validateLabelValue(value string, fldPath *field.Path) field.ErrorList {
 func validateDeviceBindingParameters(bindingConditions, bindingFailureConditions []string, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, validateSlice(bindingConditions, resource.BindingConditionsMaxSize,
-		metav1validation.ValidateLabelName, fldPath.Child("bindingConditions"))...)
+		metav1validation.ValidateLabelName, fldPath.Child("bindingConditions"), sizeCovered)...)
 
 	allErrs = append(allErrs, validateSlice(bindingFailureConditions, resource.BindingFailureConditionsMaxSize,
-		metav1validation.ValidateLabelName, fldPath.Child("bindingFailureConditions"))...)
+		metav1validation.ValidateLabelName, fldPath.Child("bindingFailureConditions"), sizeCovered)...)
 
 	// ensure BindingConditions and BindingFailureConditions contain no duplicate items and do not overlap with each other
 	conditionsSet := sets.New[string]()
