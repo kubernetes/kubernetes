@@ -152,6 +152,8 @@ func Validate_AllocatedDeviceStatus(ctx context.Context, op operation.Operation,
 			if earlyReturn {
 				return // do not proceed
 			}
+			// call the type's validation function
+			errs = append(errs, Validate_NetworkDeviceData(ctx, op, fldPath, obj, oldObj)...)
 			return
 		}(fldPath.Child("networkData"), obj.NetworkData, safe.Field(oldObj, func(oldObj *resourcev1.AllocatedDeviceStatus) *resourcev1.NetworkDeviceData {
 			return oldObj.NetworkData
@@ -1097,6 +1099,26 @@ func Validate_ExactDeviceRequest(ctx context.Context, op operation.Operation, fl
 		}(fldPath.Child("tolerations"), obj.Tolerations, safe.Field(oldObj, func(oldObj *resourcev1.ExactDeviceRequest) []resourcev1.DeviceToleration { return oldObj.Tolerations }))...)
 
 	// field resourcev1.ExactDeviceRequest.Capacity has no validation
+	return errs
+}
+
+// Validate_NetworkDeviceData validates an instance of NetworkDeviceData according
+// to declarative validation rules in the API schema.
+func Validate_NetworkDeviceData(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1.NetworkDeviceData) (errs field.ErrorList) {
+	// field resourcev1.NetworkDeviceData.InterfaceName
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			errs = append(errs, validate.MaxLength(ctx, op, fldPath, obj, oldObj, 256)...)
+			return
+		}(fldPath.Child("interfaceName"), &obj.InterfaceName, safe.Field(oldObj, func(oldObj *resourcev1.NetworkDeviceData) *string { return &oldObj.InterfaceName }))...)
+
+	// field resourcev1.NetworkDeviceData.IPs has no validation
+	// field resourcev1.NetworkDeviceData.HardwareAddress has no validation
 	return errs
 }
 

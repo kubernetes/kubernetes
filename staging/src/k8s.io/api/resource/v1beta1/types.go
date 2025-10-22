@@ -1936,6 +1936,7 @@ type NetworkDeviceData struct {
 	// Must not be longer than 256 characters.
 	//
 	// +optional
+	// +k8s:maxLength=256
 	InterfaceName string `json:"interfaceName,omitempty" protobuf:"bytes,1,opt,name=interfaceName"`
 
 	// IPs lists the network addresses assigned to the device's network interface.
