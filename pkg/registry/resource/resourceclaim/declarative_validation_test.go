@@ -1127,6 +1127,40 @@ func testValidateStatusUpdateForDeclarative(t *testing.T, apiVersion string) {
 				field.TooMany(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("bindingFailureConditions"), resource.BindingFailureConditionsMaxSize+1, resource.BindingFailureConditionsMaxSize).WithOrigin("maxItems"),
 			},
 		},
+		// .Status.Devices[%d].NetworkData.InterfaceName
+		"valid networkdevicedata interfacename": {
+			old: mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(
+				tweakStatusDevices(
+					resource.AllocatedDeviceStatus{
+						Driver: "dra.example.com",
+						Pool:   "pool-0",
+						Device: "device-0",
+						NetworkData: &resource.NetworkDeviceData{
+							InterfaceName: strings.Repeat("a", resource.NetworkDeviceDataInterfaceNameMaxLength),
+						},
+					},
+				),
+			),
+		},
+		"invalid networkdevicedata interfacename too long": {
+			old: mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(
+				tweakStatusDevices(
+					resource.AllocatedDeviceStatus{
+						Driver: "dra.example.com",
+						Pool:   "pool-0",
+						Device: "device-0",
+						NetworkData: &resource.NetworkDeviceData{
+							InterfaceName: strings.Repeat("a", resource.NetworkDeviceDataInterfaceNameMaxLength+1),
+						},
+					},
+				),
+			),
+			expectedErrs: field.ErrorList{
+				field.TooLong(field.NewPath("status", "devices").Index(0).Child("networkData", "interfaceName"), "", resource.NetworkDeviceDataInterfaceNameMaxLength).MarkCoveredByDeclarative().WithOrigin("maxLength"),
+			},
+		},
 	}
 
 	for k, tc := range testCases {
