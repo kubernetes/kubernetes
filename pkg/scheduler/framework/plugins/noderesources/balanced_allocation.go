@@ -138,6 +138,7 @@ func NewBalancedAllocation(_ context.Context, baArgs runtime.Object, h fwk.Handl
 			scorer:                          balancedResourceScorer,
 			useRequested:                    true,
 			resources:                       args.Resources,
+			enableInPlacePodLevelResourcesVerticalScaling: fts.EnableInPlacePodLevelResourcesVerticalScaling,
 		},
 	}, nil
 }
