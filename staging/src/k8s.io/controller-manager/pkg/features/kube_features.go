@@ -31,17 +31,8 @@ import (
 // of code conflicts because changes are more likely to be scattered
 // across the file.
 const (
-	// Every feature gate should add method here following this template:
-	//
-	// // owner: @username
-	// MyFeature featuregate.Feature = "MyFeature"
-	//
-	// Feature gates should be listed in alphabetical, case-sensitive
-	// (upper before any lower case character) order. This reduces the risk
-	// of code conflicts because changes are more likely to be scattered
-	// across the file.
-
 	// owner: @lukasmetzner
+	// kep:  http://kep.k8s.io/5237
 	// Use watch based route controller reconciliation instead of frequent periodic reconciliation.
 	CloudControllerManagerWatchBasedRoutesReconciliation featuregate.Feature = "CloudControllerManagerWatchBasedRoutesReconciliation"
 

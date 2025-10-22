@@ -55,8 +55,10 @@ const (
 	// Maximal number of concurrent route operation API calls.
 	// TODO: This should be per-provider.
 	maxConcurrentRouteOperations int = 200
-	// In the scenarios with a burst of node events,
-	// we don't want to be worse than a 10s interval (current default reconcile interval).
+	// In the scenarios with a burst of node events, we don't want to be worse
+	// than a 10s interval.
+	// The 10s interval was defined in KEP 5237, it is equivalent to the default
+	// sync period of the route controller.
 	minRouteResyncInterval time.Duration = 10 * time.Second
 )
 
