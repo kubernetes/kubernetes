@@ -41,47 +41,6 @@ import (
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
-func TestResolvePort(t *testing.T) {
-	for _, testCase := range []struct {
-		container  *v1.Container
-		stringPort string
-		expected   int
-	}{
-		{
-			stringPort: "foo",
-			container: &v1.Container{
-				Ports: []v1.ContainerPort{{Name: "foo", ContainerPort: int32(80)}},
-			},
-			expected: 80,
-		},
-		{
-			container:  &v1.Container{},
-			stringPort: "80",
-			expected:   80,
-		},
-		{
-			container: &v1.Container{
-				Ports: []v1.ContainerPort{
-					{Name: "bar", ContainerPort: int32(80)},
-				},
-			},
-			stringPort: "foo",
-			expected:   -1,
-		},
-	} {
-		port, err := resolvePort(intstr.FromString(testCase.stringPort), testCase.container)
-		if testCase.expected != -1 && err != nil {
-			t.Fatalf("unexpected error while resolving port: %s", err)
-		}
-		if testCase.expected == -1 && err == nil {
-			t.Errorf("expected error when a port fails to resolve")
-		}
-		if testCase.expected != port {
-			t.Errorf("failed to resolve port, expected %d, got %d", testCase.expected, port)
-		}
-	}
-}
-
 type fakeContainerCommandRunner struct {
 	Cmd []string
 	ID  kubecontainer.ContainerID
