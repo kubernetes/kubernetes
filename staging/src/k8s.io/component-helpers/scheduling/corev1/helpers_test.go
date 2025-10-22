@@ -751,7 +751,7 @@ func TestFindMatchingUntoleratedTaint(t *testing.T) {
 			description: "numeric Gt operator with taint value below threshold, expect not tolerated",
 			tolerations: []v1.Toleration{
 				{
-					Key:      "node.kubernetes.io/sla",
+					Key:      "node.example.com/priority-level",
 					Operator: "Gt",
 					Value:    "950",
 					Effect:   v1.TaintEffectNoSchedule,
@@ -759,7 +759,7 @@ func TestFindMatchingUntoleratedTaint(t *testing.T) {
 			},
 			taints: []v1.Taint{
 				{
-					Key:    "node.kubernetes.io/sla",
+					Key:    "node.example.com/priority-level",
 					Value:  "800",
 					Effect: v1.TaintEffectNoSchedule,
 				},
@@ -771,7 +771,7 @@ func TestFindMatchingUntoleratedTaint(t *testing.T) {
 			description: "numeric Gt operator with taint value above threshold, expect tolerated",
 			tolerations: []v1.Toleration{
 				{
-					Key:      "node.kubernetes.io/sla",
+					Key:      "node.example.com/priority-level",
 					Operator: "Gt",
 					Value:    "750",
 					Effect:   v1.TaintEffectNoSchedule,
@@ -779,7 +779,7 @@ func TestFindMatchingUntoleratedTaint(t *testing.T) {
 			},
 			taints: []v1.Taint{
 				{
-					Key:    "node.kubernetes.io/sla",
+					Key:    "node.example.com/priority-level",
 					Value:  "950",
 					Effect: v1.TaintEffectNoSchedule,
 				},
@@ -791,7 +791,7 @@ func TestFindMatchingUntoleratedTaint(t *testing.T) {
 			description: "numeric Lt operator with taint value above threshold, expect not tolerated",
 			tolerations: []v1.Toleration{
 				{
-					Key:      "node.kubernetes.io/sla",
+					Key:      "node.example.com/priority-level",
 					Operator: "Lt",
 					Value:    "800",
 					Effect:   v1.TaintEffectNoSchedule,
@@ -799,7 +799,7 @@ func TestFindMatchingUntoleratedTaint(t *testing.T) {
 			},
 			taints: []v1.Taint{
 				{
-					Key:    "node.kubernetes.io/sla",
+					Key:    "node.example.com/priority-level",
 					Value:  "950",
 					Effect: v1.TaintEffectNoSchedule,
 				},
@@ -811,7 +811,7 @@ func TestFindMatchingUntoleratedTaint(t *testing.T) {
 			description: "numeric Gt operator with non-numeric taint value, expect not tolerated",
 			tolerations: []v1.Toleration{
 				{
-					Key:      "node.kubernetes.io/sla",
+					Key:      "node.example.com/priority-level",
 					Operator: "Gt",
 					Value:    "950",
 					Effect:   v1.TaintEffectNoSchedule,
@@ -819,7 +819,7 @@ func TestFindMatchingUntoleratedTaint(t *testing.T) {
 			},
 			taints: []v1.Taint{
 				{
-					Key:    "node.kubernetes.io/sla",
+					Key:    "node.example.com/priority-level",
 					Value:  "high",
 					Effect: v1.TaintEffectNoSchedule,
 				},
@@ -830,7 +830,10 @@ func TestFindMatchingUntoleratedTaint(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		_, untolerated := FindMatchingUntoleratedTaint(tc.taints, tc.tolerations, tc.applyFilter)
+		_, untolerated, err := FindMatchingUntoleratedTaint(tc.taints, tc.tolerations, tc.applyFilter)
+		if err != nil {
+			t.Errorf("unexpected error in test case [%s], err %v", tc.description, err)
+		}
 		if tc.expectTolerated != !untolerated {
 			filteredTaints := []v1.Taint{}
 			for _, taint := range tc.taints {

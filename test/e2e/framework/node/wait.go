@@ -79,7 +79,11 @@ func WaitForTotalHealthy(ctx context.Context, c clientset.Interface, timeout tim
 		}
 		missingPodsPerNode = make(map[string][]string)
 		for _, node := range nodes.Items {
-			if isNodeSchedulableWithoutTaints(&node) {
+			isSched, err := isNodeSchedulableWithoutTaints(&node)
+			if err != nil {
+				return false, err
+			}
+			if isSched {
 				for _, requiredPod := range requiredPerNodePods {
 					foundRequired := false
 					for _, presentPod := range systemPodsPerNode[node.Name] {
@@ -257,7 +261,11 @@ func CheckReadyForTests(ctx context.Context, c clientset.Interface, nonblockingT
 			return false, terminalListNodesErr
 		}
 		for _, node := range allNodes.Items {
-			if !readyForTests(&node, nonblockingTaints) {
+			isReady, err := readyForTests(&node, nonblockingTaints)
+			if err != nil {
+				return false, err
+			}
+			if !isReady {
 				nodesNotReadyYet = append(nodesNotReadyYet, node)
 			}
 		}
@@ -297,17 +305,25 @@ func CheckReadyForTests(ctx context.Context, c clientset.Interface, nonblockingT
 // to enter a testable state. By default this means it is schedulable, NodeReady, and untainted.
 // Nodes with taints nonblocking taints are permitted to have that taint and
 // also have their node.Spec.Unschedulable field ignored for the purposes of this function.
-func readyForTests(node *v1.Node, nonblockingTaints string) bool {
+func readyForTests(node *v1.Node, nonblockingTaints string) (bool, error) {
 	if hasNonblockingTaint(node, nonblockingTaints) {
 		// If the node has one of the nonblockingTaints taints; just check that it is ready
 		// and don't require node.Spec.Unschedulable to be set either way.
-		if !IsNodeReady(node) || !isNodeUntaintedWithNonblocking(node, nonblockingTaints) {
-			return false
+		isUntaint, err := isNodeUntaintedWithNonblocking(node, nonblockingTaints)
+		if err != nil {
+			return false, err
+		}
+		if !IsNodeReady(node) || !isUntaint {
+			return false, nil
 		}
 	} else {
-		if !IsNodeSchedulable(node) || !isNodeUntainted(node) {
-			return false
+		isUntaint, err := isNodeUntainted(node)
+		if err != nil {
+			return false, err
+		}
+		if !IsNodeSchedulable(node) || !isUntaint {
+			return false, nil
 		}
 	}
-	return true
+	return true, nil
 }

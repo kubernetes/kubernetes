@@ -60,7 +60,11 @@ func (pl *fooPlugin) Filter(ctx context.Context, state fwk.CycleState, pod *v1.P
 		return nil
 	}
 
-	if corev1.TolerationsTolerateTaint(pod.Spec.Tolerations, &nodeInfo.Node().Spec.Taints[0]) {
+	isTolerated, err := corev1.TolerationsTolerateTaint(pod.Spec.Tolerations, &nodeInfo.Node().Spec.Taints[0])
+	if err != nil {
+		return fwk.NewStatus(fwk.UnschedulableAndUnresolvable).WithError(err)
+	}
+	if isTolerated {
 		return nil
 	}
 	return fwk.NewStatus(fwk.Unschedulable)

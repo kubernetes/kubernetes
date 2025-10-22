@@ -117,13 +117,13 @@ func TestTolerationToleratesTaint(t *testing.T) {
 		{
 			description: "toleration with Gt operator - taint value less than toleration value, expect not tolerated",
 			toleration: Toleration{
-				Key:      "node.kubernetes.io/sla",
+				Key:      "node.example.com/priority-level",
 				Operator: TolerationOpGt,
 				Value:    "950",
 				Effect:   TaintEffectNoSchedule,
 			},
 			taint: Taint{
-				Key:    "node.kubernetes.io/sla",
+				Key:    "node.example.com/priority-level",
 				Value:  "800",
 				Effect: TaintEffectNoSchedule,
 			},
@@ -132,13 +132,13 @@ func TestTolerationToleratesTaint(t *testing.T) {
 		{
 			description: "toleration with Gt operator - taint value greater than toleration value, expect tolerated",
 			toleration: Toleration{
-				Key:      "node.kubernetes.io/sla",
+				Key:      "node.example.com/priority-level",
 				Operator: TolerationOpGt,
 				Value:    "750",
 				Effect:   TaintEffectNoSchedule,
 			},
 			taint: Taint{
-				Key:    "node.kubernetes.io/sla",
+				Key:    "node.example.com/priority-level",
 				Value:  "950",
 				Effect: TaintEffectNoSchedule,
 			},
@@ -147,13 +147,13 @@ func TestTolerationToleratesTaint(t *testing.T) {
 		{
 			description: "toleration with Lt operator - taint value greater than toleration value, expect not tolerated",
 			toleration: Toleration{
-				Key:      "node.kubernetes.io/sla",
+				Key:      "node.example.com/priority-level",
 				Operator: TolerationOpLt,
 				Value:    "800",
 				Effect:   TaintEffectNoSchedule,
 			},
 			taint: Taint{
-				Key:    "node.kubernetes.io/sla",
+				Key:    "node.example.com/priority-level",
 				Value:  "950",
 				Effect: TaintEffectNoSchedule,
 			},
@@ -162,13 +162,13 @@ func TestTolerationToleratesTaint(t *testing.T) {
 		{
 			description: "toleration with Lt operator - taint value less than toleration value, expect tolerated",
 			toleration: Toleration{
-				Key:      "node.kubernetes.io/sla",
+				Key:      "node.example.com/priority-level",
 				Operator: TolerationOpLt,
 				Value:    "950",
 				Effect:   TaintEffectNoSchedule,
 			},
 			taint: Taint{
-				Key:    "node.kubernetes.io/sla",
+				Key:    "node.example.com/priority-level",
 				Value:  "800",
 				Effect: TaintEffectNoSchedule,
 			},
@@ -177,13 +177,13 @@ func TestTolerationToleratesTaint(t *testing.T) {
 		{
 			description: "toleration with Gt operator and taint with equal numeric value, expect not tolerated",
 			toleration: Toleration{
-				Key:      "node.kubernetes.io/sla",
+				Key:      "node.example.com/priority-level",
 				Operator: TolerationOpGt,
 				Value:    "950",
 				Effect:   TaintEffectNoSchedule,
 			},
 			taint: Taint{
-				Key:    "node.kubernetes.io/sla",
+				Key:    "node.example.com/priority-level",
 				Value:  "950",
 				Effect: TaintEffectNoSchedule,
 			},
@@ -192,13 +192,13 @@ func TestTolerationToleratesTaint(t *testing.T) {
 		{
 			description: "toleration with Gt operator and taint with non-numeric value, expect not tolerated",
 			toleration: Toleration{
-				Key:      "node.kubernetes.io/sla",
+				Key:      "node.example.com/priority-level",
 				Operator: TolerationOpGt,
 				Value:    "950",
 				Effect:   TaintEffectNoSchedule,
 			},
 			taint: Taint{
-				Key:    "node.kubernetes.io/sla",
+				Key:    "node.example.com/priority-level",
 				Value:  "high",
 				Effect: TaintEffectNoSchedule,
 			},
@@ -236,7 +236,11 @@ func TestTolerationToleratesTaint(t *testing.T) {
 		},
 	}
 	for _, tc := range testCases {
-		if tolerated := tc.toleration.ToleratesTaint(&tc.taint); tc.expectTolerated != tolerated {
+		tolerated, err := tc.toleration.ToleratesTaint(&tc.taint)
+		if err != nil {
+			t.Errorf("Unextected error %v", err)
+		}
+		if tc.expectTolerated != tolerated {
 			t.Errorf("[%s] expect %v, got %v: toleration %+v, taint %s", tc.description, tc.expectTolerated, tolerated, tc.toleration, tc.taint.ToString())
 		}
 	}
