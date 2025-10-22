@@ -4375,7 +4375,7 @@ func ValidateTolerations(tolerations []core.Toleration, fldPath *field.Path, opt
 				allErrors = append(allErrors, field.Invalid(idxPath.Child("operator"), toleration.Value, "value must be empty when `operator` is 'Exists'"))
 			}
 		case core.TolerationOpLt, core.TolerationOpGt:
-			// numeric comparison operators require validation option
+			// Numeric comparison operators require validation option
 			if !opts.AllowTaintTolerationComparisonOperators {
 				validValues := []core.TolerationOperator{core.TolerationOpEqual, core.TolerationOpExists, core.TolerationOpLt, core.TolerationOpGt}
 				allErrors = append(allErrors, field.NotSupported(idxPath.Child("operator"), toleration.Operator, validValues))

@@ -18,6 +18,7 @@ package helper
 
 import (
 	"fmt"
+	"k8s.io/klog/v2"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
@@ -287,7 +288,7 @@ func AddOrUpdateTolerationInPodSpec(spec *v1.PodSpec, toleration *v1.Toleration)
 }
 
 // GetMatchingTolerations returns true and list of Tolerations matching all Taints if all are tolerated, or false otherwise.
-func GetMatchingTolerations(taints []v1.Taint, tolerations []v1.Toleration) (bool, []v1.Toleration) {
+func GetMatchingTolerations(logger klog.Logger, taints []v1.Taint, tolerations []v1.Toleration) (bool, []v1.Toleration) {
 	if len(taints) == 0 {
 		return true, []v1.Toleration{}
 	}
@@ -298,7 +299,7 @@ func GetMatchingTolerations(taints []v1.Taint, tolerations []v1.Toleration) (boo
 	for i := range taints {
 		tolerated := false
 		for j := range tolerations {
-			if tolerations[j].ToleratesTaint(&taints[i]) {
+			if tolerations[j].ToleratesTaint(logger, &taints[i]) {
 				result = append(result, tolerations[j])
 				tolerated = true
 				break

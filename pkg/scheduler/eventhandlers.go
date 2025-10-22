@@ -63,7 +63,7 @@ func (sched *Scheduler) addNodeToCache(obj interface{}) {
 
 	logger.V(3).Info("Add event for node", "node", klog.KObj(node))
 	nodeInfo := sched.Cache.AddNode(logger, node)
-	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, nil, node, preCheckForNode(nodeInfo))
+	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, nil, node, preCheckForNode(logger, nodeInfo))
 }
 
 func (sched *Scheduler) updateNodeInCache(oldObj, newObj interface{}) {
@@ -90,7 +90,7 @@ func (sched *Scheduler) updateNodeInCache(oldObj, newObj interface{}) {
 	// Only requeue unschedulable pods if the node became more schedulable.
 	for _, evt := range events {
 		startMoving := time.Now()
-		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, oldNode, newNode, preCheckForNode(nodeInfo))
+		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, oldNode, newNode, preCheckForNode(logger, nodeInfo))
 		movingDuration := metrics.SinceInSeconds(startMoving)
 
 		metrics.EventHandlingLatency.WithLabelValues(evt.Label()).Observe(updatingDuration + movingDuration)
@@ -724,7 +724,7 @@ func addAllEventHandlers(
 	return nil
 }
 
-func preCheckForNode(nodeInfo *framework.NodeInfo) queue.PreEnqueueCheck {
+func preCheckForNode(logger klog.Logger, nodeInfo *framework.NodeInfo) queue.PreEnqueueCheck {
 	if utilfeature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints) {
 		// QHint is initially created from the motivation of replacing this preCheck.
 		// It assumes that the scheduler only has in-tree plugins, which is problematic for our extensibility.
@@ -740,7 +740,7 @@ func preCheckForNode(nodeInfo *framework.NodeInfo) queue.PreEnqueueCheck {
 		if len(admissionResults) != 0 {
 			return false
 		}
-		_, isUntolerated := corev1helpers.FindMatchingUntoleratedTaint(nodeInfo.Node().Spec.Taints, pod.Spec.Tolerations, helper.DoNotScheduleTaintsFilterFunc())
+		_, isUntolerated := corev1helpers.FindMatchingUntoleratedTaint(logger, nodeInfo.Node().Spec.Taints, pod.Spec.Tolerations, helper.DoNotScheduleTaintsFilterFunc())
 		return !isUntolerated
 	}
 }

@@ -17,11 +17,12 @@ limitations under the License.
 package v1
 
 import (
+	"k8s.io/klog/v2/ktesting"
 	"testing"
 )
 
 func TestTolerationToleratesTaint(t *testing.T) {
-
+	logger, _ := ktesting.NewTestContext(t)
 	testCases := []struct {
 		description     string
 		toleration      Toleration
@@ -238,7 +239,7 @@ func TestTolerationToleratesTaint(t *testing.T) {
 		},
 	}
 	for _, tc := range testCases {
-		if tolerated := tc.toleration.ToleratesTaint(&tc.taint); tc.expectTolerated != tolerated {
+		if tolerated := tc.toleration.ToleratesTaint(logger, &tc.taint); tc.expectTolerated != tolerated {
 			t.Errorf("[%s] expect %v, got %v: toleration %+v, taint %s", tc.description, tc.expectTolerated, tolerated, tc.toleration, tc.taint.ToString())
 		}
 	}

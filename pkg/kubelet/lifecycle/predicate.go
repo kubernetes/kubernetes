@@ -250,7 +250,9 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 
 // generalFilter checks a group of filterings that the kubelet cares about.
 func (w *predicateAdmitHandler) generalFilter(ctx context.Context, pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) []PredicateFailureReason {
-	reasons := generalFilter(pod, nodeInfo)
+	logger := klog.FromContext(ctx)
+
+	reasons := generalFilter(logger, pod, nodeInfo)
 	for _, r := range reasons {
 		if r.GetReason() != nodeaffinity.ErrReasonPod {
 			return reasons
@@ -259,14 +261,14 @@ func (w *predicateAdmitHandler) generalFilter(ctx context.Context, pod *v1.Pod, 
 	if len(reasons) > 0 {
 		// If the only reason for failure is the node affinity labels, fetch the node synchronously
 		// and try again.
-		logger := klog.FromContext(ctx)
+
 		node, err := w.getNodeAnyWayFunc(ctx, false)
 		if err != nil {
 			logger.Error(err, "Failed to synchronously fetch node info")
 			return reasons
 		}
 		nodeInfo.SetNode(node)
-		reasons = generalFilter(pod, nodeInfo)
+		reasons = generalFilter(logger, pod, nodeInfo)
 	}
 
 	return reasons
@@ -412,7 +414,7 @@ func (e *PredicateFailureError) GetReason() string {
 }
 
 // generalFilter checks a group of filterings that the kubelet cares about.
-func generalFilter(pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) []PredicateFailureReason {
+func generalFilter(logger klog.Logger, pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) []PredicateFailureReason {
 	admissionResults := scheduler.AdmissionCheck(pod, nodeInfo, true)
 	var reasons []PredicateFailureReason
 	for _, r := range admissionResults {
@@ -430,7 +432,7 @@ func generalFilter(pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) []Predica
 
 	// Check taint/toleration except for static pods
 	if !types.IsStaticPod(pod) {
-		_, isUntolerated := corev1.FindMatchingUntoleratedTaint(nodeInfo.Node().Spec.Taints, pod.Spec.Tolerations, func(t *v1.Taint) bool {
+		_, isUntolerated := corev1.FindMatchingUntoleratedTaint(logger, nodeInfo.Node().Spec.Taints, pod.Spec.Tolerations, func(t *v1.Taint) bool {
 			// Kubelet is only interested in the NoExecute taint.
 			return t.Effect == v1.TaintEffectNoExecute
 		})

@@ -84,7 +84,7 @@ func (pl *NodeUnschedulable) isSchedulableAfterPodTolerationChange(logger klog.L
 		// - Taint can be added, but can't be modified nor removed.
 		// - If the Pod already has the toleration, it shouldn't have rejected by this plugin in the first place.
 		//   Meaning, here this Pod has been rejected by this plugin, and hence it shouldn't have the toleration yet.
-		if v1helper.TolerationsTolerateTaint(modifiedPod.Spec.Tolerations, &v1.Taint{
+		if v1helper.TolerationsTolerateTaint(logger, modifiedPod.Spec.Tolerations, &v1.Taint{
 			Key:    v1.TaintNodeUnschedulable,
 			Effect: v1.TaintEffectNoSchedule,
 		}) {
@@ -130,6 +130,7 @@ func (pl *NodeUnschedulable) Name() string {
 
 // Filter invoked at the filter extension point.
 func (pl *NodeUnschedulable) Filter(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
+	logger := klog.FromContext(ctx)
 	node := nodeInfo.Node()
 
 	if !node.Spec.Unschedulable {
@@ -137,7 +138,7 @@ func (pl *NodeUnschedulable) Filter(ctx context.Context, _ fwk.CycleState, pod *
 	}
 
 	// If pod tolerate unschedulable taint, it's also tolerate `node.Spec.Unschedulable`.
-	podToleratesUnschedulable := v1helper.TolerationsTolerateTaint(pod.Spec.Tolerations, &v1.Taint{
+	podToleratesUnschedulable := v1helper.TolerationsTolerateTaint(logger, pod.Spec.Tolerations, &v1.Taint{
 		Key:    v1.TaintNodeUnschedulable,
 		Effect: v1.TaintEffectNoSchedule,
 	})
