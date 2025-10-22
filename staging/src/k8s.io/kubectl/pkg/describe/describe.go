@@ -42,7 +42,7 @@ import (
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
-	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
+	certificatesv1 "k8s.io/api/certificates/v1"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
@@ -195,50 +195,50 @@ func describerMap(clientConfig *rest.Config) (map[schema.GroupKind]ResourceDescr
 	}
 
 	m := map[schema.GroupKind]ResourceDescriber{
-		{Group: corev1.GroupName, Kind: "Pod"}:                                    &PodDescriber{c},
-		{Group: corev1.GroupName, Kind: "ReplicationController"}:                  &ReplicationControllerDescriber{c},
-		{Group: corev1.GroupName, Kind: "Secret"}:                                 &SecretDescriber{c},
-		{Group: corev1.GroupName, Kind: "Service"}:                                &ServiceDescriber{c},
-		{Group: corev1.GroupName, Kind: "ServiceAccount"}:                         &ServiceAccountDescriber{c},
-		{Group: corev1.GroupName, Kind: "Node"}:                                   &NodeDescriber{c},
-		{Group: corev1.GroupName, Kind: "LimitRange"}:                             &LimitRangeDescriber{c},
-		{Group: corev1.GroupName, Kind: "ResourceQuota"}:                          &ResourceQuotaDescriber{c},
-		{Group: corev1.GroupName, Kind: "PersistentVolume"}:                       &PersistentVolumeDescriber{c},
-		{Group: corev1.GroupName, Kind: "PersistentVolumeClaim"}:                  &PersistentVolumeClaimDescriber{c},
-		{Group: corev1.GroupName, Kind: "Namespace"}:                              &NamespaceDescriber{c},
-		{Group: corev1.GroupName, Kind: "Endpoints"}:                              &EndpointsDescriber{c},
-		{Group: corev1.GroupName, Kind: "ConfigMap"}:                              &ConfigMapDescriber{c},
-		{Group: corev1.GroupName, Kind: "PriorityClass"}:                          &PriorityClassDescriber{c},
-		{Group: discoveryv1beta1.GroupName, Kind: "EndpointSlice"}:                &EndpointSliceDescriber{c},
-		{Group: discoveryv1.GroupName, Kind: "EndpointSlice"}:                     &EndpointSliceDescriber{c},
-		{Group: autoscalingv2.GroupName, Kind: "HorizontalPodAutoscaler"}:         &HorizontalPodAutoscalerDescriber{c},
-		{Group: extensionsv1beta1.GroupName, Kind: "Ingress"}:                     &IngressDescriber{c},
-		{Group: networkingv1beta1.GroupName, Kind: "Ingress"}:                     &IngressDescriber{c},
-		{Group: networkingv1beta1.GroupName, Kind: "IngressClass"}:                &IngressClassDescriber{c},
-		{Group: networkingv1.GroupName, Kind: "Ingress"}:                          &IngressDescriber{c},
-		{Group: networkingv1.GroupName, Kind: "IngressClass"}:                     &IngressClassDescriber{c},
-		{Group: networkingv1beta1.GroupName, Kind: "ServiceCIDR"}:                 &ServiceCIDRDescriber{c},
-		{Group: networkingv1beta1.GroupName, Kind: "IPAddress"}:                   &IPAddressDescriber{c},
-		{Group: networkingv1.GroupName, Kind: "ServiceCIDR"}:                      &ServiceCIDRDescriber{c},
-		{Group: networkingv1.GroupName, Kind: "IPAddress"}:                        &IPAddressDescriber{c},
-		{Group: batchv1.GroupName, Kind: "Job"}:                                   &JobDescriber{c},
-		{Group: batchv1.GroupName, Kind: "CronJob"}:                               &CronJobDescriber{c},
-		{Group: batchv1beta1.GroupName, Kind: "CronJob"}:                          &CronJobDescriber{c},
-		{Group: appsv1.GroupName, Kind: "StatefulSet"}:                            &StatefulSetDescriber{c},
-		{Group: appsv1.GroupName, Kind: "Deployment"}:                             &DeploymentDescriber{c},
-		{Group: appsv1.GroupName, Kind: "DaemonSet"}:                              &DaemonSetDescriber{c},
-		{Group: appsv1.GroupName, Kind: "ReplicaSet"}:                             &ReplicaSetDescriber{c},
-		{Group: certificatesv1beta1.GroupName, Kind: "CertificateSigningRequest"}: &CertificateSigningRequestDescriber{c},
-		{Group: storagev1.GroupName, Kind: "StorageClass"}:                        &StorageClassDescriber{c},
-		{Group: storagev1.GroupName, Kind: "CSINode"}:                             &CSINodeDescriber{c},
-		{Group: storagev1.GroupName, Kind: "VolumeAttributesClass"}:               &VolumeAttributesClassDescriber{c},
-		{Group: policyv1.GroupName, Kind: "PodDisruptionBudget"}:                  &PodDisruptionBudgetDescriber{c},
-		{Group: rbacv1.GroupName, Kind: "Role"}:                                   &RoleDescriber{c},
-		{Group: rbacv1.GroupName, Kind: "ClusterRole"}:                            &ClusterRoleDescriber{c},
-		{Group: rbacv1.GroupName, Kind: "RoleBinding"}:                            &RoleBindingDescriber{c},
-		{Group: rbacv1.GroupName, Kind: "ClusterRoleBinding"}:                     &ClusterRoleBindingDescriber{c},
-		{Group: networkingv1.GroupName, Kind: "NetworkPolicy"}:                    &NetworkPolicyDescriber{c},
-		{Group: schedulingv1.GroupName, Kind: "PriorityClass"}:                    &PriorityClassDescriber{c},
+		{Group: corev1.GroupName, Kind: "Pod"}:                               &PodDescriber{c},
+		{Group: corev1.GroupName, Kind: "ReplicationController"}:             &ReplicationControllerDescriber{c},
+		{Group: corev1.GroupName, Kind: "Secret"}:                            &SecretDescriber{c},
+		{Group: corev1.GroupName, Kind: "Service"}:                           &ServiceDescriber{c},
+		{Group: corev1.GroupName, Kind: "ServiceAccount"}:                    &ServiceAccountDescriber{c},
+		{Group: corev1.GroupName, Kind: "Node"}:                              &NodeDescriber{c},
+		{Group: corev1.GroupName, Kind: "LimitRange"}:                        &LimitRangeDescriber{c},
+		{Group: corev1.GroupName, Kind: "ResourceQuota"}:                     &ResourceQuotaDescriber{c},
+		{Group: corev1.GroupName, Kind: "PersistentVolume"}:                  &PersistentVolumeDescriber{c},
+		{Group: corev1.GroupName, Kind: "PersistentVolumeClaim"}:             &PersistentVolumeClaimDescriber{c},
+		{Group: corev1.GroupName, Kind: "Namespace"}:                         &NamespaceDescriber{c},
+		{Group: corev1.GroupName, Kind: "Endpoints"}:                         &EndpointsDescriber{c},
+		{Group: corev1.GroupName, Kind: "ConfigMap"}:                         &ConfigMapDescriber{c},
+		{Group: corev1.GroupName, Kind: "PriorityClass"}:                     &PriorityClassDescriber{c},
+		{Group: discoveryv1beta1.GroupName, Kind: "EndpointSlice"}:           &EndpointSliceDescriber{c},
+		{Group: discoveryv1.GroupName, Kind: "EndpointSlice"}:                &EndpointSliceDescriber{c},
+		{Group: autoscalingv2.GroupName, Kind: "HorizontalPodAutoscaler"}:    &HorizontalPodAutoscalerDescriber{c},
+		{Group: extensionsv1beta1.GroupName, Kind: "Ingress"}:                &IngressDescriber{c},
+		{Group: networkingv1beta1.GroupName, Kind: "Ingress"}:                &IngressDescriber{c},
+		{Group: networkingv1beta1.GroupName, Kind: "IngressClass"}:           &IngressClassDescriber{c},
+		{Group: networkingv1.GroupName, Kind: "Ingress"}:                     &IngressDescriber{c},
+		{Group: networkingv1.GroupName, Kind: "IngressClass"}:                &IngressClassDescriber{c},
+		{Group: networkingv1beta1.GroupName, Kind: "ServiceCIDR"}:            &ServiceCIDRDescriber{c},
+		{Group: networkingv1beta1.GroupName, Kind: "IPAddress"}:              &IPAddressDescriber{c},
+		{Group: networkingv1.GroupName, Kind: "ServiceCIDR"}:                 &ServiceCIDRDescriber{c},
+		{Group: networkingv1.GroupName, Kind: "IPAddress"}:                   &IPAddressDescriber{c},
+		{Group: batchv1.GroupName, Kind: "Job"}:                              &JobDescriber{c},
+		{Group: batchv1.GroupName, Kind: "CronJob"}:                          &CronJobDescriber{c},
+		{Group: batchv1beta1.GroupName, Kind: "CronJob"}:                     &CronJobDescriber{c},
+		{Group: appsv1.GroupName, Kind: "StatefulSet"}:                       &StatefulSetDescriber{c},
+		{Group: appsv1.GroupName, Kind: "Deployment"}:                        &DeploymentDescriber{c},
+		{Group: appsv1.GroupName, Kind: "DaemonSet"}:                         &DaemonSetDescriber{c},
+		{Group: appsv1.GroupName, Kind: "ReplicaSet"}:                        &ReplicaSetDescriber{c},
+		{Group: certificatesv1.GroupName, Kind: "CertificateSigningRequest"}: &CertificateSigningRequestDescriber{c},
+		{Group: storagev1.GroupName, Kind: "StorageClass"}:                   &StorageClassDescriber{c},
+		{Group: storagev1.GroupName, Kind: "CSINode"}:                        &CSINodeDescriber{c},
+		{Group: storagev1.GroupName, Kind: "VolumeAttributesClass"}:          &VolumeAttributesClassDescriber{c},
+		{Group: policyv1.GroupName, Kind: "PodDisruptionBudget"}:             &PodDisruptionBudgetDescriber{c},
+		{Group: rbacv1.GroupName, Kind: "Role"}:                              &RoleDescriber{c},
+		{Group: rbacv1.GroupName, Kind: "ClusterRole"}:                       &ClusterRoleDescriber{c},
+		{Group: rbacv1.GroupName, Kind: "RoleBinding"}:                       &RoleBindingDescriber{c},
+		{Group: rbacv1.GroupName, Kind: "ClusterRoleBinding"}:                &ClusterRoleBindingDescriber{c},
+		{Group: networkingv1.GroupName, Kind: "NetworkPolicy"}:               &NetworkPolicyDescriber{c},
+		{Group: schedulingv1.GroupName, Kind: "PriorityClass"}:               &PriorityClassDescriber{c},
 	}
 
 	return m, nil
@@ -3908,38 +3908,23 @@ func (p *CertificateSigningRequestDescriber) Describe(namespace, name string, de
 		events            *corev1.EventList
 	)
 
-	if csr, err := p.client.CertificatesV1().CertificateSigningRequests().Get(context.TODO(), name, metav1.GetOptions{}); err == nil {
-		crBytes = csr.Spec.Request
-		metadata = csr.ObjectMeta
-		conditionTypes := []string{}
-		for _, c := range csr.Status.Conditions {
-			conditionTypes = append(conditionTypes, string(c.Type))
-		}
-		status = extractCSRStatus(conditionTypes, csr.Status.Certificate)
-		signerName = csr.Spec.SignerName
-		expirationSeconds = csr.Spec.ExpirationSeconds
-		username = csr.Spec.Username
-		if describerSettings.ShowEvents {
-			events, _ = searchEvents(p.client.CoreV1(), csr, describerSettings.ChunkSize)
-		}
-	} else if csr, err := p.client.CertificatesV1beta1().CertificateSigningRequests().Get(context.TODO(), name, metav1.GetOptions{}); err == nil {
-		crBytes = csr.Spec.Request
-		metadata = csr.ObjectMeta
-		conditionTypes := []string{}
-		for _, c := range csr.Status.Conditions {
-			conditionTypes = append(conditionTypes, string(c.Type))
-		}
-		status = extractCSRStatus(conditionTypes, csr.Status.Certificate)
-		if csr.Spec.SignerName != nil {
-			signerName = *csr.Spec.SignerName
-		}
-		expirationSeconds = csr.Spec.ExpirationSeconds
-		username = csr.Spec.Username
-		if describerSettings.ShowEvents {
-			events, _ = searchEvents(p.client.CoreV1(), csr, describerSettings.ChunkSize)
-		}
-	} else {
+	csr, err := p.client.CertificatesV1().CertificateSigningRequests().Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
 		return "", err
+	}
+
+	crBytes = csr.Spec.Request
+	metadata = csr.ObjectMeta
+	conditionTypes := []string{}
+	for _, c := range csr.Status.Conditions {
+		conditionTypes = append(conditionTypes, string(c.Type))
+	}
+	status = extractCSRStatus(conditionTypes, csr.Status.Certificate)
+	signerName = csr.Spec.SignerName
+	expirationSeconds = csr.Spec.ExpirationSeconds
+	username = csr.Spec.Username
+	if describerSettings.ShowEvents {
+		events, _ = searchEvents(p.client.CoreV1(), csr, describerSettings.ChunkSize)
 	}
 
 	cr, err := certificate.ParseCSR(crBytes)
@@ -5495,11 +5480,11 @@ func extractCSRStatus(conditions []string, certificateBytes []byte) string {
 	var approved, denied, failed bool
 	for _, c := range conditions {
 		switch c {
-		case string(certificatesv1beta1.CertificateApproved):
+		case string(certificatesv1.CertificateApproved):
 			approved = true
-		case string(certificatesv1beta1.CertificateDenied):
+		case string(certificatesv1.CertificateDenied):
 			denied = true
-		case string(certificatesv1beta1.CertificateFailed):
+		case string(certificatesv1.CertificateFailed):
 			failed = true
 		}
 	}
