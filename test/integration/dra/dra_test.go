@@ -222,6 +222,7 @@ func TestDRA(t *testing.T) {
 				tCtx.Run("ExtendedResource", func(tCtx ktesting.TContext) { testExtendedResource(tCtx, true) })
 				tCtx.Run("ResourceClaimDeviceStatus", func(tCtx ktesting.TContext) { testResourceClaimDeviceStatus(tCtx, true) })
 				tCtx.Run("MaxResourceSlice", testMaxResourceSlice)
+				tCtx.Run("EvictCluster", testEvictCluster)
 			},
 		},
 	} {
