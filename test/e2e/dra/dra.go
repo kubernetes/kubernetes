@@ -1961,7 +1961,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
 			framework.ExpectNoError(err, "start pod")
 			containerEnv := []string{
-				"container_0_request_0_i", "true",
+				"container_0_request_0", "true",
 				"container_0_request_1", "true",
 			}
 			drautils.TestContainerEnv(ctx, f, pod, pod.Spec.Containers[0].Name, false, containerEnv...)
@@ -1994,7 +1994,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 				// b.ExtendedResourceName(0) is added to the deivce class with name: b.ClassName()+"0"
 				b.ExtendedResourceName(0),
 			}, []string{
-				"container_0_request_0_i", "true",
+				"container_0_request_0", "true",
 				"container_0_request_1", "true",
 			})
 		})
