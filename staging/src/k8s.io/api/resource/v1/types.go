@@ -153,6 +153,7 @@ type ResourceSliceSpec struct {
 	//
 	// +optional
 	// +listType=atomic
+	// +k8s:optional
 	Devices []Device `json:"devices" protobuf:"bytes,6,name=devices"`
 
 	// PerDeviceNodeSelection defines whether the access from nodes to
@@ -367,6 +368,8 @@ type Device struct {
 	// +optional
 	// +listType=atomic
 	// +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
+	// +k8s:optional
+	// +k8s:maxItems=4
 	BindingConditions []string `json:"bindingConditions,omitempty" protobuf:"bytes,10,rep,name=bindingConditions"`
 
 	// BindingFailureConditions defines the conditions for binding failure.
@@ -383,6 +386,8 @@ type Device struct {
 	// +optional
 	// +listType=atomic
 	// +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
+	// +k8s:optional
+	// +k8s:maxItems=4
 	BindingFailureConditions []string `json:"bindingFailureConditions,omitempty" protobuf:"bytes,11,rep,name=bindingFailureConditions"`
 
 	// AllowMultipleAllocations marks whether the device is allowed to be allocated to multiple DeviceRequests.
@@ -629,6 +634,7 @@ type DeviceTaint struct {
 	// nodes is not valid here.
 	//
 	// +required
+	// +k8s:required
 	Effect DeviceTaintEffect `json:"effect" protobuf:"bytes,3,name=effect,casttype=DeviceTaintEffect"`
 
 	// ^^^^
@@ -1596,6 +1602,7 @@ type DeviceRequestAllocationResult struct {
 	// +optional
 	// +listType=atomic
 	// +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
+	// +k8s:optional
 	// +k8s:maxItems=4
 	BindingConditions []string `json:"bindingConditions,omitempty" protobuf:"bytes,7,rep,name=bindingConditions"`
 
@@ -1608,6 +1615,7 @@ type DeviceRequestAllocationResult struct {
 	// +optional
 	// +listType=atomic
 	// +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
+	// +k8s:optional
 	// +k8s:maxItems=4
 	BindingFailureConditions []string `json:"bindingFailureConditions,omitempty" protobuf:"bytes,8,rep,name=bindingFailureConditions"`
 

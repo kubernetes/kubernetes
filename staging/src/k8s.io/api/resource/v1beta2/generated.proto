@@ -429,6 +429,8 @@ message Device {
   // +optional
   // +listType=atomic
   // +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
+  // +k8s:optional
+  // +k8s:maxItems=4
   repeated string bindingConditions = 10;
 
   // BindingFailureConditions defines the conditions for binding failure.
@@ -445,6 +447,8 @@ message Device {
   // +optional
   // +listType=atomic
   // +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
+  // +k8s:optional
+  // +k8s:maxItems=4
   repeated string bindingFailureConditions = 11;
 
   // AllowMultipleAllocations marks whether the device is allowed to be allocated to multiple DeviceRequests.
@@ -901,6 +905,7 @@ message DeviceRequestAllocationResult {
   // +optional
   // +listType=atomic
   // +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
+  // +k8s:optional
   // +k8s:maxItems=4
   repeated string bindingConditions = 7;
 
@@ -913,6 +918,7 @@ message DeviceRequestAllocationResult {
   // +optional
   // +listType=atomic
   // +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
+  // +k8s:optional
   // +k8s:maxItems=4
   repeated string bindingFailureConditions = 8;
 
@@ -1088,6 +1094,7 @@ message DeviceTaint {
   // nodes is not valid here.
   //
   // +required
+  // +k8s:required
   optional string effect = 3;
 
   // TimeAdded represents the time at which the taint was added.
@@ -1620,6 +1627,7 @@ message ResourceSliceSpec {
   //
   // +optional
   // +listType=atomic
+  // +k8s:optional
   repeated Device devices = 6;
 
   // PerDeviceNodeSelection defines whether the access from nodes to
