@@ -54,8 +54,10 @@ import (
 const (
 	// Maximal number of concurrent route operation API calls.
 	// TODO: This should be per-provider.
-	maxConcurrentRouteOperations int           = 200
-	minRouteResyncInterval       time.Duration = 10 * time.Second
+	maxConcurrentRouteOperations int = 200
+	// In the scenarios with a burst of node events,
+	// we don't want to be worse than a 10s interval (current default reconcile interval).
+	minRouteResyncInterval time.Duration = 10 * time.Second
 )
 
 var updateNetworkConditionBackoff = wait.Backoff{
@@ -99,8 +101,13 @@ func New(
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.CloudControllerManagerWatchBasedRoutesReconciliation) {
+		// We use [TypedWithMaxWaitRateLimiter] to cap the [TypedBucketRateLimiter] at 10 seconds.
+		// Without this cap, the bucket rate limiter would keep accumulating delay for each node event.
+		// With the cap, even under a constant stream of node events, reconciles happen at most every
+		// 10 seconds — either triggered immediately or queued for another run if one is already in progress.
+		bucketRateLimiter := &workqueue.TypedBucketRateLimiter[string]{Limiter: rate.NewLimiter(rate.Every(minRouteResyncInterval), 1)}
 		rc.workqueue = workqueue.NewTypedRateLimitingQueueWithConfig(
-			&workqueue.TypedBucketRateLimiter[string]{Limiter: rate.NewLimiter(rate.Every(minRouteResyncInterval), 1)},
+			workqueue.NewTypedWithMaxWaitRateLimiter[string](bucketRateLimiter, minRouteResyncInterval),
 			workqueue.TypedRateLimitingQueueConfig[string]{Name: "Routes"},
 		)
 
@@ -127,7 +134,7 @@ func New(
 func (rc *RouteController) enqueueReconcile(_ interface{}) {
 	// reconcileNodeRoutes always reconciles the full cluster. It does not make sense to have
 	// separate entries in the workqueue per node, but a single one for the whole cluster is enough.
-	rc.workqueue.Add("routes")
+	rc.workqueue.AddRateLimited("routes")
 }
 
 func (rc *RouteController) handleNodeUpdate(oldObj, newObj interface{}) {
@@ -204,6 +211,16 @@ func (rc *RouteController) processNextWorkItem(ctx context.Context) bool {
 		return false
 	}
 
+	// Forget is a no-op with a BucketRateLimiter. This is still called in case the implementation detail changes,
+	// as the [workqueue.TypedRateLimitingInterface] insists on it being called.
+	//
+	// We call it before reconcileNodeRoutes, as otherwise we may have a race condition:
+	// 1. we start a reconcile with a fixed list of nodes
+	// 2. the event for a new node is enqueued, but it is not considered in the running reconcile
+	// 3. we finish the reconcile and "forget" the event from our queue
+	// => The new node is never reconciled
+	rc.workqueue.Forget(obj)
+
 	// We wrap this block in a func so we can defer rc.workqueue.Done.
 	err := func(key string) error {
 		defer rc.workqueue.Done(key)
@@ -216,9 +233,6 @@ func (rc *RouteController) processNextWorkItem(ctx context.Context) bool {
 			return fmt.Errorf("couldn't reconcile node routes: %w, requeuing", err)
 		}
 
-		// Finally, if no error occurs we Forget this item so it does not
-		// get queued again until another change happens.
-		rc.workqueue.Forget(key)
 		return nil
 	}(obj)
 
