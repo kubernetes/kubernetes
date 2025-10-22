@@ -1284,6 +1284,7 @@ message NetworkDeviceData {
   // Must not be longer than 128 characters.
   //
   // +optional
+  // +k8s:maxLength=128
   optional string hardwareAddress = 3;
 }
 

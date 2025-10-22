@@ -1283,7 +1283,7 @@ func validateNetworkDeviceData(networkDeviceData *resource.NetworkDeviceData, fl
 	}
 
 	if len(networkDeviceData.HardwareAddress) > resource.NetworkDeviceDataHardwareAddressMaxLength {
-		allErrs = append(allErrs, field.TooLong(fldPath.Child("hardwareAddress"), "" /* unused */, resource.NetworkDeviceDataHardwareAddressMaxLength))
+		allErrs = append(allErrs, field.TooLong(fldPath.Child("hardwareAddress"), "" /* unused */, resource.NetworkDeviceDataHardwareAddressMaxLength).WithOrigin("maxLength").MarkCoveredByDeclarative())
 	}
 
 	allErrs = append(allErrs, validateSet(networkDeviceData.IPs, resource.NetworkDeviceDataMaxIPs,
