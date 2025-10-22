@@ -90,6 +90,7 @@ message AllocatedDeviceStatus {
   // NetworkData contains network-related information specific to the device.
   //
   // +optional
+  // +k8s:optional
   optional NetworkDeviceData networkData = 6;
 }
 
