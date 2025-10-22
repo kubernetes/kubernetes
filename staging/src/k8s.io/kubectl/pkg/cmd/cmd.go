@@ -526,17 +526,10 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 //     RoundTripper. CommandHeaderRoundTripper adds X-Headers then delegates
 //     to standard RoundTripper.
 //
-// For beta, these hooks are updated unless the KUBECTL_COMMAND_HEADERS environment variable
-// is set, and the value of the env var is false (or zero).
 // See SIG CLI KEP 859 for more information:
 //
 //	https://github.com/kubernetes/enhancements/tree/master/keps/sig-cli/859-kubectl-headers
 func addCmdHeaderHooks(cmds *cobra.Command, kubeConfigFlags *genericclioptions.ConfigFlags) {
-	if cmdutil.CmdHeaders.IsDisabled() {
-		klog.V(5).Infoln("kubectl command headers turned off")
-		return
-	}
-	klog.V(5).Infoln("kubectl command headers turned on")
 	crt := &genericclioptions.CommandHeaderRoundTripper{}
 	existingPreRunE := cmds.PersistentPreRunE
 	// Add command parsing to the existing persistent pre-run function.
