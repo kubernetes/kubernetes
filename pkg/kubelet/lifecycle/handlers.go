@@ -23,13 +23,11 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
@@ -104,29 +102,6 @@ func (hr *handlerRunner) Run(ctx context.Context, containerID kubecontainer.Cont
 		logger.Error(err, "Cannot run handler")
 		return msg, err
 	}
-}
-
-// resolvePort attempts to turn an IntOrString port reference into a concrete port number.
-// If portReference has an int value, it is treated as a literal, and simply returns that value.
-// If portReference is a string, an attempt is first made to parse it as an integer.  If that fails,
-// an attempt is made to find a port with the same name in the container spec.
-// If a port with the same name is found, it's ContainerPort value is returned.  If no matching
-// port is found, an error is returned.
-func resolvePort(portReference intstr.IntOrString, container *v1.Container) (int, error) {
-	if portReference.Type == intstr.Int {
-		return portReference.IntValue(), nil
-	}
-	portName := portReference.StrVal
-	port, err := strconv.Atoi(portName)
-	if err == nil {
-		return port, nil
-	}
-	for _, portSpec := range container.Ports {
-		if portSpec.Name == portName {
-			return int(portSpec.ContainerPort), nil
-		}
-	}
-	return -1, fmt.Errorf("couldn't find port: %v in %v", portReference, container)
 }
 
 func (hr *handlerRunner) runSleepHandler(ctx context.Context, seconds int64) error {
