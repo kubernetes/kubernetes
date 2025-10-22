@@ -102,8 +102,8 @@ var (
 		    kubectl completion powershell | Out-String | Invoke-Expression
 		# Set kubectl completion code for powershell to run on startup
 		## Save completion code to a script and execute in the profile
-		    kubectl completion powershell > $HOME\.kube\completion.ps1
-		    Add-Content $PROFILE "$HOME\.kube\completion.ps1"
+		    kubectl completion powershell > "$HOME\.kube\completion.ps1"
+		    Add-Content $PROFILE ". '$HOME\.kube\completion.ps1'"
 		## Execute completion code in the profile
 		    Add-Content $PROFILE "if (Get-Command kubectl -ErrorAction SilentlyContinue) {
 		        kubectl completion powershell | Out-String | Invoke-Expression
