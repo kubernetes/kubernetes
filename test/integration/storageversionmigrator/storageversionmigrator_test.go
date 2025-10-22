@@ -78,7 +78,7 @@ func TestStorageVersionMigration(t *testing.T) {
 		ctx,
 		t,
 		svmName,
-		svmv1beta1.GroupResource{
+		svmv1beta1.GroupVersionResource{
 			Group:    "",
 			Resource: "secrets",
 		},
@@ -114,7 +114,7 @@ func TestStorageVersionMigration(t *testing.T) {
 		ctx,
 		t,
 		secondSVMName,
-		svmv1beta1.GroupResource{
+		svmv1beta1.GroupVersionResource{
 			Group:    "",
 			Resource: "secrets",
 		},
@@ -252,7 +252,7 @@ func TestStorageVersionMigrationWithCRD(t *testing.T) {
 	// migrate CRs from v1 to v2
 	svm, err := svmTest.createSVMResource(
 		ctx, t, "crdsvm",
-		svmv1beta1.GroupResource{
+		svmv1beta1.GroupVersionResource{
 			Group:    crd.Spec.Group,
 			Resource: crd.Spec.Names.Plural,
 		})
@@ -329,7 +329,7 @@ func TestStorageVersionMigrationDuringChaos(t *testing.T) {
 
 			svm, err := svmTest.createSVMResource(
 				ctx, t, "chaos-svm-"+strconv.Itoa(i),
-				svmv1beta1.GroupResource{
+				svmv1beta1.GroupVersionResource{
 					Group:    crd.Spec.Group,
 					Resource: crd.Spec.Names.Plural,
 				},

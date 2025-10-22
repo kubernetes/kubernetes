@@ -468,7 +468,7 @@ func (svm *svmTest) updateFile(t *testing.T, configDir, filename string, newCont
 	}
 }
 
-func (svm *svmTest) createSVMResource(ctx context.Context, t *testing.T, name string, gr svmv1beta1.GroupResource) (
+func (svm *svmTest) createSVMResource(ctx context.Context, t *testing.T, name string, gr svmv1beta1.GroupVersionResource) (
 	*svmv1beta1.StorageVersionMigration,
 	error,
 ) {
@@ -478,7 +478,7 @@ func (svm *svmTest) createSVMResource(ctx context.Context, t *testing.T, name st
 			Name: name,
 		},
 		Spec: svmv1beta1.StorageVersionMigrationSpec{
-			Resource: svmv1beta1.GroupResource{
+			Resource: svmv1beta1.GroupVersionResource{
 				Group:    gr.Group,
 				Resource: gr.Resource,
 			},

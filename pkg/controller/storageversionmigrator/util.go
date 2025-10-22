@@ -36,9 +36,10 @@ func convertResourceVersionToInt(rv string) (int64, error) {
 	return resourceVersion, nil
 }
 
-func getGRFromResource(svm *svmv1beta1.StorageVersionMigration) schema.GroupVersionResource {
+func getGVRFromResource(svm *svmv1beta1.StorageVersionMigration) schema.GroupVersionResource {
 	return schema.GroupVersionResource{
 		Group:    svm.Spec.Resource.Group,
+		Version:  svm.Spec.Resource.Version,
 		Resource: svm.Spec.Resource.Resource,
 	}
 }

@@ -203,7 +203,7 @@ func (svmc *SVMController) sync(ctx context.Context, key string) error {
 		logger.V(4).Info("The latest resource version is empty. We will attempt to migrate once the resource version is available.")
 		return nil
 	}
-	gvr := getGRFromResource(toBeProcessedSVM)
+	gvr := getGVRFromResource(toBeProcessedSVM)
 
 	// prevent unsynced monitor from blocking forever
 	// use a short timeout so that we can fail quickly and possibly handle other migrations while this monitor gets ready.
