@@ -29,6 +29,7 @@ import (
 	quota "k8s.io/apiserver/pkg/quota/v1"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/dynamic-resource-allocation/deviceclass/cache"
 	resourceinternal "k8s.io/kubernetes/pkg/apis/resource"
 	resourceversioned "k8s.io/kubernetes/pkg/apis/resource/v1"
@@ -56,9 +57,9 @@ func V1ImplicitExtendedResourceByDeviceClass(className string) corev1.ResourceNa
 }
 
 // NewResourceClaimEvaluator returns an evaluator that can evaluate resource claims
-func NewResourceClaimEvaluator(f quota.ListerForResourceFunc, m *cache.DeviceClassMapping) quota.Evaluator {
+func NewResourceClaimEvaluator(f quota.ListerForResourceFunc, m *cache.DeviceClassMapping, podsGetter corev1listers.PodLister) quota.Evaluator {
 	listFuncByNamespace := generic.ListResourceUsingListerFunc(f, resourceapi.SchemeGroupVersion.WithResource("resourceclaims"))
-	claimEvaluator := &claimEvaluator{listFuncByNamespace: listFuncByNamespace, deviceClassMapping: m}
+	claimEvaluator := &claimEvaluator{listFuncByNamespace: listFuncByNamespace, deviceClassMapping: m, podsGetter: podsGetter}
 	return claimEvaluator
 }
 
@@ -68,6 +69,8 @@ type claimEvaluator struct {
 	listFuncByNamespace generic.ListFuncByNamespace
 	// a global cache of device class and extended resource mapping
 	deviceClassMapping *cache.DeviceClassMapping
+	// podsGetter is used to get pods
+	podsGetter corev1listers.PodLister
 }
 
 // Constraints verifies that all required resources are present on the item.
@@ -132,11 +135,16 @@ func (p *claimEvaluator) extendedResourceQuota(dcName string) corev1.ResourceNam
 	return resource
 }
 
-func isImplicitRequestName(name string) bool {
-	return strings.HasSuffix(name, "-i")
+func isPodRequest(name corev1.ResourceName, quantity resource.Quantity, reqs map[corev1.ResourceName]resource.Quantity) bool {
+	for r, q := range reqs {
+		if r == name && q.Cmp(quantity) == 0 {
+			return true
+		}
+	}
+	return false
 }
 
-func (p *claimEvaluator) setResourceQuantity(resourceMap map[corev1.ResourceName]resource.Quantity, quantity resource.Quantity, deviceClassName, name string, isExtendedResourceClaim bool) {
+func (p *claimEvaluator) setResourceQuantity(resourceMap map[corev1.ResourceName]resource.Quantity, quantity resource.Quantity, deviceClassName, name string, isExtendedResourceClaim bool, reqs map[corev1.ResourceName]resource.Quantity) {
 	deviceClassClaim := V1ResourceByDeviceClass(deviceClassName)
 	q := resourceMap[deviceClassClaim]
 	q.Add(quantity)
@@ -145,20 +153,64 @@ func (p *claimEvaluator) setResourceQuantity(resourceMap map[corev1.ResourceName
 		return
 	}
 	implicitExtendedResourceClaim := V1ImplicitExtendedResourceByDeviceClass(deviceClassName)
-	isImplicitExtendedResourceRequest := isImplicitRequestName(name)
-	if !isExtendedResourceClaim || !isImplicitExtendedResourceRequest {
+	isImplicitExtendedResourceRequest := isPodRequest(implicitExtendedResourceClaim, quantity, reqs)
+	extendedResourceClaim := p.extendedResourceQuota(deviceClassName)
+	isExplicitExtendedResourceRequest := false
+	if extendedResourceClaim != "" && !isImplicitExtendedResourceRequest {
+		isExplicitExtendedResourceRequest = isPodRequest(extendedResourceClaim, quantity, reqs)
+	}
+	if !isExtendedResourceClaim || !isImplicitExtendedResourceRequest || isExplicitExtendedResourceRequest {
 		q := resourceMap[implicitExtendedResourceClaim]
 		q.Add(quantity)
 		resourceMap[implicitExtendedResourceClaim] = q
 	}
-	extendedResourceClaim := p.extendedResourceQuota(deviceClassName)
 	if extendedResourceClaim != "" {
-		if !isExtendedResourceClaim || isImplicitExtendedResourceRequest {
+		if !isExtendedResourceClaim || isImplicitExtendedResourceRequest || !isExplicitExtendedResourceRequest {
 			q := resourceMap[extendedResourceClaim]
 			q.Add(quantity)
 			resourceMap[extendedResourceClaim] = q
 		}
 	}
+	if isImplicitExtendedResourceRequest {
+		delete(reqs, implicitExtendedResourceClaim)
+		return
+	}
+	if isExplicitExtendedResourceRequest {
+		delete(reqs, extendedResourceClaim)
+		return
+	}
+}
+
+func (p *claimEvaluator) verifyOwner(claim *resourceapi.ResourceClaim) (map[corev1.ResourceName]resource.Quantity, bool) {
+	if len(claim.OwnerReferences) == 0 {
+		return nil, false
+	}
+	if claim.OwnerReferences[0].Kind != "Pod" {
+		return nil, false
+	}
+	if p.podsGetter == nil {
+		return nil, false
+	}
+	pod, err := p.podsGetter.Pods(claim.Namespace).Get(claim.OwnerReferences[0].Name)
+	if err != nil {
+		return nil, false
+	}
+
+	if pod.Status.ExtendedResourceClaimStatus == nil || pod.Status.ExtendedResourceClaimStatus.ResourceClaimName == claim.Name {
+		reqs := make(map[corev1.ResourceName]resource.Quantity)
+		for _, c := range pod.Spec.InitContainers {
+			for r, q := range c.Resources.Requests {
+				reqs[V1ExtendedResourceByDeviceClass(string(r))] = q
+			}
+		}
+		for _, c := range pod.Spec.Containers {
+			for r, q := range c.Resources.Requests {
+				reqs[V1ExtendedResourceByDeviceClass(string(r))] = q
+			}
+		}
+		return reqs, true
+	}
+	return nil, false
 }
 
 // Usage knows how to measure usage associated with item.
@@ -169,7 +221,12 @@ func (p *claimEvaluator) Usage(item runtime.Object) (corev1.ResourceList, error)
 		return result, err
 	}
 
-	isExtendedResourceClaim := claim.Annotations[resourceapi.ExtendedResourceClaimAnnotation] == "true"
+	isExtendedResourceClaim := false
+	var reqs map[corev1.ResourceName]resource.Quantity
+
+	if claim.Annotations[resourceapi.ExtendedResourceClaimAnnotation] == "true" {
+		reqs, isExtendedResourceClaim = p.verifyOwner(claim)
+	}
 	// charge for claim
 	result[ClaimObjectCountName] = *(resource.NewQuantity(1, resource.DecimalSI))
 	for _, request := range claim.Spec.Devices.Requests {
@@ -196,7 +253,7 @@ func (p *claimEvaluator) Usage(item runtime.Object) (corev1.ResourceList, error)
 				q := resource.NewQuantity(numDevices, resource.DecimalSI)
 
 				if q.Cmp(maxQuantityByDeviceClassClaim[deviceClassClaim]) > 0 {
-					p.setResourceQuantity(maxQuantityByDeviceClassClaim, *q, subrequest.DeviceClassName, subrequest.Name, isExtendedResourceClaim)
+					p.setResourceQuantity(maxQuantityByDeviceClassClaim, *q, subrequest.DeviceClassName, subrequest.Name, isExtendedResourceClaim, reqs)
 				}
 			}
 			for deviceClassClaim, q := range maxQuantityByDeviceClassClaim {
@@ -219,7 +276,7 @@ func (p *claimEvaluator) Usage(item runtime.Object) (corev1.ResourceList, error)
 				// expect that when downgrading.
 			}
 			q := resource.NewQuantity(numDevices, resource.DecimalSI)
-			p.setResourceQuantity(result, *q, request.Exactly.DeviceClassName, request.Name, isExtendedResourceClaim)
+			p.setResourceQuantity(result, *q, request.Exactly.DeviceClassName, request.Name, isExtendedResourceClaim, reqs)
 		default:
 			// Some unknown, future request type. Cannot do quota for it.
 		}

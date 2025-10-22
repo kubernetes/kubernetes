@@ -23,6 +23,7 @@ import (
 	"k8s.io/apiserver/pkg/quota/v1/generic"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
+	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/dynamic-resource-allocation/deviceclass/cache"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/clock"
@@ -45,7 +46,11 @@ func NewEvaluators(f quota.ListerForResourceFunc, i informers.SharedInformerFact
 		NewPersistentVolumeClaimEvaluator(f),
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-		result = append(result, NewResourceClaimEvaluator(f, cache.NewDeviceClassMapping(i)))
+		var podLister corev1listers.PodLister
+		if i != nil {
+			podLister = i.Core().V1().Pods().Lister()
+		}
+		result = append(result, NewResourceClaimEvaluator(f, cache.NewDeviceClassMapping(i), podLister))
 	}
 
 	// these evaluators require an alias for backwards compatibility
