@@ -24,50 +24,52 @@ import (
 )
 
 type ResourceSlice struct {
-	metav1.TypeMeta
-	metav1.ObjectMeta
-	Spec ResourceSliceSpec
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	Spec ResourceSliceSpec `json:"spec"`
 }
 
 type ResourceSliceSpec struct {
-	Driver                 UniqueString
-	Pool                   ResourcePool
-	NodeName               *string
-	NodeSelector           *v1.NodeSelector
-	AllNodes               bool
-	Devices                []Device
-	PerDeviceNodeSelection *bool
-	SharedCounters         []CounterSet
+	Driver                 UniqueString     `json:"driver"`
+	Pool                   ResourcePool     `json:"pool"`
+	NodeName               *string          `json:"nodeName,omitempty"`
+	NodeSelector           *v1.NodeSelector `json:"nodeSelector,omitempty"`
+	AllNodes               bool             `json:"allNodes,omitempty"`
+	Devices                []Device         `json:"devices,omitempty"`
+	PerDeviceNodeSelection *bool            `json:"perDeviceNodeSelection,omitempty"`
+	SharedCounters         []CounterSet     `json:"sharedCounters,omitempty"`
 }
 
 type CounterSet struct {
-	Name     UniqueString
-	Counters map[string]Counter
+	Name     UniqueString       `json:"name"`
+	Counters map[string]Counter `json:"counters,omitempty"`
 }
 
 type ResourcePool struct {
-	Name               UniqueString
-	Generation         int64
-	ResourceSliceCount int64
+	Name               UniqueString `json:"name"`
+	Generation         int64        `json:"generation"`
+	ResourceSliceCount int64        `json:"resourceSliceCount"`
 }
+
 type Device struct {
-	Name                     UniqueString
-	Attributes               map[QualifiedName]DeviceAttribute
-	Capacity                 map[QualifiedName]DeviceCapacity
-	ConsumesCounters         []DeviceCounterConsumption
-	NodeName                 *string
-	NodeSelector             *v1.NodeSelector
-	AllNodes                 *bool
-	Taints                   []resourceapi.DeviceTaint
-	BindsToNode              bool
-	BindingConditions        []string
-	BindingFailureConditions []string
-	AllowMultipleAllocations *bool
+	Name                     UniqueString                      `json:"name"`
+	Attributes               map[QualifiedName]DeviceAttribute `json:"attributes,omitempty"`
+	Capacity                 map[QualifiedName]DeviceCapacity  `json:"capacity,omitempty"`
+	ConsumesCounters         []DeviceCounterConsumption        `json:"consumesCounters,omitempty"`
+	NodeName                 *string                           `json:"nodeName,omitempty"`
+	NodeSelector             *v1.NodeSelector                  `json:"nodeSelector,omitempty"`
+	AllNodes                 *bool                             `json:"allNodes,omitempty"`
+	Taints                   []resourceapi.DeviceTaint         `json:"taints,omitempty"`
+	BindsToNode              bool                              `json:"bindsToNode,omitempty"`
+	BindingConditions        []string                          `json:"bindingConditions,omitempty"`
+	BindingFailureConditions []string                          `json:"bindingFailureConditions,omitempty"`
+	AllowMultipleAllocations *bool                             `json:"allowMultipleAllocations,omitempty"`
 }
 
 type DeviceCounterConsumption struct {
-	CounterSet UniqueString
-	Counters   map[string]Counter
+	CounterSet UniqueString       `json:"counterSet,omitempty"`
+	Counters   map[string]Counter `json:"counters,omitempty"`
 }
 
 type QualifiedName string
@@ -75,29 +77,29 @@ type QualifiedName string
 type FullyQualifiedName string
 
 type DeviceAttribute struct {
-	IntValue     *int64
-	BoolValue    *bool
-	StringValue  *string
-	VersionValue *string
+	IntValue     *int64  `json:"intValue,omitempty"`
+	BoolValue    *bool   `json:"boolValue,omitempty"`
+	StringValue  *string `json:"stringValue,omitempty"`
+	VersionValue *string `json:"versionValue,omitempty"`
 }
 
 type DeviceCapacity struct {
-	Value         resource.Quantity
-	RequestPolicy *CapacityRequestPolicy
+	Value         resource.Quantity      `json:"value,omitempty"`
+	RequestPolicy *CapacityRequestPolicy `json:"requestPolicy,omitempty"`
 }
 
 type CapacityRequestPolicy struct {
-	Default     *resource.Quantity
-	ValidValues []resource.Quantity
-	ValidRange  *CapacityRequestPolicyRange
+	Default     *resource.Quantity          `json:"default,omitempty"`
+	ValidValues []resource.Quantity         `json:"validValues,omitempty"`
+	ValidRange  *CapacityRequestPolicyRange `json:"validRange,omitempty"`
 }
 
 type CapacityRequestPolicyRange struct {
-	Min  *resource.Quantity
-	Max  *resource.Quantity
-	Step *resource.Quantity
+	Min  *resource.Quantity `json:"min,omitempty"`
+	Max  *resource.Quantity `json:"max,omitempty"`
+	Step *resource.Quantity `json:"step,omitempty"`
 }
 
 type Counter struct {
-	Value resource.Quantity
+	Value resource.Quantity `json:"value"`
 }
