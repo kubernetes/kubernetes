@@ -324,6 +324,11 @@ var (
 	PodGarbageCollector = framework.WithFeature(framework.ValidFeatures.Add("PodGarbageCollector"))
 
 	// owner: sig-node
+	// Marks a test for pod-level resource managers feature that requires
+	// PodLevelResourceManagers feature gate to be enabled.
+	PodLevelResourceManagers = framework.WithFeature(framework.ValidFeatures.Add("PodLevelResourceManagers"))
+
+	// owner: sig-node
 	// Marks a test for pod-level resources feature that requires
 	// PodLevelResources feature gate to be enabled.
 	PodLevelResources = framework.WithFeature(framework.ValidFeatures.Add("PodLevelResources"))
