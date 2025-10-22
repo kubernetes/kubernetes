@@ -44,6 +44,7 @@ type RealFIFOOptions struct {
 	// If set, will be called for objects before enqueueing them. Please
 	// see the comment on TransformFunc for details.
 	Transformer TransformFunc
+	BatchSize   int
 }
 
 const (
@@ -504,13 +505,16 @@ func NewRealFIFOWithOptions(opts RealFIFOOptions) *RealFIFO {
 	if opts.KnownObjects == nil {
 		panic("coding error: knownObjects must be provided")
 	}
+	if opts.BatchSize == 0 {
+		opts.BatchSize = defaultBatchSize
+	}
 
 	f := &RealFIFO{
 		items:        make([]Delta, 0, 10),
 		keyFunc:      opts.KeyFunction,
 		knownObjects: opts.KnownObjects,
 		transformer:  opts.Transformer,
-		batchSize:    defaultBatchSize,
+		batchSize:    opts.BatchSize,
 	}
 
 	f.cond.L = &f.lock
