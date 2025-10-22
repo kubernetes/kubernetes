@@ -31,11 +31,13 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	kubeletpodresourcesv1 "k8s.io/kubelet/pkg/apis/podresources/v1"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
+	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -69,6 +71,19 @@ func makeMemoryManagerContainers(ctnCmd string, ctnAttributes []memoryManagerCtn
 	hugepagesMount := false
 	var containers []v1.Container
 	for _, ctnAttr := range ctnAttributes {
+		res := v1.ResourceRequirements{
+			Limits:   v1.ResourceList{},
+			Requests: v1.ResourceList{},
+		}
+		if ctnAttr.cpus != "" {
+			res.Limits[v1.ResourceCPU] = resource.MustParse(ctnAttr.cpus)
+			res.Requests[v1.ResourceCPU] = resource.MustParse(ctnAttr.cpus)
+		}
+		if ctnAttr.memory != "" {
+			res.Limits[v1.ResourceMemory] = resource.MustParse(ctnAttr.memory)
+			res.Requests[v1.ResourceMemory] = resource.MustParse(ctnAttr.memory)
+		}
+
 		ctn := v1.Container{
 			Name:  ctnAttr.ctnName,
 			Image: busyboxImage,
@@ -249,6 +264,105 @@ func verifyMemoryPinning(f *framework.Framework, ctx context.Context, pod *v1.Po
 	framework.ExpectNoError(err)
 
 	gomega.Expect(numaNodeIDs).To(gomega.Equal(currentNUMANodeIDs.List()))
+}
+
+func verifyMemoryManagerAllocations(_ *framework.Framework, ctx context.Context, pod *v1.Pod, expectedGuaranteedContainers []string) {
+	ginkgo.By("Verifying memory manager allocations via pod resource API")
+	endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+	cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	defer conn.Close()
+
+	gomega.Eventually(ctx, func(ctx context.Context) error {
+		_, err := cli.List(ctx, &kubeletpodresourcesv1.ListPodResourcesRequest{})
+		return err
+	}, time.Minute, 5*time.Second).Should(gomega.Succeed())
+	resp, err := cli.List(ctx, &kubeletpodresourcesv1.ListPodResourcesRequest{})
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+	expectedGuaranteedSet := sets.NewString(expectedGuaranteedContainers...)
+
+	for _, podResource := range resp.PodResources {
+		if podResource.Name != pod.Name {
+			continue
+		}
+
+		for _, containerResource := range podResource.Containers {
+			// find the container in the pod spec
+			var containerSpec *v1.Container
+			for i := range pod.Spec.Containers {
+				if pod.Spec.Containers[i].Name == containerResource.Name {
+					containerSpec = &pod.Spec.Containers[i]
+					break
+				}
+			}
+			if containerSpec == nil {
+				// could be an init container
+				for i := range pod.Spec.InitContainers {
+					if pod.Spec.InitContainers[i].Name == containerResource.Name {
+						containerSpec = &pod.Spec.InitContainers[i]
+						break
+					}
+				}
+			}
+			gomega.Expect(containerSpec).ToNot(gomega.BeNil(), "container spec for %s not found", containerResource.Name)
+
+			if expectedGuaranteedSet.Has(containerResource.Name) {
+				gomega.Expect(containerResource.Memory).ToNot(gomega.BeEmpty(), "expected memory resources for container %s", containerResource.Name)
+				for _, mem := range containerResource.Memory {
+					q := containerSpec.Resources.Limits[v1.ResourceName(mem.MemoryType)]
+					val, ok := q.AsInt64()
+					gomega.Expect(ok).To(gomega.BeTrue())
+					gomega.Expect(val).To(gomega.BeEquivalentTo(mem.Size))
+				}
+			} else {
+				gomega.Expect(containerResource.Memory).To(gomega.BeEmpty(), "expected no memory resources for container %s", containerResource.Name)
+			}
+		}
+	}
+
+	ginkgo.By("Verifying memory manager allocations via state file")
+	gomega.Eventually(ctx, func(ctx context.Context) error {
+		stateData, err := getMemoryManagerState()
+		if err != nil {
+			return err
+		}
+		podUID := string(pod.UID)
+		_, podFound := stateData.Entries[podUID]
+		if len(expectedGuaranteedContainers) == 0 && !podFound {
+			return nil
+		}
+		if len(expectedGuaranteedContainers) > 0 && podFound {
+			return nil
+		}
+		return fmt.Errorf("pod entry in state file not found or found unexpectedly for pod %s", pod.Name)
+	}, time.Minute, 5*time.Second).Should(gomega.Succeed())
+
+	stateData, err := getMemoryManagerState()
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+	podUID := string(pod.UID)
+	podEntry, podFound := stateData.Entries[podUID]
+
+	if len(expectedGuaranteedContainers) == 0 {
+		gomega.Expect(podFound).To(gomega.BeFalse(), "pod entry for %s unexpectedly found in state", pod.Name)
+		return
+	}
+
+	gomega.Expect(podFound).To(gomega.BeTrue(), "pod entry for %s not found in state", pod.Name)
+	actualContainerSet := sets.NewString()
+	for containerName := range podEntry {
+		actualContainerSet.Insert(containerName)
+	}
+	gomega.Expect(actualContainerSet.Equal(expectedGuaranteedSet)).To(gomega.BeTrue(), "container entries in state file do not match expected. expected: %v, actual: %v", expectedGuaranteedSet.List(), actualContainerSet.List())
+
+	for _, containerName := range expectedGuaranteedContainers {
+		containerEntry, ok := podEntry[containerName]
+		gomega.Expect(ok).To(gomega.BeTrue(), "container entry for %s not found in state", containerName)
+		gomega.Expect(containerEntry).ToNot(gomega.BeEmpty(), "container entry for %s should not be empty", containerName)
+	}
 }
 
 // Serial because the test updates kubelet configuration.
@@ -606,27 +720,13 @@ var _ = SIGDescribe("Memory Manager", "[LinuxOnly]", framework.WithDisruptive(),
 				testPod = e2epod.NewPodClient(f).Create(ctx, testPod)
 
 				ginkgo.By("Checking that pod failed to start because of admission error")
-				gomega.Eventually(ctx, func() bool {
+				gomega.Eventually(ctx, func(g gomega.Gomega) {
 					tmpPod, err := e2epod.NewPodClient(f).Get(ctx, testPod.Name, metav1.GetOptions{})
 					framework.ExpectNoError(err)
 
-					if tmpPod.Status.Phase != v1.PodFailed {
-						return false
-					}
-
-					if tmpPod.Status.Reason != "UnexpectedAdmissionError" {
-						return false
-					}
-
-					if !strings.Contains(tmpPod.Status.Message, "Allocate failed due to [memorymanager]") {
-						return false
-					}
-
-					return true
-				}, time.Minute, 5*time.Second).Should(
-					gomega.BeTrueBecause(
-						"the pod succeeded to start, when it should fail with the admission error",
-					))
+					g.Expect(tmpPod.Status.Phase).To(gomega.Equal(v1.PodFailed))
+					g.Expect(tmpPod.Status.Message).To(gomega.ContainSubstring("sum of exclusive container memory requests equals pod budget"))
+				}, time.Minute, 5*time.Second).Should(gomega.Succeed())
 			})
 
 			ginkgo.JustAfterEach(func(ctx context.Context) {
@@ -713,16 +813,41 @@ var _ = SIGDescribe("Memory Manager", "[LinuxOnly]", framework.WithDisruptive(),
 	})
 })
 
-var _ = SIGDescribe("Memory Manager Incompatibility Pod Level Resources", framework.WithDisruptive(), framework.WithSerial(), feature.MemoryManager, feature.PodLevelResources, framework.WithFeatureGate(features.PodLevelResources), func() {
+type memoryManagerKubeletArguments struct {
+	policyName                     string
+	topologyManagerPolicy          string
+	topologyManagerScope           string
+	enablePodLevelResources        bool
+	enablePodLevelResourceManagers bool
+}
+
+func configureMemoryManagerInKubelet(oldCfg *kubeletconfig.KubeletConfiguration, kubeletArguments *memoryManagerKubeletArguments) *kubeletconfig.KubeletConfiguration {
+	newCfg := oldCfg.DeepCopy()
+	if newCfg.FeatureGates == nil {
+		newCfg.FeatureGates = make(map[string]bool)
+	}
+
+	newCfg.FeatureGates["PodLevelResources"] = kubeletArguments.enablePodLevelResources
+	newCfg.FeatureGates["PodLevelResourceManagers"] = kubeletArguments.enablePodLevelResourceManagers
+
+	newCfg.MemoryManagerPolicy = kubeletArguments.policyName
+	newCfg.TopologyManagerPolicy = kubeletArguments.topologyManagerPolicy
+	newCfg.TopologyManagerScope = kubeletArguments.topologyManagerScope
+
+	return newCfg
+}
+
+var _ = SIGDescribe("Memory Manager Pod Level Resources", ginkgo.Ordered, ginkgo.ContinueOnFailure, framework.WithDisruptive(), framework.WithSerial(), feature.MemoryManager, feature.PodLevelResources, feature.PodLevelResourceManagers, framework.WithFeatureGate(features.PodLevelResources), framework.WithFeatureGate(features.PodLevelResourceManagers), func() {
+	f := framework.NewDefaultFramework("memory-manager-pod-level-resources")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+
 	var (
 		allNUMANodes             []int
 		ctnParams, initCtnParams []memoryManagerCtnAttributes
 		isMultiNUMASupported     *bool
 		testPod                  *v1.Pod
+		oldCfg                   *kubeletconfig.KubeletConfiguration
 	)
-
-	f := framework.NewDefaultFramework("memory-manager-incompatibility-pod-level-resources-test")
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	memoryQuantity := resource.MustParse("1100Mi")
 	defaultKubeParams := &memoryManagerKubeletParams{
@@ -738,6 +863,16 @@ var _ = SIGDescribe("Memory Manager Incompatibility Pod Level Resources", framew
 		kubeReserved:   map[string]string{resourceMemory: "500Mi"},
 		evictionHard:   map[string]string{evictionHardMemory: "100Mi"},
 	}
+
+	ginkgo.BeforeAll(func(ctx context.Context) {
+		var err error
+		oldCfg, err = getCurrentKubeletConfig(ctx)
+		framework.ExpectNoError(err)
+	})
+
+	ginkgo.AfterAll(func(ctx context.Context) {
+		updateKubeletConfig(ctx, f, oldCfg, true)
+	})
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		if isMultiNUMASupported == nil {
@@ -781,7 +916,6 @@ var _ = SIGDescribe("Memory Manager Incompatibility Pod Level Resources", framew
 			if initialConfig.FeatureGates == nil {
 				initialConfig.FeatureGates = make(map[string]bool)
 			}
-			initialConfig.FeatureGates["PodLevelResources"] = true
 		})
 
 		ginkgo.Context("", func() {
@@ -802,7 +936,757 @@ var _ = SIGDescribe("Memory Manager Incompatibility Pod Level Resources", framew
 				initCtnParams = []memoryManagerCtnAttributes{}
 			})
 
-			ginkgo.It("should not report any memory data during request to pod resources List when pod has pod level resources", func(ctx context.Context) {
+			ginkgo.It("scope: pod, should allocate exclusive memory to a guaranteed pod with pod-level resources and guaranteed container, PodLevelResourceManagers enabled", func(ctx context.Context) {
+				currentCfg, err := getCurrentKubeletConfig(ctx)
+				framework.ExpectNoError(err)
+				updateKubeletConfigIfNeeded(ctx, f, configureMemoryManagerInKubelet(currentCfg, &memoryManagerKubeletArguments{
+					policyName:                     string(staticPolicy),
+					topologyManagerPolicy:          topologymanager.PolicyBestEffort,
+					topologyManagerScope:           topologymanager.PodTopologyScope,
+					enablePodLevelResources:        true,
+					enablePodLevelResourceManagers: true,
+				}))
+
+				ctnParams = []memoryManagerCtnAttributes{
+					{
+						ctnName: "gu-container",
+						cpus:    "100m",
+						memory:  "128Mi",
+					},
+				}
+				testPod = makeMemoryManagerPod("gu-pod-level-gu-ctn", nil, ctnParams)
+				testPod.Spec.Resources = &v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("100m"),
+						v1.ResourceMemory: resource.MustParse("128Mi"),
+					},
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("100m"),
+						v1.ResourceMemory: resource.MustParse("128Mi"),
+					},
+				}
+
+				ginkgo.By("Running the test pod")
+				testPod = e2epod.NewPodClient(f).CreateSync(ctx, testPod)
+
+				if !*isMultiNUMASupported {
+					return
+				}
+
+				verifyMemoryPinning(f, ctx, testPod, []int{0})
+				verifyMemoryManagerAllocations(f, ctx, testPod, []string{
+					"gu-container",
+				})
+			})
+
+			ginkgo.It("scope: pod, should allocate exclusive memory to a guaranteed pod with pod-level resources and non-guaranteed containers, PodLevelResourceManagers enabled", func(ctx context.Context) {
+				currentCfg, err := getCurrentKubeletConfig(ctx)
+				framework.ExpectNoError(err)
+				updateKubeletConfigIfNeeded(ctx, f, configureMemoryManagerInKubelet(currentCfg, &memoryManagerKubeletArguments{
+					policyName:                     string(staticPolicy),
+					topologyManagerPolicy:          topologymanager.PolicyBestEffort,
+					topologyManagerScope:           topologymanager.PodTopologyScope,
+					enablePodLevelResources:        true,
+					enablePodLevelResourceManagers: true,
+				}))
+
+				testPod = &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						GenerateName: "gu-pod-level-ngu-ctn-",
+					},
+					Spec: v1.PodSpec{
+						RestartPolicy: v1.RestartPolicyNever,
+						Containers: []v1.Container{
+							{
+								Name:    "ngu-container",
+								Image:   busyboxImage,
+								Command: []string{"sh", "-c", "grep Mems_allowed_list /proc/self/status | cut -f2 && sleep 1d"},
+								Resources: v1.ResourceRequirements{
+									Limits: v1.ResourceList{
+										v1.ResourceCPU: resource.MustParse("100m"),
+									},
+									Requests: v1.ResourceList{
+										v1.ResourceCPU: resource.MustParse("100m"),
+									},
+								},
+							},
+						},
+					},
+				}
+				testPod.Spec.Resources = &v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("100m"),
+						v1.ResourceMemory: resource.MustParse("128Mi"),
+					},
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("100m"),
+						v1.ResourceMemory: resource.MustParse("128Mi"),
+					},
+				}
+
+				ginkgo.By("Running the test pod")
+				testPod = e2epod.NewPodClient(f).CreateSync(ctx, testPod)
+
+				if !*isMultiNUMASupported {
+					return
+				}
+
+				verifyMemoryPinning(f, ctx, testPod, []int{0})
+				verifyMemoryManagerAllocations(f, ctx, testPod, []string{
+					"ngu-container",
+				})
+			})
+
+			ginkgo.It("scope: pod, should allocate exclusive memory to a guaranteed pod with pod-level resources and mix of guaranteed and non-guaranteed containers, PodLevelResourceManagers enabled", func(ctx context.Context) {
+				currentCfg, err := getCurrentKubeletConfig(ctx)
+				framework.ExpectNoError(err)
+				updateKubeletConfigIfNeeded(ctx, f, configureMemoryManagerInKubelet(currentCfg, &memoryManagerKubeletArguments{
+					policyName:                     string(staticPolicy),
+					topologyManagerPolicy:          topologymanager.PolicyBestEffort,
+					topologyManagerScope:           topologymanager.PodTopologyScope,
+					enablePodLevelResources:        true,
+					enablePodLevelResourceManagers: true,
+				}))
+
+				ctnParams = []memoryManagerCtnAttributes{
+					{
+						ctnName: "gu-container",
+						cpus:    "100m",
+						memory:  "64Mi",
+					},
+				}
+				testPod = makeMemoryManagerPod("gu-pod-level-mix-ctn", nil, ctnParams)
+				testPod.Spec.Containers = append(testPod.Spec.Containers, v1.Container{
+					Name:    "ngu-container",
+					Image:   busyboxImage,
+					Command: []string{"sh", "-c", "grep Mems_allowed_list /proc/self/status | cut -f2 && sleep 1d"},
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("100m"),
+						},
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("100m"),
+						},
+					},
+				})
+				testPod.Spec.Resources = &v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("200m"),
+						v1.ResourceMemory: resource.MustParse("128Mi"),
+					},
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("200m"),
+						v1.ResourceMemory: resource.MustParse("128Mi"),
+					},
+				}
+
+				ginkgo.By("Running the test pod")
+				testPod = e2epod.NewPodClient(f).CreateSync(ctx, testPod)
+
+				if !*isMultiNUMASupported {
+					return
+				}
+
+				verifyMemoryPinning(f, ctx, testPod, []int{0})
+				verifyMemoryManagerAllocations(f, ctx, testPod, []string{"gu-container", "ngu-container"})
+			})
+
+			ginkgo.It("scope: pod, should allocate exclusive memory to a guaranteed pod with pod-level resources and mix of guaranteed and non-guaranteed standard and init containers, PodLevelResourceManagers enabled", func(ctx context.Context) {
+				currentCfg, err := getCurrentKubeletConfig(ctx)
+				framework.ExpectNoError(err)
+				updateKubeletConfigIfNeeded(ctx, f, configureMemoryManagerInKubelet(currentCfg, &memoryManagerKubeletArguments{
+					policyName:                     string(staticPolicy),
+					topologyManagerPolicy:          topologymanager.PolicyBestEffort,
+					topologyManagerScope:           topologymanager.PodTopologyScope,
+					enablePodLevelResources:        true,
+					enablePodLevelResourceManagers: true,
+				}))
+
+				initCtnParams = []memoryManagerCtnAttributes{
+					{
+						ctnName: "gu-init-container",
+						cpus:    "100m",
+						memory:  "64Mi",
+					},
+				}
+				ctnParams = []memoryManagerCtnAttributes{
+					{
+						ctnName: "gu-container",
+						cpus:    "100m",
+						memory:  "64Mi",
+					},
+				}
+				testPod = makeMemoryManagerPod("gu-pod-level-mix-init-ctn", initCtnParams, ctnParams)
+				testPod.Spec.Containers = append(testPod.Spec.Containers, v1.Container{
+					Name:    "ngu-container",
+					Image:   busyboxImage,
+					Command: []string{"sh", "-c", "grep Mems_allowed_list /proc/self/status | cut -f2 && sleep 1d"},
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("100m"),
+						},
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("100m"),
+						},
+					},
+				})
+				testPod.Spec.Resources = &v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("300m"),
+						v1.ResourceMemory: resource.MustParse("128Mi"),
+					},
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("300m"),
+						v1.ResourceMemory: resource.MustParse("128Mi"),
+					},
+				}
+
+				ginkgo.By("Running the test pod")
+				testPod = e2epod.NewPodClient(f).CreateSync(ctx, testPod)
+
+				if !*isMultiNUMASupported {
+					return
+				}
+
+				verifyMemoryPinning(f, ctx, testPod, []int{0})
+				verifyMemoryManagerAllocations(f, ctx, testPod, []string{"gu-init-container", "gu-container", "ngu-container"})
+			})
+
+			ginkgo.It("scope: pod, should not allocate exclusive memory to a non-guaranteed pod with pod-level resources and guaranteed containers, PodLevelResourceManagers enabled", func(ctx context.Context) {
+				currentCfg, err := getCurrentKubeletConfig(ctx)
+				framework.ExpectNoError(err)
+				updateKubeletConfigIfNeeded(ctx, f, configureMemoryManagerInKubelet(currentCfg, &memoryManagerKubeletArguments{
+					policyName:                     string(staticPolicy),
+					topologyManagerPolicy:          topologymanager.PolicyBestEffort,
+					topologyManagerScope:           topologymanager.PodTopologyScope,
+					enablePodLevelResources:        true,
+					enablePodLevelResourceManagers: true,
+				}))
+
+				ctnParams = []memoryManagerCtnAttributes{
+					{
+						ctnName: "gu-container",
+						cpus:    "100m",
+						memory:  "64Mi",
+					},
+				}
+				testPod = makeMemoryManagerPod("ngu-pod-level-gu-ctn", nil, ctnParams)
+				testPod.Spec.Resources = &v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("100m"),
+						v1.ResourceMemory: resource.MustParse("128Mi"),
+					},
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("100m"),
+						v1.ResourceMemory: resource.MustParse("64Mi"),
+					},
+				}
+
+				ginkgo.By("Running the test pod")
+				testPod = e2epod.NewPodClient(f).CreateSync(ctx, testPod)
+
+				if !*isMultiNUMASupported {
+					return
+				}
+
+				verifyMemoryPinning(f, ctx, testPod, allNUMANodes)
+				verifyMemoryManagerAllocations(f, ctx, testPod, nil)
+			})
+
+			ginkgo.It("scope: pod, should not allocate exclusive memory to a non-guaranteed pod with pod-level resources and non-guaranteed containers, PodLevelResourceManagers enabled", func(ctx context.Context) {
+				currentCfg, err := getCurrentKubeletConfig(ctx)
+				framework.ExpectNoError(err)
+				updateKubeletConfigIfNeeded(ctx, f, configureMemoryManagerInKubelet(currentCfg, &memoryManagerKubeletArguments{
+					policyName:                     string(staticPolicy),
+					topologyManagerPolicy:          topologymanager.PolicyBestEffort,
+					topologyManagerScope:           topologymanager.PodTopologyScope,
+					enablePodLevelResources:        true,
+					enablePodLevelResourceManagers: true,
+				}))
+
+				testPod = &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						GenerateName: "ngu-pod-level-ngu-ctn-",
+					},
+					Spec: v1.PodSpec{
+						RestartPolicy: v1.RestartPolicyNever,
+						Containers: []v1.Container{
+							{
+								Name:    "ngu-container",
+								Image:   busyboxImage,
+								Command: []string{"sh", "-c", "grep Mems_allowed_list /proc/self/status | cut -f2 && sleep 1d"},
+								Resources: v1.ResourceRequirements{
+									Limits: v1.ResourceList{
+										v1.ResourceCPU: resource.MustParse("100m"),
+									},
+									Requests: v1.ResourceList{
+										v1.ResourceCPU: resource.MustParse("100m"),
+									},
+								},
+							},
+						},
+					},
+				}
+				testPod.Spec.Resources = &v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("100m"),
+						v1.ResourceMemory: resource.MustParse("128Mi"),
+					},
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("100m"),
+						v1.ResourceMemory: resource.MustParse("64Mi"),
+					},
+				}
+
+				ginkgo.By("Running the test pod")
+				testPod = e2epod.NewPodClient(f).CreateSync(ctx, testPod)
+
+				if !*isMultiNUMASupported {
+					return
+				}
+
+				verifyMemoryPinning(f, ctx, testPod, allNUMANodes)
+				verifyMemoryManagerAllocations(f, ctx, testPod, nil)
+			})
+
+			ginkgo.It("scope: pod, should reject a pod that would result in an empty pod shared pool, PodLevelResourceManagers enabled", func(ctx context.Context) {
+				currentCfg, err := getCurrentKubeletConfig(ctx)
+				framework.ExpectNoError(err)
+				updateKubeletConfigIfNeeded(ctx, f, configureMemoryManagerInKubelet(currentCfg, &memoryManagerKubeletArguments{
+					policyName:                     string(staticPolicy),
+					topologyManagerPolicy:          topologymanager.PolicyBestEffort,
+					topologyManagerScope:           topologymanager.PodTopologyScope,
+					enablePodLevelResources:        true,
+					enablePodLevelResourceManagers: true,
+				}))
+
+				ctnParams = []memoryManagerCtnAttributes{
+					{
+						ctnName: "gu-container-1",
+						cpus:    "100m",
+						memory:  "64Mi",
+					},
+					{
+						ctnName: "gu-container-2",
+						cpus:    "100m",
+						memory:  "64Mi",
+					},
+				}
+				testPod = makeMemoryManagerPod("gu-pod-level-empty-shared", nil, ctnParams)
+				testPod.Spec.Containers = append(testPod.Spec.Containers, v1.Container{
+					Name:    "ngu-container",
+					Image:   busyboxImage,
+					Command: []string{"sh", "-c", "sleep 1d"},
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("100m"),
+						},
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("100m"),
+						},
+					},
+				})
+				testPod.Spec.Resources = &v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("300m"),
+						v1.ResourceMemory: resource.MustParse("128Mi"),
+					},
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("300m"),
+						v1.ResourceMemory: resource.MustParse("128Mi"),
+					},
+				}
+
+				ginkgo.By("Creating the pod")
+				testPod = e2epod.NewPodClient(f).Create(ctx, testPod)
+
+				ginkgo.By("Checking that pod failed to start because of admission error")
+				gomega.Eventually(ctx, func(g gomega.Gomega) {
+					tmpPod, err := e2epod.NewPodClient(f).Get(ctx, testPod.Name, metav1.GetOptions{})
+					framework.ExpectNoError(err)
+
+					g.Expect(tmpPod.Status.Phase).To(gomega.Equal(v1.PodFailed))
+					g.Expect(tmpPod.Status.Message).To(gomega.ContainSubstring("sum of exclusive container memory requests equals pod budget"))
+				}, time.Minute, 5*time.Second).Should(gomega.Succeed())
+			})
+
+			ginkgo.It("scope: container, should allocate exclusive memory to a guaranteed pod with pod-level resources and guaranteed container, PodLevelResourceManagers enabled", func(ctx context.Context) {
+				currentCfg, err := getCurrentKubeletConfig(ctx)
+				framework.ExpectNoError(err)
+				updateKubeletConfigIfNeeded(ctx, f, configureMemoryManagerInKubelet(currentCfg, &memoryManagerKubeletArguments{
+					policyName:                     string(staticPolicy),
+					topologyManagerPolicy:          topologymanager.PolicyBestEffort,
+					topologyManagerScope:           topologymanager.ContainerTopologyScope,
+					enablePodLevelResources:        true,
+					enablePodLevelResourceManagers: true,
+				}))
+
+				ctnParams = []memoryManagerCtnAttributes{
+					{
+						ctnName: "gu-container",
+						cpus:    "100m",
+						memory:  "128Mi",
+					},
+				}
+				testPod = makeMemoryManagerPod("gu-pod-level-gu-ctn-ctn-scope", nil, ctnParams)
+				testPod.Spec.Resources = &v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("100m"),
+						v1.ResourceMemory: resource.MustParse("128Mi"),
+					},
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("100m"),
+						v1.ResourceMemory: resource.MustParse("128Mi"),
+					},
+				}
+
+				ginkgo.By("Running the test pod")
+				testPod = e2epod.NewPodClient(f).CreateSync(ctx, testPod)
+
+				if !*isMultiNUMASupported {
+					return
+				}
+
+				verifyMemoryPinning(f, ctx, testPod, []int{0})
+				verifyMemoryManagerAllocations(f, ctx, testPod, []string{"gu-container"})
+			})
+
+			ginkgo.It("scope: container, should not allocate exclusive memory to a guaranteed pod with pod-level resources and non-guaranteed containers, PodLevelResourceManagers enabled", func(ctx context.Context) {
+				currentCfg, err := getCurrentKubeletConfig(ctx)
+				framework.ExpectNoError(err)
+				updateKubeletConfigIfNeeded(ctx, f, configureMemoryManagerInKubelet(currentCfg, &memoryManagerKubeletArguments{
+					policyName:                     string(staticPolicy),
+					topologyManagerPolicy:          topologymanager.PolicyBestEffort,
+					topologyManagerScope:           topologymanager.ContainerTopologyScope,
+					enablePodLevelResources:        true,
+					enablePodLevelResourceManagers: true,
+				}))
+
+				testPod = &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						GenerateName: "gu-pod-level-ngu-ctn-ctn-scope-",
+					},
+					Spec: v1.PodSpec{
+						RestartPolicy: v1.RestartPolicyNever,
+						Containers: []v1.Container{
+							{
+								Name:    "ngu-container",
+								Image:   busyboxImage,
+								Command: []string{"sh", "-c", "grep Mems_allowed_list /proc/self/status | cut -f2 && sleep 1d"},
+								Resources: v1.ResourceRequirements{
+									Limits: v1.ResourceList{
+										v1.ResourceCPU: resource.MustParse("100m"),
+									},
+									Requests: v1.ResourceList{
+										v1.ResourceCPU: resource.MustParse("100m"),
+									},
+								},
+							},
+						},
+					},
+				}
+				testPod.Spec.Resources = &v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("100m"),
+						v1.ResourceMemory: resource.MustParse("128Mi"),
+					},
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("100m"),
+						v1.ResourceMemory: resource.MustParse("128Mi"),
+					},
+				}
+
+				ginkgo.By("Running the test pod")
+				testPod = e2epod.NewPodClient(f).CreateSync(ctx, testPod)
+
+				if !*isMultiNUMASupported {
+					return
+				}
+
+				verifyMemoryPinning(f, ctx, testPod, allNUMANodes)
+				verifyMemoryManagerAllocations(f, ctx, testPod, nil)
+			})
+
+			ginkgo.It("scope: container, should allocate exclusive memory to a guaranteed pod with pod-level resources and mix of guaranteed and non-guaranteed containers, PodLevelResourceManagers enabled", func(ctx context.Context) {
+				currentCfg, err := getCurrentKubeletConfig(ctx)
+				framework.ExpectNoError(err)
+				updateKubeletConfigIfNeeded(ctx, f, configureMemoryManagerInKubelet(currentCfg, &memoryManagerKubeletArguments{
+					policyName:                     string(staticPolicy),
+					topologyManagerPolicy:          topologymanager.PolicyBestEffort,
+					topologyManagerScope:           topologymanager.ContainerTopologyScope,
+					enablePodLevelResources:        true,
+					enablePodLevelResourceManagers: true,
+				}))
+
+				ctnParams = []memoryManagerCtnAttributes{
+					{
+						ctnName: "gu-container",
+						cpus:    "100m",
+						memory:  "64Mi",
+					},
+				}
+				testPod = makeMemoryManagerPod("gu-pod-level-mix-ctn-ctn-scope", nil, ctnParams)
+				testPod.Spec.Containers = append(testPod.Spec.Containers, v1.Container{
+					Name:    "ngu-container",
+					Image:   busyboxImage,
+					Command: []string{"sh", "-c", "grep Mems_allowed_list /proc/self/status | cut -f2 && sleep 1d"},
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("100m"),
+						},
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("100m"),
+						},
+					},
+				})
+				testPod.Spec.Resources = &v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("200m"),
+						v1.ResourceMemory: resource.MustParse("128Mi"),
+					},
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("200m"),
+						v1.ResourceMemory: resource.MustParse("128Mi"),
+					},
+				}
+
+				ginkgo.By("Running the test pod")
+				testPod = e2epod.NewPodClient(f).CreateSync(ctx, testPod)
+
+				if !*isMultiNUMASupported {
+					return
+				}
+
+				verifyMemoryPinning(f, ctx, testPod, []int{0})
+				verifyMemoryManagerAllocations(f, ctx, testPod, []string{"gu-container"})
+			})
+
+			ginkgo.It("scope: container, should allocate exclusive memory to a guaranteed pod with pod-level resources and mix of guaranteed and non-guaranteed standard and init containers, PodLevelResourceManagers enabled", func(ctx context.Context) {
+				currentCfg, err := getCurrentKubeletConfig(ctx)
+				framework.ExpectNoError(err)
+				updateKubeletConfigIfNeeded(ctx, f, configureMemoryManagerInKubelet(currentCfg, &memoryManagerKubeletArguments{
+					policyName:                     string(staticPolicy),
+					topologyManagerPolicy:          topologymanager.PolicyBestEffort,
+					topologyManagerScope:           topologymanager.ContainerTopologyScope,
+					enablePodLevelResources:        true,
+					enablePodLevelResourceManagers: true,
+				}))
+
+				initCtnParams = []memoryManagerCtnAttributes{
+					{
+						ctnName: "gu-init-container",
+						cpus:    "100m",
+						memory:  "64Mi",
+					},
+				}
+				ctnParams = []memoryManagerCtnAttributes{
+					{
+						ctnName: "gu-container",
+						cpus:    "100m",
+						memory:  "64Mi",
+					},
+				}
+				testPod = makeMemoryManagerPod("gu-pod-level-mix-init-ctn-ctn-scope", initCtnParams, ctnParams)
+				testPod.Spec.Containers = append(testPod.Spec.Containers, v1.Container{
+					Name:    "ngu-container",
+					Image:   busyboxImage,
+					Command: []string{"sh", "-c", "grep Mems_allowed_list /proc/self/status | cut -f2 && sleep 1d"},
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("100m"),
+						},
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("100m"),
+						},
+					},
+				})
+				testPod.Spec.Resources = &v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("300m"),
+						v1.ResourceMemory: resource.MustParse("128Mi"),
+					},
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("300m"),
+						v1.ResourceMemory: resource.MustParse("128Mi"),
+					},
+				}
+
+				ginkgo.By("Running the test pod")
+				testPod = e2epod.NewPodClient(f).CreateSync(ctx, testPod)
+
+				if !*isMultiNUMASupported {
+					return
+				}
+
+				verifyMemoryPinning(f, ctx, testPod, []int{0})
+				verifyMemoryManagerAllocations(f, ctx, testPod, []string{"gu-init-container", "gu-container"})
+			})
+
+			ginkgo.It("scope: container, should not allocate exclusive memory to a non-guaranteed pod with pod-level resources and guaranteed containers, PodLevelResourceManagers enabled", func(ctx context.Context) {
+				currentCfg, err := getCurrentKubeletConfig(ctx)
+				framework.ExpectNoError(err)
+				updateKubeletConfigIfNeeded(ctx, f, configureMemoryManagerInKubelet(currentCfg, &memoryManagerKubeletArguments{
+					policyName:                     string(staticPolicy),
+					topologyManagerPolicy:          topologymanager.PolicyBestEffort,
+					topologyManagerScope:           topologymanager.ContainerTopologyScope,
+					enablePodLevelResources:        true,
+					enablePodLevelResourceManagers: true,
+				}))
+
+				ctnParams = []memoryManagerCtnAttributes{
+					{
+						ctnName: "gu-container",
+						cpus:    "100m",
+						memory:  "64Mi",
+					},
+				}
+				testPod = makeMemoryManagerPod("ngu-pod-level-gu-ctn-ctn-scope", nil, ctnParams)
+				testPod.Spec.Resources = &v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("100m"),
+						v1.ResourceMemory: resource.MustParse("128Mi"),
+					},
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("100m"),
+						v1.ResourceMemory: resource.MustParse("64Mi"),
+					},
+				}
+
+				ginkgo.By("Running the test pod")
+				testPod = e2epod.NewPodClient(f).CreateSync(ctx, testPod)
+
+				if !*isMultiNUMASupported {
+					return
+				}
+
+				verifyMemoryPinning(f, ctx, testPod, allNUMANodes)
+			})
+
+			ginkgo.It("scope: container, should not allocate exclusive memory to a non-guaranteed pod with pod-level resources and non-guaranteed containers, PodLevelResourceManagers enabled", func(ctx context.Context) {
+				currentCfg, err := getCurrentKubeletConfig(ctx)
+				framework.ExpectNoError(err)
+				updateKubeletConfigIfNeeded(ctx, f, configureMemoryManagerInKubelet(currentCfg, &memoryManagerKubeletArguments{
+					policyName:                     string(staticPolicy),
+					topologyManagerPolicy:          topologymanager.PolicyBestEffort,
+					topologyManagerScope:           topologymanager.ContainerTopologyScope,
+					enablePodLevelResources:        true,
+					enablePodLevelResourceManagers: true,
+				}))
+
+				testPod = &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						GenerateName: "ngu-pod-level-ngu-ctn-ctn-scope-",
+					},
+					Spec: v1.PodSpec{
+						RestartPolicy: v1.RestartPolicyNever,
+						Containers: []v1.Container{
+							{
+								Name:    "ngu-container",
+								Image:   busyboxImage,
+								Command: []string{"sh", "-c", "grep Mems_allowed_list /proc/self/status | cut -f2 && sleep 1d"},
+								Resources: v1.ResourceRequirements{
+									Limits: v1.ResourceList{
+										v1.ResourceCPU: resource.MustParse("100m"),
+									},
+									Requests: v1.ResourceList{
+										v1.ResourceCPU: resource.MustParse("100m"),
+									},
+								},
+							},
+						},
+					},
+				}
+				testPod.Spec.Resources = &v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("100m"),
+						v1.ResourceMemory: resource.MustParse("128Mi"),
+					},
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("100m"),
+						v1.ResourceMemory: resource.MustParse("64Mi"),
+					},
+				}
+
+				ginkgo.By("Running the test pod")
+				testPod = e2epod.NewPodClient(f).CreateSync(ctx, testPod)
+
+				if !*isMultiNUMASupported {
+					return
+				}
+
+				verifyMemoryPinning(f, ctx, testPod, allNUMANodes)
+				verifyMemoryManagerAllocations(f, ctx, testPod, nil)
+			})
+
+			ginkgo.It("scope: container, should not reject a pod that would result in an empty pod shared pool, no pod shared pool in container scope, PodLevelResourceManagers enabled", func(ctx context.Context) {
+				currentCfg, err := getCurrentKubeletConfig(ctx)
+				framework.ExpectNoError(err)
+				updateKubeletConfigIfNeeded(ctx, f, configureMemoryManagerInKubelet(currentCfg, &memoryManagerKubeletArguments{
+					policyName:                     string(staticPolicy),
+					topologyManagerPolicy:          topologymanager.PolicyBestEffort,
+					topologyManagerScope:           topologymanager.ContainerTopologyScope,
+					enablePodLevelResources:        true,
+					enablePodLevelResourceManagers: true,
+				}))
+
+				ctnParams = []memoryManagerCtnAttributes{
+					{
+						ctnName: "gu-container-1",
+						cpus:    "100m",
+						memory:  "64Mi",
+					},
+					{
+						ctnName: "gu-container-2",
+						cpus:    "100m",
+						memory:  "64Mi",
+					},
+				}
+				testPod = makeMemoryManagerPod("gu-pod-level-empty-shared-ctn-scope", nil, ctnParams)
+				testPod.Spec.Containers = append(testPod.Spec.Containers, v1.Container{
+					Name:    "ngu-container",
+					Image:   busyboxImage,
+					Command: []string{"sh", "-c", "sleep 1d"},
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("100m"),
+						},
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("100m"),
+						},
+					},
+				})
+				testPod.Spec.Resources = &v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("300m"),
+						v1.ResourceMemory: resource.MustParse("128Mi"),
+					},
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("300m"),
+						v1.ResourceMemory: resource.MustParse("128Mi"),
+					},
+				}
+
+				ginkgo.By("Running the test pod")
+				testPod = e2epod.NewPodClient(f).CreateSync(ctx, testPod)
+
+				if !*isMultiNUMASupported {
+					return
+				}
+
+				verifyMemoryPinning(f, ctx, testPod, []int{0})
+			})
+
+			ginkgo.It("should not report any memory data during request to pod resources List when pod has pod level resources, PodLevelResourceManagers disabled", func(ctx context.Context) {
+				currentCfg, err := getCurrentKubeletConfig(ctx)
+				framework.ExpectNoError(err)
+				updateKubeletConfigIfNeeded(ctx, f, configureMemoryManagerInKubelet(currentCfg, &memoryManagerKubeletArguments{
+					policyName:                     string(staticPolicy),
+					topologyManagerPolicy:          topologymanager.PolicyBestEffort,
+					topologyManagerScope:           topologymanager.ContainerTopologyScope,
+					enablePodLevelResources:        true,
+					enablePodLevelResourceManagers: false,
+				}))
+
 				testPod = e2epod.NewPodClient(f).CreateSync(ctx, testPod)
 
 				endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
@@ -831,7 +1715,17 @@ var _ = SIGDescribe("Memory Manager Incompatibility Pod Level Resources", framew
 				}
 			})
 
-			ginkgo.It("should succeed to start the pod when it has pod level resources", func(ctx context.Context) {
+			ginkgo.It("should succeed to start the pod when it has pod level resources, PodLevelResourceManagers disabled", func(ctx context.Context) {
+				currentCfg, err := getCurrentKubeletConfig(ctx)
+				framework.ExpectNoError(err)
+				updateKubeletConfigIfNeeded(ctx, f, configureMemoryManagerInKubelet(currentCfg, &memoryManagerKubeletArguments{
+					policyName:                     string(staticPolicy),
+					topologyManagerPolicy:          topologymanager.PolicyBestEffort,
+					topologyManagerScope:           topologymanager.ContainerTopologyScope,
+					enablePodLevelResources:        true,
+					enablePodLevelResourceManagers: false,
+				}))
+
 				testPod = e2epod.NewPodClient(f).CreateSync(ctx, testPod)
 
 				// it no taste to verify NUMA pinning when the node has only one NUMA node
