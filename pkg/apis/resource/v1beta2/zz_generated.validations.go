@@ -1144,7 +1144,19 @@ func Validate_NetworkDeviceData(ctx context.Context, op operation.Operation, fld
 		}(fldPath.Child("interfaceName"), &obj.InterfaceName, safe.Field(oldObj, func(oldObj *resourcev1beta2.NetworkDeviceData) *string { return &oldObj.InterfaceName }))...)
 
 	// field resourcev1beta2.NetworkDeviceData.IPs has no validation
-	// field resourcev1beta2.NetworkDeviceData.HardwareAddress has no validation
+
+	// field resourcev1beta2.NetworkDeviceData.HardwareAddress
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			errs = append(errs, validate.MaxLength(ctx, op, fldPath, obj, oldObj, 128)...)
+			return
+		}(fldPath.Child("hardwareAddress"), &obj.HardwareAddress, safe.Field(oldObj, func(oldObj *resourcev1beta2.NetworkDeviceData) *string { return &oldObj.HardwareAddress }))...)
+
 	return errs
 }
 
