@@ -380,6 +380,11 @@ func getStatusValidationOptions(newJob, oldJob *batch.Job) batchvalidation.JobSt
 		isReadyChanged := !ptr.Equal(oldJob.Status.Ready, newJob.Status.Ready)
 		isTerminatingChanged := !ptr.Equal(oldJob.Status.Terminating, newJob.Status.Terminating)
 		isSuspendedWithZeroCompletions := ptr.Equal(newJob.Spec.Suspend, ptr.To(true)) && ptr.Equal(newJob.Spec.Completions, ptr.To[int32](0))
+		// Detect job resume via condition changes (JobSuspended: True -> False)
+		// This handles the case where the controller updates status after the user has already
+		// changed spec.suspend=false, which is the scenario from https://github.com/kubernetes/kubernetes/issues/134521
+		isJobResuming := batchvalidation.IsConditionTrue(oldJob.Status.Conditions, batch.JobSuspended) &&
+			batchvalidation.IsConditionFalse(newJob.Status.Conditions, batch.JobSuspended)
 
 		return batchvalidation.JobStatusValidationOptions{
 			// We allow to decrease the counter for succeeded pods for jobs which
@@ -397,7 +402,7 @@ func getStatusValidationOptions(newJob, oldJob *batch.Job) batchvalidation.JobSt
 			RejectFinishedJobWithActivePods:              isJobFinishedChanged || isActiveChanged,
 			RejectFinishedJobWithoutStartTime:            (isJobFinishedChanged || isStartTimeChanged) && !isSuspendedWithZeroCompletions,
 			RejectFinishedJobWithUncountedTerminatedPods: isJobFinishedChanged || isUncountedTerminatedPodsChanged,
-			RejectStartTimeUpdateForUnsuspendedJob:       isStartTimeChanged,
+			RejectStartTimeUpdateForUnsuspendedJob:       isStartTimeChanged && !isJobResuming,
 			RejectCompletionTimeBeforeStartTime:          isStartTimeChanged || isCompletionTimeChanged,
 			RejectMutatingCompletionTime:                 true,
 			RejectNotCompleteJobWithCompletionTime:       isJobCompleteChanged || isCompletionTimeChanged,
