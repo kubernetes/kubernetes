@@ -402,6 +402,54 @@ func getEphemeralStorageResourceList(storage string) v1.ResourceList {
 	return res
 }
 
+func TestNodeRefFromNode(t *testing.T) {
+	testCases := []struct {
+		name     string
+		nodeName string
+		expected *v1.ObjectReference
+	}{
+		{
+			name:     "normal node name",
+			nodeName: "test-node",
+			expected: &v1.ObjectReference{
+				APIVersion: "v1",
+				Kind:       "Node",
+				Name:       "test-node",
+				Namespace:  "",
+			},
+		},
+		{
+			name:     "empty node name",
+			nodeName: "",
+			expected: &v1.ObjectReference{
+				APIVersion: "v1",
+				Kind:       "Node",
+				Name:       "",
+				UID:        "",
+				Namespace:  "",
+			},
+		},
+		{
+			name:     "node name with special characters",
+			nodeName: "test-node-123.domain.local",
+			expected: &v1.ObjectReference{
+				APIVersion: "v1",
+				Kind:       "Node",
+				Name:       "test-node-123.domain.local",
+				Namespace:  "",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := nodeRefFromNode(tc.nodeName)
+
+			assert.Equal(t, tc.expected, result, "test case %q failed", tc.name)
+		})
+	}
+}
+
 func TestGetCgroupConfig(t *testing.T) {
 	cases := []struct {
 		name                  string
