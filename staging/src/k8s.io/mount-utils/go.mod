@@ -7,7 +7,10 @@ go 1.25.0
 godebug default=go1.25
 
 require (
+	github.com/go-ole/go-ole v1.3.0
+	github.com/microsoft/wmi v0.34.0
 	github.com/moby/sys/mountinfo v0.7.2
+	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/sys v0.35.0
 	k8s.io/klog/v2 v2.130.1

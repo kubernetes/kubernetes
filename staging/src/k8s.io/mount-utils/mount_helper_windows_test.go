@@ -71,7 +71,7 @@ func TestValidateDiskNumber(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		err := ValidateDiskNumber(test.diskNum)
+		_, err := ValidateDiskNumber(test.diskNum)
 		if (err != nil) != test.expectError {
 			t.Errorf("TestValidateDiskNumber test failed, disk number: %s, error: %v", test.diskNum, err)
 		}

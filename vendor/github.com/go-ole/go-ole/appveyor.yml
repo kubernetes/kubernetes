@@ -1,0 +1,68 @@
+# Notes:
+#   - Minimal appveyor.yml file is an empty file. All sections are optional.
+#   - Indent each level of configuration with 2 spaces. Do not use tabs!
+#   - All section names are case-sensitive.
+#   - Section names should be unique on each level.
+
+version: "1.3.0.{build}-alpha-{branch}"
+
+os: Visual Studio 2019
+
+build: off
+
+skip_tags: true
+
+clone_folder: c:\gopath\src\github.com\go-ole\go-ole
+
+environment:
+  GOPATH: c:\gopath
+  GOROOT: c:\go
+  DOWNLOADPLATFORM: "x64"
+
+before_test:
+  # - Download COM Server
+  - ps: Start-FileDownload "https://github.com/go-ole/test-com-server/releases/download/v1.0.2/test-com-server-${env:DOWNLOADPLATFORM}.zip"
+  - 7z e test-com-server-%DOWNLOADPLATFORM%.zip -oc:\gopath\src\github.com\go-ole\go-ole > NUL
+  - c:\gopath\src\github.com\go-ole\go-ole\build\register-assembly.bat
+
+test_script:
+  - go test -v -cover ./...
+  # go vet has false positives on unsafe.Pointer with windows/sys. Disabling since it is recommended to use go test instead.
+  # - go vet ./...
+
+branches:
+  only:
+    - master
+    - v1.2
+    - v1.1
+    - v1.0
+
+matrix:
+  allow_failures:
+    - environment:
+      GOROOT: C:\go-x86
+      DOWNLOADPLATFORM: "x86"
+    - environment:
+      GOROOT: C:\go118
+      DOWNLOADPLATFORM: "x64"
+    - environment:
+      GOROOT: C:\go118-x86
+      DOWNLOADPLATFORM: "x86"
+
+install:
+  - go version
+  - go env
+  - go get -u golang.org/x/tools/cmd/cover
+  - go get -u golang.org/x/tools/cmd/godoc
+  - go get -u golang.org/x/tools/cmd/stringer
+
+build_script:
+  - cd c:\gopath\src\github.com\go-ole\go-ole
+  - go get -v -t ./...
+  - go build
+
+# disable automatic tests
+test: on
+
+# disable deployment
+deploy: off
