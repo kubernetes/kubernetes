@@ -573,3 +573,7 @@ func (f *FakeRuntime) GetContainerSwapBehavior(pod *v1.Pod, container *v1.Contai
 func (f *FakeRuntime) IsPodResizeInProgress(allocatedPod *v1.Pod, podStatus *kubecontainer.PodStatus) bool {
 	return f.PodResizeInProgress
 }
+
+func (f *FakeRuntime) UpdateActuatedPodLevelResources(allocatedPod *v1.Pod) error {
+	return nil
+}

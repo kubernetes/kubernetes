@@ -4489,3 +4489,184 @@ func TestDoBackOff(t *testing.T) {
 		})
 	}
 }
+
+func TestCmpActuatedAllocated(t *testing.T) {
+	tests := []struct {
+		name               string
+		actuatedResources  *v1.ResourceRequirements
+		allocatedResources *v1.ResourceRequirements
+		cpuMemoryequal     bool
+	}{
+		{
+			name:               "both nil",
+			actuatedResources:  nil,
+			allocatedResources: nil,
+			cpuMemoryequal:     true,
+		},
+		{
+			name:               "actuated nil and allocated empty",
+			actuatedResources:  nil,
+			allocatedResources: &v1.ResourceRequirements{},
+			cpuMemoryequal:     true,
+		},
+		{
+			name:               "actuated empty allocated nil",
+			actuatedResources:  &v1.ResourceRequirements{},
+			allocatedResources: nil,
+			cpuMemoryequal:     true,
+		},
+		{
+			name: "actuated empty and allocated empty",
+			actuatedResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{},
+				Limits:   v1.ResourceList{},
+			},
+			allocatedResources: &v1.ResourceRequirements{},
+			cpuMemoryequal:     true,
+		},
+		{
+			name:              "actuated empty and allocated requests limits empty",
+			actuatedResources: &v1.ResourceRequirements{},
+			allocatedResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{},
+				Limits:   v1.ResourceList{},
+			},
+			cpuMemoryequal: true,
+		},
+		{
+			name:              "actuated empty and allocated request limits nil",
+			actuatedResources: &v1.ResourceRequirements{},
+			allocatedResources: &v1.ResourceRequirements{
+				Requests: nil,
+				Limits:   nil,
+			},
+			cpuMemoryequal: true,
+		},
+		{
+			name: "actuated requests limits nil and allocated empty",
+			actuatedResources: &v1.ResourceRequirements{
+				Requests: nil,
+				Limits:   nil,
+			},
+			allocatedResources: &v1.ResourceRequirements{},
+			cpuMemoryequal:     true,
+		},
+		{
+			name: "actuated requests limits nil and allocated requests non-nil",
+			actuatedResources: &v1.ResourceRequirements{
+				Requests: nil,
+				Limits:   nil,
+			},
+			allocatedResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU: resource.MustParse("10m"),
+				},
+				Limits: nil,
+			},
+		},
+		{
+			name: "actuated requests limits nil and allocated requests non-nil limits nil",
+			actuatedResources: &v1.ResourceRequirements{
+				Requests: nil,
+				Limits:   nil,
+			},
+			allocatedResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("10Mi"),
+					v1.ResourceCPU:    resource.MustParse("10m"),
+				},
+				Limits: nil,
+			},
+		},
+		{
+			name: "actuated requests non-nil limits nil and allocated requests non-nil limits nil",
+			actuatedResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("10Mi"),
+					v1.ResourceCPU:    resource.MustParse("10m"),
+				},
+				Limits: nil,
+			},
+			allocatedResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("10Mi"),
+					v1.ResourceCPU:    resource.MustParse("10m"),
+				},
+				Limits: nil,
+			},
+			cpuMemoryequal: true,
+		},
+		{
+			name: "actuated requests non-nil limits nil and allocated requests nil limits non-nil",
+			actuatedResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("10Mi"),
+					v1.ResourceCPU:    resource.MustParse("10m"),
+				},
+				Limits: nil,
+			},
+			allocatedResources: &v1.ResourceRequirements{
+				Requests: nil,
+				Limits: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("10Mi"),
+					v1.ResourceCPU:    resource.MustParse("10m"),
+				},
+			},
+		},
+		{
+			name: "actuated equals allocated",
+			actuatedResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("20Mi"),
+					v1.ResourceCPU:    resource.MustParse("10m"),
+				},
+				Limits: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("10Mi"),
+					v1.ResourceCPU:    resource.MustParse("20m"),
+				},
+			},
+			allocatedResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("20Mi"),
+					v1.ResourceCPU:    resource.MustParse("10m"),
+				},
+				Limits: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("10Mi"),
+					v1.ResourceCPU:    resource.MustParse("20m"),
+				},
+			},
+			cpuMemoryequal: true,
+		},
+		{
+			name: "actuated equals allocated for resizable resources",
+			actuatedResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("20Mi"),
+					v1.ResourceCPU:    resource.MustParse("10m"),
+				},
+				Limits: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("10Mi"),
+					v1.ResourceCPU:    resource.MustParse("20m"),
+				},
+			},
+			allocatedResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("20Mi"),
+					v1.ResourceCPU:    resource.MustParse("10m"),
+				},
+				Limits: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("10Mi"),
+					v1.ResourceCPU:    resource.MustParse("20m"),
+				},
+			},
+			cpuMemoryequal: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			gotEqual := cmpActuatedAllocated(test.actuatedResources, test.allocatedResources)
+			assert.Equal(t, test.cpuMemoryequal, gotEqual)
+		})
+	}
+}

@@ -130,12 +130,25 @@ func TestUpdatePodFromAllocation(t *testing.T) {
 	resizedPod.Spec.Containers[0].Resources.Requests[v1.ResourceCPU] = *resource.NewMilliQuantity(200, resource.DecimalSI)
 	resizedPod.Spec.InitContainers[0].Resources.Requests[v1.ResourceCPU] = *resource.NewMilliQuantity(300, resource.DecimalSI)
 
+	resizedPodWithPodLevelResources := resizedPod.DeepCopy()
+	resizedPodWithPodLevelResources.Spec.Resources = &v1.ResourceRequirements{
+		Requests: v1.ResourceList{
+			v1.ResourceCPU:    *resource.NewMilliQuantity(1500, resource.DecimalSI),
+			v1.ResourceMemory: *resource.NewQuantity(1700, resource.DecimalSI),
+		},
+		Limits: v1.ResourceList{
+			v1.ResourceCPU:    *resource.NewMilliQuantity(2200, resource.DecimalSI),
+			v1.ResourceMemory: *resource.NewQuantity(2500, resource.DecimalSI),
+		},
+	}
+
 	tests := []struct {
-		name         string
-		pod          *v1.Pod
-		allocated    state.PodResourceInfo
-		expectPod    *v1.Pod
-		expectUpdate bool
+		name                         string
+		pod                          *v1.Pod
+		allocated                    state.PodResourceInfo
+		expectPod                    *v1.Pod
+		expectUpdate                 bool
+		inPlacePodLevelResizeEnabled bool
 	}{{
 		name: "steady state",
 		pod:  pod,
@@ -175,10 +188,28 @@ func TestUpdatePodFromAllocation(t *testing.T) {
 		},
 		expectUpdate: true,
 		expectPod:    resizedPod,
+	}, {
+		name: "with resized pod-level resource allocation",
+		pod:  pod,
+		allocated: state.PodResourceInfo{
+			ContainerResources: map[string]v1.ResourceRequirements{
+				"c1":                  *resizedPod.Spec.Containers[0].Resources.DeepCopy(),
+				"c2":                  *resizedPod.Spec.Containers[1].Resources.DeepCopy(),
+				"c1-restartable-init": *resizedPod.Spec.InitContainers[0].Resources.DeepCopy(),
+				"c1-init":             *resizedPod.Spec.InitContainers[1].Resources.DeepCopy(),
+			},
+			PodLevelResources: resizedPodWithPodLevelResources.Spec.Resources.DeepCopy(),
+		},
+		expectUpdate:                 true,
+		expectPod:                    resizedPodWithPodLevelResources,
+		inPlacePodLevelResizeEnabled: true,
 	}}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			if test.inPlacePodLevelResizeEnabled {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, true)
+			}
 			pod := test.pod.DeepCopy()
 			allocatedPod, updated := updatePodFromAllocation(pod, test.allocated)
 
