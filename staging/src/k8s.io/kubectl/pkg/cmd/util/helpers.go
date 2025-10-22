@@ -425,12 +425,6 @@ func GetPodRunningTimeoutFlag(cmd *cobra.Command) (time.Duration, error) {
 type FeatureGate string
 
 const (
-	// owner: @soltysh
-	// kep: https://kep.k8s.io/859
-	//
-	// HTTP headers with command name and flags used.
-	CmdHeaders FeatureGate = "KUBECTL_COMMAND_HEADERS"
-
 	// owner: @ardaguclu
 	// kep: https://kep.k8s.io/3104
 	//
