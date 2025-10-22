@@ -156,11 +156,13 @@ func PodRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 
 		var effectiveReqs v1.ResourceList
 		if opts.InPlacePodLevelResourcesVerticalScalingEnabled {
-			effectiveReqs = determineEffectiveRequests(pod, &ResourceState{
-				Spec:      pod.Spec.Resources.Requests,
-				Actuated:  pod.Status.Resources.Requests,
-				Allocated: pod.Status.AllocatedResources,
-			})
+			if pod.Status.Resources != nil {
+				effectiveReqs = determineEffectiveRequests(pod, &ResourceState{
+					Spec:      pod.Spec.Resources.Requests,
+					Actuated:  pod.Status.Resources.Requests,
+					Allocated: pod.Status.AllocatedResources,
+				})
+			}
 		}
 
 		for resourceName, quantity := range pod.Spec.Resources.Requests {
@@ -294,14 +296,6 @@ func determineEffectiveLimits(pod *v1.Pod, rs *ResourceState) v1.ResourceList {
 		return rs.Actuated.DeepCopy()
 	}
 	return max(rs.Spec, rs.Actuated)
-}
-
-// determineContainerLimits will return a copy of the container limits based on if resizing is feasible or not.
-func determineContainerLimits(pod *v1.Pod, container *v1.Container, cs *v1.ContainerStatus) v1.ResourceList {
-	if IsPodResizeInfeasible(pod) {
-		return cs.Resources.Limits.DeepCopy()
-	}
-	return max(container.Resources.Limits, cs.Resources.Limits)
 }
 
 // IsPodResizeInfeasible returns true if the pod condition PodResizePending is set to infeasible.

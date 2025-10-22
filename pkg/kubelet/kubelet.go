@@ -2904,8 +2904,9 @@ func (kl *Kubelet) HandlePodReconcile(pods []*v1.Pod) {
 			// resources changing.
 			if hasPendingResizes && !retryPendingResizes && oldPod != nil {
 				opts := resourcehelper.PodResourcesOptions{
-					UseStatusResources:    true,
-					SkipPodLevelResources: !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+					UseStatusResources:                             true,
+					SkipPodLevelResources:                          !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+					InPlacePodLevelResourcesVerticalScalingEnabled: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling),
 				}
 
 				// Ignore desired resources when aggregating the resources.
