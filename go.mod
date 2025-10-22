@@ -56,9 +56,9 @@ require (
 	github.com/stretchr/testify v1.11.1
 	github.com/vishvananda/netlink v1.3.1
 	github.com/vishvananda/netns v0.0.5
-	go.etcd.io/etcd/api/v3 v3.6.4
-	go.etcd.io/etcd/client/pkg/v3 v3.6.4
-	go.etcd.io/etcd/client/v3 v3.6.4
+	go.etcd.io/etcd/api/v3 v3.6.5
+	go.etcd.io/etcd/client/pkg/v3 v3.6.5
+	go.etcd.io/etcd/client/v3 v3.6.5
 	go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful v0.44.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.61.0
 	go.opentelemetry.io/otel v1.36.0
@@ -200,9 +200,9 @@ require (
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xiang90/probing v0.0.0-20221125231312-a49e3df8f510 // indirect
 	github.com/xlab/treeprint v1.2.0 // indirect
-	go.etcd.io/bbolt v1.4.2 // indirect
-	go.etcd.io/etcd/pkg/v3 v3.6.4 // indirect
-	go.etcd.io/etcd/server/v3 v3.6.4 // indirect
+	go.etcd.io/bbolt v1.4.3 // indirect
+	go.etcd.io/etcd/pkg/v3 v3.6.5 // indirect
+	go.etcd.io/etcd/server/v3 v3.6.5 // indirect
 	go.etcd.io/raft/v3 v3.6.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.60.0 // indirect
