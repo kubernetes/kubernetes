@@ -22,26 +22,35 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// JSON tags exist to make the output more readable (klog, diff.Diff).
+// They are intentionally not compatible with the normal encoding
+// of a ResourceSlice to avoid accidentally using them with an apiserver
+// request:
+// - TypeMeta does not get encoded.
+// - Fields from this package use upper case whereas types from the
+//   real API use lower case.
+
 type ResourceSlice struct {
-	metav1.TypeMeta
+	metav1.TypeMeta `json:"-"` // Not needed, not set consistently.
 	metav1.ObjectMeta
+
 	Spec ResourceSliceSpec
 }
 
 type ResourceSliceSpec struct {
 	Driver                 UniqueString
 	Pool                   ResourcePool
-	NodeName               *string
-	NodeSelector           *v1.NodeSelector
-	AllNodes               bool
-	Devices                []Device
-	PerDeviceNodeSelection *bool
-	SharedCounters         []CounterSet
+	NodeName               *string          `json:",omitempty"`
+	NodeSelector           *v1.NodeSelector `json:",omitempty"`
+	AllNodes               bool             `json:",omitempty"`
+	Devices                []Device         `json:",omitempty"`
+	PerDeviceNodeSelection *bool            `json:",omitempty"`
+	SharedCounters         []CounterSet     `json:",omitempty"`
 }
 
 type CounterSet struct {
 	Name     UniqueString
-	Counters map[string]resourceapi.Counter
+	Counters map[string]resourceapi.Counter `json:",omitempty"`
 }
 
 type ResourcePool struct {
@@ -49,22 +58,23 @@ type ResourcePool struct {
 	Generation         int64
 	ResourceSliceCount int64
 }
+
 type Device struct {
 	Name                     UniqueString
-	Attributes               map[resourceapi.QualifiedName]resourceapi.DeviceAttribute
-	Capacity                 map[resourceapi.QualifiedName]resourceapi.DeviceCapacity
-	ConsumesCounters         []DeviceCounterConsumption
-	NodeName                 *string
-	NodeSelector             *v1.NodeSelector
-	AllNodes                 *bool
-	Taints                   []resourceapi.DeviceTaint
-	BindsToNode              bool
-	BindingConditions        []string
-	BindingFailureConditions []string
-	AllowMultipleAllocations *bool
+	Attributes               map[resourceapi.QualifiedName]resourceapi.DeviceAttribute `json:",omitempty"`
+	Capacity                 map[resourceapi.QualifiedName]resourceapi.DeviceCapacity  `json:",omitempty"`
+	ConsumesCounters         []DeviceCounterConsumption                                `json:",omitempty"`
+	NodeName                 *string                                                   `json:",omitempty"`
+	NodeSelector             *v1.NodeSelector                                          `json:",omitempty"`
+	AllNodes                 *bool                                                     `json:",omitempty"`
+	Taints                   []resourceapi.DeviceTaint                                 `json:",omitempty"`
+	BindsToNode              bool                                                      `json:",omitempty"`
+	BindingConditions        []string                                                  `json:",omitempty"`
+	BindingFailureConditions []string                                                  `json:",omitempty"`
+	AllowMultipleAllocations *bool                                                     `json:",omitempty"`
 }
 
 type DeviceCounterConsumption struct {
 	CounterSet UniqueString
-	Counters   map[string]resourceapi.Counter
+	Counters   map[string]resourceapi.Counter `json:",omitempty"`
 }
