@@ -2392,6 +2392,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	genericfeatures.WatchList: {},
 
+	kcmfeatures.CloudControllerManagerWatchBasedRoutesReconciliation: {},
+
 	kcmfeatures.CloudControllerManagerWebhook: {},
 
 	zpagesfeatures.ComponentFlagz: {},
