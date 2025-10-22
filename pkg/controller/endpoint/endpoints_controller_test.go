@@ -1930,7 +1930,7 @@ func TestPodUpdatesBatching(t *testing.T) {
 				resourceVersion++
 
 				endpoints.podStore.Update(newPod)
-				endpoints.updatePod(oldPod, newPod)
+				endpoints.onPodUpdate(oldPod, newPod)
 			}
 
 			time.Sleep(tc.finalDelay)
@@ -2039,7 +2039,7 @@ func TestPodAddsBatching(t *testing.T) {
 
 				p := testPod(ns, i, 1, true, ipv4only)
 				endpoints.podStore.Add(p)
-				endpoints.addPod(p)
+				endpoints.onPodUpdate(nil, p)
 			}
 
 			time.Sleep(tc.finalDelay)
@@ -2170,7 +2170,7 @@ func TestPodDeleteBatching(t *testing.T) {
 					t.Fatalf("Pod %q doesn't exist", update.podName)
 				}
 				endpoints.podStore.Delete(old)
-				endpoints.deletePod(old)
+				endpoints.onPodUpdate(old, nil)
 			}
 
 			time.Sleep(tc.finalDelay)
@@ -2582,7 +2582,7 @@ func TestMultiplePodChanges(t *testing.T) {
 	pod2.ResourceVersion = "2"
 	pod2.Status.Conditions[0].Status = v1.ConditionFalse
 	_ = controller.podStore.Update(pod2)
-	controller.updatePod(pod, pod2)
+	controller.onPodUpdate(pod, pod2)
 	// blockNextAction should eventually unblock once server gets endpoints request.
 	waitForChanReceive(t, 1*time.Second, blockNextAction, "Pod Update should have caused a request to be sent to the test server")
 	// The endpoints update hasn't been applied to the cache yet.
@@ -2590,7 +2590,7 @@ func TestMultiplePodChanges(t *testing.T) {
 	pod3.ResourceVersion = "3"
 	pod3.Status.Conditions[0].Status = v1.ConditionTrue
 	_ = controller.podStore.Update(pod3)
-	controller.updatePod(pod2, pod3)
+	controller.onPodUpdate(pod2, pod3)
 	// It shouldn't get endpoints request as the endpoints in the cache is out-of-date.
 	timer := time.NewTimer(100 * time.Millisecond)
 	select {

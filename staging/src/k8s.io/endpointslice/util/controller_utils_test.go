@@ -330,7 +330,7 @@ func genSimpleSvc(namespace, name string) *v1.Service {
 	}
 }
 
-func TestGetPodServiceMemberships(t *testing.T) {
+func TestGetPodServicesToUpdate(t *testing.T) {
 	fakeInformerFactory := informers.NewSharedInformerFactory(&fake.Clientset{}, 0*time.Second)
 	for i := 0; i < 3; i++ {
 		service := &v1.Service{
@@ -394,9 +394,9 @@ func TestGetPodServiceMemberships(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			services, err := GetPodServiceMemberships(fakeInformerFactory.Core().V1().Services().Lister(), test.pod)
+			services, err := GetServicesToUpdate(fakeInformerFactory.Core().V1().Services().Lister(), GetPodUpdateProjectionKey(test.pod, nil))
 			if err != nil {
-				t.Errorf("Error from cache.GetPodServiceMemberships: %v", err)
+				t.Errorf("Error from cache.GetServicesToUpdate: %v", err)
 			} else if !services.Equal(test.expect) {
 				t.Errorf("Expect service %v, but got %v", test.expect, services)
 			}
@@ -404,7 +404,7 @@ func TestGetPodServiceMemberships(t *testing.T) {
 	}
 }
 
-func BenchmarkGetPodServiceMemberships(b *testing.B) {
+func BenchmarkGetPodServicesToUpdate(b *testing.B) {
 	// init fake service informer.
 	fakeInformerFactory := informers.NewSharedInformerFactory(&fake.Clientset{}, 0*time.Second)
 	for i := 0; i < 1000; i++ {
@@ -435,9 +435,9 @@ func BenchmarkGetPodServiceMemberships(b *testing.B) {
 	expect := sets.NewString("test/service-0")
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		services, err := GetPodServiceMemberships(fakeInformerFactory.Core().V1().Services().Lister(), pod)
+		services, err := GetServicesToUpdate(fakeInformerFactory.Core().V1().Services().Lister(), GetPodUpdateProjectionKey(pod, nil))
 		if err != nil {
-			b.Fatalf("Error from GetPodServiceMemberships(): %v", err)
+			b.Fatalf("Error from GetServicesToUpdate(): %v", err)
 		}
 		if len(services) != len(expect) {
 			b.Errorf("Expect services size %d, but got: %v", len(expect), len(services))
