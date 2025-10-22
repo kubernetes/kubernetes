@@ -20,14 +20,19 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"os"
+	"testing"
 	"time"
 
 	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilcompatibility "k8s.io/apiserver/pkg/util/compatibility"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/component-base/compatibility"
+	"k8s.io/component-base/featuregate"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app"
@@ -60,7 +65,7 @@ type TestServer struct {
 // Note: we return a tear-down func instead of a stop channel because the later will leak temporary
 // files that because Golang testing's call to os.Exit will not give a stop channel go routine
 // enough time to remove temporary files.
-func StartTestServer(ctx context.Context, customFlags []string) (result TestServer, err error) {
+func StartTestServer(t *testing.T, ctx context.Context, customFlags []string) (result TestServer, err error) {
 	logger := klog.FromContext(ctx)
 	ctx, cancel := context.WithCancel(ctx)
 	var errCh chan error
@@ -75,9 +80,6 @@ func StartTestServer(ctx context.Context, customFlags []string) (result TestServ
 				logger.Error(err, "Failed to shutdown test server cleanly")
 			}
 		}
-		if len(result.TmpDir) != 0 {
-			os.RemoveAll(result.TmpDir)
-		}
 	}
 	defer func() {
 		if result.TearDownFn == nil {
@@ -85,10 +87,7 @@ func StartTestServer(ctx context.Context, customFlags []string) (result TestServ
 		}
 	}()
 
-	result.TmpDir, err = os.MkdirTemp("", "kube-controller-manager")
-	if err != nil {
-		return result, fmt.Errorf("failed to create temp dir: %v", err)
-	}
+	result.TmpDir = t.TempDir()
 
 	fs := pflag.NewFlagSet("test", pflag.PanicOnError)
 
@@ -96,6 +95,16 @@ func StartTestServer(ctx context.Context, customFlags []string) (result TestServ
 	if err != nil {
 		return TestServer{}, err
 	}
+	// set up new instance of ComponentGlobalsRegistry instead of using the DefaultComponentGlobalsRegistry to avoid contention in parallel tests.
+	featureGate := utilfeature.DefaultMutableFeatureGate.DeepCopy()
+	effectiveVersion := utilcompatibility.DefaultKubeEffectiveVersionForTest()
+	effectiveVersion.SetEmulationVersion(featureGate.EmulationVersion())
+	componentGlobalsRegistry := compatibility.NewComponentGlobalsRegistry()
+	if err := componentGlobalsRegistry.Register(compatibility.DefaultKubeComponent, effectiveVersion, featureGate); err != nil {
+		return result, err
+	}
+	s.ComponentGlobalsRegistry = componentGlobalsRegistry
+
 	all, disabled, aliases := app.KnownControllers(), app.ControllersDisabledByDefault(), app.ControllerAliases()
 	namedFlagSets := s.Flags(all, disabled, aliases)
 	for _, f := range namedFlagSets.FlagSets {
@@ -103,6 +112,24 @@ func StartTestServer(ctx context.Context, customFlags []string) (result TestServ
 	}
 	fs.Parse(customFlags)
 	s.ParsedFlags = &namedFlagSets
+
+	if err := s.ComponentGlobalsRegistry.Set(); err != nil {
+		return result, err
+	}
+	// If the local ComponentGlobalsRegistry is changed by the flags,
+	// we need to copy the new feature values back to the DefaultFeatureGate because most feature checks still use the DefaultFeatureGate.
+	if !featureGate.EmulationVersion().EqualTo(utilfeature.DefaultMutableFeatureGate.EmulationVersion()) {
+		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultMutableFeatureGate, effectiveVersion.EmulationVersion())
+	}
+	featureOverrides := map[featuregate.Feature]bool{}
+	for f := range utilfeature.DefaultMutableFeatureGate.GetAll() {
+		if featureGate.Enabled(f) != utilfeature.DefaultFeatureGate.Enabled(f) {
+			featureOverrides[f] = featureGate.Enabled(f)
+		}
+	}
+	if len(featureOverrides) > 0 {
+		featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featureOverrides)
+	}
 
 	if s.SecureServing.BindPort != 0 {
 		s.SecureServing.Listener, s.SecureServing.BindPort, err = createListenerOnFreePort()
@@ -164,13 +191,12 @@ func StartTestServer(ctx context.Context, customFlags []string) (result TestServ
 }
 
 // StartTestServerOrDie calls StartTestServer t.Fatal if it does not succeed.
-func StartTestServerOrDie(ctx context.Context, flags []string) *TestServer {
-	result, err := StartTestServer(ctx, flags)
-	if err == nil {
-		return &result
+func StartTestServerOrDie(t *testing.T, ctx context.Context, flags []string) *TestServer {
+	result, err := StartTestServer(t, ctx, flags)
+	if err != nil {
+		t.Fatalf("failed to launch server: %v", err)
 	}
-
-	panic(fmt.Errorf("failed to launch server: %v", err))
+	return &result
 }
 
 func createListenerOnFreePort() (net.Listener, int, error) {
