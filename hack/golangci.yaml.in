@@ -141,12 +141,7 @@ linters:
 
       - linters:
           - gocritic
-        text: "append result not assigned to the same slice|put a space between `//` and comment text|sloppyLen|elseif|should rewrite switch statement to if statement|regexpMust|wrapperFunc: use strings.ReplaceAll|singleCaseSwitch|deprecatedComment|exitAfterDefer|captLocal|unlambda|underef|unslice|valSwap|typeSwitchVar"
-
-      # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507008918
-      - linters:
-          - gocritic
-        text: "assignOp:"
+        text: "wrapperFunc: use strings.ReplaceAll|should rewrite switch statement to if statement"
 
     {{- end}}
 
@@ -238,9 +233,25 @@ linters:
       {{- end}}
       {{- if .Base }}
     gocritic:
-      enabled-checks:
-        - equalFold
+      enabled-checks: # These are in addition to the default checks - see https://golangci-lint.run/docs/linters/configuration/#gocritic
         - boolExprSimplify
+        - equalFold
+      disabled-checks: # This disables checks that are enabled by default (this can be combined with enabled-checks, contrary to the docs)
+        - appendAssign
+        - assignOp # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507008918
+        - captLocal
+        - commentFormatting
+        - deprecatedComment
+        - elseif
+        # The following have few (single-digit) occurrences left in k/k and wouldn't be too onerous to enable
+        - exitAfterDefer
+        - regexpMust
+        - sloppyLen
+        - typeSwitchVar
+        - underef
+        - unlambda
+        - unslice
+        - valSwap
     {{- end}}
     revive:
       # Only these rules are enabled.
