@@ -434,14 +434,14 @@ func (sched *Scheduler) skipPodSchedule(ctx context.Context, fwk framework.Frame
 
 type Batch struct {
 	feasibleNodes []fwk.NodeInfo
-	priorityList  []framework.NodePluginScores
+	priorityList  []fwk.NodePluginScores
 	diagnosis     framework.Diagnosis
 	trace         *utiltrace.Trace
 	err           error
 }
 
 // Create a batch structure using the node list.
-func (sched *Scheduler) newBatch(ctx context.Context, fwk framework.Framework, state fwk.CycleState, pod *v1.Pod, trace *utiltrace.Trace) *Batch {
+func (sched *Scheduler) newBatch(ctx context.Context, podFwk framework.Framework, state fwk.CycleState, pod *v1.Pod, trace *utiltrace.Trace) *Batch {
 	if err := sched.Cache.UpdateSnapshot(klog.FromContext(ctx), sched.nodeInfoSnapshot); err != nil {
 		return &Batch{trace: trace, err: err}
 	}
@@ -451,7 +451,7 @@ func (sched *Scheduler) newBatch(ctx context.Context, fwk framework.Framework, s
 		return &Batch{trace: trace, err: ErrNoNodesAvailable}
 	}
 
-	feasibleNodes, diagnosis, err := sched.findNodesThatFitPod(ctx, fwk, state, pod)
+	feasibleNodes, diagnosis, err := sched.findNodesThatFitPod(ctx, podFwk, state, pod)
 	if err != nil {
 		return &Batch{trace: trace, err: err}
 	}
@@ -466,9 +466,9 @@ func (sched *Scheduler) newBatch(ctx context.Context, fwk framework.Framework, s
 	}
 
 	// When only one node after predicate, don't create priorityList.
-	var priorityList []framework.NodePluginScores
+	var priorityList []fwk.NodePluginScores
 	if len(feasibleNodes) > 1 {
-		priorityList, err = prioritizeNodes(ctx, sched.Extenders, fwk, state, pod, feasibleNodes)
+		priorityList, err = prioritizeNodes(ctx, sched.Extenders, podFwk, state, pod, feasibleNodes)
 		if err != nil {
 			return &Batch{trace: trace, err: err}
 		}
