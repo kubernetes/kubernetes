@@ -902,7 +902,7 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.ExpectNoError(err)
 	})
 
-	ginkgo.It("should be updated after adding or deleting ports ", func(ctx context.Context) {
+	ginkgo.It("should be updated after adding or deleting ports", func(ctx context.Context) {
 		serviceName := "edit-port-test"
 		ns := f.Namespace.Name
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
@@ -3675,7 +3675,7 @@ var _ = common.SIGDescribe("Services", func() {
 		Testname: Service, same ports with different protocols on a Load Balancer Service
 		Description: Create a LoadBalancer service with two ports that have the same value but use different protocols. Add a Pod that listens on both ports. The Pod must be reachable via the ClusterIP and both ports
 	*/
-	ginkgo.It("should serve endpoints on same port and different protocol for internal traffic on Type LoadBalancer ", func(ctx context.Context) {
+	ginkgo.It("should serve endpoints on same port and different protocol for internal traffic on Type LoadBalancer", func(ctx context.Context) {
 		serviceName := "multiprotocol-lb-test"
 		ns := f.Namespace.Name
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)

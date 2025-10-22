@@ -9,20 +9,20 @@ import (
 
 type WithTransformMatcher struct {
 	// input
-	Transform interface{} // must be a function of one parameter that returns one value and an optional error
+	Transform any // must be a function of one parameter that returns one value and an optional error
 	Matcher   types.GomegaMatcher
 
 	// cached value
 	transformArgType reflect.Type
 
 	// state
-	transformedValue interface{}
+	transformedValue any
 }
 
 // reflect.Type for error
 var errorT = reflect.TypeOf((*error)(nil)).Elem()
 
-func NewWithTransformMatcher(transform interface{}, matcher types.GomegaMatcher) *WithTransformMatcher {
+func NewWithTransformMatcher(transform any, matcher types.GomegaMatcher) *WithTransformMatcher {
 	if transform == nil {
 		panic("transform function cannot be nil")
 	}
@@ -43,7 +43,7 @@ func NewWithTransformMatcher(transform interface{}, matcher types.GomegaMatcher)
 	}
 }
 
-func (m *WithTransformMatcher) Match(actual interface{}) (bool, error) {
+func (m *WithTransformMatcher) Match(actual any) (bool, error) {
 	// prepare a parameter to pass to the Transform function
 	var param reflect.Value
 	if actual != nil && reflect.TypeOf(actual).AssignableTo(m.transformArgType) {
@@ -72,15 +72,15 @@ func (m *WithTransformMatcher) Match(actual interface{}) (bool, error) {
 	return m.Matcher.Match(m.transformedValue)
 }
 
-func (m *WithTransformMatcher) FailureMessage(_ interface{}) (message string) {
+func (m *WithTransformMatcher) FailureMessage(_ any) (message string) {
 	return m.Matcher.FailureMessage(m.transformedValue)
 }
 
-func (m *WithTransformMatcher) NegatedFailureMessage(_ interface{}) (message string) {
+func (m *WithTransformMatcher) NegatedFailureMessage(_ any) (message string) {
 	return m.Matcher.NegatedFailureMessage(m.transformedValue)
 }
 
-func (m *WithTransformMatcher) MatchMayChangeInTheFuture(_ interface{}) bool {
+func (m *WithTransformMatcher) MatchMayChangeInTheFuture(_ any) bool {
 	// TODO: Maybe this should always just return true? (Only an issue for non-deterministic transformers.)
 	//
 	// Querying the next matcher is fine if the transformer always will return the same value.

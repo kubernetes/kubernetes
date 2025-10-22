@@ -107,6 +107,9 @@ func runSerial(suite TestSuite, ginkgoConfig types.SuiteConfig, reporterConfig t
 	if reporterConfig.JSONReport != "" {
 		reporterConfig.JSONReport = AbsPathForGeneratedAsset(reporterConfig.JSONReport, suite, cliConfig, 0)
 	}
+	if reporterConfig.GoJSONReport != "" {
+		reporterConfig.GoJSONReport = AbsPathForGeneratedAsset(reporterConfig.GoJSONReport, suite, cliConfig, 0)
+	}
 	if reporterConfig.JUnitReport != "" {
 		reporterConfig.JUnitReport = AbsPathForGeneratedAsset(reporterConfig.JUnitReport, suite, cliConfig, 0)
 	}
@@ -178,6 +181,9 @@ func runParallel(suite TestSuite, ginkgoConfig types.SuiteConfig, reporterConfig
 
 	if reporterConfig.JSONReport != "" {
 		reporterConfig.JSONReport = AbsPathForGeneratedAsset(reporterConfig.JSONReport, suite, cliConfig, 0)
+	}
+	if reporterConfig.GoJSONReport != "" {
+		reporterConfig.GoJSONReport = AbsPathForGeneratedAsset(reporterConfig.GoJSONReport, suite, cliConfig, 0)
 	}
 	if reporterConfig.JUnitReport != "" {
 		reporterConfig.JUnitReport = AbsPathForGeneratedAsset(reporterConfig.JUnitReport, suite, cliConfig, 0)

@@ -10,7 +10,7 @@ require (
 	github.com/blang/semver/v4 v4.0.0
 	github.com/google/cel-go v0.26.0
 	github.com/google/go-cmp v0.7.0
-	github.com/onsi/gomega v1.35.1
+	github.com/onsi/gomega v1.38.2
 	github.com/stretchr/testify v1.11.1
 	go.etcd.io/etcd/client/pkg/v3 v3.6.4
 	google.golang.org/grpc v1.72.2
@@ -84,6 +84,7 @@ require (
 )
 
 replace (
+	github.com/onsi/ginkgo/v2 => github.com/pohly/ginkgo/v2 v2.0.0-20251020080214-ba858f25122c
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/apiserver => ../apiserver

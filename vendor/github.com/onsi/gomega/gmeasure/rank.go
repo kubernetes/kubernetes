@@ -34,7 +34,7 @@ func (s *RankingCriteria) UnmarshalJSON(b []byte) error {
 func (s RankingCriteria) MarshalJSON() ([]byte, error) { return rcEnumSupport.MarshJSON(uint(s)) }
 
 /*
-Ranking ranks a set of Stats by a specified RankingCritera.  Use RankStats to create a Ranking.
+Ranking ranks a set of Stats by a specified RankingCriteria.  Use RankStats to create a Ranking.
 
 When using Ginkgo, you can register Rankings as Report Entries via AddReportEntry.  This will emit a formatted table representing the Stats in rank-order when Ginkgo generates the report.
 */

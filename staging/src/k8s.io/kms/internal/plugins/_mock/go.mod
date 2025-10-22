@@ -22,3 +22,5 @@ require (
 )
 
 replace k8s.io/kms => ../../../../kms
+
+replace github.com/onsi/ginkgo/v2 => github.com/pohly/ginkgo/v2 v2.0.0-20251020080214-ba858f25122c
