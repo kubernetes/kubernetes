@@ -46,15 +46,17 @@ type StorageVersionMigrationSpec struct {
 	// The resource that is being migrated. The migrator sends requests to
 	// the endpoint serving the resource.
 	// Immutable.
-	Resource GroupResource `json:"resource" protobuf:"bytes,1,opt,name=resource"`
+	Resource GroupVersionResource `json:"resource" protobuf:"bytes,1,opt,name=resource"`
 }
 
 // The names of the group, the and the resource.
-type GroupResource struct {
+type GroupVersionResource struct {
 	// The name of the group.
 	Group string `json:"group,omitempty" protobuf:"bytes,1,opt,name=group"`
+	// The name of the version.
+	Version string `json:"version,omitempty" protobuf:"bytes,2,opt,name=version"`
 	// The name of the resource.
-	Resource string `json:"resource,omitempty" protobuf:"bytes,2,opt,name=resource"`
+	Resource string `json:"resource,omitempty" protobuf:"bytes,3,opt,name=resource"`
 }
 
 type MigrationConditionType string

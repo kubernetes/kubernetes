@@ -1988,8 +1988,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsstoragemigrationv1alpha1.StorageVersionMigrationStatusApplyConfiguration{}
 
 		// Group=storagemigration.k8s.io, Version=v1beta1
-	case storagemigrationv1beta1.SchemeGroupVersion.WithKind("GroupResource"):
-		return &applyconfigurationsstoragemigrationv1beta1.GroupResourceApplyConfiguration{}
+	case storagemigrationv1beta1.SchemeGroupVersion.WithKind("GroupVersionResource"):
+		return &applyconfigurationsstoragemigrationv1beta1.GroupVersionResourceApplyConfiguration{}
 	case storagemigrationv1beta1.SchemeGroupVersion.WithKind("StorageVersionMigration"):
 		return &applyconfigurationsstoragemigrationv1beta1.StorageVersionMigrationApplyConfiguration{}
 	case storagemigrationv1beta1.SchemeGroupVersion.WithKind("StorageVersionMigrationSpec"):

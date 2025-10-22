@@ -29,12 +29,15 @@ import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 option go_package = "k8s.io/api/storagemigration/v1beta1";
 
 // The names of the group, the and the resource.
-message GroupResource {
+message GroupVersionResource {
   // The name of the group.
   optional string group = 1;
 
+  // The name of the version.
+  optional string version = 2;
+
   // The name of the resource.
-  optional string resource = 2;
+  optional string resource = 3;
 }
 
 // StorageVersionMigration represents a migration of stored data to the latest
@@ -74,7 +77,7 @@ message StorageVersionMigrationSpec {
   // The resource that is being migrated. The migrator sends requests to
   // the endpoint serving the resource.
   // Immutable.
-  optional GroupResource resource = 1;
+  optional GroupVersionResource resource = 1;
 }
 
 // Status of the storage version migration.

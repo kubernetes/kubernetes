@@ -31,7 +31,7 @@ import (
 	strings "strings"
 )
 
-func (m *GroupResource) Reset() { *m = GroupResource{} }
+func (m *GroupVersionResource) Reset() { *m = GroupVersionResource{} }
 
 func (m *StorageVersionMigration) Reset() { *m = StorageVersionMigration{} }
 
@@ -41,7 +41,7 @@ func (m *StorageVersionMigrationSpec) Reset() { *m = StorageVersionMigrationSpec
 
 func (m *StorageVersionMigrationStatus) Reset() { *m = StorageVersionMigrationStatus{} }
 
-func (m *GroupResource) Marshal() (dAtA []byte, err error) {
+func (m *GroupVersionResource) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalToSizedBuffer(dAtA[:size])
@@ -51,12 +51,12 @@ func (m *GroupResource) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *GroupResource) MarshalTo(dAtA []byte) (int, error) {
+func (m *GroupVersionResource) MarshalTo(dAtA []byte) (int, error) {
 	size := m.Size()
 	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
-func (m *GroupResource) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+func (m *GroupVersionResource) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i := len(dAtA)
 	_ = i
 	var l int
@@ -64,6 +64,11 @@ func (m *GroupResource) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i -= len(m.Resource)
 	copy(dAtA[i:], m.Resource)
 	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Resource)))
+	i--
+	dAtA[i] = 0x1a
+	i -= len(m.Version)
+	copy(dAtA[i:], m.Version)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Version)))
 	i--
 	dAtA[i] = 0x12
 	i -= len(m.Group)
@@ -260,13 +265,15 @@ func encodeVarintGenerated(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return base
 }
-func (m *GroupResource) Size() (n int) {
+func (m *GroupVersionResource) Size() (n int) {
 	if m == nil {
 		return 0
 	}
 	var l int
 	_ = l
 	l = len(m.Group)
+	n += 1 + l + sovGenerated(uint64(l))
+	l = len(m.Version)
 	n += 1 + l + sovGenerated(uint64(l))
 	l = len(m.Resource)
 	n += 1 + l + sovGenerated(uint64(l))
@@ -339,12 +346,13 @@ func sovGenerated(x uint64) (n int) {
 func sozGenerated(x uint64) (n int) {
 	return sovGenerated(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
-func (this *GroupResource) String() string {
+func (this *GroupVersionResource) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&GroupResource{`,
+	s := strings.Join([]string{`&GroupVersionResource{`,
 		`Group:` + fmt.Sprintf("%v", this.Group) + `,`,
+		`Version:` + fmt.Sprintf("%v", this.Version) + `,`,
 		`Resource:` + fmt.Sprintf("%v", this.Resource) + `,`,
 		`}`,
 	}, "")
@@ -383,7 +391,7 @@ func (this *StorageVersionMigrationSpec) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&StorageVersionMigrationSpec{`,
-		`Resource:` + strings.Replace(strings.Replace(this.Resource.String(), "GroupResource", "GroupResource", 1), `&`, ``, 1) + `,`,
+		`Resource:` + strings.Replace(strings.Replace(this.Resource.String(), "GroupVersionResource", "GroupVersionResource", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -412,7 +420,7 @@ func valueToStringGenerated(v interface{}) string {
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("*%v", pv)
 }
-func (m *GroupResource) Unmarshal(dAtA []byte) error {
+func (m *GroupVersionResource) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -435,10 +443,10 @@ func (m *GroupResource) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: GroupResource: wiretype end group for non-group")
+			return fmt.Errorf("proto: GroupVersionResource: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: GroupResource: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: GroupVersionResource: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -474,6 +482,38 @@ func (m *GroupResource) Unmarshal(dAtA []byte) error {
 			m.Group = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Version", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Version = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 3:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Resource", wireType)
 			}

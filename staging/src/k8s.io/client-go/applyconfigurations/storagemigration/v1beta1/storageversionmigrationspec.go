@@ -26,7 +26,7 @@ type StorageVersionMigrationSpecApplyConfiguration struct {
 	// The resource that is being migrated. The migrator sends requests to
 	// the endpoint serving the resource.
 	// Immutable.
-	Resource *GroupResourceApplyConfiguration `json:"resource,omitempty"`
+	Resource *GroupVersionResourceApplyConfiguration `json:"resource,omitempty"`
 }
 
 // StorageVersionMigrationSpecApplyConfiguration constructs a declarative configuration of the StorageVersionMigrationSpec type for use with
@@ -38,7 +38,7 @@ func StorageVersionMigrationSpec() *StorageVersionMigrationSpecApplyConfiguratio
 // WithResource sets the Resource field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Resource field is set to the value of the last call.
-func (b *StorageVersionMigrationSpecApplyConfiguration) WithResource(value *GroupResourceApplyConfiguration) *StorageVersionMigrationSpecApplyConfiguration {
+func (b *StorageVersionMigrationSpecApplyConfiguration) WithResource(value *GroupVersionResourceApplyConfiguration) *StorageVersionMigrationSpecApplyConfiguration {
 	b.Resource = value
 	return b
 }

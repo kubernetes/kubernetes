@@ -18,35 +18,45 @@ limitations under the License.
 
 package v1beta1
 
-// GroupResourceApplyConfiguration represents a declarative configuration of the GroupResource type for use
+// GroupVersionResourceApplyConfiguration represents a declarative configuration of the GroupVersionResource type for use
 // with apply.
 //
 // The names of the group, the and the resource.
-type GroupResourceApplyConfiguration struct {
+type GroupVersionResourceApplyConfiguration struct {
 	// The name of the group.
 	Group *string `json:"group,omitempty"`
+	// The name of the version.
+	Version *string `json:"version,omitempty"`
 	// The name of the resource.
 	Resource *string `json:"resource,omitempty"`
 }
 
-// GroupResourceApplyConfiguration constructs a declarative configuration of the GroupResource type for use with
+// GroupVersionResourceApplyConfiguration constructs a declarative configuration of the GroupVersionResource type for use with
 // apply.
-func GroupResource() *GroupResourceApplyConfiguration {
-	return &GroupResourceApplyConfiguration{}
+func GroupVersionResource() *GroupVersionResourceApplyConfiguration {
+	return &GroupVersionResourceApplyConfiguration{}
 }
 
 // WithGroup sets the Group field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Group field is set to the value of the last call.
-func (b *GroupResourceApplyConfiguration) WithGroup(value string) *GroupResourceApplyConfiguration {
+func (b *GroupVersionResourceApplyConfiguration) WithGroup(value string) *GroupVersionResourceApplyConfiguration {
 	b.Group = &value
+	return b
+}
+
+// WithVersion sets the Version field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Version field is set to the value of the last call.
+func (b *GroupVersionResourceApplyConfiguration) WithVersion(value string) *GroupVersionResourceApplyConfiguration {
+	b.Version = &value
 	return b
 }
 
 // WithResource sets the Resource field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Resource field is set to the value of the last call.
-func (b *GroupResourceApplyConfiguration) WithResource(value string) *GroupResourceApplyConfiguration {
+func (b *GroupVersionResourceApplyConfiguration) WithResource(value string) *GroupVersionResourceApplyConfiguration {
 	b.Resource = &value
 	return b
 }

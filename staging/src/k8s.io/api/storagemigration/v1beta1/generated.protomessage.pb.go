@@ -21,7 +21,7 @@ limitations under the License.
 
 package v1beta1
 
-func (*GroupResource) ProtoMessage() {}
+func (*GroupVersionResource) ProtoMessage() {}
 
 func (*StorageVersionMigration) ProtoMessage() {}
 

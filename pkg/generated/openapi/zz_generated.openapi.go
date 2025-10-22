@@ -1217,7 +1217,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		storagemigrationv1alpha1.StorageVersionMigrationList{}.OpenAPIModelName():                                       schema_k8sio_api_storagemigration_v1alpha1_StorageVersionMigrationList(ref),
 		storagemigrationv1alpha1.StorageVersionMigrationSpec{}.OpenAPIModelName():                                       schema_k8sio_api_storagemigration_v1alpha1_StorageVersionMigrationSpec(ref),
 		storagemigrationv1alpha1.StorageVersionMigrationStatus{}.OpenAPIModelName():                                     schema_k8sio_api_storagemigration_v1alpha1_StorageVersionMigrationStatus(ref),
-		storagemigrationv1beta1.GroupResource{}.OpenAPIModelName():                                                      schema_k8sio_api_storagemigration_v1beta1_GroupResource(ref),
+		storagemigrationv1beta1.GroupVersionResource{}.OpenAPIModelName():                                               schema_k8sio_api_storagemigration_v1beta1_GroupVersionResource(ref),
 		storagemigrationv1beta1.StorageVersionMigration{}.OpenAPIModelName():                                            schema_k8sio_api_storagemigration_v1beta1_StorageVersionMigration(ref),
 		storagemigrationv1beta1.StorageVersionMigrationList{}.OpenAPIModelName():                                        schema_k8sio_api_storagemigration_v1beta1_StorageVersionMigrationList(ref),
 		storagemigrationv1beta1.StorageVersionMigrationSpec{}.OpenAPIModelName():                                        schema_k8sio_api_storagemigration_v1beta1_StorageVersionMigrationSpec(ref),
@@ -58139,7 +58139,7 @@ func schema_k8sio_api_storagemigration_v1alpha1_StorageVersionMigrationStatus(re
 	}
 }
 
-func schema_k8sio_api_storagemigration_v1beta1_GroupResource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_storagemigration_v1beta1_GroupVersionResource(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -58149,6 +58149,13 @@ func schema_k8sio_api_storagemigration_v1beta1_GroupResource(ref common.Referenc
 					"group": {
 						SchemaProps: spec.SchemaProps{
 							Description: "The name of the group.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"version": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The name of the version.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -58288,7 +58295,7 @@ func schema_k8sio_api_storagemigration_v1beta1_StorageVersionMigrationSpec(ref c
 						SchemaProps: spec.SchemaProps{
 							Description: "The resource that is being migrated. The migrator sends requests to the endpoint serving the resource. Immutable.",
 							Default:     map[string]interface{}{},
-							Ref:         ref(storagemigrationv1beta1.GroupResource{}.OpenAPIModelName()),
+							Ref:         ref(storagemigrationv1beta1.GroupVersionResource{}.OpenAPIModelName()),
 						},
 					},
 				},
@@ -58296,7 +58303,7 @@ func schema_k8sio_api_storagemigration_v1beta1_StorageVersionMigrationSpec(ref c
 			},
 		},
 		Dependencies: []string{
-			storagemigrationv1beta1.GroupResource{}.OpenAPIModelName()},
+			storagemigrationv1beta1.GroupVersionResource{}.OpenAPIModelName()},
 	}
 }
 

@@ -22,8 +22,8 @@ limitations under the License.
 package v1beta1
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
-func (in GroupResource) OpenAPIModelName() string {
-	return "io.k8s.api.storagemigration.v1beta1.GroupResource"
+func (in GroupVersionResource) OpenAPIModelName() string {
+	return "io.k8s.api.storagemigration.v1beta1.GroupVersionResource"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.

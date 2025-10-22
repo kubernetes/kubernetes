@@ -15752,13 +15752,16 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: resourceVersion
       type:
         scalar: string
-- name: io.k8s.api.storagemigration.v1beta1.GroupResource
+- name: io.k8s.api.storagemigration.v1beta1.GroupVersionResource
   map:
     fields:
     - name: group
       type:
         scalar: string
     - name: resource
+      type:
+        scalar: string
+    - name: version
       type:
         scalar: string
 - name: io.k8s.api.storagemigration.v1beta1.StorageVersionMigration
@@ -15787,7 +15790,7 @@ var schemaYAML = typed.YAMLObject(`types:
     fields:
     - name: resource
       type:
-        namedType: io.k8s.api.storagemigration.v1beta1.GroupResource
+        namedType: io.k8s.api.storagemigration.v1beta1.GroupVersionResource
       default: {}
 - name: io.k8s.api.storagemigration.v1beta1.StorageVersionMigrationStatus
   map:
