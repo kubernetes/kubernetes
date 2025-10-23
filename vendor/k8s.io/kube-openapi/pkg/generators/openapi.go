@@ -1021,9 +1021,14 @@ func (g openAPITypeWriter) generateProperty(m *types.Member, parent *types.Type)
 		return err
 	}
 	g.Do("SchemaProps: spec.SchemaProps{\n", nil)
+	t := resolveAliasAndPtrType(m.Type)
 	var extraComments []string
 	if enumType, isEnum := g.enumContext.EnumType(m.Type); isEnum {
 		extraComments = enumType.DescriptionLines()
+	} else if t.Kind == types.Slice {
+		if enumType, isEnum := g.enumContext.EnumType(m.Type); isEnum {
+			extraComments = enumType.DescriptionLines()
+		}
 	}
 	g.generateDescription(append(m.CommentLines, extraComments...))
 	jsonTags := getJsonTags(m)
@@ -1040,7 +1045,6 @@ func (g openAPITypeWriter) generateProperty(m *types.Member, parent *types.Type)
 	if err != nil {
 		return err
 	}
-	t := resolveAliasAndPtrType(m.Type)
 	// If we can get a openAPI type and format for this type, we consider it to be simple property
 	typeString, format := openapi.OpenAPITypeFormat(t.String())
 	if typeString != "" {
