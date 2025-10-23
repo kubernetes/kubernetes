@@ -7,7 +7,7 @@ linters:
     - "conditions" # Ensure conditions have the correct json tags and markers.
     - "conflictingmarkers" # Detect mutually exclusive markers on the same field.
     - "integers" # Ensure only int32 and int64 are used for integers.
-    # - "jsontags" # Ensure every field has a json tag.
+    - "jsontags" # Ensure every field has a json tag.
     # - "maxlength" # Ensure all strings and arrays have maximum lengths/maximum items. ONLY for CRDs until declarative markers exist in core types.
     # - "nobools" # Bools do not evolve over time, should use enums instead.
     # - "nofloats" # Ensure floats are not used.
