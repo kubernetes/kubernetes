@@ -230,6 +230,10 @@ linters:
       # OptionalOrRequired - Existing fields that are marked as both optional and required (based on standard optional vs kubebuilder:validation:Required) and should not be fixed.
       - text: "field (PortStatus|IngressPortStatus)\\.Error must not be marked as both optional and required"
         path: "staging/src/k8s.io/api/(core/v1|extensions/v1beta1|networking/(v1|v1beta1))"
+      
+      # jsontags: 'Port' must be capitalized for backward compatibility
+      - text: 'jsontags: field Port json tag does not match pattern "[^"]+": Port$'
+        path: "staging/src/k8s.io/api/core/v1/types.go"
 
       - linters:
         - forbidigo
@@ -405,7 +409,7 @@ linters:
               - "conditions" # Ensure conditions have the correct json tags and markers.
               - "conflictingmarkers" # Detect mutually exclusive markers on the same field.
               - "integers" # Ensure only int32 and int64 are used for integers.
-              # - "jsontags" # Ensure every field has a json tag.
+              - "jsontags" # Ensure every field has a json tag.
               # - "maxlength" # Ensure all strings and arrays have maximum lengths/maximum items. ONLY for CRDs until declarative markers exist in core types.
               # - "nobools" # Bools do not evolve over time, should use enums instead.
               # - "nofloats" # Ensure floats are not used.
