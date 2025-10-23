@@ -176,7 +176,21 @@ func Validate_AllocationResult(ctx context.Context, op operation.Operation, fldP
 // to declarative validation rules in the API schema.
 func Validate_Device(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta2.Device) (errs field.ErrorList) {
 	// field resourcev1beta2.Device.Name has no validation
-	// field resourcev1beta2.Device.Attributes has no validation
+
+	// field resourcev1beta2.Device.Attributes
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj map[resourcev1beta2.QualifiedName]resourcev1beta2.DeviceAttribute) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// iterate the map and call the value type's validation function
+			errs = append(errs, validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, Validate_DeviceAttribute)...)
+			return
+		}(fldPath.Child("attributes"), obj.Attributes, safe.Field(oldObj, func(oldObj *resourcev1beta2.Device) map[resourcev1beta2.QualifiedName]resourcev1beta2.DeviceAttribute {
+			return oldObj.Attributes
+		}))...)
+
 	// field resourcev1beta2.Device.Capacity has no validation
 	// field resourcev1beta2.Device.ConsumesCounters has no validation
 	// field resourcev1beta2.Device.NodeName has no validation
@@ -348,6 +362,108 @@ func Validate_DeviceAllocationResult(ctx context.Context, op operation.Operation
 		}(fldPath.Child("config"), obj.Config, safe.Field(oldObj, func(oldObj *resourcev1beta2.DeviceAllocationResult) []resourcev1beta2.DeviceAllocationConfiguration {
 			return oldObj.Config
 		}))...)
+
+	return errs
+}
+
+var unionMembershipFor_k8s_io_api_resource_v1beta2_DeviceAttribute_ = validate.NewUnionMembership(validate.NewUnionMember("int"), validate.NewUnionMember("bool"), validate.NewUnionMember("string"), validate.NewUnionMember("version"))
+
+// Validate_DeviceAttribute validates an instance of DeviceAttribute according
+// to declarative validation rules in the API schema.
+func Validate_DeviceAttribute(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta2.DeviceAttribute) (errs field.ErrorList) {
+	errs = append(errs, validate.Union(ctx, op, fldPath, obj, oldObj, unionMembershipFor_k8s_io_api_resource_v1beta2_DeviceAttribute_, func(obj *resourcev1beta2.DeviceAttribute) bool {
+		if obj == nil {
+			return false
+		}
+		return obj.IntValue != nil
+	}, func(obj *resourcev1beta2.DeviceAttribute) bool {
+		if obj == nil {
+			return false
+		}
+		return obj.BoolValue != nil
+	}, func(obj *resourcev1beta2.DeviceAttribute) bool {
+		if obj == nil {
+			return false
+		}
+		return obj.StringValue != nil
+	}, func(obj *resourcev1beta2.DeviceAttribute) bool {
+		if obj == nil {
+			return false
+		}
+		return obj.VersionValue != nil
+	})...)
+
+	// field resourcev1beta2.DeviceAttribute.IntValue
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *int64) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("int"), obj.IntValue, safe.Field(oldObj, func(oldObj *resourcev1beta2.DeviceAttribute) *int64 { return oldObj.IntValue }))...)
+
+	// field resourcev1beta2.DeviceAttribute.BoolValue
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("bool"), obj.BoolValue, safe.Field(oldObj, func(oldObj *resourcev1beta2.DeviceAttribute) *bool { return oldObj.BoolValue }))...)
+
+	// field resourcev1beta2.DeviceAttribute.StringValue
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("string"), obj.StringValue, safe.Field(oldObj, func(oldObj *resourcev1beta2.DeviceAttribute) *string { return oldObj.StringValue }))...)
+
+	// field resourcev1beta2.DeviceAttribute.VersionValue
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("version"), obj.VersionValue, safe.Field(oldObj, func(oldObj *resourcev1beta2.DeviceAttribute) *string { return oldObj.VersionValue }))...)
 
 	return errs
 }

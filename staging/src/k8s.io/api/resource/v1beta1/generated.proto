@@ -521,26 +521,30 @@ message DeviceAttribute {
   // IntValue is a number.
   //
   // +optional
-  // +oneOf=ValueType
+  // +k8s:optional
+  // +k8s:unionMember
   optional int64 int = 2;
 
   // BoolValue is a true/false value.
   //
   // +optional
-  // +oneOf=ValueType
+  // +k8s:optional
+  // +k8s:unionMember
   optional bool bool = 3;
 
   // StringValue is a string. Must not be longer than 64 characters.
   //
   // +optional
-  // +oneOf=ValueType
+  // +k8s:optional
+  // +k8s:unionMember
   optional string string = 4;
 
   // VersionValue is a semantic version according to semver.org spec 2.0.0.
   // Must not be longer than 64 characters.
   //
   // +optional
-  // +oneOf=ValueType
+  // +k8s:optional
+  // +k8s:unionMember
   optional string version = 5;
 }
 

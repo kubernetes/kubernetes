@@ -910,11 +910,11 @@ func validateDeviceAttribute(attribute resource.DeviceAttribute, fldPath *field.
 
 	switch numFields {
 	case 0:
-		allErrs = append(allErrs, field.Required(fldPath, "exactly one value must be specified"))
+		allErrs = append(allErrs, field.Invalid(fldPath, "", "exactly one value must be specified").MarkCoveredByDeclarative())
 	case 1:
 		// Okay.
 	default:
-		allErrs = append(allErrs, field.Invalid(fldPath, attribute, "exactly one value must be specified"))
+		allErrs = append(allErrs, field.Invalid(fldPath, attribute, "exactly one value must be specified").MarkCoveredByDeclarative())
 	}
 	return allErrs
 }
