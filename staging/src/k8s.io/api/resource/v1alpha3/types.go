@@ -234,7 +234,12 @@ type DeviceTaintSelector struct {
 	// to class.metadata.name.
 	//
 	// +optional
-	DeviceClassName *string `json:"deviceClassName,omitempty" protobuf:"bytes,1,opt,name=deviceClassName"`
+	//
+	// Tombstoned since 1.35 because it turned out that supporting this in all cases
+	// would depend on copying the device attributes into the ResourceClaim allocation
+	// result. Without that the eviction controller cannot evaluate these CEL expressions.
+	//
+	// DeviceClassName *string `json:"deviceClassName,omitempty" protobuf:"bytes,1,opt,name=deviceClassName"`
 
 	// If driver is set, only devices from that driver are selected.
 	// This fields corresponds to slice.spec.driver.
@@ -269,7 +274,12 @@ type DeviceTaintSelector struct {
 	//
 	// +optional
 	// +listType=atomic
-	Selectors []DeviceSelector `json:"selectors,omitempty" protobuf:"bytes,5,rep,name=selectors"`
+	//
+	// Tombstoned since 1.35 because it turned out that supporting this in all cases
+	// would depend on copying the device attributes into the ResourceClaim allocation
+	// result. Without that the eviction controller cannot evaluate these CEL expressions.
+	//
+	// Selectors []DeviceSelector `json:"selectors,omitempty" protobuf:"bytes,5,rep,name=selectors"`
 }
 
 // DeviceTaintRuleStatus provides information about an on-going pod eviction.

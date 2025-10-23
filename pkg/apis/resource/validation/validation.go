@@ -1395,9 +1395,6 @@ func validateDeviceTaintSelector(filter, oldFilter *resource.DeviceTaintSelector
 	if filter == nil {
 		return allErrs
 	}
-	if filter.DeviceClassName != nil {
-		allErrs = append(allErrs, validateDeviceClassName(*filter.DeviceClassName, fldPath.Child("deviceClassName"))...)
-	}
 	if filter.Driver != nil {
 		allErrs = append(allErrs, validateDriverName(*filter.Driver, fldPath.Child("driver"))...)
 	}
@@ -1407,19 +1404,6 @@ func validateDeviceTaintSelector(filter, oldFilter *resource.DeviceTaintSelector
 	if filter.Device != nil {
 		allErrs = append(allErrs, validateDeviceName(*filter.Device, fldPath.Child("device"))...)
 	}
-
-	// If the selectors are exactly as before, we treat the CEL expressions as "stored".
-	// Any change, including merely reordering selectors, triggers validation as new
-	// expressions.
-	stored := false
-	if oldFilter != nil {
-		stored = apiequality.Semantic.DeepEqual(filter.Selectors, oldFilter.Selectors)
-	}
-	allErrs = append(allErrs, validateSlice(filter.Selectors, resource.DeviceSelectorsMaxSize,
-		func(selector resource.DeviceSelector, fldPath *field.Path) field.ErrorList {
-			return validateSelector(selector, fldPath, stored)
-		},
-		fldPath.Child("selectors"))...)
 
 	return allErrs
 }

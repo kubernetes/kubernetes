@@ -18,8 +18,8 @@ package devicetainteviction
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"iter"
 	"math"
 	"slices"
 	"strings"
@@ -29,14 +29,15 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
+	resourcealpha "k8s.io/api/resource/v1alpha3"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	resourceinformers "k8s.io/client-go/informers/resource/v1"
 	resourcealphainformers "k8s.io/client-go/informers/resource/v1alpha3"
@@ -44,15 +45,14 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	resourcealphalisters "k8s.io/client-go/listers/resource/v1alpha3"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
-	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/klog/v2"
 	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/devicetainteviction/metrics"
 	"k8s.io/kubernetes/pkg/controller/tainteviction"
-	"k8s.io/kubernetes/pkg/features"
 	utilpod "k8s.io/kubernetes/pkg/util/pod"
 )
 
@@ -92,6 +92,7 @@ type Controller struct {
 	sliceInformer resourceinformers.ResourceSliceInformer
 	taintInformer resourcealphainformers.DeviceTaintRuleInformer
 	classInformer resourceinformers.DeviceClassInformer
+	ruleLister    resourcealphalisters.DeviceTaintRuleLister
 	haveSynced    []cache.InformerSynced
 	metrics       metrics.Metrics
 
@@ -117,7 +118,8 @@ type poolID struct {
 }
 
 type pool struct {
-	slices        sets.Set[*resourceapi.ResourceSlice]
+	// slices maps the global name to the current instance under that name.
+	slices        map[string]*resourceapi.ResourceSlice
 	maxGeneration int64
 }
 
@@ -127,10 +129,10 @@ func (p *pool) addSlice(slice *resourceapi.ResourceSlice) {
 		return
 	}
 	if p.slices == nil {
-		p.slices = sets.New[*resourceapi.ResourceSlice]()
+		p.slices = make(map[string]*resourceapi.ResourceSlice)
 		p.maxGeneration = math.MinInt64
 	}
-	p.slices.Insert(slice)
+	p.slices[slice.Name] = slice
 
 	// Adding a slice can only increase the generation.
 	if slice.Spec.Pool.Generation > p.maxGeneration {
@@ -143,13 +145,13 @@ func (p *pool) removeSlice(slice *resourceapi.ResourceSlice) {
 	if slice == nil {
 		return
 	}
-	p.slices.Delete(slice)
+	delete(p.slices, slice.Name)
 
 	// Removing a slice might have decreased the generation to
 	// that of some other slice.
 	if slice.Spec.Pool.Generation == p.maxGeneration {
 		maxGeneration := int64(math.MinInt64)
-		for slice := range p.slices {
+		for _, slice := range p.slices {
 			if slice.Spec.Pool.Generation > maxGeneration {
 				maxGeneration = slice.Spec.Pool.Generation
 			}
@@ -162,7 +164,7 @@ func (p *pool) removeSlice(slice *resourceapi.ResourceSlice) {
 // The result is sorted by device name.
 func (p pool) getTaintedDevices() []taintedDevice {
 	var buffer []taintedDevice
-	for slice := range p.slices {
+	for _, slice := range p.slices {
 		if slice.Spec.Pool.Generation != p.maxGeneration {
 			continue
 		}
@@ -185,7 +187,7 @@ func (p pool) getTaintedDevices() []taintedDevice {
 
 // getDevice looks up one device by name. Out-dated slices are ignored.
 func (p pool) getDevice(deviceName string) *resourceapi.Device {
-	for slice := range p.slices {
+	for _, slice := range p.slices {
 		if slice.Spec.Pool.Generation != p.maxGeneration {
 			continue
 		}
@@ -300,6 +302,7 @@ func New(c clientset.Interface, podInformer coreinformers.PodInformer, claimInfo
 		sliceInformer:   sliceInformer,
 		taintInformer:   taintInformer,
 		classInformer:   classInformer,
+		ruleLister:      taintInformer.Lister(),
 		allocatedClaims: make(map[types.NamespacedName]allocatedClaim),
 		pools:           make(map[poolID]pool),
 		// Instantiate all informers now to ensure that they get started.
@@ -420,7 +423,7 @@ func (tc *Controller) Run(ctx context.Context) error {
 		AddFunc: func(obj any) {
 			pod, ok := obj.(*v1.Pod)
 			if !ok {
-				logger.Error(nil, "Expected ResourcePod", "actual", fmt.Sprintf("%T", obj))
+				logger.Error(nil, "Expected Pod", "actual", fmt.Sprintf("%T", obj))
 				return
 			}
 			mutex.Lock()
@@ -463,31 +466,54 @@ func (tc *Controller) Run(ctx context.Context) error {
 	}()
 	tc.haveSynced = append(tc.haveSynced, podHandler.HasSynced)
 
-	opts := resourceslicetracker.Options{
-		EnableDeviceTaints:       true,
-		EnableConsumableCapacity: utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity),
-		SliceInformer:            tc.sliceInformer,
-		TaintInformer:            tc.taintInformer,
-		ClassInformer:            tc.classInformer,
-		KubeClient:               tc.client,
-	}
-	sliceTracker, err := resourceslicetracker.StartTracker(ctx, opts)
+	ruleHandler, err := tc.taintInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj any) {
+			rule, ok := obj.(*resourcealpha.DeviceTaintRule)
+			if !ok {
+				logger.Error(nil, "Expected DeviceTaintRule", "actual", fmt.Sprintf("%T", obj))
+				return
+			}
+			mutex.Lock()
+			defer mutex.Unlock()
+			tc.handleRuleChange(nil, rule)
+		},
+		UpdateFunc: func(oldObj, newObj any) {
+			oldRule, ok := oldObj.(*resourcealpha.DeviceTaintRule)
+			if !ok {
+				logger.Error(nil, "Expected DeviceTaintRule", "actual", fmt.Sprintf("%T", oldObj))
+				return
+			}
+			newRule, ok := newObj.(*resourcealpha.DeviceTaintRule)
+			if !ok {
+				logger.Error(nil, "Expected DeviceTaintRule", "actual", fmt.Sprintf("%T", newObj))
+			}
+			mutex.Lock()
+			defer mutex.Unlock()
+			tc.handleRuleChange(oldRule, newRule)
+		},
+		DeleteFunc: func(obj any) {
+			if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
+				obj = tombstone.Obj
+			}
+			rule, ok := obj.(*resourcealpha.DeviceTaintRule)
+			if !ok {
+				logger.Error(nil, "Expected DeviceTaintRule", "actual", fmt.Sprintf("%T", obj))
+				return
+			}
+			mutex.Lock()
+			defer mutex.Unlock()
+			tc.handleRuleChange(rule, nil)
+		},
+	})
 	if err != nil {
-		return fmt.Errorf("initialize ResourceSlice tracker: %w", err)
+		return fmt.Errorf("adding DeviceTaintRule event handler: %w", err)
 	}
-	tc.haveSynced = append(tc.haveSynced, sliceTracker.HasSynced)
-	defer sliceTracker.Stop()
+	defer func() {
+		_ = tc.taintInformer.Informer().RemoveEventHandler(ruleHandler)
+	}()
+	tc.haveSynced = append(tc.haveSynced, ruleHandler.HasSynced)
 
-	// Wait for tracker to sync before we react to events.
-	// This doesn't have to be perfect, it merely avoids unnecessary
-	// work which might be done as events get emitted for intermediate
-	// state.
-	if !cache.WaitForNamedCacheSyncWithContext(ctx, tc.haveSynced...) {
-		return errors.New("wait for cache sync timed out")
-	}
-	logger.V(1).Info("Underlying informers have synced")
-
-	_, err = sliceTracker.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	sliceHandler, err := tc.sliceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj any) {
 			slice, ok := obj.(*resourceapi.ResourceSlice)
 			if !ok {
@@ -525,11 +551,18 @@ func (tc *Controller) Run(ctx context.Context) error {
 		},
 	})
 	if err != nil {
-		return fmt.Errorf("add slice event handler: %w", err)
+		return fmt.Errorf("adding slice event handler: %w", err)
 	}
+	defer func() {
+		_ = tc.sliceInformer.Informer().RemoveEventHandler(sliceHandler)
+	}()
+	tc.haveSynced = append(tc.haveSynced, sliceHandler.HasSynced)
 
-	// sliceTracker.AddEventHandler blocked while delivering events for all known
-	// ResourceSlices. Therefore our own state is up-to-date once we get here.
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, tc.haveSynced...) {
+		// If we get here, the caller canceled the context. This is not an error.
+		return nil
+	}
+	logger.V(1).Info("Underlying informers have synced")
 	tc.hasSynced.Store(1)
 
 	<-ctx.Done()
@@ -627,23 +660,15 @@ func (tc *Controller) evictionTime(claim *resourceapi.ResourceClaim) *metav1.Tim
 	for _, allocatedDevice := range allocation.Devices.Results {
 		id := poolID{driverName: allocatedDevice.Driver, poolName: allocatedDevice.Pool}
 		device := tc.pools[id].getDevice(allocatedDevice.Device)
-		if device == nil {
-			// Unknown device? Can't be tainted...
-			continue
-		}
 
 	nextTaint:
-		for _, taint := range device.Taints {
-			if taint.Effect != resourceapi.DeviceTaintEffectNoExecute {
-				continue
-			}
-
+		for taint := range tc.allEvictingDeviceTaints(allocatedDevice, device) {
 			newEvictionTime := taint.TimeAdded
 			haveToleration := false
 			tolerationSeconds := int64(math.MaxInt64)
 			for _, toleration := range allocatedDevice.Tolerations {
 				if toleration.Effect == resourceapi.DeviceTaintEffectNoExecute &&
-					resourceclaim.ToleratesTaint(toleration, taint) {
+					resourceclaim.ToleratesTaint(toleration, *taint) {
 					if toleration.TolerationSeconds == nil {
 						// Tolerate forever -> ignore taint.
 						continue nextTaint
@@ -675,6 +700,87 @@ func (tc *Controller) evictionTime(claim *resourceapi.ResourceClaim) *metav1.Tim
 	}
 
 	return evictionTime
+}
+
+// allEvictingDeviceTaints allows iterating over all DeviceTaintRules with NoExecute effect which affect the allocated device.
+// A taint may come from either the ResourceSlice informer (not the tracker!) or from a DeviceTaintRule, but not both.
+func (tc *Controller) allEvictingDeviceTaints(allocatedDevice resourceapi.DeviceRequestAllocationResult, device *resourceapi.Device) iter.Seq[*resourceapi.DeviceTaint] {
+	rules, err := tc.ruleLister.List(labels.Everything())
+	// TODO: instead of listing and handling an error, keep track of rules in the informer event handler?
+	if err != nil {
+		panic(err)
+	}
+
+	return func(yield func(*resourceapi.DeviceTaint) bool) {
+		if device != nil {
+			for i := range device.Taints {
+				taint := &device.Taints[i]
+				if taint.Effect != resourceapi.DeviceTaintEffectNoExecute {
+					continue
+				}
+				if !yield(taint) {
+					return
+				}
+			}
+		}
+
+		for _, rule := range rules {
+			if rule.Spec.Taint.Effect != resourcealpha.DeviceTaintEffectNoExecute {
+				continue
+			}
+			selector := rule.Spec.DeviceSelector
+			if selector == nil {
+				continue
+			}
+			if selector.Driver != nil && *selector.Driver != allocatedDevice.Driver ||
+				selector.Pool != nil && *selector.Pool != allocatedDevice.Pool ||
+				selector.Device != nil && *selector.Device != allocatedDevice.Device {
+				continue
+			}
+			if !yield(
+				// TODO when GA: directly point to rule.Spec.Taint.
+				&resourceapi.DeviceTaint{
+					Key:       rule.Spec.Taint.Key,
+					Value:     rule.Spec.Taint.Value,
+					Effect:    resourceapi.DeviceTaintEffect(rule.Spec.Taint.Effect),
+					TimeAdded: rule.Spec.Taint.TimeAdded,
+				},
+			) {
+				return
+			}
+		}
+	}
+}
+
+func (tc *Controller) handleRuleChange(oldRule, newRule *resourcealpha.DeviceTaintRule) {
+	rule := newRule
+	if rule == nil {
+		rule = oldRule
+	}
+	name := newNamespacedName(rule)
+	if tc.eventLogger != nil {
+		// This is intentionally very verbose for debugging.
+		tc.eventLogger.Info("DeviceTaintRule changed", "ruleObject", name, "oldRule", klog.Format(oldRule), "newRule", klog.Format(newRule), "diff", diff.Diff(oldRule, newRule))
+	}
+
+	if oldRule != nil &&
+		newRule != nil &&
+		oldRule.UID == newRule.UID &&
+		apiequality.Semantic.DeepEqual(&oldRule.Spec, &newRule.Spec) {
+		return
+	}
+
+	// Rule spec changes should be rare. Simply do a brute-force re-evaluation of all allocated claims.
+	for name, oldAllocatedClaim := range tc.allocatedClaims {
+		newAllocatedClaim := allocatedClaim{
+			ResourceClaim: oldAllocatedClaim.ResourceClaim,
+		}
+		newAllocatedClaim.evictionTime = tc.evictionTime(oldAllocatedClaim.ResourceClaim)
+		tc.allocatedClaims[name] = newAllocatedClaim
+		if !newAllocatedClaim.evictionTime.Equal(oldAllocatedClaim.evictionTime) {
+			tc.handlePods(newAllocatedClaim.ResourceClaim)
+		}
+	}
 }
 
 func (tc *Controller) handleSliceChange(oldSlice, newSlice *resourceapi.ResourceSlice) {

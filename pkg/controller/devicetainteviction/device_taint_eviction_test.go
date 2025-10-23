@@ -39,11 +39,11 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
+	resourcealpha "k8s.io/api/resource/v1alpha3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
@@ -148,14 +148,14 @@ func (s state) slicesAsMap() map[poolID]pool {
 		id := poolID{driverName: slice.Spec.Driver, poolName: slice.Spec.Pool.Name}
 		pool := pools[id]
 		if pool.slices == nil {
-			pool.slices = sets.New[*resourceapi.ResourceSlice]()
+			pool.slices = make(map[string]*resourceapi.ResourceSlice)
 		}
-		pool.slices.Insert(slice)
+		pool.slices[slice.Name] = slice
 		pools[id] = pool
 	}
 	for id, pool := range pools {
 		maxGeneration := int64(math.MinInt64)
-		for slice := range pool.slices {
+		for _, slice := range pool.slices {
 			if slice.Spec.Pool.Generation > maxGeneration {
 				maxGeneration = slice.Spec.Pool.Generation
 			}
@@ -289,6 +289,22 @@ var (
 		slice.Spec.Pool.Generation++
 		return slice
 	}()
+	ruleEvict = &resourcealpha.DeviceTaintRule{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "evict",
+		},
+
+		Spec: resourcealpha.DeviceTaintRuleSpec{
+			DeviceSelector: &resourcealpha.DeviceTaintSelector{
+				Driver: ptr.To(driver),
+			},
+			Taint: resourcealpha.DeviceTaint{
+				Key:       "unhealthy",
+				Effect:    resourcealpha.DeviceTaintEffectNoExecute,
+				TimeAdded: &taintTime,
+			},
+		},
+	}
 	claim = st.MakeResourceClaim().
 		Name(claimName).
 		Namespace(namespace).
@@ -455,7 +471,7 @@ func TestHandlers(t *testing.T) {
 				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim}},
 			},
 		},
-		"tainted-claim": {
+		"tainted-claim-through-resourceslice": {
 			events: []any{
 				add(sliceTainted),
 				add(slice2),
@@ -463,6 +479,15 @@ func TestHandlers(t *testing.T) {
 			},
 			finalState: state{
 				slices:          []*resourceapi.ResourceSlice{sliceTainted, slice2},
+				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime}},
+			},
+		},
+		"tainted-claim-through-rule": {
+			events: []any{
+				add(ruleEvict),
+				add(inUseClaim),
+			},
+			finalState: state{
 				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime}},
 			},
 		},
@@ -1178,14 +1203,13 @@ func testHandlers(tContext *testContext, tc testCase) {
 }
 
 func applyEventPair(tContext *testContext, event any) {
-	store := tContext.informerFactory.Core().V1().Pods().Informer().GetStore()
-
 	switch pair := event.(type) {
 	case [2]*resourceapi.ResourceSlice:
 		tContext.handleSliceChange(pair[0], pair[1])
 	case [2]*resourceapi.ResourceClaim:
 		tContext.handleClaimChange(pair[0], pair[1])
 	case [2]*v1.Pod:
+		store := tContext.informerFactory.Core().V1().Pods().Informer().GetStore()
 		switch {
 		case pair[0] != nil && pair[1] != nil:
 			tContext.ExpectNoError(store.Update(pair[1]))
@@ -1195,6 +1219,17 @@ func applyEventPair(tContext *testContext, event any) {
 			tContext.ExpectNoError(store.Add(pair[1]))
 		}
 		tContext.handlePodChange(pair[0], pair[1])
+	case [2]*resourcealpha.DeviceTaintRule:
+		store := tContext.informerFactory.Resource().V1alpha3().DeviceTaintRules().Informer().GetStore()
+		switch {
+		case pair[0] != nil && pair[1] != nil:
+			tContext.ExpectNoError(store.Update(pair[1]))
+		case pair[0] != nil:
+			tContext.ExpectNoError(store.Delete(pair[0]))
+		default:
+			tContext.ExpectNoError(store.Add(pair[1]))
+		}
+		tContext.handleRuleChange(pair[0], pair[1])
 	default:
 		tContext.Fatalf("unexpected event type %T", event)
 	}

@@ -1918,13 +1918,6 @@ type DeviceTaintRuleSpec struct {
 // The empty selector matches all devices. Without a selector, no devices
 // are matched.
 type DeviceTaintSelector struct {
-	// If DeviceClassName is set, the selectors defined there must be
-	// satisfied by a device to be selected. This field corresponds
-	// to class.metadata.name.
-	//
-	// +optional
-	DeviceClassName *string
-
 	// If driver is set, only devices from that driver are selected.
 	// This fields corresponds to slice.spec.driver.
 	//
@@ -1951,14 +1944,6 @@ type DeviceTaintSelector struct {
 	//
 	// +optional
 	Device *string
-
-	// Selectors contains the same selection criteria as a ResourceClaim.
-	// Currently, CEL expressions are supported. All of these selectors
-	// must be satisfied.
-	//
-	// +optional
-	// +listType=atomic
-	Selectors []DeviceSelector
 }
 
 // DeviceTaintRuleStatus provides information about an on-going pod eviction.
