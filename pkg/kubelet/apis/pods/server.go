@@ -19,6 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/klog/v2"
 	podsv1alpha1 "k8s.io/kubelet/pkg/apis/pods/v1alpha1"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
 const (
@@ -64,6 +65,7 @@ func (b *broadcaster) Broadcast(event PodWatchEvent) {
 		case client <- event:
 		default:
 			klog.Warningf("Watch client channel is full, dropping event.")
+			metrics.PodWatchEventsDroppedTotal.Inc()
 		}
 	}
 }
@@ -168,8 +170,7 @@ func ApplyFieldMask(mask *fieldmaskpb.FieldMask, src, dest interface{}) error {
 	for _, path := range mask.GetPaths() {
 		parts := strings.Split(path, ".")
 		if err := applySinglePath(srcVal, destVal, parts); err != nil {
-			// Note: This warning includes the full path, which is more helpful for debugging.
-			klog.Warningf("Failed to apply field mask path %q: %v", path, err)
+			return fmt.Errorf("failed to apply field mask path %q: %w", path, err)
 		}
 	}
 	return nil
@@ -234,7 +235,7 @@ func applySinglePath(src, dest reflect.Value, path []string) error {
 		}
 
 		if !srcField.IsValid() {
-			return nil // Field doesn't exist in source, so we skip it.
+			return fmt.Errorf("field %q not found in source struct", part)
 		}
 		if !destField.IsValid() {
 			return fmt.Errorf("field %q not found in destination struct", fieldName)
@@ -300,16 +301,16 @@ func applySinglePath(src, dest reflect.Value, path []string) error {
 }
 
 // applyFieldMaskToPod is a wrapper to call applyFieldMask for a k8s Pod
-func applyFieldMaskToPod(pod *v1.Pod, fieldmask *fieldmaskpb.FieldMask) *v1.Pod {
+func applyFieldMaskToPod(pod *v1.Pod, fieldmask *fieldmaskpb.FieldMask) (*v1.Pod, error) {
 	if fieldmask == nil || len(fieldmask.Paths) == 0 {
-		return pod
+		return pod, nil
 	}
 	maskedPod := &v1.Pod{}
 	err := ApplyFieldMask(fieldmask, pod, maskedPod)
 	if err != nil {
-		klog.Warningf("Failed to apply field mask: %v", err)
+		return nil, fmt.Errorf("failed to apply field mask: %w", err)
 	}
-	return maskedPod
+	return maskedPod, nil
 }
 
 // ListPods returns a list of pods.
@@ -324,9 +325,17 @@ func (s *PodsServer) ListPods(ctx context.Context, req *podsv1alpha1.ListPodsReq
 		return nil, status.Errorf(codes.InvalidArgument, "invalid field mask: %v", err)
 	}
 
-	protoPods := make([]*v1.Pod, len(podsToReturn))
+	protoPods := make([][]byte, len(podsToReturn))
 	for i, p := range podsToReturn {
-		protoPods[i] = applyFieldMaskToPod(p, fieldMask)
+		maskedPod, err := applyFieldMaskToPod(p, fieldMask)
+		if err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "failed to apply field mask: %v", err)
+		}
+		podBytes, err := maskedPod.Marshal()
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to marshal pod: %v", err)
+		}
+		protoPods[i] = podBytes
 	}
 
 	return &podsv1alpha1.ListPodsResponse{Pods: protoPods}, nil
@@ -347,9 +356,16 @@ func (s *PodsServer) GetPod(ctx context.Context, req *podsv1alpha1.GetPodRequest
 		return nil, status.Errorf(codes.InvalidArgument, "invalid field mask: %v", err)
 	}
 
-	maskedPod := applyFieldMaskToPod(pod, fieldMask)
+	maskedPod, err := applyFieldMaskToPod(pod, fieldMask)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "failed to apply field mask: %v", err)
+	}
+	podBytes, err := maskedPod.Marshal()
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to marshal pod: %v", err)
+	}
 
-	return &podsv1alpha1.GetPodResponse{Pod: maskedPod}, nil
+	return &podsv1alpha1.GetPodResponse{Pod: podBytes}, nil
 }
 
 // WatchPods streams pod events.
@@ -372,13 +388,27 @@ func (s *PodsServer) WatchPods(req *podsv1alpha1.WatchPodsRequest, stream podsv1
 		return status.Errorf(codes.InvalidArgument, "invalid field mask: %v", err)
 	}
 
+	// Validate the field mask before starting the watch.
+	if _, err := applyFieldMaskToPod(&v1.Pod{}, fieldMask); err != nil {
+		return status.Errorf(codes.InvalidArgument, "invalid field mask: %v", err)
+	}
+
 	// Send initial ADDED events
 	initialPods := s.List()
 	for _, p := range initialPods {
-		maskedPod := applyFieldMaskToPod(p, fieldMask)
+		maskedPod, err := applyFieldMaskToPod(p, fieldMask)
+		if err != nil {
+			klog.Errorf("Error applying field mask to initial watch event pod: %v", err)
+			continue
+		}
+		podBytes, err := maskedPod.Marshal()
+		if err != nil {
+			klog.Errorf("Error marshalling initial watch event pod: %v", err)
+			continue
+		}
 		if err := stream.Send(&podsv1alpha1.WatchPodsEvent{
 			Type: podsv1alpha1.EventType_ADDED,
-			Pod:  maskedPod,
+			Pod:  podBytes,
 		}); err != nil {
 			klog.Errorf("Error sending initial watch event: %v", err)
 			return err
@@ -391,10 +421,19 @@ func (s *PodsServer) WatchPods(req *podsv1alpha1.WatchPodsRequest, stream podsv1
 			klog.Infof("Watch context cancelled for client %s.", clientAddr)
 			return stream.Context().Err()
 		case event := <-clientChannel:
-			maskedPod := applyFieldMaskToPod(event.Pod, fieldMask)
+			maskedPod, err := applyFieldMaskToPod(event.Pod, fieldMask)
+			if err != nil {
+				klog.Errorf("Error applying field mask to watch event pod: %v", err)
+				continue
+			}
+			podBytes, err := maskedPod.Marshal()
+			if err != nil {
+				klog.Errorf("Error marshalling watch event pod: %v", err)
+				continue
+			}
 			if err := stream.Send(&podsv1alpha1.WatchPodsEvent{
 				Type: convertWatchEventType(event.Type),
-				Pod:  maskedPod,
+				Pod:  podBytes,
 			}); err != nil {
 				klog.Errorf("Error sending watch event to client %s: %v", clientAddr, err)
 				return err

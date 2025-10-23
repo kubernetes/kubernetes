@@ -2,6 +2,7 @@ package pods_test
 
 import (
 	"context"
+	"math/rand"
 	"reflect"
 	"sort"
 	"strings"
@@ -9,13 +10,21 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metafuzzer "k8s.io/apimachinery/pkg/apis/meta/fuzzer"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/component-base/metrics/testutil"
 	podsv1alpha1 "k8s.io/kubelet/pkg/apis/pods/v1alpha1"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	corefuzzer "k8s.io/kubernetes/pkg/apis/core/fuzzer"
 	podsapi "k8s.io/kubernetes/pkg/kubelet/apis/pods"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
 func TestStartEventLoop(t *testing.T) {
@@ -57,8 +66,14 @@ func TestListPods(t *testing.T) {
 	resp, err := server.ListPods(context.Background(), &podsv1alpha1.ListPodsRequest{})
 	assert.NoError(t, err)
 	assert.Len(t, resp.Pods, 2)
-	assert.Equal(t, "pod1", resp.Pods[0].Name)
-	assert.Equal(t, "pod2", resp.Pods[1].Name)
+	pod1Out := &v1.Pod{}
+	err = pod1Out.Unmarshal(resp.Pods[0])
+	assert.NoError(t, err)
+	pod2Out := &v1.Pod{}
+	err = pod2Out.Unmarshal(resp.Pods[1])
+	assert.NoError(t, err)
+	assert.Equal(t, "pod1", pod1Out.Name)
+	assert.Equal(t, "pod2", pod2Out.Name)
 }
 
 func TestGetPod(t *testing.T) {
@@ -70,8 +85,11 @@ func TestGetPod(t *testing.T) {
 	server.OnPodStatusUpdated(pod1, status1)
 	resp, err := server.GetPod(context.Background(), &podsv1alpha1.GetPodRequest{PodUID: "pod1-uid"})
 	assert.NoError(t, err)
-	assert.Equal(t, "pod1", resp.Pod.Name)
-	assert.Equal(t, v1.PodRunning, resp.Pod.Status.Phase)
+	podOut := &v1.Pod{}
+	err = podOut.Unmarshal(resp.Pod)
+	assert.NoError(t, err)
+	assert.Equal(t, "pod1", podOut.Name)
+	assert.Equal(t, v1.PodRunning, podOut.Status.Phase)
 }
 
 func TestPodServerFieldMasks(t *testing.T) {
@@ -89,7 +107,9 @@ func TestPodServerFieldMasks(t *testing.T) {
 		resp, err := server.ListPods(ctx, &podsv1alpha1.ListPodsRequest{})
 		assert.NoError(t, err)
 		assert.Len(t, resp.Pods, 1)
-		maskedPod := resp.Pods[0]
+		maskedPod := &v1.Pod{}
+		err = maskedPod.Unmarshal(resp.Pods[0])
+		assert.NoError(t, err)
 		assert.Equal(t, "pod1", maskedPod.Name)
 		assert.Equal(t, "node1", maskedPod.Spec.NodeName)
 		assert.Empty(t, maskedPod.Namespace)
@@ -100,7 +120,9 @@ func TestPodServerFieldMasks(t *testing.T) {
 		ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(podsapi.FieldMaskMetadataKey, strings.Join(fieldMask.Paths, ",")))
 		resp, err := server.GetPod(ctx, &podsv1alpha1.GetPodRequest{PodUID: "pod1-uid"})
 		assert.NoError(t, err)
-		maskedPod := resp.Pod
+		maskedPod := &v1.Pod{}
+		err = maskedPod.Unmarshal(resp.Pod)
+		assert.NoError(t, err)
 		assert.Empty(t, maskedPod.Name)
 		assert.Equal(t, "ns1", maskedPod.Namespace)
 		assert.Empty(t, maskedPod.Spec.NodeName)
@@ -111,13 +133,19 @@ func TestPodServerFieldMasks(t *testing.T) {
 		resp, err := server.ListPods(ctx, &podsv1alpha1.ListPodsRequest{})
 		assert.NoError(t, err)
 		assert.Len(t, resp.Pods, 1)
-		assert.Equal(t, pod1, resp.Pods[0])
+		podOut := &v1.Pod{}
+		err = podOut.Unmarshal(resp.Pods[0])
+		assert.NoError(t, err)
+		assert.Equal(t, pod1, podOut)
 	})
 	t.Run("GetPodWithNilFieldMask", func(t *testing.T) {
 		ctx := context.Background()
 		resp, err := server.GetPod(ctx, &podsv1alpha1.GetPodRequest{PodUID: "pod1-uid"})
 		assert.NoError(t, err)
-		assert.Equal(t, pod1, resp.Pod)
+		podOut := &v1.Pod{}
+		err = podOut.Unmarshal(resp.Pod)
+		assert.NoError(t, err)
+		assert.Equal(t, pod1, podOut)
 	})
 }
 
@@ -264,7 +292,9 @@ func TestGetPodWithVariousFieldMasks(t *testing.T) {
 	server.OnPodAdded(v1Pod)
 	fullResp, err := server.GetPod(context.Background(), &podsv1alpha1.GetPodRequest{PodUID: "test-uid"})
 	assert.NoError(t, err)
-	fullAlphaPod := fullResp.Pod
+	fullAlphaPod := &v1.Pod{}
+	err = fullAlphaPod.Unmarshal(fullResp.Pod)
+	assert.NoError(t, err)
 	pathsMap := make(map[string]bool)
 	getAllPaths(reflect.TypeOf(*v1Pod), "", pathsMap)
 	var paths []string
@@ -280,7 +310,9 @@ func TestGetPodWithVariousFieldMasks(t *testing.T) {
 			ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(podsapi.FieldMaskMetadataKey, path))
 			resp, err := server.GetPod(ctx, &podsv1alpha1.GetPodRequest{PodUID: "test-uid"})
 			assert.NoError(t, err)
-			maskedPodFromAPI := resp.Pod
+			maskedPodFromAPI := &v1.Pod{}
+			err = maskedPodFromAPI.Unmarshal(resp.Pod)
+			assert.NoError(t, err)
 			fieldMask := &fieldmaskpb.FieldMask{Paths: []string{path}}
 			expectedMaskedPod := &v1.Pod{}
 			err = podsapi.ApplyFieldMask(fieldMask, fullAlphaPod, expectedMaskedPod)
@@ -394,7 +426,9 @@ func TestListPodsWithVariousFieldMasks(t *testing.T) {
 	fullResp, err := server.ListPods(context.Background(), &podsv1alpha1.ListPodsRequest{})
 	assert.NoError(t, err)
 	assert.Len(t, fullResp.Pods, 1)
-	fullAlphaPod := fullResp.Pods[0]
+	fullAlphaPod := &v1.Pod{}
+	err = fullAlphaPod.Unmarshal(fullResp.Pods[0])
+	assert.NoError(t, err)
 	pathsMap := make(map[string]bool)
 	getAllPaths(reflect.TypeOf(*v1Pod), "", pathsMap)
 	var paths []string
@@ -411,12 +445,148 @@ func TestListPodsWithVariousFieldMasks(t *testing.T) {
 			resp, err := server.ListPods(ctx, &podsv1alpha1.ListPodsRequest{})
 			assert.NoError(t, err)
 			assert.Len(t, resp.Pods, 1)
-			maskedPodFromAPI := resp.Pods[0]
+			maskedPodFromAPI := &v1.Pod{}
+			err = maskedPodFromAPI.Unmarshal(resp.Pods[0])
+			assert.NoError(t, err)
 			fieldMask := &fieldmaskpb.FieldMask{Paths: []string{path}}
 			expectedMaskedPod := &v1.Pod{}
 			err = podsapi.ApplyFieldMask(fieldMask, fullAlphaPod, expectedMaskedPod)
 			assert.NoError(t, err)
 			assert.Equal(t, expectedMaskedPod, maskedPodFromAPI)
 		})
+	}
+}
+func TestErrorsAndMetrics(t *testing.T) {
+	metrics.Register()
+
+	t.Run("DroppedWatchEventIncrementsMetric", func(t *testing.T) {
+		broadcaster := podsapi.NewBroadcaster()
+		server := podsapi.NewPodsServerForTest(broadcaster)
+		pod1 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: "pod1-uid", Name: "pod1", Namespace: "ns1"}}
+		server.OnPodAdded(pod1)
+
+		// Reset the metric before the test
+		metrics.PodWatchEventsDroppedTotal.Reset()
+		clientChannel := make(chan podsapi.PodWatchEvent, 1) // Buffered channel of size 1
+		broadcaster.Register(clientChannel)
+		defer broadcaster.Unregister(clientChannel)
+
+		// Send two events. The first one should fill the buffer.
+		broadcaster.Broadcast(podsapi.PodWatchEvent{})
+		// The second one should be dropped and increment the metric.
+		broadcaster.Broadcast(podsapi.PodWatchEvent{})
+
+		err := testutil.CollectAndCompare(metrics.PodWatchEventsDroppedTotal, strings.NewReader(`
+			# HELP kubelet_pod_watch_events_dropped_total [ALPHA] Cumulative number of pod watch events dropped.
+			# TYPE kubelet_pod_watch_events_dropped_total counter
+			kubelet_pod_watch_events_dropped_total 1
+		`))
+		assert.NoError(t, err)
+	})
+
+	t.Run("InvalidFieldMaskReturnsError", func(t *testing.T) {
+		broadcaster := podsapi.NewBroadcaster()
+		server := podsapi.NewPodsServerForTest(broadcaster)
+		pod1 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: "pod1-uid", Name: "pod1", Namespace: "ns1"}}
+		server.OnPodAdded(pod1)
+
+		invalidFieldMask := "invalid.field.mask"
+		ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(podsapi.FieldMaskMetadataKey, invalidFieldMask))
+
+		_, err := server.ListPods(ctx, &podsv1alpha1.ListPodsRequest{})
+		if err == nil {
+			t.Fatal("ListPods should have returned an error")
+		}
+		assert.Contains(t, err.Error(), "failed to apply field mask path")
+
+		_, err = server.GetPod(ctx, &podsv1alpha1.GetPodRequest{PodUID: "pod1-uid"})
+		if err == nil {
+			t.Fatal("GetPod should have returned an error")
+		}
+		assert.Contains(t, err.Error(), "failed to apply field mask path")
+
+		stream := &mockWatchPodsServer{ctx: ctx, t: t}
+		err = server.WatchPods(&podsv1alpha1.WatchPodsRequest{}, stream)
+		if err == nil {
+			t.Fatal("WatchPods should have returned an error")
+		}
+		assert.Contains(t, err.Error(), "invalid field mask")
+	})
+}
+
+// mockWatchPodsServer is a mock implementation of the WatchPodsServer interface for testing.
+type mockWatchPodsServer struct {
+	ctx context.Context
+	t   *testing.T
+}
+
+func (s *mockWatchPodsServer) Send(event *podsv1alpha1.WatchPodsEvent) error {
+	s.t.Helper()
+	return nil
+}
+
+func (s *mockWatchPodsServer) SetHeader(md metadata.MD) error {
+	s.t.Helper()
+	return nil
+}
+
+func (s *mockWatchPodsServer) SendHeader(md metadata.MD) error {
+	s.t.Helper()
+	return nil
+}
+
+func (s *mockWatchPodsServer) SetTrailer(md metadata.MD) {
+	s.t.Helper()
+}
+
+func (s *mockWatchPodsServer) Context() context.Context {
+	s.t.Helper()
+	if s.ctx == nil {
+		return context.Background()
+	}
+	return s.ctx
+}
+
+func (s *mockWatchPodsServer) SendMsg(m interface{}) error {
+	s.t.Helper()
+	return nil
+}
+
+func (s *mockWatchPodsServer) RecvMsg(m interface{}) error {
+	s.t.Helper()
+	return nil
+}
+
+func TestSerialize(t *testing.T) {
+	apiObjectFuzzer := fuzzer.FuzzerFor(fuzzer.MergeFuzzerFuncs(metafuzzer.Funcs, corefuzzer.Funcs), rand.NewSource(152), legacyscheme.Codecs)
+	for i := 0; i < 100; i++ {
+		pod := &v1.Pod{}
+		apiObjectFuzzer.Fill(pod)
+		podBytes, err := pod.Marshal()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		resp := &podsv1alpha1.ListPodsResponse{Pods: [][]byte{podBytes}}
+		data, err := proto.Marshal(resp)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		resp2 := &podsv1alpha1.ListPodsResponse{}
+		if err := proto.Unmarshal(data, resp2); err != nil {
+			t.Fatal(err)
+		}
+
+		if !proto.Equal(resp, resp2) {
+			t.Fatal("round-tripped objects were different")
+		}
+		pod2 := &v1.Pod{}
+		if err := pod2.Unmarshal(resp2.Pods[0]); err != nil {
+			t.Fatal(err)
+		}
+		if !apiequality.Semantic.DeepEqual(pod, pod2) {
+			t.Fatal("round-tripped objects were different")
+		}
 	}
 }
