@@ -418,7 +418,7 @@ func TestTaintTolerationFilter(t *testing.T) {
 			pod:  podWithTolerations("pod1", []v1.Toleration{{Key: "node.example.com/priority-level", Operator: "Gt", Value: "950", Effect: "NoSchedule"}}),
 			node: nodeWithTaints("nodeA", []v1.Taint{{Key: "node.example.com/priority-level", Value: "high", Effect: "NoSchedule"}}),
 			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable,
-				"node(s) had untolerated taint {node.example.com/priority-level: high}"),
+				"failed to parse taint value high as int64, err: strconv.ParseInt: parsing \"high\": invalid syntax"),
 		},
 	}
 	for _, test := range tests {

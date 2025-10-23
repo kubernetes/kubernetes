@@ -118,7 +118,8 @@ func (pl *TaintToleration) Filter(ctx context.Context, state fwk.CycleState, pod
 	errStatus := fwk.NewStatus(fwk.UnschedulableAndUnresolvable)
 	taint, isUntolerated, err := v1helper.FindMatchingUntoleratedTaint(node.Spec.Taints, pod.Spec.Tolerations, helper.DoNotScheduleTaintsFilterFunc())
 	if err != nil {
-		errStatus.WithError(err)
+		errStatus.AppendReason(err.Error())
+		return errStatus
 	}
 	if !isUntolerated {
 		return nil
