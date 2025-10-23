@@ -1443,6 +1443,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: apiServerID
       type:
         scalar: string
+      default: ""
     - name: decodableVersions
       type:
         list:
@@ -1452,6 +1453,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: encodingVersion
       type:
         scalar: string
+      default: ""
     - name: servedVersions
       type:
         list:
