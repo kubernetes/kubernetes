@@ -50,7 +50,7 @@ var cycleStatePool = sync.Pool{
 func NewCycleState() *CycleState {
 	cs := cycleStatePool.Get().(*CycleState)
 	// Ensure the state is clean
-	cs.storage = sync.Map{}
+	// Note: storage is already cleared by Recycle(), no need to reinitialize
 	cs.recordPluginMetrics = false
 	cs.skipFilterPlugins = nil
 	cs.skipScorePlugins = nil

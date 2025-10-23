@@ -144,9 +144,13 @@ func (sched *Scheduler) ScheduleOne(ctx context.Context) {
 		metrics.Goroutines.WithLabelValues(metrics.Binding).Inc()
 		defer metrics.Goroutines.WithLabelValues(metrics.Binding).Dec()
 
-		status := sched.bindingCycle(bindingCycleCtx, state, fwk, scheduleResult, assumedPodInfo, start, podsToActivate)
+		// Clone the state to avoid use-after-recycle race condition
+		// The original state will be recycled by the main thread, but the goroutine
+		// needs its own copy since it runs asynchronously
+		bindingState := state.Clone()
+		status := sched.bindingCycle(bindingCycleCtx, bindingState, fwk, scheduleResult, assumedPodInfo, start, podsToActivate)
 		if !status.IsSuccess() {
-			sched.handleBindingCycleError(bindingCycleCtx, state, fwk, assumedPodInfo, start, scheduleResult, status)
+			sched.handleBindingCycleError(bindingCycleCtx, bindingState, fwk, assumedPodInfo, start, scheduleResult, status)
 			return
 		}
 	}()
