@@ -650,6 +650,7 @@ func TestFindMatchingUntoleratedTaint(t *testing.T) {
 		taints          []v1.Taint
 		applyFilter     taintsFilterFunc
 		expectTolerated bool
+		expectError     bool
 	}{
 		{
 			description:     "empty tolerations tolerate empty taints",
@@ -826,13 +827,18 @@ func TestFindMatchingUntoleratedTaint(t *testing.T) {
 			},
 			applyFilter:     func(t *v1.Taint) bool { return true },
 			expectTolerated: false,
+			expectError:     true,
 		},
 	}
 
 	for _, tc := range testCases {
 		_, untolerated, err := FindMatchingUntoleratedTaint(tc.taints, tc.tolerations, tc.applyFilter)
-		if err != nil {
-			t.Errorf("unexpected error in test case [%s], err %v", tc.description, err)
+		if err != nil && !tc.expectError {
+			t.Errorf("test case [%s] unexpected error %v", tc.description, err)
+		} else if err == nil && tc.expectError {
+			t.Errorf("test case [%s] expected error, but got none", tc.description)
+		} else {
+			continue
 		}
 		if tc.expectTolerated != !untolerated {
 			filteredTaints := []v1.Taint{}

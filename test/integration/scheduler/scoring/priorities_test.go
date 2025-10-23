@@ -68,8 +68,8 @@ var (
 	honorPolicy  = v1.NodeInclusionPolicyHonor
 	taints       = []v1.Taint{{Key: v1.TaintNodeUnschedulable, Value: "", Effect: v1.TaintEffectPreferNoSchedule}}
 
-	priorityLowTaint      = v1.Taint{Key: "node.example.com/priority-class", Value: "800", Effect: v1.TaintEffectNoSchedule}
-	priorityHighTaint     = v1.Taint{Key: "node.example.com/priority-class", Value: "999", Effect: v1.TaintEffectPreferNoSchedule}
+	priorityLowTaint       = v1.Taint{Key: "node.example.com/priority-class", Value: "800", Effect: v1.TaintEffectNoSchedule}
+	priorityHighTaint      = v1.Taint{Key: "node.example.com/priority-class", Value: "999", Effect: v1.TaintEffectPreferNoSchedule}
 	priorityNoExecuteTaint = v1.Taint{Key: "node.example.com/priority-class", Value: "850", Effect: v1.TaintEffectNoExecute}
 )
 

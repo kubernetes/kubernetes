@@ -1035,11 +1035,13 @@ func TestHostPorts(t *testing.T) {
 // 3. Create node2 with a taint that pod2 can't tolerate
 // 4. Update the taint value on node2; pod2 should now schedule on node2
 func TestTaintTolerationGtLtIntegration(t *testing.T) {
-	// Enable the TaintTolerationComparisonOperators feature gate
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TaintTolerationComparisonOperators, true)
 
 	testCtx := testutils.InitTestSchedulerWithNS(t, "gt-lt-integration")
-	defer testCtx.ClientSet.CoreV1().Nodes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
+	err := testCtx.ClientSet.CoreV1().Nodes().DeleteCollection(testCtx.Ctx, metav1.DeleteOptions{}, metav1.ListOptions{})
+	if err != nil {
+		t.Errorf("error whiling deleting nodes, error: %v", err)
+	}
 
 	goodCondition := v1.NodeCondition{
 		Type:              v1.NodeReady,
@@ -1051,7 +1053,16 @@ func TestTaintTolerationGtLtIntegration(t *testing.T) {
 	// 1. Create pod1 and node1 that fits pod1; pod1 schedules on node1
 	node1 := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{Name: "node1"},
-		Spec:       v1.NodeSpec{Unschedulable: false},
+		Spec: v1.NodeSpec{
+			Unschedulable: false,
+			Taints: []v1.Taint{
+				{
+					Key:    "node.example.com/dedicated",
+					Value:  "special",
+					Effect: v1.TaintEffectNoSchedule,
+				},
+			},
+		},
 		Status: v1.NodeStatus{
 			Capacity: v1.ResourceList{
 				v1.ResourceCPU:  *resource.NewQuantity(1, resource.DecimalSI),
@@ -1060,7 +1071,7 @@ func TestTaintTolerationGtLtIntegration(t *testing.T) {
 			Conditions: []v1.NodeCondition{goodCondition},
 		},
 	}
-	node1, err := testutils.CreateNode(testCtx.ClientSet, node1)
+	_, err = testutils.CreateNode(testCtx.ClientSet, node1)
 	if err != nil {
 		t.Fatalf("Failed to create node1: %v", err)
 	}
@@ -1075,6 +1086,14 @@ func TestTaintTolerationGtLtIntegration(t *testing.T) {
 					Resources: v1.ResourceRequirements{
 						Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(900, resource.DecimalSI)},
 					},
+				},
+			},
+			Tolerations: []v1.Toleration{
+				{
+					Key:      "node.example.com/dedicated",
+					Operator: v1.TolerationOpEqual,
+					Value:    "special",
+					Effect:   v1.TaintEffectNoSchedule,
 				},
 			},
 		},

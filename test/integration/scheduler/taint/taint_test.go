@@ -160,11 +160,11 @@ func TestTaintNodeByCondition(t *testing.T) {
 		Effect:   v1.TaintEffectNoSchedule,
 	}
 
-	priorityClassTaint         := v1.Taint{Key: "node.example.com/priority-class", Value: "950", Effect: v1.TaintEffectNoSchedule}
-	priorityClassPreferTaint   := v1.Taint{Key: "node.example.com/priority-class", Value: "950", Effect: v1.TaintEffectPreferNoSchedule}
-	errorRateTaint            := v1.Taint{Key: "node.example.com/error-rate", Value: "5", Effect: v1.TaintEffectNoSchedule}
-	cpuUtilizationTaint       := v1.Taint{Key: "node.example.com/cpu-utilization", Value: "75", Effect: v1.TaintEffectNoExecute}
-	cpuUtilizationLowTaint    := v1.Taint{Key: "node.example.com/cpu-utilization", Value: "60", Effect: v1.TaintEffectNoExecute}
+	priorityClassTaint := v1.Taint{Key: "node.example.com/priority-class", Value: "950", Effect: v1.TaintEffectNoSchedule}
+	priorityClassPreferTaint := v1.Taint{Key: "node.example.com/priority-class", Value: "950", Effect: v1.TaintEffectPreferNoSchedule}
+	errorRateTaint := v1.Taint{Key: "node.example.com/error-rate", Value: "5", Effect: v1.TaintEffectNoSchedule}
+	cpuUtilizationTaint := v1.Taint{Key: "node.example.com/cpu-utilization", Value: "75", Effect: v1.TaintEffectNoExecute}
+	cpuUtilizationLowTaint := v1.Taint{Key: "node.example.com/cpu-utilization", Value: "60", Effect: v1.TaintEffectNoExecute}
 
 	priorityClassGtToleration := v1.Toleration{
 		Key:      "node.example.com/priority-class",
@@ -220,12 +220,13 @@ func TestTaintNodeByCondition(t *testing.T) {
 
 	// switch to table driven testings
 	tests := []struct {
-		name           string
-		existingTaints []v1.Taint
-		nodeConditions []v1.NodeCondition
-		unschedulable  bool
-		expectedTaints []v1.Taint
-		pods           []podCase
+		name               string
+		existingTaints     []v1.Taint
+		nodeConditions     []v1.NodeCondition
+		unschedulable      bool
+		expectedTaints     []v1.Taint
+		pods               []podCase
+		requireFeatureGate bool
 	}{
 		{
 			name: "not-ready node",
@@ -571,6 +572,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 					fits:        true,
 				},
 			},
+			requireFeatureGate: true,
 		},
 		{
 			name:           "node with numeric error-rate taint - pods with Lt toleration",
@@ -593,6 +595,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 					fits:        true,
 				},
 			},
+			requireFeatureGate: true,
 		},
 		{
 			name:           "node with multiple numeric taints - mixed tolerations",
@@ -623,6 +626,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 					fits: true,
 				},
 			},
+			requireFeatureGate: true,
 		},
 		{
 			name:           "node with numeric taint - pods with Lt toleration and NoExecute effect",
@@ -650,6 +654,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 					fits:        true,
 				},
 			},
+			requireFeatureGate: true,
 		},
 		{
 			name:           "node with numeric taint - pods with mixed NoExecute tolerations",
@@ -673,6 +678,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 					fits:        true,
 				},
 			},
+			requireFeatureGate: true,
 		},
 		{
 			name:           "node with numeric taint - pods with PreferNoSchedule effect and Gt toleration",
@@ -700,14 +706,18 @@ func TestTaintNodeByCondition(t *testing.T) {
 					fits:        true,
 				},
 			},
+			requireFeatureGate: true,
 		},
 	}
 
 	for _, featureGateEnabled := range []bool{true, false} {
 		for _, test := range tests {
-			t.Run(fmt.Sprintf("%s (Async API calls enabled: %v)", test.name, featureGateEnabled), func(t *testing.T) {
+			t.Run(fmt.Sprintf("%s (TaintToleration Comparison Operators enabled: %v)", test.name, featureGateEnabled), func(t *testing.T) {
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TaintTolerationComparisonOperators, featureGateEnabled)
 
+				if test.requireFeatureGate && !featureGateEnabled {
+					return
+				}
 				node := &v1.Node{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "node-1",

@@ -1629,7 +1629,7 @@ func TestTaintTolerationFilter(t *testing.T) {
 					Taints([]v1.Taint{
 						{
 							Key:    "node.example.com/temperature",
-							Value:  "-10",
+							Value:  "10",
 							Effect: v1.TaintEffectNoSchedule,
 						},
 					}).Obj(),
@@ -1678,7 +1678,7 @@ func TestTaintTolerationFilter(t *testing.T) {
 						{
 							Key:    "node.example.com/priority-level",
 							Value:  "999",
-						Effect: v1.TaintEffectPreferNoSchedule,
+							Effect: v1.TaintEffectPreferNoSchedule,
 						},
 					}).Obj(),
 			},

@@ -27,6 +27,7 @@ func TestTolerationToleratesTaint(t *testing.T) {
 		toleration      Toleration
 		taint           Taint
 		expectTolerated bool
+		expectError     bool
 	}{
 		{
 			description: "toleration and taint have the same key and effect, and operator is Exists, and taint has no value, expect tolerated",
@@ -203,6 +204,7 @@ func TestTolerationToleratesTaint(t *testing.T) {
 				Effect: TaintEffectNoSchedule,
 			},
 			expectTolerated: false,
+			expectError:     true,
 		},
 		{
 			description: "toleration with Gt operator and negative numeric values - taint value less than threshold, expect not tolerated",
@@ -237,8 +239,10 @@ func TestTolerationToleratesTaint(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		tolerated, err := tc.toleration.ToleratesTaint(&tc.taint)
-		if err != nil {
-			t.Errorf("Unextected error %v", err)
+		if err != nil && !tc.expectError {
+			t.Errorf("test case [%s] unexpected error %v", tc.description, err)
+		} else if err == nil && tc.expectError {
+			t.Errorf("test case [%s] expected error, but got none", tc.description)
 		}
 		if tc.expectTolerated != tolerated {
 			t.Errorf("[%s] expect %v, got %v: toleration %+v, taint %s", tc.description, tc.expectTolerated, tolerated, tc.toleration, tc.taint.ToString())
