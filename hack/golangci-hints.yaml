@@ -143,6 +143,14 @@ linters:
         path: "staging/src/k8s.io/api/resource/"
       - text: "Conditions field in AllocatedDeviceStatus has incorrect tags, should be: `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,5,rep,name=conditions\"`"
         path: "staging/src/k8s.io/api/resource/"
+      
+      # OptionalOrRequired is being enabled over time. For now, each API group should be added to this list until we comb through each group and fix the missing tags.
+      - text: "must be marked as optional or required"
+        path: "staging/src/k8s.io/api/(admission|apidiscovery|apps|authentication|authorization|autoscaling|certificates|core|discovery|events|extensions|flowcontrol|imagepolicy|networking|node|policy|rbac|resource|scheduling|storage)"
+      
+      # OptionalOrRequired - Existing fields that are marked as both optional and required (based on standard optional vs kubebuilder:validation:Required) and should not be fixed.
+      - text: "field Error must not be marked as both optional and required"
+        path: "staging/src/k8s.io/api/(core/v1|extensions/v1beta1|networking/(v1|v1beta1))"
 
   default: standard
   enable: # please keep this alphabetized
@@ -303,7 +311,7 @@ linters:
               # - "nophase" # Ensure field names do not have the word "phase" in them.
               # - "notimestamp" # Ensure fields are not named "timestamp", prefer "time".
               # - "optionalfields" # Ensure fields marked optional have omitempty and pointers.
-              # - "optionalorrequired" # Every field should be marked as `+optional` xor `+required`.
+              - "optionalorrequired" # Every field should be marked as `+optional` xor `+required`.
               # - "requiredfields" # Required fields should only be pointers when required based on the validity of the zero value, they should always have `omitempty`.
               - "ssatags" # Ensure lists have a listType tag.
               # - "uniquemarkers" # Ensure markers are not duplicated across field and type definitions.
@@ -324,7 +332,6 @@ linters:
             # nomaps:
             #   policy: AllowStringToStringMaps # Determines how the linter should handle maps of basic types. Maps of objects are always disallowed.
             # optionalFields:
-            #   policy: AllowOptionalFields # Determines how the linter should handle optional fields.optionalfields:
             #  pointers:
             #    preference: Always | WhenRequired # Whether to always require pointers, or only when required. Defaults to `Always`.
             #    policy: SuggestFix | Warn # The policy for pointers in optional fields. Defaults to `SuggestFix`.
@@ -335,7 +342,6 @@ linters:
             # optionalOrRequired:
             #   preferredOptionalMarker: optional # The preferred optional marker to use, fixes will suggest to use this marker. Defaults to `optional`.
             #   preferredRequiredMarker: required # The preferred required marker to use, fixes will suggest to use this marker. Defaults to `required`. 
-            #   policy: AllowOptionalFields # Determines how the linter should handle optional fields.
             # requiredFields:
             #   pointers:
             #    policy: SuggestFix | Warn # The policy for pointers in required fields. Defaults to `SuggestFix`.

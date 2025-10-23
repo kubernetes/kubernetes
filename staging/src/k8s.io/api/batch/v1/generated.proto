@@ -55,12 +55,14 @@ message CronJobList {
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // items is the list of CronJobs.
+  // +required
   repeated CronJob items = 2;
 }
 
 // CronJobSpec describes how the job execution will look like and when it will actually run.
 message CronJobSpec {
   // The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
+  // +required
   optional string schedule = 1;
 
   // The time zone name for the given schedule, see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones.
@@ -95,6 +97,7 @@ message CronJobSpec {
   optional bool suspend = 4;
 
   // Specifies the job that will be created when executing a CronJob.
+  // +required
   optional JobTemplateSpec jobTemplate = 5;
 
   // The number of successful finished jobs to retain. Value must be non-negative integer.
@@ -145,9 +148,11 @@ message Job {
 // JobCondition describes current state of a job.
 message JobCondition {
   // Type of job condition, Complete or Failed.
+  // +optional
   optional string type = 1;
 
   // Status of the condition, one of True, False, Unknown.
+  // +optional
   optional string status = 2;
 
   // Last time the condition was checked.
@@ -273,6 +278,7 @@ message JobSpec {
   // Describes the pod that will be created when executing a job.
   // The only allowed template.spec.restartPolicy values are "Never" or "OnFailure".
   // More info: https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/
+  // +required
   optional .k8s.io.api.core.v1.PodTemplateSpec template = 6;
 
   // ttlSecondsAfterFinished limits the lifetime of a Job that has finished
@@ -458,6 +464,7 @@ message JobStatus {
 
   // The number of active pods which have a Ready condition and are not
   // terminating (without a deletionTimestamp).
+  // +optional
   optional int32 ready = 9;
 }
 
@@ -482,6 +489,7 @@ message PodFailurePolicy {
   // counter of pod failures is incremented and it is checked against
   // the backoffLimit. At most 20 elements are allowed.
   // +listType=atomic
+  // +optional
   repeated PodFailurePolicyRule rules = 1;
 }
 
@@ -511,6 +519,7 @@ message PodFailurePolicyOnExitCodesRequirement {
   //   by the 'containerName' field) is not in the set of specified values.
   // Additional values are considered to be added in the future. Clients should
   // react to an unknown operator by assuming the requirement is not satisfied.
+  // +required
   optional string operator = 2;
 
   // Specifies the set of values. Each returned container exit code (might be
@@ -519,6 +528,7 @@ message PodFailurePolicyOnExitCodesRequirement {
   // and must not contain duplicates. Value '0' cannot be used for the In operator.
   // At least one element is required. At most 255 elements are allowed.
   // +listType=set
+  // +required
   repeated int32 values = 3;
 }
 
@@ -527,6 +537,7 @@ message PodFailurePolicyOnExitCodesRequirement {
 message PodFailurePolicyOnPodConditionsPattern {
   // Specifies the required Pod condition type. To match a pod condition
   // it is required that specified type equals the pod condition type.
+  // +required
   optional string type = 1;
 
   // Specifies the required Pod condition status. To match a pod condition
@@ -552,6 +563,7 @@ message PodFailurePolicyRule {
   //   counter towards the .backoffLimit is incremented.
   // Additional values are considered to be added in the future. Clients should
   // react to an unknown action by skipping the rule.
+  // +required
   optional string action = 1;
 
   // Represents the requirement on the container exit codes.
@@ -575,6 +587,7 @@ message SuccessPolicy {
   // Additionally, these rules are evaluated in order; Once the Job meets one of the rules,
   // other rules are ignored. At most 20 elements are allowed.
   // +listType=atomic
+  // +required
   repeated SuccessPolicyRule rules = 1;
 }
 

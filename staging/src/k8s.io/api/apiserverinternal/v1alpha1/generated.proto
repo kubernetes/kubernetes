@@ -32,33 +32,40 @@ option go_package = "k8s.io/api/apiserverinternal/v1alpha1";
 // encodes objects to when persisting objects in the backend.
 message ServerStorageVersion {
   // The ID of the reporting API server.
+  // +required
   optional string apiServerID = 1;
 
   // The API server encodes the object to this version when persisting it in
   // the backend (e.g., etcd).
+  // +required
   optional string encodingVersion = 2;
 
   // The API server can decode objects encoded in these versions.
   // The encodingVersion must be included in the decodableVersions.
   // +listType=set
+  // +required
   repeated string decodableVersions = 3;
 
   // The API server can serve these versions.
   // DecodableVersions must include all ServedVersions.
   // +listType=set
+  // +optional
   repeated string servedVersions = 4;
 }
 
 // Storage version of a specific resource.
 message StorageVersion {
   // The name is <group>.<resource>.
+  // +required
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec is an empty spec. It is here to comply with Kubernetes API style.
+  // +optional
   optional StorageVersionSpec spec = 2;
 
   // API server instances report the version they can decode and the version they
   // encode objects to when persisting objects in the backend.
+  // +optional
   optional StorageVersionStatus status = 3;
 }
 
@@ -77,6 +84,7 @@ message StorageVersionCondition {
   optional int64 observedGeneration = 3;
 
   // Last time the condition transitioned from one status to another.
+  // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 4;
 
   // The reason for the condition's last transition.

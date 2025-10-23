@@ -188,6 +188,7 @@ type PodFailurePolicyOnExitCodesRequirement struct {
 	//   by the 'containerName' field) is not in the set of specified values.
 	// Additional values are considered to be added in the future. Clients should
 	// react to an unknown operator by assuming the requirement is not satisfied.
+	// +required
 	Operator PodFailurePolicyOnExitCodesOperator `json:"operator" protobuf:"bytes,2,req,name=operator"`
 
 	// Specifies the set of values. Each returned container exit code (might be
@@ -196,6 +197,7 @@ type PodFailurePolicyOnExitCodesRequirement struct {
 	// and must not contain duplicates. Value '0' cannot be used for the In operator.
 	// At least one element is required. At most 255 elements are allowed.
 	// +listType=set
+	// +required
 	Values []int32 `json:"values" protobuf:"varint,3,rep,name=values"`
 }
 
@@ -204,6 +206,7 @@ type PodFailurePolicyOnExitCodesRequirement struct {
 type PodFailurePolicyOnPodConditionsPattern struct {
 	// Specifies the required Pod condition type. To match a pod condition
 	// it is required that specified type equals the pod condition type.
+	// +required
 	Type corev1.PodConditionType `json:"type" protobuf:"bytes,1,req,name=type"`
 
 	// Specifies the required Pod condition status. To match a pod condition
@@ -229,6 +232,7 @@ type PodFailurePolicyRule struct {
 	//   counter towards the .backoffLimit is incremented.
 	// Additional values are considered to be added in the future. Clients should
 	// react to an unknown action by skipping the rule.
+	// +required
 	Action PodFailurePolicyAction `json:"action" protobuf:"bytes,1,req,name=action"`
 
 	// Represents the requirement on the container exit codes.
@@ -251,6 +255,7 @@ type PodFailurePolicy struct {
 	// counter of pod failures is incremented and it is checked against
 	// the backoffLimit. At most 20 elements are allowed.
 	// +listType=atomic
+	// +optional
 	Rules []PodFailurePolicyRule `json:"rules" protobuf:"bytes,1,opt,name=rules"`
 }
 
@@ -263,6 +268,7 @@ type SuccessPolicy struct {
 	// Additionally, these rules are evaluated in order; Once the Job meets one of the rules,
 	// other rules are ignored. At most 20 elements are allowed.
 	// +listType=atomic
+	// +required
 	Rules []SuccessPolicyRule `json:"rules" protobuf:"bytes,1,opt,name=rules"`
 }
 
@@ -400,6 +406,7 @@ type JobSpec struct {
 	// Describes the pod that will be created when executing a job.
 	// The only allowed template.spec.restartPolicy values are "Never" or "OnFailure".
 	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/
+	// +required
 	Template corev1.PodTemplateSpec `json:"template" protobuf:"bytes,6,opt,name=template"`
 
 	// ttlSecondsAfterFinished limits the lifetime of a Job that has finished
@@ -585,6 +592,7 @@ type JobStatus struct {
 
 	// The number of active pods which have a Ready condition and are not
 	// terminating (without a deletionTimestamp).
+	// +optional
 	Ready *int32 `json:"ready,omitempty" protobuf:"varint,9,opt,name=ready"`
 }
 
@@ -645,8 +653,10 @@ const (
 // JobCondition describes current state of a job.
 type JobCondition struct {
 	// Type of job condition, Complete or Failed.
+	// +optional
 	Type JobConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=JobConditionType"`
 	// Status of the condition, one of True, False, Unknown.
+	// +optional
 	Status corev1.ConditionStatus `json:"status" protobuf:"bytes,2,opt,name=status,casttype=k8s.io/api/core/v1.ConditionStatus"`
 	// Last time the condition was checked.
 	// +optional
@@ -711,6 +721,7 @@ type CronJobList struct {
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// items is the list of CronJobs.
+	// +required
 	Items []CronJob `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
@@ -718,6 +729,7 @@ type CronJobList struct {
 type CronJobSpec struct {
 
 	// The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
+	// +required
 	Schedule string `json:"schedule" protobuf:"bytes,1,opt,name=schedule"`
 
 	// The time zone name for the given schedule, see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones.
@@ -752,6 +764,7 @@ type CronJobSpec struct {
 	Suspend *bool `json:"suspend,omitempty" protobuf:"varint,4,opt,name=suspend"`
 
 	// Specifies the job that will be created when executing a CronJob.
+	// +required
 	JobTemplate JobTemplateSpec `json:"jobTemplate" protobuf:"bytes,5,opt,name=jobTemplate"`
 
 	// The number of successful finished jobs to retain. Value must be non-negative integer.

@@ -140,8 +140,7 @@
           }
         },
         "required": [
-          "schedule",
-          "jobTemplate"
+          "schedule"
         ],
         "type": "object"
       },
@@ -266,10 +265,6 @@
             "type": "string"
           }
         },
-        "required": [
-          "type",
-          "status"
-        ],
         "type": "object"
       },
       "io.k8s.api.batch.v1.JobList": {
@@ -409,9 +404,6 @@
             "type": "integer"
           }
         },
-        "required": [
-          "template"
-        ],
         "type": "object"
       },
       "io.k8s.api.batch.v1.JobStatus": {
@@ -533,9 +525,6 @@
             "x-kubernetes-list-type": "atomic"
           }
         },
-        "required": [
-          "rules"
-        ],
         "type": "object"
       },
       "io.k8s.api.batch.v1.PodFailurePolicyOnExitCodesRequirement": {
