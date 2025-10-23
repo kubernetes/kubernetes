@@ -7078,6 +7078,7 @@ func schema_k8sio_api_apiserverinternal_v1alpha1_ServerStorageVersion(ref common
 					"apiServerID": {
 						SchemaProps: spec.SchemaProps{
 							Description: "The ID of the reporting API server.",
+							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -7085,6 +7086,7 @@ func schema_k8sio_api_apiserverinternal_v1alpha1_ServerStorageVersion(ref common
 					"encodingVersion": {
 						SchemaProps: spec.SchemaProps{
 							Description: "The API server encodes the object to this version when persisting it in the backend (e.g., etcd).",
+							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -7130,6 +7132,7 @@ func schema_k8sio_api_apiserverinternal_v1alpha1_ServerStorageVersion(ref common
 						},
 					},
 				},
+				Required: []string{"apiServerID", "encodingVersion", "decodableVersions"},
 			},
 		},
 	}
@@ -7178,7 +7181,7 @@ func schema_k8sio_api_apiserverinternal_v1alpha1_StorageVersion(ref common.Refer
 						},
 					},
 				},
-				Required: []string{"spec", "status"},
+				Required: []string{"metadata"},
 			},
 		},
 		Dependencies: []string{
@@ -14377,6 +14380,7 @@ func schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscaler(ref common.Referenc
 						},
 					},
 				},
+				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -15348,6 +15352,7 @@ func schema_k8sio_api_autoscaling_v2_HorizontalPodAutoscaler(ref common.Referenc
 						},
 					},
 				},
+				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -16089,6 +16094,7 @@ func schema_k8sio_api_batch_v1_CronJob(ref common.ReferenceCallback) common.Open
 						},
 					},
 				},
+				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -17008,6 +17014,7 @@ func schema_k8sio_api_batch_v1beta1_CronJob(ref common.ReferenceCallback) common
 						},
 					},
 				},
+				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -18554,6 +18561,7 @@ func schema_k8sio_api_coordination_v1alpha2_LeaseCandidate(ref common.ReferenceC
 						},
 					},
 				},
+				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -18749,6 +18757,7 @@ func schema_k8sio_api_coordination_v1beta1_LeaseCandidate(ref common.ReferenceCa
 						},
 					},
 				},
+				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -40726,6 +40735,7 @@ func schema_k8sio_api_networking_v1_IPAddress(ref common.ReferenceCallback) comm
 						},
 					},
 				},
+				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -42180,6 +42190,7 @@ func schema_k8sio_api_networking_v1beta1_IPAddress(ref common.ReferenceCallback)
 						},
 					},
 				},
+				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
