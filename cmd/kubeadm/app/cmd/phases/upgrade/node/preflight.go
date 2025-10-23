@@ -53,7 +53,7 @@ func runPreflight(c workflow.RunData) error {
 	if err := preflight.RunRootCheckOnly(data.IgnorePreflightErrors()); err != nil {
 		return err
 	}
-	if err := preflight.RunUpgradeChecks(data.IgnorePreflightErrors()); err != nil {
+	if err := preflight.RunUpgradeChecks(utilsexec.New(), data.IgnorePreflightErrors()); err != nil {
 		return err
 	}
 

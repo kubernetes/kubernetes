@@ -484,7 +484,10 @@ func (subnet HTTPProxyCIDRCheck) Check() (warnings, errorList []error) {
 }
 
 // SystemVerificationCheck defines struct used for running the system verification node check in test/e2e_node/system
-type SystemVerificationCheck struct{}
+type SystemVerificationCheck struct {
+	isUpgrade bool
+	exec      utilsexec.Interface
+}
 
 // Name will return SystemVerification as name for SystemVerificationCheck
 func (SystemVerificationCheck) Name() string {
@@ -493,7 +496,7 @@ func (SystemVerificationCheck) Name() string {
 
 // Check runs all individual checks
 func (sysver SystemVerificationCheck) Check() (warnings, errorList []error) {
-	klog.V(1).Infoln("running all checks")
+	klog.V(1).Infoln("running system verification checks")
 	// Create a buffered writer and choose a quite large value (1M) and suppose the output from the system verification test won't exceed the limit
 	// Run the system verification check, but write to out buffered writer instead of stdout
 	bufw := bufio.NewWriterSize(os.Stdout, 1*1024*1024)
@@ -505,7 +508,18 @@ func (sysver SystemVerificationCheck) Check() (warnings, errorList []error) {
 	var validators = []system.Validator{
 		&system.KernelValidator{Reporter: reporter}}
 
-	validators = addOSValidator(validators, reporter)
+	// Account for the KubeletVersion in the CgroupsValidator added
+	// as part of addOSValidator().
+	kubeletVersion, err := GetKubeletVersion(sysver.exec)
+	if err != nil {
+		return nil, []error{errors.Wrap(err, "couldn't get kubelet version")}
+	}
+	// During upgrade we want to check the next kubelet MINOR version.
+	// The below approach does not support k8s MAJOR version bumps.
+	if sysver.isUpgrade {
+		kubeletVersion = kubeletVersion.WithMinor(kubeletVersion.Minor() + 1)
+	}
+	validators = addOSValidator(validators, reporter, kubeletVersion.String())
 
 	// Run all validators
 	for _, v := range validators {
@@ -1053,7 +1067,7 @@ func addCommonChecks(execer utilsexec.Interface, k8sVersion string, nodeReg *kub
 	checks = addSwapCheck(checks)
 	checks = addExecChecks(checks, execer, k8sVersion)
 	checks = append(checks,
-		SystemVerificationCheck{},
+		SystemVerificationCheck{isUpgrade: false, exec: execer},
 		HostnameCheck{nodeName: nodeReg.Name},
 		KubeletVersionCheck{KubernetesVersion: k8sVersion, exec: execer},
 		ServiceCheck{Service: "kubelet", CheckIfActive: false},
@@ -1071,9 +1085,9 @@ func RunRootCheckOnly(ignorePreflightErrors sets.Set[string]) error {
 }
 
 // RunUpgradeChecks initializes checks slice of structs and call RunChecks
-func RunUpgradeChecks(ignorePreflightErrors sets.Set[string]) error {
+func RunUpgradeChecks(execer utilsexec.Interface, ignorePreflightErrors sets.Set[string]) error {
 	checks := []Checker{
-		SystemVerificationCheck{},
+		SystemVerificationCheck{isUpgrade: true, exec: execer},
 	}
 
 	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
