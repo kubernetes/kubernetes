@@ -18,6 +18,7 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"runtime"
@@ -36,22 +37,25 @@ func addProfilingFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&profileOutput, "profile-output", "profile.pprof", "Name of the file to write the profile to")
 }
 
-func initProfiling() error {
+// initProfiling inits profiling and returns a function to be called on exit to flush and close.
+func initProfiling() (func() error, error) {
 	var (
 		f   *os.File
 		err error
 	)
 	switch profileName {
 	case "none":
-		return nil
+		return nil, nil
 	case "cpu":
 		f, err = os.Create(profileOutput)
 		if err != nil {
-			return err
+			return nil, err
 		}
+
 		err = pprof.StartCPUProfile(f)
 		if err != nil {
-			return err
+			f.Close() //nolint:errcheck
+			return nil, err
 		}
 	// Block and mutex profiles need a call to Set{Block,Mutex}ProfileRate to
 	// output anything. We choose to sample all events.
@@ -62,25 +66,29 @@ func initProfiling() error {
 	default:
 		// Check the profile name is valid.
 		if profile := pprof.Lookup(profileName); profile == nil {
-			return fmt.Errorf("unknown profile '%s'", profileName)
+			return nil, fmt.Errorf("unknown profile '%s'", profileName)
 		}
 	}
 
-	// If the command is interrupted before the end (ctrl-c), flush the
-	// profiling files
+	// If the command is interrupted before the end (ctrl-c), flush the profiling files
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
 	go func() {
 		<-c
-		f.Close()
-		flushProfiling()
+		flushProfiling(f) //nolint:errcheck
 		os.Exit(0)
 	}()
 
-	return nil
+	return func() error {
+		return flushProfiling(f)
+	}, nil
 }
 
-func flushProfiling() error {
+func flushProfiling(output io.Closer) error {
+	if output != nil {
+		defer output.Close() //nolint:errcheck
+	}
+
 	switch profileName {
 	case "none":
 		return nil
@@ -94,10 +102,12 @@ func flushProfiling() error {
 		if profile == nil {
 			return nil
 		}
+
 		f, err := os.Create(profileOutput)
 		if err != nil {
 			return err
 		}
+
 		defer f.Close()
 		profile.WriteTo(f, 0)
 	}
