@@ -101,18 +101,3 @@ type CapacityRequestPolicyRange struct {
 type Counter struct {
 	Value resource.Quantity
 }
-
-type DeviceTaint struct {
-	Key       string
-	Value     string
-	Effect    DeviceTaintEffect
-	TimeAdded *metav1.Time
-}
-
-type DeviceTaintEffect string
-
-const (
-	DeviceTaintEffectNoSchedule DeviceTaintEffect = "NoSchedule"
-
-	DeviceTaintEffectNoExecute DeviceTaintEffect = "NoExecute"
-)
