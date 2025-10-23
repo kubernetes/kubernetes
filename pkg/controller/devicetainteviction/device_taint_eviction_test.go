@@ -1472,20 +1472,27 @@ func TestEviction(t *testing.T) {
 			fakeClientset := fake.NewSimpleClientset(tt.initialObjects...)
 			tCtx = ktesting.WithClients(tCtx, nil, nil, fakeClientset, nil, nil)
 
+			var podGets int
 			var podUpdates int
 			var updatedPod *v1.Pod
 			var podDeletions int
 
+			fakeClientset.PrependReactor("get", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+				podGets++
+				podName := action.(core.GetAction).GetName()
+				assert.Equal(t, podWithClaimName.Name, podName, "name of pod to patch")
+				return false, nil, nil
+			})
 			fakeClientset.PrependReactor("patch", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 				podUpdates++
 				podName := action.(core.PatchAction).GetName()
-				assert.Equal(t, podWithClaimName.Name, podName, "name of patched pod")
+				assert.Equal(t, podWithClaimName.Name, podName, "name of pod to get")
 				return false, nil, nil
 			})
 			fakeClientset.PrependReactor("delete", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 				podDeletions++
 				podName := action.(core.DeleteAction).GetName()
-				assert.Equal(t, podWithClaimName.Name, podName, "name of deleted pod")
+				assert.Equal(t, podWithClaimName.Name, podName, "name of pod to delete")
 				obj, err := fakeClientset.Tracker().Get(v1.SchemeGroupVersion.WithResource("pods"), pod.Namespace, pod.Name)
 				require.NoError(tCtx, err)
 				updatedPod = obj.(*v1.Pod)
@@ -1525,9 +1532,14 @@ func TestEviction(t *testing.T) {
 				}
 			}
 
-			// Eventually the pod gets deleted (= evicted).
 			// We can wait for the controller to be idle.
 			tCtx.Wait()
+
+			// The number of API calls is deterministic.
+			assert.Equal(tCtx, 1, podGets, "get pod once")
+			assert.Equal(tCtx, 1, podUpdates, "update pod once")
+			assert.Equal(tCtx, 1, podDeletions, "delete pod once")
+
 			_, err := fakeClientset.CoreV1().Pods(pod.Namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
 			switch {
 			case err == nil:
