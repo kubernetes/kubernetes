@@ -132,7 +132,7 @@ func NewNodeIpamController(
 
 // Run starts an asynchronous loop that monitors the status of cluster nodes.
 func (nc *Controller) Run(ctx context.Context) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	// Start event processing pipeline.
 	nc.eventBroadcaster.StartStructuredLogging(3)
