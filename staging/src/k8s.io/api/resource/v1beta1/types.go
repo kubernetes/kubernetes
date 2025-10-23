@@ -1928,6 +1928,7 @@ type NetworkDeviceData struct {
 	// Must not be longer than 256 characters.
 	//
 	// +optional
+	// +k8s:optional
 	// +k8s:maxLength=256
 	InterfaceName string `json:"interfaceName,omitempty" protobuf:"bytes,1,opt,name=interfaceName"`
 
@@ -1948,6 +1949,7 @@ type NetworkDeviceData struct {
 	// Must not be longer than 128 characters.
 	//
 	// +optional
+	// +k8s:optional
 	// +k8s:maxLength=128
 	HardwareAddress string `json:"hardwareAddress,omitempty" protobuf:"bytes,3,opt,name=hardwareAddress"`
 }
