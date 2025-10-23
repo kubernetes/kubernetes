@@ -51,6 +51,37 @@ func TestDeclarativeValidate(t *testing.T) {
 				"valid": {
 					input: mkDeviceClass(),
 				},
+				// metadata.name
+				"name: empty": {
+					input: mkDeviceClass(func(dc *resource.DeviceClass) { dc.Name = "" }),
+					expectedErrs: field.ErrorList{
+						field.Required(field.NewPath("metadata", "name"), ""),
+					},
+				},
+				"name: valid": {
+					input: mkDeviceClass(func(dc *resource.DeviceClass) { dc.Name = "example.com" }),
+				},
+				"name: invalid (uppercase)": {
+					input: mkDeviceClass(func(dc *resource.DeviceClass) { dc.Name = "Invalid-Name" }),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("metadata", "name"), "Invalid-Name", "").WithOrigin("format=k8s-long-name"),
+					},
+				},
+				"name: invalid (start with dash)": {
+					input: mkDeviceClass(func(dc *resource.DeviceClass) { dc.Name = "-invalid" }),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("metadata", "name"), "-invalid", "").WithOrigin("format=k8s-long-name"),
+					},
+				},
+				"name: max length": {
+					input: mkDeviceClass(func(dc *resource.DeviceClass) { dc.Name = strings.Repeat("a", 253) }),
+				},
+				"name: too long": {
+					input: mkDeviceClass(func(dc *resource.DeviceClass) { dc.Name = strings.Repeat("a", 254) }),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("metadata", "name"), strings.Repeat("a", 254), "").WithOrigin("format=k8s-long-name"),
+					},
+				},
 				// spec.selectors.
 				"valid: at limit selectors": {
 					input: mkDeviceClass(tweakSelectors(32)),
@@ -137,6 +168,14 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 				"valid no changes": {
 					old:    mkDeviceClass(),
 					update: mkDeviceClass(),
+				},
+				// metadata.name
+				"name: changed": {
+					old:    mkDeviceClass(),
+					update: mkDeviceClass(func(dc *resource.DeviceClass) { dc.Name += "x" }),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("metadata", "name"), "test-classx", "field is immutable"),
+					},
 				},
 				"valid update: at limit selectors": {
 					old:    mkDeviceClass(),

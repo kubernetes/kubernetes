@@ -30,6 +30,7 @@ import (
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	types "k8s.io/apimachinery/pkg/types"
 	sets "k8s.io/apimachinery/pkg/util/sets"
@@ -466,7 +467,27 @@ func Validate_DeviceClaimConfiguration(ctx context.Context, op operation.Operati
 // to declarative validation rules in the API schema.
 func Validate_DeviceClass(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1.DeviceClass) (errs field.ErrorList) {
 	// field resourcev1.DeviceClass.TypeMeta has no validation
-	// field resourcev1.DeviceClass.ObjectMeta has no validation
+
+	// field resourcev1.DeviceClass.ObjectMeta
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *metav1.ObjectMeta) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			func() { // cohort name
+				earlyReturn := false
+				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "name", func(o *metav1.ObjectMeta) *string { return &o.Name }, validate.DirectEqualPtr, validate.OptionalValue); len(e) != 0 {
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
+				errs = append(errs, validate.Subfield(ctx, op, fldPath, obj, oldObj, "name", func(o *metav1.ObjectMeta) *string { return &o.Name }, validate.DirectEqualPtr, validate.LongName)...)
+			}()
+			return
+		}(fldPath.Child("metadata"), &obj.ObjectMeta, safe.Field(oldObj, func(oldObj *resourcev1.DeviceClass) *metav1.ObjectMeta { return &oldObj.ObjectMeta }))...)
 
 	// field resourcev1.DeviceClass.Spec
 	errs = append(errs,
