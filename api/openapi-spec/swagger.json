@@ -1690,6 +1690,11 @@
           "x-kubernetes-list-type": "set"
         }
       },
+      "required": [
+        "apiServerID",
+        "encodingVersion",
+        "decodableVersions"
+      ],
       "type": "object"
     },
     "io.k8s.api.apiserverinternal.v1alpha1.StorageVersion": {
@@ -1717,8 +1722,7 @@
         }
       },
       "required": [
-        "spec",
-        "status"
+        "metadata"
       ],
       "type": "object",
       "x-kubernetes-group-version-kind": [
@@ -5498,6 +5502,9 @@
           "description": "spec contains the specification of the Lease. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status"
         }
       },
+      "required": [
+        "spec"
+      ],
       "type": "object",
       "x-kubernetes-group-version-kind": [
         {
@@ -5597,6 +5604,9 @@
           "description": "spec contains the specification of the Lease. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status"
         }
       },
+      "required": [
+        "spec"
+      ],
       "type": "object",
       "x-kubernetes-group-version-kind": [
         {
@@ -13659,6 +13669,9 @@
           "description": "spec is the desired state of the IPAddress. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status"
         }
       },
+      "required": [
+        "spec"
+      ],
       "type": "object",
       "x-kubernetes-group-version-kind": [
         {
@@ -14416,6 +14429,9 @@
           "description": "spec is the desired state of the IPAddress. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status"
         }
       },
+      "required": [
+        "spec"
+      ],
       "type": "object",
       "x-kubernetes-group-version-kind": [
         {
