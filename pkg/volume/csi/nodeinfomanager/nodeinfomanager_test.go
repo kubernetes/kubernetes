@@ -56,6 +56,7 @@ type testcase struct {
 	expectedCSINode  *storage.CSINode
 	expectFail       bool
 	hasModified      bool
+	migratedPlugins  map[string](func() bool)
 }
 
 type nodeIDMap map[string]string
@@ -319,6 +320,9 @@ func TestInstallCSIDriver(t *testing.T) {
 				csiNode.OwnerReferences[0].UID = types.UID("node2")
 				return csiNode
 			}(),
+			migratedPlugins: map[string](func() bool){
+				"com.example.csi.driver1": func() bool { return true },
+			},
 			inputNodeID: "com.example.csi/csi-node1",
 			expectedNode: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
@@ -327,16 +331,20 @@ func TestInstallCSIDriver(t *testing.T) {
 					Annotations: map[string]string{annotationKeyNodeID: marshall(nodeIDMap{"": "com.example.csi/csi-node1"})},
 				},
 			},
-			expectedCSINode: &storage.CSINode{
-				ObjectMeta: getCSINodeObjectMeta(),
-				Spec: storage.CSINodeSpec{
-					Drivers: []storage.CSINodeDriver{
-						{
-							NodeID: "com.example.csi/csi-node1",
+			expectedCSINode: func() *storage.CSINode {
+				csiNode := &storage.CSINode{
+					ObjectMeta: getCSINodeObjectMeta(),
+					Spec: storage.CSINodeSpec{
+						Drivers: []storage.CSINodeDriver{
+							{
+								NodeID: "com.example.csi/csi-node1",
+							},
 						},
 					},
-				},
-			},
+				}
+				csiNode.Annotations = map[string]string{v1.MigratedPluginsAnnotationKey: "com.example.csi.driver1"}
+				return csiNode
+			}(),
 		},
 		{
 			name:          "nil topology, empty node",
@@ -1060,7 +1068,7 @@ func test(t *testing.T, addNodeInfo bool, testcases []testcase) {
 			nil,
 			nil,
 		)
-		nim := NewNodeInfoManager(types.NodeName(nodeName), host, nil)
+		nim := NewNodeInfoManager(types.NodeName(nodeName), host, tc.migratedPlugins)
 
 		//// Act
 		nim.CreateCSINode()
