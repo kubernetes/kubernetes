@@ -296,7 +296,7 @@ func TestValidateDeviceTaint(t *testing.T) {
 		},
 		"invalid-taint": {
 			wantFailures: field.ErrorList{
-				field.Required(field.NewPath("spec", "taint", "effect"), ""),
+				field.Required(field.NewPath("spec", "taint", "effect"), "").MarkCoveredByDeclarative(),
 			},
 			taintRule: func() *resourceapi.DeviceTaintRule {
 				claim := testDeviceTaintRule(goodName, validDeviceTaintRuleSpec)
