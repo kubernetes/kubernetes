@@ -1285,6 +1285,7 @@ message NetworkDeviceData {
   // Must not be longer than 256 characters.
   //
   // +optional
+  // +k8s:optional
   // +k8s:maxLength=256
   optional string interfaceName = 1;
 
@@ -1305,6 +1306,7 @@ message NetworkDeviceData {
   // Must not be longer than 128 characters.
   //
   // +optional
+  // +k8s:optional
   // +k8s:maxLength=128
   optional string hardwareAddress = 3;
 }
