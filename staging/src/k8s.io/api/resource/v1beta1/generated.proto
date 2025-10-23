@@ -635,6 +635,8 @@ message DeviceClaimConfiguration {
 message DeviceClass {
   // Standard object metadata
   // +optional
+  // +k8s:subfield(name)=+k8s:optional
+  // +k8s:subfield(name)=+k8s:format=k8s-long-name
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec defines what can be allocated and how to configure it.
