@@ -51,5 +51,5 @@
   path: "staging/src/k8s.io/api/networking/v1beta1/types.go"
 
 # jsontags: 'Port' must be capitalized for backward compatibility
-- text: ' jsontags: field Port json tag does not match pattern "^[a-z][a-z0-9]*(?:[A-Z][a-z0-9]*)*$": Port'
-  path: "staging/src/k8s.io/api/core/v1/"
+- text: 'jsontags: field Port json tag does not match pattern "[^"]+": Port$'
+  path: "staging/src/k8s.io/api/core/v1/types.go"
