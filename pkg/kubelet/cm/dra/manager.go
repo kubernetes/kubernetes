@@ -417,7 +417,9 @@ func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 					return fmt.Errorf("internal error: unable to get claim info for ResourceClaim %s", claim.Name)
 				}
 				for _, device := range result.GetDevices() {
-					info.addDevice(plugin.DriverName(), state.Device{PoolName: device.PoolName, DeviceName: device.DeviceName, RequestNames: device.RequestNames, CDIDeviceIDs: device.CdiDeviceIds})
+					info.addDevice(plugin.DriverName(), state.Device{PoolName: device.PoolName,
+						DeviceName: device.DeviceName, ShareID: (*types.UID)(device.ShareId),
+						RequestNames: device.RequestNames, CDIDeviceIDs: device.CdiDeviceIds})
 				}
 				return nil
 			})
