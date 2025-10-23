@@ -47,10 +47,14 @@ func NewEvaluators(f quota.ListerForResourceFunc, i informers.SharedInformerFact
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
 		var podLister corev1listers.PodLister
-		if i != nil {
-			podLister = i.Core().V1().Pods().Lister()
+		var deviceClassMapping *cache.DeviceClassMapping
+		if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
+			if i != nil {
+				podLister = i.Core().V1().Pods().Lister()
+				deviceClassMapping = cache.NewDeviceClassMapping(i)
+			}
 		}
-		result = append(result, NewResourceClaimEvaluator(f, cache.NewDeviceClassMapping(i), podLister))
+		result = append(result, NewResourceClaimEvaluator(f, deviceClassMapping, podLister))
 	}
 
 	// these evaluators require an alias for backwards compatibility
