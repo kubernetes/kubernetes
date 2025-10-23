@@ -50,7 +50,6 @@ func SetupCurrentKubernetesSpecificFeatureGates(featuregates featuregate.Mutable
 // To add a new feature, define a key for it above and add it here.
 var versionedCloudPublicFeatureGates = map[featuregate.Feature]featuregate.VersionedSpecs{
 	CloudControllerManagerWatchBasedRoutesReconciliation: {
-		// TODO: Update to 1.34 once the Kubernetes version is changed
 		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
 	},
 	CloudControllerManagerWebhook: {
