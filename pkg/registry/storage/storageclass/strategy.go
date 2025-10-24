@@ -72,8 +72,8 @@ func (storageClassStrategy) PrepareForUpdate(ctx context.Context, obj, old runti
 }
 
 func (storageClassStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	errorList := validation.ValidateStorageClass(obj.(*storage.StorageClass))
-	allErrs := append(errorList, validation.ValidateStorageClassUpdate(obj.(*storage.StorageClass), old.(*storage.StorageClass))...)
+	allErrs := validation.ValidateStorageClass(obj.(*storage.StorageClass))
+	allErrs = append(allErrs, validation.ValidateStorageClassUpdate(obj.(*storage.StorageClass), old.(*storage.StorageClass))...)
 	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, obj, old, allErrs, operation.Update)
 }
 
