@@ -38,3 +38,9 @@
   path: "staging/src/k8s.io/api/networking/v1/types.go"
 - text: "field IngressPortStatus.Error has conflicting markers: optional_vs_required: {\\[optional\\], \\[kubebuilder:validation:Required\\]}. fields cannot be both optional and required"
   path: "staging/src/k8s.io/api/networking/v1beta1/types.go"
+
+# nophase: Legacy 'Phase' fields retained for backward compatibility
+- text: 'nophase: naming convention "nophase": field Phase: phase fields are deprecated and conditions should be preferred, avoid phase like enum fields'
+  path: "staging/src/k8s.io/api/core/v1/types.go"
+- text: 'nophase: naming convention "nophase": field LastPhaseTransitionTime: phase fields are deprecated and conditions should be preferred, avoid phase like enum fields'
+  path: "staging/src/k8s.io/api/core/v1/types.go"   
