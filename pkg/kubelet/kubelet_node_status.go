@@ -43,7 +43,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/nodestatus"
-	taintutil "k8s.io/kubernetes/pkg/util/taints"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -322,17 +321,6 @@ func (kl *Kubelet) initialNode(ctx context.Context) (*v1.Node, error) {
 
 	nodeTaints := make([]v1.Taint, len(kl.registerWithTaints))
 	copy(nodeTaints, kl.registerWithTaints)
-	unschedulableTaint := v1.Taint{
-		Key:    v1.TaintNodeUnschedulable,
-		Effect: v1.TaintEffectNoSchedule,
-	}
-
-	// Taint node with TaintNodeUnschedulable when initializing
-	// node to avoid race condition; refer to #63897 for more detail.
-	if node.Spec.Unschedulable &&
-		!taintutil.TaintExists(nodeTaints, &unschedulableTaint) {
-		nodeTaints = append(nodeTaints, unschedulableTaint)
-	}
 
 	if kl.externalCloudProvider {
 		taint := v1.Taint{
