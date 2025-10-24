@@ -5,3 +5,4 @@ tmp/**/*
 .vscode
 .idea/
 *.log
+*.test

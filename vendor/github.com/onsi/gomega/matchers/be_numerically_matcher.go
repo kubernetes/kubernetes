@@ -11,18 +11,18 @@ import (
 
 type BeNumericallyMatcher struct {
 	Comparator string
-	CompareTo  []interface{}
+	CompareTo  []any
 }
 
-func (matcher *BeNumericallyMatcher) FailureMessage(actual interface{}) (message string) {
+func (matcher *BeNumericallyMatcher) FailureMessage(actual any) (message string) {
 	return matcher.FormatFailureMessage(actual, false)
 }
 
-func (matcher *BeNumericallyMatcher) NegatedFailureMessage(actual interface{}) (message string) {
+func (matcher *BeNumericallyMatcher) NegatedFailureMessage(actual any) (message string) {
 	return matcher.FormatFailureMessage(actual, true)
 }
 
-func (matcher *BeNumericallyMatcher) FormatFailureMessage(actual interface{}, negated bool) (message string) {
+func (matcher *BeNumericallyMatcher) FormatFailureMessage(actual any, negated bool) (message string) {
 	if len(matcher.CompareTo) == 1 {
 		message = fmt.Sprintf("to be %s", matcher.Comparator)
 	} else {
@@ -34,7 +34,7 @@ func (matcher *BeNumericallyMatcher) FormatFailureMessage(actual interface{}, ne
 	return format.Message(actual, message, matcher.CompareTo[0])
 }
 
-func (matcher *BeNumericallyMatcher) Match(actual interface{}) (success bool, err error) {
+func (matcher *BeNumericallyMatcher) Match(actual any) (success bool, err error) {
 	if len(matcher.CompareTo) == 0 || len(matcher.CompareTo) > 2 {
 		return false, fmt.Errorf("BeNumerically requires 1 or 2 CompareTo arguments.  Got:\n%s", format.Object(matcher.CompareTo, 1))
 	}
