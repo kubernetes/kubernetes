@@ -136,6 +136,11 @@ func (sched *Scheduler) ScheduleOne(ctx context.Context) {
 		return
 	}
 
+	// Clone the state BEFORE starting the goroutine to avoid use-after-recycle race condition.
+	// The original state will be recycled by the defer above, but the goroutine
+	// needs its own copy since it runs asynchronously.
+	bindingState := state.Clone()
+
 	// bind the pod to its host asynchronously (we can do this b/c of the assumption step above).
 	go func() {
 		bindingCycleCtx, cancel := context.WithCancel(ctx)
@@ -144,10 +149,6 @@ func (sched *Scheduler) ScheduleOne(ctx context.Context) {
 		metrics.Goroutines.WithLabelValues(metrics.Binding).Inc()
 		defer metrics.Goroutines.WithLabelValues(metrics.Binding).Dec()
 
-		// Clone the state to avoid use-after-recycle race condition
-		// The original state will be recycled by the main thread, but the goroutine
-		// needs its own copy since it runs asynchronously
-		bindingState := state.Clone()
 		status := sched.bindingCycle(bindingCycleCtx, bindingState, fwk, scheduleResult, assumedPodInfo, start, podsToActivate)
 		if !status.IsSuccess() {
 			sched.handleBindingCycleError(bindingCycleCtx, bindingState, fwk, assumedPodInfo, start, scheduleResult, status)
