@@ -119,7 +119,7 @@ func TestDescribePod(t *testing.T) {
 	for i, test := range tests {
 		pod := runningPod.DeepCopy()
 		pod.Name, pod.Namespace, pod.Status.Phase = test.name, test.namespace, test.phase
-		fake := fake.NewSimpleClientset(pod)
+		fake := fake.NewClientset(pod)
 		c := &describeClient{T: t, Namespace: pod.Namespace, Interface: fake}
 		d := PodDescriber{c}
 		out, err := d.Describe(pod.Namespace, pod.Name, DescriberSettings{ShowEvents: true})
@@ -135,7 +135,7 @@ func TestDescribePod(t *testing.T) {
 }
 
 func TestDescribePodServiceAccount(t *testing.T) {
-	fake := fake.NewSimpleClientset(&corev1.Pod{
+	fake := fake.NewClientset(&corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "bar",
 			Namespace: "foo",
@@ -159,7 +159,7 @@ func TestDescribePodServiceAccount(t *testing.T) {
 }
 
 func TestDescribePodEphemeralContainers(t *testing.T) {
-	fake := fake.NewSimpleClientset(&corev1.Pod{
+	fake := fake.NewClientset(&corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "bar",
 			Namespace: "foo",
@@ -204,7 +204,7 @@ func TestDescribePodEphemeralContainers(t *testing.T) {
 }
 
 func TestDescribePodNode(t *testing.T) {
-	fake := fake.NewSimpleClientset(&corev1.Pod{
+	fake := fake.NewClientset(&corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "bar",
 			Namespace: "foo",
@@ -232,7 +232,7 @@ func TestDescribePodNode(t *testing.T) {
 }
 
 func TestDescribePodTolerations(t *testing.T) {
-	fake := fake.NewSimpleClientset(&corev1.Pod{
+	fake := fake.NewClientset(&corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "bar",
 			Namespace: "foo",
@@ -304,7 +304,7 @@ func TestDescribePodVolumes(t *testing.T) {
 				Events:          <none>
 			`)[1:]
 
-	fakeClient := fake.NewSimpleClientset(pod)
+	fakeClient := fake.NewClientset(pod)
 	c := &describeClient{T: t, Namespace: "foo", Interface: fakeClient}
 	d := PodDescriber{c}
 	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
@@ -315,7 +315,7 @@ func TestDescribePodVolumes(t *testing.T) {
 }
 
 func TestDescribeTopologySpreadConstraints(t *testing.T) {
-	fake := fake.NewSimpleClientset(&corev1.Pod{
+	fake := fake.NewClientset(&corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "bar",
 			Namespace: "foo",
@@ -390,7 +390,7 @@ func TestDescribeSecret(t *testing.T) {
 				},
 				Data: testCase.data,
 			}
-			fake := fake.NewSimpleClientset(secret)
+			fake := fake.NewClientset(secret)
 			c := &describeClient{T: t, Namespace: "foo", Interface: fake}
 			d := SecretDescriber{c}
 
@@ -493,7 +493,7 @@ func TestDescribeNamespace(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			fake := fake.NewSimpleClientset(testCase.namespace)
+			fake := fake.NewClientset(testCase.namespace)
 			c := &describeClient{T: t, Namespace: "", Interface: fake}
 			d := NamespaceDescriber{c}
 
@@ -513,7 +513,7 @@ func TestDescribeNamespace(t *testing.T) {
 
 func TestDescribePodPriority(t *testing.T) {
 	priority := int32(1000)
-	fake := fake.NewSimpleClientset(&corev1.Pod{
+	fake := fake.NewClientset(&corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "bar",
 		},
@@ -592,7 +592,7 @@ func TestDescribePodRuntimeClass(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			fake := fake.NewSimpleClientset(testCase.pod)
+			fake := fake.NewClientset(testCase.pod)
 			c := &describeClient{T: t, Interface: fake}
 			d := PodDescriber{c}
 			out, err := d.Describe("", "bar", DescriberSettings{ShowEvents: true})
@@ -665,7 +665,7 @@ func TestDescribePriorityClass(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			fake := fake.NewSimpleClientset(testCase.priorityClass)
+			fake := fake.NewClientset(testCase.priorityClass)
 			c := &describeClient{T: t, Interface: fake}
 			d := PriorityClassDescriber{c}
 			out, err := d.Describe("", "bar", DescriberSettings{ShowEvents: true})
@@ -682,7 +682,7 @@ func TestDescribePriorityClass(t *testing.T) {
 }
 
 func TestDescribeConfigMap(t *testing.T) {
-	fake := fake.NewSimpleClientset(&corev1.ConfigMap{
+	fake := fake.NewClientset(&corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "mycm",
 			Namespace: "foo",
@@ -740,7 +740,7 @@ Events:  <none>
 }
 
 func TestDescribeLimitRange(t *testing.T) {
-	fake := fake.NewSimpleClientset(&corev1.LimitRange{
+	fake := fake.NewClientset(&corev1.LimitRange{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "mylr",
 			Namespace: "foo",
@@ -1219,7 +1219,7 @@ func TestDescribeService(t *testing.T) {
 			for i := range tc.endpointSlices {
 				objects = append(objects, tc.endpointSlices[i])
 			}
-			fakeClient := fake.NewSimpleClientset(objects...)
+			fakeClient := fake.NewClientset(objects...)
 			c := &describeClient{T: t, Namespace: "foo", Interface: fakeClient}
 			d := ServiceDescriber{c}
 			out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
@@ -1234,7 +1234,7 @@ func TestDescribeService(t *testing.T) {
 
 func TestPodDescribeResultsSorted(t *testing.T) {
 	// Arrange
-	fake := fake.NewSimpleClientset(
+	fake := fake.NewClientset(
 		&corev1.EventList{
 			Items: []corev1.Event{
 				{
@@ -2265,7 +2265,7 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			fake := fake.NewSimpleClientset(test.pv)
+			fake := fake.NewClientset(test.pv)
 			c := PersistentVolumeDescriber{fake}
 			str, err := c.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
 			if err != nil {
@@ -2519,7 +2519,7 @@ func TestPersistentVolumeClaimDescriber(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			fake := fake.NewSimpleClientset(test.pvc)
+			fake := fake.NewClientset(test.pvc)
 			c := PersistentVolumeClaimDescriber{fake}
 
 			var describerSettings DescriberSettings
@@ -2639,7 +2639,7 @@ func TestGetPodsForPVC(t *testing.T) {
 			var objects []runtime.Object
 			objects = append(objects, test.requiredObjects...)
 			objects = append(objects, test.pvc)
-			fake := fake.NewSimpleClientset(objects...)
+			fake := fake.NewClientset(objects...)
 
 			pods, err := getPodsForPVC(fake.CoreV1().Pods(test.pvc.ObjectMeta.Namespace), test.pvc, DescriberSettings{})
 			if err != nil {
@@ -3356,7 +3356,7 @@ func TestDescribeDeployment(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			fakeClient := fake.NewSimpleClientset(testCase.objects...)
+			fakeClient := fake.NewClientset(testCase.objects...)
 			d := DeploymentDescriber{fakeClient}
 			out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
 			if err != nil {
@@ -3468,7 +3468,7 @@ func TestDescribeJob(t *testing.T) {
 			client := &describeClient{
 				T:         t,
 				Namespace: tc.job.Namespace,
-				Interface: fake.NewSimpleClientset(tc.job),
+				Interface: fake.NewClientset(tc.job),
 			}
 			describer := JobDescriber{Interface: client}
 			out, err := describer.Describe(tc.job.Namespace, tc.job.Name, DescriberSettings{ShowEvents: true})
@@ -3497,7 +3497,7 @@ func TestDescribeIngress(t *testing.T) {
 		ServiceName: "default-backend",
 		ServicePort: intstr.FromInt32(80),
 	}
-	v1beta1 := fake.NewSimpleClientset(&networkingv1beta1.Ingress{
+	v1beta1 := fake.NewClientset(&networkingv1beta1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "bar",
 			Labels: map[string]string{
@@ -3534,7 +3534,7 @@ func TestDescribeIngress(t *testing.T) {
 		},
 	}
 
-	netv1 := fake.NewSimpleClientset(&networkingv1.Ingress{
+	netv1 := fake.NewClientset(&networkingv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "bar",
 			Namespace: "foo",
@@ -3611,7 +3611,7 @@ Annotations:   <none>
 Events:        <none>` + "\n",
 		},
 		"IngressRule.HTTP.Paths.Backend.Resource v1": {
-			input: fake.NewSimpleClientset(&networkingv1.Ingress{
+			input: fake.NewClientset(&networkingv1.Ingress{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "bar",
 					Namespace: "foo",
@@ -3650,7 +3650,7 @@ Annotations:   <none>
 Events:        <none>` + "\n",
 		},
 		"IngressRule.HTTP.Paths.Backend.Resource v1 Without APIGroup": {
-			input: fake.NewSimpleClientset(&networkingv1.Ingress{
+			input: fake.NewClientset(&networkingv1.Ingress{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "bar",
 					Namespace: "foo",
@@ -3689,7 +3689,7 @@ Annotations:   <none>
 Events:        <none>` + "\n",
 		},
 		"Spec.DefaultBackend.Service & IngressRule.HTTP.Paths.Backend.Service v1": {
-			input: fake.NewSimpleClientset(&networkingv1.Ingress{
+			input: fake.NewClientset(&networkingv1.Ingress{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "bar",
 					Namespace: "foo",
@@ -3729,7 +3729,7 @@ Annotations:   <none>
 Events:        <none>` + "\n",
 		},
 		"Spec.DefaultBackend.Resource & IngressRule.HTTP.Paths.Backend.Resource v1": {
-			input: fake.NewSimpleClientset(&networkingv1.Ingress{
+			input: fake.NewClientset(&networkingv1.Ingress{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "bar",
 					Namespace: "foo",
@@ -3769,7 +3769,7 @@ Annotations:   <none>
 Events:        <none>` + "\n",
 		},
 		"Spec.DefaultBackend.Resource & IngressRule.HTTP.Paths.Backend.Service v1": {
-			input: fake.NewSimpleClientset(&networkingv1.Ingress{
+			input: fake.NewClientset(&networkingv1.Ingress{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "bar",
 					Namespace: "foo",
@@ -3809,7 +3809,7 @@ Annotations:   <none>
 Events:        <none>` + "\n",
 		},
 		"DefaultBackend": {
-			input: fake.NewSimpleClientset(&networkingv1.Ingress{
+			input: fake.NewClientset(&networkingv1.Ingress{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "bar",
 					Namespace: "foo",
@@ -3834,7 +3834,7 @@ Events:       <none>
 `,
 		},
 		"EmptyBackend": {
-			input: fake.NewSimpleClientset(&networkingv1.Ingress{
+			input: fake.NewClientset(&networkingv1.Ingress{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "bar",
 					Namespace: "foo",
@@ -3858,7 +3858,7 @@ Events:       <none>
 `,
 		},
 		"EmptyIngressClassName": {
-			input: fake.NewSimpleClientset(&networkingv1.Ingress{
+			input: fake.NewClientset(&networkingv1.Ingress{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "bar",
 					Namespace: "foo",
@@ -3911,7 +3911,7 @@ func TestDescribeIngressV1(t *testing.T) {
 		},
 	}
 
-	fakeClient := fake.NewSimpleClientset(&networkingv1.Ingress{
+	fakeClient := fake.NewClientset(&networkingv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "bar",
 			Labels: map[string]string{
@@ -3957,7 +3957,7 @@ func TestDescribeIngressV1(t *testing.T) {
 func TestDescribeStorageClass(t *testing.T) {
 	reclaimPolicy := corev1.PersistentVolumeReclaimRetain
 	bindingMode := storagev1.VolumeBindingMode("bindingmode")
-	f := fake.NewSimpleClientset(&storagev1.StorageClass{
+	f := fake.NewClientset(&storagev1.StorageClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
 			ResourceVersion: "4",
@@ -4030,7 +4030,7 @@ Parameters:   param1=value1,param2=value2
 Events:       <none>
 `
 
-	f := fake.NewSimpleClientset(&storagev1.VolumeAttributesClass{
+	f := fake.NewClientset(&storagev1.VolumeAttributesClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
 			ResourceVersion: "4",
@@ -4056,7 +4056,7 @@ Events:       <none>
 
 func TestDescribeCSINode(t *testing.T) {
 	limit := ptr.To[int32](2)
-	f := fake.NewSimpleClientset(&storagev1.CSINode{
+	f := fake.NewClientset(&storagev1.CSINode{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 		Spec: storagev1.CSINodeSpec{
 			Drivers: []storagev1.CSINodeDriver{
@@ -4088,7 +4088,7 @@ func TestDescribeCSINode(t *testing.T) {
 
 func TestDescribePodDisruptionBudgetV1(t *testing.T) {
 	minAvailable := intstr.FromInt32(22)
-	f := fake.NewSimpleClientset(&policyv1.PodDisruptionBudget{
+	f := fake.NewClientset(&policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:         "ns1",
 			Name:              "pdb1",
@@ -4986,7 +4986,7 @@ func TestDescribeHorizontalPodAutoscaler(t *testing.T) {
 				Name:      "bar",
 				Namespace: "foo",
 			}
-			fake := fake.NewSimpleClientset(&test.hpa)
+			fake := fake.NewClientset(&test.hpa)
 			desc := HorizontalPodAutoscalerDescriber{fake}
 			str, err := desc.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
 			if err != nil {
@@ -5081,7 +5081,7 @@ func TestDescribeHorizontalPodAutoscaler(t *testing.T) {
 				Name:      "bar",
 				Namespace: "foo",
 			}
-			fake := fake.NewSimpleClientset(&test.hpa)
+			fake := fake.NewClientset(&test.hpa)
 			desc := HorizontalPodAutoscalerDescriber{fake}
 			str, err := desc.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
 			if err != nil {
@@ -5130,7 +5130,7 @@ func TestDescribeEvents(t *testing.T) {
 
 	m := map[string]ResourceDescriber{
 		"DaemonSetDescriber": &DaemonSetDescriber{
-			fake.NewSimpleClientset(&appsv1.DaemonSet{
+			fake.NewClientset(&appsv1.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "bar",
 					Namespace: "foo",
@@ -5138,7 +5138,7 @@ func TestDescribeEvents(t *testing.T) {
 			}, events),
 		},
 		"DeploymentDescriber": &DeploymentDescriber{
-			fake.NewSimpleClientset(&appsv1.Deployment{
+			fake.NewClientset(&appsv1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "bar",
 					Namespace: "foo",
@@ -5150,7 +5150,7 @@ func TestDescribeEvents(t *testing.T) {
 			}, events),
 		},
 		"EndpointsDescriber": &EndpointsDescriber{
-			fake.NewSimpleClientset(&corev1.Endpoints{
+			fake.NewClientset(&corev1.Endpoints{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "bar",
 					Namespace: "foo",
@@ -5158,7 +5158,7 @@ func TestDescribeEvents(t *testing.T) {
 			}, events),
 		},
 		"EndpointSliceDescriber": &EndpointSliceDescriber{
-			fake.NewSimpleClientset(&discoveryv1beta1.EndpointSlice{
+			fake.NewClientset(&discoveryv1beta1.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "bar",
 					Namespace: "foo",
@@ -5166,7 +5166,7 @@ func TestDescribeEvents(t *testing.T) {
 			}, events),
 		},
 		"JobDescriber": &JobDescriber{
-			fake.NewSimpleClientset(&batchv1.Job{
+			fake.NewClientset(&batchv1.Job{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "bar",
 					Namespace: "foo",
@@ -5174,7 +5174,7 @@ func TestDescribeEvents(t *testing.T) {
 			}, events),
 		},
 		"IngressDescriber": &IngressDescriber{
-			fake.NewSimpleClientset(&networkingv1beta1.Ingress{
+			fake.NewClientset(&networkingv1beta1.Ingress{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "bar",
 					Namespace: "foo",
@@ -5182,21 +5182,21 @@ func TestDescribeEvents(t *testing.T) {
 			}, events),
 		},
 		"NodeDescriber": &NodeDescriber{
-			fake.NewSimpleClientset(&corev1.Node{
+			fake.NewClientset(&corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "bar",
 				},
 			}, events),
 		},
 		"PersistentVolumeDescriber": &PersistentVolumeDescriber{
-			fake.NewSimpleClientset(&corev1.PersistentVolume{
+			fake.NewClientset(&corev1.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "bar",
 				},
 			}, events),
 		},
 		"PodDescriber": &PodDescriber{
-			fake.NewSimpleClientset(&corev1.Pod{
+			fake.NewClientset(&corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "bar",
 					Namespace: "foo",
@@ -5204,7 +5204,7 @@ func TestDescribeEvents(t *testing.T) {
 			}, events),
 		},
 		"ReplicaSetDescriber": &ReplicaSetDescriber{
-			fake.NewSimpleClientset(&appsv1.ReplicaSet{
+			fake.NewClientset(&appsv1.ReplicaSet{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "bar",
 					Namespace: "foo",
@@ -5215,7 +5215,7 @@ func TestDescribeEvents(t *testing.T) {
 			}, events),
 		},
 		"ReplicationControllerDescriber": &ReplicationControllerDescriber{
-			fake.NewSimpleClientset(&corev1.ReplicationController{
+			fake.NewClientset(&corev1.ReplicationController{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "bar",
 					Namespace: "foo",
@@ -5226,7 +5226,7 @@ func TestDescribeEvents(t *testing.T) {
 			}, events),
 		},
 		"Service": &ServiceDescriber{
-			fake.NewSimpleClientset(&corev1.Service{
+			fake.NewClientset(&corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "bar",
 					Namespace: "foo",
@@ -5234,14 +5234,14 @@ func TestDescribeEvents(t *testing.T) {
 			}, events),
 		},
 		"StorageClass": &StorageClassDescriber{
-			fake.NewSimpleClientset(&storagev1.StorageClass{
+			fake.NewClientset(&storagev1.StorageClass{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "bar",
 				},
 			}, events),
 		},
 		"HorizontalPodAutoscaler": &HorizontalPodAutoscalerDescriber{
-			fake.NewSimpleClientset(&autoscalingv2.HorizontalPodAutoscaler{
+			fake.NewClientset(&autoscalingv2.HorizontalPodAutoscaler{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "bar",
 					Namespace: "foo",
@@ -5249,7 +5249,7 @@ func TestDescribeEvents(t *testing.T) {
 			}, events),
 		},
 		"ConfigMap": &ConfigMapDescriber{
-			fake.NewSimpleClientset(&corev1.ConfigMap{
+			fake.NewClientset(&corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "bar",
 					Namespace: "foo",
@@ -5423,7 +5423,7 @@ URL:	http://localhost
 }
 
 func TestDescribeResourceQuota(t *testing.T) {
-	fake := fake.NewSimpleClientset(&corev1.ResourceQuota{
+	fake := fake.NewClientset(&corev1.ResourceQuota{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "bar",
 			Namespace: "foo",
@@ -5476,7 +5476,7 @@ Parameters:
 		output string
 	}{
 		"basic IngressClass (v1beta1)": {
-			input: fake.NewSimpleClientset(&networkingv1beta1.IngressClass{
+			input: fake.NewClientset(&networkingv1beta1.IngressClass{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "example-class",
 				},
@@ -5492,7 +5492,7 @@ Parameters:
 			output: expectedOut,
 		},
 		"basic IngressClass (v1)": {
-			input: fake.NewSimpleClientset(&networkingv1.IngressClass{
+			input: fake.NewClientset(&networkingv1.IngressClass{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "example-class",
 				},
@@ -5582,7 +5582,7 @@ Spec:
 	port82 := intstr.FromInt32(82)
 	protoTCP := corev1.ProtocolTCP
 
-	versionedFake := fake.NewSimpleClientset(&networkingv1.NetworkPolicy{
+	versionedFake := fake.NewClientset(&networkingv1.NetworkPolicy{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "network-policy-1",
 			Namespace:         "default",
@@ -5767,7 +5767,7 @@ Spec:
 	port82 := intstr.FromInt32(82)
 	protoTCP := corev1.ProtocolTCP
 
-	versionedFake := fake.NewSimpleClientset(&networkingv1.NetworkPolicy{
+	versionedFake := fake.NewClientset(&networkingv1.NetworkPolicy{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "network-policy-1",
 			Namespace:         "default",
@@ -5895,7 +5895,7 @@ Spec:
 	port82 := intstr.FromInt32(82)
 	protoTCP := corev1.ProtocolTCP
 
-	versionedFake := fake.NewSimpleClientset(&networkingv1.NetworkPolicy{
+	versionedFake := fake.NewClientset(&networkingv1.NetworkPolicy{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "network-policy-1",
 			Namespace:         "default",
@@ -6038,7 +6038,7 @@ Spec:
 	port82 := int32(82)
 	protoTCP := corev1.ProtocolTCP
 
-	versionedFake := fake.NewSimpleClientset(&networkingv1.NetworkPolicy{
+	versionedFake := fake.NewClientset(&networkingv1.NetworkPolicy{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "network-policy-1",
 			Namespace:         "default",
@@ -6183,7 +6183,7 @@ Spec:
 }
 
 func TestDescribeServiceAccount(t *testing.T) {
-	fake := fake.NewSimpleClientset(&corev1.ServiceAccount{
+	fake := fake.NewClientset(&corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "bar",
 			Namespace: "foo",
@@ -6249,7 +6249,7 @@ func TestDescribeNode(t *testing.T) {
 		getHugePageResourceList("1Gi", "0"),
 	)
 
-	fake := fake.NewSimpleClientset(
+	fake := fake.NewClientset(
 		&corev1.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "bar",
@@ -6383,7 +6383,7 @@ func TestDescribeNodeWithSidecar(t *testing.T) {
 	)
 
 	restartPolicy := corev1.ContainerRestartPolicyAlways
-	fake := fake.NewSimpleClientset(
+	fake := fake.NewClientset(
 		&corev1.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "bar",
@@ -6522,7 +6522,7 @@ func TestDescribeNodeWithSidecar(t *testing.T) {
 func TestDescribeStatefulSet(t *testing.T) {
 	var partition int32 = 2672
 	var replicas int32 = 1
-	fake := fake.NewSimpleClientset(&appsv1.StatefulSet{
+	fake := fake.NewClientset(&appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "bar",
 			Namespace: "foo",
@@ -6562,7 +6562,7 @@ func TestDescribeStatefulSet(t *testing.T) {
 }
 
 func TestDescribeDaemonSet(t *testing.T) {
-	fake := fake.NewSimpleClientset(&appsv1.DaemonSet{
+	fake := fake.NewClientset(&appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "bar",
 			Namespace: "foo",
@@ -6605,7 +6605,7 @@ func TestDescribeEndpointSlice(t *testing.T) {
 		output string
 	}{
 		"EndpointSlices v1beta1": {
-			input: fake.NewSimpleClientset(&discoveryv1beta1.EndpointSlice{
+			input: fake.NewClientset(&discoveryv1beta1.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo.123",
 					Namespace: "bar",
@@ -6665,7 +6665,7 @@ Endpoints:
 Events:         <none>` + "\n",
 		},
 		"EndpointSlices v1": {
-			input: fake.NewSimpleClientset(&discoveryv1.EndpointSlice{
+			input: fake.NewClientset(&discoveryv1.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo.123",
 					Namespace: "bar",
@@ -6744,7 +6744,7 @@ func TestDescribeServiceCIDR(t *testing.T) {
 		output string
 	}{
 		"ServiceCIDR v1beta1": {
-			input: fake.NewSimpleClientset(&networkingv1beta1.ServiceCIDR{
+			input: fake.NewClientset(&networkingv1beta1.ServiceCIDR{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo.123",
 				},
@@ -6760,7 +6760,7 @@ CIDRs:        10.1.0.0/16, fd00:1:1::/64
 Events:       <none>` + "\n",
 		},
 		"ServiceCIDR v1beta1 IPv4": {
-			input: fake.NewSimpleClientset(&networkingv1beta1.ServiceCIDR{
+			input: fake.NewClientset(&networkingv1beta1.ServiceCIDR{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo.123",
 				},
@@ -6776,7 +6776,7 @@ CIDRs:        10.1.0.0/16
 Events:       <none>` + "\n",
 		},
 		"ServiceCIDR v1beta1 IPv6": {
-			input: fake.NewSimpleClientset(&networkingv1beta1.ServiceCIDR{
+			input: fake.NewClientset(&networkingv1beta1.ServiceCIDR{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo.123",
 				},
@@ -6792,7 +6792,7 @@ CIDRs:        fd00:1:1::/64
 Events:       <none>` + "\n",
 		},
 		"ServiceCIDR v1": {
-			input: fake.NewSimpleClientset(&networkingv1.ServiceCIDR{
+			input: fake.NewClientset(&networkingv1.ServiceCIDR{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo.123",
 				},
@@ -6808,7 +6808,7 @@ CIDRs:        10.1.0.0/16, fd00:1:1::/64
 Events:       <none>` + "\n",
 		},
 		"ServiceCIDR v1 IPv4": {
-			input: fake.NewSimpleClientset(&networkingv1.ServiceCIDR{
+			input: fake.NewClientset(&networkingv1.ServiceCIDR{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo.123",
 				},
@@ -6824,7 +6824,7 @@ CIDRs:        10.1.0.0/16
 Events:       <none>` + "\n",
 		},
 		"ServiceCIDR v1 IPv6": {
-			input: fake.NewSimpleClientset(&networkingv1.ServiceCIDR{
+			input: fake.NewClientset(&networkingv1.ServiceCIDR{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo.123",
 				},
@@ -6863,7 +6863,7 @@ func TestDescribeIPAddress(t *testing.T) {
 		output string
 	}{
 		"IPAddress v1beta1": {
-			input: fake.NewSimpleClientset(&networkingv1beta1.IPAddress{
+			input: fake.NewClientset(&networkingv1beta1.IPAddress{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo.123",
 				},
@@ -6888,7 +6888,7 @@ Parent Reference:
 Events:       <none>` + "\n",
 		},
 		"IPAddress v1": {
-			input: fake.NewSimpleClientset(&networkingv1.IPAddress{
+			input: fake.NewClientset(&networkingv1.IPAddress{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo.123",
 				},
@@ -6931,7 +6931,7 @@ Events:       <none>` + "\n",
 
 func TestControllerRef(t *testing.T) {
 	var replicas int32 = 1
-	f := fake.NewSimpleClientset(
+	f := fake.NewClientset(
 		&corev1.ReplicationController{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "bar",
@@ -7020,7 +7020,7 @@ func TestControllerRef(t *testing.T) {
 }
 
 func TestDescribeTerminalEscape(t *testing.T) {
-	fake := fake.NewSimpleClientset(&corev1.ConfigMap{
+	fake := fake.NewClientset(&corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        "mycm",
 			Namespace:   "foo",
@@ -7163,7 +7163,7 @@ func TestDescribeSeccompProfile(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			fake := fake.NewSimpleClientset(testCase.pod)
+			fake := fake.NewClientset(testCase.pod)
 			c := &describeClient{T: t, Interface: fake}
 			d := PodDescriber{c}
 			out, err := d.Describe("", "", DescriberSettings{ShowEvents: true})
@@ -7180,7 +7180,7 @@ func TestDescribeSeccompProfile(t *testing.T) {
 }
 
 func TestDescribeProjectedVolumesOptionalSecret(t *testing.T) {
-	fake := fake.NewSimpleClientset(&corev1.Pod{
+	fake := fake.NewClientset(&corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "bar",
 			Namespace: "foo",
