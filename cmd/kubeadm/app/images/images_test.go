@@ -149,7 +149,7 @@ func TestGetEtcdImage(t *testing.T) {
 		},
 	}
 	for _, rt := range tests {
-		actual := GetEtcdImage(rt.cfg)
+		actual := GetEtcdImage(rt.cfg, constants.SupportedEtcdVersion)
 		if actual != rt.expected {
 			t.Errorf(
 				"failed GetEtcdImage:\n\texpected: %s\n\t  actual: %s",

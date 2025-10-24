@@ -63,22 +63,22 @@ func GetDNSImage(cfg *kubeadmapi.ClusterConfiguration) string {
 }
 
 // GetEtcdImage generates and returns the image for etcd
-func GetEtcdImage(cfg *kubeadmapi.ClusterConfiguration) string {
+func GetEtcdImage(cfg *kubeadmapi.ClusterConfiguration, supportedEtcdVersion map[uint8]string) string {
 	// Etcd uses default image repository by default
 	etcdImageRepository := cfg.ImageRepository
 	// unless an override is specified
 	if cfg.Etcd.Local != nil && cfg.Etcd.Local.ImageRepository != "" {
 		etcdImageRepository = cfg.Etcd.Local.ImageRepository
 	}
-	etcdImageTag := GetEtcdImageTag(cfg)
+	etcdImageTag := GetEtcdImageTag(cfg, supportedEtcdVersion)
 	return GetGenericImage(etcdImageRepository, constants.Etcd, etcdImageTag)
 }
 
 // GetEtcdImageTag generates and returns the image tag for etcd
-func GetEtcdImageTag(cfg *kubeadmapi.ClusterConfiguration) string {
+func GetEtcdImageTag(cfg *kubeadmapi.ClusterConfiguration, supportedEtcdVersion map[uint8]string) string {
 	// Etcd uses an imageTag that corresponds to the etcd version matching the Kubernetes version
 	etcdImageTag := constants.DefaultEtcdVersion
-	etcdVersion, warning, err := constants.EtcdSupportedVersion(constants.SupportedEtcdVersion, cfg.KubernetesVersion)
+	etcdVersion, warning, err := constants.EtcdSupportedVersion(supportedEtcdVersion, cfg.KubernetesVersion)
 	if err == nil {
 		etcdImageTag = etcdVersion.String()
 	}
@@ -119,7 +119,7 @@ func GetControlPlaneImages(cfg *kubeadmapi.ClusterConfiguration) []string {
 
 	// if etcd is not external then add the image as it will be required
 	if cfg.Etcd.Local != nil {
-		images = append(images, GetEtcdImage(cfg))
+		images = append(images, GetEtcdImage(cfg, constants.SupportedEtcdVersion))
 	}
 
 	return images
