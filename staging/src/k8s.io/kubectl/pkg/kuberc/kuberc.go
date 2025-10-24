@@ -29,7 +29,11 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/plugin/pkg/client/auth/exec"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/util/homedir"
 	"k8s.io/kubectl/pkg/config"
 )
@@ -47,11 +51,14 @@ var (
 	shortHandRegex = regexp.MustCompile("^-[a-zA-Z]+$")
 )
 
+// compile-time check that these two types are aligned
+var _ = clientcmdapi.AllowlistEntry(config.AllowlistEntry{})
+
 // PreferencesHandler is responsible for setting default flags
 // arguments based on user's kuberc configuration.
 type PreferencesHandler interface {
 	AddFlags(flags *pflag.FlagSet)
-	Apply(rootCmd *cobra.Command, args []string, errOut io.Writer) ([]string, error)
+	Apply(rootCmd *cobra.Command, kubeConfigFlags *genericclioptions.ConfigFlags, args []string, errOut io.Writer) ([]string, error)
 }
 
 // Preferences stores the kuberc file coming either from environment variable
@@ -60,6 +67,7 @@ type Preferences struct {
 	getPreferencesFunc func(kuberc string, errOut io.Writer) (*config.Preference, error)
 
 	aliases map[string]struct{}
+	policy  clientcmdapi.PluginPolicy
 }
 
 // NewPreferences returns initialized Prefrences object.
@@ -85,7 +93,7 @@ func (p *Preferences) AddFlags(flags *pflag.FlagSet) {
 
 // Apply firstly applies the aliases in the preferences file and secondly overrides
 // the default values of flags.
-func (p *Preferences) Apply(rootCmd *cobra.Command, args []string, errOut io.Writer) ([]string, error) {
+func (p *Preferences) Apply(rootCmd *cobra.Command, kubeConfigFlags *genericclioptions.ConfigFlags, args []string, errOut io.Writer) ([]string, error) {
 	if len(args) <= 1 {
 		return args, nil
 	}
@@ -103,10 +111,14 @@ func (p *Preferences) Apply(rootCmd *cobra.Command, args []string, errOut io.Wri
 		return args, nil
 	}
 
-	err = validate(kuberc)
+	p.convertPluginPolicy(kuberc)
+
+	err = p.validate(kuberc)
 	if err != nil {
 		return args, err
 	}
+
+	p.applyPluginPolicy(kubeConfigFlags, kuberc)
 
 	args, err = p.applyAliases(rootCmd, kuberc, args, errOut)
 	if err != nil {
@@ -117,6 +129,38 @@ func (p *Preferences) Apply(rootCmd *cobra.Command, args []string, errOut io.Wri
 		return args, err
 	}
 	return args, nil
+}
+
+func (p *Preferences) convertPluginPolicy(kuberc *config.Preference) {
+	var allowlist []clientcmdapi.AllowlistEntry
+	if kuberc.CredentialPluginAllowlist != nil {
+		allowlist = make([]clientcmdapi.AllowlistEntry, len(kuberc.CredentialPluginAllowlist))
+		for i := range kuberc.CredentialPluginAllowlist {
+			allowlist[i] = clientcmdapi.AllowlistEntry(kuberc.CredentialPluginAllowlist[i])
+		}
+	}
+	p.policy = clientcmdapi.PluginPolicy{
+		PolicyType: clientcmdapi.PolicyType(kuberc.CredentialPluginPolicy),
+		Allowlist:  allowlist,
+	}
+}
+
+// `applyPluginPolicy` wraps the rest client getter with one that propagates
+// the allowlist, via the rest config, to the code handling credential exec
+// plugins.
+func (p *Preferences) applyPluginPolicy(kubeConfigFlags *genericclioptions.ConfigFlags, kuberc *config.Preference) {
+	wrapConfigFn := kubeConfigFlags.WrapConfigFn
+	kubeConfigFlags.WithWrapConfigFn(func(c *rest.Config) *rest.Config {
+		if wrapConfigFn != nil {
+			c = wrapConfigFn(c)
+		}
+
+		if c.ExecProvider != nil {
+			c.ExecProvider.PluginPolicy = p.policy
+		}
+
+		return c
+	})
 }
 
 // applyOverrides finds the command and sets the defaulted flag values in kuberc.
@@ -455,7 +499,7 @@ func searchInArgs(flagName string, shorthand string, allShorthands map[string]st
 	return false
 }
 
-func validate(plugin *config.Preference) error {
+func (p *Preferences) validate(plugin *config.Preference) error {
 	validateFlag := func(flags []config.CommandOptionDefault) error {
 		for _, flag := range flags {
 			if strings.HasPrefix(flag.Name, "-") {
@@ -484,6 +528,10 @@ func validate(plugin *config.Preference) error {
 		if err := validateFlag(override.Options); err != nil {
 			return err
 		}
+	}
+
+	if err := exec.ValidatePluginPolicy(p.policy); err != nil {
+		return err
 	}
 
 	return nil

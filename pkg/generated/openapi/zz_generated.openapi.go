@@ -1451,6 +1451,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		pkgconfigv1alpha1.CommandOptionDefault{}.OpenAPIModelName():                                                     schema_kubectl_pkg_config_v1alpha1_CommandOptionDefault(ref),
 		pkgconfigv1alpha1.Preference{}.OpenAPIModelName():                                                               schema_kubectl_pkg_config_v1alpha1_Preference(ref),
 		pkgconfigv1beta1.AliasOverride{}.OpenAPIModelName():                                                             schema_kubectl_pkg_config_v1beta1_AliasOverride(ref),
+		pkgconfigv1beta1.AllowlistEntry{}.OpenAPIModelName():                                                            schema_kubectl_pkg_config_v1beta1_AllowlistEntry(ref),
 		pkgconfigv1beta1.CommandDefaults{}.OpenAPIModelName():                                                           schema_kubectl_pkg_config_v1beta1_CommandDefaults(ref),
 		pkgconfigv1beta1.CommandOptionDefault{}.OpenAPIModelName():                                                      schema_kubectl_pkg_config_v1beta1_CommandOptionDefault(ref),
 		pkgconfigv1beta1.Preference{}.OpenAPIModelName():                                                                schema_kubectl_pkg_config_v1beta1_Preference(ref),
@@ -70426,6 +70427,28 @@ func schema_kubectl_pkg_config_v1beta1_AliasOverride(ref common.ReferenceCallbac
 	}
 }
 
+func schema_kubectl_pkg_config_v1beta1_AllowlistEntry(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "AllowlistEntry is an entry in the allowlist. For each allowlist item, at least one field must be nonempty. A struct with all empty fields is considered a misconfiguration error. Each field is a criterion for execution. If multiple fields are specified, then the criteria of all specified fields must be met. That is, the result of an individual entry is the logical AND of all checks corresponding to the specified fields within the entry.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name matching is performed by first resolving the absolute path of both the plugin and the name in the allowlist entry using `exec.LookPath`. It will be called on both, and the resulting strings must be equal. If either call to `exec.LookPath` results in an error, the `Name` check will be considered a failure.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"name"},
+			},
+		},
+	}
+}
+
 func schema_kubectl_pkg_config_v1beta1_CommandDefaults(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -70558,12 +70581,38 @@ func schema_kubectl_pkg_config_v1beta1_Preference(ref common.ReferenceCallback) 
 							},
 						},
 					},
+					"credentialPluginPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "credentialPluginPolicy specifies the policy governing which, if any, client-go credential plugins may be executed. It MUST be one of { \"\", \"AllowAll\", \"DenyAll\", \"Allowlist\" }. If the policy is \"\", then it falls back to \"AllowAll\" (this is required to maintain backward compatibility). If the policy is DenyAll, no credential plugins may run. If the policy is Allowlist, only those plugins meeting the criteria specified in the `credentialPluginAllowlist` field may run.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"credentialPluginAllowlist": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Allowlist is a slice of allowlist entries. If any of them is a match, then the executable in question may execute. That is, the result is the logical OR of all entries in the allowlist. This list MUST NOT be supplied if the policy is not \"Allowlist\".\n\ne.g. credentialPluginAllowlist: - name: cloud-provider-plugin - name: /usr/local/bin/my-plugin In the above example, the user allows the credential plugins `cloud-provider-plugin` (found somewhere in PATH), and the plugin found at the explicit path `/usr/local/bin/my-plugin`.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref(pkgconfigv1beta1.AllowlistEntry{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"defaults", "aliases"},
 			},
 		},
 		Dependencies: []string{
-			pkgconfigv1beta1.AliasOverride{}.OpenAPIModelName(), pkgconfigv1beta1.CommandDefaults{}.OpenAPIModelName()},
+			pkgconfigv1beta1.AliasOverride{}.OpenAPIModelName(), pkgconfigv1beta1.AllowlistEntry{}.OpenAPIModelName(), pkgconfigv1beta1.CommandDefaults{}.OpenAPIModelName()},
 	}
 }
 
