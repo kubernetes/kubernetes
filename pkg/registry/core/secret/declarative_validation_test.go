@@ -112,6 +112,21 @@ func TestDeclarativeValidateForDeclarative(t *testing.T) {
 				withData(map[string][]byte{"key": []byte("value")}),
 			),
 		},
+		"valid secret without type field": {
+			input: makeValidSecret(
+				withName(testSecretName),
+				withNamespace(testNamespace),
+				withData(map[string][]byte{"key": []byte("value")}),
+			),
+		},
+		"valid secret without immutable field": {
+			input: makeValidSecret(
+				withName(testSecretName),
+				withNamespace(testNamespace),
+				withType(api.SecretTypeOpaque),
+				withData(map[string][]byte{"key": []byte("value")}),
+			),
+		},
 	}
 
 	for k, tc := range testCases {
@@ -201,6 +216,33 @@ func TestValidateUpdateForDeclarative(t *testing.T) {
 				withNamespace(testNamespace),
 				withType(api.SecretTypeOpaque),
 				withLabels(map[string]string{"app": "v2"}),
+			),
+		},
+		"update with type field remaining optional": {
+			old: makeValidSecret(
+				withName(testSecretName),
+				withNamespace(testNamespace),
+				withData(map[string][]byte{"key": []byte("value")}),
+			),
+			update: makeValidSecret(
+				withName(testSecretName),
+				withNamespace(testNamespace),
+				withType(api.SecretTypeOpaque),
+				withData(map[string][]byte{"key": []byte("value")}),
+			),
+		},
+		"update without changing immutable field": {
+			old: makeValidSecret(
+				withName(testSecretName),
+				withNamespace(testNamespace),
+				withType(api.SecretTypeOpaque),
+				withData(map[string][]byte{"key": []byte("old-value")}),
+			),
+			update: makeValidSecret(
+				withName(testSecretName),
+				withNamespace(testNamespace),
+				withType(api.SecretTypeOpaque),
+				withData(map[string][]byte{"key": []byte("new-value")}),
 			),
 		},
 	}
