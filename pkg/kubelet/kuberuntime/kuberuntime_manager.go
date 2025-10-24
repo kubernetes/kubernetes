@@ -45,6 +45,7 @@ import (
 	"k8s.io/component-base/logs/logreduction"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	remote "k8s.io/cri-client/pkg"	
 	crierror "k8s.io/cri-api/pkg/errors"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -1819,7 +1820,13 @@ func (m *kubeGenericRuntimeManager) GetContainerStatus(ctx context.Context, podU
 	if err != nil {
 		return nil, fmt.Errorf("runtime container status: %w", err)
 	}
-	return m.convertToKubeContainerStatus(ctx, podUID, resp.GetStatus()), nil
+
+	status := resp.GetStatus()
+	if status == nil {
+		return nil, remote.ErrContainerStatusNil
+	}
+
+	return m.convertToKubeContainerStatus(ctx, podUID, status), nil
 }
 
 // GarbageCollect removes dead containers using the specified container gc policy.
