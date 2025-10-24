@@ -399,10 +399,12 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 
 			class := requestData.class
 			if class != nil {
+				request := &claim.Spec.Devices.Requests[requestIndex]
+				requestName := request.Name
 				for _, config := range class.Spec.Config {
 					allocationResult.Devices.Config = append(allocationResult.Devices.Config, resourceapi.DeviceAllocationConfiguration{
 						Source:              resourceapi.AllocationConfigSourceClass,
-						Requests:            nil, // All of them...
+						Requests:            []string{requestName},
 						DeviceConfiguration: config.DeviceConfiguration,
 					})
 				}

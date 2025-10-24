@@ -715,12 +715,18 @@ func matchNodeSelectorRequirement(requirement v1.NodeSelectorRequirement) types.
 }
 
 func allocationResultWithConfig(selector *v1.NodeSelector, driver string, source resourceapi.AllocationConfigSource, attribute string, results ...resourceapi.DeviceRequestAllocationResult) resourceapi.AllocationResult {
+	var requests []string
+	if source == resourceapi.AllocationConfigSourceClass && len(results) > 0 {
+		// For FromClass configs, set Requests to the request name
+		requests = []string{results[0].Request}
+	}
 	return resourceapi.AllocationResult{
 		Devices: resourceapi.DeviceAllocationResult{
 			Results: results,
 			Config: []resourceapi.DeviceAllocationConfiguration{
 				{
 					Source:              source,
+					Requests:            requests,
 					DeviceConfiguration: deviceConfiguration(driver, attribute),
 				},
 			},
@@ -2264,7 +2270,7 @@ func TestAllocator(t *testing.T,
 				[]resourceapi.DeviceAllocationConfiguration{
 					{
 						Source:              resourceapi.AllocationConfigSourceClass,
-						Requests:            nil,
+						Requests:            []string{req0},
 						DeviceConfiguration: deviceConfiguration(driverB, "bar"),
 					},
 				},
