@@ -40,7 +40,7 @@ func (ic InterruptCause) String() string {
 }
 
 type InterruptStatus struct {
-	Channel chan interface{}
+	Channel chan any
 	Level   InterruptLevel
 	Cause   InterruptCause
 }
@@ -62,14 +62,14 @@ type InterruptHandlerInterface interface {
 }
 
 type InterruptHandler struct {
-	c                 chan interface{}
+	c                 chan any
 	lock              *sync.Mutex
 	level             InterruptLevel
 	cause             InterruptCause
 	client            parallel_support.Client
-	stop              chan interface{}
+	stop              chan any
 	signals           []os.Signal
-	requestAbortCheck chan interface{}
+	requestAbortCheck chan any
 }
 
 func NewInterruptHandler(client parallel_support.Client, signals ...os.Signal) *InterruptHandler {
@@ -77,10 +77,10 @@ func NewInterruptHandler(client parallel_support.Client, signals ...os.Signal) *
 		signals = []os.Signal{os.Interrupt, syscall.SIGTERM}
 	}
 	handler := &InterruptHandler{
-		c:                 make(chan interface{}),
+		c:                 make(chan any),
 		lock:              &sync.Mutex{},
-		stop:              make(chan interface{}),
-		requestAbortCheck: make(chan interface{}),
+		stop:              make(chan any),
+		requestAbortCheck: make(chan any),
 		client:            client,
 		signals:           signals,
 	}
@@ -98,9 +98,9 @@ func (handler *InterruptHandler) registerForInterrupts() {
 	signal.Notify(signalChannel, handler.signals...)
 
 	// cross-process abort handling
-	var abortChannel chan interface{}
+	var abortChannel chan any
 	if handler.client != nil {
-		abortChannel = make(chan interface{})
+		abortChannel = make(chan any)
 		go func() {
 			pollTicker := time.NewTicker(ABORT_POLLING_INTERVAL)
 			for {
@@ -125,7 +125,7 @@ func (handler *InterruptHandler) registerForInterrupts() {
 		}()
 	}
 
-	go func(abortChannel chan interface{}) {
+	go func(abortChannel chan any) {
 		var interruptCause InterruptCause
 		for {
 			select {
@@ -151,7 +151,7 @@ func (handler *InterruptHandler) registerForInterrupts() {
 			}
 			if handler.level != oldLevel {
 				close(handler.c)
-				handler.c = make(chan interface{})
+				handler.c = make(chan any)
 			}
 			handler.lock.Unlock()
 		}

@@ -2,11 +2,8 @@ package watch
 
 import (
 	"go/build"
-	"regexp"
+	"strings"
 )
-
-var ginkgoAndGomegaFilter = regexp.MustCompile(`github\.com/onsi/ginkgo|github\.com/onsi/gomega`)
-var ginkgoIntegrationTestFilter = regexp.MustCompile(`github\.com/onsi/ginkgo/integration`) //allow us to integration test this thing
 
 type Dependencies struct {
 	deps map[string]int
@@ -78,7 +75,7 @@ func (d Dependencies) resolveAndAdd(deps []string, depth int) {
 		if err != nil {
 			continue
 		}
-		if !pkg.Goroot && (!ginkgoAndGomegaFilter.MatchString(pkg.Dir) || ginkgoIntegrationTestFilter.MatchString(pkg.Dir)) {
+		if !pkg.Goroot && (!matchesGinkgoOrGomega(pkg.Dir) || matchesGinkgoIntegration(pkg.Dir)) {
 			d.addDepIfNotPresent(pkg.Dir, depth)
 		}
 	}
@@ -89,4 +86,12 @@ func (d Dependencies) addDepIfNotPresent(dep string, depth int) {
 	if !ok {
 		d.deps[dep] = depth
 	}
+}
+
+func matchesGinkgoOrGomega(s string) bool {
+	return strings.Contains(s, "github.com/onsi/ginkgo") || strings.Contains(s, "github.com/onsi/gomega")
+}
+
+func matchesGinkgoIntegration(s string) bool {
+	return strings.Contains(s, "github.com/onsi/ginkgo/integration") // allow us to integration test this thing
 }

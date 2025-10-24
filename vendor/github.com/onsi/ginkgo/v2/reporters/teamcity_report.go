@@ -38,8 +38,12 @@ func GenerateTeamcityReport(report types.Report, dst string) error {
 
 	name := report.SuiteDescription
 	labels := report.SuiteLabels
+	semVerConstraints := report.SuiteSemVerConstraints
 	if len(labels) > 0 {
 		name = name + " [" + strings.Join(labels, ", ") + "]"
+	}
+	if len(semVerConstraints) > 0 {
+		name = name + " [" + strings.Join(semVerConstraints, ", ") + "]"
 	}
 	fmt.Fprintf(f, "##teamcity[testSuiteStarted name='%s']\n", tcEscape(name))
 	for _, spec := range report.SpecReports {
@@ -50,6 +54,10 @@ func GenerateTeamcityReport(report types.Report, dst string) error {
 		labels := spec.Labels()
 		if len(labels) > 0 {
 			name = name + " [" + strings.Join(labels, ", ") + "]"
+		}
+		semVerConstraints := spec.SemVerConstraints()
+		if len(semVerConstraints) > 0 {
+			name = name + " [" + strings.Join(semVerConstraints, ", ") + "]"
 		}
 
 		name = tcEscape(name)

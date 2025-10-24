@@ -9,10 +9,10 @@ import (
 
 type MatchRegexpMatcher struct {
 	Regexp string
-	Args   []interface{}
+	Args   []any
 }
 
-func (matcher *MatchRegexpMatcher) Match(actual interface{}) (success bool, err error) {
+func (matcher *MatchRegexpMatcher) Match(actual any) (success bool, err error) {
 	actualString, ok := toString(actual)
 	if !ok {
 		return false, fmt.Errorf("RegExp matcher requires a string or stringer.\nGot:%s", format.Object(actual, 1))
@@ -26,11 +26,11 @@ func (matcher *MatchRegexpMatcher) Match(actual interface{}) (success bool, err 
 	return match, nil
 }
 
-func (matcher *MatchRegexpMatcher) FailureMessage(actual interface{}) (message string) {
+func (matcher *MatchRegexpMatcher) FailureMessage(actual any) (message string) {
 	return format.Message(actual, "to match regular expression", matcher.regexp())
 }
 
-func (matcher *MatchRegexpMatcher) NegatedFailureMessage(actual interface{}) (message string) {
+func (matcher *MatchRegexpMatcher) NegatedFailureMessage(actual any) (message string) {
 	return format.Message(actual, "not to match regular expression", matcher.regexp())
 }
 

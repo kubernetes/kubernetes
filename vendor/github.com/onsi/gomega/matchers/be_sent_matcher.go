@@ -10,11 +10,11 @@ import (
 )
 
 type BeSentMatcher struct {
-	Arg           interface{}
+	Arg           any
 	channelClosed bool
 }
 
-func (matcher *BeSentMatcher) Match(actual interface{}) (success bool, err error) {
+func (matcher *BeSentMatcher) Match(actual any) (success bool, err error) {
 	if !isChan(actual) {
 		return false, fmt.Errorf("BeSent expects a channel.  Got:\n%s", format.Object(actual, 1))
 	}
@@ -56,15 +56,15 @@ func (matcher *BeSentMatcher) Match(actual interface{}) (success bool, err error
 	return didSend, nil
 }
 
-func (matcher *BeSentMatcher) FailureMessage(actual interface{}) (message string) {
+func (matcher *BeSentMatcher) FailureMessage(actual any) (message string) {
 	return format.Message(actual, "to send:", matcher.Arg)
 }
 
-func (matcher *BeSentMatcher) NegatedFailureMessage(actual interface{}) (message string) {
+func (matcher *BeSentMatcher) NegatedFailureMessage(actual any) (message string) {
 	return format.Message(actual, "not to send:", matcher.Arg)
 }
 
-func (matcher *BeSentMatcher) MatchMayChangeInTheFuture(actual interface{}) bool {
+func (matcher *BeSentMatcher) MatchMayChangeInTheFuture(actual any) bool {
 	if !isChan(actual) {
 		return false
 	}
