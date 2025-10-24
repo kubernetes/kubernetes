@@ -31,7 +31,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/rest/fake"
@@ -279,7 +278,7 @@ func TestLabelFunc(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		err := labelFunc(test.obj, test.overwrite, test.version, test.labels, test.remove)
+		_, _, err := labelFunc(test.obj, test.overwrite, test.version, test.labels, test.remove)
 		if test.expectErr != "" {
 			if err == nil {
 				t.Errorf("unexpected non-error: %v", test)
@@ -845,7 +844,7 @@ func TestLabelMsg(t *testing.T) {
 					},
 				},
 			},
-			expectMsg: MsgLabeled,
+			expectMsg: MsgModified,
 		},
 		{
 			name: "reject modification when overwrite unset",
@@ -869,12 +868,7 @@ func TestLabelMsg(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			oldData, err := json.Marshal(test.obj)
-			if err != nil {
-				t.Errorf("unexpected error: %v %v", err, test)
-			}
-
-			err = labelFunc(test.obj, test.overwrite, test.resourceVersion, test.labels, test.remove)
+			added, removed, err := labelFunc(test.obj, test.overwrite, test.resourceVersion, test.labels, test.remove)
 			if test.expectErr {
 				if err == nil {
 					t.Errorf("unexpected non-error: %v", test)
@@ -885,14 +879,9 @@ func TestLabelMsg(t *testing.T) {
 				t.Errorf("unexpected error: %v %v", err, test)
 			}
 
-			newObj, err := json.Marshal(test.obj)
-			if err != nil {
-				t.Errorf("unexpected error: %v %v", err, test)
-			}
-
-			dataChangeMsg := updateDataChangeMsg(oldData, newObj, test.overwrite)
+			dataChangeMsg := updateDataChangeMsg(added, removed)
 			if dataChangeMsg != test.expectMsg {
-				t.Errorf("unexpected dataChangeMsg: %v != %v, %v", dataChangeMsg, test.expectMsg, test)
+				t.Errorf("unexpected dataChangeMsg: expected = %v; got = %v (test %#v)", test.expectMsg, dataChangeMsg, test)
 			}
 		})
 	}
