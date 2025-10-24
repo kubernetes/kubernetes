@@ -410,6 +410,7 @@ linters:
               # - "uniquemarkers" # Ensure markers are not duplicated across field and type definitions.
               - "duplicatemarkers" #Prevent identical markers from being present on types and fields
               - "dependenttags" # Ensure markers dependent on other markers are present.
+              - "nodurations" # Ensure duration types are not used.
           lintersConfig:
             conditions:
               isFirstField: Ignore
