@@ -659,12 +659,11 @@ func (ec *Controller) handleClaim(ctx context.Context, pod *v1.Pod, podClaim v1.
 				GenerateName: generateName,
 				OwnerReferences: []metav1.OwnerReference{
 					{
-						APIVersion:         "v1",
-						Kind:               "Pod",
-						Name:               pod.Name,
-						UID:                pod.UID,
-						Controller:         &isTrue,
-						BlockOwnerDeletion: &isTrue,
+						APIVersion: "v1",
+						Kind:       "Pod",
+						Name:       pod.Name,
+						UID:        pod.UID,
+						Controller: &isTrue,
 					},
 				},
 				Annotations: annotations,

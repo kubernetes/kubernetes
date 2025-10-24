@@ -931,14 +931,12 @@ func claimKey(claim *resourceapi.ResourceClaim) string {
 }
 
 func makeOwnerReference(pod *v1.Pod, isController bool) *metav1.OwnerReference {
-	isTrue := true
 	return &metav1.OwnerReference{
-		APIVersion:         "v1",
-		Kind:               "Pod",
-		Name:               pod.Name,
-		UID:                pod.UID,
-		Controller:         &isController,
-		BlockOwnerDeletion: &isTrue,
+		APIVersion: "v1",
+		Kind:       "Pod",
+		Name:       pod.Name,
+		UID:        pod.UID,
+		Controller: &isController,
 	}
 }
 
