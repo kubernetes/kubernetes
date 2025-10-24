@@ -544,6 +544,8 @@ func validateAllocationConfigSource(source resource.AllocationConfigSource, fldP
 // ValidateDeviceClass validates a DeviceClass.
 func ValidateDeviceClass(class *resource.DeviceClass) field.ErrorList {
 	validateClassName := func(fldPath *field.Path, name string) field.ErrorList {
+		// validate.LongName doesn't respect operation type currently (CREATE or UPDATE)
+		// so it is ok to use operation.Operation{} here
 		return validate.LongName(context.Background(), operation.Operation{}, fldPath, &name, nil).MarkCoveredByDeclarative()
 	}
 	allErrs := corevalidation.ValidateObjectMetaWithOpts(&class.ObjectMeta, false, validateClassName, field.NewPath("metadata"))
