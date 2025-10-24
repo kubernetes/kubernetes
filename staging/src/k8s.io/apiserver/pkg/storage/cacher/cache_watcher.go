@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -31,6 +32,11 @@ import (
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 
 	"k8s.io/klog/v2"
+)
+
+var (
+	// Track if we've already logged the initial event type mismatch to avoid spam
+	initialEventTypeMismatchLogged atomic.Bool
 )
 
 // possible states of the cache watcher
@@ -376,6 +382,14 @@ func (c *cacheWatcher) convertToWatchEvent(event *watchCacheEvent) *watch.Event 
 	// ADDED events precede the initial BOOKMARK, regardless of any PrevObject
 	// data or filtering logic.
 	if event.IsInitialEvent {
+		// Defensive detection for issue #134831: initial events with wrong type.
+		// This should not happen (initial events are created as ADDED), but has been
+		// observed in production at scale. Log once for diagnostics and validation.
+		if event.Type != watch.Added && initialEventTypeMismatchLogged.CompareAndSwap(false, true) {
+			klog.Warningf("Initial event type corrected (issue #134831): type=%v→ADDED, key=%s, hasPrevObject=%v, rv=%d. Further corrections will be silent.",
+				event.Type, event.Key, event.PrevObject != nil, event.ResourceVersion)
+		}
+
 		// Even for initial events, we must respect the filter - if the object
 		// doesn't match the watcher's filter, it should not be sent at all.
 		if !c.filter(event.Key, event.ObjLabels, event.ObjFields) {
