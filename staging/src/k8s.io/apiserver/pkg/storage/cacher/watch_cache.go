@@ -78,6 +78,11 @@ type watchCacheEvent struct {
 	Key             string
 	ResourceVersion uint64
 	RecordTime      time.Time
+	// IsInitialEvent indicates this event is part of the initial state sent
+	// for sendInitialEvents requests. Such events must always be delivered as
+	// ADDED events regardless of PrevObject or filtering logic to maintain the
+	// API contract that only ADDED events precede the initial BOOKMARK.
+	IsInitialEvent  bool
 }
 
 // watchCache implements a Store interface.

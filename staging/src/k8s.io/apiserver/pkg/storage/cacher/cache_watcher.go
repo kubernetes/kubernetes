@@ -371,6 +371,19 @@ func (c *cacheWatcher) convertToWatchEvent(event *watchCacheEvent) *watch.Event 
 		return e
 	}
 
+	// For initial events (sent as part of sendInitialEvents requests), we must
+	// always return them as ADDED events to maintain the API contract that only
+	// ADDED events precede the initial BOOKMARK, regardless of any PrevObject
+	// data or filtering logic.
+	if event.IsInitialEvent {
+		// Even for initial events, we must respect the filter - if the object
+		// doesn't match the watcher's filter, it should not be sent at all.
+		if !c.filter(event.Key, event.ObjLabels, event.ObjFields) {
+			return nil
+		}
+		return &watch.Event{Type: watch.Added, Object: getMutableObject(event.Object)}
+	}
+
 	curObjPasses := event.Type != watch.Deleted && c.filter(event.Key, event.ObjLabels, event.ObjFields)
 	oldObjPasses := false
 	if event.PrevObject != nil {

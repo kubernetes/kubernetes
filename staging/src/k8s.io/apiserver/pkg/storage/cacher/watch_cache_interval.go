@@ -164,6 +164,7 @@ func newCacheIntervalFromStore(resourceVersion uint64, store storeIndexer, key s
 			ObjFields:       elem.Fields,
 			Key:             elem.Key,
 			ResourceVersion: resourceVersion,
+			IsInitialEvent:  true,
 		}
 		buffer.endIndex++
 	}

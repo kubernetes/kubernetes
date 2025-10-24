@@ -388,6 +388,7 @@ func TestCacheIntervalNextFromStore(t *testing.T) {
 			ObjFields:       objFields,
 			Key:             elem.Key,
 			ResourceVersion: rv,
+			IsInitialEvent:  true,
 		}
 		store.Add(elem)
 	}
