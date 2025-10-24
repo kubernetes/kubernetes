@@ -137,6 +137,11 @@ func (in *CSIDriverSpec) DeepCopyInto(out *CSIDriverSpec) {
 		*out = new(int64)
 		**out = **in
 	}
+	if in.ServiceAccountTokenInSecrets != nil {
+		in, out := &in.ServiceAccountTokenInSecrets, &out.ServiceAccountTokenInSecrets
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 

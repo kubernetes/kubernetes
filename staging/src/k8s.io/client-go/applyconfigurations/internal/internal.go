@@ -15024,6 +15024,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: seLinuxMount
       type:
         scalar: boolean
+    - name: serviceAccountTokenInSecrets
+      type:
+        scalar: boolean
     - name: storageCapacity
       type:
         scalar: boolean
@@ -15428,6 +15431,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: boolean
     - name: seLinuxMount
+      type:
+        scalar: boolean
+    - name: serviceAccountTokenInSecrets
       type:
         scalar: boolean
     - name: storageCapacity
