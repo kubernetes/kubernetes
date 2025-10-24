@@ -409,6 +409,8 @@ message StorageClass {
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // provisioner indicates the type of the provisioner.
+  // +required
+  // +k8s:required
   optional string provisioner = 2;
 
   // parameters holds the parameters for the provisioner that should
