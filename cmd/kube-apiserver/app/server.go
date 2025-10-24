@@ -227,7 +227,7 @@ func CreateKubeAPIServerConfig(
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("error building service resolver: %w", err)
 	}
-	controlplaneConfig, admissionInitializers, err := controlplaneapiserver.CreateConfig(opts.CompletedOptions, genericConfig, versionedInformers, storageFactory, serviceResolver, kubeInitializers)
+	controlplaneConfig, admissionInitializers, err := controlplaneapiserver.CreateConfig(opts.CompletedOptions, genericConfig, versionedInformers, endpointSliceGetter, storageFactory, serviceResolver, kubeInitializers)
 	if err != nil {
 		return nil, nil, nil, err
 	}

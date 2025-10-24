@@ -34,6 +34,7 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/proxy"
 	"k8s.io/client-go/kubernetes"
 	networkingv1client "k8s.io/client-go/kubernetes/typed/networking/v1"
 	policyclient "k8s.io/client-go/kubernetes/typed/policy/v1"
@@ -72,6 +73,8 @@ type Config struct {
 
 	Proxy    ProxyConfig
 	Services ServicesConfig
+
+	EndpointSliceGetter proxy.EndpointSliceGetter
 }
 
 type ProxyConfig struct {
@@ -207,7 +210,7 @@ func (p *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 		p.primaryServiceClusterIPAllocator.IPFamily(),
 		p.serviceClusterIPAllocators,
 		p.serviceNodePortAllocator,
-		endpointsStorage,
+		p.EndpointSliceGetter,
 		podStorage.Pod,
 		p.Proxy.Transport)
 	if err != nil {

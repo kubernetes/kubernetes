@@ -27,7 +27,10 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+
+	discoveryv1 "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -38,25 +41,53 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
-	epstest "k8s.io/kubernetes/pkg/api/endpoints/testing"
 	svctest "k8s.io/kubernetes/pkg/api/service/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	endpointstore "k8s.io/kubernetes/pkg/registry/core/endpoint/storage"
+	"k8s.io/kubernetes/pkg/apis/discovery"
+	apisdiscoveryv1 "k8s.io/kubernetes/pkg/apis/discovery/v1"
 	podstore "k8s.io/kubernetes/pkg/registry/core/pod/storage"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
+	endpointslicestore "k8s.io/kubernetes/pkg/registry/discovery/endpointslice/storage"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	netutils "k8s.io/utils/net"
+	"k8s.io/utils/ptr"
 )
 
 type cleanupFunc func()
+
+// storageEndpointSliceGetter wraps a discovery REST storage and converts its unversioned
+// EndpointSlices to discoveryv1.EndpointSlice.
+type storageEndpointSliceGetter struct {
+	rest *endpointslicestore.REST
+}
+
+func (sg *storageEndpointSliceGetter) GetEndpointSlices(namespaceName, serviceName string) ([]*discoveryv1.EndpointSlice, error) {
+	obj, err := sg.rest.List(context.TODO(), &metainternalversion.ListOptions{LabelSelector: labels.SelectorFromSet(labels.Set{discoveryv1.LabelServiceName: serviceName})})
+	if err != nil {
+		return nil, err
+	}
+	unversioned := obj.(*discovery.EndpointSliceList)
+
+	// (Using Convert_discovery_EndpointSliceList_To_v1_EndpointSliceList() would give
+	// us a []discoveryv1.EndpointSlice rather than a []*discoveryv1.EndpointSlice, so
+	// we'd still have to iterate over the result and build a new array anyway.)
+	v1Slices := make([]*discoveryv1.EndpointSlice, len(unversioned.Items))
+	for i := range unversioned.Items {
+		v1Slices[i] = new(discoveryv1.EndpointSlice)
+		if err := apisdiscoveryv1.Convert_discovery_EndpointSlice_To_v1_EndpointSlice(&unversioned.Items[i], v1Slices[i], nil); err != nil {
+			return nil, err
+		}
+	}
+	return v1Slices, nil
+}
 
 // Most tests will use this to create a registry to run tests against.
 func newStorage(t *testing.T, ipFamilies []api.IPFamily) (*wrapperRESTForTests, *StatusREST, cleanupFunc) {
 	return newStorageWithPods(t, ipFamilies, nil, nil)
 }
 
-func newStorageWithPods(t *testing.T, ipFamilies []api.IPFamily, pods []api.Pod, endpoints []*api.Endpoints) (*wrapperRESTForTests, *StatusREST, cleanupFunc) {
+func newStorageWithPods(t *testing.T, ipFamilies []api.IPFamily, pods []api.Pod, endpointSlices []*discovery.EndpointSlice) (*wrapperRESTForTests, *StatusREST, cleanupFunc) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
 	restOptions := generic.RESTOptions{
 		StorageConfig:           etcdStorage.ForResource(schema.GroupResource{Resource: "services"}),
@@ -101,32 +132,37 @@ func newStorageWithPods(t *testing.T, ipFamilies []api.IPFamily, pods []api.Pod,
 		}
 	}
 
-	endpointsStorage, err := endpointstore.NewREST(generic.RESTOptions{
-		StorageConfig:  etcdStorage,
+	etcdDiscoveryStorage, discoveryServer := registrytest.NewEtcdStorage(t, discovery.GroupName)
+	endpointSliceStorage, err := endpointslicestore.NewREST(generic.RESTOptions{
+		StorageConfig:  etcdDiscoveryStorage,
 		Decorator:      generic.UndecoratedStorage,
-		ResourcePrefix: "endpoints",
+		ResourcePrefix: "endpointslices",
 	})
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}
-	if endpoints != nil && len(endpoints) > 0 {
-		ctx := genericregistrytest.NewNamespaceScopeContext(endpointsStorage.Store, metav1.NamespaceDefault)
-		for ix := range endpoints {
-			key, _ := endpointsStorage.KeyFunc(ctx, endpoints[ix].Name)
-			if err := endpointsStorage.Store.Storage.Create(ctx, key, endpoints[ix], nil, 0, false); err != nil {
-				t.Fatalf("Couldn't create endpoint: %v", err)
+	endpointSliceGetter := &storageEndpointSliceGetter{endpointSliceStorage}
+
+	if len(endpointSlices) > 0 {
+		ctx := genericregistrytest.NewNamespaceScopeContext(endpointSliceStorage.Store, metav1.NamespaceDefault)
+		for ix := range endpointSlices {
+			key, _ := endpointSliceStorage.KeyFunc(ctx, endpointSlices[ix].Name)
+			if err := endpointSliceStorage.Store.Storage.Create(ctx, key, endpointSlices[ix], nil, 0, false); err != nil {
+				t.Fatalf("Couldn't create endpointslice: %v", err)
 			}
 		}
 	}
 
-	serviceStorage, statusStorage, _, err := NewREST(restOptions, ipFamilies[0], ipAllocs, portAlloc, endpointsStorage, podStorage.Pod, nil)
+	serviceStorage, statusStorage, _, err := NewREST(restOptions, ipFamilies[0], ipAllocs, portAlloc, endpointSliceGetter, podStorage.Pod, nil)
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}
 
 	cleanup := func() {
 		server.Terminate(t)
+		discoveryServer.Terminate(t)
 		serviceStorage.Destroy()
+		endpointSliceStorage.Store.Destroy()
 	}
 
 	return &wrapperRESTForTests{serviceStorage}, statusStorage, cleanup
@@ -11605,30 +11641,84 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 		makePod("no-endpoints", "9.9.9.9"), // to prove this does not get chosen
 	}
 
-	endpoints := []*api.Endpoints{
-		epstest.MakeEndpoints("unnamed",
-			[]api.EndpointAddress{
-				epstest.MakeEndpointAddress("1.2.3.4", "unnamed"),
+	endpoints := []*discovery.EndpointSlice{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "unnamed-ep",
+				Namespace: metav1.NamespaceDefault,
+				Labels: map[string]string{
+					"kubernetes.io/service-name": "unnamed",
+				},
 			},
-			[]api.EndpointPort{
-				epstest.MakeEndpointPort("", 80),
-			}),
-		epstest.MakeEndpoints("unnamed2",
-			[]api.EndpointAddress{
-				epstest.MakeEndpointAddress("1.2.3.5", "unnamed"),
+			AddressType: discovery.AddressTypeIPv4,
+			Endpoints: []discovery.Endpoint{{
+				Addresses: []string{"1.2.3.4"},
+				TargetRef: &api.ObjectReference{
+					Name:      "unnamed",
+					Namespace: metav1.NamespaceDefault,
+				},
+			}},
+			Ports: []discovery.EndpointPort{{
+				Name: ptr.To(""),
+				Port: ptr.To[int32](80),
+			}},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "unnamed2-ep",
+				Namespace: metav1.NamespaceDefault,
+				Labels: map[string]string{
+					"kubernetes.io/service-name": "unnamed2",
+				},
 			},
-			[]api.EndpointPort{
-				epstest.MakeEndpointPort("", 80),
-			}),
-		epstest.MakeEndpoints("named",
-			[]api.EndpointAddress{
-				epstest.MakeEndpointAddress("1.2.3.6", "named"),
+			AddressType: discovery.AddressTypeIPv4,
+			Endpoints: []discovery.Endpoint{{
+				Addresses: []string{"1.2.3.5"},
+				TargetRef: &api.ObjectReference{
+					Name:      "unnamed",
+					Namespace: metav1.NamespaceDefault,
+				},
+			}},
+			Ports: []discovery.EndpointPort{{
+				Name: ptr.To(""),
+				Port: ptr.To[int32](80),
+			}},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "named-ep",
+				Namespace: metav1.NamespaceDefault,
+				Labels: map[string]string{
+					"kubernetes.io/service-name": "named",
+				},
 			},
-			[]api.EndpointPort{
-				epstest.MakeEndpointPort("p", 80),
-				epstest.MakeEndpointPort("q", 81),
-			}),
-		epstest.MakeEndpoints("no-endpoints", nil, nil), // to prove this does not get chosen
+			AddressType: discovery.AddressTypeIPv4,
+			Endpoints: []discovery.Endpoint{{
+				Addresses: []string{"1.2.3.6"},
+				TargetRef: &api.ObjectReference{
+					Name:      "named",
+					Namespace: metav1.NamespaceDefault,
+				},
+			}},
+			Ports: []discovery.EndpointPort{{
+				Name: ptr.To("p"),
+				Port: ptr.To[int32](80),
+			}, {
+				Name: ptr.To("q"),
+				Port: ptr.To[int32](81),
+			}},
+		},
+		// to prove this does not get chosen
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "no-endpoints-ep",
+				Namespace: metav1.NamespaceDefault,
+				Labels: map[string]string{
+					"kubernetes.io/service-name": "no-endpoints",
+				},
+			},
+			AddressType: discovery.AddressTypeIPv4,
+		},
 	}
 
 	storage, _, cleanup := newStorageWithPods(t, []api.IPFamily{api.IPv4Protocol}, pods, endpoints)
