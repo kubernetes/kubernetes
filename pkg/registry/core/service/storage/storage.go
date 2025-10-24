@@ -36,7 +36,6 @@ import (
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/util/dryrun"
-	"k8s.io/klog/v2"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
@@ -50,7 +49,6 @@ import (
 
 type EndpointsStorage interface {
 	rest.Getter
-	rest.GracefulDeleter
 }
 
 type PodStorage interface {
@@ -340,18 +338,6 @@ func (r *REST) afterDelete(obj runtime.Object, options *metav1.DeleteOptions) {
 
 	// Only perform the cleanup if this is a non-dryrun deletion
 	if !dryrun.IsDryRun(options.DryRun) {
-		// It would be better if we had the caller context, but that changes
-		// this hook signature.
-		ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), svc.Namespace)
-		// TODO: This is clumsy.  It was added for fear that the endpoints
-		// controller might lag, and we could end up rusing the service name
-		// with old endpoints.  We should solve that better and remove this, or
-		// else we should do this for EndpointSlice, too.
-		_, _, err := r.endpoints.Delete(ctx, svc.Name, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{})
-		if err != nil && !errors.IsNotFound(err) {
-			klog.Errorf("delete service endpoints %s/%s failed: %v", svc.Name, svc.Namespace, err)
-		}
-
 		r.alloc.releaseAllocatedResources(svc)
 	}
 }
