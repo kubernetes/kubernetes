@@ -84,7 +84,7 @@ func ValidateStorageClassUpdate(storageClass, oldStorageClass *storage.StorageCl
 	return allErrs
 }
 
-// validateProvisioner tests if provisioner is a validate qualified name.
+// validateProvisioner tests if provisioner is a valid qualified name.
 func validateProvisioner(provisioner string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(provisioner) == 0 {
