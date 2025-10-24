@@ -50,4 +50,6 @@
 - text: "field IngressPortStatus.Error has conflicting markers: optional_vs_required: {\\[optional\\], \\[kubebuilder:validation:Required\\]}. fields cannot be both optional and required"
   path: "staging/src/k8s.io/api/networking/v1beta1/types.go"
 
-
+# nomaps is being enabled over time. For now, each API group should be added to this list until we comb through each group and fix/ignore the issues.
+- text: "should not use a map type, use a list type with a unique name/identifier instead"
+  path: "staging/src/k8s.io/api/(authentication|authorization|certificates|core|node|policy|resource)"
