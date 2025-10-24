@@ -277,7 +277,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 		for i, constraint := range claim.Spec.Devices.Constraints {
 			switch {
 			case constraint.MatchAttribute != nil:
-				matchAttribute := draapi.FullyQualifiedName(*constraint.MatchAttribute)
+				matchAttribute := resourceapi.FullyQualifiedName(*constraint.MatchAttribute)
 				logger := alloc.logger
 				if loggerV := alloc.logger.V(6); loggerV.Enabled() {
 					logger = klog.LoggerWithName(logger, "matchAttributeConstraint")
@@ -290,7 +290,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 				}
 				constraints[i] = m
 			case constraint.DistinctAttribute != nil:
-				distinctAttribute := draapi.FullyQualifiedName(*constraint.DistinctAttribute)
+				distinctAttribute := resourceapi.FullyQualifiedName(*constraint.DistinctAttribute)
 				logger := alloc.logger
 				if loggerV := alloc.logger.V(6); loggerV.Enabled() {
 					logger = klog.LoggerWithName(logger, "distinctAttributeConstraint")
@@ -300,7 +300,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 					logger:        logger,
 					requestNames:  sets.New(constraint.Requests...),
 					attributeName: distinctAttribute,
-					attributes:    make(map[string]draapi.DeviceAttribute),
+					attributes:    make(map[string]resourceapi.DeviceAttribute),
 				}
 				constraints[i] = m
 			default:
@@ -602,7 +602,7 @@ type allocator struct {
 
 // counterSets is a map with the name of counter sets to the counters in
 // the set.
-type counterSets map[draapi.UniqueString]map[string]draapi.Counter
+type counterSets map[draapi.UniqueString]map[string]resourceapi.Counter
 
 // matchKey identifies a device/request pair.
 type matchKey struct {
@@ -721,9 +721,9 @@ type constraint interface {
 type matchAttributeConstraint struct {
 	logger        klog.Logger // Includes name and attribute name, so no need to repeat in log messages.
 	requestNames  sets.Set[string]
-	attributeName draapi.FullyQualifiedName
+	attributeName resourceapi.FullyQualifiedName
 
-	attribute  *draapi.DeviceAttribute
+	attribute  *resourceapi.DeviceAttribute
 	numDevices int
 }
 
@@ -803,9 +803,9 @@ func (m *matchAttributeConstraint) matches(requestName, subRequestName string) b
 	}
 }
 
-func lookupAttribute(device *draapi.Device, deviceID DeviceID, attributeName draapi.FullyQualifiedName) *draapi.DeviceAttribute {
+func lookupAttribute(device *draapi.Device, deviceID DeviceID, attributeName resourceapi.FullyQualifiedName) *resourceapi.DeviceAttribute {
 	// Fully-qualified match?
-	if attr, ok := device.Attributes[draapi.QualifiedName(attributeName)]; ok {
+	if attr, ok := device.Attributes[resourceapi.QualifiedName(attributeName)]; ok {
 		return &attr
 	}
 	index := strings.Index(string(attributeName), "/")
@@ -821,7 +821,7 @@ func lookupAttribute(device *draapi.Device, deviceID DeviceID, attributeName dra
 	}
 
 	// Domain matches the driver, so let's check just the ID.
-	if attr, ok := device.Attributes[draapi.QualifiedName(attributeName[index+1:])]; ok {
+	if attr, ok := device.Attributes[resourceapi.QualifiedName(attributeName[index+1:])]; ok {
 		return &attr
 	}
 
@@ -1311,19 +1311,9 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 		}
 
 		if allowMultipleAllocations {
-			convertedCapacities := make(map[resourceapi.QualifiedName]resourceapi.DeviceCapacity)
-			for key, value := range device.Capacity {
-				var convertedCapacity resourceapi.DeviceCapacity
-				err := draapi.Convert_api_DeviceCapacity_To_v1_DeviceCapacity(&value, &convertedCapacity, nil)
-				if err != nil {
-					return false, nil, fmt.Errorf("convert DeviceCapacity: %w", err)
-				}
-				convertedCapacities[resourceapi.QualifiedName(key)] = convertedCapacity
-			}
-			consumedCapacity = GetConsumedCapacityFromRequest(request.capacities(), convertedCapacities)
+			consumedCapacity = GetConsumedCapacityFromRequest(request.capacities(), device.Capacity)
 			shareID = GenerateNewShareID()
 			alloc.logger.V(7).Info("Device capacity allocated", "device", device.id,
-				"converted capacity", klog.Format(convertedCapacities),
 				"consumed capacity", klog.Format(consumedCapacity))
 			alloc.allocatingCapacity.Insert(NewDeviceConsumedCapacity(device.id, consumedCapacity))
 		}
@@ -1408,7 +1398,7 @@ func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error
 	if !found {
 		availableCountersForSlice = make(counterSets, len(slice.Spec.SharedCounters))
 		for _, counterSet := range slice.Spec.SharedCounters {
-			availableCountersForCounterSet := make(map[string]draapi.Counter, len(counterSet.Counters))
+			availableCountersForCounterSet := make(map[string]resourceapi.Counter, len(counterSet.Counters))
 			for name, c := range counterSet.Counters {
 				availableCountersForCounterSet[name] = c
 			}
@@ -1467,7 +1457,7 @@ func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error
 	for _, deviceCounterConsumption := range device.ConsumesCounters {
 		consumedCountersForCounterSet, found := consumedCountersForSlice[deviceCounterConsumption.CounterSet]
 		if !found {
-			consumedCountersForCounterSet = make(map[string]draapi.Counter)
+			consumedCountersForCounterSet = make(map[string]resourceapi.Counter)
 			consumedCountersForSlice[deviceCounterConsumption.CounterSet] = consumedCountersForCounterSet
 		}
 		for name, c := range deviceCounterConsumption.Counters {

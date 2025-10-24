@@ -19,7 +19,6 @@ package api
 import (
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -42,7 +41,7 @@ type ResourceSliceSpec struct {
 
 type CounterSet struct {
 	Name     UniqueString
-	Counters map[string]Counter
+	Counters map[string]resourceapi.Counter
 }
 
 type ResourcePool struct {
@@ -52,8 +51,8 @@ type ResourcePool struct {
 }
 type Device struct {
 	Name                     UniqueString
-	Attributes               map[QualifiedName]DeviceAttribute
-	Capacity                 map[QualifiedName]DeviceCapacity
+	Attributes               map[resourceapi.QualifiedName]resourceapi.DeviceAttribute
+	Capacity                 map[resourceapi.QualifiedName]resourceapi.DeviceCapacity
 	ConsumesCounters         []DeviceCounterConsumption
 	NodeName                 *string
 	NodeSelector             *v1.NodeSelector
@@ -67,52 +66,5 @@ type Device struct {
 
 type DeviceCounterConsumption struct {
 	CounterSet UniqueString
-	Counters   map[string]Counter
+	Counters   map[string]resourceapi.Counter
 }
-
-type QualifiedName string
-
-type FullyQualifiedName string
-
-type DeviceAttribute struct {
-	IntValue     *int64
-	BoolValue    *bool
-	StringValue  *string
-	VersionValue *string
-}
-
-type DeviceCapacity struct {
-	Value         resource.Quantity
-	RequestPolicy *CapacityRequestPolicy
-}
-
-type CapacityRequestPolicy struct {
-	Default     *resource.Quantity
-	ValidValues []resource.Quantity
-	ValidRange  *CapacityRequestPolicyRange
-}
-
-type CapacityRequestPolicyRange struct {
-	Min  *resource.Quantity
-	Max  *resource.Quantity
-	Step *resource.Quantity
-}
-
-type Counter struct {
-	Value resource.Quantity
-}
-
-type DeviceTaint struct {
-	Key       string
-	Value     string
-	Effect    DeviceTaintEffect
-	TimeAdded *metav1.Time
-}
-
-type DeviceTaintEffect string
-
-const (
-	DeviceTaintEffectNoSchedule DeviceTaintEffect = "NoSchedule"
-
-	DeviceTaintEffectNoExecute DeviceTaintEffect = "NoExecute"
-)
