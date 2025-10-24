@@ -24,11 +24,11 @@ func (t notARegularFileError) Error() string {
 }
 
 type BeARegularFileMatcher struct {
-	expected interface{}
+	expected any
 	err      error
 }
 
-func (matcher *BeARegularFileMatcher) Match(actual interface{}) (success bool, err error) {
+func (matcher *BeARegularFileMatcher) Match(actual any) (success bool, err error) {
 	actualFilename, ok := actual.(string)
 	if !ok {
 		return false, fmt.Errorf("BeARegularFileMatcher matcher expects a file path")
@@ -47,10 +47,10 @@ func (matcher *BeARegularFileMatcher) Match(actual interface{}) (success bool, e
 	return true, nil
 }
 
-func (matcher *BeARegularFileMatcher) FailureMessage(actual interface{}) (message string) {
+func (matcher *BeARegularFileMatcher) FailureMessage(actual any) (message string) {
 	return format.Message(actual, fmt.Sprintf("to be a regular file: %s", matcher.err))
 }
 
-func (matcher *BeARegularFileMatcher) NegatedFailureMessage(actual interface{}) (message string) {
+func (matcher *BeARegularFileMatcher) NegatedFailureMessage(actual any) (message string) {
 	return format.Message(actual, "not be a regular file")
 }

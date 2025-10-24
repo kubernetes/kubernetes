@@ -7,16 +7,17 @@ import (
 	"reflect"
 
 	"github.com/onsi/gomega/format"
+	"github.com/onsi/gomega/matchers/internal/miter"
 )
 
 type HaveKeyWithValueMatcher struct {
-	Key   interface{}
-	Value interface{}
+	Key   any
+	Value any
 }
 
-func (matcher *HaveKeyWithValueMatcher) Match(actual interface{}) (success bool, err error) {
-	if !isMap(actual) {
-		return false, fmt.Errorf("HaveKeyWithValue matcher expects a map.  Got:%s", format.Object(actual, 1))
+func (matcher *HaveKeyWithValueMatcher) Match(actual any) (success bool, err error) {
+	if !isMap(actual) && !miter.IsSeq2(actual) {
+		return false, fmt.Errorf("HaveKeyWithValue matcher expects a map/iter.Seq2.  Got:%s", format.Object(actual, 1))
 	}
 
 	keyMatcher, keyIsMatcher := matcher.Key.(omegaMatcher)
@@ -27,6 +28,27 @@ func (matcher *HaveKeyWithValueMatcher) Match(actual interface{}) (success bool,
 	valueMatcher, valueIsMatcher := matcher.Value.(omegaMatcher)
 	if !valueIsMatcher {
 		valueMatcher = &EqualMatcher{Expected: matcher.Value}
+	}
+
+	if miter.IsSeq2(actual) {
+		var success bool
+		var err error
+		miter.IterateKV(actual, func(k, v reflect.Value) bool {
+			success, err = keyMatcher.Match(k.Interface())
+			if err != nil {
+				err = fmt.Errorf("HaveKey's key matcher failed with:\n%s%s", format.Indent, err.Error())
+				return false
+			}
+			if success {
+				success, err = valueMatcher.Match(v.Interface())
+				if err != nil {
+					err = fmt.Errorf("HaveKeyWithValue's value matcher failed with:\n%s%s", format.Indent, err.Error())
+					return false
+				}
+			}
+			return !success
+		})
+		return success, err
 	}
 
 	keys := reflect.ValueOf(actual).MapKeys()
@@ -48,7 +70,7 @@ func (matcher *HaveKeyWithValueMatcher) Match(actual interface{}) (success bool,
 	return false, nil
 }
 
-func (matcher *HaveKeyWithValueMatcher) FailureMessage(actual interface{}) (message string) {
+func (matcher *HaveKeyWithValueMatcher) FailureMessage(actual any) (message string) {
 	str := "to have {key: value}"
 	if _, ok := matcher.Key.(omegaMatcher); ok {
 		str += " matching"
@@ -56,12 +78,12 @@ func (matcher *HaveKeyWithValueMatcher) FailureMessage(actual interface{}) (mess
 		str += " matching"
 	}
 
-	expect := make(map[interface{}]interface{}, 1)
+	expect := make(map[any]any, 1)
 	expect[matcher.Key] = matcher.Value
 	return format.Message(actual, str, expect)
 }
 
-func (matcher *HaveKeyWithValueMatcher) NegatedFailureMessage(actual interface{}) (message string) {
+func (matcher *HaveKeyWithValueMatcher) NegatedFailureMessage(actual any) (message string) {
 	kStr := "not to have key"
 	if _, ok := matcher.Key.(omegaMatcher); ok {
 		kStr = "not to have key matching"

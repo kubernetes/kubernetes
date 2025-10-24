@@ -153,7 +153,7 @@ func (w *SpecWatcher) WatchSpecs(args []string, additionalArgs []string) {
 }
 
 func (w *SpecWatcher) compileAndRun(suite internal.TestSuite, additionalArgs []string) internal.TestSuite {
-	suite = internal.CompileSuite(suite, w.goFlagsConfig)
+	suite = internal.CompileSuite(suite, w.goFlagsConfig, false)
 	if suite.State.Is(internal.TestSuiteStateFailedToCompile) {
 		fmt.Println(suite.CompilationError.Error())
 		return suite
