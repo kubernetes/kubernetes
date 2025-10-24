@@ -25,6 +25,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -291,7 +293,7 @@ func TestLabelFunc(t *testing.T) {
 			t.Errorf("unexpected error: %v %v", err, test)
 		}
 		if !reflect.DeepEqual(test.obj, test.expected) {
-			t.Errorf("expected: %v, got %v", test.expected, test.obj)
+			t.Errorf("unexpected Pod object:\n%s", cmp.Diff(test.expected, test.obj))
 		}
 	}
 }
@@ -729,6 +731,7 @@ pod/foo not labeled
 
 func TestLabelMsg(t *testing.T) {
 	tests := []struct {
+		name            string
 		obj             runtime.Object
 		overwrite       bool
 		resourceVersion string
@@ -739,6 +742,7 @@ func TestLabelMsg(t *testing.T) {
 		expectErr       bool
 	}{
 		{
+			name: "add existing label with the same value noop",
 			obj: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"a": "b"},
@@ -748,6 +752,7 @@ func TestLabelMsg(t *testing.T) {
 			expectMsg: MsgNotLabeled,
 		},
 		{
+			name: "add first label",
 			obj: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{},
 			},
@@ -760,6 +765,7 @@ func TestLabelMsg(t *testing.T) {
 			expectMsg: MsgLabeled,
 		},
 		{
+			name: "overwrite existing label",
 			obj: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"a": "b"},
@@ -775,6 +781,7 @@ func TestLabelMsg(t *testing.T) {
 			expectMsg: MsgLabeled,
 		},
 		{
+			name: "add another label",
 			obj: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"a": "b"},
@@ -789,6 +796,7 @@ func TestLabelMsg(t *testing.T) {
 			expectMsg: MsgLabeled,
 		},
 		{
+			name: "add another label use resource version",
 			obj: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"a": "b"},
@@ -805,6 +813,7 @@ func TestLabelMsg(t *testing.T) {
 			expectMsg: MsgLabeled,
 		},
 		{
+			name: "remove the only label",
 			obj: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"a": "b"},
@@ -820,6 +829,7 @@ func TestLabelMsg(t *testing.T) {
 			expectMsg: MsgUnLabeled,
 		},
 		{
+			name: "both add and remove labels",
 			obj: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"a": "b", "c": "d"},
@@ -838,23 +848,7 @@ func TestLabelMsg(t *testing.T) {
 			expectMsg: MsgLabeled,
 		},
 		{
-			obj: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{"status": "unhealthy"},
-				},
-			},
-			labels:    map[string]string{"status": "healthy"},
-			overwrite: true,
-			expectObj: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"status": "healthy",
-					},
-				},
-			},
-			expectMsg: MsgLabeled,
-		},
-		{
+			name: "reject modification when overwrite unset",
 			obj: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"status": "unhealthy"},
@@ -869,34 +863,37 @@ func TestLabelMsg(t *testing.T) {
 					},
 				},
 			},
-			expectMsg: MsgNotLabeled,
 			expectErr: true,
 		},
 	}
 
 	for _, test := range tests {
-		oldData, err := json.Marshal(test.obj)
-		if err != nil {
-			t.Errorf("unexpected error: %v %v", err, test)
-		}
+		t.Run(test.name, func(t *testing.T) {
+			oldData, err := json.Marshal(test.obj)
+			if err != nil {
+				t.Errorf("unexpected error: %v %v", err, test)
+			}
 
-		err = labelFunc(test.obj, test.overwrite, test.resourceVersion, test.labels, test.remove)
-		if test.expectErr && err == nil {
-			t.Errorf("unexpected non-error: %v", test)
-			continue
-		}
-		if !test.expectErr && err != nil {
-			t.Errorf("unexpected error: %v %v", err, test)
-		}
+			err = labelFunc(test.obj, test.overwrite, test.resourceVersion, test.labels, test.remove)
+			if test.expectErr {
+				if err == nil {
+					t.Errorf("unexpected non-error: %v", test)
+				}
+				return
+			}
+			if !test.expectErr && err != nil {
+				t.Errorf("unexpected error: %v %v", err, test)
+			}
 
-		newObj, err := json.Marshal(test.obj)
-		if err != nil {
-			t.Errorf("unexpected error: %v %v", err, test)
-		}
+			newObj, err := json.Marshal(test.obj)
+			if err != nil {
+				t.Errorf("unexpected error: %v %v", err, test)
+			}
 
-		dataChangeMsg := updateDataChangeMsg(oldData, newObj, test.overwrite)
-		if dataChangeMsg != test.expectMsg {
-			t.Errorf("unexpected dataChangeMsg: %v != %v, %v", dataChangeMsg, test.expectMsg, test)
-		}
+			dataChangeMsg := updateDataChangeMsg(oldData, newObj, test.overwrite)
+			if dataChangeMsg != test.expectMsg {
+				t.Errorf("unexpected dataChangeMsg: %v != %v, %v", dataChangeMsg, test.expectMsg, test)
+			}
+		})
 	}
 }
