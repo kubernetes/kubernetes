@@ -218,26 +218,7 @@ func SelectableFields(service *api.Service) fields.Set {
 //	if !utilfeature.DefaultFeatureGate.Enabled(features.MyFeature) && !myFeatureInUse(oldSvc) {
 //	    newSvc.Status.MyFeature = nil
 //	}
-func dropServiceStatusDisabledFields(newSvc *api.Service, oldSvc *api.Service) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.LoadBalancerIPMode) && !loadbalancerIPModeInUse(oldSvc) {
-		for i := range newSvc.Status.LoadBalancer.Ingress {
-			newSvc.Status.LoadBalancer.Ingress[i].IPMode = nil
-		}
-	}
-}
-
-// returns true when the LoadBalancer Ingress IPMode fields are in use.
-func loadbalancerIPModeInUse(svc *api.Service) bool {
-	if svc == nil {
-		return false
-	}
-	for _, ing := range svc.Status.LoadBalancer.Ingress {
-		if ing.IPMode != nil {
-			return true
-		}
-	}
-	return false
-}
+func dropServiceStatusDisabledFields(newSvc *api.Service, oldSvc *api.Service) {}
 
 func sameStringSlice(a []string, b []string) bool {
 	if len(a) != len(b) {

@@ -19,7 +19,6 @@ package service
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"testing"
 	"time"
 
@@ -657,24 +656,13 @@ func Test_ServiceLoadBalancerIPMode(t *testing.T) {
 	}
 
 	testCases := []struct {
-		ipModeEnabled   bool
 		setIPMode       *corev1.LoadBalancerIPMode
 		externalIP      string
 		expectedIngress corev1.LoadBalancerIngress
 	}{
 		{
-			ipModeEnabled: false,
-			externalIP:    "1.2.3.4",
-			expectedIngress: corev1.LoadBalancerIngress{
-				IP:     "1.2.3.4",
-				IPMode: nil,
-				Ports:  []corev1.PortStatus{{Port: 80, Protocol: corev1.ProtocolTCP}},
-			},
-		},
-		{
-			ipModeEnabled: true,
-			setIPMode:     nil,
-			externalIP:    "1.2.3.4",
+			setIPMode:  nil,
+			externalIP: "1.2.3.4",
 			expectedIngress: corev1.LoadBalancerIngress{
 				IP:     "1.2.3.4",
 				IPMode: ptr.To(corev1.LoadBalancerIPModeVIP),
@@ -682,9 +670,8 @@ func Test_ServiceLoadBalancerIPMode(t *testing.T) {
 			},
 		},
 		{
-			ipModeEnabled: true,
-			setIPMode:     ptr.To(corev1.LoadBalancerIPModeVIP),
-			externalIP:    "1.2.3.4",
+			setIPMode:  ptr.To(corev1.LoadBalancerIPModeVIP),
+			externalIP: "1.2.3.4",
 			expectedIngress: corev1.LoadBalancerIngress{
 				IP:     "1.2.3.4",
 				IPMode: ptr.To(corev1.LoadBalancerIPModeVIP),
@@ -692,9 +679,8 @@ func Test_ServiceLoadBalancerIPMode(t *testing.T) {
 			},
 		},
 		{
-			ipModeEnabled: true,
-			setIPMode:     ptr.To(corev1.LoadBalancerIPModeProxy),
-			externalIP:    "1.2.3.4",
+			setIPMode:  ptr.To(corev1.LoadBalancerIPModeProxy),
+			externalIP: "1.2.3.4",
 			expectedIngress: corev1.LoadBalancerIngress{
 				IP:     "1.2.3.4",
 				IPMode: ptr.To(corev1.LoadBalancerIPModeProxy),
@@ -705,12 +691,7 @@ func Test_ServiceLoadBalancerIPMode(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run("", func(t *testing.T) {
-			serverFlags := framework.DefaultTestServerFlags()
-			if !tc.ipModeEnabled {
-				serverFlags = append(serverFlags, "--emulated-version=1.31")
-			}
-			serverFlags = append(serverFlags, fmt.Sprintf("--feature-gates=LoadBalancerIPMode=%v", tc.ipModeEnabled))
-			server := kubeapiservertesting.StartTestServerOrDie(t, nil, serverFlags, framework.SharedEtcd())
+			server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 			defer server.TearDownFn()
 
 			client, err := clientset.NewForConfig(server.ClientConfig)
@@ -751,8 +732,8 @@ func Test_ServiceLoadBalancerIPMode(t *testing.T) {
 
 			ingress := service.Status.LoadBalancer.Ingress[0]
 			if !apiequality.Semantic.DeepEqual(&ingress, &tc.expectedIngress) {
-				t.Errorf("expected Ingress %v, got IP %v",
-					ingress, tc.expectedIngress)
+				t.Errorf("expected Ingress %v, got %v",
+					tc.expectedIngress, ingress)
 				if ingress.IPMode != nil && tc.expectedIngress.IPMode != nil {
 					t.Logf("IPMode %v expected %v", *ingress.IPMode, *tc.expectedIngress.IPMode)
 				}
