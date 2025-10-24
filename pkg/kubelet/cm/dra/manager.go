@@ -75,8 +75,18 @@ const defaultWipingDelay = 30 * time.Second
 // in the cache after a pod has been unprepared. This allows post-mortem
 // health updates to be processed for terminated pods.
 //
+// This addresses the race condition described in issue #132978 where:
+// 1. Pod terminates
+// 2. UnprepareResources is called, which would normally delete ClaimInfo
+// 3. Health update arrives after cleanup
+// 4. Without tombstoning, the update cannot find which pod used the device
+//
+// The tombstone mechanism ensures that pod.status.allocatedResourcesStatus
+// can be updated even after a pod has terminated, by keeping the device-to-pod
+// mapping available for a grace period.
+//
 // 5 minutes provides a reasonable window for:
-// - DRA drivers to report final health status
+// - DRA drivers to report final health status (drivers may have delays)
 // - Debugging and troubleshooting failed pods
 // - Avoiding excessive memory usage from tombstoned entries
 const defaultTombstoneGracePeriod = 5 * time.Minute
@@ -84,6 +94,14 @@ const defaultTombstoneGracePeriod = 5 * time.Minute
 // maxTombstones is the maximum number of tombstoned claims to keep in the cache.
 // This prevents unbounded memory growth from accumulating tombstones.
 // When this limit is reached, the oldest tombstones are removed first (LRU).
+//
+// The limit of 1000 is chosen to:
+// - Support clusters with high pod churn rates
+// - Prevent memory leaks in pathological cases (e.g., stuck drivers)
+// - Maintain reasonable memory usage (each tombstone is relatively small)
+//
+// In normal operation, tombstones are cleaned up after the grace period,
+// so this limit is primarily a safety mechanism.
 const maxTombstones = 1000
 
 // ActivePodsFunc is a function that returns a list of pods to reconcile.
@@ -187,6 +205,13 @@ func (m *Manager) initDRAPluginManager(ctx context.Context, getNode GetNodeFunc,
 }
 
 // reconcileLoop ensures that any stale state in the manager's claimInfoCache gets periodically reconciled.
+// This includes:
+// - Unpreparing resources for pods that are no longer running
+// - Cleaning up expired tombstones after the grace period
+// - Enforcing the maxTombstones limit using LRU eviction
+//
+// The tombstone cleanup is essential for preventing memory leaks while still allowing
+// health updates for recently terminated pods (issue #132978).
 func (m *Manager) reconcileLoop(ctx context.Context) {
 	logger := klog.FromContext(ctx)
 	// Only once all sources are ready do we attempt to reconcile.
@@ -234,7 +259,13 @@ func (m *Manager) reconcileLoop(ctx context.Context) {
 		}
 	}
 
-	// Clean up expired tombstones to prevent resource leaks
+	// Clean up expired tombstones to prevent resource leaks.
+	// This is the second phase of the two-phase cleanup process:
+	// 1. UnprepareResources tombstones claims instead of deleting them
+	// 2. reconcileLoop removes tombstones after the grace period
+	//
+	// This ensures health updates can still be processed for terminated pods
+	// while preventing unbounded memory growth.
 	expiredTombstones := []struct {
 		namespace string
 		claimName string
@@ -738,6 +769,12 @@ func (m *Manager) GetResources(pod *v1.Pod, container *v1.Container) (*Container
 // This function is idempotent and may be called multiple times against the same pod.
 // As such, calls to the underlying NodeUnprepareResource API are skipped for claims that have
 // already been successfully unprepared.
+//
+// Instead of immediately deleting the claim information from the cache, this function
+// tombstones the claims. This allows late-arriving health status updates from DRA drivers
+// to still be processed and reflected in the terminated pod's status. The tombstoned
+// claims are retained for defaultTombstoneGracePeriod before being cleaned up by the
+// reconcileLoop.
 func (m *Manager) UnprepareResources(ctx context.Context, pod *v1.Pod) error {
 	startTime := time.Now()
 	err := m.unprepareResourcesForPod(ctx, pod)

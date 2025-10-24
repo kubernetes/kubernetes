@@ -42,9 +42,14 @@ import (
 // +k8s:deepcopy-gen=true
 type ClaimInfo struct {
 	state.ClaimInfoState
-	prepared      bool
-	tombstoned    bool        // Whether this claim has been unprepared but kept for health updates
-	tombstoneTime metav1.Time // When the claim was tombstoned
+	prepared bool
+	// tombstoned indicates whether this claim has been unprepared but is being
+	// kept in the cache temporarily to allow health status updates for terminated
+	// pods. This is part of the fix for issue #132978.
+	tombstoned bool
+	// tombstoneTime records when the claim was tombstoned. Used to determine
+	// when the tombstone should expire and be removed from the cache.
+	tombstoneTime metav1.Time
 }
 
 // claimInfoCache is a cache of processed resource claims keyed by namespace/claimname.
