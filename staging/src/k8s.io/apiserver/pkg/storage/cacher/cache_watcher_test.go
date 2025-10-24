@@ -657,3 +657,83 @@ func TestBookmarkAfterResourceVersionWatchers(t *testing.T) {
 		t.Fatalf("expected only one watcher to be expired")
 	}
 }
+
+// TestCacheWatcher_SendInitialEvents_DeadlineExtension verifies that for
+// sendInitialEvents requests, the watch deadline is extended by the time
+// spent sending initial events, ensuring the watch continues for the full
+// timeout duration AFTER the bookmark is sent (issue #134837).
+func TestCacheWatcher_SendInitialEvents_DeadlineExtension(t *testing.T) {
+	filter := func(_ string, _ labels.Set, _ fields.Set) bool { return true }
+
+	// Create a watch with a 2-second timeout
+	watchTimeout := 2 * time.Second
+	deadline := time.Now().Add(watchTimeout)
+	w := newCacheWatcher(10, filter, emptyFunc, storage.APIObjectVersioner{}, deadline, true, schema.GroupResource{Resource: "pods"}, "")
+
+	// Create 50 initial events
+	initEvents := make([]*watchCacheEvent, 50)
+	for i := 0; i < 50; i++ {
+		initEvents[i] = &watchCacheEvent{
+			Type:            watch.Added,
+			Object:          makeTestPod(fmt.Sprintf("pod-%d", i), uint64(i)),
+			ResourceVersion: uint64(i),
+		}
+	}
+
+	// Create interval with bookmark
+	buffer := &watchCacheIntervalBuffer{buffer: initEvents}
+	buffer.endIndex = len(initEvents)
+	bookmark := &watchCacheEvent{
+		Type:            watch.Bookmark,
+		ResourceVersion: 50,
+		Object: &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				ResourceVersion: "50",
+			},
+		},
+	}
+	interval := &watchCacheInterval{
+		startIndex:               0,
+		endIndex:                 0,
+		buffer:                   buffer,
+		initialEventsEndBookmark: bookmark,
+	}
+
+	ctx, cancel := context.WithDeadline(context.Background(), deadline)
+	defer cancel()
+
+	// Process the interval
+	go w.processInterval(ctx, interval, 0)
+
+	// Receive all initial events and bookmark
+	received := 0
+	for received < 51 { // 50 init events + 1 bookmark
+		select {
+		case <-w.ResultChan():
+			received++
+		case <-time.After(5 * time.Second):
+			t.Fatalf("timed out after receiving %d events", received)
+		}
+	}
+
+	// Add post-bookmark events to verify watch is still active
+	for i := 0; i < 3; i++ {
+		if !w.nonblockingAdd(&watchCacheEvent{
+			Type:            watch.Added,
+			Object:          makeTestPod(fmt.Sprintf("pod-post-%d", i), uint64(100+i)),
+			ResourceVersion: uint64(100 + i),
+		}) {
+			t.Fatalf("failed to add event after bookmark")
+		}
+	}
+
+	// Verify post-bookmark events are received
+	for i := 0; i < 3; i++ {
+		select {
+		case <-w.ResultChan():
+			// Event received successfully
+		case <-time.After(3 * time.Second):
+			t.Fatal("watch closed prematurely after bookmark - deadline extension failed")
+		}
+	}
+}
