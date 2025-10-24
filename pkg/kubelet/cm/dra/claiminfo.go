@@ -22,10 +22,12 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/go-logr/logr"
 
 	resourceapi "k8s.io/api/resource/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/component-base/metrics"
@@ -40,7 +42,9 @@ import (
 // +k8s:deepcopy-gen=true
 type ClaimInfo struct {
 	state.ClaimInfoState
-	prepared bool
+	prepared      bool
+	tombstoned    bool        // Whether this claim has been unprepared but kept for health updates
+	tombstoneTime metav1.Time // When the claim was tombstoned
 }
 
 // claimInfoCache is a cache of processed resource claims keyed by namespace/claimname.
@@ -80,6 +84,8 @@ func newClaimInfoFromState(state *state.ClaimInfoState) *ClaimInfo {
 	info := &ClaimInfo{
 		ClaimInfoState: *state.DeepCopy(),
 		prepared:       false,
+		tombstoned:     state.Tombstoned,
+		tombstoneTime:  state.TombstoneTime,
 	}
 	return info
 }
@@ -117,6 +123,40 @@ func (info *ClaimInfo) setPrepared() {
 // isPrepared checks if claim info is prepared or not.
 func (info *ClaimInfo) isPrepared() bool {
 	return info.prepared
+}
+
+// markAsTombstone marks the claim as tombstoned, indicating it has been
+// unprepared but is kept for health status updates.
+func (info *ClaimInfo) markAsTombstone() {
+	info.tombstoned = true
+	info.tombstoneTime = metav1.Now()
+	// Also update the state for checkpoint persistence
+	info.ClaimInfoState.Tombstoned = true
+	info.ClaimInfoState.TombstoneTime = info.tombstoneTime
+}
+
+// isTombstoned returns whether the claim has been tombstoned.
+func (info *ClaimInfo) isTombstoned() bool {
+	return info.tombstoned
+}
+
+// shouldExpire checks if the tombstone has exceeded the grace period and
+// should be removed from the cache.
+func (info *ClaimInfo) shouldExpire(gracePeriod time.Duration) bool {
+	if !info.tombstoned {
+		return false
+	}
+	return time.Since(info.tombstoneTime.Time) > gracePeriod
+}
+
+// clearTombstone resets the tombstone state. This is used when a claim
+// is being reused by a new pod.
+func (info *ClaimInfo) clearTombstone() {
+	info.tombstoned = false
+	info.tombstoneTime = metav1.Time{}
+	// Also update the state for checkpoint persistence
+	info.ClaimInfoState.Tombstoned = false
+	info.ClaimInfoState.TombstoneTime = metav1.Time{}
 }
 
 // cdiDevicesAsList returns a list of CDIDevices from the provided claim info.

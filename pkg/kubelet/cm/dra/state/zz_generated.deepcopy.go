@@ -43,6 +43,7 @@ func (in *ClaimInfoState) DeepCopyInto(out *ClaimInfoState) {
 			(*out)[key] = *val.DeepCopy()
 		}
 	}
+	in.TombstoneTime.DeepCopyInto(&out.TombstoneTime)
 	return
 }
 

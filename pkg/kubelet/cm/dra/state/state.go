@@ -19,6 +19,7 @@ package state
 import (
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -42,6 +43,12 @@ type ClaimInfoState struct {
 	// DriverState contains information about all drivers which have allocation
 	// results in the claim, even if they don't provide devices for their results.
 	DriverState map[string]DriverState
+
+	// Tombstoned indicates if this claim has been unprepared but kept for health updates
+	Tombstoned bool
+
+	// TombstoneTime records when the claim was tombstoned
+	TombstoneTime metav1.Time
 }
 
 // DriverState is used to store per-device claim info state in a checkpoint
