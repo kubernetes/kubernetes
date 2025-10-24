@@ -39,7 +39,6 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
-	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	epstest "k8s.io/kubernetes/pkg/api/endpoints/testing"
 	svctest "k8s.io/kubernetes/pkg/api/service/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -51,12 +50,14 @@ import (
 	netutils "k8s.io/utils/net"
 )
 
+type cleanupFunc func()
+
 // Most tests will use this to create a registry to run tests against.
-func newStorage(t *testing.T, ipFamilies []api.IPFamily) (*wrapperRESTForTests, *StatusREST, *etcd3testing.EtcdTestServer) {
+func newStorage(t *testing.T, ipFamilies []api.IPFamily) (*wrapperRESTForTests, *StatusREST, cleanupFunc) {
 	return newStorageWithPods(t, ipFamilies, nil, nil)
 }
 
-func newStorageWithPods(t *testing.T, ipFamilies []api.IPFamily, pods []api.Pod, endpoints []*api.Endpoints) (*wrapperRESTForTests, *StatusREST, *etcd3testing.EtcdTestServer) {
+func newStorageWithPods(t *testing.T, ipFamilies []api.IPFamily, pods []api.Pod, endpoints []*api.Endpoints) (*wrapperRESTForTests, *StatusREST, cleanupFunc) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
 	restOptions := generic.RESTOptions{
 		StorageConfig:           etcdStorage.ForResource(schema.GroupResource{Resource: "services"}),
@@ -123,7 +124,13 @@ func newStorageWithPods(t *testing.T, ipFamilies []api.IPFamily, pods []api.Pod,
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}
-	return &wrapperRESTForTests{serviceStorage}, statusStorage, server
+
+	cleanup := func() {
+		server.Terminate(t)
+		serviceStorage.Destroy()
+	}
+
+	return &wrapperRESTForTests{serviceStorage}, statusStorage, cleanup
 }
 
 func makeIPAllocator(cidr *net.IPNet) ipallocator.Interface {
@@ -169,9 +176,8 @@ func validService() *api.Service {
 }
 
 func TestGenericCreate(t *testing.T) {
-	storage, _, server := newStorage(t, []api.IPFamily{api.IPv4Protocol})
-	defer server.Terminate(t)
-	defer storage.Store.DestroyFunc()
+	storage, _, cleanup := newStorage(t, []api.IPFamily{api.IPv4Protocol})
+	defer cleanup()
 	test := genericregistrytest.New(t, storage.Store)
 	svc := validService()
 	svc.ObjectMeta = metav1.ObjectMeta{} // because genericregistrytest
@@ -188,9 +194,8 @@ func TestGenericCreate(t *testing.T) {
 func TestGenericUpdate(t *testing.T) {
 	clusterInternalTrafficPolicy := api.ServiceInternalTrafficPolicyCluster
 
-	storage, _, server := newStorage(t, []api.IPFamily{api.IPv4Protocol})
-	defer server.Terminate(t)
-	defer storage.Store.DestroyFunc()
+	storage, _, cleanup := newStorage(t, []api.IPFamily{api.IPv4Protocol})
+	defer cleanup()
 	test := genericregistrytest.New(t, storage.Store).AllowCreateOnUpdate()
 	test.TestUpdate(
 		// valid
@@ -217,33 +222,29 @@ func TestGenericUpdate(t *testing.T) {
 }
 
 func TestGenericDelete(t *testing.T) {
-	storage, _, server := newStorage(t, []api.IPFamily{api.IPv4Protocol})
-	defer server.Terminate(t)
-	defer storage.Store.DestroyFunc()
+	storage, _, cleanup := newStorage(t, []api.IPFamily{api.IPv4Protocol})
+	defer cleanup()
 	test := genericregistrytest.New(t, storage.Store).AllowCreateOnUpdate().ReturnDeletedObject()
 	test.TestDelete(validService())
 }
 
 func TestGenericGet(t *testing.T) {
-	storage, _, server := newStorage(t, []api.IPFamily{api.IPv4Protocol})
-	defer server.Terminate(t)
-	defer storage.Store.DestroyFunc()
+	storage, _, cleanup := newStorage(t, []api.IPFamily{api.IPv4Protocol})
+	defer cleanup()
 	test := genericregistrytest.New(t, storage.Store).AllowCreateOnUpdate()
 	test.TestGet(validService())
 }
 
 func TestGenericList(t *testing.T) {
-	storage, _, server := newStorage(t, []api.IPFamily{api.IPv4Protocol})
-	defer server.Terminate(t)
-	defer storage.Store.DestroyFunc()
+	storage, _, cleanup := newStorage(t, []api.IPFamily{api.IPv4Protocol})
+	defer cleanup()
 	test := genericregistrytest.New(t, storage.Store).AllowCreateOnUpdate()
 	test.TestList(validService())
 }
 
 func TestGenericWatch(t *testing.T) {
-	storage, _, server := newStorage(t, []api.IPFamily{api.IPv4Protocol})
-	defer server.Terminate(t)
-	defer storage.Store.DestroyFunc()
+	storage, _, cleanup := newStorage(t, []api.IPFamily{api.IPv4Protocol})
+	defer cleanup()
 	test := genericregistrytest.New(t, storage.Store)
 	test.TestWatch(
 		validService(),
@@ -265,17 +266,15 @@ func TestGenericWatch(t *testing.T) {
 }
 
 func TestGenericShortNames(t *testing.T) {
-	storage, _, server := newStorage(t, []api.IPFamily{api.IPv4Protocol})
-	defer server.Terminate(t)
-	defer storage.Store.DestroyFunc()
+	storage, _, cleanup := newStorage(t, []api.IPFamily{api.IPv4Protocol})
+	defer cleanup()
 	expected := []string{"svc"}
 	registrytest.AssertShortNames(t, storage, expected)
 }
 
 func TestGenericCategories(t *testing.T) {
-	storage, _, server := newStorage(t, []api.IPFamily{api.IPv4Protocol})
-	defer server.Terminate(t)
-	defer storage.Store.DestroyFunc()
+	storage, _, cleanup := newStorage(t, []api.IPFamily{api.IPv4Protocol})
+	defer cleanup()
 	expected := []string{"all"}
 	registrytest.AssertCategories(t, storage, expected)
 }
@@ -703,9 +702,8 @@ func TestServiceDefaultOnRead(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			storage, _, server := newStorage(t, []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol})
-			defer server.Terminate(t)
-			defer storage.Store.DestroyFunc()
+			storage, _, cleanup := newStorage(t, []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol})
+			defer cleanup()
 
 			tmp := tc.input.DeepCopyObject()
 			storage.defaultOnRead(tmp)
@@ -790,9 +788,8 @@ func helpTestCreateUpdateDeleteWithFamilies(t *testing.T, testCases []cudTestCas
 	// NOTE: do not call t.Helper() here.  It's more useful for errors to be
 	// attributed to lines in this function than the caller of it.
 
-	storage, _, server := newStorage(t, ipFamilies)
-	defer server.Terminate(t)
-	defer storage.Store.DestroyFunc()
+	storage, _, cleanup := newStorage(t, ipFamilies)
+	defer cleanup()
 
 	for _, tc := range testCases {
 		name := tc.name
@@ -1389,9 +1386,8 @@ func TestCreateIgnoresIPsForExternalName(t *testing.T) {
 
 	for _, otc := range testCases {
 		t.Run(otc.name, func(t *testing.T) {
-			storage, _, server := newStorage(t, otc.clusterFamilies)
-			defer server.Terminate(t)
-			defer storage.Store.DestroyFunc()
+			storage, _, cleanup := newStorage(t, otc.clusterFamilies)
+			defer cleanup()
 
 			for _, itc := range otc.cases {
 				t.Run(itc.name, func(t *testing.T) {
@@ -1478,9 +1474,8 @@ func TestCreateInitClusterIPsFromClusterIP(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			storage, _, server := newStorage(t, tc.clusterFamilies)
-			defer server.Terminate(t)
-			defer storage.Store.DestroyFunc()
+			storage, _, cleanup := newStorage(t, tc.clusterFamilies)
+			defer cleanup()
 
 			ctx := genericapirequest.NewDefaultContext()
 			createdObj, err := storage.Create(ctx, tc.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
@@ -5935,9 +5930,8 @@ func TestCreateInitIPFields(t *testing.T) {
 		t.Run(otc.name, func(t *testing.T) {
 
 			// Do this in the outer loop for performance.
-			storage, _, server := newStorage(t, otc.clusterFamilies)
-			defer server.Terminate(t)
-			defer storage.Store.DestroyFunc()
+			storage, _, cleanup := newStorage(t, otc.clusterFamilies)
+			defer cleanup()
 
 			for _, itc := range otc.cases {
 				t.Run(itc.name+"__@L"+itc.line, func(t *testing.T) {
@@ -6087,9 +6081,8 @@ func TestCreateInvalidClusterIPInputs(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			storage, _, server := newStorage(t, tc.families)
-			defer server.Terminate(t)
-			defer storage.Store.DestroyFunc()
+			storage, _, cleanup := newStorage(t, tc.families)
+			defer cleanup()
 
 			ctx := genericapirequest.NewDefaultContext()
 			_, err := storage.Create(ctx, tc.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
@@ -6126,9 +6119,8 @@ func TestCreateDeleteReuse(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			storage, _, server := newStorage(t, []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol})
-			defer server.Terminate(t)
-			defer storage.Store.DestroyFunc()
+			storage, _, cleanup := newStorage(t, []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol})
+			defer cleanup()
 
 			ctx := genericapirequest.NewDefaultContext()
 
@@ -6379,9 +6371,8 @@ func TestCreateInitNodePorts(t *testing.T) {
 	}}
 
 	// Do this in the outer scope for performance.
-	storage, _, server := newStorage(t, []api.IPFamily{api.IPv4Protocol})
-	defer server.Terminate(t)
-	defer storage.Store.DestroyFunc()
+	storage, _, cleanup := newStorage(t, []api.IPFamily{api.IPv4Protocol})
+	defer cleanup()
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -6492,9 +6483,8 @@ func TestCreateSkipsAllocationsForHeadless(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			storage, _, server := newStorage(t, tc.clusterFamilies)
-			defer server.Terminate(t)
-			defer storage.Store.DestroyFunc()
+			storage, _, cleanup := newStorage(t, tc.clusterFamilies)
+			defer cleanup()
 
 			// This test is ONLY headless services.
 			tc.svc.Spec.ClusterIP = api.ClusterIPNone
@@ -6564,9 +6554,8 @@ func TestCreateDryRun(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			storage, _, server := newStorage(t, tc.clusterFamilies)
-			defer server.Terminate(t)
-			defer storage.Store.DestroyFunc()
+			storage, _, cleanup := newStorage(t, tc.clusterFamilies)
+			defer cleanup()
 
 			ctx := genericapirequest.NewDefaultContext()
 			createdObj, err := storage.Create(ctx, tc.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
@@ -6597,9 +6586,8 @@ func TestCreateDryRun(t *testing.T) {
 func TestDeleteWithFinalizer(t *testing.T) {
 	svcName := "foo"
 
-	storage, _, server := newStorage(t, []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol})
-	defer server.Terminate(t)
-	defer storage.Store.DestroyFunc()
+	storage, _, cleanup := newStorage(t, []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol})
+	defer cleanup()
 
 	// This will allocate cluster IPs, NodePort, and HealthCheckNodePort.
 	svc := svctest.MakeService(svcName, svctest.SetTypeLoadBalancer,
@@ -6692,9 +6680,8 @@ func TestDeleteDryRun(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 
-			storage, _, server := newStorage(t, tc.svc.Spec.IPFamilies)
-			defer server.Terminate(t)
-			defer storage.Store.DestroyFunc()
+			storage, _, cleanup := newStorage(t, tc.svc.Spec.IPFamilies)
+			defer cleanup()
 
 			ctx := genericapirequest.NewDefaultContext()
 			createdObj, err := storage.Create(ctx, tc.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
@@ -6789,9 +6776,8 @@ func TestUpdateDryRun(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			storage, _, server := newStorage(t, tc.clusterFamilies)
-			defer server.Terminate(t)
-			defer storage.Store.DestroyFunc()
+			storage, _, cleanup := newStorage(t, tc.clusterFamilies)
+			defer cleanup()
 
 			ctx := genericapirequest.NewDefaultContext()
 			obj, err := storage.Create(ctx, tc.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
@@ -11646,9 +11632,8 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 		epstest.MakeEndpoints("no-endpoints", nil, nil), // to prove this does not get chosen
 	}
 
-	storage, _, server := newStorageWithPods(t, []api.IPFamily{api.IPv4Protocol}, pods, endpoints)
-	defer server.Terminate(t)
-	defer storage.Store.DestroyFunc()
+	storage, _, cleanup := newStorageWithPods(t, []api.IPFamily{api.IPv4Protocol}, pods, endpoints)
+	defer cleanup()
 
 	ctx := genericapirequest.NewDefaultContext()
 	for _, name := range []string{"unnamed", "unnamed2", "no-endpoints"} {
@@ -11748,9 +11733,8 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 }
 
 func TestUpdateServiceLoadBalancerStatus(t *testing.T) {
-	storage, statusStorage, server := newStorage(t, []api.IPFamily{api.IPv4Protocol})
-	defer server.Terminate(t)
-	defer storage.Store.DestroyFunc()
+	storage, statusStorage, cleanup := newStorage(t, []api.IPFamily{api.IPv4Protocol})
+	defer cleanup()
 	defer statusStorage.store.DestroyFunc()
 
 	ipModeVIP := api.LoadBalancerIPModeVIP
