@@ -282,7 +282,7 @@ func setupFakeDRADriverGRPCServer(ctx context.Context, shouldTimeout bool, plugi
 }
 
 func TestNewManagerImpl(t *testing.T) {
-	kubeClient := fake.NewSimpleClientset()
+	kubeClient := fake.NewClientset()
 	for _, test := range []struct {
 		description        string
 		stateFileDirectory string
@@ -557,7 +557,7 @@ func genClaimInfoStateWithShareID(cdiDeviceID string) state.ClaimInfoState {
 }
 
 func TestGetResources(t *testing.T) {
-	kubeClient := fake.NewSimpleClientset()
+	kubeClient := fake.NewClientset()
 
 	for _, test := range []struct {
 		description string
@@ -637,7 +637,7 @@ func getFakeNode() (*v1.Node, error) {
 
 func TestPrepareResources(t *testing.T) {
 	claimName := claimName
-	fakeKubeClient := fake.NewSimpleClientset()
+	fakeKubeClient := fake.NewClientset()
 	anotherClaimUID := types.UID("another-claim-uid")
 	shareUID := types.UID(shareID)
 
@@ -914,7 +914,7 @@ func TestPrepareResources(t *testing.T) {
 }
 
 func TestUnprepareResources(t *testing.T) {
-	fakeKubeClient := fake.NewSimpleClientset()
+	fakeKubeClient := fake.NewClientset()
 	for _, test := range []struct {
 		description         string
 		driverName          string
@@ -1080,7 +1080,7 @@ func TestUnprepareResources(t *testing.T) {
 
 func TestPodMightNeedToUnprepareResources(t *testing.T) {
 	tCtx := ktesting.Init(t)
-	fakeKubeClient := fake.NewSimpleClientset()
+	fakeKubeClient := fake.NewClientset()
 	manager, err := NewManager(tCtx.Logger(), fakeKubeClient, t.TempDir())
 	require.NoError(t, err, "create DRA manager")
 
@@ -1200,7 +1200,7 @@ func TestParallelPrepareUnprepareResources(t *testing.T) {
 	defer draServerInfo.teardownFn()
 
 	// Create fake Kube client and DRA manager
-	fakeKubeClient := fake.NewSimpleClientset()
+	fakeKubeClient := fake.NewClientset()
 	manager, err := NewManager(tCtx.Logger(), fakeKubeClient, t.TempDir())
 	require.NoError(t, err, "create DRA manager")
 	manager.initDRAPluginManager(tCtx, getFakeNode, time.Second /* very short wiping delay for testing */)
@@ -1797,7 +1797,7 @@ func TestHealthUpdateForTombstonedClaim(t *testing.T) {
 	tCtx := ktesting.Init(t)
 
 	// Create manager with dependencies
-	kubeClient := fake.NewSimpleClientset()
+	kubeClient := fake.NewClientset()
 	tmpDir := t.TempDir()
 	cache, err := newClaimInfoCache(tCtx.Logger(), tmpDir, "test-checkpoint")
 	require.NoError(t, err, "Failed to create claim info cache")
@@ -1828,7 +1828,7 @@ func TestHealthUpdateForTombstonedClaim(t *testing.T) {
 		},
 	}
 	_, err = manager.healthInfoCache.updateHealthInfo(driverName, devices)
-	assert.NoError(t, err, "Health info update should succeed")
+	require.NoError(t, err, "Health info update should succeed")
 
 	// Prepare pod status
 	status := &v1.PodStatus{
@@ -1870,7 +1870,7 @@ func TestTombstoneCheckpointPersistence(t *testing.T) {
 
 	// Sync to checkpoint
 	err := manager1.cache.syncToCheckpoint()
-	assert.NoError(t, err, "Checkpoint sync should succeed")
+	require.NoError(t, err, "Checkpoint sync should succeed")
 
 	// Create second manager instance with same state directory
 	manager2 := setupManagerWithStateDir(t, tCtx.Logger(), tmpDir)
@@ -1889,7 +1889,7 @@ func TestTombstoneCleanup(t *testing.T) {
 	ctx := tCtx.Logger()
 
 	// Create manager with dependencies
-	kubeClient := fake.NewSimpleClientset()
+	kubeClient := fake.NewClientset()
 	tmpDir := t.TempDir()
 	cache, err := newClaimInfoCache(ctx, tmpDir, "test-checkpoint")
 	require.NoError(t, err, "Failed to create claim info cache")
@@ -1939,7 +1939,7 @@ func TestTombstoneLRUEviction(t *testing.T) {
 	ctx := tCtx.Logger()
 
 	// Create manager with dependencies
-	kubeClient := fake.NewSimpleClientset()
+	kubeClient := fake.NewClientset()
 	tmpDir := t.TempDir()
 	cache, err := newClaimInfoCache(ctx, tmpDir, "test-checkpoint")
 	require.NoError(t, err, "Failed to create claim info cache")
@@ -1974,11 +1974,11 @@ func TestTombstoneLRUEviction(t *testing.T) {
 
 	// Count remaining tombstones
 	tombstoneCount := 0
-	oldestRemaining := time.Now()
+	oldestRemaining := metav1.Now()
 	for _, claimInfo := range manager.cache.claimInfo {
 		if claimInfo.isTombstoned() {
 			tombstoneCount++
-			if claimInfo.tombstoneTime.Before(oldestRemaining) {
+			if claimInfo.tombstoneTime.Before(&oldestRemaining) {
 				oldestRemaining = claimInfo.tombstoneTime
 			}
 		}
@@ -1994,7 +1994,7 @@ func TestTombstoneLRUEviction(t *testing.T) {
 	// Here we just verify all our test tombstones still exist
 	for i := 0; i < testLimit+3; i++ {
 		_, exists := manager.cache.get(fmt.Sprintf("claim-%d", i), namespace)
-		assert.True(t, exists, fmt.Sprintf("Tombstone claim-%d should still exist", i))
+		assert.True(t, exists, "Tombstone claim-%d should still exist", i)
 	}
 }
 
@@ -2004,7 +2004,7 @@ func TestPodUIDReuseClearsTombstones(t *testing.T) {
 	ctx := tCtx.Logger()
 
 	// Setup manager with mocked plugin
-	kubeClient := fake.NewSimpleClientset()
+	kubeClient := fake.NewClientset()
 	tmpDir := t.TempDir()
 	cache, err := newClaimInfoCache(ctx, tmpDir, "test-checkpoint")
 	require.NoError(t, err, "Failed to create claim info cache")
@@ -2052,7 +2052,7 @@ func TestPodUIDReuseClearsTombstones(t *testing.T) {
 		}
 		return nil
 	})
-	assert.NoError(t, err, "Tombstone clearing should succeed")
+	require.NoError(t, err, "Tombstone clearing should succeed")
 
 	// Verify tombstone was cleared
 	restoredInfo, exists := manager.cache.get(claimName, namespace)
@@ -2073,7 +2073,7 @@ func (m *mockSourcesReady) AddSource(source string) {}
 
 // setupManagerWithStateDir creates a manager with a specific state directory for checkpoint testing
 func setupManagerWithStateDir(t *testing.T, logger klog.Logger, stateDir string) *Manager {
-	kubeClient := fake.NewSimpleClientset()
+	kubeClient := fake.NewClientset()
 	checkpointName := "test-checkpoint"
 
 	cache, err := newClaimInfoCache(logger, stateDir, checkpointName)

@@ -347,7 +347,13 @@ func (m *Manager) reconcileLoop(ctx context.Context) {
 	}
 
 	// Remove expired and LRU-evicted tombstones
-	tombstonesToRemove := append(expiredTombstones, lruEvictions...)
+	// Combine expired tombstones and LRU evictions into a single slice
+	tombstonesToRemove := make([]struct {
+		namespace string
+		claimName string
+	}, 0, len(expiredTombstones)+len(lruEvictions))
+	tombstonesToRemove = append(tombstonesToRemove, expiredTombstones...)
+	tombstonesToRemove = append(tombstonesToRemove, lruEvictions...)
 	if len(tombstonesToRemove) > 0 {
 		removedCount := 0
 		err := m.cache.withLock(func() error {
