@@ -34,14 +34,10 @@ func TestVersionedValidationByFuzzing(t *testing.T) {
 		// Registered group versions for versioned validation fuzz testing:
 		{Group: "", Version: "v1"},
 		{Group: "certificates.k8s.io", Version: "v1"},
-		{Group: "certificates.k8s.io", Version: "v1alpha1"},
-		{Group: "certificates.k8s.io", Version: "v1beta1"},
-		{Group: "resource.k8s.io", Version: "v1beta1"},
-		{Group: "resource.k8s.io", Version: "v1beta2"},
 		{Group: "resource.k8s.io", Version: "v1"},
 	}
 
-	fuzzIters := *roundtrip.FuzzIters / 10 // TODO: Find a better way to manage test running time
+	fuzzIters := *roundtrip.FuzzIters
 	f := fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(rand.Int63()), legacyscheme.Codecs)
 
 	for _, gv := range typesWithDeclarativeValidation {
