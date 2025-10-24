@@ -89,7 +89,7 @@ func (hr *handlerRunner) Run(ctx context.Context, containerID kubecontainer.Cont
 		}
 		return msg, err
 	case handler.Sleep != nil:
-		err := hr.runSleepHandler(ctx, handler.Sleep.Seconds)
+		err := hr.runSleepHandler(ctx, containerID, pod, handler.Sleep.Seconds)
 		var msg string
 		if err != nil {
 			msg = fmt.Sprintf("Sleep lifecycle hook (%d) for Container %q in Pod %q failed - error: %v", handler.Sleep.Seconds, container.Name, format.Pod(pod), err)
@@ -104,18 +104,50 @@ func (hr *handlerRunner) Run(ctx context.Context, containerID kubecontainer.Cont
 	}
 }
 
-func (hr *handlerRunner) runSleepHandler(ctx context.Context, seconds int64) error {
+func (hr *handlerRunner) runSleepHandler(ctx context.Context, containerID kubecontainer.ContainerID, pod *v1.Pod, seconds int64) error {
+	logger := klog.FromContext(ctx)
 	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLifecycleSleepAction) {
 		return nil
 	}
-	c := time.After(time.Duration(seconds) * time.Second)
-	select {
-	case <-ctx.Done():
-		// unexpected termination
-		metrics.LifecycleHandlerSleepTerminated.Inc()
-		return fmt.Errorf("container terminated before sleep hook finished")
-	case <-c:
-		return nil
+
+	// Create a ticker to poll container status periodically
+	// We check every 250ms to detect container exit quickly while minimizing overhead
+	ticker := time.NewTicker(250 * time.Millisecond)
+	defer ticker.Stop()
+
+	deadline := time.After(time.Duration(seconds) * time.Second)
+
+	for {
+		select {
+		case <-ctx.Done():
+			// Context canceled (e.g., grace period expired)
+			metrics.LifecycleHandlerSleepTerminated.Inc()
+			return fmt.Errorf("context canceled before sleep hook finished")
+		case <-deadline:
+			// Sleep completed successfully
+			return nil
+		case <-ticker.C:
+			// Check if container has exited
+			status, err := hr.containerManager.GetPodStatus(ctx, pod.UID, pod.Name, pod.Namespace)
+			if err != nil {
+				logger.V(4).Info("Failed to get pod status during sleep hook, continuing", "pod", klog.KObj(pod), "error", err)
+				continue
+			}
+
+			// Find the container in the status
+			for _, containerStatus := range status.ContainerStatuses {
+				if containerStatus.ID == containerID {
+					// Check if container has exited (state is Exited or Unknown)
+					if containerStatus.State == kubecontainer.ContainerStateExited ||
+						containerStatus.State == kubecontainer.ContainerStateUnknown {
+						logger.V(2).Info("Container exited during sleep hook, terminating sleep early",
+							"pod", klog.KObj(pod), "containerID", containerID.String(), "containerState", containerStatus.State)
+						return nil
+					}
+					break
+				}
+			}
+		}
 	}
 }
 
