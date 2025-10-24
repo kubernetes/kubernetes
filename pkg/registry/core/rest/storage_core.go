@@ -70,8 +70,9 @@ import (
 type Config struct {
 	GenericConfig
 
-	Proxy    ProxyConfig
-	Services ServicesConfig
+	Proxy          ProxyConfig
+	Services       ServicesConfig
+	OtherProviders OtherProviders
 }
 
 type ProxyConfig struct {
@@ -86,6 +87,10 @@ type ServicesConfig struct {
 	NodePortRange           utilnet.PortRange
 
 	IPRepairInterval time.Duration
+}
+
+type OtherProviders struct {
+	EndpointSliceListerProvider servicestore.EndpointSliceListerProvider
 }
 
 type rangeRegistries struct {
@@ -207,7 +212,7 @@ func (p *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 		p.primaryServiceClusterIPAllocator.IPFamily(),
 		p.serviceClusterIPAllocators,
 		p.serviceNodePortAllocator,
-		endpointsStorage,
+		p.OtherProviders.EndpointSliceListerProvider,
 		podStorage.Pod,
 		p.Proxy.Transport)
 	if err != nil {
