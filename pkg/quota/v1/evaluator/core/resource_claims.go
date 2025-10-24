@@ -35,6 +35,7 @@ import (
 	resourceinternal "k8s.io/kubernetes/pkg/apis/resource"
 	resourceversioned "k8s.io/kubernetes/pkg/apis/resource/v1"
 	"k8s.io/kubernetes/pkg/features"
+	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 // The name used for object count quota. This evaluator takes over counting
@@ -197,7 +198,7 @@ func (p *claimEvaluator) verifyOwner(claim *resourceapi.ResourceClaim) ([]reques
 	if controllerRef == nil {
 		return nil, false
 	}
-	if controllerRef.Kind != "Pod" {
+	if controllerRef.Kind != "Pod" || controllerRef.APIVersion != "v1" {
 		return nil, false
 	}
 	if p.podsGetter == nil {
@@ -216,12 +217,16 @@ func (p *claimEvaluator) verifyOwner(claim *resourceapi.ResourceClaim) ([]reques
 	reqs := make([]requestQuantity, 0)
 	for _, c := range pod.Spec.InitContainers {
 		for r, q := range c.Resources.Requests {
-			reqs = append(reqs, requestQuantity{name: extendedResourceToQuotaRequestResource(string(r)), quantity: q})
+			if schedutil.IsDRAExtendedResourceName(r) {
+				reqs = append(reqs, requestQuantity{name: extendedResourceToQuotaRequestResource(string(r)), quantity: q})
+			}
 		}
 	}
 	for _, c := range pod.Spec.Containers {
 		for r, q := range c.Resources.Requests {
-			reqs = append(reqs, requestQuantity{name: extendedResourceToQuotaRequestResource(string(r)), quantity: q})
+			if schedutil.IsDRAExtendedResourceName(r) {
+				reqs = append(reqs, requestQuantity{name: extendedResourceToQuotaRequestResource(string(r)), quantity: q})
+			}
 		}
 	}
 	return reqs, true

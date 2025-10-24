@@ -85,6 +85,7 @@ func (d *DeviceClassMapping) addDeviceClass(obj interface{}) {
 
 	if deviceClass, ok := obj.(*resourceapi.DeviceClass); ok {
 		if deviceClass.Spec.ExtendedResourceName == nil {
+			delete(d.mapping, deviceClass.Name)
 			return
 		}
 		d.mapping[deviceClass.Name] = *deviceClass.Spec.ExtendedResourceName
@@ -125,6 +126,7 @@ func (d *DeviceClassMapping) Get(name string) (string, bool) {
 	d.mutex.RLock()
 	defer d.mutex.RUnlock()
 	if !d.informer.HasSynced() {
+		d.logger.Info("DeviceClassMapping not synced yet")
 		return "", false
 	}
 	extendedResourceName, ok := d.mapping[name]
