@@ -18,7 +18,12 @@ limitations under the License.
 package taints
 
 import (
+	"fmt"
+	"strings"
+
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation"
 )
 
 const (
@@ -30,54 +35,196 @@ const (
 // parseTaint parses a taint from a string, whose form must be either
 // '<key>=<value>:<effect>', '<key>:<effect>', or '<key>'.
 func parseTaint(st string) (v1.Taint, error) {
-	panic("not implemented")
+	var taint v1.Taint
+
+	var key string
+	var value string
+	var effect v1.TaintEffect
+
+	parts := strings.Split(st, ":")
+	switch len(parts) {
+	case 1:
+		key = parts[0]
+	case 2:
+		effect = v1.TaintEffect(parts[1])
+		if err := validateTaintEffect(effect); err != nil {
+			return taint, err
+		}
+
+		partsKV := strings.Split(parts[0], "=")
+		if len(partsKV) > 2 {
+			return taint, fmt.Errorf("invalid taint spec: %v", st)
+		}
+		key = partsKV[0]
+		if len(partsKV) == 2 {
+			value = partsKV[1]
+			if errs := validation.IsValidLabelValue(value); len(errs) > 0 {
+				return taint, fmt.Errorf("invalid taint spec: %v, %s", st, strings.Join(errs, "; "))
+			}
+		}
+	default:
+		return taint, fmt.Errorf("invalid taint spec: %v", st)
+	}
+
+	if errs := validation.IsQualifiedName(key); len(errs) > 0 {
+		return taint, fmt.Errorf("invalid taint spec: %v, %s", st, strings.Join(errs, "; "))
+	}
+
+	taint.Key = key
+	taint.Value = value
+	taint.Effect = effect
+
+	return taint, nil
 }
 
 func validateTaintEffect(effect v1.TaintEffect) error {
-	panic("not implemented")
+	if effect != v1.TaintEffectNoSchedule && effect != v1.TaintEffectPreferNoSchedule && effect != v1.TaintEffectNoExecute {
+		return fmt.Errorf("invalid taint effect: %v, unsupported taint effect", effect)
+	}
+
+	return nil
 }
 
 // ParseTaints takes a spec which is an array and creates slices for new taints to be added, taints to be deleted.
 // It also validates the spec. For example, the form `<key>` may be used to remove a taint, but not to add one.
 func ParseTaints(spec []string) ([]v1.Taint, []v1.Taint, error) {
-	panic("not implemented")
+	var taints, taintsToRemove []v1.Taint
+	uniqueTaints := map[v1.TaintEffect]sets.Set[string]{}
+
+	for _, taintSpec := range spec {
+		if strings.HasSuffix(taintSpec, "-") {
+			taintToRemove, err := parseTaint(strings.TrimSuffix(taintSpec, "-"))
+			if err != nil {
+				return nil, nil, err
+			}
+			taintsToRemove = append(taintsToRemove, v1.Taint{Key: taintToRemove.Key, Effect: taintToRemove.Effect})
+		} else {
+			newTaint, err := parseTaint(taintSpec)
+			if err != nil {
+				return nil, nil, err
+			}
+			// validate that the taint has an effect, which is required to add the taint
+			if len(newTaint.Effect) == 0 {
+				return nil, nil, fmt.Errorf("invalid taint spec: %v", taintSpec)
+			}
+			// validate if taint is unique by <key, effect>
+			if len(uniqueTaints[newTaint.Effect]) > 0 && uniqueTaints[newTaint.Effect].Has(newTaint.Key) {
+				return nil, nil, fmt.Errorf("duplicated taints with the same key and effect: %v", newTaint)
+			}
+			// add taint to existingTaints for uniqueness check
+			if len(uniqueTaints[newTaint.Effect]) == 0 {
+				uniqueTaints[newTaint.Effect] = sets.Set[string]{}
+			}
+			uniqueTaints[newTaint.Effect].Insert(newTaint.Key)
+
+			taints = append(taints, newTaint)
+		}
+	}
+	return taints, taintsToRemove, nil
 }
 
 // CheckIfTaintsAlreadyExists checks if the node already has taints that we want to add and returns a string with taint keys.
 func CheckIfTaintsAlreadyExists(oldTaints []v1.Taint, taints []v1.Taint) string {
-	panic("not implemented")
+	var existingTaintList = make([]string, 0)
+	for _, taint := range taints {
+		for _, oldTaint := range oldTaints {
+			if taint.Key == oldTaint.Key && taint.Effect == oldTaint.Effect {
+				existingTaintList = append(existingTaintList, taint.Key)
+			}
+		}
+	}
+	return strings.Join(existingTaintList, ",")
 }
 
 // DeleteTaintsByKey removes all the taints that have the same key to given taintKey
 func DeleteTaintsByKey(taints []v1.Taint, taintKey string) ([]v1.Taint, bool) {
-	panic("not implemented")
+	newTaints := []v1.Taint{}
+	for i := range taints {
+		if taintKey == taints[i].Key {
+			continue
+		}
+		newTaints = append(newTaints, taints[i])
+	}
+	return newTaints, len(taints) != len(newTaints)
 }
 
 // DeleteTaint removes all the taints that have the same key and effect to given taintToDelete.
 func DeleteTaint(taints []v1.Taint, taintToDelete *v1.Taint) ([]v1.Taint, bool) {
-	panic("not implemented")
+	newTaints := []v1.Taint{}
+	for i := range taints {
+		if taintToDelete.MatchTaint(&taints[i]) {
+			continue
+		}
+		newTaints = append(newTaints, taints[i])
+	}
+	return newTaints, len(taints) != len(newTaints)
 }
 
 // RemoveTaint tries to remove a taint from annotations list. Returns a new copy of updated Node and true if something was updated
 // false otherwise.
 func RemoveTaint(node *v1.Node, taint *v1.Taint) (*v1.Node, bool, error) {
-	panic("not implemented")
+	newNode := node.DeepCopy()
+	nodeTaints := newNode.Spec.Taints
+	if len(nodeTaints) == 0 {
+		return newNode, false, nil
+	}
+
+	if !TaintExists(nodeTaints, taint) {
+		return newNode, false, nil
+	}
+
+	newTaints, _ := DeleteTaint(nodeTaints, taint)
+	newNode.Spec.Taints = newTaints
+	return newNode, true, nil
 }
 
 // AddOrUpdateTaint tries to add a taint to annotations list. Returns a new copy of updated Node and true if something was updated
 // false otherwise.
 func AddOrUpdateTaint(node *v1.Node, taint *v1.Taint) (*v1.Node, bool, error) {
-	panic("not implemented")
+	newNode := node.DeepCopy()
+	nodeTaints := newNode.Spec.Taints
+
+	var newTaints []v1.Taint
+	updated := false
+	for i := range nodeTaints {
+		if taint.MatchTaint(&nodeTaints[i]) {
+			if nodeTaints[i].Value == taint.Value {
+				return newNode, false, nil
+			}
+			newTaints = append(newTaints, *taint)
+			updated = true
+			continue
+		}
+
+		newTaints = append(newTaints, nodeTaints[i])
+	}
+
+	if !updated {
+		newTaints = append(newTaints, *taint)
+	}
+
+	newNode.Spec.Taints = newTaints
+	return newNode, true, nil
 }
 
 // TaintExists checks if the given taint exists in list of taints. Returns true if exists false otherwise.
 func TaintExists(taints []v1.Taint, taintToFind *v1.Taint) bool {
-	panic("not implemented")
+	for _, taint := range taints {
+		if taint.MatchTaint(taintToFind) {
+			return true
+		}
+	}
+	return false
 }
 
 // TaintKeyExists checks if the given taint key exists in list of taints. Returns true if exists false otherwise.
 func TaintKeyExists(taints []v1.Taint, taintKeyToMatch string) bool {
-	panic("not implemented")
+	for _, taint := range taints {
+		if taint.Key == taintKeyToMatch {
+			return true
+		}
+	}
+	return false
 }
 
 // TaintSetDiff finds the difference between two taint slices and
@@ -86,16 +233,65 @@ func TaintKeyExists(taints []v1.Taint, taintKeyToMatch string) bool {
 // input: taintsNew=[a b] taintsOld=[a c]
 // output: taintsToAdd=[b] taintsToRemove=[c]
 func TaintSetDiff(taintsNew, taintsOld []v1.Taint) (taintsToAdd []*v1.Taint, taintsToRemove []*v1.Taint) {
-	panic("not implemented")
+	for i := range taintsNew {
+		found := false
+		for j := range taintsOld {
+			if taintsNew[i].MatchTaint(&taintsOld[j]) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			taintsToAdd = append(taintsToAdd, &taintsNew[i])
+		}
+	}
+
+	for i := range taintsOld {
+		found := false
+		for j := range taintsNew {
+			if taintsOld[i].MatchTaint(&taintsNew[j]) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			taintsToRemove = append(taintsToRemove, &taintsOld[i])
+		}
+	}
+
+	return
 }
 
 // TaintSetFilter filters from the taint slice according to the passed fn function to get the filtered taint slice.
 func TaintSetFilter(taints []v1.Taint, fn func(*v1.Taint) bool) []v1.Taint {
-	panic("not implemented")
+	filtered := []v1.Taint{}
+	for i := range taints {
+		if fn(&taints[i]) {
+			filtered = append(filtered, taints[i])
+		}
+	}
+	return filtered
 }
 
 // CheckTaintValidation checks if the given taint is valid.
 // Returns error if the given taint is invalid.
 func CheckTaintValidation(taint v1.Taint) error {
-	panic("not implemented")
+	// Empty key is invalid
+	if len(taint.Key) == 0 {
+		return fmt.Errorf("invalid taint: key cannot be empty")
+	}
+
+	// Value exceeding 63 characters is invalid
+	if len(taint.Value) > 63 {
+		return fmt.Errorf("invalid taint: value cannot exceed 63 characters")
+	}
+
+	// Effect must be valid enum value when non-empty
+	if len(taint.Effect) > 0 {
+		if err := validateTaintEffect(taint.Effect); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
