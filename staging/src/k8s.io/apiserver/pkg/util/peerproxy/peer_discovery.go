@@ -136,7 +136,12 @@ func (h *peerProxyHandler) fetchNewDiscoveryFor(ctx context.Context, serverID st
 	var discoveryErr error
 	var discoveryResponse *apidiscoveryv2.APIGroupDiscoveryList
 	discoveryPaths := []string{"/api", "/apis"}
-	groupMap := make(map[string]apidiscoveryv2.APIGroupDiscovery)
+
+	// Use a slice to preserve order from the peer.
+	// Use a map to track seen groups to avoid duplicates.
+	groupList := make([]apidiscoveryv2.APIGroupDiscovery, 0)
+	seenGroups := make(map[string]struct{})
+
 	for _, path := range discoveryPaths {
 		discoveryResponse, discoveryErr = h.aggregateDiscovery(ctx, path, hostport)
 		if discoveryErr != nil {
@@ -161,13 +166,11 @@ func (h *peerProxyHandler) fetchNewDiscoveryFor(ctx context.Context, serverID st
 			if groupDiscovery.Name == "" {
 				continue
 			}
-			groupMap[groupDiscovery.Name] = groupDiscovery
+			if _, ok := seenGroups[groupDiscovery.Name]; !ok {
+				groupList = append(groupList, groupDiscovery)
+				seenGroups[groupDiscovery.Name] = struct{}{}
+			}
 		}
-	}
-
-	groupList := make([]apidiscoveryv2.APIGroupDiscovery, 0, len(groupMap))
-	for _, group := range groupMap {
-		groupList = append(groupList, group)
 	}
 
 	klog.V(4).Infof("Agg discovery done successfully by %s for %s", h.serverID, serverID)
@@ -193,7 +196,7 @@ func (h *peerProxyHandler) aggregateDiscovery(ctx context.Context, path string, 
 	req = req.WithContext(ctx)
 
 	// Fallback to V2 and V1 in that order if V2Local is not recognized.
-	req.Header.Add("Accept", discovery.AcceptV2Local+","+discovery.AcceptV2+","+discovery.AcceptV1)
+	req.Header.Add("Accept", discovery.AcceptV2NoPeer+","+discovery.AcceptV2+","+discovery.AcceptV1)
 
 	writer := responsewriterutil.NewInMemoryResponseWriter()
 	h.proxyRequestToDestinationAPIServer(req, writer, hostport)

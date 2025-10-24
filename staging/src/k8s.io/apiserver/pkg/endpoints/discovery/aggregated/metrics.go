@@ -23,10 +23,13 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 )
 
+const subsystem = "aggregator_discovery"
+
 var (
 	regenerationCounter = metrics.NewCounter(
 		&metrics.CounterOpts{
-			Name:           "aggregator_discovery_aggregation_count_total",
+			Name:           "aggregation_count_total",
+			Subsystem:      subsystem,
 			Help:           "Counter of number of times discovery was aggregated",
 			StabilityLevel: metrics.ALPHA,
 		},
@@ -34,7 +37,8 @@ var (
 
 	PeerAggCacheHitsCounter = metrics.NewCounter(
 		&metrics.CounterOpts{
-			Name:           "aggregator_discovery_peer_aggregated_cache_hits_total",
+			Name:           "peer_aggregated_cache_hits_total",
+			Subsystem:      subsystem,
 			Help:           "Counter of number of times discovery was served from peer-aggregated cache",
 			StabilityLevel: metrics.ALPHA,
 		},
@@ -42,16 +46,18 @@ var (
 
 	PeerAggCacheMissesCounter = metrics.NewCounter(
 		&metrics.CounterOpts{
-			Name:           "aggregator_discovery_peer_aggregated_cache_misses_total",
+			Name:           "peer_aggregated_cache_misses_total",
+			Subsystem:      subsystem,
 			Help:           "Counter of number of times discovery was aggregated across all API servers",
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
 
-	LocalDiscoveryRequestCounter = metrics.NewCounter(
+	NoPeerDiscoveryRequestCounter = metrics.NewCounter(
 		&metrics.CounterOpts{
-			Name:           "aggregator_discovery_local_requests_total",
-			Help:           "Counter of number of times local (non peer-aggregated) discovery was requested",
+			Name:           "nopeer_requests_total",
+			Subsystem:      subsystem,
+			Help:           "Counter of number of times no-peer (non peer-aggregated) discovery was requested",
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
@@ -62,6 +68,6 @@ func init() {
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.UnknownVersionInteroperabilityProxy) {
 		legacyregistry.MustRegister(PeerAggCacheHitsCounter)
 		legacyregistry.MustRegister(PeerAggCacheMissesCounter)
-		legacyregistry.MustRegister(LocalDiscoveryRequestCounter)
+		legacyregistry.MustRegister(NoPeerDiscoveryRequestCounter)
 	}
 }

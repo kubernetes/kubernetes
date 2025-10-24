@@ -89,8 +89,8 @@ func TestPeerAggDiscovery(t *testing.T) {
 		}
 	})
 
-	t.Run("LocalDiscoveryWorks", func(t *testing.T) {
-		testLocalDiscovery(t, ctx, clientA, clientB)
+	t.Run("NoPeerDiscoveryWorks", func(t *testing.T) {
+		testNoPeerDiscovery(t, ctx, clientA, clientB)
 	})
 
 	t.Run("PeerAggDiscoveryEndpoint", func(t *testing.T) {
@@ -98,13 +98,13 @@ func TestPeerAggDiscovery(t *testing.T) {
 	})
 }
 
-func testLocalDiscovery(t *testing.T, ctx context.Context, clientA, clientB kubernetes.Interface) {
+func testNoPeerDiscovery(t *testing.T, ctx context.Context, clientA, clientB kubernetes.Interface) {
 	testClientA := testClientSet{kubeClientSet: clientA}
 	testClientB := testClientSet{kubeClientSet: clientB}
 
-	// Verify serverA does NOT have apps/v1 in local discovery (disabled via runtime-config)
-	resultA, err := FetchLocalDiscovery(ctx, testClientA)
-	require.NoError(t, err, "Should be able to fetch local discovery from serverA")
+	// Verify serverA does NOT have apps/v1 in no-peer discovery (disabled via runtime-config)
+	resultA, err := FetchNoPeerDiscovery(ctx, testClientA)
+	require.NoError(t, err, "Should be able to fetch no-peer discovery from serverA")
 
 	hasAppsV1InA := false
 	for _, group := range resultA.Items {
@@ -117,11 +117,11 @@ func testLocalDiscovery(t *testing.T, ctx context.Context, clientA, clientB kube
 			}
 		}
 	}
-	require.False(t, hasAppsV1InA, "ServerA should NOT have apps/v1 in local discovery (disabled via runtime-config)")
+	require.False(t, hasAppsV1InA, "ServerA should NOT have apps/v1 in no-peer discovery (disabled via runtime-config)")
 
-	// Verify serverB does NOT have batch/v1 in local discovery (disabled via runtime-config)
-	resultB, err := FetchLocalDiscovery(ctx, testClientB)
-	require.NoError(t, err, "Should be able to fetch local discovery from serverB")
+	// Verify serverB does NOT have batch/v1 in no-peer discovery (disabled via runtime-config)
+	resultB, err := FetchNoPeerDiscovery(ctx, testClientB)
+	require.NoError(t, err, "Should be able to fetch no-peer discovery from serverB")
 
 	hasBatchV1InB := false
 	for _, group := range resultB.Items {
@@ -134,9 +134,9 @@ func testLocalDiscovery(t *testing.T, ctx context.Context, clientA, clientB kube
 			}
 		}
 	}
-	require.False(t, hasBatchV1InB, "ServerB should NOT have batch/v1 in local discovery (disabled via runtime-config)")
+	require.False(t, hasBatchV1InB, "ServerB should NOT have batch/v1 in no-peer discovery (disabled via runtime-config)")
 
-	// Verify serverA HAS batch/v1 in local discovery (should be enabled by default)
+	// Verify serverA HAS batch/v1 in no-peer discovery (should be enabled by default)
 	hasBatchV1InA := false
 	var foundGroupsA []string
 	for _, group := range resultA.Items {
@@ -150,10 +150,10 @@ func testLocalDiscovery(t *testing.T, ctx context.Context, clientA, clientB kube
 			}
 		}
 	}
-	t.Logf("ServerA local discovery has groups: %v", foundGroupsA)
-	require.True(t, hasBatchV1InA, "ServerA should have batch/v1 in local discovery (enabled by default)")
+	t.Logf("ServerA no-peer discovery has groups: %v", foundGroupsA)
+	require.True(t, hasBatchV1InA, "ServerA should have batch/v1 in no-peer discovery (enabled by default)")
 
-	// Verify serverB HAS apps/v1 in local discovery (should be enabled by default)
+	// Verify serverB HAS apps/v1 in no-peer discovery (should be enabled by default)
 	hasAppsV1InB := false
 	var foundGroupsB []string
 	for _, group := range resultB.Items {
@@ -167,10 +167,10 @@ func testLocalDiscovery(t *testing.T, ctx context.Context, clientA, clientB kube
 			}
 		}
 	}
-	t.Logf("ServerB local discovery has groups: %v", foundGroupsB)
-	require.True(t, hasAppsV1InB, "ServerB should have apps/v1 in local discovery (enabled by default)")
+	t.Logf("ServerB no-peer discovery has groups: %v", foundGroupsB)
+	require.True(t, hasAppsV1InB, "ServerB should have apps/v1 in no-peer discovery (enabled by default)")
 
-	t.Log("Local discovery validation complete:")
+	t.Log("No-peer discovery validation complete:")
 	t.Log("  ServerA: has batch/v1, missing apps/v1 ✓")
 	t.Log("  ServerB: has apps/v1, missing batch/v1 ✓")
 }

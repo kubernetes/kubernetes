@@ -280,8 +280,8 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		discoveryGroup: discoveryGroup(enabledVersions),
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.UnknownVersionInteroperabilityProxy) {
-		s.GenericAPIServer.PeerAggregatedDiscoveryManager = aggregated.NewPeerAggDiscoveryHandler(s.GenericAPIServer.AggregatedDiscoveryGroupManager, c.ExtraConfig.PeerProxy, "apis")
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.UnknownVersionInteroperabilityProxy) && c.ExtraConfig.PeerProxy != nil {
+		s.GenericAPIServer.PeerAggregatedDiscoveryManager = aggregated.NewPeerAggDiscoveryHandler(s.GenericAPIServer.APIServerID, s.GenericAPIServer.AggregatedDiscoveryGroupManager, c.ExtraConfig.PeerProxy, "apis")
 
 		// Register cache invalidation callbacks to the peer proxy handler
 		if c.ExtraConfig.PeerProxy != nil {

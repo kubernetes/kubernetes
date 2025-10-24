@@ -1123,8 +1123,7 @@ func installAPI(name string, s *GenericAPIServer, c *Config) {
 	routes.Version{Version: c.EffectiveVersion.Info()}.Install(s.Handler.GoRestfulContainer)
 
 	if c.EnableDiscovery {
-		// No peer-to-peer discovery for generic apiservers.
-		wrapped := discoveryendpoint.WrapAggregatedDiscoveryToHandler(s.DiscoveryGroupManager, s.AggregatedDiscoveryGroupManager, s.AggregatedDiscoveryGroupManager)
+		wrapped := discoveryendpoint.WrapAggregatedDiscoveryToHandler(s.DiscoveryGroupManager, s.AggregatedDiscoveryGroupManager, s.PeerAggregatedDiscoveryManager)
 		s.Handler.GoRestfulContainer.Add(wrapped.GenerateWebService("/apis", metav1.APIGroupList{}))
 	}
 	if c.FlowControl != nil {

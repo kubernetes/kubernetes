@@ -40,8 +40,8 @@ const aggregatedV2Beta1JSONAccept = jsonAccept + aggregatedV2Beta1AcceptSuffix
 const aggregatedV2Beta1ProtoAccept = protobufAccept + aggregatedV2Beta1AcceptSuffix
 const aggregatedJSONAccept = jsonAccept + aggregatedAcceptSuffix
 const aggregatedProtoAccept = protobufAccept + aggregatedAcceptSuffix
-const aggregatedLocalJSONAccept = jsonAccept + aggregatedAcceptSuffix + ";profile=local"
-const aggregatedLocalProtoAccept = protobufAccept + aggregatedAcceptSuffix + ";profile=local"
+const aggregatedNoPeerJSONAccept = jsonAccept + aggregatedAcceptSuffix + ";profile=nopeer"
+const aggregatedNoPeerProtoAccept = protobufAccept + aggregatedAcceptSuffix + ";profile=nopeer"
 
 func fetchPath(handler http.Handler, path, accept string) string {
 	w := httptest.NewRecorder()
@@ -64,7 +64,7 @@ func (f fakeHTTPHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) 
 
 func TestAggregationEnabled(t *testing.T) {
 	unaggregated := fakeHTTPHandler{data: "unaggregated"}
-	aggregated := fakeHTTPHandler{data: "aggregated-local"}
+	aggregated := fakeHTTPHandler{data: "nopeer-aggregated"}
 	peerAggregated := fakeHTTPHandler{data: "peer-aggregated"}
 	wrapped := WrapAggregatedDiscoveryToHandler(unaggregated, aggregated, peerAggregated)
 
@@ -83,16 +83,16 @@ func TestAggregationEnabled(t *testing.T) {
 			expected: "unaggregated",
 		}, {
 			accept:   aggregatedV2Beta1JSONAccept,
-			expected: "aggregated-local",
+			expected: "nopeer-aggregated",
 		}, {
 			accept:   aggregatedV2Beta1ProtoAccept,
-			expected: "aggregated-local",
+			expected: "nopeer-aggregated",
 		}, {
 			accept:   aggregatedJSONAccept,
-			expected: "aggregated-local",
+			expected: "nopeer-aggregated",
 		}, {
 			accept:   aggregatedProtoAccept,
-			expected: "aggregated-local",
+			expected: "nopeer-aggregated",
 		}, {
 			accept:   jsonAccept,
 			expected: "unaggregated",
@@ -102,11 +102,11 @@ func TestAggregationEnabled(t *testing.T) {
 		}, {
 			// Server should return the first accepted type
 			accept:   aggregatedJSONAccept + "," + jsonAccept,
-			expected: "aggregated-local",
+			expected: "nopeer-aggregated",
 		}, {
 			// Server should return the first accepted type
 			accept:   aggregatedProtoAccept + "," + protobufAccept,
-			expected: "aggregated-local",
+			expected: "nopeer-aggregated",
 		},
 		// Peer Agg discovery cases.
 		// profile is not set (should default to peer-aggregated)
@@ -119,17 +119,17 @@ func TestAggregationEnabled(t *testing.T) {
 			expected:             "peer-aggregated",
 			enablePeerAggregated: true,
 		},
-		// profile=local (should return local)
+		// profile=nopeer (should return no-peer)
 		{
-			accept:               aggregatedLocalJSONAccept,
-			expected:             "aggregated-local",
+			accept:               aggregatedNoPeerJSONAccept,
+			expected:             "nopeer-aggregated",
 			enablePeerAggregated: true,
 		}, {
-			accept:               aggregatedLocalProtoAccept,
-			expected:             "aggregated-local",
+			accept:               aggregatedNoPeerProtoAccept,
+			expected:             "nopeer-aggregated",
 			enablePeerAggregated: true,
 		},
-		// profile is set to something other than local (should default to peer-aggregated)
+		// profile is set to something other than no-peer (should default to peer-aggregated)
 		{
 			accept:               aggregatedJSONAccept + ";profile=foo",
 			expected:             "peer-aggregated",

@@ -57,7 +57,7 @@ func TestSortDiscoveryGroupsTopo(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := SortDiscoveryGroupsTopo(tc.input)
+			got := MergePreservingRelativeOrder(tc.input)
 			if len(got) != len(tc.expected) {
 				t.Errorf("length mismatch: got %v, expected %v", got, tc.expected)
 				return

@@ -106,7 +106,7 @@ func NewPeerProxyHandler(
 	}
 
 	// Always use local discovery to get local view of resources.
-	discoveryClient.ForceLocalDiscovery = true
+	discoveryClient.NoPeerDiscovery = true
 	h.discoveryClient = discoveryClient
 	h.localDiscoveryInfoCache.Store(map[schema.GroupVersionResource]bool{})
 	h.peerDiscoveryInfoCache.Store(map[string]PeerDiscoveryCacheEntry{})

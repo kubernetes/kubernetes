@@ -145,10 +145,10 @@ type resourceDiscoveryManager struct {
 
 	// Writes protected by the lock.
 	// List of all apigroups & resources indexed by the resource manager
-	lock                  sync.RWMutex
-	apiGroups             map[groupKey]*apidiscoveryv2.APIGroupDiscovery
-	versionPriorities     map[groupVersionKey]priorityInfo
-	invalidationCallbacks []func()
+	lock                 sync.RWMutex
+	apiGroups            map[groupKey]*apidiscoveryv2.APIGroupDiscovery
+	versionPriorities    map[groupVersionKey]priorityInfo
+	invalidationCallback atomic.Pointer[func()]
 }
 
 type priorityInfo struct {
@@ -157,15 +157,13 @@ type priorityInfo struct {
 }
 
 func (rdm *resourceDiscoveryManager) AddInvalidationCallback(callback func()) {
-	rdm.lock.Lock()
-	defer rdm.lock.Unlock()
-	rdm.invalidationCallbacks = append(rdm.invalidationCallbacks, callback)
+	rdm.invalidationCallback.Store(&callback)
 }
 
 func (rdm *resourceDiscoveryManager) invalidateCacheLocked() {
 	rdm.cache.Store(nil)
-	for _, callback := range rdm.invalidationCallbacks {
-		callback()
+	if callback := rdm.invalidationCallback.Load(); callback != nil {
+		(*callback)()
 	}
 }
 

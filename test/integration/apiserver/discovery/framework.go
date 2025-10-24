@@ -44,7 +44,7 @@ import (
 
 const acceptV1JSON = "application/json"
 const acceptV2JSON = "application/json;g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList"
-const acceptV2JSONLocal = "application/json;g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList;profile=local"
+const acceptV2JSONNoPeer = "application/json;g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList;profile=nopeer"
 
 const maxTimeout = 10 * time.Second
 
@@ -719,25 +719,25 @@ func FindGroupVersionV2(discovery apidiscoveryv2.APIGroupDiscoveryList, gv metav
 	return nil
 }
 
-// FetchLocalDiscovery explicitly requests local discovery
-func FetchLocalDiscovery(ctx context.Context, client testClient) (apidiscoveryv2.APIGroupDiscoveryList, error) {
+// FetchNoPeerDiscovery explicitly requests no-peer discovery
+func FetchNoPeerDiscovery(ctx context.Context, client testClient) (apidiscoveryv2.APIGroupDiscoveryList, error) {
 	result, err := client.
 		Discovery().
 		RESTClient().
 		Get().
 		AbsPath("/apis").
-		SetHeader("Accept", acceptV2JSONLocal).
+		SetHeader("Accept", acceptV2JSONNoPeer).
 		Do(ctx).
 		Raw()
 
 	if err != nil {
-		return apidiscoveryv2.APIGroupDiscoveryList{}, fmt.Errorf("failed to fetch local discovery: %w", err)
+		return apidiscoveryv2.APIGroupDiscoveryList{}, fmt.Errorf("failed to fetch no-peer discovery: %w", err)
 	}
 
 	groupList := apidiscoveryv2.APIGroupDiscoveryList{}
 	err = json.Unmarshal(result, &groupList)
 	if err != nil {
-		return apidiscoveryv2.APIGroupDiscoveryList{}, fmt.Errorf("failed to parse local discovery: %w", err)
+		return apidiscoveryv2.APIGroupDiscoveryList{}, fmt.Errorf("failed to parse no-peer discovery: %w", err)
 	}
 
 	return groupList, nil

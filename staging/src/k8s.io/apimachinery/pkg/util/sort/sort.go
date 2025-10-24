@@ -22,38 +22,49 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
-// SortDiscoveryGroupsTopo performs a topological consensus sort of API discovery group names.
+// MergePreservingRelativeOrder performs a topological consensus sort of items from multiple sources.
+// It merges multiple lists of strings into a single list, preserving the relative order of
+// elements within each source list.
 //
-// This is needed in Kubernetes API discovery merging logic, where multiple peers (apiserver instances)
-// may report different groups. To present a consistent peer-aggregated discovery response,
-// we use this function to compute a consensus ordering that respects the relative orderings
-// reported by all peers. This is called from the peer-aggregated discovery handler when constructing
-// the final APIGroupDiscoveryList for clients.
-func SortDiscoveryGroupsTopo(peers [][]string) []string {
+// For any two items, if one appears before the other in any of the input lists,
+// that relative order will be preserved in the output. If no relative ordering is
+// defined between two items, they are sorted lexicographically.
+//
+// This function contains a shortcut optimization that returns the first list
+// found to contain all items. If the 'inputLists' slice is in a different order on
+// two different calls, this shortcut may return a different, validly ordered list.
+//
+// Example:
+//   - Input {{"a", "b", "c"}, {"b", "c", "a"}} might return {"a", "b", "c"}.
+//   - Input {{"b", "c", "a"}, {"a", "b", "c"}} might return {"b", "c", "a"}.
+//
+// This is useful for creating a stable, consistent ordering when merging data from
+// multiple sources that may have partial but not conflicting orderings.
+func MergePreservingRelativeOrder(inputLists [][]string) []string {
 	items := []string{}
 	lessThan := map[string]sets.Set[string]{}
-	// build the unsorted list of items, and populate the graph with all the immediate "less than" relationships
-	for _, peerItems := range peers {
-		for i, lhs := range peerItems {
+	// Build the unsorted list of items, and populate the graph with all the immediate "less than" relationships.
+	for _, list := range inputLists {
+		for i, lhs := range list {
 			if _, seen := lessThan[lhs]; !seen {
 				items = append(items, lhs)
 				lessThan[lhs] = sets.New[string]()
 			}
-			if i < len(peerItems)-1 {
-				lessThan[lhs].Insert(peerItems[i+1])
+			if i < len(list)-1 {
+				lessThan[lhs].Insert(list[i+1])
 			}
 		}
 	}
 
-	// shortcut if one of the peers has all the items already
-	for _, peerItems := range peers {
-		if len(peerItems) == len(items) && sets.New(peerItems...).Len() == len(items) {
-			copy(items, peerItems)
+	// Shortcut if one of the lists already has all the items already.
+	for _, list := range inputLists {
+		if len(list) == len(items) && sets.New(list...).Len() == len(items) {
+			copy(items, list)
 			return items
 		}
 	}
 
-	// sort based on finding paths between pairs
+	// Sort based on finding paths between pairs.
 	sort.Slice(items, func(i, j int) bool {
 		itemI := items[i]
 		itemJ := items[j]
@@ -63,7 +74,7 @@ func SortDiscoveryGroupsTopo(peers [][]string) []string {
 		if pathFrom(itemJ, itemI, lessThan) {
 			return false
 		}
-		// if there's no path, sort lexically
+		// if there's no path, sort lexically.
 		return itemI < itemJ
 	})
 
@@ -72,7 +83,7 @@ func SortDiscoveryGroupsTopo(peers [][]string) []string {
 
 func pathFrom(from, to string, links map[string]sets.Set[string]) bool {
 	visited := sets.New[string]()
-	tovisit := sets.New[string](from)
+	tovisit := sets.New(from)
 	for {
 		v, ok := tovisit.PopAny()
 		if !ok {
