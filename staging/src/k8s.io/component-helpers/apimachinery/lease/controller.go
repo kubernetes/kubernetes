@@ -19,6 +19,8 @@ package lease
 import (
 	"context"
 	"fmt"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	coordinationv1 "k8s.io/api/coordination/v1"
@@ -72,6 +74,9 @@ type controller struct {
 	// before every time the lease is created/refreshed(updated).
 	// Note that an error will block the lease operation.
 	newLeasePostProcessFunc ProcessLeaseFunc
+
+	reconcilingLock sync.Mutex
+	stopCalled      atomic.Bool
 }
 
 // NewController constructs and returns a controller
@@ -97,7 +102,6 @@ func NewController(clock clock.Clock, client clientset.Interface, holderIdentity
 // Start performs setup actions, and then starts the lease controller.
 func (c *controller) Start(stopCh <-chan struct{}) error {
 	if c.leaseClient == nil {
-		klog.Info("lease controller has nil lease client, will not claim or renew leases")
 		return nil
 	}
 
@@ -118,10 +122,14 @@ func (c *controller) Start(stopCh <-chan struct{}) error {
 
 // Stop gracefully shuts down the controller.
 func (c *controller) Stop() {
-	// if leaseClient is nil, we can't clean up the lease
 	if c.leaseClient == nil {
 		return
 	}
+
+	c.stopCalled.Store(true)
+	// Ensure that there will be no race condition with the sync.
+	c.reconcilingLock.Lock()
+	defer c.reconcilingLock.Unlock()
 
 	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
@@ -141,6 +149,13 @@ func (c *controller) Run(ctx context.Context) {
 }
 
 func (c *controller) sync(ctx context.Context) {
+	if c.stopCalled.Load() {
+		return
+	}
+
+	c.reconcilingLock.Lock()
+	defer c.reconcilingLock.Unlock()
+
 	if c.latestLease != nil {
 		// As long as the lease is not (or very rarely) updated by any other agent than the component itself,
 		// we can optimistically assume it didn't change since our last update and try updating
