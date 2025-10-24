@@ -18,9 +18,9 @@ package staticpod
 
 import (
 	"bytes"
-	"crypto/md5"
 	"fmt"
 	"hash"
+	"hash/fnv"
 	"io"
 	"math"
 	"net/url"
@@ -373,7 +373,7 @@ func ManifestFilesAreEqual(path1, path2 string) (bool, string, error) {
 		return false, "", err
 	}
 
-	hasher := md5.New()
+	hasher := fnv.New128a()
 	DeepHashObject(hasher, pod1)
 	hash1 := hasher.Sum(nil)[0:]
 	DeepHashObject(hasher, pod2)

@@ -452,7 +452,10 @@ func (e *Controller) syncService(ctx context.Context, key string) error {
 	// When comparing the subsets, we ignore the difference in ResourceVersion of Pod to avoid unnecessary Endpoints
 	// updates caused by Pod updates that we don't care, e.g. annotation update.
 	if !createEndpoints &&
-		endpointSubsetsEqualIgnoreResourceVersion(currentEndpoints.Subsets, subsets) &&
+		(endpointSubsetsEqualIgnoreResourceVersion(currentEndpoints.Subsets, subsets) ||
+			// If the comparison fails, try again after repacking, it may be a difference in the hash algorithm
+			// For more context: https://github.com/kubernetes/kubernetes/issues/129652#issuecomment-3264035333
+			endpointSubsetsEqualIgnoreResourceVersion(endpoints.RepackSubsets(currentEndpoints.Subsets), subsets)) &&
 		labelsCorrectForEndpoints(currentEndpoints.Labels, service.Labels) &&
 		capacityAnnotationSetCorrectly(currentEndpoints.Annotations, currentEndpoints.Subsets) {
 		logger.V(5).Info("endpoints are equal, skipping update", "service", klog.KObj(service))
