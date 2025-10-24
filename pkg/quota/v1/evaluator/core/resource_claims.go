@@ -23,6 +23,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
@@ -42,17 +43,20 @@ import (
 var ClaimObjectCountName = generic.ObjectCountQuotaResourceNameFor(resourceapi.SchemeGroupVersion.WithResource("resourceclaims").GroupResource())
 
 // V1ResourceByDeviceClass returns a quota resource name by device class.
+// gpuclass -> gpuclass.deviceclass.resource.k8s.io/devices
 func V1ResourceByDeviceClass(className string) corev1.ResourceName {
 	return corev1.ResourceName(className + corev1.ResourceClaimsPerClass)
 }
 
-// V1ExtendedResourceByDeviceClass returns a quota extended resource name by device class.
-func V1ExtendedResourceByDeviceClass(extendedResourceName string) corev1.ResourceName {
+// extendedResourceToQuotaRequestResource returns a quota request extended resource name.
+// example.com/gpu -> requests.example.com/gpu
+func extendedResourceToQuotaRequestResource(extendedResourceName string) corev1.ResourceName {
 	return corev1.ResourceName(corev1.DefaultResourceRequestsPrefix + extendedResourceName)
 }
 
-// V1ImplicitExtendedResourceByDeviceClass returns a quota implicit extended resource name by device class.
-func V1ImplicitExtendedResourceByDeviceClass(className string) corev1.ResourceName {
+// deviceClassToQuotaRequestResource returns a quota request implicit extended resource name.
+// gpuclass -> requests.deviceclass.resource.kubernetes.io/gpuclass
+func deviceClassToQuotaRequestResource(className string) corev1.ResourceName {
 	return corev1.ResourceName(corev1.ResourceImplicitExtendedClaimsPerClass + className)
 }
 
@@ -116,6 +120,7 @@ func (p *claimEvaluator) MatchingResources(items []corev1.ResourceName) []corev1
 		if item == ClaimObjectCountName /* object count quota fields */ ||
 			strings.HasSuffix(string(item), corev1.ResourceClaimsPerClass /* by device class */) {
 			result = append(result, item)
+			continue
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
 			if strings.HasPrefix(string(item), corev1.ResourceImplicitExtendedClaimsPerClass /* by implicit extended resource name */) ||
@@ -127,44 +132,44 @@ func (p *claimEvaluator) MatchingResources(items []corev1.ResourceName) []corev1
 	return result
 }
 
-func (p *claimEvaluator) extendedResourceQuota(dcName string) corev1.ResourceName {
-	resource := corev1.ResourceName("")
+func (p *claimEvaluator) extendedResourceQuota(dcName string) (corev1.ResourceName, bool) {
 	if name, ok := p.deviceClassMapping.Get(dcName); ok {
-		resource = V1ExtendedResourceByDeviceClass(name)
+		return extendedResourceToQuotaRequestResource(name), true
 	}
-	return resource
+	return "", false
 }
 
-func isPodRequest(name corev1.ResourceName, quantity resource.Quantity, reqs map[corev1.ResourceName]resource.Quantity) bool {
-	for r, q := range reqs {
-		if r == name && q.Cmp(quantity) == 0 {
-			return true
+func isPodRequest(name corev1.ResourceName, quantity resource.Quantity, reqs []requestQuantity) (int, bool) {
+	for i, rq := range reqs {
+		if rq.name == name && rq.quantity.Cmp(quantity) == 0 {
+			return i, true
 		}
 	}
-	return false
+	return 0, false
 }
 
-func (p *claimEvaluator) setResourceQuantity(resourceMap map[corev1.ResourceName]resource.Quantity, quantity resource.Quantity, deviceClassName, name string, isExtendedResourceClaim bool, reqs map[corev1.ResourceName]resource.Quantity) {
+func (p *claimEvaluator) setResourceQuantity(resourceMap map[corev1.ResourceName]resource.Quantity, quantity resource.Quantity, deviceClassName string, isExtendedResourceClaim bool, reqs []requestQuantity) []requestQuantity {
 	deviceClassClaim := V1ResourceByDeviceClass(deviceClassName)
 	q := resourceMap[deviceClassClaim]
 	q.Add(quantity)
 	resourceMap[deviceClassClaim] = q
 	if !utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
-		return
+		return reqs
 	}
-	implicitExtendedResourceClaim := V1ImplicitExtendedResourceByDeviceClass(deviceClassName)
-	isImplicitExtendedResourceRequest := isPodRequest(implicitExtendedResourceClaim, quantity, reqs)
-	extendedResourceClaim := p.extendedResourceQuota(deviceClassName)
+	implicitExtendedResourceClaim := deviceClassToQuotaRequestResource(deviceClassName)
+	implicitIndex, isImplicitExtendedResourceRequest := isPodRequest(implicitExtendedResourceClaim, quantity, reqs)
+	extendedResourceClaim, ok := p.extendedResourceQuota(deviceClassName)
 	isExplicitExtendedResourceRequest := false
-	if extendedResourceClaim != "" && !isImplicitExtendedResourceRequest {
-		isExplicitExtendedResourceRequest = isPodRequest(extendedResourceClaim, quantity, reqs)
+	explictIndex := 0
+	if ok && !isImplicitExtendedResourceRequest {
+		explictIndex, isExplicitExtendedResourceRequest = isPodRequest(extendedResourceClaim, quantity, reqs)
 	}
 	if !isExtendedResourceClaim || !isImplicitExtendedResourceRequest || isExplicitExtendedResourceRequest {
 		q := resourceMap[implicitExtendedResourceClaim]
 		q.Add(quantity)
 		resourceMap[implicitExtendedResourceClaim] = q
 	}
-	if extendedResourceClaim != "" {
+	if ok {
 		if !isExtendedResourceClaim || isImplicitExtendedResourceRequest || !isExplicitExtendedResourceRequest {
 			q := resourceMap[extendedResourceClaim]
 			q.Add(quantity)
@@ -172,45 +177,54 @@ func (p *claimEvaluator) setResourceQuantity(resourceMap map[corev1.ResourceName
 		}
 	}
 	if isImplicitExtendedResourceRequest {
-		delete(reqs, implicitExtendedResourceClaim)
-		return
+		reqs = append(reqs[:implicitIndex], reqs[implicitIndex+1:]...)
+		return reqs
 	}
 	if isExplicitExtendedResourceRequest {
-		delete(reqs, extendedResourceClaim)
-		return
+		reqs = append(reqs[:explictIndex], reqs[explictIndex+1:]...)
+		return reqs
 	}
+	return reqs
 }
 
-func (p *claimEvaluator) verifyOwner(claim *resourceapi.ResourceClaim) (map[corev1.ResourceName]resource.Quantity, bool) {
-	if len(claim.OwnerReferences) == 0 {
+type requestQuantity struct {
+	name     corev1.ResourceName
+	quantity resource.Quantity
+}
+
+func (p *claimEvaluator) verifyOwner(claim *resourceapi.ResourceClaim) ([]requestQuantity, bool) {
+	controllerRef := metav1.GetControllerOf(claim)
+	if controllerRef == nil {
 		return nil, false
 	}
-	if claim.OwnerReferences[0].Kind != "Pod" {
+	if controllerRef.Kind != "Pod" {
 		return nil, false
 	}
 	if p.podsGetter == nil {
 		return nil, false
 	}
-	pod, err := p.podsGetter.Pods(claim.Namespace).Get(claim.OwnerReferences[0].Name)
+	pod, err := p.podsGetter.Pods(claim.Namespace).Get(controllerRef.Name)
 	if err != nil {
 		return nil, false
 	}
-
-	if pod.Status.ExtendedResourceClaimStatus == nil || pod.Status.ExtendedResourceClaimStatus.ResourceClaimName == claim.Name {
-		reqs := make(map[corev1.ResourceName]resource.Quantity)
-		for _, c := range pod.Spec.InitContainers {
-			for r, q := range c.Resources.Requests {
-				reqs[V1ExtendedResourceByDeviceClass(string(r))] = q
-			}
-		}
-		for _, c := range pod.Spec.Containers {
-			for r, q := range c.Resources.Requests {
-				reqs[V1ExtendedResourceByDeviceClass(string(r))] = q
-			}
-		}
-		return reqs, true
+	if controllerRef.UID != pod.UID {
+		return nil, false
 	}
-	return nil, false
+	if pod.Status.ExtendedResourceClaimStatus != nil && pod.Status.ExtendedResourceClaimStatus.ResourceClaimName != claim.Name {
+		return nil, false
+	}
+	reqs := make([]requestQuantity, 0)
+	for _, c := range pod.Spec.InitContainers {
+		for r, q := range c.Resources.Requests {
+			reqs = append(reqs, requestQuantity{name: extendedResourceToQuotaRequestResource(string(r)), quantity: q})
+		}
+	}
+	for _, c := range pod.Spec.Containers {
+		for r, q := range c.Resources.Requests {
+			reqs = append(reqs, requestQuantity{name: extendedResourceToQuotaRequestResource(string(r)), quantity: q})
+		}
+	}
+	return reqs, true
 }
 
 // Usage knows how to measure usage associated with item.
@@ -222,7 +236,7 @@ func (p *claimEvaluator) Usage(item runtime.Object) (corev1.ResourceList, error)
 	}
 
 	isExtendedResourceClaim := false
-	var reqs map[corev1.ResourceName]resource.Quantity
+	var reqs []requestQuantity
 
 	if claim.Annotations[resourceapi.ExtendedResourceClaimAnnotation] == "true" {
 		reqs, isExtendedResourceClaim = p.verifyOwner(claim)
@@ -253,7 +267,7 @@ func (p *claimEvaluator) Usage(item runtime.Object) (corev1.ResourceList, error)
 				q := resource.NewQuantity(numDevices, resource.DecimalSI)
 
 				if q.Cmp(maxQuantityByDeviceClassClaim[deviceClassClaim]) > 0 {
-					p.setResourceQuantity(maxQuantityByDeviceClassClaim, *q, subrequest.DeviceClassName, subrequest.Name, isExtendedResourceClaim, reqs)
+					reqs = p.setResourceQuantity(maxQuantityByDeviceClassClaim, *q, subrequest.DeviceClassName, isExtendedResourceClaim, reqs)
 				}
 			}
 			for deviceClassClaim, q := range maxQuantityByDeviceClassClaim {
@@ -276,7 +290,7 @@ func (p *claimEvaluator) Usage(item runtime.Object) (corev1.ResourceList, error)
 				// expect that when downgrading.
 			}
 			q := resource.NewQuantity(numDevices, resource.DecimalSI)
-			p.setResourceQuantity(result, *q, request.Exactly.DeviceClassName, request.Name, isExtendedResourceClaim, reqs)
+			reqs = p.setResourceQuantity(result, *q, request.Exactly.DeviceClassName, isExtendedResourceClaim, reqs)
 		default:
 			// Some unknown, future request type. Cannot do quota for it.
 		}

@@ -18,10 +18,12 @@ package cache
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/informers"
 	cache "k8s.io/client-go/tools/cache"
 	klog "k8s.io/klog/v2"
@@ -47,16 +49,16 @@ func NewDeviceClassMapping(i informers.SharedInformerFactory) *DeviceClassMappin
 		logger:   klog.FromContext(context.Background()),
 	}
 	items, err := i.Resource().V1().DeviceClasses().Lister().List(labels.Everything())
-	if err != nil {
-		d.logger.Error(err, "Failed to list device classes")
-		return nil
+	if err == nil {
+		for _, item := range items {
+			if item.Spec.ExtendedResourceName != nil {
+				d.mapping[item.Name] = *item.Spec.ExtendedResourceName
+			}
+		}
+	} else {
+		d.logger.Error(err, "Failed to list device classes initially")
 	}
 
-	for _, item := range items {
-		if item.Spec.ExtendedResourceName != nil {
-			d.mapping[item.Name] = *item.Spec.ExtendedResourceName
-		}
-	}
 	if _, err := d.informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			d.addDeviceClass(obj)
@@ -74,7 +76,7 @@ func NewDeviceClassMapping(i informers.SharedInformerFactory) *DeviceClassMappin
 	return d
 }
 
-func (d *DeviceClassMapping) act(obj interface{}, isDelete bool) {
+func (d *DeviceClassMapping) addDeviceClass(obj interface{}) {
 	if d == nil {
 		return
 	}
@@ -82,11 +84,6 @@ func (d *DeviceClassMapping) act(obj interface{}, isDelete bool) {
 	defer d.mutex.Unlock()
 
 	if deviceClass, ok := obj.(*resourceapi.DeviceClass); ok {
-		if isDelete {
-			delete(d.mapping, deviceClass.Name)
-			d.logger.V(5).Info("Removed device class", "deviceClass", deviceClass.Name)
-			return
-		}
 		if deviceClass.Spec.ExtendedResourceName == nil {
 			return
 		}
@@ -95,12 +92,28 @@ func (d *DeviceClassMapping) act(obj interface{}, isDelete bool) {
 	}
 }
 
-func (d *DeviceClassMapping) addDeviceClass(obj interface{}) {
-	d.act(obj, false)
-}
-
 func (d *DeviceClassMapping) deleteDeviceClass(obj interface{}) {
-	d.act(obj, true)
+	if d == nil {
+		return
+	}
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+
+	deviceClass, ok := obj.(*resourceapi.DeviceClass)
+	if !ok {
+		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+		if !ok {
+			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
+			return
+		}
+		deviceClass, ok = tombstone.Obj.(*resourceapi.DeviceClass)
+		if !ok {
+			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a DeviceClass %#v", obj))
+			return
+		}
+	}
+	delete(d.mapping, deviceClass.Name)
+	d.logger.V(5).Info("Removed device class", "deviceClass", deviceClass.Name)
 }
 
 // Get returns the extended resource name for given device class name and true if found

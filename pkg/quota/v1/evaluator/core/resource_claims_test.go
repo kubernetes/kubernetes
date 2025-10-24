@@ -50,8 +50,11 @@ func testResourceClaim(name string, namespace string, isExtended bool, podName s
 		claim.Annotations = map[string]string{resourceapi.ExtendedResourceClaimAnnotation: "true"}
 		claim.OwnerReferences = []metav1.OwnerReference{
 			{
-				Kind: "Pod",
-				Name: podName,
+				APIVersion: "v1",
+				Kind:       "Pod",
+				Name:       podName,
+				UID:        "uid",
+				Controller: ptr.To(true),
 			},
 		}
 	}
@@ -139,6 +142,22 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 						Count:           1,
 					},
 				},
+				{
+					Name: "container-1-request-0",
+					Exactly: &api.ExactDeviceRequest{
+						DeviceClassName: classGpu,
+						AllocationMode:  api.DeviceAllocationModeExactCount,
+						Count:           1,
+					},
+				},
+				{
+					Name: "container-1-request-0",
+					Exactly: &api.ExactDeviceRequest{
+						DeviceClassName: classGpu,
+						AllocationMode:  api.DeviceAllocationModeExactCount,
+						Count:           1,
+					},
+				},
 			},
 		},
 	})
@@ -165,9 +184,13 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 		},
 	})
 	podImplicit := &corev1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "ns",
 			Name:      "pod-implicit",
+			UID:       "uid",
 		},
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{
@@ -187,9 +210,13 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 		},
 	}
 	podExplicit := &corev1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "ns",
 			Name:      "pod-explicit",
+			UID:       "uid",
 		},
 		Spec: corev1.PodSpec{
 			InitContainers: []corev1.Container{
@@ -208,11 +235,14 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 			},
 		},
 	}
-
 	podHybrid := &corev1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "ns",
 			Name:      "pod-hybrid",
+			UID:       "uid",
 		},
 		Spec: corev1.PodSpec{
 			InitContainers: []corev1.Container{
@@ -220,6 +250,7 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 					Resources: corev1.ResourceRequirements{
 						Requests: corev1.ResourceList{
 							"example.com/gpu": resource.MustParse("1"),
+							corev1.ResourceName("deviceclass.resource.kubernetes.io/" + classGpu): resource.MustParse("1"),
 						},
 					},
 				},
@@ -228,6 +259,7 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 				{
 					Resources: corev1.ResourceRequirements{
 						Requests: corev1.ResourceList{
+							"example.com/gpu": resource.MustParse("1"),
 							corev1.ResourceName("deviceclass.resource.kubernetes.io/" + classGpu): resource.MustParse("1"),
 						},
 					},
@@ -241,9 +273,13 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 		},
 	}
 	podNilStatus := &corev1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "ns",
 			Name:      "pod-nil-status",
+			UID:       "uid",
 		},
 		Spec: corev1.PodSpec{
 			InitContainers: []corev1.Container{
@@ -326,9 +362,9 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 			claim:     hybridExtendedResourceClaim,
 			usage: corev1.ResourceList{
 				"count/resourceclaims.resource.k8s.io":            resource.MustParse("1"),
-				"gpu.deviceclass.resource.k8s.io/devices":         resource.MustParse("2"),
-				"requests.deviceclass.resource.kubernetes.io/gpu": resource.MustParse("1"),
-				"requests.example.com/gpu":                        resource.MustParse("1"),
+				"gpu.deviceclass.resource.k8s.io/devices":         resource.MustParse("4"),
+				"requests.deviceclass.resource.kubernetes.io/gpu": resource.MustParse("2"),
+				"requests.example.com/gpu":                        resource.MustParse("2"),
 			},
 		},
 		"ni-status-extended-resource-claim": {

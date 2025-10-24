@@ -85,10 +85,15 @@ func maskResourceWithPrefix(resource corev1.ResourceName, prefix string) corev1.
 // has the quota related resource prefix.
 func isExtendedResourceNameForQuota(name corev1.ResourceName) bool {
 	// As overcommit is not supported by extended resources for now,
-	// quota objects in format of "requests.resourceName" is allowed,
+	// quota objects in format of "requests.resourceName" is allowed
+	nonNative := !helper.IsNativeResource(name)
 	// allow the implicit extended resource name in the format of
 	// requests.deviceclass.resource.kubernetes.io/deivce-class-name
-	return (!helper.IsNativeResource(name) || strings.HasPrefix(string(name), resourceRequestsDeviceClassPrefix)) && strings.HasPrefix(string(name), corev1.DefaultResourceRequestsPrefix)
+	implicitExtendedResource := strings.HasPrefix(string(name), resourceRequestsDeviceClassPrefix)
+	// name starts with 'requests.'
+	isQuotaRequest := strings.HasPrefix(string(name), corev1.DefaultResourceRequestsPrefix)
+
+	return (nonNative || implicitExtendedResource) && isQuotaRequest
 }
 
 // NOTE: it was a mistake, but if a quota tracks cpu or memory related resources,
