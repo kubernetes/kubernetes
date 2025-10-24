@@ -751,7 +751,7 @@ func validateCounterSet(counterSet resource.CounterSet, fldPath *field.Path) fie
 	} else {
 		// The size limit is enforced for across all sets by the caller.
 		allErrs = append(allErrs, validateMap(counterSet.Counters, -1, validation.DNS1123LabelMaxLength,
-			validateCounterName, validateDeviceCounter, fldPath.Child("counters"))...)
+			validateCounterName, validateDeviceCounter, fldPath.Child("counters"), keysCovered)...)
 	}
 
 	return allErrs
@@ -876,7 +876,7 @@ func validateDeviceCounterConsumption(deviceCounterConsumption resource.DeviceCo
 	} else {
 		// The size limit is enforced for the entire device.
 		allErrs = append(allErrs, validateMap(deviceCounterConsumption.Counters, -1, validation.DNS1123LabelMaxLength,
-			validateCounterName, validateDeviceCounter, fldPath.Child("counters"))...)
+			validateCounterName, validateDeviceCounter, fldPath.Child("counters"), keysCovered)...)
 	}
 	return allErrs
 }
@@ -1142,6 +1142,8 @@ const (
 	sizeCovered
 	// The uniqueness check is covered by declarative validation.
 	uniquenessCovered
+	// key validation is covered by declarative validation.
+	keysCovered
 )
 
 // validateSlice ensures that a slice does not exceed a certain maximum size
@@ -1210,14 +1212,19 @@ func quantityKey(item apiresource.Quantity) string {
 // small limit gets increased because it is okay to include more details.
 // This is not used for validation of keys, which has to be done by
 // the callback function.
-func validateMap[K ~string, T any](m map[K]T, maxSize, truncateKeyLen int, validateKey func(K, *field.Path) field.ErrorList, validateItem func(T, *field.Path) field.ErrorList, fldPath *field.Path) field.ErrorList {
+func validateMap[K ~string, T any](m map[K]T, maxSize, truncateKeyLen int, validateKey func(K, *field.Path) field.ErrorList, validateItem func(T, *field.Path) field.ErrorList, fldPath *field.Path, opts ...validationOption) field.ErrorList {
 	var allErrs field.ErrorList
 	if maxSize >= 0 && len(m) > maxSize {
 		allErrs = append(allErrs, field.TooMany(fldPath, len(m), maxSize))
 	}
 	for key, item := range m {
 		keyPath := fldPath.Key(truncateIfTooLong(string(key), truncateKeyLen))
-		allErrs = append(allErrs, validateKey(key, keyPath)...)
+
+		keyValidationErrors := validateKey(key, fldPath)
+		if slices.Contains(opts, keysCovered) {
+			keyValidationErrors = keyValidationErrors.MarkCoveredByDeclarative()
+		}
+		allErrs = append(allErrs, keyValidationErrors...)
 		allErrs = append(allErrs, validateItem(item, keyPath)...)
 	}
 	return allErrs
