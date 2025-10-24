@@ -937,6 +937,19 @@ func (w *watchCache) getAllEventsSinceLocked(resourceVersion uint64, key string,
 // that covers the entire storage state.
 // This function assumes to be called under the watchCache lock.
 func (w *watchCache) getIntervalFromStoreLocked(key string, matchesSingle bool) (*watchCacheInterval, error) {
+	// Use snapshot if available to ensure we get a consistent view of the store
+	// without concurrent modifications leaking in. This prevents ongoing events
+	// from appearing in the initial events list before the BOOKMARK (issue #134831).
+	if w.snapshots != nil && w.snapshottingEnabled.Load() {
+		// Get the snapshot at the current resourceVersion
+		snapshot, ok := w.snapshots.GetLessOrEqual(w.resourceVersion)
+		if ok {
+			// Create interval from snapshot using the ordered lister
+			return newCacheIntervalFromSnapshot(w.resourceVersion, snapshot, key, matchesSingle)
+		}
+	}
+
+	// Fallback to live store if snapshot not available or feature disabled
 	ci, err := newCacheIntervalFromStore(w.resourceVersion, w.store, key, matchesSingle)
 	if err != nil {
 		return nil, err

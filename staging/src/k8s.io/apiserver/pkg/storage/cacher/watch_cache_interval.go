@@ -132,6 +132,61 @@ func (s sortableWatchCacheEvents) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
 }
 
+// newCacheIntervalFromSnapshot is meant to handle the case of sendInitialEvents=true with snapshots enabled,
+// such that the events returned by Next() need to be events from a snapshot of the underlying store.
+// The items returned in the interval will be sorted by Key.
+// This ensures a consistent view without concurrent modifications leaking in (issue #134831).
+func newCacheIntervalFromSnapshot(resourceVersion uint64, snapshot orderedLister, key string, matchesSingle bool) (*watchCacheInterval, error) {
+	buffer := &watchCacheIntervalBuffer{}
+	var allItems []interface{}
+	if matchesSingle {
+		// For single key matches, we need to iterate and find the matching item
+		// since orderedLister doesn't have GetByKey
+		allItems = snapshot.ListPrefix(key, "")
+		// Filter to exact match
+		for _, item := range allItems {
+			elem, ok := item.(*storeElement)
+			if ok && elem.Key == key {
+				allItems = []interface{}{item}
+				break
+			}
+		}
+		if len(allItems) > 1 {
+			allItems = nil // No exact match found
+		}
+	} else {
+		// Get all items with empty prefix
+		allItems = snapshot.ListPrefix("", "")
+	}
+	buffer.buffer = make([]*watchCacheEvent, len(allItems))
+	for i, item := range allItems {
+		elem, ok := item.(*storeElement)
+		if !ok {
+			return nil, fmt.Errorf("not a storeElement: %v", elem)
+		}
+		buffer.buffer[i] = &watchCacheEvent{
+			Type:            watch.Added,
+			Object:          elem.Object,
+			ObjLabels:       elem.Labels,
+			ObjFields:       elem.Fields,
+			Key:             elem.Key,
+			ResourceVersion: resourceVersion,
+			IsInitialEvent:  true,
+		}
+		buffer.endIndex++
+	}
+	sort.Sort(sortableWatchCacheEvents(buffer.buffer))
+	ci := &watchCacheInterval{
+		startIndex: 0,
+		// Simulate that we already have all the events we're looking for.
+		endIndex:        0,
+		buffer:          buffer,
+		resourceVersion: resourceVersion,
+	}
+
+	return ci, nil
+}
+
 // newCacheIntervalFromStore is meant to handle the case of rv=0, such that the events
 // returned by Next() need to be events from a List() done on the underlying store of
 // the watch cache.
