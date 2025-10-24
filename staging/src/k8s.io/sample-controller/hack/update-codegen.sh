@@ -29,10 +29,18 @@ kube::codegen::gen_helpers \
     --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt" \
     "${SCRIPT_ROOT}/pkg/apis"
 
+kube::codegen::gen_openapi \
+    --output-dir "${SCRIPT_ROOT}/openapi" \
+    --output-pkg "k8s.io/${THIS_PKG}/openapi" \
+    --output-model-name-file "zz_generated.model_name.go" \
+    --report-filename "${SCRIPT_ROOT}/openapi/codegen_violation_exceptions.list" \
+    --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt" \
+    "${SCRIPT_ROOT}/pkg/apis"
+
 kube::codegen::gen_client \
     --with-watch \
     --with-applyconfig \
-    --applyconfig-name "applyconfigurations" \
+    # --applyconfig-openapi-schema "${SCRIPT_ROOT}/openapi-spec/apis__samplecontroller.k8s.io__v1alpha1_openapi.json" \
     --output-dir "${SCRIPT_ROOT}/pkg/generated" \
     --output-pkg "${THIS_PKG}/pkg/generated" \
     --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt" \
