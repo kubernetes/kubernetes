@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -131,6 +132,7 @@ func createHandlerWithConfig(kubeClient *fake.Clientset, informerFactory informe
 	initializers.Initialize(handler)
 
 	informerFactory.Start(stopCh)
+	time.Sleep(time.Millisecond) // speeds up the tests by yielding to created goroutines
 	informerFactory.WaitForCacheSync(stopCh)
 	kubeClient.ClearActions()
 
