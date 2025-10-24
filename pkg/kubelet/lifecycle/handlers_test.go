@@ -785,7 +785,23 @@ func TestIsHTTPResponseError(t *testing.T) {
 }
 
 func TestRunSleepHandler(t *testing.T) {
-	handlerRunner := NewHandlerRunner(&fakeHTTP{}, &fakeContainerCommandRunner{}, nil, nil)
+	// Create a stub pod status provider that returns a running container
+	fakePodStatusProvider := podStatusProviderFunc(func(uid types.UID, name, namespace string) (*kubecontainer.PodStatus, error) {
+		return &kubecontainer.PodStatus{
+			ID:        uid,
+			Name:      name,
+			Namespace: namespace,
+			ContainerStatuses: []*kubecontainer.Status{
+				{
+					ID:    kubecontainer.ContainerID{Type: "test", ID: "abc1234"},
+					Name:  "containerFoo",
+					State: kubecontainer.ContainerStateRunning,
+				},
+			},
+		}, nil
+	})
+
+	handlerRunner := NewHandlerRunner(&fakeHTTP{}, &fakeContainerCommandRunner{}, fakePodStatusProvider, nil)
 	containerID := kubecontainer.ContainerID{Type: "test", ID: "abc1234"}
 	containerName := "containerFoo"
 	container := v1.Container{
@@ -797,6 +813,7 @@ func TestRunSleepHandler(t *testing.T) {
 	pod := v1.Pod{}
 	pod.ObjectMeta.Name = "podFoo"
 	pod.ObjectMeta.Namespace = "nsFoo"
+	pod.ObjectMeta.UID = "test-pod-uid"
 	pod.Spec.Containers = []v1.Container{container}
 
 	tests := []struct {
@@ -808,7 +825,7 @@ func TestRunSleepHandler(t *testing.T) {
 	}{
 		{
 			name:                          "valid seconds",
-			sleepSeconds:                  5,
+			sleepSeconds:                  1,
 			terminationGracePeriodSeconds: 30,
 		},
 		{
@@ -816,7 +833,7 @@ func TestRunSleepHandler(t *testing.T) {
 			sleepSeconds:                  3,
 			terminationGracePeriodSeconds: 2,
 			expectErr:                     true,
-			expectedErr:                   "container terminated before sleep hook finished",
+			expectedErr:                   "context canceled before sleep hook finished",
 		},
 	}
 
@@ -830,12 +847,69 @@ func TestRunSleepHandler(t *testing.T) {
 			_, err := handlerRunner.Run(ctx, containerID, &pod, &container, container.Lifecycle.PreStop)
 
 			if !tt.expectErr && err != nil {
-				t.Errorf("unexpected success")
+				t.Errorf("unexpected error: %v", err)
 			}
-			if tt.expectErr && err.Error() != tt.expectedErr {
+			if tt.expectErr && err != nil && err.Error() != tt.expectedErr {
 				t.Errorf("%s: expected error want %s, got %s", tt.name, tt.expectedErr, err.Error())
 			}
 		})
+	}
+}
+
+func TestRunSleepHandlerContainerExit(t *testing.T) {
+	// Create a pod status provider that simulates container exiting during sleep
+	containerExitTime := time.Now().Add(500 * time.Millisecond)
+	fakePodStatusProvider := podStatusProviderFunc(func(uid types.UID, name, namespace string) (*kubecontainer.PodStatus, error) {
+		var state kubecontainer.State
+		if time.Now().Before(containerExitTime) {
+			state = kubecontainer.ContainerStateRunning
+		} else {
+			state = kubecontainer.ContainerStateExited
+		}
+		return &kubecontainer.PodStatus{
+			ID:        uid,
+			Name:      name,
+			Namespace: namespace,
+			ContainerStatuses: []*kubecontainer.Status{
+				{
+					ID:    kubecontainer.ContainerID{Type: "test", ID: "abc1234"},
+					Name:  "containerFoo",
+					State: state,
+				},
+			},
+		}, nil
+	})
+
+	handlerRunner := NewHandlerRunner(&fakeHTTP{}, &fakeContainerCommandRunner{}, fakePodStatusProvider, nil)
+	containerID := kubecontainer.ContainerID{Type: "test", ID: "abc1234"}
+	containerName := "containerFoo"
+	container := v1.Container{
+		Name: containerName,
+		Lifecycle: &v1.Lifecycle{
+			PreStop: &v1.LifecycleHandler{
+				Sleep: &v1.SleepAction{Seconds: 60}, // Long sleep
+			},
+		},
+	}
+	pod := v1.Pod{}
+	pod.ObjectMeta.Name = "podFoo"
+	pod.ObjectMeta.Namespace = "nsFoo"
+	pod.ObjectMeta.UID = "test-pod-uid"
+	pod.Spec.Containers = []v1.Container{container}
+
+	_, tCtx := ktesting.NewTestContext(t)
+	start := time.Now()
+	_, err := handlerRunner.Run(tCtx, containerID, &pod, &container, container.Lifecycle.PreStop)
+	elapsed := time.Since(start)
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// The sleep should terminate early (within ~1 second) when container exits
+	// rather than waiting the full 60 seconds
+	if elapsed > 2*time.Second {
+		t.Errorf("sleep did not terminate early when container exited: elapsed=%v", elapsed)
 	}
 }
 
