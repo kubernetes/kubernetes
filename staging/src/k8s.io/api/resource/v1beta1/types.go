@@ -1921,6 +1921,7 @@ type AllocatedDeviceStatus struct {
 	// NetworkData contains network-related information specific to the device.
 	//
 	// +optional
+	// +k8s:optional
 	NetworkData *NetworkDeviceData `json:"networkData,omitempty" protobuf:"bytes,6,opt,name=networkData"`
 }
 
@@ -1935,6 +1936,8 @@ type NetworkDeviceData struct {
 	// Must not be longer than 256 characters.
 	//
 	// +optional
+	// +k8s:optional
+	// +k8s:maxLength=256
 	InterfaceName string `json:"interfaceName,omitempty" protobuf:"bytes,1,opt,name=interfaceName"`
 
 	// IPs lists the network addresses assigned to the device's network interface.
@@ -1954,5 +1957,7 @@ type NetworkDeviceData struct {
 	// Must not be longer than 128 characters.
 	//
 	// +optional
+	// +k8s:optional
+	// +k8s:maxLength=128
 	HardwareAddress string `json:"hardwareAddress,omitempty" protobuf:"bytes,3,opt,name=hardwareAddress"`
 }
