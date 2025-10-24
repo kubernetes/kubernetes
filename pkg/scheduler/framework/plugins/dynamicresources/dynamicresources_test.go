@@ -358,12 +358,11 @@ var (
 				Annotations(map[string]string{"resource.kubernetes.io/extended-resource-claim": "true"}).
 				OwnerRef(
 			metav1.OwnerReference{
-				APIVersion:         "v1",
-				Kind:               "Pod",
-				Name:               podName,
-				UID:                types.UID(podUID),
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				APIVersion: "v1",
+				Kind:       "Pod",
+				Name:       podName,
+				UID:        types.UID(podUID),
+				Controller: ptr.To(true),
 			}).
 		RequestWithName("container-0-request-0", className).
 		Allocation(extendedResourceAllocationResult).
@@ -375,12 +374,11 @@ var (
 					Annotations(map[string]string{"resource.kubernetes.io/extended-resource-claim": "true"}).
 					OwnerRef(
 			metav1.OwnerReference{
-				APIVersion:         "v1",
-				Kind:               "Pod",
-				Name:               podName,
-				UID:                types.UID(podUID),
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				APIVersion: "v1",
+				Kind:       "Pod",
+				Name:       podName,
+				UID:        types.UID(podUID),
+				Controller: ptr.To(true),
 			}).
 		RequestWithName("container-0-request-0", className).
 		Allocation(extendedResourceAllocationResult).
@@ -392,12 +390,11 @@ var (
 					Annotations(map[string]string{"resource.kubernetes.io/extended-resource-claim": "true"}).
 					OwnerRef(
 			metav1.OwnerReference{
-				APIVersion:         "v1",
-				Kind:               "Pod",
-				Name:               podName,
-				UID:                types.UID(podUID),
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				APIVersion: "v1",
+				Kind:       "Pod",
+				Name:       podName,
+				UID:        types.UID(podUID),
+				Controller: ptr.To(true),
 			}).
 		RequestWithName("container-0-request-0", className).
 		RequestWithNameCount("container-0-request-1", className, 2).
@@ -410,12 +407,11 @@ var (
 						Annotations(map[string]string{"resource.kubernetes.io/extended-resource-claim": "true"}).
 						OwnerRef(
 			metav1.OwnerReference{
-				APIVersion:         "v1",
-				Kind:               "Pod",
-				Name:               podName,
-				UID:                types.UID(podUID),
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				APIVersion: "v1",
+				Kind:       "Pod",
+				Name:       podName,
+				UID:        types.UID(podUID),
+				Controller: ptr.To(true),
 			}).
 		RequestWithName("container-0-request-0", className).
 		RequestWithNameCount("container-0-request-1", className, 2).
@@ -428,12 +424,11 @@ var (
 							Annotations(map[string]string{"resource.kubernetes.io/extended-resource-claim": "true"}).
 							OwnerRef(
 			metav1.OwnerReference{
-				APIVersion:         "v1",
-				Kind:               "Pod",
-				Name:               podName,
-				UID:                types.UID(podUID),
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				APIVersion: "v1",
+				Kind:       "Pod",
+				Name:       podName,
+				UID:        types.UID(podUID),
+				Controller: ptr.To(true),
 			}).
 		RequestWithName("container-0-request-0", className).
 		RequestWithNameCount("container-1-request-0", className, 2).
@@ -446,12 +441,11 @@ var (
 								Annotations(map[string]string{"resource.kubernetes.io/extended-resource-claim": "true"}).
 								OwnerRef(
 			metav1.OwnerReference{
-				APIVersion:         "v1",
-				Kind:               "Pod",
-				Name:               podName,
-				UID:                types.UID(podUID),
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				APIVersion: "v1",
+				Kind:       "Pod",
+				Name:       podName,
+				UID:        types.UID(podUID),
+				Controller: ptr.To(true),
 			}).
 		RequestWithName("container-0-request-0", className).
 		RequestWithNameCount("container-1-request-0", className, 2).
@@ -464,12 +458,11 @@ var (
 					Annotations(map[string]string{"resource.kubernetes.io/extended-resource-claim": "true"}).
 					OwnerRef(
 			metav1.OwnerReference{
-				APIVersion:         "v1",
-				Kind:               "Pod",
-				Name:               podName,
-				UID:                types.UID(podUID),
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				APIVersion: "v1",
+				Kind:       "Pod",
+				Name:       podName,
+				UID:        types.UID(podUID),
+				Controller: ptr.To(true),
 			}).
 		RequestWithName("container-0-request-0", className).
 		Allocation(extendedResourceAllocationResultNode2).
