@@ -506,12 +506,11 @@ func (pl *DynamicResources) preFilterExtendedResources(pod *v1.Pod, logger klog.
 				GenerateName: pod.Name + "-extended-resources-",
 				OwnerReferences: []metav1.OwnerReference{
 					{
-						APIVersion:         "v1",
-						Kind:               "Pod",
-						Name:               pod.Name,
-						UID:                pod.UID,
-						Controller:         ptr.To(true),
-						BlockOwnerDeletion: ptr.To(true),
+						APIVersion: "v1",
+						Kind:       "Pod",
+						Name:       pod.Name,
+						UID:        pod.UID,
+						Controller: ptr.To(true),
 					},
 				},
 				Annotations: map[string]string{
