@@ -35,6 +35,14 @@ var rolesWithAllowStar = sets.NewString(
 	saRolePrefix+"horizontal-pod-autoscaler",
 	saRolePrefix+"clusterrole-aggregation-controller",
 	saRolePrefix+"disruption-controller",
+	saRolePrefix+"storage-version-migrator-controller",
+)
+
+// rolesWithAllowInconsistentVerbs are the controller verbs which are allowed to
+// have a watch or list without the other verb included. If you're adding to
+// this list tag sig-auth.
+var rolesWithAllowInconsistentVerbs = sets.NewString(
+	saRolePrefix + "storage-version-migrator-controller",
 )
 
 // TestNoStarsForControllers confirms that no controller role has star verbs, groups,
@@ -96,6 +104,9 @@ func TestControllerRoleLabel(t *testing.T) {
 func TestControllerRoleVerbsConsistency(t *testing.T) {
 	roles := ControllerRoles()
 	for _, role := range roles {
+		if rolesWithAllowInconsistentVerbs.Has(role.Name) {
+			continue
+		}
 		for _, rule := range role.Rules {
 			verbs := rule.Verbs
 			if slices.Contains(verbs, "list") && !slices.Contains(verbs, "watch") {

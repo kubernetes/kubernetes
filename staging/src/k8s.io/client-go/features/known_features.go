@@ -54,8 +54,8 @@ const (
 	// Refactor informers to deliver watch stream events in order instead of out of order.
 	InOrderInformers Feature = "InOrderInformers"
 
-	// owner: @nilekhc
-	// alpha: v1.30
+	// owner: @enj, @michaelasp
+	// GA: v1.35
 	InformerResourceVersion Feature = "InformerResourceVersion"
 
 	// owner: @p0lyn0mial
@@ -78,6 +78,6 @@ var defaultKubernetesFeatureGates = map[Feature]FeatureSpec{
 	ClientsAllowCBOR:        {Default: false, PreRelease: Alpha},
 	ClientsPreferCBOR:       {Default: false, PreRelease: Alpha},
 	InOrderInformers:        {Default: true, PreRelease: Beta},
-	InformerResourceVersion: {Default: false, PreRelease: Alpha},
+	InformerResourceVersion: {Default: true, PreRelease: GA},
 	WatchListClient:         {Default: false, PreRelease: Beta},
 }
