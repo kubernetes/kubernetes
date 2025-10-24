@@ -1808,11 +1808,11 @@ func TestTombstoneLRUEviction(t *testing.T) {
 
 	// Count remaining tombstones
 	tombstoneCount := 0
-	oldestRemaining := time.Now()
+	oldestRemaining := metav1.Now()
 	for _, claimInfo := range manager.cache.claimInfo {
 		if claimInfo.isTombstoned() {
 			tombstoneCount++
-			if claimInfo.tombstoneTime.Before(oldestRemaining) {
+			if claimInfo.tombstoneTime.Before(&oldestRemaining) {
 				oldestRemaining = claimInfo.tombstoneTime
 			}
 		}
