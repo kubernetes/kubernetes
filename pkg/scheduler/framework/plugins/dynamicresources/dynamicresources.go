@@ -51,7 +51,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources/extended"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
@@ -140,8 +139,6 @@ func (d *stateData) Clone() fwk.StateData {
 type draExtendedResource struct {
 	// May have extended resource backed by DRA.
 	podScalarResources map[v1.ResourceName]int64
-	// The mapping of extended resource to device class name
-	resourceToDeviceClass map[v1.ResourceName]string
 }
 
 type informationForClaim struct {
@@ -410,15 +407,14 @@ func (pl *DynamicResources) foreachPodResourceClaim(pod *v1.Pod, cb func(podReso
 
 // hasDeviceClassMappedExtendedResource returns true when the given resource list has an extended resource, that has
 // a mapping to a device class.
-func hasDeviceClassMappedExtendedResource(reqs v1.ResourceList, deviceClassMapping map[v1.ResourceName]string) bool {
+func hasDeviceClassMappedExtendedResource(reqs v1.ResourceList, cache fwk.DeviceClassResolver) bool {
 	for rName, rValue := range reqs {
 		if rValue.IsZero() {
 			// We only care about the resources requested by the pod we are trying to schedule.
 			continue
 		}
 		if schedutil.IsDRAExtendedResourceName(rName) {
-			_, ok := deviceClassMapping[rName]
-			if ok {
+			if cache.GetDeviceClass(rName) != "" {
 				return true
 			}
 		}
@@ -461,18 +457,14 @@ func (pl *DynamicResources) preFilterExtendedResources(pod *v1.Pod, logger klog.
 		return nil, nil
 	}
 
-	deviceClassMapping, err := extended.DeviceClassMapping(pl.draManager)
-	if err != nil {
-		return nil, statusError(logger, err, "retrieving extended resource to DeviceClass mapping")
-	}
-
+	// Try to build device class mapping from cache
+	cache := pl.draManager.DeviceClassResolver()
 	reqs := resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{})
-	hasExtendedResource := hasDeviceClassMappedExtendedResource(reqs, deviceClassMapping)
+
+	hasExtendedResource := hasDeviceClassMappedExtendedResource(reqs, cache)
 	if !hasExtendedResource {
 		return nil, nil
 	}
-
-	s.draExtendedResource.resourceToDeviceClass = deviceClassMapping
 	r := framework.NewResource(reqs)
 	s.draExtendedResource.podScalarResources = r.ScalarResources
 
@@ -749,6 +741,7 @@ func (pl *DynamicResources) filterExtendedResources(state *stateData, pod *v1.Po
 
 	extendedResources := make(map[v1.ResourceName]int64)
 	hasExtendedResource := false
+	cache := pl.draManager.DeviceClassResolver()
 	for rName, rQuant := range state.draExtendedResource.podScalarResources {
 		if !schedutil.IsDRAExtendedResourceName(rName) {
 			continue
@@ -759,7 +752,7 @@ func (pl *DynamicResources) filterExtendedResources(state *stateData, pod *v1.Po
 		}
 
 		_, okScalar := nodeInfo.GetAllocatable().GetScalarResources()[rName]
-		_, okDynamic := state.draExtendedResource.resourceToDeviceClass[rName]
+		okDynamic := cache.GetDeviceClass(rName) != ""
 		if okDynamic {
 			if okScalar {
 				// node provides the resource via device plugin
@@ -789,7 +782,7 @@ func (pl *DynamicResources) filterExtendedResources(state *stateData, pod *v1.Po
 
 	// Each node needs its own, potentially different variant of the claim.
 	nodeExtendedResourceClaim := extendedResourceClaim.DeepCopy()
-	nodeExtendedResourceClaim.Spec.Devices.Requests = createDeviceRequests(pod, extendedResources, state.draExtendedResource.resourceToDeviceClass)
+	nodeExtendedResourceClaim.Spec.Devices.Requests = createDeviceRequests(pod, extendedResources, cache)
 
 	if extendedResourceClaim.Status.Allocation != nil {
 		// If it is already allocated, then we cannot simply allocate it again.
@@ -808,7 +801,7 @@ func (pl *DynamicResources) filterExtendedResources(state *stateData, pod *v1.Po
 // the device request name has the format: container-%d-request-%d,
 // the first %d is the container's index in the pod's initContainer and containers
 // the second %d is the extended resource's index in that container's sorted resource requests.
-func createDeviceRequests(pod *v1.Pod, extendedResources map[v1.ResourceName]int64, deviceClassMapping map[v1.ResourceName]string) []resourceapi.DeviceRequest {
+func createDeviceRequests(pod *v1.Pod, extendedResources map[v1.ResourceName]int64, cache fwk.DeviceClassResolver) []resourceapi.DeviceRequest {
 	var deviceRequests []resourceapi.DeviceRequest
 	// Creating the extended resource claim's Requests by
 	// iterating over the containers, and the resources in the containers,
@@ -834,9 +827,9 @@ func createDeviceRequests(pod *v1.Pod, extendedResources map[v1.ResourceName]int
 			if !ok || crq == 0 {
 				continue
 			}
-			className, ok := deviceClassMapping[r]
+			className := cache.GetDeviceClass(r)
 			// skip if the request does not map to a device class
-			if !ok || className == "" {
+			if className == "" {
 				continue
 			}
 			keys := make([]string, 0, len(creqs))

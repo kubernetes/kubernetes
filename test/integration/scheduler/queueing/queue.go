@@ -23,6 +23,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	resourceapi "k8s.io/api/resource/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -70,6 +71,8 @@ type CoreResourceEnqueueTestCase struct {
 	InitialStorageCapacities []*storagev1.CSIStorageCapacity
 	// InitialVolumeAttachment is the list of VolumeAttachment to be created at first.
 	InitialVolumeAttachment []*storagev1.VolumeAttachment
+	// InitialDeviceClasses are the list of DeviceClass to be created at first.
+	InitialDeviceClasses []*resourceapi.DeviceClass
 	// Pods are the list of Pods to be created.
 	// All of them are expected to be unschedulable at first.
 	Pods []*v1.Pod
@@ -432,6 +435,16 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		InitialNodes: []*v1.Node{
 			st.MakeNode().Name("fake-node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj(),
 			st.MakeNode().Name("fake-node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Label("group", "b").Obj(),
+		},
+		InitialDeviceClasses: []*resourceapi.DeviceClass{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "gpu-device-class",
+				},
+				Spec: resourceapi.DeviceClassSpec{
+					ExtendedResourceName: ptr.To("example.com/gpu"),
+				},
+			},
 		},
 		Pods: []*v1.Pod{
 			// - Pod1 requests available amount of CPU (in fake-node1), but will be rejected by NodeAffinity plugin. Note that the NodeResourceFit plugin will register for QHints because it rejected fake-node2.
@@ -2449,12 +2462,24 @@ func RunTestCoreResourceEnqueue(t *testing.T, tt *CoreResourceEnqueueTestCase) {
 		opts = append(opts, scheduler.WithProfiles(cfg.Profiles...))
 	}
 
+	// Initialize API server first to get the client
+	apiServerCtx := testutils.InitTestAPIServer(t, "core-res-enqueue", nil)
+	cs, ctx := apiServerCtx.ClientSet, apiServerCtx.Ctx
+
+	// Create DeviceClasses BEFORE initializing the scheduler so they are included in the initial informer sync.
+	// This ensures the ExtendedResourceCache is populated during initialization rather than relying on async watch events.
+	for _, deviceClass := range tt.InitialDeviceClasses {
+		if _, err := cs.ResourceV1().DeviceClasses().Create(ctx, deviceClass, metav1.CreateOptions{}); err != nil {
+			t.Fatalf("Failed to create a DeviceClass %q: %v", deviceClass.Name, err)
+		}
+	}
+
 	// Use zero backoff seconds to bypass backoffQ.
 	// It's intended to not start the scheduler's queue, and hence to
 	// not start any flushing logic. We will pop and schedule the Pods manually later.
 	testCtx := testutils.InitTestSchedulerWithOptions(
 		t,
-		testutils.InitTestAPIServer(t, "core-res-enqueue", nil),
+		apiServerCtx,
 		0,
 		opts...,
 	)
@@ -2463,7 +2488,7 @@ func RunTestCoreResourceEnqueue(t *testing.T, tt *CoreResourceEnqueueTestCase) {
 	testCtx.Scheduler.SchedulingQueue.Run(logger)
 	defer testCtx.Scheduler.SchedulingQueue.Close()
 
-	cs, ns, ctx := testCtx.ClientSet, testCtx.NS.Name, testCtx.Ctx
+	ns := testCtx.NS.Name
 	// Create one Node with a taint.
 	for _, node := range tt.InitialNodes {
 		if _, err := cs.CoreV1().Nodes().Create(ctx, node, metav1.CreateOptions{}); err != nil {
