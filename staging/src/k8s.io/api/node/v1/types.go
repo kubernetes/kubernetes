@@ -34,6 +34,8 @@ import (
 // pod.  For more details, see
 // https://kubernetes.io/docs/concepts/containers/runtime-class/
 type RuntimeClass struct {
+	// +required
+	// +k8s:required
 	metav1.TypeMeta `json:",inline"`
 
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -50,6 +52,8 @@ type RuntimeClass struct {
 	// in a pod.
 	// The Handler must be lowercase, conform to the DNS Label (RFC 1123) requirements,
 	// and is immutable.
+	// +required
+	// +k8s:required
 	Handler string `json:"handler" protobuf:"bytes,2,opt,name=handler"`
 
 	// overhead represents the resource overhead associated with running a pod for a

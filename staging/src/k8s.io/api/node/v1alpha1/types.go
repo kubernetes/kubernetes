@@ -33,6 +33,8 @@ import (
 // pod.  For more details, see
 // https://git.k8s.io/enhancements/keps/sig-node/585-runtime-class
 type RuntimeClass struct {
+	// +required
+	// +k8s:required
 	metav1.TypeMeta `json:",inline"`
 
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -41,6 +43,8 @@ type RuntimeClass struct {
 
 	// spec represents specification of the RuntimeClass
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	// +required
+	// +k8s:required
 	Spec RuntimeClassSpec `json:"spec" protobuf:"bytes,2,name=spec"`
 }
 
