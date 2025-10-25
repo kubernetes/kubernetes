@@ -808,7 +808,6 @@ func (pl *DynamicResources) filterExtendedResources(state *stateData, pod *v1.Po
 // the first %d is the container's index in the pod's initContainer and containers
 // the second %d is the extended resource's index in that container's sorted resource requests.
 func createDeviceRequests(pod *v1.Pod, extendedResources map[v1.ResourceName]int64, deviceClassMapping map[v1.ResourceName]string) []resourceapi.DeviceRequest {
-	var deviceRequests []resourceapi.DeviceRequest
 	// Creating the extended resource claim's Requests by
 	// iterating over the containers, and the resources in the containers,
 	// and create one request per <container, extended resource>.
@@ -818,8 +817,32 @@ func createDeviceRequests(pod *v1.Pod, extendedResources map[v1.ResourceName]int
 	// supported separately.
 	containers := slices.Clone(pod.Spec.InitContainers)
 	containers = append(containers, pod.Spec.Containers...)
+	numInitContainers := len(pod.Spec.InitContainers)
+
+	podExtendedResources := make(map[string]struct{})
+	for _, c := range containers {
+		for r := range c.Resources.Requests {
+			podExtendedResources[r.String()] = struct{}{}
+		}
+	}
+	podExtendedResourceSlice := make([]string, len(podExtendedResources))
+	i := 0
+	for r := range podExtendedResources {
+		podExtendedResourceSlice[i] = r
+		i++
+	}
+	sort.Strings(podExtendedResourceSlice)
+	var deviceRequests []resourceapi.DeviceRequest
 	for r := range extendedResources {
+		className, ok := deviceClassMapping[r]
+		// skip if the request does not map to a device class
+		if !ok || className == "" {
+			continue
+		}
+		var maxQuantity resource.Quantity
 		for i, c := range containers {
+			isInitContainer := i < numInitContainers
+			isSideCar := c.RestartPolicy != nil && *c.RestartPolicy == v1.ContainerRestartPolicyAlways
 			creqs := c.Resources.Requests
 			if creqs == nil {
 				continue
@@ -833,9 +856,10 @@ func createDeviceRequests(pod *v1.Pod, extendedResources map[v1.ResourceName]int
 			if !ok || crq == 0 {
 				continue
 			}
-			className, ok := deviceClassMapping[r]
-			// skip if the request does not map to a device class
-			if !ok || className == "" {
+			if isInitContainer && !isSideCar {
+				if rQuant.Cmp(maxQuantity) > 0 {
+					maxQuantity = rQuant
+				}
 				continue
 			}
 			keys := make([]string, 0, len(creqs))
@@ -858,6 +882,26 @@ func createDeviceRequests(pod *v1.Pod, extendedResources map[v1.ResourceName]int
 			deviceRequests = append(deviceRequests,
 				resourceapi.DeviceRequest{
 					Name: fmt.Sprintf("container-%d-request-%d", i, ridx), // need to be container name index - extended resource name index
+					Exactly: &resourceapi.ExactDeviceRequest{
+						DeviceClassName: className, // map external resource name -> device class name
+						AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
+						Count:           crq,
+					},
+				})
+		}
+		if maxQuantity.CmpInt64(0) > 0 {
+			// find the index in the sorted pod's all extended resources
+			ridx := sort.SearchStrings(podExtendedResourceSlice, r.String())
+			if ridx == len(podExtendedResourceSlice) {
+				continue
+			}
+			crq, ok := (&maxQuantity).AsInt64()
+			if !ok || crq == 0 {
+				continue
+			}
+			deviceRequests = append(deviceRequests,
+				resourceapi.DeviceRequest{
+					Name: fmt.Sprintf("request-%d", ridx), // need to be container name index - extended resource name index
 					Exactly: &resourceapi.ExactDeviceRequest{
 						DeviceClassName: className, // map external resource name -> device class name
 						AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
@@ -1375,12 +1419,32 @@ func createRequestMappings(claim *resourceapi.ResourceClaim, pod *v1.Pod) []v1.C
 	for _, r := range claim.Spec.Devices.Requests {
 		deviceReqNames = append(deviceReqNames, r.Name)
 	}
+
 	// pod level resources currently have only cpu and memory, they are not considered here for now.
 	// if extended resources are added to pod level resources in the future, they need to be
 	// supported separately.
 	containers := slices.Clone(pod.Spec.InitContainers)
 	containers = append(containers, pod.Spec.Containers...)
+	numInitContainers := len(pod.Spec.InitContainers)
+
+	podExtendedResources := make(map[string]struct{})
+	for _, c := range containers {
+		for r := range c.Resources.Requests {
+			podExtendedResources[r.String()] = struct{}{}
+		}
+	}
+	podExtendedResourceSlice := make([]string, len(podExtendedResources))
+	i := 0
+	for r := range podExtendedResources {
+		podExtendedResourceSlice[i] = r
+		i++
+	}
+	sort.Strings(podExtendedResourceSlice)
+
 	for i, c := range containers {
+		isInitContainer := i < numInitContainers
+		isSideCar := c.RestartPolicy != nil && *c.RestartPolicy == v1.ContainerRestartPolicyAlways
+
 		creqs := c.Resources.Requests
 		keys := make([]string, 0, len(creqs))
 		for k := range creqs {
@@ -1397,10 +1461,19 @@ func createRequestMappings(claim *resourceapi.ResourceClaim, pod *v1.Pod) []v1.C
 					break
 				}
 			}
+
+			// device request name is container-%d-request-%d format for resource requests in regular container
+			// and non-sidecar init container
+			requestName := fmt.Sprintf("container-%d-request-%d", i, ridx)
+			if isInitContainer && !isSideCar {
+				// device request name is request-%d format for resource requests in side car init container
+				ridx = sort.SearchStrings(podExtendedResourceSlice, rName.String())
+				requestName = fmt.Sprintf("request-%d", ridx)
+			}
 			for _, devReqName := range deviceReqNames {
 				// During filter phase, device request name is set to be
 				// container name index "-" extended resource name index
-				if fmt.Sprintf("container-%d-request-%d", i, ridx) == devReqName {
+				if requestName == devReqName {
 					cer = append(cer,
 						v1.ContainerExtendedResourceRequest{
 							ContainerName: c.Name,
