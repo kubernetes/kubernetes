@@ -158,11 +158,15 @@ func (p *claimEvaluator) setResourceQuantity(resourceMap map[corev1.ResourceName
 		return reqs
 	}
 	implicitExtendedResourceClaim := deviceClassToQuotaRequestResource(deviceClassName)
-	implicitIndex, isImplicitExtendedResourceRequest := isPodRequest(implicitExtendedResourceClaim, quantity, reqs)
+	implicitIndex := 0
+	isImplicitExtendedResourceRequest := false
+	if isExtendedResourceClaim {
+		implicitIndex, isImplicitExtendedResourceRequest = isPodRequest(implicitExtendedResourceClaim, quantity, reqs)
+	}
 	extendedResourceClaim, ok := p.extendedResourceQuota(deviceClassName)
-	isExplicitExtendedResourceRequest := false
 	explictIndex := 0
-	if ok && !isImplicitExtendedResourceRequest {
+	isExplicitExtendedResourceRequest := false
+	if ok && !isImplicitExtendedResourceRequest && isExtendedResourceClaim {
 		explictIndex, isExplicitExtendedResourceRequest = isPodRequest(extendedResourceClaim, quantity, reqs)
 	}
 	if !isExtendedResourceClaim || !isImplicitExtendedResourceRequest || isExplicitExtendedResourceRequest {
