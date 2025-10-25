@@ -2307,8 +2307,9 @@ type ResourceFieldSelector struct {
 	ContainerName string
 	// Required: resource to select
 	Resource string
-	// Specifies the output format of the exposed resources, defaults to "1"
+	// Specifies the output format of the exposed resources, defaults to "0"
 	// +optional
+	// +default="0"
 	Divisor resource.Quantity
 }
 
