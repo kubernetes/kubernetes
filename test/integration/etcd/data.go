@@ -510,7 +510,7 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 
 		// k8s.io/kubernetes/pkg/apis/scheduling/v1
 		gvr("scheduling.k8s.io", "v1", "priorityclasses"): {
-			Stub:              `{"metadata":{"name":"pc3"},"Value":1000}`,
+			Stub:              `{"metadata":{"name":"pc3"},"value":1000}`,
 			ExpectedEtcdPath:  "/registry/priorityclasses/pc3",
 			IntroducedVersion: "1.14",
 		},
