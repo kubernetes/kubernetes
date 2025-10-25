@@ -51,6 +51,8 @@ message RuntimeClass {
 
   // spec represents specification of the RuntimeClass
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+  // +required
+  // +k8s:required
   optional RuntimeClassSpec spec = 2;
 }
 
