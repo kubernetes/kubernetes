@@ -27,7 +27,8 @@ import (
 )
 
 func TestDeclarativeValidate(t *testing.T) {
-	apiVersions := []string{"v1", "v1beta1"}
+	// RuntimeClass is served as node.k8s.io/v1.
+	apiVersions := []string{"v1"}
 	for _, apiVersion := range apiVersions {
 		t.Run(apiVersion, func(t *testing.T) {
 			testDeclarativeValidate(t, apiVersion)
@@ -59,10 +60,12 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				obj.Handler = ""
 			}),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("handler"), ""),
+				// The handwritten validator returns "Invalid value" for "",
+				// not "Required value".
+				field.Invalid(field.NewPath("handler"), "", ""),
 			},
 		},
-		// TODO: add more cases (invalid scheduling, invalid overhead, etc.)
+		// TODO: add more cases (e.g. invalid scheduling, invalid overhead)
 	}
 
 	for name, tc := range testCases {
@@ -79,7 +82,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 }
 
 func TestDeclarativeValidateUpdate(t *testing.T) {
-	apiVersions := []string{"v1", "v1beta1", "v1alpha1"}
+	apiVersions := []string{"v1"}
 	for _, apiVersion := range apiVersions {
 		t.Run(apiVersion, func(t *testing.T) {
 			testDeclarativeValidateUpdate(t, apiVersion)
@@ -110,7 +113,10 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 				obj.Handler = ""
 			}),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("handler"), ""),
+				// New value "" still has to be a valid RFC1123 label,
+				// so we expect "Invalid value".
+				field.Invalid(field.NewPath("handler"), "", ""),
+				// And handler is immutable, so changing it is forbidden.
 				field.Forbidden(field.NewPath("handler"), "updates to handler are forbidden."),
 			},
 		},
@@ -143,13 +149,14 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 	}
 }
 
+// mkValidRuntimeClass returns a semantically valid RuntimeClass and then applies any tweaks.
 func mkValidRuntimeClass(tweaks ...func(obj *node.RuntimeClass)) node.RuntimeClass {
 	obj := node.RuntimeClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "valid-runtime-class",
 		},
 		Handler: "runc",
-		// Overhead and Scheduling are optional and omitted here for "valid"
+		// Overhead and Scheduling intentionally omitted for the base "valid" object.
 	}
 
 	for _, tweak := range tweaks {
