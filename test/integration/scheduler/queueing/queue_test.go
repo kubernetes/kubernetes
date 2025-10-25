@@ -333,8 +333,7 @@ func TestCustomResourceEnqueue(t *testing.T) {
 		t.Fatalf("Cannot find the profile for Pod %v", podInfo.Pod.Name)
 	}
 	// Schedule the Pod manually.
-	state := framework.NewCycleState()
-	_, _, fitError := testCtx.Scheduler.SchedulePod(ctx, schedFramework, state, podInfo.Pod)
+	_, _, fitError := testCtx.Scheduler.SchedulePod(ctx, schedFramework, framework.NewCycleState(), podInfo.Pod)
 	// The fitError is expected to be non-nil as it failed the fakeCRPlugin plugin.
 	if fitError == nil {
 		t.Fatalf("Expect Pod %v to fail at scheduling.", podInfo.Pod.Name)

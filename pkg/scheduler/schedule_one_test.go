@@ -3443,8 +3443,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 			informerFactory.Start(ctx.Done())
 			informerFactory.WaitForCacheSync(ctx.Done())
 
-			state := framework.NewCycleState()
-			result, _, err := sched.SchedulePod(ctx, schedFramework, state, test.pod)
+			result, _, err := sched.SchedulePod(ctx, schedFramework, framework.NewCycleState(), test.pod)
 			if err != test.wErr {
 				gotFitErr, gotOK := err.(*framework.FitError)
 				wantFitErr, wantOK := test.wErr.(*framework.FitError)

@@ -360,9 +360,7 @@ func TestSchedulerWithExtenders(t *testing.T) {
 			sched.applyDefaultHandlers()
 
 			podIgnored := &v1.Pod{}
-			state := framework.NewCycleState()
-			var result ScheduleResult
-			result, _, err = sched.SchedulePod(ctx, fwk, state, podIgnored)
+			result, _, err := sched.SchedulePod(ctx, fwk, framework.NewCycleState(), podIgnored)
 			if test.expectsErr {
 				if err == nil {
 					t.Errorf("Unexpected non-error, result %+v", result)

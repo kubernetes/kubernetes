@@ -59,9 +59,6 @@ const (
 	// to ensure that a certain minimum of nodes are checked for feasibility.
 	// This in turn helps ensure a minimum level of spreading.
 	minFeasibleNodesPercentageToFind = 5
-	// numberOfHighestScoredNodesToReport is the number of node scores
-	// to be included in ScheduleResult.
-	maxBatchSize = 100
 )
 
 // ScheduleOne does the entire scheduling workflow for a single pod. It is serialized on the scheduling algorithm's host fitting.
@@ -437,7 +434,7 @@ func (sched *Scheduler) skipPodSchedule(ctx context.Context, fwk framework.Frame
 	return isAssumed
 }
 
-// schedulePod tries to schedule the given pod to one of the nodes in the batch.
+// schedulePod tries to schedule the given pod to one of the nodes in the node list.
 // If it succeeds, it will return the name of the node.
 // If it fails, it will return a FitError with reasons.
 func (sched *Scheduler) schedulePod(
@@ -448,7 +445,6 @@ func (sched *Scheduler) schedulePod(
 ) (result ScheduleResult, sortedPrioritizedNodes nodeScoreHeap, err error) {
 	trace := utiltrace.New("Scheduling", utiltrace.Field{Key: "namespace", Value: pod.Namespace}, utiltrace.Field{Key: "name", Value: pod.Name})
 	defer trace.LogIfLong(100 * time.Millisecond)
-
 	if err := sched.Cache.UpdateSnapshot(klog.FromContext(ctx), sched.nodeInfoSnapshot); err != nil {
 		return result, nil, err
 	}
@@ -491,7 +487,7 @@ func (sched *Scheduler) schedulePod(
 	if err != nil {
 		return result, nil, err
 	}
-	trace.Step("Selecting host done")
+	trace.Step("Prioritizing done")
 
 	return ScheduleResult{
 		SuggestedHost:  node.Name,
