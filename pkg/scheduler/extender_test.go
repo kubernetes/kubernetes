@@ -39,7 +39,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
-	utiltrace "k8s.io/utils/trace"
 )
 
 var scheduleResultCmpOpts = []cmp.Option{
@@ -363,9 +362,7 @@ func TestSchedulerWithExtenders(t *testing.T) {
 			podIgnored := &v1.Pod{}
 			state := framework.NewCycleState()
 			var result ScheduleResult
-			trace := utiltrace.New("testTrace")
-			batch := sched.NewBatch(ctx, fwk, state, podIgnored, trace)
-			result, err = sched.SchedulePod(ctx, fwk, state, podIgnored, batch)
+			result, _, err = sched.SchedulePod(ctx, fwk, state, podIgnored)
 			if test.expectsErr {
 				if err == nil {
 					t.Errorf("Unexpected non-error, result %+v", result)

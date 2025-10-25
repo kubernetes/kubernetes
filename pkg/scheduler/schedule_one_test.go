@@ -81,7 +81,6 @@ import (
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/utils/ptr"
-	utiltrace "k8s.io/utils/trace"
 )
 
 const (
@@ -1099,11 +1098,8 @@ func TestSchedulerScheduleOne(t *testing.T) {
 						}
 						queue.Add(logger, item.sendPod)
 
-						sched.SchedulePod = func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, pod *v1.Pod, batch *Batch) (ScheduleResult, error) {
-							return item.mockScheduleResult, item.injectSchedulingError
-						}
-						sched.NewBatch = func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, pod *v1.Pod, trace *utiltrace.Trace) *Batch {
-							return nil
+						sched.SchedulePod = func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, pod *v1.Pod) (ScheduleResult, nodeScoreHeap, error) {
+							return item.mockScheduleResult, nil, item.injectSchedulingError
 						}
 						sched.FailureHandler = func(ctx context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, ni *fwk.NominatingInfo, start time.Time) {
 							gotPod = p.Pod
@@ -1456,11 +1452,8 @@ func TestScheduleOneMarksPodAsProcessedBeforePreBind(t *testing.T) {
 					}
 					queue.Add(logger, item.sendPod)
 
-					sched.SchedulePod = func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, pod *v1.Pod, batch *Batch) (ScheduleResult, error) {
-						return item.mockScheduleResult, item.injectSchedulingError
-					}
-					sched.NewBatch = func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, pod *v1.Pod, trace *utiltrace.Trace) *Batch {
-						return nil
+					sched.SchedulePod = func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, pod *v1.Pod) (ScheduleResult, nodeScoreHeap, error) {
+						return item.mockScheduleResult, nil, item.injectSchedulingError
 					}
 					sched.FailureHandler = func(_ context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, _ *fwk.NominatingInfo, _ time.Time) {
 						gotCallsToFailureHandler++
@@ -2360,12 +2353,11 @@ func TestUpdatePod(t *testing.T) {
 
 func Test_SelectHost(t *testing.T) {
 	tests := []struct {
-		name              string
-		list              []fwk.NodePluginScores
-		topNodesCnt       int
-		possibleNodes     sets.Set[string]
-		possibleNodeLists [][]fwk.NodePluginScores
-		wantError         error
+		name             string
+		list             []fwk.NodePluginScores
+		topNodesCnt      int
+		expectedNodeList []fwk.NodePluginScores
+		wantError        error
 	}{
 		{
 			name: "unique properly ordered scores",
@@ -2373,122 +2365,68 @@ func Test_SelectHost(t *testing.T) {
 				{Name: "node1", TotalScore: 1},
 				{Name: "node2", TotalScore: 2},
 			},
-			topNodesCnt:   2,
-			possibleNodes: sets.New("node2"),
-			possibleNodeLists: [][]fwk.NodePluginScores{
-				{
-					{Name: "node2", TotalScore: 2},
-					{Name: "node1", TotalScore: 1},
-				},
-			},
-		},
-		{
-			name: "numberOfNodeScoresToReturn > len(list)",
-			list: []fwk.NodePluginScores{
-				{Name: "node1", TotalScore: 1},
+			topNodesCnt: 2,
+			expectedNodeList: []fwk.NodePluginScores{
 				{Name: "node2", TotalScore: 2},
-			},
-			topNodesCnt:   100,
-			possibleNodes: sets.New("node2"),
-			possibleNodeLists: [][]fwk.NodePluginScores{
-				{
-					{Name: "node2", TotalScore: 2},
-					{Name: "node1", TotalScore: 1},
-				},
+				{Name: "node1", TotalScore: 1},
 			},
 		},
 		{
-			name: "equal scores",
+			name:        "equal scores",
+			topNodesCnt: 3,
 			list: []fwk.NodePluginScores{
-				{Name: "node2.1", TotalScore: 2},
-				{Name: "node2.2", TotalScore: 2},
-				{Name: "node2.3", TotalScore: 2},
+				{Name: "node2.2", TotalScore: 2, Randomizer: 2},
+				{Name: "node2.1", TotalScore: 2, Randomizer: 1},
+				{Name: "node2.3", TotalScore: 2, Randomizer: 3},
 			},
-			topNodesCnt:   2,
-			possibleNodes: sets.New("node2.1", "node2.2", "node2.3"),
-			possibleNodeLists: [][]fwk.NodePluginScores{
-				{
-					{Name: "node2.1", TotalScore: 2},
-					{Name: "node2.2", TotalScore: 2},
-				},
-				{
-					{Name: "node2.1", TotalScore: 2},
-					{Name: "node2.3", TotalScore: 2},
-				},
-				{
-					{Name: "node2.2", TotalScore: 2},
-					{Name: "node2.1", TotalScore: 2},
-				},
-				{
-					{Name: "node2.2", TotalScore: 2},
-					{Name: "node2.3", TotalScore: 2},
-				},
-				{
-					{Name: "node2.3", TotalScore: 2},
-					{Name: "node2.1", TotalScore: 2},
-				},
-				{
-					{Name: "node2.3", TotalScore: 2},
-					{Name: "node2.2", TotalScore: 2},
-				},
+			expectedNodeList: []fwk.NodePluginScores{
+				{Name: "node2.3", TotalScore: 2, Randomizer: 3},
+				{Name: "node2.2", TotalScore: 2, Randomizer: 2},
+				{Name: "node2.1", TotalScore: 2, Randomizer: 1},
 			},
 		},
 		{
-			name: "out of order scores",
+			name:        "out of order scores",
+			topNodesCnt: 4,
 			list: []fwk.NodePluginScores{
-				{Name: "node3.1", TotalScore: 3},
+				{Name: "node3.1", TotalScore: 3, Randomizer: 1},
 				{Name: "node2.1", TotalScore: 2},
 				{Name: "node1.1", TotalScore: 1},
-				{Name: "node3.2", TotalScore: 3},
+				{Name: "node3.2", TotalScore: 3, Randomizer: 2},
 			},
-			topNodesCnt:   3,
-			possibleNodes: sets.New("node3.1", "node3.2"),
-			possibleNodeLists: [][]fwk.NodePluginScores{
-				{
-					{Name: "node3.1", TotalScore: 3},
-					{Name: "node3.2", TotalScore: 3},
-					{Name: "node2.1", TotalScore: 2},
-				},
-				{
-					{Name: "node3.2", TotalScore: 3},
-					{Name: "node3.1", TotalScore: 3},
-					{Name: "node2.1", TotalScore: 2},
-				},
+			expectedNodeList: []fwk.NodePluginScores{
+				{Name: "node3.2", TotalScore: 3, Randomizer: 2},
+				{Name: "node3.1", TotalScore: 3, Randomizer: 1},
+				{Name: "node2.1", TotalScore: 2},
+				{Name: "node1.1", TotalScore: 1},
 			},
 		},
 		{
-			name:          "empty priority list",
-			list:          []fwk.NodePluginScores{},
-			possibleNodes: sets.Set[string]{},
-			wantError:     errEmptyPriorityList,
+			name:             "empty priority list",
+			list:             []fwk.NodePluginScores{},
+			expectedNodeList: []fwk.NodePluginScores{},
+			topNodesCnt:      1,
+			wantError:        errEmptyPriorityList,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			// increase the randomness
-			for i := 0; i < 10; i++ {
-				got, scoreList, err := selectHost(test.list, test.topNodesCnt)
-				if err != test.wantError {
-					t.Fatalf("unexpected error is returned from selectHost: got: %v want: %v", err, test.wantError)
+			var err error
+			var gotNode fwk.NodePluginScores
+			var scoreList = []fwk.NodePluginScores{}
+			h := newSortedPrioritizedNodes(test.list)
+			for range test.topNodesCnt {
+				gotNode, err = selectHost(&h)
+				if err != nil {
+					break
 				}
-				if test.possibleNodes.Len() == 0 {
-					if got != "" {
-						t.Fatalf("expected nothing returned as selected Node, but actually %s is returned from selectHost", got)
-					}
-					return
-				}
-				if !test.possibleNodes.Has(got) {
-					t.Errorf("got %s is not in the possible map %v", got, test.possibleNodes)
-				}
-				if got != scoreList[0].Name {
-					t.Errorf("The head of list should be the selected Node's score: got: %v, expected: %v", scoreList[0], got)
-				}
-				for _, list := range test.possibleNodeLists {
-					if cmp.Equal(list, scoreList) {
-						return
-					}
-				}
+				scoreList = append(scoreList, gotNode)
+			}
+			if err != test.wantError {
+				t.Fatalf("unexpected error is returned from selectHost: got: %v want: %v", err, test.wantError)
+			}
+			if !cmp.Equal(test.expectedNodeList, scoreList) {
 				t.Errorf("Unexpected scoreList: %v", scoreList)
 			}
 		})
@@ -3506,9 +3444,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 			informerFactory.WaitForCacheSync(ctx.Done())
 
 			state := framework.NewCycleState()
-			trace := utiltrace.New("testTrace")
-			batch := sched.NewBatch(ctx, schedFramework, state, test.pod, trace)
-			result, err := sched.SchedulePod(ctx, schedFramework, state, test.pod, batch)
+			result, _, err := sched.SchedulePod(ctx, schedFramework, state, test.pod)
 			if err != test.wErr {
 				gotFitErr, gotOK := err.(*framework.FitError)
 				wantFitErr, wantOK := test.wErr.(*framework.FitError)
@@ -4256,6 +4192,9 @@ func Test_prioritizeNodes(t *testing.T) {
 				t.Errorf("unexpected error: %v", err)
 			}
 			for i := range nodesscores {
+				nodesscores[i].Randomizer = 0
+			}
+			for i := range nodesscores {
 				sort.Slice(nodesscores[i].Scores, func(j, k int) bool {
 					return nodesscores[i].Scores[j].Name < nodesscores[i].Scores[k].Name
 				})
@@ -4631,7 +4570,6 @@ func setupTestScheduler(ctx context.Context, t *testing.T, client clientset.Inte
 	}
 
 	sched.SchedulePod = sched.schedulePod
-	sched.NewBatch = sched.newBatch
 	sched.FailureHandler = func(_ context.Context, _ framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, _ *fwk.NominatingInfo, _ time.Time) {
 		err := status.AsError()
 		errChan <- err

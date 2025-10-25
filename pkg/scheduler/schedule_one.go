@@ -31,12 +31,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	fwk "k8s.io/kube-scheduler/framework"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -59,7 +61,7 @@ const (
 	minFeasibleNodesPercentageToFind = 5
 	// numberOfHighestScoredNodesToReport is the number of node scores
 	// to be included in ScheduleResult.
-	numberOfHighestScoredNodesToReport = 3
+	maxBatchSize = 100
 )
 
 // ScheduleOne does the entire scheduling workflow for a single pod. It is serialized on the scheduling algorithm's host fitting.
@@ -83,7 +85,7 @@ func (sched *Scheduler) ScheduleOne(ctx context.Context) {
 	ctx = klog.NewContext(ctx, logger)
 	logger.V(4).Info("About to try and schedule pod", "pod", klog.KObj(pod))
 
-	podFwk, err := sched.frameworkForPod(pod)
+	fwk, err := sched.frameworkForPod(pod)
 	if err != nil {
 		// This shouldn't happen, because we only accept for scheduling the pods
 		// which specify a scheduler name that matches one of the profiles.
@@ -91,7 +93,7 @@ func (sched *Scheduler) ScheduleOne(ctx context.Context) {
 		sched.SchedulingQueue.Done(pod.UID)
 		return
 	}
-	if sched.skipPodSchedule(ctx, podFwk, pod) {
+	if sched.skipPodSchedule(ctx, fwk, pod) {
 		// We don't put this Pod back to the queue, but we have to cleanup the in-flight pods/events.
 		sched.SchedulingQueue.Done(pod.UID)
 		return
@@ -114,17 +116,21 @@ func (sched *Scheduler) ScheduleOne(ctx context.Context) {
 	schedulingCycleCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	trace := utiltrace.New("Scheduling", utiltrace.Field{Key: "namespace", Value: pod.Namespace}, utiltrace.Field{Key: "name", Value: pod.Name})
-	defer trace.LogIfLong(100 * time.Millisecond)
+	if utilfeature.DefaultFeatureGate.Enabled(features.OpportunisticBatching) {
+		sched.batch.nominateIfPossible(podInfo)
+	}
 
-	batch := sched.NewBatch(schedulingCycleCtx, podFwk, state, pod, trace)
-
-	// No batching now, but we would run the code after this line in a loop over as many pods (pulled from the queue) as have matching signatures.
-
-	scheduleResult, assumedPodInfo, status := sched.schedulingCycle(schedulingCycleCtx, state, podFwk, podInfo, start, podsToActivate, batch)
+	scheduleResult, assumedPodInfo, prioritizedNodes, status := sched.schedulingCycle(schedulingCycleCtx, state, fwk, podInfo, start, podsToActivate)
 	if !status.IsSuccess() {
-		sched.FailureHandler(schedulingCycleCtx, podFwk, assumedPodInfo, status, scheduleResult.nominatingInfo, start)
+		sched.FailureHandler(schedulingCycleCtx, fwk, assumedPodInfo, status, scheduleResult.nominatingInfo, start)
 		return
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.OpportunisticBatching) {
+		nodeInfo, err := sched.nodeInfoSnapshot.NodeInfos().Get(scheduleResult.SuggestedHost)
+		if err == nil {
+			sched.batch.updateOnSuccess(ctx, fwk, podInfo, state, nodeInfo, prioritizedNodes)
+		}
 	}
 
 	// bind the pod to its host asynchronously (we can do this b/c of the assumption step above).
@@ -135,9 +141,9 @@ func (sched *Scheduler) ScheduleOne(ctx context.Context) {
 		metrics.Goroutines.WithLabelValues(metrics.Binding).Inc()
 		defer metrics.Goroutines.WithLabelValues(metrics.Binding).Dec()
 
-		status := sched.bindingCycle(bindingCycleCtx, state, podFwk, scheduleResult, assumedPodInfo, start, podsToActivate)
+		status := sched.bindingCycle(bindingCycleCtx, state, fwk, scheduleResult, assumedPodInfo, start, podsToActivate)
 		if !status.IsSuccess() {
-			sched.handleBindingCycleError(bindingCycleCtx, state, podFwk, assumedPodInfo, start, scheduleResult, status)
+			sched.handleBindingCycleError(bindingCycleCtx, state, fwk, assumedPodInfo, start, scheduleResult, status)
 			return
 		}
 	}()
@@ -161,24 +167,23 @@ func (sched *Scheduler) schedulingCycle(
 	podInfo *framework.QueuedPodInfo,
 	start time.Time,
 	podsToActivate *framework.PodsToActivate,
-	batch *Batch,
-) (ScheduleResult, *framework.QueuedPodInfo, *fwk.Status) {
+) (ScheduleResult, *framework.QueuedPodInfo, nodeScoreHeap, *fwk.Status) {
 	logger := klog.FromContext(ctx)
 	pod := podInfo.Pod
-	scheduleResult, err := sched.SchedulePod(ctx, schedFramework, state, pod, batch)
+	scheduleResult, sortedPrioritizedNodes, err := sched.SchedulePod(ctx, schedFramework, state, pod)
 	if err != nil {
 		defer func() {
 			metrics.SchedulingAlgorithmLatency.Observe(metrics.SinceInSeconds(start))
 		}()
 		if err == ErrNoNodesAvailable {
 			status := fwk.NewStatus(fwk.UnschedulableAndUnresolvable).WithError(err)
-			return ScheduleResult{nominatingInfo: sched.newFailureNominatingInfo()}, podInfo, status
+			return ScheduleResult{nominatingInfo: sched.newFailureNominatingInfo()}, podInfo, nil, status
 		}
 
 		fitError, ok := err.(*framework.FitError)
 		if !ok {
 			logger.Error(err, "Error selecting node for pod", "pod", klog.KObj(pod))
-			return ScheduleResult{nominatingInfo: sched.newFailureNominatingInfo()}, podInfo, fwk.AsStatus(err)
+			return ScheduleResult{nominatingInfo: sched.newFailureNominatingInfo()}, podInfo, nil, fwk.AsStatus(err)
 		}
 
 		// SchedulePod() may have failed because the pod would not fit on any host, so we try to
@@ -188,7 +193,7 @@ func (sched *Scheduler) schedulingCycle(
 
 		if !schedFramework.HasPostFilterPlugins() {
 			logger.V(3).Info("No PostFilter plugins are registered, so no preemption will be performed")
-			return ScheduleResult{}, podInfo, fwk.NewStatus(fwk.Unschedulable).WithError(err)
+			return ScheduleResult{}, podInfo, nil, fwk.NewStatus(fwk.Unschedulable).WithError(err)
 		}
 
 		// Run PostFilter plugins to attempt to make the pod schedulable in a future scheduling cycle.
@@ -205,7 +210,7 @@ func (sched *Scheduler) schedulingCycle(
 		if result != nil {
 			nominatingInfo = result.NominatingInfo
 		}
-		return ScheduleResult{nominatingInfo: nominatingInfo}, podInfo, fwk.NewStatus(fwk.Unschedulable).WithError(err)
+		return ScheduleResult{nominatingInfo: nominatingInfo}, podInfo, sortedPrioritizedNodes, fwk.NewStatus(fwk.Unschedulable).WithError(err)
 	}
 
 	metrics.SchedulingAlgorithmLatency.Observe(metrics.SinceInSeconds(start))
@@ -221,7 +226,7 @@ func (sched *Scheduler) schedulingCycle(
 		// This relies on the fact that Error will check if the pod has been bound
 		// to a node and if so will not add it back to the unscheduled pods queue
 		// (otherwise this would cause an infinite loop).
-		return ScheduleResult{nominatingInfo: sched.newFailureNominatingInfo()}, assumedPodInfo, fwk.AsStatus(err)
+		return ScheduleResult{nominatingInfo: sched.newFailureNominatingInfo()}, assumedPodInfo, nil, fwk.AsStatus(err)
 	}
 
 	// Run the Reserve method of reserve plugins.
@@ -242,9 +247,9 @@ func (sched *Scheduler) schedulingCycle(
 			}
 			fitErr.Diagnosis.NodeToStatus.Set(scheduleResult.SuggestedHost, sts)
 			fitErr.Diagnosis.AddPluginStatus(sts)
-			return ScheduleResult{nominatingInfo: sched.newFailureNominatingInfo()}, assumedPodInfo, fwk.NewStatus(sts.Code()).WithError(fitErr)
+			return ScheduleResult{nominatingInfo: sched.newFailureNominatingInfo()}, assumedPodInfo, nil, fwk.NewStatus(sts.Code()).WithError(fitErr)
 		}
-		return ScheduleResult{nominatingInfo: sched.newFailureNominatingInfo()}, assumedPodInfo, sts
+		return ScheduleResult{nominatingInfo: sched.newFailureNominatingInfo()}, assumedPodInfo, nil, sts
 	}
 
 	// Run "permit" plugins.
@@ -266,10 +271,10 @@ func (sched *Scheduler) schedulingCycle(
 			}
 			fitErr.Diagnosis.NodeToStatus.Set(scheduleResult.SuggestedHost, runPermitStatus)
 			fitErr.Diagnosis.AddPluginStatus(runPermitStatus)
-			return ScheduleResult{nominatingInfo: sched.newFailureNominatingInfo()}, assumedPodInfo, fwk.NewStatus(runPermitStatus.Code()).WithError(fitErr)
+			return ScheduleResult{nominatingInfo: sched.newFailureNominatingInfo()}, assumedPodInfo, nil, fwk.NewStatus(runPermitStatus.Code()).WithError(fitErr)
 		}
 
-		return ScheduleResult{nominatingInfo: sched.newFailureNominatingInfo()}, assumedPodInfo, runPermitStatus
+		return ScheduleResult{nominatingInfo: sched.newFailureNominatingInfo()}, assumedPodInfo, nil, runPermitStatus
 	}
 
 	// At the end of a successful scheduling cycle, pop and move up Pods if needed.
@@ -279,7 +284,7 @@ func (sched *Scheduler) schedulingCycle(
 		podsToActivate.Map = make(map[string]*v1.Pod)
 	}
 
-	return scheduleResult, assumedPodInfo, nil
+	return scheduleResult, assumedPodInfo, sortedPrioritizedNodes, nil
 }
 
 // bindingCycle tries to bind an assumed Pod.
@@ -432,71 +437,39 @@ func (sched *Scheduler) skipPodSchedule(ctx context.Context, fwk framework.Frame
 	return isAssumed
 }
 
-type Batch struct {
-	feasibleNodes []fwk.NodeInfo
-	priorityList  []fwk.NodePluginScores
-	diagnosis     framework.Diagnosis
-	trace         *utiltrace.Trace
-	err           error
-}
+// schedulePod tries to schedule the given pod to one of the nodes in the batch.
+// If it succeeds, it will return the name of the node.
+// If it fails, it will return a FitError with reasons.
+func (sched *Scheduler) schedulePod(
+	ctx context.Context,
+	fwk framework.Framework,
+	state fwk.CycleState,
+	pod *v1.Pod,
+) (result ScheduleResult, sortedPrioritizedNodes nodeScoreHeap, err error) {
+	trace := utiltrace.New("Scheduling", utiltrace.Field{Key: "namespace", Value: pod.Namespace}, utiltrace.Field{Key: "name", Value: pod.Name})
+	defer trace.LogIfLong(100 * time.Millisecond)
 
-// Create a batch structure using the node list.
-func (sched *Scheduler) newBatch(ctx context.Context, podFwk framework.Framework, state fwk.CycleState, pod *v1.Pod, trace *utiltrace.Trace) *Batch {
 	if err := sched.Cache.UpdateSnapshot(klog.FromContext(ctx), sched.nodeInfoSnapshot); err != nil {
-		return &Batch{trace: trace, err: err}
+		return result, nil, err
 	}
 	trace.Step("Snapshotting scheduler cache and node infos done")
 
 	if sched.nodeInfoSnapshot.NumNodes() == 0 {
-		return &Batch{trace: trace, err: ErrNoNodesAvailable}
+		return result, nil, ErrNoNodesAvailable
 	}
 
-	feasibleNodes, diagnosis, err := sched.findNodesThatFitPod(ctx, podFwk, state, pod)
+	feasibleNodes, diagnosis, err := sched.findNodesThatFitPod(ctx, fwk, state, pod)
 	if err != nil {
-		return &Batch{trace: trace, err: err}
+		return result, nil, err
 	}
 	trace.Step("Computing predicates done")
 
 	if len(feasibleNodes) == 0 {
-		return &Batch{trace: trace, err: &framework.FitError{
+		return result, nil, &framework.FitError{
 			Pod:         pod,
 			NumAllNodes: sched.nodeInfoSnapshot.NumNodes(),
 			Diagnosis:   diagnosis,
-		}}
-	}
-
-	// When only one node after predicate, don't create priorityList.
-	var priorityList []fwk.NodePluginScores
-	if len(feasibleNodes) > 1 {
-		priorityList, err = prioritizeNodes(ctx, sched.Extenders, podFwk, state, pod, feasibleNodes)
-		if err != nil {
-			return &Batch{trace: trace, err: err}
 		}
-	}
-
-	trace.Step("Prioritizing done")
-
-	return &Batch{
-		feasibleNodes: feasibleNodes,
-		priorityList:  priorityList,
-		diagnosis:     diagnosis,
-		trace:         trace,
-	}
-}
-
-// schedulePod tries to schedule the given pod to one of the nodes in the batch.
-// If it succeeds, it will return the name of the node.
-// If it fails, it will return a FitError with reasons.
-func (sched *Scheduler) schedulePod(ctx context.Context, fwk framework.Framework, state fwk.CycleState, pod *v1.Pod, batch *Batch) (result ScheduleResult, err error) {
-	feasibleNodes := batch.feasibleNodes
-	diagnosis := batch.diagnosis
-	priorityList := batch.priorityList
-
-	defer batch.trace.LogIfLong(100 * time.Millisecond)
-
-	// If we had an error in batch creation, throw the error on the first pod in the batch
-	if batch.err != nil {
-		return ScheduleResult{}, batch.err
 	}
 
 	// When only one node after predicate, just use it.
@@ -505,17 +478,26 @@ func (sched *Scheduler) schedulePod(ctx context.Context, fwk framework.Framework
 			SuggestedHost:  feasibleNodes[0].Node().Name,
 			EvaluatedNodes: 1 + diagnosis.NodeToStatus.Len(),
 			FeasibleNodes:  1,
-		}, nil
+		}, nil, nil
 	}
 
-	host, _, err := selectHost(priorityList, numberOfHighestScoredNodesToReport)
-	batch.trace.Step("Selecting host done")
+	priorityList, err := prioritizeNodes(ctx, sched.Extenders, fwk, state, pod, feasibleNodes)
+	if err != nil {
+		return result, nil, err
+	}
+
+	sortedPrioritizedNodes = newSortedPrioritizedNodes(priorityList)
+	node, err := selectHost(&sortedPrioritizedNodes)
+	if err != nil {
+		return result, nil, err
+	}
+	trace.Step("Selecting host done")
 
 	return ScheduleResult{
-		SuggestedHost:  host,
+		SuggestedHost:  node.Name,
 		EvaluatedNodes: len(feasibleNodes) + diagnosis.NodeToStatus.Len(),
 		FeasibleNodes:  len(feasibleNodes),
-	}, err
+	}, sortedPrioritizedNodes, err
 }
 
 // Filters the nodes to find the ones that fit the pod based on the framework
@@ -914,6 +896,7 @@ func prioritizeNodes(
 			if score, ok := allNodeExtendersScores[nodes[i].Node().Name]; ok {
 				nodesScores[i].Scores = append(nodesScores[i].Scores, score.Scores...)
 				nodesScores[i].TotalScore += score.TotalScore
+				nodesScores[i].Randomizer = rand.Int()
 			}
 		}
 	}
@@ -928,57 +911,18 @@ func prioritizeNodes(
 
 var errEmptyPriorityList = errors.New("empty priorityList")
 
-// selectHost takes a prioritized list of nodes and then picks one
-// in a reservoir sampling manner from the nodes that had the highest score.
-// It also returns the top {count} Nodes,
-// and the top of the list will be always the selected host.
-func selectHost(nodeScoreList []fwk.NodePluginScores, count int) (string, []fwk.NodePluginScores, error) {
-	if len(nodeScoreList) == 0 {
-		return "", nil, errEmptyPriorityList
-	}
-
+func newSortedPrioritizedNodes(nodeScoreList []fwk.NodePluginScores) nodeScoreHeap {
 	var h nodeScoreHeap = nodeScoreList
 	heap.Init(&h)
-	cntOfMaxScore := 1
-	selectedIndex := 0
-	// The top of the heap is the NodeScoreResult with the highest score.
-	sortedNodeScoreList := make([]fwk.NodePluginScores, 0, count)
-	sortedNodeScoreList = append(sortedNodeScoreList, heap.Pop(&h).(fwk.NodePluginScores))
+	return h
+}
 
-	// This for-loop will continue until all Nodes with the highest scores get checked for a reservoir sampling,
-	// and sortedNodeScoreList gets (count - 1) elements.
-	for ns := heap.Pop(&h).(fwk.NodePluginScores); ; ns = heap.Pop(&h).(fwk.NodePluginScores) {
-		if ns.TotalScore != sortedNodeScoreList[0].TotalScore && len(sortedNodeScoreList) == count {
-			break
-		}
-
-		if ns.TotalScore == sortedNodeScoreList[0].TotalScore {
-			cntOfMaxScore++
-			if rand.Intn(cntOfMaxScore) == 0 {
-				// Replace the candidate with probability of 1/cntOfMaxScore
-				selectedIndex = cntOfMaxScore - 1
-			}
-		}
-
-		sortedNodeScoreList = append(sortedNodeScoreList, ns)
-
-		if h.Len() == 0 {
-			break
-		}
+// selectHost picks a host from the nodes that had the highest score.
+func selectHost(h *nodeScoreHeap) (fwk.NodePluginScores, error) {
+	if h.Len() == 0 {
+		return fwk.NodePluginScores{}, errEmptyPriorityList
 	}
-
-	if selectedIndex != 0 {
-		// replace the first one with selected one
-		previous := sortedNodeScoreList[0]
-		sortedNodeScoreList[0] = sortedNodeScoreList[selectedIndex]
-		sortedNodeScoreList[selectedIndex] = previous
-	}
-
-	if len(sortedNodeScoreList) > count {
-		sortedNodeScoreList = sortedNodeScoreList[:count]
-	}
-
-	return sortedNodeScoreList[0].Name, sortedNodeScoreList, nil
+	return heap.Pop(h).(fwk.NodePluginScores), nil
 }
 
 // nodeScoreHeap is a heap of fwk.NodePluginScores.
@@ -987,9 +931,12 @@ type nodeScoreHeap []fwk.NodePluginScores
 // nodeScoreHeap implements heap.Interface.
 var _ heap.Interface = &nodeScoreHeap{}
 
-func (h nodeScoreHeap) Len() int           { return len(h) }
-func (h nodeScoreHeap) Less(i, j int) bool { return h[i].TotalScore > h[j].TotalScore }
-func (h nodeScoreHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
+func (h nodeScoreHeap) Len() int { return len(h) }
+func (h nodeScoreHeap) Less(i, j int) bool {
+	return (h[i].TotalScore > h[j].TotalScore ||
+		(h[i].TotalScore == h[j].TotalScore && h[i].Randomizer > h[j].Randomizer))
+}
+func (h nodeScoreHeap) Swap(i, j int) { h[i], h[j] = h[j], h[i] }
 
 func (h *nodeScoreHeap) Push(x interface{}) {
 	*h = append(*h, x.(fwk.NodePluginScores))

@@ -273,6 +273,9 @@ type NodePluginScores struct {
 	Scores []PluginScore
 	// TotalScore is the total score in Scores.
 	TotalScore int64
+	// We randomize nodes within a common score,
+	// this field is used to provide this randomness.
+	Randomizer int
 }
 
 // PluginScore is a struct with plugin/extender name and score.
