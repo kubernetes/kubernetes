@@ -367,7 +367,7 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 		})
 	})
 
-	framework.Context("when querying /stats/summary under pressure", framework.WithSerial(), framework.WithFeatureGate(features.KubeletPSI), func() {
+	framework.Context("when querying /stats/summary under pressure", framework.WithSerial(), framework.WithNodeConformance(), framework.WithFeatureGate(features.KubeletPSI), func() {
 		ginkgo.BeforeEach(func() {
 			if !IsCgroup2UnifiedMode() {
 				ginkgo.Skip("Skipping since CgroupV2 not used")
