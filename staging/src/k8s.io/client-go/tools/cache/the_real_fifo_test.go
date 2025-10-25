@@ -22,6 +22,10 @@ import (
 	"runtime"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	clientfeatures "k8s.io/client-go/features"
+	clientfeaturestesting "k8s.io/client-go/features/testing"
 )
 
 func (f *RealFIFO) getItems() []Delta {
@@ -972,5 +976,143 @@ func TestRealFIFO_PopShouldUnblockWhenClosed(t *testing.T) {
 		case <-time.After(500 * time.Millisecond):
 			t.Fatalf("timed out waiting for Pop to return after Close")
 		}
+	}
+}
+
+func TestRealFIFO_PopMultipleDeltaInBatch(t *testing.T) {
+	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.InOrderInformersBatchProcess, true)
+	obj1 := mkFifoObj("foo1", 5)
+	obj2 := mkFifoObj("foo2", 5)
+	obj3 := mkFifoObj("foo3", 5)
+	testCases := []struct {
+		name            string
+		initialItems    []testFifoObject
+		actions         []func(f *RealFIFO)
+		batchSize       int
+		expectedBatches [][]Deltas
+	}{
+		{
+			name: "update 1 item should have separate batch",
+			initialItems: []testFifoObject{
+				obj1,
+			},
+			actions: []func(f *RealFIFO){
+				func(f *RealFIFO) { _ = f.Update(obj1) },
+				func(f *RealFIFO) { _ = f.Update(obj1) },
+			},
+			batchSize: 3,
+			expectedBatches: [][]Deltas{
+				{{{Replaced, obj1}}},
+				{{{Updated, obj1}}},
+				{{{Updated, obj1}}},
+			},
+		},
+		{
+			name: "pop 3 unique items should work",
+			initialItems: []testFifoObject{
+				obj1, obj2, obj3,
+			},
+			actions:   []func(f *RealFIFO){},
+			batchSize: 3,
+			expectedBatches: [][]Deltas{
+				{{{Replaced, obj1}}, {{Replaced, obj2}}, {{Replaced, obj3}}},
+			},
+		},
+		{
+			name: "pop 3 items with 2 unique should have 2 batch",
+			initialItems: []testFifoObject{
+				obj1, obj2, obj1,
+			},
+			actions:   []func(f *RealFIFO){},
+			batchSize: 3,
+			expectedBatches: [][]Deltas{
+				{{{Replaced, obj1}}, {{Replaced, obj2}}},
+				{{{Replaced, obj1}}},
+			},
+		},
+		{
+			name: "pop 3 items with 2 batch size should have 2 batch",
+			initialItems: []testFifoObject{
+				obj1, obj2, obj3,
+			},
+			actions:   []func(f *RealFIFO){},
+			batchSize: 2,
+			expectedBatches: [][]Deltas{
+				{{{Replaced, obj1}}, {{Replaced, obj2}}},
+				{{{Replaced, obj3}}},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			f := NewRealFIFO(
+				testFifoObjectKeyFunc,
+				literalListerGetter(func() []testFifoObject {
+					return tc.initialItems
+				}),
+				nil)
+			f.batchSize = tc.batchSize
+
+			initialItems := make([]interface{}, len(tc.initialItems))
+			for i, item := range tc.initialItems {
+				initialItems[i] = item
+			}
+			_ = f.Replace(initialItems, "")
+			for _, action := range tc.actions {
+				action(f)
+			}
+
+			const maxAttempts = 10
+			receivedItems := make([][]Deltas, 0)
+			receivedInitialDeltas := make([][]Deltas, 0)
+
+			for i := 0; i < maxAttempts; i++ {
+				received := make(chan []Deltas, 100)
+				receivedInitial := make(chan []Deltas, 100)
+				go func() {
+					_ = f.PopBatch(func(obj []Deltas, isInInitialList bool) error {
+						received <- obj
+						if isInInitialList {
+							receivedInitial <- obj
+						}
+						return nil
+					})
+				}()
+				timer := time.NewTimer(time.Millisecond * 50)
+				select {
+				case <-timer.C:
+					close(received)
+				case item := <-received:
+					receivedItems = append(receivedItems, item)
+					close(received)
+				}
+				timerInitial := time.NewTimer(time.Millisecond * 50)
+				select {
+				case <-timerInitial.C:
+					close(receivedInitial)
+				case item := <-receivedInitial:
+					receivedInitialDeltas = append(receivedInitialDeltas, item)
+					close(receivedInitial)
+				}
+			}
+
+			runtime.Gosched()
+			f.Close()
+
+			idx := 0
+			for _, batch := range receivedItems {
+				assert.Equal(t, tc.expectedBatches[idx], batch)
+				idx++
+			}
+			receivedInitialItems := make([]testFifoObject, 0)
+			for _, deltas := range receivedInitialDeltas {
+				for _, delta := range deltas {
+					receivedInitialItems = append(receivedInitialItems, delta.Newest().Object.(testFifoObject))
+				}
+			}
+
+			assert.Equal(t, tc.initialItems, receivedInitialItems)
+		})
 	}
 }

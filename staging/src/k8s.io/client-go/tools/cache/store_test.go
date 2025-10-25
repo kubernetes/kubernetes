@@ -21,6 +21,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -184,5 +185,70 @@ func TestKeyError(t *testing.T) {
 	nestedKeyErr := KeyError{obj, keyErr}
 	if !errors.Is(keyErr, err) || !errors.Is(nestedKeyErr, err) {
 		t.Errorf("not match target error: %v", err)
+	}
+}
+
+func TestCacheTransactionShouldIndexErrors(t *testing.T) {
+	successObj1 := &struct{}{}
+	successObj2 := &struct{}{}
+	failObj1 := &struct{}{}
+	failObj2 := &struct{}{}
+	testTxnType := TransactionTypeAdd
+	testCases := []struct {
+		name        string
+		objs        []interface{}
+		assertError func(error) bool
+	}{
+		{
+			name: "txn all success objects should work",
+			objs: []interface{}{successObj1, successObj2},
+		},
+		{
+			name: "txn all fail objects should work",
+			objs: []interface{}{failObj1, failObj2},
+			assertError: func(err error) bool {
+				var txnErr TransactionError
+				if !errors.As(err, &txnErr) {
+					return false
+				}
+				return assert.Equal(t, []int{0, 1}, txnErr.FailedIndices)
+			},
+		},
+		{
+			name: "txn mix success and fail objects should work",
+			objs: []interface{}{successObj1, failObj1, successObj2, failObj2},
+			assertError: func(err error) bool {
+				var txnErr TransactionError
+				if !errors.As(err, &txnErr) {
+					return false
+				}
+				return assert.Equal(t, []int{1, 3}, txnErr.FailedIndices)
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			testKeyFunc := func(obj interface{}) (string, error) {
+				if obj == successObj1 || obj == successObj2 {
+					return "", nil
+				}
+				return "", errors.New("test error")
+			}
+			testStore := NewStore(testKeyFunc)
+			txnStore := testStore.(TransactionStore)
+			txns := make([]Transaction, len(tc.objs))
+			for i := range tc.objs {
+				txns[i] = Transaction{
+					Object: tc.objs[i],
+					Type:   testTxnType,
+				}
+			}
+			txnErr := txnStore.Transaction(txns...)
+			if tc.assertError != nil {
+				tc.assertError(txnErr)
+				return
+			}
+			assert.NoError(t, txnErr)
+		})
 	}
 }
