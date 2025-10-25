@@ -19,6 +19,7 @@ package cache
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -585,6 +586,70 @@ func processDeltas(
 	return nil
 }
 
+// Multiplexes updates in the form of a list of Deltas into a Store, and informs
+// a given handler of events OnUpdate, OnAdd, OnDelete
+func processDeltasInBatch(
+	// Object which receives event notifications from the given deltas
+	handler ResourceEventHandler,
+	clientState Store,
+	deltasList []Deltas,
+	isInInitialList bool,
+) error {
+	// from oldest to newest
+	txns := make([]Transaction, 0)
+	callbacks := make([]func(), 0)
+	txnStore, txnSupported := clientState.(TransactionStore)
+	if !txnSupported {
+		var errs []error
+		for _, delta := range deltasList {
+			if err := processDeltas(handler, clientState, delta, isInInitialList); err != nil {
+				errs = append(errs, err)
+			}
+		}
+		if len(errs) > 0 {
+			return fmt.Errorf("unexpected error when handling deltas: %v", errs)
+		}
+		return nil
+	}
+	for _, deltas := range deltasList {
+		for _, d := range deltas {
+			obj := d.Object
+			switch d.Type {
+			case Sync, Replaced, Added, Updated:
+				if old, exists, err := clientState.Get(obj); err == nil && exists {
+					txns = append(txns, Transaction{
+						Type:   TransactionTypeUpdate,
+						Object: obj,
+					})
+					callbacks = append(callbacks, func() {
+						handler.OnUpdate(old, obj)
+					})
+				} else {
+					txns = append(txns, Transaction{
+						Type:   TransactionTypeAdd,
+						Object: obj,
+					})
+					callbacks = append(callbacks, func() {
+						handler.OnAdd(obj, isInInitialList)
+					})
+				}
+			case Deleted:
+				txns = append(txns, Transaction{
+					Type:   TransactionTypeDelete,
+					Object: obj,
+				})
+				callbacks = append(callbacks, func() {
+					handler.OnDelete(obj)
+				})
+			}
+		}
+	}
+	for _, callback := range callbacks {
+		callback()
+	}
+	return txnStore.Transaction(txns...)
+}
+
 // newInformer returns a controller for populating the store while also
 // providing event notifications.
 //
@@ -621,6 +686,9 @@ func newInformer(clientState Store, options InformerOptions) Controller {
 		Process: func(obj interface{}, isInInitialList bool) error {
 			if deltas, ok := obj.(Deltas); ok {
 				return processDeltas(options.Handler, clientState, deltas, isInInitialList)
+			}
+			if deltaList, ok := obj.([]Deltas); ok {
+				return processDeltasInBatch(options.Handler, clientState, deltaList, isInInitialList)
 			}
 			return errors.New("object given as Process argument is not Deltas")
 		},

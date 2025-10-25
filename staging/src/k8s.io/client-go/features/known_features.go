@@ -54,6 +54,12 @@ const (
 	// Refactor informers to deliver watch stream events in order instead of out of order.
 	InOrderInformers Feature = "InOrderInformers"
 
+	// owner: @yue9944882
+	// alpha: v1.34
+	//
+	// Allow InOrderInformer to process incoming events in batches to expedite the process rate.
+	InOrderInformersBatchProcess Feature = "InOrderInformersBatchProcess"
+
 	// owner: @nilekhc
 	// alpha: v1.30
 	InformerResourceVersion Feature = "InformerResourceVersion"
@@ -75,9 +81,10 @@ const (
 // After registering with the binary, the features are, by default, controllable using environment variables.
 // For more details, please see envVarFeatureGates implementation.
 var defaultKubernetesFeatureGates = map[Feature]FeatureSpec{
-	ClientsAllowCBOR:        {Default: false, PreRelease: Alpha},
-	ClientsPreferCBOR:       {Default: false, PreRelease: Alpha},
-	InOrderInformers:        {Default: true, PreRelease: Beta},
-	InformerResourceVersion: {Default: false, PreRelease: Alpha},
-	WatchListClient:         {Default: false, PreRelease: Beta},
+	ClientsAllowCBOR:             {Default: false, PreRelease: Alpha},
+	ClientsPreferCBOR:            {Default: false, PreRelease: Alpha},
+	InOrderInformers:             {Default: true, PreRelease: Beta},
+	InOrderInformersBatchProcess: {Default: false, PreRelease: Alpha},
+	InformerResourceVersion:      {Default: false, PreRelease: Alpha},
+	WatchListClient:              {Default: false, PreRelease: Beta},
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package cache
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -69,6 +70,31 @@ type Store interface {
 	// meaning in some implementations that have non-trivial
 	// additional behavior (e.g., DeltaFIFO).
 	Resync() error
+}
+
+// TransactionType defines the type of a transaction operation. It is used to indicate whether
+// an object is being added, updated, or deleted.
+type TransactionType string
+
+const (
+	TransactionTypeAdd    = "ADD"
+	TransactionTypeUpdate = "Update"
+	TransactionTypeDelete = "Delete"
+)
+
+// Transaction represents a single operation or event in a process. It holds a generic Object
+// associated with the transaction and a Type indicating the kind of transaction being performed.
+type Transaction struct {
+	Object interface{}
+	Type   TransactionType
+}
+
+type TransactionStore interface {
+	// Transaction allows multiple operations to occur within a single lock acquisitio to
+	// ensure progress can be made when there is contention. A lock-free view of the store
+	// is passed to the specified function, and the programmer must not utilize it outside
+	// this closure.
+	Transaction(txns ...Transaction) error
 }
 
 // KeyFunc knows how to make a key from an object. Implementations should be deterministic.
@@ -166,6 +192,24 @@ type cache struct {
 }
 
 var _ Store = &cache{}
+
+func (c *cache) Transaction(txns ...Transaction) error {
+	txnStore, ok := c.cacheStorage.(ThreadSafeStoreWithTransaction)
+	if !ok {
+		return errors.New("transaction not supported")
+	}
+	keyedTxns := make([]ThreadSafeStoreTransaction, 0)
+	for i := range txns {
+		txn := txns[i]
+		key, err := c.keyFunc(txn.Object)
+		if err != nil {
+			return KeyError{txn.Object, err}
+		}
+		keyedTxns = append(keyedTxns, ThreadSafeStoreTransaction{txn, key})
+	}
+	txnStore.Transaction(keyedTxns...)
+	return nil
+}
 
 // Add inserts an item into the cache.
 func (c *cache) Add(obj interface{}) error {

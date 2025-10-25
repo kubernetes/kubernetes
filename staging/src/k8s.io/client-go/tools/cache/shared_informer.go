@@ -732,6 +732,9 @@ func (s *sharedIndexInformer) HandleDeltas(obj interface{}, isInInitialList bool
 	if deltas, ok := obj.(Deltas); ok {
 		return processDeltas(s, s.indexer, deltas, isInInitialList)
 	}
+	if deltaList, ok := obj.([]Deltas); ok {
+		return processDeltasInBatch(s, s.indexer, deltaList, isInInitialList)
+	}
 	return errors.New("object given as Process argument is not Deltas")
 }
 
