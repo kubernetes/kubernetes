@@ -4213,39 +4213,39 @@ func TestUpdateJobPodResources(t *testing.T) {
 		initialResources  *v1.ResourceRequirements
 		jobName           string
 	}{
-		//"suspended job, feature gate enabled, update resources": {
-		//	enableFeatureGate: true,
-		//	suspend:           true,
-		//	updateResources:   true,
-		//	containers: []v1.Container{{
-		//		Name:  "test-container",
-		//		Image: "busybox",
-		//	}},
-		//	expectUpdate: true,
-		//	jobName:      "update-suspend",
-		//},
-		//"non-suspended job, feature gate enabled, update resources": {
-		//	enableFeatureGate: true,
-		//	suspend:           false,
-		//	updateResources:   true,
-		//	containers: []v1.Container{{
-		//		Name:  "test-container",
-		//		Image: "busybox",
-		//	}},
-		//	expectUpdate: false,
-		//	jobName:      "update-fail-running",
-		//},
-		//"suspended job, feature gate disabled, update resources": {
-		//	enableFeatureGate: false,
-		//	suspend:           true,
-		//	updateResources:   true,
-		//	containers: []v1.Container{{
-		//		Name:  "test-container",
-		//		Image: "busybox",
-		//	}},
-		//	expectUpdate: false,
-		//	jobName:      "no-update-with-feature-disabled",
-		//},
+		"suspended job, feature gate enabled, update resources": {
+			enableFeatureGate: true,
+			suspend:           true,
+			updateResources:   true,
+			containers: []v1.Container{{
+				Name:  "test-container",
+				Image: "busybox",
+			}},
+			expectUpdate: true,
+			jobName:      "update-suspend",
+		},
+		"non-suspended job, feature gate enabled, update resources": {
+			enableFeatureGate: true,
+			suspend:           false,
+			updateResources:   true,
+			containers: []v1.Container{{
+				Name:  "test-container",
+				Image: "busybox",
+			}},
+			expectUpdate: false,
+			jobName:      "update-fail-running",
+		},
+		"suspended job, feature gate disabled, update resources": {
+			enableFeatureGate: false,
+			suspend:           true,
+			updateResources:   true,
+			containers: []v1.Container{{
+				Name:  "test-container",
+				Image: "busybox",
+			}},
+			expectUpdate: false,
+			jobName:      "no-update-with-feature-disabled",
+		},
 		"started then suspended job, feature gate enabled, update resources": {
 			enableFeatureGate: true,
 			suspend:           false,
@@ -4319,6 +4319,19 @@ func TestUpdateJobPodResources(t *testing.T) {
 					t.Fatalf("Failed to wait for job to be suspended: %v", err)
 				}
 				t.Logf("job is suspended")
+
+				// Wait for active pods to be 0 after suspension
+				err = wait.PollUntilContextTimeout(ctx, 5*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+					j, err := jobClient.Get(ctx, job.Name, metav1.GetOptions{})
+					if err != nil {
+						return false, err
+					}
+					return j.Status.Active == 0, nil
+				})
+				if err != nil {
+					t.Fatalf("Failed to wait for pods to be terminated: %v", err)
+				}
+				t.Logf("pods terminated")
 			}
 
 			if tc.updateResources {
@@ -4343,7 +4356,7 @@ func TestUpdateJobPodResources(t *testing.T) {
 
 			// Unsuspend the job if it was suspended or if it's the start-then-suspend case
 			if tc.suspend || tc.startThenSuspend {
-				t.Logf("suspend job")
+				t.Logf("unsuspend job")
 				_, err = updateJob(ctx, jobClient, job.Name, func(j *batchv1.Job) {
 					j.Spec.Suspend = ptr.To(false)
 				})
