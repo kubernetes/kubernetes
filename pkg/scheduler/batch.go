@@ -18,10 +18,15 @@ package scheduler
 
 import (
 	"context"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+)
+
+const (
+	maxBatchAge = 500 * time.Millisecond
 )
 
 type Batch struct {
@@ -32,6 +37,7 @@ type batchState struct {
 	signature        string
 	sortedNodes      nodeScoreHeap
 	lastUseSucceeded bool
+	creationTime     time.Time
 }
 
 func (b *Batch) nominateIfPossible(podInfo *framework.QueuedPodInfo) {
@@ -63,6 +69,14 @@ func (b *Batch) nominateIfPossible(podInfo *framework.QueuedPodInfo) {
 		return
 	}
 
+	// If the batch is too old, throw it away. This is to avoid
+	// cases where we either have huge numbers of compatible pods in a
+	// row or we have a long wait between pods.
+	if time.Now().After((b.state.creationTime.Add(maxBatchAge))) {
+		b.state = nil
+		return
+	}
+
 	// The pod is compatible and we have state; grab the top entry on our list.
 	nn, err := selectHost(&b.state.sortedNodes)
 
@@ -84,6 +98,7 @@ func (b *Batch) updateOnSuccess(ctx context.Context, schedFwk framework.Framewor
 		b.state = &batchState{
 			sortedNodes:      sortedNodes,
 			lastUseSucceeded: true,
+			creationTime:     time.Now(),
 		}
 		return
 	}
