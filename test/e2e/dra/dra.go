@@ -1952,17 +1952,34 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			// b.ExtendedResourceName(0) is added to the deivce class with name: b.ClassName()+"0"
 			res[v1.ResourceName(b.ExtendedResourceName(0))] = resource.MustParse("1")
 			// implicit extended resource name
-			res[v1.ResourceName("deviceclass.resource.kubernetes.io/"+b.ClassName())] = resource.MustParse("2")
+			res[v1.ResourceName("deviceclass.resource.kubernetes.io/"+b.ClassName())] = resource.MustParse("1")
 
 			pod.Spec.Containers[0].Resources.Requests = res
 			pod.Spec.Containers[0].Resources.Limits = res
+			pod.Spec.InitContainers = []v1.Container{pod.Spec.Containers[0], pod.Spec.Containers[0], pod.Spec.Containers[0]}
+			pod.Spec.InitContainers[0].Name += "-init"
+			// This must succeed for the pod to start.
+			pod.Spec.InitContainers[0].Command = []string{"sh", "-c", "env|grep request_0=true"}
+			pod.Spec.InitContainers[0].Resources.Requests = res
+			pod.Spec.InitContainers[0].Resources.Limits = res
+			pod.Spec.InitContainers[1].Name += "-sidecar"
+			// This must succeed for the pod to start.
+			pod.Spec.InitContainers[1].Command = []string{"sh", "-c", "env|grep container_1_request_0=true; sleep 1"}
+			pod.Spec.InitContainers[1].RestartPolicy = ptr.To(v1.ContainerRestartPolicyAlways)
+			pod.Spec.InitContainers[1].Resources.Requests = res
+			pod.Spec.InitContainers[1].Resources.Limits = res
+			pod.Spec.InitContainers[2].Name += "-init-1"
+			// This must succeed for the pod to start.
+			pod.Spec.InitContainers[2].Command = []string{"sh", "-c", "env|grep request_0=true"}
+			pod.Spec.InitContainers[2].Resources.Requests = res
+			pod.Spec.InitContainers[2].Resources.Limits = res
 
 			b.Create(ctx, pod)
 			err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
 			framework.ExpectNoError(err, "start pod")
 			containerEnv := []string{
-				"container_0_request_0", "true",
-				"container_0_request_1", "true",
+				"container_3_request_0", "true",
+				"container_3_request_1", "true",
 			}
 			drautils.TestContainerEnv(ctx, f, pod, pod.Spec.Containers[0].Name, false, containerEnv...)
 
@@ -1973,9 +1990,9 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 
 			usedResources := v1.ResourceList{}
 			usedResources[v1.ResourceName("count/resourceclaims.resource.k8s.io")] = resource.MustParse("2")
-			usedResources[v1.ResourceName(fmt.Sprintf("requests.%s", b.ExtendedResourceName(0)))] = resource.MustParse("4")
-			usedResources[v1.ResourceName(fmt.Sprintf("requests.%s", "deviceclass.resource.kubernetes.io/"+b.ClassName()))] = resource.MustParse("4")
-			usedResources[v1.ResourceName(fmt.Sprintf("%s.deviceclass.resource.k8s.io/devices", b.Class(0).Name))] = resource.MustParse("4")
+			usedResources[v1.ResourceName(fmt.Sprintf("requests.%s", b.ExtendedResourceName(0)))] = resource.MustParse("7")
+			usedResources[v1.ResourceName(fmt.Sprintf("requests.%s", "deviceclass.resource.kubernetes.io/"+b.ClassName()))] = resource.MustParse("7")
+			usedResources[v1.ResourceName(fmt.Sprintf("%s.deviceclass.resource.k8s.io/devices", b.Class(0).Name))] = resource.MustParse("9")
 
 			gomega.Eventually(ctx, framework.GetObject(f.ClientSet.CoreV1().ResourceQuotas(quota.Namespace).Get, quota.Name, metav1.GetOptions{})).
 				Should(gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
