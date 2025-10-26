@@ -2630,7 +2630,7 @@ func printStorageClass(obj *storage.StorageClass, options printers.GenerateOptio
 	}
 
 	name := obj.Name
-	if storageutil.IsDefaultAnnotation(obj.ObjectMeta) {
+	if storageutil.HasDefaultAnnotation(obj.ObjectMeta) {
 		name += " (default)"
 	}
 	provtype := obj.Provisioner
