@@ -3898,9 +3898,12 @@ func validateHostUsers(spec *core.PodSpec, fldPath *field.Path, opts PodValidati
 	// know of any good use case and we can always enable them later.
 
 	// Note we already validated above spec.SecurityContext is not nil.
-	if spec.SecurityContext.HostNetwork {
-		allErrs = append(allErrs, field.Forbidden(fldPath.Child("hostNetwork"), "when `hostUsers` is false"))
+	if !opts.AllowUserNamespacesHostNetworkSupport {
+		if spec.SecurityContext.HostNetwork {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("hostNetwork"), "when `hostUsers` is false"))
+		}
 	}
+
 	if spec.SecurityContext.HostPID {
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("HostPID"), "when `hostUsers` is false"))
 	}
@@ -4431,6 +4434,8 @@ type PodValidationOptions struct {
 	AllowContainerRestartPolicyRules bool
 	// Allow user namespaces with volume devices, even though they will not function properly (should only be tolerated in updates of objects which already have this invalid configuration).
 	AllowUserNamespacesWithVolumeDevices bool
+	// Allow hostNetwork pods to use user namespaces
+	AllowUserNamespacesHostNetworkSupport bool
 }
 
 // validatePodMetadataAndSpec tests if required fields in the pod.metadata and pod.spec are set,

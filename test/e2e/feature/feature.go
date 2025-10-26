@@ -455,6 +455,11 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	Upgrade = framework.WithFeature(framework.ValidFeatures.Add("Upgrade"))
 
+	// Owner: sig-node
+	// Test marked with this feature must run on nodes where container runtime allows to pods with hostNetwork to use user namespaces.
+	// This feature can be removed once Containerd and CRI-O both added this support.
+	UserNamespacesHostNetworkSupport = framework.WithFeature(framework.ValidFeatures.Add("UserNamespacesHostNetworkSupport"))
+
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	UserNamespacesSupport = framework.WithFeature(framework.ValidFeatures.Add("UserNamespacesSupport"))
 
