@@ -151,7 +151,7 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 					},
 				},
 				{
-					Name: "container-1-request-0",
+					Name: "container-1-request-1",
 					Exactly: &api.ExactDeviceRequest{
 						DeviceClassName: classGpu,
 						AllocationMode:  api.DeviceAllocationModeExactCount,
@@ -165,7 +165,7 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 		Devices: api.DeviceClaim{
 			Requests: []api.DeviceRequest{
 				{
-					Name: "container-0-request-0",
+					Name: "request-0",
 					Exactly: &api.ExactDeviceRequest{
 						DeviceClassName: classGpu,
 						AllocationMode:  api.DeviceAllocationModeExactCount,
@@ -173,7 +173,7 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 					},
 				},
 				{
-					Name: "container-0-request-1",
+					Name: "container-1-request-0",
 					Exactly: &api.ExactDeviceRequest{
 						DeviceClassName: classGpu,
 						AllocationMode:  api.DeviceAllocationModeExactCount,
@@ -183,6 +183,45 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 			},
 		},
 	})
+	initExtendedResourceClaim := testResourceClaim("foo", "ns", true, "pod-init", api.ResourceClaimSpec{
+		Devices: api.DeviceClaim{
+			Requests: []api.DeviceRequest{
+				{
+					Name: "request-0",
+					Exactly: &api.ExactDeviceRequest{
+						DeviceClassName: classGpu,
+						AllocationMode:  api.DeviceAllocationModeExactCount,
+						Count:           1,
+					},
+				},
+				{
+					Name: "request-1",
+					Exactly: &api.ExactDeviceRequest{
+						DeviceClassName: classGpu,
+						AllocationMode:  api.DeviceAllocationModeExactCount,
+						Count:           1,
+					},
+				},
+				{
+					Name: "container-2-request-0",
+					Exactly: &api.ExactDeviceRequest{
+						DeviceClassName: classGpu,
+						AllocationMode:  api.DeviceAllocationModeExactCount,
+						Count:           1,
+					},
+				},
+				{
+					Name: "container-2-request-1",
+					Exactly: &api.ExactDeviceRequest{
+						DeviceClassName: classGpu,
+						AllocationMode:  api.DeviceAllocationModeExactCount,
+						Count:           1,
+					},
+				},
+			},
+		},
+	})
+
 	podImplicit := &corev1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "v1",
@@ -303,6 +342,54 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 		},
 		Status: corev1.PodStatus{},
 	}
+	podInit := &corev1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "ns",
+			Name:      "pod-init",
+			UID:       "uid",
+		},
+		Spec: corev1.PodSpec{
+			InitContainers: []corev1.Container{
+				{
+					Name: "init-container-1",
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							"example.com/gpu": resource.MustParse("1"),
+							corev1.ResourceName("deviceclass.resource.kubernetes.io/" + classGpu): resource.MustParse("1"),
+						},
+					},
+				},
+				{
+					Name: "init-container-2",
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							"example.com/gpu": resource.MustParse("1"),
+							corev1.ResourceName("deviceclass.resource.kubernetes.io/" + classGpu): resource.MustParse("1"),
+						},
+					},
+				},
+			},
+			Containers: []corev1.Container{
+				{
+					Name: "container-1",
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							"example.com/gpu": resource.MustParse("1"),
+							corev1.ResourceName("deviceclass.resource.kubernetes.io/" + classGpu): resource.MustParse("1"),
+						},
+					},
+				},
+			},
+		},
+		Status: corev1.PodStatus{
+			ExtendedResourceClaimStatus: &corev1.PodExtendedResourceClaimStatus{
+				ResourceClaimName: "foo",
+			},
+		},
+	}
 
 	deviceClass1 := &resourceapi.DeviceClass{
 		ObjectMeta: metav1.ObjectMeta{
@@ -315,7 +402,7 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 
 	_, ctx := ktesting.NewTestContext(t)
 	tCtx, tCancel := context.WithCancel(ctx)
-	client := fake.NewClientset(deviceClass1, podImplicit, podExplicit, podHybrid, podNilStatus)
+	client := fake.NewClientset(deviceClass1, podImplicit, podExplicit, podHybrid, podNilStatus, podInit)
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	deviceclassmapping := cache.NewDeviceClassMapping(informerFactory)
 	evaluatorWithDeviceMapping := NewResourceClaimEvaluator(nil, deviceclassmapping, informerFactory.Core().V1().Pods().Lister())
@@ -375,6 +462,16 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 				"gpu.deviceclass.resource.k8s.io/devices":         resource.MustParse("2"),
 				"requests.deviceclass.resource.kubernetes.io/gpu": resource.MustParse("1"),
 				"requests.example.com/gpu":                        resource.MustParse("1"),
+			},
+		},
+		"init-extended-resource-claim": {
+			evaluator: evaluatorWithDeviceMapping,
+			claim:     initExtendedResourceClaim,
+			usage: corev1.ResourceList{
+				"count/resourceclaims.resource.k8s.io":            resource.MustParse("1"),
+				"gpu.deviceclass.resource.k8s.io/devices":         resource.MustParse("4"),
+				"requests.deviceclass.resource.kubernetes.io/gpu": resource.MustParse("2"),
+				"requests.example.com/gpu":                        resource.MustParse("2"),
 			},
 		},
 		"simple": {

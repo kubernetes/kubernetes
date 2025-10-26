@@ -219,12 +219,27 @@ func (p *claimEvaluator) verifyOwner(claim *resourceapi.ResourceClaim) ([]reques
 		return nil, false
 	}
 	reqs := make([]requestQuantity, 0)
+	maxResourceInitContainer := make(map[corev1.ResourceName]resource.Quantity)
 	for _, c := range pod.Spec.InitContainers {
 		for r, q := range c.Resources.Requests {
 			if schedutil.IsDRAExtendedResourceName(r) {
-				reqs = append(reqs, requestQuantity{name: extendedResourceToQuotaRequestResource(string(r)), quantity: q})
+				if c.RestartPolicy != nil && *c.RestartPolicy == corev1.ContainerRestartPolicyAlways {
+					reqs = append(reqs, requestQuantity{name: extendedResourceToQuotaRequestResource(string(r)), quantity: q})
+					continue
+				}
+				maxq, ok := maxResourceInitContainer[r]
+				if !ok {
+					maxResourceInitContainer[r] = q
+					continue
+				}
+				if maxq.Cmp(q) < 0 {
+					maxResourceInitContainer[r] = q
+				}
 			}
 		}
+	}
+	for r, q := range maxResourceInitContainer {
+		reqs = append(reqs, requestQuantity{name: extendedResourceToQuotaRequestResource(string(r)), quantity: q})
 	}
 	for _, c := range pod.Spec.Containers {
 		for r, q := range c.Resources.Requests {
