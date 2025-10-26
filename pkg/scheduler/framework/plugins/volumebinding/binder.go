@@ -773,7 +773,7 @@ func (b *volumeBinder) isPVCBound(logger klog.Logger, namespace, pvcName string)
 }
 
 func (b *volumeBinder) isPVCFullyBound(pvc *v1.PersistentVolumeClaim) bool {
-	return pvc.Spec.VolumeName != "" && metav1.HasAnnotation(pvc.ObjectMeta, volume.AnnBindCompleted)
+	return pvc.Spec.VolumeName != "" && pvc.Status.Phase == v1.ClaimBound
 }
 
 // arePodVolumesBound returns true if all volumes are fully bound

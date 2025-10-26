@@ -33,7 +33,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/component-helpers/storage/volume"
 	"k8s.io/klog/v2"
 	configv1 "k8s.io/kube-scheduler/config/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -927,8 +926,8 @@ func TestReadWriteOncePodPreemption(t *testing.T) {
 	pvc1 := st.MakePersistentVolumeClaim().
 		Name("pvc-with-read-write-once-pod-1").
 		Namespace(testCtx.NS.Name).
-		// Annotation and volume name required for PVC to be considered bound.
-		Annotation(volume.AnnBindCompleted, "true").
+		// phase and volume name required for PVC to be considered bound.
+		Phase(v1.ClaimBound).
 		VolumeName(pv1.Name).
 		AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}).
 		Resources(storage).
@@ -942,8 +941,8 @@ func TestReadWriteOncePodPreemption(t *testing.T) {
 	pvc2 := st.MakePersistentVolumeClaim().
 		Name("pvc-with-read-write-once-pod-2").
 		Namespace(testCtx.NS.Name).
-		// Annotation and volume name required for PVC to be considered bound.
-		Annotation(volume.AnnBindCompleted, "true").
+		// phase and volume name required for PVC to be considered bound.
+		Phase(v1.ClaimBound).
 		VolumeName(pv2.Name).
 		AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}).
 		Resources(storage).

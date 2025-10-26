@@ -32,7 +32,6 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
-	"k8s.io/component-helpers/storage/volume"
 	configv1 "k8s.io/kube-scheduler/config/v1"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
@@ -1051,14 +1050,14 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		InitialPVCs: []*v1.PersistentVolumeClaim{
 			st.MakePersistentVolumeClaim().
 				Name("pvc1").
-				Annotation(volume.AnnBindCompleted, "true").
+				Phase(v1.ClaimBound).
 				VolumeName("pv1").
 				AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}).
 				Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}).
 				Obj(),
 			st.MakePersistentVolumeClaim().
 				Name("pvc2").
-				Annotation(volume.AnnBindCompleted, "true").
+				Phase(v1.ClaimBound).
 				VolumeName("pv2").
 				AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}).
 				Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}).
@@ -1107,14 +1106,14 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		InitialPVCs: []*v1.PersistentVolumeClaim{
 			st.MakePersistentVolumeClaim().
 				Name("pvc1").
-				Annotation(volume.AnnBindCompleted, "true").
+				Phase(v1.ClaimBound).
 				VolumeName("pv1").
 				AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}).
 				Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}).
 				Obj(),
 			st.MakePersistentVolumeClaim().
 				Name("pvc2").
-				Annotation(volume.AnnBindCompleted, "true").
+				Phase(v1.ClaimBound).
 				VolumeName("pv2").
 				AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}).
 				Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}).
@@ -1163,7 +1162,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		InitialPVCs: []*v1.PersistentVolumeClaim{
 			st.MakePersistentVolumeClaim().
 				Name("pvc1").
-				Annotation(volume.AnnBindCompleted, "true").
+				Phase(v1.ClaimBound).
 				VolumeName("pv1").
 				AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}).
 				Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}).
@@ -1179,7 +1178,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			pvc2 := st.MakePersistentVolumeClaim().
 				Name("pvc2").
-				Annotation(volume.AnnBindCompleted, "true").
+				Phase(v1.ClaimBound).
 				VolumeName("pv2").
 				AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}).
 				Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}).
@@ -1215,14 +1214,14 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		InitialPVCs: []*v1.PersistentVolumeClaim{
 			st.MakePersistentVolumeClaim().
 				Name("pvc1").
-				Annotation(volume.AnnBindCompleted, "true").
+				Phase(v1.ClaimBound).
 				VolumeName("pv1").
 				AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}).
 				Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}).
 				Obj(),
 			st.MakePersistentVolumeClaim().
 				Name("pvc2").
-				Annotation(volume.AnnBindCompleted, "true").
+				Phase(v1.ClaimBound).
 				AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}).
 				Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}).
 				Obj(),
@@ -1237,7 +1236,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			pvc2 := st.MakePersistentVolumeClaim().
 				Name("pvc2").
-				Annotation(volume.AnnBindCompleted, "true").
+				Phase(v1.ClaimBound).
 				VolumeName("pv2").
 				AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}).
 				Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}).
@@ -1266,14 +1265,14 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		InitialPVCs: []*v1.PersistentVolumeClaim{
 			st.MakePersistentVolumeClaim().
 				Name("pvc1").
-				Annotation(volume.AnnBindCompleted, "true").
+				Phase(v1.ClaimBound).
 				VolumeName("pv1").
 				AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}).
 				Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}).
 				Obj(),
 			st.MakePersistentVolumeClaim().
 				Name("pvc2").
-				Annotation(volume.AnnBindCompleted, "true").
+				Phase(v1.ClaimBound).
 				VolumeName("pv2").
 				AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}).
 				Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}).
@@ -1322,14 +1321,14 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		InitialPVCs: []*v1.PersistentVolumeClaim{
 			st.MakePersistentVolumeClaim().
 				Name("pvc1").
-				Annotation(volume.AnnBindCompleted, "true").
+				Phase(v1.ClaimBound).
 				VolumeName("pv1").
 				AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}).
 				Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}).
 				Obj(),
 			st.MakePersistentVolumeClaim().
 				Name("pvc2").
-				Annotation(volume.AnnBindCompleted, "true").
+				Phase(v1.ClaimBound).
 				VolumeName("pv2").
 				AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}).
 				Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}).
@@ -1375,7 +1374,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			pvc2 := st.MakePersistentVolumeClaim().
 				Name("pvc1").
-				Annotation(volume.AnnBindCompleted, "true").
+				Phase(v1.ClaimBound).
 				VolumeName("pv1").
 				AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}).
 				Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}).
@@ -1403,7 +1402,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		InitialPVCs: []*v1.PersistentVolumeClaim{
 			st.MakePersistentVolumeClaim().
 				Name("pvc1").
-				Annotation(volume.AnnBindCompleted, "true").
+				Phase(v1.ClaimBound).
 				VolumeName("pv1").
 				AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}).
 				Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}).
@@ -1443,7 +1442,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		InitialPVCs: []*v1.PersistentVolumeClaim{
 			st.MakePersistentVolumeClaim().
 				Name("pvc1").
-				Annotation(volume.AnnBindCompleted, "true").
+				Phase(v1.ClaimBound).
 				VolumeName("pv1").
 				AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadOnlyMany}).
 				Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}).
@@ -1484,7 +1483,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		InitialPVCs: []*v1.PersistentVolumeClaim{
 			st.MakePersistentVolumeClaim().
 				Name("pvc1").
-				Annotation(volume.AnnBindCompleted, "true").
+				Phase(v1.ClaimBound).
 				VolumeName("pv1").
 				AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
 				Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}).
@@ -1520,7 +1519,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			st.MakePersistentVolumeClaim().
 				Name("pvc1").
 				VolumeName("pv1").
-				Annotation(volume.AnnBindCompleted, "true").
+				Phase(v1.ClaimBound).
 				AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
 				Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}).
 				Obj(),
@@ -1563,7 +1562,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			st.MakePersistentVolumeClaim().
 				Name("pvc1").
 				VolumeName("pv1").
-				Annotation(volume.AnnBindCompleted, "true").
+				Phase(v1.ClaimBound).
 				AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
 				Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}).
 				Obj(),
@@ -1619,7 +1618,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			}
 			pvc1 := st.MakePersistentVolumeClaim().
 				Name("pvc1").
-				Annotation(volume.AnnBindCompleted, "true").
+				Phase(v1.ClaimBound).
 				VolumeName("pv1").
 				AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadOnlyMany}).
 				Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}).
@@ -1662,7 +1661,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			pvc1 := st.MakePersistentVolumeClaim().
 				Name("pvc1").
 				VolumeName("pv1").
-				Annotation(volume.AnnBindCompleted, "true").
+				Phase(v1.ClaimBound).
 				AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
 				Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}).
 				Obj()
@@ -2142,7 +2141,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		InitialPVCs: []*v1.PersistentVolumeClaim{
 			st.MakePersistentVolumeClaim().
 				Name("pvc1").
-				Annotation(volume.AnnBindCompleted, "true").
+				Phase(v1.ClaimBound).
 				VolumeName("pv1").
 				AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
 				Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}).
@@ -2188,14 +2187,14 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		InitialPVCs: []*v1.PersistentVolumeClaim{
 			st.MakePersistentVolumeClaim().
 				Name("pvc1").
-				Annotation(volume.AnnBindCompleted, "true").
+				Phase(v1.ClaimBound).
 				VolumeName("pv1").
 				AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}).
 				Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}).
 				Obj(),
 			st.MakePersistentVolumeClaim().
 				Name("pvc2").
-				Annotation(volume.AnnBindCompleted, "true").
+				Phase(v1.ClaimBound).
 				VolumeName("pv2").
 				AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}).
 				Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}).
@@ -2242,7 +2241,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		InitialPVCs: []*v1.PersistentVolumeClaim{
 			st.MakePersistentVolumeClaim().
 				Name("pvc1").
-				Annotation(volume.AnnBindCompleted, "true").
+				Phase(v1.ClaimBound).
 				VolumeName("pv1").
 				AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}).
 				Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}).
@@ -2265,7 +2264,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			pvc := st.MakePersistentVolumeClaim().
 				Name("pvc2").
-				Annotation(volume.AnnBindCompleted, "true").
+				Phase(v1.ClaimBound).
 				VolumeName("pv2").
 				AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}).
 				Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}).
@@ -2290,7 +2289,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		InitialPVCs: []*v1.PersistentVolumeClaim{
 			st.MakePersistentVolumeClaim().
 				Name("pvc1").
-				Annotation(volume.AnnBindCompleted, "true").
+				Phase(v1.ClaimBound).
 				VolumeName("pv1").
 				AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
 				Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}).
@@ -2344,14 +2343,14 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		InitialPVCs: []*v1.PersistentVolumeClaim{
 			st.MakePersistentVolumeClaim().
 				Name("pvc1").
-				Annotation(volume.AnnBindCompleted, "true").
+				Phase(v1.ClaimBound).
 				VolumeName("pv1").
 				AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
 				Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}).
 				Obj(),
 			st.MakePersistentVolumeClaim().
 				Name("pvc2").
-				Annotation(volume.AnnBindCompleted, "true").
+				Phase(v1.ClaimBound).
 				VolumeName("pv2").
 				AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
 				Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}).

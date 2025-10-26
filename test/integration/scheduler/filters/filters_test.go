@@ -33,7 +33,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/component-helpers/storage/volume"
 	"k8s.io/kubernetes/pkg/features"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testutils "k8s.io/kubernetes/test/integration/util"
@@ -2306,8 +2305,8 @@ func TestUnschedulablePodBecomesSchedulable(t *testing.T) {
 				pvc, err := testutils.CreatePVC(cs, st.MakePersistentVolumeClaim().
 					Name("pvc-with-read-write-once-pod").
 					Namespace(ns).
-					// Annotation and volume name required for PVC to be considered bound.
-					Annotation(volume.AnnBindCompleted, "true").
+					// phase and volume name required for PVC to be considered bound.
+					Phase(v1.ClaimBound).
 					VolumeName(pv.Name).
 					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}).
 					Resources(storage).
@@ -2366,7 +2365,7 @@ func TestUnschedulablePodBecomesSchedulable(t *testing.T) {
 				_, err = testutils.CreatePVC(cs, st.MakePersistentVolumeClaim().
 					Name("pvc-has-non-existent-nodes").
 					Namespace(ns).
-					Annotation(volume.AnnBindCompleted, "true").
+					Phase(v1.ClaimBound).
 					VolumeName(pv.Name).
 					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}).
 					Resources(storage).
@@ -2417,7 +2416,7 @@ func TestUnschedulablePodBecomesSchedulable(t *testing.T) {
 				_, err = testutils.CreatePVC(cs, st.MakePersistentVolumeClaim().
 					Name("pvc-foo").
 					Namespace(ns).
-					Annotation(volume.AnnBindCompleted, "true").
+					Phase(v1.ClaimBound).
 					VolumeName(pv.Name).
 					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}).
 					Resources(storage).

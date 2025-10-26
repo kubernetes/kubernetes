@@ -958,9 +958,9 @@ func (p *PersistentVolumeClaimWrapper) Namespace(s string) *PersistentVolumeClai
 	return p
 }
 
-// Annotation sets a {k,v} pair to the inner PersistentVolumeClaim.
-func (p *PersistentVolumeClaimWrapper) Annotation(key, value string) *PersistentVolumeClaimWrapper {
-	metav1.SetMetaDataAnnotation(&p.ObjectMeta, key, value)
+// Phase sets `phase` as the status.phase of the inner PersistentVolumeClaim.
+func (p *PersistentVolumeClaimWrapper) Phase(phase v1.PersistentVolumeClaimPhase) *PersistentVolumeClaimWrapper {
+	p.PersistentVolumeClaim.Status.Phase = phase
 	return p
 }
 

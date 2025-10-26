@@ -623,7 +623,7 @@ func makeTestPVC(name, size, node string, pvcBoundState int, pvName, resourceVer
 		metav1.SetMetaDataAnnotation(&pvc.ObjectMeta, volume.AnnSelectedNode, node)
 		// don't fallthrough
 	case pvcBound:
-		metav1.SetMetaDataAnnotation(&pvc.ObjectMeta, volume.AnnBindCompleted, "yes")
+		pvc.Status.Phase = v1.ClaimBound
 		fallthrough
 	case pvcPrebound:
 		pvc.Spec.VolumeName = pvName
@@ -1935,7 +1935,7 @@ func TestBindPodVolumes(t *testing.T) {
 				// Update PVC to be fully bound to PV
 				newPVC := pvc.DeepCopy()
 				newPVC.Spec.VolumeName = pv.Name
-				metav1.SetMetaDataAnnotation(&newPVC.ObjectMeta, volume.AnnBindCompleted, "yes")
+				newPVC.Status.Phase = v1.ClaimBound
 				if _, err := testEnv.client.CoreV1().PersistentVolumeClaims(newPVC.Namespace).Update(ctx, newPVC, metav1.UpdateOptions{}); err != nil {
 					t.Errorf("failed to update PVC %q: %v", newPVC.Name, err)
 				}
@@ -1959,7 +1959,7 @@ func TestBindPodVolumes(t *testing.T) {
 					return
 				}
 				newPVC.Spec.VolumeName = dynamicPV.Name
-				metav1.SetMetaDataAnnotation(&newPVC.ObjectMeta, volume.AnnBindCompleted, "yes")
+				newPVC.Status.Phase = v1.ClaimBound
 				if _, err := testEnv.client.CoreV1().PersistentVolumeClaims(newPVC.Namespace).Update(ctx, newPVC, metav1.UpdateOptions{}); err != nil {
 					t.Errorf("failed to update PVC %q: %v", newPVC.Name, err)
 				}
@@ -2023,7 +2023,7 @@ func TestBindPodVolumes(t *testing.T) {
 				// Update PVC to be fully bound to a PV with a different node
 				newPVC := pvcs[0].DeepCopy()
 				newPVC.Spec.VolumeName = pvNode2.Name
-				metav1.SetMetaDataAnnotation(&newPVC.ObjectMeta, volume.AnnBindCompleted, "yes")
+				newPVC.Status.Phase = v1.ClaimBound
 				if _, err := testEnv.client.CoreV1().PersistentVolumeClaims(newPVC.Namespace).Update(ctx, newPVC, metav1.UpdateOptions{}); err != nil {
 					t.Errorf("failed to update PVC %q: %v", newPVC.Name, err)
 				}
