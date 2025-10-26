@@ -1,3 +1,19 @@
+/*
+Copyright 2025 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package scheduler
 
 import (
@@ -9,10 +25,10 @@ import (
 )
 
 type Batch struct {
-	state *BatchState
+	state *batchState
 }
 
-type BatchState struct {
+type batchState struct {
 	signature        string
 	sortedNodes      nodeScoreHeap
 	lastUseSucceeded bool
@@ -65,7 +81,7 @@ func (b *Batch) nominateIfPossible(podInfo *framework.QueuedPodInfo) {
 func (b *Batch) updateOnSuccess(ctx context.Context, schedFwk framework.Framework, podInfo fwk.PodInfo, state fwk.CycleState, nodeInfo fwk.NodeInfo, sortedNodes nodeScoreHeap) {
 	// Fill the state with the results from our schedulePod call if it is empty.
 	if b.state == nil {
-		b.state = &BatchState{
+		b.state = &batchState{
 			sortedNodes:      sortedNodes,
 			lastUseSucceeded: true,
 		}
@@ -90,6 +106,8 @@ func (b *Batch) updateOnSuccess(ctx context.Context, schedFwk framework.Framewor
 		return
 	}
 
+	// We succeeded at updating the batch! Mark it as feasible to use
+	// for next pod.
 	b.state.lastUseSucceeded = true
 }
 
