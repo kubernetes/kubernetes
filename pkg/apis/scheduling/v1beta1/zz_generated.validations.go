@@ -22,7 +22,16 @@ limitations under the License.
 package v1beta1
 
 import (
+	context "context"
+	fmt "fmt"
+
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
+	equality "k8s.io/apimachinery/pkg/api/equality"
+	operation "k8s.io/apimachinery/pkg/api/operation"
+	safe "k8s.io/apimachinery/pkg/api/safe"
+	validate "k8s.io/apimachinery/pkg/api/validate"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	field "k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 func init() { localSchemeBuilder.Register(RegisterValidations) }
@@ -30,5 +39,75 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *runtime.Scheme) error {
+	// type PriorityClass
+	scheme.AddValidationFunc((*schedulingv1beta1.PriorityClass)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_PriorityClass(ctx, op, nil /* fldPath */, obj.(*schedulingv1beta1.PriorityClass), safe.Cast[*schedulingv1beta1.PriorityClass](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
+	// type PriorityClassList
+	scheme.AddValidationFunc((*schedulingv1beta1.PriorityClassList)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_PriorityClassList(ctx, op, nil /* fldPath */, obj.(*schedulingv1beta1.PriorityClassList), safe.Cast[*schedulingv1beta1.PriorityClassList](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
 	return nil
+}
+
+// Validate_PriorityClass validates an instance of PriorityClass according
+// to declarative validation rules in the API schema.
+func Validate_PriorityClass(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *schedulingv1beta1.PriorityClass) (errs field.ErrorList) {
+	// field schedulingv1beta1.PriorityClass.TypeMeta has no validation
+	// field schedulingv1beta1.PriorityClass.ObjectMeta has no validation
+
+	// field schedulingv1beta1.PriorityClass.Value
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *int32) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("value"), &obj.Value, safe.Field(oldObj, func(oldObj *schedulingv1beta1.PriorityClass) *int32 { return &oldObj.Value }))...)
+
+	// field schedulingv1beta1.PriorityClass.GlobalDefault has no validation
+	// field schedulingv1beta1.PriorityClass.Description has no validation
+	// field schedulingv1beta1.PriorityClass.PreemptionPolicy has no validation
+	return errs
+}
+
+// Validate_PriorityClassList validates an instance of PriorityClassList according
+// to declarative validation rules in the API schema.
+func Validate_PriorityClassList(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *schedulingv1beta1.PriorityClassList) (errs field.ErrorList) {
+	// field schedulingv1beta1.PriorityClassList.TypeMeta has no validation
+	// field schedulingv1beta1.PriorityClassList.ListMeta has no validation
+
+	// field schedulingv1beta1.PriorityClassList.Items
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []schedulingv1beta1.PriorityClass) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// iterate the list and call the type's validation function
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_PriorityClass)...)
+			return
+		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *schedulingv1beta1.PriorityClassList) []schedulingv1beta1.PriorityClass {
+			return oldObj.Items
+		}))...)
+
+	return errs
 }
