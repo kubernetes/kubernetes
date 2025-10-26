@@ -21,7 +21,6 @@ package mtlsserver
 import (
 	"crypto/tls"
 	"crypto/x509"
-	"flag"
 	"fmt"
 	"log"
 	"net/http"
@@ -54,9 +53,6 @@ func init() {
 func main(cmd *cobra.Command, args []string) error {
 	logs.InitLogs()
 	defer logs.FlushLogs()
-	if err := flag.Set("logtostderr", "true"); err != nil {
-		return fmt.Errorf("failed to set flags: %w", err)
-	}
 
 	if listen == "" || serverCredsFile == "" || spiffeTrustBundleFile == "" {
 		return fmt.Errorf("missing required flags")

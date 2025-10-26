@@ -22,7 +22,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
-	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -58,9 +57,6 @@ func init() {
 func main(cmd *cobra.Command, args []string) error {
 	logs.InitLogs()
 	defer logs.FlushLogs()
-	if err := flag.Set("logtostderr", "true"); err != nil {
-		return fmt.Errorf("failed to set flags: %w", err)
-	}
 
 	if fetchURL == "" || serverTrustBundleFile == "" || clientCredBundleFile == "" {
 		return fmt.Errorf("missing required flags")
