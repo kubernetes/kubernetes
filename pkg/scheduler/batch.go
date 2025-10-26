@@ -23,6 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/metrics"
 )
 
 const (
@@ -44,6 +45,7 @@ func (b *Batch) nominateIfPossible(podInfo *framework.QueuedPodInfo) {
 	pod := podInfo.GetPodInfo().GetPod()
 
 	// If we don't have any batch state, there is nothing to do.
+	// Note we increment the stats when clearing the batch, not here.
 	if b.state == nil {
 		return
 	}
@@ -51,6 +53,7 @@ func (b *Batch) nominateIfPossible(podInfo *framework.QueuedPodInfo) {
 	// If this pod already has a nominated name, then we can't use the batch
 	// (and don't need to!)
 	if pod.Status.NominatedNodeName != "" {
+		metrics.BatchUseResults.WithLabelValues("fail", "already_nominated").Inc()
 		b.state = nil
 		return
 	}
@@ -59,12 +62,14 @@ func (b *Batch) nominateIfPossible(podInfo *framework.QueuedPodInfo) {
 	// We do this now rather than on error to avoid having to catch all
 	// error paths.
 	if !b.state.lastUseSucceeded {
+		metrics.BatchUseResults.WithLabelValues("fail", "last_use_failed").Inc()
 		b.state = nil
 		return
 	}
 
 	// If the pod is incompatible with this batch, then we can't use it.
 	if !b.podCompatible(pod) {
+		metrics.BatchUseResults.WithLabelValues("fail", "pod_incompatible").Inc()
 		b.state = nil
 		return
 	}
@@ -73,6 +78,7 @@ func (b *Batch) nominateIfPossible(podInfo *framework.QueuedPodInfo) {
 	// cases where we either have huge numbers of compatible pods in a
 	// row or we have a long wait between pods.
 	if time.Now().After((b.state.creationTime.Add(maxBatchAge))) {
+		metrics.BatchUseResults.WithLabelValues("fail", "expired").Inc()
 		b.state = nil
 		return
 	}
@@ -82,12 +88,14 @@ func (b *Batch) nominateIfPossible(podInfo *framework.QueuedPodInfo) {
 
 	// If our list is empty then just clear our state.
 	if err != nil {
+		metrics.BatchUseResults.WithLabelValues("fail", "empty_list").Inc()
 		b.state = nil
 		return
 	}
 
 	// We can use the batch; set nominated node name and make sure
 	// we don't reuse the batch unless we succeed at scheduling.
+	metrics.BatchUseResults.WithLabelValues("success", "success").Inc()
 	pod.Status.NominatedNodeName = nn.Name
 	b.state.lastUseSucceeded = false
 }
@@ -108,6 +116,7 @@ func (b *Batch) updateOnSuccess(ctx context.Context, schedFwk framework.Framewor
 	// Update the state assuming placement of the previous pod. If we fail, throw away the batch.
 	status := schedFwk.RunPreFilterExtensionAddPod(ctx, state, pod, podInfo, nodeInfo)
 	if status.Code() == fwk.Error {
+		metrics.BatchUseResults.WithLabelValues("error", "add_pod_failed").Inc()
 		b.state = nil
 		return
 	}
@@ -117,6 +126,7 @@ func (b *Batch) updateOnSuccess(ctx context.Context, schedFwk framework.Framewor
 	// we can't rescore the individual node.
 	status = schedFwk.RunFilterPlugins(ctx, state, pod, nodeInfo)
 	if !status.IsRejected() {
+		metrics.BatchUseResults.WithLabelValues("fail", "node_not_filtered").Inc()
 		b.state = nil
 		return
 	}

@@ -103,6 +103,7 @@ var (
 	pendingPods                *metrics.GaugeVec
 	InFlightEvents             *metrics.GaugeVec
 	Goroutines                 *metrics.GaugeVec
+	BatchUseResults            *metrics.CounterVec
 
 	PodSchedulingSLIDuration        *metrics.HistogramVec
 	PodSchedulingAttempts           *metrics.Histogram
@@ -230,6 +231,13 @@ func InitMetrics() {
 			Help:           "Number of running goroutines split by the work they do such as binding.",
 			StabilityLevel: metrics.ALPHA,
 		}, []string{"operation"})
+	BatchUseResults = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "batch_use_results",
+			Help:           "Counts of results when we attempt to use batching.",
+			StabilityLevel: metrics.BETA,
+		}, []string{"result", "reason"})
 
 	PodSchedulingSLIDuration = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
@@ -395,6 +403,7 @@ func InitMetrics() {
 		CacheSize,
 		unschedulableReasons,
 		PluginEvaluationTotal,
+		BatchUseResults,
 	}
 }
 
