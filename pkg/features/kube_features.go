@@ -984,6 +984,12 @@ const (
 	// Proxies client to an apiserver capable of serving the request in the event of version skew.
 	UnknownVersionInteroperabilityProxy featuregate.Feature = "UnknownVersionInteroperabilityProxy"
 
+	// owner: @HirazawaUi
+	// kep: https://kep.k8s.io/5607
+	//
+	// Allow hostNetwork pods to use user namespaces
+	UserNamespacesHostNetworkSupport featuregate.Feature = "UserNamespacesHostNetworkSupport"
+
 	// owner: @saschagrunert
 	//
 	// Enables user namespace support for Pod Security Standards. Enabling this
@@ -1743,6 +1749,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.28"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
+	UserNamespacesHostNetworkSupport: {
+		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	UserNamespacesPodSecurityStandards: {
 		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
 	},
@@ -2286,6 +2296,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	TranslateStreamCloseWebsocketRequests: {},
 
 	UnknownVersionInteroperabilityProxy: {},
+
+	UserNamespacesHostNetworkSupport: {UserNamespacesSupport},
 
 	UserNamespacesPodSecurityStandards: {},
 

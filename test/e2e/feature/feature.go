@@ -464,6 +464,10 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	Upgrade = framework.WithFeature(framework.ValidFeatures.Add("Upgrade"))
 
+	// Owner: sig-node
+	// Allow hostNetwork pods to use user namespaces
+	UserNamespacesHostNetworkSupport = framework.WithFeature(framework.ValidFeatures.Add("UserNamespacesHostNetworkSupport"))
+
 	// Owned by SIG Node
 	// Can be used when the UserNamespacesPodSecurityStandards kubelet feature
 	// gate is enabled to relax the application of Pod Security Standards in a

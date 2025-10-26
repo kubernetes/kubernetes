@@ -435,6 +435,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 	opts.AllowRelaxedEnvironmentVariableValidation = useRelaxedEnvironmentVariableValidation(podSpec, oldPodSpec)
 	opts.AllowRelaxedDNSSearchValidation = useRelaxedDNSSearchValidation(oldPodSpec)
 	opts.AllowEnvFilesValidation = useAllowEnvFilesValidation(oldPodSpec)
+	opts.AllowUserNamespacesHostNetworkSupport = useAllowUserNamespacesHostNetworkSupport(oldPodSpec)
 
 	opts.AllowOnlyRecursiveSELinuxChangePolicy = useOnlyRecursiveSELinuxChangePolicy(oldPodSpec)
 
@@ -532,6 +533,21 @@ func hasDotOrUnderscore(searches []string) bool {
 			return true
 		}
 	}
+	return false
+}
+
+func useAllowUserNamespacesHostNetworkSupport(oldPodSpec *api.PodSpec) bool {
+	// Return true early if feature gate is enabled
+	if utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesHostNetworkSupport) &&
+		utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) {
+		return true
+	}
+
+	if oldPodSpec != nil && oldPodSpec.SecurityContext != nil && oldPodSpec.SecurityContext.HostNetwork &&
+		oldPodSpec.SecurityContext.HostUsers != nil && !*oldPodSpec.SecurityContext.HostUsers {
+		return true
+	}
+
 	return false
 }
 

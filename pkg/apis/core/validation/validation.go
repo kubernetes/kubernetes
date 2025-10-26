@@ -3874,15 +3874,16 @@ func validateHostUsers(spec *core.PodSpec, fldPath *field.Path, opts PodValidati
 		return allErrs
 	}
 
+	if !opts.AllowUserNamespacesHostNetworkSupport && spec.SecurityContext.HostNetwork {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("hostNetwork"), "when `hostUsers` is false"))
+	}
+
 	// We decided to restrict the usage of userns with other host namespaces:
 	// 	https://github.com/kubernetes/kubernetes/pull/111090#discussion_r935994282
 	// The tl;dr is: you can easily run into permission issues that seem unexpected, we don't
 	// know of any good use case and we can always enable them later.
 
 	// Note we already validated above spec.SecurityContext is not nil.
-	if spec.SecurityContext.HostNetwork {
-		allErrs = append(allErrs, field.Forbidden(fldPath.Child("hostNetwork"), "when `hostUsers` is false"))
-	}
 	if spec.SecurityContext.HostPID {
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("HostPID"), "when `hostUsers` is false"))
 	}
@@ -4413,6 +4414,8 @@ type PodValidationOptions struct {
 	AllowContainerRestartPolicyRules bool
 	// Allow user namespaces with volume devices, even though they will not function properly (should only be tolerated in updates of objects which already have this invalid configuration).
 	AllowUserNamespacesWithVolumeDevices bool
+	// Allow hostNetwork pods to use user namespaces
+	AllowUserNamespacesHostNetworkSupport bool
 }
 
 // validatePodMetadataAndSpec tests if required fields in the pod.metadata and pod.spec are set,
