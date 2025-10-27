@@ -136,7 +136,7 @@ func NewCachingSecretManager(kubeClient clientset.Interface, getTTL manager.GetO
 //   - whenever a pod is created or updated, we start individual watches for all
 //     referenced objects that aren't referenced from other registered pods
 //   - every GetObject() returns a value from local cache propagated via watches
-func NewWatchingSecretManager(kubeClient clientset.Interface, resyncInterval time.Duration) Manager {
+func NewWatchingSecretManager(ctx context.Context, kubeClient clientset.Interface, resyncInterval time.Duration) Manager {
 	listSecret := func(namespace string, opts metav1.ListOptions) (runtime.Object, error) {
 		return kubeClient.CoreV1().Secrets(namespace).List(context.TODO(), opts)
 	}
@@ -154,6 +154,6 @@ func NewWatchingSecretManager(kubeClient clientset.Interface, resyncInterval tim
 	}
 	gr := corev1.Resource("secret")
 	return &secretManager{
-		manager: manager.NewWatchBasedManager(listSecret, watchSecret, newSecret, isImmutable, gr, resyncInterval, getSecretNames),
+		manager: manager.NewWatchBasedManager(ctx, listSecret, watchSecret, newSecret, isImmutable, gr, resyncInterval, getSecretNames),
 	}
 }
