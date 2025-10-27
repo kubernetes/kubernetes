@@ -38,15 +38,17 @@ func TestVersionedValidationByFuzzing(t *testing.T) {
 		{Group: "certificates.k8s.io", Version: "v1"},
 		{Group: "certificates.k8s.io", Version: "v1alpha1"},
 		{Group: "certificates.k8s.io", Version: "v1beta1"},
+		{Group: "resource.k8s.io", Version: "v1"},
 		{Group: "resource.k8s.io", Version: "v1beta1"},
 		{Group: "resource.k8s.io", Version: "v1beta2"},
-		{Group: "resource.k8s.io", Version: "v1"},
 		{Group: "storage.k8s.io", Version: "v1"},
-		{Group: "storage.k8s.io", Version: "v1beta1"},
 		{Group: "storage.k8s.io", Version: "v1alpha1"},
-		{Group: "node.k8s.io", Version: "v1beta1"},
+		{Group: "storage.k8s.io", Version: "v1beta1"},
 		{Group: "node.k8s.io", Version: "v1"},
 		{Group: "node.k8s.io", Version: "v1alpha1"},
+		{Group: "node.k8s.io", Version: "v1beta1"},
+		{Group: "network.k8s.io", Version: "v1"},
+		{Group: "network.k8s.io", Version: "v1beta1"},
 		{Group: "autoscaling", Version: "v1"},
 		{Group: "autoscaling", Version: "v1beta1"},
 		{Group: "autoscaling", Version: "v1beta2"},
@@ -74,9 +76,6 @@ func TestVersionedValidationByFuzzing(t *testing.T) {
 					allRules := append([]field.NormalizationRule{}, resourcevalidation.ResourceNormalizationRules...)
 					allRules = append(allRules, nodevalidation.NodeNormalizationRules...)
 					opts = append(opts, WithNormalizationRules(allRules...))
-					if gv.Group == "autoscaling" {
-						opts = append(opts, WithIgnoreObjectConversionErrors())
-					}
 
 					VerifyVersionedValidationEquivalence(t, obj, nil, opts...)
 
