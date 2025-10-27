@@ -84,7 +84,7 @@ var defaultKubernetesFeatureGates = map[Feature]FeatureSpec{
 	ClientsAllowCBOR:             {Default: false, PreRelease: Alpha},
 	ClientsPreferCBOR:            {Default: false, PreRelease: Alpha},
 	InOrderInformers:             {Default: true, PreRelease: Beta},
-	InOrderInformersBatchProcess: {Default: false, PreRelease: Alpha},
+	InOrderInformersBatchProcess: {Default: true, PreRelease: Beta},
 	InformerResourceVersion:      {Default: false, PreRelease: Alpha},
 	WatchListClient:              {Default: false, PreRelease: Beta},
 }
