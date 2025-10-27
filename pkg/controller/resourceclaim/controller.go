@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -411,11 +412,6 @@ func (ec *Controller) enqueueResourceClaim(logger klog.Logger, oldObj, newObj in
 
 func (ec *Controller) Run(ctx context.Context, workers int) {
 	defer runtime.HandleCrashWithContext(ctx)
-	defer ec.queue.ShutDown()
-
-	logger := klog.FromContext(ctx)
-	logger.Info("Starting resource claim controller")
-	defer logger.Info("Shutting down resource claim controller")
 
 	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	eventBroadcaster.StartLogging(klog.Infof)
@@ -423,14 +419,25 @@ func (ec *Controller) Run(ctx context.Context, workers int) {
 	ec.recorder = eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "resource_claim"})
 	defer eventBroadcaster.Shutdown()
 
+	logger := klog.FromContext(ctx)
+	logger.Info("Starting resource claim controller")
+
+	var wg sync.WaitGroup
+	defer func() {
+		logger.Info("Shutting down resource claim controller")
+		ec.queue.ShutDown()
+		wg.Wait()
+	}()
+
 	if !cache.WaitForNamedCacheSyncWithContext(ctx, ec.podSynced, ec.claimsSynced, ec.templatesSynced) {
 		return
 	}
 
 	for i := 0; i < workers; i++ {
-		go wait.UntilWithContext(ctx, ec.runWorker, time.Second)
+		wg.Go(func() {
+			wait.UntilWithContext(ctx, ec.runWorker, time.Second)
+		})
 	}
-
 	<-ctx.Done()
 }
 
