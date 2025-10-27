@@ -585,26 +585,30 @@ type DeviceAttribute struct {
 	// IntValue is a number.
 	//
 	// +optional
-	// +oneOf=ValueType
+	// +k8s:optional
+	// +k8s:unionMember
 	IntValue *int64 `json:"int,omitempty" protobuf:"varint,2,opt,name=int"`
 
 	// BoolValue is a true/false value.
 	//
 	// +optional
-	// +oneOf=ValueType
+	// +k8s:optional
+	// +k8s:unionMember
 	BoolValue *bool `json:"bool,omitempty" protobuf:"varint,3,opt,name=bool"`
 
 	// StringValue is a string. Must not be longer than 64 characters.
 	//
 	// +optional
-	// +oneOf=ValueType
+	// +k8s:optional
+	// +k8s:unionMember
 	StringValue *string `json:"string,omitempty" protobuf:"bytes,4,opt,name=string"`
 
 	// VersionValue is a semantic version according to semver.org spec 2.0.0.
 	// Must not be longer than 64 characters.
 	//
 	// +optional
-	// +oneOf=ValueType
+	// +k8s:optional
+	// +k8s:unionMember
 	VersionValue *string `json:"version,omitempty" protobuf:"bytes,5,opt,name=version"`
 }
 

@@ -97,6 +97,31 @@ func TestDeclarativeValidate(t *testing.T) {
 						field.Required(field.NewPath("spec", "devices").Index(0).Child("taints").Index(0).Child("effect"), ""),
 					},
 				},
+				// spec.Devices[%].attribute
+				"valid: device attribute int": {
+					input: mkResourceSlice(tweakDeviceAttribute("test.io/int", resource.DeviceAttribute{IntValue: ptr.To[int64](123)})),
+				},
+				"valid: device attribute bool": {
+					input: mkResourceSlice(tweakDeviceAttribute("test.io/bool", resource.DeviceAttribute{BoolValue: ptr.To(true)})),
+				},
+				"valid: device attribute string": {
+					input: mkResourceSlice(tweakDeviceAttribute("test.io/string", resource.DeviceAttribute{StringValue: ptr.To("value")})),
+				},
+				"valid: device attribute version": {
+					input: mkResourceSlice(tweakDeviceAttribute("test.io/version", resource.DeviceAttribute{VersionValue: ptr.To("1.2.3")})),
+				},
+				"invalid: device attribute with multiple values": {
+					input: mkResourceSlice(tweakDeviceAttribute("test.io/multiple", resource.DeviceAttribute{IntValue: ptr.To[int64](123), BoolValue: ptr.To(true)})),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("spec", "devices").Index(0).Child("attributes").Key("test.io/multiple"), "", ""),
+					},
+				},
+				"invalid: device attribute no value": {
+					input: mkResourceSlice(tweakDeviceAttribute("test.io/multiple", resource.DeviceAttribute{})),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("spec", "devices").Index(0).Child("attributes").Key("test.io/multiple"), "", ""),
+					},
+				},
 				// TODO: Add more test cases
 			}
 
@@ -176,6 +201,17 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 						field.Required(field.NewPath("spec", "devices").Index(0).Child("taints").Index(0).Child("effect"), ""),
 					},
 				},
+				"valid update: device attribute": {
+					old:    mkResourceSlice(tweakDeviceAttribute("test.io/int", resource.DeviceAttribute{IntValue: ptr.To[int64](123)})),
+					update: mkResourceSlice(tweakDeviceAttribute("test.io/int", resource.DeviceAttribute{BoolValue: ptr.To(true)})),
+				},
+				"invalid update: device attribute with multiple values": {
+					old:    mkResourceSlice(),
+					update: mkResourceSlice(tweakDeviceAttribute("test.io/multiple", resource.DeviceAttribute{IntValue: ptr.To[int64](123), BoolValue: ptr.To(true)})),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("spec", "devices").Index(0).Child("attributes").Key("test.io/multiple"), "", "may have only one of the following fields set: bool, int, string, version"),
+					},
+				},
 			}
 			for k, tc := range testCases {
 				t.Run(k, func(t *testing.T) {
@@ -247,5 +283,14 @@ func tweakBindingConditions(count int) func(*resource.ResourceSlice) {
 func tweakDeviceTaintEffect(effect string) func(*resource.ResourceSlice) {
 	return func(rs *resource.ResourceSlice) {
 		rs.Spec.Devices[0].Taints[0].Effect = resource.DeviceTaintEffect(effect)
+	}
+}
+
+func tweakDeviceAttribute(name resource.QualifiedName, value resource.DeviceAttribute) func(*resource.ResourceSlice) {
+	return func(rs *resource.ResourceSlice) {
+		if rs.Spec.Devices[0].Attributes == nil {
+			rs.Spec.Devices[0].Attributes = make(map[resource.QualifiedName]resource.DeviceAttribute)
+		}
+		rs.Spec.Devices[0].Attributes[name] = value
 	}
 }
