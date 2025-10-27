@@ -7854,6 +7854,24 @@ func ValidateResourceQuantityValue(resource core.ResourceName, value resource.Qu
 			allErrs = append(allErrs, field.Invalid(fldPath, value, isNotIntegerErrorMsg))
 		}
 	}
+
+	// Validate that memory resources are not too small.
+	// Memory should use binary SI suffixes (Ki, Mi, Gi, Ti, Pi, Ei).
+	// This prevents confusing runtime errors like "no space left on device" when mounting
+	// tmpfs volumes (e.g., projected service account tokens) with extremely small memory limits.
+	// Common mistake: using decimal CPU suffix "m" (milliunits) for memory, e.g., "512m" = 0.512 bytes.
+	// The minimum practical memory allocation is one page (typically 4096 bytes on Linux).
+	if resource == core.ResourceMemory {
+		// Allow zero (for BestEffort pods) but reject positive values less than 4Ki (4096 bytes)
+		const minMemoryBytes = 4096
+		byteValue := value.Value()
+		if byteValue > 0 && byteValue < minMemoryBytes {
+			allErrs = append(allErrs, field.Invalid(fldPath, value.String(),
+				fmt.Sprintf("must be at least 4Ki. Memory was %s (%d bytes). Use Ki/Mi/Gi suffixes for memory, not 'm'",
+					value.String(), byteValue)))
+		}
+	}
+
 	return allErrs
 }
 

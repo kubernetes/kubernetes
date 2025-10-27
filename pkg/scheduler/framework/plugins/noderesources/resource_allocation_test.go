@@ -169,7 +169,7 @@ func TestResourceAllocationScorerCalculateRequests(t *testing.T) {
 							Resources: v1.ResourceRequirements{
 								Requests: v1.ResourceList{
 									v1.ResourceCPU:    resource.MustParse("1m"),
-									v1.ResourceMemory: resource.MustParse("1"),
+									v1.ResourceMemory: resource.MustParse("1Ki"),
 								},
 							},
 						},
@@ -179,7 +179,7 @@ func TestResourceAllocationScorerCalculateRequests(t *testing.T) {
 							Resources: v1.ResourceRequirements{
 								Requests: v1.ResourceList{
 									v1.ResourceCPU:    resource.MustParse("3m"),
-									v1.ResourceMemory: resource.MustParse("3"),
+									v1.ResourceMemory: resource.MustParse("3Ki"),
 								},
 							},
 						},
@@ -201,7 +201,7 @@ func TestResourceAllocationScorerCalculateRequests(t *testing.T) {
 							Resources: v1.ResourceRequirements{
 								Requests: v1.ResourceList{
 									v1.ResourceCPU:    resource.MustParse("1m"),
-									v1.ResourceMemory: resource.MustParse("1"),
+									v1.ResourceMemory: resource.MustParse("1Ki"),
 								},
 							},
 						},
@@ -211,7 +211,7 @@ func TestResourceAllocationScorerCalculateRequests(t *testing.T) {
 							Resources: v1.ResourceRequirements{
 								Requests: v1.ResourceList{
 									v1.ResourceCPU:    resource.MustParse("3m"),
-									v1.ResourceMemory: resource.MustParse("3"),
+									v1.ResourceMemory: resource.MustParse("3Ki"),
 								},
 							},
 						},
@@ -221,7 +221,7 @@ func TestResourceAllocationScorerCalculateRequests(t *testing.T) {
 			},
 			expected: map[v1.ResourceName]int64{
 				v1.ResourceCPU:    3 + util.DefaultMilliCPURequest,
-				v1.ResourceMemory: 3 + util.DefaultMemoryRequest,
+				v1.ResourceMemory: 3*1024 + util.DefaultMemoryRequest,
 			},
 		},
 	}

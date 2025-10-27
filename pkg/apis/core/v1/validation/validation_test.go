@@ -157,6 +157,105 @@ func validateNamesAndValuesInDescription(t *testing.T, r v1.ResourceList, errs f
 	}
 }
 
+func TestValidateResourceQuantityValue(t *testing.T) {
+	successCase := []struct {
+		name         string
+		resourceName core.ResourceName
+		value        string
+	}{{
+		name:         "Memory with binary suffix Ki",
+		resourceName: core.ResourceMemory,
+		value:        "4Ki",
+	}, {
+		name:         "Memory with binary suffix Mi",
+		resourceName: core.ResourceMemory,
+		value:        "512Mi",
+	}, {
+		name:         "Memory with binary suffix Gi",
+		resourceName: core.ResourceMemory,
+		value:        "2Gi",
+	}, {
+		name:         "Memory with exact minimum bytes",
+		resourceName: core.ResourceMemory,
+		value:        "4096",
+	}, {
+		name:         "Memory zero value (BestEffort pods)",
+		resourceName: core.ResourceMemory,
+		value:        "0",
+	}, {
+		name:         "CPU with milli suffix",
+		resourceName: core.ResourceCPU,
+		value:        "500m",
+	}, {
+		name:         "CPU with decimal suffix",
+		resourceName: core.ResourceCPU,
+		value:        "2",
+	}}
+
+	for _, tc := range successCase {
+		t.Run(tc.name, func(t *testing.T) {
+			quantity := resource.MustParse(tc.value)
+			errs := ValidateResourceQuantityValue(tc.resourceName, quantity, field.NewPath("test"))
+			if len(errs) != 0 {
+				t.Errorf("unexpected error: %v", errs)
+			}
+		})
+	}
+
+	errorCase := []struct {
+		name         string
+		resourceName core.ResourceName
+		value        string
+		expectedErr  string
+	}{{
+		name:         "Memory with milli suffix (common mistake)",
+		resourceName: core.ResourceMemory,
+		value:        "512m",
+		expectedErr:  "must be at least 4Ki",
+	}, {
+		name:         "Memory with very small value (1 byte)",
+		resourceName: core.ResourceMemory,
+		value:        "1",
+		expectedErr:  "Use Ki/Mi/Gi suffixes for memory",
+	}, {
+		name:         "Memory with very small value (3 bytes)",
+		resourceName: core.ResourceMemory,
+		value:        "3",
+		expectedErr:  "must be at least 4Ki",
+	}, {
+		name:         "Memory with small milli value",
+		resourceName: core.ResourceMemory,
+		value:        "100m",
+		expectedErr:  "not 'm'",
+	}, {
+		name:         "Memory below 4096 bytes",
+		resourceName: core.ResourceMemory,
+		value:        "4095",
+		expectedErr:  "4095 bytes",
+	}}
+
+	for _, tc := range errorCase {
+		t.Run(tc.name, func(t *testing.T) {
+			quantity := resource.MustParse(tc.value)
+			errs := ValidateResourceQuantityValue(tc.resourceName, quantity, field.NewPath("test"))
+			if len(errs) == 0 {
+				t.Errorf("expected error for %s with value %s", tc.resourceName, tc.value)
+				return
+			}
+			found := false
+			for _, err := range errs {
+				if strings.Contains(err.Error(), tc.expectedErr) {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("expected error containing '%s', got: %v", tc.expectedErr, errs)
+			}
+		})
+	}
+}
+
 func TestValidateContainerResourceName(t *testing.T) {
 	successCase := []struct {
 		name         string
