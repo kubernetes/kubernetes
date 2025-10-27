@@ -25,9 +25,8 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"sync"
 	"time"
-
-	"k8s.io/klog/v2"
 
 	capi "k8s.io/api/certificates/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,6 +36,7 @@ import (
 	certificatesinformers "k8s.io/client-go/informers/certificates/v1"
 	csrclient "k8s.io/client-go/kubernetes/typed/certificates/v1"
 	certificateslisters "k8s.io/client-go/listers/certificates/v1"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -81,12 +81,18 @@ func (ccc *CSRCleanerController) Run(ctx context.Context, workers int) {
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting CSR cleaner controller")
-	defer logger.Info("Shutting down CSR cleaner controller")
+
+	var wg sync.WaitGroup
+	defer func() {
+		logger.Info("Shutting down CSR cleaner controller")
+		wg.Wait()
+	}()
 
 	for i := 0; i < workers; i++ {
-		go wait.UntilWithContext(ctx, ccc.worker, pollingInterval)
+		wg.Go(func() {
+			wait.UntilWithContext(ctx, ccc.worker, pollingInterval)
+		})
 	}
-
 	<-ctx.Done()
 }
 
