@@ -6953,6 +6953,20 @@ func ValidateNode(node *core.Node) field.ErrorList {
 	allErrs = append(allErrs, validateNodeResources(&node.Status, statusPath)...)
 	allErrs = append(allErrs, validateNodeSwapStatus(node.Status.NodeInfo.Swap, statusPath.Child("nodeInfo", "swap"))...)
 
+	// Validate no duplicate addresses in node status.
+	addresses := make(map[core.NodeAddress]bool)
+	addressesPath := statusPath.Child("addresses")
+	for i, address := range node.Status.Addresses {
+		if _, ok := addresses[address]; ok {
+			allErrs = append(allErrs, field.Duplicate(addressesPath.Index(i), address))
+		}
+		addresses[address] = true
+	}
+
+	if node.Status.Config != nil {
+		allErrs = append(allErrs, validateNodeConfigStatus(node.Status.Config, statusPath.Child("config"))...)
+	}
+
 	return allErrs
 }
 
@@ -7016,21 +7030,6 @@ func ValidateNodeUpdate(node, oldNode *core.Node) field.ErrorList {
 
 	if node.Spec.DoNotUseExternalID != oldNode.Spec.DoNotUseExternalID {
 		allErrs = append(allErrs, field.Forbidden(specPath.Child("externalID"), "may not be updated"))
-	}
-
-	// Validate Status Updates
-
-	// Validate no duplicate addresses in node status.
-	addresses := make(map[core.NodeAddress]bool)
-	for i, address := range node.Status.Addresses {
-		if _, ok := addresses[address]; ok {
-			allErrs = append(allErrs, field.Duplicate(field.NewPath("status", "addresses").Index(i), address))
-		}
-		addresses[address] = true
-	}
-
-	if node.Status.Config != nil {
-		allErrs = append(allErrs, validateNodeConfigStatus(node.Status.Config, field.NewPath("status", "config"))...)
 	}
 
 	return allErrs

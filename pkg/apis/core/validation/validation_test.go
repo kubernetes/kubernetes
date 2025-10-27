@@ -18321,6 +18321,17 @@ func TestValidateNode(t *testing.T) {
 				PodCIDRs: []string{"192.168.000.000/16"},
 			},
 		},
+		"no-duplicate-node-address": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "abc",
+			},
+			Status: core.NodeStatus{
+				Addresses: []core.NodeAddress{
+					{Type: core.NodeHostName, Address: "cluster-foo.region-a.node-bar"},
+					{Type: core.NodeInternalDNS, Address: "cluster-foo.region-a.node-bar"},
+				},
+			},
+		},
 	}
 	for name, legacyCase := range legacyValidationCases {
 		t.Run(name, func(t *testing.T) {
@@ -18545,6 +18556,30 @@ func TestValidateNode(t *testing.T) {
 			},
 			Spec: core.NodeSpec{
 				PodCIDRs: []string{"10.0.0.1/16", "10.0.0.1/16"},
+			},
+		},
+		"duplicate-node-address": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "abc",
+			},
+			Status: core.NodeStatus{
+				Addresses: []core.NodeAddress{
+					{Type: core.NodeExternalIP, Address: "1.1.1.1"},
+					{Type: core.NodeHostName, Address: "cluster-foo.region-a.node-bar"},
+					{Type: core.NodeExternalIP, Address: "1.1.1.1"},
+				},
+			},
+		},
+		"invalid-node-config-status": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "abc",
+			},
+			Status: core.NodeStatus{
+				Config: &core.NodeConfigStatus{
+					Active: &core.NodeConfigSource{
+						ConfigMap: &core.ConfigMapNodeConfigSource{},
+					},
+				},
 			},
 		},
 	}
