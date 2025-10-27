@@ -3,7 +3,7 @@ linters:
   disable:
     - '*'
   enable:
-    # - "commentstart" # Ensure comments start with the serialized version of the field name.
+    - "commentstart" # Ensure comments start with the serialized version of the field name.
     - "conditions" # Ensure conditions have the correct json tags and markers.
     - "conflictingmarkers" # Detect mutually exclusive markers on the same field.
     # - "integers" # Ensure only int32 and int64 are used for integers.
