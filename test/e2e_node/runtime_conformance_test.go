@@ -21,9 +21,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/test/e2e/common/node"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -134,29 +134,26 @@ var _ = SIGDescribe("Container Runtime Conformance Test", func() {
 						}
 						return nil
 					}
-					// The image registry is not stable, which sometimes causes the test to fail. Add retry mechanism to make this
-					// less flaky.
-					const flakeRetry = 3
-					for i := 1; i <= flakeRetry; i++ {
-						var err error
-						ginkgo.By("create the container")
-						container.Create(ctx)
-						ginkgo.By("check the container status")
-						for start := time.Now(); time.Since(start) < node.ContainerStatusRetryTimeout; time.Sleep(node.ContainerStatusPollInterval) {
-							if err = checkContainerStatus(ctx); err == nil {
-								break
-							}
+
+					ginkgo.By("create the container")
+					container.Create(ctx)
+					ginkgo.DeferCleanup(func(ctx context.Context) {
+						ginkgo.By("delete the conformance container")
+						if err := container.Delete(ctx); err != nil {
+							framework.Logf("error deleting a conformance container: %v", err)
 						}
-						ginkgo.By("delete the container")
-						_ = container.Delete(ctx)
-						if err == nil {
-							break
+					})
+
+					ginkgo.By("check the container status")
+					var latestErr error
+					err = wait.PollUntilContextCancel(ctx, node.ContainerStatusPollInterval, true, func(ctx context.Context) (bool, error) {
+						if latestErr = checkContainerStatus(ctx); latestErr != nil {
+							return false, nil
 						}
-						if i < flakeRetry {
-							framework.Logf("No.%d attempt failed: %v, retrying...", i, err)
-						} else {
-							framework.Failf("All %d attempts failed: %v", flakeRetry, err)
-						}
+						return true, nil
+					})
+					if err != nil {
+						framework.Failf("Failed to read container status: %v; last observed error from wait loop: %v", err, latestErr)
 					}
 				})
 			}
