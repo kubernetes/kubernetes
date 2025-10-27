@@ -84,7 +84,7 @@ type frameworkImpl struct {
 	metricsRecorder          *metrics.MetricAsyncRecorder
 	profileName              string
 	percentageOfNodesToScore *int32
-	enableBatching           bool
+	enableSignatures         bool
 
 	extenders []fwk.Extender
 	fwk.PodNominator
@@ -726,31 +726,32 @@ func (f *frameworkImpl) QueueSortFunc() fwk.LessFunc {
 // If any of our preFilter, filter, preScore or score plugins haven't
 // implemented a signature, then disable the cache.
 func (f *frameworkImpl) checkPluginSignatures() {
+	f.enableSignatures = true
 	for _, pl := range f.preFilterPlugins {
-		if _, implements := pl.(fwk.BatchablePlugin); !implements && f.enableBatching {
+		if _, implements := pl.(fwk.BatchablePlugin); !implements && f.enableSignatures {
 			f.logger.Info("Disabling batching for profile %s because plugin %s does not support it", f.profileName, pl.Name())
-			f.enableBatching = false
+			f.enableSignatures = false
 			return
 		}
 	}
 	for _, pl := range f.filterPlugins {
-		if _, implements := pl.(fwk.BatchablePlugin); !implements && f.enableBatching {
+		if _, implements := pl.(fwk.BatchablePlugin); !implements && f.enableSignatures {
 			f.logger.Info("Disabling batching for profile %s because plugin %s does not support it", f.profileName, pl.Name())
-			f.enableBatching = false
+			f.enableSignatures = false
 			return
 		}
 	}
 	for _, pl := range f.preScorePlugins {
-		if _, implements := pl.(fwk.BatchablePlugin); !implements && f.enableBatching {
+		if _, implements := pl.(fwk.BatchablePlugin); !implements && f.enableSignatures {
 			f.logger.Info("Disabling batching for profile %s because plugin %s does not support it", f.profileName, pl.Name())
-			f.enableBatching = false
+			f.enableSignatures = false
 			return
 		}
 	}
 	for _, pl := range f.scorePlugins {
-		if _, implements := pl.(fwk.BatchablePlugin); !implements && f.enableBatching {
+		if _, implements := pl.(fwk.BatchablePlugin); !implements && f.enableSignatures {
 			f.logger.Info("Disabling batching for profile %s because plugin %s does not support it", f.profileName, pl.Name())
-			f.enableBatching = false
+			f.enableSignatures = false
 			return
 		}
 	}
@@ -762,7 +763,7 @@ func (f *frameworkImpl) checkPluginSignatures() {
 // there is no way to compare this pod against others, and will turn off a number of optimizations
 // for this pod.
 func (f *frameworkImpl) SignPod(ctx context.Context, pod *v1.Pod) (string, error) {
-	if !f.enableBatching {
+	if !f.enableSignatures {
 		return fwk.Unsignable, nil
 	}
 
