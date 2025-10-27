@@ -44,6 +44,7 @@ type containerManagerStub struct {
 	shouldResetExtendedResourceCapacity bool
 	extendedPluginResources             v1.ResourceList
 	memoryManager                       memorymanager.Manager
+	cpuManager                          cpumanager.Manager
 }
 
 var _ ContainerManager = &containerManagerStub{}
@@ -51,6 +52,7 @@ var _ ContainerManager = &containerManagerStub{}
 func (cm *containerManagerStub) Start(ctx context.Context, _ *v1.Node, _ ActivePodsFunc, _ GetNodeFunc, _ config.SourcesReady, _ status.PodStatusProvider, _ internalapi.RuntimeService, _ bool) error {
 	klog.V(2).InfoS("Starting stub container manager")
 	cm.memoryManager = memorymanager.NewFakeManager(ctx)
+	cm.cpuManager = cpumanager.NewFakeManager(klog.FromContext(ctx))
 	return nil
 }
 
@@ -127,7 +129,7 @@ func (cm *containerManagerStub) UpdatePluginResources(*schedulerframework.NodeIn
 }
 
 func (cm *containerManagerStub) InternalContainerLifecycle() InternalContainerLifecycle {
-	return &internalContainerLifecycleImpl{cpumanager.NewFakeManager(), cm.memoryManager, topologymanager.NewFakeManager()}
+	return &internalContainerLifecycleImpl{cm.cpuManager, cm.memoryManager, topologymanager.NewFakeManager()}
 }
 
 func (cm *containerManagerStub) GetPodCgroupRoot() string {

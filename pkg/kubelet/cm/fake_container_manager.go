@@ -21,6 +21,7 @@ import (
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
@@ -45,6 +46,7 @@ type FakeContainerManager struct {
 	PodContainerManager                 *FakePodContainerManager
 	shouldResetExtendedResourceCapacity bool
 	nodeConfig                          NodeConfig
+	cpuManager                          cpumanager.Manager
 	memoryManager                       memorymanager.Manager
 }
 
@@ -53,6 +55,7 @@ var _ ContainerManager = &FakeContainerManager{}
 func NewFakeContainerManager() *FakeContainerManager {
 	return &FakeContainerManager{
 		PodContainerManager: NewFakePodContainerManager(),
+		cpuManager:          cpumanager.NewFakeManager(klog.TODO()),
 		memoryManager:       memorymanager.NewFakeManager(context.TODO()),
 	}
 }
@@ -181,7 +184,7 @@ func (cm *FakeContainerManager) InternalContainerLifecycle() InternalContainerLi
 	cm.Lock()
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "InternalContainerLifecycle")
-	return &internalContainerLifecycleImpl{cpumanager.NewFakeManager(), cm.memoryManager, topologymanager.NewFakeManager()}
+	return &internalContainerLifecycleImpl{cm.cpuManager, cm.memoryManager, topologymanager.NewFakeManager()}
 }
 
 func (cm *FakeContainerManager) GetPodCgroupRoot() string {
