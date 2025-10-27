@@ -99,7 +99,7 @@ var _ = SIGDescribe("CPU Manager Metrics", framework.WithSerial(), feature.CPUMa
 			}
 			newCfg := configureCPUManagerInKubelet(oldCfg,
 				&cpuManagerKubeletArguments{
-					policyName:              string(cpumanager.PolicyStatic),
+					policyName:              kubeletconfig.StaticCPUManagerPolicy,
 					reservedSystemCPUs:      cpuset.New(0),
 					enableCPUManagerOptions: true,
 					options:                 cpuPolicyOptions,
@@ -398,7 +398,7 @@ var _ = SIGDescribe("CPU Manager Metrics", framework.WithSerial(), feature.CPUMa
 			}
 			newCfg := configureCPUManagerInKubelet(oldCfg,
 				&cpuManagerKubeletArguments{
-					policyName:              string(cpumanager.PolicyStatic),
+					policyName:              kubeletconfig.StaticCPUManagerPolicy,
 					reservedSystemCPUs:      cpuset.New(0),
 					enableCPUManagerOptions: true,
 					options:                 cpuPolicyOptions,
@@ -438,7 +438,7 @@ var _ = SIGDescribe("CPU Manager Metrics", framework.WithSerial(), feature.CPUMa
 			}
 			newCfg := configureCPUManagerInKubelet(oldCfg,
 				&cpuManagerKubeletArguments{
-					policyName:              string(cpumanager.PolicyStatic),
+					policyName:              kubeletconfig.StaticCPUManagerPolicy,
 					reservedSystemCPUs:      cpuset.New(0),
 					enableCPUManagerOptions: true,
 					options:                 cpuPolicyOptions,

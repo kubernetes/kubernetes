@@ -170,7 +170,7 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 		obj.CgroupDriver = "cgroupfs"
 	}
 	if obj.CPUManagerPolicy == "" {
-		obj.CPUManagerPolicy = "none"
+		obj.CPUManagerPolicy = kubeletconfigv1beta1.NoneCPUManagerPolicy
 	}
 	if obj.CPUManagerReconcilePeriod == zeroDuration {
 		// Keep the same as default NodeStatusUpdateFrequency

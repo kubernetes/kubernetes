@@ -29,6 +29,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
@@ -45,8 +46,6 @@ type ActivePodsFunc func() []*v1.Pod
 type runtimeService interface {
 	UpdateContainerResources(ctx context.Context, id string, resources *runtimeapi.ContainerResources) error
 }
-
-type policyName string
 
 // cpuManagerStateFileName is the file name where cpu manager stores its state
 const cpuManagerStateFileName = "cpu_manager_state"
@@ -166,15 +165,15 @@ func NewManager(cpuPolicyName string, cpuPolicyOptions map[string]string, reconc
 		return nil, err
 	}
 
-	switch policyName(cpuPolicyName) {
+	switch cpuPolicyName {
 
-	case PolicyNone:
+	case kubeletconfig.NoneCPUManagerPolicy:
 		policy, err = NewNonePolicy(cpuPolicyOptions)
 		if err != nil {
 			return nil, fmt.Errorf("new none policy error: %w", err)
 		}
 
-	case PolicyStatic:
+	case kubeletconfig.StaticCPUManagerPolicy:
 		klog.InfoS("Detected CPU topology", "topology", topo)
 
 		reservedCPUs, ok := nodeAllocatableReservation[v1.ResourceCPU]
@@ -243,7 +242,7 @@ func (m *manager) Start(activePods ActivePodsFunc, sourcesReady config.SourcesRe
 
 	m.allocatableCPUs = m.policy.GetAllocatableCPUs(m.state)
 
-	if m.policy.Name() == string(PolicyNone) {
+	if m.policy.Name() == kubeletconfig.NoneCPUManagerPolicy {
 		return nil
 	}
 	// Periodically call m.reconcileState() to continue to keep the CPU sets of

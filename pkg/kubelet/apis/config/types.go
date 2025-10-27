@@ -76,6 +76,18 @@ const (
 	PodTopologyManagerScope = "pod"
 )
 
+// CPUManagerPolicy denotes the policy to use for CPU Manager.
+type CPUManagerPolicy string
+
+// Enum settings for different policies of CPU Manager.
+const (
+	// NoneCPUManagerPolicy the default policy.
+	NoneCPUManagerPolicy = "none"
+
+	// StaticCPUManagerPolicy allows pods with certain resource characteristics to be granted increased CPU affinity and exclusivity on the node.
+	StaticCPUManagerPolicy = "static"
+)
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // KubeletConfiguration contains the configuration for the Kubelet
