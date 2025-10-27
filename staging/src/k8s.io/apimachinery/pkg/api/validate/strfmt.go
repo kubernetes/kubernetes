@@ -23,7 +23,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/api/validate/content"
-	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
@@ -32,7 +31,7 @@ const (
 	defaultResourceRequestsPrefix = "requests."
 	// Default namespace prefix.
 	resourceDefaultNamespacePrefix = "kubernetes.io/"
-	cDeviceMaxLength               = 32
+	resourceDeviceMaxLength        = 32
 )
 
 // ShortName verifies that the specified value is a valid "short name"
@@ -234,15 +233,13 @@ func resourcesQualifiedName[T ~string](ctx context.Context, op operation.Operati
 	}
 	var allErrs field.ErrorList
 	s := string(*value)
-	if len(s) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath, "name required"))
-		return allErrs
-	}
-
 	parts := strings.Split(s, "/")
+	// TODO: This validation and the corresponding handwritten validation validateQualifiedName in
+	// pkg/apis/resource/validation/validation.go are not validating whether there are more than 1
+	// slash. This should be fixed in both places.
 	switch len(parts) {
 	case 1:
-		allErrs = append(allErrs, validateCIdentifier(parts[0], fldPath)...)
+		allErrs = append(allErrs, validateCIdentifier(parts[0], resourceDeviceMaxLength, fldPath)...)
 	case 2:
 		if len(parts[0]) == 0 {
 			allErrs = append(allErrs, field.Invalid(fldPath, "", "prefix must not be empty"))
@@ -255,11 +252,8 @@ func resourcesQualifiedName[T ~string](ctx context.Context, op operation.Operati
 		if len(parts[1]) == 0 {
 			allErrs = append(allErrs, field.Invalid(fldPath, "", "name must not be empty"))
 		} else {
-			allErrs = append(allErrs, validateCIdentifier(parts[1], fldPath)...)
+			allErrs = append(allErrs, validateCIdentifier(parts[1], resourceDeviceMaxLength, fldPath)...)
 		}
-		// TODO: This validation and the corresponding handwritten validation validateQualifiedName in
-		// pkg/apis/resource/validation/validation.go are not validating whether there are more than 1
-		// slash. This should be fixed in both places.
 	}
 	return allErrs
 }
@@ -276,25 +270,20 @@ func ResourceFullyQualifiedName[T ~string](ctx context.Context, op operation.Ope
 		return nil
 	}
 	var allErrs field.ErrorList
-	if len(*value) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath, "name can't be empty"))
-		return allErrs
-	}
-
 	s := string(*value)
-	allErrs = append(allErrs, resourcesQualifiedName(ctx, op, fldPath, value, nil)...)
+	allErrs = append(allErrs, resourcesQualifiedName(ctx, op, fldPath, &s, nil)...)
 	if !strings.Contains(s, "/") {
-		allErrs = append(allErrs, field.Invalid(fldPath, s, "a fully qualified name must be a prefix and a name separated by a slash"))
+		allErrs = append(allErrs, field.Invalid(fldPath, s, "a fully qualified name must be a domain and a name separated by a slash"))
 	}
 	return allErrs.WithOrigin("format=k8s-resource-fully-qualified-name")
 }
 
-func validateCIdentifier(id string, fldPath *field.Path) field.ErrorList {
+func validateCIdentifier(id string, length int, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
-	if len(id) > cDeviceMaxLength {
-		allErrs = append(allErrs, field.TooLong(fldPath, id, cDeviceMaxLength))
+	if len(id) > length {
+		allErrs = append(allErrs, field.TooLong(fldPath, id, length))
 	}
-	for _, msg := range validation.IsCIdentifier(id) {
+	for _, msg := range content.IsCIdentifier(id) {
 		allErrs = append(allErrs, field.Invalid(fldPath, id, msg))
 	}
 	return allErrs
