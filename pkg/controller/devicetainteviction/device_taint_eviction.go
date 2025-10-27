@@ -57,15 +57,6 @@ import (
 	utilpod "k8s.io/kubernetes/pkg/util/pod"
 )
 
-const (
-	// This is a compromise between getting work done and not overwhelming the apiserver
-	// and pod informers. Integration testing with 100 workers modified pods so quickly
-	// that a watch in the integration test couldn't keep up:
-	//   cacher.go:855] cacher (pods): 100 objects queued in incoming channel.
-	//   cache_watcher.go:203] Forcing pods watcher close due to unresponsiveness: key: "/pods/", labels: "", fields: "". len(c.input) = 10, len(c.result) = 10, graceful = false
-	numWorkers = 10
-)
-
 // Controller listens to Taint changes of DRA devices and Toleration changes of ResourceClaims,
 // then deletes Pods which use ResourceClaims that don't tolerate a NoExecute taint.
 // Pods which have already reached a final state (aka terminated) don't need to be deleted.
@@ -383,7 +374,7 @@ func New(c clientset.Interface, podInformer coreinformers.PodInformer, claimInfo
 
 // Run starts the controller which will run until the context is done.
 // An error is returned for startup problems.
-func (tc *Controller) Run(ctx context.Context) error {
+func (tc *Controller) Run(ctx context.Context, numWorkers int) error {
 	defer utilruntime.HandleCrash()
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting", "controller", tc.name)

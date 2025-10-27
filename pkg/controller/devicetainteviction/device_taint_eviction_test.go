@@ -1509,7 +1509,7 @@ func TestEviction(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				assert.NoError(tCtx, controller.Run(tCtx), "eviction controller failed")
+				assert.NoError(tCtx, controller.Run(tCtx, 10 /* workers */), "eviction controller failed")
 			}()
 
 			// Eventually the controller should have synced it's informers.
@@ -1659,7 +1659,7 @@ func testCancelEviction(tCtx ktesting.TContext, deletePod bool) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		assert.NoError(tCtx, controller.Run(tCtx), "eviction controller failed")
+		assert.NoError(tCtx, controller.Run(tCtx, 10 /* workers */), "eviction controller failed")
 	}()
 
 	// Eventually the pod gets scheduled for eviction.
@@ -1772,7 +1772,7 @@ func TestParallelPodDeletion(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			assert.NoError(tCtx, controller.Run(tCtx), "eviction controller failed")
+			assert.NoError(tCtx, controller.Run(tCtx, 10 /* workers */), "eviction controller failed")
 		}()
 
 		// Eventually the pod gets deleted, in this test by us.
@@ -1846,7 +1846,7 @@ func TestRetry(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			assert.NoError(tCtx, controller.Run(tCtx), "eviction controller failed")
+			assert.NoError(tCtx, controller.Run(tCtx, 10 /* workers */), "eviction controller failed")
 		}()
 
 		// Eventually the pod gets deleted and the event is recorded.
