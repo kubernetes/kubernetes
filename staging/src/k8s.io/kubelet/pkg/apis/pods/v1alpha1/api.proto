@@ -3,8 +3,6 @@ package v1alpha1;
 
 option go_package = "k8s.io/kubelet/pkg/apis/pods/v1alpha1";
 
-import "k8s.io/api/core/v1/generated.proto";
-
 service Pods {
     // WatchPods will return a WatchPodsEvent whenever a Pod is created,
     // deleted, or one of its FieldMask-specified fields is updated

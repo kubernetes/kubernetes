@@ -47,24 +47,27 @@ func (b *broadcaster) Register(client chan PodWatchEvent) {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 	b.clients[client] = struct{}{}
-	klog.Infof("Registered new watch client. Total clients: %d", len(b.clients))
+	logger := klog.FromContext(context.Background())
+	logger.Info("Registered new watch client", "totalClients", len(b.clients))
 }
 
 func (b *broadcaster) Unregister(client chan PodWatchEvent) {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 	delete(b.clients, client)
-	klog.Infof("Unregistered watch client. Total clients: %d", len(b.clients))
+	logger := klog.FromContext(context.Background())
+	logger.Info("Unregistered watch client", "totalClients", len(b.clients))
 }
 
 func (b *broadcaster) Broadcast(event PodWatchEvent) {
 	b.lock.Lock()
 	defer b.lock.Unlock()
+	logger := klog.FromContext(context.Background())
 	for client := range b.clients {
 		select {
 		case client <- event:
 		default:
-			klog.Warningf("Watch client channel is full, dropping event.")
+			logger.Info("Watch client channel is full, dropping event.")
 			metrics.PodWatchEventsDroppedTotal.Inc()
 		}
 	}
@@ -100,7 +103,8 @@ func (s *PodsServer) OnPodAdded(pod *v1.Pod) {
 	defer s.lock.Unlock()
 	s.pods[pod.UID] = pod.DeepCopy()
 	s.broadcaster.Broadcast(PodWatchEvent{Type: watch.Added, Pod: pod})
-	klog.Infof("Pod %s added to storage", pod.UID)
+	logger := klog.FromContext(context.Background())
+	logger.Info("Pod added to storage", "podUID", pod.UID)
 }
 
 // OnPodUpdated is called when a pod is updated.
@@ -109,7 +113,8 @@ func (s *PodsServer) OnPodUpdated(pod *v1.Pod) {
 	defer s.lock.Unlock()
 	s.pods[pod.UID] = pod.DeepCopy()
 	s.broadcaster.Broadcast(PodWatchEvent{Type: watch.Modified, Pod: pod})
-	klog.Infof("Pod %s updated in storage", pod.UID)
+	logger := klog.FromContext(context.Background())
+	logger.Info("Pod updated in storage", "podUID", pod.UID)
 }
 
 // OnPodRemoved is called when a pod is removed.
@@ -118,7 +123,8 @@ func (s *PodsServer) OnPodRemoved(pod *v1.Pod) {
 	defer s.lock.Unlock()
 	delete(s.pods, pod.UID)
 	s.broadcaster.Broadcast(PodWatchEvent{Type: watch.Deleted, Pod: pod})
-	klog.Infof("Pod %s removed from storage", pod.UID)
+	logger := klog.FromContext(context.Background())
+	logger.Info("Pod removed from storage", "podUID", pod.UID)
 }
 
 // OnPodStatusUpdated is called when a pod's status is updated.
@@ -128,7 +134,8 @@ func (s *PodsServer) OnPodStatusUpdated(pod *v1.Pod, status v1.PodStatus) {
 	if storedPod, ok := s.pods[pod.UID]; ok {
 		storedPod.Status = status
 		s.broadcaster.Broadcast(PodWatchEvent{Type: watch.Modified, Pod: storedPod})
-		klog.Infof("Pod %s status updated in storage", pod.UID)
+		logger := klog.FromContext(context.Background())
+		logger.Info("Pod status updated in storage", "podUID", pod.UID)
 	}
 }
 
@@ -180,6 +187,7 @@ func ApplyFieldMask(mask *fieldmaskpb.FieldMask, src, dest interface{}) error {
 // creating nested objects in dest as needed and handling slice traversal.
 // `dest` must always be a pointer type.
 func applySinglePath(src, dest reflect.Value, path []string) error {
+	logger := klog.FromContext(context.Background())
 	// Invariant: dest is always a pointer.
 	for i, part := range path {
 		// Source can be a pointer or a struct. If pointer, dereference it.
@@ -279,7 +287,7 @@ func applySinglePath(src, dest reflect.Value, path []string) error {
 
 				// Recurse.
 				if err := applySinglePath(srcElemPtr, destElemPtr, remainingPath); err != nil {
-					klog.V(5).Infof("Error applying sub-path %v to slice element: %v", remainingPath, err)
+					logger.V(5).Info("Error applying sub-path to slice element", "subpath", remainingPath, "err", err)
 				}
 			}
 			return nil
@@ -315,7 +323,8 @@ func applyFieldMaskToPod(pod *v1.Pod, fieldmask *fieldmaskpb.FieldMask) (*v1.Pod
 
 // ListPods returns a list of pods.
 func (s *PodsServer) ListPods(ctx context.Context, req *podsv1alpha1.ListPodsRequest) (*podsv1alpha1.ListPodsResponse, error) {
-	klog.Infof("ListPods called with filter: %s", req.Filter)
+	logger := klog.FromContext(ctx)
+	logger.Info("ListPods called", "filter", req.Filter)
 
 	// TODO: Implement filtering based on req.Filter, pagination with req.PageToken and req.PageSize
 	podsToReturn := s.List()
@@ -343,7 +352,8 @@ func (s *PodsServer) ListPods(ctx context.Context, req *podsv1alpha1.ListPodsReq
 
 // GetPod returns a single pod by UID.
 func (s *PodsServer) GetPod(ctx context.Context, req *podsv1alpha1.GetPodRequest) (*podsv1alpha1.GetPodResponse, error) {
-	klog.Infof("GetPod called for pod UID: %s", req.PodUID)
+	logger := klog.FromContext(ctx)
+	logger.Info("GetPod called", "podUID", req.PodUID)
 
 	podUID := types.UID(req.PodUID)
 	pod, ok := s.Get(podUID)
@@ -374,13 +384,14 @@ func (s *PodsServer) WatchPods(req *podsv1alpha1.WatchPodsRequest, stream podsv1
 	if p, ok := peer.FromContext(stream.Context()); ok {
 		clientAddr = p.Addr.String()
 	}
-	klog.Infof("WatchPods called from client: %s", clientAddr)
+	logger := klog.FromContext(stream.Context())
+	logger.Info("WatchPods called", "client", clientAddr)
 
 	clientChannel := make(chan PodWatchEvent, 100)
 	s.broadcaster.Register(clientChannel)
 	defer func() {
 		s.broadcaster.Unregister(clientChannel)
-		klog.Infof("Watch client %s disconnected", clientAddr)
+		logger.Info("Watch client disconnected", "client", clientAddr)
 	}()
 
 	fieldMask, err := getFieldMaskFromContext(stream.Context())
@@ -398,19 +409,22 @@ func (s *PodsServer) WatchPods(req *podsv1alpha1.WatchPodsRequest, stream podsv1
 	for _, p := range initialPods {
 		maskedPod, err := applyFieldMaskToPod(p, fieldMask)
 		if err != nil {
-			klog.Errorf("Error applying field mask to initial watch event pod: %v", err)
+			// Should not happen, the field mask was already validated.
+			logger.Error(err, "Error applying field mask to initial watch event pod")
+			metrics.PodWatchEventsDroppedTotal.Inc()
 			continue
 		}
 		podBytes, err := maskedPod.Marshal()
 		if err != nil {
-			klog.Errorf("Error marshalling initial watch event pod: %v", err)
+			logger.Error(err, "Error marshalling initial watch event pod")
+			metrics.PodWatchEventsDroppedTotal.Inc()
 			continue
 		}
 		if err := stream.Send(&podsv1alpha1.WatchPodsEvent{
 			Type: podsv1alpha1.EventType_ADDED,
 			Pod:  podBytes,
 		}); err != nil {
-			klog.Errorf("Error sending initial watch event: %v", err)
+			logger.Error(err, "Error sending initial watch event")
 			return err
 		}
 	}
@@ -418,24 +432,26 @@ func (s *PodsServer) WatchPods(req *podsv1alpha1.WatchPodsRequest, stream podsv1
 	for {
 		select {
 		case <-stream.Context().Done():
-			klog.Infof("Watch context cancelled for client %s.", clientAddr)
+			logger.Info("Watch context cancelled", "client", clientAddr)
 			return stream.Context().Err()
 		case event := <-clientChannel:
 			maskedPod, err := applyFieldMaskToPod(event.Pod, fieldMask)
 			if err != nil {
-				klog.Errorf("Error applying field mask to watch event pod: %v", err)
+				logger.Error(err, "Error applying field mask to watch event pod")
+				metrics.PodWatchEventsDroppedTotal.Inc()
 				continue
 			}
 			podBytes, err := maskedPod.Marshal()
 			if err != nil {
-				klog.Errorf("Error marshalling watch event pod: %v", err)
+				logger.Error(err, "Error marshalling watch event pod")
+				metrics.PodWatchEventsDroppedTotal.Inc()
 				continue
 			}
 			if err := stream.Send(&podsv1alpha1.WatchPodsEvent{
 				Type: convertWatchEventType(event.Type),
 				Pod:  podBytes,
 			}); err != nil {
-				klog.Errorf("Error sending watch event to client %s: %v", clientAddr, err)
+				logger.Error(err, "Error sending watch event to client", "client", clientAddr)
 				return err
 			}
 		}

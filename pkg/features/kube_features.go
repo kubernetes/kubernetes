@@ -681,12 +681,6 @@ const (
 	// sandbox creation and network configuration completes successfully
 	PodReadyToStartContainersCondition featuregate.Feature = "PodReadyToStartContainersCondition"
 
-	// owner: @briansonnenberg
-	// kep: https://kep.k8s.io/4188
-	//
-	// Enables the PodsAPI feature to expose pod information via a gRPC API on the kubelet.
-	PodsAPI featuregate.Feature = "PodsAPI"
-
 	// owner: @Huang-Wei
 	// kep: https://kep.k8s.io/3521
 	//
@@ -706,6 +700,12 @@ const (
 	// operation when scheduling a Pod by setting the `metadata.labels` field on the submitted Binding,
 	// similar to how `metadata.annotations` behaves.
 	PodTopologyLabelsAdmission featuregate.Feature = "PodTopologyLabelsAdmission"
+
+	// owner: @briansonnenberg
+	// kep: https://kep.k8s.io/4188
+	//
+	// Enables the PodsAPI feature to expose pod information via a gRPC API on the kubelet.
+	PodsAPI featuregate.Feature = "PodsAPI"
 
 	// owner: @seans3
 	// kep: http://kep.k8s.io/4006
@@ -1518,10 +1518,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.29"), Default: true, PreRelease: featuregate.Beta},
 	},
 
-	PodsAPI: {
-		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
-	},
-
 	PodSchedulingReadiness: {
 		{Version: version.MustParse("1.26"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.27"), Default: true, PreRelease: featuregate.Beta},
@@ -1530,6 +1526,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	PodTopologyLabelsAdmission: {
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	PodsAPI: {
+		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	PortForwardWebsockets: {
@@ -2206,6 +2206,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	PodObservedGenerationTracking: {},
 
 	PodReadyToStartContainersCondition: {},
+
+	PodsAPI: {},
 
 	PodSchedulingReadiness: {},
 
