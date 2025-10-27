@@ -984,6 +984,7 @@ func TestRealFIFO_PopMultipleDeltaInBatch(t *testing.T) {
 	obj1 := mkFifoObj("foo1", 5)
 	obj2 := mkFifoObj("foo2", 5)
 	obj3 := mkFifoObj("foo3", 5)
+	obj4 := mkFifoObj("foo4", 5)
 	testCases := []struct {
 		name            string
 		incomingItems   []testFifoObject
@@ -1008,38 +1009,73 @@ func TestRealFIFO_PopMultipleDeltaInBatch(t *testing.T) {
 			},
 		},
 		{
-			name: "pop 3 unique items should work",
+			name: "update initial items should have separate batch",
 			incomingItems: []testFifoObject{
-				obj1, obj2, obj3,
+				obj1, obj2,
+			},
+			actions: []func(f *RealFIFO){
+				func(f *RealFIFO) { _ = f.Add(obj3) },
+				func(f *RealFIFO) { _ = f.Add(obj4) },
+			},
+			batchSize: 3,
+			expectedBatches: [][]Deltas{
+				{{{Replaced, obj1}}, {{Replaced, obj2}}},
+				{{{Added, obj3}}, {{Added, obj4}}},
+			},
+		},
+		{
+			name: "pop 4 unique items should work",
+			incomingItems: []testFifoObject{
+				obj1, obj2, obj3, obj4,
 			},
 			actions:   []func(f *RealFIFO){},
 			batchSize: 3,
 			expectedBatches: [][]Deltas{
 				{{{Replaced, obj1}}, {{Replaced, obj2}}, {{Replaced, obj3}}},
+				{{{Replaced, obj4}}},
 			},
 		},
 		{
-			name: "pop 3 items with 2 unique should have 2 batch",
+			name: "pop 4 items with 2 unique should have 2 batch",
 			incomingItems: []testFifoObject{
-				obj1, obj2, obj1,
+				obj1, obj2, obj1, obj3,
 			},
 			actions:   []func(f *RealFIFO){},
 			batchSize: 3,
 			expectedBatches: [][]Deltas{
 				{{{Replaced, obj1}}, {{Replaced, obj2}}},
-				{{{Replaced, obj1}}},
+				{{{Replaced, obj1}}, {{Replaced, obj3}}},
 			},
 		},
 		{
-			name: "pop 3 items with 2 batch size should have 2 batch",
-			incomingItems: []testFifoObject{
-				obj1, obj2, obj3,
+			name:          "pop 4 unique items should work",
+			incomingItems: []testFifoObject{},
+			actions: []func(f *RealFIFO){
+				func(f *RealFIFO) { _ = f.Add(obj1) },
+				func(f *RealFIFO) { _ = f.Add(obj2) },
+				func(f *RealFIFO) { _ = f.Add(obj3) },
+				func(f *RealFIFO) { _ = f.Add(obj4) },
 			},
-			actions:   []func(f *RealFIFO){},
-			batchSize: 2,
+			batchSize: 3,
 			expectedBatches: [][]Deltas{
-				{{{Replaced, obj1}}, {{Replaced, obj2}}},
-				{{{Replaced, obj3}}},
+				{{{Added, obj1}}, {{Added, obj2}}, {{Added, obj3}}},
+				{{{Added, obj4}}},
+			},
+		},
+		{
+			name: "pop 5 items with 2 unique should have 3 batch",
+			incomingItems: []testFifoObject{},
+			actions: []func(f *RealFIFO){
+				func(f *RealFIFO) { _ = f.Add(obj1) },
+				func(f *RealFIFO) { _ = f.Add(obj2) },
+				func(f *RealFIFO) { _ = f.Update(obj1) },
+				func(f *RealFIFO) { _ = f.Delete(obj2) },
+				func(f *RealFIFO) { _ = f.Add(obj3) },
+			},
+			batchSize: 3,
+			expectedBatches: [][]Deltas{
+				{{{Added, obj1}}, {{Added, obj2}}},
+				{{{Updated, obj1}}, {{Deleted, obj2}}, {{Added, obj3}}},
 			},
 		},
 	}

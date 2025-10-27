@@ -644,10 +644,15 @@ func processDeltasInBatch(
 			}
 		}
 	}
+
+	err := txnStore.Transaction(txns...)
+	if err != nil {
+		return err
+	}
 	for _, callback := range callbacks {
 		callback()
 	}
-	return txnStore.Transaction(txns...)
+	return nil
 }
 
 // newInformer returns a controller for populating the store while also

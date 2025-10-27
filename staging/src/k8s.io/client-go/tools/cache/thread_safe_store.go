@@ -237,9 +237,8 @@ func (i *storeIndex) deleteKeyFromIndex(key, indexValue string, index index) {
 
 // threadSafeMap implements ThreadSafeStore
 type threadSafeMap struct {
-	skipWriteLock bool
-	lock          *sync.RWMutex
-	items         map[string]interface{}
+	lock  sync.RWMutex
+	items map[string]interface{}
 
 	// index implements the indexing functionality
 	index *storeIndex
@@ -255,20 +254,12 @@ func (c *threadSafeMap) Transaction(txns ...ThreadSafeStoreTransaction) {
 
 	for _, txn := range txns {
 		switch txn.Type {
-		case TransactionTypeAdd:
-			c.unsafe().Add(txn.Key, txn.Object)
-		case TransactionTypeUpdate:
-			c.unsafe().Update(txn.Key, txn.Object)
+		case TransactionTypeAdd, TransactionTypeUpdate:
+			c.updateLocked(txn.Key, txn.Object)
 		case TransactionTypeDelete:
-			c.unsafe().Delete(txn.Key)
+			c.deleteLocked(txn.Key)
 		}
 	}
-}
-
-func (c *threadSafeMap) unsafe() ThreadSafeStore {
-	unsafe := *c
-	unsafe.skipWriteLock = true
-	return &unsafe
 }
 
 func (c *threadSafeMap) Add(key string, obj interface{}) {
@@ -276,20 +267,24 @@ func (c *threadSafeMap) Add(key string, obj interface{}) {
 }
 
 func (c *threadSafeMap) Update(key string, obj interface{}) {
-	if !c.skipWriteLock {
-		c.lock.Lock()
-		defer c.lock.Unlock()
-	}
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	c.updateLocked(key, obj)
+}
+
+func (c *threadSafeMap) updateLocked(key string, obj interface{}) {
 	oldObject := c.items[key]
 	c.items[key] = obj
 	c.index.updateIndices(oldObject, obj, key)
 }
 
 func (c *threadSafeMap) Delete(key string) {
-	if !c.skipWriteLock {
-		c.lock.Lock()
-		defer c.lock.Unlock()
-	}
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	c.deleteLocked(key)
+}
+
+func (c *threadSafeMap) deleteLocked(key string) {
 	if obj, exists := c.items[key]; exists {
 		c.index.updateIndices(obj, nil, key)
 		delete(c.items, key)
@@ -326,10 +321,8 @@ func (c *threadSafeMap) ListKeys() []string {
 }
 
 func (c *threadSafeMap) Replace(items map[string]interface{}, resourceVersion string) {
-	if !c.skipWriteLock {
-		c.lock.Lock()
-		defer c.lock.Unlock()
-	}
+	c.lock.Lock()
+	defer c.lock.Unlock()
 	c.items = items
 
 	// rebuild any index
@@ -424,7 +417,6 @@ func (c *threadSafeMap) Resync() error {
 // NewThreadSafeStore creates a new instance of ThreadSafeStore.
 func NewThreadSafeStore(indexers Indexers, indices Indices) ThreadSafeStore {
 	return &threadSafeMap{
-		lock:  &sync.RWMutex{},
 		items: map[string]interface{}{},
 		index: &storeIndex{
 			indexers: indexers,

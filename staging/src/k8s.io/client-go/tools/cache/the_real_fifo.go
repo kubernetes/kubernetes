@@ -221,9 +221,6 @@ func (f *RealFIFO) IsClosed() bool {
 // process function is called under lock, so it is safe
 // update data structures in it that need to be in sync with the queue.
 func (f *RealFIFO) Pop(process PopProcessFunc) (interface{}, error) {
-	if clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.InOrderInformersBatchProcess) {
-		return f.popByBatch(process)
-	}
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
@@ -237,16 +234,14 @@ func (f *RealFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 
 		f.cond.Wait()
 	}
-
 	isInInitialList := !f.hasSynced_locked()
+	var deltas interface{}
 	item := f.items[0]
-	// The underlying array still exists and references this object, so the object will not be garbage collected unless we zero the reference.
-	f.items[0] = Delta{}
-	f.items = f.items[1:]
-	if f.initialPopulationCount > 0 {
-		f.initialPopulationCount--
+	if clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.InOrderInformersBatchProcess) {
+		deltas = f.popByBatchLocked()
+	} else {
+		deltas = f.popLocked()
 	}
-
 	// Only log traces if the queue depth is greater than 10 and it takes more than
 	// 100 milliseconds to process one item from the queue.
 	// Queue depth never goes high because processing an item is locking the queue,
@@ -260,10 +255,48 @@ func (f *RealFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 			utiltrace.Field{Key: "Reason", Value: "slow event handlers blocking the queue"})
 		defer trace.LogIfLong(100 * time.Millisecond)
 	}
+	return deltas, process(deltas, isInInitialList)
+}
+
+func (f *RealFIFO) popLocked() Deltas {
+	item := f.items[0]
+	// The underlying array still exists and references this object, so the object will not be garbage collected unless we zero the reference.
+	f.items[0] = Delta{}
+	f.items = f.items[1:]
+	if f.initialPopulationCount > 0 {
+		f.initialPopulationCount--
+	}
+	// we wrap in Deltas here to be compatible with preview Pop functions and those interpreting the return value.
+	return Deltas{item}
+}
+
+func (f *RealFIFO) popByBatchLocked() []Deltas {
+	batchSize := 0
+	unique := sets.NewString()
+	// only bundle unique items into a batch
+	for batchSize < f.batchSize && batchSize < len(f.items) {
+		if f.initialPopulationCount > 0 && batchSize >= f.initialPopulationCount {
+			break
+		}
+		id, _ := f.keyOf(f.items[batchSize])
+		if unique.Has(id) {
+			break
+		}
+		batchSize++
+		unique.Insert(id)
+	}
+	ids := f.items[0:batchSize]
+	f.items = f.items[batchSize:]
+	if f.initialPopulationCount > 0 {
+		f.initialPopulationCount -= batchSize
+	}
 
 	// we wrap in Deltas here to be compatible with preview Pop functions and those interpreting the return value.
-	err := process(Deltas{item}, isInInitialList)
-	return Deltas{item}, err
+	deltas := make([]Deltas, len(ids))
+	for i := range ids {
+		deltas[i] = Deltas{ids[i]}
+	}
+	return deltas
 }
 
 // Replace
@@ -424,65 +457,6 @@ func (f *RealFIFO) Resync() error {
 // Transformer implements the TransformingStore interface.
 func (f *RealFIFO) Transformer() TransformFunc {
 	return f.transformer
-}
-
-func (f *RealFIFO) popByBatch(process PopProcessFunc) (interface{}, error) {
-	f.lock.Lock()
-	defer f.lock.Unlock()
-
-	for len(f.items) == 0 {
-		// When the queue is empty, invocation of Pop() is blocked until new item is enqueued.
-		// When Close() is called, the f.closed is set and the condition is broadcasted.
-		// Which causes this loop to continue and return from the Pop().
-		if f.closed {
-			return nil, ErrFIFOClosed
-		}
-
-		f.cond.Wait()
-	}
-
-	isInInitialList := !f.hasSynced_locked()
-	batchSize := 0
-	unique := sets.NewString()
-	// only bundle unique items into a batch
-	for batchSize < f.batchSize && batchSize < len(f.items) {
-		if f.initialPopulationCount > 0 && batchSize >= f.initialPopulationCount {
-			break
-		}
-		id, _ := f.keyOf(f.items[batchSize])
-		if unique.Has(id) {
-			break
-		}
-		batchSize++
-		unique.Insert(id)
-	}
-	ids := f.items[0:batchSize]
-	f.items = f.items[batchSize:]
-	if f.initialPopulationCount > 0 {
-		f.initialPopulationCount -= batchSize
-	}
-
-	// Only log traces if the queue depth is greater than 10 and it takes more than
-	// 100 milliseconds to process one item from the queue.
-	// Queue depth never goes high because processing an item is locking the queue,
-	// and new items can't be added until processing finish.
-	// https://github.com/kubernetes/kubernetes/issues/103789
-	if len(f.items) > 10 {
-		id, _ := f.keyOf(ids[0])
-		trace := utiltrace.New("RealFIFO Pop Process",
-			utiltrace.Field{Key: "ID", Value: id},
-			utiltrace.Field{Key: "Depth", Value: len(f.items)},
-			utiltrace.Field{Key: "Reason", Value: "slow event handlers blocking the queue"})
-		defer trace.LogIfLong(100 * time.Millisecond)
-	}
-
-	// we wrap in Deltas here to be compatible with preview Pop functions and those interpreting the return value.
-	deltas := make([]Deltas, len(ids))
-	for i := range ids {
-		deltas[i] = Deltas{ids[i]}
-	}
-	err := process(deltas, isInInitialList)
-	return deltas, err
 }
 
 // NewRealFIFO returns a Store which can be used to queue up items to
