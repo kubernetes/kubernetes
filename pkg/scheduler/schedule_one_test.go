@@ -1121,6 +1121,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 						}
 						informerFactory.Start(ctx.Done())
 						informerFactory.WaitForCacheSync(ctx.Done())
+						sched.nodeInfoSnapshot = internalcache.NewEmptySnapshot()
 						sched.ScheduleOne(ctx)
 
 						if item.podToAdmit != nil {
@@ -1478,6 +1479,7 @@ func TestScheduleOneMarksPodAsProcessedBeforePreBind(t *testing.T) {
 					if err != nil {
 						t.Fatal(err)
 					}
+					sched.nodeInfoSnapshot = internalcache.NewEmptySnapshot()
 					sched.ScheduleOne(ctx)
 					<-called
 
