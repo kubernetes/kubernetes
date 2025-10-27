@@ -2423,7 +2423,7 @@ func Test_SelectHost(t *testing.T) {
 				}
 				scoreList = append(scoreList, gotNode)
 			}
-			if errors.Is(err, test.wantError) {
+			if err != test.wantError {
 				t.Fatalf("unexpected error is returned from selectHost: got: %v want: %v", err, test.wantError)
 			}
 			if !cmp.Equal(test.expectedNodeList, scoreList) {
