@@ -608,6 +608,8 @@ type IngressClassParametersReference struct {
 	Kind string `json:"kind" protobuf:"bytes,2,opt,name=kind"`
 
 	// name is the name of resource being referenced.
+	// +required
+	// +k8s:required
 	Name string `json:"name" protobuf:"bytes,3,opt,name=name"`
 
 	// scope represents if this refers to a cluster or namespace scoped resource.

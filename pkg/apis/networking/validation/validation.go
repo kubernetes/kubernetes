@@ -636,7 +636,7 @@ func validateIngressClassParametersReference(params *networking.IngressClassPara
 		APIGroup: params.APIGroup,
 		Kind:     params.Kind,
 		Name:     params.Name,
-	}, fldPath)...)
+	}, fldPath)...).MarkCoveredByDeclarative()
 
 	if params.Scope == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("scope"), ""))

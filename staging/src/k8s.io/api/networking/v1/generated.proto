@@ -202,6 +202,8 @@ message IngressClassParametersReference {
   optional string kind = 2;
 
   // name is the name of resource being referenced.
+  // +required
+  // +k8s:required
   optional string name = 3;
 
   // scope represents if this refers to a cluster or namespace scoped resource.
