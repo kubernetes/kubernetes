@@ -35,6 +35,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/allocation/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -1826,7 +1827,7 @@ func makeAllocationManager(t *testing.T, runtime *containertest.FakeRuntime, all
 	)
 	allocationManager.SetContainerRuntime(runtime)
 
-	getNode := func() (*v1.Node, error) {
+	getNode := func(klog.Logger, bool) (*v1.Node, error) {
 		return &v1.Node{
 			Status: v1.NodeStatus{
 				Capacity: v1.ResourceList{
