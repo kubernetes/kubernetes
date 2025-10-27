@@ -406,7 +406,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				tweakMatchAttribute("nodomain"),
 			),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(0).Child("matchAttribute"), "nodomain", "must include a domain").WithOrigin("format=k8s-resource-fully-qualified-name"),
+				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(0).Child("matchAttribute"), "nodomain", "a fully qualified name must be a domain and a name separated by a slash").WithOrigin("format=k8s-resource-fully-qualified-name"),
 			},
 		},
 		"match attribute empty": {
@@ -414,7 +414,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				tweakMatchAttribute(""),
 			),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec", "devices", "constraints").Index(0).Child("matchAttribute"), "name required"),
+				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(0).Child("matchAttribute"), "", "").WithOrigin("format=k8s-resource-fully-qualified-name"),
 			},
 		},
 		"match attribute with empty domain": {

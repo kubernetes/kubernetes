@@ -143,7 +143,7 @@ func (ftv formatTagValidator) Docs() TagDoc {
 			Docs:        "Deprecated: This field holds a case-insensitive Kubernetes \"long name\", aka a \"DNS subdomain\" value.",
 		}, {
 			Description: "k8s-resource-fully-qualified-name",
-			Docs:        "This field holds a Kubernetes resource \"fully qualified name\" value.",
+			Docs:        "This field holds a Kubernetes resource \"fully qualified name\" value. A fully qualified name must not be empty and must be composed of a prefix and a name, separated by a slash (e.g., \"prefix/name\"). The prefix must be a DNS subdomain, and the name part must be a C identifier with no more than 32 characters.",
 		}, {
 			Description: "k8s-resource-pool-name",
 			Docs:        "This field holds value with one or more Kubernetes \"long name\" parts separated by `/` and no longer than 253 characters.",

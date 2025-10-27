@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/operation"
 	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/api/validate"
+	"k8s.io/apimachinery/pkg/api/validate/content"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -1087,11 +1088,6 @@ func validateDeviceCounter(counter resource.Counter, fldPath *field.Path) field.
 
 func validateQualifiedName(name resource.QualifiedName, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
-	if name == "" {
-		allErrs = append(allErrs, field.Required(fldPath, "name required"))
-		return allErrs
-	}
-
 	parts := strings.Split(string(name), "/")
 	switch len(parts) {
 	case 1:
@@ -1125,15 +1121,11 @@ func validateQualifiedName(name resource.QualifiedName, fldPath *field.Path) fie
 
 func validateFullyQualifiedName(name resource.FullyQualifiedName, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
-	if name == "" {
-		allErrs = append(allErrs, field.Required(fldPath, "name required"))
-		return allErrs
-	}
 	allErrs = append(allErrs, validateQualifiedName(resource.QualifiedName(name), fldPath)...)
-	// validateQualifiedName checks that the name isn't empty and both parts are valid.
+	// validateQualifiedName checks that both parts are valid.
 	// What we need to enforce here is that there really is a domain.
-	if name != "" && !strings.Contains(string(name), "/") {
-		allErrs = append(allErrs, field.Invalid(fldPath, name, "must include a domain"))
+	if !strings.Contains(string(name), "/") {
+		allErrs = append(allErrs, field.Invalid(fldPath, name, "a fully qualified name must be a domain and a name separated by a slash"))
 	}
 	return allErrs.WithOrigin("format=k8s-resource-fully-qualified-name")
 }
@@ -1143,7 +1135,7 @@ func validateCIdentifier(id string, fldPath *field.Path) field.ErrorList {
 	if len(id) > resource.DeviceMaxIDLength {
 		allErrs = append(allErrs, field.TooLong(fldPath, "" /*unused*/, resource.DeviceMaxIDLength))
 	}
-	for _, msg := range validation.IsCIdentifier(id) {
+	for _, msg := range content.IsCIdentifier(id) {
 		allErrs = append(allErrs, field.Invalid(fldPath, id, msg))
 	}
 	return allErrs

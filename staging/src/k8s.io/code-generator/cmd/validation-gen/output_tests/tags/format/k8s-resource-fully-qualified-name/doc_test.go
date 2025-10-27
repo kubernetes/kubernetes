@@ -38,9 +38,9 @@ func TestFullyQualifiedName(t *testing.T) {
 		FullyQualifiedNameTypedefField: "my-prefix/",
 	}
 	st.Value(invalidStruct).ExpectMatches(field.ErrorMatcher{}.ByType().ByOrigin().ByField(), field.ErrorList{
-		field.Invalid(field.NewPath("fullyQualifiedNameField"), "my_name", "").WithOrigin("format=k8s-resource-fully-qualified-name"),
-		field.Required(field.NewPath("fullyQualifiedNamePtrField"), ""),
-		field.Invalid(field.NewPath("fullyQualifiedNameTypedefField"), "my-prefix/", "").WithOrigin("format=k8s-resource-fully-qualified-name"),
+		field.Invalid(field.NewPath("fullyQualifiedNameField"), "my_name", "a fully qualified name must be a domain and a name separated by a slash").WithOrigin("format=k8s-resource-fully-qualified-name"),
+		field.Invalid(field.NewPath("fullyQualifiedNamePtrField"), "", "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_'").WithOrigin("format=k8s-resource-fully-qualified-name"),
+		field.Invalid(field.NewPath("fullyQualifiedNameTypedefField"), "my-prefix/", "name must not be empty").WithOrigin("format=k8s-resource-fully-qualified-name"),
 	})
 	// Test validation ratcheting
 	st.Value(invalidStruct).OldValue(invalidStruct).ExpectValid()
