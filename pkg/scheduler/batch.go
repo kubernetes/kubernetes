@@ -35,7 +35,7 @@ type Batch struct {
 }
 
 type batchState struct {
-	signature        string
+	// signature        string
 	sortedNodes      nodeScoreHeap
 	lastUseSucceeded bool
 	creationTime     time.Time
