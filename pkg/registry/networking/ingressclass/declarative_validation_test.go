@@ -14,38 +14,32 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-/*
-Copyright 2025 The Kubernetes Authors.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-*/
-
 package ingressclass
 
 import (
-	"strings"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	netapi "k8s.io/kubernetes/pkg/apis/networking"
+	networking "k8s.io/kubernetes/pkg/apis/networking"
 )
 
-func TestDeclarativeValidate_IngressClass_Name(t *testing.T) {
-	// IngressClass v1beta1 is no longer served (v1.22+), so we only test v1.
-	apiVersions := []string{"v1"}
+// TestDeclarativeValidateParametersName verifies that the declarative
+// validation generated from the `+required` / `+k8s:required` markers on
+// IngressClassParametersReference.Name matches the existing handwritten
+// validation logic in Strategy.Validate.
+func TestDeclarativeValidateParametersName(t *testing.T) {
+	// IngressClass exists in networking.k8s.io/v1 and (historically) v1beta1,
+	// so exercise both served versions like we do in RuntimeClass tests.
+	apiVersions := []string{"v1", "v1beta1"}
+
 	for _, apiVersion := range apiVersions {
 		t.Run(apiVersion, func(t *testing.T) {
 			ctx := genericapirequest.WithRequestInfo(
 				genericapirequest.NewDefaultContext(),
 				&genericapirequest.RequestInfo{
-					APIPrefix:         "apis",
 					APIGroup:          "networking.k8s.io",
 					APIVersion:        apiVersion,
 					Resource:          "ingressclasses",
@@ -54,52 +48,26 @@ func TestDeclarativeValidate_IngressClass_Name(t *testing.T) {
 				},
 			)
 
-			long63 := strings.Repeat("a", 63)
-			tooLong64 := strings.Repeat("a", 64)
-
 			testCases := map[string]struct {
-				input        netapi.IngressClass
+				input        networking.IngressClass
 				expectedErrs field.ErrorList
 			}{
-				"valid name": {
+				"valid": {
 					input: mkValidIngressClass(),
 				},
-				"empty name (required)": {
-					input: mkValidIngressClass(func(obj *netapi.IngressClass) {
-						obj.Name = ""
+				"missing parameters.name": {
+					input: mkValidIngressClass(func(obj *networking.IngressClass) {
+						// Simulate bad user input: required field left empty.
+						obj.Spec.Parameters.Name = ""
 					}),
 					expectedErrs: field.ErrorList{
-						// generic object meta: name or generateName required
-						field.Required(field.NewPath("metadata", "name"), ""),
-					},
-				},
-				"uppercase not allowed": {
-					input: mkValidIngressClass(func(obj *netapi.IngressClass) {
-						obj.Name = "Invalid-Upper"
-					}),
-					expectedErrs: field.ErrorList{
-						field.Invalid(field.NewPath("metadata", "name"), "Invalid-Upper", ""),
-					},
-				},
-				"must start with a letter (dash first)": {
-					input: mkValidIngressClass(func(obj *netapi.IngressClass) {
-						obj.Name = "-bad"
-					}),
-					expectedErrs: field.ErrorList{
-						field.Invalid(field.NewPath("metadata", "name"), "-bad", ""),
-					},
-				},
-				"max length 63 (exact 63 ok)": {
-					input: mkValidIngressClass(func(obj *netapi.IngressClass) {
-						obj.Name = long63
-					}),
-				},
-				"too long (>63)": {
-					input: mkValidIngressClass(func(obj *netapi.IngressClass) {
-						obj.Name = tooLong64
-					}),
-					expectedErrs: field.ErrorList{
-						field.Invalid(field.NewPath("metadata", "name"), tooLong64, ""),
+						// Handwritten validation (validateIngressClassParametersReference /
+						// validateIngressTypedLocalObjectReference) treats an empty name
+						// as "Required", with message "name is required".
+						field.Required(
+							field.NewPath("spec", "parameters", "name"),
+							"name is required",
+						),
 					},
 				},
 			}
@@ -119,55 +87,108 @@ func TestDeclarativeValidate_IngressClass_Name(t *testing.T) {
 	}
 }
 
-func TestDeclarativeValidateUpdate_IngressClass_Name(t *testing.T) {
-	// Name is immutable; we verify update parity while keeping name the same.
-	apiVersions := []string{"v1"}
+// TestDeclarativeValidateUpdateParametersName does the same check for update
+// calls, making sure both the handwritten Update validation and the
+// declarative validation surface the same required-field error when
+// spec.parameters.name is cleared.
+func TestDeclarativeValidateUpdateParametersName(t *testing.T) {
+	apiVersions := []string{"v1", "v1beta1"}
+
 	for _, apiVersion := range apiVersions {
 		t.Run(apiVersion, func(t *testing.T) {
-			oldObj := mkValidIngressClass(func(obj *netapi.IngressClass) {
-				obj.ResourceVersion = "1"
-			})
-			updateObj := mkValidIngressClass(func(obj *netapi.IngressClass) {
-				obj.ResourceVersion = "1"
-			})
-
-			ctx := genericapirequest.WithRequestInfo(
-				genericapirequest.NewDefaultContext(),
-				&genericapirequest.RequestInfo{
-					APIPrefix:         "apis",
-					APIGroup:          "networking.k8s.io",
-					APIVersion:        apiVersion,
-					Resource:          "ingressclasses",
-					Name:              oldObj.Name,
-					IsResourceRequest: true,
-					Verb:              "update",
+			testCases := map[string]struct {
+				oldObj       networking.IngressClass
+				updateObj    networking.IngressClass
+				expectedErrs field.ErrorList
+			}{
+				"valid update": {
+					oldObj: mkValidIngressClass(func(obj *networking.IngressClass) {
+						obj.ResourceVersion = "1"
+					}),
+					updateObj: mkValidIngressClass(func(obj *networking.IngressClass) {
+						obj.ResourceVersion = "1"
+					}),
 				},
-			)
+				"invalid update clears parameters.name": {
+					oldObj: mkValidIngressClass(func(obj *networking.IngressClass) {
+						obj.ResourceVersion = "1"
+					}),
+					updateObj: mkValidIngressClass(func(obj *networking.IngressClass) {
+						obj.ResourceVersion = "1"
+						obj.Spec.Parameters.Name = ""
+					}),
+					expectedErrs: field.ErrorList{
+						// Still required on update. Unlike RuntimeClass.Handler,
+						// Parameters.Name is not immutable, so we only expect the
+						// "Required" error and NOT an additional "Forbidden" error.
+						field.Required(
+							field.NewPath("spec", "parameters", "name"),
+							"name is required",
+						),
+					},
+				},
+			}
 
-			apitesting.VerifyUpdateValidationEquivalence(
-				t,
-				ctx,
-				&updateObj,
-				&oldObj,
-				Strategy.ValidateUpdate,
-				nil, // no additional expected errors
-			)
+			for name, tc := range testCases {
+				t.Run(name, func(t *testing.T) {
+					ctx := genericapirequest.WithRequestInfo(
+						genericapirequest.NewDefaultContext(),
+						&genericapirequest.RequestInfo{
+							APIPrefix:         "apis",
+							APIGroup:          "networking.k8s.io",
+							APIVersion:        apiVersion,
+							Resource:          "ingressclasses",
+							Name:              "valid-ingress-class",
+							IsResourceRequest: true,
+							Verb:              "update",
+						},
+					)
+
+					apitesting.VerifyUpdateValidationEquivalence(
+						t,
+						ctx,
+						&tc.updateObj,
+						&tc.oldObj,
+						Strategy.ValidateUpdate,
+						tc.expectedErrs,
+					)
+				})
+			}
 		})
 	}
 }
 
-// mkValidIngressClass returns a semantically valid IngressClass and then applies any tweaks.
-func mkValidIngressClass(tweaks ...func(obj *netapi.IngressClass)) netapi.IngressClass {
-	obj := netapi.IngressClass{
+// mkValidIngressClass returns a semantically valid IngressClass, including a
+// valid spec.parameters block, then applies any tweaks.
+//
+// The goal is to satisfy handwritten validation in
+// validateIngressClassParametersReference:
+//   - parameters.kind must be non-empty
+//   - parameters.name must be non-empty
+//   - parameters.scope must be set to a supported value ("Cluster"/"Namespace")
+//   - parameters.namespace must be unset when scope == "Cluster"
+//
+// We choose scope == "Cluster" so namespace must remain unset.
+func mkValidIngressClass(tweaks ...func(obj *networking.IngressClass)) networking.IngressClass {
+	apiGroup := "example.com"
+	scope := networking.IngressClassParametersReferenceScopeCluster
+
+	obj := networking.IngressClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "valid-ingress-class",
 		},
-		Spec: netapi.IngressClassSpec{
-			// Controller must be a qualified name; use a common one.
-			Controller: "k8s.io/ingress-nginx",
-			// Parameters intentionally omitted for base "valid" object.
+		Spec: networking.IngressClassSpec{
+			Controller: "example.com/ingress-controller",
+			Parameters: &networking.IngressClassParametersReference{
+				APIGroup:  &apiGroup,
+				Kind:      "IngressParameters",
+				Name:      "valid-params",
+				Scope:     &scope,
+				Namespace: nil, // must be nil when Scope == "Cluster"
+			},
 		},
 	}
+
 	for _, tweak := range tweaks {
 		tweak(&obj)
 	}

@@ -596,26 +596,55 @@ func validateIngressTypedLocalObjectReference(params *api.TypedLocalObjectRefere
 		return allErrs
 	}
 
-	if params.APIGroup != nil {
-		for _, msg := range validation.IsDNS1123Subdomain(*params.APIGroup) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("apiGroup"), *params.APIGroup, msg))
-		}
+	allErrs = append(allErrs, validateAPIGroup(params.APIGroup, fldPath.Child("apiGroup"))...)
+	allErrs = append(allErrs, validateKind(params.Kind, fldPath.Child("kind"))...)
+	allErrs = append(allErrs, validateName(params.Name, fldPath.Child("name"))...).MarkCoveredByDeclarative()
+
+	return allErrs
+}
+
+// validateAPIGroup validates the apiGroup field.
+func validateAPIGroup(apiGroup *string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if apiGroup == nil {
+		return allErrs
 	}
 
-	if params.Kind == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("kind"), ""))
-	} else {
-		for _, msg := range pathvalidation.IsValidPathSegmentName(params.Kind) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("kind"), params.Kind, msg))
-		}
+	for _, msg := range validation.IsDNS1123Subdomain(*apiGroup) {
+		allErrs = append(allErrs, field.Invalid(fldPath, *apiGroup, msg))
 	}
 
-	if params.Name == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
-	} else {
-		for _, msg := range pathvalidation.IsValidPathSegmentName(params.Name) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), params.Name, msg))
-		}
+	return allErrs
+}
+
+// validateKind validates the kind field.
+func validateKind(kind string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if kind == "" {
+		allErrs = append(allErrs, field.Required(fldPath, ""))
+		return allErrs
+	}
+
+	for _, msg := range pathvalidation.IsValidPathSegmentName(kind) {
+		allErrs = append(allErrs, field.Invalid(fldPath, kind, msg))
+	}
+
+	return allErrs
+}
+
+// validateName validates the name field.
+func validateName(name string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if name == "" {
+		allErrs = append(allErrs, field.Required(fldPath, ""))
+		return allErrs
+	}
+
+	for _, msg := range pathvalidation.IsValidPathSegmentName(name) {
+		allErrs = append(allErrs, field.Invalid(fldPath, name, msg))
 	}
 
 	return allErrs
@@ -636,7 +665,7 @@ func validateIngressClassParametersReference(params *networking.IngressClassPara
 		APIGroup: params.APIGroup,
 		Kind:     params.Kind,
 		Name:     params.Name,
-	}, fldPath)...).MarkCoveredByDeclarative()
+	}, fldPath)...)
 
 	if params.Scope == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("scope"), ""))
