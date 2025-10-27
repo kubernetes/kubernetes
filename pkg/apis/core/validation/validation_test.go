@@ -18587,7 +18587,13 @@ func TestValidateNodeUpdate(t *testing.T) {
 		node    core.Node
 		valid   bool
 	}{
-		{"empty-node", core.Node{}, core.Node{}, true},
+		{"no-change", core.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo"},
+		}, core.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo"},
+		}, true},
 		{"rename-node", core.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "foo"}},

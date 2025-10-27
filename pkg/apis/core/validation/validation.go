@@ -6971,19 +6971,18 @@ func ValidateNodeResources(node *core.Node) field.ErrorList {
 	return allErrs
 }
 
-// ValidateNodeUpdate tests to make sure a node update can be applied.  Modifies oldNode.
+// ValidateNodeUpdate tests to make sure a node update can be applied.
 func ValidateNodeUpdate(node, oldNode *core.Node) field.ErrorList {
+	allErrs := ValidateNode(node)
+
 	fldPath := field.NewPath("metadata")
-	allErrs := ValidateObjectMetaUpdate(&node.ObjectMeta, &oldNode.ObjectMeta, fldPath)
-	allErrs = append(allErrs, ValidateNodeSpecificAnnotations(node.ObjectMeta.Annotations, fldPath.Child("annotations"))...)
+	allErrs = append(allErrs, ValidateObjectMetaUpdate(&node.ObjectMeta, &oldNode.ObjectMeta, fldPath)...)
 
 	// TODO: Enable the code once we have better core object.status update model. Currently,
 	// anyone can update node status.
 	// if !apiequality.Semantic.DeepEqual(node.Status, core.NodeStatus{}) {
 	// 	allErrs = append(allErrs, field.Invalid("status", node.Status, "must be empty"))
 	// }
-
-	allErrs = append(allErrs, ValidateNodeResources(node)...)
 
 	// Validate no duplicate addresses in node status.
 	addresses := make(map[core.NodeAddress]bool)
@@ -7018,11 +7017,6 @@ func ValidateNodeUpdate(node, oldNode *core.Node) field.ErrorList {
 	}
 	if node.Status.Config != nil {
 		allErrs = append(allErrs, validateNodeConfigStatus(node.Status.Config, field.NewPath("status", "config"))...)
-	}
-
-	// update taints
-	if len(node.Spec.Taints) > 0 {
-		allErrs = append(allErrs, validateNodeTaints(node.Spec.Taints, fldPath.Child("taints"))...)
 	}
 
 	if node.Spec.DoNotUseExternalID != oldNode.Spec.DoNotUseExternalID {
