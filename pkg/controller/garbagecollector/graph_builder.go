@@ -85,6 +85,7 @@ type GraphBuilder struct {
 	// dependencyGraphBuilder
 	monitors    monitors
 	monitorLock sync.RWMutex
+	monitorWG   sync.WaitGroup
 	// informersStarted is closed after all of the controllers have been initialized and are running.
 	// After that it is safe to start them here, before that it is not.
 	informersStarted <-chan struct{}
@@ -307,11 +308,32 @@ func (gb *GraphBuilder) startMonitors(logger klog.Logger) {
 		if monitor.stopCh == nil {
 			monitor.stopCh = make(chan struct{})
 			gb.sharedInformers.Start(gb.stopCh)
-			go monitor.Run()
+			gb.monitorWG.Go(monitor.Run)
 			started++
 		}
 	}
 	logger.V(4).Info("started new monitors", "new", started, "current", len(monitors))
+}
+
+// stopMonitors terminates all running monitors.
+// stopMonitors should be called after startMonitors to do cleanup.
+func (gb *GraphBuilder) stopMonitors(logger klog.Logger) {
+	gb.monitorLock.Lock()
+	defer gb.monitorLock.Unlock()
+
+	monitors := gb.monitors
+	stopped := 0
+	for _, monitor := range monitors {
+		if monitor.stopCh != nil {
+			stopped++
+			close(monitor.stopCh)
+		}
+	}
+
+	// reset monitors so that the graph builder can be safely re-run/synced.
+	gb.monitorWG.Wait()
+	gb.monitors = nil
+	logger.Info("stopped monitors", "stopped", stopped, "total", len(monitors))
 }
 
 // IsResourceSynced returns true if a monitor exists for the given resource and has synced
@@ -357,26 +379,10 @@ func (gb *GraphBuilder) Run(ctx context.Context) {
 	gb.running = true
 	gb.monitorLock.Unlock()
 
-	// Start monitors and begin change processing until the stop channel is
-	// closed.
+	// Start monitors and begin change processing until the stop channel is closed.
 	gb.startMonitors(logger)
 	wait.Until(func() { gb.runProcessGraphChanges(logger) }, 1*time.Second, ctx.Done())
-
-	// Stop any running monitors.
-	gb.monitorLock.Lock()
-	defer gb.monitorLock.Unlock()
-	monitors := gb.monitors
-	stopped := 0
-	for _, monitor := range monitors {
-		if monitor.stopCh != nil {
-			stopped++
-			close(monitor.stopCh)
-		}
-	}
-
-	// reset monitors so that the graph builder can be safely re-run/synced.
-	gb.monitors = nil
-	logger.Info("stopped monitors", "stopped", stopped, "total", len(monitors))
+	gb.stopMonitors(logger)
 }
 
 var ignoredResources = map[schema.GroupResource]struct{}{
