@@ -411,10 +411,6 @@ var (
 	// and the networking.k8s.io/v1alpha1 API.
 	ServiceCIDRs = framework.WithFeature(framework.ValidFeatures.Add("ServiceCIDRs"))
 
-	// Owner: sig-node
-	// Sidecar KEP-753
-	SidecarContainers = framework.WithFeature(framework.ValidFeatures.Add("SidecarContainers"))
-
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	StackdriverAcceleratorMonitoring = framework.WithFeature(framework.ValidFeatures.Add("StackdriverAcceleratorMonitoring"))
 
