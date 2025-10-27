@@ -82,13 +82,8 @@ type driverDefinition struct {
 	// VolumeAttributesClass must be set to enable volume modification tests.
 	// The default is to not run those tests.
 	VolumeAttributesClass struct {
-		// FromName set to true enables the usage of a
-		// VolumeAttributesClass with DriverInfo.Name as
-		// provisioner and no parameters.
-		FromName bool
-
 		// FromFile is used only when FromName is false.  It
-		// loads a storage class from the given .yaml or .json
+		// loads a VolumeAttributesClass from the given .yaml or .json
 		// file. File names are resolved by the
 		// framework.testfiles package, which typically means
 		// that they can be absolute or relative to the test
@@ -516,7 +511,7 @@ func (d *driverDefinition) GetVolumeGroupSnapshotClass(ctx context.Context, e2ec
 }
 
 func (d *driverDefinition) GetVolumeAttributesClass(ctx context.Context, e2econfig *storageframework.PerTestConfig) *storagev1.VolumeAttributesClass {
-	if !d.VolumeAttributesClass.FromName && d.VolumeAttributesClass.FromFile == "" && d.VolumeAttributesClass.FromExistingClassName == "" {
+	if d.VolumeAttributesClass.FromFile == "" && d.VolumeAttributesClass.FromExistingClassName == "" {
 		e2eskipper.Skipf("Driver %q has no configured VolumeAttributesClass - skipping", d.DriverInfo.Name)
 		return nil
 	}
@@ -528,8 +523,6 @@ func (d *driverDefinition) GetVolumeAttributesClass(ctx context.Context, e2econf
 
 	f := e2econfig.Framework
 	switch {
-	case d.VolumeAttributesClass.FromName:
-		vac = &storagev1.VolumeAttributesClass{DriverName: d.DriverInfo.Name}
 	case d.VolumeAttributesClass.FromExistingClassName != "":
 		vac, err = f.ClientSet.StorageV1().VolumeAttributesClasses().Get(ctx, d.VolumeAttributesClass.FromExistingClassName, metav1.GetOptions{})
 		framework.ExpectNoError(err, "getting VolumeAttributesClass %s", d.VolumeAttributesClass.FromExistingClassName)
