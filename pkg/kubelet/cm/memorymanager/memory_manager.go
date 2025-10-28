@@ -280,8 +280,18 @@ func (m *manager) Allocate(pod *v1.Pod, container *v1.Container) error {
 }
 
 func (m *manager) AllocatePod(pod *v1.Pod) error {
-	// Implement AllocatePod in the corresponding policies
+	logger := klog.TODO() // until we move topology manager to contextual logging
 
+	m.removeStaleState(logger)
+
+	m.Lock()
+	defer m.Unlock()
+
+	// Call down into the policy to assign this container memory if required.
+	if err := m.policy.AllocatePod(logger, m.state, pod); err != nil {
+		logger.Error(err, "AllocatePod error", "pod", klog.KObj(pod))
+		return err
+	}
 	return nil
 }
 
