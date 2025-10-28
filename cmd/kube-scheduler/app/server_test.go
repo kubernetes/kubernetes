@@ -24,7 +24,6 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"sort"
 	"testing"
 	"time"
 
@@ -273,14 +272,6 @@ leaderElection:
 						{Name: "InterPodAffinity", Weight: 1},
 						{Name: "TaintToleration", Weight: 1},
 					}
-					plugins.Batchable.Enabled = []config.Plugin{
-						{Name: "DynamicResources"},
-						{Name: "InterPodAffinity"},
-						{Name: "NodePorts"},
-						{Name: "NodeResourcesFit"},
-						{Name: "TaintToleration"},
-						{Name: "VolumeBinding"},
-					}
 					return plugins
 				}(),
 			},
@@ -485,14 +476,6 @@ leaderElection:
 				gotPlugins := make(map[string]*config.Plugins)
 				for n, p := range sched.Profiles {
 					gotPlugins[n] = p.ListPlugins()
-				}
-
-				// Sort the batchable plugins alphabetically since they end up with a
-				// random order.
-				for n := range sched.Profiles {
-					sort.Slice(gotPlugins[n].Batchable.Enabled, func(i, j int) bool {
-						return gotPlugins[n].Batchable.Enabled[i].Name < gotPlugins[n].Batchable.Enabled[j].Name
-					})
 				}
 
 				if diff := cmp.Diff(tc.wantPlugins, gotPlugins); diff != "" {
