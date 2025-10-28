@@ -143,8 +143,9 @@ func TestCollectMetricsData(t *testing.T) {
 		memoryPrivWorkingSetBytes: 2,
 		memoryCommittedBytes:      3,
 		interfaceStats:            networkAdapterCounter.listInterfaceStats(),
-		timeStamp:                 time.Now(),
 	}
+	assert.WithinDuration(t, time.Now(), metrics.timeStamp, 20*time.Millisecond)
+	expectedMetrics.timeStamp = metrics.timeStamp
 	assert.Equal(t, expectedMetrics, metrics)
 }
 
