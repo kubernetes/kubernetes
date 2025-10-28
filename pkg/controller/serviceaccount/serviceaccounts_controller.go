@@ -19,6 +19,7 @@ package serviceaccount
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -111,19 +112,26 @@ type ServiceAccountsController struct {
 // Run runs the ServiceAccountsController blocks until receiving signal from stopCh.
 func (c *ServiceAccountsController) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrashWithContext(ctx)
-	defer c.queue.ShutDown()
 
-	klog.FromContext(ctx).Info("Starting service account controller")
-	defer klog.FromContext(ctx).Info("Shutting down service account controller")
+	logger := klog.FromContext(ctx)
+	logger.Info("Starting service account controller")
+
+	var wg sync.WaitGroup
+	defer func() {
+		logger.Info("Shutting down service account controller")
+		c.queue.ShutDown()
+		wg.Wait()
+	}()
 
 	if !cache.WaitForNamedCacheSyncWithContext(ctx, c.saListerSynced, c.nsListerSynced) {
 		return
 	}
 
 	for i := 0; i < workers; i++ {
-		go wait.UntilWithContext(ctx, c.runWorker, time.Second)
+		wg.Go(func() {
+			wait.UntilWithContext(ctx, c.runWorker, time.Second)
+		})
 	}
-
 	<-ctx.Done()
 }
 
