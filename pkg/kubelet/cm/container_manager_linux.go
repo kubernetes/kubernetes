@@ -344,7 +344,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 	cm.topologyManager.AddHintProvider(logger, cm.cpuManager)
 
 	cm.memoryManager, err = memorymanager.NewManager(
-		context.TODO(),
+		logger,
 		nodeConfig.MemoryManagerPolicy,
 		machineInfo,
 		cm.GetNodeAllocatableReservation(),
@@ -997,7 +997,7 @@ func (cm *containerManagerImpl) GetMemory(podUID, containerName string) []*podre
 
 	// This is tempporary as part of migration of memory manager to Contextual logging.
 	// Direct context to be passed when container manager is migrated.
-	return containerMemoryFromBlock(cm.memoryManager.GetMemory(context.TODO(), podUID, containerName))
+	return containerMemoryFromBlock(cm.memoryManager.GetMemory(podUID, containerName))
 }
 
 func (cm *containerManagerImpl) GetAllocatableMemory() []*podresourcesapi.ContainerMemory {
@@ -1007,7 +1007,7 @@ func (cm *containerManagerImpl) GetAllocatableMemory() []*podresourcesapi.Contai
 
 	// This is tempporary as part of migration of memory manager to Contextual logging.
 	// Direct context to be passed when container manager is migrated.
-	return containerMemoryFromBlock(cm.memoryManager.GetAllocatableMemory(context.TODO()))
+	return containerMemoryFromBlock(cm.memoryManager.GetAllocatableMemory())
 }
 
 func (cm *containerManagerImpl) GetDynamicResources(pod *v1.Pod, container *v1.Container) []*podresourcesapi.DynamicResource {

@@ -51,7 +51,7 @@ var _ ContainerManager = &containerManagerStub{}
 
 func (cm *containerManagerStub) Start(ctx context.Context, _ *v1.Node, _ ActivePodsFunc, _ GetNodeFunc, _ config.SourcesReady, _ status.PodStatusProvider, _ internalapi.RuntimeService, _ bool) error {
 	klog.V(2).InfoS("Starting stub container manager")
-	cm.memoryManager = memorymanager.NewFakeManager(ctx)
+	cm.memoryManager = memorymanager.NewFakeManager(klog.FromContext(ctx))
 	cm.cpuManager = cpumanager.NewFakeManager(klog.FromContext(ctx))
 	return nil
 }
