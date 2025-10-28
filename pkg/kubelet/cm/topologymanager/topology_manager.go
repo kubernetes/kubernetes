@@ -46,12 +46,34 @@ const (
 // TopologyAffinityError represents an resource alignment error
 type TopologyAffinityError struct{}
 
+// NewTopologyAffinityError returns a new TopologyAffinityError.
+func NewTopologyAffinityError() *TopologyAffinityError {
+	return &TopologyAffinityError{}
+}
+
 func (e TopologyAffinityError) Error() string {
 	return "Resources cannot be allocated with Topology locality"
 }
 
 func (e TopologyAffinityError) Type() string {
 	return ErrorTopologyAffinity
+}
+
+// PodLevelTopologyAffinityError represents a pod-level resource alignment error.
+type PodLevelTopologyAffinityError struct {
+	message string
+}
+
+// NewPodLevelTopologyAffinityError returns a new PodLevelTopologyAffinityError.
+func NewPodLevelTopologyAffinityError(message string) *PodLevelTopologyAffinityError {
+	return &PodLevelTopologyAffinityError{message: message}
+}
+
+func (e *PodLevelTopologyAffinityError) Error() string {
+	if e.message != "" {
+		return "Pod Scope " + e.message
+	}
+	return "Pod Scope Resources cannot be allocated with Topology locality"
 }
 
 // Manager interface provides methods for Kubelet to manage pod topology hints
@@ -89,6 +111,8 @@ type HintProvider interface {
 	// GetPodTopologyHints returns a map of resource names to a list of possible
 	// concrete resource allocations per Pod in terms of NUMA locality hints.
 	GetPodTopologyHints(pod *v1.Pod) map[string][]TopologyHint
+	// AllocatePod is called to trigger the allocation of resources to a pod.
+	AllocatePod(pod *v1.Pod) error
 	// Allocate triggers resource allocation to occur on the HintProvider after
 	// all hints have been gathered and the aggregated Hint is available via a
 	// call to Store.GetAffinity().
@@ -99,6 +123,7 @@ type HintProvider interface {
 type Store interface {
 	GetAffinity(podUID string, containerName string) TopologyHint
 	GetPolicy() Policy
+	Name() string
 }
 
 // TopologyHint is a struct containing the NUMANodeAffinity for a Container
@@ -179,10 +204,10 @@ func NewManager(topology []cadvisorapi.Node, topologyPolicyName string, topology
 	var scope Scope
 	switch topologyScopeName {
 
-	case containerTopologyScope:
+	case ContainerTopologyScope:
 		scope = NewContainerScope(policy)
 
-	case podTopologyScope:
+	case PodTopologyScope:
 		scope = NewPodScope(policy)
 
 	default:
@@ -212,6 +237,10 @@ func (m *manager) GetAffinity(podUID string, containerName string) TopologyHint 
 
 func (m *manager) GetPolicy() Policy {
 	return m.scope.GetPolicy()
+}
+
+func (m *manager) Name() string {
+	return m.scope.Name()
 }
 
 func (m *manager) AddHintProvider(_ klog.Logger, h HintProvider) {
