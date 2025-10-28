@@ -22,12 +22,12 @@ import (
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&KubeControllerManagerConfiguration{}, func(obj interface{}) {
-		SetObjectDefaults_KubeControllerManagerConfiguration(obj.(*KubeControllerManagerConfiguration))
+		SetObjectDefaultsKubeControllerManagerConfiguration(obj.(*KubeControllerManagerConfiguration))
 	})
 	return nil
 }
 
-func SetObjectDefaults_KubeControllerManagerConfiguration(in *KubeControllerManagerConfiguration) {
+func SetObjectDefaultsKubeControllerManagerConfiguration(in *KubeControllerManagerConfiguration) {
 	SetDefaults_ResourceClaimControllerConfiguration(&in.ResourceClaimController)
 }
 

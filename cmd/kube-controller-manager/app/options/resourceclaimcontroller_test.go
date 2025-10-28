@@ -41,6 +41,7 @@ func TestResourceClaimControllerOptions_AddFlags(t *testing.T) {
 	flag := fs.Lookup("concurrent-resourceclaim-syncs")
 	if flag == nil {
 		t.Error("concurrent-resourceclaim-syncs flag was not added")
+		return
 	}
 
 	// Test that the flag has the correct default value
