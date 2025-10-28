@@ -34,6 +34,7 @@ type ImageReview struct {
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Spec holds information about the pod being evaluated
+	// +optional
 	Spec ImageReviewSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 
 	// Status is filled in by the backend and indicates whether the pod should be allowed.
@@ -68,6 +69,7 @@ type ImageReviewContainerSpec struct {
 // ImageReviewStatus is the result of the review for the pod creation request.
 type ImageReviewStatus struct {
 	// Allowed indicates that all images were allowed to be run.
+	// +optional
 	Allowed bool `json:"allowed" protobuf:"varint,1,opt,name=allowed"`
 	// Reason should be empty unless Allowed is false in which case it
 	// may contain a short description of what is wrong.  Kubernetes
