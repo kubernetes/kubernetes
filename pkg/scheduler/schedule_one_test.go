@@ -1204,6 +1204,54 @@ func TestSchedulerScheduleOne(t *testing.T) {
 	}
 }
 
+func TestSignatures(t *testing.T) {
+	testPod := podWithID("foo", "")
+	testPodPort := podWithPort("bar", "", 15)
+
+	fts := feature.Features{}
+
+	table := []struct {
+		name                string
+		sendPod             *v1.Pod
+		registerPluginFuncs []tf.RegisterPluginFunc
+		expectedSignature   string
+	}{
+		{
+			name:              "basic pod",
+			sendPod:           testPod,
+			expectedSignature: "{\"Pod\":{\"Spec.SchedulerName\":\"\\\"test-scheduler\\\"\"},\"Plugin\":{}}",
+		},
+		{
+			name:    "pod port",
+			sendPod: testPodPort,
+			registerPluginFuncs: []tf.RegisterPluginFunc{
+				tf.RegisterPluginAsExtensions(nodeports.Name, frameworkruntime.FactoryAdapter(fts, nodeports.New), "Filter", "PreFilter"),
+			},
+			expectedSignature: `{"Pod":{"Spec.Containers":"[{\"name\":\"ctr\",\"ports\":[{\"hostPort\":15,\"containerPort\":0}],\"resources\":{}}]","Spec.InitContainers":"null","Spec.SchedulerName":"\"test-scheduler\""},"Plugin":{}}`,
+		},
+	}
+	for _, item := range table {
+		_, ctx := ktesting.NewTestContext(t)
+		schedFramework, err := tf.NewFramework(ctx,
+			append(item.registerPluginFuncs,
+				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			),
+			testSchedulerName,
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		signature, err := schedFramework.SignPod(ctx, item.sendPod)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if signature != item.expectedSignature {
+			t.Fatal(fmt.Errorf("Test %s got signature %s, expected %s", item.name, signature, item.expectedSignature))
+		}
+	}
+}
+
 // Tests the logic removing pods from inFlightPods after Permit (needed to fix issue https://github.com/kubernetes/kubernetes/issues/129967).
 // This needs to be a separate test case, because it mocks the waitOnPermit and runPrebindPlugins functions.
 func TestScheduleOneMarksPodAsProcessedBeforePreBind(t *testing.T) {

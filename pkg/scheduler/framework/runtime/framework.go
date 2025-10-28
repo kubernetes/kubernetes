@@ -120,7 +120,6 @@ func (f *frameworkImpl) getExtensionPoints(plugins *config.Plugins) []extensionP
 		{&plugins.Permit, &f.permitPlugins},
 		{&plugins.PreEnqueue, &f.preEnqueuePlugins},
 		{&plugins.QueueSort, &f.queueSortPlugins},
-		{&plugins.Batchable, &f.batchablePlugins},
 	}
 }
 
@@ -732,6 +731,8 @@ func (f *frameworkImpl) checkPluginSignatures() {
 			f.logger.Info("Disabling batching for profile %s because plugin %s does not support it", f.profileName, pl.Name())
 			f.enableSignatures = false
 			return
+		} else {
+			f.batchablePlugins = append(f.batchablePlugins, pl.(fwk.BatchablePlugin))
 		}
 	}
 	for _, pl := range f.filterPlugins {
@@ -739,6 +740,8 @@ func (f *frameworkImpl) checkPluginSignatures() {
 			f.logger.Info("Disabling batching for profile %s because plugin %s does not support it", f.profileName, pl.Name())
 			f.enableSignatures = false
 			return
+		} else {
+			f.batchablePlugins = append(f.batchablePlugins, pl.(fwk.BatchablePlugin))
 		}
 	}
 	for _, pl := range f.preScorePlugins {
@@ -746,6 +749,8 @@ func (f *frameworkImpl) checkPluginSignatures() {
 			f.logger.Info("Disabling batching for profile %s because plugin %s does not support it", f.profileName, pl.Name())
 			f.enableSignatures = false
 			return
+		} else {
+			f.batchablePlugins = append(f.batchablePlugins, pl.(fwk.BatchablePlugin))
 		}
 	}
 	for _, pl := range f.scorePlugins {
@@ -753,6 +758,8 @@ func (f *frameworkImpl) checkPluginSignatures() {
 			f.logger.Info("Disabling batching for profile %s because plugin %s does not support it", f.profileName, pl.Name())
 			f.enableSignatures = false
 			return
+		} else {
+			f.batchablePlugins = append(f.batchablePlugins, pl.(fwk.BatchablePlugin))
 		}
 	}
 }
