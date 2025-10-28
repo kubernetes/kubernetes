@@ -1190,6 +1190,27 @@ var (
 		},
 		[]string{"retry_trigger"},
 	)
+	ResourceManagerAllocationsTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Name: "resource_manager_allocations_total",
+			Help: "Number of exclusive resource allocations performed by a resource manager.",
+		},
+		[]string{"resource_name", "source"},
+	)
+	ResourceManagerAllocationErrorsTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Name: "resource_manager_allocation_errors_total",
+			Help: "Number of errors encountered during exclusive resource allocation.",
+		},
+		[]string{"resource_name", "source"},
+	)
+	ResourceManagerContainerAssignments = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Name: "resource_manager_container_assignments",
+			Help: "Number of containers with a specific type of resource assignment.",
+		},
+		[]string{"resource_name", "assignment_type"},
+	)
 )
 
 var registerMetrics sync.Once
@@ -1307,6 +1328,12 @@ func Register() {
 			legacyregistry.MustRegister(PodInfeasibleResizes)
 			legacyregistry.MustRegister(PodInProgressResizes)
 			legacyregistry.MustRegister(PodDeferredAcceptedResizes)
+		}
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) {
+			legacyregistry.MustRegister(ResourceManagerAllocationsTotal)
+			legacyregistry.MustRegister(ResourceManagerAllocationErrorsTotal)
+			legacyregistry.MustRegister(ResourceManagerContainerAssignments)
 		}
 	})
 }
