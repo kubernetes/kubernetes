@@ -39,6 +39,9 @@ func TestVersionedValidationByFuzzing(t *testing.T) {
 		{Group: "resource.k8s.io", Version: "v1beta1"},
 		{Group: "resource.k8s.io", Version: "v1beta2"},
 		{Group: "resource.k8s.io", Version: "v1"},
+		{Group: "scheduling.k8s.io", Version: "v1"},
+		{Group: "scheduling.k8s.io", Version: "v1alpha1"},
+		{Group: "scheduling.k8s.io", Version: "v1beta1"},
 	}
 
 	fuzzIters := *roundtrip.FuzzIters / 10 // TODO: Find a better way to manage test running time
