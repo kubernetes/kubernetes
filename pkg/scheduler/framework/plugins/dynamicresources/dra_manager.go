@@ -28,6 +28,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	resourcelisters "k8s.io/client-go/listers/resource/v1"
+	deviceclasscache "k8s.io/dynamic-resource-allocation/deviceclass/cache"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/dynamic-resource-allocation/structured"
 	"k8s.io/klog/v2"
@@ -42,9 +43,10 @@ var _ fwk.SharedDRAManager = &DefaultDRAManager{}
 // from API informers, and uses an AssumeCache and a map of in-flight allocations in order
 // to avoid race conditions when modifying ResourceClaims.
 type DefaultDRAManager struct {
-	resourceClaimTracker *claimTracker
-	resourceSliceLister  *resourceSliceLister
-	deviceClassLister    *deviceClassLister
+	resourceClaimTracker  *claimTracker
+	resourceSliceLister   *resourceSliceLister
+	deviceClassLister     *deviceClassLister
+	extendedResourceCache *deviceclasscache.ExtendedResourceCache
 }
 
 func NewDRAManager(ctx context.Context, claimsCache *assumecache.AssumeCache, resourceSliceTracker *resourceslicetracker.Tracker, informerFactory informers.SharedInformerFactory) *DefaultDRAManager {
@@ -59,6 +61,15 @@ func NewDRAManager(ctx context.Context, claimsCache *assumecache.AssumeCache, re
 		},
 		resourceSliceLister: &resourceSliceLister{tracker: resourceSliceTracker},
 		deviceClassLister:   &deviceClassLister{classLister: informerFactory.Resource().V1().DeviceClasses().Lister()},
+	}
+
+	deviceClassInformer := informerFactory.Resource().V1().DeviceClasses()
+	extCache := deviceclasscache.NewExtendedResourceCache(deviceClassInformer, logger)
+	manager.extendedResourceCache = extCache
+
+	// Register the cache as an event handler for device class changes
+	if _, err := deviceClassInformer.Informer().AddEventHandler(extCache); err != nil {
+		logger.Error(err, "Failed to add event handler for device classes")
 	}
 
 	// Reacting to events is more efficient than iterating over the list
@@ -78,6 +89,10 @@ func (s *DefaultDRAManager) ResourceSlices() fwk.ResourceSliceLister {
 
 func (s *DefaultDRAManager) DeviceClasses() fwk.DeviceClassLister {
 	return s.deviceClassLister
+}
+
+func (s *DefaultDRAManager) DeviceClassResolver() fwk.DeviceClassResolver {
+	return s.extendedResourceCache
 }
 
 var _ fwk.ResourceSliceLister = &resourceSliceLister{}
