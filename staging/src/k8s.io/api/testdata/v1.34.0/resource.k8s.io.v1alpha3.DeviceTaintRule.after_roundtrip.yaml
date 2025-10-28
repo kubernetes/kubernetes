@@ -42,11 +42,4 @@ spec:
     key: keyValue
     timeAdded: "2004-01-01T01:01:01Z"
     value: valueValue
-status:
-  conditions:
-  - lastTransitionTime: "2004-01-01T01:01:01Z"
-    message: messageValue
-    observedGeneration: 3
-    reason: reasonValue
-    status: statusValue
-    type: typeValue
+status: {}

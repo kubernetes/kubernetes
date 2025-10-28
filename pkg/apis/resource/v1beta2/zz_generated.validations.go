@@ -1212,7 +1212,7 @@ func Validate_DeviceTaint(ctx context.Context, op operation.Operation, fldPath *
 	return errs
 }
 
-var symbolsForDeviceTaintEffect = sets.New(resourcev1beta2.DeviceTaintEffectNoExecute, resourcev1beta2.DeviceTaintEffectNoSchedule)
+var symbolsForDeviceTaintEffect = sets.New(resourcev1beta2.DeviceTaintEffectNoExecute, resourcev1beta2.DeviceTaintEffectNoSchedule, resourcev1beta2.DeviceTaintEffectNone)
 
 // Validate_DeviceTaintEffect validates an instance of DeviceTaintEffect according
 // to declarative validation rules in the API schema.

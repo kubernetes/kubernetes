@@ -1065,6 +1065,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		v1alpha3.DeviceTaintRule{}.OpenAPIModelName():                                                                   schema_k8sio_api_resource_v1alpha3_DeviceTaintRule(ref),
 		v1alpha3.DeviceTaintRuleList{}.OpenAPIModelName():                                                               schema_k8sio_api_resource_v1alpha3_DeviceTaintRuleList(ref),
 		v1alpha3.DeviceTaintRuleSpec{}.OpenAPIModelName():                                                               schema_k8sio_api_resource_v1alpha3_DeviceTaintRuleSpec(ref),
+		v1alpha3.DeviceTaintRuleStatus{}.OpenAPIModelName():                                                             schema_k8sio_api_resource_v1alpha3_DeviceTaintRuleStatus(ref),
 		v1alpha3.DeviceTaintSelector{}.OpenAPIModelName():                                                               schema_k8sio_api_resource_v1alpha3_DeviceTaintSelector(ref),
 		resourcev1beta1.AllocatedDeviceStatus{}.OpenAPIModelName():                                                      schema_k8sio_api_resource_v1beta1_AllocatedDeviceStatus(ref),
 		resourcev1beta1.AllocationResult{}.OpenAPIModelName():                                                           schema_k8sio_api_resource_v1beta1_AllocationResult(ref),
@@ -48375,7 +48376,7 @@ func schema_k8sio_api_resource_v1_Device(ref common.ReferenceCallback) common.Op
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "If specified, these are the driver-defined taints.\n\nThe maximum number of taints is 4.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
+							Description: "If specified, these are the driver-defined taints.\n\nThe maximum number of taints is 16. If taints are set for any device in a ResourceSlice, then the maximum number of allowed devices per ResourceSlice is 64 instead of 128.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -49339,11 +49340,11 @@ func schema_k8sio_api_resource_v1_DeviceTaint(ref common.ReferenceCallback) comm
 					},
 					"effect": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The effect of the taint on claims that do not tolerate the taint and through such claims on the pods using them. Valid effects are NoSchedule and NoExecute. PreferNoSchedule as used for nodes is not valid here.\n\n\nPossible enum values:\n - `\"NoExecute\"` Evict any already-running pods that do not tolerate the device taint.\n - `\"NoSchedule\"` Do not allow new pods to schedule which use a tainted device unless they tolerate the taint, but allow all pods submitted to Kubelet without going through the scheduler to start, and allow all already-running pods to continue running.",
+							Description: "The effect of the taint on claims that do not tolerate the taint and through such claims on the pods using them.\n\nValid effects are None, NoSchedule and NoExecute. PreferNoSchedule as used for nodes is not valid here. More effects may get added in the future. Consumers must treat unknown effects like None.\n\n\nPossible enum values:\n - `\"NoExecute\"` Evict any already-running pods that do not tolerate the device taint.\n - `\"NoSchedule\"` Do not allow new pods to schedule which use a tainted device unless they tolerate the taint, but allow all pods submitted to Kubelet without going through the scheduler to start, and allow all already-running pods to continue running.\n - `\"None\"` No effect, the taint is purely informational.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
-							Enum:        []interface{}{"NoExecute", "NoSchedule"},
+							Enum:        []interface{}{"NoExecute", "NoSchedule", "None"},
 						},
 					},
 					"timeAdded": {
@@ -49393,10 +49394,10 @@ func schema_k8sio_api_resource_v1_DeviceToleration(ref common.ReferenceCallback)
 					},
 					"effect": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Effect indicates the taint effect to match. Empty means match all taint effects. When specified, allowed values are NoSchedule and NoExecute.\n\n\nPossible enum values:\n - `\"NoExecute\"` Evict any already-running pods that do not tolerate the device taint.\n - `\"NoSchedule\"` Do not allow new pods to schedule which use a tainted device unless they tolerate the taint, but allow all pods submitted to Kubelet without going through the scheduler to start, and allow all already-running pods to continue running.",
+							Description: "Effect indicates the taint effect to match. Empty means match all taint effects. When specified, allowed values are NoSchedule and NoExecute.\n\n\nPossible enum values:\n - `\"NoExecute\"` Evict any already-running pods that do not tolerate the device taint.\n - `\"NoSchedule\"` Do not allow new pods to schedule which use a tainted device unless they tolerate the taint, but allow all pods submitted to Kubelet without going through the scheduler to start, and allow all already-running pods to continue running.\n - `\"None\"` No effect, the taint is purely informational.",
 							Type:        []string{"string"},
 							Format:      "",
-							Enum:        []interface{}{"NoExecute", "NoSchedule"},
+							Enum:        []interface{}{"NoExecute", "NoSchedule", "None"},
 						},
 					},
 					"tolerationSeconds": {
@@ -50125,7 +50126,7 @@ func schema_k8sio_api_resource_v1_ResourceSliceSpec(ref common.ReferenceCallback
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Devices lists some or all of the devices in this pool.\n\nMust not have more than 128 entries.",
+							Description: "Devices lists some or all of the devices in this pool.\n\nMust not have more than 128 entries. If any device uses taints the limit is 64.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -50239,11 +50240,11 @@ func schema_k8sio_api_resource_v1alpha3_DeviceTaint(ref common.ReferenceCallback
 					},
 					"effect": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The effect of the taint on claims that do not tolerate the taint and through such claims on the pods using them. Valid effects are NoSchedule and NoExecute. PreferNoSchedule as used for nodes is not valid here.\n\n\nPossible enum values:\n - `\"NoExecute\"` Evict any already-running pods that do not tolerate the device taint.\n - `\"NoSchedule\"` Do not allow new pods to schedule which use a tainted device unless they tolerate the taint, but allow all pods submitted to Kubelet without going through the scheduler to start, and allow all already-running pods to continue running.",
+							Description: "The effect of the taint on claims that do not tolerate the taint and through such claims on the pods using them.\n\nValid effects are None, NoSchedule and NoExecute. PreferNoSchedule as used for nodes is not valid here. More effects may get added in the future. Consumers must treat unknown effects like None.\n\n\nPossible enum values:\n - `\"NoExecute\"` Evict any already-running pods that do not tolerate the device taint.\n - `\"NoSchedule\"` Do not allow new pods to schedule which use a tainted device unless they tolerate the taint, but allow all pods submitted to Kubelet without going through the scheduler to start, and allow all already-running pods to continue running.\n - `\"None\"` No effect, the taint is purely informational.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
-							Enum:        []interface{}{"NoExecute", "NoSchedule"},
+							Enum:        []interface{}{"NoExecute", "NoSchedule", "None"},
 						},
 					},
 					"timeAdded": {
@@ -50296,12 +50297,19 @@ func schema_k8sio_api_resource_v1alpha3_DeviceTaintRule(ref common.ReferenceCall
 							Ref:         ref(v1alpha3.DeviceTaintRuleSpec{}.OpenAPIModelName()),
 						},
 					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Status provides information about what was requested in the spec.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(v1alpha3.DeviceTaintRuleStatus{}.OpenAPIModelName()),
+						},
+					},
 				},
 				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
-			v1alpha3.DeviceTaintRuleSpec{}.OpenAPIModelName(), metav1.ObjectMeta{}.OpenAPIModelName()},
+			v1alpha3.DeviceTaintRuleSpec{}.OpenAPIModelName(), v1alpha3.DeviceTaintRuleStatus{}.OpenAPIModelName(), metav1.ObjectMeta{}.OpenAPIModelName()},
 	}
 }
 
@@ -50365,7 +50373,7 @@ func schema_k8sio_api_resource_v1alpha3_DeviceTaintRuleSpec(ref common.Reference
 				Properties: map[string]spec.Schema{
 					"deviceSelector": {
 						SchemaProps: spec.SchemaProps{
-							Description: "DeviceSelector defines which device(s) the taint is applied to. All selector criteria must be satified for a device to match. The empty selector matches all devices. Without a selector, no devices are matches.",
+							Description: "DeviceSelector defines which device(s) the taint is applied to. All selector criteria must be satisfied for a device to match. The empty selector matches all devices. Without a selector, no devices are matches.",
 							Ref:         ref(v1alpha3.DeviceTaintSelector{}.OpenAPIModelName()),
 						},
 					},
@@ -50385,6 +50393,45 @@ func schema_k8sio_api_resource_v1alpha3_DeviceTaintRuleSpec(ref common.Reference
 	}
 }
 
+func schema_k8sio_api_resource_v1alpha3_DeviceTaintRuleStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "DeviceTaintRuleStatus provides information about an on-going pod eviction.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"conditions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"type",
+								},
+								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-patch-merge-key": "type",
+								"x-kubernetes-patch-strategy":  "merge",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Conditions provide information about the state of the DeviceTaintRule and the cluster at some point in time, in a machine-readable and human-readable format.\n\nThe following condition is currently defined as part of this API, more may get added: - Type: EvictionInProgress - Status: True if there are currently pods which need to be evicted, False otherwise\n  (includes the effects which don't cause eviction).\n- Reason: not specified, may change - Message: includes information about number of pending pods and already evicted pods\n  in a human-readable format, updated periodically, may change\n\nFor `effect: None`, the condition above gets set once for each change to the spec, with the message containing information about what would happen if the effect was `NoExecute`. This feedback can be used to decide whether changing the effect to `NoExecute` will work as intended. It only gets set once to avoid having to constantly update the status.\n\nMust have 8 or fewer entries.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref(metav1.Condition{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			metav1.Condition{}.OpenAPIModelName()},
+	}
+}
+
 func schema_k8sio_api_resource_v1alpha3_DeviceTaintSelector(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -50392,13 +50439,6 @@ func schema_k8sio_api_resource_v1alpha3_DeviceTaintSelector(ref common.Reference
 				Description: "DeviceTaintSelector defines which device(s) a DeviceTaintRule applies to. The empty selector matches all devices. Without a selector, no devices are matched.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
-					"deviceClassName": {
-						SchemaProps: spec.SchemaProps{
-							Description: "If DeviceClassName is set, the selectors defined there must be satisfied by a device to be selected. This field corresponds to class.metadata.name.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
 					"driver": {
 						SchemaProps: spec.SchemaProps{
 							Description: "If driver is set, only devices from that driver are selected. This fields corresponds to slice.spec.driver.",
@@ -50420,30 +50460,9 @@ func schema_k8sio_api_resource_v1alpha3_DeviceTaintSelector(ref common.Reference
 							Format:      "",
 						},
 					},
-					"selectors": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Description: "Selectors contains the same selection criteria as a ResourceClaim. Currently, CEL expressions are supported. All of these selectors must be satisfied.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1alpha3.DeviceSelector{}.OpenAPIModelName()),
-									},
-								},
-							},
-						},
-					},
 				},
 			},
 		},
-		Dependencies: []string{
-			v1alpha3.DeviceSelector{}.OpenAPIModelName()},
 	}
 }
 
@@ -50645,7 +50664,7 @@ func schema_k8sio_api_resource_v1beta1_BasicDevice(ref common.ReferenceCallback)
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "If specified, these are the driver-defined taints.\n\nThe maximum number of taints is 4.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
+							Description: "If specified, these are the driver-defined taints.\n\nThe maximum number of taints is 16. If taints are set for any device in a ResourceSlice, then the maximum number of allowed devices per ResourceSlice is 64 instead of 128.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -51897,11 +51916,11 @@ func schema_k8sio_api_resource_v1beta1_DeviceTaint(ref common.ReferenceCallback)
 					},
 					"effect": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The effect of the taint on claims that do not tolerate the taint and through such claims on the pods using them. Valid effects are NoSchedule and NoExecute. PreferNoSchedule as used for nodes is not valid here.\n\n\nPossible enum values:\n - `\"NoExecute\"` Evict any already-running pods that do not tolerate the device taint.\n - `\"NoSchedule\"` Do not allow new pods to schedule which use a tainted device unless they tolerate the taint, but allow all pods submitted to Kubelet without going through the scheduler to start, and allow all already-running pods to continue running.",
+							Description: "The effect of the taint on claims that do not tolerate the taint and through such claims on the pods using them.\n\nValid effects are None, NoSchedule and NoExecute. PreferNoSchedule as used for nodes is not valid here. More effects may get added in the future. Consumers must treat unknown effects like None.\n\n\nPossible enum values:\n - `\"NoExecute\"` Evict any already-running pods that do not tolerate the device taint.\n - `\"NoSchedule\"` Do not allow new pods to schedule which use a tainted device unless they tolerate the taint, but allow all pods submitted to Kubelet without going through the scheduler to start, and allow all already-running pods to continue running.\n - `\"None\"` No effect, the taint is purely informational.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
-							Enum:        []interface{}{"NoExecute", "NoSchedule"},
+							Enum:        []interface{}{"NoExecute", "NoSchedule", "None"},
 						},
 					},
 					"timeAdded": {
@@ -51951,10 +51970,10 @@ func schema_k8sio_api_resource_v1beta1_DeviceToleration(ref common.ReferenceCall
 					},
 					"effect": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Effect indicates the taint effect to match. Empty means match all taint effects. When specified, allowed values are NoSchedule and NoExecute.\n\n\nPossible enum values:\n - `\"NoExecute\"` Evict any already-running pods that do not tolerate the device taint.\n - `\"NoSchedule\"` Do not allow new pods to schedule which use a tainted device unless they tolerate the taint, but allow all pods submitted to Kubelet without going through the scheduler to start, and allow all already-running pods to continue running.",
+							Description: "Effect indicates the taint effect to match. Empty means match all taint effects. When specified, allowed values are NoSchedule and NoExecute.\n\n\nPossible enum values:\n - `\"NoExecute\"` Evict any already-running pods that do not tolerate the device taint.\n - `\"NoSchedule\"` Do not allow new pods to schedule which use a tainted device unless they tolerate the taint, but allow all pods submitted to Kubelet without going through the scheduler to start, and allow all already-running pods to continue running.\n - `\"None\"` No effect, the taint is purely informational.",
 							Type:        []string{"string"},
 							Format:      "",
-							Enum:        []interface{}{"NoExecute", "NoSchedule"},
+							Enum:        []interface{}{"NoExecute", "NoSchedule", "None"},
 						},
 					},
 					"tolerationSeconds": {
@@ -52593,7 +52612,7 @@ func schema_k8sio_api_resource_v1beta1_ResourceSliceSpec(ref common.ReferenceCal
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Devices lists some or all of the devices in this pool.\n\nMust not have more than 128 entries.",
+							Description: "Devices lists some or all of the devices in this pool.\n\nMust not have more than 128 entries. If any device uses taints the limit is 64.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -53037,7 +53056,7 @@ func schema_k8sio_api_resource_v1beta2_Device(ref common.ReferenceCallback) comm
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "If specified, these are the driver-defined taints.\n\nThe maximum number of taints is 4.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
+							Description: "If specified, these are the driver-defined taints.\n\nThe maximum number of taints is 16. If taints are set for any device in a ResourceSlice, then the maximum number of allowed devices per ResourceSlice is 64 instead of 128.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -54001,11 +54020,11 @@ func schema_k8sio_api_resource_v1beta2_DeviceTaint(ref common.ReferenceCallback)
 					},
 					"effect": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The effect of the taint on claims that do not tolerate the taint and through such claims on the pods using them. Valid effects are NoSchedule and NoExecute. PreferNoSchedule as used for nodes is not valid here.\n\n\nPossible enum values:\n - `\"NoExecute\"` Evict any already-running pods that do not tolerate the device taint.\n - `\"NoSchedule\"` Do not allow new pods to schedule which use a tainted device unless they tolerate the taint, but allow all pods submitted to Kubelet without going through the scheduler to start, and allow all already-running pods to continue running.",
+							Description: "The effect of the taint on claims that do not tolerate the taint and through such claims on the pods using them.\n\nValid effects are None, NoSchedule and NoExecute. PreferNoSchedule as used for nodes is not valid here. More effects may get added in the future. Consumers must treat unknown effects like None.\n\n\nPossible enum values:\n - `\"NoExecute\"` Evict any already-running pods that do not tolerate the device taint.\n - `\"NoSchedule\"` Do not allow new pods to schedule which use a tainted device unless they tolerate the taint, but allow all pods submitted to Kubelet without going through the scheduler to start, and allow all already-running pods to continue running.\n - `\"None\"` No effect, the taint is purely informational.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
-							Enum:        []interface{}{"NoExecute", "NoSchedule"},
+							Enum:        []interface{}{"NoExecute", "NoSchedule", "None"},
 						},
 					},
 					"timeAdded": {
@@ -54055,10 +54074,10 @@ func schema_k8sio_api_resource_v1beta2_DeviceToleration(ref common.ReferenceCall
 					},
 					"effect": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Effect indicates the taint effect to match. Empty means match all taint effects. When specified, allowed values are NoSchedule and NoExecute.\n\n\nPossible enum values:\n - `\"NoExecute\"` Evict any already-running pods that do not tolerate the device taint.\n - `\"NoSchedule\"` Do not allow new pods to schedule which use a tainted device unless they tolerate the taint, but allow all pods submitted to Kubelet without going through the scheduler to start, and allow all already-running pods to continue running.",
+							Description: "Effect indicates the taint effect to match. Empty means match all taint effects. When specified, allowed values are NoSchedule and NoExecute.\n\n\nPossible enum values:\n - `\"NoExecute\"` Evict any already-running pods that do not tolerate the device taint.\n - `\"NoSchedule\"` Do not allow new pods to schedule which use a tainted device unless they tolerate the taint, but allow all pods submitted to Kubelet without going through the scheduler to start, and allow all already-running pods to continue running.\n - `\"None\"` No effect, the taint is purely informational.",
 							Type:        []string{"string"},
 							Format:      "",
-							Enum:        []interface{}{"NoExecute", "NoSchedule"},
+							Enum:        []interface{}{"NoExecute", "NoSchedule", "None"},
 						},
 					},
 					"tolerationSeconds": {
@@ -54787,7 +54806,7 @@ func schema_k8sio_api_resource_v1beta2_ResourceSliceSpec(ref common.ReferenceCal
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Devices lists some or all of the devices in this pool.\n\nMust not have more than 128 entries.",
+							Description: "Devices lists some or all of the devices in this pool.\n\nMust not have more than 128 entries. If any device uses taints the limit is 64.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{

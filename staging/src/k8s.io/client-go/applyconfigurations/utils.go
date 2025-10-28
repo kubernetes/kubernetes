@@ -1710,10 +1710,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1.ResourceSliceSpecApplyConfiguration{}
 
 		// Group=resource.k8s.io, Version=v1alpha3
-	case v1alpha3.SchemeGroupVersion.WithKind("CELDeviceSelector"):
-		return &resourcev1alpha3.CELDeviceSelectorApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("DeviceSelector"):
-		return &resourcev1alpha3.DeviceSelectorApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("DeviceTaint"):
 		return &resourcev1alpha3.DeviceTaintApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("DeviceTaintRule"):

@@ -1188,7 +1188,7 @@ func Validate_DeviceTaint(ctx context.Context, op operation.Operation, fldPath *
 	return errs
 }
 
-var symbolsForDeviceTaintEffect = sets.New(resourcev1.DeviceTaintEffectNoExecute, resourcev1.DeviceTaintEffectNoSchedule)
+var symbolsForDeviceTaintEffect = sets.New(resourcev1.DeviceTaintEffectNoExecute, resourcev1.DeviceTaintEffectNoSchedule, resourcev1.DeviceTaintEffectNone)
 
 // Validate_DeviceTaintEffect validates an instance of DeviceTaintEffect according
 // to declarative validation rules in the API schema.

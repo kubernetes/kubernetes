@@ -38,8 +38,10 @@ type DeviceTaintApplyConfiguration struct {
 	Value *string `json:"value,omitempty"`
 	// The effect of the taint on claims that do not tolerate the taint
 	// and through such claims on the pods using them.
-	// Valid effects are NoSchedule and NoExecute. PreferNoSchedule as used for
-	// nodes is not valid here.
+	//
+	// Valid effects are None, NoSchedule and NoExecute. PreferNoSchedule as used for
+	// nodes is not valid here. More effects may get added in the future.
+	// Consumers must treat unknown effects like None.
 	Effect *resourcev1beta1.DeviceTaintEffect `json:"effect,omitempty"`
 	// TimeAdded represents the time at which the taint was added.
 	// Added automatically during create or update if not set.

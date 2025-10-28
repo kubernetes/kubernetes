@@ -33,4 +33,6 @@ func (*DeviceTaintRuleList) ProtoMessage() {}
 
 func (*DeviceTaintRuleSpec) ProtoMessage() {}
 
+func (*DeviceTaintRuleStatus) ProtoMessage() {}
+
 func (*DeviceTaintSelector) ProtoMessage() {}

@@ -40,6 +40,8 @@ type DeviceTaintRulesGetter interface {
 type DeviceTaintRuleInterface interface {
 	Create(ctx context.Context, deviceTaintRule *resourcev1alpha3.DeviceTaintRule, opts v1.CreateOptions) (*resourcev1alpha3.DeviceTaintRule, error)
 	Update(ctx context.Context, deviceTaintRule *resourcev1alpha3.DeviceTaintRule, opts v1.UpdateOptions) (*resourcev1alpha3.DeviceTaintRule, error)
+	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
+	UpdateStatus(ctx context.Context, deviceTaintRule *resourcev1alpha3.DeviceTaintRule, opts v1.UpdateOptions) (*resourcev1alpha3.DeviceTaintRule, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
 	Get(ctx context.Context, name string, opts v1.GetOptions) (*resourcev1alpha3.DeviceTaintRule, error)
@@ -47,6 +49,8 @@ type DeviceTaintRuleInterface interface {
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *resourcev1alpha3.DeviceTaintRule, err error)
 	Apply(ctx context.Context, deviceTaintRule *applyconfigurationsresourcev1alpha3.DeviceTaintRuleApplyConfiguration, opts v1.ApplyOptions) (result *resourcev1alpha3.DeviceTaintRule, err error)
+	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+	ApplyStatus(ctx context.Context, deviceTaintRule *applyconfigurationsresourcev1alpha3.DeviceTaintRuleApplyConfiguration, opts v1.ApplyOptions) (result *resourcev1alpha3.DeviceTaintRule, err error)
 	DeviceTaintRuleExpansion
 }
 

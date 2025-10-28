@@ -185,7 +185,9 @@ message BasicDevice {
 
   // If specified, these are the driver-defined taints.
   //
-  // The maximum number of taints is 4.
+  // The maximum number of taints is 16. If taints are set for
+  // any device in a ResourceSlice, then the maximum number of
+  // allowed devices per ResourceSlice is 64 instead of 128.
   //
   // This is an alpha field and requires enabling the DRADeviceTaints
   // feature gate.
@@ -1227,8 +1229,10 @@ message DeviceTaint {
 
   // The effect of the taint on claims that do not tolerate the taint
   // and through such claims on the pods using them.
-  // Valid effects are NoSchedule and NoExecute. PreferNoSchedule as used for
-  // nodes is not valid here.
+  //
+  // Valid effects are None, NoSchedule and NoExecute. PreferNoSchedule as used for
+  // nodes is not valid here. More effects may get added in the future.
+  // Consumers must treat unknown effects like None.
   //
   // +required
   // +k8s:required
@@ -1654,7 +1658,7 @@ message ResourceSliceSpec {
 
   // Devices lists some or all of the devices in this pool.
   //
-  // Must not have more than 128 entries.
+  // Must not have more than 128 entries. If any device uses taints the limit is 64.
   //
   // +optional
   // +listType=atomic
