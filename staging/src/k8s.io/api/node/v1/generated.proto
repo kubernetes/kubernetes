@@ -59,21 +59,22 @@ message RuntimeClass {
   // in a pod.
   // The Handler must be lowercase, conform to the DNS Label (RFC 1123) requirements,
   // and is immutable.
-  // +required
-  // +k8s:required
+  // +k8s:immutable
   optional string handler = 2;
 
   // overhead represents the resource overhead associated with running a pod for a
   // given RuntimeClass. For more details, see
   //  https://kubernetes.io/docs/concepts/scheduling-eviction/pod-overhead/
-  // +optional
+  // +required
+  // +k8s:required
   optional Overhead overhead = 3;
 
   // scheduling holds the scheduling constraints to ensure that pods running
   // with this RuntimeClass are scheduled to nodes that support it.
   // If scheduling is nil, this RuntimeClass is assumed to be supported by all
   // nodes.
-  // +optional
+  // +required
+  // +k8s:required
   optional Scheduling scheduling = 4;
 }
 

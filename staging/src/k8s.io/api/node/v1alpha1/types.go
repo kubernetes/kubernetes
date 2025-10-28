@@ -59,19 +59,22 @@ type RuntimeClassSpec struct {
 	// in a pod.
 	// The runtimeHandler must be lowercase, conform to the DNS Label (RFC 1123)
 	// requirements, and is immutable.
+	// +k8s:immutable
 	RuntimeHandler string `json:"runtimeHandler" protobuf:"bytes,1,opt,name=runtimeHandler"`
 
 	// overhead represents the resource overhead associated with running a pod for a
 	// given RuntimeClass. For more details, see
 	// https://git.k8s.io/enhancements/keps/sig-node/688-pod-overhead/README.md
-	// +optional
+	// +required
+	// +k8s:required
 	Overhead *Overhead `json:"overhead,omitempty" protobuf:"bytes,2,opt,name=overhead"`
 
 	// scheduling holds the scheduling constraints to ensure that pods running
 	// with this RuntimeClass are scheduled to nodes that support it.
 	// If scheduling is nil, this RuntimeClass is assumed to be supported by all
 	// nodes.
-	// +optional
+	// +required
+	// +k8s:required
 	Scheduling *Scheduling `json:"scheduling,omitempty" protobuf:"bytes,3,opt,name=scheduling"`
 }
 

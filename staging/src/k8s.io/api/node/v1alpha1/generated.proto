@@ -80,19 +80,22 @@ message RuntimeClassSpec {
   // in a pod.
   // The runtimeHandler must be lowercase, conform to the DNS Label (RFC 1123)
   // requirements, and is immutable.
+  // +k8s:immutable
   optional string runtimeHandler = 1;
 
   // overhead represents the resource overhead associated with running a pod for a
   // given RuntimeClass. For more details, see
   // https://git.k8s.io/enhancements/keps/sig-node/688-pod-overhead/README.md
-  // +optional
+  // +required
+  // +k8s:required
   optional Overhead overhead = 2;
 
   // scheduling holds the scheduling constraints to ensure that pods running
   // with this RuntimeClass are scheduled to nodes that support it.
   // If scheduling is nil, this RuntimeClass is assumed to be supported by all
   // nodes.
-  // +optional
+  // +required
+  // +k8s:required
   optional Scheduling scheduling = 3;
 }
 

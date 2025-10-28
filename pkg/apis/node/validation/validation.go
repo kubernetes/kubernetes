@@ -30,14 +30,14 @@ func ValidateRuntimeClass(rc *node.RuntimeClass) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&rc.ObjectMeta, false, apivalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
 
 	for _, msg := range apivalidation.NameIsDNSLabel(rc.Handler, false) {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("handler"), rc.Handler, msg)).MarkCoveredByDeclarative()
+		allErrs = append(allErrs, field.Invalid(field.NewPath("handler"), rc.Handler, msg))
 	}
 
 	if rc.Overhead != nil {
-		allErrs = append(allErrs, validateOverhead(rc.Overhead, field.NewPath("overhead"))...)
+		allErrs = append(allErrs, validateOverhead(rc.Overhead, field.NewPath("overhead"))...).MarkCoveredByDeclarative()
 	}
 	if rc.Scheduling != nil {
-		allErrs = append(allErrs, validateScheduling(rc.Scheduling, field.NewPath("scheduling"))...)
+		allErrs = append(allErrs, validateScheduling(rc.Scheduling, field.NewPath("scheduling"))...).MarkCoveredByDeclarative()
 	}
 
 	return allErrs
