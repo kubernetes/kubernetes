@@ -74,6 +74,12 @@ func (m *fakeManager) GetPodTopologyHints(pod *v1.Pod) map[string][]topologymana
 	return map[string][]topologymanager.TopologyHint{}
 }
 
+func (m *fakeManager) AllocatePod(pod *v1.Pod) error {
+	logger := klog.TODO()
+	logger.Info("AllocatePod", "pod", klog.KObj(pod))
+	return nil
+}
+
 func (m *fakeManager) State() state.Reader {
 	return m.state
 }
