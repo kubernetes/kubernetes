@@ -6916,12 +6916,9 @@ func ValidateNodeSpecificAnnotations(annotations map[string]string, fldPath *fie
 
 // ValidateNode tests if required fields in the node are set.
 func ValidateNode(node *core.Node) field.ErrorList {
-	fldPath := field.NewPath("metadata")
-	allErrs := ValidateObjectMeta(&node.ObjectMeta, false, ValidateNodeName, fldPath)
-	allErrs = append(allErrs, ValidateNodeSpecificAnnotations(node.ObjectMeta.Annotations, fldPath.Child("annotations"))...)
-	if len(node.Spec.Taints) > 0 {
-		allErrs = append(allErrs, validateNodeTaints(node.Spec.Taints, fldPath.Child("taints"))...)
-	}
+	metadataPath := field.NewPath("metadata")
+	allErrs := ValidateObjectMeta(&node.ObjectMeta, false, ValidateNodeName, metadataPath)
+	allErrs = append(allErrs, ValidateNodeSpecificAnnotations(node.ObjectMeta.Annotations, metadataPath.Child("annotations"))...)
 
 	// Validate NodeSpec
 	specPath := field.NewPath("spec")
@@ -6945,6 +6942,10 @@ func ValidateNode(node *core.Node) field.ErrorList {
 				allErrs = append(allErrs, field.Invalid(podCIDRsField, node.Spec.PodCIDRs, "may specify no more than one CIDR for each IP family"))
 			}
 		}
+	}
+
+	if len(node.Spec.Taints) > 0 {
+		allErrs = append(allErrs, validateNodeTaints(node.Spec.Taints, specPath.Child("taints"))...)
 	}
 
 	// Validate NodeStatus
