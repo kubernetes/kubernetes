@@ -146,7 +146,7 @@ linters:
       
       # OptionalOrRequired is being enabled over time. For now, each API group should be added to this list until we comb through each group and fix the missing tags.
       - text: "must be marked as optional or required"
-        path: "staging/src/k8s.io/api/(admission|apidiscovery|apps|authentication|authorization|autoscaling|batch|certificates|core|discovery|events|extensions|flowcontrol|imagepolicy|networking|node|policy|rbac|resource|scheduling|storage)"
+        path: "staging/src/k8s.io/api/(admission|apidiscovery|apps|authentication|authorization|autoscaling|batch|certificates|core|discovery|events|extensions|flowcontrol|networking|node|policy|rbac|resource|scheduling|storage)"
       
       # OptionalOrRequired - Existing fields that are marked as both optional and required (based on standard optional vs kubebuilder:validation:Required) and should not be fixed.
       - text: "field Error must not be marked as both optional and required"

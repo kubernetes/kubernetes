@@ -1690,6 +1690,11 @@
           "x-kubernetes-list-type": "set"
         }
       },
+      "required": [
+        "apiServerID",
+        "encodingVersion",
+        "decodableVersions"
+      ],
       "type": "object"
     },
     "io.k8s.api.apiserverinternal.v1alpha1.StorageVersion": {
@@ -1717,8 +1722,7 @@
         }
       },
       "required": [
-        "spec",
-        "status"
+        "metadata"
       ],
       "type": "object",
       "x-kubernetes-group-version-kind": [
