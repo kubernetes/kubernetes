@@ -437,6 +437,17 @@ func updatePodFromAllocation(pod *v1.Pod, allocated state.PodResourceInfo) (*v1.
 	}
 
 	updated := false
+	// If pod-level resources are managed, ensure the pod spec is updated with the
+	// resources that were actually allocated and checkpointed. This is critical
+	// after a kubelet restart to reconcile the pod's view with the stored state.
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) && resourcehelper.IsPodLevelResourcesSet(pod) {
+		if !apiequality.Semantic.DeepEqual(pod.Spec.Resources, &allocated.PodResources) {
+			pod = pod.DeepCopy()
+			updated = true
+			pod.Spec.Resources = allocated.PodResources.DeepCopy()
+		}
+	}
+
 	containerAlloc := func(c v1.Container) (v1.ResourceRequirements, bool) {
 		if cAlloc, ok := allocated.ContainerResources[c.Name]; ok {
 			if !apiequality.Semantic.DeepEqual(c.Resources, cAlloc) {
@@ -474,6 +485,14 @@ func (m *manager) SetAllocatedResources(pod *v1.Pod) error {
 
 func allocationFromPod(pod *v1.Pod) state.PodResourceInfo {
 	var podAlloc state.PodResourceInfo
+	// Checkpoint pod-level resources to ensure they can be restored after a kubelet
+	// restart. This is the source of truth for what the pod was admitted with.
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) && resourcehelper.IsPodLevelResourcesSet(pod) {
+		if pod.Spec.Resources != nil {
+			podAlloc.PodResources = *pod.Spec.Resources.DeepCopy()
+		}
+	}
+
 	podAlloc.ContainerResources = make(map[string]v1.ResourceRequirements)
 	for _, container := range pod.Spec.Containers {
 		alloc := *container.Resources.DeepCopy()

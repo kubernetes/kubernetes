@@ -279,7 +279,20 @@ func (m *manager) Allocate(p *v1.Pod, c *v1.Container) error {
 }
 
 func (m *manager) AllocatePod(pod *v1.Pod, hint topologymanager.TopologyHint) error {
-	// Implement AllocatePod in the corresponding policies
+	logger := klog.TODO() // until we move topology manager to contextual logging
+
+	// Garbage collect any stranded resources before allocating CPUs.
+	m.removeStaleState(logger)
+
+	m.Lock()
+	defer m.Unlock()
+
+	// Call down into the policy to assign this container CPUs if required.
+	err := m.policy.AllocatePod(logger, m.state, pod, hint)
+	if err != nil {
+		logger.Error(err, "policy error")
+		return err
+	}
 
 	return nil
 }
