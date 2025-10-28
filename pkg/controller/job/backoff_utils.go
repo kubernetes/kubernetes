@@ -21,13 +21,14 @@ import (
 	"sort"
 	"time"
 
+	"k8s.io/kubernetes/pkg/features"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
-	framework "k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/utils/clock"
 	"k8s.io/utils/ptr"
 )
@@ -187,7 +188,7 @@ func getFinishedTime(p *v1.Pod) time.Time {
 
 func getFinishTimeFromContainers(p *v1.Pod) *time.Time {
 	finishTime := latestFinishTime(nil, p.Status.ContainerStatuses, nil)
-	if utilfeature.DefaultFeatureGate.Enabled(framework.WithNodeConformance()) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
 		// We need to check InitContainerStatuses here also,
 		// because with the sidecar (restartable init) containers,
 		// sidecar containers will always finish later than regular containers.
