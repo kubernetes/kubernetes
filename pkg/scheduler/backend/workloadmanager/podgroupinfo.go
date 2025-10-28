@@ -26,9 +26,10 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-// defaultSchedulingTimeoutDuration defines how long the gang pods should wait at the
+// DefaultSchedulingTimeoutDuration defines how long the gang pods should wait at the
 // Permit stage for a quorum before being rejected.
-const defaultSchedulingTimeoutDuration = 5 * time.Minute
+// Variable is exported only for testing purposes.
+var DefaultSchedulingTimeoutDuration = 5 * time.Minute
 
 // podGroupKey uniquely identifies a specific instance of a PodGroup.
 type podGroupKey struct {
@@ -166,7 +167,7 @@ func (pgs *podGroupInfo) SchedulingTimeout() time.Duration {
 	// A new deadline is set if one doesn't exist, or if the old one has passed.
 	// This allows a new attempt to form a gang after a previous attempt timed out.
 	if pgs.schedulingDeadline == nil || pgs.schedulingDeadline.Before(time.Now()) {
-		pgs.schedulingDeadline = ptr.To(time.Now().Add(defaultSchedulingTimeoutDuration))
+		pgs.schedulingDeadline = ptr.To(time.Now().Add(DefaultSchedulingTimeoutDuration))
 	}
 	return time.Until(*pgs.schedulingDeadline)
 }
