@@ -100,7 +100,10 @@ var _ = SIGDescribe("Container Runtime Conformance Test", func() {
 
 					err := os.WriteFile(configFile, []byte(auth), 0644)
 					framework.ExpectNoError(err)
-					ginkgo.DeferCleanup(func() { framework.ExpectNoError(os.Remove(configFile)) })
+					ginkgo.DeferCleanup(func() {
+						framework.ExpectNoError(os.Remove(configFile))
+						framework.ExpectNoError(os.RemoveAll(filepath.Join(services.KubeletRootDirectory, "image_manager")))
+					})
 
 					// checkContainerStatus checks whether the container status matches expectation.
 					checkContainerStatus := func(ctx context.Context) error {
