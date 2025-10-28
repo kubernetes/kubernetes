@@ -37,6 +37,36 @@ import (
 	"k8s.io/utils/ptr"
 )
 
+// Extended Resources Backed by DRA - Scheduler Plugin Workflow by each extension points
+//
+// PreFilter - preFilterExtendedResources()
+// - for pods using extended resources, find existing claim or create in-memory claim with temporary name "<extended-resources>"
+// - the in-memory claim is used to track and allocate resources, claim object is created in PreBind extension point.
+// - store the claim in stateData for Filter extension point
+//
+// Filter - filterExtendedResources()
+// - if stale claim with Spec is identified, return Unschedulable for PostFilter extension point to cleanup
+// - check which resources satisfied by device plugin vs need DRA
+// - if extended resources need to be allocated through DRA, create node-specific claim
+//
+// PostFilter
+// - if extended resource claim has real name (not "<extended-resources>"):
+//   - it's stale from prior cycle -> delete it -> trigger retry
+//
+// Reserve
+// - Store allocation results from Filter in stateData
+// - Mark the claim as "allocation in-flight" via SignalClaimPendingAllocation()
+//
+// Unreserve
+// - Remove claim from in-flight allocations and restore assume cache
+// - Delete claim from API server if it has real name
+//
+// PreBind - bindClaim()
+// - For "<extended-resources>" claims: create in API server and update stateData
+// - Update claim status: add finalizer, allocation, and pod reservation
+// - Store in assume cache (poll for extended resource claims)
+// - Update pod.Status.ExtendedResourceClaimStatus with request mappings
+
 const (
 	// specialClaimInMemName is the name of the special resource claim that
 	// exists only in memory. The claim will get a generated name when it is
