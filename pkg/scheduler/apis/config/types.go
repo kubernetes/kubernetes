@@ -176,9 +176,6 @@ type Plugins struct {
 
 	// MultiPoint is a simplified config field for enabling plugins for all valid extension points
 	MultiPoint PluginSet
-
-	// Plugins that can be batched.
-	Batchable PluginSet
 }
 
 // PluginSet specifies enabled and disabled plugins for an extension point.
