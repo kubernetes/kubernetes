@@ -127,8 +127,12 @@ func TestAddPluginElement(t *testing.T) {
 
 func TestMarshal(t *testing.T) {
 	s := newPodSignatureMaker()
-	s.AddPodElement("spec.nodename", "node1")
-	s.AddPluginElement("myplugin", "data1")
+	if err := s.AddPodElement("spec.nodename", "node1"); err != nil {
+		t.Fatalf("Add failed %v", err)
+	}
+	if err := s.AddPluginElement("myplugin", "data1"); err != nil {
+		t.Fatalf("Add failed %v", err)
+	}
 
 	expectedObj := Elements{
 		Pod:    map[string]string{"spec.nodename": "\"node1\""},

@@ -72,8 +72,8 @@ func (s *podSignatureMakerImpl) Marshal() ([]byte, error) {
 }
 
 // Add signature components that are not plugin specific.
-func (s *podSignatureMakerImpl) AddNonPluginElements(pod *v1.Pod) {
-	s.AddPodElement("Spec.SchedulerName", pod.Spec.SchedulerName)
+func (s *podSignatureMakerImpl) AddNonPluginElements(pod *v1.Pod) error {
+	return s.AddPodElement("Spec.SchedulerName", pod.Spec.SchedulerName)
 }
 
 // Common signature element: the pod's Volumes.  Note that

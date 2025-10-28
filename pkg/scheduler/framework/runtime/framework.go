@@ -784,7 +784,10 @@ func (f *frameworkImpl) SignPod(ctx context.Context, pod *v1.Pod) (string, error
 			return fwk.Unsignable, nil
 		}
 	}
-	signatureMaker.AddNonPluginElements(pod)
+	err := signatureMaker.AddNonPluginElements(pod)
+	if err != nil {
+		return fwk.Unsignable, err
+	}
 
 	marshalled, err := signatureMaker.Marshal()
 	return string(marshalled), err

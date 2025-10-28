@@ -58,7 +58,6 @@ import (
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	apicache "k8s.io/kubernetes/pkg/scheduler/backend/api_cache"
 	apidispatcher "k8s.io/kubernetes/pkg/scheduler/backend/api_dispatcher"
@@ -1229,7 +1228,7 @@ func TestSignatures(t *testing.T) {
 		v1.ResourceMemory: *(resource.NewQuantity(mem, resource.DecimalSI)),
 	}
 
-	popSpreadNoDefaults := &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}
+	popSpreadNoDefaults := &schedulerapi.PodTopologySpreadArgs{DefaultingType: schedulerapi.ListDefaulting}
 
 	fts := feature.Features{}
 
