@@ -7733,7 +7733,11 @@ func ValidateSecret(secret *core.Secret) field.ErrorList {
 func ValidateSecretUpdate(newSecret, oldSecret *core.Secret) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&newSecret.ObjectMeta, &oldSecret.ObjectMeta, field.NewPath("metadata"))
 
-	allErrs = append(allErrs, ValidateImmutableField(newSecret.Type, oldSecret.Type, field.NewPath("type"))...)
+	// Validate Type immutability and mark as covered by declarative validation
+	for _, err := range ValidateImmutableField(newSecret.Type, oldSecret.Type, field.NewPath("type")) {
+		allErrs = append(allErrs, err.WithOrigin("immutable").MarkCoveredByDeclarative())
+	}
+
 	if oldSecret.Immutable != nil && *oldSecret.Immutable {
 		if newSecret.Immutable == nil || !*newSecret.Immutable {
 			allErrs = append(allErrs, field.Forbidden(field.NewPath("immutable"), "field is immutable when `immutable` is set"))
