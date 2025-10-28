@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 
 	v1 "k8s.io/api/core/v1"
+	fwk "k8s.io/kube-scheduler/framework"
 )
 
 type Elements struct {
@@ -63,7 +64,11 @@ func (s *podSignatureMakerImpl) addElement(elemMap map[string]string, elementNam
 
 // Marshal the signature into a string.
 func (s *podSignatureMakerImpl) Marshal() ([]byte, error) {
-	return json.Marshal(s.elements)
+	if s.signable {
+		return json.Marshal(s.elements)
+	} else {
+		return []byte(fwk.Unsignable), nil
+	}
 }
 
 // Add signature components that are not plugin specific.
