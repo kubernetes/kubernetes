@@ -605,6 +605,8 @@ type IngressClassParametersReference struct {
 	APIGroup *string `json:"apiGroup,omitempty" protobuf:"bytes,1,opt,name=aPIGroup"`
 
 	// kind is the type of resource being referenced.
+	// +required
+	// +k8s:required
 	Kind string `json:"kind" protobuf:"bytes,2,opt,name=kind"`
 
 	// name is the name of resource being referenced.

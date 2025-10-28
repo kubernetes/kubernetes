@@ -104,7 +104,25 @@ func Validate_IngressClassList(ctx context.Context, op operation.Operation, fldP
 // to declarative validation rules in the API schema.
 func Validate_IngressClassParametersReference(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *networkingv1beta1.IngressClassParametersReference) (errs field.ErrorList) {
 	// field networkingv1beta1.IngressClassParametersReference.APIGroup has no validation
-	// field networkingv1beta1.IngressClassParametersReference.Kind has no validation
+
+	// field networkingv1beta1.IngressClassParametersReference.Kind
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("kind"), &obj.Kind, safe.Field(oldObj, func(oldObj *networkingv1beta1.IngressClassParametersReference) *string { return &oldObj.Kind }))...)
 
 	// field networkingv1beta1.IngressClassParametersReference.Name
 	errs = append(errs,

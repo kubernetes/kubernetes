@@ -186,6 +186,8 @@ message IngressClassParametersReference {
   optional string aPIGroup = 1;
 
   // kind is the type of resource being referenced.
+  // +required
+  // +k8s:required
   optional string kind = 2;
 
   // name is the name of resource being referenced.

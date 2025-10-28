@@ -597,7 +597,7 @@ func validateIngressTypedLocalObjectReference(params *api.TypedLocalObjectRefere
 	}
 
 	allErrs = append(allErrs, validateAPIGroup(params.APIGroup, fldPath.Child("apiGroup"))...)
-	allErrs = append(allErrs, validateKind(params.Kind, fldPath.Child("kind"))...)
+	allErrs = append(allErrs, validateKind(params.Kind, fldPath.Child("kind"))...).MarkCoveredByDeclarative()
 	allErrs = append(allErrs, validateName(params.Name, fldPath.Child("name"))...).MarkCoveredByDeclarative()
 
 	return allErrs
