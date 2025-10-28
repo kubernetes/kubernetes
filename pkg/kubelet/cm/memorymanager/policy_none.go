@@ -68,6 +68,10 @@ func (p *none) GetPodTopologyHints(_ klog.Logger, s state.State, pod *v1.Pod) ma
 	return nil
 }
 
+func (p *none) AllocatePod(_ klog.Logger, s state.State, pod *v1.Pod) error {
+	return nil
+}
+
 // GetAllocatableMemory returns the amount of allocatable memory for each NUMA node
 func (p *none) GetAllocatableMemory(s state.State) []state.Block {
 	return []state.Block{}
