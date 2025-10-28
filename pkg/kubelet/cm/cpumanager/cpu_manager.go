@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
+	cmqos "k8s.io/kubernetes/pkg/kubelet/cm/qos"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -279,7 +280,19 @@ func (m *manager) Allocate(p *v1.Pod, c *v1.Container) error {
 }
 
 func (m *manager) AllocatePod(pod *v1.Pod, hint topologymanager.TopologyHint) error {
-	// Implement AllocatePod in the corresponding policies
+	logger := klog.TODO() // until we move topology manager to contextual logging
+
+	// Garbage collect any stranded resources before allocating CPUs.
+	m.removeStaleState(logger)
+
+	m.Lock()
+	defer m.Unlock()
+
+	// Call down into the policy to assign this container CPUs if required.
+	err := m.policy.AllocatePod(logger, m.state, pod, hint)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -551,4 +564,13 @@ func (m *manager) GetExclusiveCPUs(podUID, containerName string) cpuset.CPUSet {
 
 func (m *manager) GetCPUAffinity(podUID, containerName string) cpuset.CPUSet {
 	return m.state.GetCPUSetOrDefault(podUID, containerName)
+}
+
+func ResourcesQualifyForExclusiveCPUs(container *v1.Container) bool {
+	if !cmqos.IsContainerEquivalentQOSGuaranteed(container) {
+		return false
+	}
+
+	cpuLimit := container.Resources.Limits[v1.ResourceCPU]
+	return cpuLimit.Value()*1000 == cpuLimit.MilliValue()
 }
