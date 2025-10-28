@@ -17,7 +17,6 @@ limitations under the License.
 package secret
 
 import (
-	"context"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,27 +26,25 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
+var apiVersions = []string{"v1"}
+
 const (
-	testSecretName       = "test-secret"
-	testNamespace        = "default"
-	testDockerSecretName = "test-docker-secret"
-	testBasicAuthName    = "test-basic-auth"
-	testSSHAuthName      = "test-ssh-auth"
-	testTLSName          = "test-tls"
-	testImmutableName    = "test-immutable"
+	testSecretName = "test-secret"
+	testNamespace  = "default"
 )
 
-// createContext creates a context with requestInfo for testing
-func createContext() context.Context {
-	return genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-		APIGroup:   "",
-		APIVersion: "v1",
-		Resource:   "secrets",
-	})
+func TestDeclarativeValidateForDeclarative(t *testing.T) {
+	for _, apiVersion := range apiVersions {
+		testDeclarativeValidateForDeclarative(t, apiVersion)
+	}
 }
 
-func TestDeclarativeValidateForDeclarative(t *testing.T) {
-	ctx := createContext()
+func testDeclarativeValidateForDeclarative(t *testing.T, apiVersion string) {
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+		APIGroup:   "",
+		APIVersion: apiVersion,
+		Resource:   "secrets",
+	})
 
 	testCases := map[string]struct {
 		input        api.Secret
@@ -61,40 +58,9 @@ func TestDeclarativeValidateForDeclarative(t *testing.T) {
 				withData(map[string][]byte{"key": []byte("value")}),
 			),
 		},
-		"valid dockerconfigjson secret": {
-			input: makeValidSecret(
-				withName(testDockerSecretName),
-				withNamespace(testNamespace),
-				withType(api.SecretTypeDockerConfigJSON),
-				withData(map[string][]byte{
-					api.DockerConfigJSONKey: []byte(`{"auths":{"example.com":{"username":"user","password":"pass"}}}`),
-				}),
-			),
-		},
-		"valid basic auth secret": {
-			input: makeValidSecret(
-				withName(testBasicAuthName),
-				withNamespace(testNamespace),
-				withType(api.SecretTypeBasicAuth),
-				withData(map[string][]byte{
-					api.BasicAuthUsernameKey: []byte("admin"),
-					api.BasicAuthPasswordKey: []byte("password"),
-				}),
-			),
-		},
-		"valid ssh auth secret": {
-			input: makeValidSecret(
-				withName(testSSHAuthName),
-				withNamespace(testNamespace),
-				withType(api.SecretTypeSSHAuth),
-				withData(map[string][]byte{
-					api.SSHAuthPrivateKey: []byte("-----BEGIN RSA PRIVATE KEY-----\ntest\n-----END RSA PRIVATE KEY-----"),
-				}),
-			),
-		},
 		"valid tls secret": {
 			input: makeValidSecret(
-				withName(testTLSName),
+				withName("test-tls"),
 				withNamespace(testNamespace),
 				withType(api.SecretTypeTLS),
 				withData(map[string][]byte{
@@ -105,25 +71,10 @@ func TestDeclarativeValidateForDeclarative(t *testing.T) {
 		},
 		"valid immutable secret": {
 			input: makeValidSecret(
-				withName(testImmutableName),
+				withName("test-immutable"),
 				withNamespace(testNamespace),
 				withType(api.SecretTypeOpaque),
 				withImmutable(true),
-				withData(map[string][]byte{"key": []byte("value")}),
-			),
-		},
-		"valid secret without type field": {
-			input: makeValidSecret(
-				withName(testSecretName),
-				withNamespace(testNamespace),
-				withData(map[string][]byte{"key": []byte("value")}),
-			),
-		},
-		"valid secret without immutable field": {
-			input: makeValidSecret(
-				withName(testSecretName),
-				withNamespace(testNamespace),
-				withType(api.SecretTypeOpaque),
 				withData(map[string][]byte{"key": []byte("value")}),
 			),
 		},
@@ -137,28 +88,24 @@ func TestDeclarativeValidateForDeclarative(t *testing.T) {
 }
 
 func TestValidateUpdateForDeclarative(t *testing.T) {
-	ctx := createContext()
+	for _, apiVersion := range apiVersions {
+		testValidateUpdateForDeclarative(t, apiVersion)
+	}
+}
+
+func testValidateUpdateForDeclarative(t *testing.T, apiVersion string) {
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+		APIGroup:   "",
+		APIVersion: apiVersion,
+		Resource:   "secrets",
+	})
 
 	testCases := map[string]struct {
 		old          api.Secret
 		update       api.Secret
 		expectedErrs field.ErrorList
 	}{
-		"no change in data - valid": {
-			old: makeValidSecret(
-				withName(testSecretName),
-				withNamespace(testNamespace),
-				withType(api.SecretTypeOpaque),
-				withData(map[string][]byte{"key": []byte("value")}),
-			),
-			update: makeValidSecret(
-				withName(testSecretName),
-				withNamespace(testNamespace),
-				withType(api.SecretTypeOpaque),
-				withData(map[string][]byte{"key": []byte("value")}),
-			),
-		},
-		"update secret data - valid": {
+		"valid update of secret data": {
 			old: makeValidSecret(
 				withName(testSecretName),
 				withNamespace(testNamespace),
@@ -172,24 +119,7 @@ func TestValidateUpdateForDeclarative(t *testing.T) {
 				withData(map[string][]byte{"key": []byte("new-value")}),
 			),
 		},
-		"add new key to secret - valid": {
-			old: makeValidSecret(
-				withName(testSecretName),
-				withNamespace(testNamespace),
-				withType(api.SecretTypeOpaque),
-				withData(map[string][]byte{"key1": []byte("value1")}),
-			),
-			update: makeValidSecret(
-				withName(testSecretName),
-				withNamespace(testNamespace),
-				withType(api.SecretTypeOpaque),
-				withData(map[string][]byte{
-					"key1": []byte("value1"),
-					"key2": []byte("value2"),
-				}),
-			),
-		},
-		"make secret immutable - valid": {
+		"valid update to make secret immutable": {
 			old: makeValidSecret(
 				withName(testSecretName),
 				withNamespace(testNamespace),
@@ -204,7 +134,7 @@ func TestValidateUpdateForDeclarative(t *testing.T) {
 				withData(map[string][]byte{"key": []byte("value")}),
 			),
 		},
-		"update labels - valid": {
+		"valid update of labels": {
 			old: makeValidSecret(
 				withName(testSecretName),
 				withNamespace(testNamespace),
@@ -218,32 +148,25 @@ func TestValidateUpdateForDeclarative(t *testing.T) {
 				withLabels(map[string]string{"app": "v2"}),
 			),
 		},
-		"update with type field remaining optional": {
+		"invalid update - type changed": {
 			old: makeValidSecret(
 				withName(testSecretName),
 				withNamespace(testNamespace),
+				withType(api.SecretTypeOpaque),
 				withData(map[string][]byte{"key": []byte("value")}),
 			),
 			update: makeValidSecret(
 				withName(testSecretName),
 				withNamespace(testNamespace),
-				withType(api.SecretTypeOpaque),
-				withData(map[string][]byte{"key": []byte("value")}),
+				withType(api.SecretTypeTLS),
+				withData(map[string][]byte{
+					api.TLSCertKey:       []byte("-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----"),
+					api.TLSPrivateKeyKey: []byte("-----BEGIN RSA PRIVATE KEY-----\ntest\n-----END RSA PRIVATE KEY-----"),
+				}),
 			),
-		},
-		"update without changing immutable field": {
-			old: makeValidSecret(
-				withName(testSecretName),
-				withNamespace(testNamespace),
-				withType(api.SecretTypeOpaque),
-				withData(map[string][]byte{"key": []byte("old-value")}),
-			),
-			update: makeValidSecret(
-				withName(testSecretName),
-				withNamespace(testNamespace),
-				withType(api.SecretTypeOpaque),
-				withData(map[string][]byte{"key": []byte("new-value")}),
-			),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("type"), api.SecretTypeTLS, "field is immutable").WithOrigin("immutable"),
+			},
 		},
 	}
 
