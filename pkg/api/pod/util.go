@@ -30,7 +30,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 // ContainerType signifies container type
@@ -747,7 +746,7 @@ func dropDisabledFields(
 		}
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(framework.WithNodeConformance()) && !restartableInitContainersInUse(oldPodSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) && !restartableInitContainersInUse(oldPodSpec) {
 		// Drop the RestartPolicy field of init containers.
 		for i := range podSpec.InitContainers {
 			podSpec.InitContainers[i].RestartPolicy = nil
