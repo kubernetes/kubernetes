@@ -18,6 +18,7 @@ package storageversiongc
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -26,9 +27,11 @@ import (
 	coordinationv1 "k8s.io/api/coordination/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
 )
@@ -39,8 +42,12 @@ func setupController(ctx context.Context, clientset kubernetes.Interface) {
 	storageVersionInformer := informerFactory.Internal().V1alpha1().StorageVersions()
 
 	controller := NewStorageVersionGC(ctx, clientset, leaseInformer, storageVersionInformer)
+	informerFactory.Start(ctx.Done())
+	// Using this ensure informer caches are fully populated before starting the controller.
+	if !cache.WaitForCacheSync(ctx.Done(), controller.leasesSynced, controller.storageVersionSynced) {
+		panic("timed out waiting for caches to sync")
+	}
 	go controller.Run(context.Background())
-	informerFactory.Start(nil)
 }
 
 func newKubeApiserverLease(name, holderIdentity string) *coordinationv1.Lease {
@@ -93,21 +100,13 @@ func Test_StorageVersionUpdatedWithAllEncodingVersionsEqualOnLeaseDeletion(t *te
 		},
 	}
 
-	clientset := fake.NewSimpleClientset(lease1, lease2, lease3, storageVersion)
+	clientset := fake.NewClientset(lease1, lease2, lease3, storageVersion)
 	_, ctx := ktesting.NewTestContext(t)
 	setupController(ctx, clientset)
 
 	// Delete the lease object and verify that storage version status is updated
 	if err := clientset.CoordinationV1().Leases(metav1.NamespaceSystem).Delete(context.Background(), "kube-apiserver-1", metav1.DeleteOptions{}); err != nil {
 		t.Fatalf("error deleting lease object: %v", err)
-	}
-
-	// add a delay to ensure controller had a chance to reconcile
-	time.Sleep(2 * time.Second)
-
-	storageVersion, err := clientset.InternalV1alpha1().StorageVersions().Get(context.Background(), "k8s.test.resources", metav1.GetOptions{})
-	if err != nil {
-		t.Fatalf("error getting StorageVersion: %v", err)
 	}
 
 	expectedServerStorageVersions := []apiserverinternalv1alpha1.ServerStorageVersion{
@@ -122,29 +121,47 @@ func Test_StorageVersionUpdatedWithAllEncodingVersionsEqualOnLeaseDeletion(t *te
 			DecodableVersions: []string{"v2"},
 		},
 	}
+	var lastErr error
 
-	if !reflect.DeepEqual(storageVersion.Status.StorageVersions, expectedServerStorageVersions) {
-		t.Error("unexpected storage version object")
-		t.Logf("got: %+v", storageVersion)
-		t.Logf("expected: %+v", expectedServerStorageVersions)
-	}
+	// Wait up to 5 seconds, checking every 100ms to ensure controller had a chance to reconcile
+	err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {
+		storageVersion, err := clientset.InternalV1alpha1().StorageVersions().Get(
+			ctx, "k8s.test.resources", metav1.GetOptions{},
+		)
+		if err != nil {
+			lastErr = fmt.Errorf("failed to get StorageVersion: %w", err)
+			return false, err
+		}
 
-	if *storageVersion.Status.CommonEncodingVersion != "v2" {
-		t.Errorf("unexpected common encoding version")
-		t.Logf("got: %q", *storageVersion.Status.CommonEncodingVersion)
-		t.Logf("expected: %q", "v2")
-	}
+		if !reflect.DeepEqual(storageVersion.Status.StorageVersions, expectedServerStorageVersions) {
+			lastErr = fmt.Errorf("storage versions mismatch: got %+v, expected %+v", storageVersion.Status.StorageVersions, expectedServerStorageVersions)
+			return false, err
+		}
+		if *storageVersion.Status.CommonEncodingVersion != "v2" {
+			t.Errorf("unexpected common encoding version")
+			t.Logf("got: %q", *storageVersion.Status.CommonEncodingVersion)
+			t.Logf("expected: %q", "v2")
+			return false, err
+		}
+		if len(storageVersion.Status.Conditions) != 1 {
+			lastErr = fmt.Errorf("CommonEncodingVersion mismatch: got %v, expected %q", storageVersion.Status.CommonEncodingVersion, "v2")
+			return false, err
+		}
 
-	if len(storageVersion.Status.Conditions) != 1 {
-		t.Errorf("expected 1 condition, got: %d", len(storageVersion.Status.Conditions))
-	}
+		if storageVersion.Status.Conditions[0].Type != apiserverinternalv1alpha1.AllEncodingVersionsEqual {
+			lastErr = fmt.Errorf("expected condition type 'AllEncodingVersionsEqual', got: %q", storageVersion.Status.Conditions[0].Type)
+			return false, nil
+		}
 
-	if storageVersion.Status.Conditions[0].Type != apiserverinternalv1alpha1.AllEncodingVersionsEqual {
-		t.Errorf("expected condition type 'AllEncodingVersionsEqual', got: %q", storageVersion.Status.Conditions[0].Type)
-	}
+		if storageVersion.Status.Conditions[0].Status != apiserverinternalv1alpha1.ConditionTrue {
+			lastErr = fmt.Errorf("expected condition status 'True', got: %q", storageVersion.Status.Conditions[0].Status)
+			return false, nil
+		}
+		return true, nil
+	})
 
-	if storageVersion.Status.Conditions[0].Status != apiserverinternalv1alpha1.ConditionTrue {
-		t.Errorf("expected condition status 'True', got: %q", storageVersion.Status.Conditions[0].Status)
+	if err != nil {
+		t.Fatalf("controller did not reconcile storage version in time: %v\nLast mismatch: %v", err, lastErr)
 	}
 }
 
