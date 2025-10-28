@@ -29,7 +29,6 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -2121,7 +2120,7 @@ var _ = SIGDescribe(framework.WithSerial(), "Containers Lifecycle", func() {
 	})
 })
 
-var _ = SIGDescribe(feature.SidecarContainers, "Containers Lifecycle", func() {
+var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", func() {
 	f := framework.NewDefaultFramework("containers-lifecycle-test")
 	addAfterEachForCleaningUpPods(f)
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
@@ -6016,7 +6015,7 @@ fi`},
 
 })
 
-var _ = SIGDescribe(feature.SidecarContainers, framework.WithSerial(), "Containers Lifecycle", func() {
+var _ = SIGDescribe(framework.WithNodeConformance(), framework.WithSerial(), "Containers Lifecycle", func() {
 	f := framework.NewDefaultFramework("containers-lifecycle-test-serial")
 	addAfterEachForCleaningUpPods(f)
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
