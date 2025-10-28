@@ -23,6 +23,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"errors"
 	"net/http/pprof"
 	"net/url"
 	"os"
@@ -275,7 +276,7 @@ func ListenAndServePodsServer(ctx context.Context, endpoint string, srv podsv1al
 
 	logger.Info("Starting to serve the pods API", "endpoint", endpoint)
 	go func() {
-		if err := server.Serve(l); err != nil && err != grpc.ErrServerStopped {
+		if err := server.Serve(l); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
 			logger.Error(err, "Failed to serve")
 			os.Exit(1)
 		}

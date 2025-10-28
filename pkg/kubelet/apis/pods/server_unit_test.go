@@ -25,6 +25,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
@@ -80,15 +81,14 @@ func TestListPods(t *testing.T) {
 	server.OnPodStatusUpdated(pod1, status1)
 	server.OnPodStatusUpdated(pod2, status2)
 	resp, err := server.ListPods(context.Background(), &podsv1alpha1.ListPodsRequest{})
-	assert.NoError(t, err)
-	assert.Len(t, resp.Pods, 2)
+	require.NoError(t, err)
 	pod1Out := &v1.Pod{}
 	err = pod1Out.Unmarshal(resp.Pods[0])
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	pod2Out := &v1.Pod{}
 	err = pod2Out.Unmarshal(resp.Pods[1])
-	assert.NoError(t, err)
-	assert.Equal(t, "pod1", pod1Out.Name)
+	require.NoError(t, err)
+	require.Equal(t, "pod1", pod1Out.Name)
 	assert.Equal(t, "pod2", pod2Out.Name)
 }
 
@@ -100,11 +100,11 @@ func TestGetPod(t *testing.T) {
 	server.OnPodAdded(pod1)
 	server.OnPodStatusUpdated(pod1, status1)
 	resp, err := server.GetPod(context.Background(), &podsv1alpha1.GetPodRequest{PodUID: "pod1-uid"})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	podOut := &v1.Pod{}
 	err = podOut.Unmarshal(resp.Pod)
-	assert.NoError(t, err)
-	assert.Equal(t, "pod1", podOut.Name)
+	require.NoError(t, err)
+	require.Equal(t, "pod1", podOut.Name)
 	assert.Equal(t, v1.PodRunning, podOut.Status.Phase)
 }
 
@@ -121,12 +121,12 @@ func TestPodServerFieldMasks(t *testing.T) {
 		fieldMask := &fieldmaskpb.FieldMask{Paths: []string{"metadata.name", "spec.nodeName"}}
 		ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(podsapi.FieldMaskMetadataKey, strings.Join(fieldMask.Paths, ",")))
 		resp, err := server.ListPods(ctx, &podsv1alpha1.ListPodsRequest{})
-		assert.NoError(t, err)
-		assert.Len(t, resp.Pods, 1)
+		require.NoError(t, err)
+		require.Len(t, resp.Pods, 1)
 		maskedPod := &v1.Pod{}
 		err = maskedPod.Unmarshal(resp.Pods[0])
-		assert.NoError(t, err)
-		assert.Equal(t, "pod1", maskedPod.Name)
+		require.NoError(t, err)
+		require.Equal(t, "pod1", maskedPod.Name)
 		assert.Equal(t, "node1", maskedPod.Spec.NodeName)
 		assert.Empty(t, maskedPod.Namespace)
 		assert.Empty(t, maskedPod.Status.Phase)
@@ -135,11 +135,11 @@ func TestPodServerFieldMasks(t *testing.T) {
 		fieldMask := &fieldmaskpb.FieldMask{Paths: []string{"metadata.namespace", "status.phase"}}
 		ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(podsapi.FieldMaskMetadataKey, strings.Join(fieldMask.Paths, ",")))
 		resp, err := server.GetPod(ctx, &podsv1alpha1.GetPodRequest{PodUID: "pod1-uid"})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		maskedPod := &v1.Pod{}
 		err = maskedPod.Unmarshal(resp.Pod)
-		assert.NoError(t, err)
-		assert.Empty(t, maskedPod.Name)
+		require.NoError(t, err)
+		require.Empty(t, maskedPod.Name)
 		assert.Equal(t, "ns1", maskedPod.Namespace)
 		assert.Empty(t, maskedPod.Spec.NodeName)
 		assert.Equal(t, v1.PodRunning, maskedPod.Status.Phase)
@@ -147,21 +147,21 @@ func TestPodServerFieldMasks(t *testing.T) {
 	t.Run("ListPodsWithEmptyFieldMask", func(t *testing.T) {
 		ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(podsapi.FieldMaskMetadataKey, ""))
 		resp, err := server.ListPods(ctx, &podsv1alpha1.ListPodsRequest{})
-		assert.NoError(t, err)
-		assert.Len(t, resp.Pods, 1)
+		require.NoError(t, err)
+		require.Len(t, resp.Pods, 1)
 		podOut := &v1.Pod{}
 		err = podOut.Unmarshal(resp.Pods[0])
-		assert.NoError(t, err)
-		assert.Equal(t, pod1, podOut)
+		require.NoError(t, err)
+		require.Equal(t, pod1, podOut)
 	})
 	t.Run("GetPodWithNilFieldMask", func(t *testing.T) {
 		ctx := context.Background()
 		resp, err := server.GetPod(ctx, &podsv1alpha1.GetPodRequest{PodUID: "pod1-uid"})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		podOut := &v1.Pod{}
 		err = podOut.Unmarshal(resp.Pod)
-		assert.NoError(t, err)
-		assert.Equal(t, pod1, podOut)
+		require.NoError(t, err)
+		require.Equal(t, pod1, podOut)
 	})
 }
 
@@ -197,8 +197,8 @@ func getAllPaths(t reflect.Type, prefix string, paths map[string]bool) {
 			fieldType = fieldType.Elem()
 		}
 		if fieldType.Kind() == reflect.Struct {
-			if !(strings.Contains(fieldType.PkgPath(), "k8s.io/apimachinery/pkg/apis/meta/v1") &&
-				(fieldType.Name() == "Time" || fieldType.Name() == "Duration" || fieldType.Name() == "MicroTime")) {
+			if !strings.Contains(fieldType.PkgPath(), "k8s.io/apimachinery/pkg/apis/meta/v1") ||
+				!(fieldType.Name() == "Time" || fieldType.Name() == "Duration" || fieldType.Name() == "MicroTime") {
 				getAllPaths(fieldType, path, paths)
 			}
 		}
@@ -307,10 +307,10 @@ func TestGetPodWithVariousFieldMasks(t *testing.T) {
 	}
 	server.OnPodAdded(v1Pod)
 	fullResp, err := server.GetPod(context.Background(), &podsv1alpha1.GetPodRequest{PodUID: "test-uid"})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	fullAlphaPod := &v1.Pod{}
 	err = fullAlphaPod.Unmarshal(fullResp.Pod)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	pathsMap := make(map[string]bool)
 	getAllPaths(reflect.TypeOf(*v1Pod), "", pathsMap)
 	var paths []string
@@ -325,15 +325,15 @@ func TestGetPodWithVariousFieldMasks(t *testing.T) {
 		t.Run(path, func(t *testing.T) {
 			ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(podsapi.FieldMaskMetadataKey, path))
 			resp, err := server.GetPod(ctx, &podsv1alpha1.GetPodRequest{PodUID: "test-uid"})
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			maskedPodFromAPI := &v1.Pod{}
 			err = maskedPodFromAPI.Unmarshal(resp.Pod)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			fieldMask := &fieldmaskpb.FieldMask{Paths: []string{path}}
 			expectedMaskedPod := &v1.Pod{}
 			err = podsapi.ApplyFieldMask(fieldMask, fullAlphaPod, expectedMaskedPod)
-			assert.NoError(t, err)
-			assert.Equal(t, expectedMaskedPod, maskedPodFromAPI)
+			require.NoError(t, err)
+			require.Equal(t, expectedMaskedPod, maskedPodFromAPI)
 		})
 	}
 }
@@ -440,11 +440,11 @@ func TestListPodsWithVariousFieldMasks(t *testing.T) {
 	}
 	server.OnPodAdded(v1Pod)
 	fullResp, err := server.ListPods(context.Background(), &podsv1alpha1.ListPodsRequest{})
-	assert.NoError(t, err)
-	assert.Len(t, fullResp.Pods, 1)
+	require.NoError(t, err)
+	require.Len(t, fullResp.Pods, 1)
 	fullAlphaPod := &v1.Pod{}
 	err = fullAlphaPod.Unmarshal(fullResp.Pods[0])
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	pathsMap := make(map[string]bool)
 	getAllPaths(reflect.TypeOf(*v1Pod), "", pathsMap)
 	var paths []string
@@ -459,16 +459,16 @@ func TestListPodsWithVariousFieldMasks(t *testing.T) {
 		t.Run(path, func(t *testing.T) {
 			ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(podsapi.FieldMaskMetadataKey, path))
 			resp, err := server.ListPods(ctx, &podsv1alpha1.ListPodsRequest{})
-			assert.NoError(t, err)
-			assert.Len(t, resp.Pods, 1)
+			require.NoError(t, err)
+			require.Len(t, resp.Pods, 1)
 			maskedPodFromAPI := &v1.Pod{}
 			err = maskedPodFromAPI.Unmarshal(resp.Pods[0])
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			fieldMask := &fieldmaskpb.FieldMask{Paths: []string{path}}
 			expectedMaskedPod := &v1.Pod{}
 			err = podsapi.ApplyFieldMask(fieldMask, fullAlphaPod, expectedMaskedPod)
-			assert.NoError(t, err)
-			assert.Equal(t, expectedMaskedPod, maskedPodFromAPI)
+			require.NoError(t, err)
+			require.Equal(t, expectedMaskedPod, maskedPodFromAPI)
 		})
 	}
 }
@@ -497,7 +497,7 @@ func TestErrorsAndMetrics(t *testing.T) {
 			# TYPE kubelet_pod_watch_events_dropped_total counter
 			kubelet_pod_watch_events_dropped_total 1
 		`))
-		assert.NoError(t, err)
+			require.NoError(t, err)
 	})
 
 	t.Run("InvalidFieldMaskReturnsError", func(t *testing.T) {
