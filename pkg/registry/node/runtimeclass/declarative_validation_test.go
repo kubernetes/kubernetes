@@ -29,13 +29,6 @@ import (
 	node "k8s.io/kubernetes/pkg/apis/node"
 )
 
-// mkValidRuntimeClassRequired builds a RuntimeClass that is valid
-// under the assumption that Overhead and Scheduling are now REQUIRED
-// via +k8s:required, and Handler:
-//   - is a valid DNS label (e.g. "runc")
-//   - is immutable via +k8s:immutable.
-//
-// We populate minimal sane values so handwritten validation passes.
 func mkValidRuntimeClassRequired(tweaks ...func(rc *node.RuntimeClass)) node.RuntimeClass {
 	rc := node.RuntimeClass{
 		ObjectMeta: metav1.ObjectMeta{
@@ -59,7 +52,6 @@ func mkValidRuntimeClassRequired(tweaks ...func(rc *node.RuntimeClass)) node.Run
 			NodeSelector: map[string]string{
 				"kubernetes.io/arch": "amd64",
 			},
-			// Tolerations may be empty.
 		},
 	}
 
@@ -69,23 +61,6 @@ func mkValidRuntimeClassRequired(tweaks ...func(rc *node.RuntimeClass)) node.Run
 	return rc
 }
 
-// TestRuntimeClassValidateRequiredForDeclarative ensures that CREATE-time
-// validation for RuntimeClass matches between handwritten validation and
-// declarative validation when Overhead and Scheduling are tagged:
-//
-//	// +required
-//	// +k8s:required
-//
-// on the internal API type.
-//
-// We expect:
-//   - both present  -> no errors
-//   - missing one   -> "field is required" for that field
-//   - missing both  -> both errors
-//
-// expectedErrs uses field.Required(...).MarkCoveredByDeclarative(), assuming
-// handwritten Strategy.Validate marks those required-field errors with
-// MarkCoveredByDeclarative() the same way declarative validation does.
 func TestRuntimeClassValidateRequiredForDeclarative(t *testing.T) {
 	apiVersions := []string{"v1", "v1beta1"}
 
@@ -154,19 +129,6 @@ func TestRuntimeClassValidateRequiredForDeclarative(t *testing.T) {
 	}
 }
 
-// TestRuntimeClassValidateImmutableHandlerForDeclarative ensures that UPDATE-time
-// validation for RuntimeClass matches between handwritten validation and
-// declarative validation for the `handler` field, which is tagged:
-//
-//	// +k8s:immutable
-//
-// We expect:
-//   - no-op update: no errors
-//   - changed handler: immutable-field error on "handler"
-//
-// expectedErrs uses field.Invalid(... apivalidation.FieldImmutableErrorMsg)
-// and we call MarkCoveredByDeclarative() so its Origin matches what
-// declarative validation emits ("immutable").
 func TestRuntimeClassValidateImmutableHandlerForDeclarative(t *testing.T) {
 	apiVersions := []string{"v1", "v1beta1"}
 
