@@ -29,7 +29,6 @@ import (
 	utilcompatibility "k8s.io/apiserver/pkg/util/compatibility"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
-	restclient "k8s.io/client-go/rest"
 	"k8s.io/component-base/compatibility"
 	"k8s.io/component-base/configz"
 	"k8s.io/component-base/featuregate"
@@ -53,11 +52,10 @@ type TearDownFunc func()
 
 // TestServer return values supplied by kube-test-ApiServer
 type TestServer struct {
-	LoopbackClientConfig *restclient.Config // Rest client config using the magic token
-	Options              *options.Options
-	Config               *kubeschedulerconfig.Config
-	TearDownFn           TearDownFunc // TearDown function
-	TmpDir               string       // Temp Dir used, by the apiserver
+	Options    *options.Options
+	Config     *kubeschedulerconfig.Config
+	TearDownFn TearDownFunc // TearDown function
+	TmpDir     string       // Temp Dir used, by the apiserver
 }
 
 // StartTestServer starts a kube-scheduler. A rest client config and a tear-down func,
@@ -139,6 +137,9 @@ func StartTestServer(t *testing.T, ctx context.Context, customFlags []string) (r
 		logger.Info("kube-scheduler will listen securely", "port", opts.SecureServing.BindPort)
 	}
 
+	// Always exempt /healthz from authorization because we use it to verify startup below.
+	opts.Authorization.AlwaysAllowPaths = append(opts.Authorization.AlwaysAllowPaths, "/healthz")
+
 	cc, sched, err := app.Setup(ctx, opts)
 	if err != nil {
 		return result, fmt.Errorf("failed to create config from options: %v", err)
@@ -153,10 +154,22 @@ func StartTestServer(t *testing.T, ctx context.Context, customFlags []string) (r
 	}(ctx)
 
 	logger.Info("Waiting for /healthz to be ok...")
-	client, err := kubernetes.NewForConfig(cc.LoopbackClientConfig)
+
+	// Cannot use cc.Kubeconfig since it is overwritten to point to kube-apiserver,
+	// build our own client instead.
+	serverCert, _ := cc.SecureServing.Cert.CurrentCertKeyContent()
+	clientConfig, err := cc.SecureServing.NewClientConfig(serverCert)
 	if err != nil {
-		return result, fmt.Errorf("failed to create a client: %v", err)
+		return result, fmt.Errorf("getting secure serving rest config %w", err)
 	}
+
+	// The server cert only includes IPv4 localhost, not IPv6.
+	clientConfig.TLSClientConfig.ServerName = "127.0.0.1"
+	client, err := kubernetes.NewForConfig(clientConfig)
+	if err != nil {
+		return result, fmt.Errorf("creating client: %w", err)
+	}
+
 	err = wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 30*time.Second, false, func(ctx context.Context) (bool, error) {
 		select {
 		case err := <-errCh:
@@ -164,12 +177,12 @@ func StartTestServer(t *testing.T, ctx context.Context, customFlags []string) (r
 		default:
 		}
 
-		result := client.CoreV1().RESTClient().Get().AbsPath("/healthz").Do(ctx)
 		status := 0
-		result.StatusCode(&status)
+		client.CoreV1().RESTClient().Get().AbsPath("/healthz").Do(ctx).StatusCode(&status)
 		if status == 200 {
 			return true, nil
 		}
+
 		return false, nil
 	})
 	if err != nil {
@@ -177,7 +190,6 @@ func StartTestServer(t *testing.T, ctx context.Context, customFlags []string) (r
 	}
 
 	// from here the caller must call tearDown
-	result.LoopbackClientConfig = cc.LoopbackClientConfig
 	result.Options = opts
 	result.Config = cc.Config
 	result.TearDownFn = tearDown

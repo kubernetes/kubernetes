@@ -39,9 +39,6 @@ type Config struct {
 	// ComponentConfig is the scheduler server's configuration object.
 	ComponentConfig kubeschedulerconfig.KubeSchedulerConfiguration
 
-	// LoopbackClientConfig is a config for a privileged loopback connection
-	LoopbackClientConfig *restclient.Config
-
 	Authentication apiserver.AuthenticationInfo
 	Authorization  apiserver.AuthorizationInfo
 	SecureServing  *apiserver.SecureServingInfo
@@ -80,8 +77,6 @@ type CompletedConfig struct {
 // Complete fills in any fields not set that are required to have valid data. It's mutating the receiver.
 func (c *Config) Complete() CompletedConfig {
 	cc := completedConfig{c}
-
-	apiserver.AuthorizeClientBearerToken(c.LoopbackClientConfig, &c.Authentication, &c.Authorization)
 
 	return CompletedConfig{&cc}
 }
