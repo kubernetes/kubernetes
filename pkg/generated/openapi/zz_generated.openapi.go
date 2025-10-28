@@ -40490,7 +40490,6 @@ func schema_k8sio_api_imagepolicy_v1alpha1_ImageReview(ref common.ReferenceCallb
 						},
 					},
 				},
-				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -40614,7 +40613,6 @@ func schema_k8sio_api_imagepolicy_v1alpha1_ImageReviewStatus(ref common.Referenc
 						},
 					},
 				},
-				Required: []string{"allowed"},
 			},
 		},
 	}
