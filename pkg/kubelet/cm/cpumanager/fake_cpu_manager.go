@@ -24,6 +24,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
+	cmqos "k8s.io/kubernetes/pkg/kubelet/cm/qos"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/status"
@@ -102,6 +103,10 @@ func (m *fakeManager) GetCPUAffinity(podUID, containerName string) cpuset.CPUSet
 func (m *fakeManager) GetAllCPUs() cpuset.CPUSet {
 	m.logger.Info("GetAllCPUs")
 	return cpuset.CPUSet{}
+}
+
+func (m *fakeManager) GetResourceIsolationLevel(pod *v1.Pod, container *v1.Container) cmqos.ResourceIsolationLevel {
+	return cmqos.ResourceIsolationContainer
 }
 
 // NewFakeManager creates empty/fake cpu manager
