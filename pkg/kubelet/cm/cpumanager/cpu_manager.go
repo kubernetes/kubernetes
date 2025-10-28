@@ -90,6 +90,9 @@ type Manager interface {
 	// among this and other resource controllers.
 	GetPodTopologyHints(pod *v1.Pod) map[string][]topologymanager.TopologyHint
 
+	// AllocatePod is called to trigger the allocation of CPUs to a pod.
+	AllocatePod(pod *v1.Pod) error
+
 	// GetAllocatableCPUs returns the total set of CPUs available for allocation.
 	GetAllocatableCPUs() cpuset.CPUSet
 
@@ -271,6 +274,12 @@ func (m *manager) Allocate(p *v1.Pod, c *v1.Container) error {
 		logger.Error(err, "policy error")
 		return err
 	}
+
+	return nil
+}
+
+func (m *manager) AllocatePod(pod *v1.Pod) error {
+	// Implement AllocatePod in the corresponding policies
 
 	return nil
 }
