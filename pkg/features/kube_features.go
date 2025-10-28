@@ -2207,11 +2207,11 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	PodReadyToStartContainersCondition: {},
 
-	PodsAPI: {},
-
 	PodSchedulingReadiness: {},
 
 	PodTopologyLabelsAdmission: {},
+
+	PodsAPI: {},
 
 	PortForwardWebsockets: {},
 
