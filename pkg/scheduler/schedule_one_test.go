@@ -1212,6 +1212,7 @@ func TestSignatures(t *testing.T) {
 	testPodLabel.Labels = map[string]string{"foo": "bar"}
 	testPodPort := podWithPort("bar", "", 15)
 	testPodAffinity := podWithAffinity("bat", "", "foo")
+	testPodPortRes := podWithPort("bar", "", 16)
 
 	cpu := int64(100)
 	mem := int64(400000)
@@ -1222,6 +1223,11 @@ func TestSignatures(t *testing.T) {
 		v1.ResourceCPU:    *(resource.NewQuantity(cpu, resource.DecimalSI)),
 		v1.ResourceMemory: *(resource.NewQuantity(mem, resource.DecimalSI)),
 	})
+
+	testPodPortRes.Spec.Containers[0].Resources.Requests = v1.ResourceList{
+		v1.ResourceCPU:    *(resource.NewQuantity(cpu, resource.DecimalSI)),
+		v1.ResourceMemory: *(resource.NewQuantity(mem, resource.DecimalSI)),
+	}
 
 	popSpreadNoDefaults := &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}
 
@@ -1263,6 +1269,15 @@ func TestSignatures(t *testing.T) {
 			expectedSignature: `{"Pod":{"Spec.Containers":"[{\"name\":\"ctr\",\"resources\":{\"limits\":{\"cpu\":\"100\",\"memory\":\"400k\"},\"requests\":{\"cpu\":\"100\",\"memory\":\"400k\"}}}]","Spec.InitContainers":"null","Spec.SchedulerName":"\"test-scheduler\""},"Plugin":{}}`,
 		},
 		{
+			name:    "pod port res",
+			sendPod: testPodRes,
+			registerPluginFuncs: []tf.RegisterPluginFunc{
+				tf.RegisterPluginAsExtensions(nodeports.Name, frameworkruntime.FactoryAdapter(fts, nodeports.New), "Filter", "PreFilter"),
+				tf.RegisterPluginAsExtensions(noderesources.Name, frameworkruntime.FactoryAdapter(fts, noderesources.NewFit), "Filter", "PreFilter"),
+			},
+			expectedSignature: `{"Pod":{"Spec.Containers":"[{\"name\":\"ctr\",\"resources\":{\"limits\":{\"cpu\":\"100\",\"memory\":\"400k\"},\"requests\":{\"cpu\":\"100\",\"memory\":\"400k\"}}}]","Spec.InitContainers":"null","Spec.SchedulerName":"\"test-scheduler\""},"Plugin":{}}`,
+		},
+		{
 			name:    "pod affinity",
 			sendPod: testPodAffinity,
 			registerPluginFuncs: []tf.RegisterPluginFunc{
@@ -1277,6 +1292,15 @@ func TestSignatures(t *testing.T) {
 				tf.RegisterPluginAsExtensions(interpodaffinity.Name, frameworkruntime.FactoryAdapter(fts, interpodaffinity.New), "Filter", "PreFilter"),
 			},
 			expectedSignature: `{"Pod":{"Labels":"{\"foo\":\"bar\"}","Spec.SchedulerName":"\"test-scheduler\""},"Plugin":{}}`,
+		},
+		{
+			name:    "pod affinity labels and port (multiple pod entries)",
+			sendPod: testPodLabel,
+			registerPluginFuncs: []tf.RegisterPluginFunc{
+				tf.RegisterPluginAsExtensions(nodeports.Name, frameworkruntime.FactoryAdapter(fts, nodeports.New), "Filter", "PreFilter"),
+				tf.RegisterPluginAsExtensions(interpodaffinity.Name, frameworkruntime.FactoryAdapter(fts, interpodaffinity.New), "Filter", "PreFilter"),
+			},
+			expectedSignature: `{"Pod":{"Labels":"{\"foo\":\"bar\"}","Spec.Containers":"null","Spec.InitContainers":"null","Spec.SchedulerName":"\"test-scheduler\""},"Plugin":{}}`,
 		},
 		{
 			name:    "pod spread",
