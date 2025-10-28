@@ -141,7 +141,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 
 	cm.topologyManager = topologymanager.NewFakeManager()
 	cm.cpuManager = cpumanager.NewFakeManager(klog.TODO())
-	cm.memoryManager = memorymanager.NewFakeManager(context.TODO())
+	cm.memoryManager = memorymanager.NewFakeManager(klog.TODO())
 
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WindowsCPUAndMemoryAffinity) {
 		klog.InfoS("Creating topology manager")
@@ -174,7 +174,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 
 		klog.InfoS("Creating memory manager")
 		cm.memoryManager, err = memorymanager.NewManager(
-			context.TODO(),
+			klog.TODO(),
 			nodeConfig.MemoryManagerPolicy,
 			machineInfo,
 			cm.GetNodeAllocatableReservation(),
