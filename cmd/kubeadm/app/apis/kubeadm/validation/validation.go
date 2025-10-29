@@ -329,7 +329,14 @@ func ValidateEtcd(e *kubeadm.Etcd, fldPath *field.Path) field.ErrorList {
 			allErrs = append(allErrs, field.Invalid(externalPath, "", "setting .Etcd.External.CertFile and .Etcd.External.KeyFile requires .Etcd.External.CAFile"))
 		}
 
-		allErrs = append(allErrs, ValidateURLs(e.External.Endpoints, requireHTTPS, externalPath.Child("endpoints"))...)
+		if len(e.External.Endpoints) == 0 {
+			allErrs = append(allErrs, field.Invalid(externalPath.Child("endpoints"), "", "at least one endpoint must be specified"))
+		} else {
+			allErrs = append(allErrs, ValidateURLs(e.External.Endpoints, requireHTTPS, externalPath.Child("endpoints"))...)
+		}
+
+		allErrs = append(allErrs, ValidateURLs(e.External.HTTPEndpoints, false /* requireHTTPS */, externalPath.Child("httpEndpoints"))...)
+
 		if e.External.CAFile != "" {
 			allErrs = append(allErrs, ValidateAbsolutePath(e.External.CAFile, externalPath.Child("caFile"))...)
 		}
