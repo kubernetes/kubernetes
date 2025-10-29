@@ -237,9 +237,10 @@ func (rc *reconciler) reconcile(ctx context.Context) {
 				continue
 			}
 
+			verifySafeToDetach := !forceDetach && !hasOutOfServiceTaint
 			// Before triggering volume detach, mark volume as detached and update the node status
 			// Wait until the update is propagated to Node object.
-			removed := rc.actualStateOfWorld.RemoveVolumeFromReportAsAttached(logger, attachedVolume.VolumeName, attachedVolume.NodeName)
+			removed := rc.actualStateOfWorld.RemoveVolumeFromReportAsAttached(logger, attachedVolume.VolumeName, attachedVolume.NodeName, verifySafeToDetach)
 			if !removed {
 				logger.V(5).Info("waiting RemoveVolumeFromReportAsAttached",
 					"node", klog.KRef("", string(attachedVolume.NodeName)),
@@ -254,7 +255,6 @@ func (rc *reconciler) reconcile(ctx context.Context) {
 			if hasOutOfServiceTaint {
 				logger.V(4).Info("node has out-of-service taint", "node", klog.KRef("", string(attachedVolume.NodeName)))
 			}
-			verifySafeToDetach := !forceDetach && !hasOutOfServiceTaint
 			err = rc.attacherDetacher.DetachVolume(logger, attachedVolume.AttachedVolume, verifySafeToDetach, rc.actualStateOfWorld)
 			if err == nil {
 				if verifySafeToDetach { // normal detach

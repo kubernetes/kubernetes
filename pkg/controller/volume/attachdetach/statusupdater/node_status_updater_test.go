@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -218,7 +219,7 @@ func TestRemove(t *testing.T) {
 	}
 
 	// ask for removal
-	removed := asw.RemoveVolumeFromReportAsAttached(logger, "volume-name-1", "testnode-1")
+	removed := asw.RemoveVolumeFromReportAsAttached(logger, "volume-name-1", "testnode-1", true)
 	if removed {
 		t.Fatalf("RemoveVolumeFromReportAsAttached returned true, expected false")
 	}
@@ -230,7 +231,7 @@ func TestRemove(t *testing.T) {
 	}
 
 	// should be removed now
-	removed = asw.RemoveVolumeFromReportAsAttached(logger, "volume-name-1", "testnode-1")
+	removed = asw.RemoveVolumeFromReportAsAttached(logger, "volume-name-1", "testnode-1", true)
 	if !removed {
 		t.Fatalf("RemoveVolumeFromReportAsAttached returned false, expected true")
 	}
@@ -255,7 +256,7 @@ func TestNodeNotFound(t *testing.T) {
 	}
 
 	// ask for removal
-	removed := asw.RemoveVolumeFromReportAsAttached(logger, "volume-name-1", "testnode-1")
+	removed := asw.RemoveVolumeFromReportAsAttached(logger, "volume-name-1", "testnode-1", true)
 	if removed {
 		t.Fatalf("RemoveVolumeFromReportAsAttached returned true, expected false")
 	}
@@ -267,10 +268,68 @@ func TestNodeNotFound(t *testing.T) {
 	}
 
 	// should be removed now even if the node is gone
-	removed = asw.RemoveVolumeFromReportAsAttached(logger, "volume-name-1", "testnode-1")
+	removed = asw.RemoveVolumeFromReportAsAttached(logger, "volume-name-1", "testnode-1", true)
 	if !removed {
 		t.Fatalf("RemoveVolumeFromReportAsAttached returned false, expected true")
 	}
+}
+
+func TestNotRemoveInUseVolumes(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+
+	synctest.Test(t, func(t *testing.T) {
+		asw, fakeKubeClient, nsu := setupNodeStatusUpdate(logger, t)
+		// do attach
+		err := nsu.processNodeVolumes(ctx, "testnode-1")
+		if err != nil {
+			t.Fatalf("processNodeVolumes failed. Expected: <no error> Actual: <%v>", err)
+		}
+
+		// mark volume as in-use
+		node, err := fakeKubeClient.CoreV1().Nodes().Get(ctx, "testnode-1", metav1.GetOptions{})
+		if err != nil {
+			t.Fatalf("Nodes().Get failed. Expected: <no error> Actual: <%v>", err)
+		}
+		node.Status.VolumesInUse = []corev1.UniqueVolumeName{"volume-name-1"}
+		_, err = fakeKubeClient.CoreV1().Nodes().UpdateStatus(ctx, node, metav1.UpdateOptions{})
+		if err != nil {
+			t.Fatalf("Nodes().UpdateStatus failed. Expected: <no error> Actual: <%v>", err)
+		}
+		synctest.Wait() // wait for informer sync
+
+		// ask for removal
+		removed := asw.RemoveVolumeFromReportAsAttached(logger, "volume-name-1", "testnode-1", true)
+		if removed {
+			t.Fatalf("RemoveVolumeFromReportAsAttached returned true, expected false")
+		}
+
+		// do removal, will not remove in-use volume
+		err = nsu.processNodeVolumes(ctx, "testnode-1")
+		if err != nil {
+			t.Fatalf("processNodeVolumes failed. Expected: <no error> Actual: <%v>", err)
+		}
+
+		assertVolumeAttached(t, ctx, fakeKubeClient, "testnode-1", "volume-name-1")
+
+		// should still not removed, try force removal now
+		removed = asw.RemoveVolumeFromReportAsAttached(logger, "volume-name-1", "testnode-1", false)
+		if removed {
+			t.Fatalf("RemoveVolumeFromReportAsAttached returned true, expected false")
+		}
+
+		err = nsu.processNodeVolumes(ctx, "testnode-1")
+		if err != nil {
+			t.Fatalf("processNodeVolumes failed. Expected: <no error> Actual: <%v>", err)
+		}
+
+		// should be removed now
+		removed = asw.RemoveVolumeFromReportAsAttached(logger, "volume-name-1", "testnode-1", false)
+		if !removed {
+			t.Fatalf("RemoveVolumeFromReportAsAttached returned false, expected true")
+		}
+
+		assertNoVolumeAttached(t, ctx, fakeKubeClient, "testnode-1")
+	})
 }
 
 func TestRun(t *testing.T) {

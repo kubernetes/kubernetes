@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -143,14 +144,19 @@ type nodeStatusPatch struct {
 	VolumesAttached []v1.AttachedVolume `json:"volumesAttached"` // intentional not omitempty
 }
 
+type objectMetaPatch struct {
+	ResourceVersion string `json:"resourceVersion,omitempty"`
+}
+
 type nodePatch struct {
-	Status nodeStatusPatch `json:"status"`
+	ObjectMeta objectMetaPatch `json:"metadata,omitzero"`
+	Status     nodeStatusPatch `json:"status"`
 }
 
 func removingVolumes(volumes []cache.VolumeToReport) []v1.UniqueVolumeName {
 	removed := make([]v1.UniqueVolumeName, 0)
 	for _, vol := range volumes {
-		if vol.Report == cache.NodeStatusReportForceRemoving {
+		if vol.Report == cache.NodeStatusReportRemoving || vol.Report == cache.NodeStatusReportForceRemoving {
 			removed = append(removed, vol.Volume.Name)
 		}
 	}
@@ -179,21 +185,40 @@ func (nsu *nodeStatusUpdater) processNodeVolumes(ctx context.Context, nodeName t
 
 	var attachedVolumes []v1.AttachedVolume
 	var removedVolumes []v1.UniqueVolumeName
+	var resourceVersion string // only set if we remove some volumes, to ensure kubelet doesn't add inUse volumes back after we check.
+	var inUseVolumes sets.Set[v1.UniqueVolumeName]
 	for _, vol := range volumesToReport {
 		switch vol.Report {
 		case cache.NodeStatusReportAdding:
 			attachedVolumes = append(attachedVolumes, vol.Volume)
+		case cache.NodeStatusReportRemoving:
+			if inUseVolumes == nil {
+				inUseVolumes = sets.New(nodeObj.Status.VolumesInUse...)
+			}
+			if !inUseVolumes.Has(vol.Volume.Name) {
+				resourceVersion = nodeObj.ResourceVersion
+				removedVolumes = append(removedVolumes, vol.Volume.Name)
+			} else {
+				logger.V(4).Info("Volume is still in use on node; will not remove from status",
+					"node", klog.KObj(nodeObj), "volumeName", vol.Volume.Name)
+				attachedVolumes = append(attachedVolumes, vol.Volume)
+			}
 		case cache.NodeStatusReportForceRemoving:
 			removedVolumes = append(removedVolumes, vol.Volume.Name)
 		}
 	}
+	// Both sides are sorted (we only ever write this list sorted), so slices.Equal is exact.
+	// An external reorder just triggers one corrective patch, then stays quiet.
 	if len(removedVolumes) == 0 && slices.Equal(attachedVolumes, nodeObj.Status.VolumesAttached) {
 		return nil // No update required
 		// we always do a patch if removedVolumes is non-empty
-		// in case the nodeObj from the lister is stale
+		// in case the nodeObj from the lister is stale and we mis-report a volume as removed
 	}
 
 	nodePatch := nodePatch{
+		ObjectMeta: objectMetaPatch{
+			ResourceVersion: resourceVersion,
+		},
 		Status: nodeStatusPatch{
 			VolumesAttached: attachedVolumes,
 		},
@@ -210,6 +235,11 @@ func (nsu *nodeStatusUpdater) processNodeVolumes(ctx context.Context, nodeName t
 		// Should queue again when the node is created to populate attached volumes.
 		logger.V(2).Info(
 			"Could not update node status, node does not exist - skipping", "node", klog.KObj(nodeObj))
+		return nil
+	} else if errors.IsConflict(err) {
+		// etcd holds a newer version than the one we read from the informer cache.
+		// Its watch event is already on its way to our informer.
+		logger.V(2).Info("Conflict updating node status; waiting for next event", "node", klog.KObj(nodeObj), "err", err)
 		return nil
 	} else if err != nil {
 		logger.V(2).Info("Could not update node status; re-marking for update", "node", klog.KObj(nodeObj), "err", err)
