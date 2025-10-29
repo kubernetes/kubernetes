@@ -323,10 +323,8 @@ type PluginPolicy struct {
 	// then the executable in question may execute. That is, the result is the
 	// logical OR of all entries in the allowlist. This list MUST be nil
 	// whenever the policy is not "Allowlist".
-	Allowlist Allowlist `json:"-"`
+	Allowlist []AllowlistEntry `json:"-"`
 }
-
-type Allowlist []AllowlistEntry
 
 type PolicyType string
 

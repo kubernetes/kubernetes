@@ -87,7 +87,7 @@ type Preference struct {
 	// In the above example, the user allows the credential plugins
 	// `cloud-provider-plugin` (found somewhere in PATH), and the plugin found
 	// at the explicit path `/usr/local/bin/my-plugin`.
-	CredPluginAllowlist clientcmdapi.Allowlist
+	CredPluginAllowlist []clientcmdapi.AllowlistEntry
 }
 
 // AliasOverride stores the alias definitions.
