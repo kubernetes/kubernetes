@@ -994,27 +994,15 @@ type Monitor struct {
 	Controller cache.Controller
 }
 
-// GetMonitor returns a monitor for the given resource.
-// If the monitor is not synced, it will return an error and the monitor to allow the caller to decide whether to retry.
-// If the monitor is not found, it will return only an error.
-func (gb *GraphBuilder) GetMonitor(ctx context.Context, resource schema.GroupVersionResource) (*Monitor, error) {
+// GetMonitor returns a monitor for the given resource. It will return the
+// monitor and whether or not the monitor has been synced yet.
+func (gb *GraphBuilder) GetMonitor(ctx context.Context, resource schema.GroupVersionResource) (*Monitor, bool, error) {
 	gb.monitorLock.RLock()
 	defer gb.monitorLock.RUnlock()
 
-	var monitor *monitor
-	if m, ok := gb.monitors[resource]; ok {
-		monitor = m
-	} else {
-		for monitorGVR, m := range gb.monitors {
-			if monitorGVR.Group == resource.Group && monitorGVR.Resource == resource.Resource {
-				monitor = m
-				break
-			}
-		}
-	}
-
-	if monitor == nil {
-		return nil, fmt.Errorf("no monitor found for resource %s", resource.String())
+	monitor, ok := gb.monitors[resource]
+	if !ok {
+		return nil, false, fmt.Errorf("no monitor found for resource %s", resource.String())
 	}
 
 	resourceMonitor := &Monitor{
@@ -1028,11 +1016,10 @@ func (gb *GraphBuilder) GetMonitor(ctx context.Context, resource schema.GroupVer
 			return monitor.controller.HasSynced()
 		},
 	) {
-		// returning monitor to allow the caller to decide whether to retry as it can be synced later
-		return resourceMonitor, fmt.Errorf("dependency graph for resource %s is not synced", resource.String())
+		return nil, false, nil
 	}
 
-	return resourceMonitor, nil
+	return resourceMonitor, true, nil
 }
 
 func (gb *GraphBuilder) Name() string {
