@@ -3919,6 +3919,32 @@ func TestAllocator(t *testing.T,
 				},
 			},
 		},
+		"binding-conditions-with-and-without": {
+			features: Features{
+				DeviceBindingAndStatus: true,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil,
+					request(req0, classA, 1),
+					request(req1, classA, 1))),
+			classes: objects(class(classA, driverA)),
+			slices: unwrap(slice(slice1, node1, pool1, driverA,
+				device(device1, nil, nil),
+				device(device2, nil, nil).withBindingConditions([]string{"IsPrepare"}, []string{"BindingFailed"}),
+			)),
+			node: node(node1, region1),
+			expectResults: []any{
+				resourceapi.AllocationResult{
+					Devices: resourceapi.DeviceAllocationResult{
+						Results: []resourceapi.DeviceRequestAllocationResult{
+							deviceAllocationResult(req0, driverA, pool1, device1, false),
+							deviceRequestAllocationResultWithBindingConditions(req1, driverA, pool1, device2, []string{"IsPrepare"}, []string{"BindingFailed"}),
+						},
+					},
+					NodeSelector: localNodeSelector(node1),
+				},
+			},
+		},
 		"binding-conditions-without-feature-gate": {
 			features: Features{
 				DeviceBindingAndStatus: false,
