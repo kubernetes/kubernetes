@@ -102,7 +102,7 @@ func (volumeAttachmentStrategy) ValidateUpdate(ctx context.Context, obj, old run
 	newVolumeAttachmentObj := obj.(*storage.VolumeAttachment)
 	oldVolumeAttachmentObj := old.(*storage.VolumeAttachment)
 	allErrs := validation.ValidateVolumeAttachmentUpdate(newVolumeAttachmentObj, oldVolumeAttachmentObj)
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, obj, old, allErrs, operation.Update)
+	return allErrs
 }
 
 // WarningsOnUpdate returns warnings for the given update.
