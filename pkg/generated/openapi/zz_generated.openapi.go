@@ -79,7 +79,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
-	storagemigrationv1alpha1 "k8s.io/api/storagemigration/v1alpha1"
+	storagemigrationv1beta1 "k8s.io/api/storagemigration/v1beta1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	resource "k8s.io/apimachinery/pkg/api/resource"
@@ -1210,12 +1210,10 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		storagev1beta1.VolumeAttributesClassList{}.OpenAPIModelName():                                                   schema_k8sio_api_storage_v1beta1_VolumeAttributesClassList(ref),
 		storagev1beta1.VolumeError{}.OpenAPIModelName():                                                                 schema_k8sio_api_storage_v1beta1_VolumeError(ref),
 		storagev1beta1.VolumeNodeResources{}.OpenAPIModelName():                                                         schema_k8sio_api_storage_v1beta1_VolumeNodeResources(ref),
-		storagemigrationv1alpha1.GroupVersionResource{}.OpenAPIModelName():                                              schema_k8sio_api_storagemigration_v1alpha1_GroupVersionResource(ref),
-		storagemigrationv1alpha1.MigrationCondition{}.OpenAPIModelName():                                                schema_k8sio_api_storagemigration_v1alpha1_MigrationCondition(ref),
-		storagemigrationv1alpha1.StorageVersionMigration{}.OpenAPIModelName():                                           schema_k8sio_api_storagemigration_v1alpha1_StorageVersionMigration(ref),
-		storagemigrationv1alpha1.StorageVersionMigrationList{}.OpenAPIModelName():                                       schema_k8sio_api_storagemigration_v1alpha1_StorageVersionMigrationList(ref),
-		storagemigrationv1alpha1.StorageVersionMigrationSpec{}.OpenAPIModelName():                                       schema_k8sio_api_storagemigration_v1alpha1_StorageVersionMigrationSpec(ref),
-		storagemigrationv1alpha1.StorageVersionMigrationStatus{}.OpenAPIModelName():                                     schema_k8sio_api_storagemigration_v1alpha1_StorageVersionMigrationStatus(ref),
+		storagemigrationv1beta1.StorageVersionMigration{}.OpenAPIModelName():                                            schema_k8sio_api_storagemigration_v1beta1_StorageVersionMigration(ref),
+		storagemigrationv1beta1.StorageVersionMigrationList{}.OpenAPIModelName():                                        schema_k8sio_api_storagemigration_v1beta1_StorageVersionMigrationList(ref),
+		storagemigrationv1beta1.StorageVersionMigrationSpec{}.OpenAPIModelName():                                        schema_k8sio_api_storagemigration_v1beta1_StorageVersionMigrationSpec(ref),
+		storagemigrationv1beta1.StorageVersionMigrationStatus{}.OpenAPIModelName():                                      schema_k8sio_api_storagemigration_v1beta1_StorageVersionMigrationStatus(ref),
 		apiextensionsv1.ConversionRequest{}.OpenAPIModelName():                                                          schema_pkg_apis_apiextensions_v1_ConversionRequest(ref),
 		apiextensionsv1.ConversionResponse{}.OpenAPIModelName():                                                         schema_pkg_apis_apiextensions_v1_ConversionResponse(ref),
 		apiextensionsv1.ConversionReview{}.OpenAPIModelName():                                                           schema_pkg_apis_apiextensions_v1_ConversionReview(ref),
@@ -57863,93 +57861,7 @@ func schema_k8sio_api_storage_v1beta1_VolumeNodeResources(ref common.ReferenceCa
 	}
 }
 
-func schema_k8sio_api_storagemigration_v1alpha1_GroupVersionResource(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "The names of the group, the version, and the resource.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"group": {
-						SchemaProps: spec.SchemaProps{
-							Description: "The name of the group.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"version": {
-						SchemaProps: spec.SchemaProps{
-							Description: "The name of the version.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"resource": {
-						SchemaProps: spec.SchemaProps{
-							Description: "The name of the resource.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-				},
-			},
-		},
-	}
-}
-
-func schema_k8sio_api_storagemigration_v1alpha1_MigrationCondition(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "Describes the state of a migration at a certain point.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"type": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Type of the condition.",
-							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"status": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Status of the condition, one of True, False, Unknown.",
-							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"lastUpdateTime": {
-						SchemaProps: spec.SchemaProps{
-							Description: "The last time this condition was updated.",
-							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
-						},
-					},
-					"reason": {
-						SchemaProps: spec.SchemaProps{
-							Description: "The reason for the condition's last transition.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"message": {
-						SchemaProps: spec.SchemaProps{
-							Description: "A human readable message indicating details about the transition.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-				},
-				Required: []string{"type", "status"},
-			},
-		},
-		Dependencies: []string{
-			metav1.Time{}.OpenAPIModelName()},
-	}
-}
-
-func schema_k8sio_api_storagemigration_v1alpha1_StorageVersionMigration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_storagemigration_v1beta1_StorageVersionMigration(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -57981,25 +57893,25 @@ func schema_k8sio_api_storagemigration_v1alpha1_StorageVersionMigration(ref comm
 						SchemaProps: spec.SchemaProps{
 							Description: "Specification of the migration.",
 							Default:     map[string]interface{}{},
-							Ref:         ref(storagemigrationv1alpha1.StorageVersionMigrationSpec{}.OpenAPIModelName()),
+							Ref:         ref(storagemigrationv1beta1.StorageVersionMigrationSpec{}.OpenAPIModelName()),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Status of the migration.",
 							Default:     map[string]interface{}{},
-							Ref:         ref(storagemigrationv1alpha1.StorageVersionMigrationStatus{}.OpenAPIModelName()),
+							Ref:         ref(storagemigrationv1beta1.StorageVersionMigrationStatus{}.OpenAPIModelName()),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			storagemigrationv1alpha1.StorageVersionMigrationSpec{}.OpenAPIModelName(), storagemigrationv1alpha1.StorageVersionMigrationStatus{}.OpenAPIModelName(), metav1.ObjectMeta{}.OpenAPIModelName()},
+			storagemigrationv1beta1.StorageVersionMigrationSpec{}.OpenAPIModelName(), storagemigrationv1beta1.StorageVersionMigrationStatus{}.OpenAPIModelName(), metav1.ObjectMeta{}.OpenAPIModelName()},
 	}
 }
 
-func schema_k8sio_api_storagemigration_v1alpha1_StorageVersionMigrationList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_storagemigration_v1beta1_StorageVersionMigrationList(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -58028,16 +57940,6 @@ func schema_k8sio_api_storagemigration_v1alpha1_StorageVersionMigrationList(ref 
 						},
 					},
 					"items": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-map-keys": []interface{}{
-									"type",
-								},
-								"x-kubernetes-list-type":       "map",
-								"x-kubernetes-patch-merge-key": "type",
-								"x-kubernetes-patch-strategy":  "merge",
-							},
-						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Items is the list of StorageVersionMigration",
 							Type:        []string{"array"},
@@ -58045,7 +57947,7 @@ func schema_k8sio_api_storagemigration_v1alpha1_StorageVersionMigrationList(ref 
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref(storagemigrationv1alpha1.StorageVersionMigration{}.OpenAPIModelName()),
+										Ref:     ref(storagemigrationv1beta1.StorageVersionMigration{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -58056,11 +57958,11 @@ func schema_k8sio_api_storagemigration_v1alpha1_StorageVersionMigrationList(ref 
 			},
 		},
 		Dependencies: []string{
-			storagemigrationv1alpha1.StorageVersionMigration{}.OpenAPIModelName(), metav1.ListMeta{}.OpenAPIModelName()},
+			storagemigrationv1beta1.StorageVersionMigration{}.OpenAPIModelName(), metav1.ListMeta{}.OpenAPIModelName()},
 	}
 }
 
-func schema_k8sio_api_storagemigration_v1alpha1_StorageVersionMigrationSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_storagemigration_v1beta1_StorageVersionMigrationSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -58071,14 +57973,7 @@ func schema_k8sio_api_storagemigration_v1alpha1_StorageVersionMigrationSpec(ref 
 						SchemaProps: spec.SchemaProps{
 							Description: "The resource that is being migrated. The migrator sends requests to the endpoint serving the resource. Immutable.",
 							Default:     map[string]interface{}{},
-							Ref:         ref(storagemigrationv1alpha1.GroupVersionResource{}.OpenAPIModelName()),
-						},
-					},
-					"continueToken": {
-						SchemaProps: spec.SchemaProps{
-							Description: "The token used in the list options to get the next chunk of objects to migrate. When the .status.conditions indicates the migration is \"Running\", users can use this token to check the progress of the migration.",
-							Type:        []string{"string"},
-							Format:      "",
+							Ref:         ref(metav1.GroupResource{}.OpenAPIModelName()),
 						},
 					},
 				},
@@ -58086,11 +57981,11 @@ func schema_k8sio_api_storagemigration_v1alpha1_StorageVersionMigrationSpec(ref 
 			},
 		},
 		Dependencies: []string{
-			storagemigrationv1alpha1.GroupVersionResource{}.OpenAPIModelName()},
+			metav1.GroupResource{}.OpenAPIModelName()},
 	}
 }
 
-func schema_k8sio_api_storagemigration_v1alpha1_StorageVersionMigrationStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_storagemigration_v1beta1_StorageVersionMigrationStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -58115,7 +58010,7 @@ func schema_k8sio_api_storagemigration_v1alpha1_StorageVersionMigrationStatus(re
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref(storagemigrationv1alpha1.MigrationCondition{}.OpenAPIModelName()),
+										Ref:     ref(metav1.Condition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -58132,7 +58027,7 @@ func schema_k8sio_api_storagemigration_v1alpha1_StorageVersionMigrationStatus(re
 			},
 		},
 		Dependencies: []string{
-			storagemigrationv1alpha1.MigrationCondition{}.OpenAPIModelName()},
+			metav1.Condition{}.OpenAPIModelName()},
 	}
 }
 

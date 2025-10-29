@@ -26,7 +26,6 @@ import (
 
 	"go.uber.org/goleak"
 
-	svmv1alpha1 "k8s.io/api/storagemigration/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -80,9 +79,8 @@ func TestStorageVersionMigration(t *testing.T) {
 		ctx,
 		t,
 		svmName,
-		svmv1alpha1.GroupVersionResource{
+		metav1.GroupResource{
 			Group:    "",
-			Version:  "v1",
 			Resource: "secrets",
 		},
 	)
@@ -117,9 +115,8 @@ func TestStorageVersionMigration(t *testing.T) {
 		ctx,
 		t,
 		secondSVMName,
-		svmv1alpha1.GroupVersionResource{
+		metav1.GroupResource{
 			Group:    "",
-			Version:  "v1",
 			Resource: "secrets",
 		},
 	)
@@ -258,9 +255,8 @@ func TestStorageVersionMigrationWithCRD(t *testing.T) {
 	// migrate CRs from v1 to v2
 	svm, err := svmTest.createSVMResource(
 		ctx, t, "crdsvm",
-		svmv1alpha1.GroupVersionResource{
+		metav1.GroupResource{
 			Group:    crd.Spec.Group,
-			Version:  "v1",
 			Resource: crd.Spec.Names.Plural,
 		})
 	if err != nil {
@@ -338,9 +334,8 @@ func TestStorageVersionMigrationDuringChaos(t *testing.T) {
 
 			svm, err := svmTest.createSVMResource(
 				ctx, t, "chaos-svm-"+strconv.Itoa(i),
-				svmv1alpha1.GroupVersionResource{
+				metav1.GroupResource{
 					Group:    crd.Spec.Group,
-					Version:  "v1",
 					Resource: crd.Spec.Names.Plural,
 				},
 			)

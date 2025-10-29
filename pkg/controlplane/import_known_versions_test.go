@@ -69,6 +69,7 @@ var typesAllowedTags = map[reflect.Type]bool{
 	reflect.TypeOf(metav1.GetOptions{}):               true,
 	reflect.TypeOf(metav1.ListOptions{}):              true,
 	reflect.TypeOf(metav1.DeleteOptions{}):            true,
+	reflect.TypeOf(metav1.GroupResource{}):            true,
 	reflect.TypeOf(metav1.GroupVersionKind{}):         true,
 	reflect.TypeOf(metav1.GroupVersionResource{}):     true,
 	reflect.TypeOf(metav1.Status{}):                   true,

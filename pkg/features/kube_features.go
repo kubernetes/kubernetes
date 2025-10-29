@@ -910,7 +910,7 @@ const (
 	// Superseded by BtreeWatchCache.
 	StorageNamespaceIndex featuregate.Feature = "StorageNamespaceIndex"
 
-	// owner: @nilekhc
+	// owner: @enj, @michaelasp
 	// kep: https://kep.k8s.io/4192
 	//
 	// Enables support for the StorageVersionMigrator controller.
@@ -1699,6 +1699,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	StorageVersionMigrator: {
 		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Beta},
 	},
 
 	StreamingCollectionEncodingToJSON: {

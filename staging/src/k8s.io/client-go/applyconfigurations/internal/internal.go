@@ -15675,39 +15675,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: count
       type:
         scalar: numeric
-- name: io.k8s.api.storagemigration.v1alpha1.GroupVersionResource
-  map:
-    fields:
-    - name: group
-      type:
-        scalar: string
-    - name: resource
-      type:
-        scalar: string
-    - name: version
-      type:
-        scalar: string
-- name: io.k8s.api.storagemigration.v1alpha1.MigrationCondition
-  map:
-    fields:
-    - name: lastUpdateTime
-      type:
-        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-    - name: message
-      type:
-        scalar: string
-    - name: reason
-      type:
-        scalar: string
-    - name: status
-      type:
-        scalar: string
-      default: ""
-    - name: type
-      type:
-        scalar: string
-      default: ""
-- name: io.k8s.api.storagemigration.v1alpha1.StorageVersionMigration
+- name: io.k8s.api.storagemigration.v1beta1.StorageVersionMigration
   map:
     fields:
     - name: apiVersion
@@ -15722,30 +15690,27 @@ var schemaYAML = typed.YAMLObject(`types:
       default: {}
     - name: spec
       type:
-        namedType: io.k8s.api.storagemigration.v1alpha1.StorageVersionMigrationSpec
+        namedType: io.k8s.api.storagemigration.v1beta1.StorageVersionMigrationSpec
       default: {}
     - name: status
       type:
-        namedType: io.k8s.api.storagemigration.v1alpha1.StorageVersionMigrationStatus
+        namedType: io.k8s.api.storagemigration.v1beta1.StorageVersionMigrationStatus
       default: {}
-- name: io.k8s.api.storagemigration.v1alpha1.StorageVersionMigrationSpec
+- name: io.k8s.api.storagemigration.v1beta1.StorageVersionMigrationSpec
   map:
     fields:
-    - name: continueToken
-      type:
-        scalar: string
     - name: resource
       type:
-        namedType: io.k8s.api.storagemigration.v1alpha1.GroupVersionResource
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.GroupResource
       default: {}
-- name: io.k8s.api.storagemigration.v1alpha1.StorageVersionMigrationStatus
+- name: io.k8s.api.storagemigration.v1beta1.StorageVersionMigrationStatus
   map:
     fields:
     - name: conditions
       type:
         list:
           elementType:
-            namedType: io.k8s.api.storagemigration.v1alpha1.MigrationCondition
+            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Condition
           elementRelationship: associative
           keys:
           - type
@@ -15821,6 +15786,17 @@ var schemaYAML = typed.YAMLObject(`types:
         elementType:
           namedType: __untyped_deduced_
         elementRelationship: separable
+- name: io.k8s.apimachinery.pkg.apis.meta.v1.GroupResource
+  map:
+    fields:
+    - name: group
+      type:
+        scalar: string
+      default: ""
+    - name: resource
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector
   map:
     fields:
