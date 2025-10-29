@@ -31,6 +31,7 @@ import (
 // The zero value is usable and empty.
 type claimStore struct {
 	// claims contains all user-owned claims, optionally followed by the special ResourceClaim for extended resources.
+	// The special ResourceClaim for extended resources is stored last so it can always be accessed at the index numUserOwned + 1 (if it exists).
 	claims []*resourceapi.ResourceClaim
 	// numUserOwned is the number of claims without the special ResourceClaim.
 	numUserOwned int

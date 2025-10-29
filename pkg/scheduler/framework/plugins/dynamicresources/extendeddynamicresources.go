@@ -17,9 +17,12 @@ limitations under the License.
 package dynamicresources
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"sort"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
@@ -27,12 +30,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/util/retry"
 	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources/extended"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
+	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
 	"k8s.io/kubernetes/pkg/util/slice"
 	"k8s.io/utils/ptr"
 )
@@ -116,13 +122,6 @@ func findExtendedResourceClaim(pod *v1.Pod, resourceClaims []*resourceapi.Resour
 // that has spec.ExtendedResourceName or its implicit extended resource name
 // matching the given extended resource in that pod requests.
 //
-// It looks for the special resource claim for the pod created from prior scheduling
-// cycle. If not found, it creates the special claim with no Requests in the Spec,
-// with a temporary UID, and the specialClaimInMemName name.
-// Either way, the special claim is stored in state.claims.
-//
-// In addition, draExtendedResource is also stored in the cycle state.
-//
 // It returns the special ResourceClaim and an error status. It returns nil for both
 // if the feature is disabled or not required for the Pod.
 func (pl *DynamicResources) preFilterExtendedResources(pod *v1.Pod, logger klog.Logger, s *stateData) (*resourceapi.ResourceClaim, *fwk.Status) {
@@ -141,9 +140,9 @@ func (pl *DynamicResources) preFilterExtendedResources(pod *v1.Pod, logger klog.
 		return nil, nil
 	}
 
+	// store the device class mapping and pod scalar resources in the cycle state for use in Filter phase.
 	s.draExtendedResource.resourceToDeviceClass = deviceClassMapping
-	r := framework.NewResource(reqs)
-	s.draExtendedResource.podScalarResources = r.ScalarResources
+	s.draExtendedResource.podScalarResources = framework.NewResource(reqs).ScalarResources
 
 	resourceClaims, err := pl.draManager.ResourceClaims().List()
 	if err != nil {
@@ -161,41 +160,41 @@ func (pl *DynamicResources) preFilterExtendedResources(pod *v1.Pod, logger klog.
 	// - Kick off deallocation in the background.
 	// - Mark the pod as unschedulable. Successful deallocation will make it schedulable again.
 	extendedResourceClaim := findExtendedResourceClaim(pod, resourceClaims)
-	if extendedResourceClaim == nil {
-		// Create one special claim for all extended resources backed by DRA in the Pod.
-		// Create the ResourceClaim with pod as owner, with a generated name that uses
-		// <pod name>-extended-resources- as base. The final name will get truncated if it
-		// would be too long.
-		extendedResourceClaim = &resourceapi.ResourceClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: pod.Namespace,
-				Name:      specialClaimInMemName,
-				// fake temporary UID for use in SignalClaimPendingAllocation
-				UID:          types.UID(uuid.NewUUID()),
-				GenerateName: pod.Name + "-extended-resources-",
-				OwnerReferences: []metav1.OwnerReference{
-					{
-						APIVersion:         "v1",
-						Kind:               "Pod",
-						Name:               pod.Name,
-						UID:                pod.UID,
-						Controller:         ptr.To(true),
-						BlockOwnerDeletion: ptr.To(true),
-					},
-				},
-				Annotations: map[string]string{
-					resourceapi.ExtendedResourceClaimAnnotation: "true",
+	if extendedResourceClaim != nil {
+		return extendedResourceClaim, nil
+	}
+	// Create one special claim for all extended resources backed by DRA in the Pod.
+	// Create the ResourceClaim with pod as owner, with a generated name that uses
+	// <pod name>-extended-resources- as base. The final name will get truncated if it
+	// would be too long.
+	return &resourceapi.ResourceClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: pod.Namespace,
+			Name:      specialClaimInMemName,
+			// fake temporary UID for use in SignalClaimPendingAllocation
+			UID:          types.UID(uuid.NewUUID()),
+			GenerateName: pod.Name + "-extended-resources-",
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "v1",
+					Kind:       "Pod",
+					Name:       pod.Name,
+					UID:        pod.UID,
+					Controller: ptr.To(true),
 				},
 			},
-			Spec: resourceapi.ResourceClaimSpec{},
-		}
-	}
-	return extendedResourceClaim, nil
+			Annotations: map[string]string{
+				resourceapi.ExtendedResourceClaimAnnotation: "true",
+			},
+		},
+		Spec: resourceapi.ResourceClaimSpec{},
+	}, nil
 }
 
 // filterExtendedResources computes the special claim's Requests based on the
-// node's Allocatable. It returns the special claim updated to match what needs
-// to be allocated through DRA for the node or nil if nothing needs to be allocated.
+// node's Allocatable. It returns:
+// - nil if nothing needs to be allocated, all the extended resources are satisfied by device plugin, or
+// - the special claim updated to match what needs to be allocated through DRA for the node
 //
 // It returns an error when the pod's extended resource requests cannot be allocated
 // from node's Allocatable, nor matching any device class's explicit or implicit
@@ -226,16 +225,16 @@ func (pl *DynamicResources) filterExtendedResources(state *stateData, pod *v1.Po
 
 		allocatable, okScalar := nodeInfo.GetAllocatable().GetScalarResources()[rName]
 		_, okDynamic := state.draExtendedResource.resourceToDeviceClass[rName]
-		if okDynamic {
-			if allocatable > 0 {
-				// node provides the resource via device plugin
-				extendedResources[rName] = 0
-			} else {
-				// node needs to provide the resource via DRA
-				extendedResources[rName] = rQuant
-				hasExtendedResource = true
-			}
-		} else if !okScalar {
+
+		switch {
+		case okDynamic && allocatable > 0:
+			// node provides the resource via device plugin
+			extendedResources[rName] = 0
+		case okDynamic && allocatable == 0:
+			// node needs to provide the resource via DRA
+			extendedResources[rName] = rQuant
+			hasExtendedResource = true
+		case !okScalar:
 			// has request neither provided by device plugin, nor backed by DRA,
 			// hence the pod does not fit the node.
 			return nil, statusUnschedulable(logger, "cannot fit resource", "pod", klog.KObj(pod), "node", klog.KObj(nodeInfo.Node()), "resource", rName)
@@ -253,10 +252,6 @@ func (pl *DynamicResources) filterExtendedResources(state *stateData, pod *v1.Po
 		return nil, nil
 	}
 
-	// Each node needs its own, potentially different variant of the claim.
-	nodeExtendedResourceClaim := extendedResourceClaim.DeepCopy()
-	nodeExtendedResourceClaim.Spec.Devices.Requests = createDeviceRequests(pod, extendedResources, state.draExtendedResource.resourceToDeviceClass)
-
 	if extendedResourceClaim.Status.Allocation != nil {
 		// If it is already allocated, then we cannot simply allocate it again.
 		//
@@ -265,6 +260,9 @@ func (pl *DynamicResources) filterExtendedResources(state *stateData, pod *v1.Po
 		return nil, nil
 	}
 
+	// Each node needs its own, potentially different variant of the claim.
+	nodeExtendedResourceClaim := extendedResourceClaim.DeepCopy()
+	nodeExtendedResourceClaim.Spec.Devices.Requests = createDeviceRequests(pod, extendedResources, state.draExtendedResource.resourceToDeviceClass)
 	return nodeExtendedResourceClaim, nil
 }
 
@@ -285,6 +283,8 @@ func createDeviceRequests(pod *v1.Pod, extendedResources map[v1.ResourceName]int
 	// supported separately.
 	containers := slices.Clone(pod.Spec.InitContainers)
 	containers = append(containers, pod.Spec.Containers...)
+
+	containerResourceIndices := buildContainerResourceIndices(containers)
 	for r := range extendedResources {
 		for i, c := range containers {
 			creqs := c.Resources.Requests
@@ -305,28 +305,12 @@ func createDeviceRequests(pod *v1.Pod, extendedResources map[v1.ResourceName]int
 			if !ok || className == "" {
 				continue
 			}
-			keys := make([]string, 0, len(creqs))
-			for k := range creqs {
-				keys = append(keys, k.String())
-			}
-			// resource requests in a container is a map, their names must
-			// be sorted to determine the resource's index order.
-			slice.SortStrings(keys)
-			ridx := 0
-			for j := range keys {
-				if keys[j] == r.String() {
-					ridx = j
-					break
-				}
-			}
 			// i is the index of the container if the list of initContainers + containers.
-			// ridx is the index of the extended resource request in the sorted all requests in the container.
-			// crq is the quantity of the extended resource request.
 			deviceRequests = append(deviceRequests,
 				resourceapi.DeviceRequest{
-					Name: fmt.Sprintf("container-%d-request-%d", i, ridx), // need to be container name index - extended resource name index
+					Name: fmt.Sprintf("container-%d-request-%d", i, containerResourceIndices[i][r]),
 					Exactly: &resourceapi.ExactDeviceRequest{
-						DeviceClassName: className, // map external resource name -> device class name
+						DeviceClassName: className,
 						AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
 						Count:           crq,
 					},
@@ -342,6 +326,32 @@ func createDeviceRequests(pod *v1.Pod, extendedResources map[v1.ResourceName]int
 // isSpecialClaimName return true when the name is the specialClaimInMemName.
 func isSpecialClaimName(name string) bool {
 	return name == specialClaimInMemName
+}
+
+// buildContainerResourceIndices creates a mapping from resource names to their sorted index
+// for each container in the pod. This is used to generate consistent device request names.
+func buildContainerResourceIndices(containers []v1.Container) []map[v1.ResourceName]int {
+	containerResourceIndices := make([]map[v1.ResourceName]int, len(containers))
+
+	for i, c := range containers {
+		creqs := c.Resources.Requests
+		if creqs == nil {
+			continue
+		}
+
+		keys := make([]string, 0, len(creqs))
+		for k := range creqs {
+			keys = append(keys, k.String())
+		}
+		slice.SortStrings(keys)
+
+		containerResourceIndices[i] = make(map[v1.ResourceName]int, len(keys))
+		for j, keyStr := range keys {
+			containerResourceIndices[i][v1.ResourceName(keyStr)] = j
+		}
+	}
+
+	return containerResourceIndices
 }
 
 // createRequestMappings creates the requestMappings for the special extended resource claim.
@@ -361,22 +371,14 @@ func createRequestMappings(claim *resourceapi.ResourceClaim, pod *v1.Pod) []v1.C
 	// supported separately.
 	containers := slices.Clone(pod.Spec.InitContainers)
 	containers = append(containers, pod.Spec.Containers...)
+
+	// Build the sorted index mapping for all containers
+	containerResourceIndices := buildContainerResourceIndices(containers)
 	for i, c := range containers {
-		creqs := c.Resources.Requests
-		keys := make([]string, 0, len(creqs))
-		for k := range creqs {
-			keys = append(keys, k.String())
-		}
-		// resource requests in a container is a map, their names must
-		// be sorted to determine the resource's index order.
-		slice.SortStrings(keys)
-		for rName := range creqs {
-			ridx := 0
-			for j := range keys {
-				if keys[j] == rName.String() {
-					ridx = j
-					break
-				}
+		for rName := range c.Resources.Requests {
+			ridx, ok := containerResourceIndices[i][rName]
+			if !ok {
+				continue
 			}
 			for _, devReqName := range deviceReqNames {
 				// During filter phase, device request name is set to be
@@ -393,4 +395,165 @@ func createRequestMappings(claim *resourceapi.ResourceClaim, pod *v1.Pod) []v1.C
 		}
 	}
 	return cer
+}
+
+// unreserveExtendedResourceClaim cleans up the scheduler-owned extended resource claim
+// when scheduling fails. It reverts the assume cache, and deletes the claim from the API
+// server if it was already created.
+func (pl *DynamicResources) unreserveExtendedResourceClaim(ctx context.Context, logger klog.Logger, pod *v1.Pod, state *stateData) {
+	extendedResourceClaim := state.claims.extendedResourceClaim()
+	if extendedResourceClaim == nil {
+		// there is no extended resource claim
+		return
+	}
+
+	// If the claim was marked as pending allocation (in-flight), remove that marker and restore
+	// the assumed claim state to what it was before this scheduling attempt.
+	if deleted := pl.draManager.ResourceClaims().RemoveClaimPendingAllocation(state.claims.getInitialExtendedResourceClaimUID()); deleted {
+		pl.draManager.ResourceClaims().AssumedClaimRestore(extendedResourceClaim.Namespace, extendedResourceClaim.Name)
+	}
+	if isSpecialClaimName(extendedResourceClaim.Name) {
+		// In memory temporary extended resource claim does not need to be deleted
+		return
+	}
+	// Claim was written to API server, need to delete it to prevent orphaned resources.
+	logger.V(5).Info("delete extended resource backed by DRA", "resourceclaim", klog.KObj(extendedResourceClaim), "pod", klog.KObj(pod), "claim.UID", extendedResourceClaim.UID)
+	extendedResourceClaim = extendedResourceClaim.DeepCopy()
+	if err := pl.deleteClaim(ctx, extendedResourceClaim, logger); err != nil {
+		logger.Error(err, "delete", "resourceclaim", klog.KObj(extendedResourceClaim))
+	}
+}
+
+// deleteClaim deletes the claim after removing the finalizer from the claim, if there is any.
+func (pl *DynamicResources) deleteClaim(ctx context.Context, claim *resourceapi.ResourceClaim, logger klog.Logger) error {
+	refreshClaim := false
+	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		if refreshClaim {
+			updatedClaim, err := pl.clientset.ResourceV1().ResourceClaims(claim.Namespace).Get(ctx, claim.Name, metav1.GetOptions{})
+			if err != nil {
+				return fmt.Errorf("get resourceclaim %s/%s: %w", claim.Namespace, claim.Name, err)
+			}
+			claim = updatedClaim
+		} else {
+			refreshClaim = true
+		}
+		// Remove the finalizer to unblock removal first.
+		builtinControllerFinalizer := slices.Index(claim.Finalizers, resourceapi.Finalizer)
+		if builtinControllerFinalizer >= 0 {
+			claim.Finalizers = slices.Delete(claim.Finalizers, builtinControllerFinalizer, builtinControllerFinalizer+1)
+		}
+
+		_, err := pl.clientset.ResourceV1().ResourceClaims(claim.Namespace).Update(ctx, claim, metav1.UpdateOptions{})
+		if err != nil {
+			return fmt.Errorf("update resourceclaim %s/%s: %w", claim.Namespace, claim.Name, err)
+		}
+		return nil
+	})
+	if retryErr != nil {
+		return retryErr
+	}
+
+	logger.V(5).Info("Delete", "resourceclaim", klog.KObj(claim))
+	err := pl.clientset.ResourceV1().ResourceClaims(claim.Namespace).Delete(ctx, claim.Name, metav1.DeleteOptions{})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// createExtendedResourceClaimInAPI creates an extended resource claim in the API server.
+func (pl *DynamicResources) createExtendedResourceClaimInAPI(
+	ctx context.Context,
+	logger klog.Logger,
+	pod *v1.Pod,
+	nodeName string,
+	state *stateData,
+) (*resourceapi.ResourceClaim, error) {
+	logger.V(5).Info("preparing to create claim for extended resources", "pod", klog.KObj(pod), "node", nodeName)
+
+	// Get the node-specific claim that was prepared during Filter phase
+	nodeAllocation, ok := state.nodeAllocations[nodeName]
+	if !ok || nodeAllocation.extendedResourceClaim == nil {
+		return nil, fmt.Errorf("extended resource claim not found for node %s", nodeName)
+	}
+
+	claim := nodeAllocation.extendedResourceClaim.DeepCopy()
+	logger.V(5).Info("create claim for extended resources", "pod", klog.KObj(pod), "node", nodeName, "resourceclaim", klog.Format(claim))
+
+	claim.Status.Allocation = nil
+	claim.Name = ""
+	claim.UID = ""
+
+	createdClaim, err := pl.clientset.ResourceV1().ResourceClaims(claim.Namespace).Create(ctx, claim, metav1.CreateOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("create claim for extended resources %v: %w", klog.KObj(claim), err)
+	}
+
+	logger.V(5).Info("created claim for extended resources", "pod", klog.KObj(pod), "node", nodeName, "resourceclaim", klog.Format(createdClaim))
+
+	if err := state.claims.updateExtendedResourceClaim(createdClaim); err != nil {
+		return nil, fmt.Errorf("internal error: update extended ResourceClaim: %w", err)
+	}
+
+	return createdClaim, nil
+}
+
+// waitForExtendedClaimInAssumeCache polls the assume cache until the extended resource claim
+// becomes visible. This is necessary because extended resource claims are created in the API
+// server, and the informer update may not have reached the assume cache yet.
+//
+// AssumeClaimAfterAPICall returns ErrNotFound when the informer update hasn't arrived,
+// so we poll with a timeout.
+func (pl *DynamicResources) waitForExtendedClaimInAssumeCache(
+	ctx context.Context,
+	logger klog.Logger,
+	claim *resourceapi.ResourceClaim,
+) error {
+	pollErr := wait.PollUntilContextTimeout(
+		ctx,
+		1*time.Second,
+		time.Duration(AssumeExtendedResourceTimeoutDefaultSeconds)*time.Second,
+		true,
+		func(ctx context.Context) (bool, error) {
+			if err := pl.draManager.ResourceClaims().AssumeClaimAfterAPICall(claim); err != nil {
+				if errors.Is(err, assumecache.ErrNotFound) {
+					return false, nil
+				}
+				logger.V(5).Info("Claim not stored in assume cache", "claim", klog.KObj(claim), "err", err)
+				return false, err
+			}
+			return true, nil
+		},
+	)
+
+	if pollErr != nil {
+		logger.V(5).Info("Claim not stored in assume cache after retries", "claim", klog.KObj(claim), "err", pollErr)
+		// Note: We log but don't fail - the claim was created successfully
+	}
+
+	return nil
+}
+
+// patchPodExtendedResourceClaimStatus updates the pod's status with information about
+// the extended resource claim.
+func (pl *DynamicResources) patchPodExtendedResourceClaimStatus(
+	ctx context.Context,
+	logger klog.Logger,
+	pod *v1.Pod,
+	claim *resourceapi.ResourceClaim,
+) error {
+	requestMappings := createRequestMappings(claim, pod)
+	podStatusCopy := pod.Status.DeepCopy()
+	podStatusCopy.ExtendedResourceClaimStatus = &v1.PodExtendedResourceClaimStatus{
+		RequestMappings:   requestMappings,
+		ResourceClaimName: claim.Name,
+	}
+
+	err := schedutil.PatchPodStatus(ctx, pl.clientset, pod.Name, pod.Namespace, &pod.Status, podStatusCopy)
+	if err != nil {
+		return fmt.Errorf("update pod %s/%s ExtendedResourceClaimStatus: %w", pod.Namespace, pod.Name, err)
+	}
+
+	logger.V(5).Info("patched pod extended resource claim status", "pod", klog.KObj(pod), "claim", klog.KObj(claim))
+	return nil
 }
