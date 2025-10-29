@@ -922,7 +922,7 @@ func TestPluginPolicy(t *testing.T) {
 			panic("unreachable")
 		}
 
-		return true, "illegal plugin policy"
+		return true, "unknown plugin policy"
 	}
 
 	wd, err := os.Getwd()

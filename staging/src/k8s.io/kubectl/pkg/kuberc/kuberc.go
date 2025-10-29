@@ -30,6 +30,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/plugin/pkg/client/auth/exec"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -64,7 +65,6 @@ type PreferencesHandler interface {
 type Preferences struct {
 	getPreferencesFunc func(kuberc string, errOut io.Writer) (*config.Preference, error) // DefaultGetPreferences
 	aliases            map[string]struct{}
-	policyWrapper      func(*rest.Config) *rest.Config
 	pluginPolicy       clientcmdapi.PluginPolicy
 }
 
@@ -72,17 +72,11 @@ var _ PreferencesHandler = &Preferences{}
 
 // NewPreferences returns initialized Prefrences object.
 func NewPreferences() PreferencesHandler {
-	p := &Preferences{
+	return &Preferences{
 		getPreferencesFunc: DefaultGetPreferences,
 		aliases:            make(map[string]struct{}),
 		pluginPolicy:       clientcmdapi.PluginPolicy{},
 	}
-
-	// if PluginPolicyWrapper != nil {
-	// 	PluginPolicyWrapper = makePluginPolicyWrapper(p)
-	// }
-
-	return p
 }
 
 type aliasing struct {
@@ -521,5 +515,13 @@ func validate(plugin *config.Preference) error {
 		}
 	}
 
+	if err := validatePluginPolicy(plugin); err != nil {
+		return err
+	}
+
 	return nil
+}
+
+func validatePluginPolicy(plugin *config.Preference) error {
+	return exec.ValidatePluginPolicy(plugin.CredentialPluginPolicy, plugin.CredentialPluginAllowlist)
 }

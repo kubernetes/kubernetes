@@ -2968,28 +2968,189 @@ users:
 	pref, ok := p.(*Preferences)
 	require.True(t, ok, "preference type")
 
-	pref.getPreferencesFunc = func(_ string, _ io.Writer) (*config.Preference, error) {
-		return &config.Preference{
-			CredentialPluginPolicy: "foo",
-			CredentialPluginAllowlist: []clientcmdapi.AllowlistEntry{
-				clientcmdapi.AllowlistEntry{
-					Name: "bar",
+	t.Run("plumbing", func(t *testing.T) {
+		pref.getPreferencesFunc = func(_ string, _ io.Writer) (*config.Preference, error) {
+			return &config.Preference{
+				CredentialPluginPolicy: "Allowlist",
+				CredentialPluginAllowlist: []clientcmdapi.AllowlistEntry{
+					clientcmdapi.AllowlistEntry{
+						Name: "bar",
+					},
+					clientcmdapi.AllowlistEntry{
+						Name: "baz",
+					},
 				},
-				clientcmdapi.AllowlistEntry{
-					Name: "baz",
+			}, nil
+		}
+
+		_, err = p.Apply(rootCmd, opts, args, io.Discard)
+		require.NoError(t, err, "error applying preferences")
+
+		cfg, err := opts.ToRESTConfig()
+		require.NoError(t, err, "unexpected error")
+		require.NotNil(t, cfg, "rest config")
+		require.NotNil(t, cfg.ExecProvider, "exec config")
+		require.Equal(t, clientcmdapi.PolicyType("Allowlist"), cfg.ExecProvider.PluginPolicy.PolicyType)
+		require.Equal(t, "bar", cfg.ExecProvider.PluginPolicy.Allowlist[0].Name)
+		require.Equal(t, "baz", cfg.ExecProvider.PluginPolicy.Allowlist[1].Name)
+	})
+
+	type pluginPolicyTest struct {
+		name      string
+		kuberc    *config.Preference
+		shouldErr bool
+	}
+	tests := []pluginPolicyTest{
+		{
+			name:      "invalid-plugin-policy-with-nil-allowlist",
+			shouldErr: true,
+			kuberc: &config.Preference{
+				CredentialPluginPolicy: "foo",
+			},
+		},
+		{
+			name:      "invalid-policy-with-empty-allowlist",
+			shouldErr: true,
+			kuberc: &config.Preference{
+				CredentialPluginPolicy:    "foo",
+				CredentialPluginAllowlist: []clientcmdapi.AllowlistEntry{},
+			},
+		},
+		{
+			name:      "invalid-policy-with-allowlist",
+			shouldErr: true,
+			kuberc: &config.Preference{
+				CredentialPluginPolicy: "foo",
+				CredentialPluginAllowlist: []clientcmdapi.AllowlistEntry{
+					{
+						Name: "bar",
+					},
 				},
 			},
-		}, nil
+		},
+		{
+			name:      "allowlist-policy-with-nil-allowlist",
+			shouldErr: true,
+			kuberc: &config.Preference{
+				CredentialPluginPolicy: "Allowlist",
+			},
+		},
+		{
+			name:      "allowlist-policy-with-empty-allowlist",
+			shouldErr: true,
+			kuberc: &config.Preference{
+				CredentialPluginPolicy:    "Allowlist",
+				CredentialPluginAllowlist: []clientcmdapi.AllowlistEntry{},
+			},
+		},
+		{
+			name:      "unspecified-policy-with-non-nil-allowlist",
+			shouldErr: true,
+			kuberc: &config.Preference{
+				CredentialPluginAllowlist: []clientcmdapi.AllowlistEntry{
+					clientcmdapi.AllowlistEntry{
+						Name: "bar",
+					},
+					clientcmdapi.AllowlistEntry{
+						Name: "baz",
+					},
+				},
+			},
+		},
+		{
+			name:      "allowall-policy-with-non-nil-allowlist",
+			shouldErr: true,
+			kuberc: &config.Preference{
+				CredentialPluginPolicy: "AllowAll",
+				CredentialPluginAllowlist: []clientcmdapi.AllowlistEntry{
+					clientcmdapi.AllowlistEntry{
+						Name: "bar",
+					},
+					clientcmdapi.AllowlistEntry{
+						Name: "baz",
+					},
+				},
+			},
+		},
+		{
+			name:      "allowall-policy-with-non-nil-allowlist",
+			shouldErr: true,
+			kuberc: &config.Preference{
+				CredentialPluginPolicy: "DenyAll",
+				CredentialPluginAllowlist: []clientcmdapi.AllowlistEntry{
+					clientcmdapi.AllowlistEntry{
+						Name: "bar",
+					},
+					clientcmdapi.AllowlistEntry{
+						Name: "baz",
+					},
+				},
+			},
+		},
+		{
+			name:      "non-allowlist-policy-with-non-nil-empty-allowlist",
+			shouldErr: true,
+			kuberc: &config.Preference{
+				CredentialPluginPolicy:    "DenyAll",
+				CredentialPluginAllowlist: []clientcmdapi.AllowlistEntry{},
+			},
+		},
+		{
+			name:      "allowlist-policy-with-one-empty-allowlist-entry",
+			shouldErr: true,
+			kuberc: &config.Preference{
+				CredentialPluginPolicy: "Allowlist",
+				CredentialPluginAllowlist: []clientcmdapi.AllowlistEntry{
+					{Name: "foo"},
+					{Name: ""},
+				},
+			},
+		},
+		{
+			name:      "allowlist-policy-with-nonempty-allowlist",
+			shouldErr: false,
+			kuberc: &config.Preference{
+				CredentialPluginPolicy: "Allowlist",
+				CredentialPluginAllowlist: []clientcmdapi.AllowlistEntry{
+					{Name: "foo"},
+				},
+			},
+		},
+		{
+			name:      "allowall-policy-with-nil-allowlist",
+			shouldErr: false,
+			kuberc: &config.Preference{
+				CredentialPluginPolicy: "AllowAll",
+			},
+		},
+		{
+			name:      "denyall-policy-with-nil-allowlist",
+			shouldErr: false,
+			kuberc: &config.Preference{
+				CredentialPluginPolicy: "DenyAll",
+			},
+		},
+		{
+			name:      "uspecified-policy-with-nil-allowlist",
+			shouldErr: false,
+			kuberc: &config.Preference{
+				CredentialPluginPolicy: "",
+			},
+		},
 	}
 
-	_, err = p.Apply(rootCmd, opts, args, io.Discard)
-	require.NoError(t, err, "error applying preferences")
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			pref.getPreferencesFunc = func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+				return test.kuberc, nil
+			}
 
-	cfg, err := opts.ToRESTConfig()
-	require.NoError(t, err, "unexpected error")
-	require.NotNil(t, cfg, "rest config")
-	require.NotNil(t, cfg.ExecProvider, "exec config")
-	require.Equal(t, clientcmdapi.PolicyType("foo"), cfg.ExecProvider.PluginPolicy.PolicyType)
-	require.Equal(t, "bar", cfg.ExecProvider.PluginPolicy.Allowlist[0].Name)
-	require.Equal(t, "baz", cfg.ExecProvider.PluginPolicy.Allowlist[1].Name)
+			_, err := p.Apply(rootCmd, opts, args, io.Discard)
+			if test.shouldErr {
+				require.NotNil(t, err, "expected error, but error was nil")
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
 }

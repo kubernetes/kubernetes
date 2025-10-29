@@ -629,16 +629,20 @@ func itemGreenlights(alEntry *api.AllowlistEntry, pluginAbsPath string) error {
 }
 
 func (a *Authenticator) validatePluginPolicy() error {
-	switch a.execPluginPolicy.PolicyType {
+	return ValidatePluginPolicy(a.execPluginPolicy.PolicyType, a.execPluginPolicy.Allowlist)
+}
+
+func ValidatePluginPolicy(policy api.PolicyType, allowlist []api.AllowlistEntry) error {
+	switch policy {
 	case api.PluginPolicyUnspecified, api.PluginPolicyAllowAll, api.PluginPolicyDenyAll:
-		if a.execPluginPolicy.Allowlist != nil {
-			return fmt.Errorf("misconfigured credential plugin allowlist: plugin policy is %q but allowlist is non-nil", a.execPluginPolicy.PolicyType)
+		if allowlist != nil {
+			return fmt.Errorf("misconfigured credential plugin allowlist: plugin policy is %q but allowlist is non-nil", policy)
 		}
 		return nil
 	case api.PluginPolicyAllowlist:
-		return validateAllowlist(a.execPluginPolicy.Allowlist)
+		return validateAllowlist(allowlist)
 	default:
-		return fmt.Errorf("illegal plugin policy: %q", a.execPluginPolicy.PolicyType)
+		return fmt.Errorf("unknown plugin policy: %q", policy)
 	}
 }
 
