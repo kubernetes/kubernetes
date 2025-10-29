@@ -60,6 +60,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/test/utils/ktesting"
+	testingclock "k8s.io/utils/clock/testing"
 	"k8s.io/utils/ptr"
 )
 
@@ -3933,6 +3934,103 @@ func TestIsPodResizeInProgress(t *testing.T) {
 
 			resizeInProgress := m.IsPodResizeInProgress(pod, podStatus)
 			assert.Equal(t, test.expectHasResize, resizeInProgress)
+		})
+	}
+}
+
+func TestDoBackOff(t *testing.T) {
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	tests := []struct {
+		name              string
+		podStatus         *kubecontainer.PodStatus
+		backoff           *flowcontrol.Backoff
+		backoffUpdateFn   func(*flowcontrol.Backoff, *v1.Pod, *kubecontainer.PodStatus)
+		expectedInBackOff bool
+		expectedError     error
+	}{
+		{
+			name: "container running",
+			podStatus: &kubecontainer.PodStatus{
+				ContainerStatuses: []*kubecontainer.Status{
+					{
+						Name:  "foocontainer",
+						State: kubecontainer.ContainerStateRunning,
+					},
+				},
+			},
+			backoff:           flowcontrol.NewFakeBackOff(time.Second, time.Minute, fakeClock),
+			expectedInBackOff: false,
+		},
+		{
+			name: "not in backoff",
+			podStatus: &kubecontainer.PodStatus{
+				ContainerStatuses: []*kubecontainer.Status{
+					{
+						Name:       "foocontainer",
+						State:      kubecontainer.ContainerStateExited,
+						FinishedAt: fakeClock.Now(),
+					},
+				},
+			},
+			backoff:           flowcontrol.NewFakeBackOff(time.Second, time.Minute, fakeClock),
+			expectedInBackOff: false,
+		},
+		{
+			name: "in backoff",
+			podStatus: &kubecontainer.PodStatus{
+				ContainerStatuses: []*kubecontainer.Status{
+					{
+						Name:       "foocontainer",
+						State:      kubecontainer.ContainerStateExited,
+						FinishedAt: fakeClock.Now(),
+					},
+				},
+			},
+			backoff: flowcontrol.NewFakeBackOff(time.Second, time.Minute, fakeClock),
+			backoffUpdateFn: func(backoff *flowcontrol.Backoff, pod *v1.Pod, podStatus *kubecontainer.PodStatus) {
+				key := GetBackoffKey(pod, &pod.Spec.Containers[0])
+				backoff.Next(key, podStatus.ContainerStatuses[0].FinishedAt)
+			},
+			expectedInBackOff: true,
+			expectedError:     kubecontainer.NewBackoffError(kubecontainer.ErrCrashLoopBackOff, fakeClock.Now().Add(time.Second)),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			_, _, m, err := createTestRuntimeManager(tCtx)
+			require.NoError(t, err)
+
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:       "12345678",
+					Name:      "foo",
+					Namespace: "new",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "foocontainer",
+							Image: "busybox",
+						},
+					},
+				},
+			}
+			container := &pod.Spec.Containers[0]
+
+			if tc.backoffUpdateFn != nil {
+				tc.backoffUpdateFn(tc.backoff, pod, tc.podStatus)
+			}
+
+			inBackOff, msg, err := m.doBackOff(tCtx, pod, container, tc.podStatus, tc.backoff)
+			assert.Equal(t, tc.expectedInBackOff, inBackOff)
+			assert.Equal(t, tc.expectedError, err)
+			if tc.expectedInBackOff {
+				assert.NotEmpty(t, msg)
+			} else {
+				assert.Empty(t, msg)
+			}
 		})
 	}
 }
