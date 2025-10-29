@@ -742,6 +742,8 @@ func TestUpdatePod(t *testing.T) {
 	pod := st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").SchedulerName("supported-scheduler").Obj()
 	updatedPod := st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").Labels(map[string]string{"foo": "bar"}).ResourceVersion("2").SchedulerName("supported-scheduler").Obj()
 
+	podWithDeletionTimestamp := st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").Terminating().ResourceVersion("2").SchedulerName("supported-scheduler").Obj()
+
 	otherPod := st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").SchedulerName("other-scheduler").Obj()
 	updatedOtherPod := st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").Labels(map[string]string{"foo": "bar"}).ResourceVersion("2").SchedulerName("other-scheduler").Obj()
 
@@ -816,6 +818,12 @@ func TestUpdatePod(t *testing.T) {
 			assumedPod:    scheduledPod,
 			newPod:        scheduledPodOtherNode,
 			expectInCache: scheduledPodOtherNode,
+		},
+		{
+			name:       "delete assumed pod with deletion timestamp",
+			oldPod:     pod,
+			assumedPod: scheduledPod,
+			newPod:     podWithDeletionTimestamp,
 		},
 	}
 	for _, tt := range tests {
@@ -909,6 +917,12 @@ func TestDeletePod(t *testing.T) {
 			name:        "delete unscheduled pod with unknown state",
 			initialPod:  pod,
 			podToDelete: cache.DeletedFinalStateUnknown{Obj: pod},
+		},
+		{
+			name:        "delete assumed pod",
+			initialPod:  scheduledPod,
+			assumed:     true,
+			podToDelete: pod,
 		},
 		{
 			name:        "delete scheduled pod",
