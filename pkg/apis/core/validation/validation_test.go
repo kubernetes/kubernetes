@@ -29612,7 +29612,7 @@ func TestNumericTolerationsWithFeatureGate(t *testing.T) {
 				Effect:   core.TaintEffectNoSchedule,
 			},
 			featureGateOn: true,
-			errorMsg:      "value must be a valid integer for numeric operators",
+			errorMsg:      "value must contain only digits with an optional leading minus sign",
 		},
 		{
 			name: "Gt operator with leading zeros and feature gate enabled (valid, parsed as 950)",
@@ -29643,7 +29643,51 @@ func TestNumericTolerationsWithFeatureGate(t *testing.T) {
 				Effect:   core.TaintEffectNoSchedule,
 			},
 			featureGateOn: true,
-			errorMsg:      "value must be a valid integer for numeric operators",
+			errorMsg:      "value must contain only digits with an optional leading minus sign",
+		},
+		{
+			name: "Gt operator with just minus sign and feature gate enabled",
+			toleration: core.Toleration{
+				Key:      "test-key",
+				Operator: core.TolerationOpGt,
+				Value:    "-",
+				Effect:   core.TaintEffectNoSchedule,
+			},
+			featureGateOn: true,
+			errorMsg:      "value must contain only digits with an optional leading minus sign",
+		},
+		{
+			name: "Gt operator with plus sign and feature gate enabled",
+			toleration: core.Toleration{
+				Key:      "test-key",
+				Operator: core.TolerationOpGt,
+				Value:    "+100",
+				Effect:   core.TaintEffectNoSchedule,
+			},
+			featureGateOn: true,
+			errorMsg:      "value must contain only digits with an optional leading minus sign",
+		},
+		{
+			name: "Gt operator with space in value and feature gate enabled",
+			toleration: core.Toleration{
+				Key:      "test-key",
+				Operator: core.TolerationOpGt,
+				Value:    "95 0",
+				Effect:   core.TaintEffectNoSchedule,
+			},
+			featureGateOn: true,
+			errorMsg:      "value must contain only digits with an optional leading minus sign",
+		},
+		{
+			name: "Gt operator with empty value and feature gate enabled",
+			toleration: core.Toleration{
+				Key:      "test-key",
+				Operator: core.TolerationOpGt,
+				Value:    "",
+				Effect:   core.TaintEffectNoSchedule,
+			},
+			featureGateOn: true,
+			errorMsg:      "value must contain only digits with an optional leading minus sign",
 		},
 		{
 			name: "Lt operator with feature gate disabled",

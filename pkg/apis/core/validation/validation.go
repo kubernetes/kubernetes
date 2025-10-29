@@ -823,7 +823,6 @@ func validateHostPathVolumeSource(hostPath *core.HostPathVolumeSource, fldPath *
 	allErrs = append(allErrs, validateHostPathType(hostPath.Type, fldPath.Child("type"))...)
 	return allErrs
 }
-
 func validateGitRepoVolumeSource(gitRepo *core.GitRepoVolumeSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(gitRepo.Repository) == 0 {
@@ -1619,7 +1618,6 @@ func validateAzureFile(azure *core.AzureFileVolumeSource, fldPath *field.Path) f
 	}
 	return allErrs
 }
-
 func validateAzureFilePV(azure *core.AzureFilePersistentVolumeSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if azure.SecretName == "" {
@@ -3196,7 +3194,6 @@ func ValidateVolumeDevices(devices []core.VolumeDevice, volmounts map[string]str
 	}
 	return allErrs
 }
-
 func validatePodResourceClaims(podMeta *metav1.ObjectMeta, claims []core.PodResourceClaim, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	podClaimNames := sets.New[string]()
@@ -3980,7 +3977,6 @@ func validateFileKeyRefVolumes(spec *core.PodSpec, fldPath *field.Path) field.Er
 
 	return allErrs
 }
-
 func validatePodHostName(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
@@ -4381,6 +4377,12 @@ func ValidateTolerations(tolerations []core.Toleration, fldPath *field.Path) fie
 				break
 			}
 
+			// Validate value format is numeric before parsing
+			if !helper.IsValidNumericString(toleration.Value) {
+				allErrors = append(allErrors, field.Invalid(idxPath.Child("value"),
+					toleration.Value, "value must contain only digits with an optional leading minus sign"))
+				break
+			}
 			// Validate value is parseable as int64
 			if _, err := strconv.ParseInt(toleration.Value, 10, 64); err != nil {
 				allErrors = append(allErrors, field.Invalid(idxPath.Child("value"),

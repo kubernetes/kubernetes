@@ -69,7 +69,7 @@ func (t *Toleration) ToleratesTaint(taint *Taint) (bool, error) {
 func compareNumericValues(tolerationVal, taintVal string, op TolerationOperator) (bool, error) {
 	tVal, err := strconv.ParseInt(tolerationVal, 10, 64)
 	if err != nil {
-		return false, fmt.Errorf("failed to parse toleration value %s as int64, err: %w", taintVal, err)
+		return false, fmt.Errorf("failed to parse toleration value %s as int64, err: %w", tolerationVal, err)
 	}
 
 	tntVal, err := strconv.ParseInt(taintVal, 10, 64)
