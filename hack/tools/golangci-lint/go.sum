@@ -295,6 +295,7 @@ github.com/google/go-cmp v0.5.2/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/
 github.com/google/go-cmp v0.5.4/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
 github.com/google/go-cmp v0.5.5/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
 github.com/google/go-cmp v0.5.8/go.mod h1:17dUlkBOakJ0+DkrSSNjCkIjxS6bF9zb3elmeNGIjoY=
+github.com/google/go-cmp v0.5.9/go.mod h1:17dUlkBOakJ0+DkrSSNjCkIjxS6bF9zb3elmeNGIjoY=
 github.com/google/go-cmp v0.7.0 h1:wk8382ETsv4JYUZwIsn6YpYiWiBsYLSJiTsyBybVuN8=
 github.com/google/go-cmp v0.7.0/go.mod h1:pXiqmnSA92OHEEa9HXL2W4E7lf9JzCmGVUdgjX3N/iU=
 github.com/google/gofuzz v1.0.0/go.mod h1:dBl0BpW6vV/+mYPU4Po3pmUjxk6FQPldtuIdl/M65Eg=
@@ -1001,7 +1002,9 @@ mvdan.cc/unparam v0.0.0-20250301125049-0df0534333a4/go.mod h1:rthT7OuvRbaGcd5gin
 rsc.io/binaryregexp v0.2.0/go.mod h1:qTv7/COck+e2FymRvadv62gMdZztPaShugOCi3I+8D8=
 rsc.io/quote/v3 v3.1.0/go.mod h1:yEA65RcK8LyAZtP9Kv3t0HmxON59tX3rD+tICJqUlj0=
 rsc.io/sampler v1.3.0/go.mod h1:T1hPZKmBbMNahiBKFy5HrXp6adAjACjK9JXDnKaTXpA=
-sigs.k8s.io/kube-api-linter v0.0.0-20251022154440-1dea13bd78d9 h1:rYyZq5TDfgz6ypu4aPh351zmuxwe+XIA2YOY8bGXXgY=
-sigs.k8s.io/kube-api-linter v0.0.0-20251022154440-1dea13bd78d9/go.mod h1:PRCuZfscKiR9Mg4J/ROYGf04mIZdcdQBSB/U+U3ICsk=
+sigs.k8s.io/kube-api-linter v0.0.0-20251029172002-9992248f8813 h1:bn2rchbo/TdTln/RcJU3B49BjPBZTl7/+pj8RSVxLbY=
+sigs.k8s.io/kube-api-linter v0.0.0-20251029172002-9992248f8813/go.mod h1:TwxOEmBIjl8POuwDF2VfmrHZ5a4o2SIPjDyqtTX7T3Q=
 sigs.k8s.io/logtools v0.9.0 h1:IMP/HTDkfM6rg6os/tcEjmQeIHyOyu/enduM/cOPGNQ=
 sigs.k8s.io/logtools v0.9.0/go.mod h1:74Z5BP7ehrMHi/Q31W1gSf8YgwT/4GPjVH5xPSPeZA0=
+sigs.k8s.io/yaml v1.4.0 h1:Mk1wCc2gy/F0THH0TAp1QYyJNzRm2KCLy3o5ASXVI5E=
+sigs.k8s.io/yaml v1.4.0/go.mod h1:Ejl7/uTz7PSA4eKMyQCUTnhZYNmLIl+5c2lQPGR2BPY=
