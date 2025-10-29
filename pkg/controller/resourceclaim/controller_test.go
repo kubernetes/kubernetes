@@ -1177,8 +1177,8 @@ func newNumMetrics(lister resourcelisters.ResourceClaimLister) numMetrics {
 	}
 }
 
-func (em numMetrics) withUpdates(label resourceclaimmetrics.NumResourceClaimLabels, n float64) numMetrics {
-	em.metrics[label] += n
+func (em numMetrics) withUpdates(rcLabels resourceclaimmetrics.NumResourceClaimLabels, n float64) numMetrics {
+	em.metrics[rcLabels] += n
 	return numMetrics{
 		metrics: em.metrics,
 		lister:  em.lister,

@@ -1057,14 +1057,14 @@ func (collector *customCollector) CollectWithStability(ch chan<- metrics.Metric)
 		}
 		rcMetrics[resourceclaimmetrics.NumResourceClaimLabels{Allocated: allocated, AdminAccess: adminAccess, Source: source}]++
 	}
-	for label, count := range rcMetrics {
+	for rcLabels, count := range rcMetrics {
 		ch <- metrics.NewLazyConstMetric(
 			resourceclaimmetrics.NumResourceClaimsDesc,
 			metrics.GaugeValue,
 			float64(count),
-			label.Allocated,
-			label.AdminAccess,
-			label.Source,
+			rcLabels.Allocated,
+			rcLabels.AdminAccess,
+			rcLabels.Source,
 		)
 	}
 }
