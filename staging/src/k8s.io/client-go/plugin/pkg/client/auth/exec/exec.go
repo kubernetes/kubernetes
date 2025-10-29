@@ -182,6 +182,15 @@ func newAuthenticator(c *cache, isTerminalFunc func(int) bool, config *api.ExecC
 		connTracker,
 	)
 
+	// This is required for backward compatibility
+	if config.PluginPolicy.PolicyType == api.PluginPolicyUnspecified {
+		config.PluginPolicy.PolicyType = api.PluginPolicyAllowAll
+	}
+
+	if err := ValidatePluginPolicy(config.PluginPolicy.PolicyType, config.PluginPolicy.Allowlist); err != nil {
+		return nil, err
+	}
+
 	a := &Authenticator{
 		cmd:                config.Command,
 		args:               config.Args,
@@ -300,15 +309,9 @@ func (a *Authenticator) allowsPlugin(cmd string) error {
 		return nil
 	}
 
-	// validates policy and allowlist
-	if err := a.validatePluginPolicy(); err != nil {
-		return err
-	}
-
 	switch a.execPluginPolicy.PolicyType {
 	case api.PluginPolicyUnspecified:
-		// Required for backward compatibility
-		return nil
+		panic("defaulting has failed")
 	case api.PluginPolicyAllowAll:
 		return nil
 	case api.PluginPolicyDenyAll:

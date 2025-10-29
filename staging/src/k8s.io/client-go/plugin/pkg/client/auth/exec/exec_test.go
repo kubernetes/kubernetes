@@ -885,10 +885,8 @@ func TestPluginPolicy(t *testing.T) {
 	// this is inlined to make highly visible and explicit the logic of which
 	// test configurations should pass and which should fail
 	shouldErrFunc := func(tt *pluginPolicyTest) (bool, string) {
-		switch tt.config.PluginPolicy.PolicyType {
-		case api.PluginPolicyUnspecified:
-			panic("should be fixed by defaults")
-		case api.PluginPolicyAllowAll:
+		switch tt.policyType {
+		case api.PluginPolicyUnspecified, api.PluginPolicyAllowAll:
 			if tt.allowlist != nil {
 				return true, "allowlist is non-nil"
 			}
@@ -958,7 +956,12 @@ func TestPluginPolicy(t *testing.T) {
 			c := test.config
 			a, err := newAuthenticator(newCache(), func(_ int) bool { return false }, c, &clientauthentication.Cluster{})
 			if err != nil {
-				t.Fatal(err)
+				if !test.wantErr {
+					t.Errorf("get token %v", err)
+				} else if !strings.Contains(err.Error(), test.wantErrSubstr) {
+					t.Errorf("expected error with substring '%v' got '%v'", test.wantErrSubstr, err.Error())
+				}
+				return
 			}
 
 			stderr := &bytes.Buffer{}
