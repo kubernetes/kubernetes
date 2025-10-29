@@ -75,7 +75,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
-	svmv1alpha1 "k8s.io/kubernetes/pkg/apis/storagemigration"
+	"k8s.io/kubernetes/pkg/apis/storagemigration"
 	"k8s.io/kubernetes/pkg/printers"
 	"k8s.io/kubernetes/pkg/util/node"
 )
@@ -732,7 +732,8 @@ func AddHandlers(h printers.PrintHandler) {
 
 	storageVersionMigrationColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "Resource", Type: "string", Description: "Fully qualified resource to migrate"},
+		{Name: "Resource", Type: "string", Description: "GroupResource to migrate"},
+		{Name: "Status", Type: "string", Description: "Status of the migration"},
 	}
 	_ = h.TableHandler(storageVersionMigrationColumnDefinitions, printStorageVersionMigration)
 	_ = h.TableHandler(storageVersionMigrationColumnDefinitions, printStorageVersionMigrationList)
@@ -3267,19 +3268,29 @@ func printDeviceTaintRuleList(list *resource.DeviceTaintRuleList, options printe
 	return rows, nil
 }
 
-func printStorageVersionMigration(obj *svmv1alpha1.StorageVersionMigration, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+func printStorageVersionMigration(obj *storagemigration.StorageVersionMigration, options printers.GenerateOptions) ([]metav1.TableRow, error) {
 	row := metav1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
+	migrationGR := obj.Spec.Resource.String()
+	row.Cells = append(row.Cells, obj.Name, migrationGR)
 
-	migrationGVR := obj.Spec.Resource.Resource + "." + obj.Spec.Resource.Version + "." + obj.Spec.Resource.Group
-	row.Cells = append(row.Cells, obj.Name, migrationGVR)
-	//ToDo: add migration condition 'status' and 'type' (migration successful | failed)
+	condStatus := "Unknown"
+	for _, cond := range obj.Status.Conditions {
+		if cond.Status != metav1.ConditionTrue {
+			continue
+		}
+		switch cond.Type {
+		case string(storagemigration.MigrationRunning), string(storagemigration.MigrationFailed), string(storagemigration.MigrationSucceeded):
+			condStatus = cond.Type
+		}
+	}
+	row.Cells = append(row.Cells, condStatus)
 
 	return []metav1.TableRow{row}, nil
 }
 
-func printStorageVersionMigrationList(list *svmv1alpha1.StorageVersionMigrationList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+func printStorageVersionMigrationList(list *storagemigration.StorageVersionMigrationList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
 	rows := make([]metav1.TableRow, 0, len(list.Items))
 
 	for i := range list.Items {

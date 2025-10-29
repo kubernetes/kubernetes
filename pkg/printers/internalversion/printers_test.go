@@ -7723,16 +7723,27 @@ func TestPrintStorageVersionMigration(t *testing.T) {
 			Name: "print-test",
 		},
 		Spec: storagemigration.StorageVersionMigrationSpec{
-			Resource: storagemigration.GroupVersionResource{
+			Resource: metav1.GroupResource{
 				Group:    "test-group",
-				Version:  "test-version",
 				Resource: "test-resource",
+			},
+		},
+		Status: storagemigration.StorageVersionMigrationStatus{
+			Conditions: []metav1.Condition{
+				{
+					Type:   string(storagemigration.MigrationRunning),
+					Status: metav1.ConditionFalse,
+				},
+				{
+					Type:   string(storagemigration.MigrationSucceeded),
+					Status: metav1.ConditionTrue,
+				},
 			},
 		},
 	}
 
-	// Columns: Name, GVRTOMIGRATE
-	expected := []metav1.TableRow{{Cells: []interface{}{"print-test", "test-resource.test-version.test-group"}}}
+	// Columns: Name, Resource, Status
+	expected := []metav1.TableRow{{Cells: []interface{}{"print-test", "test-resource.test-group", "Succeeded"}}}
 
 	rows, err := printStorageVersionMigration(&storageVersionMigration, printers.GenerateOptions{})
 	if err != nil {
@@ -7756,10 +7767,21 @@ func TestPrintStorageVersionMigrationList(t *testing.T) {
 					Name: "print-test",
 				},
 				Spec: storagemigration.StorageVersionMigrationSpec{
-					Resource: storagemigration.GroupVersionResource{
-						Group:    "test-group",
-						Version:  "test-version",
+					Resource: metav1.GroupResource{
+						Group:    "",
 						Resource: "test-resource",
+					},
+				},
+				Status: storagemigration.StorageVersionMigrationStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   string(storagemigration.MigrationRunning),
+							Status: metav1.ConditionFalse,
+						},
+						{
+							Type:   string(storagemigration.MigrationSucceeded),
+							Status: metav1.ConditionTrue,
+						},
 					},
 				},
 			},
@@ -7772,20 +7794,27 @@ func TestPrintStorageVersionMigrationList(t *testing.T) {
 					Name: "print-test2",
 				},
 				Spec: storagemigration.StorageVersionMigrationSpec{
-					Resource: storagemigration.GroupVersionResource{
+					Resource: metav1.GroupResource{
 						Group:    "test-group2",
-						Version:  "test-version2",
 						Resource: "test-resource2",
+					},
+				},
+				Status: storagemigration.StorageVersionMigrationStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   string(storagemigration.MigrationRunning),
+							Status: metav1.ConditionTrue,
+						},
 					},
 				},
 			},
 		},
 	}
 
-	// Columns: Name, GVRTOMIGRATE
+	// Columns: Name, Resource, Status
 	expected := []metav1.TableRow{
-		{Cells: []interface{}{"print-test", "test-resource.test-version.test-group"}},
-		{Cells: []interface{}{"print-test2", "test-resource2.test-version2.test-group2"}},
+		{Cells: []interface{}{"print-test", "test-resource", "Succeeded"}},
+		{Cells: []interface{}{"print-test2", "test-resource2.test-group2", "Running"}},
 	}
 
 	rows, err := printStorageVersionMigrationList(&storageVersionMigrationList, printers.GenerateOptions{})
