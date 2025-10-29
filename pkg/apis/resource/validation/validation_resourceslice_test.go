@@ -410,8 +410,8 @@ func TestValidateResourceSlice(t *testing.T) {
 		},
 		"bad-attribute-empty-domain-and-c-identifier": {
 			wantFailures: field.ErrorList{
-				field.Required(field.NewPath("spec", "devices").Index(1).Child("attributes"), "the domain must not be empty"),
-				field.Required(field.NewPath("spec", "devices").Index(1).Child("attributes"), "the name must not be empty"),
+				field.Invalid(field.NewPath("spec", "devices").Index(1).Child("attributes"), "", "the domain must not be empty"),
+				field.Invalid(field.NewPath("spec", "devices").Index(1).Child("attributes"), "", "the name must not be empty"),
 			},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, goodName, 2)

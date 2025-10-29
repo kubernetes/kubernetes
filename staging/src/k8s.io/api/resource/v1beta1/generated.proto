@@ -753,6 +753,8 @@ message DeviceConstraint {
   //
   // +optional
   // +oneOf=ConstraintType
+  // +k8s:optional
+  // +k8s:format=k8s-resource-fully-qualified-name
   optional string matchAttribute = 2;
 
   // DistinctAttribute requires that all devices in question have this

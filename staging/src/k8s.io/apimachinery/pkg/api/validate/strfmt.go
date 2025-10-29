@@ -31,6 +31,7 @@ const (
 	defaultResourceRequestsPrefix = "requests."
 	// Default namespace prefix.
 	resourceDefaultNamespacePrefix = "kubernetes.io/"
+	resourceDeviceMaxLength        = 32
 )
 
 // ShortName verifies that the specified value is a valid "short name"
@@ -217,4 +218,73 @@ func ExtendedResourceName[T ~string](_ context.Context, op operation.Operation, 
 		allErrs = append(allErrs, field.Invalid(fldPath, val, msg))
 	}
 	return allErrs.WithOrigin("format=k8s-extended-resource-name")
+}
+
+// resourcesQualifiedName verifies that the specified value is a valid Kubernetes resources
+// qualified name.
+//   - must not be empty
+//   - must be composed of an optional prefix and a name, separated by a slash (e.g., "prefix/name")
+//   - the prefix, if specified, must be a DNS subdomain
+//   - the name part must be a C identifier
+//   - the name part must be no more than 32 characters
+func resourcesQualifiedName[T ~string](ctx context.Context, op operation.Operation, fldPath *field.Path, value, _ *T) field.ErrorList {
+	if value == nil {
+		return nil
+	}
+	var allErrs field.ErrorList
+	s := string(*value)
+	parts := strings.Split(s, "/")
+	// TODO: This validation and the corresponding handwritten validation validateQualifiedName in
+	// pkg/apis/resource/validation/validation.go are not validating whether there are more than 1
+	// slash. This should be fixed in both places.
+	switch len(parts) {
+	case 1:
+		allErrs = append(allErrs, validateCIdentifier(parts[0], resourceDeviceMaxLength, fldPath)...)
+	case 2:
+		if len(parts[0]) == 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath, "", "prefix must not be empty"))
+		} else {
+			if len(parts[0]) > 63 {
+				allErrs = append(allErrs, field.TooLong(fldPath, parts[0], 63))
+			}
+			allErrs = append(allErrs, LongName(ctx, op, fldPath, &parts[0], nil).PrefixDetail("prefix: ")...)
+		}
+		if len(parts[1]) == 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath, "", "name must not be empty"))
+		} else {
+			allErrs = append(allErrs, validateCIdentifier(parts[1], resourceDeviceMaxLength, fldPath)...)
+		}
+	}
+	return allErrs
+}
+
+// ResourceFullyQualifiedName verifies that the specified value is a valid Kubernetes
+// fully qualified name.
+//   - must not be empty
+//   - must be composed of a prefix and a name, separated by a slash (e.g., "prefix/name")
+//   - the prefix must be a DNS subdomain
+//   - the name part must be a C identifier
+//   - the name part must be no more than 32 characters
+func ResourceFullyQualifiedName[T ~string](ctx context.Context, op operation.Operation, fldPath *field.Path, value, _ *T) field.ErrorList {
+	if value == nil {
+		return nil
+	}
+	var allErrs field.ErrorList
+	s := string(*value)
+	allErrs = append(allErrs, resourcesQualifiedName(ctx, op, fldPath, &s, nil)...)
+	if !strings.Contains(s, "/") {
+		allErrs = append(allErrs, field.Invalid(fldPath, s, "a fully qualified name must be a domain and a name separated by a slash"))
+	}
+	return allErrs.WithOrigin("format=k8s-resource-fully-qualified-name")
+}
+
+func validateCIdentifier(id string, length int, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if len(id) > length {
+		allErrs = append(allErrs, field.TooLong(fldPath, id, length))
+	}
+	for _, msg := range content.IsCIdentifier(id) {
+		allErrs = append(allErrs, field.Invalid(fldPath, id, msg))
+	}
+	return allErrs
 }

@@ -846,7 +846,25 @@ func Validate_DeviceConstraint(ctx context.Context, op operation.Operation, fldP
 			return
 		}(fldPath.Child("requests"), obj.Requests, safe.Field(oldObj, func(oldObj *resourcev1.DeviceConstraint) []string { return oldObj.Requests }))...)
 
-	// field resourcev1.DeviceConstraint.MatchAttribute has no validation
+	// field resourcev1.DeviceConstraint.MatchAttribute
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *resourcev1.FullyQualifiedName) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			errs = append(errs, validate.ResourceFullyQualifiedName(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("matchAttribute"), obj.MatchAttribute, safe.Field(oldObj, func(oldObj *resourcev1.DeviceConstraint) *resourcev1.FullyQualifiedName { return oldObj.MatchAttribute }))...)
+
 	// field resourcev1.DeviceConstraint.DistinctAttribute has no validation
 	return errs
 }
