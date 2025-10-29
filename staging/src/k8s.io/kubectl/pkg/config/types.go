@@ -71,7 +71,7 @@ type Preference struct {
 	// If the policy is "", then it falls back to "AllowAll" (this is required
 	// to maintain backward compatibility). If the policy is DenyAll, no
 	// credential plugins may run. If the policy is Allowlist, only those
-	// plugins meeting the criteria specified in the `credPluginAllowlist`
+	// plugins meeting the criteria specified in the `credentialPluginAllowlist`
 	// field may run.
 	CredentialPluginPolicy clientcmdapi.PolicyType
 
@@ -81,13 +81,13 @@ type Preference struct {
 	// supplied if the policy is not "Allowlist".
 	//
 	// e.g.
-	// credPluginAllowlist:
+	// credentialPluginAllowlist:
 	// - name: cloud-provider-plugin
 	// - name: /usr/local/bin/my-plugin
 	// In the above example, the user allows the credential plugins
 	// `cloud-provider-plugin` (found somewhere in PATH), and the plugin found
 	// at the explicit path `/usr/local/bin/my-plugin`.
-	CredPluginAllowlist []clientcmdapi.AllowlistEntry
+	CredentialPluginAllowlist []clientcmdapi.AllowlistEntry
 }
 
 // AliasOverride stores the alias definitions.

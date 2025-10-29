@@ -314,7 +314,7 @@ type PluginPolicy struct {
 	// If the policy is "", then it falls back to "AllowAll" (this is required
 	// to maintain backward compatibility). If the policy is DenyAll, no
 	// credential plugins may run. If the policy is Allowlist, only those
-	// plugins meeting the criteria specified in the `credPluginAllowlist`
+	// plugins meeting the criteria specified in the `credentialPluginAllowlist`
 	// field may run. If the policy is not `Allowlist` but one is provided, it
 	// is considered a configuration error.
 	PolicyType PolicyType `json:"-"`

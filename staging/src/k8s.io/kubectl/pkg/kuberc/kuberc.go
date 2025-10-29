@@ -68,8 +68,6 @@ type Preferences struct {
 
 var _ PreferencesHandler = &Preferences{}
 
-// var _ = ([]clientcmdapi.)
-
 // NewPreferences returns initialized Prefrences object.
 func NewPreferences() PreferencesHandler {
 	p := &Preferences{
@@ -137,8 +135,8 @@ func (p *Preferences) Apply(rootCmd *cobra.Command, args []string, errOut io.Wri
 // stack.
 func (p *Preferences) applyPluginPolicy(kuberc *config.Preference) {
 	p.pluginPolicy.PolicyType = kuberc.CredentialPluginPolicy
-	if kuberc.CredPluginAllowlist != nil {
-		p.pluginPolicy.Allowlist = kuberc.CredPluginAllowlist
+	if kuberc.CredentialPluginAllowlist != nil {
+		p.pluginPolicy.Allowlist = kuberc.CredentialPluginAllowlist
 	}
 }
 
