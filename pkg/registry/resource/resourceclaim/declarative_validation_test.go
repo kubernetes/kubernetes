@@ -1268,6 +1268,24 @@ func testValidateStatusUpdateForDeclarative(t *testing.T, apiVersion string) {
 				field.TooLong(field.NewPath("status", "devices").Index(0).Child("networkData", "hardwareAddress"), "", resource.NetworkDeviceDataHardwareAddressMaxLength).MarkCoveredByDeclarative().WithOrigin("maxLength"),
 			},
 		},
+		"invalid status.devices.networkData.ips duplicate": {
+			old: mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(
+				tweakStatusDevices(
+					resource.AllocatedDeviceStatus{
+						Driver: "dra.example.com",
+						Pool:   "pool-0",
+						Device: "device-0",
+						NetworkData: &resource.NetworkDeviceData{
+							IPs: []string{"1.2.3.4/32", "1.2.3.4/32"},
+						},
+					},
+				),
+			),
+			expectedErrs: field.ErrorList{
+				field.Duplicate(field.NewPath("status", "devices").Index(0).Child("networkData", "ips").Index(1), "1.2.3.4/32"),
+			},
+		},
 	}
 
 	for k, tc := range testCases {
