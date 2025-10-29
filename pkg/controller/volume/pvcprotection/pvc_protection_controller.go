@@ -161,22 +161,30 @@ func NewPVCProtectionController(logger klog.Logger, pvcInformer coreinformers.Pe
 // Run runs the controller goroutines.
 func (c *Controller) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
-	defer c.queue.ShutDown()
-	defer c.pvcProcessingStore.namespaceQueue.ShutDown()
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting PVC protection controller")
-	defer logger.Info("Shutting down PVC protection controller")
+
+	var wg sync.WaitGroup
+	defer func() {
+		logger.Info("Shutting down PVC protection controller")
+		c.queue.ShutDown()
+		c.pvcProcessingStore.namespaceQueue.ShutDown()
+		wg.Wait()
+	}()
 
 	if !cache.WaitForNamedCacheSyncWithContext(ctx, c.pvcListerSynced, c.podListerSynced) {
 		return
 	}
 
-	go wait.UntilWithContext(ctx, c.runMainWorker, time.Second)
+	wg.Go(func() {
+		wait.UntilWithContext(ctx, c.runMainWorker, time.Second)
+	})
 	for i := 0; i < workers; i++ {
-		go wait.UntilWithContext(ctx, c.runProcessNamespaceWorker, time.Second)
+		wg.Go(func() {
+			wait.UntilWithContext(ctx, c.runProcessNamespaceWorker, time.Second)
+		})
 	}
-
 	<-ctx.Done()
 }
 
