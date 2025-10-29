@@ -497,7 +497,7 @@ func TestErrorsAndMetrics(t *testing.T) {
 			# TYPE kubelet_pod_watch_events_dropped_total counter
 			kubelet_pod_watch_events_dropped_total 1
 		`))
-			require.NoError(t, err)
+		require.NoError(t, err)
 	})
 
 	t.Run("InvalidFieldMaskReturnsError", func(t *testing.T) {
