@@ -198,7 +198,7 @@ func getAllPaths(t reflect.Type, prefix string, paths map[string]bool) {
 		}
 		if fieldType.Kind() == reflect.Struct {
 			if !strings.Contains(fieldType.PkgPath(), "k8s.io/apimachinery/pkg/apis/meta/v1") ||
-				!(fieldType.Name() == "Time" || fieldType.Name() == "Duration" || fieldType.Name() == "MicroTime") {
+				(fieldType.Name() != "Time" && fieldType.Name() != "Duration" && fieldType.Name() != "MicroTime") {
 				getAllPaths(fieldType, path, paths)
 			}
 		}

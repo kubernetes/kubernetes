@@ -19,6 +19,8 @@ package e2enode
 import (
 	"context"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -55,13 +57,25 @@ var _ = ginkgo.Describe("Kubelet Pods API", func() {
 			initialConfig.FeatureGates[string(kubefeatures.PodsAPI)] = true
 		})
 
+		socketPath := "/var/lib/kubelet/pods-api"
+
+		ginkgo.BeforeEach(func(ctx context.Context) {
+			ginkgo.By("Wait for the local endpoint to be present")
+			gomega.Eventually(ctx, func() error {
+				_, err := os.Stat(filepath.Join(socketPath, pods.Socket+".sock"))
+				return err
+			}, 30*time.Second, 1*time.Second).Should(gomega.Succeed(), "Pods API socket not present")
+		})
+
 		ginkgo.It("should be able to list, get, and watch pods", func(ctx context.Context) {
-			endpoint, err := util.LocalEndpoint("/var/lib/kubelet", pods.Socket)
+			endpoint, err := util.LocalEndpoint(socketPath, pods.Socket)
 			framework.ExpectNoError(err, "failed to get local endpoint for Pods API")
 
 			conn, err := grpc.DialContext(ctx, endpoint, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
 			framework.ExpectNoError(err, "failed to dial Pods API")
-			defer conn.Close()
+			defer func(conn *grpc.ClientConn) {
+				_ = conn.Close()
+			}(conn)
 
 			client := podsv1alpha1.NewPodsClient(conn)
 
@@ -75,8 +89,9 @@ var _ = ginkgo.Describe("Kubelet Pods API", func() {
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
 						{
-							Name:  "test-container",
-							Image: "registry.k8s.io/busybox",
+							Name:    "test-container",
+							Image:   "registry.k8s.io/busybox",
+							Command: []string{"sleep", "3600"},
 						},
 					},
 				},
@@ -98,7 +113,7 @@ var _ = ginkgo.Describe("Kubelet Pods API", func() {
 					break
 				}
 			}
-			gomega.Expect(foundPod).To(gomega.BeTrue(), "test pod not found in list")
+			gomega.Expect(foundPod).To(gomega.BeTrueBecause("test pod not found in list"))
 
 			ginkgo.By("getting the test pod by UID")
 			getResp, err := client.GetPod(ctx, &podsv1alpha1.GetPodRequest{PodUID: string(testPod.UID)})
@@ -138,12 +153,14 @@ var _ = ginkgo.Describe("Kubelet Pods API", func() {
 		})
 
 		ginkgo.It("should respect field masks", func(ctx context.Context) {
-			endpoint, err := util.LocalEndpoint("/var/lib/kubelet", pods.Socket)
+			endpoint, err := util.LocalEndpoint(socketPath, pods.Socket)
 			framework.ExpectNoError(err, "failed to get local endpoint for Pods API")
 
 			conn, err := grpc.DialContext(ctx, endpoint, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
 			framework.ExpectNoError(err, "failed to dial Pods API")
-			defer conn.Close()
+			defer func(conn *grpc.ClientConn) {
+				_ = conn.Close()
+			}(conn)
 
 			client := podsv1alpha1.NewPodsClient(conn)
 
@@ -157,8 +174,9 @@ var _ = ginkgo.Describe("Kubelet Pods API", func() {
 					NodeName: framework.TestContext.NodeName,
 					Containers: []v1.Container{
 						{
-							Name:  "test-container",
-							Image: "registry.k8s.io/busybox",
+							Name:    "test-container",
+							Image:   "registry.k8s.io/busybox",
+							Command: []string{"sleep", "3600"},
 						},
 					},
 				},
