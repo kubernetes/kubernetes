@@ -164,7 +164,7 @@ func ValidateVolumeAttachmentV1(volumeAttachment *storage.VolumeAttachment) fiel
 func validateVolumeAttachmentSpec(
 	spec *storage.VolumeAttachmentSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, validateAttacher(spec.Attacher, fldPath.Child("attacher"))...)
+	allErrs = append(allErrs, validateAttacher(spec.Attacher, fldPath.Child("attacher"))...).MarkCoveredByDeclarative()
 	allErrs = append(allErrs, validateVolumeAttachmentSource(&spec.Source, fldPath.Child("source"))...)
 	allErrs = append(allErrs, validateNodeName(spec.NodeName, fldPath.Child("nodeName"))...)
 	return allErrs
@@ -174,7 +174,7 @@ func validateVolumeAttachmentSpec(
 func validateAttacher(attacher string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(attacher) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath, attacher)).MarkCoveredByDeclarative()
+		allErrs = append(allErrs, field.Required(fldPath, attacher))
 	}
 	return allErrs
 }

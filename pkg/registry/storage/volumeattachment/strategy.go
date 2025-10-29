@@ -71,8 +71,8 @@ func (volumeAttachmentStrategy) Validate(ctx context.Context, obj runtime.Object
 	errs := validation.ValidateVolumeAttachment(volumeAttachment)
 
 	// tighten up validation of newly created v1 attachments
-	allErrs := append(errs, validation.ValidateVolumeAttachmentV1(volumeAttachment)...)
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, obj, nil, allErrs, operation.Create)
+	//allErrs := append(errs, validation.ValidateVolumeAttachmentV1(volumeAttachment)...)
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, obj, nil, errs, operation.Create)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.

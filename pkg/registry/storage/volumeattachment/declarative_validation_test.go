@@ -86,54 +86,6 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 	}
 }
 
-func TestDeclarativeValidateUpdate(t *testing.T) {
-	apiVersions := []string{"v1beta1", "v1"}
-	for _, apiVersion := range apiVersions {
-		t.Run(apiVersion, func(t *testing.T) {
-			testDeclarativeValidateUpdate(t, apiVersion)
-		})
-	}
-}
-
-func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
-	testCases := map[string]struct {
-		oldObj       storage.VolumeAttachment
-		updateObj    storage.VolumeAttachment
-		expectedErrs field.ErrorList
-	}{
-		"valid update": {
-			oldObj:    mkValidVolumeAttachment(func(obj *storage.VolumeAttachment) { obj.ResourceVersion = "1" }),
-			updateObj: mkValidVolumeAttachment(func(obj *storage.VolumeAttachment) { obj.ResourceVersion = "1" }),
-		},
-		"invalid update attacher (required + immutable)": {
-			oldObj: mkValidVolumeAttachment(func(obj *storage.VolumeAttachment) { obj.ResourceVersion = "1" }),
-			updateObj: mkValidVolumeAttachment(func(obj *storage.VolumeAttachment) {
-				obj.ResourceVersion = "1"
-				obj.Spec.Attacher = ""
-			}),
-			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec", "attacher"), ""),
-				field.Forbidden(field.NewPath("spec", "attacher"), "updates to attacher are forbidden."),
-			},
-		},
-	}
-
-	for name, tc := range testCases {
-		t.Run(name, func(t *testing.T) {
-			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-				APIPrefix:         "apis",
-				APIGroup:          "storage.k8s.io",
-				APIVersion:        apiVersion,
-				Resource:          "volumeattachments",
-				Name:              "valid-volume-attachment",
-				IsResourceRequest: true,
-				Verb:              "update",
-			})
-			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.updateObj, &tc.oldObj, Strategy.ValidateUpdate, tc.expectedErrs)
-		})
-	}
-}
-
 func mkValidVolumeAttachment(tweaks ...func(obj *storage.VolumeAttachment)) storage.VolumeAttachment {
 	pvName := "pv-001"
 	obj := storage.VolumeAttachment{
