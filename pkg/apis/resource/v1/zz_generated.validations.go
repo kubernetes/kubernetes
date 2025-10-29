@@ -1349,7 +1349,18 @@ func Validate_NetworkDeviceData(ctx context.Context, op operation.Operation, fld
 			return
 		}(fldPath.Child("interfaceName"), &obj.InterfaceName, safe.Field(oldObj, func(oldObj *resourcev1.NetworkDeviceData) *string { return &oldObj.InterfaceName }))...)
 
-	// field resourcev1.NetworkDeviceData.IPs has no validation
+	// field resourcev1.NetworkDeviceData.IPs
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []string) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			// lists with set semantics require unique values
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual)...)
+			return
+		}(fldPath.Child("ips"), obj.IPs, safe.Field(oldObj, func(oldObj *resourcev1.NetworkDeviceData) []string { return oldObj.IPs }))...)
 
 	// field resourcev1.NetworkDeviceData.HardwareAddress
 	errs = append(errs,
