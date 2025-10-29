@@ -52,4 +52,20 @@
 
 # nomaps is being enabled over time. For now, each API group should be added to this list until we comb through each group and fix/ignore the issues.
 - text: "should not use a map type, use a list type with a unique name/identifier instead"
-  path: "staging/src/k8s.io/api/(authentication|authorization|certificates|core|node|policy|resource)"
+  path: "staging/src/k8s.io/api/(core|resource)"
+
+# The following exceptions are for fields in stable or deprecated APIs that cannot be
+# changed due to backward compatibility constraints. Each rule is scoped to the
+# specific field to avoid hiding new violations.
+
+# For the "Extra" field, which is common across several auth-related APIs.
+- text: "Extra should not use a map type, use a list type with a unique name/identifier instead"
+  path: "staging/src/k8s.io/api/(authentication|authorization|certificates)/(v1|v1beta1)/types\\.go"
+
+# For the "PodFixed" field in the node API.
+- text: "PodFixed should not use a map type, use a list type with a unique name/identifier instead"
+  path: "staging/src/k8s.io/api/node/(v1|v1alpha1|v1beta1)/types\\.go"
+
+# For the "DisruptedPods" field in the policy API.
+- text: "DisruptedPods should not use a map type, use a list type with a unique name/identifier instead"
+  path: "staging/src/k8s.io/api/policy/(v1|v1beta1)/types\\.go"
