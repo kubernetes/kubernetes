@@ -315,6 +315,8 @@ message CounterSet {
   // The maximum number of counters in all sets is 32.
   //
   // +required
+  // +k8s:required
+  // +k8s:eachKey=+k8s:format=k8s-short-name
   map<string, Counter> counters = 2;
 }
 
@@ -779,6 +781,8 @@ message DeviceCounterConsumption {
   // 16 counters each).
   //
   // +required
+  // +k8s:required
+  // +k8s:eachKey=+k8s:format=k8s-short-name
   map<string, Counter> counters = 2;
 }
 
