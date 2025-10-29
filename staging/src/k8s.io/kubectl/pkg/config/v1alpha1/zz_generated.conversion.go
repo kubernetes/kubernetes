@@ -155,8 +155,8 @@ func Convert_config_CommandOptionDefault_To_v1alpha1_CommandOptionDefault(in *co
 func autoConvert_v1alpha1_Preference_To_config_Preference(in *Preference, out *config.Preference, s conversion.Scope) error {
 	out.Defaults = *(*[]config.CommandDefaults)(unsafe.Pointer(&in.Defaults))
 	out.Aliases = *(*[]config.AliasOverride)(unsafe.Pointer(&in.Aliases))
-	out.CredPluginPolicy = api.PolicyType(in.CredPluginPolicy)
-	out.CredPluginAllowlist = *(*api.Allowlist)(unsafe.Pointer(&in.CredPluginAllowlist))
+	out.CredentialPluginPolicy = api.PolicyType(in.CredentialPluginPolicy)
+	out.CredentialPluginAllowlist = *(*[]api.AllowlistEntry)(unsafe.Pointer(&in.CredentialPluginAllowlist))
 	return nil
 }
 
@@ -168,8 +168,8 @@ func Convert_v1alpha1_Preference_To_config_Preference(in *Preference, out *confi
 func autoConvert_config_Preference_To_v1alpha1_Preference(in *config.Preference, out *Preference, s conversion.Scope) error {
 	out.Defaults = *(*[]CommandDefaults)(unsafe.Pointer(&in.Defaults))
 	out.Aliases = *(*[]AliasOverride)(unsafe.Pointer(&in.Aliases))
-	out.CredPluginPolicy = api.PolicyType(in.CredPluginPolicy)
-	out.CredPluginAllowlist = *(*api.Allowlist)(unsafe.Pointer(&in.CredPluginAllowlist))
+	out.CredentialPluginPolicy = api.PolicyType(in.CredentialPluginPolicy)
+	out.CredentialPluginAllowlist = *(*[]api.AllowlistEntry)(unsafe.Pointer(&in.CredentialPluginAllowlist))
 	return nil
 }
 
