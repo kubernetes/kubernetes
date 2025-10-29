@@ -114,7 +114,9 @@ func (sched *Scheduler) ScheduleOne(ctx context.Context) {
 	defer cancel()
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.OpportunisticBatching) {
-		sched.batch.nominateIfPossible(podInfo)
+		if sched.batch != nil {
+			sched.batch = sched.batch.NextPod(ctx, pod)
+		}
 	}
 
 	scheduleResult, assumedPodInfo, prioritizedNodes, status := sched.schedulingCycle(schedulingCycleCtx, state, fwk, podInfo, start, podsToActivate)
@@ -126,7 +128,11 @@ func (sched *Scheduler) ScheduleOne(ctx context.Context) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.OpportunisticBatching) {
 		nodeInfo, err := sched.nodeInfoSnapshot.NodeInfos().Get(scheduleResult.SuggestedHost)
 		if err == nil {
-			sched.batch.updateOnSuccess(ctx, fwk, podInfo, state, nodeInfo, prioritizedNodes)
+			sched.batch = fwk.UpdateBatchPodSuccess(sched.batch, ctx, podInfo, state, nodeInfo, prioritizedNodes)
+		} else {
+			// This shouldn't happen since we haven't changed the snapshot since scheduling.
+			utilruntime.HandleErrorWithContext(ctx, err, "Error while getting used nodeInfo from snapshot")
+			sched.batch = nil
 		}
 	}
 
@@ -164,7 +170,7 @@ func (sched *Scheduler) schedulingCycle(
 	podInfo *framework.QueuedPodInfo,
 	start time.Time,
 	podsToActivate *framework.PodsToActivate,
-) (ScheduleResult, *framework.QueuedPodInfo, nodeScoreHeap, *fwk.Status) {
+) (ScheduleResult, *framework.QueuedPodInfo, framework.SortedScoredNodes, *fwk.Status) {
 	logger := klog.FromContext(ctx)
 	pod := podInfo.Pod
 	scheduleResult, sortedPrioritizedNodes, err := sched.SchedulePod(ctx, schedFramework, state, pod)
@@ -442,7 +448,7 @@ func (sched *Scheduler) schedulePod(
 	fwk framework.Framework,
 	state fwk.CycleState,
 	pod *v1.Pod,
-) (result ScheduleResult, sortedPrioritizedNodes nodeScoreHeap, err error) {
+) (result ScheduleResult, sortedPrioritizedNodes framework.SortedScoredNodes, err error) {
 	trace := utiltrace.New("Scheduling", utiltrace.Field{Key: "namespace", Value: pod.Namespace}, utiltrace.Field{Key: "name", Value: pod.Name})
 	defer trace.LogIfLong(100 * time.Millisecond)
 	if err := sched.Cache.UpdateSnapshot(klog.FromContext(ctx), sched.nodeInfoSnapshot); err != nil {
@@ -482,15 +488,15 @@ func (sched *Scheduler) schedulePod(
 		return result, nil, err
 	}
 
-	sortedPrioritizedNodes = newSortedPrioritizedNodes(priorityList)
-	node, err := selectHost(&sortedPrioritizedNodes)
-	if err != nil {
-		return result, nil, err
+	sortedPrioritizedNodes = newSortedNodeScores(priorityList)
+	if sortedPrioritizedNodes.Len() == 0 {
+		return result, nil, errEmptyPriorityList
 	}
+	node := sortedPrioritizedNodes.Pop()
 	trace.Step("Prioritizing done")
 
 	return ScheduleResult{
-		SuggestedHost:  node.Name,
+		SuggestedHost:  node,
 		EvaluatedNodes: len(feasibleNodes) + diagnosis.NodeToStatus.Len(),
 		FeasibleNodes:  len(feasibleNodes),
 	}, sortedPrioritizedNodes, err
@@ -526,10 +532,18 @@ func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, schedFramework 
 		return nil, diagnosis, nil
 	}
 
+	batchNodeHint := ""
+	if utilfeature.DefaultFeatureGate.Enabled(features.OpportunisticBatching) {
+		if sched.batch != nil {
+			batchNodeHint = sched.batch.Hint(pod)
+		}
+	}
+
 	// "NominatedNodeName" can potentially be set in a previous scheduling cycle as a result of preemption.
 	// This node is likely the only candidate that will fit the pod, and hence we try it first before iterating over all nodes.
-	if len(pod.Status.NominatedNodeName) > 0 {
-		feasibleNodes, err := sched.evaluateNominatedNode(ctx, pod, schedFramework, state, diagnosis)
+	// We take the same tack for hinted nodes from the batch module.
+	if len(pod.Status.NominatedNodeName) > 0 || len(batchNodeHint) > 0 {
+		feasibleNodes, err := sched.evaluateNominatedNode(ctx, pod, batchNodeHint, schedFramework, state, diagnosis)
 		if err != nil {
 			utilruntime.HandleErrorWithContext(ctx, err, "Evaluation failed on nominated node", "pod", klog.KObj(pod), "node", pod.Status.NominatedNodeName)
 		}
@@ -582,8 +596,13 @@ func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, schedFramework 
 	return feasibleNodesAfterExtender, diagnosis, nil
 }
 
-func (sched *Scheduler) evaluateNominatedNode(ctx context.Context, pod *v1.Pod, schedFramework framework.Framework, state fwk.CycleState, diagnosis framework.Diagnosis) ([]fwk.NodeInfo, error) {
-	nnn := pod.Status.NominatedNodeName
+func (sched *Scheduler) evaluateNominatedNode(ctx context.Context, pod *v1.Pod, batchNodeHint string, schedFramework framework.Framework, state fwk.CycleState, diagnosis framework.Diagnosis) ([]fwk.NodeInfo, error) {
+	nnn := ""
+	if pod.Status.NominatedNodeName != "" {
+		nnn = pod.Status.NominatedNodeName
+	} else {
+		nnn = batchNodeHint
+	}
 	nodeInfo, err := sched.nodeInfoSnapshot.Get(nnn)
 	if err != nil {
 		return nil, err
@@ -907,18 +926,29 @@ func prioritizeNodes(
 
 var errEmptyPriorityList = errors.New("empty priorityList")
 
-func newSortedPrioritizedNodes(nodeScoreList []fwk.NodePluginScores) nodeScoreHeap {
-	var h nodeScoreHeap = nodeScoreList
-	heap.Init(&h)
-	return h
+type sortedNodeScores struct {
+	nodes nodeScoreHeap
 }
 
-// selectHost picks a host from the nodes that had the highest score.
-func selectHost(h *nodeScoreHeap) (fwk.NodePluginScores, error) {
-	if h.Len() == 0 {
-		return fwk.NodePluginScores{}, errEmptyPriorityList
-	}
-	return heap.Pop(h).(fwk.NodePluginScores), nil
+func newSortedNodeScores(nodeScoreList []fwk.NodePluginScores) *sortedNodeScores {
+	var h nodeScoreHeap = nodeScoreList
+	heap.Init(&h)
+	return &sortedNodeScores{nodes: h}
+}
+
+func (s *sortedNodeScores) Pop() string {
+	ent := heap.Pop(&s.nodes).(fwk.NodePluginScores)
+	return ent.Name
+}
+
+// Used only for unit tests.
+func (s *sortedNodeScores) PopScore() fwk.NodePluginScores {
+	ent := heap.Pop(&s.nodes).(fwk.NodePluginScores)
+	return ent
+}
+
+func (s *sortedNodeScores) Len() int {
+	return s.nodes.Len()
 }
 
 // nodeScoreHeap is a heap of fwk.NodePluginScores.

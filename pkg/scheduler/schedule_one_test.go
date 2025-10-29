@@ -1098,7 +1098,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 						}
 						queue.Add(logger, item.sendPod)
 
-						sched.SchedulePod = func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, pod *v1.Pod) (ScheduleResult, nodeScoreHeap, error) {
+						sched.SchedulePod = func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, pod *v1.Pod) (ScheduleResult, framework.SortedScoredNodes, error) {
 							return item.mockScheduleResult, nil, item.injectSchedulingError
 						}
 						sched.FailureHandler = func(ctx context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, ni *fwk.NominatingInfo, start time.Time) {
@@ -1453,7 +1453,7 @@ func TestScheduleOneMarksPodAsProcessedBeforePreBind(t *testing.T) {
 					}
 					queue.Add(logger, item.sendPod)
 
-					sched.SchedulePod = func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, pod *v1.Pod) (ScheduleResult, nodeScoreHeap, error) {
+					sched.SchedulePod = func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, pod *v1.Pod) (ScheduleResult, framework.SortedScoredNodes, error) {
 						return item.mockScheduleResult, nil, item.injectSchedulingError
 					}
 					sched.FailureHandler = func(_ context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, _ *fwk.NominatingInfo, _ time.Time) {
@@ -2415,15 +2415,15 @@ func Test_SelectHost(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var err error
-			var gotNode fwk.NodePluginScores
 			var scoreList = []fwk.NodePluginScores{}
-			h := newSortedPrioritizedNodes(test.list)
+			h := newSortedNodeScores(test.list)
 			for range test.topNodesCnt {
-				gotNode, err = selectHost(&h)
-				if err != nil {
-					break
+				if h.Len() == 0 {
+					err = errEmptyPriorityList
+				} else {
+					gotNode := h.PopScore()
+					scoreList = append(scoreList, gotNode)
 				}
-				scoreList = append(scoreList, gotNode)
 			}
 			if !errors.Is(err, test.wantError) {
 				t.Fatalf("unexpected error is returned from selectHost: got: %v want: %v", err, test.wantError)
