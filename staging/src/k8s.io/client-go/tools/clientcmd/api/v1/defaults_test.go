@@ -33,6 +33,7 @@ func TestSetDefaults_Config(t *testing.T) {
 			wantOut: &ExecConfig{
 				APIVersion:      "client.authentication.k8s.io/v1alpha1",
 				InteractiveMode: IfAvailableExecInteractiveMode,
+				PluginPolicy:    PluginPolicy{PolicyType: PluginPolicyAllowAll},
 			},
 		},
 		{
@@ -41,6 +42,7 @@ func TestSetDefaults_Config(t *testing.T) {
 			wantOut: &ExecConfig{
 				APIVersion:      "client.authentication.k8s.io/v1beta1",
 				InteractiveMode: IfAvailableExecInteractiveMode,
+				PluginPolicy:    PluginPolicy{PolicyType: PluginPolicyAllowAll},
 			},
 		},
 		{
@@ -52,6 +54,19 @@ func TestSetDefaults_Config(t *testing.T) {
 			wantOut: &ExecConfig{
 				APIVersion:      "client.authentication.k8s.io/v1alpha1",
 				InteractiveMode: NeverExecInteractiveMode,
+				PluginPolicy:    PluginPolicy{PolicyType: PluginPolicyAllowAll},
+			},
+		},
+		{
+			name: "alpha exec API with set plugin policy",
+			in: &ExecConfig{
+				APIVersion:   "client.authentication.k8s.io/v1alpha1",
+				PluginPolicy: PluginPolicy{PolicyType: PluginPolicyDenyAll},
+			},
+			wantOut: &ExecConfig{
+				APIVersion:      "client.authentication.k8s.io/v1alpha1",
+				InteractiveMode: IfAvailableExecInteractiveMode,
+				PluginPolicy:    PluginPolicy{PolicyType: PluginPolicyDenyAll},
 			},
 		},
 		{
@@ -59,16 +74,54 @@ func TestSetDefaults_Config(t *testing.T) {
 			in: &ExecConfig{
 				APIVersion:      "client.authentication.k8s.io/v1beta1",
 				InteractiveMode: NeverExecInteractiveMode,
+				PluginPolicy:    PluginPolicy{PolicyType: PluginPolicyAllowAll},
 			},
 			wantOut: &ExecConfig{
 				APIVersion:      "client.authentication.k8s.io/v1beta1",
 				InteractiveMode: NeverExecInteractiveMode,
+				PluginPolicy:    PluginPolicy{PolicyType: PluginPolicyAllowAll},
 			},
 		},
 		{
-			name:    "v1 exec API with empty interactive mode",
-			in:      &ExecConfig{APIVersion: "client.authentication.k8s.io/v1"},
-			wantOut: &ExecConfig{APIVersion: "client.authentication.k8s.io/v1"},
+			name: "beta exec API with set plugin policy",
+			in: &ExecConfig{
+				APIVersion:   "client.authentication.k8s.io/v1beta1",
+				PluginPolicy: PluginPolicy{PolicyType: PluginPolicyDenyAll},
+			},
+			wantOut: &ExecConfig{
+				APIVersion:      "client.authentication.k8s.io/v1beta1",
+				InteractiveMode: IfAvailableExecInteractiveMode,
+				PluginPolicy:    PluginPolicy{PolicyType: PluginPolicyDenyAll},
+			},
+		},
+		{
+			name: "v1 exec API with empty interactive mode",
+			in: &ExecConfig{
+				APIVersion: "client.authentication.k8s.io/v1",
+			},
+			wantOut: &ExecConfig{
+				APIVersion:   "client.authentication.k8s.io/v1",
+				PluginPolicy: PluginPolicy{PolicyType: PluginPolicyAllowAll},
+			},
+		},
+		{
+			name: "v1 exec API with empty plugin policy",
+			in:   &ExecConfig{APIVersion: "client.authentication.k8s.io/v1"},
+			wantOut: &ExecConfig{
+				APIVersion:   "client.authentication.k8s.io/v1",
+				PluginPolicy: PluginPolicy{PolicyType: PluginPolicyAllowAll},
+			},
+		},
+		{
+			name: "v1 exec API with set plugin policy",
+			in: &ExecConfig{
+				APIVersion:   "client.authentication.k8s.io/v1",
+				PluginPolicy: PluginPolicy{PolicyType: PluginPolicyDenyAll},
+			},
+			wantOut: &ExecConfig{
+				APIVersion:   "client.authentication.k8s.io/v1",
+				PluginPolicy: PluginPolicy{PolicyType: PluginPolicyDenyAll},
+			},
 		},
 	}
 	for _, test := range tests {

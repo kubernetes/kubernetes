@@ -885,8 +885,10 @@ func TestPluginPolicy(t *testing.T) {
 	// this is inlined to make highly visible and explicit the logic of which
 	// test configurations should pass and which should fail
 	shouldErrFunc := func(tt *pluginPolicyTest) (bool, string) {
-		switch tt.policyType {
-		case api.PluginPolicyUnspecified, api.PluginPolicyAllowAll:
+		switch tt.config.PluginPolicy.PolicyType {
+		case api.PluginPolicyUnspecified:
+			panic("should be fixed by defaults")
+		case api.PluginPolicyAllowAll:
 			if tt.allowlist != nil {
 				return true, "allowlist is non-nil"
 			}
