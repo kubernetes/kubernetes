@@ -17,10 +17,8 @@ limitations under the License.
 package queueing
 
 import (
-	"fmt"
 	"strings"
 	"testing"
-	"time"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -36,31 +34,10 @@ func TestCoreResourceEnqueue(t *testing.T) {
 		if tt.EnableSchedulingQueueHint != nil && !tt.EnableSchedulingQueueHint.Has(true) {
 			continue
 		}
-
-		testName := strings.Join(append(tt.EnablePlugins, tt.Name), "/")
-
-		t.Run(testName, func(t *testing.T) {
-			start := time.Now()
-			fmt.Printf("ENLOG: === START: %s at %s ===\n", testName, start.Format(time.RFC3339))
-
-			// Enable the feature gate before running the test
-			featuregatetesting.SetFeatureGateDuringTest(
-				t,
-				utilfeature.DefaultFeatureGate,
-				features.SchedulerQueueingHints,
-				true,
-			)
-
-			// Run the actual test logic
+		// Note: if EnableSchedulingQueueHint is nil, we assume the test should be run both with/without the feature gate.
+		t.Run(strings.Join(append(tt.EnablePlugins, tt.Name), "/"), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, true)
 			queueing.RunTestCoreResourceEnqueue(t, tt)
-
-			end := time.Now()
-			duration := end.Sub(start)
-			fmt.Printf("ENLOG: === END:   %s at %s (duration: %v) ===\n\n",
-				testName,
-				end.Format(time.RFC3339),
-				duration,
-			)
 		})
 	}
 }
