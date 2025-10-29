@@ -17,6 +17,7 @@ limitations under the License.
 package framework
 
 import (
+	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -108,6 +109,13 @@ type ResourceClaimTracker interface {
 	AssumedClaimRestore(namespace, claimName string)
 }
 
+// DeviceClassResolver resolves device class names from extended resource names.
+type DeviceClassResolver interface {
+	// GetDeviceClass returns the device class name for the given extended resource name.
+	// Returns empty string if no mapping exists for the resource name.
+	GetDeviceClass(resourceName v1.ResourceName) string
+}
+
 // SharedDRAManager can be used to obtain DRA objects, and track modifications to them in-memory - mainly by the DRA plugin.
 // The plugin's default implementation obtains the objects from the API. A different implementation can be
 // plugged into the framework in order to simulate the state of DRA objects. For example, Cluster Autoscaler
@@ -116,4 +124,5 @@ type SharedDRAManager interface {
 	ResourceClaims() ResourceClaimTracker
 	ResourceSlices() ResourceSliceLister
 	DeviceClasses() DeviceClassLister
+	DeviceClassResolver() DeviceClassResolver
 }

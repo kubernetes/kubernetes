@@ -2695,6 +2695,15 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 	}
 }
 
+// mockDeviceClassResolver is a simple mock implementation of fwk.DeviceClassResolver for testing
+type mockDeviceClassResolver struct {
+	mapping map[v1.ResourceName]string
+}
+
+func (m *mockDeviceClassResolver) GetDeviceClass(resourceName v1.ResourceName) string {
+	return m.mapping[resourceName]
+}
+
 func Test_createDeviceRequests(t *testing.T) {
 	pod1 := st.MakePod().Name(podName).Namespace(namespace).
 		UID(podUID).
@@ -2789,7 +2798,7 @@ func Test_createDeviceRequests(t *testing.T) {
 	testcases := map[string]struct {
 		pod                *v1.Pod
 		extendedResources  map[v1.ResourceName]int64
-		deviceClassMapping map[v1.ResourceName]string
+		cache              fwk.DeviceClassResolver
 		wantDeviceRequests []resourceapi.DeviceRequest
 	}{
 		"nil": {
@@ -2799,38 +2808,38 @@ func Test_createDeviceRequests(t *testing.T) {
 		"one resource match": {
 			pod:                pod1,
 			extendedResources:  res,
-			deviceClassMapping: devMap,
+			cache:              &mockDeviceClassResolver{mapping: devMap},
 			wantDeviceRequests: []resourceapi.DeviceRequest{devReq},
 		},
 		"one resource match, one resource not match": {
 			pod:                pod1,
 			extendedResources:  res2,
-			deviceClassMapping: devMap,
+			cache:              &mockDeviceClassResolver{mapping: devMap},
 			wantDeviceRequests: []resourceapi.DeviceRequest{devReq},
 		},
 		"two resources match": {
 			pod:                pod1,
 			extendedResources:  res2,
-			deviceClassMapping: devMap2,
+			cache:              &mockDeviceClassResolver{mapping: devMap2},
 			wantDeviceRequests: []resourceapi.DeviceRequest{devReq, devReq2},
 		},
 		"two containers match": {
 			pod:                pod2,
 			extendedResources:  res2,
-			deviceClassMapping: devMap2,
+			cache:              &mockDeviceClassResolver{mapping: devMap2},
 			wantDeviceRequests: []resourceapi.DeviceRequest{devReq, devReq3},
 		},
 		"one init container, one regular container": {
 			pod:                podInit,
 			extendedResources:  resInit,
-			deviceClassMapping: devMapInit,
+			cache:              &mockDeviceClassResolver{mapping: devMapInit},
 			wantDeviceRequests: []resourceapi.DeviceRequest{devReq2Init, devReqInit},
 		},
 	}
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			gotDeviceRequests := createDeviceRequests(tc.pod, tc.extendedResources, tc.deviceClassMapping)
+			gotDeviceRequests := createDeviceRequests(tc.pod, tc.extendedResources, tc.cache)
 			if len(tc.wantDeviceRequests) != len(gotDeviceRequests) {
 				t.Fatalf("different length, want %#v, got %#v", tc.wantDeviceRequests, gotDeviceRequests)
 			}
