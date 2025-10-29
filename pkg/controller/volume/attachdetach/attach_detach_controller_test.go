@@ -29,7 +29,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	kcache "k8s.io/client-go/tools/cache"
@@ -121,21 +120,11 @@ func Test_AttachDetachControllerStateOfWorldPopulators_Positive(t *testing.T) {
 
 	for _, node := range nodes {
 		nodeName := types.NodeName(node.Name)
-		inUseVolumes := sets.New(node.Status.VolumesInUse...)
-		allAttachedVolumes := map[v1.UniqueVolumeName]cache.AttachedVolume{}
-		for _, v := range adc.actualStateOfWorld.GetAttachedVolumesForNode(nodeName) {
-			allAttachedVolumes[v.VolumeName] = v
-		}
 
 		for _, attachedVolume := range node.Status.VolumesAttached {
 			attachedState := adc.actualStateOfWorld.GetAttachState(attachedVolume.Name, nodeName)
 			if attachedState != cache.AttachStateAttached {
 				t.Fatalf("Run failed with error. Node %s, volume %s not found", nodeName, attachedVolume.Name)
-			}
-			inUse := inUseVolumes.Has(attachedVolume.Name)
-			mounted := allAttachedVolumes[attachedVolume.Name].MountedByNode
-			if mounted != inUse {
-				t.Fatalf("Node %s, volume %s MountedByNode %v unexpected", nodeName, attachedVolume.Name, mounted)
 			}
 		}
 	}

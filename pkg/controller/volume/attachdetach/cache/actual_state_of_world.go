@@ -31,7 +31,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -81,14 +80,6 @@ type ActualStateOfWorld interface {
 	// If no node with the name nodeName exists in list of attached nodes for
 	// the specified volume, the node is added.
 	AddVolumeNode(logger klog.Logger, uniqueName v1.UniqueVolumeName, volumeSpec *volume.Spec, nodeName types.NodeName, devicePath string, attached bool) (v1.UniqueVolumeName, error)
-
-	// SetVolumesMountedByNode sets all the volumes mounted by the given node.
-	// These volumes should include attached volumes, not-yet-attached volumes,
-	// and may also include non-attachable volumes.
-	// When present in the volumeNames parameter, the volume
-	// is mounted by the given node, indicating it may not be safe to detach.
-	// Otherwise, the volume is not mounted by the given node.
-	SetVolumesMountedByNode(logger klog.Logger, volumeNames []v1.UniqueVolumeName, nodeName types.NodeName)
 
 	// SetNodeUpdateHook sets a hook to be called when the node status update
 	// is needed. The hook should update the node asynchronously and call
@@ -171,11 +162,6 @@ type ActualStateOfWorld interface {
 type AttachedVolume struct {
 	operationexecutor.AttachedVolume
 
-	// MountedByNode indicates that this volume has been mounted by the node and
-	// is unsafe to detach.
-	// The value is set and unset by SetVolumesMountedByNode(...).
-	MountedByNode bool
-
 	// DetachRequestedTime is used to capture the desire to detach this volume.
 	// When the volume is newly created this value is set to time zero.
 	// It is set to current time, when SetDetachRequestTime(...) is called, if it
@@ -214,7 +200,6 @@ func NewActualStateOfWorld(volumePluginMgr *volume.VolumePluginMgr) ActualStateO
 	return &actualStateOfWorld{
 		attachedVolumes:        make(map[v1.UniqueVolumeName]attachedVolume),
 		nodesToUpdateStatusFor: make(map[types.NodeName]nodeToUpdateStatusFor),
-		inUseVolumes:           make(map[types.NodeName]sets.Set[v1.UniqueVolumeName]),
 		volumePluginMgr:        volumePluginMgr,
 		nodeUpdateHook:         func(types.NodeName) {},
 	}
@@ -235,10 +220,6 @@ type actualStateOfWorld struct {
 	// invoked when nodesToUpdateStatusFor is updated. The change should be
 	// updated to Node object asynchronously.
 	nodeUpdateHook func(nodeName types.NodeName)
-
-	// inUseVolumes is a map containing the set of volumes that are reported as
-	// in use by the kubelet.
-	inUseVolumes map[types.NodeName]sets.Set[v1.UniqueVolumeName]
 
 	// volumePluginMgr is the volume plugin manager used to create volume
 	// plugin objects.
@@ -387,12 +368,6 @@ func (asw *actualStateOfWorld) AddVolumeNode(
 			attachedConfirmed:   isAttached,
 			detachRequestedTime: time.Time{},
 		}
-		// Assume mounted, until proven otherwise
-		if asw.inUseVolumes[nodeName] == nil {
-			asw.inUseVolumes[nodeName] = sets.New(volumeName)
-		} else {
-			asw.inUseVolumes[nodeName].Insert(volumeName)
-		}
 	} else {
 		node.attachedConfirmed = isAttached
 		logger.V(5).Info("Volume is already added to attachedVolume list to the node",
@@ -408,17 +383,6 @@ func (asw *actualStateOfWorld) AddVolumeNode(
 		asw.addVolumeToReportAsAttached(logger, volumeName, nodeName)
 	}
 	return volumeName, nil
-}
-
-func (asw *actualStateOfWorld) SetVolumesMountedByNode(
-	logger klog.Logger, volumeNames []v1.UniqueVolumeName, nodeName types.NodeName) {
-	asw.Lock()
-	defer asw.Unlock()
-
-	asw.inUseVolumes[nodeName] = sets.New(volumeNames...)
-	logger.V(5).Info("SetVolumesMountedByNode volume to the node",
-		"node", klog.KRef("", string(nodeName)),
-		"volumeNames", volumeNames)
 }
 
 func (asw *actualStateOfWorld) ResetDetachRequestTime(
@@ -726,6 +690,5 @@ func (asw *actualStateOfWorld) getAttachedVolume(
 			DevicePath:         attachedVolume.devicePath,
 			PluginIsAttachable: true,
 		},
-		MountedByNode:       asw.inUseVolumes[nodeAttachedTo.nodeName].Has(attachedVolume.volumeName),
 		DetachRequestedTime: nodeAttachedTo.detachRequestedTime}
 }

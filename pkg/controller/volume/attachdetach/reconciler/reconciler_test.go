@@ -224,8 +224,6 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithUnmountedVolume(t *te
 			generatedVolumeName,
 			nodeName)
 	}
-	asw.SetVolumesMountedByNode(logger, []v1.UniqueVolumeName{generatedVolumeName}, nodeName)
-	asw.SetVolumesMountedByNode(logger, nil, nodeName)
 
 	// Assert
 	waitForNewDetacherCallCount(t, 1 /* expectedCallCount */, fakePlugin)
@@ -281,6 +279,16 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithMountedVolume(t *test
 	volumeName := v1.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
 	nodeName := k8stypes.NodeName("node-name")
+	node1 := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: string(nodeName)},
+		Status: v1.NodeStatus{
+			VolumesInUse: []v1.UniqueVolumeName{"fake-plugin/" + volumeName},
+		},
+	}
+	addErr := informerFactory.Core().V1().Nodes().Informer().GetStore().Add(node1)
+	if addErr != nil {
+		t.Fatalf("Add node failed. Expected: <no error> Actual: <%v>", addErr)
+	}
 	dsw.AddNode(nodeName)
 
 	volumeExists := dsw.VolumeExists(volumeName, nodeName)
@@ -398,8 +406,6 @@ func Test_Run_Negative_OneDesiredVolumeAttachThenDetachWithUnmountedVolumeUpdate
 			generatedVolumeName,
 			nodeName)
 	}
-	asw.SetVolumesMountedByNode(logger, []v1.UniqueVolumeName{generatedVolumeName}, nodeName)
-	asw.SetVolumesMountedByNode(logger, nil, nodeName)
 
 	// Assert
 	verifyNewDetacherCallCount(t, true /* expectZeroNewDetacherCallCount */, fakePlugin)
@@ -654,10 +660,6 @@ func Test_Run_OneVolumeAttachAndDetachUncertainNodesWithReadWriteOnce(t *testing
 	verifyVolumeAttachedToNode(t, generatedVolumeName, nodeName1, cache.AttachStateAttached, asw)
 	verifyVolumeReportedAsAttachedToNode(t, logger, generatedVolumeName, nodeName1, true, asw, volumeAttachedCheckTimeout)
 
-	// When volume is added to the node, it is set to mounted by default. Then the status will be updated by checking node status VolumeInUse.
-	// Without this, the delete operation will be delayed due to mounted status
-	asw.SetVolumesMountedByNode(logger, nil, nodeName1)
-
 	dsw.DeletePod(types.UniquePodName(podName1), generatedVolumeName, nodeName1)
 
 	waitForVolumeRemovedFromNode(t, generatedVolumeName, nodeName1, asw)
@@ -868,10 +870,6 @@ func Test_Run_OneVolumeAttachAndDetachTimeoutNodesWithReadWriteOnce(t *testing.T
 	waitForVolumeAddedToNode(t, generatedVolumeName, nodeName1, asw)
 	verifyVolumeAttachedToNode(t, generatedVolumeName, nodeName1, cache.AttachStateUncertain, asw)
 	verifyVolumeReportedAsAttachedToNode(t, logger, generatedVolumeName, nodeName1, false, asw, volumeAttachedCheckTimeout)
-
-	// When volume is added to the node, it is set to mounted by default. Then the status will be updated by checking node status VolumeInUse.
-	// Without this, the delete operation will be delayed due to mounted status
-	asw.SetVolumesMountedByNode(logger, nil, nodeName1)
 
 	dsw.DeletePod(types.UniquePodName(podName1), generatedVolumeName, nodeName1)
 
@@ -1111,6 +1109,7 @@ func Test_Run_OneVolumeDetachOnUnhealthyNode(t *testing.T) {
 					Status: v1.ConditionTrue,
 				},
 			},
+			VolumesInUse: []v1.UniqueVolumeName{"fake-plugin/" + volumeName1},
 		},
 	}
 	informerFactory.Core().V1().Nodes().Informer().GetStore().Add(node1)
@@ -1228,6 +1227,7 @@ func Test_Run_OneVolumeDetachOnUnhealthyNodeWithForceDetachOnUnmountDisabled(t *
 					Status: v1.ConditionTrue,
 				},
 			},
+			VolumesInUse: []v1.UniqueVolumeName{"fake-plugin/" + volumeName1},
 		},
 	}
 	addErr := informerFactory.Core().V1().Nodes().Informer().GetStore().Add(node1)
@@ -1260,7 +1260,7 @@ func Test_Run_OneVolumeDetachOnUnhealthyNodeWithForceDetachOnUnmountDisabled(t *
 	waitForDetachCallCount(t, 0 /* expectedDetachCallCount */, fakePlugin)
 
 	// Act
-	// Delete the pod and the volume will be detached even after the maxWaitForUnmountDuration expires as volume is
+	// Delete the pod and the volume will not be detached even after the maxWaitForUnmountDuration expires as volume is
 	// not unmounted and the node is healthy.
 	dsw.DeletePod(types.UniquePodName(podName1), generatedVolumeName, nodeName1)
 	time.Sleep(maxWaitForUnmountDuration * 5)
@@ -1845,6 +1845,7 @@ func verifyNewDetacherCallCount(
 	expectZeroNewDetacherCallCount bool,
 	fakePlugin *volumetesting.FakeVolumePlugin) {
 
+	t.Helper()
 	if expectZeroNewDetacherCallCount &&
 		fakePlugin.GetNewDetacherCallCount() != 0 {
 		t.Fatalf("Wrong NewDetacherCallCount. Expected: <0> Actual: <%v>",

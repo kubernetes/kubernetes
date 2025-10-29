@@ -232,11 +232,6 @@ func (rc *reconciler) reconcile(ctx context.Context) {
 
 			// Check whether volume is still mounted. Skip detach if it is still mounted unless we have
 			// decided to force detach or the node has `node.kubernetes.io/out-of-service` taint.
-			if attachedVolume.MountedByNode && !forceDetach && !hasOutOfServiceTaint {
-				logger.V(5).Info("Cannot detach volume because it is still mounted", "node", klog.KRef("", string(attachedVolume.NodeName)), "volumeName", attachedVolume.VolumeName)
-				continue
-			}
-
 			verifySafeToDetach := !forceDetach && !hasOutOfServiceTaint
 			// Before triggering volume detach, mark volume as detached and update the node status
 			// Wait until the update is propagated to Node object.

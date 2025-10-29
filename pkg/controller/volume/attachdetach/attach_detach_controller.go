@@ -407,7 +407,6 @@ func (adc *attachDetachController) populateActualStateOfWorld(logger klog.Logger
 				continue
 			}
 		}
-		adc.actualStateOfWorld.SetVolumesMountedByNode(logger, node.Status.VolumesInUse, nodeName)
 		adc.addNodeToDswp(node, types.NodeName(node.Name))
 	}
 	err = adc.processVolumeAttachments(logger)
@@ -569,7 +568,6 @@ func (adc *attachDetachController) nodeUpdate(logger klog.Logger, oldObj, newObj
 
 	nodeName := types.NodeName(node.Name)
 	adc.addNodeToDswp(node, nodeName)
-	adc.processVolumesInUse(logger, nodeName, node.Status.VolumesInUse)
 }
 
 func (adc *attachDetachController) nodeDelete(logger klog.Logger, obj interface{}) {
@@ -583,8 +581,6 @@ func (adc *attachDetachController) nodeDelete(logger klog.Logger, obj interface{
 		// This might happen during drain, but we still want it to appear in our logs
 		logger.Info("Error removing node from desired-state-of-world", "node", klog.KObj(node), "err", err)
 	}
-
-	adc.processVolumesInUse(logger, nodeName, node.Status.VolumesInUse)
 }
 
 func (adc *attachDetachController) enqueuePVC(obj interface{}) {
@@ -665,16 +661,6 @@ func (adc *attachDetachController) syncPVCByKey(logger klog.Logger, key string) 
 			adc.desiredStateOfWorld, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister, adc.csiMigratedPluginManager, adc.intreeToCSITranslator)
 	}
 	return nil
-}
-
-// processVolumesInUse processes the list of volumes marked as "in-use"
-// according to the specified Node's Status.VolumesInUse and updates the
-// corresponding volume in the actual state of the world to indicate that it is
-// mounted.
-func (adc *attachDetachController) processVolumesInUse(
-	logger klog.Logger, nodeName types.NodeName, volumesInUse []v1.UniqueVolumeName) {
-	logger.V(4).Info("processVolumesInUse for node", "node", klog.KRef("", string(nodeName)))
-	adc.actualStateOfWorld.SetVolumesMountedByNode(logger, volumesInUse, nodeName)
 }
 
 // Process Volume-Attachment objects.
