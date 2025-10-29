@@ -2973,12 +2973,8 @@ users:
 			return &config.Preference{
 				CredentialPluginPolicy: "Allowlist",
 				CredentialPluginAllowlist: []clientcmdapi.AllowlistEntry{
-					clientcmdapi.AllowlistEntry{
-						Name: "bar",
-					},
-					clientcmdapi.AllowlistEntry{
-						Name: "baz",
-					},
+					{Name: "bar"},
+					{Name: "baz"},
 				},
 			}, nil
 		}
@@ -3048,12 +3044,8 @@ users:
 			shouldErr: true,
 			kuberc: &config.Preference{
 				CredentialPluginAllowlist: []clientcmdapi.AllowlistEntry{
-					clientcmdapi.AllowlistEntry{
-						Name: "bar",
-					},
-					clientcmdapi.AllowlistEntry{
-						Name: "baz",
-					},
+					{Name: "bar"},
+					{Name: "baz"},
 				},
 			},
 		},
@@ -3063,12 +3055,8 @@ users:
 			kuberc: &config.Preference{
 				CredentialPluginPolicy: "AllowAll",
 				CredentialPluginAllowlist: []clientcmdapi.AllowlistEntry{
-					clientcmdapi.AllowlistEntry{
-						Name: "bar",
-					},
-					clientcmdapi.AllowlistEntry{
-						Name: "baz",
-					},
+					{Name: "bar"},
+					{Name: "baz"},
 				},
 			},
 		},
@@ -3078,12 +3066,8 @@ users:
 			kuberc: &config.Preference{
 				CredentialPluginPolicy: "DenyAll",
 				CredentialPluginAllowlist: []clientcmdapi.AllowlistEntry{
-					clientcmdapi.AllowlistEntry{
-						Name: "bar",
-					},
-					clientcmdapi.AllowlistEntry{
-						Name: "baz",
-					},
+					{Name: "bar"},
+					{Name: "baz"},
 				},
 			},
 		},
@@ -3147,7 +3131,7 @@ users:
 
 			_, err := p.Apply(rootCmd, opts, args, io.Discard)
 			if test.shouldErr {
-				require.NotNil(t, err, "expected error, but error was nil")
+				require.Error(t, err, "expected error, but error was nil")
 			} else {
 				require.NoError(t, err)
 			}
