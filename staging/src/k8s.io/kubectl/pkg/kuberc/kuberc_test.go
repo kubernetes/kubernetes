@@ -2976,7 +2976,7 @@ users:
 
 	pref.getPreferencesFunc = func(_ string, _ io.Writer) (*config.Preference, error) {
 		return &config.Preference{
-			CredPluginPolicy: "foo",
+			CredentialPluginPolicy: "foo",
 			CredPluginAllowlist: clientcmdapi.Allowlist{
 				clientcmdapi.AllowlistEntry{
 					Name: "bar",

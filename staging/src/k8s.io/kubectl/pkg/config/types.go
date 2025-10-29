@@ -66,14 +66,14 @@ type Preference struct {
 	// +optional
 	Aliases []AliasOverride
 
-	// credPluginPolicy specifies the policy governing which, if any, client-go
+	// credentialPluginPolicy specifies the policy governing which, if any, client-go
 	// credential plugins may be executed. It MUST be one of { "", "AllowAll", "DenyAll", "Allowlist" }.
 	// If the policy is "", then it falls back to "AllowAll" (this is required
 	// to maintain backward compatibility). If the policy is DenyAll, no
 	// credential plugins may run. If the policy is Allowlist, only those
 	// plugins meeting the criteria specified in the `credPluginAllowlist`
 	// field may run.
-	CredPluginPolicy clientcmdapi.PolicyType
+	CredentialPluginPolicy clientcmdapi.PolicyType
 
 	// Allowlist is a slice of allowlist entries. If any of them is a match,
 	// then the executable in question may execute. That is, the result is the

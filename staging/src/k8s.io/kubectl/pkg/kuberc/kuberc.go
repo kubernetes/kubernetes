@@ -136,7 +136,7 @@ func (p *Preferences) Apply(rootCmd *cobra.Command, args []string, errOut io.Wri
 // prevent excessive coupling, logic to handle those values is further down the
 // stack.
 func (p *Preferences) applyPluginPolicy(kuberc *config.Preference) {
-	p.pluginPolicy.PolicyType = kuberc.CredPluginPolicy
+	p.pluginPolicy.PolicyType = kuberc.CredentialPluginPolicy
 	if kuberc.CredPluginAllowlist != nil {
 		p.pluginPolicy.Allowlist = kuberc.CredPluginAllowlist
 	}
