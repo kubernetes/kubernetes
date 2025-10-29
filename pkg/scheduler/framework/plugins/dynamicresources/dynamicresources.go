@@ -802,6 +802,27 @@ func (pl *DynamicResources) filterExtendedResources(state *stateData, pod *v1.Po
 	return nodeExtendedResourceClaim, nil
 }
 
+// sortedPodExtendedResources returns sorted list of extended resources in the pod
+func sortedPodExtendedResources(containers []v1.Container) []string {
+	podExtendedResources := make(map[string]struct{})
+	for _, c := range containers {
+		for r := range c.Resources.Requests {
+			if !schedutil.IsDRAExtendedResourceName(r) {
+				continue
+			}
+			podExtendedResources[r.String()] = struct{}{}
+		}
+	}
+	podExtendedResourceSlice := make([]string, len(podExtendedResources))
+	i := 0
+	for r := range podExtendedResources {
+		podExtendedResourceSlice[i] = r
+		i++
+	}
+	sort.Strings(podExtendedResourceSlice)
+	return podExtendedResourceSlice
+}
+
 // createDeviceRequests computes the special claim's Requests based on the pod's extended resources
 // that are not satisfied by the node's Allocatable.
 //
@@ -816,24 +837,11 @@ func createDeviceRequests(pod *v1.Pod, extendedResources map[v1.ResourceName]int
 	// pod level resources currently have only cpu and memory, they are not considered here for now.
 	// if extended resources are added to pod level resources in the future, they need to be
 	// supported separately.
-
 	containers := slices.Clone(pod.Spec.InitContainers)
 	containers = append(containers, pod.Spec.Containers...)
 	numInitContainers := len(pod.Spec.InitContainers)
 
-	podExtendedResources := make(map[string]struct{})
-	for _, c := range containers {
-		for r := range c.Resources.Requests {
-			podExtendedResources[r.String()] = struct{}{}
-		}
-	}
-	podExtendedResourceSlice := make([]string, len(podExtendedResources))
-	i := 0
-	for r := range podExtendedResources {
-		podExtendedResourceSlice[i] = r
-		i++
-	}
-	sort.Strings(podExtendedResourceSlice)
+	podExtendedResourceSlice := sortedPodExtendedResources(containers)
 	var deviceRequests []resourceapi.DeviceRequest
 	for r, maxQuantity := range extendedResources {
 		className, ok := deviceClassMapping[r]
@@ -859,11 +867,6 @@ func createDeviceRequests(pod *v1.Pod, extendedResources map[v1.ResourceName]int
 				continue
 			}
 			if isInitContainer && !isSideCar {
-				/*
-					if rQuant.Cmp(maxQuantity) > 0 {
-						maxQuantity = rQuant
-					}
-				*/
 				continue
 			}
 			sumQuantity += crq
@@ -1431,19 +1434,7 @@ func createRequestMappings(claim *resourceapi.ResourceClaim, pod *v1.Pod, logger
 	containers := slices.Clone(pod.Spec.InitContainers)
 	containers = append(containers, pod.Spec.Containers...)
 
-	podExtendedResources := make(map[string]struct{})
-	for _, c := range containers {
-		for r := range c.Resources.Requests {
-			podExtendedResources[r.String()] = struct{}{}
-		}
-	}
-	podExtendedResourceSlice := make([]string, len(podExtendedResources))
-	i := 0
-	for r := range podExtendedResources {
-		podExtendedResourceSlice[i] = r
-		i++
-	}
-	sort.Strings(podExtendedResourceSlice)
+	podExtendedResourceSlice := sortedPodExtendedResources(containers)
 	for i, c := range containers {
 		isInit := i < len(pod.Spec.InitContainers)
 		isSideCar := c.RestartPolicy != nil && *c.RestartPolicy == v1.ContainerRestartPolicyAlways
