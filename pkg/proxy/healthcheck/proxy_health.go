@@ -26,7 +26,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 	"k8s.io/utils/clock"
 	"k8s.io/utils/ptr"
@@ -59,6 +58,11 @@ type ProxyHealth struct {
 	Status map[v1.IPFamily]ProxierHealth `json:"status,omitempty"`
 }
 
+type NodeManager interface {
+	// Node returns the node object associated with this manager.
+	Node() *v1.Node
+}
+
 // ProxyHealthServer allows callers to:
 //  1. run a http server with /healthz and /livez endpoint handlers.
 //  2. update healthz timestamps before and after synchronizing dataplane.
@@ -71,7 +75,7 @@ type ProxyHealthServer struct {
 	httpFactory httpServerFactory
 	clock       clock.Clock
 
-	nodeManager *proxy.NodeManager
+	nodeManager NodeManager
 
 	addr          string
 	healthTimeout time.Duration
@@ -82,11 +86,11 @@ type ProxyHealthServer struct {
 }
 
 // NewProxyHealthServer returns a proxy health http server.
-func NewProxyHealthServer(addr string, healthTimeout time.Duration, nodeManager *proxy.NodeManager) *ProxyHealthServer {
+func NewProxyHealthServer(addr string, healthTimeout time.Duration, nodeManager NodeManager) *ProxyHealthServer {
 	return newProxyHealthServer(stdNetListener{}, stdHTTPServerFactory{}, clock.RealClock{}, addr, healthTimeout, nodeManager)
 }
 
-func newProxyHealthServer(listener listener, httpServerFactory httpServerFactory, c clock.Clock, addr string, healthTimeout time.Duration, nodeManager *proxy.NodeManager) *ProxyHealthServer {
+func newProxyHealthServer(listener listener, httpServerFactory httpServerFactory, c clock.Clock, addr string, healthTimeout time.Duration, nodeManager NodeManager) *ProxyHealthServer {
 	return &ProxyHealthServer{
 		listener:      listener,
 		httpFactory:   httpServerFactory,
