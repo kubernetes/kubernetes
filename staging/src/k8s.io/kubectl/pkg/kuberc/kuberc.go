@@ -54,8 +54,8 @@ var (
 // arguments based on user's kuberc configuration.
 type PreferencesHandler interface {
 	AddFlags(flags *pflag.FlagSet)
-	ApplyPluginPolicy(*genericclioptions.ConfigFlags)
-	Apply(rootCmd *cobra.Command, args []string, errOut io.Writer) ([]string, error)
+	// ApplyPluginPolicy(*genericclioptions.ConfigFlags)
+	Apply(rootCmd *cobra.Command, kubeConfigFlags *genericclioptions.ConfigFlags, args []string, errOut io.Writer) ([]string, error)
 }
 
 // Preferences stores the kuberc file coming either from environment variable
@@ -70,13 +70,11 @@ var _ PreferencesHandler = &Preferences{}
 
 // NewPreferences returns initialized Prefrences object.
 func NewPreferences() PreferencesHandler {
-	p := &Preferences{
+	return &Preferences{
 		getPreferencesFunc: DefaultGetPreferences,
 		aliases:            make(map[string]struct{}),
 		pluginPolicy:       clientcmdapi.PluginPolicy{},
 	}
-
-	return p
 }
 
 type aliasing struct {
@@ -94,7 +92,7 @@ func (p *Preferences) AddFlags(flags *pflag.FlagSet) {
 
 // Apply firstly applies the aliases in the preferences file and secondly overrides
 // the default values of flags.
-func (p *Preferences) Apply(rootCmd *cobra.Command, args []string, errOut io.Writer) ([]string, error) {
+func (p *Preferences) Apply(rootCmd *cobra.Command, kubeConfigFlags *genericclioptions.ConfigFlags, args []string, errOut io.Writer) ([]string, error) {
 	if len(args) <= 1 {
 		return args, nil
 	}
@@ -117,7 +115,7 @@ func (p *Preferences) Apply(rootCmd *cobra.Command, args []string, errOut io.Wri
 		return args, err
 	}
 
-	p.applyPluginPolicy(kuberc)
+	p.applyPluginPolicy(kubeConfigFlags, kuberc)
 
 	args, err = p.applyAliases(rootCmd, kuberc, args, errOut)
 	if err != nil {
@@ -133,11 +131,25 @@ func (p *Preferences) Apply(rootCmd *cobra.Command, args []string, errOut io.Wri
 // `applyPluginPolicy` passes the values unaltered to their destination. To
 // prevent excessive coupling, logic to handle those values is further down the
 // stack.
-func (p *Preferences) applyPluginPolicy(kuberc *config.Preference) {
+func (p *Preferences) applyPluginPolicy(kubeConfigFlags *genericclioptions.ConfigFlags, kuberc *config.Preference) {
 	p.pluginPolicy.PolicyType = kuberc.CredentialPluginPolicy
 	if kuberc.CredentialPluginAllowlist != nil {
 		p.pluginPolicy.Allowlist = kuberc.CredentialPluginAllowlist
 	}
+
+	wcc := kubeConfigFlags.WrapConfigFn
+
+	kubeConfigFlags.WithWrapConfigFn(func(c *rest.Config) *rest.Config {
+		if wcc != nil {
+			c = wcc(c)
+		}
+
+		if c.ExecProvider != nil {
+			c.ExecProvider.PluginPolicy = p.pluginPolicy
+		}
+
+		return c
+	})
 }
 
 // applyOverrides finds the command and sets the defaulted flag values in kuberc.

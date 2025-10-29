@@ -642,7 +642,7 @@ func (a *Authenticator) validatePluginPolicy() error {
 	}
 }
 
-func validateAllowlist(list api.Allowlist) error {
+func validateAllowlist(list []api.AllowlistEntry) error {
 	// This will be the case if the user has misspelled the field name for the
 	// allowlist. Because this is a security knob, fail immediately rather than
 	// proceed when the user has made a mistake.

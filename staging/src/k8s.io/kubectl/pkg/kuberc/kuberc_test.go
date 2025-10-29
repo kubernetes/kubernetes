@@ -868,7 +868,7 @@ func TestApplyOverride(t *testing.T) {
 			pref.getPreferencesFunc = test.getPreferencesFunc
 			errWriter := &bytes.Buffer{}
 
-			_, err := pref.Apply(rootCmd, test.args, errWriter)
+			_, err := pref.Apply(rootCmd, nil, test.args, errWriter)
 			if test.expectedErr == nil && err != nil {
 				t.Fatalf("unexpected error %v\n", err)
 			}
@@ -1116,7 +1116,7 @@ func TestApplyOverrideBool(t *testing.T) {
 			addCommands(rootCmd, test.nestedCmds)
 			pref.getPreferencesFunc = test.getPreferencesFunc
 			errWriter := &bytes.Buffer{}
-			_, err := pref.Apply(rootCmd, test.args, errWriter)
+			_, err := pref.Apply(rootCmd, nil, test.args, errWriter)
 			if err != nil {
 				t.Fatalf("unexpected error %v\n", err)
 			}
@@ -1405,7 +1405,7 @@ func TestApplyAliasBool(t *testing.T) {
 			addCommands(rootCmd, test.nestedCmds)
 			pref.getPreferencesFunc = test.getPreferencesFunc
 			errWriter := &bytes.Buffer{}
-			lastArgs, err := pref.Apply(rootCmd, test.args, errWriter)
+			lastArgs, err := pref.Apply(rootCmd, nil, test.args, errWriter)
 			if test.expectedErr == nil && err != nil {
 				t.Fatalf("unexpected error %v\n", err)
 			}
@@ -2608,7 +2608,7 @@ func TestApplyAlias(t *testing.T) {
 			addCommands(rootCmd, test.nestedCmds)
 			pref.getPreferencesFunc = test.getPreferencesFunc
 			errWriter := &bytes.Buffer{}
-			lastArgs, err := pref.Apply(rootCmd, test.args, errWriter)
+			lastArgs, err := pref.Apply(rootCmd, nil, test.args, errWriter)
 			if test.expectedErr == nil && err != nil {
 				t.Fatalf("unexpected error %v\n", err)
 			}
@@ -2949,13 +2949,7 @@ users:
       args:
       - get-token
       - --login
-      command: foo
-      installHint: |2
-
-        kubelogin is not installed which is required to connect to AAD enabled cluster.
-
-        To learn more, please go to https://aka.ms/aks/kubelogin
-      provideClusterInfo: false`
+      command: foo`
 
 	kubeconfig := filepath.Join(tmpDir, "kubeconfig")
 	err := os.WriteFile(kubeconfig, []byte(kubeconfigData), 0o644)
@@ -2977,7 +2971,7 @@ users:
 	pref.getPreferencesFunc = func(_ string, _ io.Writer) (*config.Preference, error) {
 		return &config.Preference{
 			CredentialPluginPolicy: "foo",
-			CredentialPluginAllowlist: clientcmdapi.Allowlist{
+			CredentialPluginAllowlist: []clientcmdapi.AllowlistEntry{
 				clientcmdapi.AllowlistEntry{
 					Name: "bar",
 				},
@@ -2988,8 +2982,8 @@ users:
 		}, nil
 	}
 
-	p.ApplyPluginPolicy(opts)
-	_, err = p.Apply(rootCmd, args, io.Discard)
+	// pref.applyPluginPolicy(opts)
+	_, err = p.Apply(rootCmd, opts, args, io.Discard)
 	require.NoError(t, err, "error applying preferences")
 
 	cfg, err := opts.ToRESTConfig()
