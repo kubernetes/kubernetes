@@ -18,10 +18,9 @@ package validatingadmissionpolicystatus
 
 import (
 	"context"
-	"fmt"
 	"time"
 
-	"k8s.io/api/admissionregistration/v1"
+	v1 "k8s.io/api/admissionregistration/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -32,6 +31,7 @@ import (
 	admissionregistrationv1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/klog/v2"
 )
 
 // ControllerName has "Status" in it to differentiate this controller with the other that runs in API server.
@@ -52,7 +52,7 @@ type Controller struct {
 }
 
 func (c *Controller) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	if !cache.WaitForNamedCacheSyncWithContext(ctx, c.policySynced) {
 		return
@@ -66,7 +66,7 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 	<-ctx.Done()
 }
 
-func NewController(policyInformer informerv1.ValidatingAdmissionPolicyInformer, policyClient admissionregistrationv1.ValidatingAdmissionPolicyInterface, typeChecker *validatingadmissionpolicy.TypeChecker) (*Controller, error) {
+func NewController(logger klog.Logger, policyInformer informerv1.ValidatingAdmissionPolicyInformer, policyClient admissionregistrationv1.ValidatingAdmissionPolicyInterface, typeChecker *validatingadmissionpolicy.TypeChecker) (*Controller, error) {
 	c := &Controller{
 		policyInformer: policyInformer,
 		policyQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
@@ -78,10 +78,10 @@ func NewController(policyInformer informerv1.ValidatingAdmissionPolicyInformer, 
 	}
 	reg, err := policyInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			c.enqueuePolicy(obj)
+			c.enqueuePolicy(logger, obj)
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
-			c.enqueuePolicy(newObj)
+			c.enqueuePolicy(logger, newObj)
 		},
 	})
 	if err != nil {
@@ -91,12 +91,12 @@ func NewController(policyInformer informerv1.ValidatingAdmissionPolicyInformer, 
 	return c, nil
 }
 
-func (c *Controller) enqueuePolicy(policy any) {
+func (c *Controller) enqueuePolicy(logger klog.Logger, policy any) {
 	if policy, ok := policy.(*v1.ValidatingAdmissionPolicy); ok {
 		// policy objects are cluster-scoped, no point include its namespace.
 		key := policy.ObjectMeta.Name
 		if key == "" {
-			utilruntime.HandleError(fmt.Errorf("cannot get name of object %v", policy))
+			utilruntime.HandleErrorWithLogger(logger, nil, "Cannot get name of object", "policy", policy)
 		}
 		c.policyQueue.Add(key)
 	}
@@ -131,7 +131,7 @@ func (c *Controller) processNextWorkItem(ctx context.Context) bool {
 		return true
 	}
 
-	utilruntime.HandleError(err)
+	utilruntime.HandleErrorWithContext(ctx, err, "Error processing validating admission policy work item", "item", key)
 	c.policyQueue.AddRateLimited(key)
 
 	return true

@@ -114,20 +114,20 @@ func (svmc *SVMController) Name() string {
 func (svmc *SVMController) addSVM(logger klog.Logger, obj interface{}) {
 	svm := obj.(*svmv1alpha1.StorageVersionMigration)
 	logger.V(4).Info("Adding", "svm", klog.KObj(svm))
-	svmc.enqueue(svm)
+	svmc.enqueue(logger, svm)
 }
 
 func (svmc *SVMController) updateSVM(logger klog.Logger, oldObj, newObj interface{}) {
 	oldSVM := oldObj.(*svmv1alpha1.StorageVersionMigration)
 	newSVM := newObj.(*svmv1alpha1.StorageVersionMigration)
 	logger.V(4).Info("Updating", "svm", klog.KObj(oldSVM))
-	svmc.enqueue(newSVM)
+	svmc.enqueue(logger, newSVM)
 }
 
-func (svmc *SVMController) enqueue(svm *svmv1alpha1.StorageVersionMigration) {
+func (svmc *SVMController) enqueue(logger klog.Logger, svm *svmv1alpha1.StorageVersionMigration) {
 	key, err := controller.KeyFunc(svm)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %w", svm, err))
+		utilruntime.HandleErrorWithLogger(logger, err, "Couldn't get key for object")
 		return
 	}
 
@@ -135,7 +135,7 @@ func (svmc *SVMController) enqueue(svm *svmv1alpha1.StorageVersionMigration) {
 }
 
 func (svmc *SVMController) Run(ctx context.Context) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 	defer svmc.queue.ShutDown()
 
 	logger := klog.FromContext(ctx)
