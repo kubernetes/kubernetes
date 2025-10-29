@@ -231,6 +231,49 @@ func (sched *Scheduler) syncPodWithDispatcher(pod *v1.Pod) *v1.Pod {
 	return enrichedPod
 }
 
+// handleAssumedPodDeletion is an event handler that deals with the deletion of an assumed pod.
+// We must remove it from the scheduler's cache immediately to prevent it from blocking resources for other pending pods,
+// causing unnecessary preemption attempts. Note that PreBinding/Binding will continue, but is eventually expected to fail
+// as the pod does not exist in the kube-apiserver anymore and so in the scheduler cache.
+func (sched *Scheduler) handleAssumedPodDeletion(pod *v1.Pod) {
+	logger := sched.logger
+	// We must operate on the pod from the scheduler's cache, not the one from the event.
+	// The cached version has the assigned NodeName and represents the resources being consumed.
+	assumedPod, err := sched.Cache.GetPod(pod)
+	if err != nil {
+		// This is not an error. The pod may have already completed its binding cycle and been
+		// removed from the cache. Nothing more to do.
+		logger.V(5).Info("Assumed pod was already forgotten", "pod", klog.KObj(pod))
+		return
+	}
+	pod = assumedPod
+
+	fwk, err := sched.frameworkForPod(pod)
+	if err != nil {
+		// This shouldn't happen, because we only accept for scheduling the pods
+		// which specify a scheduler name that matches one of the profiles.
+		utilruntime.HandleErrorWithLogger(logger, err, "Unable to get profile for pod", "pod", klog.KObj(pod))
+		return
+	}
+
+	// The pod might be in one of two states:
+	// 1. If the pod is waiting on WaitOnPermit, we reject it. This causes the pod's scheduling
+	//    cycle to quickly fail gracefully, and it will clean itself up via `handleBindingCycleError`.
+	if !fwk.RejectWaitingPod(pod.UID) {
+		// 2. If the pod is no longer waiting (e.g., it's in PreBind or Bind), we can't quickly reject it.
+		//    We must explicitly remove it from the cache here to free up its assumed resources.
+		if err := sched.Cache.ForgetPod(logger, pod); err != nil {
+			utilruntime.HandleErrorWithLogger(logger, err, "Scheduler cache ForgetPod failed", "pod", klog.KObj(pod))
+		}
+	}
+
+	// The removal of this assumed pod may have freed up resources. We trigger the AssignedPodDelete event
+	// to move other unscheduled pods, giving them a chance to be scheduled.
+	// If the forgotten pod reserved some resources in memory,
+	// it will wake up the pods again after freeing up the resources in `handleBindingCycleError`.
+	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.EventAssignedPodDelete, pod, nil, nil)
+}
+
 func (sched *Scheduler) updatePodInSchedulingQueue(oldPod, newPod *v1.Pod) {
 	start := time.Now()
 	logger := sched.logger
@@ -258,6 +301,11 @@ func (sched *Scheduler) updatePodInSchedulingQueue(oldPod, newPod *v1.Pod) {
 		utilruntime.HandleErrorWithLogger(logger, err, "Failed to check whether pod is assumed", "pod", klog.KObj(newPod))
 	}
 	if isAssumed {
+		if newPod.DeletionTimestamp != nil && oldPod.DeletionTimestamp == nil {
+			// Assumed pod deletion has started. We should handle that differently,
+			// because we can't update such pod in any structure directly.
+			sched.handleAssumedPodDeletion(newPod)
+		}
 		return
 	}
 
@@ -290,22 +338,18 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(pod *v1.Pod, inBinding bool
 		// once the https://github.com/kubernetes/kubernetes/issues/134859 is fixed.
 		return
 	}
-	fwk, err := sched.frameworkForPod(pod)
+	isAssumed, err := sched.Cache.IsAssumedPod(pod)
 	if err != nil {
-		// This shouldn't happen, because we only accept for scheduling the pods
-		// which specify a scheduler name that matches one of the profiles.
-		utilruntime.HandleErrorWithLogger(logger, err, "Unable to get profile", "pod", klog.KObj(pod))
-		return
+		utilruntime.HandleErrorWithLogger(logger, err, "Failed to check whether pod is assumed", "pod", klog.KObj(pod))
 	}
-	// If a waiting pod is rejected, it indicates it's previously assumed and we're
-	// removing it from the scheduler cache. In this case, signal a AssignedPodDelete
-	// event to immediately retry some unscheduled Pods.
-	// Similarly when a pod that had nominated node is deleted, it can unblock scheduling of other pods,
-	// because the lower or equal priority pods treat such a pod as if it was assigned.
-	if fwk.RejectWaitingPod(pod.UID) {
-		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.EventAssignedPodDelete, pod, nil, nil)
+	if isAssumed {
+		// Assumed pod is deleted. We should handle that differently,
+		// because we can't delete such pod from any structure directly.
+		sched.handleAssumedPodDeletion(pod)
 	} else if pod.Status.NominatedNodeName != "" {
-		// Note that a nominated pod can fall into `RejectWaitingPod` case as well,
+		// When a pod that had nominated node is deleted, it can unblock scheduling of other pods,
+		// because the lower or equal priority pods treat such a pod as if it was assigned.
+		// Note that a nominated pod can fall into `handleAssumedPodDeletion` case as well,
 		// but in that case the `MoveAllToActiveOrBackoffQueue` already covered lower priority pods.
 		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.EventAssignedPodDelete, pod, nil, getLEPriorityPreCheck(corev1helpers.PodPriority(pod)))
 	}
