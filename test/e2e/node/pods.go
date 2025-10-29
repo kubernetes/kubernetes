@@ -41,7 +41,6 @@ import (
 	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/events"
-	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -420,7 +419,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 	})
 })
 
-var _ = SIGDescribe("Pods Extended (pod generation)", feature.PodObservedGenerationTracking, framework.WithFeatureGate(features.PodObservedGenerationTracking), func() {
+var _ = SIGDescribe("Pods Extended (pod generation)", framework.WithFeatureGate(features.PodObservedGenerationTracking), func() {
 	f := framework.NewDefaultFramework("pods")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
