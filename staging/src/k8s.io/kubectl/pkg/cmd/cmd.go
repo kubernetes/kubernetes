@@ -369,8 +369,12 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 	kubeConfigFlags.AddFlags(flags)
 
 	pref := kuberc.NewPreferences()
+	var policyWrapper *func(*rest.Config) *rest.Config
 	if !cmdutil.KubeRC.IsDisabled() {
 		pref.AddFlags(flags)
+		// the `kuberc.PluginPolicyWrapper` function pointer may be initialized
+		// during pref.Apply, or it may be `nil`.
+		policyWrapper = &kuberc.PluginPolicyWrapper
 	}
 
 	matchVersionKubeConfigFlags := cmdutil.NewMatchVersionFlags(kubeConfigFlags)
@@ -380,11 +384,14 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 
 	f := cmdutil.NewFactory(matchVersionKubeConfigFlags)
 
-	// Proxy command is incompatible with CommandHeaderRoundTripper, so
-	// clear the WrapConfigFn before running proxy command.
+	// Proxy command is incompatible with CommandHeaderRoundTripper, so replace
+	// the WrapConfigFn, possibly with `nil`, before running proxy command
 	proxyCmd := proxy.NewCmdProxy(f, o.IOStreams)
 	proxyCmd.PreRun = func(cmd *cobra.Command, args []string) {
 		kubeConfigFlags.WrapConfigFn = nil
+		if policyWrapper != nil {
+			kubeConfigFlags.WrapConfigFn = *policyWrapper
+		}
 	}
 
 	// Avoid import cycle by setting ValidArgsFunction here instead of in NewCmdGet()

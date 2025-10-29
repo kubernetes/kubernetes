@@ -2926,7 +2926,6 @@ unknownField: value`,
 }
 
 func TestApplyPluginPolicy(t *testing.T) {
-	tmpDir := t.TempDir()
 	kubeconfigData := `
 apiVersion: v1
 clusters:
@@ -2951,6 +2950,7 @@ users:
       - --login
       command: foo`
 
+	tmpDir := t.TempDir()
 	kubeconfig := filepath.Join(tmpDir, "kubeconfig")
 	err := os.WriteFile(kubeconfig, []byte(kubeconfigData), 0o644)
 	require.NoError(t, err, "writing fake kubeconfig")
@@ -2982,7 +2982,6 @@ users:
 		}, nil
 	}
 
-	// pref.applyPluginPolicy(opts)
 	_, err = p.Apply(rootCmd, opts, args, io.Discard)
 	require.NoError(t, err, "error applying preferences")
 

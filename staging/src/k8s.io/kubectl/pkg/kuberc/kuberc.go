@@ -45,6 +45,7 @@ const (
 var (
 	RecommendedConfigDir  = filepath.Join(homedir.HomeDir(), clientcmd.RecommendedHomeDir)
 	RecommendedKubeRCFile = filepath.Join(RecommendedConfigDir, RecommendedKubeRCFileName)
+	PluginPolicyWrapper   func(*rest.Config) *rest.Config
 
 	aliasNameRegex = regexp.MustCompile("^[a-zA-Z]+$")
 	shortHandRegex = regexp.MustCompile("^-[a-zA-Z]+$")
@@ -63,6 +64,7 @@ type PreferencesHandler interface {
 type Preferences struct {
 	getPreferencesFunc func(kuberc string, errOut io.Writer) (*config.Preference, error) // DefaultGetPreferences
 	aliases            map[string]struct{}
+	policyWrapper      func(*rest.Config) *rest.Config
 	pluginPolicy       clientcmdapi.PluginPolicy
 }
 
@@ -70,11 +72,17 @@ var _ PreferencesHandler = &Preferences{}
 
 // NewPreferences returns initialized Prefrences object.
 func NewPreferences() PreferencesHandler {
-	return &Preferences{
+	p := &Preferences{
 		getPreferencesFunc: DefaultGetPreferences,
 		aliases:            make(map[string]struct{}),
 		pluginPolicy:       clientcmdapi.PluginPolicy{},
 	}
+
+	// if PluginPolicyWrapper != nil {
+	// 	PluginPolicyWrapper = makePluginPolicyWrapper(p)
+	// }
+
+	return p
 }
 
 type aliasing struct {
@@ -115,7 +123,9 @@ func (p *Preferences) Apply(rootCmd *cobra.Command, kubeConfigFlags *genericclio
 		return args, err
 	}
 
-	p.applyPluginPolicy(kubeConfigFlags, kuberc)
+	if kubeConfigFlags != nil {
+		p.applyPluginPolicy(kubeConfigFlags, kuberc)
+	}
 
 	args, err = p.applyAliases(rootCmd, kuberc, args, errOut)
 	if err != nil {
@@ -137,19 +147,27 @@ func (p *Preferences) applyPluginPolicy(kubeConfigFlags *genericclioptions.Confi
 		p.pluginPolicy.Allowlist = kuberc.CredentialPluginAllowlist
 	}
 
-	wcc := kubeConfigFlags.WrapConfigFn
+	existingWrapConfigFn := noop
+	if kubeConfigFlags.WrapConfigFn != nil {
+		existingWrapConfigFn = kubeConfigFlags.WrapConfigFn
+	}
 
-	kubeConfigFlags.WithWrapConfigFn(func(c *rest.Config) *rest.Config {
-		if wcc != nil {
-			c = wcc(c)
+	if PluginPolicyWrapper == nil {
+		PluginPolicyWrapper = func(c *rest.Config) *rest.Config {
+			cfg := existingWrapConfigFn(c)
+			if cfg.ExecProvider != nil {
+				cfg.ExecProvider.PluginPolicy = p.pluginPolicy
+			}
+
+			return cfg
 		}
+	}
 
-		if c.ExecProvider != nil {
-			c.ExecProvider.PluginPolicy = p.pluginPolicy
-		}
+	*kubeConfigFlags = *kubeConfigFlags.WithWrapConfigFn(PluginPolicyWrapper)
+}
 
-		return c
-	})
+func noop(c *rest.Config) *rest.Config {
+	return c
 }
 
 // applyOverrides finds the command and sets the defaulted flag values in kuberc.
@@ -164,9 +182,7 @@ func (p *Preferences) applyOverrides(rootCmd *cobra.Command, kuberc *config.Pref
 		parsedCmds := strings.Fields(c.Command)
 		overrideCmd, _, err := rootCmd.Find(parsedCmds)
 		if err != nil {
-			if _, err := fmt.Fprintf(errOut, "Warning: command %q not found to set kuberc override\n", c.Command); err != nil {
-				return err
-			}
+			fmt.Fprintf(errOut, "Warning: command %q not found to set kuberc override\n", c.Command)
 			continue
 		}
 		if overrideCmd.Name() != cmd.Name() {
@@ -244,9 +260,7 @@ func (p *Preferences) applyAliases(rootCmd *cobra.Command, kuberc *config.Prefer
 
 		// do not allow shadowing built-ins
 		if _, _, err := rootCmd.Find([]string{alias.Name}); err == nil {
-			if _, err := fmt.Fprintf(errOut, "Warning: Setting alias %q to a built-in command is not supported\n", alias.Name); err != nil {
-				return args, err
-			}
+			fmt.Fprintf(errOut, "Warning: Setting alias %q to a built-in command is not supported\n", alias.Name)
 			break
 		}
 
@@ -342,19 +356,6 @@ func (p *Preferences) applyAliases(rootCmd *cobra.Command, kuberc *config.Prefer
 	}
 
 	return args, nil
-}
-
-func (p *Preferences) ApplyPluginPolicy(configFlags *genericclioptions.ConfigFlags) {
-	// if p.pluginPolicy.PolicyType == clientcmdapi.PluginPolicyUnspecified {
-	//     p.pluginPolicy.PolicyType = client
-	// }
-	configFlags.WithWrapConfigFn(func(c *rest.Config) *rest.Config {
-		if c.ExecProvider != nil {
-			c.ExecProvider.PluginPolicy = p.pluginPolicy
-		}
-
-		return c
-	})
 }
 
 // DefaultGetPreferences returns KubeRCConfiguration.

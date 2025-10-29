@@ -862,7 +862,7 @@ type pluginPolicyTest struct {
 	useEntryAbsPath  bool
 	allowlistLength  int
 	policyType       api.PolicyType
-	allowlist        api.Allowlist
+	allowlist        []api.AllowlistEntry
 }
 
 type pluginPolicyTestMatrix struct {
@@ -1032,7 +1032,7 @@ func (m *pluginPolicyTestMatrix) makeTests(t *testing.T, testdataDir, path strin
 func (tt *pluginPolicyTest) setAllowlist(l int, existingPluginInPATHAbsolutePath string, existingPluginInPATHBasename string) {
 	tt.allowlistLength = l
 	if tt.allowlistLength >= 0 {
-		tt.allowlist = make(api.Allowlist, 0, tt.allowlistLength)
+		tt.allowlist = make([]api.AllowlistEntry, 0, tt.allowlistLength)
 	}
 
 	if tt.allowlistLength >= 1 {
