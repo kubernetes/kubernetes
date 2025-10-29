@@ -40,6 +40,22 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *runtime.Scheme) error {
+	// type ConfigMap
+	scheme.AddValidationFunc((*corev1.ConfigMap)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_ConfigMap(ctx, op, nil /* fldPath */, obj.(*corev1.ConfigMap), safe.Cast[*corev1.ConfigMap](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
+	// type ConfigMapList
+	scheme.AddValidationFunc((*corev1.ConfigMapList)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_ConfigMapList(ctx, op, nil /* fldPath */, obj.(*corev1.ConfigMapList), safe.Cast[*corev1.ConfigMapList](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
 	// type ReplicationController
 	scheme.AddValidationFunc((*corev1.ReplicationController)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
 		switch op.Request.SubresourcePath() {
@@ -57,6 +73,59 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
 	return nil
+}
+
+// Validate_ConfigMap validates an instance of ConfigMap according
+// to declarative validation rules in the API schema.
+func Validate_ConfigMap(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *corev1.ConfigMap) (errs field.ErrorList) {
+	// field corev1.ConfigMap.TypeMeta has no validation
+
+	// field corev1.ConfigMap.ObjectMeta
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *metav1.ObjectMeta) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			func() { // cohort name
+				earlyReturn := false
+				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "name", func(o *metav1.ObjectMeta) *string { return &o.Name }, validate.DirectEqualPtr, validate.OptionalValue); len(e) != 0 {
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
+				errs = append(errs, validate.Subfield(ctx, op, fldPath, obj, oldObj, "name", func(o *metav1.ObjectMeta) *string { return &o.Name }, validate.DirectEqualPtr, validate.LongName)...)
+			}()
+			return
+		}(fldPath.Child("metadata"), &obj.ObjectMeta, safe.Field(oldObj, func(oldObj *corev1.ConfigMap) *metav1.ObjectMeta { return &oldObj.ObjectMeta }))...)
+
+	// field corev1.ConfigMap.Immutable has no validation
+	// field corev1.ConfigMap.Data has no validation
+	// field corev1.ConfigMap.BinaryData has no validation
+	return errs
+}
+
+// Validate_ConfigMapList validates an instance of ConfigMapList according
+// to declarative validation rules in the API schema.
+func Validate_ConfigMapList(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *corev1.ConfigMapList) (errs field.ErrorList) {
+	// field corev1.ConfigMapList.TypeMeta has no validation
+	// field corev1.ConfigMapList.ListMeta has no validation
+
+	// field corev1.ConfigMapList.Items
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []corev1.ConfigMap) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// iterate the list and call the type's validation function
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_ConfigMap)...)
+			return
+		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *corev1.ConfigMapList) []corev1.ConfigMap { return oldObj.Items }))...)
+
+	return errs
 }
 
 // Validate_ReplicationController validates an instance of ReplicationController according

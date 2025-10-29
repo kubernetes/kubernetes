@@ -19,6 +19,7 @@ package configmap
 import (
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
@@ -38,13 +39,38 @@ func testDeclarativeValidateForDeclarative(t *testing.T, apiVersion string) {
 		input        api.ConfigMap
 		expectedErrs field.ErrorList
 	}{
-		// TODO: Add test cases
+		"valid configmap": {
+			input:        mkValidConfigMap(),
+			expectedErrs: field.ErrorList{},
+		},
+		"invalid name with underscore": {
+			input: mkValidConfigMap(func(cm *api.ConfigMap) {
+				cm.ObjectMeta.Name = "invalid_name" 
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("metadata", "name"), "invalid_name", "must be a DNS-1123 subdomain"),
+			},
+		},
+		"invalid name with uppercase": {
+			input: mkValidConfigMap(func(cm *api.ConfigMap) {
+				cm.ObjectMeta.Name = "InvalidName" 
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("metadata", "name"), "InvalidName", "must be a DNS-1123 subdomain"),
+			},
+		},
+		"invalid name with special character": {
+			input: mkValidConfigMap(func(cm *api.ConfigMap) {
+				cm.ObjectMeta.Name = "invalid@name"
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("metadata", "name"), "invalid@name", "must be a DNS-1123 subdomain"),
+			},
+		},
+		// TODO: Add more test cases
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
-			actualErrs := Strategy.Validate(ctx, &tc.input)
-			t.Logf("DEBUG: actualErrs for %s: %#v", k, actualErrs)
-			t.Logf("DEBUG: expectedErrs for %s: %#v", k, tc.expectedErrs)
 			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, Strategy.Validate, tc.expectedErrs)
 		})
 	}
@@ -64,7 +90,39 @@ func testValidateUpdateForDeclarative(t *testing.T, apiVersion string) {
 		update       api.ConfigMap
 		expectedErrs field.ErrorList
 	}{
-		// TODO: Add test cases
+		"valid update": {
+			old:          mkValidConfigMap(),
+			update:       mkValidConfigMap(),
+			expectedErrs: field.ErrorList{},
+		},
+		"invalid name format in update": {
+			old: mkValidConfigMap(),
+			update: mkValidConfigMap(func(cm *api.ConfigMap) {
+				cm.ObjectMeta.Name = "invalid_name"
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("metadata", "name"), "invalid_name", "must be a DNS-1123 subdomain"),
+			},
+		},
+		"invalid name with uppercase in update": {
+			old: mkValidConfigMap(),
+			update: mkValidConfigMap(func(cm *api.ConfigMap) {
+				cm.ObjectMeta.Name = "InvalidName"
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("metadata", "name"), "InvalidName", "must be a DNS-1123 subdomain"),
+			},
+		},
+		"invalid name with special character in update": {
+			old: mkValidConfigMap(),
+			update: mkValidConfigMap(func(cm *api.ConfigMap) {
+				cm.ObjectMeta.Name = "invalid@name"
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("metadata", "name"), "invalid@name", "must be a DNS-1123 subdomain"),
+			},
+		},
+		// TODO: Add more test cases
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
@@ -73,4 +131,21 @@ func testValidateUpdateForDeclarative(t *testing.T, apiVersion string) {
 			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, Strategy.ValidateUpdate, tc.expectedErrs)
 		})
 	}
+}
+
+// Helper function to create a valid ConfigMap
+func mkValidConfigMap(tweaks ...func(cm *api.ConfigMap)) api.ConfigMap {
+	cm := api.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-configmap",
+			Namespace: "default",
+		},
+		Data: map[string]string{
+			"key1": "value1",
+		},
+	}
+	for _, tweak := range tweaks {
+		tweak(&cm)
+	}
+	return cm
 }
