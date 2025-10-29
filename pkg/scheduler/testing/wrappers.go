@@ -562,6 +562,12 @@ func (p *PodWrapper) SchedulingGates(gates []string) *PodWrapper {
 	return p
 }
 
+// ResourceVersion sets the inner pod's ResurceVersion.
+func (p *PodWrapper) ResourceVersion(version string) *PodWrapper {
+	p.ObjectMeta.ResourceVersion = version
+	return p
+}
+
 // PodAffinityKind represents different kinds of PodAffinity.
 type PodAffinityKind int
 
