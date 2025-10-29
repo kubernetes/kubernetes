@@ -40,6 +40,7 @@ func TestApplyFeatureGates(t *testing.T) {
 			name: "Feature gate DynamicResourceAllocation disabled",
 			features: map[featuregate.Feature]bool{
 				features.DynamicResourceAllocation: false,
+				features.OpportunisticBatching:     false,
 			},
 			wantConfig: &v1.Plugins{
 				MultiPoint: v1.PluginSet{
@@ -70,6 +71,7 @@ func TestApplyFeatureGates(t *testing.T) {
 			name: "Feature gate DynamicResourceAllocation enabled",
 			features: map[featuregate.Feature]bool{
 				features.DynamicResourceAllocation: true,
+				features.OpportunisticBatching:     false,
 			},
 			wantConfig: &v1.Plugins{
 				MultiPoint: v1.PluginSet{
@@ -87,6 +89,38 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: names.VolumeBinding},
 						{Name: names.VolumeZone},
 						{Name: names.PodTopologySpread, Weight: ptr.To[int32](2)},
+						{Name: names.InterPodAffinity, Weight: ptr.To[int32](2)},
+						{Name: names.DynamicResources},
+						{Name: names.DefaultPreemption},
+						{Name: names.NodeResourcesBalancedAllocation, Weight: ptr.To[int32](1)},
+						{Name: names.ImageLocality, Weight: ptr.To[int32](1)},
+						{Name: names.DefaultBinder},
+					},
+				},
+			},
+		},
+		{
+			name: "Feature gate OpportunisticBatch enabled",
+			features: map[featuregate.Feature]bool{
+				features.OpportunisticBatching: true,
+			},
+			wantConfig: &v1.Plugins{
+				MultiPoint: v1.PluginSet{
+					Enabled: []v1.Plugin{
+						{Name: names.SchedulingGates},
+						{Name: names.PrioritySort},
+						{Name: names.NodeUnschedulable},
+						{Name: names.NodeName},
+						{Name: names.TaintToleration, Weight: ptr.To[int32](3)},
+						{Name: names.NodeAffinity, Weight: ptr.To[int32](2)},
+						{Name: names.NodePorts},
+						{Name: names.NodeResourcesFit, Weight: ptr.To[int32](1)},
+						{Name: names.VolumeRestrictions},
+						{Name: names.NodeVolumeLimits},
+						{Name: names.VolumeBinding},
+						{Name: names.VolumeZone},
+						{Name: names.PodTopologySpread, Weight: ptr.To[int32](2)},
+						{Name: names.OpportunisticBatch},
 						{Name: names.InterPodAffinity, Weight: ptr.To[int32](2)},
 						{Name: names.DynamicResources},
 						{Name: names.DefaultPreemption},

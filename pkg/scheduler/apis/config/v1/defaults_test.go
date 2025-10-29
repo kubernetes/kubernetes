@@ -365,6 +365,7 @@ func TestSchedulerDefaults(t *testing.T) {
 									{Name: names.VolumeBinding},
 									{Name: names.VolumeZone},
 									{Name: names.PodTopologySpread, Weight: ptr.To[int32](2)},
+									{Name: names.OpportunisticBatch},
 									{Name: names.InterPodAffinity, Weight: ptr.To[int32](2)},
 									{Name: names.DynamicResources},
 									{Name: names.DefaultPreemption},

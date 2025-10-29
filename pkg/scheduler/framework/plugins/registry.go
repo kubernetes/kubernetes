@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeunschedulable"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodevolumelimits"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/opportunisticbatch"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/schedulinggates"
@@ -46,6 +47,7 @@ import (
 func NewInTreeRegistry() runtime.Registry {
 	fts := plfeature.NewSchedulerFeaturesFromGates(feature.DefaultFeatureGate)
 	registry := runtime.Registry{
+		opportunisticbatch.Name:              runtime.FactoryAdapter(fts, opportunisticbatch.New),
 		dynamicresources.Name:                runtime.FactoryAdapter(fts, dynamicresources.New),
 		imagelocality.Name:                   imagelocality.New,
 		tainttoleration.Name:                 runtime.FactoryAdapter(fts, tainttoleration.New),

@@ -37,7 +37,7 @@ import (
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
-	"k8s.io/kubernetes/pkg/scheduler/backend/api_dispatcher"
+	apidispatcher "k8s.io/kubernetes/pkg/scheduler/backend/api_dispatcher"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -69,6 +69,7 @@ type frameworkImpl struct {
 	bindPlugins          []fwk.BindPlugin
 	postBindPlugins      []fwk.PostBindPlugin
 	permitPlugins        []fwk.PermitPlugin
+	nodeResultsPlugins   []fwk.NodeResultsPlugin
 
 	// pluginsMap contains all plugins, by name.
 	pluginsMap map[string]fwk.Plugin
@@ -118,6 +119,7 @@ func (f *frameworkImpl) getExtensionPoints(plugins *config.Plugins) []extensionP
 		{&plugins.Permit, &f.permitPlugins},
 		{&plugins.PreEnqueue, &f.preEnqueuePlugins},
 		{&plugins.QueueSort, &f.queueSortPlugins},
+		{&plugins.NodeResults, &f.nodeResultsPlugins},
 	}
 }
 
@@ -1261,6 +1263,16 @@ func (f *frameworkImpl) runScoreExtension(ctx context.Context, pl fwk.ScorePlugi
 	status := pl.ScoreExtensions().NormalizeScore(ctx, state, pod, nodeScoreList)
 	f.metricsRecorder.ObservePluginDurationAsync(metrics.ScoreExtensionNormalize, pl.Name(), status.Code().String(), metrics.SinceInSeconds(startTime))
 	return status
+}
+
+func (f *frameworkImpl) RunNodeResultsPlugins(ctx context.Context, state fwk.CycleState, thisFramework bool, podInfo fwk.PodInfo, chosenNode fwk.NodeInfo, otherNodes fwk.SortedScoredNodes) {
+	startTime := time.Now()
+	defer func() {
+		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.NodeResults, "success", f.profileName).Observe(metrics.SinceInSeconds(startTime))
+	}()
+	for _, pl := range f.nodeResultsPlugins {
+		pl.NodeResults(ctx, state, thisFramework, podInfo, chosenNode, otherNodes)
+	}
 }
 
 // RunPreBindPlugins runs the set of configured prebind plugins. It returns a

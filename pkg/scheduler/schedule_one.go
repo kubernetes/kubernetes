@@ -113,12 +113,6 @@ func (sched *Scheduler) ScheduleOne(ctx context.Context) {
 	schedulingCycleCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.OpportunisticBatching) {
-		if sched.batch != nil {
-			sched.batch = sched.batch.NextPod(ctx, pod)
-		}
-	}
-
 	scheduleResult, assumedPodInfo, prioritizedNodes, status := sched.schedulingCycle(schedulingCycleCtx, state, fwk, podInfo, start, podsToActivate)
 	if !status.IsSuccess() {
 		sched.FailureHandler(schedulingCycleCtx, fwk, assumedPodInfo, status, scheduleResult.nominatingInfo, start)
@@ -126,14 +120,7 @@ func (sched *Scheduler) ScheduleOne(ctx context.Context) {
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.OpportunisticBatching) {
-		nodeInfo, err := sched.nodeInfoSnapshot.NodeInfos().Get(scheduleResult.SuggestedHost)
-		if err == nil {
-			sched.batch = fwk.UpdateBatchPodSuccess(sched.batch, ctx, podInfo, state, nodeInfo, prioritizedNodes)
-		} else {
-			// This shouldn't happen since we haven't changed the snapshot since scheduling.
-			utilruntime.HandleErrorWithContext(ctx, err, "Error while getting used nodeInfo from snapshot")
-			sched.batch = nil
-		}
+		sched.runNodeResults(ctx, state, fwk, podInfo, prioritizedNodes, scheduleResult)
 	}
 
 	// bind the pod to its host asynchronously (we can do this b/c of the assumption step above).
@@ -170,7 +157,7 @@ func (sched *Scheduler) schedulingCycle(
 	podInfo *framework.QueuedPodInfo,
 	start time.Time,
 	podsToActivate *framework.PodsToActivate,
-) (ScheduleResult, *framework.QueuedPodInfo, framework.SortedScoredNodes, *fwk.Status) {
+) (ScheduleResult, *framework.QueuedPodInfo, fwk.SortedScoredNodes, *fwk.Status) {
 	logger := klog.FromContext(ctx)
 	pod := podInfo.Pod
 	scheduleResult, sortedPrioritizedNodes, err := sched.SchedulePod(ctx, schedFramework, state, pod)
@@ -420,6 +407,19 @@ func (sched *Scheduler) frameworkForPod(pod *v1.Pod) (framework.Framework, error
 	return fwk, nil
 }
 
+func (sched *Scheduler) runNodeResults(ctx context.Context, state fwk.CycleState, fwk framework.Framework, podInfo fwk.PodInfo, prioritizedNodes fwk.SortedScoredNodes, scheduleResult ScheduleResult) {
+	chosenNode, err := sched.nodeInfoSnapshot.NodeInfos().Get(scheduleResult.SuggestedHost)
+	if err == nil {
+		for _, someFwk := range sched.Profiles {
+			thisFwksPod := someFwk == fwk
+			someFwk.RunNodeResultsPlugins(ctx, state, thisFwksPod, podInfo, chosenNode, prioritizedNodes)
+		}
+	} else {
+		// This shouldn't happen since we haven't changed the snapshot since scheduling.
+		utilruntime.HandleErrorWithContext(ctx, err, "Error while getting used nodeInfo from snapshot")
+	}
+}
+
 // skipPodSchedule returns true if we could skip scheduling the pod for specified cases.
 func (sched *Scheduler) skipPodSchedule(ctx context.Context, fwk framework.Framework, pod *v1.Pod) bool {
 	// Case 1: pod is being deleted.
@@ -448,7 +448,7 @@ func (sched *Scheduler) schedulePod(
 	fwk framework.Framework,
 	state fwk.CycleState,
 	pod *v1.Pod,
-) (result ScheduleResult, sortedPrioritizedNodes framework.SortedScoredNodes, err error) {
+) (result ScheduleResult, sortedPrioritizedNodes fwk.SortedScoredNodes, err error) {
 	trace := utiltrace.New("Scheduling", utiltrace.Field{Key: "namespace", Value: pod.Namespace}, utiltrace.Field{Key: "name", Value: pod.Name})
 	defer trace.LogIfLong(100 * time.Millisecond)
 	if err := sched.Cache.UpdateSnapshot(klog.FromContext(ctx), sched.nodeInfoSnapshot); err != nil {
@@ -532,18 +532,11 @@ func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, schedFramework 
 		return nil, diagnosis, nil
 	}
 
-	batchNodeHint := ""
-	if utilfeature.DefaultFeatureGate.Enabled(features.OpportunisticBatching) {
-		if sched.batch != nil {
-			batchNodeHint = sched.batch.Hint(pod)
-		}
-	}
-
 	// "NominatedNodeName" can potentially be set in a previous scheduling cycle as a result of preemption.
 	// This node is likely the only candidate that will fit the pod, and hence we try it first before iterating over all nodes.
 	// We take the same tack for hinted nodes from the batch module.
-	if len(pod.Status.NominatedNodeName) > 0 || len(batchNodeHint) > 0 {
-		feasibleNodes, err := sched.evaluateNominatedNode(ctx, pod, batchNodeHint, schedFramework, state, diagnosis)
+	if len(pod.Status.NominatedNodeName) > 0 {
+		feasibleNodes, err := sched.evaluateNominatedNode(ctx, pod, schedFramework, state, diagnosis)
 		if err != nil {
 			utilruntime.HandleErrorWithContext(ctx, err, "Evaluation failed on nominated node", "pod", klog.KObj(pod), "node", pod.Status.NominatedNodeName)
 		}
@@ -596,13 +589,8 @@ func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, schedFramework 
 	return feasibleNodesAfterExtender, diagnosis, nil
 }
 
-func (sched *Scheduler) evaluateNominatedNode(ctx context.Context, pod *v1.Pod, batchNodeHint string, schedFramework framework.Framework, state fwk.CycleState, diagnosis framework.Diagnosis) ([]fwk.NodeInfo, error) {
-	nnn := ""
-	if pod.Status.NominatedNodeName != "" {
-		nnn = pod.Status.NominatedNodeName
-	} else {
-		nnn = batchNodeHint
-	}
+func (sched *Scheduler) evaluateNominatedNode(ctx context.Context, pod *v1.Pod, schedFramework framework.Framework, state fwk.CycleState, diagnosis framework.Diagnosis) ([]fwk.NodeInfo, error) {
+	nnn := pod.Status.NominatedNodeName
 	nodeInfo, err := sched.nodeInfoSnapshot.Get(nnn)
 	if err != nil {
 		return nil, err

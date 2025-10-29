@@ -88,7 +88,7 @@ type Scheduler struct {
 	// SchedulePod tries to schedule the given pod to one of the nodes in the node list.
 	// Return a struct of ScheduleResult with the name of suggested host on success,
 	// otherwise will return a FitError with reasons.
-	SchedulePod func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, pod *v1.Pod) (ScheduleResult, framework.SortedScoredNodes, error)
+	SchedulePod func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, pod *v1.Pod) (ScheduleResult, fwk.SortedScoredNodes, error)
 
 	// Close this to shut down the scheduler.
 	StopEverything <-chan struct{}
@@ -122,8 +122,6 @@ type Scheduler struct {
 	registeredHandlers []cache.ResourceEventHandlerRegistration
 
 	nominatedNodeNameForExpectationEnabled bool
-
-	batch framework.Batch
 }
 
 func (sched *Scheduler) applyDefaultHandlers() {

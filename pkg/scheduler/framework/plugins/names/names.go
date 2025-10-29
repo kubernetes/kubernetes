@@ -30,6 +30,7 @@ const (
 	NodeResourcesFit                = "NodeResourcesFit"
 	NodeUnschedulable               = "NodeUnschedulable"
 	NodeVolumeLimits                = "NodeVolumeLimits"
+	OpportunisticBatch              = "OpportunisticBatch"
 	PodTopologySpread               = "PodTopologySpread"
 	SchedulingGates                 = "SchedulingGates"
 	TaintToleration                 = "TaintToleration"

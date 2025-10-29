@@ -272,6 +272,7 @@ leaderElection:
 						{Name: "InterPodAffinity", Weight: 1},
 						{Name: "TaintToleration", Weight: 1},
 					}
+					plugins.NodeResults.Enabled = nil
 					return plugins
 				}(),
 			},

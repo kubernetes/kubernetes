@@ -612,6 +612,23 @@ type PermitPlugin interface {
 	Permit(ctx context.Context, state CycleState, p *v1.Pod, nodeName string) (*Status, time.Duration)
 }
 
+// A list of scored nodes, returned from scheduling.
+type SortedScoredNodes interface {
+	Pop() string
+	Len() int
+}
+
+// NodeResultsPlugin is an interface that must be implemented by plugins that
+// wish to be notified about node scoring and filtering results. Note
+// that unlike most other plugins, plugins from *all* frameworks will recieve
+// this call, to ensure plugins needing cross system consistency can get it.
+// The field "podFroThisFramework" informs the plugin if the pod is
+// for the plugin's framework or some other framework in the system.
+type NodeResultsPlugin interface {
+	Plugin
+	NodeResults(ctx context.Context, state CycleState, podForThisFramework bool, podInfo PodInfo, chosenNode NodeInfo, otherNodes SortedScoredNodes)
+}
+
 // BindPlugin is an interface that must be implemented by "Bind" plugins. Bind
 // plugins are used to bind a pod to a Node.
 type BindPlugin interface {

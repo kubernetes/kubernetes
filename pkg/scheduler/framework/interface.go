@@ -153,26 +153,6 @@ func NewPodsToActivate() *PodsToActivate {
 	return &PodsToActivate{Map: make(map[string]*v1.Pod)}
 }
 
-// Batch information that can be used to acclerate
-// pod scheduling.
-type Batch interface {
-	// Update the batch when a new pod arrives.
-	// The returned value is the new value of the
-	// batch, which can be nil.
-	NextPod(ctx context.Context, pod *v1.Pod) Batch
-
-	// Get a hinted node for the given pod.
-	// Should always be called after NextPod on
-	// the same pod.
-	Hint(pod *v1.Pod) string
-}
-
-// A list of scored nodes, returned from scheduling.
-type SortedScoredNodes interface {
-	Pop() string
-	Len() int
-}
-
 // Framework manages the set of plugins in use by the scheduling framework.
 // Configured plugins are called at specified points in a scheduling context.
 type Framework interface {
@@ -186,10 +166,6 @@ type Framework interface {
 
 	// QueueSortFunc returns the function to sort pods in scheduling queue
 	QueueSortFunc() fwk.LessFunc
-
-	// On successful scheduling of a pod, update the batch information based on the result.
-	// The returned Batch object contains the new batch information, and can be nil.
-	UpdateBatchPodSuccess(batch Batch, ctx context.Context, podInfo fwk.PodInfo, state fwk.CycleState, nodeInfo fwk.NodeInfo, sortedNodes SortedScoredNodes) Batch
 
 	// RunPreFilterPlugins runs the set of configured PreFilter plugins. It returns
 	// *fwk.Status and its code is set to non-success if any of the plugins returns
@@ -207,6 +183,10 @@ type Framework interface {
 	// to execute first and return Unschedulable status, or ones that try to change the
 	// cluster state to make the pod potentially schedulable in a future scheduling cycle.
 	RunPostFilterPlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, filteredNodeStatusMap fwk.NodeToStatusReader) (*fwk.PostFilterResult, *fwk.Status)
+
+	// On successful scheduling of a pod, update the batch information based on the result.
+	// The returned Batch object contains the new batch information, and can be nil.
+	RunNodeResultsPlugins(ctx context.Context, state fwk.CycleState, thisFramework bool, podInfo fwk.PodInfo, chosenNode fwk.NodeInfo, otherNodes fwk.SortedScoredNodes)
 
 	// RunPreBindPlugins runs the set of configured PreBind plugins. It returns
 	// *fwk.Status and its code is set to non-success if any of the plugins returns
