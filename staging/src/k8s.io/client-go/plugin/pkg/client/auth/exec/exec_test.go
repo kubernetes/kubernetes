@@ -44,7 +44,6 @@ import (
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/pkg/apis/clientauthentication"
 	"k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/transport"
@@ -952,10 +951,6 @@ func TestPluginPolicy(t *testing.T) {
 	}
 
 	tests := matrix.makeTests(t, testdataDir, path)
-
-	// to avoid unrelated errors on authenticator initialization
-	apiVersions[""] = schema.GroupVersion{}
-
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			c := test.config
@@ -1085,6 +1080,7 @@ func (tt *pluginPolicyTest) getExecConfig(existingPluginInPATHAbsolutePath strin
 	}
 
 	config := api.ExecConfig{}
+	config.APIVersion = "client.authentication.k8s.io/v1"
 	config.Command = cmd
 	config.PluginPolicy.PolicyType = tt.policyType
 	config.PluginPolicy.Allowlist = tt.allowlist

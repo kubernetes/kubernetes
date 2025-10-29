@@ -404,6 +404,87 @@ func execPluginClientTests(t *testing.T, unauthorizedCert, unauthorizedKey []byt
 			wantClientErrorPrefix:         `Get "https`,
 			wantMetrics:                   &execPluginMetrics{calls: []execPluginCall{{exitCode: 10, callStatus: "plugin_execution_error"}}},
 		},
+		{
+			name: "binary denied by denyall policy",
+			clientConfigFunc: func(c *rest.Config) {
+				c.ExecProvider.PluginPolicy.PolicyType = clientcmdapi.PluginPolicyDenyAll
+			},
+			wantGetCertificateErrorPrefix: "plugin",
+			wantClientErrorPrefix:         `Get "https`,
+			wantMetrics:                   &execPluginMetrics{},
+		},
+		{
+			name: "binary denied by allowlist policy",
+			clientConfigFunc: func(c *rest.Config) {
+				c.ExecProvider.PluginPolicy.PolicyType = clientcmdapi.PluginPolicyAllowlist
+				c.ExecProvider.PluginPolicy.Allowlist = []clientcmdapi.AllowlistEntry{
+					{Name: "/only/my/very/secure/binary"},
+					{Name: "other-very-secure-binary"},
+				}
+			},
+			wantGetCertificateErrorPrefix: `"testdata/exec-plugin.sh" is not permitted by the credential plugin allowlist`,
+			wantClientErrorPrefix:         `Get "https`,
+			wantMetrics:                   &execPluginMetrics{},
+		},
+		{
+			name: "allowall policy misconfiguration",
+			clientConfigFunc: func(c *rest.Config) {
+				c.ExecProvider.PluginPolicy.PolicyType = clientcmdapi.PluginPolicyAllowAll
+				c.ExecProvider.PluginPolicy.Allowlist = []clientcmdapi.AllowlistEntry{
+					{Name: "/only/my/very/secure/binary"},
+					{Name: "other-very-secure-binary"},
+				}
+			},
+			wantGetCertificateErrorPrefix: `misconfigured credential plugin allowlist: plugin policy is "AllowAll" but allowlist is non-nil`,
+			wantClientErrorPrefix:         `Get "https`,
+			wantMetrics:                   &execPluginMetrics{},
+		},
+		{
+			name: "allowall policy happy path",
+			clientConfigFunc: func(c *rest.Config) {
+				c.ExecProvider.PluginPolicy.PolicyType = clientcmdapi.PluginPolicyAllowAll
+				c.ExecProvider.Env = []clientcmdapi.ExecEnvVar{
+					{
+						Name: outputEnvVar,
+						Value: fmt.Sprintf(`{
+						"kind": "ExecCredential",
+						"apiVersion": "client.authentication.k8s.io/v1",
+						"status": {
+							"token": "%s"
+						}
+					}`, clientAuthorizedToken),
+					},
+				}
+			},
+			wantAuthorizationHeaderValues: [][]string{{"Bearer " + clientAuthorizedToken}},
+			wantCertificate:               &tls.Certificate{},
+			wantMetrics:                   &execPluginMetrics{calls: []execPluginCall{{exitCode: 0, callStatus: "no_error"}}},
+		},
+		{
+			name: "allowlist policy happy path",
+			clientConfigFunc: func(c *rest.Config) {
+				c.ExecProvider.PluginPolicy.PolicyType = clientcmdapi.PluginPolicyAllowlist
+				c.ExecProvider.PluginPolicy.Allowlist = []clientcmdapi.AllowlistEntry{
+					{Name: "testdata/exec-plugin.sh"},
+					{Name: "other-very-secure-binary"},
+				}
+				c.ExecProvider.Env = []clientcmdapi.ExecEnvVar{
+					{
+						Name: outputEnvVar,
+						Value: fmt.Sprintf(`{
+						"kind": "ExecCredential",
+						"apiVersion": "client.authentication.k8s.io/v1",
+						"status": {
+							"token": "%s"
+						}
+					}`, clientAuthorizedToken),
+					},
+				}
+			},
+			wantAuthorizationHeaderValues: [][]string{{"Bearer " + clientAuthorizedToken}},
+			wantCertificate:               &tls.Certificate{},
+			wantMetrics:                   &execPluginMetrics{calls: []execPluginCall{{exitCode: 0, callStatus: "no_error"}}},
+		},
 	}
 	return append(v1Tests, v1beta1TestsFromV1Tests(v1Tests)...)
 }

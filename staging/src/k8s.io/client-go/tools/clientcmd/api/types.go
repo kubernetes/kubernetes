@@ -286,7 +286,6 @@ type ExecConfig struct {
 
 	// PluginPolicy is the policy governing whether or not the configured
 	// `Command` may run.
-	// +k8s:conversion-gen=false
 	PluginPolicy PluginPolicy `json:"-"`
 }
 
