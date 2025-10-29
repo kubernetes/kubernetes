@@ -15191,9 +15191,9 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 				},
 			}),
 		),
-		old:  *podtest.MakePod("foo"),
-		err:  "Duplicate value: \"ctr\"",
-		test: "invalid container name and extended resource name in requestMapping in ExtendedResourceClaimStatus",
+		old: *podtest.MakePod("foo"),
+		//err:  "Duplicate value: \"ctr\"",
+		test: "valid container name and extended resource name in requestMapping in ExtendedResourceClaimStatus",
 	}, {
 		new: *podtest.MakePod("foo",
 			podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(

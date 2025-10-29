@@ -2099,18 +2099,18 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		pod.Spec.InitContainers = []v1.Container{pod.Spec.Containers[0], pod.Spec.Containers[0], pod.Spec.Containers[0]}
 		pod.Spec.InitContainers[0].Name += "-init"
 		// This must succeed for the pod to start.
-		pod.Spec.InitContainers[0].Command = []string{"sh", "-c", "env|grep request_0=true"}
+		pod.Spec.InitContainers[0].Command = []string{"sh", "-c", "env|grep container_1_request_0=true"}
 		pod.Spec.InitContainers[0].Resources.Requests = res
 		pod.Spec.InitContainers[0].Resources.Limits = res
 		pod.Spec.InitContainers[1].Name += "-sidecar"
 		// This must succeed for the pod to start.
-		pod.Spec.InitContainers[1].Command = []string{"sh", "-c", "env|grep container_1_request_0=true; sleep 1"}
+		pod.Spec.InitContainers[1].Command = []string{"sh", "-c", "while true; do env; env|grep container_1_request_0=true; echo $?; sleep 5; done"}
 		pod.Spec.InitContainers[1].RestartPolicy = ptr.To(v1.ContainerRestartPolicyAlways)
 		pod.Spec.InitContainers[1].Resources.Requests = res
 		pod.Spec.InitContainers[1].Resources.Limits = res
 		pod.Spec.InitContainers[2].Name += "-init-1"
 		// This must succeed for the pod to start.
-		pod.Spec.InitContainers[2].Command = []string{"sh", "-c", "env|grep request_0=true"}
+		pod.Spec.InitContainers[2].Command = []string{"sh", "-c", "env|grep container_3_request_0=true"}
 		pod.Spec.InitContainers[2].Resources.Requests = res
 		pod.Spec.InitContainers[2].Resources.Limits = res
 

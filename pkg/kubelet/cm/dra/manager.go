@@ -527,16 +527,11 @@ func (m *Manager) GetResources(pod *v1.Pod, container *v1.Container) (*Container
 					continue
 				}
 				if schedutil.IsDRAExtendedResourceName(rName) {
-					requestName := ""
 					for _, rm := range pod.Status.ExtendedResourceClaimStatus.RequestMappings {
 						if rm.ContainerName == container.Name && rm.ResourceName == rName.String() {
-							requestName = rm.RequestName
-							break
+							// As of Kubernetes 1.31, CDI device IDs are not passed via annotations anymore.
+							cdiDevices = append(cdiDevices, claimInfo.cdiDevicesAsList(rm.RequestName)...)
 						}
-					}
-					if requestName != "" {
-						// As of Kubernetes 1.31, CDI device IDs are not passed via annotations anymore.
-						cdiDevices = append(cdiDevices, claimInfo.cdiDevicesAsList(requestName)...)
 					}
 				}
 			}

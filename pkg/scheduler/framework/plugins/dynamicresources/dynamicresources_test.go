@@ -2803,6 +2803,14 @@ func Test_createDeviceRequests(t *testing.T) {
 			Count:           1,
 		},
 	}
+	devReq5Init := resourceapi.DeviceRequest{
+		Name: "request-1",
+		Exactly: &resourceapi.ExactDeviceRequest{
+			DeviceClassName: "classInit",
+			AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
+			Count:           1,
+		},
+	}
 
 	testcases := map[string]struct {
 		pod                *v1.Pod
@@ -2854,7 +2862,7 @@ func Test_createDeviceRequests(t *testing.T) {
 			pod:                podInit3,
 			extendedResources:  resInit,
 			deviceClassMapping: devMapInit,
-			wantDeviceRequests: []resourceapi.DeviceRequest{devReqSidecar, devReq4Init, devReq2Init},
+			wantDeviceRequests: []resourceapi.DeviceRequest{devReqSidecar, devReq4Init, devReq5Init},
 		},
 	}
 
@@ -2862,7 +2870,7 @@ func Test_createDeviceRequests(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			gotDeviceRequests := createDeviceRequests(tc.pod, tc.extendedResources, tc.deviceClassMapping)
 			if len(tc.wantDeviceRequests) != len(gotDeviceRequests) {
-				t.Fatalf("different length, want %#v, got %#v", tc.wantDeviceRequests, gotDeviceRequests)
+				t.Fatalf("different length, want %#v, len=%v, got %#v, len=%v", tc.wantDeviceRequests, len(tc.wantDeviceRequests), gotDeviceRequests, len(gotDeviceRequests))
 			}
 			sort.Slice(gotDeviceRequests, func(i, j int) bool { return gotDeviceRequests[i].Name < gotDeviceRequests[j].Name })
 			for i, r := range tc.wantDeviceRequests {
@@ -2876,7 +2884,7 @@ func Test_createDeviceRequests(t *testing.T) {
 					t.Errorf("different allocationMode, want %#v, got %#v", r, gotDeviceRequests[i])
 				}
 				if r.Exactly.Count != gotDeviceRequests[i].Exactly.Count {
-					t.Errorf("different count, want %#v, got %#v", r, gotDeviceRequests[i])
+					t.Errorf("different count, want %#v, got %#v", r.Exactly.Count, gotDeviceRequests[i].Exactly.Count)
 				}
 			}
 		})
@@ -3005,6 +3013,11 @@ func Test_createRequestMappings(t *testing.T) {
 		ResourceName:  extendedResourceName + "init",
 		RequestName:   "request-1",
 	}
+	cerInit1 := v1.ContainerExtendedResourceRequest{
+		ContainerName: "init-con0",
+		ResourceName:  extendedResourceName + "init",
+		RequestName:   "container-1-request-0",
+	}
 	cerInit2 := v1.ContainerExtendedResourceRequest{
 		ContainerName: "init-con1",
 		ResourceName:  extendedResourceName + "init",
@@ -3059,26 +3072,27 @@ func Test_createRequestMappings(t *testing.T) {
 		"four containers (two are init container, one sidecar), three requests": {
 			claim:           claim4Init,
 			pod:             podInit3,
-			wantReqMappings: []v1.ContainerExtendedResourceRequest{cerSidecar, cer5, cerInit, cerInit3},
+			wantReqMappings: []v1.ContainerExtendedResourceRequest{cerSidecar, cerInit1, cer5, cerInit3},
 		},
 	}
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			gotReqMappings := createRequestMappings(tc.claim, tc.pod)
+			logger, _ := ktesting.NewTestContext(t)
+			gotReqMappings := createRequestMappings(tc.claim, tc.pod, logger)
 			if len(tc.wantReqMappings) != len(gotReqMappings) {
 				t.Fatalf("different length, want %#v, got %#v", tc.wantReqMappings, gotReqMappings)
 			}
 			sort.Slice(gotReqMappings, func(i, j int) bool { return gotReqMappings[i].RequestName < gotReqMappings[j].RequestName })
 			for i, r := range tc.wantReqMappings {
 				if r.RequestName != gotReqMappings[i].RequestName {
-					t.Fatalf("different request name, want %#v, got %#v", r, gotReqMappings[i])
+					t.Errorf("different request name, want %#v, got %#v", r, gotReqMappings[i])
 				}
 				if r.ContainerName != gotReqMappings[i].ContainerName {
-					t.Fatalf("different container name, want %#v, got %#v", r, gotReqMappings[i])
+					t.Errorf("different container name, want %#v, got %#v", r, gotReqMappings[i])
 				}
 				if r.ResourceName != gotReqMappings[i].ResourceName {
-					t.Fatalf("different resource name, want %#v, got %#v", r, gotReqMappings[i])
+					t.Errorf("different resource name, want %#v, got %#v", r, gotReqMappings[i])
 				}
 			}
 		})
