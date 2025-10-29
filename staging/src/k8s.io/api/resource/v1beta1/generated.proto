@@ -1311,6 +1311,8 @@ message NetworkDeviceData {
   //
   // +optional
   // +listType=atomic
+  // +k8s:listType=atomic
+  // +k8s:unique=set
   repeated string ips = 2;
 
   // HardwareAddress represents the hardware address (e.g. MAC Address) of the device's network interface.
