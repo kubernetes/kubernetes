@@ -1650,23 +1650,34 @@ func testDeviceBindingConditions(tCtx ktesting.TContext, enabled bool) {
 		c, err := tCtx.Client().ResourceV1().ResourceClaims(namespace).Get(tCtx, claim2.Name, metav1.GetOptions{})
 		tCtx.ExpectNoError(err, "get claim")
 		claim2 = c
+		// Phase 1: saw conditions once
 		if claim2.Status.Devices != nil && len(claim2.Status.Devices[0].Conditions) != 0 {
 			setConditionsFlag = true
 		}
-		if setConditionsFlag && len(claim2.Status.Devices) == 0 {
-			// The scheduler has retried and removed the conditions.
-			// This is the expected state. Finish waiting.
-			return nil
+		// Phase 2: after seeing conditions, wait until they are cleared AND allocation is present for the same device.
+		if setConditionsFlag {
+			// conditions cleared?
+			cleared := len(claim2.Status.Devices) == 0
+			// allocation restored and matches the intended device?
+			allocated := claim2.Status.Allocation != nil &&
+				len(claim2.Status.Allocation.Devices.Results) == 1 &&
+				claim2.Status.Allocation.Devices.Results[0].Driver == driverName &&
+				claim2.Status.Allocation.Devices.Results[0].Pool == poolWithBinding &&
+				claim2.Status.Allocation.Devices.Results[0].Device == "with-binding"
+			if cleared && allocated {
+				return nil // done waiting
+			}
 		}
 		return claim2
-	}).WithTimeout(30*time.Second).WithPolling(time.Second).Should(gomega.BeNil(), "claim should not have any condition")
-
+	}).WithTimeout(30*time.Second).WithPolling(time.Second).Should(gomega.BeNil(), "claim should be re-allocated to with-binding before proceeding")
+	// Now it's safe to set the final binding condition.
 	// Allow the scheduler to proceed.
 	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		latest, err := tCtx.Client().ResourceV1().ResourceClaims(namespace).Get(tCtx, claim2.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
+		// Write status.devices for the CURRENT allocation device.
 		latest.Status.Devices = []resourceapi.AllocatedDeviceStatus{{
 			Driver: driverName,
 			Pool:   poolWithBinding,
