@@ -22,7 +22,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -51,7 +50,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	resourceapiac "k8s.io/client-go/applyconfigurations/resource/v1"
 	"k8s.io/client-go/informers"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/component-base/featuregate"
@@ -120,105 +118,6 @@ var (
 
 	numNodes = 2
 )
-
-// createTestNamespace creates a namespace with a name that is derived from the
-// current test name:
-// - Non-alpha-numeric characters replaced by hyphen.
-// - Truncated in the middle to make it short enough for GenerateName.
-// - Hyphen plus random suffix added by the apiserver.
-func createTestNamespace(tCtx ktesting.TContext, labels map[string]string) string {
-	tCtx.Helper()
-	name := regexp.MustCompile(`[^[:alnum:]_-]`).ReplaceAllString(tCtx.Name(), "-")
-	name = strings.ToLower(name)
-	if len(name) > 63 {
-		name = name[:30] + "--" + name[len(name)-30:]
-	}
-	ns := &v1.Namespace{ObjectMeta: metav1.ObjectMeta{GenerateName: name + "-"}}
-	ns.Labels = labels
-	ns, err := tCtx.Client().CoreV1().Namespaces().Create(tCtx, ns, metav1.CreateOptions{})
-	tCtx.ExpectNoError(err, "create test namespace")
-	tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
-		tCtx.ExpectNoError(tCtx.Client().CoreV1().Namespaces().Delete(tCtx, ns.Name, metav1.DeleteOptions{}), "delete test namespace")
-	})
-	return ns.Name
-}
-
-// createSlice creates the given ResourceSlice and removes it when the test is done.
-func createSlice(tCtx ktesting.TContext, slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
-	tCtx.Helper()
-	slice, err := tCtx.Client().ResourceV1().ResourceSlices().Create(tCtx, slice, metav1.CreateOptions{})
-	tCtx.ExpectNoError(err, "create ResourceSlice")
-	tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
-		tCtx.Log("Cleaning up ResourceSlice...")
-		err := tCtx.Client().ResourceV1().ResourceSlices().Delete(tCtx, slice.Name, metav1.DeleteOptions{})
-		tCtx.ExpectNoError(err, "delete ResourceSlice")
-	})
-	return slice
-}
-
-// createTestClass creates a DeviceClass with a driver name derived from the test namespace
-func createTestClass(tCtx ktesting.TContext, namespace string) (*resourceapi.DeviceClass, string) {
-	tCtx.Helper()
-	driverName := namespace + ".driver"
-	class := class.DeepCopy()
-	class.Name = namespace + ".class"
-	class.Spec.Selectors = []resourceapi.DeviceSelector{{
-		CEL: &resourceapi.CELDeviceSelector{
-			Expression: fmt.Sprintf("device.driver == %q", driverName),
-		},
-	}}
-	_, err := tCtx.Client().ResourceV1().DeviceClasses().Create(tCtx, class, metav1.CreateOptions{})
-	tCtx.ExpectNoError(err, "create class")
-	tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
-		tCtx.Log("Cleaning up DeviceClass...")
-		err := tCtx.Client().ResourceV1().DeviceClasses().Delete(tCtx, class.Name, metav1.DeleteOptions{})
-		tCtx.ExpectNoError(err, "delete class")
-	})
-
-	return class, driverName
-}
-
-// createClaim creates a claim and in the namespace.
-// The class must already exist and is used for all requests.
-func createClaim(tCtx ktesting.TContext, namespace string, suffix string, class *resourceapi.DeviceClass, claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
-	tCtx.Helper()
-	claim = claim.DeepCopy()
-	claim.Namespace = namespace
-	claim.Name += suffix
-	claimName := claim.Name
-	for i := range claim.Spec.Devices.Requests {
-		request := &claim.Spec.Devices.Requests[i]
-		if request.Exactly != nil && request.Exactly.DeviceClassName != "" {
-			request.Exactly.DeviceClassName = class.Name
-			continue
-		}
-		for e := range request.FirstAvailable {
-			subRequest := &request.FirstAvailable[e]
-			subRequest.DeviceClassName = class.Name
-		}
-	}
-	claim, err := tCtx.Client().ResourceV1().ResourceClaims(namespace).Create(tCtx, claim, metav1.CreateOptions{})
-	tCtx.ExpectNoError(err, "create claim "+claimName)
-	return claim
-}
-
-// createPod create a pod in the namespace, referencing the given claim.
-func createPod(tCtx ktesting.TContext, namespace string, suffix string, claim *resourceapi.ResourceClaim, pod *v1.Pod) *v1.Pod {
-	tCtx.Helper()
-	pod = pod.DeepCopy()
-	pod.Name += suffix
-	podName := pod.Name
-	pod.Namespace = namespace
-	pod.Spec.ResourceClaims[0].ResourceClaimName = &claim.Name
-	pod, err := tCtx.Client().CoreV1().Pods(namespace).Create(tCtx, pod, metav1.CreateOptions{})
-	tCtx.ExpectNoError(err, "create pod "+podName)
-	tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
-		tCtx.Log("Cleaning up Pod...")
-		err := tCtx.Client().CoreV1().Pods(namespace).Delete(tCtx, pod.Name, metav1.DeleteOptions{})
-		tCtx.ExpectNoError(err, "delete Pod")
-	})
-	return pod
-}
 
 func TestDRA(t *testing.T) {
 	// Each sub-test brings up the API server in a certain
@@ -375,7 +274,7 @@ func createNodes(tCtx ktesting.TContext) {
 				Name: fmt.Sprintf("worker-%d", i),
 			},
 		}
-		node, err := tCtx.Client().CoreV1().Nodes().Create(tCtx, node, metav1.CreateOptions{})
+		node, err := tCtx.Client().CoreV1().Nodes().Create(tCtx, node, metav1.CreateOptions{FieldValidation: "Strict"})
 		tCtx.ExpectNoError(err, fmt.Sprintf("creating node #%d", i))
 
 		// Make the node ready.
@@ -523,7 +422,7 @@ func testPod(tCtx ktesting.TContext, draEnabled bool) {
 	namespace := createTestNamespace(tCtx, nil)
 	podWithClaimName := podWithClaimName.DeepCopy()
 	podWithClaimName.Namespace = namespace
-	pod, err := tCtx.Client().CoreV1().Pods(namespace).Create(tCtx, podWithClaimName, metav1.CreateOptions{})
+	pod, err := tCtx.Client().CoreV1().Pods(namespace).Create(tCtx, podWithClaimName, metav1.CreateOptions{FieldValidation: "Strict"})
 	tCtx.ExpectNoError(err, "create pod")
 	if draEnabled {
 		assert.NotEmpty(tCtx, pod.Spec.ResourceClaims, "should store resource claims in pod spec")
@@ -535,7 +434,7 @@ func testPod(tCtx ktesting.TContext, draEnabled bool) {
 // testAPIDisabled checks that the resource.k8s.io API is disabled.
 func testAPIDisabled(tCtx ktesting.TContext) {
 	tCtx.Parallel()
-	_, err := tCtx.Client().ResourceV1().ResourceClaims(claim.Namespace).Create(tCtx, claim, metav1.CreateOptions{})
+	_, err := tCtx.Client().ResourceV1().ResourceClaims(claim.Namespace).Create(tCtx, claim, metav1.CreateOptions{FieldValidation: "Strict"})
 	if !apierrors.IsNotFound(err) {
 		tCtx.Fatalf("expected 'resource not found' error, got %v", err)
 	}
@@ -547,7 +446,7 @@ func testConvert(tCtx ktesting.TContext) {
 	namespace := createTestNamespace(tCtx, nil)
 	claim := claim.DeepCopy()
 	claim.Namespace = namespace
-	claim, err := tCtx.Client().ResourceV1().ResourceClaims(namespace).Create(tCtx, claim, metav1.CreateOptions{})
+	claim, err := tCtx.Client().ResourceV1().ResourceClaims(namespace).Create(tCtx, claim, metav1.CreateOptions{FieldValidation: "Strict"})
 	tCtx.ExpectNoError(err, "create claim")
 	claimBeta2, err := tCtx.Client().ResourceV1beta2().ResourceClaims(namespace).Get(tCtx, claim.Name, metav1.GetOptions{})
 	tCtx.ExpectNoError(err, "get claim")
@@ -565,7 +464,7 @@ func testAdminAccess(tCtx ktesting.TContext, adminAccessEnabled bool) {
 	claim1.Namespace = namespace
 	claim1.Spec.Devices.Requests[0].Exactly.AdminAccess = ptr.To(true)
 	// create claim with AdminAccess in non-admin namespace
-	_, err := tCtx.Client().ResourceV1().ResourceClaims(namespace).Create(tCtx, claim1, metav1.CreateOptions{})
+	_, err := tCtx.Client().ResourceV1().ResourceClaims(namespace).Create(tCtx, claim1, metav1.CreateOptions{FieldValidation: "Strict"})
 	if adminAccessEnabled {
 		if err != nil {
 			// should result in validation error
@@ -581,7 +480,7 @@ func testAdminAccess(tCtx ktesting.TContext, adminAccessEnabled bool) {
 		claim2.Namespace = adminNS
 		claim2.Name = "claim2"
 		claim2.Spec.Devices.Requests[0].Exactly.AdminAccess = ptr.To(true)
-		claim2, err := tCtx.Client().ResourceV1().ResourceClaims(adminNS).Create(tCtx, claim2, metav1.CreateOptions{})
+		claim2, err := tCtx.Client().ResourceV1().ResourceClaims(adminNS).Create(tCtx, claim2, metav1.CreateOptions{FieldValidation: "Strict"})
 		tCtx.ExpectNoError(err, "create claim")
 		if !ptr.Deref(claim2.Spec.Devices.Requests[0].Exactly.AdminAccess, true) {
 			tCtx.Fatalf("should store AdminAccess in ResourceClaim %v", claim2)
@@ -705,7 +604,7 @@ func testPrioritizedList(tCtx ktesting.TContext, enabled bool) {
 
 func testExtendedResource(tCtx ktesting.TContext, enabled bool) {
 	tCtx.Parallel()
-	c, err := tCtx.Client().ResourceV1().DeviceClasses().Create(tCtx, classWithExtendedResource, metav1.CreateOptions{})
+	c, err := tCtx.Client().ResourceV1().DeviceClasses().Create(tCtx, classWithExtendedResource, metav1.CreateOptions{FieldValidation: "Strict"})
 	tCtx.ExpectNoError(err, "create class")
 	if enabled {
 		require.NotEmpty(tCtx, c.Spec.ExtendedResourceName, "should store ExtendedResourceName")
@@ -716,7 +615,7 @@ func testExtendedResource(tCtx ktesting.TContext, enabled bool) {
 
 		pod := podWithExtendedResource.DeepCopy()
 		pod.Namespace = namespace
-		_, err := tCtx.Client().CoreV1().Pods(namespace).Create(tCtx, pod, metav1.CreateOptions{})
+		_, err := tCtx.Client().CoreV1().Pods(namespace).Create(tCtx, pod, metav1.CreateOptions{FieldValidation: "Strict"})
 		tCtx.ExpectNoError(err, "create pod")
 		schedulingAttempted := gomega.HaveField("Status.Conditions", gomega.ContainElement(
 			gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
@@ -1094,7 +993,7 @@ func testResourceClaimDeviceStatus(tCtx ktesting.TContext, enabled bool) {
 		},
 	}
 
-	claim, err := tCtx.Client().ResourceV1().ResourceClaims(namespace).Create(tCtx, claim, metav1.CreateOptions{})
+	claim, err := tCtx.Client().ResourceV1().ResourceClaims(namespace).Create(tCtx, claim, metav1.CreateOptions{FieldValidation: "Strict"})
 	tCtx.ExpectNoError(err, "create ResourceClaim")
 
 	deviceStatus := []resourceapi.AllocatedDeviceStatus{{
@@ -1247,8 +1146,7 @@ func testResourceClaimDeviceStatus(tCtx ktesting.TContext, enabled bool) {
 // and prints some information about it.
 func testMaxResourceSlice(tCtx ktesting.TContext) {
 	slice := NewMaxResourceSlice()
-	createdSlice, err := tCtx.Client().ResourceV1().ResourceSlices().Create(tCtx, slice, metav1.CreateOptions{})
-	tCtx.ExpectNoError(err)
+	createdSlice := createSlice(tCtx, slice)
 	totalSize := createdSlice.Size()
 	var managedFieldsSize int
 	for _, f := range createdSlice.ManagedFields {
@@ -1323,7 +1221,7 @@ func testControllerManagerMetrics(tCtx ktesting.TContext) {
 		},
 	}
 
-	_, err := tCtx.Client().ResourceV1().ResourceClaimTemplates(namespace).Create(tCtx, template1, metav1.CreateOptions{})
+	_, err := tCtx.Client().ResourceV1().ResourceClaimTemplates(namespace).Create(tCtx, template1, metav1.CreateOptions{FieldValidation: "Strict"})
 	tCtx.ExpectNoError(err, "create ResourceClaimTemplate without admin access")
 
 	pod1 := &v1.Pod{
@@ -1343,7 +1241,7 @@ func testControllerManagerMetrics(tCtx ktesting.TContext) {
 		},
 	}
 
-	_, err = tCtx.Client().CoreV1().Pods(namespace).Create(tCtx, pod1, metav1.CreateOptions{})
+	_, err = tCtx.Client().CoreV1().Pods(namespace).Create(tCtx, pod1, metav1.CreateOptions{FieldValidation: "Strict"})
 	tCtx.ExpectNoError(err, "create Pod with ResourceClaimTemplate without admin access")
 
 	time.Sleep(200 * time.Millisecond)
@@ -1377,7 +1275,7 @@ func testControllerManagerMetrics(tCtx ktesting.TContext) {
 		},
 	}
 
-	_, err = tCtx.Client().ResourceV1().ResourceClaimTemplates(adminNS).Create(tCtx, template2, metav1.CreateOptions{})
+	_, err = tCtx.Client().ResourceV1().ResourceClaimTemplates(adminNS).Create(tCtx, template2, metav1.CreateOptions{FieldValidation: "Strict"})
 	tCtx.ExpectNoError(err, "create ResourceClaimTemplate with admin access")
 
 	pod2 := &v1.Pod{
@@ -1397,7 +1295,7 @@ func testControllerManagerMetrics(tCtx ktesting.TContext) {
 		},
 	}
 
-	_, err = tCtx.Client().CoreV1().Pods(adminNS).Create(tCtx, pod2, metav1.CreateOptions{})
+	_, err = tCtx.Client().CoreV1().Pods(adminNS).Create(tCtx, pod2, metav1.CreateOptions{FieldValidation: "Strict"})
 	tCtx.ExpectNoError(err, "create Pod with ResourceClaimTemplate with admin access in admin namespace")
 
 	time.Sleep(200 * time.Millisecond)
@@ -1428,7 +1326,7 @@ func testControllerManagerMetrics(tCtx ktesting.TContext) {
 		},
 	}
 
-	_, err = tCtx.Client().ResourceV1().ResourceClaimTemplates(namespace).Create(tCtx, invalidTemplate, metav1.CreateOptions{})
+	_, err = tCtx.Client().ResourceV1().ResourceClaimTemplates(namespace).Create(tCtx, invalidTemplate, metav1.CreateOptions{FieldValidation: "Strict"})
 	require.Error(tCtx, err, "should fail to create ResourceClaimTemplate with AdminAccess in non-admin namespace")
 	require.ErrorContains(tCtx, err, "admin access to devices requires the `resource.kubernetes.io/admin-access: true` label on the containing namespace")
 
@@ -1452,7 +1350,7 @@ func testControllerManagerMetrics(tCtx ktesting.TContext) {
 		},
 	}
 
-	_, err = tCtx.Client().ResourceV1().ResourceClaimTemplates(namespace).Create(tCtx, template4, metav1.CreateOptions{})
+	_, err = tCtx.Client().ResourceV1().ResourceClaimTemplates(namespace).Create(tCtx, template4, metav1.CreateOptions{FieldValidation: "Strict"})
 	tCtx.ExpectNoError(err, "create second ResourceClaimTemplate without admin access")
 
 	pod4 := &v1.Pod{
@@ -1472,7 +1370,7 @@ func testControllerManagerMetrics(tCtx ktesting.TContext) {
 		},
 	}
 
-	_, err = tCtx.Client().CoreV1().Pods(namespace).Create(tCtx, pod4, metav1.CreateOptions{})
+	_, err = tCtx.Client().CoreV1().Pods(namespace).Create(tCtx, pod4, metav1.CreateOptions{FieldValidation: "Strict"})
 	tCtx.ExpectNoError(err, "create second Pod with ResourceClaimTemplate without admin access")
 
 	time.Sleep(200 * time.Millisecond)
@@ -1529,7 +1427,7 @@ func testDeviceBindingConditions(tCtx ktesting.TContext, enabled bool) {
 			},
 		},
 	}
-	slice, err := tCtx.Client().ResourceV1().ResourceSlices().Create(tCtx, slice, metav1.CreateOptions{})
+	slice, err := tCtx.Client().ResourceV1().ResourceSlices().Create(tCtx, slice, metav1.CreateOptions{FieldValidation: "Strict"})
 	tCtx.ExpectNoError(err, "create slice")
 
 	haveBindingConditionFields := len(slice.Spec.Devices[0].BindingConditions) > 0 || len(slice.Spec.Devices[0].BindingFailureConditions) > 0
@@ -1561,7 +1459,7 @@ func testDeviceBindingConditions(tCtx ktesting.TContext, enabled bool) {
 			},
 		},
 	}
-	_, err = tCtx.Client().ResourceV1().ResourceSlices().Create(tCtx, sliceWithoutBinding, metav1.CreateOptions{})
+	_, err = tCtx.Client().ResourceV1().ResourceSlices().Create(tCtx, sliceWithoutBinding, metav1.CreateOptions{FieldValidation: "Strict"})
 	tCtx.ExpectNoError(err, "create slice without binding conditions")
 
 	// Schedule first pod and wait for the scheduler to reach the binding phase, which marks the claim as allocated.
@@ -1590,8 +1488,7 @@ func testDeviceBindingConditions(tCtx ktesting.TContext, enabled bool) {
 		)),
 	}))), "first allocated claim")
 
-	err = waitForPodScheduled(tCtx, tCtx.Client(), namespace, pod.Name)
-	tCtx.ExpectNoError(err, "first pod scheduled")
+	waitForPodScheduled(tCtx, namespace, pod.Name)
 
 	// Second pod should get the device with binding conditions.
 	claim2 := createClaim(tCtx, namespace, "-b", class, claim)
@@ -1684,27 +1581,5 @@ func testDeviceBindingConditions(tCtx ktesting.TContext, enabled bool) {
 		return err
 	})
 	tCtx.ExpectNoError(err, "add binding condition to second claim")
-	err = waitForPodScheduled(tCtx, tCtx.Client(), namespace, pod.Name)
-	tCtx.ExpectNoError(err, "second pod scheduled")
-}
-
-func waitForPodScheduled(ctx context.Context, client kubernetes.Interface, namespace, podName string) error {
-	timeout := time.After(60 * time.Second)
-	tick := time.Tick(1 * time.Second)
-	for {
-		select {
-		case <-timeout:
-			return fmt.Errorf("timed out waiting for pod %s/%s to be scheduled", namespace, podName)
-		case <-tick:
-			pod, err := client.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
-			if err != nil {
-				continue
-			}
-			for _, cond := range pod.Status.Conditions {
-				if cond.Type == v1.PodScheduled && cond.Status == v1.ConditionTrue {
-					return nil
-				}
-			}
-		}
-	}
+	waitForPodScheduled(tCtx, namespace, pod.Name)
 }
