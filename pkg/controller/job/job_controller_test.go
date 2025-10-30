@@ -3019,6 +3019,51 @@ func TestSyncJobWhenManagedBy(t *testing.T) {
 				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
 			},
 		},
+		"job without the managedBy; feature enabled; the status is updated on suspend": {
+			enableJobManagedBy: true,
+			job: func() batch.Job {
+				job := baseJob.DeepCopy()
+				job.Spec.Suspend = ptr.To(true)
+				return *job
+			}(),
+			wantStatus: batch.JobStatus{
+				Active:                  0,
+				Ready:                   ptr.To[int32](0),
+				Terminating:             ptr.To[int32](0),
+				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
+				Conditions: []batch.JobCondition{
+					{
+						Type:    batch.JobSuspended,
+						Status:  v1.ConditionTrue,
+						Reason:  "JobSuspended",
+						Message: "Job suspended",
+					},
+				},
+			},
+		},
+		"job without the managedBy; feature disabled; the status is updated on suspend": {
+			enableJobManagedBy: false,
+			job: func() batch.Job {
+				job := baseJob.DeepCopy()
+				job.Spec.Suspend = ptr.To(true)
+				return *job
+			}(),
+			wantStatus: batch.JobStatus{
+				Active:                  0,
+				Ready:                   ptr.To[int32](0),
+				StartTime:               &now,
+				Terminating:             ptr.To[int32](0),
+				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
+				Conditions: []batch.JobCondition{
+					{
+						Type:    batch.JobSuspended,
+						Status:  v1.ConditionTrue,
+						Reason:  "JobSuspended",
+						Message: "Job suspended",
+					},
+				},
+			},
+		},
 	}
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
@@ -3044,8 +3089,7 @@ func TestSyncJobWhenManagedBy(t *testing.T) {
 			if err := manager.syncJob(ctx, testutil.GetKey(job, t)); err != nil {
 				t.Fatalf("error %v while reconciling the job %v", err, testutil.GetKey(job, t))
 			}
-
-			if diff := cmp.Diff(tc.wantStatus, actual.Status); diff != "" {
+			if diff := cmp.Diff(tc.wantStatus, actual.Status, cmpopts.IgnoreFields(batch.JobCondition{}, "LastProbeTime", "LastTransitionTime")); diff != "" {
 				t.Errorf("Unexpected job status (-want,+got):\n%s", diff)
 			}
 		})

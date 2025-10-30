@@ -1040,6 +1040,14 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 				if isUpdated {
 					suspendCondChanged = true
 					jm.recorder.Event(&job, v1.EventTypeNormal, "Suspended", "Job suspended")
+					if feature.DefaultFeatureGate.Enabled(features.JobManagedBy) {
+						// Suspended Jobs should reset the StartTime to allow mutating
+						// the template while suspended, and to avoid resetting the startTime
+						// while suspended. It also allows to avoid overriding startTime
+						// on resume, except for the case when resume is immediately after
+						// after suspend.
+						job.Status.StartTime = nil
+					}
 				}
 			} else {
 				// Job not suspended.
