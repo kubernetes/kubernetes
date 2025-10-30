@@ -65,7 +65,6 @@ type PreferencesHandler interface {
 type Preferences struct {
 	getPreferencesFunc func(kuberc string, errOut io.Writer) (*config.Preference, error) // DefaultGetPreferences
 	aliases            map[string]struct{}
-	pluginPolicy       clientcmdapi.PluginPolicy
 }
 
 var _ PreferencesHandler = &Preferences{}
@@ -75,7 +74,6 @@ func NewPreferences() PreferencesHandler {
 	return &Preferences{
 		getPreferencesFunc: DefaultGetPreferences,
 		aliases:            make(map[string]struct{}),
-		pluginPolicy:       clientcmdapi.PluginPolicy{},
 	}
 }
 
@@ -136,11 +134,10 @@ func (p *Preferences) Apply(rootCmd *cobra.Command, kubeConfigFlags *genericclio
 // prevent excessive coupling, logic to handle those values is further down the
 // stack.
 func (p *Preferences) applyPluginPolicy(kubeConfigFlags *genericclioptions.ConfigFlags, kuberc *config.Preference) {
-	p.pluginPolicy.PolicyType = kuberc.CredentialPluginPolicy
-	if kuberc.CredentialPluginAllowlist != nil {
-		p.pluginPolicy.Allowlist = kuberc.CredentialPluginAllowlist
+	policy := clientcmdapi.PluginPolicy{
+		PolicyType: kuberc.CredentialPluginPolicy,
+		Allowlist:  kuberc.CredentialPluginAllowlist,
 	}
-
 	existingWrapConfigFn := noop
 	if kubeConfigFlags.WrapConfigFn != nil {
 		existingWrapConfigFn = kubeConfigFlags.WrapConfigFn
@@ -150,7 +147,7 @@ func (p *Preferences) applyPluginPolicy(kubeConfigFlags *genericclioptions.Confi
 		PluginPolicyWrapper = func(c *rest.Config) *rest.Config {
 			cfg := existingWrapConfigFn(c)
 			if cfg.ExecProvider != nil {
-				cfg.ExecProvider.PluginPolicy = p.pluginPolicy
+				cfg.ExecProvider.PluginPolicy = policy
 			}
 
 			return cfg
