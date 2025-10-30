@@ -73,6 +73,7 @@ type Preference struct {
 	// credential plugins may run. If the policy is Allowlist, only those
 	// plugins meeting the criteria specified in the `credentialPluginAllowlist`
 	// field may run.
+	// +optional
 	CredentialPluginPolicy clientcmdapi.PolicyType
 
 	// Allowlist is a slice of allowlist entries. If any of them is a match,
@@ -87,6 +88,7 @@ type Preference struct {
 	// In the above example, the user allows the credential plugins
 	// `cloud-provider-plugin` (found somewhere in PATH), and the plugin found
 	// at the explicit path `/usr/local/bin/my-plugin`.
+	// +optional
 	CredentialPluginAllowlist []clientcmdapi.AllowlistEntry
 }
 
