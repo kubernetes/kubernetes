@@ -28,3 +28,9 @@ type NodeIdentifier interface {
 	// isNode is true if the user.Info represents an identity issued to a node.
 	NodeIdentity(user.Info) (nodeName string, isNode bool)
 }
+
+// NodeAssociater determines node information from a given user.
+// This can be a node identity or a node-associated credential like a service account bound to a node or pod.
+type NodeAssociater interface {
+	AssociatedNode(user.Info) (nodeName string, isAssociatedNode bool)
+}
