@@ -18,6 +18,7 @@ package core
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -31,6 +32,7 @@ import (
 	"k8s.io/apiserver/pkg/quota/v1/generic"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corev1listers "k8s.io/client-go/listers/core/v1"
+	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/dynamic-resource-allocation/deviceclass/cache"
 	resourceinternal "k8s.io/kubernetes/pkg/apis/resource"
 	resourceversioned "k8s.io/kubernetes/pkg/apis/resource/v1"
@@ -219,32 +221,38 @@ func (p *claimEvaluator) verifyOwner(claim *resourceapi.ResourceClaim) ([]reques
 		return nil, false
 	}
 	reqs := make([]requestQuantity, 0)
-	maxResourceInitContainer := make(map[corev1.ResourceName]resource.Quantity)
-	for _, c := range pod.Spec.InitContainers {
+	sumResourceContainer := make(map[corev1.ResourceName]resource.Quantity)
+	containers := slices.Clone(pod.Spec.InitContainers)
+	containers = append(containers, pod.Spec.Containers...)
+	for i, c := range containers {
 		for r, q := range c.Resources.Requests {
 			if schedutil.IsDRAExtendedResourceName(r) {
-				if c.RestartPolicy != nil && *c.RestartPolicy == corev1.ContainerRestartPolicyAlways {
-					reqs = append(reqs, requestQuantity{name: extendedResourceToQuotaRequestResource(string(r)), quantity: q})
+				isInit := i < len(pod.Spec.InitContainers)
+				isSidecar := c.RestartPolicy != nil && *c.RestartPolicy == corev1.ContainerRestartPolicyAlways
+				if isInit && !isSidecar {
+					var rq resource.Quantity
+					sumResourceContainer[r] = rq
 					continue
 				}
-				maxq, ok := maxResourceInitContainer[r]
+				reqs = append(reqs, requestQuantity{name: extendedResourceToQuotaRequestResource(string(r)), quantity: q})
+				sumQ, ok := sumResourceContainer[r]
 				if !ok {
-					maxResourceInitContainer[r] = q
+					sumResourceContainer[r] = q
 					continue
 				}
-				if maxq.Cmp(q) < 0 {
-					maxResourceInitContainer[r] = q
-				}
+				sumQ.Add(q)
+				sumResourceContainer[r] = sumQ
 			}
 		}
 	}
-	for r, q := range maxResourceInitContainer {
-		reqs = append(reqs, requestQuantity{name: extendedResourceToQuotaRequestResource(string(r)), quantity: q})
-	}
-	for _, c := range pod.Spec.Containers {
-		for r, q := range c.Resources.Requests {
-			if schedutil.IsDRAExtendedResourceName(r) {
-				reqs = append(reqs, requestQuantity{name: extendedResourceToQuotaRequestResource(string(r)), quantity: q})
+	podReqs := resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{})
+	for r, sumQ := range sumResourceContainer {
+		for r1, maxQ := range podReqs {
+			if r == r1 {
+				if maxQ.Cmp(sumQ) > 0 {
+					maxQ.Sub(sumQ)
+					reqs = append(reqs, requestQuantity{name: extendedResourceToQuotaRequestResource(string(r)), quantity: maxQ})
+				}
 			}
 		}
 	}

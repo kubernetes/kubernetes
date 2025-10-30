@@ -127,22 +127,6 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 		Devices: api.DeviceClaim{
 			Requests: []api.DeviceRequest{
 				{
-					Name: "container-0-request-0",
-					Exactly: &api.ExactDeviceRequest{
-						DeviceClassName: classGpu,
-						AllocationMode:  api.DeviceAllocationModeExactCount,
-						Count:           1,
-					},
-				},
-				{
-					Name: "container-0-request-1",
-					Exactly: &api.ExactDeviceRequest{
-						DeviceClassName: classGpu,
-						AllocationMode:  api.DeviceAllocationModeExactCount,
-						Count:           1,
-					},
-				},
-				{
 					Name: "container-1-request-0",
 					Exactly: &api.ExactDeviceRequest{
 						DeviceClassName: classGpu,
@@ -186,22 +170,6 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 	initExtendedResourceClaim := testResourceClaim("foo", "ns", true, "pod-init", api.ResourceClaimSpec{
 		Devices: api.DeviceClaim{
 			Requests: []api.DeviceRequest{
-				{
-					Name: "request-0",
-					Exactly: &api.ExactDeviceRequest{
-						DeviceClassName: classGpu,
-						AllocationMode:  api.DeviceAllocationModeExactCount,
-						Count:           1,
-					},
-				},
-				{
-					Name: "request-1",
-					Exactly: &api.ExactDeviceRequest{
-						DeviceClassName: classGpu,
-						AllocationMode:  api.DeviceAllocationModeExactCount,
-						Count:           1,
-					},
-				},
 				{
 					Name: "container-2-request-0",
 					Exactly: &api.ExactDeviceRequest{
@@ -449,9 +417,9 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 			claim:     hybridExtendedResourceClaim,
 			usage: corev1.ResourceList{
 				"count/resourceclaims.resource.k8s.io":            resource.MustParse("1"),
-				"gpu.deviceclass.resource.k8s.io/devices":         resource.MustParse("4"),
-				"requests.deviceclass.resource.kubernetes.io/gpu": resource.MustParse("2"),
-				"requests.example.com/gpu":                        resource.MustParse("2"),
+				"gpu.deviceclass.resource.k8s.io/devices":         resource.MustParse("2"),
+				"requests.deviceclass.resource.kubernetes.io/gpu": resource.MustParse("1"),
+				"requests.example.com/gpu":                        resource.MustParse("1"),
 			},
 		},
 		"ni-status-extended-resource-claim": {
@@ -469,9 +437,9 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 			claim:     initExtendedResourceClaim,
 			usage: corev1.ResourceList{
 				"count/resourceclaims.resource.k8s.io":            resource.MustParse("1"),
-				"gpu.deviceclass.resource.k8s.io/devices":         resource.MustParse("4"),
-				"requests.deviceclass.resource.kubernetes.io/gpu": resource.MustParse("2"),
-				"requests.example.com/gpu":                        resource.MustParse("2"),
+				"gpu.deviceclass.resource.k8s.io/devices":         resource.MustParse("2"),
+				"requests.deviceclass.resource.kubernetes.io/gpu": resource.MustParse("1"),
+				"requests.example.com/gpu":                        resource.MustParse("1"),
 			},
 		},
 		"simple": {
