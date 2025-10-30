@@ -1,3 +1,5 @@
+//go:build linux
+
 /*
 Copyright 2025 The Kubernetes Authors.
 
