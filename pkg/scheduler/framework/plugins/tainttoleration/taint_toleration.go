@@ -42,7 +42,7 @@ var _ fwk.PreScorePlugin = &TaintToleration{}
 var _ fwk.ScorePlugin = &TaintToleration{}
 var _ fwk.EnqueueExtensions = &TaintToleration{}
 
-const (errReason := fmt.Sprintf("node(s) had untolerated taint {%s: %s}", taint.Key, taint.Value)
+const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
 	Name = names.TaintToleration
 	// preScoreStateKey is the key in CycleState to TaintToleration pre-computed data for Scoring.
@@ -126,7 +126,8 @@ func (pl *TaintToleration) Filter(ctx context.Context, state fwk.CycleState, pod
 	}
 
 	klog.FromContext(ctx).V(4).Info("node had untolerated taints", "node", klog.KObj(node), "pod", klog.KObj(pod), "untoleratedTaint", taint)
-	return errStatus.WithReason("node(s) had untolerated taint(s)")
+	errStatus.AppendReason("node(s) had untolerated taint(s)")
+	return errStatus
 }
 
 // preScoreState computed at PreScore and used at Score.
