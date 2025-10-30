@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -49,7 +50,7 @@ var _ = SIGDescribe("Container Readiness During Termination", func() {
 		podClient = e2epod.NewPodClient(f)
 	})
 
-	framework.It("should update container readiness when containers die during pod termination", framework.WithNodeConformance(), func(ctx context.Context) {
+	f.It("should update container readiness when containers die during pod termination", f.WithNodeConformance(), framework.WithFeatureGate(features.EventedPLEG), func(ctx context.Context) {
 		ginkgo.By("Creating a pod with two containers - fast-container (no preStop) and slow-container (long preStop)")
 		podName := "test-pod-readiness-" + string(uuid.NewUUID())
 		const preStopSleepSeconds = int64(999999) // infinity constant for preStop sleep action
