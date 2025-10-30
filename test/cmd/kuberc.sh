@@ -23,74 +23,71 @@ run_kuberc_tests() {
   set -o errexit
 
   create_and_use_new_namespace
-  kube::log::status "Testing kuberc"
+  kube::log::status "Testing kubectl alpha kuberc set commands"
 
-  cat > "${TMPDIR:-/tmp}"/kuberc_file << EOF
-apiVersion: kubectl.config.k8s.io/v1beta1
-kind: Preference
-aliases:
-- name: crns
-  command: create namespace
-  appendArgs:
-   - test-kuberc-ns
-- name: getn
-  command: get
-  prependArgs:
-   - namespace
-  options:
-   - name: output
-     default: wide
-- name: crole
-  command: create role
-  options:
-  - name: verb
-    default: get,watch
-- name: getrole
-  command: get
-  options:
-  - name: output
-    default: json
-- name: runx
-  command: run
-  options:
-  - name: image
-    default: nginx
-  - name: labels
-    default: app=test,env=test
-  - name: env
-    default: DNS_DOMAIN=test
-  - name: namespace
-    default: test-kuberc-ns
-  appendArgs:
-  - test-pod-2
-  - --
-  - custom-arg1
-  - custom-arg2
-- name: setx
-  command: set image
-  appendArgs:
-  - pod/test-pod-2
-  - test-pod-2=busybox
-defaults:
-- command: apply
-  options:
-  - name: server-side
-    default: "true"
-  - name: dry-run
-    default: "server"
-  - name: validate
-    default: "strict"
-- command: delete
-  options:
-  - name: interactive
-    default: "true"
-- command: get
-  options:
-  - name: namespace
-    default: "test-kuberc-ns"
-  - name: output
-    default: "json"
-EOF
+  # Build up the kuberc file using kubectl alpha kuberc set commands
+  kubectl alpha kuberc set --file="${TMPDIR:-/tmp}"/kuberc_file --section=defaults --command=apply --option=server-side=true --option=dry-run=server --option=validate=strict
+  kubectl alpha kuberc set --file="${TMPDIR:-/tmp}"/kuberc_file --section=defaults --command=delete --option=interactive=true
+  kubectl alpha kuberc set --file="${TMPDIR:-/tmp}"/kuberc_file --section=defaults --command=get --option=namespace=test-kuberc-ns --option=output=json
+
+  kubectl alpha kuberc set --file="${TMPDIR:-/tmp}"/kuberc_file --section=aliases --name=crns --command="create namespace" --appendarg=test-kuberc-ns
+  kubectl alpha kuberc set --file="${TMPDIR:-/tmp}"/kuberc_file --section=aliases --name=getn --command=get --prependarg=namespace --option=output=wide
+  kubectl alpha kuberc set --file="${TMPDIR:-/tmp}"/kuberc_file --section=aliases --name=crole --command="create role" --option=verb=get,watch
+  kubectl alpha kuberc set --file="${TMPDIR:-/tmp}"/kuberc_file --section=aliases --name=getrole --command=get --option=output=json
+  kubectl alpha kuberc set --file="${TMPDIR:-/tmp}"/kuberc_file --section=aliases --name=runx --command=run --option=image=nginx --option=labels=app=test,env=test --option=env=DNS_DOMAIN=test --option=namespace=test-kuberc-ns --appendarg=test-pod-2 --appendarg=-- --appendarg=custom-arg1 --appendarg=custom-arg2
+  kubectl alpha kuberc set --file="${TMPDIR:-/tmp}"/kuberc_file --section=aliases --name=setx --command="set image" --appendarg=pod/test-pod-2 --appendarg=test-pod-2=busybox
+
+  kube::log::status "Testing kubectl alpha kuberc view commands"
+  # Test: kubectl alpha kuberc view
+  output_message=$(kubectl alpha kuberc view --kuberc="${TMPDIR:-/tmp}"/kuberc_file)
+  kube::test::if_has_string "${output_message}" "apiVersion: kubectl.config.k8s.io/v1beta1"
+  kube::test::if_has_string "${output_message}" "kind: Preference"
+  kube::test::if_has_string "${output_message}" "command: apply"
+  kube::test::if_has_string "${output_message}" "name: runx"
+  kube::test::if_has_string "${output_message}" "server-side"
+  kube::test::if_has_string "${output_message}" "interactive"
+
+  # Test: kubectl alpha kuberc view with json output
+  output_message=$(kubectl alpha kuberc view --kuberc="${TMPDIR:-/tmp}"/kuberc_file -o json)
+  kube::test::if_has_string "${output_message}" "\"apiVersion\": \"kubectl.config.k8s.io/v1beta1\""
+  kube::test::if_has_string "${output_message}" "\"kind\": \"Preference\""
+
+  # Test: Attempt to set existing default without --overwrite flag should fail
+  output_message=$(! kubectl alpha kuberc set --file="${TMPDIR:-/tmp}"/kuberc_file --section=defaults --command=get --option=output=yaml 2>&1)
+  kube::test::if_has_string "${output_message}" "defaults for command \"get\" already exist, use --overwrite to replace"
+
+  # Test: Now set with --overwrite flag should succeed and merge options
+  kubectl alpha kuberc set --file="${TMPDIR:-/tmp}"/kuberc_file --section=defaults --command=get --option=output=yaml --overwrite
+  output_message=$(kubectl alpha kuberc view --kuberc="${TMPDIR:-/tmp}"/kuberc_file)
+  kube::test::if_has_string "${output_message}" "default: yaml"
+  # Should still have namespace option from before
+  kube::test::if_has_string "${output_message}" "default: test-kuberc-ns"
+
+  # Test: Attempt to set existing alias without --overwrite flag should fail
+  output_message=$(! kubectl alpha kuberc set --file="${TMPDIR:-/tmp}"/kuberc_file --section=aliases --name=getn --command=get --prependarg=pods 2>&1)
+  kube::test::if_has_string "${output_message}" "alias \"getn\" already exists, use --overwrite to replace"
+
+  # Test: Error cases - Missing required flags
+  output_message=$(! kubectl alpha kuberc set --file="${TMPDIR:-/tmp}"/kuberc_file --command=get --option=output=wide 2>&1)
+  kube::test::if_has_string "${output_message}" "required flag(s) \"section\" not set"
+
+  output_message=$(! kubectl alpha kuberc set --file="${TMPDIR:-/tmp}"/kuberc_file --section=defaults --option=output=wide 2>&1)
+  kube::test::if_has_string "${output_message}" "required flag(s) \"command\" not set"
+
+  # Test: KUBERC=off with view command
+  output_message=$(! KUBERC=off kubectl alpha kuberc view 2>&1)
+  kube::test::if_has_string "${output_message}" "KUBERC is disabled via KUBERC=off environment variable"
+
+  # Test: KUBERC=off with set command
+  output_message=$(! KUBERC=off kubectl alpha kuberc set --section=defaults --command=get --option=output=wide 2>&1)
+  kube::test::if_has_string "${output_message}" "KUBERC is disabled via KUBERC=off environment variable"
+
+  # Restore getn alias back to "namespace" for remaining tests
+  kubectl alpha kuberc set --file="${TMPDIR:-/tmp}"/kuberc_file --section=aliases --name=getn --command=get --prependarg=namespace --option=output=wide --overwrite
+  # Restore get defaults back to namespace=test-kuberc-ns and output=json for remaining tests
+  kubectl alpha kuberc set --file="${TMPDIR:-/tmp}"/kuberc_file --section=defaults --command=get --option=namespace=test-kuberc-ns --option=output=json --overwrite
+
+  kube::log::status "Testing kuberc aliases and defaults functionality"
 
   # Pre-condition: the test-kuberc-ns namespace does not exist
   kube::test::get_object_assert 'namespaces' "{{range.items}}{{ if eq ${id_field:?} \"test-kuberc-ns\" }}found{{end}}{{end}}:" ':'
@@ -208,6 +205,8 @@ EOF
   # assure that explicit value supersedes
   output_message=$(kubectl delete namespace/test-kuberc-ns --interactive=false --kuberc="${TMPDIR:-/tmp}"/kuberc_file)
   kube::test::if_has_string "${output_message}" 'namespace "test-kuberc-ns" deleted'
+
+  rm "${TMPDIR:-/tmp}"/kuberc_file
 
   set +o nounset
   set +o errexit
