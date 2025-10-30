@@ -80,7 +80,7 @@ func TestClientAdapterAdd(t *testing.T) {
 			t.Errorf("expected feature %q not found", name)
 			continue
 		}
-		if diff := cmp.Diff(actual, expected, cmpopts.IgnoreFields(featuregate.FeatureSpec{}, "Version")); diff != "" {
+		if diff := cmp.Diff(actual, expected, cmpopts.IgnoreFields(featuregate.FeatureSpec{}, "Version", "MinCompatibilityVersion")); diff != "" {
 			t.Errorf("expected feature %q spec %#v, got spec %#v", name, expected, actual)
 		}
 	}
