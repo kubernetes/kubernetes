@@ -46,11 +46,11 @@ import (
 	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
-	e2etestingmanifests "k8s.io/kubernetes/test/e2e/testing-manifests"
 	"k8s.io/kubernetes/test/e2e_node/criproxy"
 	"k8s.io/kubernetes/test/e2e_node/services"
 	e2enodetestingmanifests "k8s.io/kubernetes/test/e2e_node/testing-manifests"
+	e2etestfiles "k8s.io/kubernetes/testutils/testfiles"
+	e2etestingmanifests "k8s.io/kubernetes/testutils/testing-manifests"
 	system "k8s.io/system-validators/validators"
 
 	// define and freeze constants
@@ -60,8 +60,8 @@ import (
 	_ "k8s.io/kubernetes/test/e2e/framework/debug/init"
 	_ "k8s.io/kubernetes/test/e2e/framework/metrics/init"
 	_ "k8s.io/kubernetes/test/e2e/framework/node/init"
-	_ "k8s.io/kubernetes/test/utils/format"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	_ "k8s.io/kubernetes/testutils/format"
+	"k8s.io/kubernetes/testutils/ktesting"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"

@@ -31,7 +31,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/component-base/logs"
-	"k8s.io/kubernetes/test/utils/hermeticpodcertificatesigner"
+	"k8s.io/kubernetes/testutils/hermeticpodcertificatesigner"
 	"k8s.io/utils/clock"
 )
 

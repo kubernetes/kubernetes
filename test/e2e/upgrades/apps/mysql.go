@@ -38,11 +38,11 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2estatefulset "k8s.io/kubernetes/test/e2e/framework/statefulset"
-	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 	"k8s.io/kubernetes/test/e2e/upgrades"
+	e2etestfiles "k8s.io/kubernetes/testutils/testfiles"
 )
 
-const mysqlManifestPath = "test/e2e/testing-manifests/statefulset/mysql-upgrade"
+const mysqlManifestPath = "testutils/testing-manifests/statefulset/mysql-upgrade"
 
 // MySQLUpgradeTest implements an upgrade test harness that polls a replicated sql database.
 type MySQLUpgradeTest struct {

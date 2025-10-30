@@ -454,7 +454,7 @@ func (d *Driver) SetUp(nodes *Nodes, driverResources map[string]resourceslice.Dr
 	manifests := []string{
 		// The code below matches the content of this manifest (ports,
 		// container names, etc.).
-		"test/e2e/testing-manifests/dra/dra-test-driver-proxy.yaml",
+		"testutils/testing-manifests/dra/dra-test-driver-proxy.yaml",
 	}
 
 	// Create service account and corresponding RBAC rules.

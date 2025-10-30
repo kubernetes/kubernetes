@@ -38,7 +38,7 @@ import (
 	"k8s.io/client-go/util/cert"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/kubernetes/test/utils"
+	utils "k8s.io/kubernetes/testutils"
 )
 
 func TestCertRotation(t *testing.T) {

@@ -67,7 +67,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/profile"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
-	utiltesting "k8s.io/kubernetes/test/utils/ktesting"
+	utiltesting "k8s.io/kubernetes/testutils/ktesting"
 )
 
 func init() {

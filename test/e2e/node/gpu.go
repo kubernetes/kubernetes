@@ -39,7 +39,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
+	e2etestfiles "k8s.io/kubernetes/testutils/testfiles"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
@@ -357,7 +357,7 @@ func SetupNVIDIAGPUNode(ctx context.Context, f *framework.Framework) {
 	} else {
 		// Using default local DaemonSet
 		framework.Logf("Using default local nvidia-driver-installer daemonset manifest.")
-		data, err := e2etestfiles.Read("test/e2e/testing-manifests/gpu/gce/nvidia-driver-installer.yaml")
+		data, err := e2etestfiles.Read("testutils/testing-manifests/gpu/gce/nvidia-driver-installer.yaml")
 		framework.ExpectNoError(err, "failed to read local manifest for nvidia-driver-installer daemonset")
 		ds, err = e2emanifest.DaemonSetFromData(data)
 		framework.ExpectNoError(err, "failed to parse local manifest for nvidia-driver-installer daemonset")
@@ -373,7 +373,7 @@ func SetupNVIDIAGPUNode(ctx context.Context, f *framework.Framework) {
 		framework.Logf("Successfully created daemonset to install Nvidia drivers.")
 	}
 
-	data, err := e2etestfiles.Read("test/e2e/testing-manifests/gpu/gce/nvidia-gpu-device-plugin.yaml")
+	data, err := e2etestfiles.Read("testutils/testing-manifests/gpu/gce/nvidia-gpu-device-plugin.yaml")
 	framework.ExpectNoError(err, "failed to read local manifest for nvidia-gpu-device-plugin daemonset")
 	ds, err = e2emanifest.DaemonSetFromData(data)
 	framework.ExpectNoError(err, "failed to parse local manifest for nvidia-gpu-device-plugin daemonset")

@@ -23,7 +23,7 @@ import (
 
 	. "k8s.io/kubernetes/pkg/kubelet/container"
 	ctest "k8s.io/kubernetes/pkg/kubelet/container/testing"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/testutils/ktesting"
 )
 
 func comparePods(t *testing.T, expected []*ctest.FakePod, actual []*Pod) {

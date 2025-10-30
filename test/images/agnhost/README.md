@@ -217,7 +217,7 @@ guestbook app. The endpoints and their purpose are:
 Usage:
 
 ```console
-guestbook="test/e2e/testing-manifests/guestbook"
+guestbook="testutils/testing-manifests/guestbook"
 sed_expr="s|{{.AgnhostImage}}|registry.k8s.io/e2e-test-images/agnhost:2.40|"
 
 # create the services.

@@ -34,7 +34,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/internal/output"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	_ "k8s.io/kubernetes/test/utils/format" // activate YAML object dumps
+	_ "k8s.io/kubernetes/testutils/format" // activate YAML object dumps
 )
 
 // The line number of the following code is checked in TestFailureOutput below.

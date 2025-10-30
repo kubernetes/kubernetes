@@ -59,9 +59,9 @@ import (
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
-	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
-	testutils "k8s.io/kubernetes/test/utils"
-	imageutils "k8s.io/kubernetes/test/utils/image"
+	"k8s.io/kubernetes/testutils"
+	imageutils "k8s.io/kubernetes/testutils/image"
+	e2etestfiles "k8s.io/kubernetes/testutils/testfiles"
 
 	"github.com/onsi/ginkgo/v2"
 )
@@ -94,7 +94,7 @@ const (
 	defaultBackendName = "default-http-backend"
 
 	// IngressManifestPath is the parent path to yaml test manifests.
-	IngressManifestPath = "test/e2e/testing-manifests/ingress"
+	IngressManifestPath = "testutils/testing-manifests/ingress"
 
 	// GCEIngressManifestPath is the parent path to GCE-specific yaml test manifests.
 	GCEIngressManifestPath = IngressManifestPath + "/gce"

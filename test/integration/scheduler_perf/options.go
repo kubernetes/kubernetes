@@ -16,7 +16,7 @@ limitations under the License.
 
 package benchmark
 
-import "k8s.io/kubernetes/test/utils/ktesting"
+import "k8s.io/kubernetes/testutils/ktesting"
 
 type SchedulerPerfOption func(options *schedulerPerfOptions)
 

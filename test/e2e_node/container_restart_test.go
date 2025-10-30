@@ -25,7 +25,7 @@ import (
 	"time"
 
 	podv1util "k8s.io/kubernetes/pkg/api/v1/pod"
-	imageutils "k8s.io/kubernetes/test/utils/image"
+	imageutils "k8s.io/kubernetes/testutils/image"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"

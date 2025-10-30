@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/testutils/ktesting"
 )
 
 func TestPVAssumeCache(t *testing.T) {

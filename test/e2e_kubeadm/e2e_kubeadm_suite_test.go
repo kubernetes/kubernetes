@@ -33,7 +33,7 @@ import (
 	_ "k8s.io/kubernetes/test/e2e/framework/debug/init"
 	_ "k8s.io/kubernetes/test/e2e/framework/metrics/init"
 	_ "k8s.io/kubernetes/test/e2e/framework/node/init"
-	_ "k8s.io/kubernetes/test/utils/format"
+	_ "k8s.io/kubernetes/testutils/format"
 )
 
 func TestMain(m *testing.M) {
