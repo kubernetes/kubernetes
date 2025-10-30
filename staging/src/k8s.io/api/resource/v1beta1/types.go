@@ -1684,6 +1684,8 @@ type DeviceAllocationConfiguration struct {
 	//
 	// +optional
 	// +listType=atomic
+	// +k8s:listType=atomic
+	// +k8s:unique=set
 	Requests []string `json:"requests,omitempty" protobuf:"bytes,2,opt,name=requests"`
 
 	DeviceConfiguration `json:",inline" protobuf:"bytes,3,name=deviceConfiguration"`
