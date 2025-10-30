@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
@@ -52,16 +51,12 @@ const (
 
 // NewPluginManager returns a new concrete instance implementing the
 // PluginManager interface.
-func NewPluginManager(
-	sockDir string,
-	recorder record.EventRecorder) PluginManager {
+func NewPluginManager(sockDir string) PluginManager {
 	asw := cache.NewActualStateOfWorld()
 	dsw := cache.NewDesiredStateOfWorld()
 	reconciler := reconciler.NewReconciler(
 		operationexecutor.NewOperationExecutor(
-			operationexecutor.NewOperationGenerator(
-				recorder,
-			),
+			operationexecutor.NewOperationGenerator(),
 		),
 		loopSleepDuration,
 		dsw,
