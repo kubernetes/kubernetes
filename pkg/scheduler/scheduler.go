@@ -51,6 +51,7 @@ import (
 	frameworkplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodevolumelimits"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
@@ -343,6 +344,9 @@ func New(ctx context.Context,
 		}
 		draManager = dynamicresources.NewDRAManager(ctx, resourceClaimCache, resourceSliceTracker, informerFactory)
 	}
+	var sharedCSINodeLister fwk.CSINodeLister
+	sharedCSINodeLister = nodevolumelimits.NewCSINodeLister(informerFactory.Storage().V1().CSINodes().Lister())
+
 	var apiDispatcher *apidispatcher.APIDispatcher
 	if feature.DefaultFeatureGate.Enabled(features.SchedulerAsyncAPICalls) {
 		apiDispatcher = apidispatcher.New(client, int(options.parallelism), apicalls.Relevances)
@@ -361,6 +365,7 @@ func New(ctx context.Context,
 		frameworkruntime.WithMetricsRecorder(metricsRecorder),
 		frameworkruntime.WithWaitingPods(waitingPods),
 		frameworkruntime.WithAPIDispatcher(apiDispatcher),
+		frameworkruntime.WithSharedCSINodeLister(sharedCSINodeLister),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("initializing profiles: %v", err)

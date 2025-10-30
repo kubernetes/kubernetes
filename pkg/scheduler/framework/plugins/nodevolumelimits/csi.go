@@ -57,7 +57,7 @@ type InTreeToCSITranslator interface {
 
 // CSILimits is a plugin that checks node volume limits.
 type CSILimits struct {
-	csiNodeLister storagelisters.CSINodeLister
+	csiNodeLister fwk.CSINodeLister
 	pvLister      corelisters.PersistentVolumeLister
 	pvcLister     corelisters.PersistentVolumeClaimLister
 	scLister      storagelisters.StorageClassLister
@@ -550,10 +550,11 @@ func NewCSI(_ context.Context, _ runtime.Object, handle fwk.Handle, fts feature.
 	informerFactory := handle.SharedInformerFactory()
 	pvLister := informerFactory.Core().V1().PersistentVolumes().Lister()
 	pvcLister := informerFactory.Core().V1().PersistentVolumeClaims().Lister()
-	csiNodesLister := informerFactory.Storage().V1().CSINodes().Lister()
 	scLister := informerFactory.Storage().V1().StorageClasses().Lister()
 	vaLister := informerFactory.Storage().V1().VolumeAttachments().Lister()
 	csiTranslator := csitrans.New()
+
+	csiNodesLister := handle.SharedCSINodeLister()
 
 	return &CSILimits{
 		csiNodeLister:              csiNodesLister,

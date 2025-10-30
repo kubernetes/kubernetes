@@ -18,6 +18,7 @@ package framework
 
 import (
 	resourceapi "k8s.io/api/resource/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/dynamic-resource-allocation/structured"
@@ -46,6 +47,13 @@ type StorageInfoLister interface {
 type SharedLister interface {
 	NodeInfos() NodeInfoLister
 	StorageInfos() StorageInfoLister
+}
+
+type CSINodeLister interface {
+	// List returns a list of all CSINodes.
+	List() ([]*storagev1.CSINode, error)
+	// Get returns the CSINode with the given name.
+	Get(name string) (*storagev1.CSINode, error)
 }
 
 // ResourceSliceLister can be used to obtain ResourceSlices.
