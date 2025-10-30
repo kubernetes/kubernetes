@@ -27,6 +27,7 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/stretchr/testify/assert"
+	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -71,17 +72,17 @@ type testMemoryManager struct {
 	activePods                 []*v1.Pod
 }
 
-func returnPolicyByName(ctx context.Context, testCase testMemoryManager) Policy {
+func returnPolicyByName(logger klog.Logger, testCase testMemoryManager) Policy {
 	switch testCase.policyName {
 	case policyTypeMock:
 		return &mockPolicy{
 			err: fmt.Errorf("fake reg error"),
 		}
 	case PolicyTypeStatic:
-		policy, _ := NewPolicyStatic(ctx, &testCase.machineInfo, testCase.reserved, topologymanager.NewFakeManager())
+		policy, _ := NewPolicyStatic(logger, &testCase.machineInfo, testCase.reserved, topologymanager.NewFakeManager())
 		return policy
 	case policyTypeNone:
-		return NewPolicyNone(ctx)
+		return NewPolicyNone(logger)
 	}
 	return nil
 }
@@ -94,27 +95,27 @@ func (p *mockPolicy) Name() string {
 	return string(policyTypeMock)
 }
 
-func (p *mockPolicy) Start(context.Context, state.State) error {
+func (p *mockPolicy) Start(klog.Logger, state.State) error {
 	return p.err
 }
 
-func (p *mockPolicy) Allocate(context.Context, state.State, *v1.Pod, *v1.Container) error {
+func (p *mockPolicy) Allocate(klog.Logger, state.State, *v1.Pod, *v1.Container) error {
 	return p.err
 }
 
-func (p *mockPolicy) RemoveContainer(context.Context, state.State, string, string) {
+func (p *mockPolicy) RemoveContainer(klog.Logger, state.State, string, string) {
 }
 
-func (p *mockPolicy) GetTopologyHints(context.Context, state.State, *v1.Pod, *v1.Container) map[string][]topologymanager.TopologyHint {
+func (p *mockPolicy) GetTopologyHints(klog.Logger, state.State, *v1.Pod, *v1.Container) map[string][]topologymanager.TopologyHint {
 	return nil
 }
 
-func (p *mockPolicy) GetPodTopologyHints(context.Context, state.State, *v1.Pod) map[string][]topologymanager.TopologyHint {
+func (p *mockPolicy) GetPodTopologyHints(klog.Logger, state.State, *v1.Pod) map[string][]topologymanager.TopologyHint {
 	return nil
 }
 
 // GetAllocatableMemory returns the amount of allocatable memory for each NUMA node
-func (p *mockPolicy) GetAllocatableMemory(context.Context, state.State) []state.Block {
+func (p *mockPolicy) GetAllocatableMemory(state.State) []state.Block {
 	return []state.Block{}
 }
 
@@ -491,7 +492,7 @@ func TestGetSystemReservedMemory(t *testing.T) {
 }
 
 func TestRemoveStaleState(t *testing.T) {
-	logger, tCtx := ktesting.NewTestContext(t)
+	logger, _ := ktesting.NewTestContext(t)
 	machineInfo := returnMachineInfo()
 	testCases := []testMemoryManager{
 		{
@@ -903,7 +904,7 @@ func TestRemoveStaleState(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
 			mgr := &manager{
-				policy:       returnPolicyByName(tCtx, testCase),
+				policy:       returnPolicyByName(logger, testCase),
 				state:        state.NewMemoryState(logger),
 				containerMap: containermap.NewContainerMap(),
 				containerRuntime: mockRuntimeService{
@@ -931,7 +932,7 @@ func TestRemoveStaleState(t *testing.T) {
 }
 
 func TestAddContainer(t *testing.T) {
-	logger, tCtx := ktesting.NewTestContext(t)
+	logger, _ := ktesting.NewTestContext(t)
 	machineInfo := returnMachineInfo()
 	reserved := systemReservedMemory{
 		0: map[v1.ResourceName]uint64{
@@ -1396,7 +1397,7 @@ func TestAddContainer(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
 			mgr := &manager{
-				policy:       returnPolicyByName(tCtx, testCase),
+				policy:       returnPolicyByName(logger, testCase),
 				state:        state.NewMemoryState(logger),
 				containerMap: containermap.NewContainerMap(),
 				containerRuntime: mockRuntimeService{
@@ -1418,7 +1419,7 @@ func TestAddContainer(t *testing.T) {
 				t.Errorf("Memory Manager Allocate() error (%v), expected error: %v, but got: %v",
 					testCase.description, testCase.expectedAllocateError, err)
 			}
-			mgr.AddContainer(tCtx, pod, container, "fakeID")
+			mgr.AddContainer(logger, pod, container, "fakeID")
 			_, _, err = mgr.containerMap.GetContainerRef("fakeID")
 			if !reflect.DeepEqual(err, testCase.expectedAddContainerError) {
 				t.Errorf("Memory Manager AddContainer() error (%v), expected error: %v, but got: %v",
@@ -1435,7 +1436,7 @@ func TestAddContainer(t *testing.T) {
 }
 
 func TestRemoveContainer(t *testing.T) {
-	logger, tCtx := ktesting.NewTestContext(t)
+	logger, _ := ktesting.NewTestContext(t)
 	machineInfo := returnMachineInfo()
 	reserved := systemReservedMemory{
 		0: map[v1.ResourceName]uint64{
@@ -1873,7 +1874,7 @@ func TestRemoveContainer(t *testing.T) {
 			iniContainerMap.Add("fakePod1", "fakeContainer1", "fakeID1")
 			iniContainerMap.Add("fakePod1", "fakeContainer2", "fakeID2")
 			mgr := &manager{
-				policy:       returnPolicyByName(tCtx, testCase),
+				policy:       returnPolicyByName(logger, testCase),
 				state:        state.NewMemoryState(logger),
 				containerMap: iniContainerMap,
 				containerRuntime: mockRuntimeService{
@@ -1886,7 +1887,7 @@ func TestRemoveContainer(t *testing.T) {
 			mgr.state.SetMemoryAssignments(testCase.assignments)
 			mgr.state.SetMachineState(testCase.machineState)
 
-			err := mgr.RemoveContainer(tCtx, testCase.removeContainerID)
+			err := mgr.RemoveContainer(logger, testCase.removeContainerID)
 			if !reflect.DeepEqual(err, testCase.expectedError) {
 				t.Errorf("Memory Manager RemoveContainer() error (%v), expected error: %v, but got: %v",
 					testCase.description, testCase.expectedError, err)
@@ -1914,7 +1915,7 @@ func getPolicyNameForOs() policyType {
 }
 
 func TestNewManager(t *testing.T) {
-	tCtx := ktesting.Init(t)
+	logger, _ := ktesting.NewTestContext(t)
 	machineInfo := returnMachineInfo()
 	expectedReserved := systemReservedMemory{
 		0: map[v1.ResourceName]uint64{
@@ -2006,7 +2007,7 @@ func TestNewManager(t *testing.T) {
 			}
 			defer os.RemoveAll(stateFileDirectory)
 
-			mgr, err := NewManager(tCtx, string(testCase.policyName), &testCase.machineInfo, testCase.nodeAllocatableReservation, testCase.systemReservedMemory, stateFileDirectory, testCase.affinity)
+			mgr, err := NewManager(logger, string(testCase.policyName), &testCase.machineInfo, testCase.nodeAllocatableReservation, testCase.systemReservedMemory, stateFileDirectory, testCase.affinity)
 
 			if !reflect.DeepEqual(err, testCase.expectedError) {
 				t.Errorf("Could not create the Memory Manager. Expected error: '%v', but got: '%v'",
@@ -2036,7 +2037,7 @@ func TestNewManager(t *testing.T) {
 }
 
 func TestGetTopologyHints(t *testing.T) {
-	logger, tCtx := ktesting.NewTestContext(t)
+	logger, _ := ktesting.NewTestContext(t)
 	testCases := []testMemoryManager{
 		{
 			description: "Successful hint generation",
@@ -2157,7 +2158,7 @@ func TestGetTopologyHints(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
 			mgr := &manager{
-				policy:       returnPolicyByName(tCtx, testCase),
+				policy:       returnPolicyByName(logger, testCase),
 				state:        state.NewMemoryState(logger),
 				containerMap: containermap.NewContainerMap(),
 				containerRuntime: mockRuntimeService{
@@ -2182,7 +2183,7 @@ func TestGetTopologyHints(t *testing.T) {
 }
 
 func TestAllocateAndAddPodWithInitContainers(t *testing.T) {
-	logger, tCtx := ktesting.NewTestContext(t)
+	logger, _ := ktesting.NewTestContext(t)
 	testCases := []testMemoryManager{
 		{
 			description: "should remove init containers from the state file, once app container started",
@@ -2335,7 +2336,7 @@ func TestAllocateAndAddPodWithInitContainers(t *testing.T) {
 		t.Run(testCase.description, func(t *testing.T) {
 			logger.Info("TestAllocateAndAddPodWithInitContainers", "name", testCase.description)
 			mgr := &manager{
-				policy:       returnPolicyByName(tCtx, testCase),
+				policy:       returnPolicyByName(logger, testCase),
 				state:        state.NewMemoryState(logger),
 				containerMap: containermap.NewContainerMap(),
 				containerRuntime: mockRuntimeService{
@@ -2366,12 +2367,12 @@ func TestAllocateAndAddPodWithInitContainers(t *testing.T) {
 
 			// Calls AddContainer for init containers
 			for i, initContainer := range testCase.podAllocate.Spec.InitContainers {
-				mgr.AddContainer(tCtx, testCase.podAllocate, &testCase.podAllocate.Spec.InitContainers[i], initContainer.Name)
+				mgr.AddContainer(logger, testCase.podAllocate, &testCase.podAllocate.Spec.InitContainers[i], initContainer.Name)
 			}
 
 			// Calls AddContainer for apps containers
 			for i, appContainer := range testCase.podAllocate.Spec.Containers {
-				mgr.AddContainer(tCtx, testCase.podAllocate, &testCase.podAllocate.Spec.Containers[i], appContainer.Name)
+				mgr.AddContainer(logger, testCase.podAllocate, &testCase.podAllocate.Spec.Containers[i], appContainer.Name)
 			}
 
 			assignments := mgr.state.GetMemoryAssignments()

@@ -56,20 +56,16 @@ func BenchmarkReplaceRegistryInImageURL(b *testing.B) {
 		}, {
 			in:  "registry.k8s.io/build-image/test:latest",
 			out: "test.io/build/test:latest",
-		}, {
-			in:  "gcr.io/authenticated-image-pulling/test:latest",
-			out: "test.io/gcAuth/test:latest",
 		},
 	}
 	reg := RegistryList{
-		DockerLibraryRegistry:   "test.io/library",
-		GcRegistry:              "test.io",
-		PrivateRegistry:         "test.io/k8s-authenticated-test",
-		SigStorageRegistry:      "test.io/sig-storage",
-		InvalidRegistry:         "test.io/invalid",
-		PromoterE2eRegistry:     "test.io/promoter",
-		BuildImageRegistry:      "test.io/build",
-		GcAuthenticatedRegistry: "test.io/gcAuth",
+		DockerLibraryRegistry: "test.io/library",
+		GcRegistry:            "test.io",
+		PrivateRegistry:       "test.io/k8s-authenticated-test",
+		SigStorageRegistry:    "test.io/sig-storage",
+		InvalidRegistry:       "test.io/invalid",
+		PromoterE2eRegistry:   "test.io/promoter",
+		BuildImageRegistry:    "test.io/build",
 	}
 	for i := 0; i < b.N; i++ {
 		tt := registryTests[i%len(registryTests)]
@@ -114,9 +110,6 @@ func TestReplaceRegistryInImageURL(t *testing.T) {
 			in:  "registry.k8s.io/build-image/test:latest",
 			out: "test.io/build/test:latest",
 		}, {
-			in:  "gcr.io/authenticated-image-pulling/test:latest",
-			out: "test.io/gcAuth/test:latest",
-		}, {
 			in:        "unknwon.io/google-samples/test:latest",
 			expectErr: fmt.Errorf("Registry: unknwon.io/google-samples is missing in test/utils/image/manifest.go, please add the registry, otherwise the test will fail on air-gapped clusters"),
 		},
@@ -124,14 +117,13 @@ func TestReplaceRegistryInImageURL(t *testing.T) {
 
 	// Set custom registries
 	reg := RegistryList{
-		DockerLibraryRegistry:   "test.io/library",
-		GcRegistry:              "test.io",
-		PrivateRegistry:         "test.io/k8s-authenticated-test",
-		SigStorageRegistry:      "test.io/sig-storage",
-		InvalidRegistry:         "test.io/invalid",
-		PromoterE2eRegistry:     "test.io/promoter",
-		BuildImageRegistry:      "test.io/build",
-		GcAuthenticatedRegistry: "test.io/gcAuth",
+		DockerLibraryRegistry: "test.io/library",
+		GcRegistry:            "test.io",
+		PrivateRegistry:       "test.io/k8s-authenticated-test",
+		SigStorageRegistry:    "test.io/sig-storage",
+		InvalidRegistry:       "test.io/invalid",
+		PromoterE2eRegistry:   "test.io/promoter",
+		BuildImageRegistry:    "test.io/build",
 	}
 
 	for _, tt := range registryTests {

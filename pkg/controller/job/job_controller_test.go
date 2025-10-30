@@ -6667,7 +6667,7 @@ func TestWatchPods(t *testing.T) {
 	}
 	// Start only the pod watcher and the workqueue, send a watch event,
 	// and make sure it hits the sync method for the right job.
-	go sharedInformerFactory.Core().V1().Pods().Informer().Run(ctx.Done())
+	go sharedInformerFactory.Core().V1().Pods().Informer().RunWithContext(ctx)
 	go manager.Run(ctx, 1)
 
 	pods := newPodList(1, v1.PodRunning, testJob)
@@ -6693,7 +6693,7 @@ func TestWatchOrphanPods(t *testing.T) {
 	manager.jobStoreSynced = alwaysReady
 
 	podInformer := sharedInformers.Core().V1().Pods().Informer()
-	go podInformer.Run(ctx.Done())
+	go podInformer.RunWithContext(ctx)
 	cache.WaitForCacheSync(ctx.Done(), podInformer.HasSynced)
 	go manager.Run(ctx, 1)
 
@@ -6764,7 +6764,7 @@ func TestSyncOrphanPod(t *testing.T) {
 	manager.jobStoreSynced = alwaysReady
 
 	podInformer := sharedInformers.Core().V1().Pods().Informer()
-	go podInformer.Run(ctx.Done())
+	go podInformer.RunWithContext(ctx)
 	cache.WaitForCacheSync(ctx.Done(), podInformer.HasSynced)
 	go manager.Run(ctx, 1)
 
@@ -7717,7 +7717,7 @@ func TestFinalizersRemovedExpectations(t *testing.T) {
 		t.Errorf("Different expectations for removed finalizers after syncJob (-want,+got):\n%s", diff)
 	}
 
-	go sharedInformers.Core().V1().Pods().Informer().Run(ctx.Done())
+	go sharedInformers.Core().V1().Pods().Informer().RunWithContext(ctx)
 	cache.WaitForCacheSync(ctx.Done(), podInformer.HasSynced)
 
 	// Make sure the first syncJob sets the expectations, even after the caches synced.

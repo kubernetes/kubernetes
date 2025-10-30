@@ -19,6 +19,7 @@ package experimental
 import (
 	"fmt"
 
+	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/klog/v2"
@@ -34,9 +35,9 @@ import (
 type distinctAttributeConstraint struct {
 	logger        klog.Logger // Includes name and attribute name, so no need to repeat in log messages.
 	requestNames  sets.Set[string]
-	attributeName draapi.FullyQualifiedName
+	attributeName resourceapi.FullyQualifiedName
 
-	attributes map[string]draapi.DeviceAttribute
+	attributes map[string]resourceapi.DeviceAttribute
 	numDevices int
 }
 
@@ -91,7 +92,7 @@ func (m *distinctAttributeConstraint) matches(requestName, subRequestName string
 	}
 }
 
-func (m *distinctAttributeConstraint) matchesAttribute(attribute draapi.DeviceAttribute) bool {
+func (m *distinctAttributeConstraint) matchesAttribute(attribute resourceapi.DeviceAttribute) bool {
 	for _, attr := range m.attributes {
 		switch {
 		case attribute.StringValue != nil:

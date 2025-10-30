@@ -713,7 +713,7 @@ func TestWatchPods(t *testing.T) {
 
 	// Start only the pod watcher and the workqueue, send a watch event,
 	// and make sure it hits the sync method for the right ReplicaSet.
-	go informers.Core().V1().Pods().Informer().Run(stopCh)
+	go informers.Core().V1().Pods().Informer().RunWithContext(ctx)
 	go manager.Run(ctx, 1)
 
 	pods := newPodList(nil, 1, v1.PodRunning, labelMap, testRSSpec, "pod")

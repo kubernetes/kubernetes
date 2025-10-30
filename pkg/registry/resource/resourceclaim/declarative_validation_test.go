@@ -392,6 +392,80 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				),
 			},
 		},
+		// Spec.Devices.Constraints[%d].MatchAttribute
+		"invalid match attribute": {
+			input: mkValidResourceClaim(
+				tweakMatchAttribute("invalid!"),
+			),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(0).Child("matchAttribute"), "invalid!", "").WithOrigin("format=k8s-resource-fully-qualified-name"),
+			},
+		},
+		"match attribute without domain": {
+			input: mkValidResourceClaim(
+				tweakMatchAttribute("nodomain"),
+			),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(0).Child("matchAttribute"), "nodomain", "a fully qualified name must be a domain and a name separated by a slash").WithOrigin("format=k8s-resource-fully-qualified-name"),
+			},
+		},
+		"match attribute empty": {
+			input: mkValidResourceClaim(
+				tweakMatchAttribute(""),
+			),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(0).Child("matchAttribute"), "", "").WithOrigin("format=k8s-resource-fully-qualified-name"),
+			},
+		},
+		"match attribute with empty domain": {
+			input: mkValidResourceClaim(
+				tweakMatchAttribute("/foo"),
+			),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(0).Child("matchAttribute"), "", "").WithOrigin("format=k8s-resource-fully-qualified-name"),
+			},
+		},
+		"match attribute with empty name": {
+			input: mkValidResourceClaim(
+				tweakMatchAttribute("foo/"),
+			),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(0).Child("matchAttribute"), "", "").WithOrigin("format=k8s-resource-fully-qualified-name"),
+			},
+		},
+		"match attribute with invalid domain": {
+			input: mkValidResourceClaim(
+				tweakMatchAttribute("invalid_domain/foo"),
+			),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(0).Child("matchAttribute"), "invalid_domain", "").WithOrigin("format=k8s-resource-fully-qualified-name"),
+			},
+		},
+		"match attribute with invalid name": {
+			input: mkValidResourceClaim(
+				tweakMatchAttribute("domain/invalid-name"),
+			),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(0).Child("matchAttribute"), "invalid-name", "").WithOrigin("format=k8s-resource-fully-qualified-name"),
+			},
+		},
+		"match attribute with long name": {
+			input: mkValidResourceClaim(
+				tweakMatchAttribute("domain/" + strings.Repeat("a", 65)),
+			),
+			expectedErrs: field.ErrorList{
+				field.TooLong(field.NewPath("spec", "devices", "constraints").Index(0).Child("matchAttribute"), "", 64).WithOrigin("format=k8s-resource-fully-qualified-name"),
+			},
+		},
+		"match attribute with long domain": {
+			input: mkValidResourceClaim(
+				tweakMatchAttribute(strings.Repeat("a", 254) + "/name"),
+			),
+			expectedErrs: field.ErrorList{
+				field.TooLong(field.NewPath("spec", "devices", "constraints").Index(0).Child("matchAttribute"), "", 63).WithOrigin("format=k8s-resource-fully-qualified-name"),
+				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(0).Child("matchAttribute"), "", "").WithOrigin("format=k8s-resource-fully-qualified-name"),
+			},
+		},
 		// TODO: Add more test cases
 	}
 	for k, tc := range testCases {
@@ -1523,5 +1597,16 @@ func tweakStatusAllocationConfigSource(source resource.AllocationConfigSource) f
 			})
 		}
 		rc.Status.Allocation.Devices.Config[0].Source = source
+	}
+}
+
+func tweakMatchAttribute(val string) func(*resource.ResourceClaim) {
+	return func(obj *resource.ResourceClaim) {
+		fullyQualifiedName := resource.FullyQualifiedName(val)
+		obj.Spec.Devices.Constraints = []resource.DeviceConstraint{
+			{
+				MatchAttribute: &fullyQualifiedName,
+			},
+		}
 	}
 }

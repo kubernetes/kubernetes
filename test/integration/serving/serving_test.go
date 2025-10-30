@@ -26,10 +26,10 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"reflect"
+	"slices"
 	"strings"
 	"testing"
-
-	"reflect"
 
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/options"
@@ -48,12 +48,12 @@ import (
 )
 
 type componentTester interface {
-	StartTestServer(t *testing.T, ctx context.Context, customFlags []string) (*options.SecureServingOptionsWithLoopback, *server.SecureServingInfo, func(), error)
+	StartTestServer(t *testing.T, ctx context.Context, customFlags []string) (*options.SecureServingOptions, *server.SecureServingInfo, func(), error)
 }
 
 type kubeControllerManagerTester struct{}
 
-func (kubeControllerManagerTester) StartTestServer(t *testing.T, ctx context.Context, customFlags []string) (*options.SecureServingOptionsWithLoopback, *server.SecureServingInfo, func(), error) {
+func (kubeControllerManagerTester) StartTestServer(t *testing.T, ctx context.Context, customFlags []string) (*options.SecureServingOptions, *server.SecureServingInfo, func(), error) {
 	// avoid starting any controller loops, we're just testing serving
 	customFlags = append([]string{"--controllers="}, customFlags...)
 	gotResult, err := kubectrlmgrtesting.StartTestServer(t, ctx, customFlags)
@@ -65,17 +65,17 @@ func (kubeControllerManagerTester) StartTestServer(t *testing.T, ctx context.Con
 
 type cloudControllerManagerTester struct{}
 
-func (cloudControllerManagerTester) StartTestServer(t *testing.T, ctx context.Context, customFlags []string) (*options.SecureServingOptionsWithLoopback, *server.SecureServingInfo, func(), error) {
+func (cloudControllerManagerTester) StartTestServer(t *testing.T, ctx context.Context, customFlags []string) (*options.SecureServingOptions, *server.SecureServingInfo, func(), error) {
 	gotResult, err := cloudctrlmgrtesting.StartTestServer(t, ctx, customFlags)
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	return gotResult.Options.SecureServing, gotResult.Config.SecureServing, gotResult.TearDownFn, err
+	return gotResult.Options.SecureServing.SecureServingOptions, gotResult.Config.SecureServing, gotResult.TearDownFn, err
 }
 
 type kubeSchedulerTester struct{}
 
-func (kubeSchedulerTester) StartTestServer(t *testing.T, ctx context.Context, customFlags []string) (*options.SecureServingOptionsWithLoopback, *server.SecureServingInfo, func(), error) {
+func (kubeSchedulerTester) StartTestServer(t *testing.T, ctx context.Context, customFlags []string) (*options.SecureServingOptions, *server.SecureServingInfo, func(), error) {
 	gotResult, err := kubeschedulertesting.StartTestServer(t, ctx, customFlags)
 	if err != nil {
 		return nil, nil, nil, err
@@ -232,7 +232,7 @@ func testComponentWithSecureServing(t *testing.T, tester componentTester, kubeco
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
-			secureOptions, secureInfo, tearDownFn, err := tester.StartTestServer(t, ctx, append(append([]string{}, tt.flags...), extraFlags...))
+			secureOptions, secureInfo, tearDownFn, err := tester.StartTestServer(t, ctx, slices.Concat(tt.flags, extraFlags))
 			if tearDownFn != nil {
 				defer tearDownFn()
 			}
@@ -379,7 +379,7 @@ users:
 		t.Run(tt.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, zpagesfeatures.ComponentStatusz, true)
 			_, ctx := ktesting.NewTestContext(t)
-			secureOptions, secureInfo, tearDownFn, err := kubeControllerManagerTester{}.StartTestServer(t, ctx, append(append([]string{}, tt.flags...), []string{}...))
+			secureOptions, secureInfo, tearDownFn, err := kubeControllerManagerTester{}.StartTestServer(t, ctx, slices.Concat(tt.flags, []string{}))
 			if tearDownFn != nil {
 				defer tearDownFn()
 			}
@@ -450,7 +450,7 @@ users:
 				}
 
 				var foundPathsRaw []string
-				for _, line := range strings.Split(bodyStr, "\n") {
+				for line := range strings.SplitSeq(bodyStr, "\n") {
 					if strings.HasPrefix(line, "Paths") {
 						parts := strings.Fields(line)
 						if len(parts) > 1 {

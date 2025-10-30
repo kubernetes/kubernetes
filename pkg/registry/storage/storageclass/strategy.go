@@ -18,6 +18,8 @@ package storageclass
 
 import (
 	"context"
+	"k8s.io/apimachinery/pkg/api/operation"
+	"k8s.io/apiserver/pkg/registry/rest"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -48,7 +50,8 @@ func (storageClassStrategy) PrepareForCreate(ctx context.Context, obj runtime.Ob
 
 func (storageClassStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	storageClass := obj.(*storage.StorageClass)
-	return validation.ValidateStorageClass(storageClass)
+	allErrs := validation.ValidateStorageClass(storageClass)
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, obj, nil, allErrs, operation.Create)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -69,8 +72,9 @@ func (storageClassStrategy) PrepareForUpdate(ctx context.Context, obj, old runti
 }
 
 func (storageClassStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	errorList := validation.ValidateStorageClass(obj.(*storage.StorageClass))
-	return append(errorList, validation.ValidateStorageClassUpdate(obj.(*storage.StorageClass), old.(*storage.StorageClass))...)
+	allErrs := validation.ValidateStorageClass(obj.(*storage.StorageClass))
+	allErrs = append(allErrs, validation.ValidateStorageClassUpdate(obj.(*storage.StorageClass), old.(*storage.StorageClass))...)
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, obj, old, allErrs, operation.Update)
 }
 
 // WarningsOnUpdate returns warnings for the given update.

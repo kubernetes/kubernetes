@@ -423,7 +423,7 @@ func TestAddFlags(t *testing.T) {
 				PairName:      "kube-controller-manager",
 			},
 			HTTP2MaxStreamsPerConnection: 47,
-		}).WithLoopback(),
+		}),
 		Authentication: &apiserveroptions.DelegatingAuthenticationOptions{
 			CacheTTL:            10 * time.Second,
 			TokenRequestTimeout: 10 * time.Second,

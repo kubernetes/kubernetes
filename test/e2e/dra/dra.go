@@ -2289,6 +2289,54 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 				"fails",
 			)
 		})
+		f.It("process extended resources after device plugin uninstall", f.WithSerial(), func(ctx context.Context) {
+			resourceName := b.ExtendedResourceName(drautils.SingletonIndex)
+			extendedResourceName := deployDevicePlugin(ctx, f, nodes.NodeNames[0:1])
+			gomega.Expect(string(extendedResourceName)).To(gomega.Equal(resourceName))
+
+			getAllocatable := func() int {
+				node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, nodes.NodeNames[0], metav1.GetOptions{})
+				framework.ExpectNoError(err)
+				for name, quantity := range node.Status.Allocatable {
+					if string(name) == resourceName {
+						return int(quantity.Value())
+					}
+				}
+				return -1
+			}
+			gomega.Eventually(ctx, getAllocatable).WithTimeout(f.Timeouts.PodStart).Should(gomega.Equal(2))
+
+			ginkgo.By("Uninstall Device Plugin")
+			err := f.ClientSet.AppsV1().DaemonSets(f.Namespace.Name).DeleteCollection(
+				ctx,
+				metav1.DeleteOptions{},
+				metav1.ListOptions{LabelSelector: "k8s-app=sample-device-plugin"},
+			)
+			framework.ExpectNoError(err, "uninstall device plugin")
+
+			ginkgo.By("Wait for NodeStatus.Allocatable = 0")
+			gomega.Eventually(ctx, getAllocatable).WithTimeout(f.Timeouts.PodDelete).Should(gomega.BeZero())
+
+			ginkgo.By("Create test pod")
+			pod := b.Pod()
+			pod.Spec.Containers[0].Name = "container0"
+			res := v1.ResourceList{
+				v1.ResourceName(resourceName): resource.MustParse("1"),
+			}
+			pod.Spec.Containers[0].Resources.Requests = res
+			pod.Spec.Containers[0].Resources.Limits = res
+
+			b.Create(ctx, b.Class(drautils.SingletonIndex), pod)
+
+			err = e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
+			framework.ExpectNoError(err, "start pod")
+
+			ginkgo.By("Check that pod is processed by the DRA driver")
+			containerEnv := []string{
+				"container_0_request_0", "true",
+			}
+			drautils.TestContainerEnv(ctx, f, pod, pod.Spec.Containers[0].Name, false, containerEnv...)
+		})
 	})
 
 	framework.Context(f.WithFeatureGate(features.DRAExtendedResource), func() {

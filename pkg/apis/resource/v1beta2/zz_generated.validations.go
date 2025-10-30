@@ -30,6 +30,7 @@ import (
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	types "k8s.io/apimachinery/pkg/types"
 	sets "k8s.io/apimachinery/pkg/util/sets"
@@ -194,6 +195,34 @@ func Validate_AllocationResult(ctx context.Context, op operation.Operation, fldP
 	return errs
 }
 
+// Validate_CounterSet validates an instance of CounterSet according
+// to declarative validation rules in the API schema.
+func Validate_CounterSet(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta2.CounterSet) (errs field.ErrorList) {
+	// field resourcev1beta2.CounterSet.Name has no validation
+
+	// field resourcev1beta2.CounterSet.Counters
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj map[string]resourcev1beta2.Counter) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredMap(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			errs = append(errs, validate.EachMapKey(ctx, op, fldPath, obj, oldObj, validate.ShortName)...)
+			return
+		}(fldPath.Child("counters"), obj.Counters, safe.Field(oldObj, func(oldObj *resourcev1beta2.CounterSet) map[string]resourcev1beta2.Counter { return oldObj.Counters }))...)
+
+	return errs
+}
+
 // Validate_Device validates an instance of Device according
 // to declarative validation rules in the API schema.
 func Validate_Device(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta2.Device) (errs field.ErrorList) {
@@ -214,7 +243,21 @@ func Validate_Device(ctx context.Context, op operation.Operation, fldPath *field
 		}))...)
 
 	// field resourcev1beta2.Device.Capacity has no validation
-	// field resourcev1beta2.Device.ConsumesCounters has no validation
+
+	// field resourcev1beta2.Device.ConsumesCounters
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []resourcev1beta2.DeviceCounterConsumption) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// iterate the list and call the type's validation function
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceCounterConsumption)...)
+			return
+		}(fldPath.Child("consumesCounters"), obj.ConsumesCounters, safe.Field(oldObj, func(oldObj *resourcev1beta2.Device) []resourcev1beta2.DeviceCounterConsumption {
+			return oldObj.ConsumesCounters
+		}))...)
+
 	// field resourcev1beta2.Device.NodeName has no validation
 	// field resourcev1beta2.Device.NodeSelector has no validation
 	// field resourcev1beta2.Device.AllNodes has no validation
@@ -610,7 +653,27 @@ func Validate_DeviceClaimConfiguration(ctx context.Context, op operation.Operati
 // to declarative validation rules in the API schema.
 func Validate_DeviceClass(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta2.DeviceClass) (errs field.ErrorList) {
 	// field resourcev1beta2.DeviceClass.TypeMeta has no validation
-	// field resourcev1beta2.DeviceClass.ObjectMeta has no validation
+
+	// field resourcev1beta2.DeviceClass.ObjectMeta
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *v1.ObjectMeta) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			func() { // cohort name
+				earlyReturn := false
+				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "name", func(o *v1.ObjectMeta) *string { return &o.Name }, validate.DirectEqualPtr, validate.OptionalValue); len(e) != 0 {
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
+				errs = append(errs, validate.Subfield(ctx, op, fldPath, obj, oldObj, "name", func(o *v1.ObjectMeta) *string { return &o.Name }, validate.DirectEqualPtr, validate.LongName)...)
+			}()
+			return
+		}(fldPath.Child("metadata"), &obj.ObjectMeta, safe.Field(oldObj, func(oldObj *resourcev1beta2.DeviceClass) *v1.ObjectMeta { return &oldObj.ObjectMeta }))...)
 
 	// field resourcev1beta2.DeviceClass.Spec
 	errs = append(errs,
@@ -795,8 +858,58 @@ func Validate_DeviceConstraint(ctx context.Context, op operation.Operation, fldP
 			return
 		}(fldPath.Child("requests"), obj.Requests, safe.Field(oldObj, func(oldObj *resourcev1beta2.DeviceConstraint) []string { return oldObj.Requests }))...)
 
-	// field resourcev1beta2.DeviceConstraint.MatchAttribute has no validation
+	// field resourcev1beta2.DeviceConstraint.MatchAttribute
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *resourcev1beta2.FullyQualifiedName) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			errs = append(errs, validate.ResourceFullyQualifiedName(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("matchAttribute"), obj.MatchAttribute, safe.Field(oldObj, func(oldObj *resourcev1beta2.DeviceConstraint) *resourcev1beta2.FullyQualifiedName {
+			return oldObj.MatchAttribute
+		}))...)
+
 	// field resourcev1beta2.DeviceConstraint.DistinctAttribute has no validation
+	return errs
+}
+
+// Validate_DeviceCounterConsumption validates an instance of DeviceCounterConsumption according
+// to declarative validation rules in the API schema.
+func Validate_DeviceCounterConsumption(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta2.DeviceCounterConsumption) (errs field.ErrorList) {
+	// field resourcev1beta2.DeviceCounterConsumption.CounterSet has no validation
+
+	// field resourcev1beta2.DeviceCounterConsumption.Counters
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj map[string]resourcev1beta2.Counter) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredMap(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			errs = append(errs, validate.EachMapKey(ctx, op, fldPath, obj, oldObj, validate.ShortName)...)
+			return
+		}(fldPath.Child("counters"), obj.Counters, safe.Field(oldObj, func(oldObj *resourcev1beta2.DeviceCounterConsumption) map[string]resourcev1beta2.Counter {
+			return oldObj.Counters
+		}))...)
+
 	return errs
 }
 
@@ -1628,6 +1741,20 @@ func Validate_ResourceSliceSpec(ctx context.Context, op operation.Operation, fld
 		}(fldPath.Child("devices"), obj.Devices, safe.Field(oldObj, func(oldObj *resourcev1beta2.ResourceSliceSpec) []resourcev1beta2.Device { return oldObj.Devices }))...)
 
 	// field resourcev1beta2.ResourceSliceSpec.PerDeviceNodeSelection has no validation
-	// field resourcev1beta2.ResourceSliceSpec.SharedCounters has no validation
+
+	// field resourcev1beta2.ResourceSliceSpec.SharedCounters
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []resourcev1beta2.CounterSet) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// iterate the list and call the type's validation function
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_CounterSet)...)
+			return
+		}(fldPath.Child("sharedCounters"), obj.SharedCounters, safe.Field(oldObj, func(oldObj *resourcev1beta2.ResourceSliceSpec) []resourcev1beta2.CounterSet {
+			return oldObj.SharedCounters
+		}))...)
+
 	return errs
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -29,7 +30,10 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/operation"
 	apiresource "k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/api/validate"
+	"k8s.io/apimachinery/pkg/api/validate/content"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -354,7 +358,7 @@ func validateDeviceConstraint(constraint resource.DeviceConstraint, fldPath *fie
 		},
 		stringKey, fldPath.Child("requests"), sizeCovered, uniquenessCovered)...)
 	if constraint.MatchAttribute != nil {
-		allErrs = append(allErrs, validateFullyQualifiedName(*constraint.MatchAttribute, fldPath.Child("matchAttribute"))...)
+		allErrs = append(allErrs, validateFullyQualifiedName(*constraint.MatchAttribute, fldPath.Child("matchAttribute")).MarkCoveredByDeclarative()...)
 	} else if constraint.DistinctAttribute != nil {
 		allErrs = append(allErrs, validateFullyQualifiedName(*constraint.DistinctAttribute, fldPath.Child("distinctAttribute"))...)
 	} else if utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity) {
@@ -540,15 +544,23 @@ func validateAllocationConfigSource(source resource.AllocationConfigSource, fldP
 
 // ValidateDeviceClass validates a DeviceClass.
 func ValidateDeviceClass(class *resource.DeviceClass) field.ErrorList {
-	allErrs := corevalidation.ValidateObjectMeta(&class.ObjectMeta, false, corevalidation.ValidateClassName, field.NewPath("metadata"))
+	validateClassName := func(fldPath *field.Path, name string) field.ErrorList {
+		// validate.LongName doesn't respect operation type currently (CREATE or UPDATE)
+		// so it is ok to use operation.Operation{} here
+		return validate.LongName(context.Background(), operation.Operation{}, fldPath, &name, nil).MarkCoveredByDeclarative()
+	}
+	allErrs := corevalidation.ValidateObjectMetaWithOpts(&class.ObjectMeta, false, validateClassName, field.NewPath("metadata"))
 	allErrs = append(allErrs, validateDeviceClassSpec(&class.Spec, nil, field.NewPath("spec"))...)
 	return allErrs
 }
 
 // ValidateDeviceClassUpdate tests if an update to DeviceClass is valid.
 func ValidateDeviceClassUpdate(class, oldClass *resource.DeviceClass) field.ErrorList {
+	validateClassName := func(fldPath *field.Path, name string) field.ErrorList {
+		return validate.LongName(context.Background(), operation.Operation{}, fldPath, &name, nil).MarkCoveredByDeclarative()
+	}
 	// TODO(lalitc375): Remove this if decided in https://github.com/kubernetes/kubernetes/issues/134444.
-	allErrs := corevalidation.ValidateObjectMeta(&class.ObjectMeta, false, corevalidation.ValidateClassName, field.NewPath("metadata"))
+	allErrs := corevalidation.ValidateObjectMetaWithOpts(&class.ObjectMeta, false, validateClassName, field.NewPath("metadata"))
 	allErrs = append(allErrs, corevalidation.ValidateObjectMetaUpdate(&class.ObjectMeta, &oldClass.ObjectMeta, field.NewPath("metadata"))...)
 	allErrs = append(allErrs, validateDeviceClassSpec(&class.Spec, &oldClass.Spec, field.NewPath("spec"))...)
 	return allErrs
@@ -740,7 +752,7 @@ func validateCounterSet(counterSet resource.CounterSet, fldPath *field.Path) fie
 	} else {
 		// The size limit is enforced for across all sets by the caller.
 		allErrs = append(allErrs, validateMap(counterSet.Counters, -1, validation.DNS1123LabelMaxLength,
-			validateCounterName, validateDeviceCounter, fldPath.Child("counters"))...)
+			validateCounterName, validateDeviceCounter, fldPath.Child("counters"), keysCovered)...)
 	}
 
 	return allErrs
@@ -865,7 +877,7 @@ func validateDeviceCounterConsumption(deviceCounterConsumption resource.DeviceCo
 	} else {
 		// The size limit is enforced for the entire device.
 		allErrs = append(allErrs, validateMap(deviceCounterConsumption.Counters, -1, validation.DNS1123LabelMaxLength,
-			validateCounterName, validateDeviceCounter, fldPath.Child("counters"))...)
+			validateCounterName, validateDeviceCounter, fldPath.Child("counters"), keysCovered)...)
 	}
 	return allErrs
 }
@@ -1076,38 +1088,46 @@ func validateDeviceCounter(counter resource.Counter, fldPath *field.Path) field.
 
 func validateQualifiedName(name resource.QualifiedName, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
-	if name == "" {
-		allErrs = append(allErrs, field.Required(fldPath, "name required"))
-		return allErrs
-	}
-
 	parts := strings.Split(string(name), "/")
 	switch len(parts) {
 	case 1:
 		allErrs = append(allErrs, validateCIdentifier(parts[0], fldPath)...)
 	case 2:
 		if len(parts[0]) == 0 {
-			allErrs = append(allErrs, field.Required(fldPath, "the domain must not be empty"))
+			allErrs = append(allErrs, field.Invalid(fldPath, "", "the domain must not be empty"))
 		} else {
 			allErrs = append(allErrs, validateDriverName(parts[0], fldPath)...)
 		}
 		if len(parts[1]) == 0 {
-			allErrs = append(allErrs, field.Required(fldPath, "the name must not be empty"))
+			allErrs = append(allErrs, field.Invalid(fldPath, "", "the name must not be empty"))
 		} else {
 			allErrs = append(allErrs, validateCIdentifier(parts[1], fldPath)...)
 		}
+		// TODO: This validation is incomplete. It should reject qualified names
+		// that contain more than one slash. Currently, names like "a/b/c" are not
+		// handled and are implicitly accepted.
+		//
+		// This needs to be fixed in two places:
+		// 1. Here in this function.
+		// 2. In the corresponding declarative validation utility `resourcesQualifiedName`
+		//    in `staging/src/k8s.io/apimachinery/pkg/api/validate/strfmt.go`.
+		//
+		// The fix should be introduced carefully, possibly using ratcheting to avoid
+		// breaking existing, non-compliant objects.
 	}
+
 	return allErrs
 }
 
 func validateFullyQualifiedName(name resource.FullyQualifiedName, fldPath *field.Path) field.ErrorList {
-	allErrs := validateQualifiedName(resource.QualifiedName(name), fldPath)
-	// validateQualifiedName checks that the name isn't empty and both parts are valid.
+	var allErrs field.ErrorList
+	allErrs = append(allErrs, validateQualifiedName(resource.QualifiedName(name), fldPath)...)
+	// validateQualifiedName checks that both parts are valid.
 	// What we need to enforce here is that there really is a domain.
-	if name != "" && !strings.Contains(string(name), "/") {
-		allErrs = append(allErrs, field.Invalid(fldPath, name, "must include a domain"))
+	if !strings.Contains(string(name), "/") {
+		allErrs = append(allErrs, field.Invalid(fldPath, name, "a fully qualified name must be a domain and a name separated by a slash"))
 	}
-	return allErrs
+	return allErrs.WithOrigin("format=k8s-resource-fully-qualified-name")
 }
 
 func validateCIdentifier(id string, fldPath *field.Path) field.ErrorList {
@@ -1115,7 +1135,7 @@ func validateCIdentifier(id string, fldPath *field.Path) field.ErrorList {
 	if len(id) > resource.DeviceMaxIDLength {
 		allErrs = append(allErrs, field.TooLong(fldPath, "" /*unused*/, resource.DeviceMaxIDLength))
 	}
-	for _, msg := range validation.IsCIdentifier(id) {
+	for _, msg := range content.IsCIdentifier(id) {
 		allErrs = append(allErrs, field.Invalid(fldPath, id, msg))
 	}
 	return allErrs
@@ -1131,6 +1151,8 @@ const (
 	sizeCovered
 	// The uniqueness check is covered by declarative validation.
 	uniquenessCovered
+	// key validation is covered by declarative validation.
+	keysCovered
 )
 
 // validateSlice ensures that a slice does not exceed a certain maximum size
@@ -1199,14 +1221,19 @@ func quantityKey(item apiresource.Quantity) string {
 // small limit gets increased because it is okay to include more details.
 // This is not used for validation of keys, which has to be done by
 // the callback function.
-func validateMap[K ~string, T any](m map[K]T, maxSize, truncateKeyLen int, validateKey func(K, *field.Path) field.ErrorList, validateItem func(T, *field.Path) field.ErrorList, fldPath *field.Path) field.ErrorList {
+func validateMap[K ~string, T any](m map[K]T, maxSize, truncateKeyLen int, validateKey func(K, *field.Path) field.ErrorList, validateItem func(T, *field.Path) field.ErrorList, fldPath *field.Path, opts ...validationOption) field.ErrorList {
 	var allErrs field.ErrorList
 	if maxSize >= 0 && len(m) > maxSize {
 		allErrs = append(allErrs, field.TooMany(fldPath, len(m), maxSize))
 	}
 	for key, item := range m {
 		keyPath := fldPath.Key(truncateIfTooLong(string(key), truncateKeyLen))
-		allErrs = append(allErrs, validateKey(key, keyPath)...)
+
+		keyValidationErrors := validateKey(key, fldPath)
+		if slices.Contains(opts, keysCovered) {
+			keyValidationErrors = keyValidationErrors.MarkCoveredByDeclarative()
+		}
+		allErrs = append(allErrs, keyValidationErrors...)
 		allErrs = append(allErrs, validateItem(item, keyPath)...)
 	}
 	return allErrs

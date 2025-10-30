@@ -269,7 +269,7 @@ func (ektv eachKeyTagValidator) GetValidations(context Context, tag codetags.Tag
 
 	elemContext := Context{
 		Scope:      ScopeMapKey,
-		Type:       nt.Elem,
+		Type:       nt.Key,
 		Path:       context.Path.Key("(keys)"),
 		Member:     nil, // NA for map keys
 		ParentPath: context.Path,

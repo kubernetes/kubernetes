@@ -213,7 +213,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 		for i, constraint := range claim.Spec.Devices.Constraints {
 			switch {
 			case constraint.MatchAttribute != nil:
-				matchAttribute := draapi.FullyQualifiedName(*constraint.MatchAttribute)
+				matchAttribute := resourceapi.FullyQualifiedName(*constraint.MatchAttribute)
 				logger := alloc.logger
 				if loggerV := alloc.logger.V(6); loggerV.Enabled() {
 					logger = klog.LoggerWithName(logger, "matchAttributeConstraint")
@@ -472,7 +472,7 @@ type allocator struct {
 
 // counterSets is a map with the name of counter sets to the counters in
 // the set.
-type counterSets map[draapi.UniqueString]map[string]draapi.Counter
+type counterSets map[draapi.UniqueString]map[string]resourceapi.Counter
 
 // matchKey identifies a device/request pair.
 type matchKey struct {
@@ -564,9 +564,9 @@ type constraint interface {
 type matchAttributeConstraint struct {
 	logger        klog.Logger // Includes name and attribute name, so no need to repeat in log messages.
 	requestNames  sets.Set[string]
-	attributeName draapi.FullyQualifiedName
+	attributeName resourceapi.FullyQualifiedName
 
-	attribute  *draapi.DeviceAttribute
+	attribute  *resourceapi.DeviceAttribute
 	numDevices int
 }
 
@@ -646,9 +646,9 @@ func (m *matchAttributeConstraint) matches(requestName, subRequestName string) b
 	}
 }
 
-func lookupAttribute(device *draapi.Device, deviceID DeviceID, attributeName draapi.FullyQualifiedName) *draapi.DeviceAttribute {
+func lookupAttribute(device *draapi.Device, deviceID DeviceID, attributeName resourceapi.FullyQualifiedName) *resourceapi.DeviceAttribute {
 	// Fully-qualified match?
-	if attr, ok := device.Attributes[draapi.QualifiedName(attributeName)]; ok {
+	if attr, ok := device.Attributes[resourceapi.QualifiedName(attributeName)]; ok {
 		return &attr
 	}
 	index := strings.Index(string(attributeName), "/")
@@ -664,7 +664,7 @@ func lookupAttribute(device *draapi.Device, deviceID DeviceID, attributeName dra
 	}
 
 	// Domain matches the driver, so let's check just the ID.
-	if attr, ok := device.Attributes[draapi.QualifiedName(attributeName[index+1:])]; ok {
+	if attr, ok := device.Attributes[resourceapi.QualifiedName(attributeName[index+1:])]; ok {
 		return &attr
 	}
 
@@ -1112,7 +1112,7 @@ func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error
 	if !found {
 		availableCountersForSlice = make(counterSets, len(slice.Spec.SharedCounters))
 		for _, counterSet := range slice.Spec.SharedCounters {
-			availableCountersForCounterSet := make(map[string]draapi.Counter, len(counterSet.Counters))
+			availableCountersForCounterSet := make(map[string]resourceapi.Counter, len(counterSet.Counters))
 			for name, c := range counterSet.Counters {
 				availableCountersForCounterSet[name] = c
 			}
@@ -1171,7 +1171,7 @@ func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error
 	for _, deviceCounterConsumption := range device.ConsumesCounters {
 		consumedCountersForCounterSet, found := consumedCountersForSlice[deviceCounterConsumption.CounterSet]
 		if !found {
-			consumedCountersForCounterSet = make(map[string]draapi.Counter)
+			consumedCountersForCounterSet = make(map[string]resourceapi.Counter)
 			consumedCountersForSlice[deviceCounterConsumption.CounterSet] = consumedCountersForCounterSet
 		}
 		for name, c := range deviceCounterConsumption.Counters {

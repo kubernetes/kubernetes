@@ -17,7 +17,6 @@ limitations under the License.
 package cm
 
 import (
-	"context"
 	"testing"
 
 	"github.com/go-logr/logr"
@@ -42,7 +41,7 @@ type mockMemoryManager struct {
 	memorymanager.Manager
 }
 
-func (memoryManager *mockMemoryManager) AddContainer(context.Context, *v1.Pod, *v1.Container, string) {
+func (memoryManager *mockMemoryManager) AddContainer(logr.Logger, *v1.Pod, *v1.Container, string) {
 	memoryManager.called = true
 }
 

@@ -202,6 +202,8 @@ type CounterSet struct {
 	// The maximum number of counters is 32.
 	//
 	// +required
+	// +k8s:required
+	// +k8s:eachKey=+k8s:format=k8s-short-name
 	Counters map[string]Counter `json:"counters,omitempty" protobuf:"bytes,2,name=counters"`
 }
 
@@ -429,6 +431,8 @@ type DeviceCounterConsumption struct {
 	// 16 counters each).
 	//
 	// +required
+	// +k8s:required
+	// +k8s:eachKey=+k8s:format=k8s-short-name
 	Counters map[string]Counter `json:"counters,omitempty" protobuf:"bytes,2,opt,name=counters"`
 }
 
@@ -568,6 +572,9 @@ const ResourceSliceMaxDeviceCountersPerSlice = 1024 // 64 * 16
 type QualifiedName string
 
 // FullyQualifiedName is a QualifiedName where the domain is set.
+// Format validation cannot be added to this type because one of its usages,
+// DistinctAttribute, is validated conditionally. This conditional validation
+// cannot be expressed declaratively.
 type FullyQualifiedName string
 
 // DeviceMaxDomainLength is the maximum length of the domain prefix in a fully-qualified name.
@@ -1243,6 +1250,8 @@ type DeviceConstraint struct {
 	//
 	// +optional
 	// +oneOf=ConstraintType
+	// +k8s:optional
+	// +k8s:format=k8s-resource-fully-qualified-name
 	MatchAttribute *FullyQualifiedName `json:"matchAttribute,omitempty" protobuf:"bytes,2,opt,name=matchAttribute"`
 
 	// Potential future extension, not part of the current design:
@@ -1720,6 +1729,8 @@ type DeviceClass struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object metadata
 	// +optional
+	// +k8s:subfield(name)=+k8s:optional
+	// +k8s:subfield(name)=+k8s:format=k8s-long-name
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Spec defines what can be allocated and how to configure it.

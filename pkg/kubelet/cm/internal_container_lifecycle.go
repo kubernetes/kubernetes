@@ -17,8 +17,6 @@ limitations under the License.
 package cm
 
 import (
-	"context"
-
 	v1 "k8s.io/api/core/v1"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
@@ -46,7 +44,7 @@ func (i *internalContainerLifecycleImpl) PreStartContainer(pod *v1.Pod, containe
 	}
 
 	if i.memoryManager != nil {
-		i.memoryManager.AddContainer(context.TODO(), pod, container, containerID)
+		i.memoryManager.AddContainer(klog.TODO(), pod, container, containerID)
 	}
 
 	i.topologyManager.AddContainer(pod, container, containerID)

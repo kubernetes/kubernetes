@@ -51,6 +51,37 @@ func TestDeclarativeValidate(t *testing.T) {
 				"valid": {
 					input: mkDeviceClass(),
 				},
+				// metadata.name
+				"name: empty": {
+					input: mkDeviceClass(tweakName("")),
+					expectedErrs: field.ErrorList{
+						field.Required(field.NewPath("metadata", "name"), ""),
+					},
+				},
+				"name: valid": {
+					input: mkDeviceClass(tweakName("example.com")),
+				},
+				"name: invalid (uppercase)": {
+					input: mkDeviceClass(tweakName("Invalid-Name")),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("metadata", "name"), "Invalid-Name", "").WithOrigin("format=k8s-long-name"),
+					},
+				},
+				"name: invalid (start with dash)": {
+					input: mkDeviceClass(tweakName("-invalid")),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("metadata", "name"), "-invalid", "").WithOrigin("format=k8s-long-name"),
+					},
+				},
+				"name: max length": {
+					input: mkDeviceClass(tweakName(strings.Repeat("a", 253))),
+				},
+				"name: too long": {
+					input: mkDeviceClass(tweakName(strings.Repeat("a", 254))),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("metadata", "name"), strings.Repeat("a", 254), "").WithOrigin("format=k8s-long-name"),
+					},
+				},
 				// spec.selectors.
 				"valid: at limit selectors": {
 					input: mkDeviceClass(tweakSelectors(32)),
@@ -137,6 +168,14 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 				"valid no changes": {
 					old:    mkDeviceClass(),
 					update: mkDeviceClass(),
+				},
+				// metadata.name
+				"name: changed": {
+					old:    mkDeviceClass(),
+					update: mkDeviceClass(tweakName("test-classx")),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("metadata", "name"), "test-classx", "field is immutable"),
+					},
 				},
 				"valid update: at limit selectors": {
 					old:    mkDeviceClass(),
@@ -248,6 +287,12 @@ func mkDeviceClass(mutators ...func(*resource.DeviceClass)) resource.DeviceClass
 		mutate(&dc)
 	}
 	return dc
+}
+
+func tweakName(name string) func(*resource.DeviceClass) {
+	return func(dc *resource.DeviceClass) {
+		dc.Name = name
+	}
 }
 
 func tweakSelectors(count int) func(*resource.DeviceClass) {

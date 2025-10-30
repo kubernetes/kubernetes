@@ -87,7 +87,11 @@ func (cCtx clientContext) ExpectNoError(err error, explain ...interface{}) {
 }
 
 func (cCtx clientContext) Run(name string, cb func(tCtx TContext)) bool {
-	return run(cCtx, name, cb)
+	return run(cCtx, name, false, cb)
+}
+
+func (cCtx clientContext) SyncTest(name string, cb func(tCtx TContext)) bool {
+	return run(cCtx, name, true, cb)
 }
 
 func (cCtx clientContext) Logger() klog.Logger {

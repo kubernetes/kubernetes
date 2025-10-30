@@ -158,8 +158,9 @@ var (
 	workerNode3      = &st.MakeNode().Name(node3Name).Label("kubernetes.io/hostname", node3Name).Node
 	workerNode3Slice = st.MakeResourceSlice(node3Name, driver).Device("instance-1", map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{attrName: {BoolValue: ptr.To(true)}}).Obj()
 
-	workerNodeWithExtendedResource = &st.MakeNode().Name(nodeName).Label("kubernetes.io/hostname", nodeName).Capacity(map[v1.ResourceName]string{v1.ResourceName(extendedResourceName): "1"}).Node
-	brokenSelector                 = resourceapi.DeviceSelector{
+	workerNodeWithExtendedResource                = &st.MakeNode().Name(nodeName).Label("kubernetes.io/hostname", nodeName).Capacity(map[v1.ResourceName]string{v1.ResourceName(extendedResourceName): "1"}).Node
+	workerNodeWithExtendedResourceZeroAllocatable = &st.MakeNode().Name(nodeName).Label("kubernetes.io/hostname", nodeName).Capacity(map[v1.ResourceName]string{v1.ResourceName(extendedResourceName): "0"}).Node
+	brokenSelector                                = resourceapi.DeviceSelector{
 		CEL: &resourceapi.CELDeviceSelector{
 			// Not set for workerNode.
 			Expression: fmt.Sprintf(`device.attributes["%s"].%s`, driver, attrName),
@@ -358,12 +359,11 @@ var (
 				Annotations(map[string]string{"resource.kubernetes.io/extended-resource-claim": "true"}).
 				OwnerRef(
 			metav1.OwnerReference{
-				APIVersion:         "v1",
-				Kind:               "Pod",
-				Name:               podName,
-				UID:                types.UID(podUID),
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				APIVersion: "v1",
+				Kind:       "Pod",
+				Name:       podName,
+				UID:        types.UID(podUID),
+				Controller: ptr.To(true),
 			}).
 		RequestWithName("container-0-request-0", className).
 		Allocation(extendedResourceAllocationResult).
@@ -375,12 +375,11 @@ var (
 					Annotations(map[string]string{"resource.kubernetes.io/extended-resource-claim": "true"}).
 					OwnerRef(
 			metav1.OwnerReference{
-				APIVersion:         "v1",
-				Kind:               "Pod",
-				Name:               podName,
-				UID:                types.UID(podUID),
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				APIVersion: "v1",
+				Kind:       "Pod",
+				Name:       podName,
+				UID:        types.UID(podUID),
+				Controller: ptr.To(true),
 			}).
 		RequestWithName("container-0-request-0", className).
 		Allocation(extendedResourceAllocationResult).
@@ -392,12 +391,11 @@ var (
 					Annotations(map[string]string{"resource.kubernetes.io/extended-resource-claim": "true"}).
 					OwnerRef(
 			metav1.OwnerReference{
-				APIVersion:         "v1",
-				Kind:               "Pod",
-				Name:               podName,
-				UID:                types.UID(podUID),
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				APIVersion: "v1",
+				Kind:       "Pod",
+				Name:       podName,
+				UID:        types.UID(podUID),
+				Controller: ptr.To(true),
 			}).
 		RequestWithName("container-0-request-0", className).
 		RequestWithNameCount("container-0-request-1", className, 2).
@@ -410,12 +408,11 @@ var (
 						Annotations(map[string]string{"resource.kubernetes.io/extended-resource-claim": "true"}).
 						OwnerRef(
 			metav1.OwnerReference{
-				APIVersion:         "v1",
-				Kind:               "Pod",
-				Name:               podName,
-				UID:                types.UID(podUID),
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				APIVersion: "v1",
+				Kind:       "Pod",
+				Name:       podName,
+				UID:        types.UID(podUID),
+				Controller: ptr.To(true),
 			}).
 		RequestWithName("container-0-request-0", className).
 		RequestWithNameCount("container-0-request-1", className, 2).
@@ -428,12 +425,11 @@ var (
 							Annotations(map[string]string{"resource.kubernetes.io/extended-resource-claim": "true"}).
 							OwnerRef(
 			metav1.OwnerReference{
-				APIVersion:         "v1",
-				Kind:               "Pod",
-				Name:               podName,
-				UID:                types.UID(podUID),
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				APIVersion: "v1",
+				Kind:       "Pod",
+				Name:       podName,
+				UID:        types.UID(podUID),
+				Controller: ptr.To(true),
 			}).
 		RequestWithName("container-0-request-0", className).
 		RequestWithNameCount("container-1-request-0", className, 2).
@@ -446,12 +442,11 @@ var (
 								Annotations(map[string]string{"resource.kubernetes.io/extended-resource-claim": "true"}).
 								OwnerRef(
 			metav1.OwnerReference{
-				APIVersion:         "v1",
-				Kind:               "Pod",
-				Name:               podName,
-				UID:                types.UID(podUID),
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				APIVersion: "v1",
+				Kind:       "Pod",
+				Name:       podName,
+				UID:        types.UID(podUID),
+				Controller: ptr.To(true),
 			}).
 		RequestWithName("container-0-request-0", className).
 		RequestWithNameCount("container-1-request-0", className, 2).
@@ -464,12 +459,11 @@ var (
 					Annotations(map[string]string{"resource.kubernetes.io/extended-resource-claim": "true"}).
 					OwnerRef(
 			metav1.OwnerReference{
-				APIVersion:         "v1",
-				Kind:               "Pod",
-				Name:               podName,
-				UID:                types.UID(podUID),
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				APIVersion: "v1",
+				Kind:       "Pod",
+				Name:       podName,
+				UID:        types.UID(podUID),
+				Controller: ptr.To(true),
 			}).
 		RequestWithName("container-0-request-0", className).
 		Allocation(extendedResourceAllocationResultNode2).
@@ -1422,6 +1416,38 @@ func TestPlugin(t *testing.T) {
 			pod:                                podWithExtendedResourceName,
 			classes:                            []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
 			want:                               want{},
+		},
+		"extended-resource-name-with-zero-allocatable": {
+			enableDRAExtendedResource: true,
+			nodes:                     []*v1.Node{workerNodeWithExtendedResourceZeroAllocatable},
+			pod:                       podWithExtendedResourceName,
+			classes:                   []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
+			objs:                      []apiruntime.Object{workerNodeSlice, podWithExtendedResourceName},
+			want: want{
+				reserve: result{
+					inFlightClaim: extendedResourceClaimNoName,
+				},
+				prebind: result{
+					assumedClaim: reserve(extendedResourceClaim, podWithExtendedResourceName),
+					added:        []metav1.Object{reserve(extendedResourceClaim, podWithExtendedResourceName)},
+				},
+				postbind: result{
+					assumedClaim: reserve(extendedResourceClaim, podWithExtendedResourceName),
+				},
+			},
+		},
+		"non-DRA-extended-resource-name-with-zero-allocatable": {
+			enableDRAExtendedResource: true,
+			nodes:                     []*v1.Node{workerNodeWithExtendedResourceZeroAllocatable},
+			pod:                       podWithExtendedResourceName,
+			classes:                   []*resourceapi.DeviceClass{deviceClass},
+			objs:                      []apiruntime.Object{workerNodeSlice, podWithExtendedResourceName},
+			want: want{
+				prefilter: result{
+					status: fwk.NewStatus(fwk.Skip),
+				},
+				prebindPreFlight: fwk.NewStatus(fwk.Skip),
+			},
 		},
 		"extended-resource-name-no-resource": {
 			enableDRAExtendedResource: true,

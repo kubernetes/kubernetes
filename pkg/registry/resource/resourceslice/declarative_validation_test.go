@@ -122,6 +122,27 @@ func TestDeclarativeValidate(t *testing.T) {
 						field.Invalid(field.NewPath("spec", "devices").Index(0).Child("attributes").Key("test.io/multiple"), "", ""),
 					},
 				},
+				// spec.sharedCounters.counters
+				"invalid: shared counter key with uppercase": {
+					input: mkResourceSlice(tweakSharedCounter("InvalidKey")),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("spec", "sharedCounters").Index(0).Child("counters"), "InvalidKey", "").WithOrigin("format=k8s-short-name"),
+					},
+				},
+				"valid: shared counter key": {
+					input: mkResourceSlice(tweakSharedCounter("valid-key")),
+				},
+				// spec.devices.consumesCounters.counters
+				"invalid: device counter key with uppercase": {
+					input: mkResourceSlice(tweakSharedCounter("InvalidKey"), tweakDeviceCounter("InvalidKey")),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("spec", "sharedCounters").Index(0).Child("counters"), "InvalidKey", "").WithOrigin("format=k8s-short-name"),
+						field.Invalid(field.NewPath("spec", "devices").Index(0).Child("consumesCounters").Index(0).Child("counters"), "InvalidKey", "").WithOrigin("format=k8s-short-name"),
+					},
+				},
+				"valid: device counter key": {
+					input: mkResourceSlice(tweakSharedCounter("valid-key"), tweakDeviceCounter("valid-key")),
+				},
 				// TODO: Add more test cases
 			}
 
@@ -212,6 +233,23 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 						field.Invalid(field.NewPath("spec", "devices").Index(0).Child("attributes").Key("test.io/multiple"), "", "may have only one of the following fields set: bool, int, string, version"),
 					},
 				},
+				// spec.sharedCounters.counters
+				"invalid update: shared counter key with uppercase": {
+					old:    mkResourceSlice(),
+					update: mkResourceSlice(tweakSharedCounter("InvalidKey")),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("spec", "sharedCounters").Index(0).Child("counters"), "InvalidKey", "").WithOrigin("format=k8s-short-name"),
+					},
+				},
+				// spec.devices.consumesCounters.counters
+				"invalid update: device counter key with uppercase": {
+					old:    mkResourceSlice(),
+					update: mkResourceSlice(tweakSharedCounter("InvalidKey"), tweakDeviceCounter("InvalidKey")),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("spec", "sharedCounters").Index(0).Child("counters"), "InvalidKey", "").WithOrigin("format=k8s-short-name"),
+						field.Invalid(field.NewPath("spec", "devices").Index(0).Child("consumesCounters").Index(0).Child("counters"), "InvalidKey", "").WithOrigin("format=k8s-short-name"),
+					},
+				},
 			}
 			for k, tc := range testCases {
 				t.Run(k, func(t *testing.T) {
@@ -292,5 +330,31 @@ func tweakDeviceAttribute(name resource.QualifiedName, value resource.DeviceAttr
 			rs.Spec.Devices[0].Attributes = make(map[resource.QualifiedName]resource.DeviceAttribute)
 		}
 		rs.Spec.Devices[0].Attributes[name] = value
+	}
+}
+
+func tweakSharedCounter(key string) func(*resource.ResourceSlice) {
+	return func(rs *resource.ResourceSlice) {
+		rs.Spec.SharedCounters = []resource.CounterSet{
+			{
+				Name: "shared-counter-set",
+				Counters: map[string]resource.Counter{
+					key: {},
+				},
+			},
+		}
+	}
+}
+
+func tweakDeviceCounter(key string) func(*resource.ResourceSlice) {
+	return func(rs *resource.ResourceSlice) {
+		rs.Spec.Devices[0].ConsumesCounters = []resource.DeviceCounterConsumption{
+			{
+				CounterSet: "shared-counter-set",
+				Counters: map[string]resource.Counter{
+					key: {},
+				},
+			},
+		}
 	}
 }

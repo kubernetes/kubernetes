@@ -451,6 +451,8 @@ message CounterSet {
   // The maximum number of counters is 32.
   //
   // +required
+  // +k8s:required
+  // +k8s:eachKey=+k8s:format=k8s-short-name
   map<string, Counter> counters = 2;
 }
 
@@ -635,6 +637,8 @@ message DeviceClaimConfiguration {
 message DeviceClass {
   // Standard object metadata
   // +optional
+  // +k8s:subfield(name)=+k8s:optional
+  // +k8s:subfield(name)=+k8s:format=k8s-long-name
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec defines what can be allocated and how to configure it.
@@ -749,6 +753,8 @@ message DeviceConstraint {
   //
   // +optional
   // +oneOf=ConstraintType
+  // +k8s:optional
+  // +k8s:format=k8s-resource-fully-qualified-name
   optional string matchAttribute = 2;
 
   // DistinctAttribute requires that all devices in question have this
@@ -785,6 +791,8 @@ message DeviceCounterConsumption {
   // 16 counters each).
   //
   // +required
+  // +k8s:required
+  // +k8s:eachKey=+k8s:format=k8s-short-name
   map<string, Counter> counters = 2;
 }
 

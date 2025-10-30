@@ -506,12 +506,11 @@ func (pl *DynamicResources) preFilterExtendedResources(pod *v1.Pod, logger klog.
 				GenerateName: pod.Name + "-extended-resources-",
 				OwnerReferences: []metav1.OwnerReference{
 					{
-						APIVersion:         "v1",
-						Kind:               "Pod",
-						Name:               pod.Name,
-						UID:                pod.UID,
-						Controller:         ptr.To(true),
-						BlockOwnerDeletion: ptr.To(true),
+						APIVersion: "v1",
+						Kind:       "Pod",
+						Name:       pod.Name,
+						UID:        pod.UID,
+						Controller: ptr.To(true),
 					},
 				},
 				Annotations: map[string]string{
@@ -758,10 +757,10 @@ func (pl *DynamicResources) filterExtendedResources(state *stateData, pod *v1.Po
 			continue
 		}
 
-		_, okScalar := nodeInfo.GetAllocatable().GetScalarResources()[rName]
+		allocatable, okScalar := nodeInfo.GetAllocatable().GetScalarResources()[rName]
 		_, okDynamic := state.draExtendedResource.resourceToDeviceClass[rName]
 		if okDynamic {
-			if okScalar {
+			if allocatable > 0 {
 				// node provides the resource via device plugin
 				extendedResources[rName] = 0
 			} else {

@@ -2458,6 +2458,27 @@
     The PodTemplate must be deleted.
   release: v1.19
   file: test/e2e/common/node/podtemplates.go
+- testname: Pods Generation, graceful delete
+  codename: '[sig-node] Pods Extended (pod generation) Pod Generation custom-set generation
+    on new pods and graceful delete [Conformance]'
+  description: Create a Pod, ensure that triggering a graceful delete causes the generation
+    to be updated.
+  release: v1.35
+  file: test/e2e/node/pods.go
+- testname: Pods Generation, 500 updates
+  codename: '[sig-node] Pods Extended (pod generation) Pod Generation issue 500 podspec
+    updates and verify generation and observedGeneration eventually converge [Conformance]'
+  description: Create a Pod, issue 499 podSpec updates and verify generation and observedGeneration
+    eventually converge to 500.
+  release: v1.35
+  file: test/e2e/node/pods.go
+- testname: Pods Generation, updates
+  codename: '[sig-node] Pods Extended (pod generation) Pod Generation pod generation
+    should start at 1 and increment per update [Conformance]'
+  description: Create a Pod, and perform a few updates, ensuring that the pod's metadata.generation
+    and status.observedGeneration are updated as expected.
+  release: v1.35
+  file: test/e2e/node/pods.go
 - testname: Pods, QOS
   codename: '[sig-node] Pods Extended Pods Set QOS Class should be set on Pods with
     matching resource requests and limits for memory and cpu [Conformance]'

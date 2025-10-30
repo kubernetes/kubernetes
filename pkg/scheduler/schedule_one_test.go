@@ -2097,7 +2097,7 @@ func TestSchedulerBinding(t *testing.T) {
 	}
 }
 
-func TestUpdatePod(t *testing.T) {
+func TestUpdatePodStatus(t *testing.T) {
 	tests := []struct {
 		name                     string
 		currentPodConditions     []v1.PodCondition

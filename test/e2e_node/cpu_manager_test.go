@@ -1859,7 +1859,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 		})
 	})
 
-	f.Context("When checking the sidecar containers", feature.SidecarContainers, func() {
+	f.Context("When checking the sidecar containers", framework.WithNodeConformance(), func() {
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			reservedCPUs = cpuset.New(0)
 		})
