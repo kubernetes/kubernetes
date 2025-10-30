@@ -148,7 +148,9 @@ func (rc *RouteController) handleNodeUpdate(oldObj, newObj interface{}) {
 		return
 	}
 
-	// Resync sends an update with old==new.
+	// The Node informer triggers a periodic update event.
+	// In these cases, the old and new Node objects are identical. We use this event as a signal to perform
+	// a route reconciliation — our regular cleanup process — as described in the KEP 5237.
 	resync := oldNode.GetResourceVersion() == newNode.GetResourceVersion()
 	diffInPodCIDR := !reflect.DeepEqual(oldNode.Spec.PodCIDRs, newNode.Spec.PodCIDRs)
 	diffInNodeAddresses := !reflect.DeepEqual(oldNode.Status.Addresses, newNode.Status.Addresses)
