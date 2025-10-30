@@ -328,6 +328,8 @@ var (
 	// PodLevelResources feature gate to be enabled.
 	PodLevelResources = framework.WithFeature(framework.ValidFeatures.Add("PodLevelResources"))
 
+	InPlacePodLevelResourcesVerticalScaling = framework.WithFeature(framework.ValidFeatures.Add("InPlacePodLevelResourcesVerticalScaling"))
+
 	// Owner: sig-node
 	// Marks tests that require a cluster with PodLogsQuerySplitStreams
 	// (used for testing specific log stream <https://kep.k8s.io/3288>)
