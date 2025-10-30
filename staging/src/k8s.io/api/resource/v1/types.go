@@ -1960,6 +1960,7 @@ type NetworkDeviceData struct {
 	// +listType=atomic
 	// +k8s:listType=atomic
 	// +k8s:unique=set
+	// +k8s:maxItems=16
 	IPs []string `json:"ips,omitempty" protobuf:"bytes,2,opt,name=ips"`
 
 	// HardwareAddress represents the hardware address (e.g. MAC Address) of the device's network interface.
