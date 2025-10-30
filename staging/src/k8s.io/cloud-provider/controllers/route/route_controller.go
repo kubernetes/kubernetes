@@ -163,7 +163,7 @@ func (rc *RouteController) handleNodeUpdate(oldObj, newObj interface{}) {
 func (rc *RouteController) Run(ctx context.Context, syncPeriod time.Duration, controllerManagerMetrics *controllersmetrics.ControllerManagerMetrics) {
 	defer utilruntime.HandleCrash()
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.CloudControllerManagerWatchBasedRoutesReconciliation) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.CloudControllerManagerWatchBasedRoutesReconciliation) && rc.workqueue != nil {
 		defer rc.workqueue.ShutDown()
 	}
 
