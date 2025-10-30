@@ -80,3 +80,8 @@ func (p *bestEffortPolicy) GetTopologyHints(ctx context.Context, s state.State, 
 func (p *bestEffortPolicy) GetAllocatableMemory(ctx context.Context, s state.State) []state.Block {
 	return p.static.GetAllocatableMemory(ctx, s)
 }
+
+// CanAllocateExclusively returns true if the policy can allocate exclusively mmeory blocks
+func (p *bestEffortPolicy) CanAllocateExclusively() bool {
+	return false
+}
