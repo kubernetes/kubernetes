@@ -76,11 +76,11 @@ const (
 	PodTopologyManagerScope = "pod"
 	// NoneMemoryManagerPolicy is a memory manager none policy, under the none policy
 	// the memory manager will not pin containers memory of guaranteed pods
-	NoneMemoryManagerPolicy = "None"
+	NoneMemoryManagerPolicy = "none"
 	// StaticMemoryManagerPolicy is a memory manager static policy, under the static policy
 	// the memory manager will try to pin containers memory of guaranteed pods to the smallest
 	// possible sub-set of NUMA nodes
-	StaticMemoryManagerPolicy = "Static"
+	StaticMemoryManagerPolicy = "static"
 )
 
 // ImagePullCredentialsVerificationPolicy is an enum for the policy that is enforced

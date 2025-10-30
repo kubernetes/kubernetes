@@ -51,8 +51,8 @@ import (
 const (
 	evictionHardMemory = "memory.available"
 	resourceMemory     = "memory"
-	staticPolicy       = "Static"
-	nonePolicy         = "None"
+	staticPolicy       = "static"
+	nonePolicy         = "none"
 	hugepages2MiCount  = 8
 )
 

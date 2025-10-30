@@ -23,7 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 )
 
-const policyTypeNone policyType = "None"
+const policyTypeNone policyType = "none"
 
 // none is implementation of the policy interface for the none policy, using none
 // policy is the same as disable memory management
