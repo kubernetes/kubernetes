@@ -168,7 +168,7 @@ type Framework interface {
 	QueueSortFunc() fwk.LessFunc
 
 	// Create a scheduling signature for a given pod, if possible. Two pods with the same signature
-	// should get the same feasibility and scores for any given set of nodes. If some plugins
+	// should get the same feasibility and scores for any given set of nodes even after one of them gets assigned. If some plugins
 	// are unable to create a signature, the pod may be "unsignable" which disables results caching
 	// and gang scheduling optimizations.
 	SignPod(ctx context.Context, pod *v1.Pod) (string, error)
