@@ -1310,6 +1310,21 @@ func testValidateStatusUpdateForDeclarative(t *testing.T, apiVersion string) {
 				tweakStatusAllocationConfigRequests(32),
 			),
 		},
+		"invalid status.devices.networkData.ips, too many items": {
+			old: mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(
+				tweakStatusDevicesTooManyIPs(17),
+			),
+			expectedErrs: field.ErrorList{
+				field.TooMany(field.NewPath("status", "devices").Index(0).Child("networkData", "ips"), 17, 16).WithOrigin("maxItems"),
+			},
+		},
+		"invalid status.devices.networkData.ips, max allowed": {
+			old: mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(
+				tweakStatusDevicesTooManyIPs(16),
+			),
+		},
 	}
 
 	for k, tc := range testCases {
@@ -1698,6 +1713,21 @@ func tweakStatusAllocationConfigRequests(count int) func(rc *resource.ResourceCl
 		}
 		for i := 0; i < count; i++ {
 			rc.Status.Allocation.Devices.Config[0].Requests = append(rc.Status.Allocation.Devices.Config[0].Requests, fmt.Sprintf("req-%d", i))
+		}
+	}
+}
+
+func tweakStatusDevicesTooManyIPs(count int) func(rc *resource.ResourceClaim) {
+	return func(rc *resource.ResourceClaim) {
+		if len(rc.Status.Devices) == 0 {
+			rc.Status.Devices = append(rc.Status.Devices, standardAllocatedDeviceStatus())
+		}
+		if rc.Status.Devices[0].NetworkData == nil {
+			rc.Status.Devices[0].NetworkData = &resource.NetworkDeviceData{}
+		}
+		rc.Status.Devices[0].NetworkData.IPs = []string{}
+		for i := 0; i < count; i++ {
+			rc.Status.Devices[0].NetworkData.IPs = append(rc.Status.Devices[0].NetworkData.IPs, fmt.Sprintf("1.2.3.%d/32", i))
 		}
 	}
 }
