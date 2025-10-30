@@ -897,7 +897,7 @@ func TestPluginPolicy(t *testing.T) {
 				return true, "allowlist is non-nil"
 			}
 
-			return true, "policy set to `DenyAll`"
+			return true, `policy set to "DenyAll"`
 		case api.PluginPolicyAllowlist:
 			if tt.allowlist == nil {
 				return true, "allowlist is unspecified"
@@ -913,9 +913,9 @@ func TestPluginPolicy(t *testing.T) {
 			case tt.pluginExists && !tt.entryExists:
 				return true, "is not permitted by the credential plugin allowlist"
 			case !tt.pluginExists && tt.entryExists:
-				return true, "could not resolve path of exec plugin command"
+				return true, "could not resolve path for plugin"
 			case !tt.pluginExists && !tt.entryExists:
-				return true, "could not resolve path of exec plugin command"
+				return true, "could not resolve path for plugin"
 			}
 
 			panic("unreachable")
@@ -968,7 +968,7 @@ func TestPluginPolicy(t *testing.T) {
 			a.stderr = stderr
 			a.environ = func() []string { return nil }
 
-			if err := a.allowsPlugin(test.config.Command); err != nil {
+			if err := a.allowsPlugin(); err != nil {
 				if !test.wantErr {
 					t.Errorf("get token %v", err)
 				} else if !strings.Contains(err.Error(), test.wantErrSubstr) {

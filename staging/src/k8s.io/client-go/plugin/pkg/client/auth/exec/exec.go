@@ -76,10 +76,7 @@ var (
 		clientauthenticationv1.SchemeGroupVersion.String():      clientauthenticationv1.SchemeGroupVersion,
 	}
 
-	errInvalidAPIVersion     = errors.New("exec plugin: invalid apiVersion")
-	errPolicyDenyAll         = errors.New("plugin policy set to `DenyAll`")
-	errAllowlistEntryIsEmpty = errors.New("allowlist entry is empty")
-	errCredPluginNotFound    = errors.New("could not resolve path of exec plugin command")
+	errInvalidAPIVersion = errors.New("exec plugin: invalid apiVersion")
 )
 
 func newCache() *cache {
@@ -304,7 +301,7 @@ type Authenticator struct {
 // may run according to the credential plugin policy. If the plugin is allowed,
 // `nil` is returned. If the plugin is not allowed, an error must be returned
 // explaining why.
-func (a *Authenticator) allowsPlugin(cmd string) error {
+func (a *Authenticator) allowsPlugin() error {
 	if a.execPluginPolicy == nil {
 		return nil
 	}
@@ -315,19 +312,19 @@ func (a *Authenticator) allowsPlugin(cmd string) error {
 	case api.PluginPolicyAllowAll:
 		return nil
 	case api.PluginPolicyDenyAll:
-		return fmt.Errorf("plugin %q not allowed: policy set to %w", cmd, errPolicyDenyAll)
+		return fmt.Errorf("plugin %q not allowed: policy set to %q", a.cmd, api.PluginPolicyDenyAll)
 	case api.PluginPolicyAllowlist:
-		return a.checkAllowlist(cmd)
+		return a.checkAllowlist()
 	default:
 		panic("unreachable: error will be returned by validatePluginPolicy")
 	}
 
 }
 
-func (a *Authenticator) checkAllowlist(cmd string) error {
-	pluginAbsPath, err := exec.LookPath(cmd)
+func (a *Authenticator) checkAllowlist() error {
+	pluginAbsPath, err := exec.LookPath(a.cmd)
 	if err != nil {
-		return fmt.Errorf("%w: %q", errCredPluginNotFound, cmd)
+		return fmt.Errorf("could not resolve path for plugin %q: %w", a.cmd, err)
 	}
 
 	errs := make([]error, 0, len(a.execPluginPolicy.Allowlist))
@@ -503,7 +500,7 @@ func (a *Authenticator) refreshCredsLocked() error {
 		cmd.Stdin = a.stdin
 	}
 
-	if err := a.allowsPlugin(a.cmd); err != nil {
+	if err := a.allowsPlugin(); err != nil {
 		return err
 	}
 
@@ -612,18 +609,20 @@ func (a *Authenticator) wrapCmdRunErrorLocked(err error) error {
 	}
 }
 
+var emptyAllowlistEntry api.AllowlistEntry
+
 // alEntry MUST be non-nil
 func itemGreenlights(alEntry *api.AllowlistEntry, pluginAbsPath string) error {
 	// if no fields are specified, this is a user error. To avoid fail-open
 	// behavior, an empty entry must not allow anything.
-	if *alEntry == api.EmptyAllowlistEntry {
-		return errAllowlistEntryIsEmpty
+	if *alEntry == emptyAllowlistEntry {
+		return fmt.Errorf("allowlist entry is empty")
 	}
 
 	if entryName := alEntry.Name; len(entryName) > 0 {
 		entryAbsPath, err := exec.LookPath(entryName)
 		if err != nil || pluginAbsPath != entryAbsPath {
-			return fmt.Errorf("allowlist entry %q is not a match for %q", entryName, pluginAbsPath)
+			return fmt.Errorf("allowlist entry %q is not a match for %q: %w", entryName, pluginAbsPath, err)
 		}
 	}
 
@@ -662,7 +661,7 @@ func validateAllowlist(list []api.AllowlistEntry) error {
 	}
 
 	for i, item := range list {
-		if item == api.EmptyAllowlistEntry {
+		if item == emptyAllowlistEntry {
 			return fmt.Errorf("misconfigured credential plugin allowlist: empty allowlist entry #%d", i+1)
 		}
 	}

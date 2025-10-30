@@ -334,8 +334,6 @@ const (
 	PluginPolicyAllowlist   PolicyType = "Allowlist"
 )
 
-var EmptyAllowlistEntry = AllowlistEntry{}
-
 var _ fmt.Stringer = new(ExecConfig)
 var _ fmt.GoStringer = new(ExecConfig)
 
