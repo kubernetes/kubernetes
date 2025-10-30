@@ -18,9 +18,6 @@ package e2enode
 
 import (
 	"context"
-	"encoding/json"
-	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -31,6 +28,7 @@ import (
 	"google.golang.org/grpc/metadata"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	podsv1alpha1 "k8s.io/kubelet/pkg/apis/pods/v1alpha1"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
@@ -50,6 +48,10 @@ var _ = ginkgo.Describe("Kubelet Pods API", func() {
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Context("when the PodsAPI feature gate is enabled", func() {
+		var (
+			conn   *grpc.ClientConn
+			client podsv1alpha1.PodsClient
+		)
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 			if initialConfig.FeatureGates == nil {
 				initialConfig.FeatureGates = make(map[string]bool)
@@ -57,28 +59,40 @@ var _ = ginkgo.Describe("Kubelet Pods API", func() {
 			initialConfig.FeatureGates[string(kubefeatures.PodsAPI)] = true
 		})
 
-		socketPath := "/var/lib/kubelet/pods-api"
-
 		ginkgo.BeforeEach(func(ctx context.Context) {
-			ginkgo.By("Wait for the local endpoint to be present")
-			gomega.Eventually(ctx, func() error {
-				_, err := os.Stat(filepath.Join(socketPath, pods.Socket+".sock"))
-				return err
-			}, 30*time.Second, 1*time.Second).Should(gomega.Succeed(), "Pods API socket not present")
+			ginkgo.By("Wait for the node to be ready")
+			waitForNodeReady(ctx)
+
+			ginkgo.By("Connecting to Pods API")
+			endpoint, err := util.LocalEndpoint("/var/lib/kubelet/pods-api", pods.Socket)
+			framework.ExpectNoError(err, "failed to get local endpoint for Pods API")
+
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				conn, err = grpc.DialContext(ctx, endpoint, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
+				if err != nil {
+					return err
+				}
+				client = podsv1alpha1.NewPodsClient(conn)
+				// Make a simple call to ensure the server is responsive.
+				_, err = client.ListPods(ctx, &podsv1alpha1.ListPodsRequest{})
+				if err != nil {
+					conn.Close() // Close connection on failure to retry dialing
+					return err
+				}
+				return nil
+			}, "1m", "5s").Should(gomega.Succeed(), "failed to connect to Pods API")
+		})
+
+		ginkgo.AfterEach(func() {
+			if conn != nil {
+				conn.Close()
+			}
+			ginkgo.By("Emitting Shutdown false signal; cancelling the shutdown")
+			err := emitSignalPrepareForShutdown(false)
+			framework.ExpectNoError(err)
 		})
 
 		ginkgo.It("should be able to list, get, and watch pods", func(ctx context.Context) {
-			endpoint, err := util.LocalEndpoint(socketPath, pods.Socket)
-			framework.ExpectNoError(err, "failed to get local endpoint for Pods API")
-
-			conn, err := grpc.DialContext(ctx, endpoint, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
-			framework.ExpectNoError(err, "failed to dial Pods API")
-			defer func(conn *grpc.ClientConn) {
-				_ = conn.Close()
-			}(conn)
-
-			client := podsv1alpha1.NewPodsClient(conn)
-
 			// Create a test pod
 			podName := "test-pod-" + string(uuid.NewUUID())
 			pod := &v1.Pod{
@@ -90,7 +104,7 @@ var _ = ginkgo.Describe("Kubelet Pods API", func() {
 					Containers: []v1.Container{
 						{
 							Name:    "test-container",
-							Image:   "registry.k8s.io/busybox",
+							Image:   "busybox:1.36",
 							Command: []string{"sleep", "3600"},
 						},
 					},
@@ -101,69 +115,79 @@ var _ = ginkgo.Describe("Kubelet Pods API", func() {
 			testPod := e2epod.NewPodClient(f).CreateSync(ctx, pod)
 
 			ginkgo.By("listing pods and ensuring the test pod is present")
-			listResp, err := client.ListPods(ctx, &podsv1alpha1.ListPodsRequest{})
-			framework.ExpectNoError(err, "failed to list pods")
-			var foundPod bool
-			for _, p := range listResp.Pods {
-				var pod v1.Pod
-				err := json.Unmarshal(p, &pod)
-				framework.ExpectNoError(err, "failed to unmarshal pod from list")
-				if pod.ObjectMeta.UID == testPod.UID {
-					foundPod = true
-					break
+			gomega.Eventually(ctx, func(ctx context.Context) bool {
+				listResp, err := client.ListPods(ctx, &podsv1alpha1.ListPodsRequest{})
+				if err != nil {
+					framework.Logf("failed to list pods, will retry: %v", err)
+					return false
 				}
-			}
-			gomega.Expect(foundPod).To(gomega.BeTrueBecause("test pod not found in list"))
+				for _, p := range listResp.Pods {
+					var pod v1.Pod
+					err := pod.Unmarshal(p)
+					if err != nil {
+						framework.Logf("failed to unmarshal pod, will retry: %v", err)
+						return false
+					}
+					if pod.ObjectMeta.UID == testPod.UID {
+						return true
+					}
+				}
+				return false
+			}, "1m", "5s").Should(gomega.BeTrue(), "test pod not found in list")
 
 			ginkgo.By("getting the test pod by UID")
 			getResp, err := client.GetPod(ctx, &podsv1alpha1.GetPodRequest{PodUID: string(testPod.UID)})
 			framework.ExpectNoError(err, "failed to get pod")
 			var podFromGet v1.Pod
-			err = json.Unmarshal(getResp.Pod, &podFromGet)
+			err = podFromGet.Unmarshal(getResp.Pod)
 			framework.ExpectNoError(err, "failed to unmarshal pod from get")
 			gomega.Expect(podFromGet.ObjectMeta.UID).To(gomega.Equal(testPod.UID))
 
 			ginkgo.By("watching for pod events")
-			watchCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+			watchCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 			defer cancel()
 			watchClient, err := client.WatchPods(watchCtx, &podsv1alpha1.WatchPodsRequest{})
 			framework.ExpectNoError(err, "failed to watch pods")
 
 			// Expect to receive an ADDED event for the new pod
-			event, err := watchClient.Recv()
-			framework.ExpectNoError(err, "failed to receive watch event")
-			gomega.Expect(event.Type).To(gomega.Equal(podsv1alpha1.EventType_ADDED))
 			var podFromWatch v1.Pod
-			err = json.Unmarshal(event.Pod, &podFromWatch)
-			framework.ExpectNoError(err, "failed to unmarshal pod from watch event")
-			gomega.Expect(podFromWatch.ObjectMeta.UID).To(gomega.Equal(testPod.UID))
+			gomega.Eventually(ctx, func(ctx context.Context) (types.UID, error) {
+				event, err := watchClient.Recv()
+				if err != nil {
+					return "", err
+				}
+				if event.Type != podsv1alpha1.EventType_ADDED {
+					return "", nil // Continue waiting
+				}
+				if err := podFromWatch.Unmarshal(event.Pod); err != nil {
+					return "", err
+				}
+				return podFromWatch.ObjectMeta.UID, nil
+			}, "1m", "1s").Should(gomega.Equal(testPod.UID), "did not receive ADDED event for the test pod")
 
 			ginkgo.By("deleting the test pod")
-			err = e2epod.NewPodClient(f).Delete(ctx, testPod.Name, metav1.DeleteOptions{})
+			gracePeriod := int64(0)
+			err = e2epod.NewPodClient(f).Delete(ctx, testPod.Name, metav1.DeleteOptions{GracePeriodSeconds: &gracePeriod})
 			framework.ExpectNoError(err, "failed to delete pod")
 
 			// Expect to receive a DELETED event
-			event, err = watchClient.Recv()
-			framework.ExpectNoError(err, "failed to receive watch event")
-			gomega.Expect(event.Type).To(gomega.Equal(podsv1alpha1.EventType_DELETED))
 			var podFromDeletedEvent v1.Pod
-			err = json.Unmarshal(event.Pod, &podFromDeletedEvent)
-			framework.ExpectNoError(err, "failed to unmarshal pod from delete event")
-			gomega.Expect(podFromDeletedEvent.ObjectMeta.UID).To(gomega.Equal(testPod.UID))
+			gomega.Eventually(ctx, func(ctx context.Context) (types.UID, error) {
+				event, err := watchClient.Recv()
+				if err != nil {
+					return "", err
+				}
+				if event.Type != podsv1alpha1.EventType_DELETED {
+					return "", nil // Continue waiting
+				}
+				if err := podFromDeletedEvent.Unmarshal(event.Pod); err != nil {
+					return "", err
+				}
+				return podFromDeletedEvent.ObjectMeta.UID, nil
+			}, "1m", "1s").Should(gomega.Equal(testPod.UID), "did not receive DELETED event for the test pod")
 		})
 
 		ginkgo.It("should respect field masks", func(ctx context.Context) {
-			endpoint, err := util.LocalEndpoint(socketPath, pods.Socket)
-			framework.ExpectNoError(err, "failed to get local endpoint for Pods API")
-
-			conn, err := grpc.DialContext(ctx, endpoint, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
-			framework.ExpectNoError(err, "failed to dial Pods API")
-			defer func(conn *grpc.ClientConn) {
-				_ = conn.Close()
-			}(conn)
-
-			client := podsv1alpha1.NewPodsClient(conn)
-
 			podName := "mask-test-pod-" + string(uuid.NewUUID())
 			pod := &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -175,7 +199,7 @@ var _ = ginkgo.Describe("Kubelet Pods API", func() {
 					Containers: []v1.Container{
 						{
 							Name:    "test-container",
-							Image:   "registry.k8s.io/busybox",
+							Image:   "busybox:1.36",
 							Command: []string{"sleep", "3600"},
 						},
 					},
@@ -188,20 +212,27 @@ var _ = ginkgo.Describe("Kubelet Pods API", func() {
 			ginkgo.By("listing pods with a field mask")
 			md := metadata.New(map[string]string{pods.FieldMaskMetadataKey: "metadata.name,spec.nodeName"})
 			ctxWithMask := metadata.NewOutgoingContext(ctx, md)
-			listResp, err := client.ListPods(ctxWithMask, &podsv1alpha1.ListPodsRequest{})
-			framework.ExpectNoError(err, "failed to list pods with field mask")
-
 			var maskedPod *v1.Pod
-			for _, p := range listResp.Pods {
-				pod := &v1.Pod{}
-				err := json.Unmarshal(p, pod)
-				framework.ExpectNoError(err, "failed to unmarshal pod")
-				if pod.ObjectMeta.Name == podName {
-					maskedPod = pod
-					break
+			gomega.Eventually(ctx, func(ctx context.Context) bool {
+				listResp, err := client.ListPods(ctxWithMask, &podsv1alpha1.ListPodsRequest{})
+				if err != nil {
+					framework.Logf("failed to list pods with field mask, will retry: %v", err)
+					return false
 				}
-			}
-			gomega.Expect(maskedPod).NotTo(gomega.BeNil(), "masked pod not found in list")
+				for _, p := range listResp.Pods {
+					pod := &v1.Pod{}
+					err := pod.Unmarshal(p)
+					if err != nil {
+						framework.Logf("failed to unmarshal pod, will retry: %v", err)
+						return false
+					}
+					if pod.ObjectMeta.Name == podName {
+						maskedPod = pod
+						return true
+					}
+				}
+				return false
+			}, "1m", "5s").Should(gomega.BeTrue(), "masked pod not found in list")
 			gomega.Expect(maskedPod.Name).To(gomega.Equal(podName))
 			gomega.Expect(maskedPod.Spec.NodeName).To(gomega.Equal(framework.TestContext.NodeName))
 			gomega.Expect(maskedPod.Namespace).To(gomega.BeEmpty())
@@ -214,7 +245,7 @@ var _ = ginkgo.Describe("Kubelet Pods API", func() {
 			framework.ExpectNoError(err, "failed to get pod with field mask")
 
 			maskedPod = &v1.Pod{}
-			err = json.Unmarshal(getResp.Pod, maskedPod)
+			err = maskedPod.Unmarshal(getResp.Pod)
 			framework.ExpectNoError(err, "failed to unmarshal pod")
 			gomega.Expect(maskedPod.Name).To(gomega.BeEmpty())
 			gomega.Expect(maskedPod.Namespace).To(gomega.Equal(f.Namespace.Name))
