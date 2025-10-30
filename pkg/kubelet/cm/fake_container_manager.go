@@ -56,7 +56,7 @@ func NewFakeContainerManager() *FakeContainerManager {
 	return &FakeContainerManager{
 		PodContainerManager: NewFakePodContainerManager(),
 		cpuManager:          cpumanager.NewFakeManager(klog.TODO()),
-		memoryManager:       memorymanager.NewFakeManager(context.TODO()),
+		memoryManager:       memorymanager.NewFakeManager(klog.TODO()),
 	}
 }
 
