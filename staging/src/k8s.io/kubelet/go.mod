@@ -10,7 +10,7 @@ require (
 	github.com/emicklei/go-restful/v3 v3.12.2
 	github.com/stretchr/testify v1.11.1
 	go.uber.org/goleak v1.3.0
-	google.golang.org/grpc v1.72.2
+	google.golang.org/grpc v1.75.0-dev
 	google.golang.org/protobuf v1.36.8
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
@@ -55,7 +55,7 @@ require (
 	golang.org/x/term v0.36.0 // indirect
 	golang.org/x/text v0.29.0 // indirect
 	golang.org/x/time v0.9.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20250528174236-200df99c418a // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20250818200422-3122310a409c // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20250910181357-589584f1c912 // indirect

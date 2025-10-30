@@ -322,7 +322,7 @@ github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors
 # github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 ## explicit
 github.com/grpc-ecosystem/go-grpc-prometheus
-# github.com/grpc-ecosystem/grpc-gateway/v2 v2.26.3
+# github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.1
 ## explicit; go 1.23.0
 github.com/grpc-ecosystem/grpc-gateway/v2/internal/httprule
 github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2/options
@@ -331,7 +331,7 @@ github.com/grpc-ecosystem/grpc-gateway/v2/utilities
 # github.com/inconshreveable/mousetrap v1.1.0
 ## explicit; go 1.18
 github.com/inconshreveable/mousetrap
-# github.com/ishidawataru/sctp v0.0.0-20250521072954-ae8eb7fa7995
+# github.com/ishidawataru/sctp v0.0.0-20250829011129-4b890084db30
 ## explicit; go 1.12
 github.com/ishidawataru/sctp
 # github.com/jonboulle/clockwork v0.5.0
@@ -736,8 +736,6 @@ go.opentelemetry.io/otel/sdk/internal/x
 go.opentelemetry.io/otel/sdk/resource
 go.opentelemetry.io/otel/sdk/trace
 go.opentelemetry.io/otel/sdk/trace/tracetest
-# go.opentelemetry.io/otel/sdk/metric v1.36.0
-## explicit; go 1.23.0
 # go.opentelemetry.io/otel/trace v1.36.0
 ## explicit; go 1.23.0
 go.opentelemetry.io/otel/trace
@@ -905,18 +903,18 @@ golang.org/x/tools/internal/typesinternal
 golang.org/x/tools/internal/versions
 # golang.org/x/tools/go/expect v0.1.1-deprecated
 ## explicit; go 1.23.0
-# google.golang.org/genproto/googleapis/api v0.0.0-20250303144028-a0af3efb3deb
+# google.golang.org/genproto/googleapis/api v0.0.0-20250825161204-c5933d9347a5
 ## explicit; go 1.23.0
 google.golang.org/genproto/googleapis/api
 google.golang.org/genproto/googleapis/api/annotations
 google.golang.org/genproto/googleapis/api/expr/v1alpha1
 google.golang.org/genproto/googleapis/api/httpbody
-# google.golang.org/genproto/googleapis/rpc v0.0.0-20250528174236-200df99c418a
+# google.golang.org/genproto/googleapis/rpc v0.0.0-20250818200422-3122310a409c
 ## explicit; go 1.23.0
 google.golang.org/genproto/googleapis/rpc/errdetails
 google.golang.org/genproto/googleapis/rpc/status
-# google.golang.org/grpc v1.72.2
-## explicit; go 1.23
+# google.golang.org/grpc v1.75.0-dev
+## explicit; go 1.23.0
 google.golang.org/grpc
 google.golang.org/grpc/attributes
 google.golang.org/grpc/backoff
@@ -1154,6 +1152,8 @@ k8s.io/kube-openapi/pkg/validation/validate
 # k8s.io/kubectl v0.0.0 => ./staging/src/k8s.io/kubectl
 ## explicit; go 1.25.0
 # k8s.io/kubelet v0.0.0 => ./staging/src/k8s.io/kubelet
+## explicit; go 1.25.0
+# k8s.io/kubernetes v0.0.0-00010101000000-000000000000 => .
 ## explicit; go 1.25.0
 # k8s.io/metrics v0.0.0 => ./staging/src/k8s.io/metrics
 ## explicit; go 1.25.0

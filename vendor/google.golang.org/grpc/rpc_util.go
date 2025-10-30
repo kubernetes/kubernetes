@@ -160,6 +160,7 @@ type callInfo struct {
 	codec                 baseCodec
 	maxRetryRPCBufferSize int
 	onFinish              []func(err error)
+	authority             string
 }
 
 func defaultCallInfo() *callInfo {
@@ -364,6 +365,36 @@ func (o MaxRecvMsgSizeCallOption) before(c *callInfo) error {
 	return nil
 }
 func (o MaxRecvMsgSizeCallOption) after(*callInfo, *csAttempt) {}
+
+// CallAuthority returns a CallOption that sets the HTTP/2 :authority header of
+// an RPC to the specified value. When using CallAuthority, the credentials in
+// use must implement the AuthorityValidator interface.
+//
+// # Experimental
+//
+// Notice: This API is EXPERIMENTAL and may be changed or removed in a later
+// release.
+func CallAuthority(authority string) CallOption {
+	return AuthorityOverrideCallOption{Authority: authority}
+}
+
+// AuthorityOverrideCallOption is a CallOption that indicates the HTTP/2
+// :authority header value to use for the call.
+//
+// # Experimental
+//
+// Notice: This type is EXPERIMENTAL and may be changed or removed in a later
+// release.
+type AuthorityOverrideCallOption struct {
+	Authority string
+}
+
+func (o AuthorityOverrideCallOption) before(c *callInfo) error {
+	c.authority = o.Authority
+	return nil
+}
+
+func (o AuthorityOverrideCallOption) after(*callInfo, *csAttempt) {}
 
 // MaxCallSendMsgSize returns a CallOption which sets the maximum message size
 // in bytes the client can send. If this is not set, gRPC uses the default

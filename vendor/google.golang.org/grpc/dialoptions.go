@@ -213,6 +213,7 @@ func WithReadBufferSize(s int) DialOption {
 func WithInitialWindowSize(s int32) DialOption {
 	return newFuncDialOption(func(o *dialOptions) {
 		o.copts.InitialWindowSize = s
+		o.copts.StaticWindowSize = true
 	})
 }
 
@@ -222,6 +223,26 @@ func WithInitialWindowSize(s int32) DialOption {
 func WithInitialConnWindowSize(s int32) DialOption {
 	return newFuncDialOption(func(o *dialOptions) {
 		o.copts.InitialConnWindowSize = s
+		o.copts.StaticWindowSize = true
+	})
+}
+
+// WithStaticStreamWindowSize returns a DialOption which sets the initial
+// stream window size to the value provided and disables dynamic flow control.
+func WithStaticStreamWindowSize(s int32) DialOption {
+	return newFuncDialOption(func(o *dialOptions) {
+		o.copts.InitialWindowSize = s
+		o.copts.StaticWindowSize = true
+	})
+}
+
+// WithStaticConnWindowSize returns a DialOption which sets the initial
+// connection window size to the value provided and disables dynamic flow
+// control.
+func WithStaticConnWindowSize(s int32) DialOption {
+	return newFuncDialOption(func(o *dialOptions) {
+		o.copts.InitialConnWindowSize = s
+		o.copts.StaticWindowSize = true
 	})
 }
 
@@ -360,7 +381,7 @@ func WithReturnConnectionError() DialOption {
 //
 // Note that using this DialOption with per-RPC credentials (through
 // WithCredentialsBundle or WithPerRPCCredentials) which require transport
-// security is incompatible and will cause grpc.Dial() to fail.
+// security is incompatible and will cause RPCs to fail.
 //
 // Deprecated: use WithTransportCredentials and insecure.NewCredentials()
 // instead. Will be supported throughout 1.x.
