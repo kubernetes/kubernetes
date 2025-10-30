@@ -1017,6 +1017,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.34"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.35"
 - name: MutatingAdmissionPolicy
   versionedSpecs:
   - default: false
