@@ -508,6 +508,8 @@ func TestAsyncPreemption(t *testing.T) {
 
 		// createPod creates a Pod.
 		createPod *createPod
+		// createNode creates an additional Node.
+		createNode string
 		// schedulePod schedules one Pod that is at the top of the activeQ.
 		// You should give a Pod name that is supposed to be scheduled.
 		schedulePod *schedulePod
@@ -1111,6 +1113,100 @@ func TestAsyncPreemption(t *testing.T) {
 				},
 			},
 		},
+		{
+			// Expected test outcome: lower priority Pod switches to another node, does not get stuck in unschedulable queue forever. (This part is in comment due to test name length limit.)
+			name: "While lower priority Pod is waiting for preemption, higher priority Pod takes its place on the node",
+			scenarios: []scenario{
+				{
+					name: "create N-1 victim Pods on the first node",
+					createPod: &createPod{
+						pod:   st.MakePod().GenerateName("victim-").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Node("node").Container("image").ZeroTerminationGracePeriod().Priority(1).Obj(),
+						count: ptr.To(3),
+					},
+				},
+				{
+					name: "create the last victim Pod on the first node, that is going to be blocked in binding",
+					createPod: &createPod{
+						pod: st.MakePod().Name(podBlockedInBindingName).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(1).Obj(),
+					},
+				},
+				{
+					name: "schedule the last victim Pod",
+					schedulePod: &schedulePod{
+						podName: podBlockedInBindingName,
+					},
+				},
+				{
+					name: "create a mid-priority preemptor Pod",
+					createPod: &createPod{
+						pod: st.MakePod().Name("preemptor-mid-priority").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Priority(50).Obj(),
+					},
+				},
+				{
+					name: "schedule the mid-priority preemptor Pod",
+					schedulePod: &schedulePod{
+						podName: "preemptor-mid-priority",
+					},
+				},
+				{
+					name:               "complete the preemption API calls",
+					completePreemption: "preemptor-mid-priority",
+				},
+				{
+					name:            "check the mid-priority preemptor Pod is gated, waiting for the last victim to be preempted",
+					podGatedInQueue: "preemptor-mid-priority",
+				},
+				{
+					name:       "create node2",
+					createNode: "node2",
+				},
+				{
+					name: "create victim Pods on node2",
+					createPod: &createPod{
+						pod:   st.MakePod().GenerateName("victim-").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Node("node2").Container("image").ZeroTerminationGracePeriod().Priority(1).Obj(),
+						count: ptr.To(4),
+					},
+				},
+				{
+					name: "create a high-priority preemptor Pod",
+					createPod: &createPod{
+						pod: st.MakePod().Name("preemptor-high-priority").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").Priority(100).Obj(),
+					},
+				},
+				{
+					name: "schedule the high-priority preemptor Pod and expect it to get scheduled on node1",
+					// While we don't check explicitly that Pod is scheduled on node1, we can assume that because
+					// Pod won't fit on node2 without preemption and there are enough resources on node1.
+					schedulePod: &schedulePod{
+						podName:       "preemptor-high-priority",
+						expectSuccess: true,
+					},
+				},
+				{
+					name:       "allow the preemption of the last victim Pod on node1 to finish",
+					resumeBind: true,
+				},
+				{
+					name: "check that mid-priority preemptor Pod got activated by completed preemption and try scheduling it again",
+					schedulePod: &schedulePod{
+						podName: "preemptor-mid-priority",
+						// Pod won't fit on node1 anymore and should trigger preemptions on node2.
+						expectUnschedulable: true,
+					},
+				},
+				{
+					name:               "complete the preemption API calls on node2",
+					completePreemption: "preemptor-mid-priority",
+				},
+				{
+					name: "check that mid-priority Pod got activated, schedule it on node2",
+					schedulePod: &schedulePod{
+						podName:       "preemptor-mid-priority",
+						expectSuccess: true,
+					},
+				},
+			},
+		},
 	}
 
 	// All test cases have the same node.
@@ -1267,6 +1363,16 @@ func TestAsyncPreemption(t *testing.T) {
 				for _, scenario := range test.scenarios {
 					t.Logf("Running scenario: %s", scenario.name)
 					switch {
+					case scenario.createNode != "":
+						newNode := st.MakeNode().Name(scenario.createNode).Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj()
+						if _, err := cs.CoreV1().Nodes().Create(ctx, newNode, metav1.CreateOptions{}); err != nil {
+							t.Fatalf("Failed to create an initial Node %q: %v", newNode.Name, err)
+						}
+						defer func() {
+							if err := cs.CoreV1().Nodes().Delete(ctx, newNode.Name, metav1.DeleteOptions{}); err != nil {
+								t.Fatalf("Failed to delete the Node %q: %v", newNode.Name, err)
+							}
+						}()
 					case scenario.createPod != nil:
 						if scenario.createPod.count == nil {
 							scenario.createPod.count = ptr.To(1)
