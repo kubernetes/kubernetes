@@ -493,6 +493,7 @@ message DeviceAllocationConfiguration {
   // +listType=atomic
   // +k8s:listType=atomic
   // +k8s:unique=set
+  // +k8s:maxItems=32
   repeated string requests = 2;
 
   optional DeviceConfiguration deviceConfiguration = 3;
