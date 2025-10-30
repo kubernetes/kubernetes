@@ -153,6 +153,12 @@ func NewPodsToActivate() *PodsToActivate {
 	return &PodsToActivate{Map: make(map[string]*v1.Pod)}
 }
 
+// A list of scored nodes, returned from scheduling.
+type SortedScoredNodes interface {
+	Pop() string
+	Len() int
+}
+
 // Framework manages the set of plugins in use by the scheduling framework.
 // Configured plugins are called at specified points in a scheduling context.
 type Framework interface {
