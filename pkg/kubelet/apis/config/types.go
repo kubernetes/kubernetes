@@ -181,6 +181,10 @@ type KubeletConfiguration struct {
 	// allows event creations to burst to this number, while still not exceeding
 	// eventRecordQPS. Only used if eventRecordQPS > 0.
 	EventBurst int32
+	// eventNamespace sets the Kubernetes Namespace Kubelet uses to record events.
+	// If unset, events are posted to the 'default' namespace.
+	EventNamespace string
+
 	// enableDebuggingHandlers enables server endpoints for log collection
 	// and local running of containers and commands
 	EnableDebuggingHandlers bool
