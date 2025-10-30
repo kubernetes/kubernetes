@@ -191,9 +191,10 @@ func NewBroadcaster(opts ...BroadcasterOption) EventBroadcaster {
 		opt(&c)
 	}
 	eventBroadcaster := &eventBroadcasterImpl{
-		Broadcaster:   watch.NewLongQueueBroadcaster(maxQueuedEvents, watch.DropIfChannelFull),
-		sleepDuration: c.sleepDuration,
-		options:       c.CorrelatorOptions,
+		Broadcaster:      watch.NewLongQueueBroadcaster(maxQueuedEvents, watch.DropIfChannelFull),
+		sleepDuration:    c.sleepDuration,
+		options:          c.CorrelatorOptions,
+		defaultNamespace: c.defaultNamespace,
 	}
 	ctx := c.Context
 	if ctx == nil {
@@ -253,20 +254,30 @@ func WithSleepDuration(sleepDuration time.Duration) BroadcasterOption {
 	}
 }
 
+// WithDefaultNamespace sets the namespace for events without a namespace set.
+// Uses the 'default' namespace if not set, or called with an empty string.
+func WithDefaultNamespace(ns string) BroadcasterOption {
+	return func(c *config) {
+		c.defaultNamespace = ns
+	}
+}
+
 type BroadcasterOption func(*config)
 
 type config struct {
 	CorrelatorOptions
 	context.Context
-	sleepDuration time.Duration
+	sleepDuration    time.Duration
+	defaultNamespace string
 }
 
 type eventBroadcasterImpl struct {
 	*watch.Broadcaster
-	sleepDuration  time.Duration
-	options        CorrelatorOptions
-	cancelationCtx context.Context
-	cancel         func()
+	sleepDuration    time.Duration
+	options          CorrelatorOptions
+	defaultNamespace string
+	cancelationCtx   context.Context
+	cancel           func()
 }
 
 // StartRecordingToSink starts sending events received from the specified eventBroadcaster to the given sink.
@@ -424,14 +435,21 @@ func (e *eventBroadcasterImpl) StartEventWatcher(eventHandler func(*v1.Event)) w
 
 // NewRecorder returns an EventRecorder that records events with the given event source.
 func (e *eventBroadcasterImpl) NewRecorder(scheme *runtime.Scheme, source v1.EventSource) EventRecorderLogger {
-	return &recorderImplLogger{recorderImpl: &recorderImpl{scheme, source, e.Broadcaster, clock.RealClock{}}, logger: klog.Background()}
+	return &recorderImplLogger{recorderImpl: &recorderImpl{
+		scheme:           scheme,
+		source:           source,
+		Broadcaster:      e.Broadcaster,
+		clock:            clock.RealClock{},
+		defaultNamespace: e.defaultNamespace,
+	}, logger: klog.Background()}
 }
 
 type recorderImpl struct {
 	scheme *runtime.Scheme
 	source v1.EventSource
 	*watch.Broadcaster
-	clock clock.PassiveClock
+	clock            clock.PassiveClock
+	defaultNamespace string
 }
 
 var _ EventRecorder = &recorderImpl{}
@@ -447,6 +465,8 @@ func (recorder *recorderImpl) generateEvent(logger klog.Logger, object runtime.O
 		logger.Error(nil, "Unsupported event type", "eventType", eventtype)
 		return
 	}
+
+	ref.Namespace = recorder.eventNamespace(ref)
 
 	event := recorder.makeEvent(ref, annotations, eventtype, reason, message)
 	event.Source = recorder.source
@@ -481,16 +501,24 @@ func (recorder *recorderImpl) AnnotatedEventf(object runtime.Object, annotations
 	recorder.generateEvent(klog.Background(), object, annotations, eventtype, reason, fmt.Sprintf(messageFmt, args...))
 }
 
+func (recorder *recorderImpl) eventNamespace(ref *v1.ObjectReference) string {
+	if ref.Namespace != "" {
+		return ref.Namespace
+	}
+
+	if recorder.defaultNamespace != "" {
+		return recorder.defaultNamespace
+	}
+
+	return metav1.NamespaceDefault
+}
+
 func (recorder *recorderImpl) makeEvent(ref *v1.ObjectReference, annotations map[string]string, eventtype, reason, message string) *v1.Event {
 	t := metav1.Time{Time: recorder.clock.Now()}
-	namespace := ref.Namespace
-	if namespace == "" {
-		namespace = metav1.NamespaceDefault
-	}
 	return &v1.Event{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        util.GenerateEventName(ref.Name, t.UnixNano()),
-			Namespace:   namespace,
+			Namespace:   recorder.eventNamespace(ref),
 			Annotations: annotations,
 		},
 		InvolvedObject: *ref,
