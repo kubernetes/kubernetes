@@ -45,18 +45,18 @@ func testDeclarativeValidateForDeclarative(t *testing.T, apiVersion string) {
 		},
 		"invalid name with underscore": {
 			input: mkValidConfigMap(func(cm *api.ConfigMap) {
-				cm.ObjectMeta.Name = "invalid_name" 
+				cm.ObjectMeta.Name = "invalid_name"
 			}),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("metadata", "name"), "invalid_name", "must be a DNS-1123 subdomain"),
+				field.Invalid(field.NewPath("metadata", "name"), "invalid_name", "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
 			},
 		},
 		"invalid name with uppercase": {
 			input: mkValidConfigMap(func(cm *api.ConfigMap) {
-				cm.ObjectMeta.Name = "InvalidName" 
+				cm.ObjectMeta.Name = "InvalidName"
 			}),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("metadata", "name"), "InvalidName", "must be a DNS-1123 subdomain"),
+				field.Invalid(field.NewPath("metadata", "name"), "InvalidName", "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
 			},
 		},
 		"invalid name with special character": {
@@ -64,7 +64,7 @@ func testDeclarativeValidateForDeclarative(t *testing.T, apiVersion string) {
 				cm.ObjectMeta.Name = "invalid@name"
 			}),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("metadata", "name"), "invalid@name", "must be a DNS-1123 subdomain"),
+				field.Invalid(field.NewPath("metadata", "name"), "invalid@name", "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
 			},
 		},
 		// TODO: Add more test cases
@@ -101,7 +101,7 @@ func testValidateUpdateForDeclarative(t *testing.T, apiVersion string) {
 				cm.ObjectMeta.Name = "invalid_name"
 			}),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("metadata", "name"), "invalid_name", "must be a DNS-1123 subdomain"),
+				field.Invalid(field.NewPath("metadata", "name"), "invalid_name", "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
 			},
 		},
 		"invalid name with uppercase in update": {
@@ -110,7 +110,7 @@ func testValidateUpdateForDeclarative(t *testing.T, apiVersion string) {
 				cm.ObjectMeta.Name = "InvalidName"
 			}),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("metadata", "name"), "InvalidName", "must be a DNS-1123 subdomain"),
+				field.Invalid(field.NewPath("metadata", "name"), "InvalidName", "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
 			},
 		},
 		"invalid name with special character in update": {
@@ -119,7 +119,7 @@ func testValidateUpdateForDeclarative(t *testing.T, apiVersion string) {
 				cm.ObjectMeta.Name = "invalid@name"
 			}),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("metadata", "name"), "invalid@name", "must be a DNS-1123 subdomain"),
+				field.Invalid(field.NewPath("metadata", "name"), "invalid@name", "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
 			},
 		},
 		// TODO: Add more test cases
