@@ -83,6 +83,10 @@ const (
 	// AssumeExtendedResourceTimeoutDefaultSeconds is the default timeout for waiting
 	// for the extended resource claim to be updated in assumed cache.
 	AssumeExtendedResourceTimeoutDefaultSeconds = 120
+
+	// prioritizedListTopEntryScore is the score that is given to the top entry
+	// in a prioritized list during scoring.
+	prioritizedListTopEntryScore = 8
 )
 
 // The state is initialized in PreFilter phase. Because we save the pointer in
@@ -1101,8 +1105,6 @@ func (pl *DynamicResources) Score(ctx context.Context, cs fwk.CycleState, pod *v
 		return 0, nil
 	}
 
-	// Do we need to hold the mutex here? We don't write anything, but are
-	// we guaranteeed to see data written by another thread without synchronization?
 	allocations, found := state.nodeAllocations[nodeInfo.Node().Name]
 	if !found {
 		return 0, nil
@@ -1126,7 +1128,7 @@ func computeScore(iterator iter.Seq2[int, *resourceapi.ResourceClaim], allocatio
 		allocation := allocations.allocationResults[i]
 		for _, res := range allocation.Devices.Results {
 			request := res.Request
-			if len(strings.Split(request, "/")) == 2 {
+			if resourceclaim.IsSubRequestRef(request) {
 				allocatedSubRequests.Insert(request)
 			}
 		}
@@ -1136,9 +1138,9 @@ func computeScore(iterator iter.Seq2[int, *resourceapi.ResourceClaim], allocatio
 				continue
 			}
 			for i, subReq := range req.FirstAvailable {
-				fullName := fmt.Sprintf("%s/%s", req.Name, subReq.Name)
-				if allocatedSubRequests.Has(fullName) {
-					score += int64(8 - i)
+				subRequestRef := resourceclaim.CreateSubRequestRef(req.Name, subReq.Name)
+				if allocatedSubRequests.Has(subRequestRef) {
+					score += int64(prioritizedListTopEntryScore - i)
 				}
 			}
 		}
@@ -1152,6 +1154,9 @@ func (pl *DynamicResources) ScoreExtensions() fwk.ScoreExtensions {
 
 func (pl *DynamicResources) NormalizeScore(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, scores fwk.NodeScoreList) *fwk.Status {
 	if !pl.enabled {
+		return nil
+	}
+	if len(scores) == 0 {
 		return nil
 	}
 	return helper.DefaultNormalizeScore(fwk.MaxNodeScore, false, scores)
