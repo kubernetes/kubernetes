@@ -265,13 +265,10 @@ while true; do sleep 1; done
 
 				registryAddress, _, err = e2eregistry.SetupRegistry(ctx, f, false)
 				framework.ExpectNoError(err)
-			})
-
-			ginkgo.AfterEach(func(ctx context.Context) {
-				if len(registryAddress) == 0 {
-					return
-				}
-				f.DeleteNamespace(ctx, f.Namespace.Name) // we need to wait for the registry to be removed and so we need to delete the whole NS early (before the actual cleanup)
+				// we need to wait for the registry to be removed and so we need to delete the whole NS ourselves
+				ginkgo.DeferCleanup(func(ctx context.Context) {
+					f.DeleteNamespace(ctx, f.Namespace.Name)
+				})
 			})
 
 			// Images used for ConformanceContainer are not added into NodePrePullImageList, because this test is
