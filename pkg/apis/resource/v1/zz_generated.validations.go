@@ -359,6 +359,9 @@ func Validate_DeviceAllocationConfiguration(ctx context.Context, op operation.Op
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
 			if earlyReturn {
 				return // do not proceed
 			}
@@ -410,6 +413,9 @@ func Validate_DeviceAllocationResult(ctx context.Context, op operation.Operation
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
 			if earlyReturn {
 				return // do not proceed
 			}
@@ -431,6 +437,9 @@ func Validate_DeviceAllocationResult(ctx context.Context, op operation.Operation
 			earlyReturn := false
 			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 64); len(e) != 0 {
 				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
@@ -564,6 +573,9 @@ func Validate_DeviceClaim(ctx context.Context, op operation.Operation, fldPath *
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
 			if earlyReturn {
 				return // do not proceed
 			}
@@ -587,6 +599,9 @@ func Validate_DeviceClaim(ctx context.Context, op operation.Operation, fldPath *
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
 			if earlyReturn {
 				return // do not proceed
 			}
@@ -606,6 +621,9 @@ func Validate_DeviceClaim(ctx context.Context, op operation.Operation, fldPath *
 			earlyReturn := false
 			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 32); len(e) != 0 {
 				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
@@ -633,6 +651,9 @@ func Validate_DeviceClaimConfiguration(ctx context.Context, op operation.Operati
 			earlyReturn := false
 			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 32); len(e) != 0 {
 				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
@@ -857,6 +878,9 @@ func Validate_DeviceConstraint(ctx context.Context, op operation.Operation, fldP
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
 			if earlyReturn {
 				return // do not proceed
 			}
@@ -954,6 +978,9 @@ func Validate_DeviceRequest(ctx context.Context, op operation.Operation, fldPath
 			earlyReturn := false
 			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 8); len(e) != 0 {
 				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
@@ -1138,6 +1165,9 @@ func Validate_DeviceSubRequest(ctx context.Context, op operation.Operation, fldP
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
 			if earlyReturn {
 				return // do not proceed
 			}
@@ -1299,6 +1329,9 @@ func Validate_ExactDeviceRequest(ctx context.Context, op operation.Operation, fl
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
 			if earlyReturn {
 				return // do not proceed
 			}
@@ -1379,6 +1412,9 @@ func Validate_NetworkDeviceData(ctx context.Context, op operation.Operation, fld
 			earlyReturn := false
 			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 16); len(e) != 0 {
 				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {

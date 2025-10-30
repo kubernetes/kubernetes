@@ -491,6 +491,7 @@ message DeviceAllocationConfiguration {
   //
   // +optional
   // +listType=atomic
+  // +k8s:optional
   // +k8s:listType=atomic
   // +k8s:unique=set
   // +k8s:maxItems=32
@@ -505,6 +506,7 @@ message DeviceAllocationResult {
   //
   // +optional
   // +listType=atomic
+  // +k8s:optional
   // +k8s:maxItems=32
   repeated DeviceRequestAllocationResult results = 1;
 
@@ -518,6 +520,7 @@ message DeviceAllocationResult {
   //
   // +optional
   // +listType=atomic
+  // +k8s:optional
   // +k8s:maxItems=64
   repeated DeviceAllocationConfiguration config = 2;
 }
@@ -587,6 +590,7 @@ message DeviceClaim {
   //
   // +optional
   // +listType=atomic
+  // +k8s:optional
   // +k8s:listType=atomic
   // +k8s:unique=map
   // +k8s:listMapKey=name
@@ -598,6 +602,7 @@ message DeviceClaim {
   //
   // +optional
   // +listType=atomic
+  // +k8s:optional
   // +k8s:maxItems=32
   repeated DeviceConstraint constraints = 2;
 
@@ -607,6 +612,7 @@ message DeviceClaim {
   //
   // +optional
   // +listType=atomic
+  // +k8s:optional
   // +k8s:maxItems=32
   repeated DeviceClaimConfiguration config = 3;
 }
@@ -622,6 +628,7 @@ message DeviceClaimConfiguration {
   //
   // +optional
   // +listType=atomic
+  // +k8s:optional
   // +k8s:listType=atomic
   // +k8s:unique=set
   // +k8s:maxItems=32
@@ -736,6 +743,7 @@ message DeviceConstraint {
   //
   // +optional
   // +listType=atomic
+  // +k8s:optional
   // +k8s:listType=atomic
   // +k8s:unique=set
   // +k8s:maxItems=32
@@ -841,6 +849,7 @@ message DeviceRequest {
   //
   // +optional
   // +listType=atomic
+  // +k8s:optional
   // +k8s:maxItems=32
   repeated DeviceSelector selectors = 3;
 
@@ -917,6 +926,7 @@ message DeviceRequest {
   // +oneOf=deviceRequestType
   // +listType=atomic
   // +featureGate=DRAPrioritizedList
+  // +k8s:optional
   // +k8s:listType=atomic
   // +k8s:unique=map
   // +k8s:listMapKey=name
@@ -1032,6 +1042,7 @@ message DeviceRequestAllocationResult {
   // +optional
   // +listType=atomic
   // +featureGate=DRADeviceTaints
+  // +k8s:optional
   // +k8s:maxItems=16
   repeated DeviceToleration tolerations = 6;
 
@@ -1314,6 +1325,7 @@ message NetworkDeviceData {
   //
   // +optional
   // +listType=atomic
+  // +k8s:optional
   // +k8s:listType=atomic
   // +k8s:unique=set
   // +k8s:maxItems=16

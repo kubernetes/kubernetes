@@ -743,6 +743,7 @@ type DeviceClaim struct {
 	//
 	// +optional
 	// +listType=atomic
+	// +k8s:optional
 	// +k8s:listType=atomic
 	// +k8s:unique=map
 	// +k8s:listMapKey=name
@@ -754,6 +755,7 @@ type DeviceClaim struct {
 	//
 	// +optional
 	// +listType=atomic
+	// +k8s:optional
 	// +k8s:maxItems=32
 	Constraints []DeviceConstraint `json:"constraints,omitempty" protobuf:"bytes,2,opt,name=constraints"`
 
@@ -763,6 +765,7 @@ type DeviceClaim struct {
 	//
 	// +optional
 	// +listType=atomic
+	// +k8s:optional
 	// +k8s:maxItems=32
 	Config []DeviceClaimConfiguration `json:"config,omitempty" protobuf:"bytes,3,opt,name=config"`
 
@@ -835,6 +838,7 @@ type DeviceRequest struct {
 	// +oneOf=deviceRequestType
 	// +listType=atomic
 	// +featureGate=DRAPrioritizedList
+	// +k8s:optional
 	// +k8s:listType=atomic
 	// +k8s:unique=map
 	// +k8s:listMapKey=name
@@ -866,6 +870,7 @@ type ExactDeviceRequest struct {
 	//
 	// +optional
 	// +listType=atomic
+	// +k8s:optional
 	// +k8s:maxItems=32
 	Selectors []DeviceSelector `json:"selectors,omitempty" protobuf:"bytes,2,name=selectors"`
 
@@ -996,6 +1001,7 @@ type DeviceSubRequest struct {
 	//
 	// +optional
 	// +listType=atomic
+	// +k8s:optional
 	// +k8s:maxItems=32
 	Selectors []DeviceSelector `json:"selectors,omitempty" protobuf:"bytes,3,name=selectors"`
 
@@ -1223,6 +1229,7 @@ type DeviceConstraint struct {
 	//
 	// +optional
 	// +listType=atomic
+	// +k8s:optional
 	// +k8s:listType=atomic
 	// +k8s:unique=set
 	// +k8s:maxItems=32
@@ -1285,6 +1292,7 @@ type DeviceClaimConfiguration struct {
 	//
 	// +optional
 	// +listType=atomic
+	// +k8s:optional
 	// +k8s:listType=atomic
 	// +k8s:unique=set
 	// +k8s:maxItems=32
@@ -1518,6 +1526,7 @@ type DeviceAllocationResult struct {
 	//
 	// +optional
 	// +listType=atomic
+	// +k8s:optional
 	// +k8s:maxItems=32
 	Results []DeviceRequestAllocationResult `json:"results,omitempty" protobuf:"bytes,1,opt,name=results"`
 
@@ -1531,6 +1540,7 @@ type DeviceAllocationResult struct {
 	//
 	// +optional
 	// +listType=atomic
+	// +k8s:optional
 	// +k8s:maxItems=64
 	Config []DeviceAllocationConfiguration `json:"config,omitempty" protobuf:"bytes,2,opt,name=config"`
 }
@@ -1676,6 +1686,7 @@ type DeviceAllocationConfiguration struct {
 	//
 	// +optional
 	// +listType=atomic
+	// +k8s:optional
 	// +k8s:listType=atomic
 	// +k8s:unique=set
 	// +k8s:maxItems=32
@@ -1958,6 +1969,7 @@ type NetworkDeviceData struct {
 	//
 	// +optional
 	// +listType=atomic
+	// +k8s:optional
 	// +k8s:listType=atomic
 	// +k8s:unique=set
 	// +k8s:maxItems=16
