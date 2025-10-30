@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/authentication/user"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/client-go/kubernetes/fake"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
@@ -57,7 +58,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 	})
 	fakeClient := fake.NewClientset()
 	mockNSClient := fakeClient.CoreV1().Namespaces()
-	Strategy := NewStrategy(mockNSClient)
+	Strategy := NewStrategy(mockNSClient, nil)
 
 	opaqueDriverPath := field.NewPath("spec", "devices", "config").Index(0).Child("opaque", "driver")
 
@@ -693,7 +694,7 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 	})
 	fakeClient := fake.NewClientset()
 	mockNSClient := fakeClient.CoreV1().Namespaces()
-	Strategy := NewStrategy(mockNSClient)
+	Strategy := NewStrategy(mockNSClient, nil)
 	validClaim := mkValidResourceClaim()
 	// TODO: As we accumulate more and more test cases, consider breaking this
 	// up into smaller tests for maintainability.
@@ -811,7 +812,7 @@ func TestValidateStatusUpdateForDeclarative(t *testing.T) {
 func testValidateStatusUpdateForDeclarative(t *testing.T, apiVersion string) {
 	fakeClient := fake.NewClientset()
 	mockNSClient := fakeClient.CoreV1().Namespaces()
-	Strategy := NewStrategy(mockNSClient)
+	Strategy := NewStrategy(mockNSClient, &fakeAuthorizer{true})
 	strategy := NewStatusStrategy(Strategy)
 
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
@@ -820,6 +821,8 @@ func testValidateStatusUpdateForDeclarative(t *testing.T, apiVersion string) {
 		Resource:    "resourceclaims",
 		Subresource: "status",
 	})
+	ctx = genericapirequest.WithUser(ctx, &user.DefaultInfo{Name: "test-user"})
+
 	poolPath := field.NewPath("status", "allocation", "devices", "results").Index(0).Child("pool")
 	configSourcePath := field.NewPath("status", "allocation", "devices", "config").Index(0).Child("source")
 	driverPath := field.NewPath("status", "allocation", "devices", "results").Index(0).Child("driver")

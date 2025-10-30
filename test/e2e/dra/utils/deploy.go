@@ -464,7 +464,9 @@ func (d *Driver) SetUp(tCtx ktesting.TContext, kubeletRootDir string, nodes *Nod
 	// Create service account and corresponding RBAC rules.
 	d.serviceAccountName = "dra-kubelet-plugin-" + d.Name + d.InstanceSuffix + "-service-account"
 	content := example.PluginPermissions
+
 	content = strings.ReplaceAll(content, "dra-kubelet-plugin-namespace", tCtx.Namespace())
+	content = strings.ReplaceAll(content, "dra-kubelet-plugin-driver-name", d.Name)
 	content = strings.ReplaceAll(content, "dra-kubelet-plugin", "dra-kubelet-plugin-"+d.Name+d.InstanceSuffix)
 	d.createFromYAML(tCtx, []byte(content), tCtx.Namespace())
 

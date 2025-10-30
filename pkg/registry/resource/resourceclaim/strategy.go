@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
@@ -50,15 +51,17 @@ import (
 type resourceclaimStrategy struct {
 	runtime.ObjectTyper
 	names.NameGenerator
-	nsClient v1.NamespaceInterface
+	nsClient   v1.NamespaceInterface
+	authorizer authorizer.Authorizer
 }
 
 // NewStrategy is the default logic that applies when creating and updating ResourceClaim objects.
-func NewStrategy(nsClient v1.NamespaceInterface) *resourceclaimStrategy {
+func NewStrategy(nsClient v1.NamespaceInterface, authorizer authorizer.Authorizer) *resourceclaimStrategy {
 	return &resourceclaimStrategy{
 		legacyscheme.Scheme,
 		names.SimpleNameGenerator,
 		nsClient,
+		authorizer,
 	}
 }
 
@@ -194,6 +197,10 @@ func (r *resourceclaimStatusStrategy) ValidateUpdate(ctx context.Context, obj, o
 		oldAllocationResult = oldClaim.Status.Allocation.Devices.Results
 	}
 	errs := resourceutils.AuthorizedForAdminStatus(ctx, newAllocationResult, oldAllocationResult, newClaim.Namespace, r.nsClient)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAResourceClaimDeviceStatus) {
+		errs = append(errs, resourceutils.AuthorizedForDeviceStatus(ctx, field.NewPath("status", "allocation", "devices"), r.authorizer, newClaim.Status, oldClaim.Status, newClaim.Namespace)...)
+	}
 	errs = append(errs, validation.ValidateResourceClaimStatusUpdate(newClaim, oldClaim)...)
 	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newClaim, oldClaim, errs, operation.Update)
 }

@@ -32,6 +32,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	resourcealphaapi "k8s.io/api/resource/v1alpha3"
 	resourcev1beta1 "k8s.io/api/resource/v1beta1"
@@ -43,6 +44,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	applyv1 "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -2918,6 +2920,153 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			gomega.Expect(updatedResourceClaim2).ToNot(gomega.BeNil())
 			gomega.Expect(updatedResourceClaim2.Status.Devices).To(gomega.Equal(updatedResourceClaim.Status.Devices))
 
+			getResourceClaim, err := f.ClientSet.ResourceV1().ResourceClaims(f.Namespace.Name).Get(ctx, claim.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			gomega.Expect(getResourceClaim).ToNot(gomega.BeNil())
+			gomega.Expect(getResourceClaim.Status.Devices).To(gomega.Equal(updatedResourceClaim.Status.Devices))
+		})
+
+		f.It("must be possible for a ServiceAccount to update the ResourceClaim.Status.Devices once allocated", f.WithFeatureGate(features.DRAResourceClaimDeviceStatus), func(ctx context.Context) {
+			tCtx := f.TContext(ctx)
+			pod := b.PodExternal()
+			claim := b.ExternalClaim()
+			b.Create(tCtx, claim, pod)
+
+			// Waits for the ResourceClaim to be allocated and the pod to be scheduled.
+			b.TestPod(tCtx, pod)
+
+			ginkgo.By("Creating a ServiceAccount and Role to update ResourceClaim status")
+			saName := "claim-status-updater-sa"
+			roleName := "claim-status-updater-role"
+			bindingName := "claim-status-updater-binding"
+
+			sa := &v1.ServiceAccount{
+				ObjectMeta: metav1.ObjectMeta{Name: saName, Namespace: f.Namespace.Name},
+			}
+			_, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Create(ctx, sa, metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+
+			// Create ClusterRole with 'update' permission on 'resourceclaims/status'
+			role := &rbacv1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{Name: roleName, Namespace: f.Namespace.Name},
+				Rules: []rbacv1.PolicyRule{
+					{
+						APIGroups: []string{resourceapi.SchemeGroupVersion.Group},
+						Resources: []string{"resourceclaims/status"},
+						Verbs:     []string{"update", "patch"},
+					},
+					{
+						// Also need 'get' to fetch the claim for the update operation
+						APIGroups: []string{resourceapi.SchemeGroupVersion.Group},
+						Resources: []string{"resourceclaims"},
+						Verbs:     []string{"get"},
+					},
+				},
+			}
+			_, err = f.ClientSet.RbacV1().ClusterRoles().Create(ctx, role, metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+
+			// Create ClusterRoleBinding
+			binding := &rbacv1.ClusterRoleBinding{
+				ObjectMeta: metav1.ObjectMeta{Name: bindingName, Namespace: f.Namespace.Name},
+				Subjects: []rbacv1.Subject{
+					{
+						Kind:      "ServiceAccount",
+						Name:      saName,
+						Namespace: f.Namespace.Name,
+					},
+				},
+				RoleRef: rbacv1.RoleRef{
+					Kind:     "ClusterRole",
+					Name:     roleName,
+					APIGroup: rbacv1.GroupName,
+				},
+			}
+			_, err = f.ClientSet.RbacV1().ClusterRoleBindings().Create(ctx, binding, metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+
+			// Create a new clientset impersonating the ServiceAccount
+			saClientConfig := rest.CopyConfig(f.ClientConfig())
+			saClientConfig.Impersonate = rest.ImpersonationConfig{
+				UserName: fmt.Sprintf("system:serviceaccount:%s:%s", f.Namespace.Name, saName),
+			}
+			saClient, err := kubernetes.NewForConfig(saClientConfig)
+			framework.ExpectNoError(err)
+
+			// Get the allocated claim using the admin client
+			allocatedResourceClaim, err := f.ClientSet.ResourceV1().ResourceClaims(f.Namespace.Name).Get(ctx, claim.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			gomega.Expect(allocatedResourceClaim).ToNot(gomega.BeNil())
+			gomega.Expect(allocatedResourceClaim.Status.Allocation).ToNot(gomega.BeNil())
+			gomega.Expect(allocatedResourceClaim.Status.Allocation.Devices.Results).To(gomega.HaveLen(1))
+
+			ginkgo.By("Setting the device status a first time (via ServiceAccount without proper RBAC) for driver " + b.DriverName())
+			allocatedResourceClaim.Status.Devices = append(allocatedResourceClaim.Status.Devices,
+				resourceapi.AllocatedDeviceStatus{
+					Driver:     allocatedResourceClaim.Status.Allocation.Devices.Results[0].Driver,
+					Pool:       allocatedResourceClaim.Status.Allocation.Devices.Results[0].Pool,
+					Device:     allocatedResourceClaim.Status.Allocation.Devices.Results[0].Device,
+					Conditions: []metav1.Condition{{Type: "a", Status: "True", Message: "c", Reason: "d", LastTransitionTime: metav1.NewTime(time.Now().Truncate(time.Second))}},
+					Data:       &runtime.RawExtension{Raw: []byte(`{"foo":"bar"}`)},
+					NetworkData: &resourceapi.NetworkDeviceData{
+						InterfaceName:   "inf1",
+						IPs:             []string{"10.9.8.0/24", "2001:db8::/64"},
+						HardwareAddress: "bc:1c:b6:3e:b8:25",
+					},
+				})
+
+			// Update the ResourceClaim status using the impersonated client
+			_, err = saClient.ResourceV1().ResourceClaims(f.Namespace.Name).UpdateStatus(ctx, allocatedResourceClaim, metav1.UpdateOptions{})
+			if err == nil {
+				framework.Failf("should fail without proper RBAC permissions")
+			}
+			ginkgo.By("Setting the device status a first time (via ServiceAccount with RBAC with specific driver name) for driver " + b.DriverName())
+			newRole := role.DeepCopy()
+			newRole.Rules = append(newRole.Rules, rbacv1.PolicyRule{
+				APIGroups:     []string{resourceapi.SchemeGroupVersion.Group},
+				Resources:     []string{"drivers"},
+				Verbs:         []string{"update-device-status"},
+				ResourceNames: []string{b.DriverName()}, // allow for the specific drivers
+			})
+			_, err = f.ClientSet.RbacV1().ClusterRoles().Update(ctx, newRole, metav1.UpdateOptions{})
+			framework.ExpectNoError(err)
+
+			updatedResourceClaim, err := saClient.ResourceV1().ResourceClaims(f.Namespace.Name).UpdateStatus(ctx, allocatedResourceClaim, metav1.UpdateOptions{})
+			framework.ExpectNoError(err)
+			gomega.Expect(updatedResourceClaim).ToNot(gomega.BeNil())
+			gomega.Expect(updatedResourceClaim.Status.Devices).To(gomega.Equal(allocatedResourceClaim.Status.Devices))
+
+			ginkgo.By("Updating the device status (via ServiceAccount with RBAC allowing all drivers)")
+			newRole = role.DeepCopy()
+			newRole.Rules = append(newRole.Rules, rbacv1.PolicyRule{
+				APIGroups:     []string{resourceapi.SchemeGroupVersion.Group},
+				Resources:     []string{"drivers"},
+				Verbs:         []string{"update-device-status"},
+				ResourceNames: []string{"*"}, // allow for all drivers
+			})
+			_, err = f.ClientSet.RbacV1().ClusterRoles().Update(ctx, newRole, metav1.UpdateOptions{})
+			framework.ExpectNoError(err)
+
+			updatedResourceClaim.Status.Devices[0] = resourceapi.AllocatedDeviceStatus{
+				Driver:     allocatedResourceClaim.Status.Allocation.Devices.Results[0].Driver,
+				Pool:       allocatedResourceClaim.Status.Allocation.Devices.Results[0].Pool,
+				Device:     allocatedResourceClaim.Status.Allocation.Devices.Results[0].Device,
+				Conditions: []metav1.Condition{{Type: "e", Status: "True", Message: "g", Reason: "h", LastTransitionTime: metav1.NewTime(time.Now().Truncate(time.Second))}},
+				Data:       &runtime.RawExtension{Raw: []byte(`{"bar":"foo"}`)},
+				NetworkData: &resourceapi.NetworkDeviceData{
+					InterfaceName:   "inf2",
+					IPs:             []string{"10.9.8.1/24", "2001:db8::1/64"},
+					HardwareAddress: "bc:1c:b6:3e:b8:26",
+				},
+			}
+
+			// Update the status again using the impersonated client
+			updatedResourceClaim2, err := saClient.ResourceV1().ResourceClaims(f.Namespace.Name).UpdateStatus(ctx, updatedResourceClaim, metav1.UpdateOptions{})
+			framework.ExpectNoError(err)
+			gomega.Expect(updatedResourceClaim2).ToNot(gomega.BeNil())
+			gomega.Expect(updatedResourceClaim2.Status.Devices).To(gomega.Equal(updatedResourceClaim.Status.Devices))
+
+			ginkgo.By("Verifying the final status with admin client")
 			getResourceClaim, err := f.ClientSet.ResourceV1().ResourceClaims(f.Namespace.Name).Get(ctx, claim.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 			gomega.Expect(getResourceClaim).ToNot(gomega.BeNil())

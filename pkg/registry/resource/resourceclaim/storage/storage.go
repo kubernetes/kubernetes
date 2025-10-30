@@ -22,10 +22,11 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/client-go/kubernetes/typed/core/v1"
+	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
@@ -40,11 +41,15 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against ResourceClaims.
-func NewREST(optsGetter generic.RESTOptionsGetter, nsClient v1.NamespaceInterface) (*REST, *StatusREST, error) {
+func NewREST(optsGetter generic.RESTOptionsGetter, nsClient v1.NamespaceInterface, authorizer authorizer.Authorizer) (*REST, *StatusREST, error) {
 	if nsClient == nil {
 		return nil, nil, fmt.Errorf("namespace client is required")
 	}
-	strategy := resourceclaim.NewStrategy(nsClient)
+	if authorizer == nil {
+		return nil, nil, fmt.Errorf("authorizer is required")
+	}
+
+	strategy := resourceclaim.NewStrategy(nsClient, authorizer)
 	store := &genericregistry.Store{
 		NewFunc:                   func() runtime.Object { return &resource.ResourceClaim{} },
 		NewListFunc:               func() runtime.Object { return &resource.ResourceClaimList{} },
