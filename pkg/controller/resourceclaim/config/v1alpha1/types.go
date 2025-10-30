@@ -24,7 +24,7 @@ import (
 type ResourceClaimControllerConfiguration struct {
 	metav1.TypeMeta
 
-	// concurrentResourceClaimSyncs is the number of resource claim objects that are
+	// ConcurrentResourceClaimSyncs is the number of resource claim objects that are
 	// allowed to sync concurrently. Larger number = more responsive resource claims,
 	// but more CPU (and network) load.
 	ConcurrentResourceClaimSyncs int32 `json:"concurrentResourceClaimSyncs"`

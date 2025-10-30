@@ -460,8 +460,6 @@ func newEphemeralVolumeController(ctx context.Context, controllerContext Control
 	}, controllerName), nil
 }
 
-const defaultResourceClaimControllerWorkers = 50
-
 func newResourceClaimControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:        names.ResourceClaimController,

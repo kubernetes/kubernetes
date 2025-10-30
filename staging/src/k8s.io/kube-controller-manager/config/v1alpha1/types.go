@@ -494,7 +494,7 @@ type ValidatingAdmissionPolicyStatusControllerConfiguration struct {
 
 // ResourceClaimControllerConfiguration contains elements describing ResourceClaimController.
 type ResourceClaimControllerConfiguration struct {
-	// concurrentResourceClaimSyncs is the number of resource claim objects that are
+	// ConcurrentResourceClaimSyncs is the number of resource claim objects that are
 	// allowed to sync concurrently. Larger number = more responsive resource claims,
 	// but more CPU (and network) load.
 	ConcurrentResourceClaimSyncs int32
