@@ -528,6 +528,7 @@ func (m *Manager) GetResources(pod *v1.Pod, container *v1.Container) (*Container
 				}
 				if schedutil.IsDRAExtendedResourceName(rName) {
 					for _, rm := range pod.Status.ExtendedResourceClaimStatus.RequestMappings {
+						// allow multiple device requests per container per resource.
 						if rm.ContainerName == container.Name && rm.ResourceName == rName.String() {
 							// As of Kubernetes 1.31, CDI device IDs are not passed via annotations anymore.
 							cdiDevices = append(cdiDevices, claimInfo.cdiDevicesAsList(rm.RequestName)...)

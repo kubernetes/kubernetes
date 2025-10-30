@@ -803,6 +803,9 @@ func (pl *DynamicResources) filterExtendedResources(state *stateData, pod *v1.Po
 }
 
 // sortedPodExtendedResources returns sorted list of extended resources in the pod
+// when creating the special device request for an extended resource in non-sidecar init containers,
+// we use the extended resource's index in the sorted list to construct the device request name with
+// the format of 'request-%d', %d is the extended resource's index.
 func sortedPodExtendedResources(containers []v1.Container) []string {
 	podExtendedResources := make(map[string]struct{})
 	for _, c := range containers {
@@ -829,10 +832,17 @@ func sortedPodExtendedResources(containers []v1.Container) []string {
 // the device request name has the format: container-%d-request-%d,
 // the first %d is the container's index in the pod's initContainer and containers
 // the second %d is the extended resource's index in that container's sorted resource requests.
+//
+// a specail device request name with format: request-%d,
+// where %d is the index of the extended resource in the sorted list of extended resources in the pod.
 func createDeviceRequests(pod *v1.Pod, extendedResources map[v1.ResourceName]int64, deviceClassMapping map[v1.ResourceName]string) []resourceapi.DeviceRequest {
 	// Creating the extended resource claim's Requests by
 	// iterating over the containers, and the resources in the containers,
-	// and create one request per <container, extended resource>.
+	// and create one request per <container, extended resource> for sidecar init containers
+	// ande regular (non-init) containers
+	// reuse these device requests for resources in non-sidecar init containers as much as possible,
+	// multiple of these device request could be used per container per extended resource.
+	// a special device request with name 'request-%d' is created for extra devices needed.
 
 	// pod level resources currently have only cpu and memory, they are not considered here for now.
 	// if extended resources are added to pod level resources in the future, they need to be
@@ -840,7 +850,6 @@ func createDeviceRequests(pod *v1.Pod, extendedResources map[v1.ResourceName]int
 	containers := slices.Clone(pod.Spec.InitContainers)
 	containers = append(containers, pod.Spec.Containers...)
 	numInitContainers := len(pod.Spec.InitContainers)
-
 	podExtendedResourceSlice := sortedPodExtendedResources(containers)
 	var deviceRequests []resourceapi.DeviceRequest
 	for r, maxQuantity := range extendedResources {
@@ -849,10 +858,8 @@ func createDeviceRequests(pod *v1.Pod, extendedResources map[v1.ResourceName]int
 		if !ok || className == "" {
 			continue
 		}
-		var sumQuantity int64
+		var sumQuantity int64 // all devices requested so far for the extended resource r
 		for i, c := range containers {
-			isInitContainer := i < numInitContainers
-			isSideCar := c.RestartPolicy != nil && *c.RestartPolicy == v1.ContainerRestartPolicyAlways
 			creqs := c.Resources.Requests
 			if creqs == nil {
 				continue
@@ -866,6 +873,8 @@ func createDeviceRequests(pod *v1.Pod, extendedResources map[v1.ResourceName]int
 			if !ok || crq == 0 {
 				continue
 			}
+			isInitContainer := i < numInitContainers
+			isSideCar := c.RestartPolicy != nil && *c.RestartPolicy == v1.ContainerRestartPolicyAlways
 			if isInitContainer && !isSideCar {
 				continue
 			}
@@ -898,9 +907,10 @@ func createDeviceRequests(pod *v1.Pod, extendedResources map[v1.ResourceName]int
 				})
 		}
 		if sumQuantity >= maxQuantity {
-			// log, nothing left to do
+			// all devices needed are requested, nothing left to do
 			continue
 		}
+		// create the special request for extra devices needed.
 		// find the index in the sorted pod's all extended resources
 		ridx := sort.SearchStrings(podExtendedResourceSlice, r.String())
 		if ridx == len(podExtendedResourceSlice) {
@@ -1420,7 +1430,7 @@ func (pl *DynamicResources) PreBindPreFlight(ctx context.Context, cs fwk.CycleSt
 // the first %d is the container's index in the pod's initContainer and containers
 // the second %d is the extended resource's index in that container's sorted resource requests.
 func createRequestMappings(claim *resourceapi.ResourceClaim, pod *v1.Pod, logger klog.Logger) []v1.ContainerExtendedResourceRequest {
-	var cers []v1.ContainerExtendedResourceRequest
+	// create the list of device request names, and map of device request name to request quantity
 	deviceReqNames := make([]string, 0, len(claim.Spec.Devices.Requests))
 	deviceReqQuantity := make(map[string]int64)
 	for _, r := range claim.Spec.Devices.Requests {
@@ -1433,8 +1443,10 @@ func createRequestMappings(claim *resourceapi.ResourceClaim, pod *v1.Pod, logger
 	// supported separately.
 	containers := slices.Clone(pod.Spec.InitContainers)
 	containers = append(containers, pod.Spec.Containers...)
-
 	podExtendedResourceSlice := sortedPodExtendedResources(containers)
+
+	// First construct the list of request mappings for sidecar or regular container's extended resources
+	var cers []v1.ContainerExtendedResourceRequest
 	for i, c := range containers {
 		isInit := i < len(pod.Spec.InitContainers)
 		isSideCar := c.RestartPolicy != nil && *c.RestartPolicy == v1.ContainerRestartPolicyAlways
@@ -1477,6 +1489,7 @@ func createRequestMappings(claim *resourceapi.ResourceClaim, pod *v1.Pod, logger
 		}
 	}
 
+	// Second, construct the list of request mapping for init non-sidecar container's extended resources.
 	var initcers []v1.ContainerExtendedResourceRequest
 	for _, c := range pod.Spec.InitContainers {
 		isSideCar := c.RestartPolicy != nil && *c.RestartPolicy == v1.ContainerRestartPolicyAlways
@@ -1487,7 +1500,8 @@ func createRequestMappings(claim *resourceapi.ResourceClaim, pod *v1.Pod, logger
 
 		creqs := c.Resources.Requests
 		for rName, rQuant := range creqs {
-			// find all the device requests, the sum of their quantities is no less than the requested quantity
+			// find all the device requests in sidecar or regular containers with format "container-%d-request-%d"
+			// the sum of their quantities is no less than the requested quantity
 			for _, cer := range cers {
 				if cer.ResourceName != rName.String() {
 					continue
@@ -1506,16 +1520,18 @@ func createRequestMappings(claim *resourceapi.ResourceClaim, pod *v1.Pod, logger
 				q, ok := deviceReqQuantity[cer.RequestName]
 				if !ok {
 					logger.V(5).Info("Device request not found, this should not happen", "request", cer.RequestName)
+					continue
 				}
 				rQuant.Sub(*resource.NewQuantity(q, resource.DecimalSI))
 				if rQuant.CmpInt64(0) <= 0 {
+					// all devices found for this resource rName in this init container
 					break
 				}
 			}
 			if rQuant.CmpInt64(0) > 0 {
 				ridx := sort.SearchStrings(podExtendedResourceSlice, rName.String())
 				if ridx == len(podExtendedResourceSlice) {
-					// log error
+					logger.V(5).Info("Extended resource not found, this should not happen", "extended resource", rName.String())
 					continue
 				}
 				initcers = append(initcers,

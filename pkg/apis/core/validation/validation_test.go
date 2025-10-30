@@ -15192,7 +15192,7 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 			}),
 		),
 		old:  *podtest.MakePod("foo"),
-		test: "valid container name and extended resource name in requestMapping in ExtendedResourceClaimStatus",
+		test: "valid duplicate container name and extended resource name in requestMapping in ExtendedResourceClaimStatus",
 	}, {
 		new: *podtest.MakePod("foo",
 			podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(
