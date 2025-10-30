@@ -3263,6 +3263,7 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 		ConfigMapAndSecretChangeDetectionStrategy: kubeletconfiginternal.WatchChangeDetectionStrategy,
 		ContainerLogMaxSize:                       "10Mi",
 		ContainerLogMaxFiles:                      5,
+		ImagePullCredentialsVerificationPolicy:    "NeverVerifyPreloadedImages",
 		MemoryThrottlingFactor:                    ptr.To[float64](0),
 	}
 	var prober volume.DynamicPluginProber

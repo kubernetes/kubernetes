@@ -1239,7 +1239,7 @@ func TestParallelPodPullingTimeRecorderWithErr(t *testing.T) {
 	for i := 0; i < 2; i++ {
 		wg.Add(1)
 		go func(i int) {
-			_, _, err := puller.EnsureImageExists(ctx, nil, pods[i], container.Image, testCase.pullSecrets, nil, "", container.ImagePullPolicy)
+			_, _, err := puller.EnsureImageExists(ctx, nil, pods[i], container.Image, testCase.pullSecrets, podSandboxes[i], "", container.ImagePullPolicy)
 			assert.NoError(t, err)
 			wg.Done()
 		}(i)
@@ -1444,9 +1444,7 @@ func TestEnsureImageExistsWithServiceAccountCoordinates(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.enableEnsureSecretImages {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletEnsureSecretPulledImages, true)
-			}
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletEnsureSecretPulledImages, tc.enableEnsureSecretImages)
 
 			ctx := context.Background()
 			fakeClock := testingclock.NewFakeClock(time.Now())
