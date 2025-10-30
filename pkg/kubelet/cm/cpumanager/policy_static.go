@@ -18,6 +18,7 @@ package cpumanager
 
 import (
 	"fmt"
+
 	"strconv"
 
 	"github.com/go-logr/logr"
@@ -33,12 +34,12 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/utils/cpuset"
 )
 
 const (
-
 	// PolicyStatic is the name of the static policy.
 	// Should options be given, these will be ignored and backward (up to 1.21 included)
 	// compatible behaviour will be enforced
@@ -485,6 +486,7 @@ func (p *staticPolicy) guaranteedCPUs(logger logr.Logger, pod *v1.Pod, container
 		logger.V(5).Info("Exclusive CPU allocation skipped, pod QoS is not guaranteed", "qos", qos)
 		return 0
 	}
+
 	cpuQuantity := container.Resources.Requests[v1.ResourceCPU]
 	cpuValue := cpuQuantity.Value()
 	if cpuValue*1000 != cpuQuantity.MilliValue() {
@@ -669,6 +671,18 @@ func (p *staticPolicy) GetPodTopologyHints(logger logr.Logger, s state.State, po
 	}
 }
 
+func (p *staticPolicy) GetWarnings(pod *v1.Pod) []lifecycle.PodAdmitWarning {
+	if p.isPodWithPodLevelResources(pod) {
+		return []lifecycle.PodAdmitWarning{
+			{
+				Reason:  "PodLevelResourcesIncompatible",
+				Message: "CPU Manager static policy does not support pod-level resources",
+			},
+		}
+	}
+	return nil
+}
+
 // generateCPUTopologyHints generates a set of TopologyHints given the set of
 // available CPUs and the number of CPUs being requested.
 //
@@ -831,4 +845,8 @@ func updateAllocationPerNUMAMetric(logger logr.Logger, topo *topology.CPUTopolog
 	for numaNode, count := range numaCount {
 		metrics.CPUManagerAllocationPerNUMA.WithLabelValues(strconv.Itoa(numaNode)).Set(float64(count))
 	}
+}
+
+func (p *staticPolicy) isPodWithPodLevelResources(pod *v1.Pod) bool {
+	return utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod)
 }

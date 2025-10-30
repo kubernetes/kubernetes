@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	"k8s.io/utils/cpuset"
 )
@@ -96,6 +97,10 @@ func (m *fakeManager) GetCPUAffinity(podUID, containerName string) cpuset.CPUSet
 func (m *fakeManager) GetAllCPUs() cpuset.CPUSet {
 	m.logger.Info("GetAllCPUs")
 	return cpuset.CPUSet{}
+}
+
+func (m *fakeManager) GetWarnings(pod *v1.Pod) []lifecycle.PodAdmitWarning {
+	return nil
 }
 
 // NewFakeManager creates empty/fake cpu manager

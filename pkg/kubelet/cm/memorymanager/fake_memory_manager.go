@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 )
 
@@ -99,6 +100,10 @@ func (m *fakeManager) GetMemory(ctx context.Context, podUID, containerName strin
 	logger := klog.LoggerWithValues(klog.FromContext(ctx), "podUID", podUID, "containerName", containerName)
 	logger.Info("Get Memory")
 	return []state.Block{}
+}
+
+func (m *fakeManager) GetWarnings(pod *v1.Pod) []lifecycle.PodAdmitWarning {
+	return nil
 }
 
 // NewFakeManager creates empty/fake memory manager
