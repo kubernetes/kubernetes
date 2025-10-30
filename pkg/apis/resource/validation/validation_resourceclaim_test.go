@@ -1199,6 +1199,29 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 				return claim
 			},
 		},
+		"invalid-duplicate-request-name": {
+			wantFailures: field.ErrorList{
+				field.Duplicate(field.NewPath("status", "allocation", "devices", "config").Index(0).Child("requests").Index(1), "foo"),
+			},
+			oldClaim: validClaim,
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				claim = claim.DeepCopy()
+				claim.Status.Allocation = validAllocatedClaim.Status.Allocation.DeepCopy()
+				claim.Status.Allocation.Devices.Config = []resource.DeviceAllocationConfiguration{{
+					Source:   resource.AllocationConfigSourceClaim,
+					Requests: []string{claim.Spec.Devices.Requests[0].Name, claim.Spec.Devices.Requests[0].Name},
+					DeviceConfiguration: resource.DeviceConfiguration{
+						Opaque: &resource.OpaqueDeviceConfiguration{
+							Driver: "dra.example.com",
+							Parameters: runtime.RawExtension{
+								Raw: []byte(`{"kind": "foo", "apiVersion": "dra.example.com/v1"}`),
+							},
+						},
+					},
+				}}
+				return claim
+			},
+		},
 		"configuration": {
 			wantFailures: field.ErrorList{
 				field.Required(field.NewPath("status", "allocation", "devices", "config").Index(1).Child("source"), "").MarkCoveredByDeclarative(),
