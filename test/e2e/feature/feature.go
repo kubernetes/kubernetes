@@ -444,8 +444,7 @@ var (
 	// (used for testing fine-grained SupplementalGroups control <https://kep.k8s.io/3619>)
 	SupplementalGroupsPolicy = framework.WithFeature(framework.ValidFeatures.Add("SupplementalGroupsPolicy"))
 
-	// Added to test Swap Feature
-	// This label should be used when testing KEP-2400 (Node Swap Support)
+	// The Swap feature tests must run on nodes with the swap memory allocated and kubelet swap enabled. KEP-2400 (Node Swap Support)
 	Swap = framework.WithFeature(framework.ValidFeatures.Add("NodeSwap"))
 
 	SystemNodeCriticalPod = framework.WithFeature(framework.ValidFeatures.Add("SystemNodeCriticalPod"))
