@@ -324,9 +324,14 @@ var (
 	PodGarbageCollector = framework.WithFeature(framework.ValidFeatures.Add("PodGarbageCollector"))
 
 	// owner: sig-node
-	// Marks a test for for pod-level resources feature that requires
+	// Marks a test for pod-level resources feature that requires
 	// PodLevelResources feature gate to be enabled.
 	PodLevelResources = framework.WithFeature(framework.ValidFeatures.Add("PodLevelResources"))
+
+	// owner: sig-node
+	// Marks a test for for in place pod-level resources resize feature that requires
+	// InPlacePodLevelResourcesVerticalScaling feature gate to be enabled.
+	InPlacePodLevelResourcesVerticalScaling = framework.WithFeature(framework.ValidFeatures.Add("InPlacePodLevelResourcesVerticalScaling"))
 
 	// Owner: sig-node
 	// Marks tests that require a cluster with PodLogsQuerySplitStreams
