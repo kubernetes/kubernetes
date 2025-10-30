@@ -70043,7 +70043,7 @@ func schema_kubectl_pkg_config_v1beta1_Preference(ref common.ReferenceCallback) 
 					"credentialPluginAllowlist": {
 						VendorExtensible: spec.VendorExtensible{
 							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "set",
+								"x-kubernetes-list-type": "atomic",
 							},
 						},
 						SchemaProps: spec.SchemaProps{

@@ -113,18 +113,23 @@ type CommandOptionDefault struct {
 }
 
 func Convert_config_Preference_To_v1alpha1_Preference(in *config.Preference, out *Preference, s conversion.Scope) error {
-	out.Defaults = make([]CommandDefaults, len(in.Defaults))
-	out.Aliases = make([]AliasOverride, len(in.Aliases))
+	if len(in.Defaults) > 0 {
+		out.Defaults = make([]CommandDefaults, len(in.Defaults))
 
-	for i, d := range in.Defaults {
-		if err := Convert_config_CommandDefaults_To_v1alpha1_CommandDefaults(&d, &out.Defaults[i], s); err != nil {
-			return err
+		for i, d := range in.Defaults {
+			if err := Convert_config_CommandDefaults_To_v1alpha1_CommandDefaults(&d, &out.Defaults[i], s); err != nil {
+				return err
+			}
 		}
 	}
 
-	for i, a := range in.Aliases {
-		if err := Convert_config_AliasOverride_To_v1alpha1_AliasOverride(&a, &out.Aliases[i], s); err != nil {
-			return err
+	if len(in.Aliases) > 0 {
+		out.Aliases = make([]AliasOverride, len(in.Aliases))
+
+		for i, a := range in.Aliases {
+			if err := Convert_config_AliasOverride_To_v1alpha1_AliasOverride(&a, &out.Aliases[i], s); err != nil {
+				return err
+			}
 		}
 	}
 

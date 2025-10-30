@@ -593,7 +593,7 @@ func (a *Authenticator) allowsPlugin() error {
 	case api.PluginPolicyAllowlist:
 		return a.checkAllowlist()
 	default:
-		panic("unreachable: error will be returned by validatePluginPolicy")
+		panic("unreachable: error will be returned by ValidatePluginPolicy")
 	}
 
 }
@@ -636,10 +636,6 @@ func itemGreenlights(alEntry *api.AllowlistEntry, pluginAbsPath string) error {
 
 	return nil
 
-}
-
-func (a *Authenticator) validatePluginPolicy() error {
-	return ValidatePluginPolicy(a.execPluginPolicy.PolicyType, a.execPluginPolicy.Allowlist)
 }
 
 func ValidatePluginPolicy(policy api.PolicyType, allowlist []api.AllowlistEntry) error {

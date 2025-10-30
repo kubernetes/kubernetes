@@ -158,10 +158,6 @@ func (p *Preferences) applyPluginPolicy(kubeConfigFlags *genericclioptions.Confi
 	*kubeConfigFlags = *kubeConfigFlags.WithWrapConfigFn(PluginPolicyWrapper)
 }
 
-func noop(c *rest.Config) *rest.Config {
-	return c
-}
-
 // applyOverrides finds the command and sets the defaulted flag values in kuberc.
 func (p *Preferences) applyOverrides(rootCmd *cobra.Command, kuberc *config.Preference, args []string, errOut io.Writer) error {
 	args = args[1:]

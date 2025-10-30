@@ -428,19 +428,6 @@ func execPluginClientTests(t *testing.T, unauthorizedCert, unauthorizedKey []byt
 			wantMetrics:                   &execPluginMetrics{},
 		},
 		{
-			name: "allowall policy misconfiguration",
-			clientConfigFunc: func(c *rest.Config) {
-				c.ExecProvider.PluginPolicy.PolicyType = clientcmdapi.PluginPolicyAllowAll
-				c.ExecProvider.PluginPolicy.Allowlist = []clientcmdapi.AllowlistEntry{
-					{Name: "/only/my/very/secure/binary"},
-					{Name: "other-very-secure-binary"},
-				}
-			},
-			wantGetAuthenticatorErrorPrefix: `misconfigured credential plugin allowlist: plugin policy is "AllowAll" but allowlist is non-nil`,
-			wantClientErrorPrefix:           `Get "https`,
-			wantMetrics:                     &execPluginMetrics{},
-		},
-		{
 			name: "allowall policy happy path",
 			clientConfigFunc: func(c *rest.Config) {
 				c.ExecProvider.PluginPolicy.PolicyType = clientcmdapi.PluginPolicyAllowAll
@@ -1112,6 +1099,10 @@ func TestExecPluginGlobalCache(t *testing.T) {
 						"--random-arg-to-avoid-authenticator-cache-hits",
 						randStrings[i],
 					},
+				}
+
+				if test.wantGetAuthenticatorErrorPrefix != "" {
+					return
 				}
 
 				if test.clientConfigFunc != nil {

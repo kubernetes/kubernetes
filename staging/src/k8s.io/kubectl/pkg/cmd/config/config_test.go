@@ -28,7 +28,6 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/tools/clientcmd/api"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	utiltesting "k8s.io/client-go/util/testing"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
@@ -302,8 +301,8 @@ func TestExecPlugin(t *testing.T) {
 		APIVersion:         "client.authentication.k8s.io/v1",
 		ProvideClusterInfo: false,
 		InteractiveMode:    "Never",
-		PluginPolicy: api.PluginPolicy{
-			PolicyType: api.PluginPolicyAllowAll,
+		PluginPolicy: clientcmdapi.PluginPolicy{
+			PolicyType: clientcmdapi.PluginPolicyAllowAll,
 		},
 	}
 	expectedConfig.AuthInfos["cred-exec-user"] = authInfo
@@ -347,8 +346,8 @@ func TestExecPluginWithProveClusterInfo(t *testing.T) {
 		APIVersion:         "client.authentication.k8s.io/v1",
 		ProvideClusterInfo: true,
 		InteractiveMode:    "Always",
-		PluginPolicy: api.PluginPolicy{
-			PolicyType: api.PluginPolicyAllowAll,
+		PluginPolicy: clientcmdapi.PluginPolicy{
+			PolicyType: clientcmdapi.PluginPolicyAllowAll,
 		},
 	}
 	expectedConfig.AuthInfos["cred-exec-user"] = authInfo
