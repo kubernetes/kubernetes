@@ -1416,6 +1416,7 @@ func TestEventsToRegister(t *testing.T) {
 		name                            string
 		enableInPlacePodVerticalScaling bool
 		enableSchedulingQueueHint       bool
+		enableDRAExtendedResource       bool
 		expectedClusterEvents           []fwk.ClusterEventWithHint
 	}{
 		{
@@ -1442,11 +1443,28 @@ func TestEventsToRegister(t *testing.T) {
 				{Event: fwk.ClusterEvent{Resource: "Node", ActionType: fwk.Add | fwk.UpdateNodeAllocatable | fwk.UpdateNodeTaint | fwk.UpdateNodeLabel}},
 			},
 		},
+		{
+			name:                      "Register events with DRAExtendedResource feature enabled",
+			enableDRAExtendedResource: true,
+			expectedClusterEvents: []fwk.ClusterEventWithHint{
+				{Event: fwk.ClusterEvent{Resource: "Pod", ActionType: fwk.Delete}},
+				{Event: fwk.ClusterEvent{Resource: "Node", ActionType: fwk.Add | fwk.UpdateNodeAllocatable | fwk.UpdateNodeTaint | fwk.UpdateNodeLabel}},
+				{Event: fwk.ClusterEvent{Resource: fwk.DeviceClass, ActionType: fwk.Add | fwk.Update}},
+			},
+		},
+		{
+			name:                      "Register events with DRAExtendedResource feature disabled",
+			enableDRAExtendedResource: false,
+			expectedClusterEvents: []fwk.ClusterEventWithHint{
+				{Event: fwk.ClusterEvent{Resource: "Pod", ActionType: fwk.Delete}},
+				{Event: fwk.ClusterEvent{Resource: "Node", ActionType: fwk.Add | fwk.UpdateNodeAllocatable | fwk.UpdateNodeTaint | fwk.UpdateNodeLabel}},
+			},
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fp := &Fit{enableInPlacePodVerticalScaling: test.enableInPlacePodVerticalScaling, enableSchedulingQueueHint: test.enableSchedulingQueueHint}
+			fp := &Fit{enableInPlacePodVerticalScaling: test.enableInPlacePodVerticalScaling, enableSchedulingQueueHint: test.enableSchedulingQueueHint, enableDRAExtendedResource: test.enableDRAExtendedResource}
 			_, ctx := ktesting.NewTestContext(t)
 			actualClusterEvents, err := fp.EventsToRegister(ctx)
 			if err != nil {

@@ -314,10 +314,16 @@ func (f *Fit) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, e
 		nodeActionType = fwk.Add | fwk.UpdateNodeAllocatable
 	}
 
-	return []fwk.ClusterEventWithHint{
+	events := []fwk.ClusterEventWithHint{
 		{Event: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: podActionType}, QueueingHintFn: f.isSchedulableAfterPodEvent},
 		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: nodeActionType}, QueueingHintFn: f.isSchedulableAfterNodeChange},
-	}, nil
+	}
+	if f.enableDRAExtendedResource {
+		events = append(events,
+			// A pod might be waiting for an exteneded resurce fom a class to get created or modified.
+			fwk.ClusterEventWithHint{Event: fwk.ClusterEvent{Resource: fwk.DeviceClass, ActionType: fwk.Add | fwk.Update}})
+	}
+	return events, nil
 }
 
 // isSchedulableAfterPodEvent is invoked whenever a pod deleted or scaled down. It checks whether
