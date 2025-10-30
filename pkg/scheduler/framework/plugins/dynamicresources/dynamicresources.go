@@ -221,6 +221,7 @@ func (pl *DynamicResources) Name() string {
 
 // Because it isn't simple to determine if DRA claims are single host or more complex,
 // we exclude any pod with a DRA claim from signatures. We should improve this.
+// See https://github.com/kubernetes/kubernetes/issues/134986
 func (pl *DynamicResources) SignPod(pod *v1.Pod, signature fwk.PodSignatureBuilder) error {
 	if len(pod.Spec.ResourceClaims) > 0 {
 		signature.Unsignable()
