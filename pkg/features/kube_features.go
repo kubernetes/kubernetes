@@ -1793,6 +1793,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Deprecated},
 	},
 
+	apiextensionsfeatures.CRDObservedGenerationTracking: {
+		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Beta},
+	},
+
 	apiextensionsfeatures.CRDValidationRatcheting: {
 		{Version: version.MustParse("1.28"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.Beta},
@@ -2310,6 +2314,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	WindowsGracefulNodeShutdown: {GracefulNodeShutdown},
 
 	WindowsHostNetwork: {},
+
+	apiextensionsfeatures.CRDObservedGenerationTracking: {},
 
 	apiextensionsfeatures.CRDValidationRatcheting: {},
 

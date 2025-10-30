@@ -317,6 +317,12 @@
     lockToDefault: true
     preRelease: GA
     version: "1.33"
+- name: CRDObservedGenerationTracking
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.35"
 - name: CRDValidationRatcheting
   versionedSpecs:
   - default: false
