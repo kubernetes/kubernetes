@@ -33,7 +33,7 @@ type OpportunisticBatch struct {
 
 type batchState struct {
 	// signature        string
-	sortedNodes  fwk.SortedScoredNodes
+	sortedNodes  framework.SortedScoredNodes
 	podSucceeded bool
 	creationTime time.Time
 }
@@ -112,7 +112,7 @@ func (b *OpportunisticBatch) podCompatible(_ *v1.Pod) bool {
 	return false
 }
 
-func (b *OpportunisticBatch) postScore(ctx context.Context, inputState fwk.CycleState, thisFramework bool, owningFwk framework.Framework, podInfo fwk.PodInfo, inputChosenNode fwk.NodeInfo, otherNodes fwk.SortedScoredNodes) {
+func (b *OpportunisticBatch) postScore(ctx context.Context, inputState fwk.CycleState, thisFramework bool, owningFwk framework.Framework, podInfo fwk.PodInfo, inputChosenNode fwk.NodeInfo, otherNodes framework.SortedScoredNodes) {
 	// A pod from another framework means we need to invalidate our results.
 	if !thisFramework {
 		b.invalidate("failure", "other_fwk_pod")

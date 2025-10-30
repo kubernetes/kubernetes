@@ -161,7 +161,7 @@ func (sched *Scheduler) schedulingCycle(
 	podInfo *framework.QueuedPodInfo,
 	start time.Time,
 	podsToActivate *framework.PodsToActivate,
-) (ScheduleResult, *framework.QueuedPodInfo, fwk.SortedScoredNodes, *fwk.Status) {
+) (ScheduleResult, *framework.QueuedPodInfo, framework.SortedScoredNodes, *fwk.Status) {
 	logger := klog.FromContext(ctx)
 	pod := podInfo.Pod
 	scheduleResult, sortedPrioritizedNodes, err := sched.SchedulePod(ctx, schedFramework, state, pod)
@@ -411,7 +411,7 @@ func (sched *Scheduler) frameworkForPod(pod *v1.Pod) (framework.Framework, error
 	return fwk, nil
 }
 
-func (sched *Scheduler) runPostScore(ctx context.Context, state fwk.CycleState, fwk framework.Framework, podInfo fwk.PodInfo, prioritizedNodes fwk.SortedScoredNodes, scheduleResult ScheduleResult) {
+func (sched *Scheduler) runPostScore(ctx context.Context, state fwk.CycleState, fwk framework.Framework, podInfo fwk.PodInfo, prioritizedNodes framework.SortedScoredNodes, scheduleResult ScheduleResult) {
 	chosenNode, err := sched.nodeInfoSnapshot.NodeInfos().Get(scheduleResult.SuggestedHost)
 	if err == nil {
 		for _, someFwk := range sched.Profiles {
@@ -452,7 +452,7 @@ func (sched *Scheduler) schedulePod(
 	fwk framework.Framework,
 	state fwk.CycleState,
 	pod *v1.Pod,
-) (result ScheduleResult, sortedPrioritizedNodes fwk.SortedScoredNodes, err error) {
+) (result ScheduleResult, sortedPrioritizedNodes framework.SortedScoredNodes, err error) {
 	trace := utiltrace.New("Scheduling", utiltrace.Field{Key: "namespace", Value: pod.Namespace}, utiltrace.Field{Key: "name", Value: pod.Name})
 	defer trace.LogIfLong(100 * time.Millisecond)
 	if err := sched.Cache.UpdateSnapshot(klog.FromContext(ctx), sched.nodeInfoSnapshot); err != nil {
@@ -536,7 +536,10 @@ func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, schedFramework 
 		return nil, diagnosis, nil
 	}
 
-	nodeHint := schedFramework.NodeHint(ctx, pod)
+	var nodeHint string
+	if utilfeature.DefaultFeatureGate.Enabled(features.OpportunisticBatching) {
+		nodeHint = schedFramework.NodeHint(ctx, pod)
+	}
 
 	// "NominatedNodeName" can potentially be set in a previous scheduling cycle as a result of preemption.
 	// This node is likely the only candidate that will fit the pod, and hence we try it first before iterating over all nodes.

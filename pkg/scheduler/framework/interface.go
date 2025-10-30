@@ -199,7 +199,7 @@ type Framework interface {
 
 	// On successful scheduling of a pod, update the batch information based on the result.
 	// The returned Batch object contains the new batch information, and can be nil.
-	RunPostScore(ctx context.Context, state fwk.CycleState, thisFramework bool, podInfo fwk.PodInfo, chosenNode fwk.NodeInfo, otherNodes fwk.SortedScoredNodes)
+	RunPostScore(ctx context.Context, state fwk.CycleState, thisFramework bool, podInfo fwk.PodInfo, chosenNode fwk.NodeInfo, otherNodes SortedScoredNodes)
 
 	// RunPreBindPlugins runs the set of configured PreBind plugins. It returns
 	// *fwk.Status and its code is set to non-success if any of the plugins returns

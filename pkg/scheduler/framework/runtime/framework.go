@@ -1273,7 +1273,7 @@ func (f *frameworkImpl) NodeHint(ctx context.Context, pod *v1.Pod) string {
 	return f.batch.NodeHint(ctx, pod)
 }
 
-func (f *frameworkImpl) RunPostScore(ctx context.Context, state fwk.CycleState, thisFramework bool, podInfo fwk.PodInfo, chosenNode fwk.NodeInfo, otherNodes fwk.SortedScoredNodes) {
+func (f *frameworkImpl) RunPostScore(ctx context.Context, state fwk.CycleState, thisFramework bool, podInfo fwk.PodInfo, chosenNode fwk.NodeInfo, otherNodes framework.SortedScoredNodes) {
 	f.batch.postScore(ctx, state, thisFramework, f, podInfo, chosenNode, otherNodes)
 }
 
