@@ -37,7 +37,7 @@ import (
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/controller/replicaset"
 	"k8s.io/kubernetes/test/integration/framework"
-	testutil "k8s.io/kubernetes/test/utils"
+	testutil "k8s.io/kubernetes/testutils"
 	"k8s.io/utils/ptr"
 )
 

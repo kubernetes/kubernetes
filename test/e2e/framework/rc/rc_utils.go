@@ -30,7 +30,7 @@ import (
 	e2edebug "k8s.io/kubernetes/test/e2e/framework/debug"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
-	testutils "k8s.io/kubernetes/test/utils"
+	"k8s.io/kubernetes/testutils"
 	"k8s.io/utils/ptr"
 )
 

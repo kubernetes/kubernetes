@@ -42,8 +42,8 @@ import (
 	corelistersv1 "k8s.io/client-go/listers/core/v1"
 	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/test/utils/hermeticpodcertificatesigner"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/testutils/hermeticpodcertificatesigner"
+	"k8s.io/kubernetes/testutils/ktesting"
 	testclock "k8s.io/utils/clock/testing"
 	"k8s.io/utils/ptr"
 )

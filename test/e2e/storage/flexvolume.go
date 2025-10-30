@@ -33,14 +33,14 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
-	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	e2etestfiles "k8s.io/kubernetes/testutils/testfiles"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 const (
-	driverDir              = "test/e2e/testing-manifests/flexvolume/"
+	driverDir              = "testutils/testing-manifests/flexvolume/"
 	defaultVolumePluginDir = "/usr/libexec/kubernetes/kubelet-plugins/volume/exec"
 	// TODO: change this and config-test.sh when default flex volume install path is changed for GCI
 	// On gci, root is read-only and controller-manager containerized. Assume

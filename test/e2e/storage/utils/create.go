@@ -36,9 +36,9 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
-	"k8s.io/kubernetes/test/utils/client-go/ktesting"
-	imageutils "k8s.io/kubernetes/test/utils/image"
+	"k8s.io/kubernetes/testutils/client-go/ktesting"
+	imageutils "k8s.io/kubernetes/testutils/image"
+	e2etestfiles "k8s.io/kubernetes/testutils/testfiles"
 )
 
 // LoadFromManifests loads .yaml or .json manifest files and returns

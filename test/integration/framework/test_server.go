@@ -53,7 +53,7 @@ import (
 	controlplaneapiserver "k8s.io/kubernetes/pkg/controlplane/apiserver"
 	generatedopenapi "k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/test/e2e/invariants/metrics"
-	"k8s.io/kubernetes/test/utils"
+	utils "k8s.io/kubernetes/testutils"
 )
 
 // This key is for testing purposes only and is not considered secure.

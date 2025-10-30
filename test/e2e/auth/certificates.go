@@ -43,7 +43,7 @@ import (
 	"k8s.io/client-go/util/certificate/csr"
 	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/utils"
+	utils "k8s.io/kubernetes/testutils"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 

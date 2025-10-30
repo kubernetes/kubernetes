@@ -39,7 +39,7 @@ import (
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/certificates/cleaner"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/kubernetes/test/utils/hermeticpodcertificatesigner"
+	"k8s.io/kubernetes/testutils/hermeticpodcertificatesigner"
 	"k8s.io/utils/clock"
 )
 

@@ -23,7 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
-	"k8s.io/kubernetes/test/utils/harness"
+	"k8s.io/kubernetes/testutils/harness"
 	"k8s.io/utils/exec"
 	exectesting "k8s.io/utils/exec/testing"
 )

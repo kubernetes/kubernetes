@@ -182,7 +182,7 @@ sampleRegistry: your-awesome-registry
 
 Keep in mind that some tests are using multiple images, so it is a good idea to also build and push those images.
 
-Finally, make sure to bump the image version used in E2E testing by modifying the file `test/utils/image/manifest.go`, and recompile afterwards:
+Finally, make sure to bump the image version used in E2E testing by modifying the file `testutils/image/manifest.go`, and recompile afterwards:
 
 ```bash
 ./build/run.sh make WHAT=test/e2e/e2e.test
@@ -209,7 +209,7 @@ from the staging registry to do more testing if required. All the postsubmit job
     ```bash
     manifest-tool inspect --raw gcr.io/k8s-staging-e2e-test-images/${IMAGE_NAME}:${VERSION} | jq '.[0].Digest'
     ```
-1. Finally you can open a pull request to update the e2e tests to use the newly promoted image by updating the image tag in [test/utils/image/manifest.go](../utils/image/manifest.go) file. See this [pull request](https://github.com/kubernetes/kubernetes/pull/100383/files) for an example.
+1. Finally you can open a pull request to update the e2e tests to use the newly promoted image by updating the image tag in [testutils/image/manifest.go](../utils/image/manifest.go) file. See this [pull request](https://github.com/kubernetes/kubernetes/pull/100383/files) for an example.
 
 You have now gone through the entire process and your changes will be used by the e2e tests.
 

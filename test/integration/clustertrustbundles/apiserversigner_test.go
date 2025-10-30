@@ -42,8 +42,8 @@ import (
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	kubecontrollermanagertesting "k8s.io/kubernetes/cmd/kube-controller-manager/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/kubernetes/test/utils/kubeconfig"
+	"k8s.io/kubernetes/testutils/ktesting"
 )
 
 func TestClusterTrustBundlesPublisherController(t *testing.T) {

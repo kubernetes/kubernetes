@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	kubernetes "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/testutils/ktesting"
 )
 
 // TestHealthHandler tests /health?verbose with etcd overrides servers.

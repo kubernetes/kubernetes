@@ -46,8 +46,8 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
-	testutils "k8s.io/kubernetes/test/utils"
-	"k8s.io/kubernetes/test/utils/client-go/ktesting"
+	"k8s.io/kubernetes/testutils"
+	"k8s.io/kubernetes/testutils/client-go/ktesting"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/yaml"
 )

@@ -357,7 +357,7 @@ linters:
         # Replace context.WithCancel with t.Context in tests.
         #
         # Disabled because in Kubernetes,
-        # test/utils/ktesting handles
+        # testutils/ktesting handles
         # context cancellation and also
         # addresses other pain points.
         - testingcontext

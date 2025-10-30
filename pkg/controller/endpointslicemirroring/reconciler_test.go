@@ -32,7 +32,7 @@ import (
 	endpointsliceutil "k8s.io/endpointslice/util"
 	endpointsv1 "k8s.io/kubernetes/pkg/api/v1/endpoints"
 	"k8s.io/kubernetes/pkg/controller/endpointslicemirroring/metrics"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/testutils/ktesting"
 	"k8s.io/utils/ptr"
 )
 

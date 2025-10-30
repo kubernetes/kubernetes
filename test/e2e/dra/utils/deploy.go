@@ -75,8 +75,8 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/drivers/proxy"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
-	"k8s.io/kubernetes/test/utils/client-go/ktesting"
-	"k8s.io/kubernetes/test/utils/image"
+	"k8s.io/kubernetes/testutils/client-go/ktesting"
+	"k8s.io/kubernetes/testutils/image"
 	"k8s.io/utils/clock"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/yaml"
@@ -481,14 +481,14 @@ func (d *Driver) SetUp(tCtx ktesting.TContext, kubeletRootDir string, nodes *Nod
 	d.createFromYAML(tCtx, []byte(content), tCtx.Namespace())
 
 	// Figure out which hostpathplugin to use: basically the latest one
-	// from the test/e2e/testing-manifests/storage-csi manifests. That is
+	// from the testutils/testing-manifests/storage-csi manifests. That is
 	// where SIG Storage maintains the versions of the hostpath image which
-	// are part of Kubernetes E2E testing. test/utils/image parses those files.
+	// are part of Kubernetes E2E testing. testutils/image parses those files.
 	//
 	// We piggy-back on that instead of controlling the version ourselves
 	// because it reduces effort, at the risk of unexpected
 	// breakage. Another benefit is that -list-images and registry patching
-	// via test/utils/image + KUBE_TEST_REPO_LIST work.
+	// via testutils/image + KUBE_TEST_REPO_LIST work.
 	hostPathImage := "registry.k8s.io/sig-storage/hostpathplugin"
 	hostPathVersion := ""
 	for _, config := range image.GetOriginalImageConfigs() {
@@ -517,7 +517,7 @@ func (d *Driver) SetUp(tCtx ktesting.TContext, kubeletRootDir string, nodes *Nod
 	manifests := []string{
 		// The code below matches the content of this manifest (ports,
 		// container names, etc.).
-		"test/e2e/testing-manifests/dra/dra-test-driver-proxy.yaml",
+		"testutils/testing-manifests/dra/dra-test-driver-proxy.yaml",
 	}
 	instanceKey := "app.kubernetes.io/instance"
 	rsName := ""

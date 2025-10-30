@@ -73,8 +73,8 @@ run_template_output_tests() {
   kubectl taint node 127.0.0.1 dedicated-
 
   # check that "apply set-last-applied" command supports --template output
-  kubectl "${kube_flags[@]:?}" create -f test/e2e/testing-manifests/statefulset/cassandra/controller.yaml
-  output_message=$(kubectl "${kube_flags[@]:?}" apply set-last-applied -f test/e2e/testing-manifests/statefulset/cassandra/controller.yaml --dry-run=client --create-annotation --template="{{ .metadata.name }}:")
+  kubectl "${kube_flags[@]:?}" create -f testutils/testing-manifests/statefulset/cassandra/controller.yaml
+  output_message=$(kubectl "${kube_flags[@]:?}" apply set-last-applied -f testutils/testing-manifests/statefulset/cassandra/controller.yaml --dry-run=client --create-annotation --template="{{ .metadata.name }}:")
   kube::test::if_has_string "${output_message}" 'cassandra:'
 
   # check that "auth reconcile" command supports --template output

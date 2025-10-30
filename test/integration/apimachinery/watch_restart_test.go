@@ -35,7 +35,7 @@ import (
 	watchtools "k8s.io/client-go/tools/watch"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/testutils/ktesting"
 )
 
 func noopNormalization(output []string) []string {

@@ -89,7 +89,7 @@ func NewDefaultTestServerOptions() *TestServerInstanceOptions {
 // files that because Golang testing's call to os.Exit will not give a stop channel go routine
 // enough time to remove temporary files.
 func StartTestServer(t Logger, _ *TestServerInstanceOptions, customFlags []string, storageConfig *storagebackend.Config) (result TestServer, err error) {
-	// TODO: this is a candidate for using what is now test/utils/ktesting,
+	// TODO: this is a candidate for using what is now testutils/ktesting,
 	// should that become a staging repo.
 	ctx, cancel := context.WithCancelCause(context.Background())
 	var errCh chan error

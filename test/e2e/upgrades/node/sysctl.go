@@ -33,7 +33,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	"k8s.io/kubernetes/test/e2e/upgrades"
-	imageutils "k8s.io/kubernetes/test/utils/image"
+	imageutils "k8s.io/kubernetes/testutils/image"
 )
 
 // SysctlUpgradeTest tests that a pod with sysctls runs before and after an upgrade. During

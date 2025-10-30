@@ -28,7 +28,7 @@ import (
 	"k8s.io/dynamic-resource-allocation/structured"
 	"k8s.io/klog/v2"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
-	"k8s.io/kubernetes/test/utils/client-go/ktesting"
+	"k8s.io/kubernetes/testutils/client-go/ktesting"
 )
 
 func testUsesAllResources(tCtx ktesting.TContext) {

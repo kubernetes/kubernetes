@@ -38,11 +38,11 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2estatefulset "k8s.io/kubernetes/test/e2e/framework/statefulset"
-	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 	"k8s.io/kubernetes/test/e2e/upgrades"
+	e2etestfiles "k8s.io/kubernetes/testutils/testfiles"
 )
 
-const cassandraManifestPath = "test/e2e/testing-manifests/statefulset/cassandra"
+const cassandraManifestPath = "testutils/testing-manifests/statefulset/cassandra"
 
 // CassandraUpgradeTest ups and verifies that a Cassandra StatefulSet behaves
 // well across upgrades.

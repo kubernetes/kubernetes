@@ -43,7 +43,7 @@ import (
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/test/integration/framework"
-	utiltest "k8s.io/kubernetes/test/utils"
+	utiltest "k8s.io/kubernetes/testutils"
 	podsecurityconfigloader "k8s.io/pod-security-admission/admission/api/load"
 	podsecurityserver "k8s.io/pod-security-admission/cmd/webhook/server"
 	podsecuritytest "k8s.io/pod-security-admission/test"

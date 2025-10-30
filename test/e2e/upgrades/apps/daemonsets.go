@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edaemonset "k8s.io/kubernetes/test/e2e/framework/daemonset"
 	"k8s.io/kubernetes/test/e2e/upgrades"
-	imageutils "k8s.io/kubernetes/test/utils/image"
+	imageutils "k8s.io/kubernetes/testutils/image"
 )
 
 // DaemonSetUpgradeTest tests that a DaemonSet is running before and after

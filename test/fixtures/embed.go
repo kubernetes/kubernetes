@@ -19,7 +19,7 @@ package fixtures
 import (
 	"embed"
 
-	"k8s.io/kubernetes/test/e2e/framework/testfiles"
+	"k8s.io/kubernetes/testutils/testfiles"
 )
 
 //go:embed doc-yaml/user-guide/liveness doc-yaml/user-guide/secrets doc-yaml/user-guide/downward-api doc-yaml/user-guide/update-demo

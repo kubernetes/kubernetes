@@ -30,7 +30,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"k8s.io/kubernetes/test/utils/client-go/ktesting"
+	"k8s.io/kubernetes/testutils/client-go/ktesting"
 )
 
 type Cmd struct {

@@ -29,7 +29,7 @@ import (
 	utilversion "k8s.io/component-base/version"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 
-	"k8s.io/kubernetes/test/utils/image"
+	"k8s.io/kubernetes/testutils/image"
 )
 
 // GetSupportedEmulatedVersions provides the list of supported emulated versions in the etcd data.

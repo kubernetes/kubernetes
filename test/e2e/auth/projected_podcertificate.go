@@ -33,8 +33,8 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	"k8s.io/kubernetes/test/utils/hermeticpodcertificatesigner"
-	imageutils "k8s.io/kubernetes/test/utils/image" // Import imageutils
+	"k8s.io/kubernetes/testutils/hermeticpodcertificatesigner"
+	imageutils "k8s.io/kubernetes/testutils/image" // Import imageutils
 	admissionapi "k8s.io/pod-security-admission/api"
 	admissiontest "k8s.io/pod-security-admission/test"
 	"k8s.io/utils/clock"

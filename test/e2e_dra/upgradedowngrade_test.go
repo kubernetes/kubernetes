@@ -40,9 +40,9 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	drautils "k8s.io/kubernetes/test/e2e/dra/utils"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
-	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
-	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	"k8s.io/kubernetes/test/utils/localupcluster"
+	"k8s.io/kubernetes/testutils/client-go/ktesting"
+	e2etestfiles "k8s.io/kubernetes/testutils/testfiles"
 )
 
 var errHTTP404 = errors.New("resource not found (404)")
