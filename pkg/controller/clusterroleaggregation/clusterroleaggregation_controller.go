@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"sync"
 	"time"
 
 	rbacv1ac "k8s.io/client-go/applyconfigurations/rbac/v1"
@@ -194,12 +195,21 @@ func (c *ClusterRoleAggregationController) Run(ctx context.Context, workers int)
 	logger.Info("Starting ClusterRoleAggregator controller")
 	defer logger.Info("Shutting down ClusterRoleAggregator controller")
 
+	var wg sync.WaitGroup
+	defer func() {
+		logger.Info("Shutting down ClusterRoleAggregator controller")
+		c.queue.ShutDown()
+		wg.Wait()
+	}()
+
 	if !cache.WaitForNamedCacheSyncWithContext(ctx, c.clusterRolesSynced) {
 		return
 	}
 
 	for i := 0; i < workers; i++ {
-		go wait.UntilWithContext(ctx, c.runWorker, time.Second)
+		wg.Go(func() {
+			wait.UntilWithContext(ctx, c.runWorker, time.Second)
+		})
 	}
 
 	<-ctx.Done()
