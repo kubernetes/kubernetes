@@ -399,8 +399,7 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 		}
 	}
 
-	// Disable signatures if we don't have the full support of all the needed plugins
-	f.checkPluginSignatures()
+	f.computeBatchPlugins()
 
 	if options.captureProfile != nil {
 		if len(outputProfile.PluginConfig) != 0 {
@@ -724,7 +723,7 @@ func (f *frameworkImpl) QueueSortFunc() fwk.LessFunc {
 
 // If any of our preFilter, filter, preScore or score plugins haven't
 // implemented a signature, then disable the cache.
-func (f *frameworkImpl) checkPluginSignatures() {
+func (f *frameworkImpl) computeBatchPlugins() {
 	f.enableSignatures = true
 
 	// Get all plugins of compatible types.

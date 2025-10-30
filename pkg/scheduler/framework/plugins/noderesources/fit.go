@@ -155,8 +155,7 @@ func (f *Fit) Name() string {
 	return Name
 }
 
-// Fit is based on the node resources for the pod. We reuse the function used
-// internally to compute the final resource list.
+// Fit is based on the node resources for the pod containers.
 func (f *Fit) SignPod(pod *v1.Pod, signature fwk.PodSignatureBuilder) error {
 	if err := signature.AddPodElement("Spec.InitContainers", pod.Spec.InitContainers); err != nil {
 		return err
