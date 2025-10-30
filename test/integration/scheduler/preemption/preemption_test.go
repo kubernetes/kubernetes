@@ -583,6 +583,49 @@ func TestAsyncPreemption(t *testing.T) {
 			},
 		},
 		{
+			name: "basic async preemption with 1 victim, preemptor gated until preemption API call finishes",
+			scenarios: []scenario{
+				{
+					name: "create victim",
+					createPod: &createPod{
+						pod: st.MakePod().GenerateName("victim-").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Node("node").Container("image").ZeroTerminationGracePeriod().Priority(1).Obj(),
+					},
+				},
+				{
+					name: "create a preemptor Pod",
+					createPod: &createPod{
+						pod: st.MakePod().Name("preemptor").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Priority(100).Obj(),
+					},
+				},
+				{
+					name: "schedule the preemptor Pod",
+					schedulePod: &schedulePod{
+						podName:             "preemptor",
+						expectUnschedulable: true,
+					},
+				},
+				{
+					name:            "check the preemptor Pod is in the queue and gated",
+					podGatedInQueue: "preemptor",
+				},
+				{
+					name:                 "check the preemptor Pod making the preemption API calls",
+					podRunningPreemption: ptr.To(1),
+				},
+				{
+					name:               "complete the preemption API call",
+					completePreemption: "preemptor",
+				},
+				{
+					name: "schedule the preemptor Pod again and expect it to be scheduled",
+					schedulePod: &schedulePod{
+						podName:       "preemptor",
+						expectSuccess: true,
+					},
+				},
+			},
+		},
+		{
 			name: "Lower priority Pod doesn't take over the place for higher priority Pod that is running the preemption",
 			scenarios: []scenario{
 				{
