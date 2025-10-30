@@ -130,60 +130,84 @@ func doGuaranteedPodResizeTests(f *framework.Framework) {
 		ginkgo.Entry("cpu & mem restart + resize initContainers", v1.RestartContainer, v1.RestartContainer, true),
 	)
 
-	ginkgo.DescribeTable("guaranteed pods with multiple containers", func(ctx context.Context, expectedContainers []podresize.ResizableContainerInfo) {
-		originalContainers := makeGuaranteedContainers(3, v1.NotRequired, v1.NotRequired, false, false, originalCPU, originalMem)
-		for i := range originalContainers {
-			originalContainers[i].CPUPolicy = nil
-			originalContainers[i].MemPolicy = nil
-		}
+	// All tests will perform the requested resize, and once completed, will roll back the change.
+	// This results in coverage of both the operation as described, and its reverse.
+	ginkgo.Describe("guaranteed pods with multiple containers", func() {
+		ginkgo.It("3 containers - increase cpu & mem on c1, c2, decrease cpu & mem on c3 - net increase", func(ctx context.Context) {
+			originalContainers := makeGuaranteedContainers(3, v1.NotRequired, v1.NotRequired, false, false, originalCPU, originalMem)
+			for i := range originalContainers {
+				originalContainers[i].CPUPolicy = nil
+				originalContainers[i].MemPolicy = nil
+			}
 
-		doPatchAndRollback(ctx, f, originalContainers, expectedContainers, true)
-	},
-		// All tests will perform the requested resize, and once completed, will roll back the change.
-		// This results in coverage of both the operation as described, and its reverse.
-		ginkgo.Entry("3 containers - increase cpu & mem on c1, c2, decrease cpu & mem on c3 - net increase", []podresize.ResizableContainerInfo{
-			{
-				Name:      "c1",
-				Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(0, increasedCPU), CPULim: offsetCPU(0, increasedCPU), MemReq: offsetMemory(0, increasedMem), MemLim: offsetMemory(0, increasedMem)},
-			},
-			{
-				Name:      "c2",
-				Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(1, increasedCPU), CPULim: offsetCPU(1, increasedCPU), MemReq: offsetMemory(1, increasedMem), MemLim: offsetMemory(1, increasedMem)},
-			},
-			{
-				Name:      "c3",
-				Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(2, reducedCPU), CPULim: offsetCPU(2, reducedCPU), MemReq: offsetMemory(2, reducedMem), MemLim: offsetMemory(2, reducedMem)},
-			},
-		}),
-		ginkgo.Entry("3 containers - increase cpu & mem on c1, decrease cpu & mem on c2, c3 - net decrease", []podresize.ResizableContainerInfo{
-			{
-				Name:      "c1",
-				Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(0, increasedCPU), CPULim: offsetCPU(0, increasedCPU), MemReq: offsetMemory(0, increasedMem), MemLim: offsetMemory(0, increasedMem)},
-			},
-			{
-				Name:      "c2",
-				Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(1, reducedCPU), CPULim: offsetCPU(1, reducedCPU), MemReq: offsetMemory(1, reducedMem), MemLim: offsetMemory(1, reducedMem)},
-			},
-			{
-				Name:      "c3",
-				Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(2, reducedCPU), CPULim: offsetCPU(2, reducedCPU), MemReq: offsetMemory(2, reducedMem), MemLim: offsetMemory(2, reducedMem)},
-			},
-		}),
-		ginkgo.Entry("3 containers - increase: CPU (c1,c3), memory (c2, c3) ; decrease: CPU (c2)", []podresize.ResizableContainerInfo{
-			{
-				Name:      "c1",
-				Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(0, increasedCPU), CPULim: offsetCPU(0, increasedCPU), MemReq: offsetMemory(0, originalMem), MemLim: offsetMemory(0, originalMem)},
-			},
-			{
-				Name:      "c2",
-				Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(1, reducedCPU), CPULim: offsetCPU(1, reducedCPU), MemReq: offsetMemory(1, increasedMem), MemLim: offsetMemory(1, increasedMem)},
-			},
-			{
-				Name:      "c3",
-				Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(2, increasedCPU), CPULim: offsetCPU(2, increasedCPU), MemReq: offsetMemory(2, increasedMem), MemLim: offsetMemory(2, increasedMem)},
-			},
-		}),
-	)
+			expectedContainers := []podresize.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(0, increasedCPU), CPULim: offsetCPU(0, increasedCPU), MemReq: offsetMemory(0, increasedMem), MemLim: offsetMemory(0, increasedMem)},
+				},
+				{
+					Name:      "c2",
+					Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(1, increasedCPU), CPULim: offsetCPU(1, increasedCPU), MemReq: offsetMemory(1, increasedMem), MemLim: offsetMemory(1, increasedMem)},
+				},
+				{
+					Name:      "c3",
+					Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(2, reducedCPU), CPULim: offsetCPU(2, reducedCPU), MemReq: offsetMemory(2, reducedMem), MemLim: offsetMemory(2, reducedMem)},
+				},
+			}
+
+			doPatchAndRollback(ctx, f, originalContainers, expectedContainers, true)
+		})
+
+		ginkgo.It("3 containers - increase cpu & mem on c1, decrease cpu & mem on c2, c3 - net decrease", func(ctx context.Context) {
+			originalContainers := makeGuaranteedContainers(3, v1.NotRequired, v1.NotRequired, false, false, originalCPU, originalMem)
+			for i := range originalContainers {
+				originalContainers[i].CPUPolicy = nil
+				originalContainers[i].MemPolicy = nil
+			}
+
+			expectedContainers := []podresize.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(0, increasedCPU), CPULim: offsetCPU(0, increasedCPU), MemReq: offsetMemory(0, increasedMem), MemLim: offsetMemory(0, increasedMem)},
+				},
+				{
+					Name:      "c2",
+					Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(1, reducedCPU), CPULim: offsetCPU(1, reducedCPU), MemReq: offsetMemory(1, reducedMem), MemLim: offsetMemory(1, reducedMem)},
+				},
+				{
+					Name:      "c3",
+					Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(2, reducedCPU), CPULim: offsetCPU(2, reducedCPU), MemReq: offsetMemory(2, reducedMem), MemLim: offsetMemory(2, reducedMem)},
+				},
+			}
+
+			doPatchAndRollback(ctx, f, originalContainers, expectedContainers, true)
+		})
+
+		ginkgo.It("3 containers - increase: CPU (c1,c3), memory (c2, c3) ; decrease: CPU (c2)", func(ctx context.Context) {
+			originalContainers := makeGuaranteedContainers(3, v1.NotRequired, v1.NotRequired, false, false, originalCPU, originalMem)
+			for i := range originalContainers {
+				originalContainers[i].CPUPolicy = nil
+				originalContainers[i].MemPolicy = nil
+			}
+
+			expectedContainers := []podresize.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(0, increasedCPU), CPULim: offsetCPU(0, increasedCPU), MemReq: offsetMemory(0, originalMem), MemLim: offsetMemory(0, originalMem)},
+				},
+				{
+					Name:      "c2",
+					Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(1, reducedCPU), CPULim: offsetCPU(1, reducedCPU), MemReq: offsetMemory(1, increasedMem), MemLim: offsetMemory(1, increasedMem)},
+				},
+				{
+					Name:      "c3",
+					Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(2, increasedCPU), CPULim: offsetCPU(2, increasedCPU), MemReq: offsetMemory(2, increasedMem), MemLim: offsetMemory(2, increasedMem)},
+				},
+			}
+
+			doPatchAndRollback(ctx, f, originalContainers, expectedContainers, true)
+		})
+	})
 }
 
 func doBurstablePodResizeTests(f *framework.Framework) {
@@ -228,11 +252,9 @@ func doBurstablePodResizeTests(f *framework.Framework) {
 	// - adding limits where only requests were previously set
 	// - adding requests where none were previously set
 	// - resizing with equivalents (e.g. 2m -> 1m)
-	ginkgo.DescribeTable("burstable pods - extended", func(ctx context.Context, originalContainers, expectedContainers []podresize.ResizableContainerInfo, doRollback bool) {
-		doPatchAndRollback(ctx, f, originalContainers, expectedContainers, doRollback)
-	},
-		ginkgo.Entry("6 containers - various operations performed (including adding limits and requests)",
-			[]podresize.ResizableContainerInfo{
+	ginkgo.Describe("burstable pods - extended", func() {
+		ginkgo.It("6 containers - various operations performed (including adding limits and requests)", func(ctx context.Context) {
+			originalContainers := []podresize.ResizableContainerInfo{
 				{
 					// c1 starts with CPU requests only; increase CPU requests + add CPU limits
 					Name:      "c1",
@@ -258,8 +280,8 @@ func doBurstablePodResizeTests(f *framework.Framework) {
 					Name:      "c5",
 					Resources: &cgroups.ContainerResources{MemReq: originalMem},
 				},
-			},
-			[]podresize.ResizableContainerInfo{
+			}
+			expectedContainers := []podresize.ResizableContainerInfo{
 				{
 					// c1 starts with CPU requests only; increase CPU requests + add CPU limits
 					Name:      "c1",
@@ -285,25 +307,26 @@ func doBurstablePodResizeTests(f *framework.Framework) {
 					Name:      "c5",
 					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, MemReq: increasedMem},
 				},
-			},
-			false,
-		),
-		ginkgo.Entry("resize with equivalents",
-			[]podresize.ResizableContainerInfo{
+			}
+			doPatchAndRollback(ctx, f, originalContainers, expectedContainers, false)
+		})
+
+		ginkgo.It("resize with equivalents", func(ctx context.Context) {
+			originalContainers := []podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
 					Resources: &cgroups.ContainerResources{CPUReq: "2m", CPULim: "10m"},
 				},
-			},
-			[]podresize.ResizableContainerInfo{
+			}
+			expectedContainers := []podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
 					Resources: &cgroups.ContainerResources{CPUReq: "1m", CPULim: "5m"},
 				},
-			},
-			true,
-		),
-	)
+			}
+			doPatchAndRollback(ctx, f, originalContainers, expectedContainers, true)
+		})
+	})
 }
 
 func doPodResizePatchErrorTests(f *framework.Framework) {
