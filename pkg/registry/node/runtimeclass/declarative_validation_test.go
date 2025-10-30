@@ -88,7 +88,7 @@ func TestRuntimeClassValidateRequiredForDeclarative(t *testing.T) {
 						rc.Overhead = nil
 					}),
 					expectedErrs: field.ErrorList{
-						field.Required(field.NewPath("overhead"), "Required value").MarkCoveredByDeclarative(),
+						field.Required(field.NewPath("overhead"), ""),
 					},
 				},
 
@@ -97,7 +97,7 @@ func TestRuntimeClassValidateRequiredForDeclarative(t *testing.T) {
 						rc.Scheduling = nil
 					}),
 					expectedErrs: field.ErrorList{
-						field.Required(field.NewPath("scheduling"), "Required value").MarkCoveredByDeclarative(),
+						field.Required(field.NewPath("scheduling"), ""),
 					},
 				},
 
@@ -107,8 +107,8 @@ func TestRuntimeClassValidateRequiredForDeclarative(t *testing.T) {
 						rc.Scheduling = nil
 					}),
 					expectedErrs: field.ErrorList{
-						field.Required(field.NewPath("overhead"), "Required value").MarkCoveredByDeclarative(),
-						field.Required(field.NewPath("scheduling"), "Required value").MarkCoveredByDeclarative(),
+						field.Required(field.NewPath("overhead"), ""),
+						field.Required(field.NewPath("scheduling"), ""),
 					},
 				},
 			}
