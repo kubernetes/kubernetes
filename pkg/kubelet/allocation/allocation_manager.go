@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/tools/record"
 	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -131,8 +130,6 @@ type manager struct {
 
 	allocationMutex        sync.Mutex
 	podsWithPendingResizes []types.UID
-
-	recorder record.EventRecorder
 }
 
 func NewManager(checkpointDirectory string,
@@ -143,7 +140,6 @@ func NewManager(checkpointDirectory string,
 	getActivePods func() []*v1.Pod,
 	getPodByUID func(types.UID) (*v1.Pod, bool),
 	sourcesReady config.SourcesReady,
-	recorder record.EventRecorder,
 ) Manager {
 	return &manager{
 		allocated: newStateImpl(checkpointDirectory, allocatedPodsStateFile),
@@ -158,7 +154,6 @@ func NewManager(checkpointDirectory string,
 		triggerPodSync: triggerPodSync,
 		getActivePods:  getActivePods,
 		getPodByUID:    getPodByUID,
-		recorder:       recorder,
 	}
 }
 
