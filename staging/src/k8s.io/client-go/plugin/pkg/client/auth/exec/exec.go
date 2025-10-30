@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/dump"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/client-go/pkg/apis/clientauthentication"
 	"k8s.io/client-go/pkg/apis/clientauthentication/install"
@@ -606,7 +607,7 @@ func (a *Authenticator) checkAllowlist() error {
 		errs = append(errs, err)
 	}
 
-	return fmt.Errorf("%q is not permitted by the credential plugin allowlist\n%w", pluginAbsPath, errors.Join(errs...))
+	return fmt.Errorf("%q is not permitted by the credential plugin allowlist\n%w", pluginAbsPath, utilerrors.NewAggregate(errs))
 }
 
 var emptyAllowlistEntry api.AllowlistEntry
