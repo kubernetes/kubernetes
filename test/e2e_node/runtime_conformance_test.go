@@ -64,15 +64,16 @@ var _ = SIGDescribe("Container Runtime Conformance Test", func() {
 				var podNodes []string
 				ginkgo.BeforeEach(func(ctx context.Context) {
 					var err error
-					if testCase.setupRegisty {
-						registryAddress, podNodes, err = e2eregistry.SetupRegistry(ctx, f, true)
-						framework.ExpectNoError(err)
+					if !testCase.setupRegisty {
+						return
 					}
-				})
-				ginkgo.AfterEach(func(ctx context.Context) {
-					if testCase.setupRegisty {
-						f.DeleteNamespace(ctx, f.Namespace.Name) // we need to wait for the registry to be removed and so we need to delete the whole NS early (before the actual cleanup)
-					}
+
+					registryAddress, podNodes, err = e2eregistry.SetupRegistry(ctx, f, true)
+					framework.ExpectNoError(err)
+					// we need to wait for the registry to be removed and so we need to delete the whole NS ourselves
+					ginkgo.DeferCleanup(func(ctx context.Context) {
+						f.DeleteNamespace(ctx, f.Namespace.Name)
+					})
 				})
 
 				f.It(testCase.description+"", f.WithNodeConformance(), func(ctx context.Context) {
