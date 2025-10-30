@@ -400,6 +400,9 @@ func (m *CustomResourceDefinitionCondition) MarshalToSizedBuffer(dAtA []byte) (i
 	_ = i
 	var l int
 	_ = l
+	i = encodeVarintGenerated(dAtA, i, uint64(m.ObservedGeneration))
+	i--
+	dAtA[i] = 0x30
 	i -= len(m.Message)
 	copy(dAtA[i:], m.Message)
 	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Message)))
@@ -638,6 +641,9 @@ func (m *CustomResourceDefinitionStatus) MarshalToSizedBuffer(dAtA []byte) (int,
 	_ = i
 	var l int
 	_ = l
+	i = encodeVarintGenerated(dAtA, i, uint64(m.ObservedGeneration))
+	i--
+	dAtA[i] = 0x20
 	if len(m.StoredVersions) > 0 {
 		for iNdEx := len(m.StoredVersions) - 1; iNdEx >= 0; iNdEx-- {
 			i -= len(m.StoredVersions[iNdEx])
@@ -2018,6 +2024,7 @@ func (m *CustomResourceDefinitionCondition) Size() (n int) {
 	n += 1 + l + sovGenerated(uint64(l))
 	l = len(m.Message)
 	n += 1 + l + sovGenerated(uint64(l))
+	n += 1 + sovGenerated(uint64(m.ObservedGeneration))
 	return n
 }
 
@@ -2113,6 +2120,7 @@ func (m *CustomResourceDefinitionStatus) Size() (n int) {
 			n += 1 + l + sovGenerated(uint64(l))
 		}
 	}
+	n += 1 + sovGenerated(uint64(m.ObservedGeneration))
 	return n
 }
 
@@ -2659,6 +2667,7 @@ func (this *CustomResourceDefinitionCondition) String() string {
 		`LastTransitionTime:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.LastTransitionTime), "Time", "v1.Time", 1), `&`, ``, 1) + `,`,
 		`Reason:` + fmt.Sprintf("%v", this.Reason) + `,`,
 		`Message:` + fmt.Sprintf("%v", this.Message) + `,`,
+		`ObservedGeneration:` + fmt.Sprintf("%v", this.ObservedGeneration) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -2727,6 +2736,7 @@ func (this *CustomResourceDefinitionStatus) String() string {
 		`Conditions:` + repeatedStringForConditions + `,`,
 		`AcceptedNames:` + strings.Replace(strings.Replace(this.AcceptedNames.String(), "CustomResourceDefinitionNames", "CustomResourceDefinitionNames", 1), `&`, ``, 1) + `,`,
 		`StoredVersions:` + fmt.Sprintf("%v", this.StoredVersions) + `,`,
+		`ObservedGeneration:` + fmt.Sprintf("%v", this.ObservedGeneration) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -4152,6 +4162,25 @@ func (m *CustomResourceDefinitionCondition) Unmarshal(dAtA []byte) error {
 			}
 			m.Message = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
+		case 6:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ObservedGeneration", wireType)
+			}
+			m.ObservedGeneration = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ObservedGeneration |= int64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
@@ -4897,6 +4926,25 @@ func (m *CustomResourceDefinitionStatus) Unmarshal(dAtA []byte) error {
 			}
 			m.StoredVersions = append(m.StoredVersions, string(dAtA[iNdEx:postIndex]))
 			iNdEx = postIndex
+		case 4:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ObservedGeneration", wireType)
+			}
+			m.ObservedGeneration = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ObservedGeneration |= int64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
