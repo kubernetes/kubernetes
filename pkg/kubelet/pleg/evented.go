@@ -42,11 +42,11 @@ var (
 	eventedPLEGUsageMu = sync.RWMutex{}
 )
 
-// isEventedPLEGInUse indicates whether Evented PLEG is in use. Even after enabling
+// IsEventedPLEGInUse indicates whether Evented PLEG is in use. Even after enabling
 // the Evented PLEG feature gate, there could be several reasons it may not be in use.
 // e.g. Streaming data issues from the runtime or the runtime does not implement the
 // container events stream.
-func isEventedPLEGInUse() bool {
+func IsEventedPLEGInUse() bool {
 	eventedPLEGUsageMu.RLock()
 	defer eventedPLEGUsageMu.RUnlock()
 	return eventedPLEGUsage
@@ -122,7 +122,7 @@ func (e *EventedPLEG) Relist() {
 func (e *EventedPLEG) Start() {
 	e.runningMu.Lock()
 	defer e.runningMu.Unlock()
-	if isEventedPLEGInUse() {
+	if IsEventedPLEGInUse() {
 		return
 	}
 	setEventedPLEGUsage(true)
@@ -136,7 +136,7 @@ func (e *EventedPLEG) Start() {
 func (e *EventedPLEG) Stop() {
 	e.runningMu.Lock()
 	defer e.runningMu.Unlock()
-	if !isEventedPLEGInUse() {
+	if !IsEventedPLEGInUse() {
 		return
 	}
 	setEventedPLEGUsage(false)
@@ -193,7 +193,7 @@ func (e *EventedPLEG) watchEventsChannel() {
 				return
 			default:
 				if numAttempts >= e.eventedPlegMaxStreamRetries {
-					if isEventedPLEGInUse() {
+					if IsEventedPLEGInUse() {
 						// Fall back to Generic PLEG relisting since Evented PLEG is not working.
 						e.logger.V(4).Info("Fall back to Generic PLEG relisting since Evented PLEG is not working")
 						e.Stop()
@@ -218,7 +218,7 @@ func (e *EventedPLEG) watchEventsChannel() {
 		}
 	}()
 
-	if isEventedPLEGInUse() {
+	if IsEventedPLEGInUse() {
 		e.processCRIEvents(ctx, containerEventsResponseCh)
 	}
 }
@@ -266,6 +266,9 @@ func (e *EventedPLEG) processCRIEvents(ctx context.Context, containerEventsRespo
 			e.updateRunningContainerMetric(status)
 			e.updateLatencyMetric(event)
 
+			existStatus, _ := e.cache.Get(podID)
+			canUpdate := shouldUpdateCache(event.ContainerEventType, existStatus, status, event.ContainerId)
+
 			if event.ContainerEventType == runtimeapi.ContainerEventType_CONTAINER_DELETED_EVENT {
 				for _, sandbox := range status.SandboxStatuses {
 					if sandbox.Id == event.ContainerId {
@@ -277,14 +280,75 @@ func (e *EventedPLEG) processCRIEvents(ctx context.Context, containerEventsRespo
 					}
 				}
 				shouldSendPLEGEvent = true
-			} else if e.cache.Set(podID, status, nil, time.Unix(0, event.GetCreatedAt())) {
-				shouldSendPLEGEvent = true
+			} else if canUpdate && e.cache.Set(podID, status, nil, time.Unix(0, event.GetCreatedAt())) {
+				// For sandbox-only events, update pod cache but skip pod worker event to avoid
+				// racing with SyncPod on sandbox lifecycle transitions.
+				if event.ContainersStatuses != nil {
+					shouldSendPLEGEvent = true
+				}
 			}
 
 			if shouldSendPLEGEvent {
 				e.processCRIEvent(event)
 			}
 		}
+	}
+}
+
+func shouldUpdateCache(eventType runtimeapi.ContainerEventType, existStatus, newStatus *kubecontainer.PodStatus, containerID string) bool {
+	if eventType == runtimeapi.ContainerEventType_CONTAINER_DELETED_EVENT {
+		return true
+	}
+	if existStatus == nil || newStatus == nil {
+		return true
+	}
+
+	var existContainer *kubecontainer.Status
+	for i := range existStatus.ContainerStatuses {
+		if existStatus.ContainerStatuses[i].ID.ID == containerID {
+			existContainer = existStatus.ContainerStatuses[i]
+			break
+		}
+	}
+
+	var newContainer *kubecontainer.Status
+	for i := range newStatus.ContainerStatuses {
+		if newStatus.ContainerStatuses[i].ID.ID == containerID {
+			newContainer = newStatus.ContainerStatuses[i]
+			break
+		}
+	}
+
+	if existContainer == nil || newContainer == nil {
+		return true
+	}
+
+	return shouldUpdateContainerStatus(eventType, existContainer, newContainer)
+}
+
+func shouldUpdateContainerStatus(eventType runtimeapi.ContainerEventType, existContainer, newContainer *kubecontainer.Status) bool {
+	switch eventType {
+	case runtimeapi.ContainerEventType_CONTAINER_CREATED_EVENT:
+		// CREATED is a lower-order lifecycle event. Once cache already observed
+		// STARTED/STOPPED for the same container ID, never allow a delayed CREATED
+		// event to regress the status.
+		if !existContainer.StartedAt.IsZero() || !existContainer.FinishedAt.IsZero() {
+			return false
+		}
+		return !newContainer.CreatedAt.IsZero() &&
+			(existContainer.CreatedAt.IsZero() || !existContainer.CreatedAt.After(newContainer.CreatedAt))
+	case runtimeapi.ContainerEventType_CONTAINER_STARTED_EVENT:
+		// STARTED must not override a terminal STOPPED state.
+		if !existContainer.FinishedAt.IsZero() {
+			return false
+		}
+		return !newContainer.StartedAt.IsZero() &&
+			(existContainer.StartedAt.IsZero() || !existContainer.StartedAt.After(newContainer.StartedAt))
+	case runtimeapi.ContainerEventType_CONTAINER_STOPPED_EVENT:
+		return !newContainer.FinishedAt.IsZero() &&
+			(existContainer.FinishedAt.IsZero() || !existContainer.FinishedAt.After(newContainer.FinishedAt))
+	default:
+		return true
 	}
 }
 

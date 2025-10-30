@@ -231,3 +231,65 @@ func TestEventedPLEG_getPodIPs(t *testing.T) {
 		})
 	}
 }
+
+func TestShouldUpdateCache(t *testing.T) {
+	baseTime := time.Unix(1700000000, 0)
+	containerID := "c1"
+
+	tests := []struct {
+		name      string
+		eventType v1.ContainerEventType
+		existing  *kubecontainer.PodStatus
+		incoming  *kubecontainer.PodStatus
+		want      bool
+	}{
+		{
+			name:      "ignore delayed created event when cache already started",
+			eventType: v1.ContainerEventType_CONTAINER_CREATED_EVENT,
+			existing:  podStatusWithContainer(containerID, baseTime, baseTime.Add(time.Second), time.Time{}),
+			incoming:  podStatusWithContainer(containerID, baseTime, time.Time{}, time.Time{}),
+			want:      false,
+		},
+		{
+			name:      "accept created when only created timestamp advances",
+			eventType: v1.ContainerEventType_CONTAINER_CREATED_EVENT,
+			existing:  podStatusWithContainer(containerID, baseTime, time.Time{}, time.Time{}),
+			incoming:  podStatusWithContainer(containerID, baseTime.Add(time.Second), time.Time{}, time.Time{}),
+			want:      true,
+		},
+		{
+			name:      "ignore delayed started event when cache already stopped",
+			eventType: v1.ContainerEventType_CONTAINER_STARTED_EVENT,
+			existing:  podStatusWithContainer(containerID, baseTime, baseTime.Add(time.Second), baseTime.Add(2*time.Second)),
+			incoming:  podStatusWithContainer(containerID, baseTime, baseTime.Add(time.Second), time.Time{}),
+			want:      false,
+		},
+		{
+			name:      "ignore stopped event with older finished timestamp",
+			eventType: v1.ContainerEventType_CONTAINER_STOPPED_EVENT,
+			existing:  podStatusWithContainer(containerID, baseTime, baseTime.Add(time.Second), baseTime.Add(2*time.Second)),
+			incoming:  podStatusWithContainer(containerID, baseTime, baseTime.Add(time.Second), baseTime.Add(time.Second)),
+			want:      false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := shouldUpdateCache(tc.eventType, tc.existing, tc.incoming, containerID)
+			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
+func podStatusWithContainer(containerID string, createdAt, startedAt, finishedAt time.Time) *kubecontainer.PodStatus {
+	return &kubecontainer.PodStatus{
+		ContainerStatuses: []*kubecontainer.Status{
+			{
+				ID:         kubecontainer.ContainerID{ID: containerID},
+				CreatedAt:  createdAt,
+				StartedAt:  startedAt,
+				FinishedAt: finishedAt,
+			},
+		},
+	}
+}
