@@ -167,9 +167,7 @@ func TestGracefulControllers(t *testing.T) {
 			wg.Go(func() {
 				c.Run(ctx)
 			})
-
 		})
-
 	}
 }
 

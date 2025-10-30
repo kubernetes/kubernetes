@@ -174,9 +174,7 @@ func newQueue[T comparable](c clock.WithTicker, queue Queue[T], metrics queueMet
 	// Don't start the goroutine for a type of noMetrics so we don't consume
 	// resources unnecessarily
 	if _, ok := metrics.(noMetrics[T]); !ok {
-		t.wg.Go(func() {
-			t.updateUnfinishedWorkLoop()
-		})
+		t.wg.Go(t.updateUnfinishedWorkLoop)
 	}
 
 	return t
