@@ -747,7 +747,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 	var cgroupRoots []string
 	nodeAllocatableRoot := cm.NodeAllocatableRoot(s.CgroupRoot, s.CgroupsPerQOS, s.CgroupDriver)
 	cgroupRoots = append(cgroupRoots, nodeAllocatableRoot)
-	kubeletCgroup, err := cm.GetKubeletContainer(s.KubeletCgroups)
+	kubeletCgroup, err := cm.GetKubeletContainer(logger, s.KubeletCgroups)
 	if err != nil {
 		logger.Info("Failed to get the kubelet's cgroup. Kubelet system container metrics may be missing", "err", err)
 	} else if kubeletCgroup != "" {
@@ -843,6 +843,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		}
 
 		kubeDeps.ContainerManager, err = cm.NewContainerManager(
+			ctx,
 			kubeDeps.Mounter,
 			kubeDeps.CAdvisorInterface,
 			cm.NodeConfig{

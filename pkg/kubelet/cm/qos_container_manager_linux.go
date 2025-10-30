@@ -17,6 +17,7 @@ limitations under the License.
 package cm
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -29,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	units "github.com/docker/go-units"
+	"github.com/go-logr/logr"
 	libcontainercgroups "github.com/opencontainers/cgroups"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
@@ -44,9 +46,9 @@ const (
 )
 
 type QOSContainerManager interface {
-	Start(func() v1.ResourceList, ActivePodsFunc) error
+	Start(context.Context, func() v1.ResourceList, ActivePodsFunc) error
 	GetQOSContainersInfo() QOSContainersInfo
-	UpdateCgroups() error
+	UpdateCgroups(logger klog.Logger) error
 }
 
 type qosContainerManagerImpl struct {
@@ -79,7 +81,8 @@ func (m *qosContainerManagerImpl) GetQOSContainersInfo() QOSContainersInfo {
 	return m.qosContainersInfo
 }
 
-func (m *qosContainerManagerImpl) Start(getNodeAllocatable func() v1.ResourceList, activePods ActivePodsFunc) error {
+func (m *qosContainerManagerImpl) Start(ctx context.Context, getNodeAllocatable func() v1.ResourceList, activePods ActivePodsFunc) error {
+	logger := klog.FromContext(ctx)
 	cm := m.cgroupManager
 	rootContainer := m.cgroupRoot
 
@@ -114,12 +117,12 @@ func (m *qosContainerManagerImpl) Start(getNodeAllocatable func() v1.ResourceLis
 
 		// check if it exists
 		if !cm.Exists(containerName) {
-			if err := cm.Create(containerConfig); err != nil {
+			if err := cm.Create(logger, containerConfig); err != nil {
 				return fmt.Errorf("failed to create top level %v QOS cgroup : %v", qosClass, err)
 			}
 		} else {
 			// to ensure we actually have the right state, we update the config on startup
-			if err := cm.Update(containerConfig); err != nil {
+			if err := cm.Update(logger, containerConfig); err != nil {
 				return fmt.Errorf("failed to update top level %v QOS cgroup : %v", qosClass, err)
 			}
 		}
@@ -136,7 +139,7 @@ func (m *qosContainerManagerImpl) Start(getNodeAllocatable func() v1.ResourceLis
 	// update qos cgroup tiers on startup and in periodic intervals
 	// to ensure desired state is in sync with actual state.
 	go wait.Until(func() {
-		err := m.UpdateCgroups()
+		err := m.UpdateCgroups(logger)
 		if err != nil {
 			klog.InfoS("Failed to reserve QoS requests", "err", err)
 		}
@@ -310,7 +313,7 @@ func (m *qosContainerManagerImpl) setMemoryQoS(configs map[v1.PodQOSClass]*Cgrou
 	}
 }
 
-func (m *qosContainerManagerImpl) UpdateCgroups() error {
+func (m *qosContainerManagerImpl) UpdateCgroups(logger logr.Logger) error {
 	m.Lock()
 	defer m.Unlock()
 
@@ -355,7 +358,7 @@ func (m *qosContainerManagerImpl) UpdateCgroups() error {
 
 		updateSuccess := true
 		for _, config := range qosConfigs {
-			err := m.cgroupManager.Update(config)
+			err := m.cgroupManager.Update(logger, config)
 			if err != nil {
 				updateSuccess = false
 			}
@@ -377,7 +380,7 @@ func (m *qosContainerManagerImpl) UpdateCgroups() error {
 	}
 
 	for _, config := range qosConfigs {
-		err := m.cgroupManager.Update(config)
+		err := m.cgroupManager.Update(logger, config)
 		if err != nil {
 			klog.ErrorS(err, "Failed to update QoS cgroup configuration")
 			return err
@@ -398,10 +401,10 @@ func (m *qosContainerManagerNoop) GetQOSContainersInfo() QOSContainersInfo {
 	return QOSContainersInfo{}
 }
 
-func (m *qosContainerManagerNoop) Start(_ func() v1.ResourceList, _ ActivePodsFunc) error {
+func (m *qosContainerManagerNoop) Start(_ context.Context, _ func() v1.ResourceList, _ ActivePodsFunc) error {
 	return nil
 }
 
-func (m *qosContainerManagerNoop) UpdateCgroups() error {
+func (m *qosContainerManagerNoop) UpdateCgroups(logger klog.Logger) error {
 	return nil
 }

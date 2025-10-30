@@ -23,6 +23,7 @@ import (
 	"errors"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/klog/v2"
 )
 
 type unsupportedCgroupManager struct{}
@@ -57,15 +58,15 @@ func (m *unsupportedCgroupManager) Exists(_ CgroupName) bool {
 	return false
 }
 
-func (m *unsupportedCgroupManager) Destroy(_ *CgroupConfig) error {
+func (m *unsupportedCgroupManager) Destroy(_ klog.Logger, _ *CgroupConfig) error {
 	return nil
 }
 
-func (m *unsupportedCgroupManager) Update(_ *CgroupConfig) error {
+func (m *unsupportedCgroupManager) Update(_ klog.Logger, _ *CgroupConfig) error {
 	return nil
 }
 
-func (m *unsupportedCgroupManager) Create(_ *CgroupConfig) error {
+func (m *unsupportedCgroupManager) Create(_ klog.Logger, _ *CgroupConfig) error {
 	return errNotSupported
 }
 
@@ -73,7 +74,7 @@ func (m *unsupportedCgroupManager) MemoryUsage(_ CgroupName) (int64, error) {
 	return -1, errNotSupported
 }
 
-func (m *unsupportedCgroupManager) Pids(_ CgroupName) []int {
+func (m *unsupportedCgroupManager) Pids(_ klog.Logger, _ CgroupName) []int {
 	return nil
 }
 
@@ -81,7 +82,7 @@ func (m *unsupportedCgroupManager) CgroupName(name string) CgroupName {
 	return CgroupName([]string{})
 }
 
-func (m *unsupportedCgroupManager) ReduceCPULimits(cgroupName CgroupName) error {
+func (m *unsupportedCgroupManager) ReduceCPULimits(_ klog.Logger, cgroupName CgroupName) error {
 	return nil
 }
 
@@ -89,7 +90,7 @@ func (m *unsupportedCgroupManager) GetCgroupConfig(name CgroupName, resource v1.
 	return nil, errNotSupported
 }
 
-func (m *unsupportedCgroupManager) SetCgroupConfig(name CgroupName, resourceConfig *ResourceConfig) error {
+func (m *unsupportedCgroupManager) SetCgroupConfig(logger klog.Logger, name CgroupName, resourceConfig *ResourceConfig) error {
 	return errNotSupported
 }
 

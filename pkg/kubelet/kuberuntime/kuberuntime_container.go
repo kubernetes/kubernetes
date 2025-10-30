@@ -266,7 +266,7 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 		return err.Error(), ErrCreateContainerConfig
 	}
 
-	err = m.internalLifecycle.PreCreateContainer(pod, container, containerConfig)
+	err = m.internalLifecycle.PreCreateContainer(logger, pod, container, containerConfig)
 	if err != nil {
 		s, _ := grpcstatus.FromError(err)
 		m.recordContainerEvent(ctx, pod, container, "", v1.EventTypeWarning, events.FailedToCreateContainer, "Internal PreCreateContainer hook failed: %v", s.Message())
@@ -279,7 +279,7 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 		m.recordContainerEvent(ctx, pod, container, containerID, v1.EventTypeWarning, events.FailedToCreateContainer, "Error: %v", s.Message())
 		return s.Message(), ErrCreateContainer
 	}
-	err = m.internalLifecycle.PreStartContainer(pod, container, containerID)
+	err = m.internalLifecycle.PreStartContainer(logger, pod, container, containerID)
 	if err != nil {
 		s, _ := grpcstatus.FromError(err)
 		m.recordContainerEvent(ctx, pod, container, containerID, v1.EventTypeWarning, events.FailedToStartContainer, "Internal PreStartContainer hook failed: %v", s.Message())
@@ -1349,7 +1349,7 @@ func (m *kubeGenericRuntimeManager) removeContainer(ctx context.Context, contain
 	logger := klog.FromContext(ctx)
 	logger.V(4).Info("Removing container", "containerID", containerID)
 	// Call internal container post-stop lifecycle hook.
-	if err := m.internalLifecycle.PostStopContainer(containerID); err != nil {
+	if err := m.internalLifecycle.PostStopContainer(logger, containerID); err != nil {
 		return err
 	}
 

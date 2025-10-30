@@ -26,12 +26,14 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2/ktesting"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
 func TestIsCgroupPod(t *testing.T) {
+	_, tCtx := ktesting.NewTestContext(t)
 	qosContainersInfo := QOSContainersInfo{
 		Guaranteed: RootCgroupName,
 		Burstable:  NewCgroupName(RootCgroupName, strings.ToLower(string(v1.PodQOSBurstable))),
@@ -112,7 +114,7 @@ func TestIsCgroupPod(t *testing.T) {
 	}
 	for _, cgroupDriver := range []string{"cgroupfs", "systemd"} {
 		pcm := &podContainerManagerImpl{
-			cgroupManager:     NewCgroupManager(nil, cgroupDriver),
+			cgroupManager:     NewCgroupManager(tCtx, nil, cgroupDriver),
 			enforceCPULimits:  true,
 			qosContainersInfo: qosContainersInfo,
 		}
@@ -138,6 +140,7 @@ func TestIsCgroupPod(t *testing.T) {
 }
 
 func TestGetPodContainerName(t *testing.T) {
+	_, tCtx := ktesting.NewTestContext(t)
 	newGuaranteedPodWithUID := func(uid types.UID) *v1.Pod {
 		return &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -220,7 +223,7 @@ func TestGetPodContainerName(t *testing.T) {
 		{
 			name: "pod with qos guaranteed and cgroupfs",
 			fields: fields{
-				cgroupManager: NewCgroupManager(nil, "cgroupfs"),
+				cgroupManager: NewCgroupManager(tCtx, nil, "cgroupfs"),
 			},
 			args: args{
 				pod: newGuaranteedPodWithUID("fake-uid-1"),
@@ -230,7 +233,7 @@ func TestGetPodContainerName(t *testing.T) {
 		}, {
 			name: "pod with qos guaranteed and systemd",
 			fields: fields{
-				cgroupManager: NewCgroupManager(nil, "systemd"),
+				cgroupManager: NewCgroupManager(tCtx, nil, "systemd"),
 			},
 			args: args{
 				pod: newGuaranteedPodWithUID("fake-uid-2"),
@@ -240,7 +243,7 @@ func TestGetPodContainerName(t *testing.T) {
 		}, {
 			name: "pod with qos burstable and cgroupfs",
 			fields: fields{
-				cgroupManager: NewCgroupManager(nil, "cgroupfs"),
+				cgroupManager: NewCgroupManager(tCtx, nil, "cgroupfs"),
 			},
 			args: args{
 				pod: newBurstablePodWithUID("fake-uid-3"),
@@ -250,7 +253,7 @@ func TestGetPodContainerName(t *testing.T) {
 		}, {
 			name: "pod with qos burstable and systemd",
 			fields: fields{
-				cgroupManager: NewCgroupManager(nil, "systemd"),
+				cgroupManager: NewCgroupManager(tCtx, nil, "systemd"),
 			},
 			args: args{
 				pod: newBurstablePodWithUID("fake-uid-4"),
@@ -260,7 +263,7 @@ func TestGetPodContainerName(t *testing.T) {
 		}, {
 			name: "pod with qos best-effort and cgroupfs",
 			fields: fields{
-				cgroupManager: NewCgroupManager(nil, "cgroupfs"),
+				cgroupManager: NewCgroupManager(tCtx, nil, "cgroupfs"),
 			},
 			args: args{
 				pod: newBestEffortPodWithUID("fake-uid-5"),
@@ -270,7 +273,7 @@ func TestGetPodContainerName(t *testing.T) {
 		}, {
 			name: "pod with qos best-effort and systemd",
 			fields: fields{
-				cgroupManager: NewCgroupManager(nil, "systemd"),
+				cgroupManager: NewCgroupManager(tCtx, nil, "systemd"),
 			},
 			args: args{
 				pod: newBestEffortPodWithUID("fake-uid-6"),
