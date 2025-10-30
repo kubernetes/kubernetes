@@ -30,21 +30,14 @@ func ValidateRuntimeClass(rc *node.RuntimeClass) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&rc.ObjectMeta, false, apivalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
 
 	for _, msg := range apivalidation.NameIsDNSLabel(rc.Handler, false) {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("handler"), rc.Handler, msg))
+		allErrs = append(allErrs, field.Invalid(field.NewPath("handler"), rc.Handler, msg)).MarkCoveredByDeclarative()
 	}
-	allErrs = validateRuntimeClassOverheadScheduling(rc)
-	return allErrs
-}
 
-// validateRuntimeClassOverheadScheduling is kept for callers that still need
-// the old handwritten validation.
-func validateRuntimeClassOverheadScheduling(rc *node.RuntimeClass) field.ErrorList {
-	var allErrs field.ErrorList
 	if rc.Overhead != nil {
-		allErrs = append(allErrs, validateOverhead(rc.Overhead, field.NewPath("overhead"))...).MarkCoveredByDeclarative()
+		allErrs = append(allErrs, validateOverhead(rc.Overhead, field.NewPath("overhead"))...)
 	}
 	if rc.Scheduling != nil {
-		allErrs = append(allErrs, validateScheduling(rc.Scheduling, field.NewPath("scheduling"))...).MarkCoveredByDeclarative()
+		allErrs = append(allErrs, validateScheduling(rc.Scheduling, field.NewPath("scheduling"))...)
 	}
 	return allErrs
 }

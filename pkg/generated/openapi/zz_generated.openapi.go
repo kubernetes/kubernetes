@@ -44862,7 +44862,7 @@ func schema_k8sio_api_node_v1_RuntimeClass(ref common.ReferenceCallback) common.
 						},
 					},
 				},
-				Required: []string{"handler", "overhead", "scheduling"},
+				Required: []string{"handler"},
 			},
 		},
 		Dependencies: []string{
@@ -45128,7 +45128,7 @@ func schema_k8sio_api_node_v1alpha1_RuntimeClassSpec(ref common.ReferenceCallbac
 						},
 					},
 				},
-				Required: []string{"runtimeHandler", "overhead", "scheduling"},
+				Required: []string{"runtimeHandler"},
 			},
 		},
 		Dependencies: []string{
@@ -45269,7 +45269,7 @@ func schema_k8sio_api_node_v1beta1_RuntimeClass(ref common.ReferenceCallback) co
 						},
 					},
 				},
-				Required: []string{"handler", "overhead", "scheduling"},
+				Required: []string{"handler"},
 			},
 		},
 		Dependencies: []string{

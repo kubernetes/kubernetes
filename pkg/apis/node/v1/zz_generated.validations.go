@@ -83,44 +83,8 @@ func Validate_RuntimeClass(ctx context.Context, op operation.Operation, fldPath 
 			return
 		}(fldPath.Child("handler"), &obj.Handler, safe.Field(oldObj, func(oldObj *nodev1.RuntimeClass) *string { return &oldObj.Handler }))...)
 
-	// field nodev1.RuntimeClass.Overhead
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *nodev1.Overhead) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
-			}
-			// call field-attached validations
-			earlyReturn := false
-			if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
-			}
-			return
-		}(fldPath.Child("overhead"), obj.Overhead, safe.Field(oldObj, func(oldObj *nodev1.RuntimeClass) *nodev1.Overhead { return oldObj.Overhead }))...)
-
-	// field nodev1.RuntimeClass.Scheduling
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *nodev1.Scheduling) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
-			}
-			// call field-attached validations
-			earlyReturn := false
-			if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
-			}
-			return
-		}(fldPath.Child("scheduling"), obj.Scheduling, safe.Field(oldObj, func(oldObj *nodev1.RuntimeClass) *nodev1.Scheduling { return oldObj.Scheduling }))...)
-
+	// field nodev1.RuntimeClass.Overhead has no validation
+	// field nodev1.RuntimeClass.Scheduling has no validation
 	return errs
 }
 

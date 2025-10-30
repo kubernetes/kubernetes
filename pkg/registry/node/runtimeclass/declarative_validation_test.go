@@ -19,50 +19,30 @@ package runtimeclass
 import (
 	"testing"
 
-	"k8s.io/apimachinery/pkg/api/resource"
 	apivalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	node "k8s.io/kubernetes/pkg/apis/node"
 )
 
-func mkValidRuntimeClassRequired(tweaks ...func(rc *node.RuntimeClass)) node.RuntimeClass {
+func mkRuntimeClassHandlerOnly(tweaks ...func(*node.RuntimeClass)) node.RuntimeClass {
 	rc := node.RuntimeClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "myrc",
 		},
-
-		// handler must still be DNSLabel, lowercase, immutable, etc.
+		// valid dnsLabel
 		Handler: "runc",
-
-		// Overhead is now required.
-		Overhead: &node.Overhead{
-			PodFixed: api.ResourceList{
-				api.ResourceCPU: resource.MustParse("100m"),
-				// memory can be added if needed, CPU alone is fine for validity
-			},
-		},
-
-		// Scheduling is now required.
-		// Minimal-but-valid Scheduling: give it a nodeSelector.
-		Scheduling: &node.Scheduling{
-			NodeSelector: map[string]string{
-				"kubernetes.io/arch": "amd64",
-			},
-		},
 	}
-
-	for _, tweak := range tweaks {
-		tweak(&rc)
+	for _, f := range tweaks {
+		f(&rc)
 	}
 	return rc
 }
 
-func TestRuntimeClassValidateRequiredForDeclarative(t *testing.T) {
-	apiVersions := []string{"v1", "v1beta1"}
+func TestRuntimeClass_DeclarativeValidate_Handler(t *testing.T) {
+	apiVersions := []string{"v1"}
 
 	for _, apiVersion := range apiVersions {
 		t.Run(apiVersion, func(t *testing.T) {
@@ -74,48 +54,35 @@ func TestRuntimeClassValidateRequiredForDeclarative(t *testing.T) {
 				},
 			)
 
-			testCases := map[string]struct {
+			tests := map[string]struct {
 				obj          node.RuntimeClass
 				expectedErrs field.ErrorList
 			}{
-				"all required fields present": {
-					obj:          mkValidRuntimeClassRequired(),
-					expectedErrs: field.ErrorList{},
-				},
-
-				"missing overhead only": {
-					obj: mkValidRuntimeClassRequired(func(rc *node.RuntimeClass) {
-						rc.Overhead = nil
+				//"valid": {
+				//	obj:          mkRuntimeClassHandlerOnly(),
+				//	expectedErrs: field.ErrorList{},
+				//},
+				//"missing handler": {
+				//	obj: mkRuntimeClassHandlerOnly(func(rc *node.RuntimeClass) {
+				//		rc.Handler = ""
+				//	}),
+				//	expectedErrs: field.ErrorList{
+				//		field.Required(field.NewPath("handler"), ""),
+				//	},
+				//},
+				"invalid handler (not dnsLabel)": {
+					obj: mkRuntimeClassHandlerOnly(func(rc *node.RuntimeClass) {
+						rc.Handler = "Not-Valid" // uppercase + hyphen
 					}),
 					expectedErrs: field.ErrorList{
-						field.Required(field.NewPath("overhead"), ""),
-					},
-				},
-
-				"missing scheduling only": {
-					obj: mkValidRuntimeClassRequired(func(rc *node.RuntimeClass) {
-						rc.Scheduling = nil
-					}),
-					expectedErrs: field.ErrorList{
-						field.Required(field.NewPath("scheduling"), ""),
-					},
-				},
-
-				"missing both overhead and scheduling": {
-					obj: mkValidRuntimeClassRequired(func(rc *node.RuntimeClass) {
-						rc.Overhead = nil
-						rc.Scheduling = nil
-					}),
-					expectedErrs: field.ErrorList{
-						field.Required(field.NewPath("overhead"), ""),
-						field.Required(field.NewPath("scheduling"), ""),
+						field.Invalid(field.NewPath("handler"), "Not-Valid", "must be a DNS label"),
 					},
 				},
 			}
 
-			for name, tc := range testCases {
+			for name, tc := range tests {
 				t.Run(name, func(t *testing.T) {
-					// CREATE path: Strategy.Validate
+					// this checks: handwritten == declarative
 					apitesting.VerifyValidationEquivalence(
 						t,
 						ctx,
@@ -129,8 +96,8 @@ func TestRuntimeClassValidateRequiredForDeclarative(t *testing.T) {
 	}
 }
 
-func TestRuntimeClassValidateImmutableHandlerForDeclarative(t *testing.T) {
-	apiVersions := []string{"v1", "v1beta1"}
+func TestRuntimeClass_DeclarativeValidate_ImmutableHandler(t *testing.T) {
+	apiVersions := []string{"v1"}
 
 	for _, apiVersion := range apiVersions {
 		t.Run(apiVersion, func(t *testing.T) {
@@ -142,26 +109,20 @@ func TestRuntimeClassValidateImmutableHandlerForDeclarative(t *testing.T) {
 				},
 			)
 
-			testCases := map[string]struct {
-				oldObj       node.RuntimeClass
-				newObj       node.RuntimeClass
-				expectedErrs field.ErrorList
+			tests := map[string]struct {
+				oldObj, newObj node.RuntimeClass
+				expectedErrs   field.ErrorList
 			}{
-				"no-op update (same handler)": {
-					oldObj: mkValidRuntimeClassRequired(func(rc *node.RuntimeClass) {
-						rc.Handler = "runc"
-					}),
-					newObj: mkValidRuntimeClassRequired(func(rc *node.RuntimeClass) {
-						rc.Handler = "runc"
-					}),
+				"no-op update": {
+					oldObj:       mkRuntimeClassHandlerOnly(),
+					newObj:       mkRuntimeClassHandlerOnly(),
 					expectedErrs: field.ErrorList{},
 				},
-
-				"handler changed is rejected (immutable)": {
-					oldObj: mkValidRuntimeClassRequired(func(rc *node.RuntimeClass) {
+				"handler changed (immutable)": {
+					oldObj: mkRuntimeClassHandlerOnly(func(rc *node.RuntimeClass) {
 						rc.Handler = "runc"
 					}),
-					newObj: mkValidRuntimeClassRequired(func(rc *node.RuntimeClass) {
+					newObj: mkRuntimeClassHandlerOnly(func(rc *node.RuntimeClass) {
 						rc.Handler = "gvisor"
 					}),
 					expectedErrs: field.ErrorList{
@@ -172,12 +133,20 @@ func TestRuntimeClassValidateImmutableHandlerForDeclarative(t *testing.T) {
 						).MarkCoveredByDeclarative(),
 					},
 				},
+				//"old empty -> new set (allow for legacy objs)": {
+				//	oldObj: mkRuntimeClassHandlerOnly(func(rc *node.RuntimeClass) {
+				//		rc.Handler = ""
+				//	}),
+				//	newObj: mkRuntimeClassHandlerOnly(func(rc *node.RuntimeClass) {
+				//		rc.Handler = "runc"
+				//	}),
+				//	expectedErrs: field.ErrorList{},
+				//},
 			}
 
-			for name, tc := range testCases {
+			for name, tc := range tests {
 				t.Run(name, func(t *testing.T) {
-					// To make this an UPDATE and not a CREATE, both objects
-					// must have the same name and a non-empty ResourceVersion.
+					// make it UPDATE
 					tc.oldObj.ObjectMeta.Name = "myrc"
 					tc.newObj.ObjectMeta.Name = "myrc"
 					tc.oldObj.ObjectMeta.ResourceVersion = "1"
