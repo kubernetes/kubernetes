@@ -18,10 +18,11 @@ package patch
 
 import (
 	"context"
-	"github.com/google/go-cmp/cmp"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/google/go-cmp/cmp"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -234,7 +235,7 @@ func TestApplyConfiguration(t *testing.T) {
 		},
 	}
 
-	compiler, err := cel.NewCompositedCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true))
+	compiler, err := cel.NewCompositedCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -255,7 +256,7 @@ func TestApplyConfiguration(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			accessor := &ApplyConfigurationCondition{Expression: tc.expression}
-			compileResult := compiler.CompileMutatingEvaluator(accessor, cel.OptionalVariableDeclarations{StrictCost: true, HasPatchTypes: true}, environment.StoredExpressions)
+			compileResult := compiler.CompileMutatingEvaluator(accessor, cel.OptionalVariableDeclarations{HasPatchTypes: true}, environment.StoredExpressions)
 
 			patcher := applyConfigPatcher{expressionEvaluator: compileResult}
 
