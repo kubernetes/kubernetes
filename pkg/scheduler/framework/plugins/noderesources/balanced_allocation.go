@@ -98,7 +98,7 @@ func (ba *BalancedAllocation) Name() string {
 
 // Feasibilty and scoring are based on a set of resources considered by BA. We
 // reuse the internal function used to determine the relevant resources.
-func (ba *BalancedAllocation) SignPod(pod *v1.Pod, signature fwk.PodSignatureMaker) error {
+func (ba *BalancedAllocation) SignPod(pod *v1.Pod, signature fwk.PodSignatureBuilder) error {
 	if err := signature.AddPodElement("Spec.InitContainers", pod.Spec.InitContainers); err != nil {
 		return err
 	}

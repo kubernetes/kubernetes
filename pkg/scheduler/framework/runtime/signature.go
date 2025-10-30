@@ -28,13 +28,15 @@ type Elements struct {
 	Plugin map[string]string
 }
 
-type podSignatureMakerImpl struct {
+type podSignatureBuilderImpl struct {
 	elements Elements
 	signable bool
 }
 
-func newPodSignatureMaker() *podSignatureMakerImpl {
-	return &podSignatureMakerImpl{
+var _ fwk.PodSignatureBuilder = &podSignatureBuilderImpl{}
+
+func newPodSignatureBuilder() *podSignatureBuilderImpl {
+	return &podSignatureBuilderImpl{
 		elements: Elements{
 			Pod:    map[string]string{},
 			Plugin: map[string]string{},
@@ -44,14 +46,14 @@ func newPodSignatureMaker() *podSignatureMakerImpl {
 }
 
 // The given pod cannot be signed by the given plugin.
-func (s *podSignatureMakerImpl) Unsignable() {
+func (s *podSignatureBuilderImpl) Unsignable() {
 	s.signable = false
 }
 
 // Add a part of the pod (spec, etc) to the signature if it hasn't been already.
 // The pod path should be in dot notation (so pod.Spec.NodeName should be "Spec.NodeName")
 // to avoid collisions.
-func (s *podSignatureMakerImpl) AddPodElement(podPath string, object any) error {
+func (s *podSignatureBuilderImpl) AddPodElement(podPath string, object any) error {
 	if _, found := s.elements.Pod[podPath]; !found {
 		return s.addElement(s.elements.Pod, podPath, object)
 	}
@@ -60,7 +62,7 @@ func (s *podSignatureMakerImpl) AddPodElement(podPath string, object any) error 
 
 // Add a plugin specific element to the signature. The name should be the plugin name to
 // avoid collisions.
-func (s *podSignatureMakerImpl) AddPluginElement(pluginName string, object any) error {
+func (s *podSignatureBuilderImpl) AddPluginElement(pluginName string, object any) error {
 	return s.addElement(s.elements.Plugin, pluginName, object)
 }
 
@@ -69,7 +71,7 @@ func (s *podSignatureMakerImpl) AddPluginElement(pluginName string, object any) 
 // Note that the golang json serializer has fixed ordering for structs and maps, so it is stable:
 //
 //	https://stackoverflow.com/questions/18668652/how-to-produce-json-with-sorted-keys-in-go
-func (s *podSignatureMakerImpl) addElement(elemMap map[string]string, elementName string, object any) error {
+func (s *podSignatureBuilderImpl) addElement(elemMap map[string]string, elementName string, object any) error {
 	marshalled, err := json.Marshal(object)
 	if err != nil {
 		return err
@@ -79,22 +81,23 @@ func (s *podSignatureMakerImpl) addElement(elemMap map[string]string, elementNam
 }
 
 // Marshal the signature into a string.
-func (s *podSignatureMakerImpl) Marshal() ([]byte, error) {
+func (s *podSignatureBuilderImpl) Build() (string, error) {
 	if s.signable {
-		return json.Marshal(s.elements)
+		res, err := json.Marshal(s.elements)
+		return string(res), err
 	} else {
-		return []byte(fwk.Unsignable), nil
+		return fwk.Unsignable, nil
 	}
 }
 
 // Add signature components that are not plugin specific.
-func (s *podSignatureMakerImpl) AddNonPluginElements(pod *v1.Pod) error {
+func (s *podSignatureBuilderImpl) AddNonPluginElements(pod *v1.Pod) error {
 	return s.AddPodElement("Spec.SchedulerName", pod.Spec.SchedulerName)
 }
 
 // Common signature element: the pod's Volumes.  Note that
 // we exclude ConfigMap and Secret volumes because they are synthetic.
-func (s *podSignatureMakerImpl) AddSignatureVolumes(pod *v1.Pod) error {
+func (s *podSignatureBuilderImpl) AddSignatureVolumes(pod *v1.Pod) error {
 	if _, found := s.elements.Pod["_SignatureVolumes"]; !found {
 		volumes := []v1.Volume{}
 		for _, volume := range pod.Spec.Volumes {

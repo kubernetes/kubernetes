@@ -25,24 +25,24 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func TestNewPodSignatureMaker(t *testing.T) {
-	s := newPodSignatureMaker()
+func TestNewPodSignatureBuilder(t *testing.T) {
+	s := newPodSignatureBuilder()
 	if s == nil {
-		t.Fatal("newPodSignatureMaker() returned nil")
+		t.Fatal("newPodSignatureBuilder() returned nil")
 	}
 	if !s.signable {
-		t.Errorf("newPodSignatureMaker() signable = %v, want true", s.signable)
+		t.Errorf("newPodSignatureBuilder() signable = %v, want true", s.signable)
 	}
 	if len(s.elements.Pod) != 0 {
-		t.Errorf("newPodSignatureMaker() pod elements map should be empty, got %v", s.elements.Pod)
+		t.Errorf("newPodSignatureBuilder() pod elements map should be empty, got %v", s.elements.Pod)
 	}
 	if len(s.elements.Plugin) != 0 {
-		t.Errorf("newPodSignatureMaker() plugin elements map should be empty, got %v", s.elements.Plugin)
+		t.Errorf("newPodSignatureBuilder() plugin elements map should be empty, got %v", s.elements.Plugin)
 	}
 }
 
 func TestUnsignable(t *testing.T) {
-	s := newPodSignatureMaker()
+	s := newPodSignatureBuilder()
 	s.Unsignable()
 	if s.signable {
 		t.Errorf("Unsignable() did not set signable to false")
@@ -101,7 +101,7 @@ func TestAddPodElement(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			s := newPodSignatureMaker()
+			s := newPodSignatureBuilder()
 			if tc.initialPod != nil {
 				s.elements.Pod = tc.initialPod
 			}
@@ -120,7 +120,7 @@ func TestAddPodElement(t *testing.T) {
 }
 
 func TestAddPluginElement(t *testing.T) {
-	s := newPodSignatureMaker()
+	s := newPodSignatureBuilder()
 	pluginName := "myplugin"
 	pluginData := map[string]string{"key": "value"}
 	expectedJSON := "{\"key\":\"value\"}"
@@ -142,7 +142,7 @@ func TestAddPluginElement(t *testing.T) {
 }
 
 func TestMarshal(t *testing.T) {
-	s := newPodSignatureMaker()
+	s := newPodSignatureBuilder()
 	if err := s.AddPodElement("spec.nodename", "node1"); err != nil {
 		t.Fatalf("Add failed %v", err)
 	}
@@ -155,14 +155,14 @@ func TestMarshal(t *testing.T) {
 		Plugin: map[string]string{"myplugin": "\"data1\""},
 	}
 
-	gotJSON, err := s.Marshal()
+	gotJSON, err := s.Build()
 	if err != nil {
 		t.Fatalf("Marshal() failed: %v", err)
 	}
 
 	// Unmarshal to compare maps because key order is not guaranteed in marshalled JSON
 	var gotObj Elements
-	if err := json.Unmarshal(gotJSON, &gotObj); err != nil {
+	if err := json.Unmarshal([]byte(gotJSON), &gotObj); err != nil {
 		t.Fatalf("Failed to unmarshal result: %v", err)
 	}
 
@@ -177,8 +177,11 @@ func TestAddNonPluginElements(t *testing.T) {
 			SchedulerName: "my-scheduler",
 		},
 	}
-	s := newPodSignatureMaker()
-	s.AddNonPluginElements(pod)
+	s := newPodSignatureBuilder()
+	err := s.AddNonPluginElements(pod)
+	if err != nil {
+		t.Fatalf("Error %v", err)
+	}
 
 	expectedPodMap := map[string]string{
 		"Spec.SchedulerName": "\"my-scheduler\"",
@@ -244,7 +247,7 @@ func TestAddSignatureVolumes(t *testing.T) {
 					Volumes: tc.podVolumes,
 				},
 			}
-			s := newPodSignatureMaker()
+			s := newPodSignatureBuilder()
 			if tc.initialCaches != nil {
 				s.elements.Pod = tc.initialCaches
 			}

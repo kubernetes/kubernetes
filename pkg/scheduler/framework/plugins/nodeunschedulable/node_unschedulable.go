@@ -130,7 +130,7 @@ func (pl *NodeUnschedulable) Name() string {
 }
 
 // Feasibility and scoring based on the pod's tolerations.
-func (pl *NodeUnschedulable) SignPod(pod *v1.Pod, signature fwk.PodSignatureMaker) error {
+func (pl *NodeUnschedulable) SignPod(pod *v1.Pod, signature fwk.PodSignatureBuilder) error {
 	return signature.AddPodElement("Spec.Tolerations", pod.Spec.Tolerations)
 }
 

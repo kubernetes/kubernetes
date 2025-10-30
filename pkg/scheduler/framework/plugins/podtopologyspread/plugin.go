@@ -89,7 +89,7 @@ func (pl *PodTopologySpread) Name() string {
 // Pod topology spread is not localized to a pod and node, so we cannot
 // sign pods that have topology spread constraints, either explicit or
 // defaulted.
-func (pl *PodTopologySpread) SignPod(pod *v1.Pod, signature fwk.PodSignatureMaker) error {
+func (pl *PodTopologySpread) SignPod(pod *v1.Pod, signature fwk.PodSignatureBuilder) error {
 	if len(pod.Spec.TopologySpreadConstraints) > 0 || len(pl.defaultConstraints) > 0 {
 		signature.Unsignable()
 	}

@@ -621,6 +621,6 @@ func getVolumeUniqueName(driverName, volumeHandle string) string {
 	return fmt.Sprintf("%s/%s", driverName, volumeHandle)
 }
 
-func (pl *CSILimits) SignPod(pod *v1.Pod, signature fwk.PodSignatureMaker) error {
+func (pl *CSILimits) SignPod(pod *v1.Pod, signature fwk.PodSignatureBuilder) error {
 	return signature.AddSignatureVolumes(pod)
 }

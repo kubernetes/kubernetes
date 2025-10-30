@@ -69,7 +69,7 @@ func (pl *NodeName) Name() string {
 }
 
 // NodeName scoring and feasibility are dependent on the NodeName field.
-func (pl *NodeName) SignPod(pod *v1.Pod, signature fwk.PodSignatureMaker) error {
+func (pl *NodeName) SignPod(pod *v1.Pod, signature fwk.PodSignatureBuilder) error {
 	return signature.AddPodElement("Spec.NodeName", pod.Spec.NodeName)
 }
 

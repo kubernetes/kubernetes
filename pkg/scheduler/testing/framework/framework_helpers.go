@@ -125,7 +125,10 @@ func RegisterPluginAsExtensionsWithWeight(pluginName string, weight int32, plugi
 // RegisterPluginAsExtensionsWithWeight returns a function to register a Plugin as given extensionPoints with weight to a given registry.
 func RegisterPluginAsExtensionsWithWeightAndArgs(pluginName string, weight int32, pluginNewFunc runtime.PluginFactory, args baseruntime.Object, extensions ...string) RegisterPluginFunc {
 	return func(reg *runtime.Registry, profile *schedulerapi.KubeSchedulerProfile) {
-		reg.Register(pluginName, pluginNewFunc)
+		err := reg.Register(pluginName, pluginNewFunc)
+		if err != nil {
+			print("Error registering plugin for test")
+		}
 		for _, extension := range extensions {
 			ps := getPluginSetByExtension(profile.Plugins, extension)
 			if ps == nil {

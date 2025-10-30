@@ -104,7 +104,7 @@ func (pl *VolumeZone) Name() string {
 }
 
 // Feasibility and scoring are based on the pod's volume definitions.
-func (pl *VolumeZone) SignPod(pod *v1.Pod, signature fwk.PodSignatureMaker) error {
+func (pl *VolumeZone) SignPod(pod *v1.Pod, signature fwk.PodSignatureBuilder) error {
 	return signature.AddSignatureVolumes(pod)
 }
 

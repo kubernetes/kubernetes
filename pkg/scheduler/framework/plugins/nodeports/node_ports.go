@@ -65,7 +65,7 @@ func (pl *NodePorts) Name() string {
 }
 
 // NodePort feasibility and scheduling is based on the host ports for the containers.
-func (pl *NodePorts) SignPod(pod *v1.Pod, signature fwk.PodSignatureMaker) error {
+func (pl *NodePorts) SignPod(pod *v1.Pod, signature fwk.PodSignatureBuilder) error {
 	if err := signature.AddPodElement("Spec.InitContainers", pod.Spec.InitContainers); err != nil {
 		return err
 	}

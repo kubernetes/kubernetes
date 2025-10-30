@@ -76,7 +76,7 @@ func (pl *NodeAffinity) Name() string {
 }
 
 // Node affinity filtering and scoring depend on NodeAffinity and NodeSelectors.
-func (pl *NodeAffinity) SignPod(pod *v1.Pod, signature fwk.PodSignatureMaker) error {
+func (pl *NodeAffinity) SignPod(pod *v1.Pod, signature fwk.PodSignatureBuilder) error {
 	if pod.Spec.Affinity != nil && pod.Spec.Affinity.NodeAffinity != nil {
 		if err := signature.AddPodElement("Spec.Affinity.NodeAffinity", pod.Spec.Affinity.NodeAffinity); err != nil {
 			return err

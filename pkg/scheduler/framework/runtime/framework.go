@@ -726,40 +726,33 @@ func (f *frameworkImpl) QueueSortFunc() fwk.LessFunc {
 // implemented a signature, then disable the cache.
 func (f *frameworkImpl) checkPluginSignatures() {
 	f.enableSignatures = true
+
+	// Get all plugins of compatible types.
+	candidatePlugins := []fwk.Plugin{}
 	for _, pl := range f.preFilterPlugins {
-		if _, implements := pl.(fwk.BatchablePlugin); !implements && f.enableSignatures {
-			f.logger.Info("Disabling batching for profile %s because plugin %s does not support it", f.profileName, pl.Name())
-			f.enableSignatures = false
-			return
-		} else {
-			f.batchablePlugins = append(f.batchablePlugins, pl.(fwk.BatchablePlugin))
-		}
+		candidatePlugins = append(candidatePlugins, pl)
 	}
 	for _, pl := range f.filterPlugins {
-		if _, implements := pl.(fwk.BatchablePlugin); !implements && f.enableSignatures {
-			f.logger.Info("Disabling batching for profile %s because plugin %s does not support it", f.profileName, pl.Name())
-			f.enableSignatures = false
-			return
-		} else {
-			f.batchablePlugins = append(f.batchablePlugins, pl.(fwk.BatchablePlugin))
-		}
+		candidatePlugins = append(candidatePlugins, pl)
 	}
 	for _, pl := range f.preScorePlugins {
-		if _, implements := pl.(fwk.BatchablePlugin); !implements && f.enableSignatures {
-			f.logger.Info("Disabling batching for profile %s because plugin %s does not support it", f.profileName, pl.Name())
-			f.enableSignatures = false
-			return
-		} else {
-			f.batchablePlugins = append(f.batchablePlugins, pl.(fwk.BatchablePlugin))
-		}
+		candidatePlugins = append(candidatePlugins, pl)
 	}
 	for _, pl := range f.scorePlugins {
-		if _, implements := pl.(fwk.BatchablePlugin); !implements && f.enableSignatures {
-			f.logger.Info("Disabling batching for profile %s because plugin %s does not support it", f.profileName, pl.Name())
-			f.enableSignatures = false
-			return
-		} else {
-			f.batchablePlugins = append(f.batchablePlugins, pl.(fwk.BatchablePlugin))
+		candidatePlugins = append(candidatePlugins, pl)
+	}
+
+	// Remove duplicates and check compatiblity.
+	batchPluginMap := map[string]bool{}
+	for _, pl := range candidatePlugins {
+		if _, found := batchPluginMap[pl.Name()]; !found {
+			batchPluginMap[pl.Name()] = true
+			if _, implements := pl.(fwk.BatchablePlugin); implements {
+				f.batchablePlugins = append(f.batchablePlugins, pl.(fwk.BatchablePlugin))
+			} else {
+				f.logger.Info("Disabling batching for profile %s because plugin %s does not support it", f.profileName, pl.Name())
+				f.enableSignatures = false
+			}
 		}
 	}
 }
@@ -774,23 +767,22 @@ func (f *frameworkImpl) SignPod(ctx context.Context, pod *v1.Pod) (string, error
 		return fwk.Unsignable, nil
 	}
 
-	signatureMaker := newPodSignatureMaker()
+	SignatureBuilder := newPodSignatureBuilder()
 	for _, pl := range f.batchablePlugins {
-		err := pl.SignPod(pod, signatureMaker)
+		err := pl.SignPod(pod, SignatureBuilder)
 		if err != nil {
 			return fwk.Unsignable, err
 		}
-		if !signatureMaker.signable {
+		if !SignatureBuilder.signable {
 			return fwk.Unsignable, nil
 		}
 	}
-	err := signatureMaker.AddNonPluginElements(pod)
+	err := SignatureBuilder.AddNonPluginElements(pod)
 	if err != nil {
 		return fwk.Unsignable, err
 	}
 
-	marshalled, err := signatureMaker.Marshal()
-	return string(marshalled), err
+	return SignatureBuilder.Build()
 }
 
 // RunPreFilterPlugins runs the set of configured PreFilter plugins. It returns

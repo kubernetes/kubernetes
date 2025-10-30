@@ -61,7 +61,7 @@ func (pl *InterPodAffinity) Name() string {
 // pods in addition the current pod and node, so we cannot sign pods with these
 // constraints. Whether we have constraints or not, since affinity is symmetric
 // we must include the pod's labels.
-func (pl *InterPodAffinity) SignPod(pod *v1.Pod, signature fwk.PodSignatureMaker) error {
+func (pl *InterPodAffinity) SignPod(pod *v1.Pod, signature fwk.PodSignatureBuilder) error {
 	if pod.Spec.Affinity != nil && (pod.Spec.Affinity.PodAffinity != nil || pod.Spec.Affinity.PodAntiAffinity != nil) {
 		signature.Unsignable()
 	} else {

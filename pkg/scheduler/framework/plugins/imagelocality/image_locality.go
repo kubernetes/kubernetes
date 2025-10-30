@@ -51,7 +51,7 @@ func (pl *ImageLocality) Name() string {
 }
 
 // Image locality filtering and scoring depends on images for the pod's containers.
-func (pl *ImageLocality) SignPod(pod *v1.Pod, signature fwk.PodSignatureMaker) error {
+func (pl *ImageLocality) SignPod(pod *v1.Pod, signature fwk.PodSignatureBuilder) error {
 	if err := signature.AddPodElement("Spec.InitContainers", pod.Spec.InitContainers); err != nil {
 		return err
 	}

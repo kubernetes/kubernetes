@@ -171,6 +171,7 @@ type Framework interface {
 	// should get the same feasibility and scores for any given set of nodes even after one of them gets assigned. If some plugins
 	// are unable to create a signature, the pod may be "unsignable" which disables results caching
 	// and gang scheduling optimizations.
+	// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-scheduling/5598-opportunistic-batching
 	SignPod(ctx context.Context, pod *v1.Pod) (string, error)
 
 	// RunPreFilterPlugins runs the set of configured PreFilter plugins. It returns

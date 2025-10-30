@@ -102,7 +102,7 @@ func (pl *VolumeRestrictions) Name() string {
 }
 
 // Feasibility and scoring are based on the pod's volume definitions.
-func (pl *VolumeRestrictions) SignPod(pod *v1.Pod, signature fwk.PodSignatureMaker) error {
+func (pl *VolumeRestrictions) SignPod(pod *v1.Pod, signature fwk.PodSignatureBuilder) error {
 	return signature.AddSignatureVolumes(pod)
 }
 
