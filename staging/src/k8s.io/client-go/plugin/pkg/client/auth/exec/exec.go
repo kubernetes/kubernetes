@@ -297,49 +297,6 @@ type Authenticator struct {
 	dial *transport.DialHolder
 }
 
-// `allowsPlugin` determines whether or not the executable specified in its argument
-// may run according to the credential plugin policy. If the plugin is allowed,
-// `nil` is returned. If the plugin is not allowed, an error must be returned
-// explaining why.
-func (a *Authenticator) allowsPlugin() error {
-	if a.execPluginPolicy == nil {
-		return nil
-	}
-
-	switch a.execPluginPolicy.PolicyType {
-	case api.PluginPolicyUnspecified:
-		panic("defaulting has failed")
-	case api.PluginPolicyAllowAll:
-		return nil
-	case api.PluginPolicyDenyAll:
-		return fmt.Errorf("plugin %q not allowed: policy set to %q", a.cmd, api.PluginPolicyDenyAll)
-	case api.PluginPolicyAllowlist:
-		return a.checkAllowlist()
-	default:
-		panic("unreachable: error will be returned by validatePluginPolicy")
-	}
-
-}
-
-func (a *Authenticator) checkAllowlist() error {
-	pluginAbsPath, err := exec.LookPath(a.cmd)
-	if err != nil {
-		return fmt.Errorf("could not resolve path for plugin %q: %w", a.cmd, err)
-	}
-
-	errs := make([]error, 0, len(a.execPluginPolicy.Allowlist))
-	for _, entry := range a.execPluginPolicy.Allowlist {
-		err := itemGreenlights(&entry, pluginAbsPath)
-		if err == nil {
-			return nil
-		}
-
-		errs = append(errs, err)
-	}
-
-	return fmt.Errorf("%q is not permitted by the credential plugin allowlist\n%w", pluginAbsPath, errors.Join(errs...))
-}
-
 type credentials struct {
 	token string           `datapolicy:"token"`
 	cert  *tls.Certificate `datapolicy:"secret-key"`
@@ -607,6 +564,49 @@ func (a *Authenticator) wrapCmdRunErrorLocked(err error) error {
 	default:
 		return fmt.Errorf("exec: %v", err)
 	}
+}
+
+// `allowsPlugin` determines whether or not the executable specified in its argument
+// may run according to the credential plugin policy. If the plugin is allowed,
+// `nil` is returned. If the plugin is not allowed, an error must be returned
+// explaining why.
+func (a *Authenticator) allowsPlugin() error {
+	if a.execPluginPolicy == nil {
+		return nil
+	}
+
+	switch a.execPluginPolicy.PolicyType {
+	case api.PluginPolicyUnspecified:
+		panic("defaulting has failed")
+	case api.PluginPolicyAllowAll:
+		return nil
+	case api.PluginPolicyDenyAll:
+		return fmt.Errorf("plugin %q not allowed: policy set to %q", a.cmd, api.PluginPolicyDenyAll)
+	case api.PluginPolicyAllowlist:
+		return a.checkAllowlist()
+	default:
+		panic("unreachable: error will be returned by validatePluginPolicy")
+	}
+
+}
+
+func (a *Authenticator) checkAllowlist() error {
+	pluginAbsPath, err := exec.LookPath(a.cmd)
+	if err != nil {
+		return fmt.Errorf("could not resolve path for plugin %q: %w", a.cmd, err)
+	}
+
+	errs := make([]error, 0, len(a.execPluginPolicy.Allowlist))
+	for _, entry := range a.execPluginPolicy.Allowlist {
+		err := itemGreenlights(&entry, pluginAbsPath)
+		if err == nil {
+			return nil
+		}
+
+		errs = append(errs, err)
+	}
+
+	return fmt.Errorf("%q is not permitted by the credential plugin allowlist\n%w", pluginAbsPath, errors.Join(errs...))
 }
 
 var emptyAllowlistEntry api.AllowlistEntry
