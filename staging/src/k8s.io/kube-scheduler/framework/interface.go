@@ -637,7 +637,7 @@ const Unsignable = ""
 type BatchablePlugin interface {
 	Plugin
 	// This is called before PreFilter. The plugin must update the signature builder with the necessary
-	// componenets from their plugin. If the plugin cannot sign the pod, it can call "unsignable" on the
+	// components from their plugin. If the plugin cannot sign the pod, it can call "unsignable" on the
 	// signature builder. An internal error can be returned and will fail the scheduling.
 	SignPod(pod *v1.Pod, signature PodSignatureBuilder) error
 }

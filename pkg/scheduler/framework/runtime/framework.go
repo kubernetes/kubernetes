@@ -741,7 +741,7 @@ func (f *frameworkImpl) computeBatchPlugins() {
 		candidatePlugins = append(candidatePlugins, pl)
 	}
 
-	// Remove duplicates and check compatiblity.
+	// Remove duplicates and check compatibility.
 	batchPluginMap := map[string]bool{}
 	for _, pl := range candidatePlugins {
 		if _, found := batchPluginMap[pl.Name()]; !found {
