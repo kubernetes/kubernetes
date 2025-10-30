@@ -2091,8 +2091,10 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 	extendedResourceTest := func(ctx context.Context, b *drautils.Builder, f *framework.Framework, resourceNames []string, containerEnv []string) {
 		pod := b.Pod()
 		res := v1.ResourceList{}
+		res2 := v1.ResourceList{}
 		for _, resourceName := range resourceNames {
 			res[v1.ResourceName(resourceName)] = resource.MustParse("1")
+			res2[v1.ResourceName(resourceName)] = resource.MustParse("2")
 		}
 		pod.Spec.Containers[0].Resources.Requests = res
 		pod.Spec.Containers[0].Resources.Limits = res
@@ -2100,8 +2102,8 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		pod.Spec.InitContainers[0].Name += "-init"
 		// This must succeed for the pod to start.
 		pod.Spec.InitContainers[0].Command = []string{"sh", "-c", "env|grep container_1_request_0=true"}
-		pod.Spec.InitContainers[0].Resources.Requests = res
-		pod.Spec.InitContainers[0].Resources.Limits = res
+		pod.Spec.InitContainers[0].Resources.Requests = res2
+		pod.Spec.InitContainers[0].Resources.Limits = res2
 		pod.Spec.InitContainers[1].Name += "-sidecar"
 		// This must succeed for the pod to start.
 		pod.Spec.InitContainers[1].Command = []string{"sh", "-c", "while true; do env; env|grep container_1_request_0=true; echo $?; sleep 5; done"}

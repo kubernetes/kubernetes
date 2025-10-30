@@ -833,7 +833,7 @@ func sortedPodExtendedResources(containers []v1.Container) []string {
 // the first %d is the container's index in the pod's initContainer and containers
 // the second %d is the extended resource's index in that container's sorted resource requests.
 //
-// a specail device request name with format: request-%d,
+// a special device request name with format: request-%d,
 // where %d is the index of the extended resource in the sorted list of extended resources in the pod.
 func createDeviceRequests(pod *v1.Pod, extendedResources map[v1.ResourceName]int64, deviceClassMapping map[v1.ResourceName]string) []resourceapi.DeviceRequest {
 	// Creating the extended resource claim's Requests by
