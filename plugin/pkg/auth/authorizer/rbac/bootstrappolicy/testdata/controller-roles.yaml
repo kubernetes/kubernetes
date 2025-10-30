@@ -1245,6 +1245,14 @@ items:
     - create
     - patch
     - update
+  - apiGroups:
+    - resource.k8s.io
+    resourceNames:
+    - '*'
+    resources:
+    - drivers
+    verbs:
+    - update-device-status
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:

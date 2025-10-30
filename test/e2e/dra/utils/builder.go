@@ -79,6 +79,16 @@ func (b *Builder) ClassName() string {
 	return b.namespace + b.Driver.NameSuffix + "-class"
 }
 
+// DriverName returns the default device driver name.
+func (b *Builder) DriverName() string {
+	return b.Driver.Name
+}
+
+// SingletonIndex causes Builder.Class and ExtendedResourceName to create a
+// DeviceClass where the the extended resource name has no %d
+// suffix and matches the name as used by the example device plugin.
+const SingletonIndex = -1
+
 // Class returns the device Class that the builder's other objects
 // reference.
 func (b *Builder) Class() *DeviceClassWrapper {
