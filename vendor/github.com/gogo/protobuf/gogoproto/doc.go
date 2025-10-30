@@ -161,7 +161,7 @@ The most complete way to see examples is to look at
 
 	github.com/gogo/protobuf/test/thetest.proto
 
-Gogoprototest is a seperate project,
+Gogoprototest is a separate project,
 because we want to keep gogoprotobuf independent of goprotobuf,
 but we still want to test it thoroughly.
 
