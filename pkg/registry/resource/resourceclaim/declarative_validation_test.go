@@ -1295,6 +1295,21 @@ func testValidateStatusUpdateForDeclarative(t *testing.T, apiVersion string) {
 				field.Duplicate(field.NewPath("status", "devices").Index(0).Child("networkData", "ips").Index(1), "1.2.3.4/32"),
 			},
 		},
+		"invalid status.allocation.devices.config.requests too many": {
+			old: mkValidResourceClaim(tweakDevicesRequests(33)),
+			update: mkResourceClaimWithStatus(
+				tweakStatusAllocationConfigRequests(33),
+			),
+			expectedErrs: field.ErrorList{
+				field.TooMany(field.NewPath("status", "allocation", "devices", "config").Index(0).Child("requests"), 33, 32).WithOrigin("maxItems"),
+			},
+		},
+		"valid status.allocation.devices.config.requests, max allowed": {
+			old: mkValidResourceClaim(tweakDevicesRequests(32)),
+			update: mkResourceClaimWithStatus(
+				tweakStatusAllocationConfigRequests(32),
+			),
+		},
 	}
 
 	for k, tc := range testCases {
@@ -1658,5 +1673,31 @@ func tweakAddStatusAllocationConfigRequest(req string) func(rc *resource.Resourc
 			})
 		}
 		rc.Status.Allocation.Devices.Config[0].Requests = append(rc.Status.Allocation.Devices.Config[0].Requests, req)
+	}
+}
+
+func tweakStatusAllocationConfigRequests(count int) func(rc *resource.ResourceClaim) {
+	return func(rc *resource.ResourceClaim) {
+		if rc.Status.Allocation == nil {
+			rc.Status.Allocation = &resource.AllocationResult{}
+		}
+		tweakDevicesRequests(count)(rc)
+		if len(rc.Status.Allocation.Devices.Config) == 0 {
+			rc.Status.Allocation.Devices.Config = append(rc.Status.Allocation.Devices.Config, resource.DeviceAllocationConfiguration{
+				Source:   resource.AllocationConfigSourceClaim,
+				Requests: []string{},
+				DeviceConfiguration: resource.DeviceConfiguration{
+					Opaque: &resource.OpaqueDeviceConfiguration{
+						Driver: "dra.example.com",
+						Parameters: runtime.RawExtension{
+							Raw: []byte(`{"kind": "foo", "apiVersion": "dra.example.com/v1"}`),
+						},
+					},
+				},
+			})
+		}
+		for i := 0; i < count; i++ {
+			rc.Status.Allocation.Devices.Config[0].Requests = append(rc.Status.Allocation.Devices.Config[0].Requests, fmt.Sprintf("req-%d", i))
+		}
 	}
 }
