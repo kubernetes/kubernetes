@@ -1316,7 +1316,7 @@ func validateNetworkDeviceData(networkDeviceData *resource.NetworkDeviceData, fl
 	allErrs = append(allErrs, validateSet(networkDeviceData.IPs, resource.NetworkDeviceDataMaxIPs,
 		func(address string, fldPath *field.Path) field.ErrorList {
 			return validation.IsValidInterfaceAddress(fldPath, address)
-		}, stringKey, fldPath.Child("ips"), uniquenessCovered)...)
+		}, stringKey, fldPath.Child("ips"), sizeCovered, uniquenessCovered)...)
 	return allErrs
 }
 
