@@ -21,6 +21,7 @@ package sctp
 import (
 	"io"
 	"net"
+	"os"
 	"runtime"
 	"sync/atomic"
 	"syscall"
@@ -77,10 +78,22 @@ func (r rawConn) Write(f func(fd uintptr) (done bool)) error {
 	panic("not implemented")
 }
 
+func (c *SCTPConn) SyscallConn() (syscall.RawConn, error) {
+	fd := c.fd()
+	if fd < 0 {
+		return nil, syscall.EINVAL
+	}
+	return &rawConn{sockfd: int(fd)}, nil
+}
+
 func (c *SCTPConn) SCTPWrite(b []byte, info *SndRcvInfo) (int, error) {
 	var cbuf []byte
 	if info != nil {
+		// Fix PPID to network byte order
+		oldPPID := info.PPID
+		info.PPID = htonl(info.PPID)
 		cmsgBuf := toBuf(info)
+		info.PPID = oldPPID
 		hdr := &syscall.Cmsghdr{
 			Level: syscall.IPPROTO_SCTP,
 			Type:  SCTP_CMSG_SNDRCV,
@@ -103,7 +116,10 @@ func parseSndRcvInfo(b []byte) (*SndRcvInfo, error) {
 		if m.Header.Level == syscall.IPPROTO_SCTP {
 			switch m.Header.Type {
 			case SCTP_CMSG_SNDRCV:
-				return (*SndRcvInfo)(unsafe.Pointer(&m.Data[0])), nil
+				dst := (*SndRcvInfo)(unsafe.Pointer(&m.Data[0]))
+				// Fix PPID to host byte order
+				dst.PPID = ntohl(dst.PPID)
+				return dst, nil
 			}
 		}
 	}
@@ -182,7 +198,7 @@ func listenSCTPExtConfig(network string, laddr *SCTPAddr, options InitMsg, contr
 	af, ipv6only := favoriteAddrFamily(network, laddr, nil, "listen")
 	sock, err := syscall.Socket(
 		af,
-		syscall.SOCK_STREAM,
+		syscall.SOCK_STREAM|syscall.SOCK_CLOEXEC,
 		syscall.IPPROTO_SCTP,
 	)
 	if err != nil {
@@ -238,6 +254,28 @@ func listenSCTPExtConfig(network string, laddr *SCTPAddr, options InitMsg, contr
 		nil
 }
 
+// FileListener takes a file, dup's the underlying file descriptor, and returns
+// a SCTPListener created from the dup'd fd.
+func FileListener(file *os.File) (*SCTPListener, error) {
+	r1, _, err := syscall.Syscall(syscall.SYS_FCNTL, file.Fd(), syscall.F_DUPFD_CLOEXEC, 0)
+	if err != 0 {
+		return nil, os.NewSyscallError("fcntl", err)
+	}
+
+	// Clear the non-blocking flag on the dup'd fd. This is needed to make sure
+	// an SCTPListener created with FileListener will behave like other
+	// listeners. Namely, its Accept methods will block until a connection is
+	// available.
+	if err := syscall.SetNonblock(int(r1), false); err != nil {
+		return nil, os.NewSyscallError("fcntl", err)
+	}
+
+	return &SCTPListener{
+		fd:                  int(r1),
+		notificationHandler: nil,
+	}, nil
+}
+
 // AcceptSCTP waits for and returns the next SCTP connection to the listener.
 func (ln *SCTPListener) AcceptSCTP() (*SCTPConn, error) {
 	fd, _, err := syscall.Accept4(ln.fd, 0)
@@ -252,6 +290,14 @@ func (ln *SCTPListener) Accept() (net.Conn, error) {
 func (ln *SCTPListener) Close() error {
 	syscall.Shutdown(ln.fd, syscall.SHUT_RDWR)
 	return syscall.Close(ln.fd)
+}
+
+func (ln *SCTPListener) SyscallConn() (syscall.RawConn, error) {
+	fd := ln.fd
+	if fd < 0 {
+		return nil, syscall.EINVAL
+	}
+	return &rawConn{sockfd: int(fd)}, nil
 }
 
 // DialSCTP - bind socket to laddr (if given) and connect to raddr
@@ -269,7 +315,7 @@ func dialSCTPExtConfig(network string, laddr, raddr *SCTPAddr, options InitMsg, 
 	af, ipv6only := favoriteAddrFamily(network, laddr, raddr, "dial")
 	sock, err := syscall.Socket(
 		af,
-		syscall.SOCK_STREAM,
+		syscall.SOCK_STREAM|syscall.SOCK_CLOEXEC,
 		syscall.IPPROTO_SCTP,
 	)
 	if err != nil {

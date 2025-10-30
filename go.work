@@ -39,4 +39,5 @@ use (
 	./staging/src/k8s.io/sample-cli-plugin
 	./staging/src/k8s.io/sample-controller
 	./staging/src/k8s.io/streaming
+	./test
 )
