@@ -1086,6 +1086,15 @@ func testValidateStatusUpdateForDeclarative(t *testing.T, apiVersion string) {
 				field.TooMany(field.NewPath("status", "allocation", "devices", "config"), 33, 32).WithOrigin("maxItems"),
 			},
 		},
+		"invalid status.allocation.devices.config requests, duplicate": {
+			old: mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(
+				tweakAddStatusAllocationConfigRequest("req-0"),
+			),
+			expectedErrs: field.ErrorList{
+				field.Duplicate(field.NewPath("status", "allocation", "devices", "config").Index(0).Child("requests").Index(1), "req-0"),
+			},
+		},
 		// .Status.Allocation.Devices.Config[%d].Source
 		"valid status.allocation.devices.config source FromClass": {
 			old:    mkValidResourceClaim(),
@@ -1626,5 +1635,28 @@ func tweakMatchAttribute(val string) func(*resource.ResourceClaim) {
 				MatchAttribute: &fullyQualifiedName,
 			},
 		}
+	}
+}
+
+func tweakAddStatusAllocationConfigRequest(req string) func(rc *resource.ResourceClaim) {
+	return func(rc *resource.ResourceClaim) {
+		if rc.Status.Allocation == nil {
+			rc.Status.Allocation = &resource.AllocationResult{}
+		}
+		if len(rc.Status.Allocation.Devices.Config) == 0 {
+			rc.Status.Allocation.Devices.Config = append(rc.Status.Allocation.Devices.Config, resource.DeviceAllocationConfiguration{
+				Source:   resource.AllocationConfigSourceClaim,
+				Requests: []string{"req-0"},
+				DeviceConfiguration: resource.DeviceConfiguration{
+					Opaque: &resource.OpaqueDeviceConfiguration{
+						Driver: "dra.example.com",
+						Parameters: runtime.RawExtension{
+							Raw: []byte(`{"kind": "foo", "apiVersion": "dra.example.com/v1"}`),
+						},
+					},
+				},
+			})
+		}
+		rc.Status.Allocation.Devices.Config[0].Requests = append(rc.Status.Allocation.Devices.Config[0].Requests, req)
 	}
 }
