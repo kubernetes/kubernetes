@@ -138,19 +138,20 @@ func (p *Preferences) applyPluginPolicy(kubeConfigFlags *genericclioptions.Confi
 		PolicyType: kuberc.CredentialPluginPolicy,
 		Allowlist:  kuberc.CredentialPluginAllowlist,
 	}
-	existingWrapConfigFn := noop
-	if kubeConfigFlags.WrapConfigFn != nil {
-		existingWrapConfigFn = kubeConfigFlags.WrapConfigFn
-	}
+
+	existingWrapConfigFn := kubeConfigFlags.WrapConfigFn
 
 	if PluginPolicyWrapper == nil {
 		PluginPolicyWrapper = func(c *rest.Config) *rest.Config {
-			cfg := existingWrapConfigFn(c)
-			if cfg.ExecProvider != nil {
-				cfg.ExecProvider.PluginPolicy = policy
+			if existingWrapConfigFn != nil {
+				c = existingWrapConfigFn(c)
 			}
 
-			return cfg
+			if c.ExecProvider != nil {
+				c.ExecProvider.PluginPolicy = policy
+			}
+
+			return c
 		}
 	}
 
