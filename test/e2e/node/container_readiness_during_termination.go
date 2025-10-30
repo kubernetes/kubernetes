@@ -34,7 +34,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
-var _ = SIGDescribe("Container Readiness During Termination", func() {
+var _ = SIGDescribe("Container Readiness During Termination", framework.WithFeatureGate(features.EventedPLEG), func() {
 	f := framework.NewDefaultFramework("container-readiness-termination")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
@@ -50,7 +50,7 @@ var _ = SIGDescribe("Container Readiness During Termination", func() {
 		podClient = e2epod.NewPodClient(f)
 	})
 
-	f.It("should update container readiness when containers die during pod termination", f.WithNodeConformance(), framework.WithFeatureGate(features.EventedPLEG), func(ctx context.Context) {
+	f.It("should update container readiness when containers die during pod termination", f.WithNodeConformance(), func(ctx context.Context) {
 		ginkgo.By("Creating a pod with two containers - fast-container (no preStop) and slow-container (long preStop)")
 		podName := "test-pod-readiness-" + string(uuid.NewUUID())
 		const preStopSleepSeconds = int64(999999) // infinity constant for preStop sleep action
