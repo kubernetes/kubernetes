@@ -36,7 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
@@ -755,8 +755,8 @@ func Test_buildQueueingHintMap(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.featuregateDisabled {
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, false)
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, version.MustParse("1.33"))
+				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.SchedulerQueueingHints, false)
 			}
 
 			logger, ctx := ktesting.NewTestContext(t)
@@ -827,6 +827,7 @@ func Test_buildQueueingHintMap(t *testing.T) {
 
 // Test_UnionedGVKs tests UnionedGVKs worked with buildQueueingHintMap.
 func Test_UnionedGVKs(t *testing.T) {
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, version.MustParse("1.34"))
 	tests := []struct {
 		name                            string
 		plugins                         schedulerapi.PluginSet
@@ -1008,14 +1009,14 @@ func Test_UnionedGVKs(t *testing.T) {
 
 			if !tt.enableSchedulerQueueingHints || !tt.enableDynamicResourceAllocation {
 				// Set emulated version before setting other feature gates, since it can impact feature dependencies.
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, version.MustParse("1.33"))
 			}
-			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.InPlacePodVerticalScaling: tt.enableInPlacePodVerticalScaling,
 				features.DynamicResourceAllocation: tt.enableDynamicResourceAllocation,
 			})
 			if !tt.enableSchedulerQueueingHints {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, false)
+				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.SchedulerQueueingHints, false)
 				// The test uses defaults.PluginConfigsV1, which contains the filter timeout.
 				// With emulation of 1.33, the DRASchedulerFilterTimeout feature gets disabled
 				// and also cannot be enabled ("pre-alpha"), which makes the config invalid.
