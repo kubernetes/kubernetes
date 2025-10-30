@@ -458,7 +458,6 @@ func newTestKubeletWithImageList(
 
 	kubelet.pluginManager = pluginmanager.NewPluginManager(
 		kubelet.getPluginsRegistrationDir(), /* sockDir */
-		kubelet.recorder,
 	)
 	pluginManagerStopCh := make(chan struct{})
 	kubelet.pluginManagerStopCh = pluginManagerStopCh
