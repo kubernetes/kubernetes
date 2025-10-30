@@ -69,7 +69,6 @@ type frameworkImpl struct {
 	bindPlugins          []fwk.BindPlugin
 	postBindPlugins      []fwk.PostBindPlugin
 	permitPlugins        []fwk.PermitPlugin
-	nodeResultsPlugins   []fwk.NodeResultsPlugin
 
 	// pluginsMap contains all plugins, by name.
 	pluginsMap map[string]fwk.Plugin
@@ -92,6 +91,8 @@ type frameworkImpl struct {
 	apiCacher     fwk.APICacher
 
 	parallelizer fwk.Parallelizer
+
+	batch OpportunisticBatch
 }
 
 // extensionPoint encapsulates desired and applied set of plugins at a specific extension
@@ -119,7 +120,6 @@ func (f *frameworkImpl) getExtensionPoints(plugins *config.Plugins) []extensionP
 		{&plugins.Permit, &f.permitPlugins},
 		{&plugins.PreEnqueue, &f.preEnqueuePlugins},
 		{&plugins.QueueSort, &f.queueSortPlugins},
-		{&plugins.NodeResults, &f.nodeResultsPlugins},
 	}
 }
 
@@ -1265,14 +1265,16 @@ func (f *frameworkImpl) runScoreExtension(ctx context.Context, pl fwk.ScorePlugi
 	return status
 }
 
-func (f *frameworkImpl) RunNodeResultsPlugins(ctx context.Context, state fwk.CycleState, thisFramework bool, podInfo fwk.PodInfo, chosenNode fwk.NodeInfo, otherNodes fwk.SortedScoredNodes) {
-	startTime := time.Now()
-	defer func() {
-		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.NodeResults, "success", f.profileName).Observe(metrics.SinceInSeconds(startTime))
-	}()
-	for _, pl := range f.nodeResultsPlugins {
-		pl.NodeResults(ctx, state, thisFramework, podInfo, chosenNode, otherNodes)
-	}
+func (f *frameworkImpl) NewPod(ctx context.Context, pod *v1.Pod) {
+	f.batch.NewPod(ctx, pod)
+}
+
+func (f *frameworkImpl) NodeHint(ctx context.Context, pod *v1.Pod) string {
+	return f.batch.NodeHint(ctx, pod)
+}
+
+func (f *frameworkImpl) RunPostScore(ctx context.Context, state fwk.CycleState, thisFramework bool, podInfo fwk.PodInfo, chosenNode fwk.NodeInfo, otherNodes fwk.SortedScoredNodes) {
+	f.batch.postScore(ctx, state, thisFramework, f, podInfo, chosenNode, otherNodes)
 }
 
 // RunPreBindPlugins runs the set of configured prebind plugins. It returns a

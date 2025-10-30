@@ -80,7 +80,6 @@ const (
 	Reserve                     = "Reserve"
 	Unreserve                   = "Unreserve"
 	Permit                      = "Permit"
-	NodeResults                 = "NodeResults"
 )
 
 const (
@@ -237,7 +236,7 @@ func InitMetrics() {
 			Subsystem:      SchedulerSubsystem,
 			Name:           "batch_use_results",
 			Help:           "Counts of results when we attempt to use batching.",
-			StabilityLevel: metrics.BETA,
+			StabilityLevel: metrics.ALPHA,
 		}, []string{"result", "reason"})
 
 	PodSchedulingSLIDuration = metrics.NewHistogramVec(

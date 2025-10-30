@@ -184,9 +184,16 @@ type Framework interface {
 	// cluster state to make the pod potentially schedulable in a future scheduling cycle.
 	RunPostFilterPlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, filteredNodeStatusMap fwk.NodeToStatusReader) (*fwk.PostFilterResult, *fwk.Status)
 
+	// Update necessary internal state based on a new pod arrival.
+	NewPod(ctx context.Context, pod *v1.Pod)
+
+	// Get a node hint for a given pod if possible. It no hint is available the function will
+	// return "".
+	NodeHint(ctx context.Context, pod *v1.Pod) string
+
 	// On successful scheduling of a pod, update the batch information based on the result.
 	// The returned Batch object contains the new batch information, and can be nil.
-	RunNodeResultsPlugins(ctx context.Context, state fwk.CycleState, thisFramework bool, podInfo fwk.PodInfo, chosenNode fwk.NodeInfo, otherNodes fwk.SortedScoredNodes)
+	RunPostScore(ctx context.Context, state fwk.CycleState, thisFramework bool, podInfo fwk.PodInfo, chosenNode fwk.NodeInfo, otherNodes fwk.SortedScoredNodes)
 
 	// RunPreBindPlugins runs the set of configured PreBind plugins. It returns
 	// *fwk.Status and its code is set to non-success if any of the plugins returns

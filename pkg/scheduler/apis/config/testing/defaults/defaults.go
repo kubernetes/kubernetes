@@ -41,7 +41,6 @@ var PluginsV1 = &config.Plugins{
 			{Name: names.VolumeBinding},
 			{Name: names.VolumeZone},
 			{Name: names.PodTopologySpread, Weight: 2},
-			{Name: names.OpportunisticBatch},
 			{Name: names.InterPodAffinity, Weight: 2},
 			{Name: names.DynamicResources},
 			{Name: names.DefaultPreemption},
@@ -76,7 +75,6 @@ var ExpandedPluginsV1 = &config.Plugins{
 			{Name: names.VolumeBinding},
 			{Name: names.VolumeZone},
 			{Name: names.PodTopologySpread},
-			{Name: names.OpportunisticBatch},
 			{Name: names.InterPodAffinity},
 			{Name: names.DynamicResources},
 		},
@@ -153,11 +151,6 @@ var ExpandedPluginsV1 = &config.Plugins{
 	Bind: config.PluginSet{
 		Enabled: []config.Plugin{
 			{Name: names.DefaultBinder},
-		},
-	},
-	NodeResults: config.PluginSet{
-		Enabled: []config.Plugin{
-			{Name: names.OpportunisticBatch},
 		},
 	},
 }

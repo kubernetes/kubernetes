@@ -61,9 +61,6 @@ func applyFeatureGates(config *v1.Plugins) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
 		applyDynamicResources(config)
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.OpportunisticBatching) {
-		applyOpportunisticBatch(config)
-	}
 }
 
 func applyDynamicResources(config *v1.Plugins) {
@@ -77,19 +74,6 @@ func applyDynamicResources(config *v1.Plugins) {
 			extended := make([]v1.Plugin, 0, len(config.MultiPoint.Enabled)+1)
 			extended = append(extended, config.MultiPoint.Enabled[:i]...)
 			extended = append(extended, v1.Plugin{Name: names.DynamicResources})
-			extended = append(extended, config.MultiPoint.Enabled[i:]...)
-			config.MultiPoint.Enabled = extended
-			break
-		}
-	}
-}
-
-func applyOpportunisticBatch(config *v1.Plugins) {
-	for i := range config.MultiPoint.Enabled {
-		if config.MultiPoint.Enabled[i].Name == names.InterPodAffinity {
-			extended := make([]v1.Plugin, 0, len(config.MultiPoint.Enabled)+1)
-			extended = append(extended, config.MultiPoint.Enabled[:i]...)
-			extended = append(extended, v1.Plugin{Name: names.OpportunisticBatch})
 			extended = append(extended, config.MultiPoint.Enabled[i:]...)
 			config.MultiPoint.Enabled = extended
 			break
