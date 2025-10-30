@@ -62,6 +62,12 @@ type CallsMetric interface {
 	Increment(exitCode int, callStatus string)
 }
 
+// CallsMetric counts the success or failure of execution for exec plugins.
+type PolicyMetric interface {
+	// Increment increments a counter per exitCode and callStatus.
+	Increment(status string)
+}
+
 // RetryMetric counts the number of retries sent to the server
 // partitioned by code, method, and host.
 type RetryMetric interface {
@@ -101,6 +107,9 @@ var (
 	ExecPluginCalls CallsMetric = noopCalls{}
 	// RequestRetry is the retry metric that tracks the number of
 	// retries sent to the server.
+	ExecPluginPolicy PolicyMetric = noopPolicy{}
+	// RequestRetry is the retry metric that tracks the number of
+	// retries sent to the server.
 	RequestRetry RetryMetric = noopRetry{}
 	// TransportCacheEntries is the metric that tracks the number of entries in the
 	// internal transport cache.
@@ -121,6 +130,7 @@ type RegisterOpts struct {
 	RateLimiterLatency    LatencyMetric
 	RequestResult         ResultMetric
 	ExecPluginCalls       CallsMetric
+	ExecPluginPolicy      PolicyMetric
 	RequestRetry          RetryMetric
 	TransportCacheEntries TransportCacheMetric
 	TransportCreateCalls  TransportCreateCallsMetric
@@ -155,6 +165,9 @@ func Register(opts RegisterOpts) {
 			RequestResult = opts.RequestResult
 		}
 		if opts.ExecPluginCalls != nil {
+			ExecPluginCalls = opts.ExecPluginCalls
+		}
+		if opts.ExecPluginPolicy != nil {
 			ExecPluginCalls = opts.ExecPluginCalls
 		}
 		if opts.RequestRetry != nil {
@@ -197,6 +210,10 @@ func (noopResult) Increment(context.Context, string, string, string) {}
 type noopCalls struct{}
 
 func (noopCalls) Increment(int, string) {}
+
+type noopPolicy struct{}
+
+func (noopPolicy) Increment(string) {}
 
 type noopRetry struct{}
 

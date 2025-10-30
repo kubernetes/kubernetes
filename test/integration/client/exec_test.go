@@ -104,13 +104,14 @@ var execPluginMetricsComparer = cmp.Comparer(func(a, b *execPluginMetrics) bool 
 })
 
 type execPluginClientTestData struct {
-	name                          string
-	clientConfigFunc              func(*rest.Config)
-	wantAuthorizationHeaderValues [][]string
-	wantCertificate               *tls.Certificate
-	wantGetCertificateErrorPrefix string
-	wantClientErrorPrefix         string
-	wantMetrics                   *execPluginMetrics
+	name                            string
+	clientConfigFunc                func(*rest.Config)
+	wantAuthorizationHeaderValues   [][]string
+	wantCertificate                 *tls.Certificate
+	wantGetAuthenticatorErrorPrefix string
+	wantGetCertificateErrorPrefix   string
+	wantClientErrorPrefix           string
+	wantMetrics                     *execPluginMetrics
 }
 
 func execPluginClientTests(t *testing.T, unauthorizedCert, unauthorizedKey []byte, clientAuthorizedToken, clientCertFileName, clientKeyFileName string) []execPluginClientTestData {
@@ -435,9 +436,9 @@ func execPluginClientTests(t *testing.T, unauthorizedCert, unauthorizedKey []byt
 					{Name: "other-very-secure-binary"},
 				}
 			},
-			wantGetCertificateErrorPrefix: `misconfigured credential plugin allowlist: plugin policy is "AllowAll" but allowlist is non-nil`,
-			wantClientErrorPrefix:         `Get "https`,
-			wantMetrics:                   &execPluginMetrics{},
+			wantGetAuthenticatorErrorPrefix: `misconfigured credential plugin allowlist: plugin policy is "AllowAll" but allowlist is non-nil`,
+			wantClientErrorPrefix:           `Get "https`,
+			wantMetrics:                     &execPluginMetrics{},
 		},
 		{
 			name: "allowall policy happy path",
@@ -551,7 +552,18 @@ func TestExecPluginViaClient(t *testing.T) {
 			if test.clientConfigFunc != nil {
 				test.clientConfigFunc(clientConfig)
 			}
-			client := clientset.NewForConfigOrDie(clientConfig)
+			client, err := clientset.NewForConfig(clientConfig)
+			if test.wantGetAuthenticatorErrorPrefix != "" {
+				if err == nil || !strings.HasPrefix(err.Error(), test.wantGetAuthenticatorErrorPrefix) {
+					t.Fatalf("got %v, wanted %s...", err, test.wantGetAuthenticatorErrorPrefix)
+				}
+
+				// expected the authenticator to fail and it did, so count the
+				// test as passed
+				return
+			} else if err != nil {
+				t.Fatal(err)
+			}
 
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 			defer cancel()

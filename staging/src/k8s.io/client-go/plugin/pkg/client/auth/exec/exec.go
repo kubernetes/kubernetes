@@ -80,6 +80,11 @@ var (
 	errInvalidAPIVersion = errors.New("exec plugin: invalid apiVersion")
 )
 
+const (
+	metricAllowed = "allowed"
+	metricDenied  = "denied"
+)
+
 func newCache() *cache {
 	return &cache{m: make(map[string]*Authenticator)}
 }
@@ -459,8 +464,10 @@ func (a *Authenticator) refreshCredsLocked() error {
 	}
 
 	if err := a.allowsPlugin(); err != nil {
+		metrics.ExecPluginPolicy.Increment(metricDenied)
 		return err
 	}
+	metrics.ExecPluginPolicy.Increment(metricAllowed)
 
 	err = cmd.Run()
 	incrementCallsMetric(err)
