@@ -52,7 +52,8 @@ type Config struct {
 	// Process can process a popped Deltas.
 	Process ProcessFunc
 
-	// ProcessBatch can process a batch of popped Deltas.
+	// ProcessBatch can process a batch of popped Deltas, which should return `TransactionError` if not all items
+	// in the batch were successfully processed.
 	ProcessBatch ProcessBatchFunc
 
 	// ObjectType is an example object of the type this controller is
@@ -682,12 +683,16 @@ func processDeltasInBatch(
 		for _, SuccessfulIdx := range txnErr.SuccessfulIndices {
 			callbacks[SuccessfulIdx]()
 		}
-		return err
+		// formatting the error so txns doesn't escape and keeps allocated in the stack.
+		return fmt.Errorf("not all items in the batch successfully processed: %w", txnErr)
+	}
+	if err != nil {
+		return fmt.Errorf("unexpected error from cache storage: %w", err)
 	}
 	for _, callback := range callbacks {
 		callback()
 	}
-	return err
+	return nil
 }
 
 // newInformer returns a controller for populating the store while also

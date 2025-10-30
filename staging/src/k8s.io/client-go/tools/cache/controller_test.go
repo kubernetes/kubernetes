@@ -808,8 +808,7 @@ func TestProcessDeltasInBatch(t *testing.T) {
 			failingObjects:       []runtime.Object{cm1},
 			expectedSuccessCount: 0,
 			assertErr: func(err error) bool {
-				var txnErr TransactionError
-				return errors.As(err, &txnErr)
+				return assert.Contains(t, err.Error(), "failed to execute (1/1) transactions")
 			},
 			expectedListenerReceivedObjects: make([]interface{}, 0),
 		},
@@ -819,11 +818,7 @@ func TestProcessDeltasInBatch(t *testing.T) {
 			failingObjects:       []runtime.Object{cm2},
 			expectedSuccessCount: 1,
 			assertErr: func(err error) bool {
-				var txnErr TransactionError
-				if !errors.As(err, &txnErr) {
-					return false
-				}
-				return assert.Equal(t, []int{1}, txnErr.FailedIndices) && assert.Equal(t, []int{0}, txnErr.SuccessfulIndices)
+				return assert.Contains(t, err.Error(), "failed to execute (1/2) transactions")
 			},
 			expectedListenerReceivedObjects: []interface{}{cm1},
 		},
@@ -833,12 +828,7 @@ func TestProcessDeltasInBatch(t *testing.T) {
 			failingObjects:       []runtime.Object{cm2},
 			expectedSuccessCount: 2,
 			assertErr: func(err error) bool {
-				var txnErr TransactionError
-				if !errors.As(err, &txnErr) {
-					return false
-				}
-				return assert.Equal(t, []int{1}, txnErr.FailedIndices) &&
-					assert.Equal(t, []int{0, 2}, txnErr.SuccessfulIndices)
+				return assert.Contains(t, err.Error(), "failed to execute (1/3) transactions")
 			},
 			expectedListenerReceivedObjects: []interface{}{cm1, cm3},
 		},

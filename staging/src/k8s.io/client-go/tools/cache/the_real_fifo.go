@@ -277,41 +277,37 @@ func (f *RealFIFO) PopBatch(process ProcessBatchFunc) error {
 	}
 
 	isInInitialList := !f.hasSynced_locked()
-	batchSize := 0
 	unique := sets.NewString()
+	deltas := make([]Deltas, 0, min(len(f.items), f.batchSize))
 	// only bundle unique items into a batch
-	for batchSize < f.batchSize && batchSize < len(f.items) {
-		if f.initialPopulationCount > 0 && batchSize >= f.initialPopulationCount {
+	for i := 0; i < f.batchSize && i < len(f.items); i++ {
+		if f.initialPopulationCount > 0 && i >= f.initialPopulationCount {
 			break
 		}
-		id, err := f.keyOf(f.items[batchSize])
+		item := f.items[i]
+		id, err := f.keyOf(item)
 		if err != nil {
-			// close the batch if error happens
-			// TODO: log the error when RealFIFOOptions supports passing klog instance like deprecated DeltaFIO
-			if batchSize == 0 {
-				// return if the 1st item has key error
-				return err
-			}
+			// close the batch here if error happens
+			// TODO: log the error when RealFIFOOptions supports passing klog instance like deprecated DeltaFIFO
+			// still pop the broken item out of queue to be compatible with the non-batch behavior it should be safe
+			// when 1st element is broken, however for Nth broken element, there's possible risk that broken item
+			// still can be processed and broke the uniqueness of the batch unexpectedly.
+			deltas = append(deltas, Deltas{item})
 			break
 		}
 		if unique.Has(id) {
 			break
 		}
-		batchSize++
 		unique.Insert(id)
-	}
-	ids := f.items[0:batchSize]
-	deltas := make([]Deltas, len(ids))
-	for i := range batchSize {
 		// we wrap in Deltas here to be compatible with preview Pop functions and those interpreting the return value.
-		deltas[i] = Deltas{ids[i]}
+		deltas = append(deltas, Deltas{item})
 		// The underlying array still exists and references this object, so the object will not be garbage collected unless we zero the reference.
 		f.items[i] = Delta{}
 	}
-	f.items = f.items[batchSize:]
 	if f.initialPopulationCount > 0 {
-		f.initialPopulationCount -= batchSize
+		f.initialPopulationCount -= len(deltas)
 	}
+	f.items = f.items[len(deltas):]
 
 	// Only log traces if the queue depth is greater than 10 and it takes more than
 	// 100 milliseconds to process one item from the queue.
@@ -319,7 +315,7 @@ func (f *RealFIFO) PopBatch(process ProcessBatchFunc) error {
 	// and new items can't be added until processing finish.
 	// https://github.com/kubernetes/kubernetes/issues/103789
 	if len(f.items) > 10 {
-		id, _ := f.keyOf(ids[0])
+		id, _ := f.keyOf(deltas[0])
 		trace := utiltrace.New("RealFIFO Pop Process",
 			utiltrace.Field{Key: "ID", Value: id},
 			utiltrace.Field{Key: "Depth", Value: len(f.items)},
