@@ -18,6 +18,8 @@ package noderesources
 
 import (
 	"context"
+	"strings"
+	"sync"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -51,6 +53,78 @@ type resourceAllocationScorer struct {
 	draFeatures  structured.Features
 	draManager   fwk.SharedDRAManager
 	celCache     *cel.Cache
+	// Cache for DeviceMatches results to avoid expensive repeated evaluations
+	deviceMatchCache sync.Map // map[deviceMatchCacheKey]bool
+	// Cache for NodeMatches results to avoid expensive repeated node selector evaluations
+	nodeMatchCache sync.Map // map[nodeMatchCacheKey]bool
+}
+
+// buildNodeMatchCacheKey creates a string cache key for node matching results
+// Using a string key is significantly faster than struct keys with sync.Map
+func buildNodeMatchCacheKey(nodeName string, nodeNameToMatch string, allNodesMatch bool, nodeSelectorHash string) string {
+	// Pre-allocate sufficient capacity to avoid reallocation
+	var b strings.Builder
+	b.Grow(len(nodeName) + len(nodeNameToMatch) + len(nodeSelectorHash) + 10)
+
+	b.WriteString(nodeName)
+	b.WriteByte('|')
+	b.WriteString(nodeNameToMatch)
+	b.WriteByte('|')
+	if allNodesMatch {
+		b.WriteByte('1')
+	} else {
+		b.WriteByte('0')
+	}
+	b.WriteByte('|')
+	b.WriteString(nodeSelectorHash)
+
+	return b.String()
+}
+
+// buildDeviceMatchCacheKey creates a string cache key for device matching results
+// Using a string key is significantly faster than struct keys with sync.Map
+// This concatenates expression|driver|poolName|deviceName with pipe separators
+func buildDeviceMatchCacheKey(expression string, driver string, poolName string, deviceName string) string {
+	// Pre-allocate sufficient capacity to avoid reallocation
+	var b strings.Builder
+	b.Grow(len(expression) + len(driver) + len(poolName) + len(deviceName) + 4)
+
+	b.WriteString(expression)
+	b.WriteByte('|')
+	b.WriteString(driver)
+	b.WriteByte('|')
+	b.WriteString(poolName)
+	b.WriteByte('|')
+	b.WriteString(deviceName)
+
+	return b.String()
+}
+
+// nodeMatches is a cached wrapper around structured.NodeMatches
+func (r *resourceAllocationScorer) nodeMatches(node *v1.Node, nodeNameToMatch string, allNodesMatch bool, nodeSelector *v1.NodeSelector) (bool, error) {
+
+	var nodeName string
+	if node != nil {
+		nodeName = node.Name
+	}
+
+	nodeSelectorStr := nodeSelector.String()
+	key := buildNodeMatchCacheKey(nodeName, nodeNameToMatch, allNodesMatch, nodeSelectorStr)
+
+	// Check cache first
+	if matches, ok := r.nodeMatchCache.Load(key); ok {
+		return matches.(bool), nil
+	}
+
+	// Call the original function
+	matches, err := structured.NodeMatches(r.draFeatures, node, nodeNameToMatch, allNodesMatch, nodeSelector)
+
+	// Cache the result (even if there was an error, to avoid repeated failures)
+	if err == nil {
+		r.nodeMatchCache.Store(key, matches)
+	}
+
+	return matches, err
 }
 
 // score will use `scorer` function to calculate the score.
@@ -269,7 +343,7 @@ func (r *resourceAllocationScorer) calculateDRAResourceTotals(ctx context.Contex
 			// When per-device node selection is enabled, check each device individually
 			for _, device := range slice.Spec.Devices {
 				// Check if this specific device matches the node
-				deviceMatches, err := structured.NodeMatches(r.draFeatures, node, ptr.Deref(device.NodeName, ""), ptr.Deref(device.AllNodes, false), device.NodeSelector)
+				deviceMatches, err := r.nodeMatches(node, ptr.Deref(device.NodeName, ""), ptr.Deref(device.AllNodes, false), device.NodeSelector)
 				if err != nil {
 					return 0, 0, err
 				}
@@ -279,7 +353,7 @@ func (r *resourceAllocationScorer) calculateDRAResourceTotals(ctx context.Contex
 			}
 		} else {
 			// When per-device node selection is disabled, check slice-level node selection first
-			matches, err := structured.NodeMatches(r.draFeatures, node, ptr.Deref(slice.Spec.NodeName, ""), ptr.Deref(slice.Spec.AllNodes, false), slice.Spec.NodeSelector)
+			matches, err := r.nodeMatches(node, ptr.Deref(slice.Spec.NodeName, ""), ptr.Deref(slice.Spec.AllNodes, false), slice.Spec.NodeSelector)
 			if err != nil {
 				return 0, 0, err
 			}
@@ -291,7 +365,7 @@ func (r *resourceAllocationScorer) calculateDRAResourceTotals(ctx context.Contex
 		}
 		// Count devices that match the device class
 		for _, device := range devices {
-			matches, err := r.deviceMatchesClass(ctx, device, deviceClass, driver)
+			matches, err := r.deviceMatchesClass(ctx, device, deviceClass, driver, pool)
 			if err != nil {
 				return 0, 0, err
 			}
@@ -313,16 +387,41 @@ func (r *resourceAllocationScorer) calculateDRAResourceTotals(ctx context.Contex
 // Note: This method assumes the device class has ExtendedResourceName set, as filtering
 // should be done by the caller to ensure we only process DRA resources meant for extended
 // resource scoring.
-func (r *resourceAllocationScorer) deviceMatchesClass(ctx context.Context, device resourceapi.Device, deviceClass *resourceapi.DeviceClass, driver string) (bool, error) {
+func (r *resourceAllocationScorer) deviceMatchesClass(ctx context.Context, device resourceapi.Device, deviceClass *resourceapi.DeviceClass, driver string, poolName string) (bool, error) {
 	// If no selectors are defined, all devices match
 	if len(deviceClass.Spec.Selectors) == 0 {
 		return true, nil
 	}
 
+	// Lazily create the CEL device only when needed (first CEL selector that's not cached)
+	var celDevice cel.Device
+	celDeviceCreated := false
+
 	// All selectors must match for the device to be considered a match
 	for _, selector := range deviceClass.Spec.Selectors {
 		if selector.CEL == nil {
 			continue
+		}
+
+		key := buildDeviceMatchCacheKey(selector.CEL.Expression, driver, poolName, device.Name)
+
+		// Check if result is already cached
+		if matches, ok := r.deviceMatchCache.Load(key); ok {
+			if !matches.(bool) {
+				return false, nil
+			}
+			continue // This selector matches, check the next one
+		}
+
+		// Cache miss - need to evaluate CEL expression
+		// Create CEL device if we haven't already
+		if !celDeviceCreated {
+			celDevice = cel.Device{
+				Driver:     driver,
+				Attributes: device.Attributes,
+				Capacity:   device.Capacity,
+			}
+			celDeviceCreated = true
 		}
 
 		// Use cached CEL compilation for performance
@@ -331,17 +430,13 @@ func (r *resourceAllocationScorer) deviceMatchesClass(ctx context.Context, devic
 			return false, result.Error
 		}
 
-		// Evaluate the expression against the device
-		celDevice := cel.Device{
-			Driver:     driver,
-			Attributes: device.Attributes,
-			Capacity:   device.Capacity,
-		}
-
 		matches, _, err := result.DeviceMatches(ctx, celDevice)
 		if err != nil || !matches {
-			return false, nil
+			return false, err
 		}
+
+		// Cache the result for future use
+		r.deviceMatchCache.Store(key, matches)
 	}
 
 	return true, nil

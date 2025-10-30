@@ -98,7 +98,7 @@ type Fit struct {
 	enablePodLevelResources         bool
 	enableDRAExtendedResource       bool
 	handle                          fwk.Handle
-	resourceAllocationScorer
+	*resourceAllocationScorer
 }
 
 // ScoreExtensions of the Score plugin.
@@ -258,7 +258,7 @@ func NewFit(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.
 		handle:                          h,
 		enablePodLevelResources:         fts.EnablePodLevelResources,
 		enableDRAExtendedResource:       fts.EnableDRAExtendedResource,
-		resourceAllocationScorer:        *scorer,
+		resourceAllocationScorer:        scorer,
 	}, nil
 }
 
