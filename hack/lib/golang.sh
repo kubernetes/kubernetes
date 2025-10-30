@@ -324,9 +324,6 @@ readonly KUBE_STATIC_BINARIES=(
   kube-scheduler
   kube-proxy
   kube-log-runner
-  kubeadm
-  kubectl
-  kubectl-convert
   kubemark
   mounter
 )
@@ -502,6 +499,10 @@ kube::golang::set_platform_envs() {
       "linux/s390x")
         export CGO_ENABLED=1
         export CC=${KUBE_LINUX_S390X_CC:-s390x-linux-gnu-gcc}
+        ;;
+      "linux/bs209e")
+        export CGO_ENABLED=1
+        export CC=${KUBE_LINUX_S390X_CC:-bs209e-linux-gnu-gcc}
         ;;
     esac
   fi
