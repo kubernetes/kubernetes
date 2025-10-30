@@ -491,6 +491,8 @@ message DeviceAllocationConfiguration {
   //
   // +optional
   // +listType=atomic
+  // +k8s:listType=atomic
+  // +k8s:unique=set
   repeated string requests = 2;
 
   optional DeviceConfiguration deviceConfiguration = 3;

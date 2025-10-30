@@ -1201,7 +1201,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 		},
 		"invalid-duplicate-request-name": {
 			wantFailures: field.ErrorList{
-				field.Duplicate(field.NewPath("status", "allocation", "devices", "config").Index(0).Child("requests").Index(1), "foo"),
+				field.Duplicate(field.NewPath("status", "allocation", "devices", "config").Index(0).Child("requests").Index(1), "foo").MarkCoveredByDeclarative(),
 			},
 			oldClaim: validClaim,
 			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {

@@ -368,7 +368,18 @@ func Validate_DeviceAllocationConfiguration(ctx context.Context, op operation.Op
 			return &oldObj.Source
 		}))...)
 
-	// field resourcev1beta1.DeviceAllocationConfiguration.Requests has no validation
+	// field resourcev1beta1.DeviceAllocationConfiguration.Requests
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []string) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			// lists with set semantics require unique values
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual)...)
+			return
+		}(fldPath.Child("requests"), obj.Requests, safe.Field(oldObj, func(oldObj *resourcev1beta1.DeviceAllocationConfiguration) []string { return oldObj.Requests }))...)
 
 	// field resourcev1beta1.DeviceAllocationConfiguration.DeviceConfiguration
 	errs = append(errs,
