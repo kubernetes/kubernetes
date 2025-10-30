@@ -1573,7 +1573,7 @@ func TestPlugin(t *testing.T) {
 			objs:                      []apiruntime.Object{workerNodeSlice, podWithExtendedResourceName},
 			want: want{
 				reserve: result{
-					inFlightClaim: extendedResourceClaimNoName,
+					inFlightClaims: []*resourceapi.ResourceClaim{extendedResourceClaimNoName},
 				},
 				prebind: result{
 					assumedClaim: reserve(extendedResourceClaim, podWithExtendedResourceName),
