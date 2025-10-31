@@ -917,33 +917,6 @@ func TestSchedulerScheduleOne(t *testing.T) {
 			eventReason:        "FailedScheduling",
 		},
 		{
-			name: "pod with existing nominated node name on scheduling error keeps nomination",
-			sendPod: func() *v1.Pod {
-				p := podWithID("foo", "")
-				p.Status.NominatedNodeName = "existing-node"
-				return p
-			}(),
-			injectSchedulingError: schedulingErr,
-			mockScheduleResult:    scheduleResultOk,
-			expectError:           schedulingErr,
-			expectErrorPod: func() *v1.Pod {
-				p := podWithID("foo", "")
-				p.Status.NominatedNodeName = "existing-node"
-				return p
-			}(),
-			expectPodInBackoffQ: func() *v1.Pod {
-				p := podWithID("foo", "")
-				p.Status.NominatedNodeName = "existing-node"
-				return p
-			}(),
-			// Depending on the timing, if asyncAPICallsEnabled, the NNN update might not be sent yet while checking the expectNominatedNodeName.
-			// So, asyncAPICallsEnabled is set to false.
-			asyncAPICallsEnabled:                   ptr.To(false),
-			nominatedNodeNameForExpectationEnabled: ptr.To(true),
-			expectNominatedNodeName:                "existing-node",
-			eventReason:                            "FailedScheduling",
-		},
-		{
 			name: "pod with existing nominated node name on scheduling error clears nomination",
 			sendPod: func() *v1.Pod {
 				p := podWithID("foo", "")
@@ -965,9 +938,9 @@ func TestSchedulerScheduleOne(t *testing.T) {
 			}(),
 			// Depending on the timing, if asyncAPICallsEnabled, the NNN update might not be sent yet while checking the expectNominatedNodeName.
 			// So, asyncAPICallsEnabled is set to false.
-			asyncAPICallsEnabled:                   ptr.To(false),
-			nominatedNodeNameForExpectationEnabled: ptr.To(false),
-			eventReason:                            "FailedScheduling",
+			asyncAPICallsEnabled:    ptr.To(false),
+			expectNominatedNodeName: "",
+			eventReason:             "FailedScheduling",
 		},
 	}
 
@@ -986,7 +959,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 				for _, nominatedNodeNameForExpectationEnabled := range nominatedNodeNameForExpectationEnabled {
 					if (asyncAPICallsEnabled || nominatedNodeNameForExpectationEnabled) && !qHintEnabled {
 						// If the QHint feature gate is disabled, NominatedNodeNameForExpectation and SchedulerAsyncAPICalls cannot be enabled
-						// because that means users set the emilation version to 1.33 or later.
+						// because that means users set the emulation version to 1.33 or later.
 						continue
 					}
 					t.Run(fmt.Sprintf("%s (Queueing hints enabled: %v, Async API calls enabled: %v, NominatedNodeNameForExpectation enabled: %v)", item.name, qHintEnabled, asyncAPICallsEnabled, nominatedNodeNameForExpectationEnabled), func(t *testing.T) {
@@ -1157,11 +1130,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 							t.Errorf("Unexpected error. Wanted %v, got %v", item.expectError.Error(), gotError.Error())
 						}
 						if item.expectError != nil {
-							var expectedNominatingInfo *fwk.NominatingInfo
-							// Check nominatingInfo expectation based on feature gate
-							if !nominatedNodeNameForExpectationEnabled {
-								expectedNominatingInfo = &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: ""}
-							}
+							expectedNominatingInfo := &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: ""}
 							if diff := cmp.Diff(expectedNominatingInfo, gotNominatingInfo); diff != "" {
 								t.Errorf("Unexpected nominatingInfo (-want,+got):\n%s", diff)
 							}
