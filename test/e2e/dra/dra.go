@@ -1990,8 +1990,8 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 
 			usedResources := v1.ResourceList{}
 			usedResources[v1.ResourceName("count/resourceclaims.resource.k8s.io")] = resource.MustParse("2")
-			usedResources[v1.ResourceName(fmt.Sprintf("requests.%s", b.ExtendedResourceName(0)))] = resource.MustParse("8")
-			usedResources[v1.ResourceName(fmt.Sprintf("requests.%s", "deviceclass.resource.kubernetes.io/"+b.ClassName()))] = resource.MustParse("8")
+			usedResources[v1.ResourceName(fmt.Sprintf("requests.%s", b.ExtendedResourceName(0)))] = resource.MustParse("9")
+			usedResources[v1.ResourceName(fmt.Sprintf("requests.%s", "deviceclass.resource.kubernetes.io/"+b.ClassName()))] = resource.MustParse("9")
 			usedResources[v1.ResourceName(fmt.Sprintf("%s.deviceclass.resource.k8s.io/devices", b.Class(0).Name))] = resource.MustParse("9")
 
 			gomega.Eventually(ctx, framework.GetObject(f.ClientSet.CoreV1().ResourceQuotas(quota.Namespace).Get, quota.Name, metav1.GetOptions{})).

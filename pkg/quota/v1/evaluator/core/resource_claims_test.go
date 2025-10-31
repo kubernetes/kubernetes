@@ -495,9 +495,8 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 				return claim
 			}(),
 			usage: corev1.ResourceList{
-				"count/resourceclaims.resource.k8s.io":            resource.MustParse("1"),
-				"gpu.deviceclass.resource.k8s.io/devices":         resource.MustParse("0"),
-				"requests.deviceclass.resource.kubernetes.io/gpu": resource.MustParse("0"),
+				"count/resourceclaims.resource.k8s.io":    resource.MustParse("1"),
+				"gpu.deviceclass.resource.k8s.io/devices": resource.MustParse("0"),
 			},
 		},
 		"admin": {
