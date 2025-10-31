@@ -2931,6 +2931,18 @@ func Test_createRequestMappings(t *testing.T) {
 			v1.ResourceName(extendedResourceName + "init"): "2",
 		}).
 		Obj()
+	podInitImplicit := st.MakePod().Name(podName).Namespace(namespace).
+		UID(podUID).
+		Res(map[v1.ResourceName]string{
+			v1.ResourceName(extendedResourceName): "1",
+		}).
+		InitReq(map[v1.ResourceName]string{
+			v1.ResourceName(extendedResourceName + "init"): "1",
+		}).
+		InitReq(map[v1.ResourceName]string{
+			v1.ResourceName(resourceapi.ResourceDeviceClassPrefix + "classInit"): "2",
+		}).
+		Obj()
 	podInit3 := st.MakePod().Name(podName).Namespace(namespace).
 		UID(podUID).
 		Res(map[v1.ResourceName]string{
@@ -2952,8 +2964,9 @@ func Test_createRequestMappings(t *testing.T) {
 		v1.ResourceName(extendedResourceName + "1"): "class1",
 	}
 	devMapInit := map[v1.ResourceName]string{
-		v1.ResourceName(extendedResourceName):          "class",
-		v1.ResourceName(extendedResourceName + "init"): "classInit",
+		v1.ResourceName(extendedResourceName):                                "class",
+		v1.ResourceName(extendedResourceName + "init"):                       "classInit",
+		v1.ResourceName(resourceapi.ResourceDeviceClassPrefix + "classInit"): "classInit",
 	}
 
 	claim := st.MakeResourceClaim().
@@ -2992,6 +3005,12 @@ func Test_createRequestMappings(t *testing.T) {
 		RequestWithName("container-1-request-0", className).
 		RequestWithName("container-3-request-0", className).
 		Obj()
+	claim5Init := st.MakeResourceClaim().
+		Name(claimName).
+		Namespace(namespace).
+		RequestWithName("request-0", className).
+		RequestWithName("container-2-request-0", className).
+		Obj()
 
 	cer := v1.ContainerExtendedResourceRequest{
 		ContainerName: "con0",
@@ -3023,6 +3042,11 @@ func Test_createRequestMappings(t *testing.T) {
 		ResourceName:  extendedResourceName + "init",
 		RequestName:   "request-1",
 	}
+	cerInitImplicit := v1.ContainerExtendedResourceRequest{
+		ContainerName: "init-con0",
+		ResourceName:  extendedResourceName + "init",
+		RequestName:   "request-0",
+	}
 	cerInit1 := v1.ContainerExtendedResourceRequest{
 		ContainerName: "init-con0",
 		ResourceName:  extendedResourceName + "init",
@@ -3032,6 +3056,11 @@ func Test_createRequestMappings(t *testing.T) {
 		ContainerName: "init-con1",
 		ResourceName:  extendedResourceName + "init",
 		RequestName:   "request-1",
+	}
+	cerInit2Implicit := v1.ContainerExtendedResourceRequest{
+		ContainerName: "init-con1",
+		ResourceName:  resourceapi.ResourceDeviceClassPrefix + "classInit",
+		RequestName:   "request-0",
 	}
 	cerInit3 := v1.ContainerExtendedResourceRequest{
 		ContainerName: "init-con2",
@@ -3085,6 +3114,12 @@ func Test_createRequestMappings(t *testing.T) {
 			pod:                podInit2,
 			deviceClassMapping: devMapInit,
 			wantReqMappings:    []v1.ContainerExtendedResourceRequest{cer4, cerInit, cerInit2},
+		},
+		"three containers (two are init container), both explicit and implicit resources": {
+			claim:              claim5Init,
+			pod:                podInitImplicit,
+			deviceClassMapping: devMapInit,
+			wantReqMappings:    []v1.ContainerExtendedResourceRequest{cer4, cerInitImplicit, cerInit2Implicit},
 		},
 		"four containers (two are init container, one sidecar), three requests": {
 			claim:              claim4Init,
