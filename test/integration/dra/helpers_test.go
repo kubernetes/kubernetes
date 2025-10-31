@@ -188,3 +188,34 @@ func waitForNotFound[T any](tCtx ktesting.TContext, get func(context.Context, st
 		return err
 	}).WithTimeout(60*time.Second).Should(gomega.MatchError(apierrors.IsNotFound, "IsNotFound"), "Object %T %s should have been removed.", t, name)
 }
+
+func waitForClaimAllocatedToDevice(tCtx ktesting.TContext, namespace, claimName string, timeout time.Duration) *resourceapi.ResourceClaim {
+	var latestClaim *resourceapi.ResourceClaim
+	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) *resourceapi.ResourceClaim {
+		c, err := tCtx.Client().ResourceV1().ResourceClaims(namespace).Get(tCtx, claimName, metav1.GetOptions{})
+		tCtx.ExpectNoError(err)
+		latestClaim = c
+		return latestClaim
+	}).WithTimeout(timeout).WithPolling(time.Second).Should(gomega.HaveField("Status.Allocation", gomega.Not(gomega.BeNil())), "Claim should have been allocated.")
+	return latestClaim
+}
+
+// Wait until the claim.status.Devices[0].Conditions become nil again after rescheduling.
+func waitDeviceConditionsBeNil(tCtx ktesting.TContext, namespace, claimName string, timeout time.Duration) {
+	var latestClaim *resourceapi.ResourceClaim
+	var setConditionsFlag bool
+	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) *resourceapi.ResourceClaim {
+		c, err := tCtx.Client().ResourceV1().ResourceClaims(namespace).Get(tCtx, claimName, metav1.GetOptions{})
+		tCtx.ExpectNoError(err)
+		latestClaim = c
+		if latestClaim.Status.Devices != nil && len(latestClaim.Status.Devices[0].Conditions) != 0 {
+			setConditionsFlag = true
+		}
+		if setConditionsFlag && len(latestClaim.Status.Devices) == 0 {
+			// The scheduler has retried and removed the conditions.
+			// This is the expected state. Finish waiting.
+			return nil
+		}
+		return latestClaim
+	}).WithTimeout(timeout).WithPolling(time.Second).Should(gomega.BeNil(), "claim should not have any condition")
+}
