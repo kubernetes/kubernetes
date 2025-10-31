@@ -21,12 +21,10 @@ package main
 import (
 	"strings"
 
-	"github.com/gogo/protobuf/vanity/command"
-
-	// dependencies that are required for our packages
-	_ "github.com/gogo/protobuf/gogoproto"
-	_ "github.com/gogo/protobuf/proto"
-	_ "github.com/gogo/protobuf/sortkeys"
+	_ "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/gogoproto"
+	_ "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/proto"
+	_ "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/sortkeys"
+	"k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/vanity/command" // dependencies that are required for our packages
 )
 
 func main() {

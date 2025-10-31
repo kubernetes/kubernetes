@@ -1,0 +1,6 @@
+syntax = "proto2";
+
+package issue270.b;
+
+message B {
+}

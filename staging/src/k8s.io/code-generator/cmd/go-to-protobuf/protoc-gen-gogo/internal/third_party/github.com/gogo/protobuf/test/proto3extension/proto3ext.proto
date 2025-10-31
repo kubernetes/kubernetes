@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package proto3extension;
+
+import "google/protobuf/descriptor.proto";
+
+extend google.protobuf.FieldOptions {
+  bool primary = 51234;
+  bool index = 51235;
+}
+
