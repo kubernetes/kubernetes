@@ -1673,26 +1673,6 @@
     lockToDefault: true
     preRelease: GA
     version: "1.34"
-- name: StrictCostEnforcementForVAP
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Beta
-    version: "1.30"
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: "1.32"
-- name: StrictCostEnforcementForWebhooks
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Beta
-    version: "1.30"
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: "1.32"
 - name: StrictIPCIDRValidation
   versionedSpecs:
   - default: false
