@@ -48,6 +48,7 @@ import (
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
 	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
+	"k8s.io/utils/ptr"
 )
 
 var (
@@ -1690,6 +1691,112 @@ func Test_isSchedulableAfterNodeChange(t *testing.T) {
 				t.Fatal(err)
 			}
 			actualHint, err := p.(*Fit).isSchedulableAfterNodeChange(logger, tc.pod, tc.oldObj, tc.newObj)
+			if tc.expectedErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tc.expectedHint, actualHint)
+		})
+	}
+}
+
+func Test_isSchedulableAfterDeviceClassChange(t *testing.T) {
+	testcases := map[string]struct {
+		pod            *v1.Pod
+		oldObj, newObj interface{}
+		expectedHint   fwk.QueueingHint
+		expectedErr    bool
+	}{
+		"backoff-wrong-new-object": {
+			pod:          &v1.Pod{},
+			newObj:       "not-a-class",
+			expectedHint: fwk.Queue,
+			expectedErr:  true,
+		},
+		"backoff-wrong-old-object": {
+			pod:          &v1.Pod{},
+			oldObj:       "not-a-class",
+			newObj:       &resourceapi.DeviceClass{},
+			expectedHint: fwk.Queue,
+			expectedErr:  true,
+		},
+		"skip-queue-on-class-same-extended-resource-name-pointer": {
+			pod: newResourcePod(framework.Resource{Memory: 2}),
+			newObj: &resourceapi.DeviceClass{
+				Spec: resourceapi.DeviceClassSpec{},
+			},
+			oldObj: &resourceapi.DeviceClass{
+				Spec: resourceapi.DeviceClassSpec{},
+			},
+			expectedHint: fwk.QueueSkip,
+		},
+		"skip-queue-on-class-same-extended-resource-name": {
+			pod: newResourcePod(framework.Resource{Memory: 2}),
+			newObj: &resourceapi.DeviceClass{
+				Spec: resourceapi.DeviceClassSpec{ExtendedResourceName: ptr.To("example.com/gpu")},
+			},
+			oldObj: &resourceapi.DeviceClass{
+				Spec: resourceapi.DeviceClassSpec{ExtendedResourceName: ptr.To("example.com/gpu")},
+			},
+			expectedHint: fwk.QueueSkip,
+		},
+		"queue-on-class-add-with-implicit-extended-resource-name": {
+			pod: newResourcePod(framework.Resource{
+				ScalarResources: map[v1.ResourceName]int64{"deviceclass.resource.kubernetes.io/gpuclass": 1},
+			}),
+			newObj: &resourceapi.DeviceClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "gpuclass",
+				},
+				Spec: resourceapi.DeviceClassSpec{ExtendedResourceName: ptr.To("example.com/gpu")},
+			},
+			expectedHint: fwk.Queue,
+		},
+		"skip-on-class-add-with-implicit-extended-resource-name": {
+			pod: newResourcePod(framework.Resource{
+				ScalarResources: map[v1.ResourceName]int64{"deviceclass.resource.kubernetes.io/gpuclass": 1},
+			}),
+			newObj: &resourceapi.DeviceClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "gpuclass",
+				},
+				Spec: resourceapi.DeviceClassSpec{ExtendedResourceName: ptr.To("example.com/gpu")},
+			},
+			oldObj:       &resourceapi.DeviceClass{},
+			expectedHint: fwk.QueueSkip,
+		},
+		"queue-on-class-add-with-extended-resource-name": {
+			pod: newResourcePod(framework.Resource{
+				ScalarResources: map[v1.ResourceName]int64{"example.com/gpu": 1},
+			}),
+			newObj: &resourceapi.DeviceClass{
+				Spec: resourceapi.DeviceClassSpec{ExtendedResourceName: ptr.To("example.com/gpu")},
+			},
+			expectedHint: fwk.Queue,
+		},
+		"queue-on-class-update-with-extended-resource-name": {
+			pod: newResourcePod(framework.Resource{
+				ScalarResources: map[v1.ResourceName]int64{"example.com/gpu": 1},
+			}),
+			newObj: &resourceapi.DeviceClass{
+				Spec: resourceapi.DeviceClassSpec{ExtendedResourceName: ptr.To("example.com/gpu")},
+			},
+			oldObj: &resourceapi.DeviceClass{
+				Spec: resourceapi.DeviceClassSpec{ExtendedResourceName: ptr.To("example.com/gpu1")},
+			},
+			expectedHint: fwk.Queue,
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			p, err := NewFit(ctx, &config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, nil, plfeature.Features{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			actualHint, err := p.(*Fit).isSchedulableAfterDeviceClassEvent(logger, tc.pod, tc.oldObj, tc.newObj)
 			if tc.expectedErr {
 				require.Error(t, err)
 				return

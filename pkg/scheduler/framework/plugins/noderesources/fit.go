@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
+	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -321,7 +322,7 @@ func (f *Fit) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, e
 	if f.enableDRAExtendedResource {
 		events = append(events,
 			// A pod might be waiting for an exteneded resurce fom a class to get created or modified.
-			fwk.ClusterEventWithHint{Event: fwk.ClusterEvent{Resource: fwk.DeviceClass, ActionType: fwk.Add | fwk.Update}})
+			fwk.ClusterEventWithHint{Event: fwk.ClusterEvent{Resource: fwk.DeviceClass, ActionType: fwk.Add | fwk.Update}, QueueingHintFn: f.isSchedulableAfterDeviceClassEvent})
 	}
 	return events, nil
 }
@@ -449,6 +450,39 @@ func (f *Fit) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1.Pod, oldO
 
 	logger.V(5).Info("node was updated, and may now fit the pod's resource requests", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
 	return fwk.Queue, nil
+}
+
+// isSchedulableAfterDeviceClassChange is invoked whenever a device class added or changed. It checks whether
+// that change could make a previously unschedulable pod schedulable.
+func (f *Fit) isSchedulableAfterDeviceClassEvent(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+	originalClass, modifiedClass, err := schedutil.As[*resourceapi.DeviceClass](oldObj, newObj)
+	if err != nil {
+		return fwk.Queue, err
+	}
+	if originalClass != nil && modifiedClass != nil && originalClass.Spec.ExtendedResourceName == modifiedClass.Spec.ExtendedResourceName {
+		return fwk.QueueSkip, nil
+	}
+	if originalClass != nil && modifiedClass != nil && originalClass.Spec.ExtendedResourceName != nil && modifiedClass.Spec.ExtendedResourceName != nil && *originalClass.Spec.ExtendedResourceName == *modifiedClass.Spec.ExtendedResourceName {
+		return fwk.QueueSkip, nil
+	}
+	if modifiedClass != nil {
+		if originalClass == nil {
+			// only check implicit extended resource name for Add, as device class name does not change during Update.
+			reqs := resource.PodRequests(pod, resource.PodResourcesOptions{})
+			if _, ok := reqs[v1.ResourceName(resourceapi.ResourceDeviceClassPrefix+modifiedClass.Name)]; ok {
+				logger.V(5).Info("device class was added, and may now fit the pod's resource requests", "pod", klog.KObj(pod), "deviceclass", klog.KObj(modifiedClass))
+				return fwk.Queue, nil
+			}
+		}
+		if modifiedClass.Spec.ExtendedResourceName != nil {
+			reqs := resource.PodRequests(pod, resource.PodResourcesOptions{})
+			if _, ok := reqs[v1.ResourceName(*modifiedClass.Spec.ExtendedResourceName)]; ok {
+				logger.V(5).Info("deivce class was created or updated, and may not fit the pod's resoruce requests", "pod", klog.KObj(pod), "node", klog.KObj(modifiedClass))
+				return fwk.Queue, nil
+			}
+		}
+	}
+	return fwk.QueueSkip, nil
 }
 
 // haveAnyRequestedResourcesIncreased returns true if any of the resources requested by the pod have increased or if allowed pod number increased.
