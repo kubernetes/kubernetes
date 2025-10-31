@@ -962,7 +962,12 @@ func TestCondition(t *testing.T) {
 
 			optionalVars := OptionalVariableBindings{VersionedParams: tc.params, Authorizer: tc.authorizer}
 			ctx := context.TODO()
-			evalResults, _, err := f.ForInput(ctx, versionedAttr, CreateAdmissionRequest(versionedAttr.Attributes, metav1.GroupVersionResource(versionedAttr.GetResource()), metav1.GroupVersionKind(versionedAttr.VersionedKind)), optionalVars, CreateNamespaceObject(tc.namespaceObject), celconfig.RuntimeCELCostBudget)
+			aReq := CreateAdmissionRequest(versionedAttr.Attributes, metav1.GroupVersionResource(versionedAttr.GetResource()), metav1.GroupVersionKind(versionedAttr.VersionedKind))
+			uReq, err := ConvertObjectToUnstructured(aReq)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			evalResults, _, err := f.ForInput(ctx, versionedAttr, uReq, optionalVars, CreateNamespaceObject(tc.namespaceObject), celconfig.RuntimeCELCostBudget)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -1382,7 +1387,12 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 			}
 			optionalVars := OptionalVariableBindings{VersionedParams: tc.params, Authorizer: tc.authorizer}
 			ctx := context.TODO()
-			evalResults, remaining, err := f.ForInput(ctx, versionedAttr, CreateAdmissionRequest(versionedAttr.Attributes, metav1.GroupVersionResource(versionedAttr.GetResource()), metav1.GroupVersionKind(versionedAttr.VersionedKind)), optionalVars, nil, tc.testRuntimeCELCostBudget)
+			aReq := CreateAdmissionRequest(versionedAttr.Attributes, metav1.GroupVersionResource(versionedAttr.GetResource()), metav1.GroupVersionKind(versionedAttr.VersionedKind))
+			uReq, err := ConvertObjectToUnstructured(aReq)
+			if err != nil {
+				t.Fatalf("unexpected error on conversion: %v", err)
+			}
+			evalResults, remaining, err := f.ForInput(ctx, versionedAttr, uReq, optionalVars, nil, tc.testRuntimeCELCostBudget)
 			if tc.exceedPerCallLimit {
 				hasCostErr := false
 				for _, evalResult := range evalResults {
