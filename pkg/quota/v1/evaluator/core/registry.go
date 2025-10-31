@@ -17,6 +17,8 @@ limitations under the License.
 package core
 
 import (
+	"context"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	quota "k8s.io/apiserver/pkg/quota/v1"
@@ -24,7 +26,8 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	corev1listers "k8s.io/client-go/listers/core/v1"
-	"k8s.io/dynamic-resource-allocation/deviceclass/cache"
+	"k8s.io/dynamic-resource-allocation/deviceclass/extendedresourcecache"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/clock"
 )
@@ -47,11 +50,12 @@ func NewEvaluators(f quota.ListerForResourceFunc, i informers.SharedInformerFact
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
 		var podLister corev1listers.PodLister
-		var deviceClassMapping *cache.DeviceClassMapping
+		var deviceClassMapping *extendedresourcecache.ExtendedResourceCache
 		if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
 			if i != nil {
 				podLister = i.Core().V1().Pods().Lister()
-				deviceClassMapping = cache.NewDeviceClassMapping(i)
+				deviceClassMapping = extendedresourcecache.NewExtendedResourceCache(klog.FromContext(context.Background()))
+				i.Resource().V1().DeviceClasses().Informer().AddEventHandler(deviceClassMapping)
 			}
 		}
 		result = append(result, NewResourceClaimEvaluator(f, deviceClassMapping, podLister))

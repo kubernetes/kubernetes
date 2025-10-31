@@ -34,7 +34,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/dynamic-resource-allocation/deviceclass/cache"
+	"k8s.io/dynamic-resource-allocation/deviceclass/extendedresourcecache"
 	"k8s.io/klog/v2/ktesting"
 	api "k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/features"
@@ -368,11 +368,12 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 		},
 	}
 
-	_, ctx := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	tCtx, tCancel := context.WithCancel(ctx)
 	client := fake.NewClientset(deviceClass1, podImplicit, podExplicit, podHybrid, podNilStatus, podInit)
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
-	deviceclassmapping := cache.NewDeviceClassMapping(informerFactory)
+	deviceclassmapping := extendedresourcecache.NewExtendedResourceCache(logger)
+	informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandler(deviceclassmapping)
 	evaluatorWithDeviceMapping := NewResourceClaimEvaluator(nil, deviceclassmapping, informerFactory.Core().V1().Pods().Lister())
 
 	informerFactory.Start(tCtx.Done())

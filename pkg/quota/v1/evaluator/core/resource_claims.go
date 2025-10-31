@@ -32,7 +32,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	resourcehelper "k8s.io/component-helpers/resource"
-	"k8s.io/dynamic-resource-allocation/deviceclass/cache"
+	"k8s.io/dynamic-resource-allocation/deviceclass/extendedresourcecache"
 	resourceinternal "k8s.io/kubernetes/pkg/apis/resource"
 	resourceversioned "k8s.io/kubernetes/pkg/apis/resource/v1"
 	"k8s.io/kubernetes/pkg/features"
@@ -62,7 +62,7 @@ func deviceClassToQuotaRequestResource(className string) corev1.ResourceName {
 }
 
 // NewResourceClaimEvaluator returns an evaluator that can evaluate resource claims
-func NewResourceClaimEvaluator(f quota.ListerForResourceFunc, m *cache.DeviceClassMapping, podsGetter corev1listers.PodLister) quota.Evaluator {
+func NewResourceClaimEvaluator(f quota.ListerForResourceFunc, m *extendedresourcecache.ExtendedResourceCache, podsGetter corev1listers.PodLister) quota.Evaluator {
 	listFuncByNamespace := generic.ListResourceUsingListerFunc(f, resourceapi.SchemeGroupVersion.WithResource("resourceclaims"))
 	claimEvaluator := &claimEvaluator{listFuncByNamespace: listFuncByNamespace, deviceClassMapping: m, podsGetter: podsGetter}
 	return claimEvaluator
@@ -73,7 +73,7 @@ type claimEvaluator struct {
 	// listFuncByNamespace knows how to list resource claims
 	listFuncByNamespace generic.ListFuncByNamespace
 	// a global cache of device class and extended resource mapping
-	deviceClassMapping *cache.DeviceClassMapping
+	deviceClassMapping *extendedresourcecache.ExtendedResourceCache
 	// podsGetter is used to get pods
 	podsGetter corev1listers.PodLister
 }
@@ -134,7 +134,7 @@ func (p *claimEvaluator) MatchingResources(items []corev1.ResourceName) []corev1
 }
 
 func (p *claimEvaluator) extendedResourceQuota(dcName string) (corev1.ResourceName, bool) {
-	if name, ok := p.deviceClassMapping.Get(dcName); ok {
+	if name := p.deviceClassMapping.GetExtendedResource(dcName); name != "" {
 		return extendedResourceToQuotaRequestResource(name), true
 	}
 	return "", false
