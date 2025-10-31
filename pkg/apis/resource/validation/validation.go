@@ -525,7 +525,7 @@ func validateDeviceAllocationConfiguration(config resource.DeviceAllocationConfi
 	allErrs = append(allErrs, validateSet(config.Requests, resource.DeviceRequestsMaxSize,
 		func(name string, fldPath *field.Path) field.ErrorList {
 			return validateRequestNameRef(name, fldPath, requestNames)
-		}, stringKey, fldPath.Child("requests"))...)
+		}, stringKey, fldPath.Child("requests"), sizeCovered, uniquenessCovered)...)
 	allErrs = append(allErrs, validateDeviceConfiguration(config.DeviceConfiguration, fldPath, stored)...)
 	return allErrs
 }
@@ -1316,7 +1316,7 @@ func validateNetworkDeviceData(networkDeviceData *resource.NetworkDeviceData, fl
 	allErrs = append(allErrs, validateSet(networkDeviceData.IPs, resource.NetworkDeviceDataMaxIPs,
 		func(address string, fldPath *field.Path) field.ErrorList {
 			return validation.IsValidInterfaceAddress(fldPath, address)
-		}, stringKey, fldPath.Child("ips"))...)
+		}, stringKey, fldPath.Child("ips"), sizeCovered, uniquenessCovered)...)
 	return allErrs
 }
 

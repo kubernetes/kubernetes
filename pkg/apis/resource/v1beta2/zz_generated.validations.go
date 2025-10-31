@@ -350,7 +350,29 @@ func Validate_DeviceAllocationConfiguration(ctx context.Context, op operation.Op
 			return &oldObj.Source
 		}))...)
 
-	// field resourcev1beta2.DeviceAllocationConfiguration.Requests has no validation
+	// field resourcev1beta2.DeviceAllocationConfiguration.Requests
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []string) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 32); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// lists with set semantics require unique values
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual)...)
+			return
+		}(fldPath.Child("requests"), obj.Requests, safe.Field(oldObj, func(oldObj *resourcev1beta2.DeviceAllocationConfiguration) []string { return oldObj.Requests }))...)
 
 	// field resourcev1beta2.DeviceAllocationConfiguration.DeviceConfiguration
 	errs = append(errs,
@@ -395,6 +417,9 @@ func Validate_DeviceAllocationResult(ctx context.Context, op operation.Operation
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
 			if earlyReturn {
 				return // do not proceed
 			}
@@ -416,6 +441,9 @@ func Validate_DeviceAllocationResult(ctx context.Context, op operation.Operation
 			earlyReturn := false
 			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 64); len(e) != 0 {
 				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
@@ -549,6 +577,9 @@ func Validate_DeviceClaim(ctx context.Context, op operation.Operation, fldPath *
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
 			if earlyReturn {
 				return // do not proceed
 			}
@@ -572,6 +603,9 @@ func Validate_DeviceClaim(ctx context.Context, op operation.Operation, fldPath *
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
 			if earlyReturn {
 				return // do not proceed
 			}
@@ -593,6 +627,9 @@ func Validate_DeviceClaim(ctx context.Context, op operation.Operation, fldPath *
 			earlyReturn := false
 			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 32); len(e) != 0 {
 				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
@@ -622,6 +659,9 @@ func Validate_DeviceClaimConfiguration(ctx context.Context, op operation.Operati
 			earlyReturn := false
 			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 32); len(e) != 0 {
 				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
@@ -850,6 +890,9 @@ func Validate_DeviceConstraint(ctx context.Context, op operation.Operation, fldP
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
 			if earlyReturn {
 				return // do not proceed
 			}
@@ -949,6 +992,9 @@ func Validate_DeviceRequest(ctx context.Context, op operation.Operation, fldPath
 			earlyReturn := false
 			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 8); len(e) != 0 {
 				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
@@ -1139,6 +1185,9 @@ func Validate_DeviceSubRequest(ctx context.Context, op operation.Operation, fldP
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
 			if earlyReturn {
 				return // do not proceed
 			}
@@ -1306,6 +1355,9 @@ func Validate_ExactDeviceRequest(ctx context.Context, op operation.Operation, fl
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
 			if earlyReturn {
 				return // do not proceed
 			}
@@ -1379,7 +1431,29 @@ func Validate_NetworkDeviceData(ctx context.Context, op operation.Operation, fld
 			return
 		}(fldPath.Child("interfaceName"), &obj.InterfaceName, safe.Field(oldObj, func(oldObj *resourcev1beta2.NetworkDeviceData) *string { return &oldObj.InterfaceName }))...)
 
-	// field resourcev1beta2.NetworkDeviceData.IPs has no validation
+	// field resourcev1beta2.NetworkDeviceData.IPs
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []string) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 16); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// lists with set semantics require unique values
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual)...)
+			return
+		}(fldPath.Child("ips"), obj.IPs, safe.Field(oldObj, func(oldObj *resourcev1beta2.NetworkDeviceData) []string { return oldObj.IPs }))...)
 
 	// field resourcev1beta2.NetworkDeviceData.HardwareAddress
 	errs = append(errs,

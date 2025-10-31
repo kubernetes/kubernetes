@@ -1086,6 +1086,15 @@ func testValidateStatusUpdateForDeclarative(t *testing.T, apiVersion string) {
 				field.TooMany(field.NewPath("status", "allocation", "devices", "config"), 33, 32).WithOrigin("maxItems"),
 			},
 		},
+		"invalid status.allocation.devices.config requests, duplicate": {
+			old: mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(
+				tweakAddStatusAllocationConfigRequest("req-0"),
+			),
+			expectedErrs: field.ErrorList{
+				field.Duplicate(field.NewPath("status", "allocation", "devices", "config").Index(0).Child("requests").Index(1), "req-0"),
+			},
+		},
 		// .Status.Allocation.Devices.Config[%d].Source
 		"valid status.allocation.devices.config source FromClass": {
 			old:    mkValidResourceClaim(),
@@ -1267,6 +1276,54 @@ func testValidateStatusUpdateForDeclarative(t *testing.T, apiVersion string) {
 			expectedErrs: field.ErrorList{
 				field.TooLong(field.NewPath("status", "devices").Index(0).Child("networkData", "hardwareAddress"), "", resource.NetworkDeviceDataHardwareAddressMaxLength).MarkCoveredByDeclarative().WithOrigin("maxLength"),
 			},
+		},
+		"invalid status.devices.networkData.ips duplicate": {
+			old: mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(
+				tweakStatusDevices(
+					resource.AllocatedDeviceStatus{
+						Driver: "dra.example.com",
+						Pool:   "pool-0",
+						Device: "device-0",
+						NetworkData: &resource.NetworkDeviceData{
+							IPs: []string{"1.2.3.4/32", "1.2.3.4/32"},
+						},
+					},
+				),
+			),
+			expectedErrs: field.ErrorList{
+				field.Duplicate(field.NewPath("status", "devices").Index(0).Child("networkData", "ips").Index(1), "1.2.3.4/32"),
+			},
+		},
+		"invalid status.allocation.devices.config.requests too many": {
+			old: mkValidResourceClaim(tweakDevicesRequests(33)),
+			update: mkResourceClaimWithStatus(
+				tweakStatusAllocationConfigRequests(33),
+			),
+			expectedErrs: field.ErrorList{
+				field.TooMany(field.NewPath("status", "allocation", "devices", "config").Index(0).Child("requests"), 33, 32).WithOrigin("maxItems"),
+			},
+		},
+		"valid status.allocation.devices.config.requests, max allowed": {
+			old: mkValidResourceClaim(tweakDevicesRequests(32)),
+			update: mkResourceClaimWithStatus(
+				tweakStatusAllocationConfigRequests(32),
+			),
+		},
+		"invalid status.devices.networkData.ips, too many items": {
+			old: mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(
+				tweakStatusDevicesTooManyIPs(17),
+			),
+			expectedErrs: field.ErrorList{
+				field.TooMany(field.NewPath("status", "devices").Index(0).Child("networkData", "ips"), 17, 16).WithOrigin("maxItems"),
+			},
+		},
+		"invalid status.devices.networkData.ips, max allowed": {
+			old: mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(
+				tweakStatusDevicesTooManyIPs(16),
+			),
 		},
 	}
 
@@ -1607,6 +1664,70 @@ func tweakMatchAttribute(val string) func(*resource.ResourceClaim) {
 			{
 				MatchAttribute: &fullyQualifiedName,
 			},
+		}
+	}
+}
+
+func tweakAddStatusAllocationConfigRequest(req string) func(rc *resource.ResourceClaim) {
+	return func(rc *resource.ResourceClaim) {
+		if rc.Status.Allocation == nil {
+			rc.Status.Allocation = &resource.AllocationResult{}
+		}
+		if len(rc.Status.Allocation.Devices.Config) == 0 {
+			rc.Status.Allocation.Devices.Config = append(rc.Status.Allocation.Devices.Config, resource.DeviceAllocationConfiguration{
+				Source:   resource.AllocationConfigSourceClaim,
+				Requests: []string{"req-0"},
+				DeviceConfiguration: resource.DeviceConfiguration{
+					Opaque: &resource.OpaqueDeviceConfiguration{
+						Driver: "dra.example.com",
+						Parameters: runtime.RawExtension{
+							Raw: []byte(`{"kind": "foo", "apiVersion": "dra.example.com/v1"}`),
+						},
+					},
+				},
+			})
+		}
+		rc.Status.Allocation.Devices.Config[0].Requests = append(rc.Status.Allocation.Devices.Config[0].Requests, req)
+	}
+}
+
+func tweakStatusAllocationConfigRequests(count int) func(rc *resource.ResourceClaim) {
+	return func(rc *resource.ResourceClaim) {
+		if rc.Status.Allocation == nil {
+			rc.Status.Allocation = &resource.AllocationResult{}
+		}
+		tweakDevicesRequests(count)(rc)
+		if len(rc.Status.Allocation.Devices.Config) == 0 {
+			rc.Status.Allocation.Devices.Config = append(rc.Status.Allocation.Devices.Config, resource.DeviceAllocationConfiguration{
+				Source:   resource.AllocationConfigSourceClaim,
+				Requests: []string{},
+				DeviceConfiguration: resource.DeviceConfiguration{
+					Opaque: &resource.OpaqueDeviceConfiguration{
+						Driver: "dra.example.com",
+						Parameters: runtime.RawExtension{
+							Raw: []byte(`{"kind": "foo", "apiVersion": "dra.example.com/v1"}`),
+						},
+					},
+				},
+			})
+		}
+		for i := 0; i < count; i++ {
+			rc.Status.Allocation.Devices.Config[0].Requests = append(rc.Status.Allocation.Devices.Config[0].Requests, fmt.Sprintf("req-%d", i))
+		}
+	}
+}
+
+func tweakStatusDevicesTooManyIPs(count int) func(rc *resource.ResourceClaim) {
+	return func(rc *resource.ResourceClaim) {
+		if len(rc.Status.Devices) == 0 {
+			rc.Status.Devices = append(rc.Status.Devices, standardAllocatedDeviceStatus())
+		}
+		if rc.Status.Devices[0].NetworkData == nil {
+			rc.Status.Devices[0].NetworkData = &resource.NetworkDeviceData{}
+		}
+		rc.Status.Devices[0].NetworkData.IPs = []string{}
+		for i := 0; i < count; i++ {
+			rc.Status.Devices[0].NetworkData.IPs = append(rc.Status.Devices[0].NetworkData.IPs, fmt.Sprintf("1.2.3.%d/32", i))
 		}
 	}
 }
