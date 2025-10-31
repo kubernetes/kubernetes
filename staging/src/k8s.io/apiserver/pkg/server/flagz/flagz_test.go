@@ -157,10 +157,8 @@ func TestHandleFlagz(t *testing.T) {
 							t.Errorf("expected deprecation warning in header, but got: %s", w.Header().Get("Warning"))
 						}
 					}
-				} else {
-					if !strings.Contains(string(w.Body.String()), tt.wantBody) {
-						t.Errorf("Unexpected response body:\n- want: %s\n- got:  %s", tt.wantBody, string(w.Body.String()))
-					}
+				} else if !strings.Contains(string(w.Body.String()), tt.wantBody) {
+					t.Errorf("Unexpected response body:\n- want: %s\n- got:  %s", tt.wantBody, string(w.Body.String()))
 				}
 			}
 		})
