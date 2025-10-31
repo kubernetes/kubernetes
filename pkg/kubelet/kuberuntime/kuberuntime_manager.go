@@ -64,6 +64,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/logs"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
+	"k8s.io/kubernetes/pkg/kubelet/pleg"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/runtimeclass"
 	"k8s.io/kubernetes/pkg/kubelet/sysctl"
@@ -1222,6 +1223,26 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 			m.recorder.Eventf(ref, v1.EventTypeNormal, events.SandboxChanged, "Pod sandbox changed, it will be killed and re-created.")
 		} else {
 			logger.V(4).Info("SyncPod received new pod, will create a sandbox for it", "pod", klog.KObj(pod))
+		}
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) && pleg.IsEventedPLEGInUse() {
+		// Don't bother resyncing pod status if there are no changes.
+		if podContainerChanges.KillPod || podContainerChanges.CreateSandbox || len(podContainerChanges.InitContainersToStart) > 0 ||
+			len(podContainerChanges.ContainersToStart) > 0 || len(podContainerChanges.ContainersToKill) > 0 ||
+			len(podContainerChanges.EphemeralContainersToStart) > 0 {
+			// To ensure state consistency and avoid race conditions,
+			// we update the container cache after the completion of SyncPod.
+			defer func() {
+				// Don't resync if SyncPod returned any error. The pod worker
+				// will retry at an appropriate time. This avoids hot-looping.
+				for _, r := range result.SyncResults {
+					if r.Error != nil {
+						return
+					}
+				}
+				m.runtimeHelper.RequestPodReSync(pod.UID)
+			}()
 		}
 	}
 
