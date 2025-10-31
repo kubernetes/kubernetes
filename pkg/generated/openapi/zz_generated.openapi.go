@@ -1331,6 +1331,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		runtime.Unknown{}.OpenAPIModelName():                                                                            schema_k8sio_apimachinery_pkg_runtime_Unknown(ref),
 		intstr.IntOrString{}.OpenAPIModelName():                                                                         schema_apimachinery_pkg_util_intstr_IntOrString(ref),
 		version.Info{}.OpenAPIModelName():                                                                               schema_k8sio_apimachinery_pkg_version_Info(ref),
+		auditv1.AuthenticationMetadata{}.OpenAPIModelName():                                                             schema_pkg_apis_audit_v1_AuthenticationMetadata(ref),
 		auditv1.Event{}.OpenAPIModelName():                                                                              schema_pkg_apis_audit_v1_Event(ref),
 		auditv1.EventList{}.OpenAPIModelName():                                                                          schema_pkg_apis_audit_v1_EventList(ref),
 		auditv1.GroupResources{}.OpenAPIModelName():                                                                     schema_pkg_apis_audit_v1_GroupResources(ref),
@@ -64283,6 +64284,25 @@ func schema_k8sio_apimachinery_pkg_version_Info(ref common.ReferenceCallback) co
 	}
 }
 
+func schema_pkg_apis_audit_v1_AuthenticationMetadata(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Type: []string{"object"},
+				Properties: map[string]spec.Schema{
+					"impersonationConstraint": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ImpersonationConstraint is the verb associated with the constrained impersonation mode that was used to authorize the ImpersonatedUser associated with this audit event.  It is only set when constrained impersonation was used.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
 func schema_pkg_apis_audit_v1_Event(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -64355,6 +64375,12 @@ func schema_pkg_apis_audit_v1_Event(ref common.ReferenceCallback) common.OpenAPI
 						SchemaProps: spec.SchemaProps{
 							Description: "Impersonated user information.",
 							Ref:         ref(authenticationv1.UserInfo{}.OpenAPIModelName()),
+						},
+					},
+					"authenticationMetadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "AuthenticationMetadata contains details about how the request was authenticated.",
+							Ref:         ref(auditv1.AuthenticationMetadata{}.OpenAPIModelName()),
 						},
 					},
 					"sourceIPs": {
@@ -64441,7 +64467,7 @@ func schema_pkg_apis_audit_v1_Event(ref common.ReferenceCallback) common.OpenAPI
 			},
 		},
 		Dependencies: []string{
-			authenticationv1.UserInfo{}.OpenAPIModelName(), metav1.MicroTime{}.OpenAPIModelName(), metav1.Status{}.OpenAPIModelName(), runtime.Unknown{}.OpenAPIModelName(), auditv1.ObjectReference{}.OpenAPIModelName()},
+			authenticationv1.UserInfo{}.OpenAPIModelName(), metav1.MicroTime{}.OpenAPIModelName(), metav1.Status{}.OpenAPIModelName(), runtime.Unknown{}.OpenAPIModelName(), auditv1.AuthenticationMetadata{}.OpenAPIModelName(), auditv1.ObjectReference{}.OpenAPIModelName()},
 	}
 }
 

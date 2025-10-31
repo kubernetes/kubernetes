@@ -29,6 +29,13 @@ import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 // Package-wide variables from generator "generated".
 option go_package = "k8s.io/apiserver/pkg/apis/audit/v1";
 
+message AuthenticationMetadata {
+  // ImpersonationConstraint is the verb associated with the constrained impersonation mode that was used to authorize
+  // the ImpersonatedUser associated with this audit event.  It is only set when constrained impersonation was used.
+  // +optional
+  optional string impersonationConstraint = 1;
+}
+
 // Event captures all the information that can be included in an API audit log.
 message Event {
   // AuditLevel at which event was generated
@@ -53,6 +60,10 @@ message Event {
   // Impersonated user information.
   // +optional
   optional .k8s.io.api.authentication.v1.UserInfo impersonatedUser = 7;
+
+  // AuthenticationMetadata contains details about how the request was authenticated.
+  // +optional
+  optional AuthenticationMetadata authenticationMetadata = 17;
 
   // Source IPs, from where the request originated and intermediate proxies.
   // The source IPs are listed from (in order):

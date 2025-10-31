@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package filters
+package impersonation
 
 import (
 	"errors"
@@ -27,6 +27,7 @@ import (
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	"k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
@@ -43,7 +44,7 @@ func WithImpersonation(handler http.Handler, a authorizer.Authorizer, s runtime.
 		impersonationRequests, err := buildImpersonationRequests(req.Header)
 		if err != nil {
 			klog.V(4).Infof("%v", err)
-			responsewriters.InternalError(w, req, err)
+			responsewriters.RespondWithError(w, req, err, s)
 			return
 		}
 		if len(impersonationRequests) == 0 {
@@ -110,14 +111,14 @@ func WithImpersonation(handler http.Handler, a authorizer.Authorizer, s runtime.
 
 			default:
 				klog.V(4).InfoS("unknown impersonation request type", "request", impersonationRequest)
-				responsewriters.Forbidden(ctx, actingAsAttributes, w, req, fmt.Sprintf("unknown impersonation request type: %v", impersonationRequest), s)
+				responsewriters.Forbidden(actingAsAttributes, w, req, fmt.Sprintf("unknown impersonation request type: %v", impersonationRequest), s)
 				return
 			}
 
 			decision, reason, err := a.Authorize(ctx, actingAsAttributes)
 			if err != nil || decision != authorizer.DecisionAllow {
 				klog.V(4).InfoS("Forbidden", "URI", req.RequestURI, "reason", reason, "err", err)
-				responsewriters.Forbidden(ctx, actingAsAttributes, w, req, reason, s)
+				responsewriters.Forbidden(actingAsAttributes, w, req, reason, s)
 				return
 			}
 		}
@@ -166,7 +167,7 @@ func WithImpersonation(handler http.Handler, a authorizer.Authorizer, s runtime.
 		oldUser, _ := request.UserFrom(ctx)
 		httplog.LogOf(req, w).Addf("%v is impersonating %v", userString(oldUser), userString(newUser))
 
-		audit.LogImpersonatedUser(audit.WithAuditContext(ctx), newUser)
+		audit.LogImpersonatedUser(audit.WithAuditContext(ctx), newUser, "")
 
 		// clear all the impersonation headers from the request
 		req.Header.Del(authenticationv1.ImpersonateUserHeader)
@@ -266,7 +267,7 @@ func buildImpersonationRequests(headers http.Header) ([]v1.ObjectReference, erro
 	}
 
 	if (hasGroups || hasUserExtra || hasUID) && !hasUser {
-		return nil, fmt.Errorf("requested %v without impersonating a user", impersonationRequests)
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("requested %v without impersonating a user", impersonationRequests))
 	}
 
 	return impersonationRequests, nil
