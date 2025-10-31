@@ -24,3 +24,5 @@ require (
 replace k8s.io/kms => ../../../../kms
 
 replace k8s.io/kube-openapi => github.com/pohly/kube-openapi v0.0.0-20251031162619-7c7e24fa61bc
+
+replace github.com/onsi/gomega => github.com/pohly/gomega v0.0.0-20251031173942-4203bdba264b
