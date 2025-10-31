@@ -45,7 +45,6 @@ import (
 	"k8s.io/client-go/plugin/pkg/client/auth/exec"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/clientcmd/api"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/tools/metrics"
 	"k8s.io/client-go/transport"
@@ -1110,8 +1109,8 @@ func TestExecPluginGlobalCache(t *testing.T) {
 					test.clientConfigFunc(clientConfig)
 				}
 
-				if clientConfig.ExecProvider.PluginPolicy.PolicyType == api.PluginPolicyUnspecified {
-					clientConfig.ExecProvider.PluginPolicy.PolicyType = api.PluginPolicyAllowAll
+				if clientConfig.ExecProvider.PluginPolicy.PolicyType == clientcmdapi.PluginPolicyUnspecified {
+					clientConfig.ExecProvider.PluginPolicy.PolicyType = clientcmdapi.PluginPolicyAllowAll
 				}
 
 				addresses = append(addresses, execPluginMemoryAddress(t, clientConfig, i))
