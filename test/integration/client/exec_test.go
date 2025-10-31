@@ -527,6 +527,9 @@ func TestExecPluginViaClient(t *testing.T) {
 					rand.String(10),
 				},
 				InteractiveMode: clientcmdapi.IfAvailableExecInteractiveMode,
+				PluginPolicy: clientcmdapi.PluginPolicy{
+					PolicyType: clientcmdapi.PluginPolicyAllowAll,
+				},
 			}
 			clientConfig.Wrap(func(rt http.RoundTripper) http.RoundTripper {
 				return roundTripperFunc(func(req *http.Request) (*http.Response, error) {
@@ -746,6 +749,9 @@ func TestExecPluginViaInformer(t *testing.T) {
 				Command:         "testdata/exec-plugin.sh",
 				APIVersion:      "client.authentication.k8s.io/v1",
 				InteractiveMode: clientcmdapi.IfAvailableExecInteractiveMode,
+				PluginPolicy: clientcmdapi.PluginPolicy{
+					PolicyType: clientcmdapi.PluginPolicyAllowAll,
+				},
 			}
 
 			if test.clientConfigFunc != nil {
@@ -780,6 +786,9 @@ func (e *execPlugin) config() *clientcmdapi.ExecConfig {
 		Command:         "testdata/exec-plugin.sh",
 		APIVersion:      "client.authentication.k8s.io/v1",
 		InteractiveMode: clientcmdapi.IfAvailableExecInteractiveMode,
+		PluginPolicy: clientcmdapi.PluginPolicy{
+			PolicyType: clientcmdapi.PluginPolicyAllowAll,
+		},
 		Env: []clientcmdapi.ExecEnvVar{
 			{
 				Name:  outputFileEnvVar,
