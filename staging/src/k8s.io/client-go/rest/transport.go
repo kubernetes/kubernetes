@@ -128,6 +128,7 @@ func (c *Config) TransportConfig() (*transport.Config, error) {
 				return nil, err
 			}
 		}
+
 		provider, err := exec.GetAuthenticator(c.ExecProvider, cluster)
 		if err != nil {
 			return nil, err

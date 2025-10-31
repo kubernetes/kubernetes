@@ -185,11 +185,6 @@ func newAuthenticator(c *cache, isTerminalFunc func(int) bool, config *api.ExecC
 		connTracker,
 	)
 
-	// This is required for backward compatibility
-	if config.PluginPolicy.PolicyType == api.PluginPolicyUnspecified {
-		config.PluginPolicy.PolicyType = api.PluginPolicyAllowAll
-	}
-
 	if err := ValidatePluginPolicy(config.PluginPolicy.PolicyType, config.PluginPolicy.Allowlist); err != nil {
 		return nil, err
 	}
@@ -201,7 +196,7 @@ func newAuthenticator(c *cache, isTerminalFunc func(int) bool, config *api.ExecC
 		cluster:            cluster,
 		provideClusterInfo: config.ProvideClusterInfo,
 
-		execPluginPolicy: &config.PluginPolicy,
+		execPluginPolicy: config.PluginPolicy,
 
 		installHint: config.InstallHint,
 		sometimes: &sometimes{
@@ -270,7 +265,7 @@ type Authenticator struct {
 	provideClusterInfo bool
 
 	// Set by the allowlist config
-	execPluginPolicy *api.PluginPolicy
+	execPluginPolicy api.PluginPolicy
 
 	// Used to avoid log spew by rate limiting install hint printing. We didn't do
 	// this by interval based rate limiting alone since that way may have prevented
@@ -579,13 +574,9 @@ func (a *Authenticator) wrapCmdRunErrorLocked(err error) error {
 // `nil` is returned. If the plugin is not allowed, an error must be returned
 // explaining why.
 func (a *Authenticator) allowsPlugin() error {
-	if a.execPluginPolicy == nil {
-		return nil
-	}
-
 	switch a.execPluginPolicy.PolicyType {
 	case api.PluginPolicyUnspecified:
-		panic("defaulting has failed")
+		return fmt.Errorf("unspecified plugin policy")
 	case api.PluginPolicyAllowAll:
 		return nil
 	case api.PluginPolicyDenyAll:
@@ -593,7 +584,7 @@ func (a *Authenticator) allowsPlugin() error {
 	case api.PluginPolicyAllowlist:
 		return a.checkAllowlist()
 	default:
-		panic("unreachable: error will be returned by ValidatePluginPolicy")
+		return fmt.Errorf("unknown plugin policy %q", a.execPluginPolicy.PolicyType)
 	}
 
 }
@@ -640,7 +631,9 @@ func itemGreenlights(alEntry *api.AllowlistEntry, pluginAbsPath string) error {
 
 func ValidatePluginPolicy(policy api.PolicyType, allowlist []api.AllowlistEntry) error {
 	switch policy {
-	case api.PluginPolicyUnspecified, api.PluginPolicyAllowAll, api.PluginPolicyDenyAll:
+	case api.PluginPolicyUnspecified:
+		return fmt.Errorf("unspecified plugin policy")
+	case api.PluginPolicyAllowAll, api.PluginPolicyDenyAll:
 		if allowlist != nil {
 			return fmt.Errorf("misconfigured credential plugin allowlist: plugin policy is %q but allowlist is non-nil", policy)
 		}

@@ -809,6 +809,10 @@ func TestRefreshCreds(t *testing.T) {
 				})
 			}
 
+			if c.PluginPolicy.PolicyType == "" {
+				c.PluginPolicy.PolicyType = api.PluginPolicyAllowAll
+			}
+
 			a, err := newAuthenticator(newCache(), func(_ int) bool { return test.isTerminal }, &c, test.cluster)
 			if err != nil {
 				t.Fatal(err)
@@ -886,7 +890,9 @@ func TestPluginPolicy(t *testing.T) {
 	// test configurations should pass and which should fail
 	shouldErrFunc := func(tt *pluginPolicyTest) (bool, string) {
 		switch tt.policyType {
-		case api.PluginPolicyUnspecified, api.PluginPolicyAllowAll:
+		case api.PluginPolicyUnspecified:
+			return true, "unspecified plugin policy"
+		case api.PluginPolicyAllowAll:
 			if tt.allowlist != nil {
 				return true, "allowlist is non-nil"
 			}
