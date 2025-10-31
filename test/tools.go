@@ -2,7 +2,7 @@
 // +build tools
 
 /*
-Copyright 2019 The Kubernetes Authors.
+Copyright 2025 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,13 +18,8 @@ limitations under the License.
 */
 
 // This package imports things required by build scripts, to force `go mod` to see them as dependencies
-package tools
+package test
 
 import (
-	// build script dependencies
-	_ "k8s.io/code-generator/cmd/deepcopy-gen"
-	_ "k8s.io/code-generator/cmd/defaulter-gen"
-	_ "k8s.io/code-generator/cmd/go-to-protobuf"
-	_ "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo"
-	_ "k8s.io/kube-openapi/cmd/openapi-gen"
+	_ "github.com/onsi/ginkgo/v2/ginkgo"
 )
