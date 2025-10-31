@@ -234,6 +234,13 @@ func computePodResourceRequest(pod *v1.Pod, opts ResourceRequestsOptions) *preFi
 
 // withDeviceClass adds resource to device class mapping to preFilterState.
 func withDeviceClass(result *preFilterState, draManager fwk.SharedDRAManager) *fwk.Status {
+	// If draManager is nil, DynamicResourceAllocation is not enabled.
+	// This can happen if DRAExtendedResource is enabled but DynamicResourceAllocation is not,
+	// which violates the feature gate dependency. Return early to avoid nil pointer dereference.
+	if draManager == nil {
+		return nil
+	}
+
 	hasExtendedResource := false
 	for rName, rQuant := range result.ScalarResources {
 		// Skip in case request quantity is zero

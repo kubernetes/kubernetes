@@ -1997,4 +1997,21 @@ func TestWithDeviceClass(t *testing.T) {
 			}
 		})
 	}
+
+	// Test nil draManager (when DynamicResourceAllocation is disabled)
+	t.Run("nil draManager", func(t *testing.T) {
+		state := &preFilterState{
+			Resource: framework.Resource{
+				ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 1},
+			},
+		}
+		// Should not panic and should return nil
+		status := withDeviceClass(state, nil)
+		if status != nil {
+			t.Errorf("expected nil status, got %v", status)
+		}
+		if state.resourceToDeviceClass != nil {
+			t.Errorf("expected nil resourceToDeviceClass, got %v", state.resourceToDeviceClass)
+		}
+	})
 }
