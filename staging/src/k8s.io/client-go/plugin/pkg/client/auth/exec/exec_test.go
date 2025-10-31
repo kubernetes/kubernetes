@@ -1185,6 +1185,9 @@ func TestRoundTripper(t *testing.T) {
 		Command:         "./testdata/test-plugin.sh",
 		APIVersion:      "client.authentication.k8s.io/v1beta1",
 		InteractiveMode: api.IfAvailableExecInteractiveMode,
+		PluginPolicy: api.PluginPolicy{
+			PolicyType: api.PluginPolicyAllowAll,
+		},
 	}
 	a, err := newAuthenticator(newCache(), func(_ int) bool { return false }, &c, nil)
 	if err != nil {
@@ -1299,6 +1302,9 @@ func TestAuthorizationHeaderPresentCancelsExecAction(t *testing.T) {
 			a, err := newAuthenticator(newCache(), func(_ int) bool { return false }, &api.ExecConfig{
 				Command:    "./testdata/test-plugin.sh",
 				APIVersion: "client.authentication.k8s.io/v1beta1",
+				PluginPolicy: api.PluginPolicy{
+					PolicyType: api.PluginPolicyAllowAll,
+				},
 			}, nil)
 			if err != nil {
 				t.Fatal(err)
@@ -1342,6 +1348,9 @@ func TestTLSCredentials(t *testing.T) {
 		Command:         "./testdata/test-plugin.sh",
 		APIVersion:      "client.authentication.k8s.io/v1beta1",
 		InteractiveMode: api.IfAvailableExecInteractiveMode,
+		PluginPolicy: api.PluginPolicy{
+			PolicyType: api.PluginPolicyAllowAll,
+		},
 	}, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -1431,6 +1440,9 @@ func TestConcurrentUpdateTransportConfig(t *testing.T) {
 	c := api.ExecConfig{
 		Command:    "./testdata/test-plugin.sh",
 		APIVersion: "client.authentication.k8s.io/v1beta1",
+		PluginPolicy: api.PluginPolicy{
+			PolicyType: api.PluginPolicyAllowAll,
+		},
 	}
 	a, err := newAuthenticator(newCache(), func(_ int) bool { return false }, &c, nil)
 	if err != nil {
@@ -1499,6 +1511,9 @@ func TestInstallHintRateLimit(t *testing.T) {
 				APIVersion:      "client.authentication.k8s.io/v1beta1",
 				InstallHint:     "some install hint",
 				InteractiveMode: api.IfAvailableExecInteractiveMode,
+				PluginPolicy: api.PluginPolicy{
+					PolicyType: api.PluginPolicyAllowAll,
+				},
 			}
 			a, err := newAuthenticator(newCache(), func(_ int) bool { return false }, &c, nil)
 			if err != nil {

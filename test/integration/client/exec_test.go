@@ -104,14 +104,13 @@ var execPluginMetricsComparer = cmp.Comparer(func(a, b *execPluginMetrics) bool 
 })
 
 type execPluginClientTestData struct {
-	name                            string
-	clientConfigFunc                func(*rest.Config)
-	wantAuthorizationHeaderValues   [][]string
-	wantCertificate                 *tls.Certificate
-	wantGetAuthenticatorErrorPrefix string
-	wantGetCertificateErrorPrefix   string
-	wantClientErrorPrefix           string
-	wantMetrics                     *execPluginMetrics
+	name                          string
+	clientConfigFunc              func(*rest.Config)
+	wantAuthorizationHeaderValues [][]string
+	wantCertificate               *tls.Certificate
+	wantGetCertificateErrorPrefix string
+	wantClientErrorPrefix         string
+	wantMetrics                   *execPluginMetrics
 }
 
 func execPluginClientTests(t *testing.T, unauthorizedCert, unauthorizedKey []byte, clientAuthorizedToken, clientCertFileName, clientKeyFileName string) []execPluginClientTestData {
@@ -540,15 +539,7 @@ func TestExecPluginViaClient(t *testing.T) {
 				test.clientConfigFunc(clientConfig)
 			}
 			client, err := clientset.NewForConfig(clientConfig)
-			if test.wantGetAuthenticatorErrorPrefix != "" {
-				if err == nil || !strings.HasPrefix(err.Error(), test.wantGetAuthenticatorErrorPrefix) {
-					t.Fatalf("got %v, wanted %s...", err, test.wantGetAuthenticatorErrorPrefix)
-				}
-
-				// expected the authenticator to fail and it did, so count the
-				// test as passed
-				return
-			} else if err != nil {
+			if err != nil {
 				t.Fatal(err)
 			}
 
@@ -1100,10 +1091,6 @@ func TestExecPluginGlobalCache(t *testing.T) {
 						randStrings[i],
 					},
 				}
-
-				// if test.wantGetAuthenticatorErrorPrefix != "" {
-				// 	return
-				// }
 
 				if test.clientConfigFunc != nil {
 					test.clientConfigFunc(clientConfig)
