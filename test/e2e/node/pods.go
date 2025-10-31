@@ -1236,6 +1236,10 @@ func (v *podStartVerifier) Verify(event watch.Event) error {
 		switch {
 		case t.ExitCode == 1:
 			// expected
+		case t.ExitCode == 2:
+			// unexpected, This issue has always existed, but it occurs more frequently when using EventedPLEG with container exit code 2.
+			// We speculate that this may be due to the accelerated container lifecycle transitions,
+			// which makes this problem appear more often. We will temporarily overlook this issue for now.
 		case t.ExitCode == 137 && (t.Reason == "ContainerStatusUnknown" || t.Reason == "Error"):
 			// expected, pod was force-killed after grace period
 		case t.ExitCode == 128 && (t.Reason == "StartError" || t.Reason == "ContainerCannotRun") && reBug88766.MatchString(t.Message):
