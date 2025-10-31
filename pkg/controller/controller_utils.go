@@ -482,6 +482,7 @@ type PodControlInterface interface {
 type RealPodControl struct {
 	KubeClient clientset.Interface
 	Recorder   record.EventRecorder
+	OnWrite    func(*v1.Pod, *metav1.OwnerReference)
 }
 
 var _ PodControlInterface = &RealPodControl{}
@@ -551,11 +552,15 @@ func (r RealPodControl) CreatePodsWithGenerateName(ctx context.Context, namespac
 	if len(generateName) > 0 {
 		pod.ObjectMeta.GenerateName = generateName
 	}
-	return r.createPods(ctx, namespace, pod, controllerObject)
+	return r.createPods(ctx, namespace, pod, controllerObject, controllerRef)
 }
 
 func (r RealPodControl) PatchPod(ctx context.Context, namespace, name string, data []byte) error {
-	_, err := r.KubeClient.CoreV1().Pods(namespace).Patch(ctx, name, types.StrategicMergePatchType, data, metav1.PatchOptions{})
+	pod, err := r.KubeClient.CoreV1().Pods(namespace).Patch(ctx, name, types.StrategicMergePatchType, data, metav1.PatchOptions{})
+	if err != nil && r.OnWrite != nil {
+		ownerRef := metav1.GetControllerOfNoCopy(pod)
+		r.OnWrite(pod, ownerRef)
+	}
 	return err
 }
 
@@ -584,7 +589,7 @@ func GetPodFromTemplate(template *v1.PodTemplateSpec, parentObject runtime.Objec
 	return pod, nil
 }
 
-func (r RealPodControl) createPods(ctx context.Context, namespace string, pod *v1.Pod, object runtime.Object) error {
+func (r RealPodControl) createPods(ctx context.Context, namespace string, pod *v1.Pod, object runtime.Object, controllerRef *metav1.OwnerReference) error {
 	if len(labels.Set(pod.Labels)) == 0 {
 		return fmt.Errorf("unable to create pods, no labels")
 	}
@@ -597,6 +602,9 @@ func (r RealPodControl) createPods(ctx context.Context, namespace string, pod *v
 		return err
 	}
 	logger := klog.FromContext(ctx)
+	if r.OnWrite != nil {
+		r.OnWrite(newPod, controllerRef)
+	}
 	accessor, err := meta.Accessor(object)
 	if err != nil {
 		logger.Error(err, "parentObject does not have ObjectMeta")

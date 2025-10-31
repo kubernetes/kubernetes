@@ -935,6 +935,13 @@ const (
 	// pod's lifecycle and will not block pod termination.
 	SidecarContainers featuregate.Feature = "SidecarContainers"
 
+	// owner: @michaelasp
+	// kep: http://kep.k8s.io/5647
+	//
+	// Introduces the ability for certain controllers to be able to read their writes
+	// prior to running a reconcile on the same object.
+	StaleControllerConsistency featuregate.Feature = "StaleControllerConsistency"
+
 	// owner: @liggitt
 	//
 	// Mitigates spurious statefulset rollouts due to controller revision comparison mismatches
@@ -1766,6 +1773,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.33"), Default: true, LockToDefault: true, PreRelease: featuregate.GA}, // GA in 1.33 remove in 1.36
 	},
 
+	StaleControllerConsistency: {
+		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	StatefulSetSemanticRevisionComparison: {
 		// This is a mitigation for a 1.34 regression due to serialization differences that cannot be feature-gated,
 		// so this mitigation should not auto-disable even if emulating versions prior to 1.34 with --emulation-version.
@@ -2373,6 +2384,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	ServiceAccountTokenPodNodeInfo: {},
 
 	SidecarContainers: {},
+
+	StaleControllerConsistency: {},
 
 	StatefulSetSemanticRevisionComparison: {},
 
