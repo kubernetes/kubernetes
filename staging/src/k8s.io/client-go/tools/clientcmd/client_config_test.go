@@ -831,6 +831,9 @@ func TestCreateAuthConfigExecInstallHintCleanup(t *testing.T) {
 				Command:         "some-command",
 				InstallHint:     "some install hint with \x1b[1mcontrol chars\x1b[0m\nand a newline",
 				InteractiveMode: clientcmdapi.IfAvailableExecInteractiveMode,
+				PluginPolicy: clientcmdapi.PluginPolicy{
+					PolicyType: clientcmdapi.PluginPolicyAllowAll,
+				},
 			},
 		},
 	}, nil)

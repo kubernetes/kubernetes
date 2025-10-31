@@ -36,11 +36,6 @@ func SetDefaults_ExecConfig(exec *ExecConfig) {
 	}
 
 	if len(exec.PluginPolicy.PolicyType) == 0 {
-		switch exec.APIVersion {
-		case "client.authentication.k8s.io/v1beta1", "client.authentication.k8s.io/v1alpha1":
-			exec.PluginPolicy.PolicyType = PluginPolicyAllowAll
-		default:
-			exec.PluginPolicy.PolicyType = PluginPolicyAllowAll
-		}
+		exec.PluginPolicy.PolicyType = PluginPolicyAllowAll
 	}
 }
