@@ -1601,6 +1601,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.34"
+- name: StatefulSetSemanticRevisionComparison
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.0"
 - name: StorageCapacityScoring
   versionedSpecs:
   - default: false
