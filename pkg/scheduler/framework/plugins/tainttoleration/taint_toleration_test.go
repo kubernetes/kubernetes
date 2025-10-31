@@ -329,11 +329,10 @@ func TestTaintTolerationFilter(t *testing.T) {
 		wantStatus *fwk.Status
 	}{
 		{
-			name: "A pod having no tolerations can't be scheduled onto a node with nonempty taints",
-			pod:  podWithTolerations("pod1", []v1.Toleration{}),
-			node: nodeWithTaints("nodeA", []v1.Taint{{Key: "dedicated", Value: "user1", Effect: "NoSchedule"}}),
-			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable,
-				"node(s) had untolerated taint(s)"),
+			name:       "A pod having no tolerations can't be scheduled onto a node with nonempty taints",
+			pod:        podWithTolerations("pod1", []v1.Toleration{}),
+			node:       nodeWithTaints("nodeA", []v1.Taint{{Key: "dedicated", Value: "user1", Effect: "NoSchedule"}}),
+			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "node(s) had untolerated taint(s)"),
 		},
 		{
 			name: "A pod which can be scheduled on a dedicated node assigned to user1 with effect NoSchedule",
@@ -341,11 +340,10 @@ func TestTaintTolerationFilter(t *testing.T) {
 			node: nodeWithTaints("nodeA", []v1.Taint{{Key: "dedicated", Value: "user1", Effect: "NoSchedule"}}),
 		},
 		{
-			name: "A pod which can't be scheduled on a dedicated node assigned to user2 with effect NoSchedule",
-			pod:  podWithTolerations("pod1", []v1.Toleration{{Key: "dedicated", Operator: "Equal", Value: "user2", Effect: "NoSchedule"}}),
-			node: nodeWithTaints("nodeA", []v1.Taint{{Key: "dedicated", Value: "user1", Effect: "NoSchedule"}}),
-			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable,
-				"node(s) had untolerated taint(s)"),
+			name:       "A pod which can't be scheduled on a dedicated node assigned to user2 with effect NoSchedule",
+			pod:        podWithTolerations("pod1", []v1.Toleration{{Key: "dedicated", Operator: "Equal", Value: "user2", Effect: "NoSchedule"}}),
+			node:       nodeWithTaints("nodeA", []v1.Taint{{Key: "dedicated", Value: "user1", Effect: "NoSchedule"}}),
+			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "node(s) had untolerated taint(s)"),
 		},
 		{
 			name: "A pod can be scheduled onto the node, with a toleration uses operator Exists that tolerates the taints on the node",
@@ -366,10 +364,9 @@ func TestTaintTolerationFilter(t *testing.T) {
 		{
 			name: "A pod has a toleration that keys and values match the taint on the node, but (non-empty) effect doesn't match, " +
 				"can't be scheduled onto the node",
-			pod:  podWithTolerations("pod1", []v1.Toleration{{Key: "foo", Operator: "Equal", Value: "bar", Effect: "PreferNoSchedule"}}),
-			node: nodeWithTaints("nodeA", []v1.Taint{{Key: "foo", Value: "bar", Effect: "NoSchedule"}}),
-			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable,
-				"node(s) had untolerated taint(s)"),
+			pod:        podWithTolerations("pod1", []v1.Toleration{{Key: "foo", Operator: "Equal", Value: "bar", Effect: "PreferNoSchedule"}}),
+			node:       nodeWithTaints("nodeA", []v1.Taint{{Key: "foo", Value: "bar", Effect: "NoSchedule"}}),
+			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "node(s) had untolerated taint(s)"),
 		},
 		{
 			name: "The pod has a toleration that keys and values match the taint on the node, the effect of toleration is empty, " +
@@ -390,11 +387,10 @@ func TestTaintTolerationFilter(t *testing.T) {
 			node: nodeWithTaints("nodeA", []v1.Taint{{Key: "dedicated", Value: "user1", Effect: "PreferNoSchedule"}}),
 		},
 		{
-			name: "Pod with Gt toleration cannot be scheduled on node when taint value is lower than threshold",
-			pod:  podWithTolerations("pod1", []v1.Toleration{{Key: "node.example.com/priority-level", Operator: "Gt", Value: "950", Effect: "NoSchedule"}}),
-			node: nodeWithTaints("nodeA", []v1.Taint{{Key: "node.example.com/priority-level", Value: "800", Effect: "NoSchedule"}}),
-			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable,
-				"node(s) had untolerated taint {node.example.com/priority-level: 800}"),
+			name:       "Pod with Gt toleration cannot be scheduled on node when taint value is lower than threshold",
+			pod:        podWithTolerations("pod1", []v1.Toleration{{Key: "node.example.com/priority-level", Operator: "Gt", Value: "950", Effect: "NoSchedule"}}),
+			node:       nodeWithTaints("nodeA", []v1.Taint{{Key: "node.example.com/priority-level", Value: "800", Effect: "NoSchedule"}}),
+			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "node(s) had untolerated taint(s)"),
 		},
 		{
 			name: "Pod with Gt toleration can be scheduled on node when taint value is higher than threshold",
@@ -402,11 +398,10 @@ func TestTaintTolerationFilter(t *testing.T) {
 			node: nodeWithTaints("nodeA", []v1.Taint{{Key: "node.example.com/priority-level", Value: "950", Effect: "NoSchedule"}}),
 		},
 		{
-			name: "Pod with Lt toleration cannot be scheduled on node when taint value is higher than threshold",
-			pod:  podWithTolerations("pod1", []v1.Toleration{{Key: "node.example.com/priority-level", Operator: "Lt", Value: "800", Effect: "NoSchedule"}}),
-			node: nodeWithTaints("nodeA", []v1.Taint{{Key: "node.example.com/priority-level", Value: "950", Effect: "NoSchedule"}}),
-			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable,
-				"node(s) had untolerated taint {node.example.com/priority-level: 950}"),
+			name:       "Pod with Lt toleration cannot be scheduled on node when taint value is higher than threshold",
+			pod:        podWithTolerations("pod1", []v1.Toleration{{Key: "node.example.com/priority-level", Operator: "Lt", Value: "800", Effect: "NoSchedule"}}),
+			node:       nodeWithTaints("nodeA", []v1.Taint{{Key: "node.example.com/priority-level", Value: "950", Effect: "NoSchedule"}}),
+			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "node(s) had untolerated taint(s)"),
 		},
 		{
 			name: "Pod with Lt toleration can be scheduled on node when taint value is lower than threshold",

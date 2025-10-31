@@ -12247,13 +12247,13 @@ func TestValidatePod(t *testing.T) {
 			),
 		},
 		"numeric operator Lt requires feature gate (gate disabled)": {
-			expectedError: "numeric operators are forbidden when the TaintTolerationComparisonOperators feature gate is disabled",
+			expectedError: "Unsupported value: \"Lt\"",
 			spec: *podtest.MakePod("123",
 				podtest.SetTolerations(core.Toleration{Key: "node.kubernetes.io/sla", Operator: "Lt", Value: "950", Effect: "NoSchedule"}),
 			),
 		},
 		"numeric operator Gt requires feature gate (gate disabled)": {
-			expectedError: "numeric operators are forbidden when the TaintTolerationComparisonOperators feature gate is disabled",
+			expectedError: "Unsupported value: \"Gt\"",
 			spec: *podtest.MakePod("123",
 				podtest.SetTolerations(core.Toleration{Key: "node.kubernetes.io/sla", Operator: "Gt", Value: "950", Effect: "NoSchedule"}),
 			),
@@ -29698,7 +29698,7 @@ func TestNumericTolerationsWithFeatureGate(t *testing.T) {
 				Effect:   core.TaintEffectNoSchedule,
 			},
 			featureGateOn: false,
-			errorMsg:      "numeric operators are forbidden when the TaintTolerationComparisonOperators feature gate is disabled",
+			errorMsg:      "Unsupported value",
 		},
 		{
 			name: "Gt operator with max int64 value and feature gate enabled",
@@ -29727,7 +29727,10 @@ func TestNumericTolerationsWithFeatureGate(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TaintTolerationComparisonOperators, tc.featureGateOn)
 
-			errs := ValidateTolerations([]core.Toleration{tc.toleration}, field.NewPath("tolerations"))
+			opts := PodValidationOptions{
+				AllowTaintTolerationComparisonOperators: tc.featureGateOn,
+			}
+			errs := ValidateTolerations([]core.Toleration{tc.toleration}, field.NewPath("tolerations"), opts)
 
 			if tc.errorMsg != "" {
 				if len(errs) == 0 {

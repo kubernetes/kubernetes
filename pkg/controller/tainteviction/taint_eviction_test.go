@@ -70,16 +70,34 @@ func createNoExecuteTaint(index int) corev1.Taint {
 	}
 }
 
-func addToleration(pod *corev1.Pod, index int, duration int64) *corev1.Pod {
+func addToleration(pod *corev1.Pod, index int, duration int64, operator corev1.TolerationOperator, value string) *corev1.Pod {
 	if pod.Annotations == nil {
 		pod.Annotations = map[string]string{}
 	}
-	if duration < 0 {
-		pod.Spec.Tolerations = []corev1.Toleration{{Key: "testTaint" + fmt.Sprintf("%v", index), Value: "test" + fmt.Sprintf("%v", index), Effect: corev1.TaintEffectNoExecute}}
 
-	} else {
-		pod.Spec.Tolerations = []corev1.Toleration{{Key: "testTaint" + fmt.Sprintf("%v", index), Value: "test" + fmt.Sprintf("%v", index), Effect: corev1.TaintEffectNoExecute, TolerationSeconds: &duration}}
+	// Use default value generation if value is empty
+	if value == "" {
+		value = "test" + fmt.Sprintf("%v", index)
 	}
+
+	key := "testTaint" + fmt.Sprintf("%v", index)
+	toleration := corev1.Toleration{
+		Key:    key,
+		Value:  value,
+		Effect: corev1.TaintEffectNoExecute,
+	}
+
+	// Set operator if provided, otherwise it defaults to Equal
+	if operator != "" {
+		toleration.Operator = operator
+	}
+
+	// Set toleration seconds if duration is non-negative
+	if duration >= 0 {
+		toleration.TolerationSeconds = &duration
+	}
+
+	pod.Spec.Tolerations = []corev1.Toleration{toleration}
 	return pod
 }
 
@@ -142,6 +160,7 @@ func TestCreatePod(t *testing.T) {
 		taintedNodes map[string][]corev1.Taint
 		expectPatch  bool
 		expectDelete bool
+		expectError  bool
 	}{
 		{
 			description:  "not scheduled - ignore",
@@ -166,7 +185,7 @@ func TestCreatePod(t *testing.T) {
 		},
 		{
 			description: "schedule on tainted Node with finite toleration",
-			pod:         addToleration(testutil.NewPod("pod1", "node1"), 1, 100),
+			pod:         addToleration(testutil.NewPod("pod1", "node1"), 1, 100, "", ""),
 			taintedNodes: map[string][]corev1.Taint{
 				"node1": {createNoExecuteTaint(1)},
 			},
@@ -174,7 +193,7 @@ func TestCreatePod(t *testing.T) {
 		},
 		{
 			description: "schedule on tainted Node with infinite toleration",
-			pod:         addToleration(testutil.NewPod("pod1", "node1"), 1, -1),
+			pod:         addToleration(testutil.NewPod("pod1", "node1"), 1, -1, "", ""),
 			taintedNodes: map[string][]corev1.Taint{
 				"node1": {createNoExecuteTaint(1)},
 			},
@@ -182,12 +201,28 @@ func TestCreatePod(t *testing.T) {
 		},
 		{
 			description: "schedule on tainted Node with infinite invalid toleration",
-			pod:         addToleration(testutil.NewPod("pod1", "node1"), 2, -1),
+			pod:         addToleration(testutil.NewPod("pod1", "node1"), 2, -1, "", ""),
 			taintedNodes: map[string][]corev1.Taint{
 				"node1": {createNoExecuteTaint(1)},
 			},
 			expectPatch:  true,
 			expectDelete: true,
+		},
+		{
+			description: "schedule on tainted Node with invalid Lt operator toleration",
+			pod:         addToleration(testutil.NewPod("pod1", "node1"), 1, -1, corev1.TolerationOpLt, "not-a-number"),
+			taintedNodes: map[string][]corev1.Taint{
+				"node1": {createNoExecuteTaint(1)},
+			},
+			expectError: true,
+		},
+		{
+			description: "schedule on tainted Node with invalid Gt operator toleration",
+			pod:         addToleration(testutil.NewPod("pod1", "node1"), 1, 100, corev1.TolerationOpGt, "invalid"),
+			taintedNodes: map[string][]corev1.Taint{
+				"node1": {createNoExecuteTaint(1)},
+			},
+			expectError: true,
 		},
 	}
 
@@ -210,7 +245,9 @@ func TestCreatePod(t *testing.T) {
 			podIndexer.Add(item.pod)
 			controller.PodUpdated(nil, item.pod)
 
-			verifyPodActions(t, item.description, fakeClientset, item.expectPatch, item.expectDelete)
+			verifyPodActions(t, item.description, fakeClientset, item.expectPatch, item.expectDelete, item.expectError)
+
+			cancel()
 		})
 	}
 }
@@ -244,6 +281,7 @@ func TestUpdatePod(t *testing.T) {
 		taintedNodes              map[string][]corev1.Taint
 		expectPatch               bool
 		expectDelete              bool
+		expectError               bool
 		skipOnWindows             bool
 	}{
 		{
@@ -258,8 +296,8 @@ func TestUpdatePod(t *testing.T) {
 		},
 		{
 			description: "scheduling onto tainted Node with toleration",
-			prevPod:     addToleration(testutil.NewPod("pod1", ""), 1, -1),
-			newPod:      addToleration(testutil.NewPod("pod1", "node1"), 1, -1),
+			prevPod:     addToleration(testutil.NewPod("pod1", ""), 1, -1, "", ""),
+			newPod:      addToleration(testutil.NewPod("pod1", "node1"), 1, -1, "", ""),
 			taintedNodes: map[string][]corev1.Taint{
 				"node1": {createNoExecuteTaint(1)},
 			},
@@ -267,7 +305,7 @@ func TestUpdatePod(t *testing.T) {
 		},
 		{
 			description:               "removing toleration",
-			prevPod:                   addToleration(testutil.NewPod("pod1", "node1"), 1, 100),
+			prevPod:                   addToleration(testutil.NewPod("pod1", "node1"), 1, 100, "", ""),
 			newPod:                    testutil.NewPod("pod1", "node1"),
 			awaitForScheduledEviction: true,
 			taintedNodes: map[string][]corev1.Taint{
@@ -278,8 +316,8 @@ func TestUpdatePod(t *testing.T) {
 		},
 		{
 			description:               "lengthening toleration shouldn't work",
-			prevPod:                   addToleration(testutil.NewPod("pod1", "node1"), 1, 1),
-			newPod:                    addToleration(testutil.NewPod("pod1", "node1"), 1, 100),
+			prevPod:                   addToleration(testutil.NewPod("pod1", "node1"), 1, 1, "", ""),
+			newPod:                    addToleration(testutil.NewPod("pod1", "node1"), 1, 100, "", ""),
 			awaitForScheduledEviction: true,
 			taintedNodes: map[string][]corev1.Taint{
 				"node1": {createNoExecuteTaint(1)},
@@ -287,6 +325,24 @@ func TestUpdatePod(t *testing.T) {
 			expectPatch:   true,
 			expectDelete:  true,
 			skipOnWindows: true,
+		},
+		{
+			description: "update to invalid Lt operator toleration on tainted Node",
+			prevPod:     addToleration(testutil.NewPod("pod1", "node1"), 1, 100, "", ""),
+			newPod:      addToleration(testutil.NewPod("pod1", "node1"), 1, 100, corev1.TolerationOpLt, "invalid-number"),
+			taintedNodes: map[string][]corev1.Taint{
+				"node1": {createNoExecuteTaint(1)},
+			},
+			expectError: true,
+		},
+		{
+			description: "update to invalid Gt operator toleration on tainted Node",
+			prevPod:     testutil.NewPod("pod1", "node1"),
+			newPod:      addToleration(testutil.NewPod("pod1", "node1"), 1, -1, corev1.TolerationOpGt, "not-numeric"),
+			taintedNodes: map[string][]corev1.Taint{
+				"node1": {createNoExecuteTaint(1)},
+			},
+			expectError: true,
 		},
 	}
 
@@ -328,7 +384,8 @@ func TestUpdatePod(t *testing.T) {
 			podIndexer.Update(item.newPod)
 			controller.PodUpdated(item.prevPod, item.newPod)
 
-			verifyPodActions(t, item.description, fakeClientset, item.expectPatch, item.expectDelete)
+			verifyPodActions(t, item.description, fakeClientset, item.expectPatch, item.expectDelete, item.expectError)
+			cancel()
 		})
 	}
 }
@@ -340,6 +397,7 @@ func TestCreateNode(t *testing.T) {
 		node         *corev1.Node
 		expectPatch  bool
 		expectDelete bool
+		expectError  bool
 	}{
 		{
 			description: "Creating Node matching already assigned Pod",
@@ -362,11 +420,27 @@ func TestCreateNode(t *testing.T) {
 		{
 			description: "Creating tainted Node matching already assigned tolerating Pod",
 			pods: []corev1.Pod{
-				*addToleration(testutil.NewPod("pod1", "node1"), 1, -1),
+				*addToleration(testutil.NewPod("pod1", "node1"), 1, -1, "", ""),
 			},
 			node:         addTaintsToNode(testutil.NewNode("node1"), "testTaint1", "taint1", []int{1}),
 			expectPatch:  false,
 			expectDelete: false,
+		},
+		{
+			description: "Creating tainted Node with Pod having invalid Lt toleration",
+			pods: []corev1.Pod{
+				*addToleration(testutil.NewPod("pod1", "node1"), 1, -1, corev1.TolerationOpLt, "bad-value"),
+			},
+			node:        addTaintsToNode(testutil.NewNode("node1"), "testTaint1", "taint1", []int{1}),
+			expectError: true,
+		},
+		{
+			description: "Creating tainted Node with Pod having invalid Gt toleration",
+			pods: []corev1.Pod{
+				*addToleration(testutil.NewPod("pod1", "node1"), 1, 100, corev1.TolerationOpGt, "non-numeric"),
+			},
+			node:        addTaintsToNode(testutil.NewNode("node1"), "testTaint1", "taint1", []int{1}),
+			expectError: true,
 		},
 	}
 
@@ -390,8 +464,9 @@ func TestCreateNode(t *testing.T) {
 
 			controller.NodeUpdated(nil, item.node)
 
-			verifyPodActions(t, item.description, fakeClientset, item.expectPatch, item.expectDelete)
-		})
+		verifyPodActions(t, item.description, fakeClientset, item.expectPatch, item.expectDelete, item.expectError)
+
+		cancel()
 	}
 }
 
@@ -434,6 +509,7 @@ func TestUpdateNode(t *testing.T) {
 		newNode         *corev1.Node
 		expectPatch     bool
 		expectDelete    bool
+		expectError     bool
 		additionalSleep time.Duration
 	}{
 		{
@@ -449,7 +525,7 @@ func TestUpdateNode(t *testing.T) {
 		{
 			description: "Added tolerated taint",
 			pods: []corev1.Pod{
-				*addToleration(testutil.NewPod("pod1", "node1"), 1, 100),
+				*addToleration(testutil.NewPod("pod1", "node1"), 1, 100, "", ""),
 			},
 			oldNode:      testutil.NewNode("node1"),
 			newNode:      addTaintsToNode(testutil.NewNode("node1"), "testTaint1", "taint1", []int{1}),
@@ -458,7 +534,7 @@ func TestUpdateNode(t *testing.T) {
 		{
 			description: "Only one added taint tolerated",
 			pods: []corev1.Pod{
-				*addToleration(testutil.NewPod("pod1", "node1"), 1, 100),
+				*addToleration(testutil.NewPod("pod1", "node1"), 1, 100, "", ""),
 			},
 			oldNode:      testutil.NewNode("node1"),
 			newNode:      addTaintsToNode(testutil.NewNode("node1"), "testTaint1", "taint1", []int{1, 2}),
@@ -468,7 +544,7 @@ func TestUpdateNode(t *testing.T) {
 		{
 			description: "Taint removed",
 			pods: []corev1.Pod{
-				*addToleration(testutil.NewPod("pod1", "node1"), 1, 1),
+				*addToleration(testutil.NewPod("pod1", "node1"), 1, 1, "", ""),
 			},
 			oldNode:         addTaintsToNode(testutil.NewNode("node1"), "testTaint1", "taint1", []int{1}),
 			newNode:         testutil.NewNode("node1"),
@@ -505,6 +581,24 @@ func TestUpdateNode(t *testing.T) {
 			expectPatch:  true,
 			expectDelete: true,
 		},
+		{
+			description: "Added taint with Pod having invalid Lt toleration",
+			pods: []corev1.Pod{
+				*addToleration(testutil.NewPod("pod1", "node1"), 1, -1, corev1.TolerationOpLt, "invalid-value"),
+			},
+			oldNode:     testutil.NewNode("node1"),
+			newNode:     addTaintsToNode(testutil.NewNode("node1"), "testTaint1", "taint1", []int{1}),
+			expectError: true,
+		},
+		{
+			description: "Added taint with Pod having invalid Gt toleration",
+			pods: []corev1.Pod{
+				*addToleration(testutil.NewPod("pod1", "node1"), 1, 100, corev1.TolerationOpGt, "abc"),
+			},
+			oldNode:     testutil.NewNode("node1"),
+			newNode:     addTaintsToNode(testutil.NewNode("node1"), "testTaint1", "taint1", []int{1}),
+			expectError: true,
+		},
 	}
 
 	for _, item := range testCases {
@@ -529,7 +623,7 @@ func TestUpdateNode(t *testing.T) {
 				time.Sleep(item.additionalSleep)
 			}
 
-			verifyPodActions(t, item.description, fakeClientset, item.expectPatch, item.expectDelete)
+			verifyPodActions(t, item.description, fakeClientset, item.expectPatch, item.expectDelete, item.expectError)
 		})
 	}
 }
@@ -619,8 +713,8 @@ func TestUpdateNodeWithMultiplePods(t *testing.T) {
 			description: "Pods with different toleration times are evicted appropriately",
 			pods: []corev1.Pod{
 				*testutil.NewPod("pod1", "node1"),
-				*addToleration(testutil.NewPod("pod2", "node1"), 1, 1),
-				*addToleration(testutil.NewPod("pod3", "node1"), 1, -1),
+				*addToleration(testutil.NewPod("pod2", "node1"), 1, 1, "", ""),
+				*addToleration(testutil.NewPod("pod3", "node1"), 1, -1, "", ""),
 			},
 			oldNode: testutil.NewNode("node1"),
 			newNode: addTaintsToNode(testutil.NewNode("node1"), "testTaint1", "taint1", []int{1}),
@@ -633,8 +727,8 @@ func TestUpdateNodeWithMultiplePods(t *testing.T) {
 			description: "Evict all pods not matching all taints instantly",
 			pods: []corev1.Pod{
 				*testutil.NewPod("pod1", "node1"),
-				*addToleration(testutil.NewPod("pod2", "node1"), 1, 1),
-				*addToleration(testutil.NewPod("pod3", "node1"), 1, -1),
+				*addToleration(testutil.NewPod("pod2", "node1"), 1, 1, "", ""),
+				*addToleration(testutil.NewPod("pod3", "node1"), 1, -1, "", ""),
 			},
 			oldNode: testutil.NewNode("node1"),
 			newNode: addTaintsToNode(testutil.NewNode("node1"), "testTaint1", "taint1", []int{1, 2}),
@@ -827,8 +921,8 @@ func TestEventualConsistency(t *testing.T) {
 			pods: []corev1.Pod{
 				*testutil.NewPod("pod1", "node1"),
 			},
-			prevPod:      addToleration(testutil.NewPod("pod2", ""), 1, 100),
-			newPod:       addToleration(testutil.NewPod("pod2", "node1"), 1, 100),
+			prevPod:      addToleration(testutil.NewPod("pod2", ""), 1, 100, "", ""),
+			newPod:       addToleration(testutil.NewPod("pod2", "node1"), 1, 100, "", ""),
 			oldNode:      testutil.NewNode("node1"),
 			newNode:      addTaintsToNode(testutil.NewNode("node1"), "testTaint1", "taint1", []int{1}),
 			expectPatch:  true,
@@ -852,7 +946,7 @@ func TestEventualConsistency(t *testing.T) {
 				*testutil.NewPod("pod1", "node1"),
 			},
 			prevPod:      nil,
-			newPod:       addToleration(testutil.NewPod("pod2", "node1"), 1, 100),
+			newPod:       addToleration(testutil.NewPod("pod2", "node1"), 1, 100, "", ""),
 			oldNode:      testutil.NewNode("node1"),
 			newNode:      addTaintsToNode(testutil.NewNode("node1"), "testTaint1", "taint1", []int{1}),
 			expectPatch:  true,
@@ -884,7 +978,7 @@ func TestEventualConsistency(t *testing.T) {
 			// First we simulate NodeUpdate that should delete 'pod1'. It doesn't know about 'pod2' yet.
 			controller.NodeUpdated(item.oldNode, item.newNode)
 
-			verifyPodActions(t, item.description, fakeClientset, item.expectPatch, item.expectDelete)
+			verifyPodActions(t, item.description, fakeClientset, item.expectPatch, item.expectDelete, false)
 			fakeClientset.ClearActions()
 
 			// And now the delayed update of 'pod2' comes to the TaintManager. We should delete it as well.
@@ -896,7 +990,7 @@ func TestEventualConsistency(t *testing.T) {
 	}
 }
 
-func verifyPodActions(t *testing.T, description string, fakeClientset *fake.Clientset, expectPatch, expectDelete bool) {
+func verifyPodActions(t *testing.T, description string, fakeClientset *fake.Clientset, expectPatch, expectDelete bool, expectError bool) {
 	t.Helper()
 	podPatched := false
 	podDeleted := false
@@ -913,7 +1007,7 @@ func verifyPodActions(t *testing.T, description string, fakeClientset *fake.Clie
 		}
 		return podPatched == expectPatch && podDeleted == expectDelete, nil
 	})
-	if err != nil {
+	if err != nil && !expectError {
 		t.Errorf("Failed waiting for the expected actions: %q", err)
 	}
 	if podPatched != expectPatch {
