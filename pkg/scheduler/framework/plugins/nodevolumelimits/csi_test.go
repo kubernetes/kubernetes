@@ -27,6 +27,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	csitrans "k8s.io/csi-translation-lib"
@@ -1248,6 +1249,30 @@ func getNodeWithPodAndVolumeLimits(limitSource string, pods []*v1.Pod, limit int
 	return nodeInfo, csiNode
 }
 
+// fakeCSIDriverLister is a minimal lister for CSIDriver used in tests.
+type fakeCSIDriverLister []storagev1.CSIDriver
+
+func (l fakeCSIDriverLister) Get(name string) (*storagev1.CSIDriver, error) {
+	for i := range l {
+		if l[i].Name == name {
+			return &l[i], nil
+		}
+	}
+	return nil, fmt.Errorf("csidriver %s not found", name)
+}
+
+func (l fakeCSIDriverLister) List(selector labels.Selector) ([]*storagev1.CSIDriver, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+func getFakeCSIDriverLister(driverNames ...string) fakeCSIDriverLister {
+	var list fakeCSIDriverLister
+	for _, name := range driverNames {
+		list = append(list, storagev1.CSIDriver{ObjectMeta: metav1.ObjectMeta{Name: name}})
+	}
+	return list
+}
+
 func TestVolumeLimitScalingGate(t *testing.T) {
 	// Pod uses a PVC that resolves to the EBS CSI driver via PV
 	newPod := st.MakePod().PVC("csi-ebs.csi.aws.com-0").Obj()
@@ -1293,6 +1318,7 @@ func TestVolumeLimitScalingGate(t *testing.T) {
 				pvcLister:                getFakeCSIPVCLister("csi", scName, ebsCSIDriverName),
 				scLister:                 getFakeCSIStorageClassLister(scName, ebsCSIDriverName),
 				vaLister:                 getFakeVolumeAttachmentLister(0, ebsCSIDriverName),
+				csiDriverLister:          getFakeCSIDriverLister(ebsCSIDriverName),
 				enableVolumeLimitScaling: tt.enableVolumeLimitScaling,
 				randomVolumeIDPrefix:     rand.String(32),
 				translator:               csiTranslator,
