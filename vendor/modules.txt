@@ -1119,7 +1119,9 @@ k8s.io/klog/v2/textlogger
 ## explicit; go 1.25.0
 # k8s.io/kube-controller-manager v0.0.0 => ./staging/src/k8s.io/kube-controller-manager
 ## explicit; go 1.25.0
-# k8s.io/kube-openapi v0.0.0-20250910181357-589584f1c912
+# k8s.io/kube-openapi v0.0.0-20250910181357-589584f1c912 => github.com/pohly/kube-openapi v0.0.0-20251031162619-7c7e24fa61bc
+## explicit; go 1.23.0
+# k8s.io/kube-openapi v0.0.0-20251031162619-7c7e24fa61bc => github.com/pohly/kube-openapi v0.0.0-20251031162619-7c7e24fa61bc
 ## explicit; go 1.23.0
 k8s.io/kube-openapi/cmd/openapi-gen
 k8s.io/kube-openapi/cmd/openapi-gen/args
@@ -1301,3 +1303,4 @@ sigs.k8s.io/structured-merge-diff/v6/value
 ## explicit; go 1.22
 sigs.k8s.io/yaml
 sigs.k8s.io/yaml/kyaml
+# k8s.io/kube-openapi => github.com/pohly/kube-openapi v0.0.0-20251031162619-7c7e24fa61bc
