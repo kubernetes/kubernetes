@@ -26,6 +26,7 @@ import (
 	"google.golang.org/grpc/internal/channelz"
 	"google.golang.org/grpc/internal/grpcsync"
 	"google.golang.org/grpc/internal/pretty"
+	"google.golang.org/grpc/internal/resolver/delegatingresolver"
 	"google.golang.org/grpc/resolver"
 	"google.golang.org/grpc/serviceconfig"
 )
@@ -76,9 +77,19 @@ func (ccr *ccResolverWrapper) start() error {
 			CredsBundle:          ccr.cc.dopts.copts.CredsBundle,
 			Dialer:               ccr.cc.dopts.copts.Dialer,
 			Authority:            ccr.cc.authority,
+			MetricsRecorder:      ccr.cc.metricsRecorderList,
 		}
 		var err error
-		ccr.resolver, err = ccr.cc.resolverBuilder.Build(ccr.cc.parsedTarget, ccr, opts)
+		// The delegating resolver is used unless:
+		//   - A custom dialer is provided via WithContextDialer dialoption or
+		//   - Proxy usage is disabled through WithNoProxy dialoption.
+		// In these cases, the resolver is built based on the scheme of target,
+		// using the appropriate resolver builder.
+		if ccr.cc.dopts.copts.Dialer != nil || !ccr.cc.dopts.useProxy {
+			ccr.resolver, err = ccr.cc.resolverBuilder.Build(ccr.cc.parsedTarget, ccr, opts)
+		} else {
+			ccr.resolver, err = delegatingresolver.New(ccr.cc.parsedTarget, ccr, opts, ccr.cc.resolverBuilder, ccr.cc.dopts.enableLocalDNSResolution)
+		}
 		errCh <- err
 	})
 	return <-errCh
@@ -123,12 +134,7 @@ func (ccr *ccResolverWrapper) UpdateState(s resolver.State) error {
 		return nil
 	}
 	if s.Endpoints == nil {
-		s.Endpoints = make([]resolver.Endpoint, 0, len(s.Addresses))
-		for _, a := range s.Addresses {
-			ep := resolver.Endpoint{Addresses: []resolver.Address{a}, Attributes: a.BalancerAttributes}
-			ep.Addresses[0].BalancerAttributes = nil
-			s.Endpoints = append(s.Endpoints, ep)
-		}
+		s.Endpoints = addressesToEndpoints(s.Addresses)
 	}
 	ccr.addChannelzTraceEvent(s)
 	ccr.curState = s
@@ -161,7 +167,11 @@ func (ccr *ccResolverWrapper) NewAddress(addrs []resolver.Address) {
 		ccr.cc.mu.Unlock()
 		return
 	}
-	s := resolver.State{Addresses: addrs, ServiceConfig: ccr.curState.ServiceConfig}
+	s := resolver.State{
+		Addresses:     addrs,
+		ServiceConfig: ccr.curState.ServiceConfig,
+		Endpoints:     addressesToEndpoints(addrs),
+	}
 	ccr.addChannelzTraceEvent(s)
 	ccr.curState = s
 	ccr.mu.Unlock()
@@ -198,4 +208,14 @@ func (ccr *ccResolverWrapper) addChannelzTraceEvent(s resolver.State) {
 		updates = append(updates, "resolver returned new addresses")
 	}
 	channelz.Infof(logger, ccr.cc.channelz, "Resolver state updated: %s (%v)", pretty.ToJSON(s), strings.Join(updates, "; "))
+}
+
+func addressesToEndpoints(addrs []resolver.Address) []resolver.Endpoint {
+	endpoints := make([]resolver.Endpoint, 0, len(addrs))
+	for _, a := range addrs {
+		ep := resolver.Endpoint{Addresses: []resolver.Address{a}, Attributes: a.BalancerAttributes}
+		ep.Addresses[0].BalancerAttributes = nil
+		endpoints = append(endpoints, ep)
+	}
+	return endpoints
 }

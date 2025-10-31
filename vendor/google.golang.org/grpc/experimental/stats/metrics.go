@@ -19,7 +19,7 @@
 // Package stats contains experimental metrics/stats API's.
 package stats
 
-import "maps"
+import "google.golang.org/grpc/stats"
 
 // MetricsRecorder records on metrics derived from metric registry.
 type MetricsRecorder interface {
@@ -40,75 +40,15 @@ type MetricsRecorder interface {
 	RecordInt64Gauge(handle *Int64GaugeHandle, incr int64, labels ...string)
 }
 
-// Metric is an identifier for a metric.
-type Metric string
+// Metrics is an experimental legacy alias of the now-stable stats.MetricSet.
+// Metrics will be deleted in a future release.
+type Metrics = stats.MetricSet
 
-// Metrics is a set of metrics to record. Once created, Metrics is immutable,
-// however Add and Remove can make copies with specific metrics added or
-// removed, respectively.
-//
-// Do not construct directly; use NewMetrics instead.
-type Metrics struct {
-	// metrics are the set of metrics to initialize.
-	metrics map[Metric]bool
-}
+// Metric was replaced by direct usage of strings.
+type Metric = string
 
-// NewMetrics returns a Metrics containing Metrics.
+// NewMetrics is an experimental legacy alias of the now-stable
+// stats.NewMetricSet.  NewMetrics will be deleted in a future release.
 func NewMetrics(metrics ...Metric) *Metrics {
-	newMetrics := make(map[Metric]bool)
-	for _, metric := range metrics {
-		newMetrics[metric] = true
-	}
-	return &Metrics{
-		metrics: newMetrics,
-	}
-}
-
-// Metrics returns the metrics set. The returned map is read-only and must not
-// be modified.
-func (m *Metrics) Metrics() map[Metric]bool {
-	return m.metrics
-}
-
-// Add adds the metrics to the metrics set and returns a new copy with the
-// additional metrics.
-func (m *Metrics) Add(metrics ...Metric) *Metrics {
-	newMetrics := make(map[Metric]bool)
-	for metric := range m.metrics {
-		newMetrics[metric] = true
-	}
-
-	for _, metric := range metrics {
-		newMetrics[metric] = true
-	}
-	return &Metrics{
-		metrics: newMetrics,
-	}
-}
-
-// Join joins the metrics passed in with the metrics set, and returns a new copy
-// with the merged metrics.
-func (m *Metrics) Join(metrics *Metrics) *Metrics {
-	newMetrics := make(map[Metric]bool)
-	maps.Copy(newMetrics, m.metrics)
-	maps.Copy(newMetrics, metrics.metrics)
-	return &Metrics{
-		metrics: newMetrics,
-	}
-}
-
-// Remove removes the metrics from the metrics set and returns a new copy with
-// the metrics removed.
-func (m *Metrics) Remove(metrics ...Metric) *Metrics {
-	newMetrics := make(map[Metric]bool)
-	for metric := range m.metrics {
-		newMetrics[metric] = true
-	}
-
-	for _, metric := range metrics {
-		delete(newMetrics, metric)
-	}
-	return &Metrics{
-		metrics: newMetrics,
-	}
+	return stats.NewMetricSet(metrics...)
 }

@@ -65,6 +65,7 @@ func (s *store) scheduleCompaction(compactMainRev, prevCompactRev int64) (KeyVal
 			revToBytes(revision{main: compactMainRev}, rbytes)
 			tx.UnsafePut(buckets.Meta, finishedCompactKeyName, rbytes)
 			tx.Unlock()
+			dbCompactionPauseMs.Observe(float64(time.Since(start) / time.Millisecond))
 			// gofail: var compactAfterSetFinishedCompact struct{}
 			hash := h.Hash()
 			size, sizeInUse := s.b.Size(), s.b.SizeInUse()

@@ -537,7 +537,7 @@ func NewServer(cfg config.ServerConfig) (srv *EtcdServer, err error) {
 		if !cfg.ForceNewCluster {
 			id, cl, n, s, w = restartNode(cfg, snapshot)
 		} else {
-			id, cl, n, s, w = restartAsStandaloneNode(cfg, snapshot)
+			id, cl, n, s, w = restartAsStandaloneNode(cfg, snapshot, ci)
 		}
 
 		cl.SetStore(st)
