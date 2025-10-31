@@ -113,10 +113,6 @@ func (sched *Scheduler) ScheduleOne(ctx context.Context) {
 	schedulingCycleCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.OpportunisticBatching) {
-		fwk.NewPod(ctx, pod)
-	}
-
 	scheduleResult, assumedPodInfo, prioritizedNodes, status := sched.schedulingCycle(schedulingCycleCtx, state, fwk, podInfo, start, podsToActivate)
 	if !status.IsSuccess() {
 		sched.FailureHandler(schedulingCycleCtx, fwk, assumedPodInfo, status, scheduleResult.nominatingInfo, start)
@@ -124,7 +120,7 @@ func (sched *Scheduler) ScheduleOne(ctx context.Context) {
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.OpportunisticBatching) {
-		sched.runPostScore(ctx, state, fwk, podInfo, prioritizedNodes, scheduleResult)
+		sched.runPostScore(ctx, fwk, pod, prioritizedNodes, scheduleResult)
 	}
 
 	// bind the pod to its host asynchronously (we can do this b/c of the assumption step above).
@@ -411,16 +407,10 @@ func (sched *Scheduler) frameworkForPod(pod *v1.Pod) (framework.Framework, error
 	return fwk, nil
 }
 
-func (sched *Scheduler) runPostScore(ctx context.Context, state fwk.CycleState, fwk framework.Framework, podInfo fwk.PodInfo, prioritizedNodes framework.SortedScoredNodes, scheduleResult ScheduleResult) {
-	chosenNode, err := sched.nodeInfoSnapshot.NodeInfos().Get(scheduleResult.SuggestedHost)
-	if err == nil {
-		for _, someFwk := range sched.Profiles {
-			thisFwksPod := someFwk == fwk
-			someFwk.RunPostScore(ctx, state, thisFwksPod, podInfo, chosenNode, prioritizedNodes)
-		}
-	} else {
-		// This shouldn't happen since we haven't changed the snapshot since scheduling.
-		utilruntime.HandleErrorWithContext(ctx, err, "Error while getting used nodeInfo from snapshot")
+func (sched *Scheduler) runPostScore(ctx context.Context, fwk framework.Framework, pod *v1.Pod, prioritizedNodes framework.SortedScoredNodes, scheduleResult ScheduleResult) {
+	for _, someFwk := range sched.Profiles {
+		thisFwksPod := someFwk == fwk
+		someFwk.RunPostScore(ctx, thisFwksPod, pod, scheduleResult.SuggestedHost, prioritizedNodes)
 	}
 }
 
@@ -538,7 +528,10 @@ func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, schedFramework 
 
 	var nodeHint string
 	if utilfeature.DefaultFeatureGate.Enabled(features.OpportunisticBatching) {
-		nodeHint = schedFramework.NodeHint(ctx, pod)
+		lastChosen := schedFramework.LastChosen()
+		if lastHintedNode, err := sched.nodeInfoSnapshot.Get(lastChosen); err == nil {
+			nodeHint = schedFramework.RunNodeHint(ctx, pod, state, lastHintedNode)
+		}
 	}
 
 	// "NominatedNodeName" can potentially be set in a previous scheduling cycle as a result of preemption.

@@ -1267,16 +1267,16 @@ func (f *frameworkImpl) runScoreExtension(ctx context.Context, pl fwk.ScorePlugi
 	return status
 }
 
-func (f *frameworkImpl) NewPod(ctx context.Context, pod *v1.Pod) {
-	f.batch.NewPod(ctx, pod)
+func (f *frameworkImpl) LastChosen() string {
+	return f.batch.LastChosen()
 }
 
-func (f *frameworkImpl) NodeHint(ctx context.Context, pod *v1.Pod) string {
-	return f.batch.NodeHint(ctx, pod)
+func (f *frameworkImpl) RunNodeHint(ctx context.Context, pod *v1.Pod, state fwk.CycleState, lastChosenNode fwk.NodeInfo) string {
+	return f.batch.RunNodeHint(ctx, pod, state, lastChosenNode)
 }
 
-func (f *frameworkImpl) RunPostScore(ctx context.Context, state fwk.CycleState, thisFramework bool, podInfo fwk.PodInfo, chosenNode fwk.NodeInfo, otherNodes framework.SortedScoredNodes) {
-	f.batch.postScore(ctx, state, thisFramework, podInfo, chosenNode, otherNodes)
+func (f *frameworkImpl) RunPostScore(ctx context.Context, thisFramework bool, pod *v1.Pod, chosenNode string, otherNodes framework.SortedScoredNodes) {
+	f.batch.PostScore(ctx, thisFramework, pod, chosenNode, otherNodes)
 }
 
 // RunPreBindPlugins runs the set of configured prebind plugins. It returns a

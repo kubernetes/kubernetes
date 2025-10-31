@@ -231,24 +231,13 @@ func TestBatchBasic(t *testing.T) {
 		state := framework.NewCycleState()
 
 		// Run the first "pod" through
-		batch.NewPod(ctx, pod)
-		hint := batch.NodeHint(ctx, pod)
+		hint := batch.RunNodeHint(ctx, pod, state, nil)
 		if hint != "" {
 			t.Fatalf("Got unexpected hint %s", hint)
 		}
 
-		firstChosenNode := framework.NewNodeInfo()
-		firstChosenNode.SetNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{
-			Name: tt.firstChosenNode,
-			UID:  types.UID(tt.firstChosenNode),
-		}})
-
-		podInfo, err := framework.NewPodInfo(pod)
-		if err != nil {
-			t.Fatalf("Error making podinfo %v", err)
-		}
 		if tt.firstPodCompleted {
-			batch.postScore(ctx, state, true, podInfo, firstChosenNode, tt.firstOtherNodes)
+			batch.PostScore(ctx, true, pod, tt.firstChosenNode, tt.firstOtherNodes)
 		}
 
 		// Run the second pod
@@ -259,25 +248,24 @@ func TestBatchBasic(t *testing.T) {
 			},
 		}
 
+		var lastChosenNode fwk.NodeInfo
+		if batch.LastChosen() != "" {
+			lastChosenNode = framework.NewNodeInfo(pod)
+			lastChosenNode.SetNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{
+				Name: batch.LastChosen(),
+				UID:  types.UID(batch.LastChosen()),
+			}})
+		}
+
 		signature = tt.secondSig
-		batch.NewPod(ctx, pod2)
-		hint = batch.NodeHint(ctx, pod2)
+		hint = batch.RunNodeHint(ctx, pod2, state, lastChosenNode)
 
 		if hint != tt.expectedHint {
 			t.Fatalf("Got hint '%s' expected '%s' for test '%s'", hint, tt.expectedHint, tt.name)
 		}
 
-		podInfo2, err := framework.NewPodInfo(pod2)
-		if err != nil {
-			t.Fatalf("Error making podinfo2 %v", err)
-		}
-		chosenNode2 := framework.NewNodeInfo()
-		chosenNode2.SetNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{
-			Name: tt.secondChosenNode,
-			UID:  types.UID(tt.secondChosenNode),
-		}})
 		if tt.firstPodCompleted {
-			batch.postScore(ctx, state, true, podInfo2, chosenNode2, tt.secondOtherNodes)
+			batch.PostScore(ctx, true, pod2, tt.secondChosenNode, tt.secondOtherNodes)
 		}
 
 		batchEmpty := batch.state == nil || batch.state.sortedNodes == nil || batch.state.sortedNodes.Len() == 0

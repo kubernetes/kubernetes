@@ -173,9 +173,6 @@ type Framework interface {
 	// QueueSortFunc returns the function to sort pods in scheduling queue
 	QueueSortFunc() fwk.LessFunc
 
-	// Update necessary internal state based on a new pod arrival.
-	NewPod(ctx context.Context, pod *v1.Pod)
-
 	// RunPreFilterPlugins runs the set of configured PreFilter plugins. It returns
 	// *fwk.Status and its code is set to non-success if any of the plugins returns
 	// anything but Success. If a non-success status is returned, then the scheduling
@@ -193,12 +190,16 @@ type Framework interface {
 	// cluster state to make the pod potentially schedulable in a future scheduling cycle.
 	RunPostFilterPlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, filteredNodeStatusMap fwk.NodeToStatusReader) (*fwk.PostFilterResult, *fwk.Status)
 
-	// Get a node hint for a given pod if possible. It no hint is available the function will
-	// return "".
-	NodeHint(ctx context.Context, pod *v1.Pod) string
+	// Get the last chosen node according to the batch. The caller must provide the up-to-date NodeInfo for this
+	// node to RunNodeHint.
+	LastChosen() string
+
+	// Get a "node hint" for a given pod. If the function returns anything but the empty string, then
+	// this node can be evaluated
+	RunNodeHint(ctx context.Context, pod *v1.Pod, state fwk.CycleState, lastChosenNode fwk.NodeInfo) string
 
 	// On successful scheduling of a pod, update internal (batch) information.
-	RunPostScore(ctx context.Context, state fwk.CycleState, thisFramework bool, podInfo fwk.PodInfo, chosenNode fwk.NodeInfo, otherNodes SortedScoredNodes)
+	RunPostScore(ctx context.Context, thisFramework bool, pod *v1.Pod, chosenNode string, otherNodes SortedScoredNodes)
 
 	// RunPreBindPlugins runs the set of configured PreBind plugins. It returns
 	// *fwk.Status and its code is set to non-success if any of the plugins returns
