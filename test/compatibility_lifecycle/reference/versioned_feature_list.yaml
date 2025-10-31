@@ -1633,6 +1633,12 @@
     lockToDefault: true
     preRelease: GA
     version: "1.32"
+- name: StatefulSetSemanticRevisionComparison
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.0"
 - name: StorageCapacityScoring
   versionedSpecs:
   - default: false
