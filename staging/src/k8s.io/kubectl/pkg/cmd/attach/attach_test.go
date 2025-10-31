@@ -510,7 +510,7 @@ func TestReattachMessage(t *testing.T) {
 			container: "bar",
 			rawTTY:    true,
 			stdin:     true,
-			expected:  "Session ended, resume using 'kubectl foo -c bar -n test -i -t' command when the pod is running",
+			expected:  "Session ended, resume using 'kubectl foo -c bar -n test -i -t' command",
 		},
 		{
 			name:      "no stdin",
@@ -541,7 +541,7 @@ func TestReattachMessage(t *testing.T) {
 			container: "bar",
 			rawTTY:    true,
 			stdin:     true,
-			expected:  "",
+			expected:  "Session ended, resume using 'kubectl foo -c bar -n test -i -t' command",
 		},
 		{
 			name:      "ephemeral container",
