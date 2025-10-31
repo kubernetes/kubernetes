@@ -20,12 +20,14 @@ limitations under the License.
 package mount
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 
+	"golang.org/x/sys/windows"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/keymutex"
 )
@@ -119,7 +121,7 @@ func (mounter *Mounter) MountSensitive(source string, target string, fstype stri
 		if output, err := newSMBMapping(username, password, source); err != nil {
 			klog.Warningf("SMB Mapping(%s) returned with error(%v), output(%s)", source, err, string(output))
 			if isSMBMappingExist(source) {
-				valid, err := isValidPath(source)
+				valid, err := IsPathValid(source)
 				if !valid {
 					if err == nil || isAccessDeniedError(err) {
 						klog.V(2).Infof("SMB Mapping(%s) already exists while it's not valid, return error: %v, now begin to remove and remount", source, err)
@@ -190,19 +192,6 @@ func isSMBMappingExist(remotepath string) bool {
 	return err == nil
 }
 
-// check whether remotepath is valid
-// return (true, nil) if remotepath is valid
-func isValidPath(remotepath string) (bool, error) {
-	cmd := exec.Command("powershell", "/c", `Test-Path $Env:remotepath`)
-	cmd.Env = append(os.Environ(), fmt.Sprintf("remotepath=%s", remotepath))
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return false, fmt.Errorf("returned output: %s, error: %v", string(output), err)
-	}
-
-	return strings.HasPrefix(strings.ToLower(string(output)), "true"), nil
-}
-
 func isAccessDeniedError(err error) bool {
 	return err != nil && strings.Contains(strings.ToLower(err.Error()), accessDenied)
 }
@@ -232,21 +221,16 @@ func (mounter *Mounter) List() ([]MountPoint, error) {
 	return []MountPoint{}, nil
 }
 
-// IsLikelyNotMountPoint determines if a directory is not a mountpoint.
+// IsLikelyNotMountPoint determines if a directory is not a mount point.
 func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
-	stat, err := os.Lstat(file)
+	isMnt, err := mounter.IsMountPoint(file)
 	if err != nil {
-		return true, err
-	}
-
-	if stat.Mode()&os.ModeSymlink != 0 {
+		if errors.Is(err, windows.ERROR_PATH_NOT_FOUND) || errors.Is(err, windows.ERROR_FILE_NOT_FOUND) || errors.Is(err, windows.ERROR_INVALID_NAME) {
+			return true, err
+		}
 		return false, err
 	}
-	// go1.23 behavior change: https://github.com/golang/go/issues/63703#issuecomment-2535941458
-	if stat.Mode()&os.ModeIrregular != 0 {
-		return false, err
-	}
-	return true, nil
+	return !isMnt, nil
 }
 
 // CanSafelySkipMountPointCheck always returns false on Windows
@@ -254,13 +238,9 @@ func (mounter *Mounter) CanSafelySkipMountPointCheck() bool {
 	return false
 }
 
-// IsMountPoint: determines if a directory is a mountpoint.
-func (mounter *Mounter) IsMountPoint(file string) (bool, error) {
-	isNotMnt, err := mounter.IsLikelyNotMountPoint(file)
-	if err != nil {
-		return false, err
-	}
-	return !isNotMnt, nil
+// IsMountPoint determines if a directory is a mount point.
+func (mounter *Mounter) IsMountPoint(path string) (bool, error) {
+	return IsMountedFolder(path)
 }
 
 // GetMountRefs : empty implementation here since there is no place to query all mount points on Windows
