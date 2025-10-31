@@ -31,6 +31,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/util/wait"
 	kubeletevents "k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/test/e2e/feature"
@@ -183,4 +184,215 @@ func newPullImageAlwaysPod() *v1.Pod {
 		},
 	}
 	return pod
+}
+
+var _ = SIGDescribe("Deleted pods handling", feature.CriProxy, framework.WithSerial(), func() {
+	f := framework.NewDefaultFramework("deleted-pods-test")
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
+
+	ginkgo.Context("Verify RemoveContainer call count for single container pod", func() {
+		ginkgo.BeforeEach(func() {
+			if err := resetCRIProxyInjector(e2eCriProxy); err != nil {
+				ginkgo.Skip("Skip the test since the CRI Proxy is undefined.")
+			}
+			ginkgo.DeferCleanup(func() error {
+				return resetCRIProxyInjector(e2eCriProxy)
+			})
+		})
+
+		ginkgo.It("Should call RemoveContainer at most once for single container pod deletion", func(ctx context.Context) {
+			// Wait for cluster to be clean before starting test
+			err := waitForNoTerminatingPods(ctx, f)
+			framework.ExpectNoError(err)
+
+			// Set up RemoveContainer call tracking
+			removeContainerCallCount := 0
+			err = addCRIProxyInjector(e2eCriProxy, func(apiName string) error {
+				if apiName == criproxy.RemoveContainer {
+					removeContainerCallCount++
+					framework.Logf("RemoveContainer called, total count: %d", removeContainerCallCount)
+				}
+				return nil
+			})
+			framework.ExpectNoError(err)
+
+			// Create and wait for pod to be running
+			pod := e2epod.NewPodClient(f).Create(ctx, newSingleContainerPod())
+			podErr := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
+			framework.ExpectNoError(podErr)
+
+			// Record the baseline count before deletion
+			baselineCount := removeContainerCallCount
+			framework.Logf("Baseline RemoveContainer count before pod deletion: %d", baselineCount)
+
+			// Delete the pod
+			err = e2epod.NewPodClient(f).Delete(ctx, pod.Name, metav1.DeleteOptions{})
+			framework.ExpectNoError(err)
+
+			// Wait for pod to be deleted
+			err = e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name, 2*time.Minute)
+			framework.ExpectNoError(err)
+
+			// Calculate calls made during this pod's deletion
+			podDeletionCalls := removeContainerCallCount - baselineCount
+			framework.Logf("RemoveContainer calls for this pod deletion: %d", podDeletionCalls)
+
+			// Verify that RemoveContainer was called at least once for this pod
+			gomega.Expect(podDeletionCalls).To(gomega.BeNumerically(">", 0),
+				"RemoveContainer should be called at least once for a single container pod")
+
+			// Verify that RemoveContainer was called at most once for this pod
+			gomega.Expect(podDeletionCalls).To(gomega.BeNumerically("<=", 1),
+				"RemoveContainer should be called at most once for a single container pod")
+		})
+	})
+
+	ginkgo.Context("Verify RemoveContainer call count for two container pod", func() {
+		ginkgo.BeforeEach(func() {
+			if err := resetCRIProxyInjector(e2eCriProxy); err != nil {
+				ginkgo.Skip("Skip the test since the CRI Proxy is undefined.")
+			}
+			ginkgo.DeferCleanup(func() error {
+				return resetCRIProxyInjector(e2eCriProxy)
+			})
+		})
+
+		ginkgo.It("Should call RemoveContainer at most three times for two container pod deletion", func(ctx context.Context) {
+			// Wait for cluster to be clean before starting test
+			err := waitForNoTerminatingPods(ctx, f)
+			framework.ExpectNoError(err)
+
+			// Set up RemoveContainer call tracking
+			removeContainerCallCount := 0
+			err = addCRIProxyInjector(e2eCriProxy, func(apiName string) error {
+				if apiName == criproxy.RemoveContainer {
+					removeContainerCallCount++
+					framework.Logf("RemoveContainer called, total count: %d", removeContainerCallCount)
+				}
+				return nil
+			})
+			framework.ExpectNoError(err)
+
+			// Create and wait for pod to be running
+			pod := e2epod.NewPodClient(f).Create(ctx, newTwoContainerPod())
+			podErr := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
+			framework.ExpectNoError(podErr)
+
+			// Record the baseline count before deletion
+			baselineCount := removeContainerCallCount
+			framework.Logf("Baseline RemoveContainer count before pod deletion: %d", baselineCount)
+
+			// Delete the pod
+			err = e2epod.NewPodClient(f).Delete(ctx, pod.Name, metav1.DeleteOptions{})
+			framework.ExpectNoError(err)
+
+			// Wait for pod to be deleted
+			err = e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name, 2*time.Minute)
+			framework.ExpectNoError(err)
+
+			// Calculate calls made during this pod's deletion
+			podDeletionCalls := removeContainerCallCount - baselineCount
+			framework.Logf("RemoveContainer calls for this pod deletion: %d", podDeletionCalls)
+
+			// Verify that RemoveContainer was called at least once for this pod
+			gomega.Expect(podDeletionCalls).To(gomega.BeNumerically(">", 0),
+				"RemoveContainer should be called at least once for a two container pod")
+
+			// Verify that RemoveContainer was called at most three times for this pod
+			// If two containers in a pod terminate simultaneously,
+			// PLEG will detect both exits and trigger two ContainerDied events.
+			// During the first event, all containers are removed since they're all
+			// in the Exited state in the pod cache. The second event then triggers an additional RemoveContainer() call.
+			//
+			// We have no complete solution for this, but compared to the previous
+			// implementation where RemoveContainer() calls grew exponentially with the
+			// number of containers in a pod, this already represents an improvement.
+			gomega.Expect(podDeletionCalls).To(gomega.BeNumerically("<=", 3),
+				"RemoveContainer should be called at most three times for a two container pod")
+		})
+	})
+})
+
+func newSingleContainerPod() *v1.Pod {
+	podName := "single-container-pod-" + string(uuid.NewUUID())
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: podName,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Image: imageutils.GetE2EImage(imageutils.BusyBox),
+					Name:  "container1",
+					Command: []string{
+						"sh",
+						"-c",
+						"trap \"exit 0\" SIGTERM; while true; do sleep 1; done",
+					},
+				},
+			},
+		},
+	}
+	return pod
+}
+
+func newTwoContainerPod() *v1.Pod {
+	podName := "two-container-pod-" + string(uuid.NewUUID())
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: podName,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Image: imageutils.GetE2EImage(imageutils.BusyBox),
+					Name:  "container1",
+					Command: []string{
+						"sh",
+						"-c",
+						"trap \"exit 0\" SIGTERM; while true; do sleep 1; done",
+					},
+				},
+				{
+					Image: imageutils.GetE2EImage(imageutils.BusyBox),
+					Name:  "container2",
+					Command: []string{
+						"sh",
+						"-c",
+						"trap \"exit 0\" SIGTERM; while true; do sleep 1; done",
+					},
+				},
+			},
+		},
+	}
+	return pod
+}
+
+// waitForNoTerminatingPods waits for cluster to be clean with no terminating pods
+func waitForNoTerminatingPods(ctx context.Context, f *framework.Framework) error {
+	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
+	defer cancel()
+	return wait.PollUntilContextCancel(ctx, time.Second, true, func(ctx context.Context) (bool, error) {
+		// Check all namespaces for terminating pods
+		pods, err := f.ClientSet.CoreV1().Pods("").List(ctx, metav1.ListOptions{})
+		if err != nil {
+			return false, err
+		}
+
+		terminatingPods := []string{}
+		for _, pod := range pods.Items {
+			if pod.DeletionTimestamp != nil {
+				terminatingPods = append(terminatingPods, fmt.Sprintf("%s/%s", pod.Namespace, pod.Name))
+			}
+		}
+
+		if len(terminatingPods) > 0 {
+			framework.Logf("Still waiting for %d terminating pods to be fully deleted: %v",
+				len(terminatingPods), terminatingPods)
+			return false, nil
+		}
+
+		framework.Logf("No terminating pods found, cluster is clean")
+		return true, nil
+	})
 }
