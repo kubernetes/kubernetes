@@ -17,6 +17,7 @@ limitations under the License.
 package statefulset
 
 import (
+	"bytes"
 	"context"
 	"sort"
 	"sync"
@@ -29,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/controller/history"
 	"k8s.io/kubernetes/pkg/controller/statefulset/metrics"
 	"k8s.io/kubernetes/pkg/features"
@@ -209,6 +211,31 @@ func (ssc *defaultStatefulSetControl) truncateHistory(
 	return nil
 }
 
+var nullCreationTimestamp = []byte(`"creationTimestamp":null`)
+
+func latestRevisionMatchesUpdateRevisionWhenNormalized(updateSet *apps.StatefulSet, updateRevision *apps.ControllerRevision, latestRevision *apps.ControllerRevision) bool {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ControllerRevisionNullCreationTimestampFix) {
+		return false
+	}
+	if !bytes.Contains(latestRevision.Data.Raw, nullCreationTimestamp) {
+		// short-circuit if the revision doesn't have the data we think normalization would drop
+		return false
+	}
+	// apply the latest revision and default it
+	latestSet, err := ApplyRevision(updateSet, latestRevision)
+	if err != nil {
+		return false
+	}
+	legacyscheme.Scheme.Default(latestSet)
+	// construct the resulting revision
+	reserializedLatestRevision, err := newRevision(latestSet, 0, nil)
+	if err != nil {
+		return false
+	}
+	// check if they match
+	return history.EqualRevision(reserializedLatestRevision, updateRevision)
+}
+
 // getStatefulSetRevisions returns the current and update ControllerRevisions for set. It also
 // returns a collision count that records the number of name collisions set saw when creating
 // new ControllerRevisions. This count is incremented on every name collision and is used in
@@ -252,6 +279,9 @@ func (ssc *defaultStatefulSetControl) getStatefulSetRevisions(
 		if err != nil {
 			return nil, nil, collisionCount, err
 		}
+	} else if revisionCount > 0 && latestRevisionMatchesUpdateRevisionWhenNormalized(set, updateRevision, revisions[revisionCount-1]) {
+		// the update revision has not changed
+		updateRevision = revisions[revisionCount-1]
 	} else {
 		//if there is no equivalent revision we create a new one
 		updateRevision, err = ssc.controllerHistory.CreateControllerRevision(set, updateRevision, &collisionCount)

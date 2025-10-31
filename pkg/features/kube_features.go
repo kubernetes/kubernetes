@@ -163,6 +163,12 @@ const (
 	// Enables configuring custom stop signals for containers from container lifecycle
 	ContainerStopSignals featuregate.Feature = "ContainerStopSignals"
 
+	// owner: @liggitt
+	//
+	// Mitigates spurious rollouts due to differences in controller revisions
+	// because of null creationTimestamp values from 1.33 -> 1.34.
+	ControllerRevisionNullCreationTimestampFix = "ControllerRevisionNullCreationTimestampFix"
+
 	// owner: @jefftree
 	// kep: https://kep.k8s.io/4355
 	//
@@ -1138,6 +1144,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	ContainerStopSignals: {
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	ControllerRevisionNullCreationTimestampFix: {
+		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	CrossNamespaceVolumeDataSource: {
