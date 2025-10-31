@@ -363,7 +363,7 @@ func TestUpdate(t *testing.T) {
 	// everything we've added has been deleted.
 	watchCh := make(chan struct{})
 	_, controller := NewInformer(
-		&ListWatch{
+		toListWatcherWithUnSupportedWatchListSemantics(&ListWatch{
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				watch, err := source.Watch(options)
 				close(watchCh)
@@ -372,7 +372,7 @@ func TestUpdate(t *testing.T) {
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				return source.List(options)
 			},
-		},
+		}),
 		&v1.Pod{},
 		0,
 		ResourceEventHandlerFuncs{
@@ -731,5 +731,19 @@ func TestDeletionHandlingObjectToName(t *testing.T) {
 	}
 	if expected != actual {
 		t.Errorf("Expected %#v, got %#v", expected, actual)
+	}
+}
+
+type listWatchWithUnSupportedWatchListSemanticsWrapper struct {
+	*ListWatch
+}
+
+func (lw listWatchWithUnSupportedWatchListSemanticsWrapper) IsWatchListSemanticsUnSupported() bool {
+	return true
+}
+
+func toListWatcherWithUnSupportedWatchListSemantics(lw *ListWatch) ListerWatcher {
+	return listWatchWithUnSupportedWatchListSemanticsWrapper{
+		lw,
 	}
 }
