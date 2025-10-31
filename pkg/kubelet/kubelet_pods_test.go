@@ -3605,9 +3605,6 @@ func TestConvertToAPIContainerStatuses(t *testing.T) {
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "my-pod",
-					Annotations: map[string]string{
-						kubetypes.ConfigSourceAnnotationKey: "file", // static pod
-					},
 				},
 				Spec: desiredStateWithInitContainer,
 				Status: v1.PodStatus{
@@ -3646,9 +3643,6 @@ func TestConvertToAPIContainerStatuses(t *testing.T) {
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "my-pod",
-					Annotations: map[string]string{
-						kubetypes.ConfigSourceAnnotationKey: "file", // static pod
-					},
 				},
 				Spec: desiredStateWithSidecarContainer,
 				Status: v1.PodStatus{
