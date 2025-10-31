@@ -2626,7 +2626,6 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 			// When the init container is a sidecar container, it should be waiting (and will be restarted).
 			isSidecar := container.RestartPolicy != nil && *container.RestartPolicy == v1.ContainerRestartPolicyAlways
 			if s == nil &&
-				kubetypes.IsStaticPod(pod) &&
 				kuberuntime.HasAnyRegularContainerCreated(pod, podStatus) &&
 				!isSidecar &&
 				statuses[container.Name].State.Waiting != nil {
