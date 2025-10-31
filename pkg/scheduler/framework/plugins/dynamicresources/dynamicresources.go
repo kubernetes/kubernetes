@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"slices"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -789,7 +788,7 @@ func (pl *DynamicResources) filterExtendedResources(state *stateData, pod *v1.Po
 
 	// Each node needs its own, potentially different variant of the claim.
 	nodeExtendedResourceClaim := extendedResourceClaim.DeepCopy()
-	nodeExtendedResourceClaim.Spec.Devices.Requests = createDeviceRequests(pod, extendedResources, state.draExtendedResource.resourceToDeviceClass)
+	nodeExtendedResourceClaim.Spec.Devices.Requests = createDeviceRequests(pod, extendedResources, logger, state.draExtendedResource.resourceToDeviceClass)
 
 	if extendedResourceClaim.Status.Allocation != nil {
 		// If it is already allocated, then we cannot simply allocate it again.
@@ -835,7 +834,7 @@ func sortedPodExtendedResources(containers []v1.Container) []string {
 //
 // a special device request name with format: request-%d,
 // where %d is the index of the extended resource in the sorted list of extended resources in the pod.
-func createDeviceRequests(pod *v1.Pod, extendedResources map[v1.ResourceName]int64, deviceClassMapping map[v1.ResourceName]string) []resourceapi.DeviceRequest {
+func createDeviceRequests(pod *v1.Pod, extendedResources map[v1.ResourceName]int64, logger klog.Logger, deviceClassMapping map[v1.ResourceName]string) []resourceapi.DeviceRequest {
 	// Creating the extended resource claim's Requests by
 	// iterating over the containers, and the resources in the containers,
 	// and create one request per <container, extended resource> for sidecar init containers
@@ -912,10 +911,12 @@ func createDeviceRequests(pod *v1.Pod, extendedResources map[v1.ResourceName]int
 		}
 		// create the special request for extra devices needed.
 		// find the index in the sorted pod's all extended resources
-		ridx := sort.SearchStrings(podExtendedResourceSlice, r.String())
-		if ridx == len(podExtendedResourceSlice) {
+		ridx := slices.Index(podExtendedResourceSlice, r.String())
+		if ridx < 0 {
+			logger.V(5).Info("Extended resource not found, this should not happen", "extended resource", r.String())
 			continue
 		}
+
 		deviceRequests = append(deviceRequests,
 			resourceapi.DeviceRequest{
 				Name: fmt.Sprintf("request-%d", ridx), // need to be container name index - extended resource name index
@@ -926,10 +927,40 @@ func createDeviceRequests(pod *v1.Pod, extendedResources map[v1.ResourceName]int
 				},
 			})
 	}
-	sort.Slice(deviceRequests, func(i, j int) bool {
-		return deviceRequests[i].Name < deviceRequests[j].Name
+
+	// At most one special device request (name has format request-%d) for each device class is needed,
+	// the code above may create two such requests, one for explicit extended resource,
+	// one for implicit extended resource. In such cases, we remove the one that requests
+	// for smaller quantity. We also always use the implicit extended resource name index in request-%d.
+	uniqDeviceRequests := make([]resourceapi.DeviceRequest, 0, len(deviceRequests))
+	seen := make(map[string]resourceapi.DeviceRequest)
+	for _, r := range deviceRequests {
+		if !strings.HasPrefix(r.Name, "reuqest-") {
+			uniqDeviceRequests = append(uniqDeviceRequests, r)
+			continue
+		}
+
+		if rseen, ok := seen[r.Exactly.DeviceClassName]; ok {
+			class := r.Exactly.DeviceClassName
+			ridx := slices.Index(podExtendedResourceSlice, resourceapi.ResourceDeviceClassPrefix+class)
+			if ridx >= 0 {
+				// ensure always use the implicit extended resource request name
+				rseen.Name = fmt.Sprintf("request-%d", ridx)
+				seen[rseen.Exactly.DeviceClassName] = rseen
+			}
+			if rseen.Exactly.Count >= r.Exactly.Count {
+				continue
+			}
+		}
+		seen[r.Exactly.DeviceClassName] = r
+	}
+	for _, r := range seen {
+		uniqDeviceRequests = append(uniqDeviceRequests, r)
+	}
+	sort.Slice(uniqDeviceRequests, func(i, j int) bool {
+		return uniqDeviceRequests[i].Name < uniqDeviceRequests[j].Name
 	})
-	return deviceRequests
+	return uniqDeviceRequests
 }
 
 // Filter invoked at the filter extension point.
@@ -1429,7 +1460,7 @@ func (pl *DynamicResources) PreBindPreFlight(ctx context.Context, cs fwk.CycleSt
 // the device request name has the format: container-%d-request-%d,
 // the first %d is the container's index in the pod's initContainer and containers
 // the second %d is the extended resource's index in that container's sorted resource requests.
-func createRequestMappings(claim *resourceapi.ResourceClaim, pod *v1.Pod, logger klog.Logger) []v1.ContainerExtendedResourceRequest {
+func createRequestMappings(claim *resourceapi.ResourceClaim, pod *v1.Pod, logger klog.Logger, deviceClassMapping map[v1.ResourceName]string) []v1.ContainerExtendedResourceRequest {
 	// create the list of device request names, and map of device request name to request quantity
 	deviceReqNames := make([]string, 0, len(claim.Spec.Devices.Requests))
 	deviceReqQuantity := make(map[string]int64)
@@ -1484,6 +1515,7 @@ func createRequestMappings(claim *resourceapi.ResourceClaim, pod *v1.Pod, logger
 							ResourceName:  rName.String(),
 							RequestName:   devReqName,
 						})
+					break
 				}
 			}
 		}
@@ -1529,17 +1561,52 @@ func createRequestMappings(claim *resourceapi.ResourceClaim, pod *v1.Pod, logger
 				}
 			}
 			if rQuant.CmpInt64(0) > 0 {
-				ridx := sort.SearchStrings(podExtendedResourceSlice, rName.String())
-				if ridx == len(podExtendedResourceSlice) {
+				ridx := slices.Index(podExtendedResourceSlice, rName.String())
+				requestName := fmt.Sprintf("request-%d", ridx)
+				found := false
+				for _, devReqName := range deviceReqNames {
+					// During filter phase, special device request name is set to be
+					// request "-" extended resource name index
+					if requestName == devReqName {
+						initcers = append(initcers,
+							v1.ContainerExtendedResourceRequest{
+								ContainerName: c.Name,
+								ResourceName:  rName.String(),
+								RequestName:   requestName,
+							})
+						found = true
+						break
+					}
+				}
+				if found {
+					continue
+				}
+				// This can only happen when pod requests both explicit and implicit extended resource name for the same device class,
+				// rName is explicit, and the device request name is using implicit's index.
+				class, ok := deviceClassMapping[rName]
+				if !ok {
+					logger.V(5).Info("Extended resource not found in device class mapping, this should not happen", "extended resource", rName.String())
+					continue
+				}
+				ridx = slices.Index(podExtendedResourceSlice, resourceapi.ResourceDeviceClassPrefix+class)
+				if ridx < 0 {
 					logger.V(5).Info("Extended resource not found, this should not happen", "extended resource", rName.String())
 					continue
 				}
-				initcers = append(initcers,
-					v1.ContainerExtendedResourceRequest{
-						ContainerName: c.Name,
-						ResourceName:  rName.String(),
-						RequestName:   "request-" + strconv.Itoa(ridx),
-					})
+				requestName = fmt.Sprintf("request-%d", ridx)
+				for _, devReqName := range deviceReqNames {
+					// During filter phase, special device request name is set to be
+					// request "-" extended resource name index
+					if requestName == devReqName {
+						initcers = append(initcers,
+							v1.ContainerExtendedResourceRequest{
+								ContainerName: c.Name,
+								ResourceName:  rName.String(),
+								RequestName:   requestName,
+							})
+						break
+					}
+				}
 			}
 		}
 	}
@@ -1720,7 +1787,7 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 	// Patch the pod status with the new information about the generated
 	// special resource claim.
 	if isExtendedResourceClaim {
-		cer := createRequestMappings(claim, pod, logger)
+		cer := createRequestMappings(claim, pod, logger, state.draExtendedResource.resourceToDeviceClass)
 		podStatusCopy := pod.Status.DeepCopy()
 		podStatusCopy.ExtendedResourceClaimStatus = &v1.PodExtendedResourceClaimStatus{
 			RequestMappings:   cer,

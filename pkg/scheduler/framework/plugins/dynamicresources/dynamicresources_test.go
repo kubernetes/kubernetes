@@ -2868,7 +2868,8 @@ func Test_createDeviceRequests(t *testing.T) {
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			gotDeviceRequests := createDeviceRequests(tc.pod, tc.extendedResources, tc.deviceClassMapping)
+			logger, _ := ktesting.NewTestContext(t)
+			gotDeviceRequests := createDeviceRequests(tc.pod, tc.extendedResources, logger, tc.deviceClassMapping)
 			if len(tc.wantDeviceRequests) != len(gotDeviceRequests) {
 				t.Fatalf("different length, want %#v, len=%v, got %#v, len=%v", tc.wantDeviceRequests, len(tc.wantDeviceRequests), gotDeviceRequests, len(gotDeviceRequests))
 			}
@@ -2945,6 +2946,15 @@ func Test_createRequestMappings(t *testing.T) {
 			v1.ResourceName(extendedResourceName + "init"): "2",
 		}).
 		Obj()
+
+	devMap := map[v1.ResourceName]string{
+		v1.ResourceName(extendedResourceName):       "class",
+		v1.ResourceName(extendedResourceName + "1"): "class1",
+	}
+	devMapInit := map[v1.ResourceName]string{
+		v1.ResourceName(extendedResourceName):          "class",
+		v1.ResourceName(extendedResourceName + "init"): "classInit",
+	}
 
 	claim := st.MakeResourceClaim().
 		Name(claimName).
@@ -3035,51 +3045,59 @@ func Test_createRequestMappings(t *testing.T) {
 	}
 
 	testcases := map[string]struct {
-		claim           *resourceapi.ResourceClaim
-		pod             *v1.Pod
-		wantReqMappings []v1.ContainerExtendedResourceRequest
+		claim              *resourceapi.ResourceClaim
+		pod                *v1.Pod
+		deviceClassMapping map[v1.ResourceName]string
+		wantReqMappings    []v1.ContainerExtendedResourceRequest
 	}{
 		"one container, one request": {
-			claim:           claim,
-			pod:             pod1,
-			wantReqMappings: []v1.ContainerExtendedResourceRequest{cer},
+			claim:              claim,
+			pod:                pod1,
+			deviceClassMapping: devMap,
+			wantReqMappings:    []v1.ContainerExtendedResourceRequest{cer},
 		},
 		"two containers, one request": {
-			claim:           claim,
-			pod:             pod2,
-			wantReqMappings: []v1.ContainerExtendedResourceRequest{cer},
+			claim:              claim,
+			pod:                pod2,
+			deviceClassMapping: devMap,
+			wantReqMappings:    []v1.ContainerExtendedResourceRequest{cer},
 		},
 		"one init container, one regular container, one request": {
-			claim:           claimInit,
-			pod:             podInit,
-			wantReqMappings: []v1.ContainerExtendedResourceRequest{cerInit},
+			claim:              claimInit,
+			pod:                podInit,
+			deviceClassMapping: devMapInit,
+			wantReqMappings:    []v1.ContainerExtendedResourceRequest{cerInit},
 		},
 		"two containers, two requests": {
-			claim:           claim2,
-			pod:             pod2,
-			wantReqMappings: []v1.ContainerExtendedResourceRequest{cer, cer2},
+			claim:              claim2,
+			pod:                pod2,
+			deviceClassMapping: devMap,
+			wantReqMappings:    []v1.ContainerExtendedResourceRequest{cer, cer2},
 		},
 		"two containers (one is init container), two requests": {
-			claim:           claim2Init,
-			pod:             podInit,
-			wantReqMappings: []v1.ContainerExtendedResourceRequest{cer3, cerInit},
+			claim:              claim2Init,
+			pod:                podInit,
+			deviceClassMapping: devMapInit,
+			wantReqMappings:    []v1.ContainerExtendedResourceRequest{cer3, cerInit},
 		},
 		"three containers (two are init container), two requests": {
-			claim:           claim3Init,
-			pod:             podInit2,
-			wantReqMappings: []v1.ContainerExtendedResourceRequest{cer4, cerInit, cerInit2},
+			claim:              claim3Init,
+			pod:                podInit2,
+			deviceClassMapping: devMapInit,
+			wantReqMappings:    []v1.ContainerExtendedResourceRequest{cer4, cerInit, cerInit2},
 		},
 		"four containers (two are init container, one sidecar), three requests": {
-			claim:           claim4Init,
-			pod:             podInit3,
-			wantReqMappings: []v1.ContainerExtendedResourceRequest{cerSidecar, cerInit1, cer5, cerInit3},
+			claim:              claim4Init,
+			pod:                podInit3,
+			deviceClassMapping: devMapInit,
+			wantReqMappings:    []v1.ContainerExtendedResourceRequest{cerSidecar, cerInit1, cer5, cerInit3},
 		},
 	}
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
-			gotReqMappings := createRequestMappings(tc.claim, tc.pod, logger)
+			gotReqMappings := createRequestMappings(tc.claim, tc.pod, logger, tc.deviceClassMapping)
 			if len(tc.wantReqMappings) != len(gotReqMappings) {
 				t.Fatalf("different length, want %#v, got %#v", tc.wantReqMappings, gotReqMappings)
 			}
