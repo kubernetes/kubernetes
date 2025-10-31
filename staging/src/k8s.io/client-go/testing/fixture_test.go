@@ -26,19 +26,19 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"sigs.k8s.io/structured-merge-diff/v6/typed"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	runtime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/managedfields"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/applyconfigurations"
 	"k8s.io/utils/ptr"
 )
 
@@ -287,7 +287,7 @@ func TestApplyCreate(t *testing.T) {
 	scheme := runtime.NewScheme()
 	scheme.AddKnownTypes(cmResource.GroupVersion(), &v1.ConfigMap{})
 	codecs := serializer.NewCodecFactory(scheme)
-	o := NewFieldManagedObjectTracker(scheme, codecs.UniversalDecoder(), configMapTypeConverter(scheme))
+	o := NewFieldManagedObjectTracker(scheme, codecs.UniversalDecoder(), applyconfigurations.NewTypeConverter(scheme))
 
 	reaction := ObjectReaction(o)
 	patch := []byte(`{"apiVersion": "v1", "kind": "ConfigMap", "metadata": {"name": "cm-1"}, "data": {"k": "v"}}`)
@@ -307,7 +307,7 @@ func TestApplyNoMeta(t *testing.T) {
 	scheme := runtime.NewScheme()
 	scheme.AddKnownTypes(cmResource.GroupVersion(), &v1.ConfigMap{})
 	codecs := serializer.NewCodecFactory(scheme)
-	o := NewFieldManagedObjectTracker(scheme, codecs.UniversalDecoder(), configMapTypeConverter(scheme))
+	o := NewFieldManagedObjectTracker(scheme, codecs.UniversalDecoder(), applyconfigurations.NewTypeConverter(scheme))
 
 	reaction := ObjectReaction(o)
 	patch := []byte(`{"apiVersion": "v1", "kind": "ConfigMap", "data": {"k": "v"}}`)
@@ -328,7 +328,7 @@ func TestApplyUpdateMultipleFieldManagers(t *testing.T) {
 	scheme := runtime.NewScheme()
 	scheme.AddKnownTypes(cmResource.GroupVersion(), &v1.ConfigMap{})
 	codecs := serializer.NewCodecFactory(scheme)
-	o := NewFieldManagedObjectTracker(scheme, codecs.UniversalDecoder(), configMapTypeConverter(scheme))
+	o := NewFieldManagedObjectTracker(scheme, codecs.UniversalDecoder(), applyconfigurations.NewTypeConverter(scheme))
 
 	reaction := ObjectReaction(o)
 	action := NewCreateAction(cmResource, "default", &v1.ConfigMap{
@@ -432,6 +432,84 @@ func TestApplyUpdateMultipleFieldManagers(t *testing.T) {
 	}
 	typedCm := configMap.(*v1.ConfigMap)
 	assert.Equal(t, map[string]string{"k99": "v99"}, typedCm.Data)
+}
+
+func TestApplySubresource(t *testing.T) {
+	podResource := schema.GroupVersionResource{Version: "v1", Resource: "pods"}
+	scheme := runtime.NewScheme()
+	scheme.AddKnownTypes(podResource.GroupVersion(), &v1.Pod{})
+	codecs := serializer.NewCodecFactory(scheme)
+
+	tracker := NewFieldManagedObjectTracker(scheme, codecs.UniversalDecoder(), managedfields.NewDeducedTypeConverter())
+
+	pod := &v1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "Pod",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-pod",
+			Namespace: "default",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "test-container",
+					Image: "nginx:1.14",
+				},
+			},
+		},
+	}
+
+	err := tracker.Apply(podResource, pod, "default", "", metav1.PatchOptions{FieldManager: "test-manager-a"})
+	require.NoError(t, err)
+
+	statusUpdate := &unstructured.Unstructured{}
+	statusUpdate.SetAPIVersion("v1")
+	statusUpdate.SetKind("Pod")
+	statusUpdate.SetName("test-pod")
+	statusUpdate.SetNamespace("default")
+	require.NoError(t, unstructured.SetNestedMap(statusUpdate.Object,
+		map[string]any{
+			"phase": "Running",
+			"conditions": []any{
+				map[string]any{
+					"type":   "Ready",
+					"status": "True",
+				},
+			},
+		},
+		"status"),
+	)
+
+	err = tracker.Apply(podResource, statusUpdate, "default", "status", metav1.PatchOptions{FieldManager: "test-manager-a"})
+	require.NoError(t, err)
+
+	podActualUntyped, err := tracker.Get(podResource, "default", "test-pod")
+	require.NoError(t, err)
+
+	podActual, ok := podActualUntyped.(*v1.Pod)
+	require.True(t, ok)
+
+	// Verify status is updated
+	assert.Equal(t, v1.PodRunning, podActual.Status.Phase)
+	require.Len(t, podActual.Status.Conditions, 1)
+	assert.Equal(t, v1.PodReady, podActual.Status.Conditions[0].Type)
+	assert.Equal(t, v1.ConditionTrue, podActual.Status.Conditions[0].Status)
+
+	// Verify spec is unchanged
+	require.Len(t, podActual.Spec.Containers, 1)
+	assert.Equal(t, "test-container", podActual.Spec.Containers[0].Name)
+	assert.Equal(t, "nginx:1.14", podActual.Spec.Containers[0].Image)
+
+	require.Len(t, podActual.ObjectMeta.ManagedFields, 2)
+	assert.Equal(t, "test-manager-a", podActual.ObjectMeta.ManagedFields[0].Manager)
+	assert.Equal(t, metav1.ManagedFieldsOperationApply, podActual.ObjectMeta.ManagedFields[0].Operation)
+	assert.Empty(t, podActual.ObjectMeta.ManagedFields[0].Subresource)
+
+	assert.Equal(t, "test-manager-a", podActual.ObjectMeta.ManagedFields[1].Manager)
+	assert.Equal(t, metav1.ManagedFieldsOperationApply, podActual.ObjectMeta.ManagedFields[1].Operation)
+	assert.Equal(t, "status", podActual.ObjectMeta.ManagedFields[1].Subresource)
 }
 
 func TestGetWithExactMatch(t *testing.T) {
@@ -568,109 +646,13 @@ func Test_resourceCovers(t *testing.T) {
 	}
 }
 
-func configMapTypeConverter(scheme *runtime.Scheme) managedfields.TypeConverter {
-	parser, err := typed.NewParser(configMapTypedSchema)
-	if err != nil {
-		panic(fmt.Sprintf("Failed to parse schema: %v", err))
-	}
-
-	return managedfields.NewSchemeTypeConverter(scheme, parser)
-}
-
-var configMapTypedSchema = typed.YAMLObject(`types:
-- name: io.k8s.api.core.v1.ConfigMap
-  map:
-    fields:
-    - name: apiVersion
-      type:
-        scalar: string
-    - name: data
-      type:
-        map:
-          elementType:
-            scalar: string
-    - name: kind
-      type:
-        scalar: string
-    - name: metadata
-      type:
-        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
-      default: {}
-- name: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
-  map:
-    fields:
-    - name: creationTimestamp
-      type:
-        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-    - name: managedFields
-      type:
-        list:
-          elementType:
-            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ManagedFieldsEntry
-          elementRelationship: atomic
-    - name: name
-      type:
-        scalar: string
-    - name: namespace
-      type:
-        scalar: string
-- name: io.k8s.apimachinery.pkg.apis.meta.v1.ManagedFieldsEntry
-  map:
-    fields:
-    - name: apiVersion
-      type:
-        scalar: string
-    - name: fieldsType
-      type:
-        scalar: string
-    - name: fieldsV1
-      type:
-        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.FieldsV1
-    - name: manager
-      type:
-        scalar: string
-    - name: operation
-      type:
-        scalar: string
-    - name: subresource
-      type:
-        scalar: string
-    - name: time
-      type:
-        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-- name: io.k8s.apimachinery.pkg.apis.meta.v1.FieldsV1
-  map:
-    elementType:
-      scalar: untyped
-      list:
-        elementType:
-          namedType: __untyped_atomic_
-        elementRelationship: atomic
-      map:
-        elementType:
-          namedType: __untyped_deduced_
-        elementRelationship: separable
-- name: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-  scalar: untyped
-- name: __untyped_deduced_
-  scalar: untyped
-  list:
-    elementType:
-      namedType: __untyped_atomic_
-    elementRelationship: atomic
-  map:
-    elementType:
-      namedType: __untyped_deduced_
-    elementRelationship: separable
-`)
-
 func TestManagedFieldsObjectTrackerReloadsScheme(t *testing.T) {
 	cmResource := schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}
 	scheme := runtime.NewScheme()
 	codecs := serializer.NewCodecFactory(scheme)
 
 	// Create tracker without registered ConfigMap type
-	tracker := NewFieldManagedObjectTracker(scheme, codecs.UniversalDecoder(), configMapTypeConverter(scheme))
+	tracker := NewFieldManagedObjectTracker(scheme, codecs.UniversalDecoder(), applyconfigurations.NewTypeConverter(scheme))
 
 	cm := &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -710,7 +692,7 @@ func TestManagedFielsdObjectTrackerWithUnstructured(t *testing.T) {
 	// Validate creating through apply works
 	cmOriginal := cm.DeepCopy()
 
-	require.NoError(t, tracker.Apply(cmResource, cm, "default", metav1.PatchOptions{FieldManager: "test-manager"}))
+	require.NoError(t, tracker.Apply(cmResource, cm, "default", "", metav1.PatchOptions{FieldManager: "test-manager"}))
 	cmActualUntyped, err := tracker.Get(cmResource, "default", cm.GetName())
 	require.NoError(t, err)
 
@@ -730,7 +712,7 @@ func TestManagedFielsdObjectTrackerWithUnstructured(t *testing.T) {
 	)
 
 	cmOriginal = cmActual.DeepCopy()
-	require.NoError(t, tracker.Apply(cmResource, cmActual, "default", metav1.PatchOptions{FieldManager: "test-manager"}))
+	require.NoError(t, tracker.Apply(cmResource, cmActual, "default", "", metav1.PatchOptions{FieldManager: "test-manager"}))
 	cmActualUntyped, err = tracker.Get(cmResource, "default", cm.GetName())
 	require.NoError(t, err)
 
