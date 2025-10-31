@@ -41,6 +41,8 @@ func (lw fakePodLW) Watch(options metav1.ListOptions) (watch.Interface, error) {
 	return lw.watchResp, nil
 }
 
+func (lw fakePodLW) IsWatchListSemanticsUnSupported() bool { return true }
+
 var _ cache.ListerWatcher = fakePodLW{}
 
 func TestNewSourceApiserver_UpdatesAndMultiplePods(t *testing.T) {

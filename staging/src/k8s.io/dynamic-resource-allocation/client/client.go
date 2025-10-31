@@ -23,6 +23,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	cgoresource "k8s.io/client-go/kubernetes/typed/resource/v1"
 	rest "k8s.io/client-go/rest"
+	"k8s.io/client-go/util/watchlist"
 )
 
 // Enumerate all supported APIs, most preferred first.
@@ -101,4 +102,8 @@ func (c *Client) ResourceSlices() cgoresource.ResourceSliceInterface {
 		c.clientSet.ResourceV1beta1().ResourceSlices(),
 		c.clientSet.ResourceV1beta2().ResourceSlices(),
 	)
+}
+
+func (c *Client) IsWatchListSemanticsUnSupported() bool {
+	return watchlist.DoesClientNotSupportWatchListSemantics(c.clientSet)
 }
