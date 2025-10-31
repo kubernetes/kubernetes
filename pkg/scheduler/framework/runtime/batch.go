@@ -35,9 +35,10 @@ func noBatchSignatures(p *v1.Pod) string { return "" }
 // OpportunisticBatching caches results from filtering and scoring when possible to optimize
 // scheudling of common pods.
 type OpportunisticBatch struct {
-	state         *batchState
-	currPod       batchPodInfo
-	signatureFunc PodSignatureFunc
+	state          *batchState
+	currPod        batchPodInfo
+	signatureFunc  PodSignatureFunc
+	schedFramework framework.Framework
 }
 
 type batchState struct {
@@ -69,31 +70,38 @@ func (b *OpportunisticBatch) invalidate(logger klog.Logger, result, reason strin
 	}
 }
 
-// PreFilter invoked at the prefilter extension point.
+// Inform the batch of a new pod. Note that this will only be called for
+// pods that match this framework, while the "postScoring" call will
+// happen for every pod that comes through the scheduler.
 func (b *OpportunisticBatch) NewPod(ctx context.Context, pod *v1.Pod) {
 	log := klog.FromContext(ctx)
 
-	// If our last pod didn't succeed, then clear our state
+	// If our last pod didn't succeed, then clear our state, but
+	// keep going.
 	if !b.currPod.succeeded {
 		b.invalidate(log, "failure", "pod_failure")
 	}
 
-	// Reset our current pod.
-	b.setPod(pod)
-
-	// If our state is empty, then just return
-	if b.state == nil || b.state.sortedNodes == nil || b.state.sortedNodes.Len() == 0 {
-		b.invalidate(log, "failure", "empty_list")
+	// Update our current pod and check if the new pod is batchable.
+	// Clear state if it isn't.
+	if !b.setPod(pod) {
+		b.invalidate(log, "failure", "pod_not_batchable")
 		return
 	}
 
-	// If the pod is incompatible with the state, then we can't use the state.
-	if !b.podCompatibleWithState() {
+	// Just return if we don't have any state.
+	if b.stateEmpty() {
+		b.state = nil
+		return
+	}
+
+	// If the pod is incompatible with the state, throw the state away.
+	if b.currPod.signature != b.state.signature {
 		b.invalidate(log, "failure", "pod_incompatible")
 		return
 	}
 
-	// If the state is too old, throw it away. This is to avoid
+	// If the state is too old, throw the state away. This is to avoid
 	// cases where we either have huge numbers of compatible pods in a
 	// row or we have a long wait between pods.
 	if time.Now().After((b.state.creationTime.Add(maxBatchAge))) {
@@ -101,12 +109,15 @@ func (b *OpportunisticBatch) NewPod(ctx context.Context, pod *v1.Pod) {
 		return
 	}
 
-	// We have matching state for the given pod!
+	// Our state matches with our new pod.
 	metrics.BatchUsageStats.WithLabelValues("success", "success").Inc()
 }
 
+// Provide a hint for the pod. Note that this should always be the same
+// pod given in the preceeding NewPod call, but if somehow this isn't the
+// case we don't give a hint, which will then clear our state later.
 func (b *OpportunisticBatch) NodeHint(ctx context.Context, pod *v1.Pod) string {
-	if b.state == nil || b.currPod.pod != pod {
+	if b.stateEmpty() || b.currPod.pod != pod {
 		return ""
 	}
 	hint := b.state.sortedNodes.Pop()
@@ -114,79 +125,93 @@ func (b *OpportunisticBatch) NodeHint(ctx context.Context, pod *v1.Pod) string {
 	return hint
 }
 
-func (b *OpportunisticBatch) postScore(ctx context.Context, inputState fwk.CycleState, thisFramework bool, owningFwk framework.Framework, podInfo fwk.PodInfo, inputChosenNode fwk.NodeInfo, otherNodes framework.SortedScoredNodes) {
+func (b *OpportunisticBatch) postScore(ctx context.Context, state fwk.CycleState, thisFramework bool, podInfo fwk.PodInfo, chosenNode fwk.NodeInfo, otherNodes framework.SortedScoredNodes) {
 	log := klog.FromContext(ctx)
 	pod := podInfo.GetPod()
 
-	// If this pod doesn't match our current pod (either from another framework or because of a failure)
-	// then we need to clear state.
-	if b.currPod.pod != pod || !thisFramework {
-		b.invalidate(log, "failure", "different_pod")
-		return
-	}
+	// If we know that we can't schedule any more pods of this signature on the node we just used,
+	// then we can continue to use the additional scheduling information, either from this pod
+	// or from the batch we used for this pod. This is because we know it is no longer feasible,
+	// so the remaining nodes should remain in the same score order.
+	if b.chosenNodeFull(ctx, state, podInfo, chosenNode) {
+		// If we used the batch to assign this pod, and we still have results, we can
+		// potentially keep using the remaining state for the next pod as well
+		if b.podBatched(thisFramework, pod, chosenNode) && !b.stateEmpty() {
+			b.currPod.succeeded = true
+		} else {
+			// Otherwise, check if we can use the results from this new pod.
+			if b.setPod(pod) {
+				// If so, set our state to try for next time.
+				b.state = &batchState{
+					signature:    b.currPod.signature,
+					sortedNodes:  otherNodes,
+					creationTime: time.Now(),
+				}
+				log.V(2).Info("Set batch info", "signature", b.state.signature)
 
-	// If we didn't use the hint we provided, then we need to clear state.
-	if b.currPod.hint != inputChosenNode.Node().Name {
-		b.invalidate(log, "failure", "different_node_used")
-		return
+				b.currPod.succeeded = true
+			} else {
+				b.invalidate(log, "failure", "pod_not_batchable")
+			}
+		}
+	} else {
+		b.invalidate(log, "failure", "node_not_full")
 	}
+}
 
-	// Now check if the node we used can be filtered. If it is no longer feasible,
-	// then we can continue using the state. Otherwise throw the state away, because
-	// we can't rescore the individual node.
+// We used the batch for the given node if:
+// - the pod is for our framework
+// - it matches the last NewNode we recieved
+// - we gave a hint
+// - the hint was the node we chose.
+// In this case we can potentially continue using our existing batch state.
+func (b *OpportunisticBatch) podBatched(thisFramework bool, pod *v1.Pod, chosenNode fwk.NodeInfo) bool {
+	return thisFramework && b.currPod.pod == pod && b.currPod.hint != "" && b.currPod.hint == chosenNode.Node().Name
+}
+
+// Irritatingly we can end up with a variety of different configurations that are all "empty".
+// Rather than trying to normalize all cases when they happen, we just check them all.
+func (b *OpportunisticBatch) stateEmpty() bool {
+	return b.state == nil || b.state.sortedNodes == nil || b.state.sortedNodes.Len() == 0
+}
+
+// Check if the given node is "full", i.e. cannot host any more pods with this signature.
+// We do this by assuming the current pod is already scheduled and calling the filter command.
+func (b *OpportunisticBatch) chosenNodeFull(ctx context.Context, inputState fwk.CycleState, podInfo fwk.PodInfo, inputChosenNode fwk.NodeInfo) bool {
+	pod := podInfo.GetPod()
+
+	// Clone state to ensure we don't mess up the rest of the pipeline.
 	state := inputState.Clone()
 	chosenNode := inputChosenNode.Snapshot()
 
 	chosenNode.AddPodInfo(podInfo)
-	status := owningFwk.RunPreFilterExtensionAddPod(ctx, state, pod, podInfo, chosenNode)
+	status := b.schedFramework.RunPreFilterExtensionAddPod(ctx, state, pod, podInfo, chosenNode)
 	if !status.IsSuccess() {
-		b.invalidate(log, "error", "add_pod_failed")
-		return
+		return false
 	}
 
-	status = owningFwk.RunFilterPlugins(ctx, state, pod, chosenNode)
+	status = b.schedFramework.RunFilterPlugins(ctx, state, pod, chosenNode)
 	if !status.IsRejected() {
-		b.invalidate(log, "failure", "node_not_filtered")
-		return
+		return false
 	}
 
-	// We can use the state (new or existing)
-
-	// Fill the state with the results from our schedulePod call if it is empty.
-	if b.state == nil {
-		b.state = &batchState{
-			signature:    b.podSignature(),
-			sortedNodes:  otherNodes,
-			creationTime: time.Now(),
-		}
-		log.V(2).Info("Set batch info", "signature", b.state.signature)
-	}
-
-	// Make sure we can reuse our state for the next pod.
-	b.currPod.succeeded = true
+	return true
 }
 
-func (b *OpportunisticBatch) setPod(pod *v1.Pod) {
+// Set the current pod to match a new pod. Returns true
+// if the new pod is batchable, false otherwise.
+func (b *OpportunisticBatch) setPod(pod *v1.Pod) bool {
 	b.currPod = batchPodInfo{
 		pod:       pod,
-		signed:    false,
+		signature: b.signatureFunc(pod),
 		succeeded: false,
 	}
+	return b.currPod.signature != ""
 }
 
-func (b *OpportunisticBatch) podSignature() string {
-	if !b.currPod.signed {
-		b.currPod.signature = b.signatureFunc(b.currPod.pod)
-		b.currPod.signed = true
+func newOpportunisticBatch(f framework.Framework, signatureFunc PodSignatureFunc) *OpportunisticBatch {
+	return &OpportunisticBatch{
+		signatureFunc:  signatureFunc,
+		schedFramework: f,
 	}
-	return b.currPod.signature
-}
-
-func (b *OpportunisticBatch) podCompatibleWithState() bool {
-	signature := b.podSignature()
-	return signature != "" && signature == b.state.signature
-}
-
-func newOpportunisticBatch(signatureFunc PodSignatureFunc) *OpportunisticBatch {
-	return &OpportunisticBatch{signatureFunc: signatureFunc}
 }

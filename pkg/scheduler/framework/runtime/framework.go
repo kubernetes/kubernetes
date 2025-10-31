@@ -305,8 +305,9 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 		apiDispatcher:        options.apiDispatcher,
 		parallelizer:         options.parallelizer,
 		logger:               logger,
-		batch:                newOpportunisticBatch(noBatchSignatures),
 	}
+
+	f.batch = newOpportunisticBatch(f, noBatchSignatures)
 
 	if len(f.extenders) > 0 {
 		// Extender doesn't support any kind of requeueing feature like EnqueueExtensions in the scheduling framework.
@@ -1275,7 +1276,7 @@ func (f *frameworkImpl) NodeHint(ctx context.Context, pod *v1.Pod) string {
 }
 
 func (f *frameworkImpl) RunPostScore(ctx context.Context, state fwk.CycleState, thisFramework bool, podInfo fwk.PodInfo, chosenNode fwk.NodeInfo, otherNodes framework.SortedScoredNodes) {
-	f.batch.postScore(ctx, state, thisFramework, f, podInfo, chosenNode, otherNodes)
+	f.batch.postScore(ctx, state, thisFramework, podInfo, chosenNode, otherNodes)
 }
 
 // RunPreBindPlugins runs the set of configured prebind plugins. It returns a

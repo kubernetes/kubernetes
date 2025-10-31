@@ -112,11 +112,12 @@ func TestBatchBasic(t *testing.T) {
 			name:              "single match",
 			firstId:           "b1",
 			firstSig:          "sig",
-			firstChosenNode:   "n1",
+			firstChosenNode:   "n3",
 			firstOtherNodes:   newTestNodes([]string{"n1"}),
 			firstPodCompleted: true,
 			secondId:          "b2",
 			secondSig:         "sig",
+			secondChosenNode:  "n1",
 			expectedHint:      "n1",
 		},
 		{
@@ -226,7 +227,7 @@ func TestBatchBasic(t *testing.T) {
 		}
 
 		signature := tt.firstSig
-		batch := newOpportunisticBatch(newTestSigFunc(&signature))
+		batch := newOpportunisticBatch(testFwk, newTestSigFunc(&signature))
 		state := framework.NewCycleState()
 
 		// Run the first "pod" through
@@ -247,7 +248,7 @@ func TestBatchBasic(t *testing.T) {
 			t.Fatalf("Error making podinfo %v", err)
 		}
 		if tt.firstPodCompleted {
-			batch.postScore(ctx, state, true, testFwk, podInfo, firstChosenNode, tt.firstOtherNodes)
+			batch.postScore(ctx, state, true, podInfo, firstChosenNode, tt.firstOtherNodes)
 		}
 
 		// Run the second pod
@@ -276,7 +277,7 @@ func TestBatchBasic(t *testing.T) {
 			UID:  types.UID(tt.secondChosenNode),
 		}})
 		if tt.firstPodCompleted {
-			batch.postScore(ctx, state, true, testFwk, podInfo2, chosenNode2, tt.secondOtherNodes)
+			batch.postScore(ctx, state, true, podInfo2, chosenNode2, tt.secondOtherNodes)
 		}
 
 		batchEmpty := batch.state == nil || batch.state.sortedNodes == nil || batch.state.sortedNodes.Len() == 0
