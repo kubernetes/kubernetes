@@ -832,10 +832,6 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 		return err
 	}
 
-	// Always update the pod status once. Even if there was a resize error, the resize may have been
-	// partially actuated.
-	defer m.runtimeHelper.RequestPodReSync(pod.UID)
-
 	if len(podContainerChanges.ContainersToUpdate[v1.ResourceMemory]) > 0 || podContainerChanges.UpdatePodResources {
 		if podResources.Memory == nil {
 			// Default pod memory limit to the current memory limit if unset to prevent it from updating.
@@ -1224,6 +1220,10 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 			logger.V(4).Info("SyncPod received new pod, will create a sandbox for it", "pod", klog.KObj(pod))
 		}
 	}
+
+	// To ensure state consistency and avoid race conditions,
+	// we update the container cache after the completion of SyncPod.
+	defer m.runtimeHelper.RequestPodReSync(pod.UID)
 
 	// Step 2: Kill the pod if the sandbox has changed.
 	if podContainerChanges.KillPod {
