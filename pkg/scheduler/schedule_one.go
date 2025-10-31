@@ -200,7 +200,7 @@ func (sched *Scheduler) schedulingCycle(
 		if result != nil {
 			nominatingInfo = result.NominatingInfo
 		}
-		return ScheduleResult{nominatingInfo: nominatingInfo}, podInfo, sortedPrioritizedNodes, fwk.NewStatus(fwk.Unschedulable).WithError(err)
+		return ScheduleResult{nominatingInfo: nominatingInfo}, podInfo, nil, fwk.NewStatus(fwk.Unschedulable).WithError(err)
 	}
 
 	metrics.SchedulingAlgorithmLatency.Observe(metrics.SinceInSeconds(start))
