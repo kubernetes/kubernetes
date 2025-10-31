@@ -113,14 +113,14 @@ func (sched *Scheduler) ScheduleOne(ctx context.Context) {
 	schedulingCycleCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	scheduleResult, assumedPodInfo, prioritizedNodes, status := sched.schedulingCycle(schedulingCycleCtx, state, fwk, podInfo, start, podsToActivate)
+	scheduleResult, assumedPodInfo, status := sched.schedulingCycle(schedulingCycleCtx, state, fwk, podInfo, start, podsToActivate)
 	if !status.IsSuccess() {
 		sched.FailureHandler(schedulingCycleCtx, fwk, assumedPodInfo, status, scheduleResult.nominatingInfo, start)
 		return
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.OpportunisticBatching) {
-		sched.runPostScore(ctx, fwk, pod, prioritizedNodes, scheduleResult)
+		sched.runPostScore(ctx, fwk, pod)
 	}
 
 	// bind the pod to its host asynchronously (we can do this b/c of the assumption step above).
@@ -157,23 +157,23 @@ func (sched *Scheduler) schedulingCycle(
 	podInfo *framework.QueuedPodInfo,
 	start time.Time,
 	podsToActivate *framework.PodsToActivate,
-) (ScheduleResult, *framework.QueuedPodInfo, framework.SortedScoredNodes, *fwk.Status) {
+) (ScheduleResult, *framework.QueuedPodInfo, *fwk.Status) {
 	logger := klog.FromContext(ctx)
 	pod := podInfo.Pod
-	scheduleResult, sortedPrioritizedNodes, err := sched.SchedulePod(ctx, schedFramework, state, pod)
+	scheduleResult, err := sched.SchedulePod(ctx, schedFramework, state, pod)
 	if err != nil {
 		defer func() {
 			metrics.SchedulingAlgorithmLatency.Observe(metrics.SinceInSeconds(start))
 		}()
 		if err == ErrNoNodesAvailable {
 			status := fwk.NewStatus(fwk.UnschedulableAndUnresolvable).WithError(err)
-			return ScheduleResult{nominatingInfo: sched.newFailureNominatingInfo()}, podInfo, nil, status
+			return ScheduleResult{nominatingInfo: sched.newFailureNominatingInfo()}, podInfo, status
 		}
 
 		fitError, ok := err.(*framework.FitError)
 		if !ok {
 			logger.Error(err, "Error selecting node for pod", "pod", klog.KObj(pod))
-			return ScheduleResult{nominatingInfo: sched.newFailureNominatingInfo()}, podInfo, nil, fwk.AsStatus(err)
+			return ScheduleResult{nominatingInfo: sched.newFailureNominatingInfo()}, podInfo, fwk.AsStatus(err)
 		}
 
 		// SchedulePod() may have failed because the pod would not fit on any host, so we try to
@@ -183,7 +183,7 @@ func (sched *Scheduler) schedulingCycle(
 
 		if !schedFramework.HasPostFilterPlugins() {
 			logger.V(3).Info("No PostFilter plugins are registered, so no preemption will be performed")
-			return ScheduleResult{}, podInfo, nil, fwk.NewStatus(fwk.Unschedulable).WithError(err)
+			return ScheduleResult{}, podInfo, fwk.NewStatus(fwk.Unschedulable).WithError(err)
 		}
 
 		// Run PostFilter plugins to attempt to make the pod schedulable in a future scheduling cycle.
@@ -200,7 +200,7 @@ func (sched *Scheduler) schedulingCycle(
 		if result != nil {
 			nominatingInfo = result.NominatingInfo
 		}
-		return ScheduleResult{nominatingInfo: nominatingInfo}, podInfo, nil, fwk.NewStatus(fwk.Unschedulable).WithError(err)
+		return ScheduleResult{nominatingInfo: nominatingInfo}, podInfo, fwk.NewStatus(fwk.Unschedulable).WithError(err)
 	}
 
 	metrics.SchedulingAlgorithmLatency.Observe(metrics.SinceInSeconds(start))
@@ -216,7 +216,7 @@ func (sched *Scheduler) schedulingCycle(
 		// This relies on the fact that Error will check if the pod has been bound
 		// to a node and if so will not add it back to the unscheduled pods queue
 		// (otherwise this would cause an infinite loop).
-		return ScheduleResult{nominatingInfo: sched.newFailureNominatingInfo()}, assumedPodInfo, nil, fwk.AsStatus(err)
+		return ScheduleResult{nominatingInfo: sched.newFailureNominatingInfo()}, assumedPodInfo, fwk.AsStatus(err)
 	}
 
 	// Run the Reserve method of reserve plugins.
@@ -237,9 +237,9 @@ func (sched *Scheduler) schedulingCycle(
 			}
 			fitErr.Diagnosis.NodeToStatus.Set(scheduleResult.SuggestedHost, sts)
 			fitErr.Diagnosis.AddPluginStatus(sts)
-			return ScheduleResult{nominatingInfo: sched.newFailureNominatingInfo()}, assumedPodInfo, nil, fwk.NewStatus(sts.Code()).WithError(fitErr)
+			return ScheduleResult{nominatingInfo: sched.newFailureNominatingInfo()}, assumedPodInfo, fwk.NewStatus(sts.Code()).WithError(fitErr)
 		}
-		return ScheduleResult{nominatingInfo: sched.newFailureNominatingInfo()}, assumedPodInfo, nil, sts
+		return ScheduleResult{nominatingInfo: sched.newFailureNominatingInfo()}, assumedPodInfo, sts
 	}
 
 	// Run "permit" plugins.
@@ -261,10 +261,10 @@ func (sched *Scheduler) schedulingCycle(
 			}
 			fitErr.Diagnosis.NodeToStatus.Set(scheduleResult.SuggestedHost, runPermitStatus)
 			fitErr.Diagnosis.AddPluginStatus(runPermitStatus)
-			return ScheduleResult{nominatingInfo: sched.newFailureNominatingInfo()}, assumedPodInfo, nil, fwk.NewStatus(runPermitStatus.Code()).WithError(fitErr)
+			return ScheduleResult{nominatingInfo: sched.newFailureNominatingInfo()}, assumedPodInfo, fwk.NewStatus(runPermitStatus.Code()).WithError(fitErr)
 		}
 
-		return ScheduleResult{nominatingInfo: sched.newFailureNominatingInfo()}, assumedPodInfo, nil, runPermitStatus
+		return ScheduleResult{nominatingInfo: sched.newFailureNominatingInfo()}, assumedPodInfo, runPermitStatus
 	}
 
 	// At the end of a successful scheduling cycle, pop and move up Pods if needed.
@@ -274,7 +274,7 @@ func (sched *Scheduler) schedulingCycle(
 		podsToActivate.Map = make(map[string]*v1.Pod)
 	}
 
-	return scheduleResult, assumedPodInfo, sortedPrioritizedNodes, nil
+	return scheduleResult, assumedPodInfo, nil
 }
 
 // bindingCycle tries to bind an assumed Pod.
@@ -407,10 +407,10 @@ func (sched *Scheduler) frameworkForPod(pod *v1.Pod) (framework.Framework, error
 	return fwk, nil
 }
 
-func (sched *Scheduler) runPostScore(ctx context.Context, fwk framework.Framework, pod *v1.Pod, prioritizedNodes framework.SortedScoredNodes, scheduleResult ScheduleResult) {
+func (sched *Scheduler) runPostScore(ctx context.Context, fwk framework.Framework, pod *v1.Pod) {
 	for _, someFwk := range sched.Profiles {
 		thisFwksPod := someFwk == fwk
-		someFwk.RunPostScore(ctx, thisFwksPod, pod, scheduleResult.SuggestedHost, prioritizedNodes)
+		someFwk.RunPostScore(ctx, thisFwksPod, pod)
 	}
 }
 
@@ -437,31 +437,26 @@ func (sched *Scheduler) skipPodSchedule(ctx context.Context, fwk framework.Frame
 // schedulePod tries to schedule the given pod to one of the nodes in the node list.
 // If it succeeds, it will return the name of the node.
 // If it fails, it will return a FitError with reasons.
-func (sched *Scheduler) schedulePod(
-	ctx context.Context,
-	fwk framework.Framework,
-	state fwk.CycleState,
-	pod *v1.Pod,
-) (result ScheduleResult, sortedPrioritizedNodes framework.SortedScoredNodes, err error) {
+func (sched *Scheduler) schedulePod(ctx context.Context, fwk framework.Framework, state fwk.CycleState, pod *v1.Pod) (result ScheduleResult, err error) {
 	trace := utiltrace.New("Scheduling", utiltrace.Field{Key: "namespace", Value: pod.Namespace}, utiltrace.Field{Key: "name", Value: pod.Name})
 	defer trace.LogIfLong(100 * time.Millisecond)
 	if err := sched.Cache.UpdateSnapshot(klog.FromContext(ctx), sched.nodeInfoSnapshot); err != nil {
-		return result, nil, err
+		return result, err
 	}
 	trace.Step("Snapshotting scheduler cache and node infos done")
 
 	if sched.nodeInfoSnapshot.NumNodes() == 0 {
-		return result, nil, ErrNoNodesAvailable
+		return result, ErrNoNodesAvailable
 	}
 
 	feasibleNodes, diagnosis, err := sched.findNodesThatFitPod(ctx, fwk, state, pod)
 	if err != nil {
-		return result, nil, err
+		return result, err
 	}
 	trace.Step("Computing predicates done")
 
 	if len(feasibleNodes) == 0 {
-		return result, nil, &framework.FitError{
+		return result, &framework.FitError{
 			Pod:         pod,
 			NumAllNodes: sched.nodeInfoSnapshot.NumNodes(),
 			Diagnosis:   diagnosis,
@@ -474,26 +469,28 @@ func (sched *Scheduler) schedulePod(
 			SuggestedHost:  feasibleNodes[0].Node().Name,
 			EvaluatedNodes: 1 + diagnosis.NodeToStatus.Len(),
 			FeasibleNodes:  1,
-		}, nil, nil
+		}, nil
 	}
 
 	priorityList, err := prioritizeNodes(ctx, sched.Extenders, fwk, state, pod, feasibleNodes)
 	if err != nil {
-		return result, nil, err
+		return result, err
 	}
 
-	sortedPrioritizedNodes = newSortedNodeScores(priorityList)
+	sortedPrioritizedNodes := newSortedNodeScores(priorityList)
 	if sortedPrioritizedNodes.Len() == 0 {
-		return result, nil, errEmptyPriorityList
+		return result, errEmptyPriorityList
 	}
 	node := sortedPrioritizedNodes.Pop()
 	trace.Step("Prioritizing done")
+
+	fwk.StoreScheduleResults(ctx, pod, node, sortedPrioritizedNodes)
 
 	return ScheduleResult{
 		SuggestedHost:  node,
 		EvaluatedNodes: len(feasibleNodes) + diagnosis.NodeToStatus.Len(),
 		FeasibleNodes:  len(feasibleNodes),
-	}, sortedPrioritizedNodes, err
+	}, err
 }
 
 // Filters the nodes to find the ones that fit the pod based on the framework

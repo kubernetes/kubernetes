@@ -1275,8 +1275,12 @@ func (f *frameworkImpl) RunNodeHint(ctx context.Context, pod *v1.Pod, state fwk.
 	return f.batch.RunNodeHint(ctx, pod, state, lastChosenNode)
 }
 
-func (f *frameworkImpl) RunPostScore(ctx context.Context, thisFramework bool, pod *v1.Pod, chosenNode string, otherNodes framework.SortedScoredNodes) {
-	f.batch.PostScore(ctx, thisFramework, pod, chosenNode, otherNodes)
+func (f *frameworkImpl) StoreScheduleResults(ctx context.Context, pod *v1.Pod, chosenNode string, otherNodes framework.SortedScoredNodes) {
+	f.batch.StoreScheduleResults(ctx, pod, chosenNode, otherNodes)
+}
+
+func (f *frameworkImpl) RunPostScore(ctx context.Context, thisFramework bool, pod *v1.Pod) {
+	f.batch.PostScore(ctx, thisFramework, pod)
 }
 
 // RunPreBindPlugins runs the set of configured prebind plugins. It returns a

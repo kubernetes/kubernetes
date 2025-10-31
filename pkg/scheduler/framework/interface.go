@@ -198,8 +198,11 @@ type Framework interface {
 	// this node can be evaluated
 	RunNodeHint(ctx context.Context, pod *v1.Pod, state fwk.CycleState, lastChosenNode fwk.NodeInfo) string
 
-	// On successful scheduling of a pod, update internal (batch) information.
-	RunPostScore(ctx context.Context, thisFramework bool, pod *v1.Pod, chosenNode string, otherNodes SortedScoredNodes)
+	// Store the results after we have sorted and filtered nodes.
+	StoreScheduleResults(ctx context.Context, pod *v1.Pod, chosenNode string, otherNodes SortedScoredNodes)
+
+	// Called when a pod successfully schedules.
+	RunPostScore(ctx context.Context, thisFramework bool, pod *v1.Pod)
 
 	// RunPreBindPlugins runs the set of configured PreBind plugins. It returns
 	// *fwk.Status and its code is set to non-success if any of the plugins returns

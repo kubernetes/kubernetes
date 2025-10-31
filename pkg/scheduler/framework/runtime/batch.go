@@ -82,19 +82,18 @@ func (b *OpportunisticBatch) RunNodeHint(ctx context.Context, pod *v1.Pod, state
 	return hint
 }
 
-func (b *OpportunisticBatch) PostScore(ctx context.Context, thisFramework bool, pod *v1.Pod, chosenNode string, otherNodes framework.SortedScoredNodes) {
+func (b *OpportunisticBatch) StoreScheduleResults(ctx context.Context, pod *v1.Pod, chosenNode string, otherNodes framework.SortedScoredNodes) {
 	logger := klog.FromContext(ctx)
 
 	// If we used the batch to assign this pod, we can keep using the state in the batch.
-	if b.podBatched(thisFramework, pod, chosenNode) {
+	if b.podBatched(pod, chosenNode) {
 		metrics.BatchUsageStats.WithLabelValues("hint_used").Inc()
 		b.currPod.chosenNode = chosenNode
-		b.currPod.succeeded = true
 	} else {
 		// If this pod is batchable, set our results as state.
 		// We will check this against the next pod when we give the
 		// next hint.
-		if b.currPod.signature != "" && thisFramework {
+		if b.currPod.signature != "" {
 			b.state = &batchState{
 				signature:    b.currPod.signature,
 				sortedNodes:  otherNodes,
@@ -103,10 +102,15 @@ func (b *OpportunisticBatch) PostScore(ctx context.Context, thisFramework bool, 
 			logger.V(2).Info("Set batch info", "signature", b.state.signature)
 
 			b.currPod.chosenNode = chosenNode
-			b.currPod.succeeded = true
 		} else {
 			b.invalidate(logger, "pod_not_batchable")
 		}
+	}
+}
+
+func (b *OpportunisticBatch) PostScore(ctx context.Context, thisFramework bool, pod *v1.Pod) {
+	if b.currPod.pod == pod && thisFramework {
+		b.currPod.succeeded = true
 	}
 }
 
@@ -182,12 +186,12 @@ func (b *OpportunisticBatch) updateState(ctx context.Context, logger klog.Logger
 
 // We used the batch for the given pod iff:
 // - the pod is for our framework
-// - it matches the last pod we recieved in RunNodeHint
+// - it matches the last pod we received in RunNodeHint
 // - we gave a hint
 // - the hint was the node we chose.
 // In this case we can potentially continue using our existing batch state.
-func (b *OpportunisticBatch) podBatched(thisFramework bool, pod *v1.Pod, chosenNode string) bool {
-	return thisFramework && b.currPod.pod == pod && b.currPod.hint != "" && b.currPod.hint == chosenNode
+func (b *OpportunisticBatch) podBatched(pod *v1.Pod, chosenNode string) bool {
+	return b.currPod.pod == pod && b.currPod.hint != "" && b.currPod.hint == chosenNode
 }
 
 // Irritatingly we can end up with a variety of different configurations that are all "empty".

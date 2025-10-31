@@ -235,9 +235,10 @@ func TestBatchBasic(t *testing.T) {
 		if hint != "" {
 			t.Fatalf("Got unexpected hint %s", hint)
 		}
+		batch.StoreScheduleResults(ctx, pod, tt.firstChosenNode, tt.firstOtherNodes)
 
 		if tt.firstPodCompleted {
-			batch.PostScore(ctx, true, pod, tt.firstChosenNode, tt.firstOtherNodes)
+			batch.PostScore(ctx, true, pod)
 		}
 
 		// Run the second pod
@@ -264,8 +265,10 @@ func TestBatchBasic(t *testing.T) {
 			t.Fatalf("Got hint '%s' expected '%s' for test '%s'", hint, tt.expectedHint, tt.name)
 		}
 
+		batch.StoreScheduleResults(ctx, pod, tt.secondChosenNode, tt.secondOtherNodes)
+
 		if tt.firstPodCompleted {
-			batch.PostScore(ctx, true, pod2, tt.secondChosenNode, tt.secondOtherNodes)
+			batch.PostScore(ctx, true, pod2)
 		}
 
 		batchEmpty := batch.state == nil || batch.state.sortedNodes == nil || batch.state.sortedNodes.Len() == 0
