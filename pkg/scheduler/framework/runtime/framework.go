@@ -82,7 +82,7 @@ type frameworkImpl struct {
 	logger           klog.Logger
 
 	// for tracking CSI node limits
-	sharedCSINodeLister fwk.CSINodeLister
+	sharedCSIManager fwk.CSIManager
 
 	metricsRecorder          *metrics.MetricAsyncRecorder
 	profileName              string
@@ -137,7 +137,7 @@ type frameworkOptions struct {
 	eventRecorder          events.EventRecorder
 	informerFactory        informers.SharedInformerFactory
 	sharedDRAManager       fwk.SharedDRAManager
-	sharedCSINodeLister    fwk.CSINodeLister
+	sharedCSIManager       fwk.CSIManager
 	snapshotSharedLister   fwk.SharedLister
 	metricsRecorder        *metrics.MetricAsyncRecorder
 	podNominator           fwk.PodNominator
@@ -198,10 +198,10 @@ func WithSharedDRAManager(sharedDRAManager fwk.SharedDRAManager) Option {
 	}
 }
 
-// WithSharedCSINodeLister sets SharedCSINodeLister for the framework.
-func WithSharedCSINodeLister(sharedCSINodeLister fwk.CSINodeLister) Option {
+// WithSharedCSIManager sets SharedCSIManager for the framework.
+func WithSharedCSIManager(sharedCSIManager fwk.CSIManager) Option {
 	return func(o *frameworkOptions) {
-		o.sharedCSINodeLister = sharedCSINodeLister
+		o.sharedCSIManager = sharedCSIManager
 	}
 }
 
@@ -301,7 +301,7 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 	f := &frameworkImpl{
 		registry:             r,
 		snapshotSharedLister: options.snapshotSharedLister,
-		sharedCSINodeLister:  options.sharedCSINodeLister,
+		sharedCSIManager:     options.sharedCSIManager,
 		scorePluginWeight:    make(map[string]int),
 		waitingPods:          options.waitingPods,
 		clientSet:            options.clientSet,
@@ -1734,9 +1734,9 @@ func (f *frameworkImpl) SharedDRAManager() fwk.SharedDRAManager {
 	return f.sharedDRAManager
 }
 
-// SharedCSINodeLister returns the SharedCSINodeLister of the framework.
-func (f *frameworkImpl) SharedCSINodeLister() fwk.CSINodeLister {
-	return f.sharedCSINodeLister
+// SharedCSIManager returns the SharedCSIManager of the framework.
+func (f *frameworkImpl) SharedCSIManager() fwk.CSIManager {
+	return f.sharedCSIManager
 }
 
 func (f *frameworkImpl) pluginsNeeded(plugins *config.Plugins) sets.Set[string] {

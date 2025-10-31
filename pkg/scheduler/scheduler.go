@@ -344,8 +344,8 @@ func New(ctx context.Context,
 		}
 		draManager = dynamicresources.NewDRAManager(ctx, resourceClaimCache, resourceSliceTracker, informerFactory)
 	}
-	var sharedCSINodeLister fwk.CSINodeLister
-	sharedCSINodeLister = nodevolumelimits.NewCSINodeLister(informerFactory.Storage().V1().CSINodes().Lister())
+	var sharedCSIManager fwk.CSIManager
+	sharedCSIManager = nodevolumelimits.NewCSIManager(informerFactory.Storage().V1().CSINodes().Lister())
 
 	var apiDispatcher *apidispatcher.APIDispatcher
 	if feature.DefaultFeatureGate.Enabled(features.SchedulerAsyncAPICalls) {
@@ -365,7 +365,7 @@ func New(ctx context.Context,
 		frameworkruntime.WithMetricsRecorder(metricsRecorder),
 		frameworkruntime.WithWaitingPods(waitingPods),
 		frameworkruntime.WithAPIDispatcher(apiDispatcher),
-		frameworkruntime.WithSharedCSINodeLister(sharedCSINodeLister),
+		frameworkruntime.WithSharedCSIManager(sharedCSIManager),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("initializing profiles: %v", err)

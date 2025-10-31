@@ -125,3 +125,11 @@ type SharedDRAManager interface {
 	ResourceSlices() ResourceSliceLister
 	DeviceClasses() DeviceClassLister
 }
+
+// CSIManager can be used to obtain CSINode objects, and track changes to CSINode objects in-memory.
+// The plugin's default implementation obtains the objects from the API. A different implementation can be
+// plugged into the framework in order to simulate the state of CSINode objects. For example, Cluster Autoscaler
+// can use this to provide the correct CSINode object state to the CSINode plugin when simulating scheduling changes in-memory.
+type CSIManager interface {
+	CSINodes() CSINodeLister
+}

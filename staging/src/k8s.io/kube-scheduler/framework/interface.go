@@ -672,8 +672,9 @@ type Handle interface {
 	// A non-default implementation can be plugged into the framework to simulate the state of DRA objects.
 	SharedDRAManager() SharedDRAManager
 
-	// SharedCSINodeLister returns the SharedCSINodeLister of the framework.
-	SharedCSINodeLister() CSINodeLister
+	// SharedCSIManager can be used to obtain CSINode objects, and track changes to them in-memory.
+	// A non-default implementation can be plugged into the framework to simulate the state of CSINode objects.
+	SharedCSIManager() CSIManager
 
 	// RunFilterPluginsWithNominatedPods runs the set of configured filter plugins for nominated pod on the given node.
 	RunFilterPluginsWithNominatedPods(ctx context.Context, state CycleState, pod *v1.Pod, info NodeInfo) *Status

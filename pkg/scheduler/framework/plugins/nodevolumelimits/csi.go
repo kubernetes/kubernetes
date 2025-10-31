@@ -57,11 +57,11 @@ type InTreeToCSITranslator interface {
 
 // CSILimits is a plugin that checks node volume limits.
 type CSILimits struct {
-	csiNodeLister fwk.CSINodeLister
-	pvLister      corelisters.PersistentVolumeLister
-	pvcLister     corelisters.PersistentVolumeClaimLister
-	scLister      storagelisters.StorageClassLister
-	vaLister      storagelisters.VolumeAttachmentLister
+	csiManager fwk.CSIManager
+	pvLister   corelisters.PersistentVolumeLister
+	pvcLister  corelisters.PersistentVolumeClaimLister
+	scLister   storagelisters.StorageClassLister
+	vaLister   storagelisters.VolumeAttachmentLister
 
 	enableCSIMigrationPortworx bool
 	randomVolumeIDPrefix       string
@@ -261,7 +261,7 @@ func (pl *CSILimits) Filter(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, 
 
 	logger := klog.FromContext(ctx)
 
-	csiNode, err := pl.csiNodeLister.Get(node.Name)
+	csiNode, err := pl.csiManager.CSINodes().Get(node.Name)
 	if err != nil {
 		// TODO: return the error once CSINode is created by default (2 releases)
 		logger.V(5).Info("Could not get a CSINode object for the node", "node", klog.KObj(node), "err", err)
@@ -554,10 +554,8 @@ func NewCSI(_ context.Context, _ runtime.Object, handle fwk.Handle, fts feature.
 	vaLister := informerFactory.Storage().V1().VolumeAttachments().Lister()
 	csiTranslator := csitrans.New()
 
-	csiNodesLister := handle.SharedCSINodeLister()
-
 	return &CSILimits{
-		csiNodeLister:              csiNodesLister,
+		csiManager:                 handle.SharedCSIManager(),
 		pvLister:                   pvLister,
 		pvcLister:                  pvcLister,
 		scLister:                   scLister,
