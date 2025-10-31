@@ -1955,10 +1955,14 @@ def resolve(host):
   fi
   sed -i -e "s@{{ *etcd_protocol *}}@$etcd_protocol@g" "${temp_file}"
   sed -i -e "s@{{ *etcd_apiserver_protocol *}}@$etcd_apiserver_protocol@g" "${temp_file}"
-  sed -i -e "s@{{ *etcd_creds *}}@$etcd_creds@g" "${temp_file}"
+
+  etcd_creds_and_extra_args="${etcd_creds} ${etcd_apiserver_creds} ${etcd_extra_args}"
+  etcd_creds_and_extra_args=$(echo "$etcd_creds_and_extra_args" | awk '{for (i=1;i<=NF;i++) printf "\"%s\"%s", $i, (i<NF?", ":"") }')
+  etcdctl_certs=$(echo "$etcdctl_certs" | awk '{for (i=1; i<=NF; i++) printf "\"%s\",", $i }')
+
+  sed -i -e "s@{{ *etcd_creds_and_extra_args *}}@$etcd_creds_and_extra_args@g" "${temp_file}"
+
   sed -i -e "s@{{ *etcdctl_certs *}}@$etcdctl_certs@g" "${temp_file}"
-  sed -i -e "s@{{ *etcd_apiserver_creds *}}@$etcd_apiserver_creds@g" "${temp_file}"
-  sed -i -e "s@{{ *etcd_extra_args *}}@$etcd_extra_args@g" "${temp_file}"
   if [[ -n "${ETCD_VERSION:-}" ]]; then
     sed -i -e "s@{{ *pillar\.get('etcd_version', '\(.*\)') *}}@${ETCD_VERSION}@g" "${temp_file}"
   else
@@ -1972,6 +1976,7 @@ def resolve(host):
     container_security_context="\"securityContext\": {\"runAsUser\": ${ETCD_RUNASUSER}, \"runAsGroup\": ${ETCD_RUNASGROUP}, \"allowPrivilegeEscalation\": false, \"capabilities\": {\"drop\": [\"all\"]}},"
   fi
   sed -i -e "s@{{security_context}}@${container_security_context}@g" "${temp_file}"
+
   mv "${temp_file}" /etc/kubernetes/manifests
 }
 
