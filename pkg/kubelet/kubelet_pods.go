@@ -2621,9 +2621,17 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 			if s != nil && s.State == kubecontainer.ContainerStateExited && s.ExitCode == 0 {
 				continue
 			}
-			// When the pod is static, init container status might be lost.
-			// We can assume that the init containers are already completed if the main containers are created.
-			// When the init container is a sidecar container, it should be waiting (and will be restarted).
+			// When pod status is not persisted, init container status may be lost.
+			// This can occur in the following scenarios:
+			// 1. Static pods
+			// 2. Regular pods where init container status failed to sync to the API server
+			//    (e.g., due to control plane issues, though this is rare)
+			//
+			// In these cases, if the init container has already been removed from the runtime,
+			// kubelet cannot determine its status. However, we can infer that non-restartable
+			// init containers have completed successfully if regular containers have been created.
+			// Note: Restartable init containers (sidecars) should remain in waiting state and
+			// will be restarted by the kubelet.
 			isSidecar := container.RestartPolicy != nil && *container.RestartPolicy == v1.ContainerRestartPolicyAlways
 			if s == nil &&
 				kuberuntime.HasAnyRegularContainerCreated(pod, podStatus) &&
