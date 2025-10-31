@@ -77,6 +77,7 @@ func setFeatureDuringTestInternal(tb testing.TB, feature clientfeatures.Feature,
 		overriddenFeaturesLock.Lock()
 		defer overriddenFeaturesLock.Unlock()
 		delete(overriddenFeatures, feature)
+		// if default is not set
 		if err := featureGates.Set(feature, originalFeatureValue); err != nil {
 			tb.Errorf("failed restoring client-go feature: %v to its original value: %v, err: %v", feature, originalFeatureValue, err)
 		}
