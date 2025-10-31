@@ -92,7 +92,7 @@ type frameworkImpl struct {
 
 	parallelizer fwk.Parallelizer
 
-	batch OpportunisticBatch
+	batch *OpportunisticBatch
 }
 
 // extensionPoint encapsulates desired and applied set of plugins at a specific extension
@@ -305,6 +305,7 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 		apiDispatcher:        options.apiDispatcher,
 		parallelizer:         options.parallelizer,
 		logger:               logger,
+		batch:                newOpportunisticBatch(noBatchSignatures),
 	}
 
 	if len(f.extenders) > 0 {
