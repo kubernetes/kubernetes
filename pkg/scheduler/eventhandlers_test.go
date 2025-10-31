@@ -606,7 +606,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 				}
 			}
 
-			if err := addAllEventHandlers(&testSched, informerFactory, dynInformerFactory, resourceClaimCache, resourceSliceTracker, tt.gvkMap); err != nil {
+			if err := addAllEventHandlers(&testSched, informerFactory, dynInformerFactory, resourceClaimCache, resourceSliceTracker, nil /* DRA manager, maybe added test case for DRAExtendedResource */, tt.gvkMap); err != nil {
 				t.Fatalf("Add event handlers failed, error = %v", err)
 			}
 

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cache
+package extendedresourcecache
 
 import (
 	"fmt"
@@ -22,56 +22,54 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	resourceinformers "k8s.io/client-go/informers/resource/v1"
 	"k8s.io/client-go/tools/cache"
 	klog "k8s.io/klog/v2"
 )
 
-// ExtendedResourceCache maintains a global cache of extended resource to device class mappings
-// that can also be accessed by event handlers without requiring an extra scheduling cycle.
+// ExtendedResourceCache maintains a global cache of extended resource to device class mappings,
+// based on informer events. For that it implements the cache.ResourceEventHandler interface.
 type ExtendedResourceCache struct {
+	logger   klog.Logger
+	handlers []cache.ResourceEventHandler
+
 	mutex sync.RWMutex
 	// mapping maps extended resource name to device class name
 	mapping map[v1.ResourceName]string
-	logger  klog.Logger
 }
 
-// NewExtendedResourceCache creates a new ExtendedResourceCache instance, populates it
-// with the current device classes from the informer cache, and registers itself as an
-// event handler for device class changes.
-func NewExtendedResourceCache(deviceClassInformer resourceinformers.DeviceClassInformer, logger klog.Logger) *ExtendedResourceCache {
+var _ cache.ResourceEventHandler = &ExtendedResourceCache{}
+
+// NewExtendedResourceCache creates a new ExtendedResourceCache instance. The caller
+// is responsible for registering the instance as a handler of DeviceClass events.
+//
+// Additional event handlers may be registered here or via AddEventHandler.
+func NewExtendedResourceCache(logger klog.Logger, handlers ...cache.ResourceEventHandler) *ExtendedResourceCache {
 	cache := &ExtendedResourceCache{
-		mapping: make(map[v1.ResourceName]string),
-		logger:  logger,
-	}
-
-	// Populate the cache with existing device classes from the informer
-	if deviceClassInformer == nil {
-		logger.V(4).Info("Created extended resource cache without initial population (deviceClassInformer is nil)")
-		return cache
-	}
-	deviceClassLister := deviceClassInformer.Lister()
-	classes, err := deviceClassLister.List(labels.Everything())
-	if err != nil {
-		logger.Error(err, "Failed to populate extended resource cache during initialization")
-	}
-	for _, deviceClass := range classes {
-		cache.updateMapping(deviceClass, nil)
-	}
-	logger.V(4).Info("Created and populated extended resource cache", "mappingCount", len(cache.mapping))
-
-	// Register the cache as an event handler for device class changes
-	if _, err := deviceClassInformer.Informer().AddEventHandler(cache); err != nil {
-		logger.Error(err, "Failed to add event handler for device classes")
+		logger:   logger,
+		handlers: handlers,
+		mapping:  make(map[v1.ResourceName]string),
 	}
 
 	return cache
 }
 
+// AddEventHandler adds an event handler which gets called after the cache
+// has processed some incoming event. More than one additional event handler
+// may be added. They will be called in the order in which they were registered.
+// GetDeviceClass may be called from those event handlers.
+//
+// Not thread-safe, must be called *before* adding the cache itself to an
+// informer.
+func (c *ExtendedResourceCache) AddEventHandler(handler cache.ResourceEventHandler) {
+	c.handlers = append(c.handlers, handler)
+}
+
 // GetDeviceClass returns the device class name for the given extended resource name.
 // Returns empty string if the resource name is not found in the cache.
+//
+// This (and only this) method may be called on a nil ExtendedResourceCache. The nil
+// instance always returns the empty string.
 func (c *ExtendedResourceCache) GetDeviceClass(resourceName v1.ResourceName) string {
 	if c == nil {
 		return ""
@@ -85,50 +83,57 @@ func (c *ExtendedResourceCache) GetDeviceClass(resourceName v1.ResourceName) str
 func (c *ExtendedResourceCache) OnAdd(obj interface{}, isInInitialList bool) {
 	deviceClass, ok := obj.(*resourceapi.DeviceClass)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("object is not a DeviceClass %#v", obj))
+		utilruntime.HandleErrorWithLogger(c.logger, nil, "Expected DeviceClass", "actual", fmt.Sprintf("%T", obj))
 		return
 	}
 	c.updateMapping(deviceClass, nil)
+
+	for _, handler := range c.handlers {
+		handler.OnAdd(obj, isInInitialList)
+	}
 }
 
 // OnUpdate handles updates to an existing device class.
 func (c *ExtendedResourceCache) OnUpdate(oldObj, newObj interface{}) {
 	deviceClass, ok := newObj.(*resourceapi.DeviceClass)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("object is not a DeviceClass %#v", newObj))
+		utilruntime.HandleErrorWithLogger(c.logger, nil, "Expected DeviceClass", "actual", fmt.Sprintf("%T", newObj))
 		return
 	}
 	oldDeviceClass, ok := oldObj.(*resourceapi.DeviceClass)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("object is not a DeviceClass %#v", oldObj))
+		utilruntime.HandleErrorWithLogger(c.logger, nil, "Expected DeviceClass", "actual", fmt.Sprintf("%T", oldObj))
 		return
 	}
 	c.updateMapping(deviceClass, oldDeviceClass)
+
+	for _, handler := range c.handlers {
+		handler.OnUpdate(oldObj, newObj)
+	}
 }
 
 // OnDelete handles deletion of a device class.
 func (c *ExtendedResourceCache) OnDelete(obj interface{}) {
+	if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
+		obj = tombstone.Obj
+	}
 	deviceClass, ok := obj.(*resourceapi.DeviceClass)
 	if !ok {
-		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
-			return
-		}
-		deviceClass, ok = tombstone.Obj.(*resourceapi.DeviceClass)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a DeviceClass %#v", obj))
-			return
-		}
+		utilruntime.HandleErrorWithLogger(c.logger, nil, "Expected DeviceClass", "actual", fmt.Sprintf("%T", obj))
+		return
 	}
 	c.removeMapping(deviceClass)
+
+	for _, handler := range c.handlers {
+		handler.OnDelete(obj)
+	}
 }
 
 // updateMapping updates the cache with the device class mapping.
 // It first removes any existing mappings for this device class to handle
 // ExtendedResourceName changes, then adds the new mappings.
 func (c *ExtendedResourceCache) updateMapping(newDeviceClass, oldDeviceClass *resourceapi.DeviceClass) {
-	if c == nil || newDeviceClass == nil {
+	if newDeviceClass == nil {
 		return
 	}
 	c.mutex.Lock()
@@ -161,7 +166,7 @@ func (c *ExtendedResourceCache) updateMapping(newDeviceClass, oldDeviceClass *re
 // It searches for all mappings to the given device class name and removes them,
 // because the ExtendedResourceName in the deviceClass object may be stale.
 func (c *ExtendedResourceCache) removeMapping(deviceClass *resourceapi.DeviceClass) {
-	if c == nil || deviceClass == nil {
+	if deviceClass == nil {
 		return
 	}
 	c.mutex.Lock()
