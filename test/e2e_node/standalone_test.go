@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
+	"k8s.io/utils/ptr"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -208,6 +209,147 @@ var _ = SIGDescribe(feature.StandaloneMode, func() {
 				}
 				return fmt.Errorf("pod (%v/%v) still exists", ns, staticPodName)
 			}).Should(gomega.Succeed())
+		})
+
+		f.Context("when the static pod has init container", f.WithSerial(), func() {
+			f.It("should be ready after init container is removed and kubelet restarts", func(ctx context.Context) {
+				ginkgo.By("create static pod")
+				staticPod := &v1.Pod{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "Pod",
+						APIVersion: "v1",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "static",
+						Namespace: f.Namespace.Name,
+					},
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
+							{
+								Name:  "main",
+								Image: imageutils.GetE2EImage(imageutils.Pause),
+							},
+						},
+						InitContainers: []v1.Container{
+							{
+								Name:    "init",
+								Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+								Command: []string{"ls"},
+							},
+						},
+					},
+				}
+				err := scheduleStaticPod(kubeletCfg.StaticPodPath, staticPod.Name, staticPod.Namespace, staticPod)
+				framework.ExpectNoError(err)
+
+				var initCtrID string
+				var startTime *metav1.Time
+				ginkgo.By("wait for the mirror pod to be updated")
+				gomega.Eventually(ctx, func(g gomega.Gomega) {
+					pod, err := getPodFromStandaloneKubelet(ctx, staticPod.Namespace, staticPod.Name)
+					g.Expect(err).Should(gomega.Succeed())
+					g.Expect(pod.Status.InitContainerStatuses).To(gomega.HaveLen(1))
+					cstatus := pod.Status.InitContainerStatuses[0]
+					// Wait until the init container is terminated.
+					g.Expect(cstatus.State.Terminated).NotTo(gomega.BeNil())
+					g.Expect(cstatus.State.Terminated.ContainerID).NotTo(gomega.BeEmpty())
+					initCtrID = cstatus.ContainerID
+					startTime = pod.Status.StartTime
+				}, 2*time.Minute, 5*time.Second).Should(gomega.Succeed())
+
+				ginkgo.By("remove init container")
+				removeInitContainer(ctx, initCtrID)
+
+				ginkgo.By("restart kubelet")
+				startKubelet := mustStopKubelet(ctx, f)
+				startKubelet(ctx)
+				gomega.Eventually(ctx, func() bool {
+					return kubeletHealthCheck(kubeletHealthCheckURL)
+				}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeTrueBecause("kubelet should be started"))
+
+				ginkgo.By("wait for the mirror pod to be updated")
+				gomega.Eventually(ctx, func(g gomega.Gomega) {
+					pod, err := getPodFromStandaloneKubelet(ctx, staticPod.Namespace, staticPod.Name)
+					g.Expect(pod.Status.StartTime).NotTo(gomega.Equal(startTime))
+					g.Expect(err).Should(gomega.Succeed())
+					g.Expect(pod.Status.InitContainerStatuses).To(gomega.HaveLen(1))
+					cstatus := pod.Status.InitContainerStatuses[0]
+					// Init container should be completed.
+					g.Expect(cstatus.State.Terminated).NotTo(gomega.BeNil())
+					g.Expect(cstatus.State.Terminated.Reason).To(gomega.Equal("Completed"))
+					g.Expect(cstatus.State.Terminated.ExitCode).To(gomega.BeZero())
+				}, 2*time.Minute, 5*time.Second).Should(gomega.Succeed())
+			})
+		})
+		f.Context("when the static pod has sidecar container", func() {
+			f.It("should be ready after sidecar container is removed and kubelet restarts", f.WithNodeConformance(), func(ctx context.Context) {
+				ginkgo.By("create static pod")
+				staticPod := &v1.Pod{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "Pod",
+						APIVersion: "v1",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "static",
+						Namespace: f.Namespace.Name,
+					},
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
+							{
+								Name:  "main",
+								Image: imageutils.GetE2EImage(imageutils.Pause),
+							},
+						},
+						InitContainers: []v1.Container{
+							{
+								Name:          "init",
+								Image:         imageutils.GetE2EImage(imageutils.Pause),
+								RestartPolicy: ptr.To(v1.ContainerRestartPolicyAlways),
+							},
+						},
+					},
+				}
+				err := scheduleStaticPod(kubeletCfg.StaticPodPath, staticPod.Name, staticPod.Namespace, staticPod)
+				framework.ExpectNoError(err)
+
+				var sidecarCtrID string
+				var startTime *metav1.Time
+				ginkgo.By("wait for the mirror pod to be updated")
+				gomega.Eventually(ctx, func(g gomega.Gomega) {
+					pod, err := getPodFromStandaloneKubelet(ctx, staticPod.Namespace, staticPod.Name)
+					g.Expect(err).Should(gomega.Succeed())
+					g.Expect(pod.Status.InitContainerStatuses).To(gomega.HaveLen(1))
+					cstatus := pod.Status.InitContainerStatuses[0]
+					// Wait until the sidecar container starts running.
+					g.Expect(cstatus.State.Running).NotTo(gomega.BeNil())
+					sidecarCtrID = cstatus.ContainerID
+					startTime = pod.Status.StartTime
+				}, 2*time.Minute, 5*time.Second).Should(gomega.Succeed())
+
+				// Stop kubelet first not to restart the sidecar container.
+				ginkgo.By("stop kubelet")
+				startKubelet := mustStopKubelet(ctx, f)
+
+				ginkgo.By("remove sidecar container")
+				removeInitContainer(ctx, sidecarCtrID)
+
+				ginkgo.By("start kubelet")
+				startKubelet(ctx)
+				gomega.Eventually(ctx, func() bool {
+					return kubeletHealthCheck(kubeletHealthCheckURL)
+				}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeTrueBecause("kubelet should be started"))
+
+				ginkgo.By("wait for the mirror pod to be updated")
+				gomega.Eventually(ctx, func(g gomega.Gomega) {
+					pod, err := getPodFromStandaloneKubelet(ctx, staticPod.Namespace, staticPod.Name)
+					g.Expect(pod.Status.StartTime).NotTo(gomega.Equal(startTime))
+					g.Expect(err).Should(gomega.Succeed())
+					g.Expect(pod.Status.InitContainerStatuses).To(gomega.HaveLen(1))
+					cstatus := pod.Status.InitContainerStatuses[0]
+					// Sidecar container should be restarted and running.
+					g.Expect(cstatus.State.Running).NotTo(gomega.BeNil())
+				}, 2*time.Minute, 5*time.Second).Should(gomega.Succeed())
+			})
 		})
 	})
 })
