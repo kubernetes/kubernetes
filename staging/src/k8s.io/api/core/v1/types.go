@@ -5489,7 +5489,7 @@ type ReplicationControllerSpec struct {
 	// insufficient replicas are detected. This takes precedence over a TemplateRef.
 	// The only allowed template.spec.restartPolicy value is "Always".
 	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template
-	// +optional
+	// +k8s:required
 	Template *PodTemplateSpec `json:"template,omitempty" protobuf:"bytes,3,opt,name=template"`
 }
 

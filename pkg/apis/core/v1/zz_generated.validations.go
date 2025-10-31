@@ -178,6 +178,24 @@ func Validate_ReplicationControllerSpec(ctx context.Context, op operation.Operat
 			return
 		}(fldPath.Child("selector"), obj.Selector, safe.Field(oldObj, func(oldObj *corev1.ReplicationControllerSpec) map[string]string { return oldObj.Selector }))...)
 
-	// field corev1.ReplicationControllerSpec.Template has no validation
+	// field corev1.ReplicationControllerSpec.Template
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *corev1.PodTemplateSpec) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("template"), obj.Template, safe.Field(oldObj, func(oldObj *corev1.ReplicationControllerSpec) *corev1.PodTemplateSpec { return oldObj.Template }))...)
+
 	return errs
 }

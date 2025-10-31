@@ -5337,7 +5337,7 @@ message ReplicationControllerSpec {
   // insufficient replicas are detected. This takes precedence over a TemplateRef.
   // The only allowed template.spec.restartPolicy value is "Always".
   // More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template
-  // +optional
+  // +k8s:required
   optional PodTemplateSpec template = 3;
 }
 

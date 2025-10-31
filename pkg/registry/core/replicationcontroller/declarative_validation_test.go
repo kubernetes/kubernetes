@@ -197,7 +197,26 @@ func TestDeclarativeValidateForDeclarative(t *testing.T) {
 		},
 		"selector: valid": {
 			input: mkValidReplicationController(func(rc *api.ReplicationController) {
-				rc.Spec.Selector = map[string]string{"foo": "bar"}
+				rc.Spec.Selector = map[string]string{"a": "b"}
+			}),
+		},
+		// spec.template
+		"template: nil": {
+			input: mkValidReplicationController(func(rc *api.ReplicationController) {
+				rc.Spec.Template = nil
+			}),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec.template"), ""),
+			},
+		},
+		"template : valid": {
+			input: mkValidReplicationController(func(rc *api.ReplicationController) {
+				rc.Spec.Template = &api.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{"a": "b"},
+					},
+					Spec: podtest.MakePodSpec(),
+				}
 			}),
 		},
 	}
@@ -296,9 +315,30 @@ func TestValidateUpdateForDeclarative(t *testing.T) {
 		"selector: valid": {
 			old: mkValidReplicationController(),
 			update: mkValidReplicationController(func(rc *api.ReplicationController) {
-				rc.Spec.Selector = map[string]string{"foo": "bar"}
+				rc.Spec.Selector = map[string]string{"a": "b"}
 			}),
-},
+		},
+		// spec.template
+		"template: nil": {
+			old: mkValidReplicationController(),
+			update: mkValidReplicationController(func(rc *api.ReplicationController) {
+				rc.Spec.Template = nil
+			}),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec.template"), ""),
+			},
+		},
+		"template: valid": {
+			old: mkValidReplicationController(),
+			update: mkValidReplicationController(func(rc *api.ReplicationController) {
+				rc.Spec.Template = &api.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{"a": "b"},
+					},
+					Spec: podtest.MakePodSpec(),
+				}
+			}),
+		},
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
