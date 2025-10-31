@@ -57,11 +57,12 @@ type InTreeToCSITranslator interface {
 
 // CSILimits is a plugin that checks node volume limits.
 type CSILimits struct {
-	csiManager fwk.CSIManager
-	pvLister   corelisters.PersistentVolumeLister
-	pvcLister  corelisters.PersistentVolumeClaimLister
-	scLister   storagelisters.StorageClassLister
-	vaLister   storagelisters.VolumeAttachmentLister
+	csiManager      fwk.CSIManager
+	pvLister        corelisters.PersistentVolumeLister
+	pvcLister       corelisters.PersistentVolumeClaimLister
+	scLister        storagelisters.StorageClassLister
+	vaLister        storagelisters.VolumeAttachmentLister
+	csiDriverLister storagelisters.CSIDriverLister
 
 	enableCSIMigrationPortworx bool
 	randomVolumeIDPrefix       string
@@ -574,6 +575,7 @@ func NewCSI(_ context.Context, _ runtime.Object, handle fwk.Handle, fts feature.
 	pvcLister := informerFactory.Core().V1().PersistentVolumeClaims().Lister()
 	scLister := informerFactory.Storage().V1().StorageClasses().Lister()
 	vaLister := informerFactory.Storage().V1().VolumeAttachments().Lister()
+	csiDriverLister := informerFactory.Storage().V1().CSIDrivers().Lister()
 	csiTranslator := csitrans.New()
 
 	return &CSILimits{
@@ -582,6 +584,7 @@ func NewCSI(_ context.Context, _ runtime.Object, handle fwk.Handle, fts feature.
 		pvcLister:                  pvcLister,
 		scLister:                   scLister,
 		vaLister:                   vaLister,
+		csiDriverLister:            csiDriverLister,
 		enableCSIMigrationPortworx: fts.EnableCSIMigrationPortworx,
 		enableVolumeLimitScaling:   fts.EnableVolumeLimitScaling,
 		randomVolumeIDPrefix:       rand.String(32),
