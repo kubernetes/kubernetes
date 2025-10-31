@@ -131,6 +131,14 @@ type PodStatusApplyConfiguration struct {
 	ResourceClaimStatuses []PodResourceClaimStatusApplyConfiguration `json:"resourceClaimStatuses,omitempty"`
 	// Status of extended resource claim backed by DRA.
 	ExtendedResourceClaimStatus *PodExtendedResourceClaimStatusApplyConfiguration `json:"extendedResourceClaimStatus,omitempty"`
+	// AllocatedResources is the total requests allocated for this pod by the node.
+	// If pod-level requests are not set, this will be the total requests aggregated
+	// across containers in the pod.
+	AllocatedResources *corev1.ResourceList `json:"allocatedResources,omitempty"`
+	// Resources represents the compute resource requests and limits that have been
+	// applied at the pod level if pod-level requests or limits are set in
+	// PodSpec.Resources
+	Resources *ResourceRequirementsApplyConfiguration `json:"resources,omitempty"`
 }
 
 // PodStatusApplyConfiguration constructs a declarative configuration of the PodStatus type for use with
@@ -315,5 +323,21 @@ func (b *PodStatusApplyConfiguration) WithResourceClaimStatuses(values ...*PodRe
 // If called multiple times, the ExtendedResourceClaimStatus field is set to the value of the last call.
 func (b *PodStatusApplyConfiguration) WithExtendedResourceClaimStatus(value *PodExtendedResourceClaimStatusApplyConfiguration) *PodStatusApplyConfiguration {
 	b.ExtendedResourceClaimStatus = value
+	return b
+}
+
+// WithAllocatedResources sets the AllocatedResources field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the AllocatedResources field is set to the value of the last call.
+func (b *PodStatusApplyConfiguration) WithAllocatedResources(value corev1.ResourceList) *PodStatusApplyConfiguration {
+	b.AllocatedResources = &value
+	return b
+}
+
+// WithResources sets the Resources field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Resources field is set to the value of the last call.
+func (b *PodStatusApplyConfiguration) WithResources(value *ResourceRequirementsApplyConfiguration) *PodStatusApplyConfiguration {
+	b.Resources = value
 	return b
 }

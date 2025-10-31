@@ -546,6 +546,11 @@ func SetObjectDefaults_Pod(in *corev1.Pod) {
 			SetDefaults_ResourceList(&a.Resources.Requests)
 		}
 	}
+	SetDefaults_ResourceList(&in.Status.AllocatedResources)
+	if in.Status.Resources != nil {
+		SetDefaults_ResourceList(&in.Status.Resources.Limits)
+		SetDefaults_ResourceList(&in.Status.Resources.Requests)
+	}
 }
 
 func SetObjectDefaults_PodList(in *corev1.PodList) {
@@ -583,6 +588,11 @@ func SetObjectDefaults_PodStatusResult(in *corev1.PodStatusResult) {
 			SetDefaults_ResourceList(&a.Resources.Limits)
 			SetDefaults_ResourceList(&a.Resources.Requests)
 		}
+	}
+	SetDefaults_ResourceList(&in.Status.AllocatedResources)
+	if in.Status.Resources != nil {
+		SetDefaults_ResourceList(&in.Status.Resources.Limits)
+		SetDefaults_ResourceList(&in.Status.Resources.Requests)
 	}
 }
 

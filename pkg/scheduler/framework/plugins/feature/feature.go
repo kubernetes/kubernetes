@@ -25,26 +25,27 @@ import (
 // This struct allows us to break the dependency of the plugins on
 // the internal k8s features pkg.
 type Features struct {
-	EnableDRAExtendedResource                    bool
-	EnableDRAPrioritizedList                     bool
-	EnableDRAAdminAccess                         bool
-	EnableDRAConsumableCapacity                  bool
-	EnableDRADeviceTaints                        bool
-	EnableDRADeviceBindingConditions             bool
-	EnableDRAPartitionableDevices                bool
-	EnableDRAResourceClaimDeviceStatus           bool
-	EnableDRASchedulerFilterTimeout              bool
-	EnableDynamicResourceAllocation              bool
-	EnableVolumeAttributesClass                  bool
-	EnableCSIMigrationPortworx                   bool
-	EnableNodeInclusionPolicyInPodTopologySpread bool
-	EnableMatchLabelKeysInPodTopologySpread      bool
-	EnableInPlacePodVerticalScaling              bool
-	EnableSidecarContainers                      bool
-	EnableSchedulingQueueHint                    bool
-	EnableAsyncPreemption                        bool
-	EnablePodLevelResources                      bool
-	EnableStorageCapacityScoring                 bool
+	EnableDRAExtendedResource                     bool
+	EnableDRAPrioritizedList                      bool
+	EnableDRAAdminAccess                          bool
+	EnableDRAConsumableCapacity                   bool
+	EnableDRADeviceTaints                         bool
+	EnableDRADeviceBindingConditions              bool
+	EnableDRAPartitionableDevices                 bool
+	EnableDRAResourceClaimDeviceStatus            bool
+	EnableDRASchedulerFilterTimeout               bool
+	EnableDynamicResourceAllocation               bool
+	EnableVolumeAttributesClass                   bool
+	EnableCSIMigrationPortworx                    bool
+	EnableNodeInclusionPolicyInPodTopologySpread  bool
+	EnableMatchLabelKeysInPodTopologySpread       bool
+	EnableInPlacePodVerticalScaling               bool
+	EnableInPlacePodLevelResourcesVerticalScaling bool
+	EnableSidecarContainers                       bool
+	EnableSchedulingQueueHint                     bool
+	EnableAsyncPreemption                         bool
+	EnablePodLevelResources                       bool
+	EnableStorageCapacityScoring                  bool
 }
 
 // NewSchedulerFeaturesFromGates copies the current state of the feature gates into the struct.

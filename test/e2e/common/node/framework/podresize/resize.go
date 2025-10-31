@@ -77,7 +77,7 @@ func makeResizableContainer(tcInfo ResizableContainerInfo) v1.Container {
 	return tc
 }
 
-func MakePodWithResizableContainers(ns, name, timeStamp string, tcInfo []ResizableContainerInfo) *v1.Pod {
+func MakePodWithResizableContainers(ns, name, timeStamp string, tcInfo []ResizableContainerInfo, podResources *v1.ResourceRequirements) *v1.Pod {
 	testInitContainers, testContainers := separateContainers(tcInfo)
 
 	minGracePeriodSeconds := int64(0)
@@ -97,6 +97,11 @@ func MakePodWithResizableContainers(ns, name, timeStamp string, tcInfo []Resizab
 			TerminationGracePeriodSeconds: &minGracePeriodSeconds,
 		},
 	}
+
+	if podResources != nil {
+		pod.Spec.Resources = podResources
+	}
+
 	return pod
 }
 
@@ -154,7 +159,7 @@ func VerifyPodResizePolicy(gotPod *v1.Pod, wantInfo []ResizableContainerInfo) {
 	}
 }
 
-func VerifyPodResources(gotPod *v1.Pod, wantInfo []ResizableContainerInfo) {
+func VerifyPodResources(gotPod *v1.Pod, wantInfo []ResizableContainerInfo, wantPodResources *v1.ResourceRequirements) {
 	ginkgo.GinkgoHelper()
 
 	gotCtrs := append(append([]v1.Container{}, gotPod.Spec.Containers...), gotPod.Spec.InitContainers...)
@@ -171,6 +176,8 @@ func VerifyPodResources(gotPod *v1.Pod, wantInfo []ResizableContainerInfo) {
 			gomega.Expect(gotCtr.Resources).To(gomega.BeComparableTo(wantCtr.Resources))
 		}
 	}
+	gomega.Expect(gotPod.Spec.Resources).To(gomega.BeComparableTo(wantPodResources))
+
 }
 
 func VerifyPodStatusResources(gotPod *v1.Pod, wantInfo []ResizableContainerInfo) error {
@@ -353,11 +360,11 @@ func ExpectPodResized(ctx context.Context, f *framework.Framework, resizedPod *v
 	}
 }
 
-func MakeResizePatch(originalContainers, desiredContainers []ResizableContainerInfo) []byte {
-	original, err := json.Marshal(MakePodWithResizableContainers("", "", "", originalContainers))
+func MakeResizePatch(originalContainers, desiredContainers []ResizableContainerInfo, originPodResources, desiredPodResources *v1.ResourceRequirements) []byte {
+	original, err := json.Marshal(MakePodWithResizableContainers("", "", "", originalContainers, originPodResources))
 	framework.ExpectNoError(err)
 
-	desired, err := json.Marshal(MakePodWithResizableContainers("", "", "", desiredContainers))
+	desired, err := json.Marshal(MakePodWithResizableContainers("", "", "", desiredContainers, desiredPodResources))
 	framework.ExpectNoError(err)
 
 	patch, err := strategicpatch.CreateTwoWayMergePatch(original, desired, v1.Pod{})
