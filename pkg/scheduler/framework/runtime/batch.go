@@ -36,15 +36,22 @@ func noBatchSignatures(p *v1.Pod) string { return "" }
 // scheudling of common pods.
 type OpportunisticBatch struct {
 	state         *batchState
+	currPod       batchPodInfo
 	signatureFunc PodSignatureFunc
 }
 
 type batchState struct {
 	signature    string
 	sortedNodes  framework.SortedScoredNodes
-	podSucceeded bool
-	lastHint     string
 	creationTime time.Time
+}
+
+type batchPodInfo struct {
+	pod       *v1.Pod
+	succeeded bool
+	signed    bool
+	signature string
+	hint      string
 }
 
 const (
@@ -66,34 +73,27 @@ func (b *OpportunisticBatch) invalidate(logger klog.Logger, result, reason strin
 func (b *OpportunisticBatch) NewPod(ctx context.Context, pod *v1.Pod) {
 	log := klog.FromContext(ctx)
 
+	// If our last pod didn't succeed, then clear our state
+	if !b.currPod.succeeded {
+		b.invalidate(log, "failure", "pod_failure")
+	}
+
+	// Reset our current pod.
+	b.setPod(pod)
+
 	// If our state is empty, then just return
 	if b.state == nil || b.state.sortedNodes == nil || b.state.sortedNodes.Len() == 0 {
 		b.invalidate(log, "failure", "empty_list")
 		return
 	}
 
-	// If our last pod didn't succeed, then clear our state
-	if !b.state.podSucceeded {
-		b.invalidate(log, "failure", "pod_failure")
-		return
-	}
-
-	// If this pod already has a nominated name, then we can't use the batch
-	// (and don't need to!)
-	if pod.Status.NominatedNodeName != "" {
-		b.invalidate(log, "failure", "already_nominated")
-		return
-	}
-
-	signature := b.signatureFunc(pod)
-
-	// If the pod is incompatible with this batch, then we can't use it.
-	if !b.podCompatible(signature) {
+	// If the pod is incompatible with the state, then we can't use the state.
+	if !b.podCompatibleWithState() {
 		b.invalidate(log, "failure", "pod_incompatible")
 		return
 	}
 
-	// If the batch is too old, throw it away. This is to avoid
+	// If the state is too old, throw it away. This is to avoid
 	// cases where we either have huge numbers of compatible pods in a
 	// row or we have a long wait between pods.
 	if time.Now().After((b.state.creationTime.Add(maxBatchAge))) {
@@ -103,43 +103,40 @@ func (b *OpportunisticBatch) NewPod(ctx context.Context, pod *v1.Pod) {
 
 	// We have matching state for the given pod!
 	metrics.BatchUsageStats.WithLabelValues("success", "success").Inc()
-
-	// Clear the success bit; the NodeResults call will set it.
-	b.state.podSucceeded = false
 }
 
 func (b *OpportunisticBatch) NodeHint(ctx context.Context, pod *v1.Pod) string {
-	if b.state == nil {
+	if b.state == nil || b.currPod.pod != pod {
 		return ""
 	}
 	hint := b.state.sortedNodes.Pop()
-	b.state.lastHint = hint
+	b.currPod.hint = hint
 	return hint
-}
-
-func (b *OpportunisticBatch) podCompatible(signature string) bool {
-	return signature != "" && signature == b.state.signature
 }
 
 func (b *OpportunisticBatch) postScore(ctx context.Context, inputState fwk.CycleState, thisFramework bool, owningFwk framework.Framework, podInfo fwk.PodInfo, inputChosenNode fwk.NodeInfo, otherNodes framework.SortedScoredNodes) {
 	log := klog.FromContext(ctx)
+	pod := podInfo.GetPod()
 
-	// A pod from another framework means we need to invalidate our results.
-	if !thisFramework {
-		b.invalidate(log, "failure", "other_fwk_pod")
+	// If this pod doesn't match our current pod (either from another framework or because of a failure)
+	// then we need to clear state.
+	if b.currPod.pod != pod || !thisFramework {
+		b.invalidate(log, "failure", "different_pod")
 		return
 	}
 
-	pod := podInfo.GetPod()
+	// If we didn't use the hint we provided, then we need to clear state.
+	if b.currPod.hint != inputChosenNode.Node().Name {
+		b.invalidate(log, "failure", "different_node_used")
+		return
+	}
+
+	// Now check if the node we used can be filtered. If it is no longer feasible,
+	// then we can continue using the state. Otherwise throw the state away, because
+	// we can't rescore the individual node.
 	state := inputState.Clone()
 	chosenNode := inputChosenNode.Snapshot()
 
-	// If we have state, clear it if we didn't use the hint we provided.
-	if b.state != nil && b.state.lastHint != chosenNode.Node().Name {
-		b.invalidate(log, "failure", "different_node_used")
-	}
-
-	// Update the state assuming placement of the previous pod. If we fail, throw away the batch.
 	chosenNode.AddPodInfo(podInfo)
 	status := owningFwk.RunPreFilterExtensionAddPod(ctx, state, pod, podInfo, chosenNode)
 	if !status.IsSuccess() {
@@ -147,9 +144,6 @@ func (b *OpportunisticBatch) postScore(ctx context.Context, inputState fwk.Cycle
 		return
 	}
 
-	// Now check if the node we used can be filtered. If it is no longer feasible,
-	// then we can continue using the batch. Otherwise throw the batch away, because
-	// we can't rescore the individual node.
 	status = owningFwk.RunFilterPlugins(ctx, state, pod, chosenNode)
 	if !status.IsRejected() {
 		b.invalidate(log, "failure", "node_not_filtered")
@@ -161,16 +155,36 @@ func (b *OpportunisticBatch) postScore(ctx context.Context, inputState fwk.Cycle
 	// Fill the state with the results from our schedulePod call if it is empty.
 	if b.state == nil {
 		b.state = &batchState{
-			signature:    b.signatureFunc(pod),
+			signature:    b.podSignature(),
 			sortedNodes:  otherNodes,
 			creationTime: time.Now(),
 		}
 		log.V(2).Info("Set batch info", "signature", b.state.signature)
 	}
 
-	// Make sure we reuse our state for the next pod.
-	b.state.podSucceeded = true
-	b.state.lastHint = ""
+	// Make sure we can reuse our state for the next pod.
+	b.currPod.succeeded = true
+}
+
+func (b *OpportunisticBatch) setPod(pod *v1.Pod) {
+	b.currPod = batchPodInfo{
+		pod:       pod,
+		signed:    false,
+		succeeded: false,
+	}
+}
+
+func (b *OpportunisticBatch) podSignature() string {
+	if !b.currPod.signed {
+		b.currPod.signature = b.signatureFunc(b.currPod.pod)
+		b.currPod.signed = true
+	}
+	return b.currPod.signature
+}
+
+func (b *OpportunisticBatch) podCompatibleWithState() bool {
+	signature := b.podSignature()
+	return signature != "" && signature == b.state.signature
 }
 
 func newOpportunisticBatch(signatureFunc PodSignatureFunc) *OpportunisticBatch {
