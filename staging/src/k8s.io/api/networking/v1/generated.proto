@@ -234,6 +234,7 @@ message IngressClassSpec {
   // configuration for the controller. This is optional if the controller does
   // not require extra parameters.
   // +optional
+  // +k8s:optional
   optional IngressClassParametersReference parameters = 2;
 }
 
