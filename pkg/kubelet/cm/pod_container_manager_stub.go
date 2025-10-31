@@ -71,6 +71,6 @@ func (m *podContainerManagerStub) SetPodCgroupMemoryLimit(_ *v1.Pod, _ int64) er
 	return nil
 }
 
-func (m *podContainerManagerStub) SetPodCgroupCpuLimit(_ klog.Logger, _ *v1.Pod, _ *int64, _, _ *uint64) error {
+func (m *podContainerManagerStub) SetPodCgroupCPULimit(_ klog.Logger, _ *v1.Pod, _ *int64, _, _ *uint64) error {
 	return nil
 }
