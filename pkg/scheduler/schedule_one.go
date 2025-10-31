@@ -484,7 +484,9 @@ func (sched *Scheduler) schedulePod(ctx context.Context, fwk framework.Framework
 	node := sortedPrioritizedNodes.Pop()
 	trace.Step("Prioritizing done")
 
-	fwk.StoreScheduleResults(ctx, pod, node, sortedPrioritizedNodes)
+	if utilfeature.DefaultFeatureGate.Enabled(features.OpportunisticBatching) {
+		fwk.StoreScheduleResults(ctx, pod, node, sortedPrioritizedNodes)
+	}
 
 	return ScheduleResult{
 		SuggestedHost:  node,
