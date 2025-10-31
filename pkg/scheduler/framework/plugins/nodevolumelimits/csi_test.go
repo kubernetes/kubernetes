@@ -1273,6 +1273,17 @@ func getFakeCSIDriverLister(driverNames ...string) fakeCSIDriverLister {
 	return list
 }
 
+func getFakeCSIDriverListerWithPrevent(driverName string, prevent *bool) fakeCSIDriverLister {
+	return fakeCSIDriverLister{
+		storagev1.CSIDriver{
+			ObjectMeta: metav1.ObjectMeta{Name: driverName},
+			Spec: storagev1.CSIDriverSpec{
+				PreventPodSchedulingIfMissing: prevent,
+			},
+		},
+	}
+}
+
 func TestVolumeLimitScalingGate(t *testing.T) {
 	// Pod uses a PVC that resolves to the EBS CSI driver via PV
 	newPod := st.MakePod().PVC("csi-ebs.csi.aws.com-0").Obj()
@@ -1283,13 +1294,15 @@ func TestVolumeLimitScalingGate(t *testing.T) {
 		limitSource              string
 		limit                    int32
 		wantStatus               *fwk.Status
+		preventIfMissing         *bool
 	}{
 		{
-			name:                     "gate enabled - fail when driver not installed",
+			name:                     "gate enabled - fail when driver not installed and prevent=true",
 			enableVolumeLimitScaling: true,
 			limitSource:              "no-csi-driver",
 			limit:                    0,
 			wantStatus:               fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("%s CSI driver is not installed on the node", ebsCSIDriverName)),
+			preventIfMissing:         ptr.To(true),
 		},
 		{
 			name:                     "gate disabled - skip driver presence check",
@@ -1297,6 +1310,22 @@ func TestVolumeLimitScalingGate(t *testing.T) {
 			limitSource:              "no-csi-driver",
 			limit:                    0,
 			wantStatus:               nil,
+		},
+		{
+			name:                     "gate enabled - prevent unset allows scheduling when driver not installed",
+			enableVolumeLimitScaling: true,
+			limitSource:              "no-csi-driver",
+			limit:                    0,
+			wantStatus:               nil,
+			preventIfMissing:         nil,
+		},
+		{
+			name:                     "gate enabled - prevent=false allows scheduling when driver not installed",
+			enableVolumeLimitScaling: true,
+			limitSource:              "no-csi-driver",
+			limit:                    0,
+			wantStatus:               nil,
+			preventIfMissing:         ptr.To(false),
 		},
 		{
 			name:                     "gate enabled - driver installed within limit",
@@ -1318,10 +1347,17 @@ func TestVolumeLimitScalingGate(t *testing.T) {
 				pvcLister:                getFakeCSIPVCLister("csi", scName, ebsCSIDriverName),
 				scLister:                 getFakeCSIStorageClassLister(scName, ebsCSIDriverName),
 				vaLister:                 getFakeVolumeAttachmentLister(0, ebsCSIDriverName),
-				csiDriverLister:          getFakeCSIDriverLister(ebsCSIDriverName),
+				csiDriverLister:          nil,
 				enableVolumeLimitScaling: tt.enableVolumeLimitScaling,
 				randomVolumeIDPrefix:     rand.String(32),
 				translator:               csiTranslator,
+			}
+
+			// Inject appropriate CSIDriver lister depending on preventIfMissing
+			if tt.preventIfMissing == nil {
+				p.csiDriverLister = getFakeCSIDriverLister(ebsCSIDriverName)
+			} else {
+				p.csiDriverLister = getFakeCSIDriverListerWithPrevent(ebsCSIDriverName, tt.preventIfMissing)
 			}
 
 			_, ctx := ktesting.NewTestContext(t)
