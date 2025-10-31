@@ -87,7 +87,7 @@ type Options struct {
 	//
 	// The following API server metrics for fetching JWKS and provider status will not be recorded if this is set.
 	//  - apiserver_authentication_jwt_authenticator_jwks_fetch_last_timestamp_seconds
-	//  - apiserver_authentication_jwt_authenticator_jwks_fetch_last_key_set_hash
+	//  - apiserver_authentication_jwt_authenticator_jwks_fetch_last_key_set_info
 	KeySet oidc.KeySet
 
 	// PEM encoded root certificate contents of the provider.  Mutually exclusive with Client.
