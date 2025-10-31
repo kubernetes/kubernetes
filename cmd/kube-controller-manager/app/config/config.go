@@ -18,11 +18,11 @@ package config
 
 import (
 	apiserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/flagz"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	basecompatibility "k8s.io/component-base/compatibility"
-	"k8s.io/component-base/zpages/flagz"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 	"time"
 )
