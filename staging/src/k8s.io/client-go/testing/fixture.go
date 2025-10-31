@@ -511,6 +511,17 @@ func (t *tracker) Apply(gvr schema.GroupVersionResource, applyConfiguration runt
 	return t.add(gvr, obj, ns, true)
 }
 
+// IsWatchListSemanticsUnSupported informs the reflector that this client
+// doesn't support WatchList semantics.
+//
+// This is a synthetic method whose sole purpose is to satisfy the optional
+// interface check performed by the reflector.
+// Returning true signals that WatchList can NOT be used.
+// No additional logic is implemented here.
+func (t *tracker) IsWatchListSemanticsUnSupported() bool {
+	return true
+}
+
 func (t *tracker) getWatches(gvr schema.GroupVersionResource, ns string) []*watch.RaceFreeFakeWatcher {
 	watches := []*watch.RaceFreeFakeWatcher{}
 	if t.watchers[gvr] != nil {
