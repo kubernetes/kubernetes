@@ -100,11 +100,12 @@ func getContainersToDeleteInPod(filterContainerID string, podStatus *kubecontain
 }
 
 // deleteContainersInPod issues container deletion requests for containers selected by getContainersToDeleteInPod.
+// If removeAll is true, all containers matching filterContainerID will be removed.
+// Otherwise, the oldest containers will be removed, but a minimum number of containers will be preserved.
 func (p *podContainerDeletor) deleteContainersInPod(filterContainerID string, podStatus *kubecontainer.PodStatus, removeAll bool) {
 	containersToKeep := p.containersToKeep
 	if removeAll {
 		containersToKeep = 0
-		filterContainerID = ""
 	}
 
 	for _, candidate := range getContainersToDeleteInPod(filterContainerID, podStatus, containersToKeep) {
