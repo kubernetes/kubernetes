@@ -159,7 +159,25 @@ func Validate_ReplicationControllerSpec(ctx context.Context, op operation.Operat
 			return
 		}(fldPath.Child("minReadySeconds"), &obj.MinReadySeconds, safe.Field(oldObj, func(oldObj *corev1.ReplicationControllerSpec) *int32 { return &oldObj.MinReadySeconds }))...)
 
-	// field corev1.ReplicationControllerSpec.Selector has no validation
+	// field corev1.ReplicationControllerSpec.Selector
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj map[string]string) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredMap(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("selector"), obj.Selector, safe.Field(oldObj, func(oldObj *corev1.ReplicationControllerSpec) map[string]string { return oldObj.Selector }))...)
+
 	// field corev1.ReplicationControllerSpec.Template has no validation
 	return errs
 }

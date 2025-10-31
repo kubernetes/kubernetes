@@ -6788,7 +6788,7 @@ func ValidateNonEmptySelector(selectorMap map[string]string, fldPath *field.Path
 	allErrs := field.ErrorList{}
 	selector := labels.Set(selectorMap).AsSelector()
 	if selector.Empty() {
-		allErrs = append(allErrs, field.Required(fldPath, ""))
+		allErrs = append(allErrs, field.Required(fldPath, "")).MarkCoveredByDeclarative()
 	}
 	return allErrs
 }

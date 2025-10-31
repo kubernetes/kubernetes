@@ -186,6 +186,20 @@ func TestDeclarativeValidateForDeclarative(t *testing.T) {
 				field.Invalid(field.NewPath("spec.minReadySeconds"), nil, "").WithOrigin("minimum"),
 			},
 		},
+		// spec.selector
+		"selector: empty": {
+			input: mkValidReplicationController(func(rc *api.ReplicationController) {
+				rc.Spec.Selector = map[string]string{}
+			}),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec.selector"), ""),
+			},
+		},
+		"selector: valid": {
+			input: mkValidReplicationController(func(rc *api.ReplicationController) {
+				rc.Spec.Selector = map[string]string{"foo": "bar"}
+			}),
+		},
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
@@ -269,6 +283,22 @@ func TestValidateUpdateForDeclarative(t *testing.T) {
 				field.Invalid(field.NewPath("spec.minReadySeconds"), nil, "").WithOrigin("minimum"),
 			},
 		},
+		// spec.selector
+		"selector: empty": {
+			old: mkValidReplicationController(),
+			update: mkValidReplicationController(func(rc *api.ReplicationController) {
+				rc.Spec.Selector = map[string]string{}
+			}),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec.selector"), ""),
+			},
+		},
+		"selector: valid": {
+			old: mkValidReplicationController(),
+			update: mkValidReplicationController(func(rc *api.ReplicationController) {
+				rc.Spec.Selector = map[string]string{"foo": "bar"}
+			}),
+},
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
