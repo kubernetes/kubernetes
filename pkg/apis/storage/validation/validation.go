@@ -457,6 +457,7 @@ func validateCSIDriverSpec(
 	allErrs = append(allErrs, validateSELinuxMount(spec.SELinuxMount, fldPath.Child("seLinuxMount"))...)
 	allErrs = append(allErrs, validateNodeAllocatableUpdatePeriodSeconds(spec.NodeAllocatableUpdatePeriodSeconds, fldPath.Child("nodeAllocatableUpdatePeriodSeconds"))...)
 	allErrs = append(allErrs, validateServiceAccountTokenInSecrets(spec.ServiceAccountTokenInSecrets, spec.TokenRequests, fldPath.Child("serviceAccountTokenInSecrets"))...)
+	allErrs = append(allErrs, validatePreventPodSchedulingIfMissing(spec.PreventPodSchedulingIfMissing, fldPath.Child("preventPodSchedulingIfMissing"))...)
 	return allErrs
 }
 
@@ -580,6 +581,16 @@ func validateServiceAccountTokenInSecrets(serviceAccountTokenInSecrets *bool, to
 		allErrs = append(allErrs, field.Invalid(fldPath, serviceAccountTokenInSecrets, "serviceAccountTokenInSecrets is set but no tokenRequests are specified"))
 	}
 
+	return allErrs
+}
+
+// validatePreventPodSchedulingIfMissing validates that the field is only set when the
+// VolumeLimitScaling feature gate is enabled. The field itself is optional.
+func validatePreventPodSchedulingIfMissing(preventPodSchedulingIfMissing *bool, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if preventPodSchedulingIfMissing != nil && !utilfeature.DefaultFeatureGate.Enabled(features.VolumeLimitScaling) {
+		allErrs = append(allErrs, field.Invalid(fldPath, *preventPodSchedulingIfMissing, "field requires VolumeLimitScaling feature gate"))
+	}
 	return allErrs
 }
 
