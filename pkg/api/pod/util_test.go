@@ -2902,6 +2902,7 @@ func TestValidateAllowNonLocalProjectedTokenPathOption(t *testing.T) {
 }
 
 func TestDropInPlacePodVerticalScaling(t *testing.T) {
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
 	podWithInPlaceVerticalScaling := func() *api.Pod {
 		return &api.Pod{
 			Spec: api.PodSpec{
@@ -4403,6 +4404,7 @@ func TestDropSELinuxChangePolicy(t *testing.T) {
 }
 
 func TestValidateAllowSidecarResizePolicy(t *testing.T) {
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
 	restartPolicyAlways := api.ContainerRestartPolicyAlways
 	testCases := []struct {
 		name       string
