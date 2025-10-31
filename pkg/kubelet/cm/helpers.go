@@ -37,13 +37,7 @@ var _ func() (*CgroupSubsystems, error) = GetCgroupSubsystems
 var _ func(string) ([]int, error) = getCgroupProcs
 var _ func(types.UID) string = GetPodCgroupNameSuffix
 var _ func(string, bool, string) string = NodeAllocatableRoot
-
-// We cannot simply update the function signature of GetKubeletContainer here because that function may be called from other places in the codebase, and its actual implementation must match all real usages.
-// Changing its signature without updating all call sites and the implementation would introduce compilation errors.
-// This type assertion is only to check at compile time that the signature matches—if the signature has changed elsewhere, this line should be updated or removed,
-// but updating it here is not a "fix" unless the entire function and its usages are also changed accordingly.
-// Therefore, the safest approach is to remove or comment out the assertion if there's a signature mismatch, rather than updating the signature here.
-// var _ func(klog.Logger, string) (string, error) = GetKubeletContainer
+var _ func(klog.Logger, string) (string, error) = GetKubeletContainer
 
 // hardEvictionReservation returns a resourcelist that includes reservation of resources based on hard eviction thresholds.
 func hardEvictionReservation(thresholds []evictionapi.Threshold, capacity v1.ResourceList) v1.ResourceList {

@@ -234,7 +234,7 @@ func runTest(ctx context.Context, f *framework.Framework) error {
 	}
 
 	// Create a cgroup manager object for manipulating cgroups.
-	cgroupManager := cm.NewCgroupManager(context.Background(), subsystems, oldCfg.CgroupDriver)
+	cgroupManager := cm.NewCgroupManager(klog.Background(), subsystems, oldCfg.CgroupDriver)
 
 	ginkgo.DeferCleanup(destroyTemporaryCgroupsForReservation, cgroupManager)
 	ginkgo.DeferCleanup(func(ctx context.Context) {

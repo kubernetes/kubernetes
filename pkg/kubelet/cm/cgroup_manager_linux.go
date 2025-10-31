@@ -17,7 +17,6 @@ limitations under the License.
 package cm
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path"
@@ -153,8 +152,7 @@ var _ CgroupManager = &cgroupV1impl{}
 var _ CgroupManager = &cgroupV2impl{}
 
 // NewCgroupManager is a factory method that returns a CgroupManager
-func NewCgroupManager(ctx context.Context, cs *CgroupSubsystems, cgroupDriver string) CgroupManager {
-	logger := klog.FromContext(ctx)
+func NewCgroupManager(logger klog.Logger, cs *CgroupSubsystems, cgroupDriver string) CgroupManager {
 	if libcontainercgroups.IsCgroup2UnifiedMode() {
 		return NewCgroupV2Manager(logger, cs, cgroupDriver)
 	}

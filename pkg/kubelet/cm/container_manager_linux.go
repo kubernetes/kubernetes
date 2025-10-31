@@ -253,7 +253,7 @@ func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadviso
 
 	// Turn CgroupRoot from a string (in cgroupfs path format) to internal CgroupName
 	cgroupRoot := ParseCgroupfsToCgroupName(nodeConfig.CgroupRoot)
-	cgroupManager := NewCgroupManager(ctx, subsystems, nodeConfig.CgroupDriver)
+	cgroupManager := NewCgroupManager(logger, subsystems, nodeConfig.CgroupDriver)
 	nodeConfig.CgroupVersion = cgroupManager.Version()
 	// Check if Cgroup-root actually exists on the node
 	if nodeConfig.CgroupsPerQOS {

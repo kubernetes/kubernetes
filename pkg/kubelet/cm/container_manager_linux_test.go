@@ -258,7 +258,7 @@ func TestGetCapacity(t *testing.T) {
 }
 
 func TestNewPodContainerManager(t *testing.T) {
-	_, tCtx := ktesting.NewTestContext(t)
+	logger, _ := ktesting.NewTestContext(t)
 	info := QOSContainersInfo{
 		Guaranteed: CgroupName{"guaranteed"},
 		BestEffort: CgroupName{"besteffort"},
@@ -280,7 +280,7 @@ func TestNewPodContainerManager(t *testing.T) {
 			cm: &containerManagerImpl{
 				qosContainerManager: &qosContainerManagerImpl{
 					qosContainersInfo: info,
-					cgroupManager:     NewCgroupManager(tCtx, &CgroupSubsystems{}, ""),
+					cgroupManager:     NewCgroupManager(logger, &CgroupSubsystems{}, ""),
 				},
 
 				NodeConfig: QosDisabled,
@@ -291,7 +291,7 @@ func TestNewPodContainerManager(t *testing.T) {
 			cm: &containerManagerImpl{
 				qosContainerManager: &qosContainerManagerImpl{
 					qosContainersInfo: info,
-					cgroupManager:     NewCgroupManager(tCtx, &CgroupSubsystems{}, ""),
+					cgroupManager:     NewCgroupManager(logger, &CgroupSubsystems{}, ""),
 				},
 
 				NodeConfig: QosEnabled,
@@ -302,7 +302,7 @@ func TestNewPodContainerManager(t *testing.T) {
 			cm: &containerManagerImpl{
 				qosContainerManager: &qosContainerManagerImpl{
 					qosContainersInfo: info,
-					cgroupManager:     NewCgroupManager(tCtx, &CgroupSubsystems{}, "systemd"),
+					cgroupManager:     NewCgroupManager(logger, &CgroupSubsystems{}, "systemd"),
 				},
 
 				NodeConfig: QosEnabled,
@@ -313,7 +313,7 @@ func TestNewPodContainerManager(t *testing.T) {
 			cm: &containerManagerImpl{
 				qosContainerManager: &qosContainerManagerImpl{
 					qosContainersInfo: info,
-					cgroupManager:     NewCgroupManager(tCtx, &CgroupSubsystems{}, "systemd"),
+					cgroupManager:     NewCgroupManager(logger, &CgroupSubsystems{}, "systemd"),
 				},
 
 				NodeConfig: QosDisabled,

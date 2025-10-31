@@ -20,7 +20,6 @@ limitations under the License.
 package cm
 
 import (
-	"context"
 	"fmt"
 	"strconv"
 	"testing"
@@ -29,6 +28,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 )
 
@@ -108,7 +108,7 @@ func activeTestPods() []*v1.Pod {
 	}
 }
 
-func createTestQOSContainerManager(tCtx context.Context) (*qosContainerManagerImpl, error) {
+func createTestQOSContainerManager(logger klog.Logger) (*qosContainerManagerImpl, error) {
 	subsystems, err := GetCgroupSubsystems()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get mounted cgroup subsystems: %v", err)
@@ -119,7 +119,7 @@ func createTestQOSContainerManager(tCtx context.Context) (*qosContainerManagerIm
 
 	qosContainerManager := &qosContainerManagerImpl{
 		subsystems:    subsystems,
-		cgroupManager: NewCgroupManager(tCtx, subsystems, "cgroupfs"),
+		cgroupManager: NewCgroupManager(logger, subsystems, "cgroupfs"),
 		cgroupRoot:    cgroupRoot,
 		qosReserved:   nil,
 	}
@@ -130,8 +130,8 @@ func createTestQOSContainerManager(tCtx context.Context) (*qosContainerManagerIm
 }
 
 func TestQoSContainerCgroup(t *testing.T) {
-	_, tCtx := ktesting.NewTestContext(t)
-	m, err := createTestQOSContainerManager(tCtx)
+	logger, _ := ktesting.NewTestContext(t)
+	m, err := createTestQOSContainerManager(logger)
 	assert.NoError(t, err)
 
 	qosConfigs := map[v1.PodQOSClass]*CgroupConfig{
