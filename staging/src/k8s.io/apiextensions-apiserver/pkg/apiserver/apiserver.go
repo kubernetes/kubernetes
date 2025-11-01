@@ -246,7 +246,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		go establishingController.RunWithContext(hookContext)
 		go nonStructuralSchemaController.RunWithContext(5, hookContext)
 		go apiApprovalController.RunWithContext(5, hookContext)
-		go finalizingController.Run(5, hookContext.Done())
+		go finalizingController.RunWithContext(5, hookContext)
 
 		discoverySyncedCh := make(chan struct{})
 		go discoveryController.Run(hookContext.Done(), discoverySyncedCh)
