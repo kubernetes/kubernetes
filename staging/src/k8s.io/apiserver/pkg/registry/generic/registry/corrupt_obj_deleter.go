@@ -30,6 +30,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
 	storeerr "k8s.io/apiserver/pkg/storage/errors"
+	"k8s.io/apiserver/pkg/util/dryrun"
 
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
@@ -57,6 +58,8 @@ type corruptObjectDeleter struct {
 }
 
 // Delete performs an unsafe deletion of the given resource from the storage.
+// On successful deletion, the returned object is nil because the object was
+// corrupt and could not be decoded from storage.
 //
 // NOTE: This function should NEVER be used for any normal deletion
 // flow, it is exclusively used when the user enables
@@ -91,6 +94,7 @@ func (d *corruptObjectDeleter) Delete(ctx context.Context, name string, deleteVa
 	}
 
 	// try normal deletion anyway, it is expected to fail
+	// NOTE: handled by classic DRY-RUN
 	obj, deleted, err := d.store.Delete(ctx, name, deleteValidation, opts)
 	if err == nil {
 		return obj, deleted, err
@@ -99,6 +103,11 @@ func (d *corruptObjectDeleter) Delete(ctx context.Context, name string, deleteVa
 	// conversion to API error drops the inner error chain
 	if !strings.Contains(err.Error(), "corrupt object") {
 		return obj, deleted, err
+	}
+
+	if dryrun.IsDryRun(opts.DryRun) {
+		// NOTE: in line with the return on success.
+		return nil, true, nil
 	}
 
 	// TODO: at this instant, some actor may have a) managed to recreate this
