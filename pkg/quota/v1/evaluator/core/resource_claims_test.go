@@ -603,7 +603,37 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 }
 
 func TestResourceClaimEvaluatorMatchingResources(t *testing.T) {
-	evaluator := NewResourceClaimEvaluator(nil, nil, nil)
+	deviceClass1 := &resourceapi.DeviceClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "gpu",
+		},
+		Spec: resourceapi.DeviceClassSpec{
+			ExtendedResourceName: ptr.To("example.com/gpu"),
+		},
+	}
+
+	logger, ctx := ktesting.NewTestContext(t)
+	tCtx, tCancel := context.WithCancel(ctx)
+	client := fake.NewClientset(deviceClass1)
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
+	deviceclassmapping := extendedresourcecache.NewExtendedResourceCache(logger)
+	if _, err := informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandler(deviceclassmapping); err != nil {
+		logger.Error(err, "failed to add device class informer event handler")
+	}
+	evaluator := NewResourceClaimEvaluator(nil, deviceclassmapping, informerFactory.Core().V1().Pods().Lister())
+
+	informerFactory.Start(tCtx.Done())
+	t.Cleanup(func() {
+		// Need to cancel before waiting for the shutdown.
+		tCancel()
+		// Now we can wait for all goroutines to stop.
+		informerFactory.Shutdown()
+	})
+	informerFactory.WaitForCacheSync(tCtx.Done())
+
+	// wait for informer sync
+	time.Sleep(1 * time.Second)
+
 	testCases := map[string]struct {
 		items []corev1.ResourceName
 		want  []corev1.ResourceName

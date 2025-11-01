@@ -88,7 +88,7 @@ func isExtendedResourceNameForQuota(name corev1.ResourceName) bool {
 	// quota objects in format of "requests.resourceName" is allowed
 	nonNative := !helper.IsNativeResource(name)
 	// allow the implicit extended resource name in the format of
-	// requests.deviceclass.resource.kubernetes.io/deivce-class-name
+	// requests.deviceclass.resource.kubernetes.io/device-class-name
 	implicitExtendedResource := strings.HasPrefix(string(name), resourceRequestsDeviceClassPrefix)
 	// name starts with 'requests.'
 	isQuotaRequest := strings.HasPrefix(string(name), corev1.DefaultResourceRequestsPrefix)
