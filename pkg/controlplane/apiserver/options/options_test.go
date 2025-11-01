@@ -116,6 +116,8 @@ func TestAddFlags(t *testing.T) {
 		"--etcd-certfile=/var/run/kubernetes/etcdce.crt",
 		"--etcd-cafile=/var/run/kubernetes/etcdca.crt",
 		"--http2-max-streams-per-connection=42",
+		"--http2-read-idle-timeout=48s",
+		"--http2-ping-timeout=13s",
 		"--tracing-config-file=/var/run/kubernetes/tracing_config.yaml",
 		"--proxy-client-cert-file=/var/run/kubernetes/proxy.crt",
 		"--proxy-client-key-file=/var/run/kubernetes/proxy.key",
@@ -193,6 +195,8 @@ func TestAddFlags(t *testing.T) {
 			},
 			HTTP2MaxStreamsPerConnection: 42,
 			Required:                     true,
+			HTTP2ReadIdleTimeout:         48 * time.Second,
+			HTTP2PingTimeout:             13 * time.Second,
 		}).WithLoopback(),
 		EventTTL: 1 * time.Hour,
 		Audit: &apiserveroptions.AuditOptions{
