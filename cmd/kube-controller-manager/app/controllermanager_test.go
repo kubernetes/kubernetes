@@ -20,6 +20,7 @@ import (
 	"context"
 	"regexp"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -29,10 +30,15 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/server/healthz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes/fake"
 	cpnames "k8s.io/cloud-provider/names"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+
+	"go.uber.org/goleak"
 	"k8s.io/klog/v2/ktesting"
+	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/features"
 )
@@ -113,6 +119,56 @@ func TestControllerNamesDeclaration(t *testing.T) {
 
 func TestNewControllerDescriptorsShouldNotPanic(t *testing.T) {
 	NewControllerDescriptors()
+}
+
+func TestGracefulControllers(t *testing.T) {
+	controllerDescriptorMap := NewControllerDescriptors()
+	gracefulControllers := sets.NewString(names.ClusterRoleAggregationController)
+
+	for controllerName, controllerDesc := range controllerDescriptorMap {
+		t.Run(controllerName, func(t *testing.T) {
+			defer goleak.VerifyNone(t)
+			var wg sync.WaitGroup
+			defer wg.Wait()
+
+			// Start with a single controller as test
+			if !gracefulControllers.Has(controllerName) {
+				t.Skipf("Controller %s is not in the graceful shutdown test list", controllerName)
+			}
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			testClientset := fake.NewSimpleClientset()
+			testClientBuilder := TestClientBuilder{clientset: testClientset}
+			testInformerFactory := informers.NewSharedInformerFactoryWithOptions(testClientset, 3*time.Minute)
+			config, err := options.NewDefaultComponentConfig()
+			if err != nil {
+				t.Fatal(err)
+			}
+			controllerContext := ControllerContext{
+				ClientBuilder:                   testClientBuilder,
+				ComponentConfig:                 config,
+				InformerFactory:                 testInformerFactory,
+				ObjectOrMetadataInformerFactory: testInformerFactory,
+				InformersStarted:                make(chan struct{}),
+			}
+
+			// Cloud provider controllers should be skipped
+			if controllerDesc.IsCloudProviderController() {
+				return
+			}
+			c, err := controllerDesc.GetControllerConstructor()(ctx, controllerContext, controllerName)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if c == nil {
+				return
+			}
+			wg.Go(func() {
+				c.Run(ctx)
+			})
+		})
+	}
 }
 
 func TestNewControllerDescriptorsAlwaysReturnsDescriptorsForAllControllers(t *testing.T) {
