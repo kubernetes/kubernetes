@@ -157,6 +157,7 @@ func (r *NodeAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attribu
 			if r.features.Enabled(features.PodCertificateRequest) && r.features.Enabled(features.AuthorizeNodeWithSelectors) {
 				return r.authorizePodCertificateRequest(nodeName, attrs)
 			}
+			return authorizer.DecisionNoOpinion, "", nil
 		}
 	}
 

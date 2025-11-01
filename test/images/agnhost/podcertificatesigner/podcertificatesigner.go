@@ -21,7 +21,6 @@ package podcertificatesigner
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"os"
 	"os/signal"
@@ -51,8 +50,6 @@ func init() {
 }
 
 func run(cmd *cobra.Command, args []string) error {
-	flag.Set("logtostderr", "true")
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 

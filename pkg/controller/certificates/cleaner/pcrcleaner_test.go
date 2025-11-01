@@ -24,7 +24,7 @@ import (
 	"testing"
 	"time"
 
-	certsv1alpha1 "k8s.io/api/certificates/v1alpha1"
+	certsv1beta1 "k8s.io/api/certificates/v1beta1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -42,18 +42,18 @@ func TestPCRCleaner(t *testing.T) {
 
 	testCases := []struct {
 		desc              string
-		pcr               *certsv1alpha1.PodCertificateRequest
+		pcr               *certsv1beta1.PodCertificateRequest
 		wantErrRecognizer func(error) bool
 	}{
 		{
 			desc: "Pending request within the threshold should be left alone",
-			pcr: &certsv1alpha1.PodCertificateRequest{
+			pcr: &certsv1beta1.PodCertificateRequest{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace:         "foo",
 					Name:              "bar",
 					CreationTimestamp: metav1.NewTime(mustParseRFC3339(t, "2025-01-01T00:15:01Z")),
 				},
-				Spec: certsv1alpha1.PodCertificateRequestSpec{
+				Spec: certsv1beta1.PodCertificateRequestSpec{
 					SignerName:           "foo.com/abc",
 					PodName:              "pod-1",
 					PodUID:               types.UID(podUID1),
@@ -70,13 +70,13 @@ func TestPCRCleaner(t *testing.T) {
 		},
 		{
 			desc: "Pending request outside the threshold should be deleted",
-			pcr: &certsv1alpha1.PodCertificateRequest{
+			pcr: &certsv1beta1.PodCertificateRequest{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace:         "foo",
 					Name:              "bar",
 					CreationTimestamp: metav1.NewTime(mustParseRFC3339(t, "2025-01-01T00:14:59Z")),
 				},
-				Spec: certsv1alpha1.PodCertificateRequestSpec{
+				Spec: certsv1beta1.PodCertificateRequestSpec{
 					SignerName:           "foo.com/abc",
 					PodName:              "pod-1",
 					PodUID:               types.UID(podUID1),
@@ -93,13 +93,13 @@ func TestPCRCleaner(t *testing.T) {
 		},
 		{
 			desc: "Terminal request within the threshold should be left alone",
-			pcr: &certsv1alpha1.PodCertificateRequest{
+			pcr: &certsv1beta1.PodCertificateRequest{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace:         "foo",
 					Name:              "bar",
 					CreationTimestamp: metav1.NewTime(mustParseRFC3339(t, "2025-01-01T00:15:01Z")),
 				},
-				Spec: certsv1alpha1.PodCertificateRequestSpec{
+				Spec: certsv1beta1.PodCertificateRequestSpec{
 					SignerName:           "foo.com/abc",
 					PodName:              "pod-1",
 					PodUID:               types.UID(podUID1),
@@ -111,10 +111,10 @@ func TestPCRCleaner(t *testing.T) {
 					PKIXPublicKey:        pubPKIX1,
 					ProofOfPossession:    proof1,
 				},
-				Status: certsv1alpha1.PodCertificateRequestStatus{
+				Status: certsv1beta1.PodCertificateRequestStatus{
 					Conditions: []metav1.Condition{
 						{
-							Type:    certsv1alpha1.PodCertificateRequestConditionTypeDenied,
+							Type:    certsv1beta1.PodCertificateRequestConditionTypeDenied,
 							Status:  metav1.ConditionTrue,
 							Reason:  "Foo",
 							Message: "abc",
@@ -126,13 +126,13 @@ func TestPCRCleaner(t *testing.T) {
 		},
 		{
 			desc: "Terminal request outside the threshold should be deleted",
-			pcr: &certsv1alpha1.PodCertificateRequest{
+			pcr: &certsv1beta1.PodCertificateRequest{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace:         "foo",
 					Name:              "bar",
 					CreationTimestamp: metav1.NewTime(mustParseRFC3339(t, "2025-01-01T00:14:59Z")),
 				},
-				Spec: certsv1alpha1.PodCertificateRequestSpec{
+				Spec: certsv1beta1.PodCertificateRequestSpec{
 					SignerName:           "foo.com/abc",
 					PodName:              "pod-1",
 					PodUID:               types.UID(podUID1),
@@ -144,10 +144,10 @@ func TestPCRCleaner(t *testing.T) {
 					PKIXPublicKey:        pubPKIX1,
 					ProofOfPossession:    proof1,
 				},
-				Status: certsv1alpha1.PodCertificateRequestStatus{
+				Status: certsv1beta1.PodCertificateRequestStatus{
 					Conditions: []metav1.Condition{
 						{
-							Type:    certsv1alpha1.PodCertificateRequestConditionTypeDenied,
+							Type:    certsv1beta1.PodCertificateRequestConditionTypeDenied,
 							Status:  metav1.ConditionTrue,
 							Reason:  "Foo",
 							Message: "abc",
@@ -173,7 +173,7 @@ func TestPCRCleaner(t *testing.T) {
 			// Simulate a pass of the cleaner worker by listing all PCRs and
 			// calling handle() on them.
 
-			pcrList, err := kc.CertificatesV1alpha1().PodCertificateRequests(metav1.NamespaceAll).List(ctx, metav1.ListOptions{})
+			pcrList, err := kc.CertificatesV1beta1().PodCertificateRequests(metav1.NamespaceAll).List(ctx, metav1.ListOptions{})
 			if err != nil {
 				t.Fatalf("Unexpected error listing PCRs: %v", err)
 			}
@@ -185,7 +185,7 @@ func TestPCRCleaner(t *testing.T) {
 
 			// Now check on the test case's PCR, to see if it was deleted or not
 			// according to our expectation.
-			_, err = kc.CertificatesV1alpha1().PodCertificateRequests(tc.pcr.ObjectMeta.Namespace).Get(ctx, tc.pcr.ObjectMeta.Name, metav1.GetOptions{})
+			_, err = kc.CertificatesV1beta1().PodCertificateRequests(tc.pcr.ObjectMeta.Namespace).Get(ctx, tc.pcr.ObjectMeta.Name, metav1.GetOptions{})
 			if !tc.wantErrRecognizer(err) {
 				t.Errorf("Bad error output: %v", err)
 			}
