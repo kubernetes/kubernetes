@@ -33,21 +33,23 @@ import (
 	"sync"
 	"time"
 
-	certificatesv1alpha1 "k8s.io/api/certificates/v1alpha1"
+	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	certinformersv1alpha1 "k8s.io/client-go/informers/certificates/v1alpha1"
+	certinformersv1beta1 "k8s.io/client-go/informers/certificates/v1beta1"
 	coreinformersv1 "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
-	certlistersv1alpha1 "k8s.io/client-go/listers/certificates/v1alpha1"
+	certlistersv1beta1 "k8s.io/client-go/listers/certificates/v1beta1"
 	corelistersv1 "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/utils/clock"
 )
 
@@ -74,6 +76,8 @@ type Manager interface {
 // created, but isn't showing up on our informer, must have been deleted.
 const assumeDeletedThreshold = 10 * time.Minute
 
+const refreshOverdueDuration = 10 * time.Minute
+
 // IssuingManager is the main implementation of Manager.
 //
 // The core construct is a workqueue that contains one entry for each
@@ -92,10 +96,12 @@ type IssuingManager struct {
 
 	podManager PodManager
 
+	recorder record.EventRecorder
+
 	projectionQueue workqueue.TypedRateLimitingInterface[projectionKey]
 
 	pcrInformer cache.SharedIndexInformer
-	pcrLister   certlistersv1alpha1.PodCertificateRequestLister
+	pcrLister   certlistersv1beta1.PodCertificateRequestLister
 
 	nodeInformer cache.SharedIndexInformer
 	nodeLister   corelistersv1.NodeLister
@@ -176,9 +182,12 @@ func (c *credStateFailed) getCredBundle() ([]byte, []byte, error) {
 }
 
 type credStateFresh struct {
-	privateKey     []byte
-	certChain      []byte
-	beginRefreshAt time.Time
+	privateKey        []byte
+	certChain         []byte
+	beginRefreshAt    time.Time
+	notAfter          time.Time
+	overdueForRefresh bool
+	expired           bool
 }
 
 func (c *credStateFresh) getCredBundle() ([]byte, []byte, error) {
@@ -186,9 +195,12 @@ func (c *credStateFresh) getCredBundle() ([]byte, []byte, error) {
 }
 
 type credStateWaitRefresh struct {
-	privateKey     []byte
-	certChain      []byte
-	beginRefreshAt time.Time
+	privateKey        []byte
+	certChain         []byte
+	beginRefreshAt    time.Time
+	notAfter          time.Time
+	overdueForRefresh bool
+	expired           bool
 
 	refreshPrivateKey []byte
 	refreshPCRName    string
@@ -203,11 +215,12 @@ func (c *credStateWaitRefresh) getCredBundle() ([]byte, []byte, error) {
 
 var _ Manager = (*IssuingManager)(nil)
 
-func NewIssuingManager(kc kubernetes.Interface, podManager PodManager, pcrInformer certinformersv1alpha1.PodCertificateRequestInformer, nodeInformer coreinformersv1.NodeInformer, nodeName types.NodeName, clock clock.WithTicker) *IssuingManager {
+func NewIssuingManager(kc kubernetes.Interface, podManager PodManager, recorder record.EventRecorder, pcrInformer certinformersv1beta1.PodCertificateRequestInformer, nodeInformer coreinformersv1.NodeInformer, nodeName types.NodeName, clock clock.WithTicker) *IssuingManager {
 	m := &IssuingManager{
 		kc: kc,
 
 		podManager:      podManager,
+		recorder:        recorder,
 		projectionQueue: workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[projectionKey]()),
 
 		pcrInformer:  pcrInformer.Informer(),
@@ -227,15 +240,15 @@ func NewIssuingManager(kc kubernetes.Interface, podManager PodManager, pcrInform
 	// for us to notice immediately once the certificate is issued.
 	m.pcrInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj any) {
-			pcr := obj.(*certificatesv1alpha1.PodCertificateRequest)
+			pcr := obj.(*certificatesv1beta1.PodCertificateRequest)
 			m.queueAllProjectionsForPod(pcr.Spec.PodUID)
 		},
 		UpdateFunc: func(old, new any) {
-			pcr := new.(*certificatesv1alpha1.PodCertificateRequest)
+			pcr := new.(*certificatesv1beta1.PodCertificateRequest)
 			m.queueAllProjectionsForPod(pcr.Spec.PodUID)
 		},
 		DeleteFunc: func(obj any) {
-			pcr := obj.(*certificatesv1alpha1.PodCertificateRequest)
+			pcr := obj.(*certificatesv1beta1.PodCertificateRequest)
 			m.queueAllProjectionsForPod(pcr.Spec.PodUID)
 		},
 	})
@@ -276,6 +289,9 @@ func (m *IssuingManager) Run(ctx context.Context) {
 	if !cache.WaitForCacheSync(ctx.Done(), m.pcrInformer.HasSynced, m.nodeInformer.HasSynced) {
 		return
 	}
+	// Reset the PodCertificateStates gauge metric.
+	metrics.PodCertificateStates.Reset()
+
 	go wait.JitterUntilWithContext(ctx, m.runRefreshPass, 1*time.Minute, 1.0, false)
 	go wait.UntilWithContext(ctx, m.runProjectionProcessor, time.Second)
 	<-ctx.Done()
@@ -381,7 +397,7 @@ func (m *IssuingManager) handleProjection(ctx context.Context, key projectionKey
 			pod.ObjectMeta.Name, pod.ObjectMeta.UID,
 			pod.Spec.ServiceAccountName, serviceAccount.ObjectMeta.UID,
 			m.nodeName, node.ObjectMeta.UID,
-			source.SignerName, source.KeyType, source.MaxExpirationSeconds,
+			source.SignerName, source.KeyType, source.MaxExpirationSeconds, source.UserAnnotations,
 		)
 		if err != nil {
 			return fmt.Errorf("while creating initial PodCertificateRequest: %w", err)
@@ -424,27 +440,33 @@ func (m *IssuingManager) handleProjection(ctx context.Context, key projectionKey
 		// our state machine accordingly.
 		for _, cond := range pcr.Status.Conditions {
 			switch cond.Type {
-			case certificatesv1alpha1.PodCertificateRequestConditionTypeDenied:
+			case certificatesv1beta1.PodCertificateRequestConditionTypeDenied:
 				rec.curState = &credStateDenied{
 					Reason:  cond.Reason,
 					Message: cond.Message,
 				}
 				klog.V(4).InfoS("PodCertificateRequest denied, moving to credStateDenied", "key", key, "pcr", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
+				metrics.PodCertificateStates.WithLabelValues(source.SignerName, "denied").Inc()
+				m.recorder.Eventf(pod, corev1.EventTypeWarning, certificatesv1beta1.PodCertificateRequestConditionTypeDenied, "PodCertificateRequest denied")
 				return nil
-			case certificatesv1alpha1.PodCertificateRequestConditionTypeFailed:
+			case certificatesv1beta1.PodCertificateRequestConditionTypeFailed:
 				rec.curState = &credStateFailed{
 					Reason:  cond.Reason,
 					Message: cond.Message,
 				}
 				klog.V(4).InfoS("PodCertificateRequest denied, moving to credStateFailed", "key", key, "pcr", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
+				metrics.PodCertificateStates.WithLabelValues(source.SignerName, "failed").Inc()
+				m.recorder.Eventf(pod, corev1.EventTypeWarning, certificatesv1beta1.PodCertificateRequestConditionTypeFailed, "PodCertificateRequest failed")
 				return nil
-			case certificatesv1alpha1.PodCertificateRequestConditionTypeIssued:
+			case certificatesv1beta1.PodCertificateRequestConditionTypeIssued:
 				rec.curState = &credStateFresh{
 					privateKey:     state.privateKey,
 					certChain:      cleanCertificateChain([]byte(pcr.Status.CertificateChain)),
 					beginRefreshAt: pcr.Status.BeginRefreshAt.Time.Add(jitterDuration()),
+					notAfter:       pcr.Status.NotAfter.Time,
 				}
 				klog.V(4).InfoS("PodCertificateRequest issued, moving to credStateFresh", "key", key, "pcr", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
+				metrics.PodCertificateStates.WithLabelValues(source.SignerName, "fresh").Inc()
 				return nil
 			}
 		}
@@ -476,6 +498,24 @@ func (m *IssuingManager) handleProjection(ctx context.Context, key projectionKey
 
 		klog.V(4).InfoS("Time to refresh", "key", key)
 
+		// The current time is more than 10 minutes past the most recently issued certificate's `beginRefreshAt` timestamp but the state has not been labeled with overdue for refresh.
+		if m.clock.Now().After(state.beginRefreshAt.Add(refreshOverdueDuration)) && !state.overdueForRefresh {
+			metrics.PodCertificateStates.WithLabelValues(source.SignerName, "overdue_for_refresh").Inc()
+			metrics.PodCertificateStates.WithLabelValues(source.SignerName, "fresh").Dec()
+			klog.V(4).InfoS("Refresh overdue", "key", key)
+			m.recorder.Eventf(pod, corev1.EventTypeWarning, "overdue_for_refresh", "PodCertificate refresh overdue")
+			state.overdueForRefresh = true
+		}
+
+		// The current time is past the most recently issued certificate's `notAfter` timestamp but the state has not been labelled with expired.
+		if m.clock.Now().After(state.notAfter) && !state.expired {
+			metrics.PodCertificateStates.WithLabelValues(source.SignerName, "overdue_for_refresh").Dec()
+			metrics.PodCertificateStates.WithLabelValues(source.SignerName, "expired").Inc()
+			klog.V(4).InfoS("Certificates expired", "key", key)
+			m.recorder.Eventf(pod, corev1.EventTypeWarning, "expired", "PodCertificate expired")
+			state.expired = true
+		}
+
 		// We fetch the service account so we can know its UID.  Ideally, Kubelet
 		// would have a central component that tracks all service accounts related
 		// to pods on the node using a single-item watch.
@@ -495,16 +535,19 @@ func (m *IssuingManager) handleProjection(ctx context.Context, key projectionKey
 			pod.ObjectMeta.Name, pod.ObjectMeta.UID,
 			pod.Spec.ServiceAccountName, serviceAccount.ObjectMeta.UID,
 			m.nodeName, node.ObjectMeta.UID,
-			source.SignerName, source.KeyType, source.MaxExpirationSeconds,
+			source.SignerName, source.KeyType, source.MaxExpirationSeconds, source.UserAnnotations,
 		)
 		if err != nil {
 			return fmt.Errorf("while creating refresh PodCertificateRequest: %w", err)
 		}
 
 		rec.curState = &credStateWaitRefresh{
-			privateKey:     state.privateKey,
-			certChain:      state.certChain,
-			beginRefreshAt: state.beginRefreshAt,
+			privateKey:        state.privateKey,
+			certChain:         state.certChain,
+			beginRefreshAt:    state.beginRefreshAt,
+			notAfter:          state.notAfter,
+			overdueForRefresh: state.overdueForRefresh,
+			expired:           state.expired,
 
 			refreshPrivateKey:   privKey,
 			refreshPCRName:      pcr.ObjectMeta.Name,
@@ -531,9 +574,12 @@ func (m *IssuingManager) handleProjection(ctx context.Context, key projectionKey
 			// remember creating the PCR, then we must be in case 2.  Return to
 			// credStateFresh so we create a new PCR.
 			rec.curState = &credStateFresh{
-				privateKey:     state.privateKey,
-				certChain:      state.certChain,
-				beginRefreshAt: state.beginRefreshAt,
+				privateKey:        state.privateKey,
+				certChain:         state.certChain,
+				beginRefreshAt:    state.beginRefreshAt,
+				notAfter:          state.notAfter,
+				overdueForRefresh: state.overdueForRefresh,
+				expired:           state.expired,
 			}
 			return fmt.Errorf("PodCertificateRequest appears to have been deleted")
 		} else if err != nil {
@@ -544,27 +590,33 @@ func (m *IssuingManager) handleProjection(ctx context.Context, key projectionKey
 		// our state machine accordingly.
 		for _, cond := range pcr.Status.Conditions {
 			switch cond.Type {
-			case certificatesv1alpha1.PodCertificateRequestConditionTypeDenied:
+			case certificatesv1beta1.PodCertificateRequestConditionTypeDenied:
 				rec.curState = &credStateDenied{
 					Reason:  cond.Reason,
 					Message: cond.Message,
 				}
 				klog.V(4).InfoS("PodCertificateRequest denied, moving to credStateDenied", "key", key, "pcr", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
+				metrics.PodCertificateStates.WithLabelValues(source.SignerName, "denied").Inc()
+				m.recorder.Eventf(pod, corev1.EventTypeWarning, certificatesv1beta1.PodCertificateRequestConditionTypeDenied, "PodCertificateRequest denied")
 				return nil
-			case certificatesv1alpha1.PodCertificateRequestConditionTypeFailed:
+			case certificatesv1beta1.PodCertificateRequestConditionTypeFailed:
 				rec.curState = &credStateFailed{
 					Reason:  cond.Reason,
 					Message: cond.Message,
 				}
 				klog.V(4).InfoS("PodCertificateRequest denied, moving to credStateFailed", "key", key, "pcr", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
+				m.recorder.Eventf(pod, corev1.EventTypeWarning, certificatesv1beta1.PodCertificateRequestConditionTypeFailed, "PodCertificateRequest failed")
+				metrics.PodCertificateStates.WithLabelValues(source.SignerName, "failed").Inc()
 				return nil
-			case certificatesv1alpha1.PodCertificateRequestConditionTypeIssued:
+			case certificatesv1beta1.PodCertificateRequestConditionTypeIssued:
 				rec.curState = &credStateFresh{
 					privateKey:     state.refreshPrivateKey,
 					certChain:      cleanCertificateChain([]byte(pcr.Status.CertificateChain)),
 					beginRefreshAt: pcr.Status.BeginRefreshAt.Time.Add(jitterDuration()),
+					notAfter:       pcr.Status.NotAfter.Time,
 				}
 				klog.V(4).InfoS("PodCertificateRequest issued, moving to credStateFresh", "key", key, "pcr", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
+				metrics.PodCertificateStates.WithLabelValues(source.SignerName, "fresh").Inc()
 				return nil
 			}
 		}
@@ -573,6 +625,24 @@ func (m *IssuingManager) handleProjection(ctx context.Context, key projectionKey
 		// projection from the workqueue.  It will be redriven when the
 		// PodCertificateRequest gets an update.
 		klog.V(4).InfoS("PodCertificateRequest not in terminal state, remaining in credStateWaitRefresh", "key", key, "pcr", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
+
+		// The current time is more than 10 minutes past the most recently issued certificate's `beginRefreshAt` timestamp but the state has not been labeled with overdue for refresh.
+		if m.clock.Now().After(state.beginRefreshAt.Add(refreshOverdueDuration)) && !state.overdueForRefresh {
+			metrics.PodCertificateStates.WithLabelValues(source.SignerName, "overdue_for_refresh").Inc()
+			metrics.PodCertificateStates.WithLabelValues(source.SignerName, "fresh").Dec()
+			klog.V(4).InfoS("Refresh overdue", "key", key)
+			m.recorder.Eventf(pod, corev1.EventTypeWarning, "overdue_for_refresh", "PodCertificate refresh overdue")
+			state.overdueForRefresh = true
+		}
+
+		// The current time is past the most recently issued certificate's `notAfter` timestamp but the state has not been lablled with expired.
+		if m.clock.Now().After(state.notAfter) && !state.expired {
+			metrics.PodCertificateStates.WithLabelValues(source.SignerName, "overdue_for_refresh").Dec()
+			metrics.PodCertificateStates.WithLabelValues(source.SignerName, "expired").Inc()
+			klog.V(4).InfoS("Certificates expired", "key", key)
+			m.recorder.Eventf(pod, corev1.EventTypeWarning, "expired", "PodCertificate expired")
+			state.expired = true
+		}
 		return nil
 	}
 
@@ -629,7 +699,7 @@ func (m *IssuingManager) createPodCertificateRequest(
 	podName string, podUID types.UID,
 	serviceAccountName string, serviceAccountUID types.UID,
 	nodeName types.NodeName, nodeUID types.UID,
-	signerName, keyType string, maxExpirationSeconds *int32) ([]byte, *certificatesv1alpha1.PodCertificateRequest, error) {
+	signerName, keyType string, maxExpirationSeconds *int32, userAnnotations map[string]string) ([]byte, *certificatesv1beta1.PodCertificateRequest, error) {
 
 	privateKey, publicKey, proof, err := generateKeyAndProof(keyType, []byte(podUID))
 	if err != nil {
@@ -646,7 +716,7 @@ func (m *IssuingManager) createPodCertificateRequest(
 		return nil, nil, fmt.Errorf("while PEM-encoding private key: %w", err)
 	}
 
-	req := &certificatesv1alpha1.PodCertificateRequest{
+	req := &certificatesv1beta1.PodCertificateRequest{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:    namespace,
 			GenerateName: "req-",
@@ -659,21 +729,22 @@ func (m *IssuingManager) createPodCertificateRequest(
 				},
 			},
 		},
-		Spec: certificatesv1alpha1.PodCertificateRequestSpec{
-			SignerName:           signerName,
-			PodName:              podName,
-			PodUID:               podUID,
-			ServiceAccountName:   serviceAccountName,
-			ServiceAccountUID:    serviceAccountUID,
-			NodeName:             nodeName,
-			NodeUID:              nodeUID,
-			MaxExpirationSeconds: maxExpirationSeconds,
-			PKIXPublicKey:        pkixPublicKey,
-			ProofOfPossession:    proof,
+		Spec: certificatesv1beta1.PodCertificateRequestSpec{
+			SignerName:                signerName,
+			PodName:                   podName,
+			PodUID:                    podUID,
+			ServiceAccountName:        serviceAccountName,
+			ServiceAccountUID:         serviceAccountUID,
+			NodeName:                  nodeName,
+			NodeUID:                   nodeUID,
+			MaxExpirationSeconds:      maxExpirationSeconds,
+			PKIXPublicKey:             pkixPublicKey,
+			ProofOfPossession:         proof,
+			UnverifiedUserAnnotations: userAnnotations,
 		},
 	}
 
-	req, err = m.kc.CertificatesV1alpha1().PodCertificateRequests(namespace).Create(ctx, req, metav1.CreateOptions{})
+	req, err = m.kc.CertificatesV1beta1().PodCertificateRequests(namespace).Create(ctx, req, metav1.CreateOptions{})
 	if err != nil {
 		return nil, nil, fmt.Errorf("while creating on API: %w", err)
 	}

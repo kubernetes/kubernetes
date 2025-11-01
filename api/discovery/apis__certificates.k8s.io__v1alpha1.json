@@ -19,34 +19,6 @@
         "update",
         "watch"
       ]
-    },
-    {
-      "kind": "PodCertificateRequest",
-      "name": "podcertificaterequests",
-      "namespaced": true,
-      "singularName": "podcertificaterequest",
-      "storageVersionHash": "3F2mRg06NdI=",
-      "verbs": [
-        "create",
-        "delete",
-        "deletecollection",
-        "get",
-        "list",
-        "patch",
-        "update",
-        "watch"
-      ]
-    },
-    {
-      "kind": "PodCertificateRequest",
-      "name": "podcertificaterequests/status",
-      "namespaced": true,
-      "singularName": "",
-      "verbs": [
-        "get",
-        "patch",
-        "update"
-      ]
     }
   ]
 }

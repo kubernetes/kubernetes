@@ -6306,6 +6306,7 @@ func autoConvert_v1_PodCertificateProjection_To_core_PodCertificateProjection(in
 	out.CredentialBundlePath = in.CredentialBundlePath
 	out.KeyPath = in.KeyPath
 	out.CertificateChainPath = in.CertificateChainPath
+	out.UserAnnotations = *(*map[string]string)(unsafe.Pointer(&in.UserAnnotations))
 	return nil
 }
 
@@ -6321,6 +6322,7 @@ func autoConvert_core_PodCertificateProjection_To_v1_PodCertificateProjection(in
 	out.CredentialBundlePath = in.CredentialBundlePath
 	out.KeyPath = in.KeyPath
 	out.CertificateChainPath = in.CertificateChainPath
+	out.UserAnnotations = *(*map[string]string)(unsafe.Pointer(&in.UserAnnotations))
 	return nil
 }
 
