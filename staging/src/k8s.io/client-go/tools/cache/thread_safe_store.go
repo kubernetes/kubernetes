@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"sync"
 
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -42,12 +44,15 @@ type ThreadSafeStore interface {
 	Add(key string, obj interface{})
 	Update(key string, obj interface{})
 	Delete(key string)
+	DeleteWithObject(key string, obj interface{})
 	Get(key string) (item interface{}, exists bool)
 	List() []interface{}
 	ListKeys() []string
 	Replace(map[string]interface{}, string)
 	Index(indexName string, obj interface{}) ([]interface{}, error)
 	IndexKeys(indexName, indexedValue string) ([]string, error)
+	ObserveResourceVersion(rv string)
+	GetObservedResourceVersion() string
 	ListIndexFuncValues(name string) []string
 	ByIndex(indexName, indexedValue string) ([]interface{}, error)
 	GetIndexers() Indexers
@@ -227,6 +232,7 @@ type threadSafeMap struct {
 
 	// index implements the indexing functionality
 	index *storeIndex
+	rv    string
 }
 
 func (c *threadSafeMap) Add(key string, obj interface{}) {
@@ -234,8 +240,12 @@ func (c *threadSafeMap) Add(key string, obj interface{}) {
 }
 
 func (c *threadSafeMap) Update(key string, obj interface{}) {
+	rv, rvErr := c.rvFromObject(obj)
 	c.lock.Lock()
 	defer c.lock.Unlock()
+	if rvErr == nil {
+		c.updateRV(rv)
+	}
 	oldObject := c.items[key]
 	c.items[key] = obj
 	c.index.updateIndices(oldObject, obj, key)
@@ -244,6 +254,19 @@ func (c *threadSafeMap) Update(key string, obj interface{}) {
 func (c *threadSafeMap) Delete(key string) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
+	if obj, exists := c.items[key]; exists {
+		c.index.updateIndices(obj, nil, key)
+		delete(c.items, key)
+	}
+}
+
+func (c *threadSafeMap) DeleteWithObject(key string, obj interface{}) {
+	rv, rvErr := c.rvFromObject(obj)
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	if rvErr == nil {
+		c.updateRV(rv)
+	}
 	if obj, exists := c.items[key]; exists {
 		c.index.updateIndices(obj, nil, key)
 		delete(c.items, key)
@@ -280,14 +303,47 @@ func (c *threadSafeMap) ListKeys() []string {
 }
 
 func (c *threadSafeMap) Replace(items map[string]interface{}, resourceVersion string) {
+	_, rvErr := resourceversion.CompareResourceVersion(resourceVersion, resourceVersion)
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	c.items = items
+	if rvErr == nil {
+		c.rv = resourceVersion
+	} else {
+		c.rv = ""
+	}
 
 	// rebuild any index
 	c.index.reset()
 	for key, item := range c.items {
 		c.index.updateIndices(nil, item, key)
+	}
+}
+
+func (c *threadSafeMap) rvFromObject(obj interface{}) (rv string, err error) {
+	meta, err := meta.Accessor(obj)
+	if err != nil {
+		return
+	}
+	rv = meta.GetResourceVersion()
+	_, err = resourceversion.CompareResourceVersion(rv, rv)
+	if err != nil {
+		return "", err
+	}
+	return rv, nil
+}
+
+func (c *threadSafeMap) updateRV(rv string) {
+	if c.rv == "" {
+		c.rv = rv
+		return
+	}
+	cmp, err := resourceversion.CompareResourceVersion(c.rv, rv)
+	if err != nil {
+		return
+	}
+	if cmp < 0 {
+		c.rv = rv
 	}
 }
 
@@ -307,6 +363,33 @@ func (c *threadSafeMap) Index(indexName string, obj interface{}) ([]interface{},
 		list = append(list, c.items[storeKey])
 	}
 	return list, nil
+}
+
+// GetObservedResourceVersion returns the latest resource version that the store has seen.
+func (c *threadSafeMap) GetObservedResourceVersion() string {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	return c.rv
+}
+
+// ObserveResourceVersion returns the latest resource version that the store has seen.
+func (c *threadSafeMap) ObserveResourceVersion(rv string) {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	if c.rv == "" {
+		_, err := resourceversion.CompareResourceVersion(rv, rv)
+		if err == nil {
+			c.rv = rv
+		}
+		return
+	}
+	cmp, err := resourceversion.CompareResourceVersion(c.rv, rv)
+	if err != nil {
+		return
+	}
+	if cmp < 0 {
+		c.rv = rv
+	}
 }
 
 // ByIndex returns a list of the items whose indexed values in the given index include the given indexed value
