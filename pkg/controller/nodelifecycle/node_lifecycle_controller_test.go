@@ -40,6 +40,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	testcore "k8s.io/client-go/testing"
+	"k8s.io/client-go/util/workqueue"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/nodelifecycle/scheduler"
@@ -3897,6 +3898,141 @@ func TestProcessPodMarkPodNotReady(t *testing.T) {
 			}
 			if podStatusUpdated != item.expectedPodStatusUpdate {
 				t.Errorf("expect pod status updated to be %v, but got %v", item.expectedPodStatusUpdate, podStatusUpdated)
+			}
+		})
+	}
+}
+
+func TestPodInformerEventHandlers(t *testing.T) {
+	tests := []struct {
+		name        string
+		eventType   string
+		oldPod      *v1.Pod
+		newPod      *v1.Pod
+		expectAdded bool
+	}{
+		// Add Events (AddFunc: nc.podUpdated(nil, pod))
+		{
+			name:      "Adding pod with node assignment should trigger queue addition",
+			eventType: "add",
+			oldPod:    nil,
+			newPod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-pod-1", Namespace: "default"},
+				Spec:       v1.PodSpec{NodeName: "test-node-1"},
+			},
+			expectAdded: true,
+		},
+		{
+			name:      "Adding pod without node assignment should NOT trigger queue addition, because the pod is not assigned to a node",
+			eventType: "add",
+			oldPod:    nil,
+			newPod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-pod-2", Namespace: "default"},
+				Spec:       v1.PodSpec{}, // No NodeName
+			},
+			expectAdded: false,
+		},
+		// Update Events (UpdateFunc: nc.podUpdated(prevPod, newPod))
+		{
+			name:      "Updating pod to add node assignment should trigger queue addition, node name is changed",
+			eventType: "update",
+			oldPod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-pod-3", Namespace: "default"},
+				Spec:       v1.PodSpec{}, // No NodeName initially
+			},
+			newPod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-pod-3", Namespace: "default"},
+				Spec:       v1.PodSpec{NodeName: "test-node-1"}, // NodeName added
+			},
+			expectAdded: true,
+		},
+		{
+			name:      "Updating pod with unchanged node assignment should NOT trigger queue addition, node name is unchanged",
+			eventType: "update",
+			oldPod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-pod-4", Namespace: "default"},
+				Spec:       v1.PodSpec{NodeName: "test-node-1"},
+			},
+			newPod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-pod-4", Namespace: "default"},
+				Spec:       v1.PodSpec{NodeName: "test-node-1"}, // NodeName unchanged
+			},
+			expectAdded: false,
+		},
+		// Delete Events (DeleteFunc: nc.podDeleted(pod))
+		{
+			name:      "Deleting pod with node assignment should ALWAYS trigger queue addition",
+			eventType: "delete",
+			oldPod:    nil,
+			newPod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-pod-5", Namespace: "default"},
+				Spec:       v1.PodSpec{NodeName: "test-node-1"},
+			},
+			expectAdded: true,
+		},
+		{
+			name:      "Deleting pod without node assignment should ALWAYS trigger queue addition",
+			eventType: "delete",
+			oldPod:    nil,
+			newPod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-pod-6", Namespace: "default"},
+				Spec:       v1.PodSpec{}, // No NodeName
+			},
+			expectAdded: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			podUpdateQueue := workqueue.NewTypedRateLimitingQueueWithConfig(
+				workqueue.DefaultTypedControllerRateLimiter[podUpdateItem](),
+				workqueue.TypedRateLimitingQueueConfig[podUpdateItem]{
+					Name: "test_pod_update_queue",
+				},
+			)
+			defer podUpdateQueue.ShutDown()
+
+			nc := &Controller{
+				podUpdateQueue: podUpdateQueue,
+			}
+
+			initialLen := podUpdateQueue.Len()
+
+			switch tt.eventType {
+			case "add":
+				nc.podUpdated(nil, tt.newPod)
+			case "update":
+				nc.podUpdated(tt.oldPod, tt.newPod)
+			case "delete":
+				nc.podDeleted(tt.newPod)
+			}
+
+			// Check queue length after operation
+			finalLen := podUpdateQueue.Len()
+			itemsAdded := finalLen - initialLen
+
+			expectedItems := 0
+			if tt.expectAdded {
+				expectedItems = 1
+			}
+
+			if itemsAdded != expectedItems {
+				t.Errorf("Expected %d items added to queue, got %d. %s", expectedItems, itemsAdded, tt.name)
+				return
+			}
+
+			if tt.expectAdded && itemsAdded > 0 {
+				item, shutdown := podUpdateQueue.Get()
+				if shutdown {
+					t.Errorf("Queue was shutdown unexpectedly")
+					return
+				}
+
+				expectedItem := podUpdateItem{tt.newPod.Namespace, tt.newPod.Name}
+				if item != expectedItem {
+					t.Errorf("Expected item %v, got %v", expectedItem, item)
+				}
+				podUpdateQueue.Done(item)
 			}
 		})
 	}
