@@ -156,3 +156,176 @@ type LeaseCandidateList struct {
 	// items is a list of schema objects.
 	Items []LeaseCandidate
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// EvictionRequest defines an eviction request
+type EvictionRequest struct {
+	metav1.TypeMeta
+	// +optional
+	metav1.ObjectMeta
+
+	// Spec defines the eviction request specification.
+	// This field is required.
+	Spec EvictionRequestSpec
+
+	// Status represents the most recently observed status of the eviction request.
+	// Populated by the current interceptor and eviction request controller.
+	// +optional
+	Status EvictionRequestStatus
+}
+
+// EvictionRequestSpec is a specification of an EvictionRequest.
+type EvictionRequestSpec struct {
+	// PodRef references a pod that is subject to eviction/termination.
+	// This field is required and immutable.
+	PodRef LocalPodReference
+
+	// Interceptors reference interceptors that respond to this eviction request.
+	// This field does not need to be set and is resolved when the EvictionRequest object is created
+	// on admission.
+	// If no interceptors are specified, the pod in PodRef is evicted using the Eviction API.
+	// The maximum length of the interceptors list is 100.
+	// This field is immutable.
+	// +optional
+	Interceptors []Interceptor
+
+	// HeartbeatDeadlineSeconds is a maximum amount of time that an interceptor should take to
+	// periodically report on an eviction progress by updating the .status.heartbeatTime.
+	// If the .status.heartbeatTime is not updated within the duration of
+	// HeartbeatDeadlineSeconds, the eviction request is passed over to the next interceptor with the
+	// highest priority. If there is none, the pod is evicted using the Eviction API.
+	//
+	// The minimum value is 600 (10m) and the maximum value is 21600 (6h).
+	// The default value is 1800 (30m).
+	// This field is required and immutable.
+	HeartbeatDeadlineSeconds *int32
+}
+
+// LocalPodReference contains enough information to locate the referenced pod inside the same namespace.
+type LocalPodReference struct {
+	// Name of the pod.
+	// This field is required.
+	Name string
+	// UID of the pod.
+	// This field is required.
+	UID string
+}
+
+// Interceptor information that allows you to identify the interceptor responding to this eviction
+// request. Pods can be annotated with:
+// interceptor.evictionrequest.coordination.k8s.io/priority_${INTERCEPTOR_CLASS}: ${PRIORITY}/${ROLE}
+// interceptor.evictionrequest.coordination.k8s.io/priority_replicaset.apps.k8s.io: "10000/controller"
+// annotations that can be parsed into the Interceptor struct when the EvictionRequest object is
+// created on admission.
+type Interceptor struct {
+	// InterceptorClass must be RFC-1123 DNS subdomain identifying the interceptor (e.g.
+	// foo.example.com).
+	// This field is required.
+	InterceptorClass string
+
+	// Priority for this InterceptorClass. Higher priorities are selected first by the eviction
+	// request controller. The interceptor that is the managing controller should set the value of
+	// this field to 10000 to allow both for preemption or fallback registration by other
+	// interceptors.
+	//
+	// Priorities 9900-10100 are reserved for interceptors with a class that has the same parent
+	// domain as the controller interceptor. Duplicate priorities are not allowed in this interval.
+	//
+	// The number of interceptor annotations is limited to 30 in the 9900-10100 interval and to 70
+	// outside of this interval.
+	// The minimum value is 0 and the maximum value is 100000.
+	// This field is required.
+	Priority int32
+
+	// Role of the interceptor. The "controller" value is reserved for the managing controller of
+	// the pod. The role can send additional signal to other interceptors if they should preempt
+	// this interceptor or not.
+	// +optional
+	Role *string
+}
+
+// EvictionRequestStatus represents the last observed status of the eviction request.
+type EvictionRequestStatus struct {
+	// Conditions can be used by interceptors to share additional information about the eviction
+	// request.
+	// +optional
+	Conditions []metav1.Condition
+
+	// Message is a human readable message indicating details about the eviction request.
+	// This may be an empty string.
+	Message string
+
+	// Interceptors of the ActiveInterceptorClass can adopt this eviction request by updating the
+	// HeartbeatTime or orphan/complete it by setting ActiveInterceptorCompleted to true.
+	// +optional
+	ActiveInterceptorClass *string
+
+	// ActiveInterceptorCompleted should be set to true when the interceptor of the
+	// ActiveInterceptorClass has fully or partially completed (may result in pod termination).
+	// This field can also be set to true if no interceptor is available.
+	// If this field is true, there is no additional interceptor available, and the evicted pod is
+	// still running, it will be evicted using the Eviction API.
+	// +optional
+	ActiveInterceptorCompleted bool
+
+	// ExpectedInterceptorFinishTime is the time at which the eviction process step is expected to
+	// end for the current interceptor and its class.
+	// May be empty if no estimate can be made.
+	// +optional
+	ExpectedInterceptorFinishTime *metav1.Time
+
+	// HeartbeatTime is the time at which the eviction process was reported to be in progress by
+	// the interceptor.
+	// Cannot be set to the future time (after taking time skew of up to 10 seconds into account).
+	// +optional
+	HeartbeatTime *metav1.Time
+
+	// EvictionRequestCancellationPolicy should be set to Forbid by the interceptor if it is not possible
+	// to cancel (delete) the eviction request.
+	// When this value is Forbid, DELETE requests of this EvictionRequest object will not be accepted
+	// while the pod exists.
+	// This field is not reset by the eviction request controller when selecting an interceptor.
+	// Changes to this field should always be reconciled by the active interceptor.
+	//
+	// Valid policies are Allow and Forbid.
+	// The default value is Allow.
+	//
+	// Allow policy allows cancellation of this eviction request.
+	// The EvictionRequest can be deleted before the Pod is fully terminated.
+	//
+	// Forbid policy forbids cancellation of this eviction request.
+	// The EvictionRequest can't be deleted until the Pod is fully terminated.
+	//
+	// This field is required.
+	EvictionRequestCancellationPolicy EvictionRequestCancellationPolicy
+
+	// The number of unsuccessful attempts to evict the referenced pod via the API-initiated eviction,
+	// e.g. due to a PodDisruptionBudget.
+	// This is set by the eviction controller after all the interceptors have completed.
+	// The minimum value is 1, and subsequent updates can only increase it.
+	// +optional
+	FailedAPIEvictionCounter *int32
+}
+
+type EvictionRequestCancellationPolicy string
+
+const (
+	// Allow policy allows cancellation of this eviction request.
+	// The EvictionRequest can be deleted before the Pod is fully terminated.
+	Allow EvictionRequestCancellationPolicy = "Allow"
+	// Forbid policy forbids cancellation of this eviction request.
+	// The EvictionRequest can't be deleted until the Pod is fully terminated.
+	Forbid EvictionRequestCancellationPolicy = "Forbid"
+)
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// EvictionRequestList is a collection of EvictionRequests.
+type EvictionRequestList struct {
+	metav1.TypeMeta
+	// +optional
+	metav1.ListMeta
+	// Items is a list of EvictionRequests
+	Items []EvictionRequest
+}
