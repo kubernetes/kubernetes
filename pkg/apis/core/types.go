@@ -3243,7 +3243,7 @@ type ContainerRestartRule struct {
 // container exits.
 type ContainerRestartRuleAction string
 
-// The only valid action is Restart.
+// These are valid restart rule actions.
 const (
 	ContainerRestartRuleActionRestart              ContainerRestartRuleAction = "Restart"
 	ContainerRestartRuleActionRestartAllContainers ContainerRestartRuleAction = "RestartAllContainers"

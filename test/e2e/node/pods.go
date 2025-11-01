@@ -1071,9 +1071,11 @@ func validateAllContainersRestarted(ctx context.Context, f *framework.Framework,
 			}
 			if restarted {
 				restartedCount++
+			} else {
+				framework.Logf("container %s did not restart", cName)
 			}
 		}
-		ginkgo.By(fmt.Sprintf("%d out of %d containers restarted", restartedCount, len(containers)))
+		framework.Logf("%d out of %d containers restarted", restartedCount, len(containers))
 		return restartedCount == len(containers), nil
 	})
 	framework.ExpectNoError(err, "failed to see all containers restart")

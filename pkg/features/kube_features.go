@@ -826,7 +826,7 @@ const (
 	// Adds the AllocatedResourcesStatus to the container status.
 	ResourceHealthStatus featuregate.Feature = "ResourceHealthStatus"
 
-	// owner: @yuanwangyw
+	// owner: @yuanwang04
 	// kep: https://kep.k8s.io/5532
 	//
 	// Restart the pod in-place on the same node.

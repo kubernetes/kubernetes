@@ -1505,7 +1505,7 @@ func TestComputePodActionsForRestartAllContainers(t *testing.T) {
 			podFunc: func() *v1.Pod {
 				pod, _ := makeBasePodAndStatusWithRestartableInitContainers()
 				source := pod.Spec.InitContainers[2]
-				source.RestartPolicy = &restartPolicyNever
+				source.RestartPolicy = &restartPolicyAlways
 				source.RestartPolicyRules = restartAllContainersRules
 				pod.Spec.InitContainers[2] = source
 				pod.Status.Conditions = allContainersRestartingTrue

@@ -492,7 +492,6 @@ func scheduleStaticPod(dir, name, namespace string, podSpec *v1.Pod) error {
 	}
 	defer f.Close()
 
-	fmt.Println("creating static pod at: " + file)
 	y := printers.YAMLPrinter{}
 	y.PrintObj(podSpec, f)
 

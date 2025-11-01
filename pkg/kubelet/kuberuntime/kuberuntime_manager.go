@@ -1034,7 +1034,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		ContainersToKill:  make(map[kubecontainer.ContainerID]containerToKillInfo),
 	}
 
-	// Needs to create a new sandbox when the pod is marked for RestartAllContainers
+	// Needs to kill and remove all containers in reverse order when the pod is marked for RestartAllContainers.
 	if utilfeature.DefaultFeatureGate.Enabled(features.RestartAllContainersOnContainerExits) {
 		allContainersRestarting := false
 		if apiPodStatus != nil {
