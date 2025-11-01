@@ -6725,7 +6725,10 @@ var schemaYAML = typed.YAMLObject(`types:
         list:
           elementType:
             namedType: io.k8s.api.core.v1.Taint
-          elementRelationship: atomic
+          elementRelationship: associative
+          keys:
+          - key
+          - effect
     - name: unschedulable
       type:
         scalar: boolean
