@@ -37,6 +37,7 @@ spec:
   fsGroupPolicy: fsGroupPolicyValue
   nodeAllocatableUpdatePeriodSeconds: 9
   podInfoOnMount: true
+  preventPodSchedulingIfMissing: true
   requiresRepublish: true
   seLinuxMount: true
   serviceAccountTokenInSecrets: true

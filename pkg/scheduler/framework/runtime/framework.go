@@ -37,7 +37,7 @@ import (
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
-	"k8s.io/kubernetes/pkg/scheduler/backend/api_dispatcher"
+	apidispatcher "k8s.io/kubernetes/pkg/scheduler/backend/api_dispatcher"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -54,21 +54,22 @@ const (
 type frameworkImpl struct {
 	registry             Registry
 	snapshotSharedLister fwk.SharedLister
-	waitingPods          *waitingPodsMap
-	scorePluginWeight    map[string]int
-	preEnqueuePlugins    []fwk.PreEnqueuePlugin
-	enqueueExtensions    []fwk.EnqueueExtensions
-	queueSortPlugins     []fwk.QueueSortPlugin
-	preFilterPlugins     []fwk.PreFilterPlugin
-	filterPlugins        []fwk.FilterPlugin
-	postFilterPlugins    []fwk.PostFilterPlugin
-	preScorePlugins      []fwk.PreScorePlugin
-	scorePlugins         []fwk.ScorePlugin
-	reservePlugins       []fwk.ReservePlugin
-	preBindPlugins       []fwk.PreBindPlugin
-	bindPlugins          []fwk.BindPlugin
-	postBindPlugins      []fwk.PostBindPlugin
-	permitPlugins        []fwk.PermitPlugin
+
+	waitingPods       *waitingPodsMap
+	scorePluginWeight map[string]int
+	preEnqueuePlugins []fwk.PreEnqueuePlugin
+	enqueueExtensions []fwk.EnqueueExtensions
+	queueSortPlugins  []fwk.QueueSortPlugin
+	preFilterPlugins  []fwk.PreFilterPlugin
+	filterPlugins     []fwk.FilterPlugin
+	postFilterPlugins []fwk.PostFilterPlugin
+	preScorePlugins   []fwk.PreScorePlugin
+	scorePlugins      []fwk.ScorePlugin
+	reservePlugins    []fwk.ReservePlugin
+	preBindPlugins    []fwk.PreBindPlugin
+	bindPlugins       []fwk.BindPlugin
+	postBindPlugins   []fwk.PostBindPlugin
+	permitPlugins     []fwk.PermitPlugin
 
 	// pluginsMap contains all plugins, by name.
 	pluginsMap map[string]fwk.Plugin
@@ -79,6 +80,9 @@ type frameworkImpl struct {
 	informerFactory  informers.SharedInformerFactory
 	sharedDRAManager fwk.SharedDRAManager
 	logger           klog.Logger
+
+	// for tracking CSI node limits
+	sharedCSIManager fwk.CSIManager
 
 	metricsRecorder          *metrics.MetricAsyncRecorder
 	profileName              string
@@ -133,6 +137,7 @@ type frameworkOptions struct {
 	eventRecorder          events.EventRecorder
 	informerFactory        informers.SharedInformerFactory
 	sharedDRAManager       fwk.SharedDRAManager
+	sharedCSIManager       fwk.CSIManager
 	snapshotSharedLister   fwk.SharedLister
 	metricsRecorder        *metrics.MetricAsyncRecorder
 	podNominator           fwk.PodNominator
@@ -190,6 +195,13 @@ func WithInformerFactory(informerFactory informers.SharedInformerFactory) Option
 func WithSharedDRAManager(sharedDRAManager fwk.SharedDRAManager) Option {
 	return func(o *frameworkOptions) {
 		o.sharedDRAManager = sharedDRAManager
+	}
+}
+
+// WithSharedCSIManager sets SharedCSIManager for the framework.
+func WithSharedCSIManager(sharedCSIManager fwk.CSIManager) Option {
+	return func(o *frameworkOptions) {
+		o.sharedCSIManager = sharedCSIManager
 	}
 }
 
@@ -289,6 +301,7 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 	f := &frameworkImpl{
 		registry:             r,
 		snapshotSharedLister: options.snapshotSharedLister,
+		sharedCSIManager:     options.sharedCSIManager,
 		scorePluginWeight:    make(map[string]int),
 		waitingPods:          options.waitingPods,
 		clientSet:            options.clientSet,
@@ -1719,6 +1732,11 @@ func (f *frameworkImpl) SharedInformerFactory() informers.SharedInformerFactory 
 // SharedDRAManager returns the SharedDRAManager of the framework.
 func (f *frameworkImpl) SharedDRAManager() fwk.SharedDRAManager {
 	return f.sharedDRAManager
+}
+
+// SharedCSIManager returns the SharedCSIManager of the framework.
+func (f *frameworkImpl) SharedCSIManager() fwk.CSIManager {
+	return f.sharedCSIManager
 }
 
 func (f *frameworkImpl) pluginsNeeded(plugins *config.Plugins) sets.Set[string] {

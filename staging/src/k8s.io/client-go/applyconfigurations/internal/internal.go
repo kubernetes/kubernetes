@@ -15018,6 +15018,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: podInfoOnMount
       type:
         scalar: boolean
+    - name: preventPodSchedulingIfMissing
+      type:
+        scalar: boolean
     - name: requiresRepublish
       type:
         scalar: boolean
@@ -15425,6 +15428,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: numeric
     - name: podInfoOnMount
+      type:
+        scalar: boolean
+    - name: preventPodSchedulingIfMissing
       type:
         scalar: boolean
     - name: requiresRepublish

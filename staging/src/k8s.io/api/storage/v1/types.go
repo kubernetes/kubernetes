@@ -469,6 +469,14 @@ type CSIDriverSpec struct {
 	// +featureGate=CSIServiceAccountTokenSecrets
 	// +optional
 	ServiceAccountTokenInSecrets *bool `json:"serviceAccountTokenInSecrets,omitempty" protobuf:"varint,10,opt,name=serviceAccountTokenInSecrets"`
+
+	// preventPodSchedulingIfMissing indicates that the CSI driver wants to prevent pod scheduling if the CSI driver
+	// on the node is missing.
+	// This is a alpha feature and requires the VolumeLimitScaling feature gate to be enabled.
+	// Default is "false".
+	// +featureGate=VolumeLimitScaling
+	// +optional
+	PreventPodSchedulingIfMissing *bool `json:"preventPodSchedulingIfMissing,omitempty" protobuf:"varint,11,opt,name=preventPodSchedulingIfMissing"`
 }
 
 // FSGroupPolicy specifies if a CSI Driver supports modifying

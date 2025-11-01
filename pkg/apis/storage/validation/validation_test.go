@@ -2409,6 +2409,112 @@ func TestCSIDriverValidationSELinuxMountEnabledDisabled(t *testing.T) {
 	}
 }
 
+func TestCSIDriverValidationPreventPodSchedulingIfMissingEnabledDisabled(t *testing.T) {
+	tests := []struct {
+		name        string
+		featureOn   bool
+		fieldValue  *bool
+		expectError bool
+	}{
+		{
+			name:        "feature enabled, nil value allowed",
+			featureOn:   true,
+			fieldValue:  nil,
+			expectError: false,
+		},
+		{
+			name:        "feature enabled, non-nil value allowed",
+			featureOn:   true,
+			fieldValue:  ptr.To(true),
+			expectError: false,
+		},
+		{
+			name:        "feature disabled, nil value allowed",
+			featureOn:   false,
+			fieldValue:  nil,
+			expectError: false,
+		},
+		{
+			name:        "feature disabled, non-nil value rejected",
+			featureOn:   false,
+			fieldValue:  ptr.To(true),
+			expectError: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeLimitScaling, test.featureOn)
+			csiDriver := &storage.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Spec: storage.CSIDriverSpec{
+					AttachRequired:                ptr.To(true),
+					PodInfoOnMount:                ptr.To(true),
+					RequiresRepublish:             ptr.To(true),
+					StorageCapacity:               ptr.To(true),
+					SELinuxMount:                  ptr.To(true),
+					PreventPodSchedulingIfMissing: test.fieldValue,
+				},
+			}
+			err := ValidateCSIDriver(csiDriver)
+			if test.expectError && err == nil {
+				t.Error("Expected validation error, got nil")
+			}
+			if !test.expectError && err != nil {
+				t.Errorf("Validation returned error: %s", err)
+			}
+		})
+	}
+
+	updateTests := []struct {
+		name        string
+		featureOn   bool
+		oldValue    *bool
+		newValue    *bool
+		expectError bool
+	}{
+		{
+			name:        "feature enabled, set->set allowed",
+			featureOn:   true,
+			oldValue:    ptr.To(true),
+			newValue:    ptr.To(false),
+			expectError: false,
+		},
+		{
+			name:        "feature disabled, nil->set rejected",
+			featureOn:   false,
+			oldValue:    nil,
+			newValue:    ptr.To(true),
+			expectError: true,
+		},
+	}
+	for _, test := range updateTests {
+		t.Run(test.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeLimitScaling, test.featureOn)
+			oldCSIDriver := &storage.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "1"},
+				Spec: storage.CSIDriverSpec{
+					AttachRequired:                ptr.To(true),
+					PodInfoOnMount:                ptr.To(true),
+					RequiresRepublish:             ptr.To(true),
+					StorageCapacity:               ptr.To(true),
+					SELinuxMount:                  ptr.To(true),
+					PreventPodSchedulingIfMissing: test.oldValue,
+				},
+			}
+			newCSIDriver := oldCSIDriver.DeepCopy()
+			newCSIDriver.Spec.PreventPodSchedulingIfMissing = test.newValue
+			err := ValidateCSIDriverUpdate(newCSIDriver, oldCSIDriver)
+			if test.expectError && err == nil {
+				t.Error("Expected validation error, got nil")
+			}
+			if !test.expectError && err != nil {
+				t.Errorf("Validation returned error: %s", err)
+			}
+		})
+	}
+}
+
 func TestValidateVolumeAttributesClass(t *testing.T) {
 	successCases := []storage.VolumeAttributesClass{
 		{
