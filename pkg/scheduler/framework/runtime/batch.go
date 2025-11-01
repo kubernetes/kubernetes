@@ -33,7 +33,7 @@ type PodSignatureFunc func(p *v1.Pod) string
 func noBatchSignatures(p *v1.Pod) string { return "" }
 
 // OpportunisticBatching caches results from filtering and scoring when possible to optimize
-// scheudling of common pods.
+// scheduling of common pods.
 type OpportunisticBatch struct {
 	state          *batchState
 	currPod        batchPodInfo
@@ -60,7 +60,7 @@ const (
 )
 
 // Provide a hint for the pod. Note that this should always be the same
-// pod given in the preceeding NewPod call, but if somehow this isn't the
+// pod given in the preceding NewPod call, but if somehow this isn't the
 // case we don't give a hint, which will then clear our state later.
 func (b *OpportunisticBatch) RunNodeHint(ctx context.Context, pod *v1.Pod, state fwk.CycleState, lastHintedNode fwk.NodeInfo) string {
 	logger := klog.FromContext(ctx)
