@@ -362,16 +362,21 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 
 	flags.BoolVar(&warningsAsErrors, "warnings-as-errors", warningsAsErrors, "Treat warnings received from the server as errors and exit with a non-zero exit code")
 
-	pref := kuberc.NewPreferences()
-	if !cmdutil.KubeRC.IsDisabled() {
-		pref.AddFlags(flags)
-	}
-
 	kubeConfigFlags := o.ConfigFlags
 	if kubeConfigFlags == nil {
 		kubeConfigFlags = defaultConfigFlags().WithWarningPrinter(o.IOStreams)
 	}
 	kubeConfigFlags.AddFlags(flags)
+
+	pref := kuberc.NewPreferences()
+	var policyWrapper *func(*rest.Config) *rest.Config
+	if !cmdutil.KubeRC.IsDisabled() {
+		pref.AddFlags(flags)
+		// the `kuberc.PluginPolicyWrapper` function pointer may be initialized
+		// during pref.Apply, or it may be `nil`.
+		policyWrapper = &kuberc.PluginPolicyWrapper
+	}
+
 	matchVersionKubeConfigFlags := cmdutil.NewMatchVersionFlags(kubeConfigFlags)
 	matchVersionKubeConfigFlags.AddFlags(flags)
 	// Updates hooks to add kubectl command headers: SIG CLI KEP 859.
@@ -379,11 +384,14 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 
 	f := cmdutil.NewFactory(matchVersionKubeConfigFlags)
 
-	// Proxy command is incompatible with CommandHeaderRoundTripper, so
-	// clear the WrapConfigFn before running proxy command.
+	// Proxy command is incompatible with CommandHeaderRoundTripper, so replace
+	// the WrapConfigFn, possibly with `nil`, before running proxy command
 	proxyCmd := proxy.NewCmdProxy(f, o.IOStreams)
 	proxyCmd.PreRun = func(cmd *cobra.Command, args []string) {
 		kubeConfigFlags.WrapConfigFn = nil
+		if policyWrapper != nil {
+			kubeConfigFlags.WrapConfigFn = *policyWrapper
+		}
 	}
 
 	// Avoid import cycle by setting ValidArgsFunction here instead of in NewCmdGet()
@@ -508,7 +516,7 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 			}
 			return existingPreRunE(cmd, args)
 		}
-		_, err := pref.Apply(cmds, o.Arguments, o.IOStreams.ErrOut)
+		_, err := pref.Apply(cmds, kubeConfigFlags, o.Arguments, o.IOStreams.ErrOut)
 		if err != nil {
 			fmt.Fprintf(o.IOStreams.ErrOut, "error occurred while applying preferences %v\n", err)
 			os.Exit(1)

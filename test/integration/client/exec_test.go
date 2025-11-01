@@ -404,6 +404,74 @@ func execPluginClientTests(t *testing.T, unauthorizedCert, unauthorizedKey []byt
 			wantClientErrorPrefix:         `Get "https`,
 			wantMetrics:                   &execPluginMetrics{calls: []execPluginCall{{exitCode: 10, callStatus: "plugin_execution_error"}}},
 		},
+		{
+			name: "binary denied by denyall policy",
+			clientConfigFunc: func(c *rest.Config) {
+				c.ExecProvider.PluginPolicy.PolicyType = clientcmdapi.PluginPolicyDenyAll
+			},
+			wantGetCertificateErrorPrefix: "plugin",
+			wantClientErrorPrefix:         `Get "https`,
+			wantMetrics:                   &execPluginMetrics{},
+		},
+		{
+			name: "binary denied by allowlist policy",
+			clientConfigFunc: func(c *rest.Config) {
+				c.ExecProvider.PluginPolicy.PolicyType = clientcmdapi.PluginPolicyAllowlist
+				c.ExecProvider.PluginPolicy.Allowlist = []clientcmdapi.AllowlistEntry{
+					{Name: "/only/my/very/secure/binary"},
+					{Name: "other-very-secure-binary"},
+				}
+			},
+			wantGetCertificateErrorPrefix: `"testdata/exec-plugin.sh" is not permitted by the credential plugin allowlist`,
+			wantClientErrorPrefix:         `Get "https`,
+			wantMetrics:                   &execPluginMetrics{},
+		},
+		{
+			name: "allowall policy happy path",
+			clientConfigFunc: func(c *rest.Config) {
+				c.ExecProvider.PluginPolicy.PolicyType = clientcmdapi.PluginPolicyAllowAll
+				c.ExecProvider.Env = []clientcmdapi.ExecEnvVar{
+					{
+						Name: outputEnvVar,
+						Value: fmt.Sprintf(`{
+						"kind": "ExecCredential",
+						"apiVersion": "client.authentication.k8s.io/v1",
+						"status": {
+							"token": "%s"
+						}
+					}`, clientAuthorizedToken),
+					},
+				}
+			},
+			wantAuthorizationHeaderValues: [][]string{{"Bearer " + clientAuthorizedToken}},
+			wantCertificate:               &tls.Certificate{},
+			wantMetrics:                   &execPluginMetrics{calls: []execPluginCall{{exitCode: 0, callStatus: "no_error"}}},
+		},
+		{
+			name: "allowlist policy happy path",
+			clientConfigFunc: func(c *rest.Config) {
+				c.ExecProvider.PluginPolicy.PolicyType = clientcmdapi.PluginPolicyAllowlist
+				c.ExecProvider.PluginPolicy.Allowlist = []clientcmdapi.AllowlistEntry{
+					{Name: "testdata/exec-plugin.sh"},
+					{Name: "other-very-secure-binary"},
+				}
+				c.ExecProvider.Env = []clientcmdapi.ExecEnvVar{
+					{
+						Name: outputEnvVar,
+						Value: fmt.Sprintf(`{
+						"kind": "ExecCredential",
+						"apiVersion": "client.authentication.k8s.io/v1",
+						"status": {
+							"token": "%s"
+						}
+					}`, clientAuthorizedToken),
+					},
+				}
+			},
+			wantAuthorizationHeaderValues: [][]string{{"Bearer " + clientAuthorizedToken}},
+			wantCertificate:               &tls.Certificate{},
+			wantMetrics:                   &execPluginMetrics{calls: []execPluginCall{{exitCode: 0, callStatus: "no_error"}}},
+		},
 	}
 	return append(v1Tests, v1beta1TestsFromV1Tests(v1Tests)...)
 }
@@ -459,6 +527,9 @@ func TestExecPluginViaClient(t *testing.T) {
 					rand.String(10),
 				},
 				InteractiveMode: clientcmdapi.IfAvailableExecInteractiveMode,
+				PluginPolicy: clientcmdapi.PluginPolicy{
+					PolicyType: clientcmdapi.PluginPolicyAllowAll,
+				},
 			}
 			clientConfig.Wrap(func(rt http.RoundTripper) http.RoundTripper {
 				return roundTripperFunc(func(req *http.Request) (*http.Response, error) {
@@ -470,7 +541,10 @@ func TestExecPluginViaClient(t *testing.T) {
 			if test.clientConfigFunc != nil {
 				test.clientConfigFunc(clientConfig)
 			}
-			client := clientset.NewForConfigOrDie(clientConfig)
+			client, err := clientset.NewForConfig(clientConfig)
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 			defer cancel()
@@ -675,6 +749,9 @@ func TestExecPluginViaInformer(t *testing.T) {
 				Command:         "testdata/exec-plugin.sh",
 				APIVersion:      "client.authentication.k8s.io/v1",
 				InteractiveMode: clientcmdapi.IfAvailableExecInteractiveMode,
+				PluginPolicy: clientcmdapi.PluginPolicy{
+					PolicyType: clientcmdapi.PluginPolicyAllowAll,
+				},
 			}
 
 			if test.clientConfigFunc != nil {
@@ -709,6 +786,9 @@ func (e *execPlugin) config() *clientcmdapi.ExecConfig {
 		Command:         "testdata/exec-plugin.sh",
 		APIVersion:      "client.authentication.k8s.io/v1",
 		InteractiveMode: clientcmdapi.IfAvailableExecInteractiveMode,
+		PluginPolicy: clientcmdapi.PluginPolicy{
+			PolicyType: clientcmdapi.PluginPolicyAllowAll,
+		},
 		Env: []clientcmdapi.ExecEnvVar{
 			{
 				Name:  outputFileEnvVar,
@@ -1023,6 +1103,10 @@ func TestExecPluginGlobalCache(t *testing.T) {
 
 				if test.clientConfigFunc != nil {
 					test.clientConfigFunc(clientConfig)
+				}
+
+				if clientConfig.ExecProvider.PluginPolicy.PolicyType == clientcmdapi.PluginPolicyUnspecified {
+					clientConfig.ExecProvider.PluginPolicy.PolicyType = clientcmdapi.PluginPolicyAllowAll
 				}
 
 				addresses = append(addresses, execPluginMemoryAddress(t, clientConfig, i))

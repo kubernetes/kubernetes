@@ -34,4 +34,8 @@ func SetDefaults_ExecConfig(exec *ExecConfig) {
 			// require other versions to explicitly declare whether they want stdin or not
 		}
 	}
+
+	if len(exec.PluginPolicy.PolicyType) == 0 {
+		exec.PluginPolicy.PolicyType = PluginPolicyAllowAll
+	}
 }

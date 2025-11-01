@@ -19,10 +19,25 @@ package scheme
 import (
 	"testing"
 
+	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	"k8s.io/apimachinery/pkg/api/apitesting/roundtrip"
-	"k8s.io/kubectl/pkg/config/fuzzer"
+	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/kubectl/pkg/config"
+	kubectlfuzzer "k8s.io/kubectl/pkg/config/fuzzer"
+	"sigs.k8s.io/randfill"
 )
 
 func TestRoundTripTypes(t *testing.T) {
-	roundtrip.RoundTripTestForScheme(t, Scheme, fuzzer.Funcs)
+	ff := func(codecs runtimeserializer.CodecFactory) []interface{} {
+		return []interface{}{
+			func(s *config.Preference, c randfill.Continue) {
+				c.FillNoCustom(s)
+				s.CredentialPluginPolicy = ""
+				s.CredentialPluginAllowlist = nil
+			},
+		}
+	}
+
+	funcs := fuzzer.MergeFuzzerFuncs(kubectlfuzzer.Funcs, ff)
+	roundtrip.RoundTripTestForScheme(t, Scheme, funcs)
 }

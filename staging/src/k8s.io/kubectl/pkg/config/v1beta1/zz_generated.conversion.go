@@ -26,6 +26,7 @@ import (
 
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	api "k8s.io/client-go/tools/clientcmd/api"
 	config "k8s.io/kubectl/pkg/config"
 )
 
@@ -154,6 +155,8 @@ func Convert_config_CommandOptionDefault_To_v1beta1_CommandOptionDefault(in *con
 func autoConvert_v1beta1_Preference_To_config_Preference(in *Preference, out *config.Preference, s conversion.Scope) error {
 	out.Defaults = *(*[]config.CommandDefaults)(unsafe.Pointer(&in.Defaults))
 	out.Aliases = *(*[]config.AliasOverride)(unsafe.Pointer(&in.Aliases))
+	out.CredentialPluginPolicy = api.PolicyType(in.CredentialPluginPolicy)
+	out.CredentialPluginAllowlist = *(*[]api.AllowlistEntry)(unsafe.Pointer(&in.CredentialPluginAllowlist))
 	return nil
 }
 
@@ -165,6 +168,8 @@ func Convert_v1beta1_Preference_To_config_Preference(in *Preference, out *config
 func autoConvert_config_Preference_To_v1beta1_Preference(in *config.Preference, out *Preference, s conversion.Scope) error {
 	out.Defaults = *(*[]CommandDefaults)(unsafe.Pointer(&in.Defaults))
 	out.Aliases = *(*[]AliasOverride)(unsafe.Pointer(&in.Aliases))
+	out.CredentialPluginPolicy = api.PolicyType(in.CredentialPluginPolicy)
+	out.CredentialPluginAllowlist = *(*[]api.AllowlistEntry)(unsafe.Pointer(&in.CredentialPluginAllowlist))
 	return nil
 }
 

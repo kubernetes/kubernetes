@@ -138,6 +138,9 @@ func TestCallsMetric(t *testing.T) {
 				{Name: "TEST_OUTPUT", Value: goodOutput},
 			},
 			InteractiveMode: api.IfAvailableExecInteractiveMode,
+			PluginPolicy: api.PluginPolicy{
+				PolicyType: api.PluginPolicyAllowAll,
+			},
 		}
 
 		a, err := newAuthenticator(newCache(), func(_ int) bool { return false }, &c, nil)
@@ -173,6 +176,9 @@ func TestCallsMetric(t *testing.T) {
 			Command:         command,
 			APIVersion:      "client.authentication.k8s.io/v1beta1",
 			InteractiveMode: api.IfAvailableExecInteractiveMode,
+			PluginPolicy: api.PluginPolicy{
+				PolicyType: api.PluginPolicyAllowAll,
+			},
 		}
 		a, err := newAuthenticator(newCache(), func(_ int) bool { return false }, &c, nil)
 		if err != nil {

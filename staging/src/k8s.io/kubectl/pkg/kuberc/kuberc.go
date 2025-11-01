@@ -29,7 +29,11 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/plugin/pkg/client/auth/exec"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/util/homedir"
 	"k8s.io/kubectl/pkg/config"
 )
@@ -42,6 +46,7 @@ const (
 var (
 	RecommendedConfigDir  = filepath.Join(homedir.HomeDir(), clientcmd.RecommendedHomeDir)
 	RecommendedKubeRCFile = filepath.Join(RecommendedConfigDir, RecommendedKubeRCFileName)
+	PluginPolicyWrapper   func(*rest.Config) *rest.Config
 
 	aliasNameRegex = regexp.MustCompile("^[a-zA-Z]+$")
 	shortHandRegex = regexp.MustCompile("^-[a-zA-Z]+$")
@@ -51,16 +56,18 @@ var (
 // arguments based on user's kuberc configuration.
 type PreferencesHandler interface {
 	AddFlags(flags *pflag.FlagSet)
-	Apply(rootCmd *cobra.Command, args []string, errOut io.Writer) ([]string, error)
+	// ApplyPluginPolicy(*genericclioptions.ConfigFlags)
+	Apply(rootCmd *cobra.Command, kubeConfigFlags *genericclioptions.ConfigFlags, args []string, errOut io.Writer) ([]string, error)
 }
 
 // Preferences stores the kuberc file coming either from environment variable
 // or file from set in flag or the default kuberc path.
 type Preferences struct {
-	getPreferencesFunc func(kuberc string, errOut io.Writer) (*config.Preference, error)
-
-	aliases map[string]struct{}
+	getPreferencesFunc func(kuberc string, errOut io.Writer) (*config.Preference, error) // DefaultGetPreferences
+	aliases            map[string]struct{}
 }
+
+var _ PreferencesHandler = &Preferences{}
 
 // NewPreferences returns initialized Prefrences object.
 func NewPreferences() PreferencesHandler {
@@ -85,7 +92,7 @@ func (p *Preferences) AddFlags(flags *pflag.FlagSet) {
 
 // Apply firstly applies the aliases in the preferences file and secondly overrides
 // the default values of flags.
-func (p *Preferences) Apply(rootCmd *cobra.Command, args []string, errOut io.Writer) ([]string, error) {
+func (p *Preferences) Apply(rootCmd *cobra.Command, kubeConfigFlags *genericclioptions.ConfigFlags, args []string, errOut io.Writer) ([]string, error) {
 	if len(args) <= 1 {
 		return args, nil
 	}
@@ -108,6 +115,10 @@ func (p *Preferences) Apply(rootCmd *cobra.Command, args []string, errOut io.Wri
 		return args, err
 	}
 
+	if kubeConfigFlags != nil {
+		p.applyPluginPolicy(kubeConfigFlags, kuberc)
+	}
+
 	args, err = p.applyAliases(rootCmd, kuberc, args, errOut)
 	if err != nil {
 		return args, err
@@ -117,6 +128,34 @@ func (p *Preferences) Apply(rootCmd *cobra.Command, args []string, errOut io.Wri
 		return args, err
 	}
 	return args, nil
+}
+
+// `applyPluginPolicy` passes the values unaltered to their destination. To
+// prevent excessive coupling, logic to handle those values is further down the
+// stack.
+func (p *Preferences) applyPluginPolicy(kubeConfigFlags *genericclioptions.ConfigFlags, kuberc *config.Preference) {
+	policy := clientcmdapi.PluginPolicy{
+		PolicyType: kuberc.CredentialPluginPolicy,
+		Allowlist:  kuberc.CredentialPluginAllowlist,
+	}
+
+	existingWrapConfigFn := kubeConfigFlags.WrapConfigFn
+
+	if PluginPolicyWrapper == nil {
+		PluginPolicyWrapper = func(c *rest.Config) *rest.Config {
+			if existingWrapConfigFn != nil {
+				c = existingWrapConfigFn(c)
+			}
+
+			if c.ExecProvider != nil {
+				c.ExecProvider.PluginPolicy = policy
+			}
+
+			return c
+		}
+	}
+
+	*kubeConfigFlags = *kubeConfigFlags.WithWrapConfigFn(PluginPolicyWrapper)
 }
 
 // applyOverrides finds the command and sets the defaulted flag values in kuberc.
@@ -470,5 +509,17 @@ func validate(plugin *config.Preference) error {
 		}
 	}
 
+	if err := validatePluginPolicy(plugin); err != nil {
+		return err
+	}
+
 	return nil
+}
+
+func validatePluginPolicy(plugin *config.Preference) error {
+	policy := plugin.CredentialPluginPolicy
+	if policy == clientcmdapi.PluginPolicyUnspecified {
+		policy = clientcmdapi.PluginPolicyAllowAll
+	}
+	return exec.ValidatePluginPolicy(policy, plugin.CredentialPluginAllowlist)
 }

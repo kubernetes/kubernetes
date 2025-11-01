@@ -16,7 +16,11 @@ limitations under the License.
 
 package v1alpha1
 
-import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	conversion "k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/kubectl/pkg/config"
+)
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -106,4 +110,28 @@ type CommandOptionDefault struct {
 	// In a string format of a default value. It will be parsed
 	// by kubectl to the compatible value of the flag.
 	Default string `json:"default"`
+}
+
+func Convert_config_Preference_To_v1alpha1_Preference(in *config.Preference, out *Preference, s conversion.Scope) error {
+	if len(in.Defaults) > 0 {
+		out.Defaults = make([]CommandDefaults, len(in.Defaults))
+
+		for i, d := range in.Defaults {
+			if err := Convert_config_CommandDefaults_To_v1alpha1_CommandDefaults(&d, &out.Defaults[i], s); err != nil {
+				return err
+			}
+		}
+	}
+
+	if len(in.Aliases) > 0 {
+		out.Aliases = make([]AliasOverride, len(in.Aliases))
+
+		for i, a := range in.Aliases {
+			if err := Convert_config_AliasOverride_To_v1alpha1_AliasOverride(&a, &out.Aliases[i], s); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
