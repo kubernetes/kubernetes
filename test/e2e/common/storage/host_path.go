@@ -49,7 +49,7 @@ var _ = SIGDescribe("HostPath", func() {
 	   Create a Pod with host volume mounted. The volume mounted MUST be a directory with permissions mode -rwxrwxrwx and that is has the sticky bit (mode flag t) set.
 	   This test is marked LinuxOnly since Windows does not support setting the sticky bit (mode flag t).
 	*/
-	f.It("should give a volume the correct mode [LinuxOnly]", f.WithNodeConformance(), func(ctx context.Context) {
+	f.It("should give a volume the correct mode", f.WithNodeConformance(), f.WithLinuxOnly(), func(ctx context.Context) {
 		source := &v1.HostPathVolumeSource{
 			Path: "/tmp",
 		}

@@ -365,7 +365,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 	   Containers MUST verify that the projected service account token can be
 	   read and has correct file mode set including ownership and permission.
 	*/
-	f.It("should set ownership and permission when RunAsUser or FsGroup is present [LinuxOnly]", func(ctx context.Context) {
+	f.It(f.WithLinuxOnly(), "should set ownership and permission when RunAsUser or FsGroup is present", func(ctx context.Context) {
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 
 		var (

@@ -38,7 +38,7 @@ var _ = utils.SIGDescribe("CSI Mock volume fsgroup policies", func() {
 	m := newMockDriverSetup(f)
 
 	// These tests *only* work on a cluster which has the CSIVolumeFSGroupPolicy feature enabled.
-	ginkgo.Context("CSI FSGroupPolicy [LinuxOnly]", func() {
+	framework.Context("CSI FSGroupPolicy", framework.WithLinuxOnly(), func() {
 		tests := []struct {
 			name          string
 			fsGroupPolicy storagev1.FSGroupPolicy
@@ -81,7 +81,7 @@ var _ = utils.SIGDescribe("CSI Mock volume fsgroup policies", func() {
 		}
 	})
 
-	ginkgo.Context("CSI FSGroupPolicy Update [LinuxOnly]", func() {
+	framework.Context("CSI FSGroupPolicy Update", framework.WithLinuxOnly(), func() {
 		tests := []struct {
 			name             string
 			oldFSGroupPolicy storagev1.FSGroupPolicy

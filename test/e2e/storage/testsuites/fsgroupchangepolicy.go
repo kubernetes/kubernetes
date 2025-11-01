@@ -218,8 +218,8 @@ func (s *fsGroupChangePolicyTestSuite) DefineTests(driver storageframework.TestD
 
 	for _, t := range tests {
 		test := t
-		testCaseName := fmt.Sprintf("(%s)[LinuxOnly], %s", test.podfsGroupChangePolicy, test.name)
-		ginkgo.It(testCaseName, func(ctx context.Context) {
+		testCaseName := fmt.Sprintf("(%s), %s", test.podfsGroupChangePolicy, test.name)
+		framework.It(testCaseName, f.WithLinuxOnly(), func(ctx context.Context) {
 			dInfo := driver.GetDriverInfo()
 			policy := v1.PodFSGroupChangePolicy(test.podfsGroupChangePolicy)
 

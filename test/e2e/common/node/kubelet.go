@@ -181,7 +181,7 @@ var _ = SIGDescribe("Kubelet", func() {
 			Description: Create a Pod with security context set with ReadOnlyRootFileSystem set to true. The Pod then tries to write to the /file on the root, write operation to the root filesystem MUST fail as expected.
 			This test is marked LinuxOnly since Windows does not support creating containers with read-only access.
 		*/
-		framework.ConformanceIt("should not write to root filesystem [LinuxOnly]", f.WithNodeConformance(), func(ctx context.Context) {
+		framework.ConformanceIt("should not write to root filesystem", f.WithNodeConformance(), f.WithLinuxOnly(), func(ctx context.Context) {
 			isReadOnly := true
 			podClient.CreateSync(ctx, &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{

@@ -44,7 +44,7 @@ var _ = SIGDescribe("Security Context", func() {
 		podClient = e2epod.NewPodClient(f)
 	})
 
-	f.Context(framework.WithNodeConformance(), "[LinuxOnly] Container PID namespace sharing", func() {
+	f.Context(framework.WithNodeConformance(), framework.WithLinuxOnly(), "Container PID namespace sharing", func() {
 		ginkgo.It("containers in pods using isolated PID namespaces should all receive PID 1", func(ctx context.Context) {
 			ginkgo.By("Create a pod with isolated PID namespaces.")
 			e2epod.NewPodClient(f).CreateSync(ctx, &v1.Pod{
