@@ -18,6 +18,7 @@ package extended
 
 import (
 	"testing"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
@@ -67,6 +68,9 @@ func TestDeviceClassMapping(t *testing.T) {
 	class1 := &resourceapi.DeviceClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "class1",
+			CreationTimestamp: metav1.Time{
+				Time: time.Now().Add(-24 * time.Hour),
+			},
 		},
 		Spec: resourceapi.DeviceClassSpec{
 			ExtendedResourceName: &ern1,
@@ -85,9 +89,23 @@ func TestDeviceClassMapping(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "class3",
 		},
+		Spec: resourceapi.DeviceClassSpec{
+			ExtendedResourceName: &ern2,
+		},
+	}
+	class4 := &resourceapi.DeviceClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "class4",
+			CreationTimestamp: metav1.Time{
+				Time: time.Now(),
+			},
+		},
+		Spec: resourceapi.DeviceClassSpec{
+			ExtendedResourceName: &ern1,
+		},
 	}
 
-	client := fake.NewSimpleClientset(class1, class2, class3)
+	client := fake.NewClientset(class1, class2, class3, class4)
 
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	draManager := &fakeDRAManager{
@@ -112,22 +130,22 @@ func TestDeviceClassMapping(t *testing.T) {
 	if !ok {
 		t.Errorf("result does not contain extended resource %s", ern1)
 	}
-	if c != "class1" {
-		t.Errorf("result does not match device class name %s", "class1")
+	if c.Name != "class4" {
+		t.Errorf("result does not match device class name %s", "class4")
 	}
 	c, ok = rm[v1.ResourceName(ern2)]
 	if !ok {
 		t.Errorf("result does not contain extended resource %s", ern2)
 	}
-	if c != "class2" {
+	if c.Name != "class2" {
 		t.Errorf("result does not match device class name %s", "class2")
 	}
-	for _, c := range []string{"class1", "class2", "class3"} {
+	for _, c := range []string{"class1", "class2", "class3", "class4"} {
 		n, ok := rm[v1.ResourceName("deviceclass.resource.kubernetes.io/"+c)]
 		if !ok {
 			t.Errorf("result does not contain implicit extended resource for device class %s", c)
 		}
-		if n != c {
+		if n.Name != c {
 			t.Errorf("result %s does not match device class name %s", n, c)
 		}
 	}
@@ -136,7 +154,7 @@ func TestDeviceClassMapping(t *testing.T) {
 func TestNoDeviceClassMapping(t *testing.T) {
 	tCtx := ktesting.Init(t)
 
-	client := fake.NewSimpleClientset()
+	client := fake.NewClientset()
 
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	draManager := &fakeDRAManager{
