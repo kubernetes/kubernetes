@@ -19,6 +19,7 @@ package cache
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -48,8 +49,12 @@ type Config struct {
 	// Something that can list and watch your objects.
 	ListerWatcher
 
-	// Something that can process a popped Deltas.
+	// Process can process a popped Deltas.
 	Process ProcessFunc
+
+	// ProcessBatch can process a batch of popped Deltas, which should return `TransactionError` if not all items
+	// in the batch were successfully processed.
+	ProcessBatch ProcessBatchFunc
 
 	// ObjectType is an example object of the type this controller is
 	// expected to handle.
@@ -93,6 +98,9 @@ type ShouldResyncFunc func() bool
 
 // ProcessFunc processes a single object.
 type ProcessFunc func(obj interface{}, isInInitialList bool) error
+
+// ProcessBatchFunc processes multiple objects in batch.
+type ProcessBatchFunc func(deltas []Deltas, isInInitialList bool) error
 
 // `*controller` implements Controller
 type controller struct {
@@ -203,12 +211,25 @@ func (c *controller) LastSyncResourceVersion() string {
 // to make sure that we don't end up processing the same object multiple times
 // concurrently.
 func (c *controller) processLoop(ctx context.Context) {
+	var popFunc = func() error {
+		_, err := c.config.Pop(PopProcessFunc(c.config.Process))
+		return err
+	}
+	if clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.InOrderInformersBatchProcess) {
+		if batchQueue, ok := c.config.Queue.(QueueWithBatch); ok && c.config.ProcessBatch != nil {
+			popFunc = func() error {
+				_, err := batchQueue.PopBatch(c.config.ProcessBatch)
+				return err
+			}
+		}
+		// otherwise fallback to non-batch process behavior
+	}
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		default:
-			_, err := c.config.Pop(PopProcessFunc(c.config.Process))
+			err := popFunc()
 			if err != nil {
 				if errors.Is(err, ErrFIFOClosed) {
 					return
@@ -585,6 +606,95 @@ func processDeltas(
 	return nil
 }
 
+// processDeltasInBatch applies a batch of Deltas to the given Store and
+// notifies the ResourceEventHandler of add, update, or delete events.
+//
+// If the Store supports transactions (TransactionStore), all Deltas are applied
+// atomically in a single transaction and corresponding handler callbacks are
+// executed afterward. Otherwise, each Delta is processed individually.
+//
+// Returns an error if any Delta or transaction fails. For TransactionError,
+// only successful operations trigger callbacks.
+func processDeltasInBatch(
+	handler ResourceEventHandler,
+	clientState Store,
+	deltasList []Deltas,
+	isInInitialList bool,
+) error {
+	// from oldest to newest
+	txns := make([]Transaction, 0)
+	callbacks := make([]func(), 0)
+	txnStore, txnSupported := clientState.(TransactionStore)
+	if !txnSupported {
+		var errs []error
+		for _, delta := range deltasList {
+			if err := processDeltas(handler, clientState, delta, isInInitialList); err != nil {
+				errs = append(errs, err)
+			}
+		}
+		if len(errs) > 0 {
+			return fmt.Errorf("unexpected error when handling deltas: %v", errs)
+		}
+		return nil
+	}
+	// deltasList is a list of unique objects
+	for _, deltas := range deltasList {
+		for _, d := range deltas {
+			obj := d.Object
+			switch d.Type {
+			case Sync, Replaced, Added, Updated:
+				// it will only return one old object for each because items are unique
+				if old, exists, err := clientState.Get(obj); err == nil && exists {
+					txn := Transaction{
+						Type:   TransactionTypeUpdate,
+						Object: obj,
+					}
+					txns = append(txns, txn)
+					callbacks = append(callbacks, func() {
+						handler.OnUpdate(old, obj)
+					})
+				} else {
+					txn := Transaction{
+						Type:   TransactionTypeAdd,
+						Object: obj,
+					}
+					txns = append(txns, txn)
+					callbacks = append(callbacks, func() {
+						handler.OnAdd(obj, isInInitialList)
+					})
+				}
+			case Deleted:
+				txn := Transaction{
+					Type:   TransactionTypeDelete,
+					Object: obj,
+				}
+				txns = append(txns, txn)
+				callbacks = append(callbacks, func() {
+					handler.OnDelete(obj)
+				})
+			}
+		}
+	}
+
+	err := txnStore.Transaction(txns...)
+	var txnErr TransactionError
+	if errors.As(err, &txnErr) {
+		// if txn had error, only execute the callbacks for the successful ones
+		for _, SuccessfulIdx := range txnErr.SuccessfulIndices {
+			callbacks[SuccessfulIdx]()
+		}
+		// formatting the error so txns doesn't escape and keeps allocated in the stack.
+		return fmt.Errorf("not all items in the batch successfully processed: %w", txnErr)
+	}
+	if err != nil {
+		return fmt.Errorf("unexpected error from cache storage: %w", err)
+	}
+	for _, callback := range callbacks {
+		callback()
+	}
+	return nil
+}
+
 // newInformer returns a controller for populating the store while also
 // providing event notifications.
 //
@@ -623,6 +733,9 @@ func newInformer(clientState Store, options InformerOptions) Controller {
 				return processDeltas(options.Handler, clientState, deltas, isInInitialList)
 			}
 			return errors.New("object given as Process argument is not Deltas")
+		},
+		ProcessBatch: func(deltaList []Deltas, isInInitialList bool) error {
+			return processDeltasInBatch(options.Handler, clientState, deltaList, isInInitialList)
 		},
 	}
 	return New(cfg)
