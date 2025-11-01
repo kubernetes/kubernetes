@@ -73,6 +73,15 @@ run_impersonation_tests() {
     kube::test::get_object_assert 'csr/foo' '{{.spec.uid}}' 'abc123'
     kubectl delete -f hack/testdata/csr.yml "${kube_flags_with_token[@]:?}"
 
+    # --as-user-extra
+    kubectl create -f hack/testdata/csr.yml "${kube_flags_with_token[@]:?}" --as=user1 --as-uid=abc123 --as-user-extra key1="val1,val2" --as-user-extra key2=val3
+    kubectl get csr/foo -oyaml
+    kube::test::get_object_assert 'csr/foo' '{{.spec.username}}' 'user1'
+    kube::test::get_object_assert 'csr/foo' '{{.spec.uid}}' 'abc123'
+    kube::test::get_object_assert 'csr/foo' '{{range .spec.extra.key1}}{{.}} {{end}}' 'val1 val2 '
+    kube::test::get_object_assert 'csr/foo' '{{range .spec.extra.key2}}{{.}} {{end}}' 'val3 '
+    kubectl delete -f hack/testdata/csr.yml "${kube_flags_with_token[@]:?}"
+
   fi
 
   set +o nounset
