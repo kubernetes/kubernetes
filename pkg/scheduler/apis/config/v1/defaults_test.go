@@ -892,6 +892,18 @@ func TestPluginArgsDefaults(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "DynamicResourcesArgs defaults, DRADeviceBindingConditions enabled",
+			features: map[featuregate.Feature]bool{
+				features.DRADeviceBindingConditions:   true,
+				features.DRAResourceClaimDeviceStatus: true,
+			},
+			in: &configv1.DynamicResourcesArgs{},
+			want: &configv1.DynamicResourcesArgs{
+				FilterTimeout:  &metav1.Duration{Duration: 10 * time.Second},
+				BindingTimeout: &metav1.Duration{Duration: 600 * time.Second},
+			},
+		},
 	}
 	for _, tc := range tests {
 		scheme := runtime.NewScheme()
