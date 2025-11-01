@@ -19,6 +19,7 @@ package memorymanager
 import (
 	"fmt"
 	"reflect"
+	"strconv"
 	"testing"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
@@ -26,7 +27,9 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
@@ -47,11 +50,22 @@ var (
 
 	podLevelRequirementsGuaranteed = &v1.ResourceRequirements{
 		Limits: v1.ResourceList{
-			v1.ResourceCPU:    resource.MustParse("1000Mi"),
+			v1.ResourceCPU:    resource.MustParse("1000m"),
 			v1.ResourceMemory: resource.MustParse("1Gi"),
 		},
 		Requests: v1.ResourceList{
-			v1.ResourceCPU:    resource.MustParse("1000Mi"),
+			v1.ResourceCPU:    resource.MustParse("1000m"),
+			v1.ResourceMemory: resource.MustParse("1Gi"),
+		},
+	}
+
+	podLevelRequirementsBurstable = &v1.ResourceRequirements{
+		Limits: v1.ResourceList{
+			v1.ResourceCPU:    resource.MustParse("1000m"),
+			v1.ResourceMemory: resource.MustParse("1Gi"),
+		},
+		Requests: v1.ResourceList{
+			v1.ResourceCPU:    resource.MustParse("500m"),
 			v1.ResourceMemory: resource.MustParse("1Gi"),
 		},
 	}
@@ -133,19 +147,20 @@ func areContainerMemoryAssignmentsEqual(t *testing.T, cma1, cma2 state.Container
 }
 
 type testStaticPolicy struct {
-	description                  string
-	assignments                  state.ContainerMemoryAssignments
-	expectedAssignments          state.ContainerMemoryAssignments
-	machineState                 state.NUMANodeMap
-	expectedMachineState         state.NUMANodeMap
-	systemReserved               systemReservedMemory
-	expectedError                error
-	machineInfo                  *cadvisorapi.MachineInfo
-	pod                          *v1.Pod
-	topologyHint                 *topologymanager.TopologyHint
-	expectedTopologyHints        map[string][]topologymanager.TopologyHint
-	initContainersReusableMemory reusableMemory
-	podLevelResourcesEnabled     bool
+	description                     string
+	assignments                     state.ContainerMemoryAssignments
+	expectedAssignments             state.ContainerMemoryAssignments
+	machineState                    state.NUMANodeMap
+	expectedMachineState            state.NUMANodeMap
+	systemReserved                  systemReservedMemory
+	expectedError                   error
+	machineInfo                     *cadvisorapi.MachineInfo
+	pod                             *v1.Pod
+	topologyHint                    *topologymanager.TopologyHint
+	expectedTopologyHints           map[string][]topologymanager.TopologyHint
+	initContainersReusableMemory    reusableMemory
+	podLevelResourcesEnabled        bool
+	podLevelResourceManagersEnabled bool
 }
 
 func initTests(t *testing.T, testCase *testStaticPolicy, hint *topologymanager.TopologyHint, initContainersReusableMemory reusableMemory) (Policy, state.State, error) {
@@ -3816,11 +3831,135 @@ func TestStaticPolicyGetTopologyHints(t *testing.T) {
 			expectedTopologyHints:    nil,
 			podLevelResourcesEnabled: true,
 		},
+		{
+			description: "should provide pod topology hints for guaranteed pod with pod level resources when PodLevelResourceManagers is enabled",
+			pod:         getPodWithPodLevelResources("pod1", podLevelRequirementsGuaranteed, "container1", requirementsGuaranteed),
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    2 * gb,
+							Free:           2 * gb,
+							Reserved:       0,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   3 * gb,
+						},
+						hugepages1Gi: {
+							Allocatable:    gb,
+							Free:           gb,
+							Reserved:       0,
+							SystemReserved: 0,
+							TotalMemSize:   gb,
+						},
+					},
+					Cells: []int{0},
+				},
+				1: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    2 * gb,
+							Free:           2 * gb,
+							Reserved:       0,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   3 * gb,
+						},
+						hugepages1Gi: {
+							Allocatable:    gb,
+							Free:           gb,
+							Reserved:       0,
+							SystemReserved: 0,
+							TotalMemSize:   gb,
+						},
+					},
+					Cells: []int{1},
+				},
+			},
+			systemReserved: systemReservedMemory{
+				0: map[v1.ResourceName]uint64{
+					v1.ResourceMemory: 1024 * mb,
+				},
+				1: map[v1.ResourceName]uint64{
+					v1.ResourceMemory: 1024 * mb,
+				},
+			},
+			machineInfo: &cadvisorapi.MachineInfo{
+				Topology: []cadvisorapi.Node{
+					{
+						Id:     0,
+						Memory: 3 * gb,
+						HugePages: []cadvisorapi.HugePagesInfo{
+							{
+								PageSize: pageSize1Gb,
+								NumPages: 1,
+							},
+						},
+					},
+					{
+						Id:     1,
+						Memory: 3 * gb,
+						HugePages: []cadvisorapi.HugePagesInfo{
+							{
+								PageSize: pageSize1Gb,
+								NumPages: 1,
+							},
+						},
+					},
+				},
+			},
+			expectedTopologyHints: map[string][]topologymanager.TopologyHint{
+				string(v1.ResourceMemory): {
+					{
+						NUMANodeAffinity: newNUMAAffinity(0),
+						Preferred:        true,
+					},
+					{
+						NUMANodeAffinity: newNUMAAffinity(1),
+						Preferred:        true,
+					},
+					{
+						NUMANodeAffinity: newNUMAAffinity(0, 1),
+						Preferred:        false,
+					},
+				},
+				string(hugepages1Gi): {
+					{
+						NUMANodeAffinity: newNUMAAffinity(0),
+						Preferred:        true,
+					},
+					{
+						NUMANodeAffinity: newNUMAAffinity(1),
+						Preferred:        true,
+					},
+					{
+						NUMANodeAffinity: newNUMAAffinity(0, 1),
+						Preferred:        false,
+					},
+				},
+			},
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: true,
+		}, {
+			description: "should not provide pod topology hints for burstable pod with pod level resources when PodLevelResourceManagers is enabled",
+			pod:         getPodWithPodLevelResources("pod1", podLevelRequirementsBurstable, "container1", requirementsGuaranteed),
+			systemReserved: systemReservedMemory{
+				0: map[v1.ResourceName]uint64{
+					v1.ResourceMemory: 1024 * mb,
+				},
+			},
+			expectedTopologyHints:           nil,
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: true,
+		},
 	}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, testCase.podLevelResourcesEnabled)
+			if testCase.podLevelResourcesEnabled {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, testCase.podLevelResourcesEnabled)
+			}
+			if testCase.podLevelResourceManagersEnabled {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, testCase.podLevelResourceManagersEnabled)
+			}
 
 			p, s, err := initTests(t, &testCase, nil, nil)
 			if err != nil {
@@ -3839,21 +3978,107 @@ func TestStaticPolicyGetPodTopologyHints(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 	testCases := []testStaticPolicy{
 		{
-			description: "should not provide pod topology hints for guaranteed pod with pod level resources",
+			description: "should not provide pod topology hints for guaranteed pod with pod level resources when PodLevelResourceManagers is disabled",
 			pod:         getPodWithPodLevelResources("pod1", podLevelRequirementsGuaranteed, "container1", requirementsGuaranteed),
 			systemReserved: systemReservedMemory{
 				0: map[v1.ResourceName]uint64{
 					v1.ResourceMemory: 1024 * mb,
 				},
 			},
-			expectedTopologyHints:    nil,
-			podLevelResourcesEnabled: true,
+			expectedTopologyHints:           nil,
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: false,
+		},
+		{
+			description: "should provide pod topology hints for guaranteed pod with pod level resources when PodLevelResourceManagers is enabled",
+			pod:         getPodWithPodLevelResources("pod1", podLevelRequirementsGuaranteed, "container1", requirementsGuaranteed),
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    2 * gb,
+							Free:           2 * gb,
+							Reserved:       0,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   3 * gb,
+						},
+					},
+					Cells: []int{0},
+				},
+				1: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    2 * gb,
+							Free:           2 * gb,
+							Reserved:       0,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   3 * gb,
+						},
+					},
+					Cells: []int{1},
+				},
+			},
+			systemReserved: systemReservedMemory{
+				0: map[v1.ResourceName]uint64{
+					v1.ResourceMemory: 1024 * mb,
+				},
+				1: map[v1.ResourceName]uint64{
+					v1.ResourceMemory: 1024 * mb,
+				},
+			},
+			machineInfo: &cadvisorapi.MachineInfo{
+				Topology: []cadvisorapi.Node{
+					{
+						Id:     0,
+						Memory: 3 * gb,
+					},
+					{
+						Id:     1,
+						Memory: 3 * gb,
+					},
+				},
+			},
+			expectedTopologyHints: map[string][]topologymanager.TopologyHint{
+				string(v1.ResourceMemory): {
+					{
+						NUMANodeAffinity: newNUMAAffinity(0),
+						Preferred:        true,
+					},
+					{
+						NUMANodeAffinity: newNUMAAffinity(1),
+						Preferred:        true,
+					},
+					{
+						NUMANodeAffinity: newNUMAAffinity(0, 1),
+						Preferred:        false,
+					},
+				},
+			},
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: true,
+		},
+		{
+			description: "should not provide pod topology hints for burstable pod with pod level resources when PodLevelResourceManagers is enabled",
+			pod:         getPodWithPodLevelResources("pod1", podLevelRequirementsBurstable, "container1", requirementsGuaranteed),
+			systemReserved: systemReservedMemory{
+				0: map[v1.ResourceName]uint64{
+					v1.ResourceMemory: 1024 * mb,
+				},
+			},
+			expectedTopologyHints:           nil,
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: true,
 		},
 	}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, testCase.podLevelResourcesEnabled)
+			if testCase.podLevelResourcesEnabled {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, testCase.podLevelResourcesEnabled)
+			}
+			if testCase.podLevelResourceManagersEnabled {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, testCase.podLevelResourceManagersEnabled)
+			}
 
 			p, s, err := initTests(t, &testCase, nil, nil)
 			if err != nil {
@@ -4130,7 +4355,9 @@ func Test_getPodRequestedResources(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			actual, err := getPodRequestedResources(tc.pod)
+			logger, _ := ktesting.NewTestContext(t)
+
+			actual, err := getPodRequestedResources(logger, tc.pod)
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
@@ -4212,6 +4439,289 @@ func Test_isAffinityViolatingNUMAAllocations(t *testing.T) {
 		t.Run(tc.description, func(t *testing.T) {
 			if isAffinityViolatingNUMAAllocations(tc.machineState, tc.topologyHint.NUMANodeAffinity) != tc.isViolationExpected {
 				t.Errorf("isAffinityViolatingNUMAAllocations with affinity %v expected to return %t, got %t", tc.topologyHint.NUMANodeAffinity.GetBits(), tc.isViolationExpected, !tc.isViolationExpected)
+			}
+		})
+	}
+}
+
+type containerOptions struct {
+	name          string
+	request       string
+	limit         string
+	restartPolicy *v1.ContainerRestartPolicy
+}
+
+type podOption func(*v1.Pod)
+
+func withPodResources(memRequest, memLimit string) podOption {
+	return func(pod *v1.Pod) {
+		pod.Spec.Resources = &v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				v1.ResourceMemory: resource.MustParse(memRequest),
+			},
+			Limits: v1.ResourceList{
+				v1.ResourceMemory: resource.MustParse(memLimit),
+			},
+		}
+	}
+}
+
+func makeMultiContainerPodWithOptions(initContainers, appContainers []*containerOptions, podOptions ...podOption) *v1.Pod {
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "pod",
+			UID:  "podUID",
+		},
+		Spec: v1.PodSpec{
+			InitContainers: []v1.Container{},
+			Containers:     []v1.Container{},
+		},
+	}
+
+	for i, opts := range initContainers {
+		container := v1.Container{
+			Name: "initContainer-" + strconv.Itoa(i),
+		}
+		if opts.request != "" {
+			container.Resources = v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse(opts.request),
+					v1.ResourceCPU:    resource.MustParse("1"),
+				},
+				Limits: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse(opts.limit),
+					v1.ResourceCPU:    resource.MustParse("1"),
+				},
+			}
+		}
+		if opts.restartPolicy != nil {
+			container.RestartPolicy = opts.restartPolicy
+		}
+		pod.Spec.InitContainers = append(pod.Spec.InitContainers, container)
+	}
+
+	for i, opts := range appContainers {
+		container := v1.Container{
+			Name: "appContainer-" + strconv.Itoa(i),
+		}
+		if opts.request != "" {
+			container.Resources = v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse(opts.request),
+					v1.ResourceCPU:    resource.MustParse("1"),
+				},
+				Limits: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse(opts.limit),
+					v1.ResourceCPU:    resource.MustParse("1"),
+				},
+			}
+		}
+		pod.Spec.Containers = append(pod.Spec.Containers, container)
+	}
+
+	for _, fn := range podOptions {
+		fn(pod)
+	}
+
+	return pod
+}
+
+func makeMultiContainerPodWithOptionsAndPodLevelResources(podLevelMemory string, initContainers, appContainers []*containerOptions) *v1.Pod {
+	return makeMultiContainerPodWithOptions(initContainers, appContainers, withPodResources(podLevelMemory, podLevelMemory))
+}
+
+func TestValidatePodScopeResources(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, true)
+	testCases := []struct {
+		name        string
+		pod         *v1.Pod
+		expectedErr error
+		scope       string
+		features    map[featuregate.Feature]bool
+	}{
+		{
+			name: "Valid: Pod-level != Guaranteed containers, has podSharedPool containers, PLR: Enabled, PLRM: Enabled",
+			pod: makeMultiContainerPodWithOptionsAndPodLevelResources(
+				"2Gi",
+				[]*containerOptions{},
+				[]*containerOptions{
+					{name: "c1", request: "1Gi", limit: "1Gi"},
+					{name: "c2"},
+				},
+			),
+			scope:       topologymanager.PodTopologyScope,
+			expectedErr: nil,
+			features:    map[featuregate.Feature]bool{features.PodLevelResources: true, features.PodLevelResourceManagers: true},
+		},
+		{
+			name: "Valid: Only Guaranteed containers, PLR: Enabled, PLRM: Enabled",
+			pod: makeMultiContainerPodWithOptionsAndPodLevelResources(
+				"2Gi",
+				[]*containerOptions{},
+				[]*containerOptions{
+					{name: "c1", request: "1Gi", limit: "1Gi"},
+					{name: "c2", request: "1Gi", limit: "1Gi"},
+				},
+			),
+			scope:       topologymanager.PodTopologyScope,
+			expectedErr: nil,
+			features:    map[featuregate.Feature]bool{features.PodLevelResources: true, features.PodLevelResourceManagers: true},
+		},
+		{
+			name: "Valid: Only podSharedPool containers, PLR: Enabled, PLRM: Enabled",
+			pod: makeMultiContainerPodWithOptionsAndPodLevelResources(
+				"2Gi",
+				[]*containerOptions{},
+				[]*containerOptions{
+					{name: "c1"},
+					{name: "c2"},
+				},
+			),
+			scope:       topologymanager.PodTopologyScope,
+			expectedErr: nil,
+			features:    map[featuregate.Feature]bool{features.PodLevelResources: true, features.PodLevelResourceManagers: true},
+		},
+		{
+			name: "Valid: Pod-level == Guaranteed containers, has podSharedPool containers with request, PLR: Enabled, PLRM: Enabled",
+			pod: makeMultiContainerPodWithOptionsAndPodLevelResources(
+				"6Gi",
+				[]*containerOptions{},
+				[]*containerOptions{
+					{name: "c1", request: "3Gi", limit: "3Gi"},
+					{name: "c2", request: "2Gi", limit: "2Gi"},
+					{name: "c3", request: "500Gi", limit: "1Gi"},
+					{name: "c4"},
+				},
+			),
+			scope:       topologymanager.PodTopologyScope,
+			expectedErr: nil,
+			features:    map[featuregate.Feature]bool{features.PodLevelResources: true, features.PodLevelResourceManagers: true},
+		},
+		{
+			name: "Failure: Pod-level == Guaranteed containers, has podSharedPool containers, PLR: Enabled, PLRM: Enabled",
+			pod: makeMultiContainerPodWithOptionsAndPodLevelResources(
+				"5Gi",
+				[]*containerOptions{},
+				[]*containerOptions{
+					{name: "c1", request: "2Gi", limit: "2Gi"},
+					{name: "c2", request: "3Gi", limit: "3Gi"},
+					{name: "c3"},
+				},
+			),
+			scope:       topologymanager.PodTopologyScope,
+			expectedErr: fmt.Errorf("pod rejected, sum of exclusive container memory requests equals pod budget, leaving no memory for shared containers"),
+			features:    map[featuregate.Feature]bool{features.PodLevelResources: true, features.PodLevelResourceManagers: true},
+		},
+		{
+			name: "Valid: Pod-level resources with standard and restartable init containers, PLR: Enabled, PLRM: Enabled",
+			pod: makeMultiContainerPodWithOptionsAndPodLevelResources(
+				"2Gi",
+				[]*containerOptions{
+					{name: "init-c1", request: "1Gi", limit: "1Gi"},
+					{name: "restartable-init-c1", request: "1Gi", limit: "1Gi", restartPolicy: &containerRestartPolicyAlways},
+				},
+				[]*containerOptions{
+					{name: "c1"},
+				},
+			),
+			scope:       topologymanager.PodTopologyScope,
+			expectedErr: nil,
+			features:    map[featuregate.Feature]bool{features.PodLevelResources: true, features.PodLevelResourceManagers: true},
+		},
+		{
+			name: "Valid: Pod-level resources equal init and standard container resources, PLR: Enabled, PLRM: Enabled",
+			pod: makeMultiContainerPodWithOptionsAndPodLevelResources(
+				"2Gi",
+				[]*containerOptions{
+					{name: "restartable-init-c1", request: "2Gi", limit: "2Gi", restartPolicy: &containerRestartPolicyAlways},
+				},
+				[]*containerOptions{
+					{name: "c1", request: "2Gi", limit: "2Gi"},
+				},
+			),
+			scope:       topologymanager.PodTopologyScope,
+			expectedErr: nil,
+			features:    map[featuregate.Feature]bool{features.PodLevelResources: true, features.PodLevelResourceManagers: true},
+		},
+		{
+			name: "Failure: Pod-level resources with shared standard init container and no available pool, PLR: Enabled, PLRM: Enabled",
+			pod: makeMultiContainerPodWithOptionsAndPodLevelResources(
+				"2Gi",
+				[]*containerOptions{
+					{name: "init-c1"},
+					{name: "restartable-init-c1", request: "2Gi", limit: "2Gi", restartPolicy: &containerRestartPolicyAlways},
+				},
+				[]*containerOptions{},
+			),
+			scope:       topologymanager.PodTopologyScope,
+			expectedErr: fmt.Errorf("pod rejected, pod has shared init containers but no memory available for them"),
+			features:    map[featuregate.Feature]bool{features.PodLevelResources: true, features.PodLevelResourceManagers: true},
+		},
+		{
+			name: "Failure: Pod-level == Restartable guaranteed init containers, has podSharedPool containers, PLR: Enabled, PLRM: Enabled",
+			pod: makeMultiContainerPodWithOptionsAndPodLevelResources(
+				"2Gi",
+				[]*containerOptions{
+					{name: "restartable-init-c1", request: "2Gi", limit: "2Gi", restartPolicy: &containerRestartPolicyAlways},
+					{name: "restartable-init-c2", restartPolicy: &containerRestartPolicyAlways},
+				},
+				[]*containerOptions{},
+			),
+			scope:       topologymanager.PodTopologyScope,
+			expectedErr: fmt.Errorf("pod rejected, sum of exclusive container memory requests equals pod budget, leaving no memory for shared containers"),
+			features:    map[featuregate.Feature]bool{features.PodLevelResources: true, features.PodLevelResourceManagers: true},
+		},
+		{
+			name: "Valid: Pod-level resources with only restartable init container, PLR: Enabled, PLRM: Enabled",
+			pod: makeMultiContainerPodWithOptionsAndPodLevelResources(
+				"2Gi",
+				[]*containerOptions{
+					{name: "restartable-init-c", request: "1Gi", limit: "1Gi", restartPolicy: &containerRestartPolicyAlways},
+				},
+				[]*containerOptions{
+					{name: "c1", request: "1Gi", limit: "1Gi"},
+				},
+			),
+			scope:       topologymanager.PodTopologyScope,
+			expectedErr: nil,
+			features:    map[featuregate.Feature]bool{features.PodLevelResources: true, features.PodLevelResourceManagers: true},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			for feature, enabled := range tc.features {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, enabled)
+			}
+
+			logger, _ := ktesting.NewTestContext(t)
+			machineInfo := &cadvisorapi.MachineInfo{
+				Topology: []cadvisorapi.Node{
+					{
+						Id:     0,
+						Memory: 8 * gb,
+					},
+				},
+			}
+			systemReserved := systemReservedMemory{
+				0: map[v1.ResourceName]uint64{
+					v1.ResourceMemory: 256 * mb,
+				},
+			}
+			policy, err := NewPolicyStatic(logger, machineInfo, systemReserved, topologymanager.NewFakeManagerWithScope(tc.scope))
+			if err != nil {
+				t.Fatalf("NewPolicyStatic() failed: %v", err)
+			}
+
+			err = policy.(*staticPolicy).validatePodScopeResources(logger, tc.pod)
+			if tc.expectedErr != nil {
+				if err == nil {
+					t.Errorf("Expected error %q, got nil", tc.expectedErr.Error())
+				} else if err.Error() != tc.expectedErr.Error() {
+					t.Errorf("Expected error %q, got %q", tc.expectedErr.Error(), err.Error())
+				}
+			} else if err != nil {
+				t.Errorf("Unexpected error: %v", err)
 			}
 		})
 	}

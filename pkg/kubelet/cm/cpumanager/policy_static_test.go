@@ -24,6 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
@@ -2072,6 +2073,203 @@ func TestSMTAlignmentErrorText(t *testing.T) {
 			got := testCase.err.Error()
 			if got != testCase.expected {
 				t.Errorf("got=%v expected=%v", got, testCase.expected)
+			}
+		})
+	}
+}
+
+func TestValidatePodScopeResources(t *testing.T) {
+	testCases := []struct {
+		name          string
+		pod           *v1.Pod
+		scope         string
+		features      map[featuregate.Feature]bool
+		expectErr     bool
+		topology      *topology.CPUTopology
+		numReserved   int
+		reservedCPUs  cpuset.CPUSet
+		policyOptions map[string]string
+	}{
+		{
+			name: "Valid: Pod-level != Guaranteed containers, has podSharedPool containers, PLR: Enabled, PLRM: Enabled",
+			pod: makeMultiContainerPodWithOptionsAndPodLevelResources(
+				"4",
+				[]*containerOptions{},
+				[]*containerOptions{
+					{name: "c1", request: "2", limit: "2"},
+					{name: "c2"},
+				},
+			),
+			scope:     topologymanager.PodTopologyScope,
+			features:  map[featuregate.Feature]bool{pkgfeatures.PodLevelResources: true, pkgfeatures.PodLevelResourceManagers: true},
+			expectErr: false,
+			topology:  topoSingleSocketHT,
+		},
+		{
+			name: "Valid: Only Guaranteed containers, PLR: Enabled, PLRM: Enabled",
+			pod: makeMultiContainerPodWithOptionsAndPodLevelResources(
+				"4",
+				[]*containerOptions{},
+				[]*containerOptions{
+					{name: "c1", request: "2", limit: "2"},
+					{name: "c2", request: "2", limit: "2"},
+				},
+			),
+			scope:     topologymanager.PodTopologyScope,
+			features:  map[featuregate.Feature]bool{pkgfeatures.PodLevelResources: true, pkgfeatures.PodLevelResourceManagers: true},
+			expectErr: false,
+			topology:  topoSingleSocketHT,
+		},
+		{
+			name: "Valid: Only podSharedPool containers, PLR: Enabled, PLRM: Enabled",
+			pod: makeMultiContainerPodWithOptionsAndPodLevelResources(
+				"4",
+				[]*containerOptions{},
+				[]*containerOptions{
+					{name: "c1"},
+					{name: "c2"},
+				},
+			),
+			scope:     topologymanager.PodTopologyScope,
+			features:  map[featuregate.Feature]bool{pkgfeatures.PodLevelResources: true, pkgfeatures.PodLevelResourceManagers: true},
+			expectErr: false,
+			topology:  topoSingleSocketHT,
+		},
+		{
+			name: "Valid: Pod-level == Guaranteed containers, has podSharedPool containers with request, PLR: Enabled, PLRM: Enabled",
+			pod: makeMultiContainerPodWithOptionsAndPodLevelResources(
+				"6",
+				[]*containerOptions{},
+				[]*containerOptions{
+					{name: "c1", request: "3", limit: "3"},
+					{name: "c2", request: "2", limit: "2"},
+					{name: "c3", request: "500m", limit: "1000m"},
+					{name: "c4"},
+				},
+			),
+			scope:     topologymanager.PodTopologyScope,
+			features:  map[featuregate.Feature]bool{pkgfeatures.PodLevelResources: true, pkgfeatures.PodLevelResourceManagers: true},
+			expectErr: false,
+			topology:  topoSingleSocketHT,
+		},
+		{
+			name: "Failure: Pod-level == Guaranteed containers, has podSharedPool containers, PLR: Enabled, PLRM: Enabled",
+			pod: makeMultiContainerPodWithOptionsAndPodLevelResources(
+				"5",
+				[]*containerOptions{},
+				[]*containerOptions{
+					{name: "c1", request: "3", limit: "3"},
+					{name: "c2", request: "2", limit: "2"},
+					{name: "c3"},
+				},
+			),
+			scope:     topologymanager.PodTopologyScope,
+			features:  map[featuregate.Feature]bool{pkgfeatures.PodLevelResources: true, pkgfeatures.PodLevelResourceManagers: true},
+			expectErr: true,
+			topology:  topoSingleSocketHT,
+		},
+		{
+			name: "Valid: Pod-level resources with standard and restartable init containers, PLR: Enabled, PLRM: Enabled",
+			pod: makeMultiContainerPodWithOptionsAndPodLevelResources(
+				"2",
+				[]*containerOptions{
+					{name: "init-container1", request: "1", limit: "1"},
+					{name: "restartable-init-container1", request: "1", limit: "1", restartPolicy: v1.ContainerRestartPolicyAlways},
+				},
+				[]*containerOptions{
+					{name: "container1"},
+				},
+			),
+			scope:     topologymanager.PodTopologyScope,
+			features:  map[featuregate.Feature]bool{pkgfeatures.PodLevelResources: true, pkgfeatures.PodLevelResourceManagers: true},
+			expectErr: false,
+			topology:  topoSingleSocketHT,
+		},
+		{
+			name: "Valid: Pod-level resources equal init and standard container resources, PLR: Enabled, PLRM: Enabled",
+			pod: makeMultiContainerPodWithOptionsAndPodLevelResources(
+				"2",
+				[]*containerOptions{
+					{name: "init-container1", request: "2", limit: "2"},
+				},
+				[]*containerOptions{
+					{name: "container1", request: "2", limit: "2"},
+				},
+			),
+			scope:     topologymanager.PodTopologyScope,
+			features:  map[featuregate.Feature]bool{pkgfeatures.PodLevelResources: true, pkgfeatures.PodLevelResourceManagers: true},
+			expectErr: false,
+			topology:  topoSingleSocketHT,
+		},
+		{
+			name: "Failure: Pod-level resources with shared standard init container and no available pool, PLR: Enabled, PLRM: Enabled",
+			pod: makeMultiContainerPodWithOptionsAndPodLevelResources(
+				"2",
+				[]*containerOptions{
+					{name: "init-container1"},
+					{name: "restartable-init-container1", request: "2", limit: "2", restartPolicy: v1.ContainerRestartPolicyAlways},
+				},
+				[]*containerOptions{},
+			),
+			scope:     topologymanager.PodTopologyScope,
+			features:  map[featuregate.Feature]bool{pkgfeatures.PodLevelResources: true, pkgfeatures.PodLevelResourceManagers: true},
+			expectErr: true,
+			topology:  topoSingleSocketHT,
+		},
+		{
+			name: "Failure: Pod-level == Restartable guaranteed init containers, has podSharedPool containers, PLR: Enabled, PLRM: Enabled",
+			pod: makeMultiContainerPodWithOptionsAndPodLevelResources(
+				"2",
+				[]*containerOptions{
+					{name: "restartable-init-container1", request: "2", limit: "2", restartPolicy: v1.ContainerRestartPolicyAlways},
+					{name: "restartable-init-container2", restartPolicy: v1.ContainerRestartPolicyAlways},
+				},
+				[]*containerOptions{},
+			),
+			scope:     topologymanager.PodTopologyScope,
+			features:  map[featuregate.Feature]bool{pkgfeatures.PodLevelResources: true, pkgfeatures.PodLevelResourceManagers: true},
+			expectErr: true,
+			topology:  topoSingleSocketHT,
+		},
+		{
+			name: "Valid: Pod-level resources with only restartable init container, PLR: Enabled, PLRM: Enabled",
+			pod: makeMultiContainerPodWithOptionsAndPodLevelResources(
+				"2",
+				[]*containerOptions{
+					{name: "restartable-init-container1", request: "1", limit: "1", restartPolicy: v1.ContainerRestartPolicyAlways},
+				},
+				[]*containerOptions{
+					{name: "container1", request: "1", limit: "1"},
+				},
+			),
+			scope:     topologymanager.PodTopologyScope,
+			features:  map[featuregate.Feature]bool{pkgfeatures.PodLevelResources: true, pkgfeatures.PodLevelResourceManagers: true},
+			expectErr: false,
+			topology:  topoSingleSocketHT,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+
+			for feature, enabled := range tc.features {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, enabled)
+			}
+
+			fakeTopologyManager := topologymanager.NewFakeManagerWithScope(tc.scope)
+			policy, err := NewStaticPolicy(logger, tc.topology, tc.numReserved, tc.reservedCPUs, fakeTopologyManager, tc.policyOptions)
+			if err != nil {
+				t.Fatalf("NewStaticPolicy() failed: %v", err)
+			}
+
+			err = policy.(*staticPolicy).validatePodScopeResources(logger, tc.pod)
+
+			if tc.expectErr && err == nil {
+				t.Error("Expected an error, but got none")
+			}
+			if !tc.expectErr && err != nil {
+				t.Errorf("Unexpected error: %v", err)
 			}
 		})
 	}

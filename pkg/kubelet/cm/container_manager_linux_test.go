@@ -27,16 +27,34 @@ import (
 	"time"
 
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
-
 	"github.com/opencontainers/cgroups"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
-
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/mount-utils"
+	"k8s.io/utils/cpuset"
 )
+
+type mockCPUAllocationReader struct {
+	cpumanager.Manager
+	sets map[string]cpuset.CPUSet
+}
+
+func (m *mockCPUAllocationReader) GetExclusiveCPUs(podUID, containerName string) cpuset.CPUSet {
+	key := podUID + "/" + containerName
+	if cset, ok := m.sets[key]; ok {
+		return cset
+	}
+	return cpuset.New()
+}
 
 func fakeContainerMgrMountInt() mount.Interface {
 	return mount.NewFakeMounter(
@@ -339,6 +357,233 @@ func TestNewPodContainerManager(t *testing.T) {
 				got := pcm.(*podContainerManagerNoop)
 				assert.Equal(t, c.cm.cgroupRoot, got.cgroupRoot)
 			}
+		})
+	}
+}
+
+func TestContainerHasExclusiveCPUs(t *testing.T) {
+	guaranteedPodResources := &v1.ResourceRequirements{
+		Requests: v1.ResourceList{
+			v1.ResourceCPU:    resource.MustParse("2"),
+			v1.ResourceMemory: resource.MustParse("200Mi"),
+		},
+		Limits: v1.ResourceList{
+			v1.ResourceCPU:    resource.MustParse("2"),
+			v1.ResourceMemory: resource.MustParse("200Mi"),
+		},
+	}
+	guaranteedContainerResources := v1.ResourceRequirements{
+		Requests: v1.ResourceList{
+			v1.ResourceCPU:    resource.MustParse("1"),
+			v1.ResourceMemory: resource.MustParse("100Mi"),
+		},
+		Limits: v1.ResourceList{
+			v1.ResourceCPU:    resource.MustParse("1"),
+			v1.ResourceMemory: resource.MustParse("100Mi"),
+		},
+	}
+	burstableContainerResources := v1.ResourceRequirements{
+		Requests: v1.ResourceList{
+			v1.ResourceCPU:    resource.MustParse("1"),
+			v1.ResourceMemory: resource.MustParse("100Mi"),
+		},
+		Limits: v1.ResourceList{
+			v1.ResourceMemory: resource.MustParse("100Mi"),
+		},
+	}
+	nonIntegerContainerResources := v1.ResourceRequirements{
+		Requests: v1.ResourceList{
+			v1.ResourceCPU:    resource.MustParse("500m"),
+			v1.ResourceMemory: resource.MustParse("100Mi"),
+		},
+		Limits: v1.ResourceList{
+			v1.ResourceCPU:    resource.MustParse("500m"),
+			v1.ResourceMemory: resource.MustParse("100Mi"),
+		},
+	}
+
+	testCases := []struct {
+		name                            string
+		pod                             *v1.Pod
+		containerName                   string
+		cpuSets                         map[string]cpuset.CPUSet
+		expectExclusiveCPUs             bool
+		podLevelResourceManagersEnabled bool
+	}{
+		{
+			name: "Feature gate on, no pod-level resources, has exclusive CPUs",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "pod1"},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{Name: "c1"}},
+				},
+			},
+			containerName:                   "c1",
+			cpuSets:                         map[string]cpuset.CPUSet{"pod1/c1": cpuset.New(1)},
+			expectExclusiveCPUs:             true,
+			podLevelResourceManagersEnabled: true,
+		},
+		{
+			name: "Pod-level resources, Guaranteed, Integer CPUs, exclusive CPUs assigned",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "pod1"},
+				Spec: v1.PodSpec{
+					Resources:  guaranteedPodResources,
+					Containers: []v1.Container{{Name: "c1", Resources: guaranteedContainerResources}},
+				},
+			},
+			containerName:                   "c1",
+			cpuSets:                         map[string]cpuset.CPUSet{"pod1/c1": cpuset.New(1)},
+			expectExclusiveCPUs:             true,
+			podLevelResourceManagersEnabled: true,
+		},
+		{
+			name: "Pod-level resources, Guaranteed, Integer CPUs, no exclusive CPUs assigned",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "pod1"},
+				Spec: v1.PodSpec{
+					Resources:  guaranteedPodResources,
+					Containers: []v1.Container{{Name: "c1", Resources: guaranteedContainerResources}},
+				},
+			},
+			containerName:                   "c1",
+			cpuSets:                         map[string]cpuset.CPUSet{},
+			expectExclusiveCPUs:             false,
+			podLevelResourceManagersEnabled: true,
+		},
+		{
+			name: "Pod-level resources, Burstable container",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "pod1"},
+				Spec: v1.PodSpec{
+					Resources:  guaranteedPodResources,
+					Containers: []v1.Container{{Name: "c1", Resources: burstableContainerResources}},
+				},
+			},
+			containerName:                   "c1",
+			cpuSets:                         map[string]cpuset.CPUSet{"pod1/c1": cpuset.New(1)},
+			expectExclusiveCPUs:             false,
+			podLevelResourceManagersEnabled: true,
+		},
+		{
+			name: "Pod-level resources, Guaranteed, non-integer CPU",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "pod1"},
+				Spec: v1.PodSpec{
+					Resources:  guaranteedPodResources,
+					Containers: []v1.Container{{Name: "c1", Resources: nonIntegerContainerResources}},
+				},
+			},
+			containerName:                   "c1",
+			cpuSets:                         map[string]cpuset.CPUSet{"pod1/c1": cpuset.New(1)},
+			expectExclusiveCPUs:             false,
+			podLevelResourceManagersEnabled: true,
+		},
+		{
+			name: "Feature gate off, does not have exclusive CPUs",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "pod1"},
+				Spec: v1.PodSpec{
+					Resources:  guaranteedPodResources,
+					Containers: []v1.Container{{Name: "c1"}},
+				},
+			},
+			containerName:                   "c1",
+			cpuSets:                         map[string]cpuset.CPUSet{},
+			expectExclusiveCPUs:             false,
+			podLevelResourceManagersEnabled: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.pod.UID == "" {
+				tc.pod.UID = types.UID("pod1")
+			}
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.PodLevelResourceManagers, tc.podLevelResourceManagersEnabled)
+
+			mockReader := &mockCPUAllocationReader{
+				sets: tc.cpuSets,
+			}
+			cm := &containerManagerImpl{
+				cpuManager: mockReader,
+			}
+
+			var targetContainer *v1.Container
+			for i := range tc.pod.Spec.Containers {
+				if tc.pod.Spec.Containers[i].Name == tc.containerName {
+					targetContainer = &tc.pod.Spec.Containers[i]
+					break
+				}
+			}
+			if targetContainer == nil {
+				t.Fatalf("container %s not found in pod spec", tc.containerName)
+			}
+
+			result := cm.ContainerHasExclusiveCPUs(tc.pod, targetContainer)
+			assert.Equal(t, tc.expectExclusiveCPUs, result)
+		})
+	}
+}
+
+func TestPodHasExclusiveCPUs(t *testing.T) {
+	testCases := []struct {
+		name                string
+		pod                 *v1.Pod
+		cpuSets             map[string]cpuset.CPUSet
+		expectExclusiveCPUs bool
+		setFeatureGate      bool
+	}{
+		{
+			name: "No exclusive CPUs",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "pod1"},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "c1"},
+					},
+				},
+			},
+			cpuSets:             map[string]cpuset.CPUSet{},
+			expectExclusiveCPUs: false,
+		},
+		{
+			name: "One container with exclusive CPUs",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "pod1"},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "c1"},
+					},
+				},
+			},
+			cpuSets: map[string]cpuset.CPUSet{
+				"pod1/c1": cpuset.New(1),
+			},
+			expectExclusiveCPUs: true,
+		},
+		{
+			name: "Init container with exclusive CPUs",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "pod1"},
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{Name: "init1"},
+					},
+				},
+			},
+			cpuSets: map[string]cpuset.CPUSet{
+				"pod1/init1": cpuset.New(1),
+			},
+			expectExclusiveCPUs: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockReader := &mockCPUAllocationReader{sets: tc.cpuSets}
+			result := podHasExclusiveCPUs(mockReader, tc.pod)
+			assert.Equal(t, tc.expectExclusiveCPUs, result)
 		})
 	}
 }

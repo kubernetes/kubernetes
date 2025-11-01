@@ -79,3 +79,7 @@ func (p *bestEffortPolicy) GetTopologyHints(logger logr.Logger, s state.State, p
 func (p *bestEffortPolicy) GetAllocatableMemory(s state.State) []state.Block {
 	return p.static.GetAllocatableMemory(s)
 }
+
+func (p *bestEffortPolicy) AllocatePod(logger logr.Logger, s state.State, pod *v1.Pod, hint topologymanager.TopologyHint) error {
+	return p.static.AllocatePod(logger, s, pod, hint)
+}

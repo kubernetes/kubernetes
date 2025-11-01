@@ -36,13 +36,14 @@ import (
 )
 
 type testCase struct {
-	name                     string
-	pod                      v1.Pod
-	container                v1.Container
-	assignments              state.ContainerCPUAssignments
-	defaultCPUSet            cpuset.CPUSet
-	expectedHints            []topologymanager.TopologyHint
-	podLevelResourcesEnabled bool
+	name                            string
+	pod                             v1.Pod
+	container                       v1.Container
+	assignments                     state.ContainerCPUAssignments
+	defaultCPUSet                   cpuset.CPUSet
+	expectedHints                   []topologymanager.TopologyHint
+	podLevelResourcesEnabled        bool
+	podLevelResourceManagersEnabled bool
 }
 
 func returnMachineInfo() cadvisorapi.MachineInfo {
@@ -68,6 +69,7 @@ func returnMachineInfo() cadvisorapi.MachineInfo {
 }
 
 type containerOptions struct {
+	name          string
 	request       string
 	limit         string
 	restartPolicy v1.ContainerRestartPolicy
@@ -132,12 +134,16 @@ func TestPodGuaranteedCPUs(t *testing.T) {
 		{request: "100", limit: "100"},
 	})
 
+	testPodWithPLR := makePodWithPodLevelResources("fakePodWithPLR", "3", "3", "fakeContainer", "1", "1")
+
 	p := staticPolicy{}
 
 	tcases := []struct {
-		name        string
-		pod         *v1.Pod
-		expectedCPU int
+		name                            string
+		pod                             *v1.Pod
+		expectedCPU                     int
+		podLevelResourcesEnabled        bool
+		podLevelResourceManagersEnabled bool
 	}{
 		{
 			name:        "TestCase01: if requestedCPU == 0, Pod is not Guaranteed Qos",
@@ -199,13 +205,26 @@ func TestPodGuaranteedCPUs(t *testing.T) {
 			pod:         testPod12,
 			expectedCPU: 210,
 		},
+		{
+			name:                            "TestCase13: Pod with pod-level resources and PodLevelResourceManagers enabled",
+			pod:                             testPodWithPLR,
+			expectedCPU:                     3,
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: true,
+		},
 	}
 	for _, tc := range tcases {
 		t.Run(tc.name, func(t *testing.T) {
+			if tc.podLevelResourcesEnabled {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.podLevelResourcesEnabled)
+			}
+			if tc.podLevelResourceManagersEnabled {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, tc.podLevelResourceManagersEnabled)
+			}
 			requestedCPU := p.podGuaranteedCPUs(logger, tc.pod)
 
 			if requestedCPU != tc.expectedCPU {
-				t.Errorf("Expected in result to be %v , got %v", tc.expectedCPU, requestedCPU)
+				t.Errorf("Test case %q: Expected in result to be %v , got %v", tc.name, tc.expectedCPU, requestedCPU)
 			}
 		})
 	}
@@ -216,7 +235,12 @@ func TestGetTopologyHints(t *testing.T) {
 	machineInfo := returnMachineInfo()
 
 	for _, tc := range returnTestCases() {
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.podLevelResourcesEnabled)
+		if tc.podLevelResourcesEnabled {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.podLevelResourcesEnabled)
+		}
+		if tc.podLevelResourceManagersEnabled {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, tc.podLevelResourceManagersEnabled)
+		}
 
 		topology, _ := topology.Discover(logger, &machineInfo)
 
@@ -257,7 +281,7 @@ func TestGetTopologyHints(t *testing.T) {
 			return tc.expectedHints[i].LessThan(tc.expectedHints[j])
 		})
 		if !reflect.DeepEqual(tc.expectedHints, hints) {
-			t.Errorf("Expected in result to be %v , got %v", tc.expectedHints, hints)
+			t.Errorf("Test case %q: Expected in result to be %v , got %v", tc.name, tc.expectedHints, hints)
 		}
 	}
 }
@@ -267,7 +291,12 @@ func TestGetPodTopologyHints(t *testing.T) {
 	machineInfo := returnMachineInfo()
 
 	for _, tc := range returnTestCases() {
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.podLevelResourcesEnabled)
+		if tc.podLevelResourcesEnabled {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.podLevelResourcesEnabled)
+		}
+		if tc.podLevelResourceManagersEnabled {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, tc.podLevelResourceManagersEnabled)
+		}
 
 		topology, _ := topology.Discover(logger, &machineInfo)
 
@@ -308,7 +337,7 @@ func TestGetPodTopologyHints(t *testing.T) {
 			return tc.expectedHints[i].LessThan(tc.expectedHints[j])
 		})
 		if !reflect.DeepEqual(tc.expectedHints, podHints) {
-			t.Errorf("Expected in result to be %v , got %v", tc.expectedHints, podHints)
+			t.Errorf("Test case %q: Expected in result to be %v , got %v", tc.name, tc.expectedHints, podHints)
 		}
 	}
 }
@@ -503,7 +532,7 @@ func returnTestCases() []testCase {
 	testPod4 := makePod("fakePod", "fakeContainer", "11", "11")
 	testContainer4 := &testPod4.Spec.Containers[0]
 
-	testPod5 := makePodWithPodLevelResources("fakePod", "5", "5", "fakeContainer", "4", "4")
+	testPod5 := makePodWithPodLevelResources("fakePod", "3", "3", "fakeContainer", "2", "2")
 	testContainer5 := &testPod5.Spec.Containers[0]
 
 	firstSocketMask, _ := bitmask.NewBitMask(0)
@@ -669,12 +698,31 @@ func returnTestCases() []testCase {
 			expectedHints: []topologymanager.TopologyHint{},
 		},
 		{
-			name:                     "Pod has pod level resources, no hint generation",
-			pod:                      *testPod5,
-			container:                *testContainer5,
-			defaultCPUSet:            cpuset.New(0, 1, 2, 3),
-			expectedHints:            nil,
-			podLevelResourcesEnabled: true,
+			name:                            "Pod has pod level resources but PodLevelResourceManagersEnabled is disabled, no hint generation",
+			pod:                             *testPod5,
+			container:                       *testContainer5,
+			defaultCPUSet:                   cpuset.New(0, 1, 2, 3),
+			expectedHints:                   nil,
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: false,
+		},
+		{
+			name:          "Pod has pod level resources and PodLevelResourceManagersEnabled is enabled, hint generation",
+			pod:           *testPod5,
+			container:     *testContainer5,
+			defaultCPUSet: cpuset.New(0, 1, 2, 3),
+			expectedHints: []topologymanager.TopologyHint{
+				{
+					NUMANodeAffinity: firstSocketMask,
+					Preferred:        true,
+				},
+				{
+					NUMANodeAffinity: crossSocketMask,
+					Preferred:        false,
+				},
+			},
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: true,
 		},
 	}
 }
