@@ -64,7 +64,7 @@ dependencies:
 
   # etcd
   - name: "etcd"
-    version: 3.5.21
+    version: 3.5.24
     refPaths:
     - path: cluster/gce/manifests/etcd.manifest
       match: etcd_docker_tag|etcd_version
@@ -74,10 +74,6 @@ dependencies:
       match: DefaultEtcdVersion =
     - path: hack/lib/etcd.sh
       match: ETCD_VERSION=
-    - path: staging/src/k8s.io/sample-apiserver/artifacts/example/deployment.yaml
-      match: gcr.io/etcd-development/etcd
-    - path: test/utils/image/manifest.go
-      match: configs\[Etcd\] = Config{list\.GcEtcdRegistry, "etcd", "\d+\.\d+.\d+(-(alpha|beta|rc).\d+)?(-\d+)?"}
 
   - name: "etcd-image"
     version: 3.5.21
