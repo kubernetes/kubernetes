@@ -1,0 +1,26 @@
+name: Sync with upstream
+
+on:
+  schedule:
+    # Runs every hour
+    - cron: '0 * * * *'
+  workflow_dispatch: # Allows you to run this workflow manually from the Actions tab
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout target repository
+        uses: actions/checkout@v4
+        with:
+          # The PAT is required to push the updates back to your fork
+          token: ${{ secrets.GH_PAT }}
+          fetch-depth: 0 # Fetch all history for a successful merge
+
+      - name: Sync fork with upstream repository
+        uses: tgymnich/fork-sync@v1.2
+        with:
+          owner: <UPSTREAM_OWNER> # IMPORTANT: Change this to the upstream repository's owner
+          head: master
+          base: master
+          github_token: ${{ secrets.GH_PAT }}
