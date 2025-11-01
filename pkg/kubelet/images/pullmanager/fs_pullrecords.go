@@ -19,7 +19,9 @@ package pullmanager
 import (
 	"bytes"
 	"crypto/sha256"
+	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -27,7 +29,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/apimachinery/pkg/util/errors"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	kubeletconfigv1alpha1 "k8s.io/kubelet/config/v1alpha1"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeletconfigvint1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/config/v1alpha1"
@@ -52,7 +54,7 @@ type fsPullRecordsAccessor struct {
 
 // NewFSPullRecordsAccessor returns an accessor for the ImagePullIntent/ImagePulledRecord
 // records with a filesystem as the backing database.
-func NewFSPullRecordsAccessor(kubeletDir string) (*fsPullRecordsAccessor, error) {
+func NewFSPullRecordsAccessor(kubeletDir string) (PullRecordsAccessor, error) {
 	kubeletConfigEncoder, kubeletConfigDecoder, err := createKubeletConfigSchemeEncoderDecoder()
 	if err != nil {
 		return nil, err
@@ -74,7 +76,7 @@ func NewFSPullRecordsAccessor(kubeletDir string) (*fsPullRecordsAccessor, error)
 		return nil, err
 	}
 
-	return accessor, nil
+	return NewMeteringRecordsAccessor(accessor, fsPullIntentsSize, fsPulledRecordsSize), nil
 }
 
 func (f *fsPullRecordsAccessor) WriteImagePullIntent(image string) error {
@@ -181,8 +183,64 @@ func (f *fsPullRecordsAccessor) DeleteImagePulledRecord(imageRef string) error {
 	return err
 }
 
+func (f *fsPullRecordsAccessor) intentsSize() (uint, error) {
+	intentsCount, err := countCacheFiles(f.pullingDir)
+	if err != nil {
+		return 0, err
+	}
+	return intentsCount, nil
+}
+
+func (f *fsPullRecordsAccessor) pulledRecordsSize() (uint, error) {
+	pulledRecordsCount, err := countCacheFiles(f.pulledDir)
+	if err != nil {
+		return 0, err
+	}
+	return pulledRecordsCount, nil
+}
+
+func countCacheFiles(dirName string) (uint, error) {
+	const readBatch = 20
+
+	var cacheFilesCount uint
+	dir, err := os.Open(dirName)
+	if err != nil {
+		return 0, fmt.Errorf("failed to open directory %q: %w", dirName, err)
+	}
+	// ignoring close error on a readonly open should be safe
+	defer func() { _ = dir.Close() }()
+
+	for {
+		entries, err := dir.ReadDir(readBatch)
+		for _, entry := range entries {
+			if !isValidCacheFile(entry) {
+				continue
+			}
+			cacheFilesCount++
+		}
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return 0, fmt.Errorf("failed to list all entries in directory %q: %w", dirName, err)
+		}
+	}
+	return cacheFilesCount, nil
+}
+
 func cacheFilename(image string) string {
 	return fmt.Sprintf("%s%x", cacheFilesSHA256Prefix, sha256.Sum256([]byte(image)))
+}
+
+// isValidCacheFile returns true if the info doesn't point to a directory and
+// the filename matches the expectation for a valid, non-temporary cache file.
+func isValidCacheFile(fileInfo os.DirEntry) bool {
+	if fileInfo.IsDir() {
+		return false
+	}
+
+	filename := fileInfo.Name()
+	return strings.HasPrefix(filename, cacheFilesSHA256Prefix) && !strings.HasSuffix(filename, tmpFilesSuffix)
 }
 
 // writeFile writes `content` to the file with name `filename` in directory `dir`.
@@ -247,7 +305,7 @@ func processDirFiles(dirName string, fileAction func(filePath string, fileConten
 		walkErrors = append(walkErrors, err)
 	}
 
-	return errors.NewAggregate(walkErrors)
+	return utilerrors.NewAggregate(walkErrors)
 }
 
 // createKubeletCOnfigSchemeEncoderDecoder creates strict-encoding encoder and
