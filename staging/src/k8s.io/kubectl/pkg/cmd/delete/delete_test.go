@@ -1003,7 +1003,7 @@ func TestDeleteMessageOutput(t *testing.T) {
 	}
 	cmd.Run(cmd, []string{})
 
-	if buf.String() != "replicationcontroller \"redis-master\" deleted from test-specific namespace\n" {
+	if buf.String() != "replicationcontroller \"redis-master\" deleted from namespace \"test-specific\"\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 
