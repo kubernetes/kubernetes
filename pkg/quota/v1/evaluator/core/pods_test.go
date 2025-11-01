@@ -276,6 +276,23 @@ func TestPodEvaluatorUsage(t *testing.T) {
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
 			},
 		},
+		"init container implicit extended resources": {
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					InitContainers: []api.Container{{
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceName("deviceclass.resource.kubernetes.io/dongle"): resource.MustParse("3")},
+							Limits:   api.ResourceList{api.ResourceName("deviceclass.resource.kubernetes.io/dongle"): resource.MustParse("3")},
+						},
+					}},
+				},
+			},
+			usage: corev1.ResourceList{
+				corev1.ResourceName("requests.deviceclass.resource.kubernetes.io/dongle"): resource.MustParse("3"),
+				corev1.ResourcePods: resource.MustParse("1"),
+				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
+			},
+		},
 		"container CPU": {
 			pod: &api.Pod{
 				Spec: api.PodSpec{
@@ -363,6 +380,23 @@ func TestPodEvaluatorUsage(t *testing.T) {
 			},
 			usage: corev1.ResourceList{
 				corev1.ResourceName("requests.example.com/dongle"): resource.MustParse("3"),
+				corev1.ResourcePods: resource.MustParse("1"),
+				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
+			},
+		},
+		"container implicit extended resources": {
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{{
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceName("deviceclass.resource.kubernetes.io/dongle"): resource.MustParse("3")},
+							Limits:   api.ResourceList{api.ResourceName("deviceclass.resource.kubernetes.io/dongle"): resource.MustParse("3")},
+						},
+					}},
+				},
+			},
+			usage: corev1.ResourceList{
+				corev1.ResourceName("requests.deviceclass.resource.kubernetes.io/dongle"): resource.MustParse("3"),
 				corev1.ResourcePods: resource.MustParse("1"),
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
 			},

@@ -43,7 +43,7 @@ func (c *Config) New(proxyTransport *http.Transport, egressSelector *egressselec
 	webhookPluginInitializer := webhookinit.NewPluginInitializer(webhookAuthResolverWrapper, serviceResolver)
 
 	kubePluginInitializer := NewPluginInitializer(
-		quotainstall.NewQuotaConfigurationForAdmission(),
+		quotainstall.NewQuotaConfigurationForAdmission(c.ExternalInformers),
 		exclusion.Excluded(),
 	)
 
