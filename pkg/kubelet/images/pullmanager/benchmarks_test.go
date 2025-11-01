@@ -74,9 +74,11 @@ func directRecordReadFunc(expectHit bool) benchmarkedCheckFunc {
 func mustAttemptPullReadFunc(expectHit bool) benchmarkedCheckFunc {
 	return func(b *testing.B, pullManager PullManager, imgRef string) {
 		tCtx := ktesting.Init(b)
-		mustPull := pullManager.MustAttemptImagePull(tCtx, "test.repo/org/"+imgRef, imgRef, nil, nil)
-		if mustPull != !expectHit {
-			b.Fatalf("MustAttemptImagePull() expected %t, got %t", !expectHit, mustPull)
+		mustPull, err := pullManager.MustAttemptImagePull(tCtx, "test.repo/org/"+imgRef, imgRef, func() ([]kubeletconfig.ImagePullSecret, *kubeletconfig.ImagePullServiceAccount, error) {
+			return nil, nil, nil
+		})
+		if mustPull != !expectHit || err != nil {
+			b.Fatalf("no error expected (got %v); MustAttemptImagePull() expected %t, got %t", err, !expectHit, mustPull)
 		}
 	}
 }
