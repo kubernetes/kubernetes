@@ -906,17 +906,24 @@ func TestGarbageCollectorSync(t *testing.T) {
 
 	sharedInformers := informers.NewSharedInformerFactory(client, 0)
 
+	var wg sync.WaitGroup
+	defer wg.Wait()
+
 	logger, tCtx := ktesting.NewTestContext(t)
 	defer tCtx.Cancel("test has completed")
+
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
+
 	gc, err := NewGarbageCollector(tCtx, client, metadataClient, rm, map[schema.GroupResource]struct{}{}, sharedInformers, alwaysStarted)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	syncPeriod := 200 * time.Millisecond
-	go gc.Run(tCtx, 1, syncPeriod)
+	wg.Go(func() {
+		gc.Run(tCtx, 1, syncPeriod)
+	})
 	// The pseudo-code of GarbageCollector.Sync():
 	// GarbageCollector.Sync(client, period, stopCh):
 	//    wait.Until() loops with `period` until the `stopCh` is closed :
@@ -931,7 +938,9 @@ func TestGarbageCollectorSync(t *testing.T) {
 	// The 1s sleep in the test allows GetDeletableResources and
 	// gc.resyncMonitors to run ~5 times to ensure the changes to the
 	// fakeDiscoveryClient are picked up.
-	go gc.Sync(tCtx, fakeDiscoveryClient, syncPeriod)
+	wg.Go(func() {
+		gc.Sync(tCtx, fakeDiscoveryClient, syncPeriod)
+	})
 
 	// Wait until the sync discovers the initial resources
 	time.Sleep(1 * time.Second)
