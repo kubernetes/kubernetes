@@ -44,6 +44,7 @@ import (
 
 const acceptV1JSON = "application/json"
 const acceptV2JSON = "application/json;g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList"
+const acceptV2JSONNoPeer = "application/json;g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList;profile=nopeer"
 
 const maxTimeout = 10 * time.Second
 
@@ -716,4 +717,73 @@ func FindGroupVersionV2(discovery apidiscoveryv2.APIGroupDiscoveryList, gv metav
 	}
 
 	return nil
+}
+
+// FetchNoPeerDiscovery explicitly requests no-peer discovery
+func FetchNoPeerDiscovery(ctx context.Context, client testClient) (apidiscoveryv2.APIGroupDiscoveryList, error) {
+	result, err := client.
+		Discovery().
+		RESTClient().
+		Get().
+		AbsPath("/apis").
+		SetHeader("Accept", acceptV2JSONNoPeer).
+		Do(ctx).
+		Raw()
+
+	if err != nil {
+		return apidiscoveryv2.APIGroupDiscoveryList{}, fmt.Errorf("failed to fetch no-peer discovery: %w", err)
+	}
+
+	groupList := apidiscoveryv2.APIGroupDiscoveryList{}
+	err = json.Unmarshal(result, &groupList)
+	if err != nil {
+		return apidiscoveryv2.APIGroupDiscoveryList{}, fmt.Errorf("failed to parse no-peer discovery: %w", err)
+	}
+
+	return groupList, nil
+}
+
+// FetchPeerAggDiscovery explicitly requests peer-aggregated discovery
+func FetchPeerAggDiscovery(ctx context.Context, client testClient) (apidiscoveryv2.APIGroupDiscoveryList, error) {
+	result, err := client.
+		Discovery().
+		RESTClient().
+		Get().
+		AbsPath("/apis").
+		SetHeader("Accept", acceptV2JSON).
+		Do(ctx).
+		Raw()
+
+	if err != nil {
+		return apidiscoveryv2.APIGroupDiscoveryList{}, fmt.Errorf("failed to fetch peer-aggregated discovery: %w", err)
+	}
+
+	groupList := apidiscoveryv2.APIGroupDiscoveryList{}
+	err = json.Unmarshal(result, &groupList)
+	if err != nil {
+		return apidiscoveryv2.APIGroupDiscoveryList{}, fmt.Errorf("failed to parse peer-aggregated discovery: %w", err)
+	}
+
+	return groupList, nil
+}
+
+// WaitForPeerAggDiscoveryWithCondition waits for peer-aggregated discovery to satisfy a condition.
+func WaitForPeerAggDiscoveryWithCondition(ctx context.Context, client testClient, condition func(result apidiscoveryv2.APIGroupDiscoveryList) bool) error {
+	return wait.PollUntilContextTimeout(
+		ctx,
+		5*time.Second,
+		30*time.Second,
+		true,
+		func(ctx context.Context) (done bool, err error) {
+			groupList, err := FetchPeerAggDiscovery(ctx, client)
+			if err != nil {
+				return false, err
+			}
+
+			if condition(groupList) {
+				return true, nil
+			}
+
+			return false, nil
+		})
 }

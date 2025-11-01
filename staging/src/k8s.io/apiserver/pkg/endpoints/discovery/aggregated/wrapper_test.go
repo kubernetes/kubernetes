@@ -40,6 +40,8 @@ const aggregatedV2Beta1JSONAccept = jsonAccept + aggregatedV2Beta1AcceptSuffix
 const aggregatedV2Beta1ProtoAccept = protobufAccept + aggregatedV2Beta1AcceptSuffix
 const aggregatedJSONAccept = jsonAccept + aggregatedAcceptSuffix
 const aggregatedProtoAccept = protobufAccept + aggregatedAcceptSuffix
+const aggregatedNoPeerJSONAccept = jsonAccept + aggregatedAcceptSuffix + ";profile=nopeer"
+const aggregatedNoPeerProtoAccept = protobufAccept + aggregatedAcceptSuffix + ";profile=nopeer"
 
 func fetchPath(handler http.Handler, path, accept string) string {
 	w := httptest.NewRecorder()
@@ -49,7 +51,7 @@ func fetchPath(handler http.Handler, path, accept string) string {
 	req.Header.Set("Accept", accept)
 
 	handler.ServeHTTP(w, req)
-	return string(w.Body.Bytes())
+	return w.Body.String()
 }
 
 type fakeHTTPHandler struct {
@@ -62,12 +64,14 @@ func (f fakeHTTPHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) 
 
 func TestAggregationEnabled(t *testing.T) {
 	unaggregated := fakeHTTPHandler{data: "unaggregated"}
-	aggregated := fakeHTTPHandler{data: "aggregated"}
-	wrapped := WrapAggregatedDiscoveryToHandler(unaggregated, aggregated)
+	aggregated := fakeHTTPHandler{data: "nopeer-aggregated"}
+	peerAggregated := fakeHTTPHandler{data: "peer-aggregated"}
+	wrapped := WrapAggregatedDiscoveryToHandler(unaggregated, aggregated, peerAggregated)
 
 	testCases := []struct {
-		accept   string
-		expected string
+		accept               string
+		expected             string
+		enablePeerAggregated bool
 	}{
 		{
 			// Misconstructed/incorrect accept headers should be passed to the unaggregated handler to return an error
@@ -79,16 +83,16 @@ func TestAggregationEnabled(t *testing.T) {
 			expected: "unaggregated",
 		}, {
 			accept:   aggregatedV2Beta1JSONAccept,
-			expected: "aggregated",
+			expected: "nopeer-aggregated",
 		}, {
 			accept:   aggregatedV2Beta1ProtoAccept,
-			expected: "aggregated",
+			expected: "nopeer-aggregated",
 		}, {
 			accept:   aggregatedJSONAccept,
-			expected: "aggregated",
+			expected: "nopeer-aggregated",
 		}, {
 			accept:   aggregatedProtoAccept,
-			expected: "aggregated",
+			expected: "nopeer-aggregated",
 		}, {
 			accept:   jsonAccept,
 			expected: "unaggregated",
@@ -98,17 +102,47 @@ func TestAggregationEnabled(t *testing.T) {
 		}, {
 			// Server should return the first accepted type
 			accept:   aggregatedJSONAccept + "," + jsonAccept,
-			expected: "aggregated",
+			expected: "nopeer-aggregated",
 		}, {
 			// Server should return the first accepted type
 			accept:   aggregatedProtoAccept + "," + protobufAccept,
-			expected: "aggregated",
+			expected: "nopeer-aggregated",
+		},
+		// Peer Agg discovery cases.
+		// profile is not set (should default to peer-aggregated)
+		{
+			accept:               aggregatedJSONAccept,
+			expected:             "peer-aggregated",
+			enablePeerAggregated: true,
+		}, {
+			accept:               aggregatedProtoAccept,
+			expected:             "peer-aggregated",
+			enablePeerAggregated: true,
+		},
+		// profile=nopeer (should return no-peer)
+		{
+			accept:               aggregatedNoPeerJSONAccept,
+			expected:             "nopeer-aggregated",
+			enablePeerAggregated: true,
+		}, {
+			accept:               aggregatedNoPeerProtoAccept,
+			expected:             "nopeer-aggregated",
+			enablePeerAggregated: true,
+		},
+		// profile is set to something other than no-peer (should default to peer-aggregated)
+		{
+			accept:               aggregatedJSONAccept + ";profile=foo",
+			expected:             "peer-aggregated",
+			enablePeerAggregated: true,
 		},
 	}
 
 	for _, tc := range testCases {
 		if tc.accept == aggregatedV2Beta1JSONAccept || tc.accept == aggregatedV2Beta1ProtoAccept {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AggregatedDiscoveryRemoveBetaType, false)
+		}
+		if tc.enablePeerAggregated {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.UnknownVersionInteroperabilityProxy, true)
 		}
 		body := fetchPath(wrapped, discoveryPath, tc.accept)
 		assert.Equal(t, tc.expected, body)

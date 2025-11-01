@@ -116,6 +116,7 @@ func CreateAggregatorConfig(
 			ServiceResolver:           serviceResolver,
 			ProxyTransport:            proxyTransport,
 			RejectForwardingRedirects: commandOptions.AggregatorRejectForwardingRedirects,
+			PeerProxy:                 peerProxy,
 		},
 	}
 

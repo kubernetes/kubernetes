@@ -168,6 +168,9 @@ type MediaTypeOptions struct {
 	// has set
 	Export bool
 
+	// profile controls the discovery profile (e.g., "local" for local (non peer-aggregated) discovery)
+	Profile string
+
 	// unrecognized is a list of all unrecognized keys
 	Unrecognized []string
 
@@ -226,6 +229,10 @@ func acceptMediaTypeOptions(params map[string]string, accepts *runtime.Serialize
 		// if specified, the pretty serializer will be used
 		case "pretty":
 			options.Pretty = v == "1"
+
+		// controls the discovery profile (eg local vs peer-aggregated)
+		case "profile":
+			options.Profile = v
 
 		default:
 			options.Unrecognized = append(options.Unrecognized, k)

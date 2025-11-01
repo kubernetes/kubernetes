@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	apiextensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
+	apiserverfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
 	"k8s.io/kubernetes/pkg/features"
@@ -72,7 +73,7 @@ func validateAPIPriorityAndFairness(options *Options) []error {
 
 func validateUnknownVersionInteroperabilityProxyFlags(options *Options) []error {
 	err := []error{}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.UnknownVersionInteroperabilityProxy) {
+	if !utilfeature.DefaultFeatureGate.Enabled(apiserverfeatures.UnknownVersionInteroperabilityProxy) {
 		if options.PeerCAFile != "" {
 			err = append(err, fmt.Errorf("--peer-ca-file requires UnknownVersionInteroperabilityProxy feature to be turned on"))
 		}
