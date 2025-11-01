@@ -55,14 +55,14 @@ func ResourceTypeAndNameCompletionFunc(f cmdutil.Factory) func(*cobra.Command, [
 // SpecifiedResourceTypeAndNameCompletionFunc Returns a completion function that completes resource
 // types limited to the specified allowedTypes, and resource names that match the toComplete prefix.
 // It allows for multiple resources. It supports the <type>/<name> form.
-func SpecifiedResourceTypeAndNameCompletionFunc(f cmdutil.Factory, allowedTypes []string) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+func SpecifiedResourceTypeAndNameCompletionFunc(f genericclioptions.RESTClientGetter, allowedTypes []string) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 	return resourceTypeAndNameCompletionFunc(f, allowedTypes, true)
 }
 
 // SpecifiedResourceTypeAndNameNoRepeatCompletionFunc Returns a completion function that completes resource
 // types limited to the specified allowedTypes, and resource names that match the toComplete prefix.
 // It only allows for one resource. It supports the <type>/<name> form.
-func SpecifiedResourceTypeAndNameNoRepeatCompletionFunc(f cmdutil.Factory, allowedTypes []string) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+func SpecifiedResourceTypeAndNameNoRepeatCompletionFunc(f genericclioptions.RESTClientGetter, allowedTypes []string) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 	return resourceTypeAndNameCompletionFunc(f, allowedTypes, false)
 }
 
@@ -71,11 +71,12 @@ func SpecifiedResourceTypeAndNameNoRepeatCompletionFunc(f cmdutil.Factory, allow
 // This function does NOT support the <type>/<name> form: it is meant to be used by commands
 // that don't support that form.  For commands that apply to pods and that support the <type>/<name>
 // form, please use PodResourceNameCompletionFunc()
-func ResourceNameCompletionFunc(f cmdutil.Factory, resourceType string) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+// TODO: Remove unused parameter 'f'
+func ResourceNameCompletionFunc(f genericclioptions.RESTClientGetter, resourceType string) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 	return func(_ *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		var comps []string
 		if len(args) == 0 {
-			comps = CompGetResource(f, resourceType, toComplete)
+			comps = CompGetResource(factory, resourceType, toComplete)
 		}
 		return comps, cobra.ShellCompDirectiveNoFileComp
 	}
@@ -354,7 +355,7 @@ func compGetResourceList(restClientGetter genericclioptions.RESTClientGetter, cm
 
 // resourceTypeAndNameCompletionFunc Returns a completion function that completes resource types
 // and resource names that match the toComplete prefix.  It supports the <type>/<name> form.
-func resourceTypeAndNameCompletionFunc(f cmdutil.Factory, allowedTypes []string, allowRepeat bool) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+func resourceTypeAndNameCompletionFunc(restClient genericclioptions.RESTClientGetter, allowedTypes []string, allowRepeat bool) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		var comps []string
 		directive := cobra.ShellCompDirectiveNoFileComp
@@ -363,7 +364,7 @@ func resourceTypeAndNameCompletionFunc(f cmdutil.Factory, allowedTypes []string,
 			// The first argument is of the form <type> (e.g., pods)
 			// All following arguments should be a resource name.
 			if allowRepeat || len(args) == 1 {
-				comps = CompGetResource(f, args[0], toComplete)
+				comps = CompGetResource(factory, args[0], toComplete)
 
 				// Remove choices already on the command-line
 				if len(args) > 1 {
@@ -379,7 +380,7 @@ func resourceTypeAndNameCompletionFunc(f cmdutil.Factory, allowedTypes []string,
 					// So we suggest resource types and let the shell add a space after
 					// the completion.
 					if len(allowedTypes) == 0 {
-						comps = compGetResourceList(f, cmd, toComplete)
+						comps = compGetResourceList(factory, cmd, toComplete)
 					} else {
 						for _, c := range allowedTypes {
 							if strings.HasPrefix(c, toComplete) {
@@ -396,7 +397,7 @@ func resourceTypeAndNameCompletionFunc(f cmdutil.Factory, allowedTypes []string,
 						directive |= cobra.ShellCompDirectiveNoSpace
 
 						if len(allowedTypes) == 0 {
-							typeComps := compGetResourceList(f, cmd, toComplete)
+							typeComps := compGetResourceList(factory, cmd, toComplete)
 							for _, c := range typeComps {
 								comps = append(comps, fmt.Sprintf("%s/", c))
 							}
@@ -415,7 +416,7 @@ func resourceTypeAndNameCompletionFunc(f cmdutil.Factory, allowedTypes []string,
 				if allowRepeat || len(args) == 0 {
 					resourceType := toComplete[:slashIdx]
 					toComplete = toComplete[slashIdx+1:]
-					nameComps := CompGetResource(f, resourceType, toComplete)
+					nameComps := CompGetResource(factory, resourceType, toComplete)
 					for _, c := range nameComps {
 						comps = append(comps, fmt.Sprintf("%s/%s", resourceType, c))
 					}
