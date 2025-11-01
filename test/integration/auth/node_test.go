@@ -878,6 +878,7 @@ func TestNodeRestrictionServiceAccountAudience(t *testing.T) {
 		"--kubeconfig=" + kubeConfigFile,
 		"--controllers=ephemeral-volume-controller", // we need this controller to test the ephemeral volume source in the pod
 		"--leader-elect=false",                      // KCM leader election calls os.Exit when it ends, so it is easier to just turn it off altogether
+		"--concurrent-resourceclaim-syncs=50",       // Required: concurrent-resourceclaim-syncs must be greater than 0
 	})
 	defer kcm.TearDownFn()
 
