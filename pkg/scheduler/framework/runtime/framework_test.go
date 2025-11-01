@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -3011,7 +3012,7 @@ func TestPermitPlugins(t *testing.T) {
 }
 
 // withMetricsRecorder set metricsRecorder for the scheduling frameworkImpl.
-func withMetricsRecorder(recorder *metrics.MetricAsyncRecorder) Option {
+func withMetricsRecorder(recorder MetricsRecorder) Option {
 	return func(o *frameworkOptions) {
 		o.metricsRecorder = recorder
 	}
@@ -3198,6 +3199,412 @@ func TestRecordingMetrics(t *testing.T) {
 
 			collectAndCompareFrameworkMetrics(t, tt.wantExtensionPoint, tt.wantStatus)
 			collectAndComparePluginMetrics(t, tt.wantExtensionPoint, testPlugin, tt.wantStatus)
+		})
+	}
+}
+
+// TestRecordingMetricsWithMocks is the refactored approach using mocks.
+// This verifies framework behavior without relying on global metrics registration.
+// Tests both enabled and disabled metrics recording states, which was not possible
+// with real metrics due to sync.Once limitations.
+func TestRecordingMetricsWithMocks(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	// Test with both metrics enabled and disabled
+	for _, metricsEnabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("metrics_enabled=%v", metricsEnabled), func(t *testing.T) {
+			// Set the metrics recording state for this test
+			state.SetRecordPluginMetrics(metricsEnabled)
+
+			tests := []struct {
+				name               string
+				action             func(ctx context.Context, f framework.Framework)
+				inject             injectedResult
+				wantExtensionPoint string
+				wantStatus         fwk.Code
+
+				// Expected metrics fields
+				expectedPluginDurationCallCount int
+				expectedPluginDurationRecords   []PluginDurationRecord
+
+				// Plugin configuration fields
+				prefilterPlugins *config.PluginSet
+				prescorePlugins  *config.PluginSet
+				scorePlugins     *config.PluginSet
+				reservePlugins   *config.PluginSet
+				permitPlugins    *config.PluginSet
+				prebindPlugins   *config.PluginSet
+				bindPlugins      *config.PluginSet
+				postbindPlugins  *config.PluginSet
+			}{
+				{
+					name:                            "PreFilter - Success",
+					action:                          func(ctx context.Context, f framework.Framework) { f.RunPreFilterPlugins(ctx, state, pod) },
+					wantExtensionPoint:              "PreFilter",
+					wantStatus:                      fwk.Success,
+					prefilterPlugins:                &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 1}}},
+					expectedPluginDurationCallCount: 1,
+					expectedPluginDurationRecords: []PluginDurationRecord{
+						{
+							ExtensionPoint: "PreFilter",
+							PluginName:     testPlugin,
+							Status:         "Success",
+						},
+					},
+				},
+				{
+					name: "Score - Success",
+					action: func(ctx context.Context, f framework.Framework) {
+						f.RunScorePlugins(ctx, state, pod, BuildNodeInfos(nodes))
+					},
+					wantExtensionPoint:              "Score",
+					wantStatus:                      fwk.Success,
+					scorePlugins:                    &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 1}}},
+					expectedPluginDurationCallCount: 2, // Score runs once per node (2 nodes)
+					expectedPluginDurationRecords: []PluginDurationRecord{
+						{
+							ExtensionPoint: "Score",
+							PluginName:     testPlugin,
+							Status:         "Success",
+						},
+						{
+							ExtensionPoint: "Score",
+							PluginName:     testPlugin,
+							Status:         "Success",
+						},
+					},
+				},
+				{
+					name:                            "Bind - Success",
+					action:                          func(ctx context.Context, f framework.Framework) { f.RunBindPlugins(ctx, state, pod, "") },
+					wantExtensionPoint:              "Bind",
+					wantStatus:                      fwk.Success,
+					bindPlugins:                     &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+					expectedPluginDurationCallCount: 1,
+					expectedPluginDurationRecords: []PluginDurationRecord{
+						{
+							ExtensionPoint: "Bind",
+							PluginName:     testPlugin,
+							Status:         "Success",
+						},
+					},
+				},
+				{
+					name:                            "PreFilter - Error",
+					action:                          func(ctx context.Context, f framework.Framework) { f.RunPreFilterPlugins(ctx, state, pod) },
+					inject:                          injectedResult{PreFilterStatus: int(fwk.Error)},
+					wantExtensionPoint:              "PreFilter",
+					wantStatus:                      fwk.Error,
+					prefilterPlugins:                &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 1}}},
+					expectedPluginDurationCallCount: 1,
+					expectedPluginDurationRecords: []PluginDurationRecord{
+						{
+							ExtensionPoint: "PreFilter",
+							PluginName:     testPlugin,
+							Status:         "Error",
+						},
+					},
+				},
+				{
+					name:                            "Bind - Error",
+					action:                          func(ctx context.Context, f framework.Framework) { f.RunBindPlugins(ctx, state, pod, "") },
+					inject:                          injectedResult{BindStatus: int(fwk.Error)},
+					wantExtensionPoint:              "Bind",
+					wantStatus:                      fwk.Error,
+					bindPlugins:                     &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+					expectedPluginDurationCallCount: 1,
+					expectedPluginDurationRecords: []PluginDurationRecord{
+						{
+							ExtensionPoint: "Bind",
+							PluginName:     testPlugin,
+							Status:         "Error",
+						},
+					},
+				},
+				{
+					name:                            "PreScore - Success",
+					action:                          func(ctx context.Context, f framework.Framework) { f.RunPreScorePlugins(ctx, state, pod, nil) },
+					wantExtensionPoint:              "PreScore",
+					wantStatus:                      fwk.Success,
+					prescorePlugins:                 &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 1}}},
+					expectedPluginDurationCallCount: 1,
+					expectedPluginDurationRecords: []PluginDurationRecord{
+						{
+							ExtensionPoint: "PreScore",
+							PluginName:     testPlugin,
+							Status:         "Success",
+						},
+					},
+				},
+				{
+					name:                            "PreScore - Error",
+					action:                          func(ctx context.Context, f framework.Framework) { f.RunPreScorePlugins(ctx, state, pod, nil) },
+					inject:                          injectedResult{PreScoreStatus: int(fwk.Error)},
+					wantExtensionPoint:              "PreScore",
+					wantStatus:                      fwk.Error,
+					prescorePlugins:                 &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 1}}},
+					expectedPluginDurationCallCount: 1,
+					expectedPluginDurationRecords: []PluginDurationRecord{
+						{
+							ExtensionPoint: "PreScore",
+							PluginName:     testPlugin,
+							Status:         "Error",
+						},
+					},
+				},
+				{
+					name: "Score - Error",
+					action: func(ctx context.Context, f framework.Framework) {
+						f.RunScorePlugins(ctx, state, pod, BuildNodeInfos(nodes))
+					},
+					inject:                          injectedResult{ScoreStatus: int(fwk.Error)},
+					wantExtensionPoint:              "Score",
+					wantStatus:                      fwk.Error,
+					scorePlugins:                    &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 1}}},
+					expectedPluginDurationCallCount: 2, // Score still runs for all nodes even on error
+					expectedPluginDurationRecords: []PluginDurationRecord{
+						{
+							ExtensionPoint: "Score",
+							PluginName:     testPlugin,
+							Status:         "Error",
+						},
+						{
+							ExtensionPoint: "Score",
+							PluginName:     testPlugin,
+							Status:         "Error",
+						},
+					},
+				},
+				{
+					name:                            "Reserve - Success",
+					action:                          func(ctx context.Context, f framework.Framework) { f.RunReservePluginsReserve(ctx, state, pod, "") },
+					wantExtensionPoint:              "Reserve",
+					wantStatus:                      fwk.Success,
+					reservePlugins:                  &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+					expectedPluginDurationCallCount: 1,
+					expectedPluginDurationRecords: []PluginDurationRecord{
+						{
+							ExtensionPoint: "Reserve",
+							PluginName:     testPlugin,
+							Status:         "Success",
+						},
+					},
+				},
+				{
+					name:                            "Reserve - Error",
+					action:                          func(ctx context.Context, f framework.Framework) { f.RunReservePluginsReserve(ctx, state, pod, "") },
+					inject:                          injectedResult{ReserveStatus: int(fwk.Error)},
+					wantExtensionPoint:              "Reserve",
+					wantStatus:                      fwk.Error,
+					reservePlugins:                  &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+					expectedPluginDurationCallCount: 1,
+					expectedPluginDurationRecords: []PluginDurationRecord{
+						{
+							ExtensionPoint: "Reserve",
+							PluginName:     testPlugin,
+							Status:         "Error",
+						},
+					},
+				},
+				{
+					name:                            "Unreserve - Success",
+					action:                          func(ctx context.Context, f framework.Framework) { f.RunReservePluginsUnreserve(ctx, state, pod, "") },
+					wantExtensionPoint:              "Unreserve",
+					wantStatus:                      fwk.Success,
+					reservePlugins:                  &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+					expectedPluginDurationCallCount: 1,
+					expectedPluginDurationRecords: []PluginDurationRecord{
+						{
+							ExtensionPoint: "Unreserve",
+							PluginName:     testPlugin,
+							Status:         "Success",
+						},
+					},
+				},
+				{
+					name:                            "PreBind - Success",
+					action:                          func(ctx context.Context, f framework.Framework) { f.RunPreBindPlugins(ctx, state, pod, "") },
+					wantExtensionPoint:              "PreBind",
+					wantStatus:                      fwk.Success,
+					prebindPlugins:                  &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+					expectedPluginDurationCallCount: 1,
+					expectedPluginDurationRecords: []PluginDurationRecord{
+						{
+							ExtensionPoint: "PreBind",
+							PluginName:     testPlugin,
+							Status:         "Success",
+						},
+					},
+				},
+				{
+					name:                            "PreBind - Error",
+					action:                          func(ctx context.Context, f framework.Framework) { f.RunPreBindPlugins(ctx, state, pod, "") },
+					inject:                          injectedResult{PreBindStatus: int(fwk.Error)},
+					wantExtensionPoint:              "PreBind",
+					wantStatus:                      fwk.Error,
+					prebindPlugins:                  &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+					expectedPluginDurationCallCount: 1,
+					expectedPluginDurationRecords: []PluginDurationRecord{
+						{
+							ExtensionPoint: "PreBind",
+							PluginName:     testPlugin,
+							Status:         "Error",
+						},
+					},
+				},
+				{
+					name:                            "PostBind - Success",
+					action:                          func(ctx context.Context, f framework.Framework) { f.RunPostBindPlugins(ctx, state, pod, "") },
+					wantExtensionPoint:              "PostBind",
+					wantStatus:                      fwk.Success,
+					postbindPlugins:                 &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+					expectedPluginDurationCallCount: 1,
+					expectedPluginDurationRecords: []PluginDurationRecord{
+						{
+							ExtensionPoint: "PostBind",
+							PluginName:     testPlugin,
+							Status:         "Success",
+						},
+					},
+				},
+				{
+					name:                            "Permit - Success",
+					action:                          func(ctx context.Context, f framework.Framework) { f.RunPermitPlugins(ctx, state, pod, "") },
+					wantExtensionPoint:              "Permit",
+					wantStatus:                      fwk.Success,
+					permitPlugins:                   &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+					expectedPluginDurationCallCount: 1,
+					expectedPluginDurationRecords: []PluginDurationRecord{
+						{
+							ExtensionPoint: "Permit",
+							PluginName:     testPlugin,
+							Status:         "Success",
+						},
+					},
+				},
+				{
+					name:                            "Permit - Error",
+					action:                          func(ctx context.Context, f framework.Framework) { f.RunPermitPlugins(ctx, state, pod, "") },
+					inject:                          injectedResult{PermitStatus: int(fwk.Error)},
+					wantExtensionPoint:              "Permit",
+					wantStatus:                      fwk.Error,
+					permitPlugins:                   &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+					expectedPluginDurationCallCount: 1,
+					expectedPluginDurationRecords: []PluginDurationRecord{
+						{
+							ExtensionPoint: "Permit",
+							PluginName:     testPlugin,
+							Status:         "Error",
+						},
+					},
+				},
+				{
+					name:                            "Permit - Wait",
+					action:                          func(ctx context.Context, f framework.Framework) { f.RunPermitPlugins(ctx, state, pod, "") },
+					inject:                          injectedResult{PermitStatus: int(fwk.Wait)},
+					wantExtensionPoint:              "Permit",
+					wantStatus:                      fwk.Wait,
+					permitPlugins:                   &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+					expectedPluginDurationCallCount: 1,
+					expectedPluginDurationRecords: []PluginDurationRecord{
+						{
+							ExtensionPoint: "Permit",
+							PluginName:     testPlugin,
+							Status:         "Wait",
+						},
+					},
+				},
+			}
+
+			for _, tt := range tests {
+				t.Run(tt.name, func(t *testing.T) {
+					// Create a fake metrics recorder to verify calls
+					mockRecorder := NewMockMetricsRecorder()
+
+					// Create registry with test plugin
+					plugin := &TestPlugin{name: testPlugin, inj: tt.inject}
+					r := make(Registry)
+					if err := r.Register(testPlugin,
+						func(_ context.Context, _ runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
+							return plugin, nil
+						}); err != nil {
+						t.Fatalf("Failed to register plugin %s: %v", testPlugin, err)
+					}
+
+					// Helper function to dereference plugin set or return empty set
+					pluginSetOrEmpty := func(ps *config.PluginSet) config.PluginSet {
+						if ps != nil {
+							return *ps
+						}
+						return config.PluginSet{}
+					}
+
+					// Build plugins configuration using individual plugin sets
+					plugins := &config.Plugins{
+						PreFilter: pluginSetOrEmpty(tt.prefilterPlugins),
+						PreScore:  pluginSetOrEmpty(tt.prescorePlugins),
+						Score:     pluginSetOrEmpty(tt.scorePlugins),
+						Reserve:   pluginSetOrEmpty(tt.reservePlugins),
+						Permit:    pluginSetOrEmpty(tt.permitPlugins),
+						PreBind:   pluginSetOrEmpty(tt.prebindPlugins),
+						Bind:      pluginSetOrEmpty(tt.bindPlugins),
+						PostBind:  pluginSetOrEmpty(tt.postbindPlugins),
+					}
+
+					profile := config.KubeSchedulerProfile{
+						PercentageOfNodesToScore: ptr.To[int32](testPercentageOfNodesToScore),
+						SchedulerName:            testProfileName,
+						Plugins:                  plugins,
+					}
+
+					// Create framework with mock recorder
+					f, err := newFrameworkWithQueueSortAndBind(ctx, r, profile,
+						withMetricsRecorder(mockRecorder),
+						WithWaitingPods(NewWaitingPodsMap()),
+						WithSnapshotSharedLister(cache.NewEmptySnapshot()),
+					)
+					if err != nil {
+						t.Fatalf("Failed to create framework for testing: %v", err)
+					}
+					defer func() {
+						_ = f.Close()
+					}()
+
+					// Run the action
+					tt.action(ctx, f)
+
+					if metricsEnabled {
+						// Check plugin duration call count
+						if tt.expectedPluginDurationCallCount != mockRecorder.PluginDurationCallCount() {
+							t.Errorf("plugin duration call count mismatch: expected %d, got %d",
+								tt.expectedPluginDurationCallCount,
+								mockRecorder.PluginDurationCallCount())
+						}
+
+						// Check plugin duration records with cmp.Diff
+						// Note: Ignore the Value field as it contains timing information
+						if diff := cmp.Diff(tt.expectedPluginDurationRecords,
+							mockRecorder.GetPluginDurationRecords(),
+							cmpopts.IgnoreFields(PluginDurationRecord{}, "Value")); diff != "" {
+							t.Errorf("plugin duration records mismatch (-want +got):\n%s", diff)
+						}
+					} else {
+						// If recording of plugin execution metrics is disabled, don't expect any calls.
+						// When metrics disabled, expect no calls
+						if mockRecorder.PluginDurationCallCount() != 0 {
+							t.Errorf("expected no plugin duration calls when metrics disabled, got %d",
+								mockRecorder.PluginDurationCallCount())
+						}
+
+						// Verify no records were created
+						if records := mockRecorder.GetPluginDurationRecords(); len(records) != 0 {
+							t.Errorf("expected no plugin duration records when metrics disabled, got %v", records)
+						}
+					}
+				})
+			}
 		})
 	}
 }
