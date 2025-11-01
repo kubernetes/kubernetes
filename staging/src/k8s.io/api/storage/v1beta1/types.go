@@ -594,6 +594,8 @@ type CSINodeDriver struct {
 	// name represents the name of the CSI driver that this object refers to.
 	// This MUST be the same name returned by the CSI GetPluginName() call for
 	// that driver.
+	// +required
+	// +k8s:required
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 
 	// nodeID of the node from the driver point of view.
@@ -604,6 +606,8 @@ type CSINodeDriver struct {
 	// system to attach a volume to a specific node, it can use this field to
 	// refer to the node name using the ID that the storage system will
 	// understand, e.g. "nodeA" instead of "node1". This field is required.
+	// +required
+	// +k8s:required
 	NodeID string `json:"nodeID" protobuf:"bytes,2,opt,name=nodeID"`
 
 	// topologyKeys is the list of keys supported by the driver.
