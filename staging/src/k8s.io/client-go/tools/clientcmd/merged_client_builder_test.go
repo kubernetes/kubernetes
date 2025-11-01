@@ -17,8 +17,11 @@ limitations under the License.
 package clientcmd
 
 import (
+	"errors"
 	"fmt"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 
 	restclient "k8s.io/client-go/rest"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -195,17 +198,23 @@ func TestInClusterConfig(t *testing.T) {
 	}
 
 	for name, test := range testCases {
-		c := &DeferredLoadingClientConfig{icc: test.icc}
-		c.loader = &ClientConfigLoadingRules{DefaultClientConfig: test.defaultConfig}
-		c.clientConfig = test.clientConfig
+		t.Run(name, func(t *testing.T) {
+			c := &DeferredLoadingClientConfig{icc: test.icc}
+			c.loader = &ClientConfigLoadingRules{DefaultClientConfig: test.defaultConfig}
+			c.clientConfig = test.clientConfig
+			c.clientConfigNoOverrides = test.clientConfig
 
-		cfg, err := c.ClientConfig()
-		if test.icc.called != test.checkedICC {
-			t.Errorf("%s: unexpected in-cluster-config call %t", name, test.icc.called)
-		}
-		if err != test.err || cfg != test.result {
-			t.Errorf("%s: unexpected result: %v %#v", name, err, cfg)
-		}
+			cfg, err := c.ClientConfig()
+			if test.icc.called != test.checkedICC {
+				t.Errorf("Unexpected in-cluster-config call %t", test.icc.called)
+			}
+			if !errors.Is(err, test.err) {
+				t.Errorf("Unexpected error: %v", err)
+			}
+			if !cmp.Equal(cfg, test.result) {
+				t.Errorf("Unexpected result:\n%s", cmp.Diff(test.result, cfg))
+			}
+		})
 	}
 }
 
@@ -328,12 +337,13 @@ func TestInClusterConfigNamespace(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			c := &DeferredLoadingClientConfig{icc: test.icc, overrides: test.overrides}
 			c.clientConfig = test.clientConfig
+			c.clientConfigNoOverrides = test.clientConfig
 
 			ns, overridden, err := c.Namespace()
 			if test.icc.called != test.checkedICC {
 				t.Errorf("%s: unexpected in-cluster-config call %t", name, test.icc.called)
 			}
-			if err != test.err || ns != test.result || overridden != test.overridden {
+			if !errors.Is(err, test.err) || ns != test.result || overridden != test.overridden {
 				t.Errorf("%s: unexpected result: %v %s %t", name, err, ns, overridden)
 			}
 		})
