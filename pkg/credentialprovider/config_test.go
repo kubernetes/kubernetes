@@ -245,6 +245,12 @@ func TestDecodeDockerConfigFieldAuth(t *testing.T) {
 			password: "bar",
 		},
 
+		// non UTF-8 character
+		{
+			input: encodeDockerConfigFieldAuth("foo", "a\xc5z"),
+			fail:  true,
+		},
+
 		// good base64 data, but no colon separating username & password
 		{
 			input: "cGFudHM=",
