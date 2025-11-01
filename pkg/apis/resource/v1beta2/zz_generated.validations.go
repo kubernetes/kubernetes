@@ -198,7 +198,17 @@ func Validate_AllocationResult(ctx context.Context, op operation.Operation, fldP
 // Validate_CounterSet validates an instance of CounterSet according
 // to declarative validation rules in the API schema.
 func Validate_CounterSet(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta2.CounterSet) (errs field.ErrorList) {
-	// field resourcev1beta2.CounterSet.Name has no validation
+	// field resourcev1beta2.CounterSet.Name
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			errs = append(errs, validate.ShortName(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("name"), &obj.Name, safe.Field(oldObj, func(oldObj *resourcev1beta2.CounterSet) *string { return &oldObj.Name }))...)
 
 	// field resourcev1beta2.CounterSet.Counters
 	errs = append(errs,
@@ -251,8 +261,23 @@ func Validate_Device(ctx context.Context, op operation.Operation, fldPath *field
 			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 2); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// lists with map semantics require unique keys
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a resourcev1beta2.DeviceCounterConsumption, b resourcev1beta2.DeviceCounterConsumption) bool {
+				return a.CounterSet == b.CounterSet
+			})...)
 			// iterate the list and call the type's validation function
-			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceCounterConsumption)...)
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, func(a resourcev1beta2.DeviceCounterConsumption, b resourcev1beta2.DeviceCounterConsumption) bool {
+				return a.CounterSet == b.CounterSet
+			}, validate.SemanticDeepEqual, Validate_DeviceCounterConsumption)...)
 			return
 		}(fldPath.Child("consumesCounters"), obj.ConsumesCounters, safe.Field(oldObj, func(oldObj *resourcev1beta2.Device) []resourcev1beta2.DeviceCounterConsumption {
 			return oldObj.ConsumesCounters
@@ -929,7 +954,17 @@ func Validate_DeviceConstraint(ctx context.Context, op operation.Operation, fldP
 // Validate_DeviceCounterConsumption validates an instance of DeviceCounterConsumption according
 // to declarative validation rules in the API schema.
 func Validate_DeviceCounterConsumption(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta2.DeviceCounterConsumption) (errs field.ErrorList) {
-	// field resourcev1beta2.DeviceCounterConsumption.CounterSet has no validation
+	// field resourcev1beta2.DeviceCounterConsumption.CounterSet
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			errs = append(errs, validate.ShortName(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("counterSet"), &obj.CounterSet, safe.Field(oldObj, func(oldObj *resourcev1beta2.DeviceCounterConsumption) *string { return &oldObj.CounterSet }))...)
 
 	// field resourcev1beta2.DeviceCounterConsumption.Counters
 	errs = append(errs,
@@ -1823,8 +1858,19 @@ func Validate_ResourceSliceSpec(ctx context.Context, op operation.Operation, fld
 			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 8); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// lists with map semantics require unique keys
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a resourcev1beta2.CounterSet, b resourcev1beta2.CounterSet) bool { return a.Name == b.Name })...)
 			// iterate the list and call the type's validation function
-			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_CounterSet)...)
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, func(a resourcev1beta2.CounterSet, b resourcev1beta2.CounterSet) bool { return a.Name == b.Name }, validate.SemanticDeepEqual, Validate_CounterSet)...)
 			return
 		}(fldPath.Child("sharedCounters"), obj.SharedCounters, safe.Field(oldObj, func(oldObj *resourcev1beta2.ResourceSliceSpec) []resourcev1beta2.CounterSet {
 			return oldObj.SharedCounters
