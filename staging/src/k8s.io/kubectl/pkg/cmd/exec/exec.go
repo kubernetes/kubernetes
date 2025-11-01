@@ -358,6 +358,18 @@ func (p *ExecOptions) Run() error {
 			return err
 		}
 		containerName = container.Name
+	} else {
+		found := false
+		containerNames := make([]string, len(pod.Spec.Containers))
+		for _, c := range pod.Spec.Containers {
+			if c.Name == containerName {
+				found = true
+			}
+			containerNames = append(containerNames, c.Name)
+		}
+		if !found {
+			return fmt.Errorf("container %s not found within %s", containerName, containerNames)
+		}
 	}
 
 	// ensure we can recover the terminal while attached
