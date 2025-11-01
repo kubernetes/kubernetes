@@ -826,21 +826,25 @@ func sortedPodExtendedResources(containers []v1.Container) []string {
 }
 
 // createDeviceRequests computes the special claim's Requests based on the pod's extended resources
-// that are not satisfied by the node's Allocatable.
+// that are not satisfied by the node's Allocatable. Two device request name formats:
 //
-// the device request name has the format: container-%d-request-%d,
+// 1/ a device request name has the format: container-%d-request-%d,
 // the first %d is the container's index in the pod's initContainer and containers
 // the second %d is the extended resource's index in that container's sorted resource requests.
+// This format is used for sidecar containers and regular (non-init) containers.
+// One device request per contaienr per extended resource.
 //
-// a special device request name with format: request-%d,
+// 2/ a special device request name with format: request-%d,
 // where %d is the index of the extended resource in the sorted list of extended resources in the pod.
+// This format is used for init non-sidecar containers.
+// There is at most one such device request per extended resource.
 func createDeviceRequests(pod *v1.Pod, extendedResources map[v1.ResourceName]int64, logger klog.Logger, deviceClassMapping map[v1.ResourceName]string) []resourceapi.DeviceRequest {
 	// Creating the extended resource claim's Requests by
 	// iterating over the containers, and the resources in the containers,
 	// and create one request per <container, extended resource> for sidecar init containers
 	// ande regular (non-init) containers
 	// reuse these device requests for resources in non-sidecar init containers as much as possible,
-	// multiple of these device request could be used per container per extended resource.
+	// multiple of these device requests could be used per container per extended resource.
 	// a special device request with name 'request-%d' is created for extra devices needed.
 
 	// pod level resources currently have only cpu and memory, they are not considered here for now.
@@ -852,12 +856,14 @@ func createDeviceRequests(pod *v1.Pod, extendedResources map[v1.ResourceName]int
 	podExtendedResourceSlice := sortedPodExtendedResources(containers)
 	var deviceRequests []resourceapi.DeviceRequest
 	for r, maxQuantity := range extendedResources {
+		// note maxQuantity is the max quantity for the resource calculated by resourcehelper.PodRequests
 		className, ok := deviceClassMapping[r]
 		// skip if the request does not map to a device class
 		if !ok || className == "" {
 			continue
 		}
-		var sumQuantity int64 // all devices requested so far for the extended resource r
+		// sumQuantity is all devices requested so far for the extended resource r
+		var sumQuantity int64
 		for i, c := range containers {
 			creqs := c.Resources.Requests
 			if creqs == nil {
@@ -875,6 +881,8 @@ func createDeviceRequests(pod *v1.Pod, extendedResources map[v1.ResourceName]int
 			isInitContainer := i < numInitContainers
 			isSideCar := c.RestartPolicy != nil && *c.RestartPolicy == v1.ContainerRestartPolicyAlways
 			if isInitContainer && !isSideCar {
+				// init non-sidecar containers are handled below
+				// here only hanldes sidecar and regular (non-init) containers
 				continue
 			}
 			sumQuantity += crq
@@ -906,7 +914,8 @@ func createDeviceRequests(pod *v1.Pod, extendedResources map[v1.ResourceName]int
 				})
 		}
 		if sumQuantity >= maxQuantity {
-			// all devices needed are requested, nothing left to do
+			// all devices needed are requested, nothing left to do for this extended resource
+			// continue to the next extended resource
 			continue
 		}
 		// create the special request for extra devices needed.
@@ -935,22 +944,36 @@ func createDeviceRequests(pod *v1.Pod, extendedResources map[v1.ResourceName]int
 	uniqDeviceRequests := make([]resourceapi.DeviceRequest, 0, len(deviceRequests))
 	seen := make(map[string]resourceapi.DeviceRequest)
 	for _, r := range deviceRequests {
+		// request with name "conainer-%d-request-%" must be unique, as it is per container per extended resource.
+		// suppose we have one container requests both explicit extended resource example.com/gpu: 1
+		// and implicit extended resource for the same device class: deviceclass.resource.kubernetes.io/mygpu: 2
+		// two device requests will be created from the above code, one for each.
+		// this is expected, there is no need to merge them.
 		if !strings.HasPrefix(r.Name, "reuqest-") {
 			uniqDeviceRequests = append(uniqDeviceRequests, r)
 			continue
 		}
 
+		// requests for init non-sidecar containers for each extended resource for the same device class
+		// should keep only one device request with the implicit extended resource's index in the pod's
+		// extended resources.
 		if rseen, ok := seen[r.Exactly.DeviceClassName]; ok {
 			class := r.Exactly.DeviceClassName
 			ridx := slices.Index(podExtendedResourceSlice, resourceapi.ResourceDeviceClassPrefix+class)
-			if ridx >= 0 {
-				// ensure always use the implicit extended resource request name
-				rseen.Name = fmt.Sprintf("request-%d", ridx)
-				seen[rseen.Exactly.DeviceClassName] = rseen
+			if ridx < 0 {
+				logger.V(5).Info("Implicit extended resource not found, this should not happen", "implicit extended resource", resourceapi.ResourceDeviceClassPrefix+class)
+				continue
 			}
+			// always use the implicit extended resource request name
+			rseen.Name = fmt.Sprintf("request-%d", ridx)
+			seen[rseen.Exactly.DeviceClassName] = rseen
 			if rseen.Exactly.Count >= r.Exactly.Count {
 				continue
 			}
+			// always pick the bigger quantity
+			rseen.Exactly.Count = r.Exactly.Count
+			seen[rseen.Exactly.DeviceClassName] = rseen
+			continue
 		}
 		seen[r.Exactly.DeviceClassName] = r
 	}
@@ -1457,9 +1480,15 @@ func (pl *DynamicResources) PreBindPreFlight(ctx context.Context, cs fwk.CycleSt
 // createRequestMappings creates the requestMappings for the special extended resource claim.
 // For each device request in the claim, it finds the container name, and
 // the extended resource name in that container matching the device request.
-// the device request name has the format: container-%d-request-%d,
+// the device request name has two formats:
+// 1/ one format is: container-%d-request-%d,
 // the first %d is the container's index in the pod's initContainer and containers
 // the second %d is the extended resource's index in that container's sorted resource requests.
+// 2/ seconf format is: request-%d
+// %d is the extended resource's index in the sorted list of all extended resources in the pod
+// when a pod requests both explicit and implicit extended resources for the same device class,
+// only one such device request with the max of the quantity of the two is needed,
+// always use the implicit extended resources' index.
 func createRequestMappings(claim *resourceapi.ResourceClaim, pod *v1.Pod, logger klog.Logger, deviceClassMapping map[v1.ResourceName]string) []v1.ContainerExtendedResourceRequest {
 	// create the list of device request names, and map of device request name to request quantity
 	deviceReqNames := make([]string, 0, len(claim.Spec.Devices.Requests))
@@ -1476,7 +1505,7 @@ func createRequestMappings(claim *resourceapi.ResourceClaim, pod *v1.Pod, logger
 	containers = append(containers, pod.Spec.Containers...)
 	podExtendedResourceSlice := sortedPodExtendedResources(containers)
 
-	// First construct the list of request mappings for sidecar or regular container's extended resources
+	// First construct the list of request mappings for sidecar or regular (non-init) container's extended resources
 	var cers []v1.ContainerExtendedResourceRequest
 	for i, c := range containers {
 		isInit := i < len(pod.Spec.InitContainers)
@@ -1504,11 +1533,10 @@ func createRequestMappings(claim *resourceapi.ResourceClaim, pod *v1.Pod, logger
 
 			// device request name is container-%d-request-%d format for resource requests in regular container
 			// and non-sidecar init container
-			requestName := fmt.Sprintf("container-%d-request-%d", i, ridx)
 			for _, devReqName := range deviceReqNames {
 				// During filter phase, device request name is set to be
 				// container name index "-" extended resource name index
-				if requestName == devReqName {
+				if fmt.Sprintf("container-%d-request-%d", i, ridx) == devReqName {
 					cers = append(cers,
 						v1.ContainerExtendedResourceRequest{
 							ContainerName: c.Name,
@@ -1521,7 +1549,7 @@ func createRequestMappings(claim *resourceapi.ResourceClaim, pod *v1.Pod, logger
 		}
 	}
 
-	// Second, construct the list of request mapping for init non-sidecar container's extended resources.
+	// Secondly, construct the list of request mapping for init non-sidecar container's extended resources.
 	var initcers []v1.ContainerExtendedResourceRequest
 	for _, c := range pod.Spec.InitContainers {
 		isSideCar := c.RestartPolicy != nil && *c.RestartPolicy == v1.ContainerRestartPolicyAlways
@@ -1533,7 +1561,6 @@ func createRequestMappings(claim *resourceapi.ResourceClaim, pod *v1.Pod, logger
 		creqs := c.Resources.Requests
 		for rName, rQuant := range creqs {
 			// find all the device requests in sidecar or regular containers with format "container-%d-request-%d"
-			// the sum of their quantities is no less than the requested quantity
 			for _, cer := range cers {
 				if cer.ResourceName != rName.String() {
 					continue
@@ -1543,6 +1570,7 @@ func createRequestMappings(claim *resourceapi.ResourceClaim, pod *v1.Pod, logger
 				if isSidcarBefore(cer.ContainerName, c.Name, pod.Spec.InitContainers) {
 					continue
 				}
+				// found, reuse the regular, or sidecar container's reuqest
 				initcers = append(initcers,
 					v1.ContainerExtendedResourceRequest{
 						ContainerName: c.Name,
@@ -1551,7 +1579,7 @@ func createRequestMappings(claim *resourceapi.ResourceClaim, pod *v1.Pod, logger
 					})
 				q, ok := deviceReqQuantity[cer.RequestName]
 				if !ok {
-					logger.V(5).Info("Device request not found, this should not happen", "request", cer.RequestName)
+					logger.V(5).Info("Device request not found, this should not happen", "container", cer.ContainerName, "resource", cer.ResourceName, "request", cer.ResourceName)
 					continue
 				}
 				rQuant.Sub(*resource.NewQuantity(q, resource.DecimalSI))
@@ -1560,19 +1588,23 @@ func createRequestMappings(claim *resourceapi.ResourceClaim, pod *v1.Pod, logger
 					break
 				}
 			}
+			// some extra devices are still needed for this init container's extended resource rName
 			if rQuant.CmpInt64(0) > 0 {
 				ridx := slices.Index(podExtendedResourceSlice, rName.String())
-				requestName := fmt.Sprintf("request-%d", ridx)
+				if ridx < 0 {
+					logger.V(5).Info("Extended resource not found, this should not happen", "extended resource", rName.String())
+					continue
+				}
 				found := false
 				for _, devReqName := range deviceReqNames {
 					// During filter phase, special device request name is set to be
 					// request "-" extended resource name index
-					if requestName == devReqName {
+					if fmt.Sprintf("request-%d", ridx) == devReqName {
 						initcers = append(initcers,
 							v1.ContainerExtendedResourceRequest{
 								ContainerName: c.Name,
 								ResourceName:  rName.String(),
-								RequestName:   requestName,
+								RequestName:   devReqName,
 							})
 						found = true
 						break
@@ -1582,7 +1614,7 @@ func createRequestMappings(claim *resourceapi.ResourceClaim, pod *v1.Pod, logger
 					continue
 				}
 				// This can only happen when pod requests both explicit and implicit extended resource name for the same device class,
-				// rName is explicit, and the device request name is using implicit's index.
+				// rName is explicit extended resource name, and the device request name is using implicit extended resource's index.
 				class, ok := deviceClassMapping[rName]
 				if !ok {
 					logger.V(5).Info("Extended resource not found in device class mapping, this should not happen", "extended resource", rName.String())
@@ -1590,19 +1622,18 @@ func createRequestMappings(claim *resourceapi.ResourceClaim, pod *v1.Pod, logger
 				}
 				ridx = slices.Index(podExtendedResourceSlice, resourceapi.ResourceDeviceClassPrefix+class)
 				if ridx < 0 {
-					logger.V(5).Info("Extended resource not found, this should not happen", "extended resource", rName.String())
+					logger.V(5).Info("Implicit extended resource not found, this should not happen", "implicit extended resource", rName.String())
 					continue
 				}
-				requestName = fmt.Sprintf("request-%d", ridx)
 				for _, devReqName := range deviceReqNames {
 					// During filter phase, special device request name is set to be
 					// request "-" extended resource name index
-					if requestName == devReqName {
+					if fmt.Sprintf("request-%d", ridx) == devReqName {
 						initcers = append(initcers,
 							v1.ContainerExtendedResourceRequest{
 								ContainerName: c.Name,
 								ResourceName:  rName.String(),
-								RequestName:   requestName,
+								RequestName:   devReqName,
 							})
 						break
 					}
@@ -1621,6 +1652,7 @@ func isSidcarBefore(reqContainerName, curContainerName string, initContainers []
 	for _, c := range initContainers {
 		if c.Name == curContainerName {
 			foundCurContainer = true
+			continue
 		}
 		if c.Name == reqContainerName {
 			if foundCurContainer {
