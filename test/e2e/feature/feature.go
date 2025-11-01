@@ -239,6 +239,10 @@ var (
 	KubeletCredentialProviders = framework.WithFeature(framework.ValidFeatures.Add("KubeletCredentialProviders"))
 
 	// Owner: sig-node
+	// Testing with kubelet's ability to authorize access to images pulled with credentials
+	KubeletEnsureSecretPulledImages = framework.WithFeature(framework.ValidFeatures.Add("KubeletEnsureSecretPulledImages"))
+
+	// Owner: sig-node
 	// Testing kubelet PSI metrics KEP
 	KubeletPSI = framework.WithFeature(framework.ValidFeatures.Add("KubeletPSI"))
 
