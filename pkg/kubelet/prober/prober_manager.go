@@ -18,16 +18,19 @@ package prober
 
 import (
 	"context"
+
 	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/component-base/metrics"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/status"
@@ -278,6 +281,10 @@ func (m *manager) isContainerStarted(pod *v1.Pod, containerStatus *v1.ContainerS
 		return result == results.Success
 	}
 
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ChangeContainerStatusOnKubeletRestart) && containerStatus.Started != nil && *containerStatus.Started {
+		return true
+	}
+
 	// if there is a startup probe which hasn't run yet, the container is not
 	// started.
 	if _, exists := m.getWorker(pod.UID, containerStatus.Name, startup); exists {
@@ -286,6 +293,40 @@ func (m *manager) isContainerStarted(pod *v1.Pod, containerStatus *v1.ContainerS
 
 	// there is no startup probe, so the container is started.
 	return true
+}
+
+// setReadyStateOnKubeletRestart sets the ready state of a container to false if it was started
+// before kubelet restarted and has a readiness probe, but the pod is not ready yet.
+// This is to avoid flapping ready status of containers that were ready before kubelet restarted.
+func (m *manager) setReadyStateOnKubeletRestart(ready *bool, pod *v1.Pod, containerStatus *v1.ContainerStatus, containerSpec *v1.Container) {
+	var containerStartTime time.Time
+	if containerStatus.State.Running != nil {
+		containerStartTime = containerStatus.State.Running.StartedAt.Time
+	}
+
+	if !containerStartTime.IsZero() && containerStartTime.Before(kubeletRestartGracePeriod(m.start)) {
+		// At this point, the Pod may be in one of the following two states:
+		// - It has not yet been added to the readinessManager. In this case, we directly set the container status to Ready.
+		// - It has been added to the readinessManager, but the probe has not yet started execution.
+		// Therefore, in this case, we also need to set the container status to Ready.
+		if !*ready {
+			if _, ok := m.readinessManager.Get(kubecontainer.ParseContainerID(containerStatus.ContainerID)); !ok {
+				*ready = true
+			}
+		}
+		if containerSpec.ReadinessProbe != nil {
+			podIsReady := false
+			for _, c := range pod.Status.Conditions {
+				if c.Type == v1.PodReady && c.Status == v1.ConditionTrue {
+					podIsReady = true
+					break
+				}
+			}
+			if !podIsReady {
+				*ready = false
+			}
+		}
+	}
 }
 
 func (m *manager) UpdatePodStatus(ctx context.Context, pod *v1.Pod, podStatus *v1.PodStatus) {
@@ -313,6 +354,20 @@ func (m *manager) UpdatePodStatus(ctx context.Context, pod *v1.Pod, podStatus *v
 				case w.manualTriggerCh <- struct{}{}:
 				default: // Non-blocking.
 					logger.Info("Failed to trigger a manual run", "probe", w.probeType.String())
+				}
+			}
+
+			if !utilfeature.DefaultFeatureGate.Enabled(features.ChangeContainerStatusOnKubeletRestart) {
+				// Find the container spec for the container status.
+				var containerSpec *v1.Container
+				for j := range pod.Spec.Containers {
+					if pod.Spec.Containers[j].Name == c.Name {
+						containerSpec = &pod.Spec.Containers[j]
+						break
+					}
+				}
+				if containerSpec != nil {
+					m.setReadyStateOnKubeletRestart(&ready, pod, &podStatus.ContainerStatuses[i], containerSpec)
 				}
 			}
 		}
@@ -356,6 +411,9 @@ func (m *manager) UpdatePodStatus(ctx context.Context, pod *v1.Pod, podStatus *v
 					logger.Info("Failed to trigger a manual run", "probe", w.probeType.String())
 				}
 			}
+			if !utilfeature.DefaultFeatureGate.Enabled(features.ChangeContainerStatusOnKubeletRestart) {
+				m.setReadyStateOnKubeletRestart(&ready, pod, &podStatus.InitContainerStatuses[i], &initContainer)
+			}
 		}
 		podStatus.InitContainerStatuses[i].Ready = ready
 	}
@@ -380,4 +438,13 @@ func (m *manager) workerCount() int {
 	m.workerLock.RLock()
 	defer m.workerLock.RUnlock()
 	return len(m.workers)
+}
+
+// kubeletRestartGracePeriod returns a time point that is 10 seconds before the kubelet start time.
+// This grace period is used to determine if a container was already running before kubelet restarted.
+// If a container's start time is before this grace period, it indicates the container was running
+// prior to kubelet restart and should not be immediately marked as failed to avoid unnecessary
+// status changes for containers that were previously ready.
+func kubeletRestartGracePeriod(start time.Time) time.Time {
+	return start.Add(-time.Second * 10)
 }
