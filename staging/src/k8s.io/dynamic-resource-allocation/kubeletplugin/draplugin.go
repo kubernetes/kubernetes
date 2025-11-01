@@ -41,6 +41,7 @@ import (
 	drapbv1 "k8s.io/kubelet/pkg/apis/dra/v1"
 	drapbv1beta1 "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -199,6 +200,10 @@ type Device struct {
 	// Each ID must be of the form "<vendor ID>/<class>=<unique name>".
 	// May be empty.
 	CDIDeviceIDs []string
+
+	// ShareID identifes the device share.
+	// May be empty.
+	ShareID *types.UID
 }
 
 // Option implements the functional options pattern for Start.
@@ -865,11 +870,16 @@ func (d *nodePluginImplementation) NodePrepareResources(ctx context.Context, req
 	for uid, claimResult := range result {
 		var devices []*drapbv1.Device
 		for _, result := range claimResult.Devices {
+			var shareIDStr *string
+			if result.ShareID != nil {
+				shareIDStr = ptr.To(string(*result.ShareID))
+			}
 			device := &drapbv1.Device{
 				RequestNames: stripSubrequestNames(result.Requests),
 				PoolName:     result.PoolName,
 				DeviceName:   result.DeviceName,
 				CdiDeviceIds: result.CDIDeviceIDs,
+				ShareId:      shareIDStr,
 			}
 			devices = append(devices, device)
 		}
