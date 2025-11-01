@@ -217,7 +217,7 @@ func setScheduling(a admission.Attributes, pod *api.Pod, runtimeClass *nodev1.Ru
 }
 
 func validateOverhead(a admission.Attributes, pod *api.Pod, runtimeClass *nodev1.RuntimeClass) (err error) {
-	if runtimeClass != nil && runtimeClass.Overhead != nil {
+	if runtimeClass != nil && runtimeClass.Overhead != nil && len(pod.Spec.Overhead) > 0 {
 		// If the Overhead set doesn't match what is provided in the RuntimeClass definition, reject the pod
 		nodeOverhead := &node.Overhead{}
 		if err := apinodev1.Convert_v1_Overhead_To_node_Overhead(runtimeClass.Overhead, nodeOverhead, nil); err != nil {
