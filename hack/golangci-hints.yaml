@@ -156,6 +156,12 @@ linters:
         path: "staging/src/k8s.io/api/networking/v1/types.go"
       - text: "field IngressPortStatus.Error has conflicting markers: optional_vs_required: {\\[optional\\], \\[kubebuilder:validation:Required\\]}. fields cannot be both optional and required"
         path: "staging/src/k8s.io/api/networking/v1beta1/types.go"
+      
+      # nophase: Legacy 'Phase' fields retained for backward compatibility
+      - text: 'nophase: naming convention "nophase": field Phase: phase fields are deprecated and conditions should be preferred, avoid phase like enum fields'
+        path: "staging/src/k8s.io/api/core/v1/types.go"
+      - text: 'nophase: naming convention "nophase": field LastPhaseTransitionTime: phase fields are deprecated and conditions should be preferred, avoid phase like enum fields'
+        path: "staging/src/k8s.io/api/core/v1/types.go"
 
   default: standard
   enable: # please keep this alphabetized
@@ -314,7 +320,7 @@ linters:
               # - "nobools" # Bools do not evolve over time, should use enums instead.
               # - "nofloats" # Ensure floats are not used.
               # - "nomaps" # Ensure maps are not used, unless they are `map[string]string` (for labels/annotations/etc).
-              # - "nophase" # Ensure field names do not have the word "phase" in them.
+              - "nophase" # Ensure field names do not have the word "phase" in them.
               # - "notimestamp" # Ensure fields are not named "timestamp", prefer "time".
               # - "optionalfields" # Ensure fields marked optional have omitempty and pointers.
               # - "optionalorrequired" # Every field should be marked as `+optional` xor `+required`.
