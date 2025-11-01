@@ -52,14 +52,7 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 // Validate_Max0Type validates an instance of Max0Type according
 // to declarative validation rules in the API schema.
 func Validate_Max0Type(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj Max0Type) (errs field.ErrorList) {
-	earlyReturn := false
-	if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 0); len(e) != 0 {
-		errs = append(errs, e...)
-		earlyReturn = true
-	}
-	if earlyReturn {
-		return // do not proceed
-	}
+	errs = append(errs, validate.MaxItems(ctx, op, fldPath, obj, oldObj, 0)...)
 
 	return errs
 }
@@ -67,14 +60,7 @@ func Validate_Max0Type(ctx context.Context, op operation.Operation, fldPath *fie
 // Validate_Max0TypedefType validates an instance of Max0TypedefType according
 // to declarative validation rules in the API schema.
 func Validate_Max0TypedefType(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj Max0TypedefType) (errs field.ErrorList) {
-	earlyReturn := false
-	if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 0); len(e) != 0 {
-		errs = append(errs, e...)
-		earlyReturn = true
-	}
-	if earlyReturn {
-		return // do not proceed
-	}
+	errs = append(errs, validate.MaxItems(ctx, op, fldPath, obj, oldObj, 0)...)
 
 	return errs
 }
@@ -82,14 +68,7 @@ func Validate_Max0TypedefType(ctx context.Context, op operation.Operation, fldPa
 // Validate_Max10Type validates an instance of Max10Type according
 // to declarative validation rules in the API schema.
 func Validate_Max10Type(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj Max10Type) (errs field.ErrorList) {
-	earlyReturn := false
-	if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 10); len(e) != 0 {
-		errs = append(errs, e...)
-		earlyReturn = true
-	}
-	if earlyReturn {
-		return // do not proceed
-	}
+	errs = append(errs, validate.MaxItems(ctx, op, fldPath, obj, oldObj, 10)...)
 
 	return errs
 }
@@ -97,14 +76,7 @@ func Validate_Max10Type(ctx context.Context, op operation.Operation, fldPath *fi
 // Validate_Max10TypedefType validates an instance of Max10TypedefType according
 // to declarative validation rules in the API schema.
 func Validate_Max10TypedefType(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj Max10TypedefType) (errs field.ErrorList) {
-	earlyReturn := false
-	if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 10); len(e) != 0 {
-		errs = append(errs, e...)
-		earlyReturn = true
-	}
-	if earlyReturn {
-		return // do not proceed
-	}
+	errs = append(errs, validate.MaxItems(ctx, op, fldPath, obj, oldObj, 10)...)
 
 	return errs
 }
