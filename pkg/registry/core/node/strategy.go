@@ -111,6 +111,10 @@ func dropDisabledFields(node *api.Node, oldNode *api.Node) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.SupplementalGroupsPolicy) && !supplementalGroupsPolicyInUse(oldNode) {
 		node.Status.Features = nil
 	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.NodeDeclaredFeatures) && !nodeDeclaredFeaturesInUse(oldNode) {
+		node.Status.DeclaredFeatures = nil
+	}
 }
 
 // nodeConfigSourceInUse returns true if node's Spec ConfigSource is set(used)
@@ -315,4 +319,9 @@ func supplementalGroupsPolicyInUse(node *api.Node) bool {
 		return false
 	}
 	return node.Status.Features != nil
+}
+
+// nodeDeclaredFeaturesInUse returns true if the node.status has DeclaredFeatures
+func nodeDeclaredFeaturesInUse(node *api.Node) bool {
+	return node != nil && node.Status.DeclaredFeatures != nil
 }

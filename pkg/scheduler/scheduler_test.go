@@ -61,6 +61,7 @@ import (
 	apicalls "k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -827,7 +828,6 @@ func Test_buildQueueingHintMap(t *testing.T) {
 
 // Test_UnionedGVKs tests UnionedGVKs worked with buildQueueingHintMap.
 func Test_UnionedGVKs(t *testing.T) {
-	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, version.MustParse("1.34"))
 	tests := []struct {
 		name                            string
 		plugins                         schedulerapi.PluginSet
@@ -835,6 +835,7 @@ func Test_UnionedGVKs(t *testing.T) {
 		enableInPlacePodVerticalScaling bool
 		enableSchedulerQueueingHints    bool
 		enableDynamicResourceAllocation bool
+		enableNodeDeclaredFeatures      bool
 	}{
 		{
 			name: "filter without EnqueueExtensions plugin",
@@ -1002,6 +1003,30 @@ func Test_UnionedGVKs(t *testing.T) {
 			enableDynamicResourceAllocation: true,
 			enableSchedulerQueueingHints:    true,
 		},
+		{
+			name:    "plugins with default profile and NodeDeclaredFeatures",
+			plugins: schedulerapi.PluginSet{Enabled: append(defaults.PluginsV1.MultiPoint.Enabled, schedulerapi.Plugin{Name: names.NodeDeclaredFeatures})},
+			want: map[fwk.EventResource]fwk.ActionType{
+				// NodeDeclaredFeatures adds fwk.Update
+				fwk.Pod: fwk.Add | fwk.UpdatePodLabel | fwk.UpdatePodGeneratedResourceClaim | fwk.UpdatePodToleration | fwk.UpdatePodSchedulingGatesEliminated | fwk.Delete | fwk.Update,
+				// NodeDeclaredFeatures adds fwk.UpdateNodeDeclaredFeature
+				fwk.Node:                  fwk.Add | fwk.UpdateNodeAllocatable | fwk.UpdateNodeLabel | fwk.UpdateNodeTaint | fwk.Delete | fwk.UpdateNodeDeclaredFeature,
+				fwk.CSINode:               fwk.All - fwk.Delete,
+				fwk.CSIDriver:             fwk.Update,
+				fwk.CSIStorageCapacity:    fwk.All - fwk.Delete,
+				fwk.PersistentVolume:      fwk.All - fwk.Delete,
+				fwk.PersistentVolumeClaim: fwk.All - fwk.Delete,
+				fwk.StorageClass:          fwk.All - fwk.Delete,
+				fwk.VolumeAttachment:      fwk.Delete,
+				fwk.DeviceClass:           fwk.All - fwk.Delete,
+				fwk.ResourceClaim:         fwk.All - fwk.Delete,
+				fwk.ResourceSlice:         fwk.All - fwk.Delete,
+			},
+			enableDynamicResourceAllocation: true,
+			enableSchedulerQueueingHints:    true,
+			enableNodeDeclaredFeatures:      true,
+			enableInPlacePodVerticalScaling: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1010,6 +1035,11 @@ func Test_UnionedGVKs(t *testing.T) {
 			if !tt.enableSchedulerQueueingHints || !tt.enableDynamicResourceAllocation {
 				// Set emulated version before setting other feature gates, since it can impact feature dependencies.
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, version.MustParse("1.33"))
+			} else if !tt.enableInPlacePodVerticalScaling {
+				// In place pod resize GA'd in 1.35. Set emulation version to 1.34 for tests that do not have the flag set
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, version.MustParse("1.34"))
+			} else {
+				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.NodeDeclaredFeatures, tt.enableNodeDeclaredFeatures)
 			}
 			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.InPlacePodVerticalScaling: tt.enableInPlacePodVerticalScaling,

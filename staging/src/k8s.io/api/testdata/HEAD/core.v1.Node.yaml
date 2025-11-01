@@ -92,6 +92,8 @@ status:
   daemonEndpoints:
     kubeletEndpoint:
       Port: 1
+  declaredFeatures:
+  - declaredFeaturesValue
   features:
     supplementalGroupsPolicy: true
   images:

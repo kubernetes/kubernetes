@@ -171,6 +171,9 @@
     ],
     "features": {
       "supplementalGroupsPolicy": true
-    }
+    },
+    "declaredFeatures": [
+      "declaredFeaturesValue"
+    ]
   }
 }
