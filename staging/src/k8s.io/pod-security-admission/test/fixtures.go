@@ -183,9 +183,9 @@ type fixtureGenerator struct {
 	// Pass cases are not allowed to be feature-gated (pass cases must only depend on data existing in GA fields).
 	failRequiresFeatures []featuregate.Feature
 
-	// generatePass transforms a minimum valid pod into one or more valid pods.
+	// generatePass transforms a minimum valid pod into one or more valid pods that pass the given policy level.
 	// pods do not need to populate metadata.name.
-	generatePass func(*corev1.Pod) []*corev1.Pod
+	generatePass func(*corev1.Pod, api.Level) []*corev1.Pod
 	// generateFail transforms a minimum valid pod into one or more invalid pods.
 	// pods do not need to populate metadata.name.
 	generateFail func(*corev1.Pod) []*corev1.Pod
@@ -249,7 +249,7 @@ func getFixtures(key fixtureKey) (fixtureData, error) {
 				expectErrorSubstring: generator.expectErrorSubstring,
 				failRequiresFeatures: generator.failRequiresFeatures,
 
-				pass: generator.generatePass(validPodForLevel.DeepCopy()),
+				pass: generator.generatePass(validPodForLevel.DeepCopy(), key.level),
 				fail: generator.generateFail(validPodForLevel.DeepCopy()),
 			}
 			if len(data.expectErrorSubstring) == 0 {
