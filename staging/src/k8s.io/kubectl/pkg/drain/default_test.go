@@ -38,7 +38,7 @@ func TestRunCordonOrUncordon(t *testing.T) {
 		{
 			description: "nil context object",
 			drainer: &Helper{
-				Client: fake.NewSimpleClientset(),
+				Client: fake.NewClientset(),
 			},
 			desired:       true,
 			expectedError: &nilContextError,
