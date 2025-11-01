@@ -55,8 +55,9 @@ var _ ContainerManager = &FakeContainerManager{}
 func NewFakeContainerManager() *FakeContainerManager {
 	return &FakeContainerManager{
 		PodContainerManager: NewFakePodContainerManager(),
-		cpuManager:          cpumanager.NewFakeManager(klog.TODO()),
-		memoryManager:       memorymanager.NewFakeManager(klog.TODO()),
+		// Using klog.Background() for fake/test implementations where no real context is available
+		cpuManager:    cpumanager.NewFakeManager(klog.Background()),
+		memoryManager: memorymanager.NewFakeManager(klog.Background()),
 	}
 }
 
@@ -102,7 +103,7 @@ func (cm *FakeContainerManager) GetQOSContainersInfo() QOSContainersInfo {
 	return QOSContainersInfo{}
 }
 
-func (cm *FakeContainerManager) UpdateQOSCgroups() error {
+func (cm *FakeContainerManager) UpdateQOSCgroups(logger klog.Logger) error {
 	cm.Lock()
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "UpdateQOSCgroups")

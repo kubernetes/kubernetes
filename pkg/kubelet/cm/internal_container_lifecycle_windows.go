@@ -32,12 +32,12 @@ import (
 	"k8s.io/utils/cpuset"
 )
 
-func (i *internalContainerLifecycleImpl) PreCreateContainer(pod *v1.Pod, container *v1.Container, containerConfig *runtimeapi.ContainerConfig) error {
+func (i *internalContainerLifecycleImpl) PreCreateContainer(logger klog.Logger, pod *v1.Pod, container *v1.Container, containerConfig *runtimeapi.ContainerConfig) error {
 	if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WindowsCPUAndMemoryAffinity) {
 		return nil
 	}
 
-	klog.V(4).Info("PreCreateContainer for Windows")
+	logger.V(4).Info("PreCreateContainer for Windows")
 
 	// retrieve CPU and NUMA affinity from CPU Manager and Memory Manager (if enabled)
 	var allocatedCPUs cpuset.CPUSet
@@ -47,7 +47,7 @@ func (i *internalContainerLifecycleImpl) PreCreateContainer(pod *v1.Pod, contain
 
 	var numaNodes sets.Set[int]
 	if i.memoryManager != nil {
-		numaNodes = i.memoryManager.GetMemoryNUMANodes(klog.TODO(), pod, container)
+		numaNodes = i.memoryManager.GetMemoryNUMANodes(logger, pod, container)
 	}
 
 	// Gather all CPUs associated with the selected NUMA nodes
@@ -62,7 +62,7 @@ func (i *internalContainerLifecycleImpl) PreCreateContainer(pod *v1.Pod, contain
 
 	var finalCPUSet = computeFinalCpuSet(allocatedCPUs, allNumaNodeCPUs)
 
-	klog.V(4).InfoS("Setting CPU affinity", "affinity", finalCPUSet, "container", container.Name, "pod", pod.UID)
+	logger.V(4).Info("Setting CPU affinity", "affinity", finalCPUSet, "container", container.Name, "pod", pod.UID)
 
 	// Set CPU group affinities in the container config
 	if finalCPUSet != nil {

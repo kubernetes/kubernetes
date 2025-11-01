@@ -1050,7 +1050,8 @@ func (kl *Kubelet) killPod(ctx context.Context, pod *v1.Pod, p kubecontainer.Pod
 	if err := kl.containerRuntime.KillPod(ctx, pod, p, gracePeriodOverride); err != nil {
 		return err
 	}
-	if err := kl.containerManager.UpdateQOSCgroups(); err != nil {
+	// TODO: Pass logger from context once contextual logging migration is complete
+	if err := kl.containerManager.UpdateQOSCgroups(klog.TODO()); err != nil {
 		klog.V(2).InfoS("Failed to update QoS cgroups while killing pod", "err", err)
 	}
 	return nil
@@ -2586,17 +2587,24 @@ func (kl *Kubelet) cleanupOrphanedPodCgroups(pcm cm.PodContainerManager, cgroupP
 		// process in the cgroup to the minimum value while we wait.
 		if podVolumesExist := kl.podVolumesExist(uid); podVolumesExist {
 			klog.V(3).InfoS("Orphaned pod found, but volumes not yet removed.  Reducing cpu to minimum", "podUID", uid)
-			if err := pcm.ReduceCPULimits(val); err != nil {
+			// TODO: Pass logger from context once contextual logging migration is complete
+			if err := pcm.ReduceCPULimits(klog.TODO(), val); err != nil {
 				klog.InfoS("Failed to reduce cpu time for pod pending volume cleanup", "podUID", uid, "err", err)
 			}
 			continue
 		}
 		klog.V(3).InfoS("Orphaned pod found, removing pod cgroups", "podUID", uid)
-		// Destroy all cgroups of pod that should not be running,
-		// by first killing all the attached processes to these cgroups.
-		// We ignore errors thrown by the method, as the housekeeping loop would
-		// again try to delete these unwanted pod cgroups
-		go pcm.Destroy(val)
+		// Destroy all cgroups of pods that should not be running,
+		// by first killing all the attached processes in these cgroups.
+		// The error return value of Destroy is explicitly checked and logged,
+		// but errors are tolerated since the housekeeping loop loop would
+		// again try to delete these unwanted pod cgroups.
+		// TODO: Pass logger from context once contextual logging migration is complete
+		go func() {
+			if err := pcm.Destroy(klog.TODO(), val); err != nil {
+				klog.InfoS("Failed to destroy orphaned pod cgroup", "podUID", uid, "err", err)
+			}
+		}()
 	}
 }
 

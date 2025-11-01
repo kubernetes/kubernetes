@@ -766,7 +766,7 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 		return resizeResult
 	}
 
-	setPodCgroupConfig := func(rName v1.ResourceName, setLimitValue bool) error {
+	setPodCgroupConfig := func(logger klog.Logger, rName v1.ResourceName, setLimitValue bool) error {
 		var err error
 		resizedResources := &cm.ResourceConfig{}
 		switch rName {
@@ -784,7 +784,7 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 			}
 			resizedResources.Memory = podResources.Memory
 		}
-		err = pcm.SetPodCgroupConfig(pod, resizedResources)
+		err = pcm.SetPodCgroupConfig(logger, pod, resizedResources)
 		if err != nil {
 			logger.Error(err, "Failed to set cgroup config", "resource", rName, "pod", klog.KObj(pod))
 			return err
@@ -804,12 +804,14 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 		var err error
 		// At upsizing, limits should expand prior to requests in order to keep "requests <= limits".
 		if newPodCgLimValue > currPodCgLimValue {
-			if err = setPodCgroupConfig(rName, true); err != nil {
+			// TODO: Pass logger from context once contextual logging migration is complete
+			if err = setPodCgroupConfig(klog.TODO(), rName, true); err != nil {
 				return err
 			}
 		}
 		if newPodCgReqValue > currPodCgReqValue {
-			if err = setPodCgroupConfig(rName, false); err != nil {
+			// TODO: Pass logger from context once contextual logging migration is complete
+			if err = setPodCgroupConfig(klog.TODO(), rName, false); err != nil {
 				return err
 			}
 		}
@@ -821,12 +823,14 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 		}
 		// At downsizing, requests should shrink prior to limits in order to keep "requests <= limits".
 		if newPodCgReqValue < currPodCgReqValue {
-			if err = setPodCgroupConfig(rName, false); err != nil {
+			// TODO: Pass logger from context once contextual logging migration is complete
+			if err = setPodCgroupConfig(klog.TODO(), rName, false); err != nil {
 				return err
 			}
 		}
 		if newPodCgLimValue < currPodCgLimValue {
-			if err = setPodCgroupConfig(rName, true); err != nil {
+			// TODO(#127825): Pass logger from context once contextual logging migration is complete
+			if err = setPodCgroupConfig(klog.TODO(), rName, true); err != nil {
 				return err
 			}
 		}
@@ -1112,7 +1116,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		// allocated cpus are released immediately. If the container is restarted, cpus will be re-allocated
 		// to it.
 		if containerStatus != nil && containerStatus.State != kubecontainer.ContainerStateRunning {
-			if err := m.internalLifecycle.PostStopContainer(containerStatus.ID.ID); err != nil {
+			if err := m.internalLifecycle.PostStopContainer(logger, containerStatus.ID.ID); err != nil {
 				logger.Error(err, "Internal container post-stop lifecycle hook failed for container in pod with error",
 					"containerName", container.Name, "pod", klog.KObj(pod))
 			}
