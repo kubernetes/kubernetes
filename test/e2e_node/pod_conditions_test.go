@@ -57,40 +57,65 @@ var _ = SIGDescribe("Pod conditions managed by Kubelet", func() {
 		})
 		ginkgo.It("a pod without init containers should report all conditions set in expected order after the pod is up", runPodReadyConditionsTest(f, false, true))
 		ginkgo.It("a pod with init containers should report all conditions set in expected order after the pod is up", runPodReadyConditionsTest(f, true, true))
-		ginkgo.It("a pod failing to mount volumes and without init containers should report scheduled and initialized conditions set", runPodFailingConditionsTest(f, false, true))
-		ginkgo.It("a pod failing to mount volumes and with init containers should report just the scheduled condition set", runPodFailingConditionsTest(f, true, true))
+		ginkgo.It("a pod failing to mount volumes (ConfigMap) and without init containers should report scheduled and initialized conditions set", runPodFailingConditionsTest(f, false, true, "ConfigMap"))
+		ginkgo.It("a pod failing to mount volumes (ConfigMap) and with init containers should report just the scheduled condition set", runPodFailingConditionsTest(f, true, true, "ConfigMap"))
+		ginkgo.It("a pod failing to mount volumes (Secret) and without init containers should report scheduled and initialized conditions set", runPodFailingConditionsTest(f, false, true, "Secret"))
+		ginkgo.It("a pod failing to mount volumes (Secret) and with init containers should report just the scheduled condition set", runPodFailingConditionsTest(f, true, true, "Secret"))
 		addAfterEachForCleaningUpPods(f)
 	})
 
 	ginkgo.Context("without PodReadyToStartContainersCondition condition", func() {
 		ginkgo.It("a pod without init containers should report all conditions set in expected order after the pod is up", runPodReadyConditionsTest(f, false, false))
 		ginkgo.It("a pod with init containers should report all conditions set in expected order after the pod is up", runPodReadyConditionsTest(f, true, false))
-		ginkgo.It("a pod failing to mount volumes and without init containers should report scheduled and initialized conditions set", runPodFailingConditionsTest(f, false, false))
-		ginkgo.It("a pod failing to mount volumes and with init containers should report just the scheduled condition set", runPodFailingConditionsTest(f, true, false))
+		ginkgo.It("a pod failing to mount volumes and without init containers should report scheduled and initialized conditions set", runPodFailingConditionsTest(f, false, false, "ConfigMap"))
+		ginkgo.It("a pod failing to mount volumes and with init containers should report just the scheduled condition set", runPodFailingConditionsTest(f, true, false, "ConfigMap"))
+		ginkgo.It("a pod failing to mount volumes (Secret) and without init containers should report scheduled and initialized conditions set", runPodFailingConditionsTest(f, false, false, "Secret"))
+		ginkgo.It("a pod failing to mount volumes (Secret) and with init containers should report just the scheduled condition set", runPodFailingConditionsTest(f, true, false, "Secret"))
 		addAfterEachForCleaningUpPods(f)
 	})
 })
 
-func runPodFailingConditionsTest(f *framework.Framework, hasInitContainers, checkPodReadyToStart bool) func(ctx context.Context) {
+func runPodFailingConditionsTest(f *framework.Framework, hasInitContainers, checkPodReadyToStart bool, volumeSource string) func(ctx context.Context) {
 	return func(ctx context.Context) {
 		ginkgo.By("creating a pod whose sandbox creation is blocked due to a missing volume")
 
 		p := webserverPodSpec("pod-"+string(uuid.NewUUID()), "web1", "init1", hasInitContainers)
-		p.Spec.Volumes = []v1.Volume{
-			{
-				Name: "cm",
-				VolumeSource: v1.VolumeSource{
-					ConfigMap: &v1.ConfigMapVolumeSource{
-						LocalObjectReference: v1.LocalObjectReference{Name: "does-not-exist"},
+
+		switch volumeSource {
+		case "ConfigMap":
+			p.Spec.Volumes = []v1.Volume{
+				{
+					Name: "cm",
+					VolumeSource: v1.VolumeSource{
+						ConfigMap: &v1.ConfigMapVolumeSource{
+							LocalObjectReference: v1.LocalObjectReference{Name: "does-not-exist-configmap"},
+						},
 					},
 				},
-			},
-		}
-		p.Spec.Containers[0].VolumeMounts = []v1.VolumeMount{
-			{
-				Name:      "cm",
-				MountPath: "/config",
-			},
+			}
+			p.Spec.Containers[0].VolumeMounts = []v1.VolumeMount{
+				{
+					Name:      "cm",
+					MountPath: "/config"},
+			}
+		case "Secret":
+			p.Spec.Volumes = []v1.Volume{
+				{
+					Name: "secret",
+					VolumeSource: v1.VolumeSource{
+						Secret: &v1.SecretVolumeSource{
+							SecretName: "does-not-exist-secret",
+						},
+					},
+				},
+			}
+			p.Spec.Containers[0].VolumeMounts = []v1.VolumeMount{
+				{
+					Name:      "secret",
+					MountPath: "/secret"},
+			}
+		default:
+			framework.Failf("unsupported volumeSource: %s", volumeSource)
 		}
 
 		p = e2epod.NewPodClient(f).Create(ctx, p)
@@ -139,44 +164,80 @@ func runPodFailingConditionsTest(f *framework.Framework, hasInitContainers, chec
 
 		// this testcase is creating the missing volume that unblock the pod above,
 		// and check PodReadyToStartContainer is setting correctly.
-		ginkgo.By("checking pod condition for a pod when volumes source is created")
+		ginkgo.By(fmt.Sprintf("checking pod condition for a pod when volume source (%s) is created", volumeSource))
 
-		configmap := v1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "cm-that-unblock-pod-condition",
-			},
-			Data: map[string]string{
-				"key": "value",
-			},
-			BinaryData: map[string][]byte{
-				"binaryKey": []byte("value"),
-			},
+		switch volumeSource {
+		case "ConfigMap":
+			configmap := v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cm-that-unblock-pod-condition",
+				},
+				Data: map[string]string{
+					"key": "value",
+				},
+				BinaryData: map[string][]byte{
+					"binaryKey": []byte("value"),
+				},
+			}
+			_, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, &configmap, metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+			defer func() {
+				err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Delete(ctx, "cm-that-unblock-pod-condition", metav1.DeleteOptions{})
+				framework.ExpectNoError(err, "unable to delete configmap")
+			}()
+		case "Secret":
+			secret := v1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "secret-that-unblock-pod-condition",
+				},
+				Data: map[string][]byte{
+					"key": []byte("value"),
+				},
+			}
+			_, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(ctx, &secret, metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+			defer func() {
+				err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Delete(ctx, "secret-that-unblock-pod-condition", metav1.DeleteOptions{})
+				framework.ExpectNoError(err, "unable to delete secret")
+			}()
 		}
-
-		_, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, &configmap, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
-
-		defer func() {
-			err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Delete(ctx, "cm-that-unblock-pod-condition", metav1.DeleteOptions{})
-			framework.ExpectNoError(err, "unable to delete configmap")
-		}()
 
 		p2 := webserverPodSpec("pod2-"+string(uuid.NewUUID()), "web2", "init2", hasInitContainers)
-		p2.Spec.Volumes = []v1.Volume{
-			{
-				Name: "cm-2",
-				VolumeSource: v1.VolumeSource{
-					ConfigMap: &v1.ConfigMapVolumeSource{
-						LocalObjectReference: v1.LocalObjectReference{Name: "cm-that-unblock-pod-condition"},
+
+		switch volumeSource {
+		case "ConfigMap":
+			p2.Spec.Volumes = []v1.Volume{
+				{
+					Name: "cm-2",
+					VolumeSource: v1.VolumeSource{
+						ConfigMap: &v1.ConfigMapVolumeSource{
+							LocalObjectReference: v1.LocalObjectReference{Name: "cm-that-unblock-pod-condition"},
+						},
 					},
 				},
-			},
-		}
-		p2.Spec.Containers[0].VolumeMounts = []v1.VolumeMount{
-			{
-				Name:      "cm-2",
-				MountPath: "/config",
-			},
+			}
+			p2.Spec.Containers[0].VolumeMounts = []v1.VolumeMount{
+				{
+					Name:      "cm-2",
+					MountPath: "/config"},
+			}
+		case "Secret":
+			p2.Spec.Volumes = []v1.Volume{
+				{
+					Name: "secret-2",
+					VolumeSource: v1.VolumeSource{
+						Secret: &v1.SecretVolumeSource{
+							SecretName: "secret-that-unblock-pod-condition",
+						},
+					},
+				},
+			}
+			p2.Spec.Containers[0].VolumeMounts = []v1.VolumeMount{
+				{
+					Name:      "secret-2",
+					MountPath: "/secret",
+				},
+			}
 		}
 
 		p2 = e2epod.NewPodClient(f).Create(ctx, p2)
