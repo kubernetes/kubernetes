@@ -811,6 +811,9 @@ run_rs_tests() {
     kube::test::if_has_string "${output_message}" 'kubectl-autoscale'
     # Clean up
     kubectl delete hpa frontend "${kube_flags[@]:?}"
+    # autoscale with --dry-run=client should include namespace in output
+    output_message=$(kubectl autoscale rs frontend "${kube_flags[@]:?}" --max=3 --dry-run=client -o yaml 2>&1)
+    kube::test::if_has_string "${output_message}" 'namespace:'
     # autoscale without specifying --max should fail
     ! kubectl autoscale rs frontend "${kube_flags[@]:?}" || exit 1
     # Clean up
