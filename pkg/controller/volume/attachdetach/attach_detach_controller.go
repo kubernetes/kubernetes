@@ -495,7 +495,6 @@ func (adc *attachDetachController) podAdd(logger klog.Logger, obj interface{}) {
 
 	volumeActionFlag := util.DetermineVolumeAction(
 		pod,
-		adc.desiredStateOfWorld,
 		true /* default volume action */)
 
 	util.ProcessPodVolumes(logger, pod, volumeActionFlag, /* addVolumes */
@@ -519,7 +518,6 @@ func (adc *attachDetachController) podUpdate(logger klog.Logger, oldObj, newObj 
 
 	volumeActionFlag := util.DetermineVolumeAction(
 		pod,
-		adc.desiredStateOfWorld,
 		true /* default volume action */)
 
 	util.ProcessPodVolumes(logger, pod, volumeActionFlag, /* addVolumes */
@@ -651,7 +649,6 @@ func (adc *attachDetachController) syncPVCByKey(logger klog.Logger, key string) 
 		}
 		volumeActionFlag := util.DetermineVolumeAction(
 			pod,
-			adc.desiredStateOfWorld,
 			true /* default volume action */)
 
 		util.ProcessPodVolumes(logger, pod, volumeActionFlag, /* addVolumes */
