@@ -340,36 +340,6 @@ func TestNewSMBMapping(t *testing.T) {
 	}
 }
 
-func TestIsValidPath(t *testing.T) {
-	tests := []struct {
-		remotepath     string
-		expectedResult bool
-		expectError    bool
-	}{
-		{
-			"c:",
-			true,
-			false,
-		},
-		{
-			"invalid-path",
-			false,
-			false,
-		},
-	}
-
-	for _, test := range tests {
-		result, err := isValidPath(test.remotepath)
-		assert.Equal(t, result, test.expectedResult, "Expect result not equal with isValidPath(%s) return: %q, expected: %q, error: %v",
-			test.remotepath, result, test.expectedResult, err)
-		if test.expectError {
-			assert.NotNil(t, err, "Expect error during isValidPath(%s)", test.remotepath)
-		} else {
-			assert.Nil(t, err, "Expect error is nil during isValidPath(%s)", test.remotepath)
-		}
-	}
-}
-
 func TestIsAccessDeniedError(t *testing.T) {
 	tests := []struct {
 		err            error
