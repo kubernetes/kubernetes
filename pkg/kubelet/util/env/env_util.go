@@ -23,16 +23,19 @@ import (
 	"strings"
 )
 
-// ParseEnv implements a strict parser for .env environment files,
-// adhering to the format defined in the RFC documentation at https://smartmob-rfc.readthedocs.io/en/latest/2-dotenv.html.
+// ParseEnv implements a strict parser for environment files using a subset of POSIX shell syntax.
+// The parser enforces that all variable values must be enclosed in single quotes.
 //
-// This function implements a strict parser for environment files similar to the requirements in the OCI and Docker env file RFCs:
-//   - Leading whitespace is ignored for all lines.
-//   - Blank lines (including those with only whitespace) are ignored.
-//   - Lines starting with '#' are treated as comments and ignored.
-//   - Each variable must be declared as VAR=VAL. Whitespace around '=' and at the end of the line is ignored.
-//   - A backslash ('\') at the end of a variable declaration line indicates the value continues on the next line. The lines are joined with a single space, and the backslash is not included.
-//   - If a continuation line is interrupted by a blank line or comment, it is considered invalid and an error is returned.
+// Supported format:
+//   - VAR='value' - Values must be enclosed in single quotes
+//   - Content within single quotes is preserved literally (no escape sequences or expansions)
+//   - Multi-line values are supported (newlines within single quotes are preserved)
+//   - Inline comments after the closing quote are supported (e.g., VAR='value' # comment)
+//   - Leading whitespace before the variable name is ignored
+//   - Blank lines (including those with only whitespace) are ignored when not within quotes
+//   - Lines starting with '#' are treated as comments and ignored
+//   - Whitespace before '=' is invalid (e.g., VAR = 'value' is rejected)
+//   - Whitespace after '=' but before the quote results in empty assignment (e.g., VAR= 'value' assigns empty string)
 func ParseEnv(envFilePath, key string) (string, error) {
 	file, err := os.Open(envFilePath)
 	if err != nil {
@@ -41,67 +44,85 @@ func ParseEnv(envFilePath, key string) (string, error) {
 	defer func() { _ = file.Close() }()
 
 	scanner := bufio.NewScanner(file)
-	var (
-		currentLine    string
-		inContinuation bool
-		lineNum        int
-	)
+	lineNum := 0
 
 	for scanner.Scan() {
 		lineNum++
 		line := scanner.Text()
 		line = strings.TrimLeft(line, " \t")
 
+		// Skip blank lines
 		if line == "" {
-			if inContinuation {
-				return "", fmt.Errorf("invalid environment variable format at line %d: blank line in continuation", lineNum)
-			}
-			continue
-		}
-		if strings.HasPrefix(line, "#") {
-			if inContinuation {
-				return "", fmt.Errorf("invalid environment variable format at line %d: comment in continuation", lineNum)
-			}
 			continue
 		}
 
-		if inContinuation {
-			trimmed := strings.TrimRight(line, " \t")
-			if strings.HasSuffix(trimmed, "\\") {
-				currentLine += " " + strings.TrimRight(trimmed[:len(trimmed)-1], " \t")
-				continue
-			} else {
-				currentLine += " " + trimmed
-				line = currentLine
-				inContinuation = false
-				currentLine = ""
-			}
-		} else {
-			trimmed := strings.TrimRight(line, " \t")
-			if strings.HasSuffix(trimmed, "\\") {
-				currentLine = strings.TrimRight(trimmed[:len(trimmed)-1], " \t")
-				inContinuation = true
-				continue
-			}
+		// Skip comments
+		if strings.HasPrefix(line, "#") {
+			continue
 		}
 
 		eqIdx := strings.Index(line, "=")
 		if eqIdx == -1 {
-			return "", fmt.Errorf("invalid environment variable format at line %d", lineNum)
+			return "", fmt.Errorf("invalid environment variable format at line %d: missing '='", lineNum)
 		}
-		varName := strings.TrimSpace(line[:eqIdx])
-		varValue := strings.TrimRight(strings.TrimSpace(line[eqIdx+1:]), " \t")
 
+		// Variable name must not contain whitespace or trailing whitespace before '='
+		varNamePart := line[:eqIdx]
+		varName := strings.TrimRight(varNamePart, " \t")
 		if varName == "" {
-			return "", fmt.Errorf("invalid environment variable format at line %d", lineNum)
+			return "", fmt.Errorf("invalid environment variable format at line %d: empty variable name", lineNum)
 		}
-		if varName == key {
-			return varValue, nil
-		}
-	}
 
-	if inContinuation {
-		return "", fmt.Errorf("unexpected end of file: unfinished line continuation")
+		// If trimming removed whitespace, it means there was whitespace before '='
+		if varNamePart != varName {
+			return "", fmt.Errorf("invalid environment variable format at line %d: whitespace before '=' is not allowed", lineNum)
+		}
+		valuePart := line[eqIdx+1:]
+
+		// Check if there's whitespace before any non-whitespace character
+		trimmedValue := strings.TrimLeft(valuePart, " \t")
+		if valuePart != trimmedValue {
+			// There is whitespace between '=' and the value
+			// This matches bash behavior: KEY= 'val1' results in KEY being empty
+			if varName == key {
+				return "", nil
+			}
+			continue
+		}
+
+		// Value must start with single quote
+		if !strings.HasPrefix(trimmedValue, "'") {
+			return "", fmt.Errorf("invalid environment variable format at line %d: value must be enclosed in single quotes", lineNum)
+		}
+
+		// Find the closing single quote (may span multiple lines)
+		var valueBuilder strings.Builder
+		rest := trimmedValue[1:]
+		startLineNum := lineNum
+
+		for {
+			closingIdx := strings.Index(rest, "'")
+			if closingIdx != -1 {
+				valueBuilder.WriteString(rest[:closingIdx])
+				afterQuote := strings.TrimLeft(rest[closingIdx+1:], " \t")
+				if afterQuote != "" && !strings.HasPrefix(afterQuote, "#") {
+					return "", fmt.Errorf("invalid environment variable format at line %d: unexpected content after closing quote", lineNum)
+				}
+
+				if varName == key {
+					return valueBuilder.String(), nil
+				}
+				break
+			}
+
+			valueBuilder.WriteString(rest)
+			valueBuilder.WriteString("\n")
+			if !scanner.Scan() {
+				return "", fmt.Errorf("invalid environment variable format starting at line %d: unclosed single quote", startLineNum)
+			}
+			lineNum++
+			rest = scanner.Text()
+		}
 	}
 
 	if err := scanner.Err(); err != nil {
