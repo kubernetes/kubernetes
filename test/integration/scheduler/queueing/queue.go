@@ -23,6 +23,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	schedulingapi "k8s.io/api/scheduling/v1alpha1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -70,6 +71,8 @@ type CoreResourceEnqueueTestCase struct {
 	InitialStorageCapacities []*storagev1.CSIStorageCapacity
 	// InitialVolumeAttachment is the list of VolumeAttachment to be created at first.
 	InitialVolumeAttachment []*storagev1.VolumeAttachment
+	// InitialWorkloads is the list of Workloads to be created at first.
+	InitialWorkloads []*schedulingapi.Workload
 	// Pods are the list of Pods to be created.
 	// All of them are expected to be unschedulable at first.
 	Pods []*v1.Pod
@@ -77,6 +80,9 @@ type CoreResourceEnqueueTestCase struct {
 	// It returns the map keyed with ClusterEvents to be triggered by this function,
 	// and valued with the number of triggering of the event.
 	TriggerFn func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error)
+	// WaitingInUnschedulable specifies whether the test should wait until the pods wait as unschedulable,
+	// being blocked at the PreEnqueue gate.
+	WaitingInUnschedulable bool
 	// WantRequeuedPods is the map of Pods that are expected to be requeued after triggerFn.
 	WantRequeuedPods sets.Set[string]
 	// EnableSchedulingQueueHint indicates which feature gate value(s) the test case should run with.
@@ -89,6 +95,9 @@ type CoreResourceEnqueueTestCase struct {
 	// EnabledRAExtendedResource indicates wether the test case should run with feature gate
 	// DRAExtendedResource enabled or not.
 	EnableDRAExtendedResource bool
+	// EnableGangScheduling indicates wether the test case should run with feature gates
+	// GenericWorkload and GangScheduling enabled or not.
+	EnableGangScheduling bool
 }
 
 var (
@@ -124,7 +133,8 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.UpdateNodeAllocatable}: 1}, nil
 		},
-		WantRequeuedPods: sets.New("pod2"),
+		WantRequeuedPods:          sets.New("pod2"),
+		EnableSchedulingQueueHint: sets.New(true),
 	},
 	{
 		Name:          "Pod rejected by the PodAffinity plugin is requeued when a new Node is created and turned to ready",
@@ -2410,6 +2420,53 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		WantRequeuedPods:          sets.New("pod1"),
 		EnableSchedulingQueueHint: sets.New(true),
 	},
+	{
+		Name:          "Pod rejected by the GangScheduling plugin is requeued when a new pod with matching workload reference is created",
+		EnablePlugins: []string{names.GangScheduling},
+		InitialNodes: []*v1.Node{
+			st.MakeNode().Name("fake-node1").Obj(),
+		},
+		InitialWorkloads: []*schedulingapi.Workload{
+			st.MakeWorkload().Name("w1").PodGroup(st.MakePodGroup().Name("pg1").MinCount(2).Obj()).Obj(),
+		},
+		Pods: []*v1.Pod{
+			st.MakePod().Name("pod1").Container("image").Workload(&v1.WorkloadReference{Name: "w1", PodGroup: "pg1"}).Obj(),
+			st.MakePod().Name("pod2").Container("image").Workload(&v1.WorkloadReference{Name: "w1", PodGroup: "pg2"}).Obj(),
+		},
+		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+			pod := st.MakePod().Name("pod3").Container("image").Workload(&v1.WorkloadReference{Name: "w1", PodGroup: "pg1"}).Obj()
+			if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Create(testCtx.Ctx, pod, metav1.CreateOptions{}); err != nil {
+				return nil, fmt.Errorf("failed to create Pod %q: %w", pod.Name, err)
+			}
+			return map[fwk.ClusterEvent]uint64{framework.EventUnscheduledPodAdd: 1}, nil
+		},
+		WaitingInUnschedulable:    true,
+		WantRequeuedPods:          sets.New("pod1", "pod3"),
+		EnableSchedulingQueueHint: sets.New(true),
+		EnableGangScheduling:      true,
+	},
+	{
+		Name:          "Pod rejected by the GangScheduling plugin is requeued when a matching workload is created",
+		EnablePlugins: []string{names.GangScheduling},
+		InitialNodes: []*v1.Node{
+			st.MakeNode().Name("fake-node1").Obj(),
+		},
+		Pods: []*v1.Pod{
+			st.MakePod().Name("pod1").Container("image").Workload(&v1.WorkloadReference{Name: "w1", PodGroup: "pg1"}).Obj(),
+			st.MakePod().Name("pod2").Container("image").Workload(&v1.WorkloadReference{Name: "w1", PodGroup: "pg2"}).Obj(),
+		},
+		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+			workload := st.MakeWorkload().Name("w1").PodGroup(st.MakePodGroup().Name("pg1").MinCount(1).Obj()).Obj()
+			if _, err := testCtx.ClientSet.SchedulingV1alpha1().Workloads(testCtx.NS.Name).Create(testCtx.Ctx, workload, metav1.CreateOptions{}); err != nil {
+				return nil, fmt.Errorf("failed to create Workload %q: %w", workload.Name, err)
+			}
+			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Workload, ActionType: fwk.Add}: 1}, nil
+		},
+		WaitingInUnschedulable:    true,
+		WantRequeuedPods:          sets.New("pod1"),
+		EnableSchedulingQueueHint: sets.New(true),
+		EnableGangScheduling:      true,
+	},
 }
 
 // TestCoreResourceEnqueue verify Pods failed by in-tree default plugins can be
@@ -2419,6 +2476,12 @@ func RunTestCoreResourceEnqueue(t *testing.T, tt *CoreResourceEnqueueTestCase) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	if tt.EnableDRAExtendedResource {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, true)
+	}
+	if tt.EnableGangScheduling {
+		featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+			features.GenericWorkload: true,
+			features.GangScheduling:  true,
+		})
 	}
 	logger, _ := ktesting.NewTestContext(t)
 
@@ -2514,6 +2577,13 @@ func RunTestCoreResourceEnqueue(t *testing.T, tt *CoreResourceEnqueueTestCase) {
 		}
 	}
 
+	for _, wl := range tt.InitialWorkloads {
+		wl.Namespace = ns
+		if _, err := cs.SchedulingV1alpha1().Workloads(ns).Create(testCtx.Ctx, wl, metav1.CreateOptions{}); err != nil {
+			t.Fatalf("Failed to create a Workload %q: %v", wl.Name, err)
+		}
+	}
+
 	for _, pod := range tt.InitialPods {
 		if _, err := cs.CoreV1().Pods(ns).Create(ctx, pod, metav1.CreateOptions{}); err != nil {
 			t.Fatalf("Failed to create an initial Pod %q: %v", pod.Name, err)
@@ -2526,34 +2596,44 @@ func RunTestCoreResourceEnqueue(t *testing.T, tt *CoreResourceEnqueueTestCase) {
 		}
 	}
 
-	// Wait for the tt.Pods to be present in the scheduling active queue.
-	if err := wait.PollUntilContextTimeout(ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
-		pendingPods, _ := testCtx.Scheduler.SchedulingQueue.PendingPods()
-		return len(pendingPods) == len(tt.Pods) && len(testCtx.Scheduler.SchedulingQueue.PodsInActiveQ()) == len(tt.Pods), nil
-	}); err != nil {
-		t.Fatalf("Failed to wait for all pods to be present in the scheduling queue: %v", err)
-	}
-
-	t.Log("Confirmed Pods in the scheduling queue, starting to schedule them")
-
-	// Pop all pods out. They should become unschedulable.
-	for i := 0; i < len(tt.Pods); i++ {
-		testCtx.Scheduler.ScheduleOne(testCtx.Ctx)
-	}
-	// Wait for the tt.Pods to be still present in the scheduling (unschedulable) queue.
-	if err := wait.PollUntilContextTimeout(ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
-		activePodsCount := len(testCtx.Scheduler.SchedulingQueue.PodsInActiveQ())
-		if activePodsCount > 0 {
-			return false, fmt.Errorf("active queue was expected to be empty, but found %v Pods", activePodsCount)
+	if tt.WaitingInUnschedulable {
+		// Wait for the tt.Pods to be unschedulable in the scheduling queue.
+		if err := wait.PollUntilContextTimeout(ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
+			pendingPods, _ := testCtx.Scheduler.SchedulingQueue.PendingPods()
+			return len(pendingPods) == len(tt.Pods) && len(testCtx.Scheduler.SchedulingQueue.PodsInActiveQ()) == 0, nil
+		}); err != nil {
+			t.Fatalf("Failed to wait for all pods to be present in the scheduling queue: %v", err)
+		}
+		t.Log("All pods are waiting as unschedulable, will trigger triggerFn")
+	} else {
+		// Wait for the tt.Pods to be present in the scheduling active queue.
+		if err := wait.PollUntilContextTimeout(ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
+			pendingPods, _ := testCtx.Scheduler.SchedulingQueue.PendingPods()
+			return len(pendingPods) == len(tt.Pods) && len(testCtx.Scheduler.SchedulingQueue.PodsInActiveQ()) == len(tt.Pods), nil
+		}); err != nil {
+			t.Fatalf("Failed to wait for all pods to be present in the scheduling queue: %v", err)
 		}
 
-		pendingPods, _ := testCtx.Scheduler.SchedulingQueue.PendingPods()
-		return len(pendingPods) == len(tt.Pods), nil
-	}); err != nil {
-		t.Fatalf("Failed to wait for all pods to remain in the scheduling queue after scheduling attempts: %v", err)
-	}
+		t.Log("Confirmed Pods in the scheduling queue, starting to schedule them")
 
-	t.Log("finished initial schedulings for all Pods, will trigger triggerFn")
+		// Pop all pods out. They should become unschedulable.
+		for i := 0; i < len(tt.Pods); i++ {
+			testCtx.Scheduler.ScheduleOne(testCtx.Ctx)
+		}
+		// Wait for the tt.Pods to be still present in the scheduling (unschedulable) queue.
+		if err := wait.PollUntilContextTimeout(ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
+			activePodsCount := len(testCtx.Scheduler.SchedulingQueue.PodsInActiveQ())
+			if activePodsCount > 0 {
+				return false, fmt.Errorf("active queue was expected to be empty, but found %v Pods", activePodsCount)
+			}
+
+			pendingPods, _ := testCtx.Scheduler.SchedulingQueue.PendingPods()
+			return len(pendingPods) == len(tt.Pods), nil
+		}); err != nil {
+			t.Fatalf("Failed to wait for all pods to remain in the scheduling queue after scheduling attempts: %v", err)
+		}
+		t.Log("finished initial schedulings for all Pods, will trigger triggerFn")
+	}
 
 	legacyregistry.Reset() // reset the metric before triggering
 	wantTriggeredEvents, err := tt.TriggerFn(testCtx)

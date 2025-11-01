@@ -75,6 +75,7 @@ var (
 		fwk.ResourceClaim,
 		fwk.ResourceSlice,
 		fwk.DeviceClass,
+		fwk.Workload,
 	}
 )
 
@@ -152,6 +153,7 @@ func UnrollWildCardResource() []fwk.ClusterEventWithHint {
 		{Event: fwk.ClusterEvent{Resource: fwk.StorageClass, ActionType: fwk.All}},
 		{Event: fwk.ClusterEvent{Resource: fwk.ResourceClaim, ActionType: fwk.All}},
 		{Event: fwk.ClusterEvent{Resource: fwk.DeviceClass, ActionType: fwk.All}},
+		{Event: fwk.ClusterEvent{Resource: fwk.Workload, ActionType: fwk.All}},
 	}
 }
 
