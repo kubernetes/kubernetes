@@ -27346,6 +27346,13 @@ func schema_k8sio_api_core_v1_NodeSystemInfo(ref common.ReferenceCallback) commo
 							Ref:         ref(corev1.NodeSwapStatus{}.OpenAPIModelName()),
 						},
 					},
+					"runningInUserNS": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Whether the node is running in a user namespace.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 				},
 				Required: []string{"machineID", "systemUUID", "bootID", "kernelVersion", "osImage", "containerRuntimeVersion", "kubeletVersion", "kubeProxyVersion", "operatingSystem", "architecture"},
 			},

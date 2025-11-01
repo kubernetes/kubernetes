@@ -457,6 +457,7 @@ const (
 	KubeletFineGrainedAuthz featuregate.Feature = "KubeletFineGrainedAuthz"
 
 	// owner: @AkihiroSuda
+	// kep: https://kep.k8s.io/2033
 	//
 	// Enables support for running kubelet in a user namespace.
 	// The user namespace has to be created before running kubelet.
@@ -1341,6 +1342,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	KubeletInUserNamespace: {
 		{Version: version.MustParse("1.22"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	KubeletPSI: {

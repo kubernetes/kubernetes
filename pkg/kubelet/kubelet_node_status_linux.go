@@ -1,8 +1,5 @@
-//go:build !windows && !linux
-// +build !windows,!linux
-
 /*
-Copyright 2019 The Kubernetes Authors.
+Copyright 2025 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,11 +16,17 @@ limitations under the License.
 
 package kubelet
 
+import (
+	"github.com/moby/sys/userns"
+
+	"k8s.io/utils/ptr"
+)
+
 func getOSSpecificLabels() (map[string]string, error) {
 	return nil, nil
 }
 
 // runningInUserNS returns a pointer to true if the Kubelet is running in a user namespace.
 func (kl *Kubelet) runningInUserNS() *bool {
-	return nil
+	return ptr.To(userns.RunningInUserNS())
 }
