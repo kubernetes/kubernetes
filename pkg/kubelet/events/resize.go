@@ -26,38 +26,150 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 )
 
-// PodResizeCompletedMsg gernerates the pod resize completed event message.
-func PodResizeCompletedMsg(allocatedPod *v1.Pod) string {
-	type containerAllocation struct {
-		Name      string                  `json:"name"`
-		Resources v1.ResourceRequirements `json:"resources,omitempty"`
+type containerAllocation struct {
+	Name      string                  `json:"name"`
+	Resources v1.ResourceRequirements `json:"resources,omitempty"`
+}
+
+type podResourceSummary struct {
+	// TODO: resources v1.ResourceRequirements, add pod-level resources here once resizing pod-level resources is supported
+	InitContainers []containerAllocation `json:"initContainers,omitempty"`
+	Containers     []containerAllocation `json:"containers,omitempty"`
+}
+
+// PodResizeCompletedMsg generates the pod resize completed event message.
+func PodResizeCompletedMsg(pod *v1.Pod, observedGeneration int64) string {
+	type podResourceSummaryWithGeneration struct {
+		ObservedGeneration int64 `json:"observedGeneration"`
+		*podResourceSummary
 	}
-	type podResourceSummary struct {
-		//TODO: resources v1.ResourceRequirements, add pod-level resources here once resizing pod-level resources is supported
-		InitContainers []containerAllocation `json:"initContainers,omitempty"`
-		Containers     []containerAllocation `json:"containers,omitempty"`
+	resources, _ := makeResourceSummary(pod)
+	podResizeSource := podResourceSummaryWithGeneration{
+		ObservedGeneration: observedGeneration,
+		podResourceSummary: resources,
+	}
+	podResizeMsgDetailsJSON, err := json.Marshal(podResizeSource)
+	if err != nil {
+		klog.ErrorS(err, "Failed to serialize resource summary", "pod", format.Pod(pod))
+		return "Pod resize completed"
+	}
+	podResizeCompletedMsg := fmt.Sprintf("Pod resize completed: %s", string(podResizeMsgDetailsJSON))
+	return podResizeCompletedMsg
+}
+
+// PodResizeInProgressMsg generates the pod resize in progress event message.
+func PodResizeInProgressMsg(allocatedPod *v1.Pod, observedGeneration int64) string {
+	type podResizeDiff struct {
+		ObservedGeneration int64               `json:"observedGeneration"`
+		ActualResources    *podResourceSummary `json:"actual,omitempty"`
+		AllocatedResources *podResourceSummary `json:"allocated,omitempty"`
 	}
 
-	podResizeSource := &podResourceSummary{}
+	allocated, actual := makeResourceSummary(allocatedPod)
 
-	for container, containerType := range podutil.ContainerIter(&allocatedPod.Spec, podutil.InitContainers|podutil.Containers) {
+	diff := &podResizeDiff{
+		ObservedGeneration: observedGeneration,
+		AllocatedResources: allocated,
+		ActualResources:    actual,
+	}
+
+	podResizeMsgDetailsJSON, err := json.Marshal(diff)
+	if err != nil {
+		klog.ErrorS(err, "Failed to serialize resource summary", "pod", format.Pod(allocatedPod))
+		return "Pod resize in progress"
+	}
+	podResizeInProgressMsg := fmt.Sprintf("Pod resize in progress: %s", string(podResizeMsgDetailsJSON))
+	return podResizeInProgressMsg
+}
+
+// PodResizeInProgressErrorMsg generates the pod resize in progress error event message.
+func PodResizeInProgressErrorMsg(allocatedPod *v1.Pod, observedGeneration int64, errorMsg string) string {
+	type podResizeDiff struct {
+		ObservedGeneration int64               `json:"observedGeneration"`
+		ActualResources    *podResourceSummary `json:"actual,omitempty"`
+		AllocatedResources *podResourceSummary `json:"allocated,omitempty"`
+		Error              string              `json:"error"`
+	}
+
+	allocated, actual := makeResourceSummary(allocatedPod)
+	diff := &podResizeDiff{
+		ObservedGeneration: observedGeneration,
+		AllocatedResources: allocated,
+		ActualResources:    actual,
+		Error:              errorMsg,
+	}
+
+	podResizeMsgDetailsJSON, err := json.Marshal(diff)
+	if err != nil {
+		klog.ErrorS(err, "Failed to serialize resource summary", "pod", format.Pod(allocatedPod))
+		return "Pod resize in progress reported an error: " + errorMsg
+	}
+	podResizeInProgressMsg := fmt.Sprintf("Pod resize in progress reported an error: %s", string(podResizeMsgDetailsJSON))
+	return podResizeInProgressMsg
+}
+
+// PodResizePendingMsg generates the pod resize pending event message.
+func PodResizePendingMsg(pod, allocatedPod *v1.Pod, reason string, observedGeneration int64) string {
+	type podResizeDiff struct {
+		ObservedGeneration int64               `json:"observedGeneration"`
+		AllocatedResources *podResourceSummary `json:"allocated,omitempty"`
+		DesiredResources   *podResourceSummary `json:"desired,omitempty"`
+	}
+
+	allocated, _ := makeResourceSummary(allocatedPod)
+	desired, _ := makeResourceSummary(pod)
+
+	diff := &podResizeDiff{
+		ObservedGeneration: observedGeneration,
+		AllocatedResources: allocated,
+		DesiredResources:   desired,
+	}
+
+	podResizeMsgDetailsJSON, err := json.Marshal(diff)
+	if err != nil {
+		klog.ErrorS(err, "Failed to serialize resource summary", "pod", format.Pod(pod))
+		return fmt.Sprintf("Pod resize %s", reason)
+	}
+	podResizePendingMsg := fmt.Sprintf("Pod resize %s: %s", reason, string(podResizeMsgDetailsJSON))
+	return podResizePendingMsg
+}
+
+// Returns the desired resources from the spec, and the actual resources from the container statuses.
+func makeResourceSummary(pod *v1.Pod) (*podResourceSummary, *podResourceSummary) {
+	desiredResources := &podResourceSummary{}
+	actualResources := &podResourceSummary{}
+
+	for container, containerType := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
 		allocation := containerAllocation{
 			Name:      container.Name,
 			Resources: container.Resources,
 		}
 		switch containerType {
 		case podutil.InitContainers:
-			podResizeSource.InitContainers = append(podResizeSource.InitContainers, allocation)
+			desiredResources.InitContainers = append(desiredResources.InitContainers, allocation)
 		case podutil.Containers:
-			podResizeSource.Containers = append(podResizeSource.Containers, allocation)
+			desiredResources.Containers = append(desiredResources.Containers, allocation)
 		}
 	}
 
-	podResizeMsgDetailsJSON, err := json.Marshal(podResizeSource)
-	if err != nil {
-		klog.ErrorS(err, "Failed to serialize resource summary", "pod", format.Pod(allocatedPod))
-		return "Pod resize completed"
+	for _, container := range pod.Status.InitContainerStatuses {
+		allocation := containerAllocation{
+			Name: container.Name,
+		}
+		if container.Resources != nil {
+			allocation.Resources = *container.Resources
+		}
+		actualResources.InitContainers = append(actualResources.InitContainers, allocation)
 	}
-	podResizeCompletedMsg := fmt.Sprintf("Pod resize completed: %s", string(podResizeMsgDetailsJSON))
-	return podResizeCompletedMsg
+	for _, container := range pod.Status.ContainerStatuses {
+		allocation := containerAllocation{
+			Name: container.Name,
+		}
+		if container.Resources != nil {
+			allocation.Resources = *container.Resources
+		}
+		actualResources.Containers = append(actualResources.Containers, allocation)
+	}
+
+	return desiredResources, actualResources
 }
