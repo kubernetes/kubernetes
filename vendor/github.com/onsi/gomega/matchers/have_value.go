@@ -12,10 +12,10 @@ const maxIndirections = 31
 
 type HaveValueMatcher struct {
 	Matcher        types.GomegaMatcher // the matcher to apply to the "resolved" actual value.
-	resolvedActual interface{}         // the ("resolved") value.
+	resolvedActual any                 // the ("resolved") value.
 }
 
-func (m *HaveValueMatcher) Match(actual interface{}) (bool, error) {
+func (m *HaveValueMatcher) Match(actual any) (bool, error) {
 	val := reflect.ValueOf(actual)
 	for allowedIndirs := maxIndirections; allowedIndirs > 0; allowedIndirs-- {
 		// return an error if value isn't valid. Please note that we cannot
@@ -45,10 +45,10 @@ func (m *HaveValueMatcher) Match(actual interface{}) (bool, error) {
 	return false, errors.New(format.Message(actual, "too many indirections"))
 }
 
-func (m *HaveValueMatcher) FailureMessage(_ interface{}) (message string) {
+func (m *HaveValueMatcher) FailureMessage(_ any) (message string) {
 	return m.Matcher.FailureMessage(m.resolvedActual)
 }
 
-func (m *HaveValueMatcher) NegatedFailureMessage(_ interface{}) (message string) {
+func (m *HaveValueMatcher) NegatedFailureMessage(_ any) (message string) {
 	return m.Matcher.NegatedFailureMessage(m.resolvedActual)
 }

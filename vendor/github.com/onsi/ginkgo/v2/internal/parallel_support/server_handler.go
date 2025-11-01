@@ -18,7 +18,7 @@ var voidSender Void
 // It handles all the business logic to avoid duplication between the two servers
 
 type ServerHandler struct {
-	done                   chan interface{}
+	done                   chan any
 	outputDestination      io.Writer
 	reporter               reporters.Reporter
 	alives                 []func() bool
@@ -46,7 +46,7 @@ func newServerHandler(parallelTotal int, reporter reporters.Reporter) *ServerHan
 
 		parallelTotal:     parallelTotal,
 		outputDestination: os.Stdout,
-		done:              make(chan interface{}),
+		done:              make(chan any),
 	}
 }
 

@@ -75,7 +75,7 @@ func (server *httpServer) Address() string {
 	return "http://" + server.listener.Addr().String()
 }
 
-func (server *httpServer) GetSuiteDone() chan interface{} {
+func (server *httpServer) GetSuiteDone() chan any {
 	return server.handler.done
 }
 
@@ -96,7 +96,7 @@ func (server *httpServer) RegisterAlive(node int, alive func() bool) {
 //
 
 // The server will forward all received messages to Ginkgo reporters registered with `RegisterReporters`
-func (server *httpServer) decode(writer http.ResponseWriter, request *http.Request, object interface{}) bool {
+func (server *httpServer) decode(writer http.ResponseWriter, request *http.Request, object any) bool {
 	defer request.Body.Close()
 	if json.NewDecoder(request.Body).Decode(object) != nil {
 		writer.WriteHeader(http.StatusBadRequest)

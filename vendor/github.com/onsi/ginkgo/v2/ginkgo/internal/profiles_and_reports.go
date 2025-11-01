@@ -90,6 +90,9 @@ func FinalizeProfilesAndReportsForSuites(suites TestSuites, cliConfig types.CLIC
 	if reporterConfig.JSONReport != "" {
 		reportFormats = append(reportFormats, reportFormat{ReportName: reporterConfig.JSONReport, GenerateFunc: reporters.GenerateJSONReport, MergeFunc: reporters.MergeAndCleanupJSONReports})
 	}
+	if reporterConfig.GoJSONReport != "" {
+		reportFormats = append(reportFormats, reportFormat{ReportName: reporterConfig.GoJSONReport, GenerateFunc: reporters.GenerateGoTestJSONReport, MergeFunc: reporters.MergeAndCleanupGoTestJSONReports})
+	}
 	if reporterConfig.JUnitReport != "" {
 		reportFormats = append(reportFormats, reportFormat{ReportName: reporterConfig.JUnitReport, GenerateFunc: reporters.GenerateJUnitReport, MergeFunc: reporters.MergeAndCleanupJUnitReports})
 	}
