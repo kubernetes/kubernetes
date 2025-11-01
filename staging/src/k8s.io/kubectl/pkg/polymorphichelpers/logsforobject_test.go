@@ -387,7 +387,7 @@ func TestLogsForObject(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		fakeClientset := fakeexternal.NewSimpleClientset(test.clientsetPods...)
+		fakeClientset := fakeexternal.NewClientset(test.clientsetPods...)
 		responses, err := logsForObjectWithClient(fakeClientset.CoreV1(), test.obj, test.opts, 20*time.Second, test.allContainers, test.allPods)
 		if test.expectedErr == "" && err != nil {
 			t.Errorf("%s: unexpected error: %v", test.name, err)
@@ -565,7 +565,7 @@ func TestLogsForObjectWithClient(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			pod := tc.podFn()
-			fakeClientset := fakeexternal.NewSimpleClientset(pod)
+			fakeClientset := fakeexternal.NewClientset(pod)
 			responses, err := logsForObjectWithClient(fakeClientset.CoreV1(), pod, tc.podLogOptions, 20*time.Second, tc.allContainers, tc.allPods)
 			if err != nil {
 				if len(tc.expectedError) > 0 {
