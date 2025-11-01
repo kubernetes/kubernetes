@@ -1616,3 +1616,45 @@ func verifyEventEmitted(t *testing.T, dc *disruptionController, expectedEvent st
 		}
 	}
 }
+
+func TestPodWithDeletionTimestampIsIgnoredForControllerCheck(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	dc, _ := newFakeDisruptionController(ctx)
+
+	pdb, _ := newMinAvailablePodDisruptionBudget(t, intstr.FromInt32(1))
+	add(t, dc.pdbStore, pdb)
+	dc.sync(ctx, pdb.Name)
+
+	// Create a pod with a controller that is not in the finders list
+	// to represent already deleted replica set/deployment/statefulset but pod is not deleted yet
+	pod, _ := newPod(t, "test-pod")
+	var trueVar = true
+	pod.OwnerReferences = []metav1.OwnerReference{
+		{
+			APIVersion: customGVK.GroupVersion().String(),
+			Kind:       customGVK.Kind,
+			Name:       "test-controller",
+			UID:        types.UID("controller-uid"),
+			Controller: &trueVar,
+		},
+	}
+
+	// Test case 1: Pod without deletion timestamp should error
+	_, _, err := dc.getExpectedScale(ctx, pdb, []*v1.Pod{pod})
+	if err == nil {
+		t.Fatalf("expected error for pod with missing controller and no DeletionTimestamp, got none")
+	}
+	if !strings.Contains(err.Error(), "found no controllers for pod") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Test case 2: Pod with deletion timestamp should NOT error
+	podWithDeletionTimestamp := pod.DeepCopy()
+	now := metav1.Now()
+	podWithDeletionTimestamp.DeletionTimestamp = &now
+
+	_, _, err = dc.getExpectedScale(ctx, pdb, []*v1.Pod{podWithDeletionTimestamp})
+	if err != nil {
+		t.Fatalf("unexpected error for pod with missing controller and DeletionTimestamp: %v", err)
+	}
+}
