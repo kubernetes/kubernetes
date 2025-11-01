@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/api/admissionregistration/v1"
+	v1 "k8s.io/api/admissionregistration/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -331,7 +331,38 @@ func CollectParams(
 			return nil, fmt.Errorf("paramRef.name and paramRef.selector are mutually exclusive")
 		}
 
-		switch param, err := paramStore.Get(paramRef.Name); {
+		// Try to get the param from the cache. If it's not found, retry with backoff
+		// to handle the race condition where resources (ConfigMap, Policy, Binding, and Param)
+		// are created in quick succession. The informer cache may have completed its initial
+		// sync (checked by WaitForCacheSync above), but newly created params might not have
+		// propagated to the cache yet. This retry logic with exponential backoff gives the
+		// cache a chance to catch up, avoiding false "param not found" errors during batch
+		// resource creation scenarios
+		var param runtime.Object
+		var err error
+		const maxRetries = 3
+		retryDelay := 50 * time.Millisecond
+
+		for i := 0; i < maxRetries; i++ {
+			param, err = paramStore.Get(paramRef.Name)
+			if err == nil {
+				// Successfully retrieved the param
+				params = []runtime.Object{param}
+				break
+			} else if !apierrors.IsNotFound(err) {
+				// Not a NotFound error, handle it immediately
+				break
+			}
+
+			// NotFound error - retry after a delay if there are retries left
+			if i < maxRetries-1 {
+				time.Sleep(retryDelay)
+				retryDelay *= 2 // exponential backoff
+			}
+		}
+
+		// Process the final result
+		switch {
 		case err == nil:
 			params = []runtime.Object{param}
 		case apierrors.IsNotFound(err):
