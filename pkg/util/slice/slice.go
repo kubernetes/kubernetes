@@ -18,37 +18,34 @@ limitations under the License.
 package slice
 
 import (
-	"sort"
+	"slices"
 )
 
 // CopyStrings copies the contents of the specified string slice
 // into a new slice.
-func CopyStrings(s []string) []string {
-	if s == nil {
-		return nil
-	}
-	c := make([]string, len(s))
-	copy(c, s)
-	return c
-}
+//
+// Deprecated: Use slices.Clone instead.
+var CopyStrings = slices.Clone[[]string]
 
 // SortStrings sorts the specified string slice in place. It returns the same
 // slice that was provided in order to facilitate method chaining.
+//
+// Deprecated: Use slices.Sort instead.
 func SortStrings(s []string) []string {
-	sort.Strings(s)
+	slices.Sort(s)
 	return s
 }
 
 // ContainsString checks if a given slice of strings contains the provided string.
 // If a modifier func is provided, it is called with the slice item before the comparation.
+//
+// Deprecated: Use slices.ContainsFunc or slices.Contains instead.
 func ContainsString(slice []string, s string, modifier func(s string) string) bool {
-	for _, item := range slice {
-		if item == s {
-			return true
-		}
-		if modifier != nil && modifier(item) == s {
-			return true
-		}
+	if slices.Contains(slice, s) {
+		return true
+	}
+	if modifier != nil {
+		return slices.ContainsFunc(slice, func(item string) bool { return modifier(item) == s })
 	}
 	return false
 }
