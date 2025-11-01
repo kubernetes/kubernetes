@@ -51,7 +51,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/events"
 	cliflag "k8s.io/component-base/cli/flag"
-	pvutil "k8s.io/component-helpers/storage/volume"
 	"k8s.io/controller-manager/pkg/informerfactory"
 	"k8s.io/klog/v2"
 	kubeschedulerconfigv1 "k8s.io/kube-scheduler/config/v1"
@@ -164,7 +163,7 @@ func StartFakePVController(ctx context.Context, clientSet clientset.Interface, i
 
 			if pvc.Spec.VolumeName == "" {
 				pvc.Spec.VolumeName = obj.Name
-				metav1.SetMetaDataAnnotation(&pvc.ObjectMeta, pvutil.AnnBindCompleted, "yes")
+				pvc.Status.Phase = v1.ClaimBound
 				_, err := clientSet.CoreV1().PersistentVolumeClaims(claimRef.Namespace).Update(ctx, pvc, metav1.UpdateOptions{})
 				if err != nil {
 					if ctx.Err() == nil || !errors.Is(err, context.Canceled) {
@@ -908,7 +907,17 @@ func CreatePausePodWithResource(cs clientset.Interface, podName string,
 // CreatePVC creates a PersistentVolumeClaim with the given config and returns
 // its pointer and error status.
 func CreatePVC(cs clientset.Interface, pvc *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error) {
-	return cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(context.TODO(), pvc, metav1.CreateOptions{})
+	ctx := context.TODO()
+	pvcClient := cs.CoreV1().PersistentVolumeClaims(pvc.Namespace)
+	created, err := pvcClient.Create(ctx, pvc, metav1.CreateOptions{})
+	if err != nil {
+		return nil, err
+	}
+	if pvc.Status.Phase != "" {
+		created.Status = pvc.Status
+		created, err = pvcClient.UpdateStatus(ctx, created, metav1.UpdateOptions{})
+	}
+	return created, err
 }
 
 // CreatePV creates a PersistentVolume with the given config and returns its
