@@ -42,7 +42,12 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/images/pullmanager"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/util/parsers"
+	"k8s.io/utils/ptr"
 )
+
+func init() {
+	registerMetrics()
+}
 
 type ImagePodPullingTimeRecorder interface {
 	RecordImageStartedPulling(podUID types.UID)
@@ -101,25 +106,33 @@ func NewImageManager(
 
 // imagePullPrecheck inspects the pull policy and checks for image presence accordingly,
 // returning (imageRef, error msg, err) and logging any errors.
-func (m *imageManager) imagePullPrecheck(ctx context.Context, objRef *v1.ObjectReference, logPrefix string, pullPolicy v1.PullPolicy, spec *kubecontainer.ImageSpec, requestedImage string) (imageRef string, msg string, err error) {
+func (m *imageManager) imagePullPrecheck(
+	ctx context.Context,
+	objRef *v1.ObjectReference,
+	logPrefix string,
+	pullPolicy v1.PullPolicy,
+	spec *kubecontainer.ImageSpec,
+	requestedImage string,
+) (imageRef string, imageFound *bool, msg string, err error) {
 	switch pullPolicy {
 	case v1.PullAlways:
-		return "", msg, nil
+		return "", nil, msg, nil
 	case v1.PullIfNotPresent, v1.PullNever:
 		imageRef, err = m.imageService.GetImageRef(ctx, *spec)
 		if err != nil {
 			msg = fmt.Sprintf("Failed to inspect image %q: %v", imageRef, err)
 			m.logIt(objRef, v1.EventTypeWarning, events.FailedToInspectImage, logPrefix, msg, klog.Warning)
-			return "", msg, ErrImageInspect
+			return "", nil, msg, ErrImageInspect
 		}
 	}
 
-	if len(imageRef) == 0 && pullPolicy == v1.PullNever {
+	imageFound = ptr.To(len(imageRef) > 0)
+	if !*imageFound && pullPolicy == v1.PullNever {
 		msg, err = m.imageNotPresentOnNeverPolicyError(logPrefix, objRef, requestedImage)
-		return "", msg, err
+		return "", ptr.To(false), msg, err
 	}
 
-	return imageRef, msg, nil
+	return imageRef, imageFound, msg, nil
 }
 
 // records an event using ref, event msg.  log to glog using prefix, msg, logFn
@@ -151,6 +164,14 @@ func (m *imageManager) imageNotPresentOnNeverPolicyError(logPrefix string, objRe
 func (m *imageManager) EnsureImageExists(ctx context.Context, objRef *v1.ObjectReference, pod *v1.Pod, requestedImage string, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig, podRuntimeHandler string, pullPolicy v1.PullPolicy) (imageRef, message string, err error) {
 	logPrefix := fmt.Sprintf("%s/%s/%s", pod.Namespace, pod.Name, requestedImage)
 
+	var ( // variables used to record metrics
+		imagePresentLocally *bool
+		imagePullRequired   *bool
+	)
+	defer func() {
+		recordEnsureImageRequest(pullPolicy, imagePresentLocally, imagePullRequired)
+	}()
+
 	// If the image contains no tag or digest, a default tag should be applied.
 	image, err := applyDefaultImageTag(requestedImage)
 	if err != nil {
@@ -173,12 +194,13 @@ func (m *imageManager) EnsureImageExists(ctx context.Context, objRef *v1.ObjectR
 		RuntimeHandler: podRuntimeHandler,
 	}
 
-	imageRef, message, err = m.imagePullPrecheck(ctx, objRef, logPrefix, pullPolicy, &spec, requestedImage)
+	imageRef, imagePresentLocally, message, err = m.imagePullPrecheck(ctx, objRef, logPrefix, pullPolicy, &spec, requestedImage)
 	if err != nil {
 		return "", message, err
 	}
 
 	if imageRef != "" && !utilfeature.DefaultFeatureGate.Enabled(features.KubeletEnsureSecretPulledImages) {
+		imagePullRequired = ptr.To(false)
 		msg := fmt.Sprintf("Container image %q already present on machine", requestedImage)
 		m.logIt(objRef, v1.EventTypeNormal, events.PulledImage, logPrefix, msg, klog.Info)
 
@@ -218,6 +240,8 @@ func (m *imageManager) EnsureImageExists(ctx context.Context, objRef *v1.ObjectR
 	pullCredentials, _ := keyring.Lookup(repoToPull)
 
 	if imageRef != "" {
+		imagePullRequired = ptr.To(false) // should be overridden right after this if-block in case pull was required
+
 		var imagePullSecrets []kubeletconfiginternal.ImagePullSecret
 		// we don't take the audience of the service account into account, so there can only
 		// be one imagePullServiceAccount per pod when we try to make a decision.
@@ -256,6 +280,7 @@ func (m *imageManager) EnsureImageExists(ctx context.Context, objRef *v1.ObjectR
 			return imageRef, msg, nil
 		}
 	}
+	imagePullRequired = ptr.To(true)
 
 	if pullPolicy == v1.PullNever {
 		// The image is present as confirmed by imagePullPrecheck but it apparently
