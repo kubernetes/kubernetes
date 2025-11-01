@@ -20,6 +20,9 @@
 - text: "Conditions field in AllocatedDeviceStatus has incorrect tags, should be: `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,5,rep,name=conditions\"`"
   path: "staging/src/k8s.io/api/resource/"
 
+# Commentstart - Ignore commentstart issues for existing API group
+- text: "Ensure comments start check for specific existing API group is ignored"
+  path: "staging/src/k8s.io/api/(admissionregistration|apiserverinternal|apps|authentication|authorization|autoscaling|batch|certificates|coordination|core|extensions|imagepolicy|networking|policy|rbac|resource|storagemigration)"
 
 # Pre-existing issues from the conflictmarkers linter
 # The Error field in some older API types is marked as both optional and required.
