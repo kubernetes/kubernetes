@@ -477,7 +477,7 @@ func (f *Fit) isSchedulableAfterDeviceClassEvent(logger klog.Logger, pod *v1.Pod
 		if modifiedClass.Spec.ExtendedResourceName != nil {
 			reqs := resource.PodRequests(pod, resource.PodResourcesOptions{})
 			if _, ok := reqs[v1.ResourceName(*modifiedClass.Spec.ExtendedResourceName)]; ok {
-				logger.V(5).Info("deivce class was created or updated, and may not fit the pod's resoruce requests", "pod", klog.KObj(pod), "node", klog.KObj(modifiedClass))
+				logger.V(5).Info("deivce class was created or updated, and may fit the pod's resoruce requests", "pod", klog.KObj(pod), "deviceclass", klog.KObj(modifiedClass))
 				return fwk.Queue, nil
 			}
 		}

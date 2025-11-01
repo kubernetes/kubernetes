@@ -49,6 +49,8 @@ import (
 
 type CoreResourceEnqueueTestCase struct {
 	Name string
+	// InitialDeviceClasses is the list of DeviceClasses to be created at first.
+	InitialDeviceClasses []*resourceapi.DeviceClass
 	// InitialNodes is the list of Nodes to be created at first.
 	InitialNodes []*v1.Node
 	// InitialPods is the list of Pods to be created at first if it's not empty.
@@ -457,6 +459,54 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 				return nil, fmt.Errorf("failed to update fake-node: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.UpdateNodeAllocatable}: 1}, nil
+		},
+		WantRequeuedPods:          sets.New("pod1"),
+		EnableSchedulingQueueHint: sets.New(true),
+		EnableDRAExtendedResource: true,
+	},
+	{
+		Name:                 "Pod rejected by the NodeResourcesFit plugin isn't requeued when a DeviceClass have the extended resource not matching pod's requests, and DRAExtendedResource is enabled",
+		EnablePlugins:        []string{names.NodeResourcesFit, names.NodeAffinity},
+		InitialDeviceClasses: []*resourceapi.DeviceClass{{ObjectMeta: metav1.ObjectMeta{Name: "fake-class"}, Spec: resourceapi.DeviceClassSpec{ExtendedResourceName: nil}}},
+		InitialNodes: []*v1.Node{
+			st.MakeNode().Name("fake-node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj(),
+			st.MakeNode().Name("fake-node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Label("group", "b").Obj(),
+		},
+		Pods: []*v1.Pod{
+			// - Pod1 requests available amount of CPU (in fake-node1), but will be rejected by NodeAffinity plugin. Note that the NodeResourceFit plugin will register for QHints because it rejected fake-node2.
+			st.MakePod().Name("pod1").Res(map[v1.ResourceName]string{v1.ResourceCPU: "4", "example.com/gpu": "1"}).NodeAffinityIn("group", []string{"b"}, st.NodeSelectorTypeMatchExpressions).Container("image").Obj(),
+		},
+		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+			// Trigger a DeviceClass Update event that adds the extended resource name that matches pod's resource request.
+			if _, err := testCtx.ClientSet.ResourceV1().DeviceClasses().Update(testCtx.Ctx, &resourceapi.DeviceClass{ObjectMeta: metav1.ObjectMeta{Name: "fake-class"}, Spec: resourceapi.DeviceClassSpec{ExtendedResourceName: ptr.To("example.com/other-gpu")}}, metav1.UpdateOptions{}); err != nil {
+				return nil, fmt.Errorf("failed to update the fake-class: %w", err)
+			}
+
+			return map[fwk.ClusterEvent]uint64{{Resource: fwk.DeviceClass, ActionType: fwk.Update}: 1}, nil
+		},
+		WantRequeuedPods:          sets.Set[string]{},
+		EnableSchedulingQueueHint: sets.New(true),
+		EnableDRAExtendedResource: true,
+	},
+	{
+		Name:                 "Pod rejected by the NodeResourcesFit plugin is requeued when a DeviceClass have the extended resource, and DRAExtendedResource is enabled",
+		EnablePlugins:        []string{names.NodeResourcesFit, names.NodeAffinity},
+		InitialDeviceClasses: []*resourceapi.DeviceClass{{ObjectMeta: metav1.ObjectMeta{Name: "fake-class"}, Spec: resourceapi.DeviceClassSpec{ExtendedResourceName: nil}}},
+		InitialNodes: []*v1.Node{
+			st.MakeNode().Name("fake-node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj(),
+			st.MakeNode().Name("fake-node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Label("group", "b").Obj(),
+		},
+		Pods: []*v1.Pod{
+			// - Pod1 requests available amount of CPU (in fake-node1), but will be rejected by NodeAffinity plugin. Note that the NodeResourceFit plugin will register for QHints because it rejected fake-node2.
+			st.MakePod().Name("pod1").Res(map[v1.ResourceName]string{v1.ResourceCPU: "4", "example.com/gpu": "1"}).NodeAffinityIn("group", []string{"b"}, st.NodeSelectorTypeMatchExpressions).Container("image").Obj(),
+		},
+		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+			// Trigger a DeviceClass Update event that adds the extended resource name that matches pod's resource request.
+			if _, err := testCtx.ClientSet.ResourceV1().DeviceClasses().Update(testCtx.Ctx, &resourceapi.DeviceClass{ObjectMeta: metav1.ObjectMeta{Name: "fake-class"}, Spec: resourceapi.DeviceClassSpec{ExtendedResourceName: ptr.To("example.com/gpu")}}, metav1.UpdateOptions{}); err != nil {
+				return nil, fmt.Errorf("failed to update the fake-class: %w", err)
+			}
+
+			return map[fwk.ClusterEvent]uint64{{Resource: fwk.DeviceClass, ActionType: fwk.Update}: 1}, nil
 		},
 		WantRequeuedPods:          sets.New("pod1"),
 		EnableSchedulingQueueHint: sets.New(true),
@@ -2477,6 +2527,11 @@ func RunTestCoreResourceEnqueue(t *testing.T, tt *CoreResourceEnqueueTestCase) {
 	defer testCtx.Scheduler.SchedulingQueue.Close()
 
 	cs, ns, ctx := testCtx.ClientSet, testCtx.NS.Name, testCtx.Ctx
+	for _, class := range tt.InitialDeviceClasses {
+		if _, err := cs.ResourceV1().DeviceClasses().Create(ctx, class, metav1.CreateOptions{}); err != nil {
+			t.Fatalf("Failed to create an initial DeviceClass %q: %v", class.Name, err)
+		}
+	}
 	// Create one Node with a taint.
 	for _, node := range tt.InitialNodes {
 		if _, err := cs.CoreV1().Nodes().Create(ctx, node, metav1.CreateOptions{}); err != nil {
