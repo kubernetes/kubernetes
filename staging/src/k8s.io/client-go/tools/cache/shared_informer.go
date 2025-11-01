@@ -236,6 +236,13 @@ type SharedInformer interface {
 	IsStopped() bool
 }
 
+// TransformProtectedInformer allows detecting if a transform is set.
+// Informers implementing this interface protect their transform from being overridden.
+type TransformProtectedInformer interface {
+	// HasTransform returns true if a custom transform is set.
+	HasTransform() bool
+}
+
 // Opaque interface representing the registration of ResourceEventHandler for
 // a SharedInformer. Must be supplied back to the same SharedInformer's
 // `RemoveEventHandler` to unregister the handlers.
@@ -520,6 +527,13 @@ func (s *sharedIndexInformer) SetTransform(handler TransformFunc) error {
 
 	s.transform = handler
 	return nil
+}
+
+func (s *sharedIndexInformer) HasTransform() bool {
+	s.startedLock.Lock()
+	defer s.startedLock.Unlock()
+
+	return s.transform != nil
 }
 
 func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
