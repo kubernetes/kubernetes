@@ -119,10 +119,10 @@ func TestNominatedNode(t *testing.T) {
 					st.MakePod().Name("low-4").Priority(lowPriority).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
 				},
 				{
-					st.MakePod().Name("medium").Priority(mediumPriority).Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj(),
+					st.MakePod().Name("medium").Priority(mediumPriority).Req(map[v1.ResourceName]string{v1.ResourceCPU: "3"}).Obj(),
 				},
 				{
-					st.MakePod().Name("high").Priority(highPriority).Req(map[v1.ResourceName]string{v1.ResourceCPU: "3"}).Obj(),
+					st.MakePod().Name("high").Priority(highPriority).Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj(),
 				},
 			},
 			postChecks: []func(ctx context.Context, cs clientset.Interface, pod *v1.Pod) error{
@@ -130,6 +130,7 @@ func TestNominatedNode(t *testing.T) {
 				testutils.WaitForNominatedNodeName,
 				testutils.WaitForNominatedNodeName,
 			},
+			podNamesToDelete:           []string{"low-1", "low-2", "low-3", "low-4"},
 			expectNilNominatedNodeName: true,
 		},
 		{
