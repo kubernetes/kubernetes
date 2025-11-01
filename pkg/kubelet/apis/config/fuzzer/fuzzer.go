@@ -126,6 +126,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 				"AllAlpha": false,
 				"AllBeta":  true,
 			}
+			obj.PodHousekeepingPeriod = metav1.Duration{Duration: 2 * time.Second}
 		},
 
 		// tokenAttributes field is only supported in v1 CredentialProvider
