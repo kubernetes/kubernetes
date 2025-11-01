@@ -40,9 +40,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/util/certificate/csr"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	capi "k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 	testclock "k8s.io/utils/clock/testing"
 	"k8s.io/utils/ptr"
 )
@@ -924,6 +927,90 @@ func TestValidateCertificateSigningRequestApprovalUpdate(t *testing.T) {
 			}
 			for _, unexpected := range gotErrs.Difference(wantErrs).List() {
 				t.Errorf("unexpected error: %s", unexpected)
+			}
+		})
+	}
+}
+
+func TestAllowDuplicateConditionTypes(t *testing.T) {
+	csrWithDuplicates := &capi.CertificateSigningRequest{
+		Status: capi.CertificateSigningRequestStatus{
+			Conditions: []capi.CertificateSigningRequestCondition{
+				{Type: "A"},
+				{Type: "A"},
+			},
+		},
+	}
+	csrWithoutDuplicates := &capi.CertificateSigningRequest{
+		Status: capi.CertificateSigningRequestStatus{
+			Conditions: []capi.CertificateSigningRequestCondition{
+				{Type: "A"},
+				{Type: "B"},
+			},
+		},
+	}
+
+	testCases := []struct {
+		name        string
+		featureGate bool
+		newCSR      *capi.CertificateSigningRequest
+		oldCSR      *capi.CertificateSigningRequest
+		want        bool
+	}{
+		{
+			name:        "gate disabled: old has duplicates",
+			featureGate: false,
+			oldCSR:      csrWithDuplicates,
+			newCSR:      csrWithDuplicates, // newCSR is not even considered
+			want:        true,
+		},
+		{
+			name:        "gate disabled: old has no duplicates",
+			featureGate: false,
+			oldCSR:      csrWithoutDuplicates,
+			newCSR:      csrWithDuplicates,
+			want:        false,
+		},
+		{
+			name:        "gate enabled: old is nil",
+			featureGate: true,
+			oldCSR:      nil,
+			newCSR:      csrWithDuplicates,
+			want:        false,
+		},
+		{
+			name:        "gate enabled: old has no duplicates",
+			featureGate: true,
+			oldCSR:      csrWithoutDuplicates,
+			newCSR:      csrWithDuplicates,
+			want:        false,
+		},
+		{
+			name:        "gate enabled: old has duplicates, new is identical",
+			featureGate: true,
+			oldCSR:      csrWithDuplicates,
+			newCSR:      csrWithDuplicates.DeepCopy(),
+			want:        true,
+		},
+		{
+			name:        "gate enabled: old has duplicates, new is different",
+			featureGate: true,
+			oldCSR:      csrWithDuplicates,
+			newCSR: func() *capi.CertificateSigningRequest {
+				csr := csrWithDuplicates.DeepCopy()
+				csr.Status.Conditions[0].Message = "changed"
+				return csr
+			}(),
+			want: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSRStrictConditionUniquenessOnUpdate, tc.featureGate)
+			got := allowDuplicateConditionTypes(tc.newCSR, tc.oldCSR)
+			if got != tc.want {
+				t.Errorf("allowDuplicateConditionTypes() = %v, want %v", got, tc.want)
 			}
 		})
 	}
