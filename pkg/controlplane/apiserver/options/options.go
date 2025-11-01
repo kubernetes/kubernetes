@@ -27,6 +27,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	peerreconcilers "k8s.io/apiserver/pkg/reconcilers"
+	"k8s.io/apiserver/pkg/server/flagz"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/client-go/util/keyutil"
@@ -34,7 +35,6 @@ import (
 	"k8s.io/component-base/logs"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics"
-	"k8s.io/component-base/zpages/flagz"
 	"k8s.io/klog/v2"
 	netutil "k8s.io/utils/net"
 

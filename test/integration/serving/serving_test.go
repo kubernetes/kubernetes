@@ -33,6 +33,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	flagzv1alpha1 "k8s.io/apiserver/pkg/server/flagz/api/v1alpha1"
 	"k8s.io/apiserver/pkg/server/statusz/api/v1alpha1"
 
 	"k8s.io/apiserver/pkg/server"
@@ -299,7 +300,7 @@ func fakeCloudProviderFactory(io.Reader) (cloudprovider.Interface, error) {
 	}, nil
 }
 
-func TestKubeControllerManagerServingStatusz(t *testing.T) {
+func TestKubeControllerManagerServingZPages(t *testing.T) {
 	// authenticate to apiserver via bearer token
 	token := "flwqkenfjasasdfmwerasd" // Fake token for testing.
 	tokenFile, err := os.CreateTemp("", "kubeconfig")
@@ -352,8 +353,8 @@ users:
 		t.Fatal(err)
 	}
 
-	wantBodyStr := "kube-controller-manager statusz\nWarning: This endpoint is not meant to be machine parseable"
-	wantBodyJSON := &v1alpha1.Statusz{
+	statuszWantBodyStr := "kube-controller-manager statusz\nWarning: This endpoint is not meant to be machine parseable"
+	statuszWantBodyJSON := &v1alpha1.Statusz{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Statusz",
 			APIVersion: "config.k8s.io/v1alpha1",
@@ -361,10 +362,21 @@ users:
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "kube-controller-manager",
 		},
-		Paths: []string{"/configz", "/healthz", "/metrics"},
+		Paths: []string{"/configz", "/flagz", "/healthz", "/metrics"},
 	}
 
-	testCases := []struct {
+	flagzWantBodyStr := "kube-controller-manager flagz\nWarning: This endpoint is not meant to be machine parseable"
+	flagzWantBodyJSON := &flagzv1alpha1.Flagz{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Flagz",
+			APIVersion: "config.k8s.io/v1alpha1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "kube-controller-manager",
+		},
+	}
+
+	statuszTestCases := []struct {
 		name         string
 		acceptHeader string
 		wantStatus   int
@@ -375,19 +387,19 @@ users:
 			name:         "text plain response",
 			acceptHeader: "text/plain",
 			wantStatus:   http.StatusOK,
-			wantBodySub:  wantBodyStr,
+			wantBodySub:  statuszWantBodyStr,
 		},
 		{
 			name:         "structured json response",
 			acceptHeader: "application/json;v=v1alpha1;g=config.k8s.io;as=Statusz",
 			wantStatus:   http.StatusOK,
-			wantJSON:     wantBodyJSON,
+			wantJSON:     statuszWantBodyJSON,
 		},
 		{
 			name:         "no accept header (defaults to text)",
 			acceptHeader: "",
 			wantStatus:   http.StatusOK,
-			wantBodySub:  wantBodyStr,
+			wantBodySub:  statuszWantBodyStr,
 		},
 		{
 			name:         "invalid accept header",
@@ -408,23 +420,78 @@ users:
 			name:         "wildcard accept header",
 			acceptHeader: "*/*",
 			wantStatus:   http.StatusOK,
-			wantBodySub:  wantBodyStr,
+			wantBodySub:  statuszWantBodyStr,
 		},
 		{
 			name:         "bad json header fall back wildcard",
 			acceptHeader: "application/json;v=foo;g=config.k8s.io;as=Statusz,*/*",
 			wantStatus:   http.StatusOK,
-			wantBodySub:  wantBodyStr,
+			wantBodySub:  statuszWantBodyStr,
+		},
+	}
+
+	flagzTestCases := []struct {
+		name         string
+		acceptHeader string
+		wantStatus   int
+		wantBodySub  string               // for text/plain
+		wantJSON     *flagzv1alpha1.Flagz // for structured json
+	}{
+		{
+			name:         "text plain response",
+			acceptHeader: "text/plain",
+			wantStatus:   http.StatusOK,
+			wantBodySub:  flagzWantBodyStr,
+		},
+		{
+			name:         "structured json response",
+			acceptHeader: "application/json;v=v1alpha1;g=config.k8s.io;as=Flagz",
+			wantStatus:   http.StatusOK,
+			wantJSON:     flagzWantBodyJSON,
+		},
+		{
+			name:         "no accept header (defaults to text)",
+			acceptHeader: "",
+			wantStatus:   http.StatusOK,
+			wantBodySub:  flagzWantBodyStr,
+		},
+		{
+			name:         "invalid accept header",
+			acceptHeader: "application/xml",
+			wantStatus:   http.StatusNotAcceptable,
+		},
+		{
+			name:         "application/json without params",
+			acceptHeader: "application/json",
+			wantStatus:   http.StatusNotAcceptable,
+		},
+		{
+			name:         "application/json with missing as",
+			acceptHeader: "application/json;v=v1alpha1;g=config.k8s.io",
+			wantStatus:   http.StatusNotAcceptable,
+		},
+		{
+			name:         "wildcard accept header",
+			acceptHeader: "*/*",
+			wantStatus:   http.StatusOK,
+			wantBodySub:  flagzWantBodyStr,
+		},
+		{
+			name:         "bad json header fall back wildcard",
+			acceptHeader: "application/json;v=foo;g=config.k8s.io;as=Flagz,*/*",
+			wantStatus:   http.StatusOK,
+			wantBodySub:  flagzWantBodyStr,
 		},
 	}
 
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, zpagesfeatures.ComponentStatusz, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, zpagesfeatures.ComponentFlagz, true)
 	_, ctx := ktesting.NewTestContext(t)
 	flags := []string{
 		"--authentication-skip-lookup",
 		"--authentication-kubeconfig", apiserverConfig.Name(),
 		"--authorization-kubeconfig", apiserverConfig.Name(),
-		"--authorization-always-allow-paths", "/statusz",
+		"--authorization-always-allow-paths", "/statusz,/flagz",
 		"--kubeconfig", apiserverConfig.Name(),
 		"--leader-elect=false",
 	}
@@ -442,7 +509,8 @@ users:
 	if err != nil {
 		t.Fatalf("could not get host and port from %s : %v", secureInfo.Listener.Addr().String(), err)
 	}
-	url := fmt.Sprintf("https://127.0.0.1:%s/statusz", port)
+	statuszURL := fmt.Sprintf("https://127.0.0.1:%s/statusz", port)
+	flagzURL := fmt.Sprintf("https://127.0.0.1:%s/flagz", port)
 
 	// read self-signed server cert disk
 	pool := x509.NewCertPool()
@@ -459,9 +527,9 @@ users:
 	}
 	client := &http.Client{Transport: tr}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			req, err := http.NewRequest(http.MethodGet, url, nil)
+	for _, tc := range statuszTestCases {
+		t.Run("statusz_"+tc.name, func(t *testing.T) {
+			req, err := http.NewRequest(http.MethodGet, statuszURL, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -506,6 +574,56 @@ users:
 					}
 					if diff := cmp.Diff(tc.wantJSON.Paths, got.Paths); diff != "" {
 						t.Errorf("Paths mismatch (-want,+got):\n%s", diff)
+					}
+				}
+			}
+		})
+	}
+
+	for _, tc := range flagzTestCases {
+		t.Run("flagz_"+tc.name, func(t *testing.T) {
+			req, err := http.NewRequest(http.MethodGet, flagzURL, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			req.Header.Set("Accept", tc.acceptHeader)
+			req.Header.Add("Authorization", fmt.Sprintf("Token %s", token))
+			r, err := client.Do(req)
+			if err != nil {
+				t.Fatalf("failed to GET /flagz: %v", err)
+			}
+
+			body, err := io.ReadAll(r.Body)
+			if err != nil {
+				t.Fatalf("failed to read response body: %v", err)
+			}
+
+			if err = r.Body.Close(); err != nil {
+				t.Fatalf("failed to close response body: %v", err)
+			}
+
+			if r.StatusCode != tc.wantStatus {
+				t.Fatalf("want status %d, got %d", tc.wantStatus, r.StatusCode)
+			}
+
+			if tc.wantStatus == http.StatusOK {
+				if tc.wantBodySub != "" {
+					if !strings.Contains(string(body), tc.wantBodySub) {
+						t.Errorf("body missing expected substring: %q\nGot:\n%s", tc.wantBodySub, string(body))
+					}
+				}
+				if tc.wantJSON != nil {
+					var got flagzv1alpha1.Flagz
+					if err := json.Unmarshal(body, &got); err != nil {
+						t.Fatalf("error unmarshalling JSON: %v", err)
+					}
+					// Only check static fields, since others are dynamic
+					if got.TypeMeta != tc.wantJSON.TypeMeta {
+						t.Errorf("TypeMeta mismatch: want %+v, got %+v", tc.wantJSON.TypeMeta, got.TypeMeta)
+					}
+					if got.ObjectMeta.Name != tc.wantJSON.ObjectMeta.Name {
+						t.Errorf("ObjectMeta.Name mismatch: want %q, got %q", tc.wantJSON.ObjectMeta.Name, got.ObjectMeta.Name)
 					}
 				}
 			}
