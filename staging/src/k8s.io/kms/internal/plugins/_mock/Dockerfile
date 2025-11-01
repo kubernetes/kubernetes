@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # NOTE: this is just a default placeholder for convenience
-# To build this image properly, please invoke test/e2e/testing-manifests/auth/encrypt/run-e2e.sh
+# To build this image properly, please invoke testutils/testing-manifests/auth/encrypt/run-e2e.sh
 ARG BUILDER_IMAGE=golang:latest
 FROM $BUILDER_IMAGE AS builder
 

@@ -161,7 +161,7 @@ var _ = utils.SIGDescribe("CSI Mock volume attach", func() {
 			}
 			err = utils.CreateFromManifests(ctx, f, driverNamespace, func(item interface{}) error {
 				return utils.PatchCSIDeployment(f, o, item)
-			}, "test/e2e/testing-manifests/storage-csi/mock/csi-mock-driverinfo.yaml")
+			}, "testutils/testing-manifests/storage-csi/mock/csi-mock-driverinfo.yaml")
 			if err != nil {
 				framework.Failf("fail to deploy CSIDriver object: %v", err)
 			}

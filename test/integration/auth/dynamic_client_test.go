@@ -32,7 +32,7 @@ import (
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/testutils/ktesting"
 )
 
 func TestDynamicClientBuilder(t *testing.T) {

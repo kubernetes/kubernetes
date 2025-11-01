@@ -67,7 +67,7 @@ import (
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/test/integration/framework"
-	imageutils "k8s.io/kubernetes/test/utils/image"
+	imageutils "k8s.io/kubernetes/testutils/image"
 	wardlev1alpha1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
 	wardlev1alpha1client "k8s.io/sample-apiserver/pkg/generated/clientset/versioned/typed/wardle/v1alpha1"
 	"k8s.io/utils/ptr"

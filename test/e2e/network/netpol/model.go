@@ -23,7 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
-	imageutils "k8s.io/kubernetes/test/utils/image"
+	imageutils "k8s.io/kubernetes/testutils/image"
 )
 
 // Model defines the namespaces, deployments, services, pods, containers and associated

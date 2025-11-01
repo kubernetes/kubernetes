@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	certificatesclient "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	"k8s.io/client-go/rest"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/testutils/ktesting"
 )
 
 var (

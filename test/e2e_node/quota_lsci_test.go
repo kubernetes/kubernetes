@@ -31,7 +31,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	imageutils "k8s.io/kubernetes/test/utils/image"
+	imageutils "k8s.io/kubernetes/testutils/image"
 	"k8s.io/mount-utils"
 	admissionapi "k8s.io/pod-security-admission/api"
 

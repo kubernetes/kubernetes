@@ -35,7 +35,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/drivers"
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
-	imageutils "k8s.io/kubernetes/test/utils/image"
+	imageutils "k8s.io/kubernetes/testutils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 

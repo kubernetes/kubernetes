@@ -10,7 +10,7 @@ require (
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/client-go v0.0.0
-	k8s.io/kube-openapi v0.0.0-20250910181357-589584f1c912
+	k8s.io/kube-openapi v0.0.0-20251031162619-7c7e24fa61bc
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.0
 )
 
@@ -57,3 +57,7 @@ replace (
 	k8s.io/apimachinery => ../../apimachinery
 	k8s.io/client-go => ../../client-go
 )
+
+replace k8s.io/kube-openapi => github.com/pohly/kube-openapi v0.0.0-20251031162619-7c7e24fa61bc
+
+replace github.com/onsi/gomega => github.com/pohly/gomega v0.0.0-20251031173942-4203bdba264b

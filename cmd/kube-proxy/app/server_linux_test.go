@@ -37,7 +37,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/testutils/ktesting"
 	"k8s.io/utils/ptr"
 )
 

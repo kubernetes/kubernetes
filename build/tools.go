@@ -22,7 +22,6 @@ package tools
 
 import (
 	// build script dependencies
-	_ "github.com/onsi/ginkgo/v2/ginkgo"
 	_ "k8s.io/code-generator/cmd/deepcopy-gen"
 	_ "k8s.io/code-generator/cmd/defaulter-gen"
 	_ "k8s.io/code-generator/cmd/go-to-protobuf"

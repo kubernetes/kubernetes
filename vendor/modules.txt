@@ -15,6 +15,9 @@ github.com/JeffAshton/win_pdh
 # github.com/MakeNowJust/heredoc v1.0.0
 ## explicit; go 1.12
 github.com/MakeNowJust/heredoc
+# github.com/Masterminds/semver/v3 v3.4.0
+## explicit; go 1.21
+github.com/Masterminds/semver/v3
 # github.com/Microsoft/go-winio v0.6.2
 ## explicit; go 1.21
 github.com/Microsoft/go-winio
@@ -322,7 +325,7 @@ github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors
 # github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 ## explicit
 github.com/grpc-ecosystem/go-grpc-prometheus
-# github.com/grpc-ecosystem/grpc-gateway/v2 v2.26.3
+# github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.1
 ## explicit; go 1.23.0
 github.com/grpc-ecosystem/grpc-gateway/v2/internal/httprule
 github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2/options
@@ -417,12 +420,13 @@ github.com/munnerz/goautoneg
 # github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f
 ## explicit
 github.com/mxk/go-flowrate/flowrate
-# github.com/onsi/ginkgo/v2 v2.21.0
-## explicit; go 1.22.0
+# github.com/onsi/ginkgo/v2 v2.27.2
+## explicit; go 1.23.0
 github.com/onsi/ginkgo/v2
 github.com/onsi/ginkgo/v2/config
 github.com/onsi/ginkgo/v2/formatter
 github.com/onsi/ginkgo/v2/ginkgo
+github.com/onsi/ginkgo/v2/ginkgo/automaxprocs
 github.com/onsi/ginkgo/v2/ginkgo/build
 github.com/onsi/ginkgo/v2/ginkgo/command
 github.com/onsi/ginkgo/v2/ginkgo/generators
@@ -436,11 +440,12 @@ github.com/onsi/ginkgo/v2/internal
 github.com/onsi/ginkgo/v2/internal/global
 github.com/onsi/ginkgo/v2/internal/interrupt_handler
 github.com/onsi/ginkgo/v2/internal/parallel_support
+github.com/onsi/ginkgo/v2/internal/reporters
 github.com/onsi/ginkgo/v2/internal/testingtproxy
 github.com/onsi/ginkgo/v2/reporters
 github.com/onsi/ginkgo/v2/types
-# github.com/onsi/gomega v1.35.1
-## explicit; go 1.22
+# github.com/onsi/gomega v1.38.2
+## explicit; go 1.23.0
 github.com/onsi/gomega
 github.com/onsi/gomega/format
 github.com/onsi/gomega/gcustom
@@ -451,6 +456,7 @@ github.com/onsi/gomega/gstruct/errors
 github.com/onsi/gomega/internal
 github.com/onsi/gomega/internal/gutil
 github.com/onsi/gomega/matchers
+github.com/onsi/gomega/matchers/internal/miter
 github.com/onsi/gomega/matchers/support/goraph/bipartitegraph
 github.com/onsi/gomega/matchers/support/goraph/edge
 github.com/onsi/gomega/matchers/support/goraph/node
@@ -736,8 +742,6 @@ go.opentelemetry.io/otel/sdk/internal/x
 go.opentelemetry.io/otel/sdk/resource
 go.opentelemetry.io/otel/sdk/trace
 go.opentelemetry.io/otel/sdk/trace/tracetest
-# go.opentelemetry.io/otel/sdk/metric v1.36.0
-## explicit; go 1.23.0
 # go.opentelemetry.io/otel/trace v1.36.0
 ## explicit; go 1.23.0
 go.opentelemetry.io/otel/trace
@@ -905,18 +909,18 @@ golang.org/x/tools/internal/typesinternal
 golang.org/x/tools/internal/versions
 # golang.org/x/tools/go/expect v0.1.1-deprecated
 ## explicit; go 1.23.0
-# google.golang.org/genproto/googleapis/api v0.0.0-20250303144028-a0af3efb3deb
+# google.golang.org/genproto/googleapis/api v0.0.0-20250825161204-c5933d9347a5
 ## explicit; go 1.23.0
 google.golang.org/genproto/googleapis/api
 google.golang.org/genproto/googleapis/api/annotations
 google.golang.org/genproto/googleapis/api/expr/v1alpha1
 google.golang.org/genproto/googleapis/api/httpbody
-# google.golang.org/genproto/googleapis/rpc v0.0.0-20250528174236-200df99c418a
+# google.golang.org/genproto/googleapis/rpc v0.0.0-20250818200422-3122310a409c
 ## explicit; go 1.23.0
 google.golang.org/genproto/googleapis/rpc/errdetails
 google.golang.org/genproto/googleapis/rpc/status
-# google.golang.org/grpc v1.72.2
-## explicit; go 1.23
+# google.golang.org/grpc v1.75.0-dev
+## explicit; go 1.23.0
 google.golang.org/grpc
 google.golang.org/grpc/attributes
 google.golang.org/grpc/backoff
@@ -1115,7 +1119,9 @@ k8s.io/klog/v2/textlogger
 ## explicit; go 1.25.0
 # k8s.io/kube-controller-manager v0.0.0 => ./staging/src/k8s.io/kube-controller-manager
 ## explicit; go 1.25.0
-# k8s.io/kube-openapi v0.0.0-20250910181357-589584f1c912
+# k8s.io/kube-openapi v0.0.0-20250910181357-589584f1c912 => github.com/pohly/kube-openapi v0.0.0-20251031162619-7c7e24fa61bc
+## explicit; go 1.23.0
+# k8s.io/kube-openapi v0.0.0-20251031162619-7c7e24fa61bc => github.com/pohly/kube-openapi v0.0.0-20251031162619-7c7e24fa61bc
 ## explicit; go 1.23.0
 k8s.io/kube-openapi/cmd/openapi-gen
 k8s.io/kube-openapi/cmd/openapi-gen/args
@@ -1154,6 +1160,8 @@ k8s.io/kube-openapi/pkg/validation/validate
 # k8s.io/kubectl v0.0.0 => ./staging/src/k8s.io/kubectl
 ## explicit; go 1.25.0
 # k8s.io/kubelet v0.0.0 => ./staging/src/k8s.io/kubelet
+## explicit; go 1.25.0
+# k8s.io/kubernetes v0.0.0-00010101000000-000000000000 => .
 ## explicit; go 1.25.0
 # k8s.io/metrics v0.0.0 => ./staging/src/k8s.io/metrics
 ## explicit; go 1.25.0
@@ -1295,3 +1303,4 @@ sigs.k8s.io/structured-merge-diff/v6/value
 ## explicit; go 1.22
 sigs.k8s.io/yaml
 sigs.k8s.io/yaml/kyaml
+# k8s.io/kube-openapi => github.com/pohly/kube-openapi v0.0.0-20251031162619-7c7e24fa61bc

@@ -57,7 +57,7 @@ import (
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	schedulerutils "k8s.io/kubernetes/test/integration/scheduler"
 	testutils "k8s.io/kubernetes/test/integration/util"
-	imageutils "k8s.io/kubernetes/test/utils/image"
+	imageutils "k8s.io/kubernetes/testutils/image"
 	"k8s.io/utils/ptr"
 )
 

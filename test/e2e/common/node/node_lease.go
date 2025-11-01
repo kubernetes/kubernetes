@@ -31,7 +31,7 @@ import (
 
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
-	testutils "k8s.io/kubernetes/test/utils"
+	"k8s.io/kubernetes/testutils"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/onsi/ginkgo/v2"

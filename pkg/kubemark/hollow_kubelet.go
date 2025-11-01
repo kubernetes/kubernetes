@@ -57,7 +57,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/secret"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
-	"k8s.io/kubernetes/test/utils"
+	utils "k8s.io/kubernetes/testutils"
 )
 
 type HollowKubelet struct {

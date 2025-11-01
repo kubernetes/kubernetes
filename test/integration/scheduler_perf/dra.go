@@ -43,7 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources"
 	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/testutils/ktesting"
 	"k8s.io/utils/ptr"
 )
 

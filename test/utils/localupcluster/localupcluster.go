@@ -50,7 +50,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/testutils/ktesting"
 )
 
 type KubeComponentName string

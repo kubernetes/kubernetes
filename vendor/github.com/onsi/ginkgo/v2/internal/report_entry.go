@@ -8,7 +8,7 @@ import (
 
 type ReportEntry = types.ReportEntry
 
-func NewReportEntry(name string, cl types.CodeLocation, args ...interface{}) (ReportEntry, error) {
+func NewReportEntry(name string, cl types.CodeLocation, args ...any) (ReportEntry, error) {
 	out := ReportEntry{
 		Visibility: types.ReportEntryVisibilityAlways,
 		Name:       name,

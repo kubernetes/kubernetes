@@ -43,7 +43,7 @@ import (
 	resourcequotacontroller "k8s.io/kubernetes/pkg/controller/resourcequota"
 	quotainstall "k8s.io/kubernetes/pkg/quota/v1/install"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/testutils/ktesting"
 )
 
 const (

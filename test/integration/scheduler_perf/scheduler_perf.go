@@ -72,9 +72,9 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/test/integration/framework"
-	testutils "k8s.io/kubernetes/test/utils"
-	"k8s.io/kubernetes/test/utils/ktesting"
-	"k8s.io/kubernetes/test/utils/ktesting/initoption"
+	"k8s.io/kubernetes/testutils"
+	"k8s.io/kubernetes/testutils/ktesting"
+	"k8s.io/kubernetes/testutils/ktesting/initoption"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/yaml"
 )

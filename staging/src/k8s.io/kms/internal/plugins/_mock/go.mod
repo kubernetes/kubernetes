@@ -16,9 +16,13 @@ require (
 	golang.org/x/net v0.43.0 // indirect
 	golang.org/x/sys v0.37.0 // indirect
 	golang.org/x/text v0.29.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20250528174236-200df99c418a // indirect
-	google.golang.org/grpc v1.72.2 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20250818200422-3122310a409c // indirect
+	google.golang.org/grpc v1.75.0-dev // indirect
 	google.golang.org/protobuf v1.36.8 // indirect
 )
 
 replace k8s.io/kms => ../../../../kms
+
+replace k8s.io/kube-openapi => github.com/pohly/kube-openapi v0.0.0-20251031162619-7c7e24fa61bc
+
+replace github.com/onsi/gomega => github.com/pohly/gomega v0.0.0-20251031173942-4203bdba264b

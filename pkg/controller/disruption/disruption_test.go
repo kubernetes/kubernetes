@@ -51,7 +51,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/testutils/ktesting"
 	clocktesting "k8s.io/utils/clock/testing"
 	"k8s.io/utils/ptr"
 )

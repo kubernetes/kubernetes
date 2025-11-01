@@ -45,7 +45,7 @@ import (
 	"k8s.io/kubernetes/test/integration/authutil"
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/kubernetes/test/utils"
+	utils "k8s.io/kubernetes/testutils"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

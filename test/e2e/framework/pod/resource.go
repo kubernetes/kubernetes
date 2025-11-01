@@ -33,8 +33,8 @@ import (
 	"k8s.io/klog/v2"
 
 	"k8s.io/kubernetes/test/e2e/framework"
-	testutils "k8s.io/kubernetes/test/utils"
-	imageutils "k8s.io/kubernetes/test/utils/image"
+	"k8s.io/kubernetes/testutils"
+	imageutils "k8s.io/kubernetes/testutils/image"
 )
 
 // LabelLogOnPodFailure can be used to mark which Pods will have their logs logged in the case of

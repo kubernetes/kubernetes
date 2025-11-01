@@ -41,8 +41,8 @@ import (
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 
 	"k8s.io/kubernetes/test/integration/framework"
-	testutil "k8s.io/kubernetes/test/utils"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	testutil "k8s.io/kubernetes/testutils"
+	"k8s.io/kubernetes/testutils/ktesting"
 )
 
 func TestPeerProxiedRequest(t *testing.T) {

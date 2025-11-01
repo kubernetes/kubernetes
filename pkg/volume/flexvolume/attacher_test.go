@@ -22,7 +22,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/test/utils/harness"
+	"k8s.io/kubernetes/testutils/harness"
 )
 
 func TestAttach(tt *testing.T) {

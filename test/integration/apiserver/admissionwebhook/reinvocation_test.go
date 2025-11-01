@@ -47,7 +47,7 @@ import (
 	utiltesting "k8s.io/client-go/util/testing"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/kubernetes/test/utils"
+	utils "k8s.io/kubernetes/testutils"
 )
 
 const (

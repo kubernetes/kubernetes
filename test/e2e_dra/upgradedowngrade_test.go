@@ -56,9 +56,9 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
-	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/kubernetes/test/utils/localupcluster"
+	"k8s.io/kubernetes/testutils/ktesting"
+	e2etestfiles "k8s.io/kubernetes/testutils/testfiles"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 

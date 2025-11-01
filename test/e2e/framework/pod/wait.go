@@ -38,8 +38,8 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubectl/pkg/util/podutils"
 	"k8s.io/kubernetes/test/e2e/framework"
-	testutils "k8s.io/kubernetes/test/utils"
-	"k8s.io/kubernetes/test/utils/format"
+	"k8s.io/kubernetes/testutils"
+	"k8s.io/kubernetes/testutils/format"
 )
 
 const (

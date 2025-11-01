@@ -45,7 +45,7 @@ import (
 	endptspkg "k8s.io/kubernetes/pkg/api/v1/endpoints"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	controllerpkg "k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/testutils/ktesting"
 	utilnet "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
 )

@@ -65,7 +65,7 @@ import (
 	rolebindingstore "k8s.io/kubernetes/pkg/registry/rbac/rolebinding/storage"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/testutils/ktesting"
 )
 
 func clientForToken(user string, rt http.RoundTripper) *http.Client {

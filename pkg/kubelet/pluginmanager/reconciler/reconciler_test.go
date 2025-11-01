@@ -31,7 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/operationexecutor"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/pluginwatcher"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/testutils/ktesting"
 )
 
 const (

@@ -300,11 +300,11 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 		ginkgo.DeferCleanup(f.DeleteNamespace, valNamespace.Name)
 
 		valManifests := []string{
-			"test/e2e/testing-manifests/storage-csi/any-volume-datasource/volume-data-source-validator/rbac-data-source-validator.yaml",
-			"test/e2e/testing-manifests/storage-csi/any-volume-datasource/volume-data-source-validator/setup-data-source-validator.yaml",
+			"testutils/testing-manifests/storage-csi/any-volume-datasource/volume-data-source-validator/rbac-data-source-validator.yaml",
+			"testutils/testing-manifests/storage-csi/any-volume-datasource/volume-data-source-validator/setup-data-source-validator.yaml",
 		}
 
-		crdManifestPath := "test/e2e/testing-manifests/storage-csi/any-volume-datasource/crd/populator.storage.k8s.io_volumepopulators.yaml"
+		crdManifestPath := "testutils/testing-manifests/storage-csi/any-volume-datasource/crd/populator.storage.k8s.io_volumepopulators.yaml"
 		crdItems, err := storageutils.LoadFromManifests(crdManifestPath)
 		framework.ExpectNoError(err, "Failed to load VolumePopulator CRD manifest")
 		gomega.Expect(crdItems).To(gomega.HaveLen(1), "Expected exactly one CRD in manifest")
@@ -343,8 +343,8 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 
 		ginkgo.By("Deploying hello-populator")
 		popManifests := []string{
-			"test/e2e/testing-manifests/storage-csi/any-volume-datasource/crd/hello-populator-crd.yaml",
-			"test/e2e/testing-manifests/storage-csi/any-volume-datasource/hello-populator-deploy.yaml",
+			"testutils/testing-manifests/storage-csi/any-volume-datasource/crd/hello-populator-crd.yaml",
+			"testutils/testing-manifests/storage-csi/any-volume-datasource/hello-populator-deploy.yaml",
 		}
 		err = storageutils.CreateFromManifests(ctx, f, popNamespace,
 			func(item interface{}) error {

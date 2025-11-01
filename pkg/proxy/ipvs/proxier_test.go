@@ -55,7 +55,7 @@ import (
 	proxyutiltest "k8s.io/kubernetes/pkg/proxy/util/testing"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	iptablestest "k8s.io/kubernetes/pkg/util/iptables/testing"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/testutils/ktesting"
 	netutils "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
 )

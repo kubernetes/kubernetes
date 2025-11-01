@@ -41,7 +41,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	testutils "k8s.io/kubernetes/test/utils"
+	"k8s.io/kubernetes/testutils"
 )
 
 var _ = SIGDescribe("NodeProblemDetector", feature.NodeProblemDetector, framework.WithSerial(), func() {

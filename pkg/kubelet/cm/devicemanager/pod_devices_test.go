@@ -27,7 +27,7 @@ import (
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/checkpoint"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/testutils/ktesting"
 )
 
 func TestGetContainerDevices(t *testing.T) {

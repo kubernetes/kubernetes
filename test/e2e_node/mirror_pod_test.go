@@ -34,7 +34,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/e2e/framework"
-	imageutils "k8s.io/kubernetes/test/utils/image"
+	imageutils "k8s.io/kubernetes/testutils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"sigs.k8s.io/yaml"
 

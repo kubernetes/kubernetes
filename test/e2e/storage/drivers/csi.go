@@ -180,14 +180,14 @@ func InitHostPathCSIDriver() storageframework.TestDriver {
 		[]map[string]string{
 			{"foo": "bar"},
 		},
-		"test/e2e/testing-manifests/storage-csi/external-attacher/rbac.yaml",
-		"test/e2e/testing-manifests/storage-csi/external-provisioner/rbac.yaml",
-		"test/e2e/testing-manifests/storage-csi/external-snapshotter/csi-snapshotter/rbac-csi-snapshotter.yaml",
-		"test/e2e/testing-manifests/storage-csi/external-health-monitor/external-health-monitor-controller/rbac.yaml",
-		"test/e2e/testing-manifests/storage-csi/external-resizer/rbac.yaml",
-		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpath-driverinfo.yaml",
-		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpath-plugin.yaml",
-		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/e2e-test-rbac.yaml",
+		"testutils/testing-manifests/storage-csi/external-attacher/rbac.yaml",
+		"testutils/testing-manifests/storage-csi/external-provisioner/rbac.yaml",
+		"testutils/testing-manifests/storage-csi/external-snapshotter/csi-snapshotter/rbac-csi-snapshotter.yaml",
+		"testutils/testing-manifests/storage-csi/external-health-monitor/external-health-monitor-controller/rbac.yaml",
+		"testutils/testing-manifests/storage-csi/external-resizer/rbac.yaml",
+		"testutils/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpath-driverinfo.yaml",
+		"testutils/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpath-plugin.yaml",
+		"testutils/testing-manifests/storage-csi/hostpath/hostpath/e2e-test-rbac.yaml",
 	)
 }
 
@@ -520,33 +520,33 @@ var _ storageframework.SnapshottableTestDriver = &mockCSIDriver{}
 // InitMockCSIDriver returns a mockCSIDriver that implements TestDriver interface
 func InitMockCSIDriver(driverOpts CSIMockDriverOpts) MockCSITestDriver {
 	driverManifests := []string{
-		"test/e2e/testing-manifests/storage-csi/external-attacher/rbac.yaml",
-		"test/e2e/testing-manifests/storage-csi/external-provisioner/rbac.yaml",
-		"test/e2e/testing-manifests/storage-csi/external-resizer/rbac.yaml",
-		"test/e2e/testing-manifests/storage-csi/external-snapshotter/csi-snapshotter/rbac-csi-snapshotter.yaml",
-		"test/e2e/testing-manifests/storage-csi/mock/csi-mock-rbac.yaml",
-		"test/e2e/testing-manifests/storage-csi/mock/csi-storageclass.yaml",
+		"testutils/testing-manifests/storage-csi/external-attacher/rbac.yaml",
+		"testutils/testing-manifests/storage-csi/external-provisioner/rbac.yaml",
+		"testutils/testing-manifests/storage-csi/external-resizer/rbac.yaml",
+		"testutils/testing-manifests/storage-csi/external-snapshotter/csi-snapshotter/rbac-csi-snapshotter.yaml",
+		"testutils/testing-manifests/storage-csi/mock/csi-mock-rbac.yaml",
+		"testutils/testing-manifests/storage-csi/mock/csi-storageclass.yaml",
 	}
 	if driverOpts.Embedded {
-		driverManifests = append(driverManifests, "test/e2e/testing-manifests/storage-csi/mock/csi-mock-proxy.yaml")
+		driverManifests = append(driverManifests, "testutils/testing-manifests/storage-csi/mock/csi-mock-proxy.yaml")
 	} else {
-		driverManifests = append(driverManifests, "test/e2e/testing-manifests/storage-csi/mock/csi-mock-driver.yaml")
+		driverManifests = append(driverManifests, "testutils/testing-manifests/storage-csi/mock/csi-mock-driver.yaml")
 	}
 
 	if driverOpts.RegisterDriver {
-		driverManifests = append(driverManifests, "test/e2e/testing-manifests/storage-csi/mock/csi-mock-driverinfo.yaml")
+		driverManifests = append(driverManifests, "testutils/testing-manifests/storage-csi/mock/csi-mock-driverinfo.yaml")
 	}
 
 	if !driverOpts.DisableAttach {
-		driverManifests = append(driverManifests, "test/e2e/testing-manifests/storage-csi/mock/csi-mock-driver-attacher.yaml")
+		driverManifests = append(driverManifests, "testutils/testing-manifests/storage-csi/mock/csi-mock-driver-attacher.yaml")
 	}
 
 	if driverOpts.EnableResizing {
-		driverManifests = append(driverManifests, "test/e2e/testing-manifests/storage-csi/mock/csi-mock-driver-resizer.yaml")
+		driverManifests = append(driverManifests, "testutils/testing-manifests/storage-csi/mock/csi-mock-driver-resizer.yaml")
 	}
 
 	if driverOpts.EnableSnapshot {
-		driverManifests = append(driverManifests, "test/e2e/testing-manifests/storage-csi/mock/csi-mock-driver-snapshotter.yaml")
+		driverManifests = append(driverManifests, "testutils/testing-manifests/storage-csi/mock/csi-mock-driver-snapshotter.yaml")
 	}
 
 	return &mockCSIDriver{
@@ -979,11 +979,11 @@ func (g *gcePDCSIDriver) PrepareTest(ctx context.Context, f *framework.Framework
 	createGCESecrets(f.ClientSet, driverns)
 
 	manifests := []string{
-		"test/e2e/testing-manifests/storage-csi/external-attacher/rbac.yaml",
-		"test/e2e/testing-manifests/storage-csi/external-provisioner/rbac.yaml",
-		"test/e2e/testing-manifests/storage-csi/gce-pd/csi-controller-rbac.yaml",
-		"test/e2e/testing-manifests/storage-csi/gce-pd/node_ds.yaml",
-		"test/e2e/testing-manifests/storage-csi/gce-pd/controller_ss.yaml",
+		"testutils/testing-manifests/storage-csi/external-attacher/rbac.yaml",
+		"testutils/testing-manifests/storage-csi/external-provisioner/rbac.yaml",
+		"testutils/testing-manifests/storage-csi/gce-pd/csi-controller-rbac.yaml",
+		"testutils/testing-manifests/storage-csi/gce-pd/node_ds.yaml",
+		"testutils/testing-manifests/storage-csi/gce-pd/controller_ss.yaml",
 	}
 
 	err = utils.CreateFromManifests(ctx, f, driverNamespace, nil, manifests...)

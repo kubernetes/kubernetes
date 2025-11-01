@@ -67,8 +67,8 @@ import (
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/kubernetes/test/utils"
 	"k8s.io/kubernetes/test/utils/kubeconfig"
+	utils "k8s.io/kubernetes/testutils"
 	utilnet "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
 )

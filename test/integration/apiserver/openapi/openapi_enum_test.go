@@ -31,7 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/controlplane"
 	generated "k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/testutils/ktesting"
 )
 
 func TestEnablingOpenAPIEnumTypes(t *testing.T) {

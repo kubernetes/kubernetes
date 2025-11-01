@@ -52,7 +52,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/resourceupdates"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/testutils/ktesting"
 )
 
 const (

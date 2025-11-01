@@ -17,7 +17,7 @@ limitations under the License.
 package apps
 
 import (
-	imageutils "k8s.io/kubernetes/test/utils/image"
+	imageutils "k8s.io/kubernetes/testutils/image"
 )
 
 // NOTE(claudiub): These constants should NOT be used as Pod Container Images.

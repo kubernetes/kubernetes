@@ -42,7 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/util"
-	testutils "k8s.io/kubernetes/test/utils"
+	"k8s.io/kubernetes/testutils"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/cpuset"
 

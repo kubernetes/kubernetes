@@ -29,7 +29,7 @@ import (
 	kubecm "k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	imageutils "k8s.io/kubernetes/test/utils/image"
+	imageutils "k8s.io/kubernetes/testutils/image"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"

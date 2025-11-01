@@ -37,9 +37,9 @@ import (
 	conformancetestdata "k8s.io/kubernetes/test/conformance/testdata"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/config"
-	"k8s.io/kubernetes/test/e2e/framework/testfiles"
-	e2etestingmanifests "k8s.io/kubernetes/test/e2e/testing-manifests"
 	testfixtures "k8s.io/kubernetes/test/fixtures"
+	"k8s.io/kubernetes/testutils/testfiles"
+	e2etestingmanifests "k8s.io/kubernetes/testutils/testing-manifests"
 
 	// define and freeze constants
 	_ "k8s.io/kubernetes/test/e2e/feature"
@@ -70,7 +70,7 @@ import (
 	_ "k8s.io/kubernetes/test/e2e/framework/debug/init"
 	_ "k8s.io/kubernetes/test/e2e/framework/metrics/init"
 	_ "k8s.io/kubernetes/test/e2e/framework/node/init"
-	_ "k8s.io/kubernetes/test/utils/format"
+	_ "k8s.io/kubernetes/testutils/format"
 )
 
 // handleFlags sets up all flags and parses the command line.

@@ -40,7 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	v1testing "k8s.io/kubernetes/pkg/serviceaccount/externaljwt/plugin/testing/v1"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/testutils/ktesting"
 )
 
 func TestExternalJWTSigningAndAuth(t *testing.T) {

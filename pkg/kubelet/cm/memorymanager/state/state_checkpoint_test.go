@@ -26,7 +26,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	testutil "k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state/testing"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/testutils/ktesting"
 )
 
 const testingCheckpoint = "memorymanager_checkpoint_test"

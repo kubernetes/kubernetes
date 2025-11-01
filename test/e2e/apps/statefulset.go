@@ -61,15 +61,15 @@ import (
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2estatefulset "k8s.io/kubernetes/test/e2e/framework/statefulset"
-	imageutils "k8s.io/kubernetes/test/utils/image"
+	imageutils "k8s.io/kubernetes/testutils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/ptr"
 )
 
 const (
-	zookeeperManifestPath   = "test/e2e/testing-manifests/statefulset/zookeeper"
-	mysqlGaleraManifestPath = "test/e2e/testing-manifests/statefulset/mysql-galera"
-	cockroachDBManifestPath = "test/e2e/testing-manifests/statefulset/cockroachdb"
+	zookeeperManifestPath   = "testutils/testing-manifests/statefulset/zookeeper"
+	mysqlGaleraManifestPath = "testutils/testing-manifests/statefulset/mysql-galera"
+	cockroachDBManifestPath = "testutils/testing-manifests/statefulset/cockroachdb"
 	// We don't restart MySQL cluster regardless of restartCluster, since MySQL doesn't handle restart well
 	restartCluster = true
 

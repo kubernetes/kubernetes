@@ -32,7 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/testutils/ktesting"
 )
 
 // setup create kube-apiserver backed up by two separate etcds,

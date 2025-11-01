@@ -19,7 +19,7 @@ package testing_manifests
 import (
 	"embed"
 
-	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
+	e2etestfiles "k8s.io/kubernetes/testutils/testfiles"
 )
 
 //go:embed *.yaml

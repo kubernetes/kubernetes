@@ -27,7 +27,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	resourcelisters "k8s.io/client-go/listers/resource/v1"
 	fwk "k8s.io/kube-scheduler/framework"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/testutils/ktesting"
 )
 
 type fakeDRAManager struct {

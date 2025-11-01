@@ -25,7 +25,7 @@ import (
 	"testing"
 
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/testutils/ktesting"
 
 	"github.com/google/go-cmp/cmp"
 	certificatesv1 "k8s.io/api/certificates/v1"

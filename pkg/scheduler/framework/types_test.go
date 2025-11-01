@@ -34,8 +34,8 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
-	"k8s.io/kubernetes/test/utils/ktesting"
-	"k8s.io/kubernetes/test/utils/ktesting/initoption"
+	"k8s.io/kubernetes/testutils/ktesting"
+	"k8s.io/kubernetes/testutils/ktesting/initoption"
 )
 
 var nodeInfoCmpOpts = []cmp.Option{

@@ -54,7 +54,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
-	testutils "k8s.io/kubernetes/test/utils"
+	"k8s.io/kubernetes/testutils"
 )
 
 var _ = SIGDescribe("GracefulNodeShutdown", framework.WithSerial(), feature.GracefulNodeShutdown, feature.GracefulNodeShutdownBasedOnPodPriority, func() {

@@ -30,7 +30,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
-	imageutils "k8s.io/kubernetes/test/utils/image"
+	imageutils "k8s.io/kubernetes/testutils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"

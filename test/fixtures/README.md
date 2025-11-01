@@ -14,7 +14,7 @@ For example, if one wants to include this Readme as a test fixture (potential ba
 ...
 ```
 
-This fixture can be accessed in the e2e tests using `test/e2e/framework/testfiles.Read` like
+This fixture can be accessed in the e2e tests using `testutils/testfiles.Read` like
 `testfiles.Read("test/fixtures/README.md)`.
 
 This is needed since [migrating to //go:embed from go-bindata][1].

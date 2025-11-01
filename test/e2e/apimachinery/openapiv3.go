@@ -37,7 +37,7 @@ import (
 	"k8s.io/client-go/openapi3"
 	aggregatorclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
 	"k8s.io/kube-openapi/pkg/spec3"
-	imageutils "k8s.io/kubernetes/test/utils/image"
+	imageutils "k8s.io/kubernetes/testutils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 	samplev1beta1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1beta1"
 

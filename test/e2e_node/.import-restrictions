@@ -10,6 +10,6 @@ rules:
       - k8s.io/kubernetes/test/e2e/storage/utils
       - k8s.io/kubernetes/test/e2e/network/common
       - k8s.io/kubernetes/test/e2e/perftype
-      - k8s.io/kubernetes/test/e2e/testing-manifests
+      - k8s.io/kubernetes/testutils/testing-manifests
       - k8s.io/kubernetes/test/e2e_node
       - k8s.io/kubernetes/test/utils

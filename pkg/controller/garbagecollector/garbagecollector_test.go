@@ -68,7 +68,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	c "k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector/metrics"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/testutils/ktesting"
 )
 
 type testRESTMapper struct {

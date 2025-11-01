@@ -25,7 +25,7 @@ import (
 	podresourcesv1 "k8s.io/kubelet/pkg/apis/podresources/v1"
 	"k8s.io/kubelet/pkg/apis/podresources/v1alpha1"
 	podresourcetest "k8s.io/kubernetes/pkg/kubelet/apis/podresources/testing"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/testutils/ktesting"
 )
 
 func TestListPodResourcesV1alpha1(t *testing.T) {

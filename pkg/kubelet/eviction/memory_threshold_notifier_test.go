@@ -32,7 +32,7 @@ import (
 	klogtesting "k8s.io/klog/v2/ktesting"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/testutils/ktesting"
 )
 
 const testCgroupPath = "/sys/fs/cgroups/memory"

@@ -22,6 +22,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"net"
 	"net/url"
@@ -48,6 +49,21 @@ type TLSInfo struct {
 // AuthType returns the type of TLSInfo as a string.
 func (t TLSInfo) AuthType() string {
 	return "tls"
+}
+
+// ValidateAuthority validates the provided authority being used to override the
+// :authority header by verifying it against the peer certificates. It returns a
+// non-nil error if the validation fails.
+func (t TLSInfo) ValidateAuthority(authority string) error {
+	var errs []error
+	for _, cert := range t.State.PeerCertificates {
+		var err error
+		if err = cert.VerifyHostname(authority); err == nil {
+			return nil
+		}
+		errs = append(errs, err)
+	}
+	return fmt.Errorf("credentials: invalid authority %q: %v", authority, errors.Join(errs...))
 }
 
 // cipherSuiteLookup returns the string version of a TLS cipher suite ID.

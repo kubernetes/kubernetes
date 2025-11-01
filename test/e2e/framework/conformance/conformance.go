@@ -45,7 +45,7 @@ import (
 	"k8s.io/klog/v2"
 	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/utils/format"
+	"k8s.io/kubernetes/testutils/format"
 	"k8s.io/utils/ptr"
 	k8sjson "sigs.k8s.io/json"
 )

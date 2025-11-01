@@ -36,7 +36,7 @@ import (
 
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/kubernetes/test/utils/image"
+	"k8s.io/kubernetes/testutils/image"
 )
 
 // namespace used for all tests, do not change this
