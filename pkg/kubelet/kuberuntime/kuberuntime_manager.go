@@ -833,10 +833,6 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 		return err
 	}
 
-	// Always update the pod status once. Even if there was a resize error, the resize may have been
-	// partially actuated.
-	defer m.runtimeHelper.SetPodWatchCondition(pod.UID, "doPodResizeAction", func(*kubecontainer.PodStatus) bool { return true })
-
 	if len(podContainerChanges.ContainersToUpdate[v1.ResourceMemory]) > 0 || podContainerChanges.UpdatePodResources {
 		if podResources.Memory == nil {
 			// Default pod memory limit to the current memory limit if unset to prevent it from updating.
@@ -1102,12 +1098,12 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		return changes
 	}
 
+	logger.Info("DEBUG", "status", podStatus)
 	// Number of running containers to keep.
 	keepCount := 0
 	// check the status of containers.
 	for idx, container := range pod.Spec.Containers {
 		containerStatus := podStatus.FindContainerStatusByName(container.Name)
-
 		// Call internal container post-stop lifecycle hook for any non-running container so that any
 		// allocated cpus are released immediately. If the container is restarted, cpus will be re-allocated
 		// to it.
@@ -1225,6 +1221,10 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 			logger.V(4).Info("SyncPod received new pod, will create a sandbox for it", "pod", klog.KObj(pod))
 		}
 	}
+
+	// To ensure state consistency and avoid race conditions,
+	// we update the container cache after the completion of SyncPod.
+	defer m.runtimeHelper.RequestPodReSync(pod.UID)
 
 	// Step 2: Kill the pod if the sandbox has changed.
 	if podContainerChanges.KillPod {
@@ -1690,12 +1690,13 @@ func (m *kubeGenericRuntimeManager) GeneratePodStatus(event *runtimeapi.Containe
 	sort.Sort(containerStatusByCreated(kubeContainerStatuses))
 
 	return &kubecontainer.PodStatus{
-		ID:                kubetypes.UID(event.PodSandboxStatus.Metadata.Uid),
-		Name:              event.PodSandboxStatus.Metadata.Name,
-		Namespace:         event.PodSandboxStatus.Metadata.Namespace,
-		IPs:               podIPs,
-		SandboxStatuses:   []*runtimeapi.PodSandboxStatus{event.PodSandboxStatus},
-		ContainerStatuses: kubeContainerStatuses,
+		ID:                      kubetypes.UID(event.PodSandboxStatus.Metadata.Uid),
+		Name:                    event.PodSandboxStatus.Metadata.Name,
+		Namespace:               event.PodSandboxStatus.Metadata.Namespace,
+		IPs:                     podIPs,
+		SandboxStatuses:         []*runtimeapi.PodSandboxStatus{event.PodSandboxStatus},
+		ActiveContainerStatuses: kubeContainerStatuses,
+		ContainerStatuses:       kubeContainerStatuses,
 	}
 }
 
@@ -1786,6 +1787,7 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(ctx context.Context, uid kubety
 				for _, cs := range resp.ContainersStatuses {
 					cStatus := m.convertToKubeContainerStatus(ctx, uid, cs)
 					containerStatuses = append(containerStatuses, cStatus)
+					activeContainerStatuses = containerStatuses
 				}
 			}
 		}
