@@ -166,7 +166,11 @@ func (plugin *portworxVolumePlugin) NewDeleter(logger klog.Logger, spec *volume.
 }
 
 func (plugin *portworxVolumePlugin) newDeleterInternal(spec *volume.Spec, manager portworxManager) (volume.Deleter, error) {
-	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.PortworxVolume == nil {
+	if spec.PersistentVolume == nil {
+		return nil, fmt.Errorf("spec.PersistentVolume is nil")
+	}
+
+	if spec.PersistentVolume.Spec.PortworxVolume == nil {
 		return nil, fmt.Errorf("spec.PersistentVolumeSource.PortworxVolume is nil")
 	}
 
