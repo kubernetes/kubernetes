@@ -19,6 +19,7 @@ linters:
     # - "requiredfields" # Required fields should only be pointers when required based on the validity of the zero value, they should always have `omitempty`.
     - "ssatags" # Ensure lists have a listType tag.
     # - "uniquemarkers" # Ensure markers are not duplicated across field and type definitions.
+    - "nodurations" # Ensure duration types are not used.
 lintersConfig:
   conditions:
     isFirstField: Ignore
