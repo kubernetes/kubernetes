@@ -170,6 +170,41 @@ var cascDel = `
 }
 `
 
+func Test422StatusCodeInvalidPodsBinding(t *testing.T) {
+	ctx, client, _, tearDownFn := setup(t)
+	defer tearDownFn()
+
+	var statusCode int
+
+	bodyPodsBinding := []byte(`{"apiVersion":"v1","kind":"Binding","metadata":{"name":"my-pod","namespace":"default"},"target":{}}`)
+	result := client.CoreV1().RESTClient().
+		Post().
+		Namespace("default").
+		Resource("pods").
+		Name("my-pod").
+		SubResource("binding").
+		Body(bodyPodsBinding).
+		Do(ctx)
+	result.StatusCode(&statusCode)
+
+	if statusCode != 422 {
+		t.Fatalf("Expected status code to be 422, got %v (%#v)", statusCode, result)
+	}
+
+	bodyBindings := []byte(`{"target":{}}`)
+	result = client.CoreV1().RESTClient().
+		Post().
+		Namespace("default").
+		Resource("bindings").
+		Body(bodyBindings).
+		Do(ctx)
+	result.StatusCode(&statusCode)
+
+	if statusCode != 422 {
+		t.Fatalf("Expected status code to be 422, got %v (%#v)", statusCode, result)
+	}
+}
+
 func Test4xxStatusCodeInvalidPatch(t *testing.T) {
 	ctx, client, _, tearDownFn := setup(t)
 	defer tearDownFn()
