@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package filters
+package impersonation
 
 import (
 	"errors"
@@ -110,14 +110,14 @@ func WithImpersonation(handler http.Handler, a authorizer.Authorizer, s runtime.
 
 			default:
 				klog.V(4).InfoS("unknown impersonation request type", "request", impersonationRequest)
-				responsewriters.Forbidden(ctx, actingAsAttributes, w, req, fmt.Sprintf("unknown impersonation request type: %v", impersonationRequest), s)
+				responsewriters.Forbidden(actingAsAttributes, w, req, fmt.Sprintf("unknown impersonation request type: %v", impersonationRequest), s)
 				return
 			}
 
 			decision, reason, err := a.Authorize(ctx, actingAsAttributes)
 			if err != nil || decision != authorizer.DecisionAllow {
 				klog.V(4).InfoS("Forbidden", "URI", req.RequestURI, "reason", reason, "err", err)
-				responsewriters.Forbidden(ctx, actingAsAttributes, w, req, reason, s)
+				responsewriters.Forbidden(actingAsAttributes, w, req, reason, s)
 				return
 			}
 		}
@@ -166,7 +166,7 @@ func WithImpersonation(handler http.Handler, a authorizer.Authorizer, s runtime.
 		oldUser, _ := request.UserFrom(ctx)
 		httplog.LogOf(req, w).Addf("%v is impersonating %v", userString(oldUser), userString(newUser))
 
-		audit.LogImpersonatedUser(audit.WithAuditContext(ctx), newUser)
+		audit.LogImpersonatedUser(audit.WithAuditContext(ctx), newUser, "")
 
 		// clear all the impersonation headers from the request
 		req.Header.Del(authenticationv1.ImpersonateUserHeader)

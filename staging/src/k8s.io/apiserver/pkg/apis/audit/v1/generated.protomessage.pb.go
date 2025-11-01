@@ -21,6 +21,8 @@ limitations under the License.
 
 package v1
 
+func (*AuthenticationMetadata) ProtoMessage() {}
+
 func (*Event) ProtoMessage() {}
 
 func (*EventList) ProtoMessage() {}
