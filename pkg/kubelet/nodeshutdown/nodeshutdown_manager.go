@@ -19,6 +19,7 @@ package nodeshutdown
 import (
 	"context"
 	"fmt"
+	"math"
 	"sort"
 	"sync"
 	"time"
@@ -33,6 +34,7 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager"
 	"k8s.io/utils/clock"
 )
@@ -256,14 +258,32 @@ type podShutdownGroup struct {
 }
 
 func groupByPriority(shutdownGracePeriodByPodPriority []kubeletconfig.ShutdownGracePeriodByPodPriority, pods []*v1.Pod) []podShutdownGroup {
-	groups := make([]podShutdownGroup, 0, len(shutdownGracePeriodByPodPriority))
+	// Allocate one extra group for static pods, hence +1.
+	groups := make([]podShutdownGroup, 0, len(shutdownGracePeriodByPodPriority)+1)
 	for _, period := range shutdownGracePeriodByPodPriority {
 		groups = append(groups, podShutdownGroup{
 			ShutdownGracePeriodByPodPriority: period,
 		})
 	}
 
+	var staticPodShutdownGracePeriod int64
+	if len(groups) > 0 {
+		staticPodShutdownGracePeriod = groups[len(groups)-1].ShutdownGracePeriodSeconds
+	}
+
+	groups = append(groups, podShutdownGroup{
+		ShutdownGracePeriodByPodPriority: kubeletconfig.ShutdownGracePeriodByPodPriority{
+			Priority:                   int32(math.MaxInt32),
+			ShutdownGracePeriodSeconds: staticPodShutdownGracePeriod,
+		},
+	})
+
 	for _, pod := range pods {
+		if kubetypes.IsStaticPod(pod) {
+			groups[len(groups)-1].Pods = append(groups[len(groups)-1].Pods, pod)
+			continue
+		}
+
 		var priority int32
 		if pod.Spec.Priority != nil {
 			priority = *pod.Spec.Priority
