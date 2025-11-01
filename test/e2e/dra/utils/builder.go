@@ -665,7 +665,9 @@ func ToDriverResources(counters []resourceapi.CounterSet, devices ...resourceapi
 						Slices: []resourceslice.Slice{
 							{
 								SharedCounters: counters,
-								Devices:        devices,
+							},
+							{
+								Devices: devices,
 							},
 						},
 					},
