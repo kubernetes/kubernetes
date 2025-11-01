@@ -54,7 +54,7 @@ func newStorageClass(t testsuites.StorageClassTest, ns string, prefix string) *s
 		// fstype might be forced from outside, in that case skip setting a default
 		if _, exists := t.Parameters["fstype"]; !exists {
 			t.Parameters["fstype"] = e2epv.GetDefaultFSType()
-			framework.Logf("settings a default fsType=%s in the storage class", t.Parameters["fstype"])
+			framework.Logf("setting a default fsType=%s in the storage class", t.Parameters["fstype"])
 		}
 	}
 
