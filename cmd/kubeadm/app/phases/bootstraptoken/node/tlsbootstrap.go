@@ -111,7 +111,26 @@ func AutoApproveNodeBootstrapTokens(client clientset.Interface) error {
 
 // AutoApproveNodeCertificateRotation creates RBAC rules in a way that makes Node certificate rotation CSR auto-approved by the csrapprover controller
 func AutoApproveNodeCertificateRotation(client clientset.Interface) error {
-	fmt.Println("[bootstrap-token] Configured RBAC rules to allow certificate rotation for all node client certificates in the cluster")
+	fmt.Println("[bootstrap-token] Configured RBAC rules to allow certificate rotation for all node client and server certificates in the cluster")
+
+	if err := apiclient.CreateOrUpdate(client.RbacV1().ClusterRoleBindings(), &rbac.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: constants.NodeAutoApproveServingCertificateRotationClusterRoleBinding,
+		},
+		RoleRef: rbac.RoleRef{
+			APIGroup: rbac.GroupName,
+			Kind:     "ClusterRole",
+			Name:     constants.NodeSelfServingCSRAutoApprovalClusterRoleName,
+		},
+		Subjects: []rbac.Subject{
+			{
+				Kind: rbac.GroupKind,
+				Name: constants.NodesGroup,
+			},
+		},
+	}); err != nil {
+		return err
+	}
 
 	return apiclient.CreateOrUpdate(client.RbacV1().ClusterRoleBindings(), &rbac.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
