@@ -100,7 +100,8 @@ status:
         - 3
         uid: 1
     volumeMounts:
-    - mountPath: mountPathValue
+    - imageRef: imageRefValue
+      mountPath: mountPathValue
       name: nameValue
       readOnly: true
       recursiveReadOnly: recursiveReadOnlyValue
@@ -163,7 +164,8 @@ status:
         - 3
         uid: 1
     volumeMounts:
-    - mountPath: mountPathValue
+    - imageRef: imageRefValue
+      mountPath: mountPathValue
       name: nameValue
       readOnly: true
       recursiveReadOnly: recursiveReadOnlyValue
@@ -235,7 +237,8 @@ status:
         - 3
         uid: 1
     volumeMounts:
-    - mountPath: mountPathValue
+    - imageRef: imageRefValue
+      mountPath: mountPathValue
       name: nameValue
       readOnly: true
       recursiveReadOnly: recursiveReadOnlyValue

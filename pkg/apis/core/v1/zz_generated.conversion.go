@@ -9078,6 +9078,7 @@ func autoConvert_v1_VolumeMountStatus_To_core_VolumeMountStatus(in *corev1.Volum
 	out.MountPath = in.MountPath
 	out.ReadOnly = in.ReadOnly
 	out.RecursiveReadOnly = (*core.RecursiveReadOnlyMode)(unsafe.Pointer(in.RecursiveReadOnly))
+	out.ImageRef = (*string)(unsafe.Pointer(in.ImageRef))
 	return nil
 }
 
@@ -9091,6 +9092,7 @@ func autoConvert_core_VolumeMountStatus_To_v1_VolumeMountStatus(in *core.VolumeM
 	out.MountPath = in.MountPath
 	out.ReadOnly = in.ReadOnly
 	out.RecursiveReadOnly = (*corev1.RecursiveReadOnlyMode)(unsafe.Pointer(in.RecursiveReadOnly))
+	out.ImageRef = (*string)(unsafe.Pointer(in.ImageRef))
 	return nil
 }
 
