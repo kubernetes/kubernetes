@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/netip"
+	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -126,23 +127,29 @@ type Controller struct {
 // Run will not return until stopCh is closed.
 func (c *Controller) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrashWithContext(ctx)
-	defer c.queue.ShutDown()
 
 	c.eventBroadcaster.StartStructuredLogging(3)
 	c.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: c.client.CoreV1().Events("")})
 	defer c.eventBroadcaster.Shutdown()
 
 	logger := klog.FromContext(ctx)
-
 	logger.Info("Starting", "controller", controllerName)
-	defer logger.Info("Shutting down", "controller", controllerName)
+
+	var wg sync.WaitGroup
+	defer func() {
+		logger.Info("Shutting down", "controller", controllerName)
+		c.queue.ShutDown()
+		wg.Wait()
+	}()
 
 	if !cache.WaitForNamedCacheSyncWithContext(ctx, c.serviceCIDRsSynced, c.ipAddressSynced) {
 		return
 	}
 
 	for i := 0; i < workers; i++ {
-		go wait.UntilWithContext(ctx, c.worker, c.workerLoopPeriod)
+		wg.Go(func() {
+			wait.UntilWithContext(ctx, c.worker, c.workerLoopPeriod)
+		})
 	}
 	<-ctx.Done()
 }

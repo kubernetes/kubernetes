@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -177,19 +178,24 @@ func (r *rangeAllocator) Run(ctx context.Context) {
 	r.broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: r.client.CoreV1().Events("")})
 	defer r.broadcaster.Shutdown()
 
-	defer r.queue.ShutDown()
-
 	logger.Info("Starting range CIDR allocator")
-	defer logger.Info("Shutting down range CIDR allocator")
+
+	var wg sync.WaitGroup
+	defer func() {
+		logger.Info("Shutting down range CIDR allocator")
+		r.queue.ShutDown()
+		wg.Wait()
+	}()
 
 	if !cache.WaitForNamedCacheSyncWithContext(ctx, r.nodesSynced) {
 		return
 	}
 
 	for i := 0; i < cidrUpdateWorkers; i++ {
-		go wait.UntilWithContext(ctx, r.runWorker, time.Second)
+		wg.Go(func() {
+			wait.UntilWithContext(ctx, r.runWorker, time.Second)
+		})
 	}
-
 	<-ctx.Done()
 }
 

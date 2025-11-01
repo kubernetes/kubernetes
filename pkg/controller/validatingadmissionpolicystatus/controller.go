@@ -19,6 +19,7 @@ package validatingadmissionpolicystatus
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"k8s.io/api/admissionregistration/v1"
@@ -54,15 +55,21 @@ type Controller struct {
 func (c *Controller) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 
+	var wg sync.WaitGroup
+	defer func() {
+		c.policyQueue.ShutDown()
+		wg.Wait()
+	}()
+
 	if !cache.WaitForNamedCacheSyncWithContext(ctx, c.policySynced) {
 		return
 	}
 
-	defer c.policyQueue.ShutDown()
 	for i := 0; i < workers; i++ {
-		go wait.UntilWithContext(ctx, c.runWorker, time.Second)
+		wg.Go(func() {
+			wait.UntilWithContext(ctx, c.runWorker, time.Second)
+		})
 	}
-
 	<-ctx.Done()
 }
 

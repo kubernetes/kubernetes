@@ -69,9 +69,7 @@ func (c *PCRCleanerController) Run(ctx context.Context, workers int) {
 	logger.Info("Starting PodCertificateRequest cleaner controller")
 	defer logger.Info("Shutting down PodCertificateRequest cleaner controller")
 
-	go wait.UntilWithContext(ctx, c.worker, c.pollingInterval)
-
-	<-ctx.Done()
+	wait.UntilWithContext(ctx, c.worker, c.pollingInterval)
 }
 
 func (c *PCRCleanerController) worker(ctx context.Context) {

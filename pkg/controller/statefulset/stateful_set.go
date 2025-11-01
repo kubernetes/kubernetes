@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"sync"
 	"time"
 
 	apps "k8s.io/api/apps/v1"
@@ -171,20 +172,25 @@ func (ssc *StatefulSetController) Run(ctx context.Context, workers int) {
 	ssc.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: ssc.kubeClient.CoreV1().Events("")})
 	defer ssc.eventBroadcaster.Shutdown()
 
-	defer ssc.queue.ShutDown()
-
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting stateful set controller")
-	defer logger.Info("Shutting down statefulset controller")
+
+	var wg sync.WaitGroup
+	defer func() {
+		logger.Info("Shutting down statefulset controller")
+		ssc.queue.ShutDown()
+		wg.Wait()
+	}()
 
 	if !cache.WaitForNamedCacheSyncWithContext(ctx, ssc.podListerSynced, ssc.setListerSynced, ssc.pvcListerSynced, ssc.revListerSynced) {
 		return
 	}
 
 	for i := 0; i < workers; i++ {
-		go wait.UntilWithContext(ctx, ssc.worker, time.Second)
+		wg.Go(func() {
+			wait.UntilWithContext(ctx, ssc.worker, time.Second)
+		})
 	}
-
 	<-ctx.Done()
 }
 

@@ -19,6 +19,7 @@ package endpointslicemirroring
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"golang.org/x/time/rate"
@@ -221,21 +222,27 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 	c.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: c.client.CoreV1().Events("")})
 	defer c.eventBroadcaster.Shutdown()
 
-	defer c.queue.ShutDown()
-
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting EndpointSliceMirroring controller")
-	defer logger.Info("Shutting down EndpointSliceMirroring controller")
+
+	var wg sync.WaitGroup
+	defer func() {
+		logger.Info("Shutting down EndpointSliceMirroring controller")
+		c.queue.ShutDown()
+		wg.Wait()
+	}()
 
 	if !cache.WaitForNamedCacheSyncWithContext(ctx, c.endpointsSynced, c.endpointSlicesSynced, c.servicesSynced) {
 		return
 	}
 
 	logger.V(2).Info("Starting worker threads", "total", workers)
-	for i := 0; i < workers; i++ {
-		go wait.Until(func() { c.worker(logger) }, c.workerLoopPeriod, ctx.Done())
-	}
 
+	for i := 0; i < workers; i++ {
+		wg.Go(func() {
+			wait.Until(func() { c.worker(logger) }, c.workerLoopPeriod, ctx.Done())
+		})
+	}
 	<-ctx.Done()
 }
 

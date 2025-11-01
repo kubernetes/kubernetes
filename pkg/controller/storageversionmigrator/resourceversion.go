@@ -19,6 +19,7 @@ package storageversionmigrator
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -123,18 +124,24 @@ func (rv *ResourceVersionController) enqueue(svm *svmv1beta1.StorageVersionMigra
 
 func (rv *ResourceVersionController) Run(ctx context.Context) {
 	defer utilruntime.HandleCrash()
-	defer rv.queue.ShutDown()
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting", "controller", ResourceVersionControllerName)
-	defer logger.Info("Shutting down", "controller", ResourceVersionControllerName)
+
+	var wg sync.WaitGroup
+	defer func() {
+		logger.Info("Shutting down", "controller", ResourceVersionControllerName)
+		rv.queue.ShutDown()
+		wg.Wait()
+	}()
 
 	if !cache.WaitForNamedCacheSyncWithContext(ctx, rv.svmSynced) {
 		return
 	}
 
-	go wait.UntilWithContext(ctx, rv.worker, time.Second)
-
+	wg.Go(func() {
+		wait.UntilWithContext(ctx, rv.worker, time.Second)
+	})
 	<-ctx.Done()
 }
 

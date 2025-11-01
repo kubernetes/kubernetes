@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync"
 	"time"
 
 	"k8s.io/klog/v2"
@@ -136,20 +137,26 @@ func (svmc *SVMController) enqueue(svm *svmv1beta1.StorageVersionMigration) {
 
 func (svmc *SVMController) Run(ctx context.Context) {
 	defer utilruntime.HandleCrash()
-	defer svmc.queue.ShutDown()
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting", "controller", svmc.controllerName)
-	defer logger.Info("Shutting down", "controller", svmc.controllerName)
+
+	var wg sync.WaitGroup
+	defer func() {
+		logger.Info("Shutting down", "controller", svmc.controllerName)
+		svmc.queue.ShutDown()
+		wg.Wait()
+	}()
 
 	if !cache.WaitForNamedCacheSyncWithContext(ctx, svmc.svmSynced) {
 		return
 	}
 
 	for i := 0; i < workers; i++ {
-		go wait.UntilWithContext(ctx, svmc.worker, time.Second)
+		wg.Go(func() {
+			wait.UntilWithContext(ctx, svmc.worker, time.Second)
+		})
 	}
-
 	<-ctx.Done()
 }
 
