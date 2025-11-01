@@ -8903,6 +8903,14 @@
           "$ref": "#/definitions/io.k8s.api.core.v1.NodeDaemonEndpoints",
           "description": "Endpoints of daemons running on the Node."
         },
+        "declaredFeatures": {
+          "description": "DeclaredFeatures represents the features related to feature gates that are declared by the node.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
+        },
         "features": {
           "$ref": "#/definitions/io.k8s.api.core.v1.NodeFeatures",
           "description": "Features describes the set of features implemented by the CRI implementation."

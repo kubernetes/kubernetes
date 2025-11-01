@@ -68,6 +68,8 @@ type NodeStatusApplyConfiguration struct {
 	RuntimeHandlers []NodeRuntimeHandlerApplyConfiguration `json:"runtimeHandlers,omitempty"`
 	// Features describes the set of features implemented by the CRI implementation.
 	Features *NodeFeaturesApplyConfiguration `json:"features,omitempty"`
+	// DeclaredFeatures represents the features related to feature gates that are declared by the node.
+	DeclaredFeatures []string `json:"declaredFeatures,omitempty"`
 }
 
 // NodeStatusApplyConfiguration constructs a declarative configuration of the NodeStatus type for use with
@@ -204,5 +206,15 @@ func (b *NodeStatusApplyConfiguration) WithRuntimeHandlers(values ...*NodeRuntim
 // If called multiple times, the Features field is set to the value of the last call.
 func (b *NodeStatusApplyConfiguration) WithFeatures(value *NodeFeaturesApplyConfiguration) *NodeStatusApplyConfiguration {
 	b.Features = value
+	return b
+}
+
+// WithDeclaredFeatures adds the given value to the DeclaredFeatures field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the DeclaredFeatures field.
+func (b *NodeStatusApplyConfiguration) WithDeclaredFeatures(values ...string) *NodeStatusApplyConfiguration {
+	for i := range values {
+		b.DeclaredFeatures = append(b.DeclaredFeatures, values[i])
+	}
 	return b
 }

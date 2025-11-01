@@ -6770,6 +6770,12 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.api.core.v1.NodeDaemonEndpoints
       default: {}
+    - name: declaredFeatures
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
     - name: features
       type:
         namedType: io.k8s.api.core.v1.NodeFeatures
