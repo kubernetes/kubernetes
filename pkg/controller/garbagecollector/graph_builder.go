@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"slices"
 	"sync"
 	"time"
 
@@ -195,8 +196,11 @@ func (gb *GraphBuilder) controllerFor(logger klog.Logger, resource schema.GroupV
 			gb.graphChanges.Add(event)
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
-			// TODO: check if there are differences in the ownerRefs,
-			// finalizers, and DeletionTimestamp; if not, ignore the update.
+			// Check if there are differences in the ownerRefs, finalizers, and DeletionTimestamp
+			// If not, ignore the update to avoid unnecessary processing.
+			if !hasRelevantChanges(oldObj, newObj) {
+				return
+			}
 			event := &event{
 				eventType: updateEvent,
 				obj:       newObj,
@@ -260,12 +264,12 @@ func (gb *GraphBuilder) syncMonitors(logger klog.Logger, resources map[schema.Gr
 		}
 		kind, err := gb.restMapper.KindFor(resource)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("couldn't look up resource %q: %v", resource, err))
+			errs = append(errs, fmt.Errorf("couldn't look up resource %q: %w", resource, err))
 			continue
 		}
 		c, s, err := gb.controllerFor(logger, resource, kind)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("couldn't start monitor for resource %q: %v", resource, err))
+			errs = append(errs, fmt.Errorf("couldn't start monitor for resource %q: %w", resource, err))
 			continue
 		}
 		current[resource] = &monitor{store: s, controller: c}
@@ -598,6 +602,53 @@ func hasFinalizer(accessor metav1.Object, matchingFinalizer string) bool {
 			return true
 		}
 	}
+	return false
+}
+
+// hasRelevantChanges checks if there are any changes in ownerRefs, finalizers, or DeletionTimestamp
+// that are relevant to the garbage collector. If there are no relevant changes, the update can be ignored.
+func hasRelevantChanges(oldObj, newObj interface{}) bool {
+	oldAccessor, err := meta.Accessor(oldObj)
+	if err != nil {
+		// If we can't access the old object, process the update to be safe
+		return true
+	}
+	newAccessor, err := meta.Accessor(newObj)
+	if err != nil {
+		// If we can't access the new object, process the update to be safe
+		return true
+	}
+
+	// Check for changes in DeletionTimestamp
+	oldDeletionTimestamp := oldAccessor.GetDeletionTimestamp()
+	newDeletionTimestamp := newAccessor.GetDeletionTimestamp()
+	if (oldDeletionTimestamp == nil) != (newDeletionTimestamp == nil) {
+		return true
+	}
+	if oldDeletionTimestamp != nil && newDeletionTimestamp != nil && !oldDeletionTimestamp.Equal(newDeletionTimestamp) {
+		return true
+	}
+
+	// Check for changes in finalizers
+	oldFinalizers := oldAccessor.GetFinalizers()
+	newFinalizers := newAccessor.GetFinalizers()
+	oldFinalizersCpy := make([]string, len(oldFinalizers))
+	copy(oldFinalizersCpy, oldFinalizers)
+	newFinalizersCpy := make([]string, len(newFinalizers))
+	copy(newFinalizersCpy, newFinalizers)
+	if !slices.Equal(oldFinalizersCpy, newFinalizersCpy) {
+		return true
+	}
+
+	// Check for changes in owner references
+	oldOwnerRefs := oldAccessor.GetOwnerReferences()
+	newOwnerRefs := newAccessor.GetOwnerReferences()
+	added, removed, changed := referencesDiffs(oldOwnerRefs, newOwnerRefs)
+	if len(added) > 0 || len(removed) > 0 || len(changed) > 0 {
+		return true
+	}
+
+	// No relevant changes found
 	return false
 }
 
