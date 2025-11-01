@@ -20,6 +20,7 @@ import (
 	"context"
 
 	v1 "k8s.io/api/core/v1"
+	baseruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	kubeschedulerconfigv1 "k8s.io/kube-scheduler/config/v1"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -118,6 +119,28 @@ func RegisterPluginAsExtensionsWithWeight(pluginName string, weight int32, plugi
 				Args: args,
 			})
 		}
+	}
+}
+
+// RegisterPluginAsExtensionsWithWeight returns a function to register a Plugin as given extensionPoints with weight to a given registry.
+func RegisterPluginAsExtensionsWithWeightAndArgs(pluginName string, weight int32, pluginNewFunc runtime.PluginFactory, args baseruntime.Object, extensions ...string) RegisterPluginFunc {
+	return func(reg *runtime.Registry, profile *schedulerapi.KubeSchedulerProfile) {
+		err := reg.Register(pluginName, pluginNewFunc)
+		if err != nil {
+			print("Error registering plugin for test")
+		}
+		for _, extension := range extensions {
+			ps := getPluginSetByExtension(profile.Plugins, extension)
+			if ps == nil {
+				continue
+			}
+			ps.Enabled = append(ps.Enabled, schedulerapi.Plugin{Name: pluginName, Weight: weight})
+		}
+		// Use defaults from latest config API version.
+		profile.PluginConfig = append(profile.PluginConfig, schedulerapi.PluginConfig{
+			Name: pluginName,
+			Args: args,
+		})
 	}
 }
 

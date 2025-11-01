@@ -41,6 +41,7 @@ var _ fwk.FilterPlugin = &InterPodAffinity{}
 var _ fwk.PreScorePlugin = &InterPodAffinity{}
 var _ fwk.ScorePlugin = &InterPodAffinity{}
 var _ fwk.EnqueueExtensions = &InterPodAffinity{}
+var _ fwk.BatchablePlugin = &InterPodAffinity{}
 
 // InterPodAffinity is a plugin that checks inter pod affinity
 type InterPodAffinity struct {
@@ -54,6 +55,19 @@ type InterPodAffinity struct {
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *InterPodAffinity) Name() string {
 	return Name
+}
+
+// Inter pod affinity make feasibility and scoring dependent on the placement of other
+// pods in addition the current pod and node, so we cannot sign pods with these
+// constraints. Whether we have constraints or not, since affinity is symmetric
+// we must include the pod's labels.
+func (pl *InterPodAffinity) SignPod(pod *v1.Pod, signature fwk.PodSignatureBuilder) error {
+	if pod.Spec.Affinity != nil && (pod.Spec.Affinity.PodAffinity != nil || pod.Spec.Affinity.PodAntiAffinity != nil) {
+		signature.Unsignable()
+	} else {
+		return signature.AddPodElement("Labels", pod.Labels)
+	}
+	return nil
 }
 
 // EventsToRegister returns the possible events that may make a failed Pod

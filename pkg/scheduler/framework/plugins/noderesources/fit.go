@@ -43,6 +43,7 @@ var _ fwk.FilterPlugin = &Fit{}
 var _ fwk.EnqueueExtensions = &Fit{}
 var _ fwk.PreScorePlugin = &Fit{}
 var _ fwk.ScorePlugin = &Fit{}
+var _ fwk.BatchablePlugin = &Fit{}
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
@@ -152,6 +153,14 @@ func getPreScoreState(cycleState fwk.CycleState) (*preScoreState, error) {
 // Name returns name of the plugin. It is used in logs, etc.
 func (f *Fit) Name() string {
 	return Name
+}
+
+// Fit is based on the node resources for the pod containers.
+func (f *Fit) SignPod(pod *v1.Pod, signature fwk.PodSignatureBuilder) error {
+	if err := signature.AddPodElement("Spec.InitContainers", pod.Spec.InitContainers); err != nil {
+		return err
+	}
+	return signature.AddPodElement("Spec.Containers", pod.Spec.Containers)
 }
 
 // NewFit initializes a new plugin and returns it.

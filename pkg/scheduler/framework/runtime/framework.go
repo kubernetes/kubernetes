@@ -37,7 +37,7 @@ import (
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
-	"k8s.io/kubernetes/pkg/scheduler/backend/api_dispatcher"
+	apidispatcher "k8s.io/kubernetes/pkg/scheduler/backend/api_dispatcher"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -69,6 +69,7 @@ type frameworkImpl struct {
 	bindPlugins          []fwk.BindPlugin
 	postBindPlugins      []fwk.PostBindPlugin
 	permitPlugins        []fwk.PermitPlugin
+	batchablePlugins     []fwk.BatchablePlugin
 
 	// pluginsMap contains all plugins, by name.
 	pluginsMap map[string]fwk.Plugin
@@ -83,6 +84,7 @@ type frameworkImpl struct {
 	metricsRecorder          *metrics.MetricAsyncRecorder
 	profileName              string
 	percentageOfNodesToScore *int32
+	enableSignatures         bool
 
 	extenders []fwk.Extender
 	fwk.PodNominator
@@ -396,6 +398,8 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 			return nil, fmt.Errorf("score plugin %q is not configured with weight", scorePlugin.Name())
 		}
 	}
+
+	f.computeBatchPlugins()
 
 	if options.captureProfile != nil {
 		if len(outputProfile.PluginConfig) != 0 {
@@ -715,6 +719,69 @@ func (f *frameworkImpl) QueueSortFunc() fwk.LessFunc {
 
 	// Only one QueueSort plugin can be enabled.
 	return f.queueSortPlugins[0].Less
+}
+
+// If any of our preFilter, filter, preScore or score plugins haven't
+// implemented a signature, then disable the cache.
+func (f *frameworkImpl) computeBatchPlugins() {
+	f.enableSignatures = true
+
+	// Get all plugins of compatible types.
+	candidatePlugins := []fwk.Plugin{}
+	for _, pl := range f.preFilterPlugins {
+		candidatePlugins = append(candidatePlugins, pl)
+	}
+	for _, pl := range f.filterPlugins {
+		candidatePlugins = append(candidatePlugins, pl)
+	}
+	for _, pl := range f.preScorePlugins {
+		candidatePlugins = append(candidatePlugins, pl)
+	}
+	for _, pl := range f.scorePlugins {
+		candidatePlugins = append(candidatePlugins, pl)
+	}
+
+	// Remove duplicates and check compatibility.
+	batchPluginMap := map[string]bool{}
+	for _, pl := range candidatePlugins {
+		if _, found := batchPluginMap[pl.Name()]; !found {
+			batchPluginMap[pl.Name()] = true
+			if _, implements := pl.(fwk.BatchablePlugin); implements {
+				f.batchablePlugins = append(f.batchablePlugins, pl.(fwk.BatchablePlugin))
+			} else {
+				f.logger.Info("Disabling batching for profile %s because plugin %s does not support it", f.profileName, pl.Name())
+				f.enableSignatures = false
+			}
+		}
+	}
+}
+
+// SignPod returns a signature for a given pod. Any two pods with the same signature should get
+// the same feasibility and scoring for the same set of nodes in the same state. If one or more plugins
+// is unable to construct a signature for the pod, the result will have "Signable" set to false, which means
+// there is no way to compare this pod against others, and will turn off a number of optimizations
+// for this pod.
+func (f *frameworkImpl) SignPod(ctx context.Context, pod *v1.Pod) (string, error) {
+	if !f.enableSignatures {
+		return fwk.Unsignable, nil
+	}
+
+	SignatureBuilder := newPodSignatureBuilder()
+	for _, pl := range f.batchablePlugins {
+		err := pl.SignPod(pod, SignatureBuilder)
+		if err != nil {
+			return fwk.Unsignable, err
+		}
+		if !SignatureBuilder.signable {
+			return fwk.Unsignable, nil
+		}
+	}
+	err := SignatureBuilder.AddNonPluginElements(pod)
+	if err != nil {
+		return fwk.Unsignable, err
+	}
+
+	return SignatureBuilder.Build()
 }
 
 // RunPreFilterPlugins runs the set of configured PreFilter plugins. It returns

@@ -622,6 +622,26 @@ type BindPlugin interface {
 	Bind(ctx context.Context, state CycleState, p *v1.Pod, nodeName string) *Status
 }
 
+type PodSignatureBuilder interface {
+	Unsignable()
+	AddPodElement(elementName string, obj any) error
+	AddSignatureVolumes(pod *v1.Pod) error
+	AddPluginElement(elementName string, obj any) error
+}
+
+const Unsignable = ""
+
+// BatchablePlugin is an interface that should be implemented by plugins that either filter or score
+// pods to enable batching and gang scheduling optimizations. If an enabled plugin that does Scoring,
+// Prescoring, Filtering or Prefiltering does not implement this interface we will turn off batching for all pods.
+type BatchablePlugin interface {
+	Plugin
+	// This is called before PreFilter. The plugin must update the signature builder with the necessary
+	// components from their plugin. If the plugin cannot sign the pod, it can call "unsignable" on the
+	// signature builder. An internal error can be returned and will fail the scheduling.
+	SignPod(pod *v1.Pod, signature PodSignatureBuilder) error
+}
+
 // Handle provides data and some tools that plugins can use. It is
 // passed to the plugin factories at the time of plugin initialization. Plugins
 // must store and use this handle to call framework functions.

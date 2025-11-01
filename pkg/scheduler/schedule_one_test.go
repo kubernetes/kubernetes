@@ -69,6 +69,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/imagelocality"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
@@ -1200,6 +1201,145 @@ func TestSchedulerScheduleOne(t *testing.T) {
 					})
 				}
 			}
+		}
+	}
+}
+
+func TestSignatures(t *testing.T) {
+	testPod := podWithID("foo", "")
+	testPodLabel := podWithID("label", "")
+	testPodLabel.Labels = map[string]string{"foo": "bar"}
+	testPodPort := podWithPort("bar", "", 15)
+	testPodAffinity := podWithAffinity("bat", "", "foo")
+	testPodPortRes := podWithPort("bar", "", 16)
+
+	cpu := int64(100)
+	mem := int64(400000)
+	testPodRes := podWithResources("baz", "", v1.ResourceList{
+		v1.ResourceCPU:    *(resource.NewQuantity(cpu, resource.DecimalSI)),
+		v1.ResourceMemory: *(resource.NewQuantity(mem, resource.DecimalSI)),
+	}, v1.ResourceList{
+		v1.ResourceCPU:    *(resource.NewQuantity(cpu, resource.DecimalSI)),
+		v1.ResourceMemory: *(resource.NewQuantity(mem, resource.DecimalSI)),
+	})
+
+	testPodPortRes.Spec.Containers[0].Resources.Requests = v1.ResourceList{
+		v1.ResourceCPU:    *(resource.NewQuantity(cpu, resource.DecimalSI)),
+		v1.ResourceMemory: *(resource.NewQuantity(mem, resource.DecimalSI)),
+	}
+
+	popSpreadNoDefaults := &schedulerapi.PodTopologySpreadArgs{DefaultingType: schedulerapi.ListDefaulting}
+
+	fts := feature.Features{}
+
+	table := []struct {
+		name                string
+		sendPod             *v1.Pod
+		registerPluginFuncs []tf.RegisterPluginFunc
+		expectedSignature   string
+	}{
+		{
+			name:              "basic pod",
+			sendPod:           testPod,
+			expectedSignature: "{\"Pod\":{\"Spec.SchedulerName\":\"\\\"test-scheduler\\\"\"},\"Plugin\":{}}",
+		},
+		{
+			name:    "pod port",
+			sendPod: testPodPort,
+			registerPluginFuncs: []tf.RegisterPluginFunc{
+				tf.RegisterPluginAsExtensions(nodeports.Name, frameworkruntime.FactoryAdapter(fts, nodeports.New), "Filter", "PreFilter"),
+			},
+			expectedSignature: `{"Pod":{"Spec.Containers":"[{\"name\":\"ctr\",\"ports\":[{\"hostPort\":15,\"containerPort\":0}],\"resources\":{}}]","Spec.InitContainers":"null","Spec.SchedulerName":"\"test-scheduler\""},"Plugin":{}}`,
+		},
+		{
+			name:    "pod port",
+			sendPod: testPodPort,
+			registerPluginFuncs: []tf.RegisterPluginFunc{
+				tf.RegisterPluginAsExtensions(nodeports.Name, frameworkruntime.FactoryAdapter(fts, nodeports.New), "Filter", "PreFilter"),
+			},
+			expectedSignature: `{"Pod":{"Spec.Containers":"[{\"name\":\"ctr\",\"ports\":[{\"hostPort\":15,\"containerPort\":0}],\"resources\":{}}]","Spec.InitContainers":"null","Spec.SchedulerName":"\"test-scheduler\""},"Plugin":{}}`,
+		},
+		{
+			name:    "pod res",
+			sendPod: testPodRes,
+			registerPluginFuncs: []tf.RegisterPluginFunc{
+				tf.RegisterPluginAsExtensions(noderesources.Name, frameworkruntime.FactoryAdapter(fts, noderesources.NewFit), "Filter", "PreFilter"),
+			},
+			expectedSignature: `{"Pod":{"Spec.Containers":"[{\"name\":\"ctr\",\"resources\":{\"limits\":{\"cpu\":\"100\",\"memory\":\"400k\"},\"requests\":{\"cpu\":\"100\",\"memory\":\"400k\"}}}]","Spec.InitContainers":"null","Spec.SchedulerName":"\"test-scheduler\""},"Plugin":{}}`,
+		},
+		{
+			name:    "pod port res",
+			sendPod: testPodRes,
+			registerPluginFuncs: []tf.RegisterPluginFunc{
+				tf.RegisterPluginAsExtensions(nodeports.Name, frameworkruntime.FactoryAdapter(fts, nodeports.New), "Filter", "PreFilter"),
+				tf.RegisterPluginAsExtensions(noderesources.Name, frameworkruntime.FactoryAdapter(fts, noderesources.NewFit), "Filter", "PreFilter"),
+			},
+			expectedSignature: `{"Pod":{"Spec.Containers":"[{\"name\":\"ctr\",\"resources\":{\"limits\":{\"cpu\":\"100\",\"memory\":\"400k\"},\"requests\":{\"cpu\":\"100\",\"memory\":\"400k\"}}}]","Spec.InitContainers":"null","Spec.SchedulerName":"\"test-scheduler\""},"Plugin":{}}`,
+		},
+		{
+			name:    "pod affinity",
+			sendPod: testPodAffinity,
+			registerPluginFuncs: []tf.RegisterPluginFunc{
+				tf.RegisterPluginAsExtensions(interpodaffinity.Name, frameworkruntime.FactoryAdapter(fts, interpodaffinity.New), "Filter", "PreFilter"),
+			},
+			expectedSignature: fwk.Unsignable,
+		},
+		{
+			name:    "pod affinity labels",
+			sendPod: testPodLabel,
+			registerPluginFuncs: []tf.RegisterPluginFunc{
+				tf.RegisterPluginAsExtensions(interpodaffinity.Name, frameworkruntime.FactoryAdapter(fts, interpodaffinity.New), "Filter", "PreFilter"),
+			},
+			expectedSignature: `{"Pod":{"Labels":"{\"foo\":\"bar\"}","Spec.SchedulerName":"\"test-scheduler\""},"Plugin":{}}`,
+		},
+		{
+			name:    "pod affinity labels and port (multiple pod entries)",
+			sendPod: testPodLabel,
+			registerPluginFuncs: []tf.RegisterPluginFunc{
+				tf.RegisterPluginAsExtensions(nodeports.Name, frameworkruntime.FactoryAdapter(fts, nodeports.New), "Filter", "PreFilter"),
+				tf.RegisterPluginAsExtensions(interpodaffinity.Name, frameworkruntime.FactoryAdapter(fts, interpodaffinity.New), "Filter", "PreFilter"),
+			},
+			expectedSignature: `{"Pod":{"Labels":"{\"foo\":\"bar\"}","Spec.Containers":"null","Spec.InitContainers":"null","Spec.SchedulerName":"\"test-scheduler\""},"Plugin":{}}`,
+		},
+		{
+			name:    "pod spread",
+			sendPod: testPod,
+			registerPluginFuncs: []tf.RegisterPluginFunc{
+				tf.RegisterPluginAsExtensions(podtopologyspread.Name, frameworkruntime.FactoryAdapter(fts, podtopologyspread.New), "Filter", "PreFilter"),
+			},
+			expectedSignature: fwk.Unsignable,
+		},
+		{
+			name:    "pod spread no default",
+			sendPod: testPod,
+			registerPluginFuncs: []tf.RegisterPluginFunc{
+				tf.RegisterPluginAsExtensionsWithWeightAndArgs(podtopologyspread.Name, 0, frameworkruntime.FactoryAdapter(fts, podtopologyspread.New), popSpreadNoDefaults, "Filter", "PreFilter"),
+			},
+			expectedSignature: `{"Pod":{"Spec.SchedulerName":"\"test-scheduler\""},"Plugin":{}}`,
+		},
+	}
+	for _, item := range table {
+		_, ctx := ktesting.NewTestContext(t)
+		snapshot := internalcache.NewSnapshot([]*v1.Pod{}, []*v1.Node{})
+		informerFactory := informers.NewSharedInformerFactory(nil, 0)
+		schedFramework, err := tf.NewFramework(ctx,
+			append(item.registerPluginFuncs,
+				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			),
+			testSchedulerName,
+			frameworkruntime.WithSnapshotSharedLister(snapshot),
+			frameworkruntime.WithInformerFactory(informerFactory),
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		signature, err := schedFramework.SignPod(ctx, item.sendPod)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if signature != item.expectedSignature {
+			t.Fatal(fmt.Errorf("Test %s got signature %s, expected %s", item.name, signature, item.expectedSignature))
 		}
 	}
 }
@@ -4477,6 +4617,20 @@ func podWithResources(id, desiredHost string, limits v1.ResourceList, requests v
 	pod := podWithID(id, desiredHost)
 	pod.Spec.Containers = []v1.Container{
 		{Name: "ctr", Resources: v1.ResourceRequirements{Limits: limits, Requests: requests}},
+	}
+	return pod
+}
+
+func podWithAffinity(id, desiredHost, label string) *v1.Pod {
+	pod := podWithID(id, desiredHost)
+	pod.Spec.Affinity = &v1.Affinity{
+		PodAffinity: &v1.PodAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+				{
+					TopologyKey: label,
+				},
+			},
+		},
 	}
 	return pod
 }

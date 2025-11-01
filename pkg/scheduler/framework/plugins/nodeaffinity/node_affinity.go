@@ -48,6 +48,7 @@ var _ fwk.FilterPlugin = &NodeAffinity{}
 var _ fwk.PreScorePlugin = &NodeAffinity{}
 var _ fwk.ScorePlugin = &NodeAffinity{}
 var _ fwk.EnqueueExtensions = &NodeAffinity{}
+var _ fwk.BatchablePlugin = &NodeAffinity{}
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
@@ -72,6 +73,21 @@ const (
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *NodeAffinity) Name() string {
 	return Name
+}
+
+// Node affinity filtering and scoring depend on NodeAffinity and NodeSelectors.
+func (pl *NodeAffinity) SignPod(pod *v1.Pod, signature fwk.PodSignatureBuilder) error {
+	if pod.Spec.Affinity != nil && pod.Spec.Affinity.NodeAffinity != nil {
+		if err := signature.AddPodElement("Spec.Affinity.NodeAffinity", pod.Spec.Affinity.NodeAffinity); err != nil {
+			return err
+		}
+	}
+
+	if err := signature.AddPodElement("Spec.NodeSelector", pod.Spec.NodeSelector); err != nil {
+		return err
+	}
+
+	return signature.AddPluginElement(pl.Name(), pl.addedNodeSelector)
 }
 
 type preFilterState struct {

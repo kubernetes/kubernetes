@@ -45,6 +45,7 @@ var _ fwk.PreFilterPlugin = &VolumeRestrictions{}
 var _ fwk.FilterPlugin = &VolumeRestrictions{}
 var _ fwk.EnqueueExtensions = &VolumeRestrictions{}
 var _ fwk.StateData = &preFilterState{}
+var _ fwk.BatchablePlugin = &VolumeRestrictions{}
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
@@ -98,6 +99,11 @@ func (s *preFilterState) Clone() fwk.StateData {
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *VolumeRestrictions) Name() string {
 	return Name
+}
+
+// Feasibility and scoring are based on the pod's volume definitions.
+func (pl *VolumeRestrictions) SignPod(pod *v1.Pod, signature fwk.PodSignatureBuilder) error {
+	return signature.AddSignatureVolumes(pod)
 }
 
 func isVolumeConflict(volume *v1.Volume, pod *v1.Pod) bool {

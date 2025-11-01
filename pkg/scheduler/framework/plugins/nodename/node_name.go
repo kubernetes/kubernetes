@@ -33,6 +33,7 @@ type NodeName struct {
 
 var _ fwk.FilterPlugin = &NodeName{}
 var _ fwk.EnqueueExtensions = &NodeName{}
+var _ fwk.BatchablePlugin = &NodeName{}
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
@@ -65,6 +66,11 @@ func (pl *NodeName) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithH
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *NodeName) Name() string {
 	return Name
+}
+
+// NodeName scoring and feasibility are dependent on the NodeName field.
+func (pl *NodeName) SignPod(pod *v1.Pod, signature fwk.PodSignatureBuilder) error {
+	return signature.AddPodElement("Spec.NodeName", pod.Spec.NodeName)
 }
 
 // Filter invoked at the filter extension point.

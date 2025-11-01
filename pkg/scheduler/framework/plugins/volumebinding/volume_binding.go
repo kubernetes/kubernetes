@@ -85,6 +85,7 @@ var _ fwk.PreBindPlugin = &VolumeBinding{}
 var _ fwk.PreScorePlugin = &VolumeBinding{}
 var _ fwk.ScorePlugin = &VolumeBinding{}
 var _ fwk.EnqueueExtensions = &VolumeBinding{}
+var _ fwk.BatchablePlugin = &VolumeBinding{}
 
 // Name is the name of the plugin used in Registry and configurations.
 const Name = names.VolumeBinding
@@ -92,6 +93,11 @@ const Name = names.VolumeBinding
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *VolumeBinding) Name() string {
 	return Name
+}
+
+// Feasibility and scoring are based on the pod's volume definitions.
+func (pl *VolumeBinding) SignPod(pod *v1.Pod, signature fwk.PodSignatureBuilder) error {
+	return signature.AddSignatureVolumes(pod)
 }
 
 // EventsToRegister returns the possible events that may make a Pod

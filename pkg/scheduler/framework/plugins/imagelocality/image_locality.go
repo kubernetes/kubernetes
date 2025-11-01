@@ -40,6 +40,7 @@ type ImageLocality struct {
 }
 
 var _ fwk.ScorePlugin = &ImageLocality{}
+var _ fwk.BatchablePlugin = &ImageLocality{}
 
 // Name is the name of the plugin used in the plugin registry and configurations.
 const Name = names.ImageLocality
@@ -47,6 +48,14 @@ const Name = names.ImageLocality
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *ImageLocality) Name() string {
 	return Name
+}
+
+// Image locality filtering and scoring depends on images for the pod's containers.
+func (pl *ImageLocality) SignPod(pod *v1.Pod, signature fwk.PodSignatureBuilder) error {
+	if err := signature.AddPodElement("Spec.InitContainers", pod.Spec.InitContainers); err != nil {
+		return err
+	}
+	return signature.AddPodElement("Spec.Containers", pod.Spec.Containers)
 }
 
 // Score invoked at the score extension point.
