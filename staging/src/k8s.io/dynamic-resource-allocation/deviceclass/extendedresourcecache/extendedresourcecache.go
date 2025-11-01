@@ -36,7 +36,7 @@ type ExtendedResourceCache struct {
 	mutex sync.RWMutex
 	// mapping maps extended resource name to device class name
 	mapping map[v1.ResourceName]string
-	//classMapping maps device class name to extended resource name
+	// classMapping maps device class name to extended resource name
 	classMapping map[string]string
 }
 

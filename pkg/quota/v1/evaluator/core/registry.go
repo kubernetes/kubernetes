@@ -54,8 +54,11 @@ func NewEvaluators(f quota.ListerForResourceFunc, i informers.SharedInformerFact
 		if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
 			if i != nil {
 				podLister = i.Core().V1().Pods().Lister()
-				deviceClassMapping = extendedresourcecache.NewExtendedResourceCache(klog.FromContext(context.Background()))
-				i.Resource().V1().DeviceClasses().Informer().AddEventHandler(deviceClassMapping)
+				logger := klog.FromContext(context.Background())
+				deviceClassMapping = extendedresourcecache.NewExtendedResourceCache(logger)
+				if _, err := i.Resource().V1().DeviceClasses().Informer().AddEventHandler(deviceClassMapping); err != nil {
+					logger.Error(err, "failed to add device class informer event handler")
+				}
 			}
 		}
 		result = append(result, NewResourceClaimEvaluator(f, deviceClassMapping, podLister))

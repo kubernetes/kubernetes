@@ -219,7 +219,9 @@ func TestDeviceClassMapping(t *testing.T) {
 	client := fake.NewClientset()
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	cache := NewExtendedResourceCache(logger)
-	informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandler(cache)
+	if _, err := informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandler(cache); err != nil {
+		logger.Error(err, "failed to add device class informer event handler")
+	}
 	informerFactory.Start(tCtx.Done())
 	t.Cleanup(func() {
 		// Need to cancel before waiting for the shutdown.

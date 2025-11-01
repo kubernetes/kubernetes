@@ -373,7 +373,9 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 	client := fake.NewClientset(deviceClass1, podImplicit, podExplicit, podHybrid, podNilStatus, podInit)
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	deviceclassmapping := extendedresourcecache.NewExtendedResourceCache(logger)
-	informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandler(deviceclassmapping)
+	if _, err := informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandler(deviceclassmapping); err != nil {
+		logger.Error(err, "failed to add device class informer event handler")
+	}
 	evaluatorWithDeviceMapping := NewResourceClaimEvaluator(nil, deviceclassmapping, informerFactory.Core().V1().Pods().Lister())
 
 	informerFactory.Start(tCtx.Done())
