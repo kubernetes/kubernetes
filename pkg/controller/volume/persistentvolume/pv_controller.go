@@ -180,7 +180,7 @@ type PersistentVolumeController struct {
 	// Any write to API server would fail with version conflict - these objects
 	// have been already written.
 	volumes persistentVolumeOrderedIndex
-	claims  cache.Store
+	claims  cache.TypedStore[*v1.PersistentVolumeClaim]
 
 	// Work queues of claims and volumes to process. Every queue should have
 	// exactly one worker thread, especially syncClaim() is not reentrant.
@@ -597,9 +597,8 @@ func (ctrl *PersistentVolumeController) syncVolume(ctx context.Context, volume *
 		}
 		logger.V(4).Info("Synchronizing PersistentVolume, volume is bound to claim", "PVC", klog.KRef(volume.Spec.ClaimRef.Namespace, volume.Spec.ClaimRef.Name), "volumeName", volume.Name)
 		// Get the PVC by _name_
-		var claim *v1.PersistentVolumeClaim
 		claimName := claimrefToClaimKey(volume.Spec.ClaimRef)
-		obj, found, err := ctrl.claims.GetByKey(claimName)
+		claim, found, err := ctrl.claims.GetByKey(claimName)
 		if err != nil {
 			return err
 		}
@@ -614,13 +613,13 @@ func (ctrl *PersistentVolumeController) syncVolume(ctx context.Context, volume *
 			// Note that only non-released and non-failed volumes will be
 			// updated to Released state when PVC does not exist.
 			if volume.Status.Phase != v1.VolumeReleased && volume.Status.Phase != v1.VolumeFailed {
-				obj, err = ctrl.claimLister.PersistentVolumeClaims(volume.Spec.ClaimRef.Namespace).Get(volume.Spec.ClaimRef.Name)
+				claim, err = ctrl.claimLister.PersistentVolumeClaims(volume.Spec.ClaimRef.Namespace).Get(volume.Spec.ClaimRef.Name)
 				if err != nil && !apierrors.IsNotFound(err) {
 					return err
 				}
 				found = !apierrors.IsNotFound(err)
 				if !found {
-					obj, err = ctrl.kubeClient.CoreV1().PersistentVolumeClaims(volume.Spec.ClaimRef.Namespace).Get(ctx, volume.Spec.ClaimRef.Name, metav1.GetOptions{})
+					claim, err = ctrl.kubeClient.CoreV1().PersistentVolumeClaims(volume.Spec.ClaimRef.Namespace).Get(ctx, volume.Spec.ClaimRef.Name, metav1.GetOptions{})
 					if err != nil && !apierrors.IsNotFound(err) {
 						return err
 					}
@@ -632,11 +631,6 @@ func (ctrl *PersistentVolumeController) syncVolume(ctx context.Context, volume *
 			logger.V(4).Info("Synchronizing PersistentVolume, claim not found", "PVC", klog.KRef(volume.Spec.ClaimRef.Namespace, volume.Spec.ClaimRef.Name), "volumeName", volume.Name)
 			// Fall through with claim = nil
 		} else {
-			var ok bool
-			claim, ok = obj.(*v1.PersistentVolumeClaim)
-			if !ok {
-				return fmt.Errorf("cannot convert object from volume cache to volume %q!?: %#v", claim.Spec.VolumeName, obj)
-			}
 			logger.V(4).Info("Synchronizing PersistentVolume, claim found", "PVC", klog.KRef(volume.Spec.ClaimRef.Namespace, volume.Spec.ClaimRef.Name), "claimStatus", getClaimStatusForLogging(claim), "volumeName", volume.Name)
 		}
 		if claim != nil && claim.UID != volume.Spec.ClaimRef.UID {
@@ -1406,20 +1400,10 @@ func (ctrl *PersistentVolumeController) isVolumeReleased(logger klog.Logger, vol
 		return false, nil
 	}
 
-	var claim *v1.PersistentVolumeClaim
 	claimName := claimrefToClaimKey(volume.Spec.ClaimRef)
-	obj, found, err := ctrl.claims.GetByKey(claimName)
+	claim, _, err := ctrl.claims.GetByKey(claimName)
 	if err != nil {
 		return false, err
-	}
-	if !found {
-		// Fall through with claim = nil
-	} else {
-		var ok bool
-		claim, ok = obj.(*v1.PersistentVolumeClaim)
-		if !ok {
-			return false, fmt.Errorf("cannot convert object from claim cache to claim!?: %#v", obj)
-		}
 	}
 	if claim != nil && claim.UID == volume.Spec.ClaimRef.UID {
 		// the claim still exists and has the right UID
