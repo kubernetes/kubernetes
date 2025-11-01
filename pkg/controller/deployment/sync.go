@@ -311,7 +311,7 @@ func (dc *DeploymentController) scale(ctx context.Context, deployment *apps.Depl
 		if *(activeOrLatest.Spec.Replicas) == *(deployment.Spec.Replicas) {
 			return nil
 		}
-		_, _, err := dc.scaleReplicaSetAndRecordEvent(ctx, activeOrLatest, *(deployment.Spec.Replicas), deployment)
+		_, _, err := dc.scaleReplicaSet(ctx, activeOrLatest, *(deployment.Spec.Replicas), deployment)
 		return err
 	}
 
@@ -319,7 +319,7 @@ func (dc *DeploymentController) scale(ctx context.Context, deployment *apps.Depl
 	// This case handles replica set adoption during a saturated new replica set.
 	if deploymentutil.IsSaturated(deployment, newRS) {
 		for _, old := range controller.FilterActiveReplicaSets(oldRSs) {
-			if _, _, err := dc.scaleReplicaSetAndRecordEvent(ctx, old, 0, deployment); err != nil {
+			if _, _, err := dc.scaleReplicaSet(ctx, old, 0, deployment); err != nil {
 				return err
 			}
 		}
@@ -390,7 +390,6 @@ func (dc *DeploymentController) scale(ctx context.Context, deployment *apps.Depl
 				}
 			}
 
-			// TODO: Use transactions when we have them.
 			if _, _, err := dc.scaleReplicaSet(ctx, rs, nameToSize[rs.Name], deployment); err != nil {
 				// Return as soon as we fail, the deployment is requeued
 				return err
@@ -400,23 +399,14 @@ func (dc *DeploymentController) scale(ctx context.Context, deployment *apps.Depl
 	return nil
 }
 
-func (dc *DeploymentController) scaleReplicaSetAndRecordEvent(ctx context.Context, rs *apps.ReplicaSet, newScale int32, deployment *apps.Deployment) (bool, *apps.ReplicaSet, error) {
-	// No need to scale
+func (dc *DeploymentController) scaleReplicaSet(ctx context.Context, rs *apps.ReplicaSet, newScale int32, deployment *apps.Deployment) (scaled bool, newRS *apps.ReplicaSet, err error) {
 	if *(rs.Spec.Replicas) == newScale {
 		return false, rs, nil
 	}
-	scaled, newRS, err := dc.scaleReplicaSet(ctx, rs, newScale, deployment)
-	return scaled, newRS, err
-}
-
-func (dc *DeploymentController) scaleReplicaSet(ctx context.Context, rs *apps.ReplicaSet, newScale int32, deployment *apps.Deployment) (bool, *apps.ReplicaSet, error) {
-
 	sizeNeedsUpdate := *(rs.Spec.Replicas) != newScale
 
 	annotationsNeedUpdate := deploymentutil.ReplicasAnnotationsNeedUpdate(rs, *(deployment.Spec.Replicas), *(deployment.Spec.Replicas)+deploymentutil.MaxSurge(*deployment))
 
-	scaled := false
-	var err error
 	if sizeNeedsUpdate || annotationsNeedUpdate {
 		oldScale := *(rs.Spec.Replicas)
 		rsCopy := rs.DeepCopy()
