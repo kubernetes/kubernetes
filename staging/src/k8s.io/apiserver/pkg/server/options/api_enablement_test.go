@@ -40,22 +40,26 @@ func TestAPIEnablementOptionsValidate(t *testing.T) {
 			name: "test when options is nil",
 		},
 		{
-			name:          "test when invalid key with only api/all=false",
+			name:          "test when invalid API group with only api/all=false",
 			runtimeConfig: cliflag.ConfigurationMap{"api/all": "false"},
-			expectErr:     "invalid key with only api/all=false",
+			expectErr:     "invalid API group with only api/all=false",
 		},
 		{
-			name:          "test when ConfigurationMap key is invalid",
+			name:          "test when ConfigurationMap API group is invalid",
 			runtimeConfig: cliflag.ConfigurationMap{"apiall": "false"},
-			expectErr:     "runtime-config invalid key",
+			expectErr:     "runtime-config invalid API group",
 		},
 		{
 			name:          "test when unknown api groups",
-			runtimeConfig: cliflag.ConfigurationMap{"api/v1": "true"},
-			expectErr:     "unknown api groups",
+			runtimeConfig: cliflag.ConfigurationMap{"api/v1": "true", "api/v1beta2": "true"},
+			expectErr:     "unknown api groups api/v1,api/v1beta2",
 		},
 		{
 			name:          "test when valid api groups",
+			runtimeConfig: cliflag.ConfigurationMap{"apiregistration.k8s.io/v1beta1": "true"},
+		},
+		{
+			name:          "test when invalid api groups",
 			runtimeConfig: cliflag.ConfigurationMap{"apiregistration.k8s.io/v1beta1": "true"},
 		},
 	}
