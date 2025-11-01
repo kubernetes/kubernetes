@@ -153,6 +153,12 @@ func NewPodsToActivate() *PodsToActivate {
 	return &PodsToActivate{Map: make(map[string]*v1.Pod)}
 }
 
+// A list of scored nodes, returned from scheduling.
+type SortedScoredNodes interface {
+	Pop() string
+	Len() int
+}
+
 // Framework manages the set of plugins in use by the scheduling framework.
 // Configured plugins are called at specified points in a scheduling context.
 type Framework interface {
@@ -183,6 +189,20 @@ type Framework interface {
 	// to execute first and return Unschedulable status, or ones that try to change the
 	// cluster state to make the pod potentially schedulable in a future scheduling cycle.
 	RunPostFilterPlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, filteredNodeStatusMap fwk.NodeToStatusReader) (*fwk.PostFilterResult, *fwk.Status)
+
+	// Get the last chosen node according to the batch. The caller must provide the up-to-date NodeInfo for this
+	// node to RunNodeHint.
+	LastChosen() string
+
+	// Get a "node hint" for a given pod. If the function returns anything but the empty string, then
+	// this node can be evaluated
+	RunNodeHint(ctx context.Context, pod *v1.Pod, state fwk.CycleState, lastChosenNode fwk.NodeInfo) string
+
+	// Store the results after we have sorted and filtered nodes.
+	StoreScheduleResults(ctx context.Context, pod *v1.Pod, chosenNode string, otherNodes SortedScoredNodes)
+
+	// Called when a pod successfully schedules.
+	RunPostScore(ctx context.Context, thisFramework bool, pod *v1.Pod)
 
 	// RunPreBindPlugins runs the set of configured PreBind plugins. It returns
 	// *fwk.Status and its code is set to non-success if any of the plugins returns

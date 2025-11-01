@@ -37,7 +37,7 @@ import (
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
-	"k8s.io/kubernetes/pkg/scheduler/backend/api_dispatcher"
+	apidispatcher "k8s.io/kubernetes/pkg/scheduler/backend/api_dispatcher"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -91,6 +91,8 @@ type frameworkImpl struct {
 	apiCacher     fwk.APICacher
 
 	parallelizer fwk.Parallelizer
+
+	batch *OpportunisticBatch
 }
 
 // extensionPoint encapsulates desired and applied set of plugins at a specific extension
@@ -304,6 +306,8 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 		parallelizer:         options.parallelizer,
 		logger:               logger,
 	}
+
+	f.batch = newOpportunisticBatch(f, noBatchSignatures)
 
 	if len(f.extenders) > 0 {
 		// Extender doesn't support any kind of requeueing feature like EnqueueExtensions in the scheduling framework.
@@ -1261,6 +1265,22 @@ func (f *frameworkImpl) runScoreExtension(ctx context.Context, pl fwk.ScorePlugi
 	status := pl.ScoreExtensions().NormalizeScore(ctx, state, pod, nodeScoreList)
 	f.metricsRecorder.ObservePluginDurationAsync(metrics.ScoreExtensionNormalize, pl.Name(), status.Code().String(), metrics.SinceInSeconds(startTime))
 	return status
+}
+
+func (f *frameworkImpl) LastChosen() string {
+	return f.batch.LastChosen()
+}
+
+func (f *frameworkImpl) RunNodeHint(ctx context.Context, pod *v1.Pod, state fwk.CycleState, lastChosenNode fwk.NodeInfo) string {
+	return f.batch.RunNodeHint(ctx, pod, state, lastChosenNode)
+}
+
+func (f *frameworkImpl) StoreScheduleResults(ctx context.Context, pod *v1.Pod, chosenNode string, otherNodes framework.SortedScoredNodes) {
+	f.batch.StoreScheduleResults(ctx, pod, chosenNode, otherNodes)
+}
+
+func (f *frameworkImpl) RunPostScore(ctx context.Context, thisFramework bool, pod *v1.Pod) {
+	f.batch.PostScore(ctx, thisFramework, pod)
 }
 
 // RunPreBindPlugins runs the set of configured prebind plugins. It returns a
