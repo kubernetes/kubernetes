@@ -18,6 +18,7 @@ package reconciler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -25,8 +26,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/component-helpers/storage/volume"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
 	volumepkg "k8s.io/kubernetes/pkg/volume"
@@ -178,7 +182,7 @@ func (rc *reconciler) mountOrAttachVolumes(logger klog.Logger) {
 			// The volume is mounted, but with an unexpected SELinux context.
 			// It will get unmounted in unmountVolumes / unmountDetachDevices and
 			// then removed from actualStateOfWorld.
-			rc.desiredStateOfWorld.AddErrorToPod(volumeToMount.PodName, err.Error())
+			rc.desiredStateOfWorld.MarkPodError(volumeToMount.PodName, err)
 			continue
 		} else if cache.IsVolumeNotAttachedError(err) {
 			rc.waitForVolumeAttach(logger, volumeToMount)
@@ -229,6 +233,26 @@ func (rc *reconciler) mountAttachedVolumes(logger klog.Logger, volumeToMount cac
 	}
 }
 
+var ErrNodeAffinityMismatch = errors.New("node affinity mismatch")
+
+func (rc *reconciler) rejectNodeAffinityMismatch(logger klog.Logger, volumeToMount cache.VolumeToMount) {
+	pv := volumeToMount.VolumeSpec.PersistentVolume
+	if pv == nil {
+		return
+	}
+	labels, err := rc.volumePluginMgr.Host.GetNodeLabels()
+	if err != nil {
+		logger.Error(err, "Failed to get node labels")
+		return
+	}
+	err = volume.CheckNodeAffinity(pv, labels)
+	if err != nil {
+		logger.V(1).Info("Rejecting pod because it's volume has node affinity that does not match current node",
+			"pod", klog.KObj(volumeToMount.Pod), "pv", klog.KObj(pv), "error", err)
+		rc.desiredStateOfWorld.MarkPodError(volumeToMount.PodName, ErrNodeAffinityMismatch)
+	}
+}
+
 func (rc *reconciler) waitForVolumeAttach(logger klog.Logger, volumeToMount cache.VolumeToMount) {
 	if rc.controllerAttachDetachEnabled || !volumeToMount.PluginIsAttachable {
 		//// lets not spin a goroutine and unnecessarily trigger exponential backoff if this happens
@@ -246,6 +270,12 @@ func (rc *reconciler) waitForVolumeAttach(logger klog.Logger, volumeToMount cach
 			rc.actualStateOfWorld)
 		if err != nil && !isExpectedError(err) {
 			logger.Error(err, volumeToMount.GenerateErrorDetailed(fmt.Sprintf("operationExecutor.VerifyControllerAttachedVolume failed (controllerAttachDetachEnabled %v)", rc.controllerAttachDetachEnabled), err).Error(), "pod", klog.KObj(volumeToMount.Pod))
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.MutablePVNodeAffinity) && operationexecutor.IsMountFailedPreconditionError(err) {
+			// Reject pods that cannot pass affinity check, which will stuck in Pending status forever,
+			// But only for unattached pods, to avoid interrupting running pods.
+			// Hopefully scheduler will assign them to other nodes the next time.
+			rc.rejectNodeAffinityMismatch(logger, volumeToMount)
 		}
 		if err == nil {
 			logger.Info(volumeToMount.GenerateMsgDetailed("operationExecutor.VerifyControllerAttachedVolume started", ""), "pod", klog.KObj(volumeToMount.Pod))

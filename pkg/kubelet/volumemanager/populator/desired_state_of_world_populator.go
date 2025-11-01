@@ -266,7 +266,7 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods(logger klog.L
 	podsWithError := dswp.desiredStateOfWorld.GetPodsWithErrors()
 	for _, podName := range podsWithError {
 		if _, podExists := dswp.podManager.GetPodByUID(types.UID(podName)); !podExists {
-			dswp.desiredStateOfWorld.PopPodErrors(podName)
+			_ = dswp.desiredStateOfWorld.PopPodError(podName)
 		}
 	}
 }
@@ -300,7 +300,7 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(ctx context.Context,
 			dswp.createVolumeSpec(ctx, podVolume, pod, mounts, devices)
 		if err != nil {
 			logger.Error(err, "Error processing volume", "pod", klog.KObj(pod), "volumeName", podVolume.Name)
-			dswp.desiredStateOfWorld.AddErrorToPod(uniquePodName, err.Error())
+			dswp.desiredStateOfWorld.MarkPodError(uniquePodName, err)
 			allVolumesAdded = false
 			continue
 		}
@@ -310,7 +310,7 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(ctx context.Context,
 			logger, uniquePodName, pod, volumeSpec, podVolume.Name, volumeGIDValue, seLinuxContainerContexts[podVolume.Name])
 		if err != nil {
 			logger.Error(err, "Failed to add volume to desiredStateOfWorld", "pod", klog.KObj(pod), "volumeName", podVolume.Name, "volumeSpecName", volumeSpec.Name())
-			dswp.desiredStateOfWorld.AddErrorToPod(uniquePodName, err.Error())
+			dswp.desiredStateOfWorld.MarkPodError(uniquePodName, err)
 			allVolumesAdded = false
 			continue
 		}
@@ -326,7 +326,7 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(ctx context.Context,
 		// (e.g. DownwardAPI)
 		dswp.actualStateOfWorld.MarkRemountRequired(logger, uniquePodName)
 		// Remove any stored errors for the pod, everything went well in this processPodVolumes
-		dswp.desiredStateOfWorld.PopPodErrors(uniquePodName)
+		_ = dswp.desiredStateOfWorld.PopPodError(uniquePodName)
 	} else if dswp.podHasBeenSeenOnce(uniquePodName) {
 		// For the Pod which has been processed at least once, even though some volumes
 		// may not have been reprocessed successfully this round, we still mark it as processed to avoid
