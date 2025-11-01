@@ -224,6 +224,8 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 					rbacv1helpers.NewRule("get", "list", "watch", "delete").Groups(legacyGroup).Resources("pods").RuleOrDie(),
 					// Sets pod conditions.
 					rbacv1helpers.NewRule("update", "patch").Groups(legacyGroup).Resources("pods/status").RuleOrDie(),
+					// Sets DeviceTaintRule conditions.
+					rbacv1helpers.NewRule("update", "patch").Groups(resourceGroup).Resources("devicetaintrules/status").RuleOrDie(),
 					// The rest is read-only.
 					rbacv1helpers.NewRule("get", "list", "watch").Groups(resourceGroup).Resources("resourceclaims").RuleOrDie(),
 					rbacv1helpers.NewRule("get", "list", "watch").Groups(resourceGroup).Resources("resourceslices").RuleOrDie(),

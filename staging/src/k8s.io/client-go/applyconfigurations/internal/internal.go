@@ -13476,19 +13476,6 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.resource.v1.CounterSet
           elementRelationship: atomic
-- name: io.k8s.api.resource.v1alpha3.CELDeviceSelector
-  map:
-    fields:
-    - name: expression
-      type:
-        scalar: string
-      default: ""
-- name: io.k8s.api.resource.v1alpha3.DeviceSelector
-  map:
-    fields:
-    - name: cel
-      type:
-        namedType: io.k8s.api.resource.v1alpha3.CELDeviceSelector
 - name: io.k8s.api.resource.v1alpha3.DeviceTaint
   map:
     fields:
@@ -13523,6 +13510,10 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.api.resource.v1alpha3.DeviceTaintRuleSpec
       default: {}
+    - name: status
+      type:
+        namedType: io.k8s.api.resource.v1alpha3.DeviceTaintRuleStatus
+      default: {}
 - name: io.k8s.api.resource.v1alpha3.DeviceTaintRuleSpec
   map:
     fields:
@@ -13533,13 +13524,21 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.api.resource.v1alpha3.DeviceTaint
       default: {}
+- name: io.k8s.api.resource.v1alpha3.DeviceTaintRuleStatus
+  map:
+    fields:
+    - name: conditions
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Condition
+          elementRelationship: associative
+          keys:
+          - type
 - name: io.k8s.api.resource.v1alpha3.DeviceTaintSelector
   map:
     fields:
     - name: device
-      type:
-        scalar: string
-    - name: deviceClassName
       type:
         scalar: string
     - name: driver
@@ -13548,12 +13547,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: pool
       type:
         scalar: string
-    - name: selectors
-      type:
-        list:
-          elementType:
-            namedType: io.k8s.api.resource.v1alpha3.DeviceSelector
-          elementRelationship: atomic
 - name: io.k8s.api.resource.v1beta1.AllocatedDeviceStatus
   map:
     fields:

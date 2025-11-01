@@ -45,17 +45,9 @@
   },
   "spec": {
     "deviceSelector": {
-      "deviceClassName": "deviceClassNameValue",
       "driver": "driverValue",
       "pool": "poolValue",
-      "device": "deviceValue",
-      "selectors": [
-        {
-          "cel": {
-            "expression": "expressionValue"
-          }
-        }
-      ]
+      "device": "deviceValue"
     },
     "taint": {
       "key": "keyValue",
@@ -63,5 +55,17 @@
       "effect": "effectValue",
       "timeAdded": "2004-01-01T01:01:01Z"
     }
+  },
+  "status": {
+    "conditions": [
+      {
+        "type": "typeValue",
+        "status": "statusValue",
+        "observedGeneration": 3,
+        "lastTransitionTime": "2004-01-01T01:01:01Z",
+        "reason": "reasonValue",
+        "message": "messageValue"
+      }
+    ]
   }
 }

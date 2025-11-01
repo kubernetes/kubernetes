@@ -134,8 +134,10 @@ type DeviceTaint struct {
 
 	// The effect of the taint on claims that do not tolerate the taint
 	// and through such claims on the pods using them.
-	// Valid effects are NoSchedule and NoExecute. PreferNoSchedule as used for
-	// nodes is not valid here.
+	//
+	// Valid effects are None, NoSchedule and NoExecute. PreferNoSchedule as used for
+	// nodes is not valid here. More effects may get added in the future.
+	// Consumers must treat unknown effects like None.
 	//
 	// +required
 	Effect DeviceTaintEffect `json:"effect" protobuf:"bytes,3,name=effect,casttype=DeviceTaintEffect"`
@@ -144,6 +146,14 @@ type DeviceTaint struct {
 	//
 	// Implementing PreferNoSchedule would depend on a scoring solution for DRA.
 	// It might get added as part of that.
+	//
+	// A possible future new effect is NoExecuteWithPodDisruptionBudget:
+	// honor the pod disruption budget instead of simply deleting pods.
+	// This is currently undecided, it could also be a separate field.
+	//
+	// Validation must be prepared to allow unknown enums in stored objects,
+	// which will enable adding new enums within a single release without
+	// ratcheting.
 
 	// TimeAdded represents the time at which the taint was added.
 	// Added automatically during create or update if not set.
@@ -162,6 +172,9 @@ type DeviceTaint struct {
 type DeviceTaintEffect string
 
 const (
+	// No effect, the taint is purely informational.
+	DeviceTaintEffectNone DeviceTaintEffect = "None"
+
 	// Do not allow new pods to schedule which use a tainted device unless they tolerate the taint,
 	// but allow all pods submitted to Kubelet without going through the scheduler
 	// to start, and allow all already-running pods to continue running.
@@ -190,18 +203,16 @@ type DeviceTaintRule struct {
 	// Changing the spec automatically increments the metadata.generation number.
 	Spec DeviceTaintRuleSpec `json:"spec" protobuf:"bytes,2,name=spec"`
 
-	// ^^^
-	// A spec gets added because adding a status seems likely.
-	// Such a status could provide feedback on applying the
-	// eviction and/or statistics (number of matching devices,
-	// affected allocated claims, pods remaining to be evicted,
-	// etc.).
+	// Status provides information about what was requested in the spec.
+	//
+	// +optional
+	Status DeviceTaintRuleStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
 // DeviceTaintRuleSpec specifies the selector and one taint.
 type DeviceTaintRuleSpec struct {
 	// DeviceSelector defines which device(s) the taint is applied to.
-	// All selector criteria must be satified for a device to
+	// All selector criteria must be satisfied for a device to
 	// match. The empty selector matches all devices. Without
 	// a selector, no devices are matches.
 	//
@@ -223,7 +234,12 @@ type DeviceTaintSelector struct {
 	// to class.metadata.name.
 	//
 	// +optional
-	DeviceClassName *string `json:"deviceClassName,omitempty" protobuf:"bytes,1,opt,name=deviceClassName"`
+	//
+	// Tombstoned since 1.35 because it turned out that supporting this in all cases
+	// would depend on copying the device attributes into the ResourceClaim allocation
+	// result. Without that the eviction controller cannot evaluate these CEL expressions.
+	//
+	// DeviceClassName *string `json:"deviceClassName,omitempty" protobuf:"bytes,1,opt,name=deviceClassName"`
 
 	// If driver is set, only devices from that driver are selected.
 	// This fields corresponds to slice.spec.driver.
@@ -258,8 +274,50 @@ type DeviceTaintSelector struct {
 	//
 	// +optional
 	// +listType=atomic
-	Selectors []DeviceSelector `json:"selectors,omitempty" protobuf:"bytes,5,rep,name=selectors"`
+	//
+	// Tombstoned since 1.35 because it turned out that supporting this in all cases
+	// would depend on copying the device attributes into the ResourceClaim allocation
+	// result. Without that the eviction controller cannot evaluate these CEL expressions.
+	//
+	// Selectors []DeviceSelector `json:"selectors,omitempty" protobuf:"bytes,5,rep,name=selectors"`
 }
+
+// DeviceTaintRuleStatus provides information about an on-going pod eviction.
+type DeviceTaintRuleStatus struct {
+	// Conditions provide information about the state of the DeviceTaintRule
+	// and the cluster at some point in time,
+	// in a machine-readable and human-readable format.
+	//
+	// The following condition is currently defined as part of this API, more may
+	// get added:
+	// - Type: EvictionInProgress
+	// - Status: True if there are currently pods which need to be evicted, False otherwise
+	//   (includes the effects which don't cause eviction).
+	// - Reason: not specified, may change
+	// - Message: includes information about number of pending pods and already evicted pods
+	//   in a human-readable format, updated periodically, may change
+	//
+	// For `effect: None`, the condition above gets set once for each change to
+	// the spec, with the message containing information about what would happen
+	// if the effect was `NoExecute`. This feedback can be used to decide whether
+	// changing the effect to `NoExecute` will work as intended. It only gets
+	// set once to avoid having to constantly update the status.
+	//
+	// Must have 8 or fewer entries.
+	//
+	// +optional
+	// +listType=map
+	// +listMapKey=type
+	// +patchStrategy=merge
+	// +patchMergeKey=type
+	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
+}
+
+// DeviceTaintRuleStatusMaxConditions is the maximum number of conditions in DeviceTaintRuleStatus.
+const DeviceTaintRuleStatusMaxConditions = 8
+
+// DeviceTaintConditionEvictionInProgress is the publicly documented condition type for the DeviceTaintRuleStatus.
+const DeviceTaintConditionEvictionInProgress = "EvictionInProgress"
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.33

@@ -25,6 +25,7 @@ import (
 	cronjobconfig "k8s.io/kubernetes/pkg/controller/cronjob/config"
 	daemonconfig "k8s.io/kubernetes/pkg/controller/daemon/config"
 	deploymentconfig "k8s.io/kubernetes/pkg/controller/deployment/config"
+	devicetaintevictionconfig "k8s.io/kubernetes/pkg/controller/devicetainteviction/config"
 	endpointconfig "k8s.io/kubernetes/pkg/controller/endpoint/config"
 	endpointsliceconfig "k8s.io/kubernetes/pkg/controller/endpointslice/config"
 	endpointslicemirroringconfig "k8s.io/kubernetes/pkg/controller/endpointslicemirroring/config"
@@ -136,6 +137,8 @@ type KubeControllerManagerConfiguration struct {
 	// ValidatingAdmissionPolicyStatusControllerConfiguration holds configuration for
 	// ValidatingAdmissionPolicyStatusController related features.
 	ValidatingAdmissionPolicyStatusController validatingadmissionpolicystatusconfig.ValidatingAdmissionPolicyStatusControllerConfiguration
+	// DeviceTaintEvictionControllerConfiguration contains elements configuring the device taint eviction controller.
+	DeviceTaintEvictionController devicetaintevictionconfig.DeviceTaintEvictionControllerConfiguration
 }
 
 // DeprecatedControllerConfiguration contains elements be deprecated.

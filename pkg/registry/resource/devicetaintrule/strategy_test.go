@@ -19,14 +19,17 @@ package devicetaintrule
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/kubernetes/pkg/apis/resource"
 )
 
-var patch = &resource.DeviceTaintRule{
+var obj = &resource.DeviceTaintRule{
 	ObjectMeta: metav1.ObjectMeta{
-		Name: "valid-patch",
+		Name:       "valid-patch",
+		Generation: 1,
 	},
 	Spec: resource.DeviceTaintRuleSpec{
 		Taint: resource.DeviceTaint{
@@ -35,6 +38,31 @@ var patch = &resource.DeviceTaintRule{
 		},
 	},
 }
+
+var objWithStatus = &resource.DeviceTaintRule{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:       "valid-patch",
+		Generation: 1,
+	},
+	Spec: resource.DeviceTaintRuleSpec{
+		Taint: resource.DeviceTaint{
+			Key:    "example.com/tainted",
+			Effect: resource.DeviceTaintEffectNoExecute,
+		},
+	},
+	Status: resource.DeviceTaintRuleStatus{
+		Conditions: []metav1.Condition{{
+			Type:               "foo",
+			Status:             metav1.ConditionFalse,
+			LastTransitionTime: metav1.Now(),
+			Reason:             "something",
+			Message:            "else",
+		}},
+	},
+}
+
+var fieldImmutableError = "field is immutable"
+var metadataError = "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters"
 
 func TestDeviceTaintRuleStrategy(t *testing.T) {
 	if Strategy.NamespaceScoped() {
@@ -47,40 +75,202 @@ func TestDeviceTaintRuleStrategy(t *testing.T) {
 
 func TestDeviceTaintRuleStrategyCreate(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
-	patch := patch.DeepCopy()
+	testcases := map[string]struct {
+		obj                   *resource.DeviceTaintRule
+		expectValidationError string
+		expectObj             *resource.DeviceTaintRule
+	}{
+		"simple": {
+			obj:       obj,
+			expectObj: obj,
+		},
+		"validation-error": {
+			obj: func() *resource.DeviceTaintRule {
+				obj := obj.DeepCopy()
+				obj.Name = "%#@$%$"
+				return obj
+			}(),
+			expectValidationError: metadataError,
+		},
+		"drop-status": {
+			obj:       objWithStatus,
+			expectObj: obj,
+		},
+		"set-generation": {
+			obj: func() *resource.DeviceTaintRule {
+				obj := obj.DeepCopy()
+				obj.Generation = 42 // Cannot be set by client on create, overwritten with 1.
+				return obj
+			}(),
+			expectObj: obj,
+		},
+	}
 
-	Strategy.PrepareForCreate(ctx, patch)
-	errs := Strategy.Validate(ctx, patch)
-	if len(errs) != 0 {
-		t.Errorf("unexpected error validating for create %v", errs)
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			obj := tc.obj.DeepCopy()
+			Strategy.PrepareForCreate(ctx, obj)
+			if errs := Strategy.Validate(ctx, obj); len(errs) != 0 {
+				if tc.expectValidationError == "" {
+					t.Fatalf("unexpected error(s): %v", errs)
+				}
+				assert.ErrorContains(t, errs[0], tc.expectValidationError, "the error message should have contained the expected error message")
+				return
+			}
+			if tc.expectValidationError != "" {
+				t.Fatal("expected validation error(s), got none")
+			}
+			if warnings := Strategy.WarningsOnCreate(ctx, obj); len(warnings) != 0 {
+				t.Fatalf("unexpected warnings: %q", warnings)
+			}
+			Strategy.Canonicalize(obj)
+			assert.Equal(t, tc.expectObj, obj)
+		})
 	}
 }
 
 func TestDeviceTaintRuleStrategyUpdate(t *testing.T) {
-	t.Run("no-changes-okay", func(t *testing.T) {
-		ctx := genericapirequest.NewDefaultContext()
-		patch := patch.DeepCopy()
-		newPatch := patch.DeepCopy()
-		newPatch.ResourceVersion = "4"
+	ctx := genericapirequest.NewDefaultContext()
 
-		Strategy.PrepareForUpdate(ctx, newPatch, patch)
-		errs := Strategy.ValidateUpdate(ctx, newPatch, patch)
-		if len(errs) != 0 {
-			t.Errorf("unexpected validation errors: %v", errs)
-		}
-	})
+	testcases := map[string]struct {
+		oldObj                *resource.DeviceTaintRule
+		newObj                *resource.DeviceTaintRule
+		expectValidationError string
+		expectObj             *resource.DeviceTaintRule
+	}{
+		"no-changes-okay": {
+			oldObj:    obj,
+			newObj:    obj,
+			expectObj: obj,
+		},
+		"name-change-not-allowed": {
+			oldObj: obj,
+			newObj: func() *resource.DeviceTaintRule {
+				obj := obj.DeepCopy()
+				obj.Name += "-2"
+				return obj
+			}(),
+			expectValidationError: fieldImmutableError,
+		},
+		"drop-status": {
+			oldObj:    obj,
+			newObj:    objWithStatus,
+			expectObj: obj,
+		},
+		"bump-generation": {
+			oldObj: obj,
+			newObj: func() *resource.DeviceTaintRule {
+				obj := obj.DeepCopy()
+				obj.Spec.Taint.Effect = resource.DeviceTaintEffectNone
+				return obj
+			}(),
+			expectObj: func() *resource.DeviceTaintRule {
+				obj := obj.DeepCopy()
+				obj.Spec.Taint.Effect = resource.DeviceTaintEffectNone
+				obj.Generation++
+				return obj
+			}(),
+		},
+	}
 
-	t.Run("name-change-not-allowed", func(t *testing.T) {
-		ctx := genericapirequest.NewDefaultContext()
-		patch := patch.DeepCopy()
-		newPatch := patch.DeepCopy()
-		newPatch.Name = "valid-patch-2"
-		newPatch.ResourceVersion = "4"
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			oldObj := tc.oldObj.DeepCopy()
+			newObj := tc.newObj.DeepCopy()
+			newObj.ResourceVersion = "4"
 
-		Strategy.PrepareForUpdate(ctx, newPatch, patch)
-		errs := Strategy.ValidateUpdate(ctx, newPatch, patch)
-		if len(errs) == 0 {
-			t.Errorf("expected a validation error")
-		}
-	})
+			Strategy.PrepareForUpdate(ctx, newObj, oldObj)
+			if errs := Strategy.ValidateUpdate(ctx, newObj, oldObj); len(errs) != 0 {
+				if tc.expectValidationError == "" {
+					t.Fatalf("unexpected error(s): %v", errs)
+				}
+				assert.ErrorContains(t, errs[0], tc.expectValidationError, "the error message should have contained the expected error message")
+				return
+			}
+			if tc.expectValidationError != "" {
+				t.Fatal("expected validation error(s), got none")
+			}
+			if warnings := Strategy.WarningsOnUpdate(ctx, newObj, oldObj); len(warnings) != 0 {
+				t.Fatalf("unexpected warnings: %q", warnings)
+			}
+			Strategy.Canonicalize(newObj)
+			expectObj := tc.expectObj.DeepCopy()
+			expectObj.ResourceVersion = "4"
+			assert.Equal(t, expectObj, newObj)
+		})
+	}
+}
+
+func TestStatusStrategyUpdate(t *testing.T) {
+	ctx := genericapirequest.NewDefaultContext()
+	testcases := map[string]struct {
+		oldObj                *resource.DeviceTaintRule
+		newObj                *resource.DeviceTaintRule
+		expectValidationError string
+		expectObj             *resource.DeviceTaintRule
+	}{
+		"no-changes-okay": {
+			oldObj:    obj,
+			newObj:    obj,
+			expectObj: obj,
+		},
+		"name-change-not-allowed": {
+			oldObj: obj,
+			newObj: func() *resource.DeviceTaintRule {
+				obj := obj.DeepCopy()
+				obj.Name += "-2"
+				return obj
+			}(),
+			expectValidationError: fieldImmutableError,
+		},
+		// Cannot add finalizers, annotations and labels during status update.
+		"drop-meta-changes": {
+			oldObj: obj,
+			newObj: func() *resource.DeviceTaintRule {
+				obj := obj.DeepCopy()
+				obj.Finalizers = []string{"foo"}
+				obj.Annotations = map[string]string{"foo": "bar"}
+				obj.Labels = map[string]string{"foo": "bar"}
+				return obj
+			}(),
+			expectObj: obj,
+		},
+		"drop-spec": {
+			oldObj: obj,
+			newObj: func() *resource.DeviceTaintRule {
+				obj := obj.DeepCopy()
+				obj.Spec.Taint.Effect = resource.DeviceTaintEffectNone
+				return obj
+			}(),
+			expectObj: obj,
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			oldObj := tc.oldObj.DeepCopy()
+			newObj := tc.newObj.DeepCopy()
+			newObj.ResourceVersion = "4"
+
+			StatusStrategy.PrepareForUpdate(ctx, newObj, oldObj)
+			if errs := StatusStrategy.ValidateUpdate(ctx, newObj, oldObj); len(errs) != 0 {
+				if tc.expectValidationError == "" {
+					t.Fatalf("unexpected error(s): %v", errs)
+				}
+				assert.ErrorContains(t, errs[0], tc.expectValidationError, "the error message should have contained the expected error message")
+				return
+			}
+			if tc.expectValidationError != "" {
+				t.Fatal("expected validation error(s), got none")
+			}
+			if warnings := StatusStrategy.WarningsOnUpdate(ctx, newObj, oldObj); len(warnings) != 0 {
+				t.Fatalf("unexpected warnings: %q", warnings)
+			}
+			StatusStrategy.Canonicalize(newObj)
+
+			expectObj := tc.expectObj.DeepCopy()
+			expectObj.ResourceVersion = "4"
+			assert.Equal(t, expectObj, newObj)
+		})
+	}
 }

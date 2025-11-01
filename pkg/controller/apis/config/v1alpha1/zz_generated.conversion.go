@@ -34,6 +34,7 @@ import (
 	cronjobconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/cronjob/config/v1alpha1"
 	daemonconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/daemon/config/v1alpha1"
 	deploymentconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/deployment/config/v1alpha1"
+	devicetaintevictionconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/devicetainteviction/config/v1alpha1"
 	endpointconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/endpoint/config/v1alpha1"
 	endpointsliceconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/endpointslice/config/v1alpha1"
 	endpointslicemirroringconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/endpointslicemirroring/config/v1alpha1"
@@ -224,6 +225,9 @@ func autoConvert_v1alpha1_KubeControllerManagerConfiguration_To_config_KubeContr
 	if err := validatingadmissionpolicystatusconfigv1alpha1.Convert_v1alpha1_ValidatingAdmissionPolicyStatusControllerConfiguration_To_config_ValidatingAdmissionPolicyStatusControllerConfiguration(&in.ValidatingAdmissionPolicyStatusController, &out.ValidatingAdmissionPolicyStatusController, s); err != nil {
 		return err
 	}
+	if err := devicetaintevictionconfigv1alpha1.Convert_v1alpha1_DeviceTaintEvictionControllerConfiguration_To_config_DeviceTaintEvictionControllerConfiguration(&in.DeviceTaintEvictionController, &out.DeviceTaintEvictionController, s); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -318,6 +322,9 @@ func autoConvert_config_KubeControllerManagerConfiguration_To_v1alpha1_KubeContr
 		return err
 	}
 	if err := validatingadmissionpolicystatusconfigv1alpha1.Convert_config_ValidatingAdmissionPolicyStatusControllerConfiguration_To_v1alpha1_ValidatingAdmissionPolicyStatusControllerConfiguration(&in.ValidatingAdmissionPolicyStatusController, &out.ValidatingAdmissionPolicyStatusController, s); err != nil {
+		return err
+	}
+	if err := devicetaintevictionconfigv1alpha1.Convert_config_DeviceTaintEvictionControllerConfiguration_To_v1alpha1_DeviceTaintEvictionControllerConfiguration(&in.DeviceTaintEvictionController, &out.DeviceTaintEvictionController, s); err != nil {
 		return err
 	}
 	return nil

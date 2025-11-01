@@ -56,6 +56,7 @@ import (
 	cronjobconfig "k8s.io/kubernetes/pkg/controller/cronjob/config"
 	daemonconfig "k8s.io/kubernetes/pkg/controller/daemon/config"
 	deploymentconfig "k8s.io/kubernetes/pkg/controller/deployment/config"
+	devicetaintevictionconfig "k8s.io/kubernetes/pkg/controller/devicetainteviction/config"
 	endpointconfig "k8s.io/kubernetes/pkg/controller/endpoint/config"
 	endpointsliceconfig "k8s.io/kubernetes/pkg/controller/endpointslice/config"
 	endpointslicemirroringconfig "k8s.io/kubernetes/pkg/controller/endpointslicemirroring/config"
@@ -98,6 +99,7 @@ var args = []string{
 	"--cluster-signing-legacy-unknown-cert-file=/cluster-signing-legacy-unknown/cert-file",
 	"--cluster-signing-legacy-unknown-key-file=/cluster-signing-legacy-unknown/key-file",
 	"--concurrent-deployment-syncs=10",
+	"--concurrent-device-taint-eviction-syncs=10",
 	"--concurrent-daemonset-syncs=10",
 	"--concurrent-horizontal-pod-autoscaler-syncs=10",
 	"--concurrent-statefulset-syncs=15",
@@ -271,6 +273,11 @@ func TestAddFlags(t *testing.T) {
 		DeploymentController: &DeploymentControllerOptions{
 			&deploymentconfig.DeploymentControllerConfiguration{
 				ConcurrentDeploymentSyncs: 10,
+			},
+		},
+		DeviceTaintEvictionController: &DeviceTaintEvictionControllerOptions{
+			&devicetaintevictionconfig.DeviceTaintEvictionControllerConfiguration{
+				ConcurrentSyncs: 10,
 			},
 		},
 		StatefulSetController: &StatefulSetControllerOptions{
@@ -623,6 +630,9 @@ func TestApplyTo(t *testing.T) {
 			},
 			DeploymentController: deploymentconfig.DeploymentControllerConfiguration{
 				ConcurrentDeploymentSyncs: 10,
+			},
+			DeviceTaintEvictionController: devicetaintevictionconfig.DeviceTaintEvictionControllerConfiguration{
+				ConcurrentSyncs: 10,
 			},
 			StatefulSetController: statefulsetconfig.StatefulSetControllerConfiguration{
 				ConcurrentStatefulSetSyncs: 15,
@@ -1259,6 +1269,15 @@ func TestValidateControllersOptions(t *testing.T) {
 			options: &DeploymentControllerOptions{
 				&deploymentconfig.DeploymentControllerConfiguration{
 					ConcurrentDeploymentSyncs: 10,
+				},
+			},
+		},
+		{
+			name:         "DeviceTaintEvictionControllerOptions",
+			expectErrors: false,
+			options: &DeviceTaintEvictionControllerOptions{
+				&devicetaintevictionconfig.DeviceTaintEvictionControllerConfiguration{
+					ConcurrentSyncs: 10,
 				},
 			},
 		},

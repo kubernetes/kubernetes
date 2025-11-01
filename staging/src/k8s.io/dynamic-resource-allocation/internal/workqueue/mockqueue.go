@@ -216,6 +216,16 @@ func (m *Mock[T]) AddAfter(item T, duration time.Duration) {
 	m.state.Later = append(m.state.Later, MockDelayedItem[T]{Item: item, Duration: duration})
 }
 
+// CancelAfter is an extension of the TypedDelayingInterface: it allows a test to remove an item that may or may not have been added before via AddAfter.
+func (m *Mock[T]) CancelAfter(item T) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	m.state.Later = slices.DeleteFunc(m.state.Later, func(later MockDelayedItem[T]) bool {
+		return later.Item == item
+	})
+}
+
 // AddRateLimited implements [TypedRateLimitingInterface.AddRateLimited].
 func (m *Mock[T]) AddRateLimited(item T) {
 	m.mutex.Lock()

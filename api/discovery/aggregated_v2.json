@@ -2101,6 +2101,21 @@
               },
               "scope": "Cluster",
               "singularResource": "devicetaintrule",
+              "subresources": [
+                {
+                  "responseKind": {
+                    "group": "",
+                    "kind": "DeviceTaintRule",
+                    "version": ""
+                  },
+                  "subresource": "status",
+                  "verbs": [
+                    "get",
+                    "patch",
+                    "update"
+                  ]
+                }
+              ],
               "verbs": [
                 "create",
                 "delete",

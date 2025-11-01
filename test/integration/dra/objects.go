@@ -29,8 +29,33 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-// NewMaxResourceSlice creates a slice that is as large as possible given the current validation constraints.
-func NewMaxResourceSlice() *resourceapi.ResourceSlice {
+// NewMaxResourceSlices creates slices that are as large as possible given the current validation constraints.
+func NewMaxResourceSlices() map[string]*resourceapi.ResourceSlice {
+	slices := map[string]*resourceapi.ResourceSlice{
+		"basic":       newBasicResourceSlice(resourceapi.ResourceSliceMaxDevices),
+		"with-taints": newTaintedResourceSlice(),
+	}
+	return slices
+}
+
+func newTaintedResourceSlice() *resourceapi.ResourceSlice {
+	slice := newBasicResourceSlice(resourceapi.ResourceSliceMaxDevicesWithTaints)
+	for i := range slice.Spec.Devices {
+		for j := 0; j < resourceapi.DeviceTaintsMaxLength; j++ {
+			slice.Spec.Devices[i].Taints = append(slice.Spec.Devices[i].Taints,
+				resourceapi.DeviceTaint{
+					Key:       maxLabelName(i),
+					Value:     maxLabelValue(i),
+					Effect:    resourceapi.DeviceTaintEffectNoSchedule,
+					TimeAdded: &metav1.Time{Time: time.Now().Truncate(time.Second)},
+				},
+			)
+		}
+	}
+	return slice
+}
+
+func newBasicResourceSlice(numDevices int) *resourceapi.ResourceSlice {
 	slice := &resourceapi.ResourceSlice{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: maxSubDomain(0),
@@ -70,7 +95,7 @@ func NewMaxResourceSlice() *resourceapi.ResourceSlice {
 			}(),
 			Devices: func() []resourceapi.Device {
 				var devices []resourceapi.Device
-				for i := 0; i < resourceapi.ResourceSliceMaxDevices; i++ {
+				for i := 0; i < numDevices; i++ {
 					devices = append(devices, resourceapi.Device{
 						Name: maxDNSLabel(i),
 						// Use attributes rather than capacity since it is more expensive.
@@ -98,18 +123,6 @@ func NewMaxResourceSlice() *resourceapi.ResourceSlice {
 							return consumesCounters
 						}(),
 						NodeName: ptr.To(maxSubDomain(0)),
-						Taints: func() []resourceapi.DeviceTaint {
-							var taints []resourceapi.DeviceTaint
-							for i := 0; i < resourceapi.DeviceTaintsMaxLength; i++ {
-								taints = append(taints, resourceapi.DeviceTaint{
-									Key:       maxLabelName(i),
-									Value:     maxLabelValue(i),
-									Effect:    resourceapi.DeviceTaintEffectNoSchedule,
-									TimeAdded: &metav1.Time{Time: time.Now().Truncate(time.Second)},
-								})
-							}
-							return taints
-						}(),
 					})
 				}
 				return devices

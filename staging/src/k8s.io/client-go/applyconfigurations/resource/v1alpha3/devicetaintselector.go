@@ -25,10 +25,6 @@ package v1alpha3
 // The empty selector matches all devices. Without a selector, no devices
 // are matched.
 type DeviceTaintSelectorApplyConfiguration struct {
-	// If DeviceClassName is set, the selectors defined there must be
-	// satisfied by a device to be selected. This field corresponds
-	// to class.metadata.name.
-	DeviceClassName *string `json:"deviceClassName,omitempty"`
 	// If driver is set, only devices from that driver are selected.
 	// This fields corresponds to slice.spec.driver.
 	Driver *string `json:"driver,omitempty"`
@@ -47,24 +43,12 @@ type DeviceTaintSelectorApplyConfiguration struct {
 	// Setting also driver and pool may be required to avoid ambiguity,
 	// but is not required.
 	Device *string `json:"device,omitempty"`
-	// Selectors contains the same selection criteria as a ResourceClaim.
-	// Currently, CEL expressions are supported. All of these selectors
-	// must be satisfied.
-	Selectors []DeviceSelectorApplyConfiguration `json:"selectors,omitempty"`
 }
 
 // DeviceTaintSelectorApplyConfiguration constructs a declarative configuration of the DeviceTaintSelector type for use with
 // apply.
 func DeviceTaintSelector() *DeviceTaintSelectorApplyConfiguration {
 	return &DeviceTaintSelectorApplyConfiguration{}
-}
-
-// WithDeviceClassName sets the DeviceClassName field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the DeviceClassName field is set to the value of the last call.
-func (b *DeviceTaintSelectorApplyConfiguration) WithDeviceClassName(value string) *DeviceTaintSelectorApplyConfiguration {
-	b.DeviceClassName = &value
-	return b
 }
 
 // WithDriver sets the Driver field in the declarative configuration to the given value
@@ -88,18 +72,5 @@ func (b *DeviceTaintSelectorApplyConfiguration) WithPool(value string) *DeviceTa
 // If called multiple times, the Device field is set to the value of the last call.
 func (b *DeviceTaintSelectorApplyConfiguration) WithDevice(value string) *DeviceTaintSelectorApplyConfiguration {
 	b.Device = &value
-	return b
-}
-
-// WithSelectors adds the given value to the Selectors field in the declarative configuration
-// and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, values provided by each call will be appended to the Selectors field.
-func (b *DeviceTaintSelectorApplyConfiguration) WithSelectors(values ...*DeviceSelectorApplyConfiguration) *DeviceTaintSelectorApplyConfiguration {
-	for i := range values {
-		if values[i] == nil {
-			panic("nil value passed to WithSelectors")
-		}
-		b.Selectors = append(b.Selectors, *values[i])
-	}
 	return b
 }

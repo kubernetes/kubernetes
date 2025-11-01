@@ -74,6 +74,7 @@ func (in *KubeControllerManagerConfiguration) DeepCopyInto(out *KubeControllerMa
 	out.ServiceController = in.ServiceController
 	out.TTLAfterFinishedController = in.TTLAfterFinishedController
 	out.ValidatingAdmissionPolicyStatusController = in.ValidatingAdmissionPolicyStatusController
+	out.DeviceTaintEvictionController = in.DeviceTaintEvictionController
 	return
 }
 

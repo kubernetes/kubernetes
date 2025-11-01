@@ -72,7 +72,9 @@ type DeviceApplyConfiguration struct {
 	AllNodes *bool `json:"allNodes,omitempty"`
 	// If specified, these are the driver-defined taints.
 	//
-	// The maximum number of taints is 4.
+	// The maximum number of taints is 16. If taints are set for
+	// any device in a ResourceSlice, then the maximum number of
+	// allowed devices per ResourceSlice is 64 instead of 128.
 	//
 	// This is an alpha field and requires enabling the DRADeviceTaints
 	// feature gate.

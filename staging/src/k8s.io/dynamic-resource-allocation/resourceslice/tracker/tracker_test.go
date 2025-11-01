@@ -316,37 +316,10 @@ var (
 		}
 		return rule
 	}
-	taintCELSelectedDevicesRule = func(rule *resourcealphaapi.DeviceTaintRule, exprs ...string) *resourcealphaapi.DeviceTaintRule {
-		rule = rule.DeepCopy()
-		var selectors []resourcealphaapi.DeviceSelector
-		for _, expr := range exprs {
-			selectors = append(selectors, resourcealphaapi.DeviceSelector{
-				CEL: &resourcealphaapi.CELDeviceSelector{
-					Expression: expr,
-				},
-			})
-		}
-		rule.Spec.DeviceSelector = &resourcealphaapi.DeviceTaintSelector{
-			Selectors: selectors,
-		}
-		return rule
-	}
-	taintDeviceClassRule = func(rule *resourcealphaapi.DeviceTaintRule, deviceClassName string) *resourcealphaapi.DeviceTaintRule {
-		rule = rule.DeepCopy()
-		rule.Spec.DeviceSelector = &resourcealphaapi.DeviceTaintSelector{
-			DeviceClassName: &deviceClassName,
-		}
-		return rule
-	}
-	taintPool1DevicesRule             = taintPoolDevicesRule(taintAllDevicesRule, pool1)
-	taintPool2DevicesRule             = taintPoolDevicesRule(taintAllDevicesRule, pool2)
-	taintDriver1DevicesRule           = taintDriverDevicesRule(taintAllDevicesRule, driver1)
-	taintDevice1Rule                  = taintNamedDevicesRule(taintAllDevicesRule, device1Name)
-	taintDriver1DevicesCELRule        = taintCELSelectedDevicesRule(taintAllDevicesRule, `device.driver == "`+driver1+`"`)
-	taintNoDevicesCELRule             = taintCELSelectedDevicesRule(taintAllDevicesRule, `true`, `false`, `true`)
-	taintNoDevicesCELRuntimeErrorRule = taintCELSelectedDevicesRule(taintAllDevicesRule, `device.attributes["test.example.com"].deviceAttr`)
-	taintNoDevicesInvalidCELRule      = taintCELSelectedDevicesRule(taintAllDevicesRule, `invalid`)
-	taintDeviceClass1Rule             = taintDeviceClassRule(taintAllDevicesRule, deviceClass1.Name)
+	taintPool1DevicesRule   = taintPoolDevicesRule(taintAllDevicesRule, pool1)
+	taintPool2DevicesRule   = taintPoolDevicesRule(taintAllDevicesRule, pool2)
+	taintDriver1DevicesRule = taintDriverDevicesRule(taintAllDevicesRule, driver1)
+	taintDevice1Rule        = taintNamedDevicesRule(taintAllDevicesRule, device1Name)
 )
 
 func TestListPatchedResourceSlices(t *testing.T) {
@@ -519,102 +492,19 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				{event: handlerEventAdd, newObj: slice2},
 			},
 		},
-		"add-attribute-for-selector": {
-			events: []any{
-				add(taintDriver1DevicesCELRule),
-				add(slice1),
-				add(slice2),
-			},
-			expectedPatchedSlices: []*resourceapi.ResourceSlice{
-				slice1Tainted,
-				slice2,
-			},
-			expectedHandlerEvents: []handlerEvent{
-				{event: handlerEventAdd, newObj: slice1Tainted},
-				{event: handlerEventAdd, newObj: slice2},
-			},
-		},
-		"selector-does-not-match": {
-			events: []any{
-				add(taintNoDevicesCELRule),
-				add(slice1),
-			},
-			expectedPatchedSlices: []*resourceapi.ResourceSlice{
-				slice1,
-			},
-			expectedHandlerEvents: []handlerEvent{
-				{event: handlerEventAdd, newObj: slice1},
-			},
-		},
-		"runtime-CEL-errors-skip-devices": {
-			events: []any{
-				add(taintNoDevicesCELRuntimeErrorRule),
-				add(slice1),
-			},
-			expectedPatchedSlices: []*resourceapi.ResourceSlice{
-				slice1,
-			},
-			expectEvents: func(t *assert.CollectT, events *v1.EventList) {
-				if !assert.Len(t, events.Items, 1) {
-					return
-				}
-				assert.Equal(t, taintNoDevicesCELRuntimeErrorRule.Name, events.Items[0].InvolvedObject.Name)
-				assert.Equal(t, "CELRuntimeError", events.Items[0].Reason)
-			},
-			expectedHandlerEvents: []handlerEvent{
-				{event: handlerEventAdd, newObj: slice1},
-			},
-		},
-		"invalid-CEL-expression-throws-error": {
-			events: []any{
-				[]any{
-					add(taintNoDevicesInvalidCELRule),
-					add(slice1),
-				},
-			},
-			expectedPatchedSlices: []*resourceapi.ResourceSlice{},
-			expectUnhandledErrors: func(t *testing.T, errs []error) {
-				if !assert.Len(t, errs, 1) {
-					return
-				}
-				assert.ErrorContains(t, errs[0], "CEL compile error")
-			},
-		},
-		"add-taint-for-device-class": {
-			events: []any{
-				add(deviceClass1),
-				add(taintDeviceClass1Rule),
-				add(slice1),
-				add(slice2),
-			},
-			expectedPatchedSlices: []*resourceapi.ResourceSlice{
-				slice1Tainted,
-				slice2,
-			},
-			expectedHandlerEvents: []handlerEvent{
-				{event: handlerEventAdd, newObj: slice1Tainted},
-				{event: handlerEventAdd, newObj: slice2},
-			},
-		},
 		"filter-all-criteria": {
 			events: []any{
 				add(deviceClass1),
 				add(
-					taintDeviceClassRule(
-						taintDriverDevicesRule(
-							taintPoolDevicesRule(
-								taintNamedDevicesRule(
-									taintCELSelectedDevicesRule(
-										taintAllDevicesRule,
-										`true`,
-									),
-									device1Name,
-								),
-								pool1,
+					taintDriverDevicesRule(
+						taintPoolDevicesRule(
+							taintNamedDevicesRule(
+								taintAllDevicesRule,
+								device1Name,
 							),
-							driver1,
+							pool1,
 						),
-						deviceClass1.Name,
+						driver1,
 					),
 				),
 				add(slice1),
