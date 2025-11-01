@@ -847,14 +847,14 @@ func (m *Manager) UpdateAllocatedResourcesStatus(pod *v1.Pod, status *v1.PodStat
 					// Iterate through each specific device allocated by this driver
 					for _, device := range driverState.Devices {
 
-						healthStr := m.healthInfoCache.getHealthInfo(driverName, device.PoolName, device.DeviceName)
+						healthInfo := m.healthInfoCache.getHealthInfo(driverName, device.PoolName, device.DeviceName)
 
 						// Convert internal health string to API type
 						var health v1.ResourceHealthStatus
-						switch healthStr {
-						case "Healthy":
+						switch healthInfo.Health {
+						case state.DeviceHealthStatusHealthy:
 							health = v1.ResourceHealthStatusHealthy
-						case "Unhealthy":
+						case state.DeviceHealthStatusUnhealthy:
 							health = v1.ResourceHealthStatusUnhealthy
 						default: // Catches "Unknown" or any other case
 							health = v1.ResourceHealthStatusUnknown
@@ -862,7 +862,8 @@ func (m *Manager) UpdateAllocatedResourcesStatus(pod *v1.Pod, status *v1.PodStat
 
 						// Create the ResourceHealth entry
 						resourceHealth := v1.ResourceHealth{
-							Health: health,
+							Health:  health,
+							Message: healthInfo.Message,
 						}
 
 						// Use first CDI device ID as ResourceID, with fallback
@@ -938,6 +939,7 @@ func (m *Manager) HandleWatchResourcesStream(ctx context.Context, stream draheal
 				DeviceName:  d.GetDevice().GetDeviceName(),
 				Health:      health,
 				LastUpdated: time.Unix(d.GetLastUpdatedTime(), 0),
+				Message:     d.GetMessage(),
 			}
 		}
 
