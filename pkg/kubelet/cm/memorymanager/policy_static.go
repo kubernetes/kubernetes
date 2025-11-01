@@ -37,7 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
-const PolicyTypeStatic policyType = "Static"
+const PolicyTypeStatic policyType = "static"
 
 type systemReservedMemory map[int]map[v1.ResourceName]uint64
 type reusableMemory map[string]map[string]map[v1.ResourceName]uint64
