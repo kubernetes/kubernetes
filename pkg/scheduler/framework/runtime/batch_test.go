@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"context"
+	"log"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -17,9 +18,18 @@ import (
 
 var batchRegistry = func() Registry {
 	r := make(Registry)
-	r.Register("batchTest", newBatchTestPlugin)
-	r.Register(queueSortPlugin, newQueueSortPlugin)
-	r.Register(bindPlugin, newBindPlugin)
+	err := r.Register("batchTest", newBatchTestPlugin)
+	if err != nil {
+		log.Fatal("Couldn't register test.")
+	}
+	err = r.Register(queueSortPlugin, newQueueSortPlugin)
+	if err != nil {
+		log.Fatal("Couldn't register test.")
+	}
+	err = r.Register(bindPlugin, newBindPlugin)
+	if err != nil {
+		log.Fatal("Couldn't register test.")
+	}
 	return r
 }()
 
@@ -32,10 +42,10 @@ func (pl *BatchTestPlugin) Name() string {
 // Test plugin assumes that each node can hold only one node whose id begins with "b". This allows
 // us to construct pods that block future selves or not.
 func (pl *BatchTestPlugin) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
-	podId := pod.GetUID()
+	podID := pod.GetUID()
 	for _, nodePod := range nodeInfo.GetPods() {
 		npid := nodePod.GetPod().GetUID()
-		if npid[0] == podId[0] && npid[0] == 'b' {
+		if podID[0] == 'b' && npid[0] == 'b' {
 			return fwk.NewStatus(fwk.Unschedulable, "unsched")
 		}
 	}
@@ -96,12 +106,12 @@ func newTestSigFunc(sig *string) PodSignatureFunc {
 func TestBatchBasic(t *testing.T) {
 	tests := []struct {
 		name              string
-		firstId           string
+		firstID           string
 		firstSig          string
 		firstChosenNode   string
 		firstOtherNodes   framework.SortedScoredNodes
 		firstPodCompleted bool
-		secondId          string
+		secondID          string
 		secondSig         string
 		secondChosenNode  string
 		secondOtherNodes  framework.SortedScoredNodes
@@ -110,84 +120,84 @@ func TestBatchBasic(t *testing.T) {
 	}{
 		{
 			name:              "single match",
-			firstId:           "b1",
+			firstID:           "b1",
 			firstSig:          "sig",
 			firstChosenNode:   "n3",
 			firstOtherNodes:   newTestNodes([]string{"n1"}),
 			firstPodCompleted: true,
-			secondId:          "b2",
+			secondID:          "b2",
 			secondSig:         "sig",
 			secondChosenNode:  "n1",
 			expectedHint:      "n1",
 		},
 		{
 			name:              "diff sigs",
-			firstId:           "a1",
+			firstID:           "a1",
 			firstSig:          "sig",
 			firstChosenNode:   "n3",
 			firstOtherNodes:   newTestNodes([]string{"n1"}),
 			firstPodCompleted: true,
-			secondId:          "a2",
+			secondID:          "a2",
 			secondSig:         "sig2",
 			secondChosenNode:  "n1",
 			expectedHint:      "",
 		},
 		{
 			name:              "node not filtered",
-			firstId:           "a1",
+			firstID:           "a1",
 			firstSig:          "sig",
 			firstChosenNode:   "n3",
 			firstOtherNodes:   newTestNodes([]string{"n1"}),
 			firstPodCompleted: true,
-			secondId:          "a2",
+			secondID:          "a2",
 			secondSig:         "sig",
 			secondChosenNode:  "n1",
 			expectedHint:      "",
 		},
 		{
 			name:              "incomplete",
-			firstId:           "b1",
+			firstID:           "b1",
 			firstSig:          "sig",
 			firstChosenNode:   "n3",
 			firstOtherNodes:   newTestNodes([]string{"n1"}),
 			firstPodCompleted: false,
-			secondId:          "b2",
+			secondID:          "b2",
 			secondSig:         "sig",
 			secondChosenNode:  "n1",
 			expectedHint:      "",
 		},
 		{
 			name:              "empty list",
-			firstId:           "b1",
+			firstID:           "b1",
 			firstSig:          "sig",
 			firstChosenNode:   "n3",
 			firstOtherNodes:   newTestNodes([]string{}),
 			firstPodCompleted: true,
-			secondId:          "b2",
+			secondID:          "b2",
 			secondSig:         "sig",
 			secondChosenNode:  "n4",
 			expectedHint:      "",
 		},
 		{
 			name:              "nil list",
-			firstId:           "b1",
+			firstID:           "b1",
 			firstSig:          "sig",
 			firstChosenNode:   "n3",
 			firstOtherNodes:   nil,
 			firstPodCompleted: true,
-			secondId:          "b2",
+			secondID:          "b2",
 			secondSig:         "sig",
 			secondChosenNode:  "n4",
 			expectedHint:      "",
 		},
 		{
 			name:              "match multi",
-			firstId:           "b1",
+			firstID:           "b1",
 			firstSig:          "sig",
 			firstChosenNode:   "n3",
 			firstOtherNodes:   newTestNodes([]string{"n1", "n2"}),
 			firstPodCompleted: true,
-			secondId:          "b2",
+			secondID:          "b2",
 			secondSig:         "sig",
 			secondChosenNode:  "n1",
 			expectedHint:      "n1",
@@ -198,12 +208,12 @@ func TestBatchBasic(t *testing.T) {
 		},
 		{
 			name:              "match multi diff choice",
-			firstId:           "b1",
+			firstID:           "b1",
 			firstSig:          "sig",
 			firstChosenNode:   "n3",
 			firstOtherNodes:   newTestNodes([]string{"n1", "n2"}),
 			firstPodCompleted: true,
-			secondId:          "b2",
+			secondID:          "b2",
 			secondSig:         "sig",
 			secondChosenNode:  "n7",
 			expectedHint:      "n1",
@@ -222,7 +232,7 @@ func TestBatchBasic(t *testing.T) {
 		pod := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "pod",
-				UID:  types.UID(tt.firstId),
+				UID:  types.UID(tt.firstID),
 			},
 		}
 
@@ -245,7 +255,7 @@ func TestBatchBasic(t *testing.T) {
 		pod2 := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "pod2",
-				UID:  types.UID(tt.secondId),
+				UID:  types.UID(tt.secondID),
 			},
 		}
 
@@ -265,7 +275,7 @@ func TestBatchBasic(t *testing.T) {
 			t.Fatalf("Got hint '%s' expected '%s' for test '%s'", hint, tt.expectedHint, tt.name)
 		}
 
-		batch.StoreScheduleResults(ctx, pod, tt.secondChosenNode, tt.secondOtherNodes)
+		batch.StoreScheduleResults(ctx, pod2, tt.secondChosenNode, tt.secondOtherNodes)
 
 		if tt.firstPodCompleted {
 			batch.PostScore(ctx, true, pod2)

@@ -68,7 +68,7 @@ func (b *OpportunisticBatch) RunNodeHint(ctx context.Context, pod *v1.Pod, state
 	// If we don't have state that we can use, then return an empty hint.
 	if !b.updateState(ctx, logger, pod, state, lastHintedNode) {
 		metrics.BatchUsageStats.WithLabelValues("no_hint").Inc()
-		logger.V(0).Info("Hint", "pod", pod.GetUID(), "value", "")
+		logger.V(3).Info("Hint", "pod", pod.GetUID(), "value", "")
 		return ""
 	}
 
@@ -77,7 +77,7 @@ func (b *OpportunisticBatch) RunNodeHint(ctx context.Context, pod *v1.Pod, state
 	metrics.BatchUsageStats.WithLabelValues("hint").Inc()
 	hint := b.state.sortedNodes.Pop()
 	b.currPod.hint = hint
-	logger.V(0).Info("Hint", "pod", pod.GetUID(), "value", hint)
+	logger.V(3).Info("Hint", "pod", pod.GetUID(), "value", hint)
 
 	return hint
 }
@@ -99,7 +99,7 @@ func (b *OpportunisticBatch) StoreScheduleResults(ctx context.Context, pod *v1.P
 				sortedNodes:  otherNodes,
 				creationTime: time.Now(),
 			}
-			logger.V(2).Info("Set batch info", "signature", b.state.signature)
+			logger.V(3).Info("Set batch info", "signature", b.state.signature)
 
 			b.currPod.chosenNode = chosenNode
 		} else {
@@ -109,7 +109,9 @@ func (b *OpportunisticBatch) StoreScheduleResults(ctx context.Context, pod *v1.P
 }
 
 func (b *OpportunisticBatch) PostScore(ctx context.Context, thisFramework bool, pod *v1.Pod) {
-	if b.currPod.pod == pod && thisFramework {
+	if b.currPod.pod != pod || !thisFramework {
+		b.invalidate(klog.FromContext(ctx), "diff_pod")
+	} else {
 		b.currPod.succeeded = true
 	}
 }
@@ -124,7 +126,7 @@ func (b *OpportunisticBatch) invalidate(logger klog.Logger, reason string) {
 	metrics.BatchEventStats.WithLabelValues("invalidate", reason).Inc()
 	if b.state != nil {
 		b.state = nil
-		logger.V(0).Info("Invalidate change", "reason", reason)
+		logger.V(5).Info("Invalidate change", "reason", reason)
 	}
 }
 
