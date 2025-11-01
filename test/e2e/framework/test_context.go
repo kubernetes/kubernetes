@@ -646,9 +646,24 @@ func listTestInformation(report ginkgo.Report) {
 	if TestContext.listTests {
 		leafs := make([][]string, 0, len(report.SpecReports))
 		wd, _ := os.Getwd()
+		allAdditionalLabels := sets.New[string]()
 		for _, spec := range report.SpecReports {
 			if spec.LeafNodeType == types.NodeTypeIt {
-				leafs = append(leafs, []string{fmt.Sprintf("%s:%d: ", relativePath(wd, spec.LeafNodeLocation.FileName), spec.LeafNodeLocation.LineNumber), spec.FullText()})
+				location := fmt.Sprintf("%s:%d: ", relativePath(wd, spec.LeafNodeLocation.FileName), spec.LeafNodeLocation.LineNumber)
+				text := spec.FullText()
+				additionalTags := sets.New[string]()
+				for _, label := range spec.Labels() {
+					// If a label is already present in the test name, then it must be enclosed with square brackets.
+					tag := "[" + label + "]"
+					if !strings.Contains(text, tag) {
+						additionalTags.Insert(tag)
+						allAdditionalLabels.Insert(label)
+					}
+				}
+				if len(additionalTags) > 0 {
+					text += " + " + strings.Join(sets.List(additionalTags), " ")
+				}
+				leafs = append(leafs, []string{location, text})
 			}
 		}
 		// Sort by test name, not the source code location, because the test
@@ -656,11 +671,15 @@ func listTestInformation(report ginkgo.Report) {
 		sort.Slice(leafs, func(i, j int) bool {
 			return leafs[i][1] < leafs[j][1]
 		})
-		fmt.Fprint(Output, "The following spec names can be used with 'ginkgo run --focus/skip':\n")
-		for _, leaf := range leafs {
-			fmt.Fprintf(Output, "%s%s%s\n", indent, leaf[0], leaf[1])
+		additionalLabelsText := "none at the moment"
+		if len(allAdditionalLabels) > 0 {
+			additionalLabelsText = "currently " + strings.Join(sets.List(allAdditionalLabels), " ")
 		}
-		fmt.Fprint(Output, "\n")
+		_, _ = fmt.Fprintf(Output, "The following spec names can be used with 'ginkgo run --focus/skip'.\nLabels which are not embedded in the test name (%s) follow after + at the end of each line.\n\n", additionalLabelsText)
+		for _, leaf := range leafs {
+			_, _ = fmt.Fprintf(Output, "%s%s%s\n", indent, leaf[0], leaf[1])
+		}
+		_, _ = fmt.Fprint(Output, "\n")
 	}
 }
 
