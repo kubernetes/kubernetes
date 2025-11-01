@@ -5999,11 +5999,6 @@ func validatePodExtendedResourceClaimStatus(status *core.PodExtendedResourceClai
 	if len(status.RequestMappings) == 0 {
 		allErrs = append(allErrs, field.Required(rmFldPath, "at least one request mapping is required"))
 	}
-	type key struct {
-		container string
-		resource  string
-	}
-	seen := map[key]struct{}{}
 	for i, rm := range status.RequestMappings {
 		idxPath := rmFldPath.Index(i)
 		c, ok := containers[rm.ContainerName]
@@ -6015,12 +6010,6 @@ func validatePodExtendedResourceClaimStatus(status *core.PodExtendedResourceClai
 			allErrs = append(allErrs, field.Invalid(idxPath.Child("containerName"), rm.ContainerName, "must match the name of an entry in spec.initContainers.name or spec.containers.name"))
 		}
 		allErrs = append(allErrs, ValidateDNS1123Label(rm.RequestName, fldPath.Child("requestName"))...)
-		k := key{container: rm.ContainerName, resource: rm.ResourceName}
-		if _, ok := seen[k]; ok {
-			allErrs = append(allErrs, field.Duplicate(idxPath.Child("containerName"), rm.ContainerName))
-			allErrs = append(allErrs, field.Duplicate(idxPath.Child("resourceName"), rm.ResourceName))
-		}
-		seen[k] = struct{}{}
 	}
 	if len(status.ResourceClaimName) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("resourceClaimName"), ""))
