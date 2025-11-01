@@ -278,7 +278,7 @@ func (p *ClusterTrustBundlePublisher[T]) Run(ctx context.Context) {
 	logger.Info("Starting ClusterTrustBundle CA cert publisher controller")
 	defer logger.Info("Shutting down ClusterTrustBundle CA cert publisher controller")
 
-	go p.ctbInformer.Run(ctx.Done())
+	go p.ctbInformer.RunWithContext(ctx)
 
 	if !cache.WaitForNamedCacheSyncWithContext(ctx, p.ctbListerSynced) {
 		return

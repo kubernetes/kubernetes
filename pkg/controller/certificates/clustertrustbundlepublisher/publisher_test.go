@@ -274,7 +274,7 @@ func TestCTBPublisherSync(t *testing.T) {
 				t.Fatalf("failed to assert the controller for the beta API")
 			}
 
-			go controller.ctbInformer.Run(testCtx.Done())
+			go controller.ctbInformer.RunWithContext(testCtx)
 			if !cache.WaitForCacheSync(testCtx.Done(), controller.ctbInformer.HasSynced) {
 				t.Fatal("timed out waiting for informer to sync")
 			}

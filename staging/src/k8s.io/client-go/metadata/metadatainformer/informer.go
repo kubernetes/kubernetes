@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/metadata"
@@ -135,7 +136,7 @@ func (f *metadataSharedInformerFactory) Start(stopCh <-chan struct{}) {
 			informer := informer.Informer()
 			go func() {
 				defer f.wg.Done()
-				informer.Run(stopCh)
+				informer.RunWithContext(wait.ContextForChannel(stopCh))
 			}()
 			f.startedInformers[informerType] = true
 		}
