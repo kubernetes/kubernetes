@@ -60,6 +60,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/klog/v2/ktesting"
 	apiregistration "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	"k8s.io/utils/ptr"
 )
@@ -1065,12 +1066,11 @@ func TestProxyCertReload(t *testing.T) {
 			t.Errorf("Unable to clean up test directory %q: %v", dir, err)
 		}
 	}()
-
+	_, ctx := ktesting.NewTestContext(t)
 	certProvider, err := dynamiccertificates.NewDynamicServingContentFromFiles("test", certFile, keyFile)
 	if err != nil {
 		t.Fatalf("Unable to create dynamic certificates: %v", err)
 	}
-	ctx := context.TODO()
 	err = certProvider.RunOnce(ctx)
 	if err != nil {
 		t.Fatalf("Unable to load dynamic certificates: %v", err)

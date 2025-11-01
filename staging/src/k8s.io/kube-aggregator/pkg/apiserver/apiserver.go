@@ -202,7 +202,7 @@ func (cfg *Config) Complete() CompletedConfig {
 }
 
 // NewWithDelegate returns a new instance of APIAggregator from the given config.
-func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.DelegationTarget) (*APIAggregator, error) {
+func (c completedConfig) NewWithDelegate(ctx context.Context, delegationTarget genericapiserver.DelegationTarget) (*APIAggregator, error) {
 	genericServer, err := c.GenericConfig.New("kube-aggregator", delegationTarget)
 	if err != nil {
 		return nil, err
