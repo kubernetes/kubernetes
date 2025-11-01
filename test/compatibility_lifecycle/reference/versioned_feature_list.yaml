@@ -275,6 +275,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.30"
+- name: ControllerRevisionNullCreationTimestampFix
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.34"
 - name: CoordinatedLeaderElection
   versionedSpecs:
   - default: false
