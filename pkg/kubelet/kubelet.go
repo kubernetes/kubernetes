@@ -696,7 +696,6 @@ func NewMainKubelet(ctx context.Context,
 		klet.GetActivePods,
 		klet.podManager.GetPodByUID,
 		klet.sourcesReady,
-		kubeDeps.Recorder,
 	)
 
 	klet.resourceAnalyzer = serverstats.NewResourceAnalyzer(ctx, klet, kubeCfg.VolumeStatsAggPeriod.Duration, kubeDeps.Recorder)
@@ -974,7 +973,6 @@ func NewMainKubelet(ctx context.Context,
 	}
 	klet.pluginManager = pluginmanager.NewPluginManager(
 		klet.getPluginsRegistrationDir(), /* sockDir */
-		kubeDeps.Recorder,
 	)
 
 	// If the experimentalMounterPathFlag is set, we do not want to
