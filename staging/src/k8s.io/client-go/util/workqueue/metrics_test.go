@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	"go.uber.org/goleak"
 	testingclock "k8s.io/utils/clock/testing"
 )
 
@@ -278,4 +279,38 @@ func TestMetrics(t *testing.T) {
 	if e, a := 2, mp.duration.observationCount(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
+}
+
+func TestLeak(t *testing.T) {
+	defer func() {
+		// Since tests are being executed at the pkg level, any lingering goroutines trip this test.
+		// Filter out the known waitingLoop goroutine which doesn't immediately exit on shutdown.
+		if err := goleak.Find(goleak.IgnoreTopFunction("k8s.io/client-go/util/workqueue.(*delayingType[...]).waitingLoop")); err != nil {
+			t.Errorf("goleak: %v", err)
+		}
+	}()
+
+	mp := testMetricsProvider{}
+	t0 := time.Unix(0, 0)
+	c := testingclock.NewFakeClock(t0)
+	config := QueueConfig{
+		Name:            "test",
+		Clock:           c,
+		MetricsProvider: &mp,
+	}
+	// We don't actually step the clock so the period doesn't matter.
+	q := newQueueWithConfig(config, time.Hour)
+
+	q.Add("foo")
+
+	drained := make(chan struct{})
+	go func() {
+		q.ShutDownWithDrain()
+		close(drained)
+	}()
+
+	a, _ := q.Get()
+	q.Done(a)
+
+	<-drained
 }
