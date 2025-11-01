@@ -26,6 +26,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -704,6 +705,10 @@ func shouldSyncUpdatedNode(oldNode, newNode *v1.Node) bool {
 	}
 	// For the same reason as above, also check for any change to the providerID
 	if oldNode.Spec.ProviderID != newNode.Spec.ProviderID {
+		return true
+	}
+	// Check if nodes' labels have changed
+	if !apiequality.Semantic.DeepEqual(oldNode.Labels, newNode.Labels) {
 		return true
 	}
 
