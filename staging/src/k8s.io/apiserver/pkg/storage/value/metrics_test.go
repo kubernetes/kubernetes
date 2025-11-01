@@ -37,12 +37,14 @@ func TestTotals(t *testing.T) {
 	failedPreconditionErr := status.Error(codes.FailedPrecondition, "test error")
 	internalErr := status.Error(codes.Internal, "test error")
 	wrappedErr := fmt.Errorf("some low level thing failed: %w", status.Error(codes.NotFound, "some error"))
+	messageAuthenticityErr := errors.New("cipher: message authentication failed")
 
 	nonStatusErrTransformer := PrefixTransformer{Prefix: []byte("k8s:enc:kms:v1:"), Transformer: &testTransformer{err: nonStatusErr}}
 	failedPreconditionErrTransformer := PrefixTransformer{Prefix: []byte("k8s:enc:kms:v1:"), Transformer: &testTransformer{err: failedPreconditionErr}}
 	internalErrTransformer := PrefixTransformer{Prefix: []byte("k8s:enc:kms:v1:"), Transformer: &testTransformer{err: internalErr}}
 	okTransformer := PrefixTransformer{Prefix: []byte("k8s:enc:kms:v1:"), Transformer: &testTransformer{from: []byte("value")}}
 	wrappedErrTransformer := PrefixTransformer{Prefix: []byte("k8s:enc:kms:v1:"), Transformer: &testTransformer{err: wrappedErr}}
+	messageAuthenticityErrTransformer := PrefixTransformer{Prefix: []byte("k8s:enc:kms:v1:"), Transformer: &testTransformer{err: messageAuthenticityErr}}
 
 	testCases := []struct {
 		desc      string
@@ -118,6 +120,20 @@ func TestTotals(t *testing.T) {
 			# TYPE apiserver_storage_transformation_operations_total counter
 			apiserver_storage_transformation_operations_total{resource="test",status="NotFound",transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v1:"} 1
 			apiserver_storage_transformation_operations_total{resource="test",status="NotFound",transformation_type="to_storage",transformer_prefix="k8s:enc:kms:v1:"} 1
+			`,
+			expectErr: true,
+		},
+		{
+			desc:   "message authenticity check error",
+			prefix: NewPrefixTransformers(nil, messageAuthenticityErrTransformer),
+			metrics: []string{
+				"apiserver_storage_transformation_operations_total",
+			},
+			want: `
+			# HELP apiserver_storage_transformation_operations_total [ALPHA] Total number of transformations. Successful transformation will have a status 'OK' and a varied status string when the transformation fails. The status, resource, and transformation_type fields can be used for alerting purposes. For example, you can monitor for encryption/decryption failures using the transformation_type (e.g., from_storage for decryption and to_storage for encryption). Additionally, these fields can be used to ensure that the correct transformers are applied to each resource.
+			# TYPE apiserver_storage_transformation_operations_total counter
+			apiserver_storage_transformation_operations_total{resource="test",status="message-authentication-failed",transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v1:"} 1
+			apiserver_storage_transformation_operations_total{resource="test",status="message-authentication-failed",transformation_type="to_storage",transformer_prefix="k8s:enc:kms:v1:"} 1
 			`,
 			expectErr: true,
 		},

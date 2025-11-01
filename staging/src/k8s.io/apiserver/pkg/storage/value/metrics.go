@@ -18,6 +18,8 @@ package value
 
 import (
 	"errors"
+	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -154,6 +156,15 @@ func getErrorCode(err error) string {
 	var s gRPCError
 	if errors.As(err, &s) {
 		return s.GRPCStatus().Code().String()
+	}
+
+	// This is a non gRPC error. The operation failed to decrypt data using DEK after
+	// successfully retrieving the decrypted DEK.
+	// Authenticated Encryption with Associated Data (AEAD) failed its Authenticity check,
+	// indicating that the encrypted plaintext underlying the ciphertext has been modified.
+	// This can be caused by data corruption in ETCD.
+	if strings.Contains(fmt.Sprint(err), "cipher: message authentication failed") {
+		return "message-authentication-failed"
 	}
 
 	// This is not gRPC error. The operation must have failed before gRPC
