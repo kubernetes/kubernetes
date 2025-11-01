@@ -117,7 +117,7 @@ var (
 func (maxItemsTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
 	var result Validations
 
-	// NOTE: pointers to lists are not supported, so we should never see a pointer here.
+	// pointers to lists are not supported, so we should never see a pointer here.
 	if t := util.NativeType(context.Type); t.Kind != types.Slice && t.Kind != types.Array {
 		return Validations{}, fmt.Errorf("can only be used on list types (%s)", rootTypeString(context.Type, t))
 	}
@@ -129,8 +129,7 @@ func (maxItemsTagValidator) GetValidations(context Context, tag codetags.Tag) (V
 	if intVal < 0 {
 		return result, fmt.Errorf("must be greater than or equal to zero")
 	}
-	// Note: maxItems short-circuits other validations.
-	result.AddFunction(Function(maxItemsTagName, ShortCircuit, maxItemsValidator, intVal))
+	result.AddFunction(Function(maxItemsTagName, DefaultFlags, maxItemsValidator, intVal))
 	return result, nil
 }
 
