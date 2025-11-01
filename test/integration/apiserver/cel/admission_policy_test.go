@@ -29,7 +29,9 @@ import (
 	v1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
@@ -568,8 +570,38 @@ func testPolicyAdmission(t *testing.T, supportV1Beta1 bool) {
 		}
 	}
 
-	// Allow the policy & binding to establish
-	time.Sleep(1 * time.Second)
+	testConfigmap := corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-k8s",
+		},
+	}
+	_, err = client.CoreV1().ConfigMaps(testNamespace).Create(context.TODO(), &testConfigmap, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Try to patch the configmap and look for the warning message.
+	if err := wait.PollUntilContextTimeout(context.Background(), time.Millisecond*10, time.Second*5, false, func(ctx context.Context) (bool, error) {
+		holder.reset(t)
+		_, err = client.CoreV1().ConfigMaps(testNamespace).Patch(context.TODO(), testConfigmap.Name, types.JSONPatchType, []byte("[]"), metav1.PatchOptions{})
+		if err != nil {
+			return false, nil
+		}
+		for _, warning := range holder.warnings {
+			if strings.Contains(warning, beginSentinel) {
+				return true, nil
+			}
+		}
+		return false, nil
+	}); err != nil {
+		t.Errorf("timed out waiting policy and biniding to establish: %v", err)
+	}
+
+	// Try deleting the configmap.
+	err = client.CoreV1().ConfigMaps(testNamespace).Delete(context.TODO(), testConfigmap.Name, metav1.DeleteOptions{})
+	if err != nil {
+		t.Errorf("Failed to delete ConfigMap with error: %+v", err)
+	}
 
 	start := time.Now()
 	count := 0
