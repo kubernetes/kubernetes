@@ -3273,3 +3273,32 @@ func (kl *Kubelet) fastStaticPodsRegistration(ctx context.Context) {
 func (kl *Kubelet) SetPodWatchCondition(podUID types.UID, conditionKey string, condition pleg.WatchCondition) {
 	kl.pleg.SetPodWatchCondition(podUID, conditionKey, condition)
 }
+
+// OnPodSandboxReady is the callback implementation invoked by the container runtime after
+// all three requirements (sandbox, networking, volumes) are ready to immediately update
+// the `PodReadyToStartContainers` pod status condition to `True`.
+// This method implements the RuntimeHelper interface.
+// Ref: https://github.com/kubernetes/kubernetes/issues/134460
+func (kl *Kubelet) OnPodSandboxReady(ctx context.Context, pod *v1.Pod, sandboxStatus *runtimeapi.PodSandboxStatus) error {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodReadyToStartContainersCondition) {
+		return nil
+	}
+
+	logger := klog.FromContext(ctx)
+	logger.V(3).Info("OnPodSandboxReady callback invoked", "pod", klog.KObj(pod), "podUID", pod.UID)
+
+	podSandboxStatus := &kubecontainer.PodStatus{
+		SandboxStatuses: []*runtimeapi.PodSandboxStatus{sandboxStatus},
+	}
+
+	apiPodStatus := kl.generateAPIPodStatus(pod, podSandboxStatus, false)
+
+	kl.statusManager.SetPodStatus(logger, pod, apiPodStatus)
+
+	logger.V(3).Info("Successfully updated PodReadyToStartContainers condition after sandbox creation",
+		"pod", klog.KObj(pod),
+		"podUID", pod.UID,
+		"podIP", apiPodStatus.PodIP)
+
+	return nil
+}
