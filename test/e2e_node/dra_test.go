@@ -1584,6 +1584,15 @@ func createHealthTestPodAndClaim(ctx context.Context, f *framework.Framework, dr
 		e2epod.DeletePodOrFail(ctx, f.ClientSet, createdPod.Namespace, createdPod.Name)
 	})
 
+	// Update the Pod's status to include the ResourceClaimStatuses, mimicking the scheduler.
+	podToUpdate, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, createdPod.Name, metav1.GetOptions{})
+	framework.ExpectNoError(err)
+	podToUpdate.Status.ResourceClaimStatuses = []v1.PodResourceClaimStatus{
+		{Name: claimName, ResourceClaimName: &claimName},
+	}
+	_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).UpdateStatus(ctx, podToUpdate, metav1.UpdateOptions{})
+	framework.ExpectNoError(err, "failed to update Pod status with ResourceClaimStatuses")
+
 	ginkgo.By(fmt.Sprintf("Allocating claim %q to pod %q with its real UID", claimName, podName))
 	// Get the created claim to ensure the latest version before updating.
 	claimToUpdate, err := f.ClientSet.ResourceV1().ResourceClaims(f.Namespace.Name).Get(ctx, claimName, metav1.GetOptions{})

@@ -1538,49 +1538,165 @@ func TestHandleWatchResourcesStream(t *testing.T) {
 	})
 }
 
-// TestUpdateAllocatedResourcesStatus checks if the manager correctly updates the
-// PodStatus with the health information of allocated DRA resources. It populates
-// the caches with known claim and health data, then calls the function and verifies the resulting PodStatus.
+// TestUpdateAllocatedResourcesStatus verifies that the manager can correctly
+// update the PodStatus with health information for different types of DRA claims.
+// It covers the main scenarios that were difficult to test reliably in an e2e
+// environment due to timing issues:
+//  1. Direct claims: Where the pod's resource claim name directly matches the ResourceClaim object name.
+//  2. Renamed claims: Where the pod uses a local name for a ResourceClaim that has a different object name.
+//  3. Templated claims: Where the claim is generated from a template, and the pod status contains the
+//     dynamically generated claim name.
 func TestUpdateAllocatedResourcesStatus(t *testing.T) {
-	tCtx := ktesting.Init(t)
+	directClaimName := "direct-claim-name"
+	renamedClaimObject := "renamed-claim-object"
+	templateName := "template-name"
+	templatedClaimName := "pod-templated-templated-claim"
 
-	// Setup Manager with caches
-	manager, err := NewManager(tCtx.Logger(), nil, t.TempDir())
-	require.NoError(t, err)
-
-	// Populate claimInfoCache
-	claimInfo := genTestClaimInfo(claimUID, []string{podUID}, true)
-	manager.cache.add(claimInfo)
-
-	// Populate healthInfoCache
-	healthyDevice := state.DeviceHealth{PoolName: poolName, DeviceName: deviceName, Health: "Healthy", LastUpdated: time.Now()}
-	_, err = manager.healthInfoCache.updateHealthInfo(driverName, []state.DeviceHealth{healthyDevice})
-	require.NoError(t, err)
-
-	// Create Pod and Status objects
-	pod := genTestPod()
-	require.NotEmpty(t, pod.Spec.Containers, "genTestPod should create at least one container")
-	// Ensure the container has a name for matching
-	pod.Spec.Containers[0].Name = containerName
-	podStatus := &v1.PodStatus{
-		ContainerStatuses: []v1.ContainerStatus{
-			{Name: containerName},
+	testCases := []struct {
+		name                             string
+		pod                              *v1.Pod
+		claimInfos                       []*ClaimInfo
+		initialStatus                    *v1.PodStatus
+		expectedAllocatedResourcesStatus []v1.ResourceStatus
+	}{
+		{
+			name: "Direct claim",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod-direct", UID: "pod-direct-uid"},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "container1", Resources: v1.ResourceRequirements{Claims: []v1.ResourceClaim{{Name: "claim1"}}}},
+					},
+					ResourceClaims: []v1.PodResourceClaim{
+						{Name: "claim1", ResourceClaimName: &directClaimName},
+					},
+				},
+				Status: v1.PodStatus{
+					ResourceClaimStatuses: []v1.PodResourceClaimStatus{
+						{Name: "claim1", ResourceClaimName: &directClaimName},
+					},
+				},
+			},
+			claimInfos: []*ClaimInfo{
+				{
+					ClaimInfoState: state.ClaimInfoState{
+						ClaimName: directClaimName,
+						PodUIDs:   sets.New("pod-direct-uid"),
+						DriverState: map[string]state.DriverState{
+							"test-driver": {Devices: []state.Device{{PoolName: "pool", DeviceName: "dev-a"}}},
+						},
+					},
+				},
+			},
+			initialStatus: &v1.PodStatus{ContainerStatuses: []v1.ContainerStatus{{Name: "container1"}}},
+			expectedAllocatedResourcesStatus: []v1.ResourceStatus{
+				{
+					Name: "claim:claim1",
+					Resources: []v1.ResourceHealth{
+						{ResourceID: "test-driver/pool/dev-a", Health: v1.ResourceHealthStatusHealthy},
+					},
+				},
+			},
+		},
+		{
+			name: "Renamed claim",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod-renamed", UID: "pod-renamed-uid"},
+				Spec: v1.PodSpec{
+					ResourceClaims: []v1.PodResourceClaim{{Name: "renamed-pod-claim", ResourceClaimName: &renamedClaimObject}},
+					Containers:     []v1.Container{{Name: "container1", Resources: v1.ResourceRequirements{Claims: []v1.ResourceClaim{{Name: "renamed-pod-claim"}}}}},
+				},
+				Status: v1.PodStatus{
+					ResourceClaimStatuses: []v1.PodResourceClaimStatus{
+						{Name: "renamed-pod-claim", ResourceClaimName: &renamedClaimObject},
+					},
+				},
+			},
+			claimInfos: []*ClaimInfo{
+				{
+					ClaimInfoState: state.ClaimInfoState{
+						ClaimName: renamedClaimObject,
+						PodUIDs:   sets.New("pod-renamed-uid"),
+						DriverState: map[string]state.DriverState{
+							"test-driver": {Devices: []state.Device{{PoolName: "pool", DeviceName: "dev-b"}}},
+						},
+					},
+				},
+			},
+			initialStatus: &v1.PodStatus{ContainerStatuses: []v1.ContainerStatus{{Name: "container1"}}},
+			expectedAllocatedResourcesStatus: []v1.ResourceStatus{
+				{
+					Name: "claim:renamed-pod-claim",
+					Resources: []v1.ResourceHealth{
+						{ResourceID: "test-driver/pool/dev-b", Health: v1.ResourceHealthStatusHealthy},
+					},
+				},
+			},
+		},
+		{
+			name: "Templated claim",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod-templated", UID: "pod-templated-uid"},
+				Spec: v1.PodSpec{
+					ResourceClaims: []v1.PodResourceClaim{{Name: "templated-claim", ResourceClaimTemplateName: &templateName}},
+					Containers:     []v1.Container{{Name: "container1", Resources: v1.ResourceRequirements{Claims: []v1.ResourceClaim{{Name: "templated-claim"}}}}},
+				},
+				Status: v1.PodStatus{
+					ResourceClaimStatuses: []v1.PodResourceClaimStatus{
+						{Name: "templated-claim", ResourceClaimName: &templatedClaimName},
+					},
+				},
+			},
+			claimInfos: []*ClaimInfo{
+				{
+					ClaimInfoState: state.ClaimInfoState{
+						ClaimName: templatedClaimName,
+						PodUIDs:   sets.New("pod-templated-uid"),
+						DriverState: map[string]state.DriverState{
+							"test-driver": {Devices: []state.Device{{PoolName: "pool", DeviceName: "dev-c"}}},
+						},
+					},
+				},
+			},
+			initialStatus: &v1.PodStatus{ContainerStatuses: []v1.ContainerStatus{{Name: "container1"}}},
+			expectedAllocatedResourcesStatus: []v1.ResourceStatus{
+				{
+					Name: "claim:templated-claim",
+					Resources: []v1.ResourceHealth{
+						{ResourceID: "test-driver/pool/dev-c", Health: v1.ResourceHealthStatusHealthy},
+					},
+				},
+			},
 		},
 	}
 
-	// Call the function under test
-	manager.UpdateAllocatedResourcesStatus(pod, podStatus)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			manager, err := NewManager(tCtx.Logger(), nil, t.TempDir())
+			require.NoError(t, err)
 
-	require.Len(t, podStatus.ContainerStatuses, 1)
-	contStatus := podStatus.ContainerStatuses[0]
-	require.NotNil(t, contStatus.AllocatedResourcesStatus)
-	require.Len(t, contStatus.AllocatedResourcesStatus, 1, "Should have status for one resource claim")
+			for _, ci := range tc.claimInfos {
+				manager.cache.add(ci)
+			}
 
-	resourceStatus := contStatus.AllocatedResourcesStatus[0]
-	assert.Equal(t, v1.ResourceName("claim:"+claimName), resourceStatus.Name, "ResourceStatus Name mismatch")
-	// Check the Resources slice
-	require.Len(t, resourceStatus.Resources, 1, "Should have health info for one device")
-	resourceHealth := resourceStatus.Resources[0]
-	assert.Equal(t, v1.ResourceID(cdiID), resourceHealth.ResourceID, "ResourceHealth ResourceID mismatch")
-	assert.Equal(t, v1.ResourceHealthStatusHealthy, resourceHealth.Health, "ResourceHealth Health status mismatch")
+			// Set all devices to be healthy for the test.
+			devices := []state.DeviceHealth{}
+			for _, ci := range tc.claimInfos {
+				for driverName, ds := range ci.DriverState {
+					for _, dev := range ds.Devices {
+						devices = append(devices, state.DeviceHealth{PoolName: dev.PoolName, DeviceName: dev.DeviceName, Health: state.DeviceHealthStatusHealthy})
+					}
+					_, err := manager.healthInfoCache.updateHealthInfo(driverName, devices)
+					require.NoError(t, err)
+				}
+			}
+
+			status := tc.initialStatus.DeepCopy()
+			manager.UpdateAllocatedResourcesStatus(tc.pod, status)
+
+			require.Len(t, status.ContainerStatuses, 1)
+			assert.Equal(t, tc.expectedAllocatedResourcesStatus, status.ContainerStatuses[0].AllocatedResourcesStatus)
+		})
+	}
 }
