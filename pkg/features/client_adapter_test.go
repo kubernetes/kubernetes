@@ -21,6 +21,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"k8s.io/apimachinery/pkg/util/version"
 	clientfeatures "k8s.io/client-go/features"
 	"k8s.io/component-base/featuregate"
 )
@@ -96,5 +97,70 @@ func TestClientAdapterAdd(t *testing.T) {
 	}()
 	if r == nil {
 		t.Error("expected panic when adding feature with unknown prerelease")
+	}
+}
+
+func TestClientAdapterAddVersioned(t *testing.T) {
+	fg := featuregate.NewVersionedFeatureGate(version.MustParse("1.29"))
+	a := &clientAdapter{fg}
+	defaults := fg.GetAllVersioned()
+
+	clientFeatures := map[clientfeatures.Feature]clientfeatures.VersionedSpecs{
+		"FeatureA": {
+			{Version: version.MustParse("1.28"), PreRelease: clientfeatures.Beta, Default: true},
+		},
+		"FeatureB": {
+			{Version: version.MustParse("1.28"), PreRelease: clientfeatures.Alpha, Default: false},
+			{Version: version.MustParse("1.30"), PreRelease: clientfeatures.Beta, Default: true},
+		},
+	}
+
+	if err := a.AddVersioned(clientFeatures); err != nil {
+		t.Fatal(err)
+	}
+	all := fg.GetAllVersioned()
+	allexpected := map[featuregate.Feature]featuregate.VersionedSpecs{
+		"FeatureA": {
+			{Version: version.MustParse("1.28"), PreRelease: featuregate.Beta, Default: true},
+		},
+		"FeatureB": {
+			{Version: version.MustParse("1.28"), PreRelease: featuregate.Alpha, Default: false},
+			{Version: version.MustParse("1.30"), PreRelease: featuregate.Beta, Default: true},
+		},
+	}
+	for name, spec := range defaults {
+		allexpected[name] = spec
+	}
+	if len(all) != len(allexpected) {
+		t.Errorf("expected %d registered features, got %d", len(allexpected), len(all))
+	}
+	for name, expected := range allexpected {
+		actual, ok := all[name]
+		if !ok {
+			t.Errorf("expected feature %q not found", name)
+			continue
+		}
+		if diff := cmp.Diff(actual, expected, cmpopts.IgnoreFields(featuregate.FeatureSpec{}, "Version")); diff != "" {
+			t.Errorf("feature %q spec mismatch (-want +got):\n%s", name, diff)
+		}
+	}
+
+	var r interface{}
+	func() {
+		defer func() {
+			r = recover()
+		}()
+		_ = a.AddVersioned(map[clientfeatures.Feature]clientfeatures.VersionedSpecs{
+			"FeaturePanic": {{PreRelease: "foobar"}},
+		})
+	}()
+	if r == nil {
+		t.Error("expected panic when adding feature with unknown prerelease")
+	}
+	if !a.Enabled("FeatureA") {
+		t.Error("expected Enabled(\"FeatureA\") to return true")
+	}
+	if a.Enabled("FeatureB") {
+		t.Error("expected Enabled(\"FeatureB\") to return false")
 	}
 }
