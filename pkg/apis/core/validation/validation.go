@@ -27,6 +27,7 @@ import (
 	"reflect"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"unicode"
@@ -181,7 +182,7 @@ func ValidatePodSpecificAnnotations(annotations map[string]string, spec *core.Po
 	}
 
 	if annotations[core.TolerationsAnnotationKey] != "" {
-		allErrs = append(allErrs, ValidateTolerationsInPodAnnotations(annotations, fldPath)...)
+		allErrs = append(allErrs, ValidateTolerationsInPodAnnotations(annotations, fldPath, opts)...)
 	}
 
 	if !opts.AllowInvalidPodDeletionCost {
@@ -197,7 +198,7 @@ func ValidatePodSpecificAnnotations(annotations map[string]string, spec *core.Po
 }
 
 // ValidateTolerationsInPodAnnotations tests that the serialized tolerations in Pod.Annotations has valid data
-func ValidateTolerationsInPodAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
+func ValidateTolerationsInPodAnnotations(annotations map[string]string, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	tolerations, err := helper.GetTolerationsFromPodAnnotations(annotations)
@@ -207,7 +208,7 @@ func ValidateTolerationsInPodAnnotations(annotations map[string]string, fldPath 
 	}
 
 	if len(tolerations) > 0 {
-		allErrs = append(allErrs, ValidateTolerations(tolerations, fldPath.Child(core.TolerationsAnnotationKey))...)
+		allErrs = append(allErrs, ValidateTolerations(tolerations, fldPath.Child(core.TolerationsAnnotationKey), opts)...)
 	}
 
 	return allErrs
@@ -793,7 +794,6 @@ func validateHostPathVolumeSource(hostPath *core.HostPathVolumeSource, fldPath *
 	allErrs = append(allErrs, validateHostPathType(hostPath.Type, fldPath.Child("type"))...)
 	return allErrs
 }
-
 func validateGitRepoVolumeSource(gitRepo *core.GitRepoVolumeSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(gitRepo.Repository) == 0 {
@@ -1584,7 +1584,6 @@ func validateAzureFile(azure *core.AzureFileVolumeSource, fldPath *field.Path) f
 	}
 	return allErrs
 }
-
 func validateAzureFilePV(azure *core.AzureFilePersistentVolumeSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if azure.SecretName == "" {
@@ -3160,7 +3159,6 @@ func ValidateVolumeDevices(devices []core.VolumeDevice, volmounts map[string]str
 	}
 	return allErrs
 }
-
 func validatePodResourceClaims(podMeta *metav1.ObjectMeta, claims []core.PodResourceClaim, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	podClaimNames := sets.New[string]()
@@ -3941,7 +3939,6 @@ func validateFileKeyRefVolumes(spec *core.PodSpec, fldPath *field.Path) field.Er
 
 	return allErrs
 }
-
 func validatePodHostName(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
@@ -4246,7 +4243,7 @@ func validateTaintEffect(effect *core.TaintEffect, allowEmpty bool, fldPath *fie
 }
 
 // validateOnlyAddedTolerations validates updated pod tolerations.
-func validateOnlyAddedTolerations(newTolerations []core.Toleration, oldTolerations []core.Toleration, fldPath *field.Path) field.ErrorList {
+func validateOnlyAddedTolerations(newTolerations []core.Toleration, oldTolerations []core.Toleration, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for _, old := range oldTolerations {
 		found := false
@@ -4265,7 +4262,7 @@ func validateOnlyAddedTolerations(newTolerations []core.Toleration, oldToleratio
 		}
 	}
 
-	allErrs = append(allErrs, ValidateTolerations(newTolerations, fldPath)...)
+	allErrs = append(allErrs, ValidateTolerations(newTolerations, fldPath, opts)...)
 	return allErrs
 }
 
@@ -4303,7 +4300,7 @@ func ValidateHostAliases(hostAliases []core.HostAlias, fldPath *field.Path) fiel
 }
 
 // ValidateTolerations tests if given tolerations have valid data.
-func ValidateTolerations(tolerations []core.Toleration, fldPath *field.Path) field.ErrorList {
+func ValidateTolerations(tolerations []core.Toleration, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	allErrors := field.ErrorList{}
 	for i, toleration := range tolerations {
 		idxPath := fldPath.Index(i)
@@ -4333,6 +4330,26 @@ func ValidateTolerations(tolerations []core.Toleration, fldPath *field.Path) fie
 		case core.TolerationOpExists:
 			if len(toleration.Value) > 0 {
 				allErrors = append(allErrors, field.Invalid(idxPath.Child("operator"), toleration.Value, "value must be empty when `operator` is 'Exists'"))
+			}
+		case core.TolerationOpLt, core.TolerationOpGt:
+			// Numeric comparison operators require validation option
+			if !opts.AllowTaintTolerationComparisonOperators {
+				validValues := []core.TolerationOperator{core.TolerationOpEqual, core.TolerationOpExists, core.TolerationOpLt, core.TolerationOpGt}
+				allErrors = append(allErrors, field.NotSupported(idxPath.Child("operator"), toleration.Operator, validValues))
+				break
+			}
+
+			// Validate value format is numeric before parsing
+			if !helper.IsValidNumericString(toleration.Value) {
+				allErrors = append(allErrors, field.Invalid(idxPath.Child("value"),
+					toleration.Value, "value must contain only digits with an optional leading minus sign"))
+				break
+			}
+			// Validate value is parseable as int64
+			if _, err := strconv.ParseInt(toleration.Value, 10, 64); err != nil {
+				allErrors = append(allErrors, field.Invalid(idxPath.Child("value"),
+					toleration.Value, "value must be a valid integer for numeric operators"))
+				break
 			}
 		default:
 			validValues := []core.TolerationOperator{core.TolerationOpEqual, core.TolerationOpExists}
@@ -4413,6 +4430,8 @@ type PodValidationOptions struct {
 	AllowContainerRestartPolicyRules bool
 	// Allow user namespaces with volume devices, even though they will not function properly (should only be tolerated in updates of objects which already have this invalid configuration).
 	AllowUserNamespacesWithVolumeDevices bool
+	// Allow taint toleration comparison operators (Lt, Gt)
+	AllowTaintTolerationComparisonOperators bool
 }
 
 // validatePodMetadataAndSpec tests if required fields in the pod.metadata and pod.spec are set,
@@ -4608,7 +4627,7 @@ func ValidatePodSpec(spec *core.PodSpec, podMeta *metav1.ObjectMeta, fldPath *fi
 	}
 
 	if len(spec.Tolerations) > 0 {
-		allErrs = append(allErrs, ValidateTolerations(spec.Tolerations, fldPath.Child("tolerations"))...)
+		allErrs = append(allErrs, ValidateTolerations(spec.Tolerations, fldPath.Child("tolerations"), opts)...)
 	}
 
 	if len(spec.HostAliases) > 0 {
@@ -5654,7 +5673,7 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 	}
 
 	// Allow only additions to tolerations updates.
-	allErrs = append(allErrs, validateOnlyAddedTolerations(newPod.Spec.Tolerations, oldPod.Spec.Tolerations, specPath.Child("tolerations"))...)
+	allErrs = append(allErrs, validateOnlyAddedTolerations(newPod.Spec.Tolerations, oldPod.Spec.Tolerations, specPath.Child("tolerations"), opts)...)
 
 	// Allow only deletions to schedulingGates updates.
 	allErrs = append(allErrs, validateOnlyDeletedSchedulingGates(newPod.Spec.SchedulingGates, oldPod.Spec.SchedulingGates, specPath.Child("schedulingGates"))...)

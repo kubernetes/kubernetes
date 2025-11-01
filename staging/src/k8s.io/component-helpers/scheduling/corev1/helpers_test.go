@@ -650,6 +650,7 @@ func TestFindMatchingUntoleratedTaint(t *testing.T) {
 		taints          []v1.Taint
 		applyFilter     taintsFilterFunc
 		expectTolerated bool
+		expectError     bool
 	}{
 		{
 			description:     "empty tolerations tolerate empty taints",
@@ -747,10 +748,98 @@ func TestFindMatchingUntoleratedTaint(t *testing.T) {
 			applyFilter:     func(t *v1.Taint) bool { return t.Effect == v1.TaintEffectNoExecute },
 			expectTolerated: true,
 		},
+		{
+			description: "numeric Gt operator with taint value below threshold, expect not tolerated",
+			tolerations: []v1.Toleration{
+				{
+					Key:      "node.example.com/priority-level",
+					Operator: "Gt",
+					Value:    "950",
+					Effect:   v1.TaintEffectNoSchedule,
+				},
+			},
+			taints: []v1.Taint{
+				{
+					Key:    "node.example.com/priority-level",
+					Value:  "800",
+					Effect: v1.TaintEffectNoSchedule,
+				},
+			},
+			applyFilter:     func(t *v1.Taint) bool { return true },
+			expectTolerated: false,
+		},
+		{
+			description: "numeric Gt operator with taint value above threshold, expect tolerated",
+			tolerations: []v1.Toleration{
+				{
+					Key:      "node.example.com/priority-level",
+					Operator: "Gt",
+					Value:    "750",
+					Effect:   v1.TaintEffectNoSchedule,
+				},
+			},
+			taints: []v1.Taint{
+				{
+					Key:    "node.example.com/priority-level",
+					Value:  "950",
+					Effect: v1.TaintEffectNoSchedule,
+				},
+			},
+			applyFilter:     func(t *v1.Taint) bool { return true },
+			expectTolerated: true,
+		},
+		{
+			description: "numeric Lt operator with taint value above threshold, expect not tolerated",
+			tolerations: []v1.Toleration{
+				{
+					Key:      "node.example.com/priority-level",
+					Operator: "Lt",
+					Value:    "800",
+					Effect:   v1.TaintEffectNoSchedule,
+				},
+			},
+			taints: []v1.Taint{
+				{
+					Key:    "node.example.com/priority-level",
+					Value:  "950",
+					Effect: v1.TaintEffectNoSchedule,
+				},
+			},
+			applyFilter:     func(t *v1.Taint) bool { return true },
+			expectTolerated: false,
+		},
+		{
+			description: "numeric Gt operator with non-numeric taint value, expect not tolerated",
+			tolerations: []v1.Toleration{
+				{
+					Key:      "node.example.com/priority-level",
+					Operator: "Gt",
+					Value:    "950",
+					Effect:   v1.TaintEffectNoSchedule,
+				},
+			},
+			taints: []v1.Taint{
+				{
+					Key:    "node.example.com/priority-level",
+					Value:  "high",
+					Effect: v1.TaintEffectNoSchedule,
+				},
+			},
+			applyFilter:     func(t *v1.Taint) bool { return true },
+			expectTolerated: false,
+			expectError:     true,
+		},
 	}
 
 	for _, tc := range testCases {
-		_, untolerated := FindMatchingUntoleratedTaint(tc.taints, tc.tolerations, tc.applyFilter)
+		_, untolerated, err := FindMatchingUntoleratedTaint(tc.taints, tc.tolerations, tc.applyFilter)
+		if err != nil && !tc.expectError {
+			t.Errorf("test case [%s] unexpected error %v", tc.description, err)
+		} else if err == nil && tc.expectError {
+			t.Errorf("test case [%s] expected error, but got none", tc.description)
+		} else {
+			continue
+		}
 		if tc.expectTolerated != !untolerated {
 			filteredTaints := []v1.Taint{}
 			for _, taint := range tc.taints {

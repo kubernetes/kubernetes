@@ -32,10 +32,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	configv1 "k8s.io/kube-scheduler/config/v1"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -1023,4 +1026,279 @@ func TestHostPorts(t *testing.T) {
 			testutils.CleanupPods(testCtx.Ctx, testCtx.ClientSet, t, []*v1.Pod{p1, p2})
 		})
 	}
+}
+
+// TestTaintTolerationGtLtIntegration tests integration scenarios for Gt/Lt toleration operators
+// The test verifies that unschedulable pods are re-queued when taint values change.
+// 1. Create pod1 and node1 that fits pod1; pod1 schedules on node1
+// 2. Create pod2 with Gt/Lt toleration, it should be unschedulable due to incompatible taint
+// 3. Create node2 with a taint that pod2 can't tolerate
+// 4. Update the taint value on node2; pod2 should now schedule on node2
+func TestTaintTolerationGtLtIntegration(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TaintTolerationComparisonOperators, true)
+
+	testCtx := testutils.InitTestSchedulerWithNS(t, "gt-lt-integration")
+	err := testCtx.ClientSet.CoreV1().Nodes().DeleteCollection(testCtx.Ctx, metav1.DeleteOptions{}, metav1.ListOptions{})
+	if err != nil {
+		t.Errorf("error whiling deleting nodes, error: %v", err)
+	}
+
+	goodCondition := v1.NodeCondition{
+		Type:              v1.NodeReady,
+		Status:            v1.ConditionTrue,
+		Reason:            "schedulable condition",
+		LastHeartbeatTime: metav1.Time{Time: time.Now()},
+	}
+
+	// 1. Create pod1 and node1 that fits pod1; pod1 schedules on node1
+	node1 := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: "node1"},
+		Spec: v1.NodeSpec{
+			Unschedulable: false,
+			Taints: []v1.Taint{
+				{
+					Key:    "node.example.com/dedicated",
+					Value:  "special",
+					Effect: v1.TaintEffectNoSchedule,
+				},
+			},
+		},
+		Status: v1.NodeStatus{
+			Capacity: v1.ResourceList{
+				v1.ResourceCPU:  *resource.NewQuantity(1, resource.DecimalSI),
+				v1.ResourcePods: *resource.NewQuantity(32, resource.DecimalSI),
+			},
+			Conditions: []v1.NodeCondition{goodCondition},
+		},
+	}
+	_, err = testutils.CreateNode(testCtx.ClientSet, node1)
+	if err != nil {
+		t.Fatalf("Failed to create node1: %v", err)
+	}
+
+	pod1 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "pod1", Namespace: testCtx.NS.Name},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "busybox",
+					Image: "busybox",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(900, resource.DecimalSI)},
+					},
+				},
+			},
+			Tolerations: []v1.Toleration{
+				{
+					Key:      "node.example.com/dedicated",
+					Operator: v1.TolerationOpEqual,
+					Value:    "special",
+					Effect:   v1.TaintEffectNoSchedule,
+				},
+			},
+		},
+	}
+	pod1, err = testutils.CreatePausePod(testCtx.ClientSet, pod1)
+	if err != nil {
+		t.Fatalf("Failed to create pod1: %v", err)
+	}
+
+	err = testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod1)
+	if err != nil {
+		t.Fatalf("Failed to schedule pod1: %v", err)
+	}
+
+	// 2. Create pod2 with Gt toleration, it should be unschedulable on node1 due to resource constraints
+	pod2 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "pod2", Namespace: testCtx.NS.Name},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "busybox",
+					Image: "busybox",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(200, resource.DecimalSI)},
+					},
+				},
+			},
+			Tolerations: []v1.Toleration{
+				{
+					Key:      "node.example.com/priority-level",
+					Operator: v1.TolerationOpGt,
+					Value:    "900",
+					Effect:   v1.TaintEffectNoSchedule,
+				},
+			},
+		},
+	}
+	pod2, err = testutils.CreatePausePod(testCtx.ClientSet, pod2)
+	if err != nil {
+		t.Fatalf("Failed to create pod2: %v", err)
+	}
+
+	err = testutils.WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, pod2)
+	if err != nil {
+		t.Fatalf("Failed to verify pod2 is unschedulable: %v", err)
+	}
+
+	// 3. Create node2 with a taint that pod2 can't tolerate (priority too low)
+	node2 := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: "node2"},
+		Spec: v1.NodeSpec{
+			Unschedulable: false,
+			Taints: []v1.Taint{
+				{
+					Key:    "node.example.com/priority-level",
+					Value:  "850", // Too low for pod2's Gt 900 requirement
+					Effect: v1.TaintEffectNoSchedule,
+				},
+			},
+		},
+		Status: v1.NodeStatus{
+			Capacity: v1.ResourceList{
+				v1.ResourceCPU:  *resource.NewQuantity(1, resource.DecimalSI),
+				v1.ResourcePods: *resource.NewQuantity(32, resource.DecimalSI),
+			},
+			Conditions: []v1.NodeCondition{goodCondition},
+		},
+	}
+	node2, err = testutils.CreateNode(testCtx.ClientSet, node2)
+	if err != nil {
+		t.Fatalf("Failed to create node2: %v", err)
+	}
+
+	// Verify pod2 still doesn't schedule
+	err = testutils.WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, pod2)
+	if err != nil {
+		t.Fatalf("Failed to verify pod2 is still unschedulable: %v", err)
+	}
+
+	// 4. Update the taint value on node2; pod2 should now schedule on node2
+	node2, err = testCtx.ClientSet.CoreV1().Nodes().Get(context.TODO(), node2.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to get node2: %v", err)
+	}
+
+	// Update taint to have acceptable priority value
+	for i := range node2.Spec.Taints {
+		if node2.Spec.Taints[i].Key == "node.example.com/priority-level" {
+			node2.Spec.Taints[i].Value = "950"
+			break
+		}
+	}
+
+	_, err = testCtx.ClientSet.CoreV1().Nodes().Update(context.TODO(), node2, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to update node2 taint: %v", err)
+	}
+
+	// Verify pod2 now schedules on node2
+	err = testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod2)
+	if err != nil {
+		t.Fatalf("Failed to schedule pod2: %v", err)
+	}
+
+	scheduledPod2, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Get(testCtx.Ctx, pod2.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to get scheduled pod2: %v", err)
+	}
+
+	if scheduledPod2.Spec.NodeName != node2.Name {
+		t.Errorf("Pod2 scheduled on unexpected node: got %s, expected %s", scheduledPod2.Spec.NodeName, node2.Name)
+	}
+
+	// Test Lt operator scenario
+	pod3 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "pod3", Namespace: testCtx.NS.Name},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "busybox",
+					Image: "busybox",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(100, resource.DecimalSI)},
+					},
+				},
+			},
+			Tolerations: []v1.Toleration{
+				{
+					Key:      "node.example.com/error-rate",
+					Operator: v1.TolerationOpLt,
+					Value:    "10",
+					Effect:   v1.TaintEffectNoSchedule,
+				},
+			},
+		},
+	}
+	pod3, err = testutils.CreatePausePod(testCtx.ClientSet, pod3)
+	if err != nil {
+		t.Fatalf("Failed to create pod3: %v", err)
+	}
+
+	// Create node3 with high error rate
+	node3 := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: "node3"},
+		Spec: v1.NodeSpec{
+			Unschedulable: false,
+			Taints: []v1.Taint{
+				{
+					Key:    "node.example.com/error-rate",
+					Value:  "15", // Too high for pod3's Lt 10 requirement
+					Effect: v1.TaintEffectNoSchedule,
+				},
+			},
+		},
+		Status: v1.NodeStatus{
+			Capacity: v1.ResourceList{
+				v1.ResourceCPU:  *resource.NewQuantity(1, resource.DecimalSI),
+				v1.ResourcePods: *resource.NewQuantity(32, resource.DecimalSI),
+			},
+			Conditions: []v1.NodeCondition{goodCondition},
+		},
+	}
+	node3, err = testutils.CreateNode(testCtx.ClientSet, node3)
+	if err != nil {
+		t.Fatalf("Failed to create node3: %v", err)
+	}
+
+	err = testutils.WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, pod3)
+	if err != nil {
+		t.Fatalf("Failed to verify pod3 is unschedulable: %v", err)
+	}
+
+	// Update node3 taint to acceptable error rate
+	node3, err = testCtx.ClientSet.CoreV1().Nodes().Get(context.TODO(), node3.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to get node3: %v", err)
+	}
+
+	for i := range node3.Spec.Taints {
+		if node3.Spec.Taints[i].Key == "node.example.com/error-rate" {
+			node3.Spec.Taints[i].Value = "5"
+			break
+		}
+	}
+
+	_, err = testCtx.ClientSet.CoreV1().Nodes().Update(context.TODO(), node3, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to update node3 taint: %v", err)
+	}
+
+	err = testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod3)
+	if err != nil {
+		t.Fatalf("Failed to schedule pod3: %v", err)
+	}
+
+	scheduledPod3, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Get(testCtx.Ctx, pod3.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to get scheduled pod3: %v", err)
+	}
+
+	if scheduledPod3.Spec.NodeName != node3.Name {
+		t.Errorf("Pod3 scheduled on unexpected node: got %s, expected %s", scheduledPod3.Spec.NodeName, node3.Name)
+	}
+
+	// Cleanup pods
+	allPods := []*v1.Pod{pod1, pod2, pod3}
+	testutils.CleanupPods(testCtx.Ctx, testCtx.ClientSet, t, allPods)
 }

@@ -437,6 +437,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 	opts.AllowEnvFilesValidation = useAllowEnvFilesValidation(oldPodSpec)
 
 	opts.AllowOnlyRecursiveSELinuxChangePolicy = useOnlyRecursiveSELinuxChangePolicy(oldPodSpec)
+	opts.AllowTaintTolerationComparisonOperators = allowTaintTolerationComparisonOperators(oldPodSpec)
 
 	if oldPodSpec != nil {
 		// if old spec used non-integer multiple of huge page unit size, we must allow it
@@ -1597,6 +1598,28 @@ func useOnlyRecursiveSELinuxChangePolicy(oldPodSpec *api.PodSpec) bool {
 	}
 	// No feature gate + no value in the old object -> only Recursive is allowed
 	return true
+}
+
+func taintTolerationComparisonOperatorsInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	for _, toleration := range podSpec.Tolerations {
+		if toleration.Operator == api.TolerationOpLt || toleration.Operator == api.TolerationOpGt {
+			return true
+		}
+	}
+	return false
+}
+
+func allowTaintTolerationComparisonOperators(oldPodSpec *api.PodSpec) bool {
+	// allow the operators if the feature gate is enabled or the old pod spec uses
+	// comparison operators
+	if utilfeature.DefaultFeatureGate.Enabled(features.TaintTolerationComparisonOperators) ||
+		taintTolerationComparisonOperatorsInUse(oldPodSpec) {
+		return true
+	}
+	return false
 }
 
 func hasUserNamespacesWithVolumeDevices(podSpec *api.PodSpec) bool {

@@ -28,8 +28,8 @@ import (
 func ValidateConfiguration(config *internalapi.Configuration) error {
 	allErrs := field.ErrorList{}
 	fldpath := field.NewPath("podtolerationrestriction")
-	allErrs = append(allErrs, validation.ValidateTolerations(config.Default, fldpath.Child("default"))...)
-	allErrs = append(allErrs, validation.ValidateTolerations(config.Whitelist, fldpath.Child("whitelist"))...)
+	allErrs = append(allErrs, validation.ValidateTolerations(config.Default, fldpath.Child("default"), validation.PodValidationOptions{})...)
+	allErrs = append(allErrs, validation.ValidateTolerations(config.Whitelist, fldpath.Child("whitelist"), validation.PodValidationOptions{})...)
 	if len(allErrs) > 0 {
 		return fmt.Errorf("invalid config: %v", allErrs)
 	}

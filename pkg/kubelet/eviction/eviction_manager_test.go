@@ -2935,6 +2935,22 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
 		}
 	}
+
+	// test invalid toleration error handling
+	// create a best-effort pod with invalid toleration that causes TolerationsTolerateTaint to error
+	podWithInvalidToleration, _ := podMaker("invalid-toleration-pod", defaultPriority, newResourceList("", "", ""), newResourceList("", "", ""), "0Gi")
+	podWithInvalidToleration.Spec.Tolerations = []v1.Toleration{
+		{
+			Key:      v1.TaintNodeMemoryPressure,
+			Operator: v1.TolerationOpGt,
+			Value:    "invalid-number",
+			Effect:   v1.TaintEffectNoSchedule,
+		},
+	}
+
+	if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: podWithInvalidToleration}); !result.Admit {
+		t.Errorf("Pod with invalid toleration should be admitted when no memory pressure, got Admit: %v", result.Admit)
+	}
 }
 
 func TestUpdateMemcgThreshold(t *testing.T) {

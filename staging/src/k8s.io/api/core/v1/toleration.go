@@ -16,6 +16,11 @@ limitations under the License.
 
 package v1
 
+import (
+	"fmt"
+	"strconv"
+)
+
 // MatchToleration checks if the toleration matches tolerationToMatch. Tolerations are unique by <key,effect,operator,value>,
 // if the two tolerations have same <key,effect,operator,value> combination, regard as they match.
 // TODO: uniqueness check for tolerations in api validations.
@@ -35,23 +40,49 @@ func (t *Toleration) MatchToleration(tolerationToMatch *Toleration) bool {
 //  3. Empty toleration.key means to match all taint keys.
 //     If toleration.key is empty, toleration.operator must be 'Exists';
 //     this combination means to match all taint values and all taint keys.
-func (t *Toleration) ToleratesTaint(taint *Taint) bool {
+//  4. If toleration.operator is 'Lt' or 'Gt', numeric comparison is performed
+//     between toleration.value and taint.value.
+func (t *Toleration) ToleratesTaint(taint *Taint) (bool, error) {
 	if len(t.Effect) > 0 && t.Effect != taint.Effect {
-		return false
+		return false, nil
 	}
 
 	if len(t.Key) > 0 && t.Key != taint.Key {
-		return false
+		return false, nil
 	}
 
 	// TODO: Use proper defaulting when Toleration becomes a field of PodSpec
 	switch t.Operator {
 	// empty operator means Equal
 	case "", TolerationOpEqual:
-		return t.Value == taint.Value
+		return t.Value == taint.Value, nil
 	case TolerationOpExists:
-		return true
+		return true, nil
+	case TolerationOpLt, TolerationOpGt:
+		return compareNumericValues(t.Value, taint.Value, t.Operator)
 	default:
-		return false
+		return false, nil
+	}
+}
+
+// compareNumericValues performs numeric comparison between toleration and taint values
+func compareNumericValues(tolerationVal, taintVal string, op TolerationOperator) (bool, error) {
+	tVal, err := strconv.ParseInt(tolerationVal, 10, 64)
+	if err != nil {
+		return false, fmt.Errorf("failed to parse toleration value %s as int64, err: %w", tolerationVal, err)
+	}
+
+	tntVal, err := strconv.ParseInt(taintVal, 10, 64)
+	if err != nil {
+		return false, fmt.Errorf("failed to parse taint value %s as int64, err: %w", taintVal, err)
+	}
+
+	switch op {
+	case TolerationOpLt:
+		return tntVal < tVal, nil
+	case TolerationOpGt:
+		return tntVal > tVal, nil
+	default:
+		return false, nil
 	}
 }
