@@ -23,6 +23,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	apps "k8s.io/api/apps/v1"
@@ -1187,22 +1188,17 @@ func CreatePod(ctx context.Context, client clientset.Interface, namespace string
 }
 
 func CreatePodWithPersistentVolume(ctx context.Context, client clientset.Interface, namespace string, claimTemplate *v1.PersistentVolumeClaim, factory volumeFactory, podTemplate PodTemplate, count int, bindVolume bool) error {
-	var createError error
-	lock := sync.Mutex{}
+	var createError atomic.Pointer[error]
+	saveErr := func(err error) {
+		createError.Store(&err)
+	}
 	createPodFunc := func(i int) {
 		pvcName := fmt.Sprintf("pvc-%d", i)
 		// pvc
 		pvc := claimTemplate.DeepCopy()
 		pvc.Name = pvcName
 		// pv
-		pv := factory(i)
-		// PVs are cluster-wide resources.
-		// Prepend a namespace to make the name globally unique.
-		pv.Name = fmt.Sprintf("%s-%s", namespace, pv.Name)
-		pvs := pv.Spec.PersistentVolumeSource
-		if pvs.CSI != nil {
-			pvs.CSI.VolumeHandle = pv.Name
-		}
+		pv := factory(namespace, i)
 		if bindVolume {
 			// bind pv to "pvc-$i"
 			pv.Spec.ClaimRef = &v1.ObjectReference{
@@ -1217,45 +1213,50 @@ func CreatePodWithPersistentVolume(ctx context.Context, client clientset.Interfa
 			pvc.Spec.VolumeName = pv.Name
 			pvc.Status.Phase = v1.ClaimBound
 		} else {
+			scName := "wait-for-first-consumer"
+			_, err := client.StorageV1().StorageClasses().Create(ctx, &storagev1.StorageClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: scName,
+				},
+				Provisioner:       "example.com/provisioner",
+				VolumeBindingMode: ptr.To(storagev1.VolumeBindingWaitForFirstConsumer),
+			}, metav1.CreateOptions{})
+			if err != nil && !apierrors.IsAlreadyExists(err) {
+				saveErr(fmt.Errorf("error creating storage class: %w", err))
+				return
+			}
+
+			pvc.Spec.StorageClassName = &scName
+			pv.Spec.StorageClassName = scName
 			pv.Status.Phase = v1.VolumeAvailable
 		}
 
 		// Create PVC first as it's referenced by the PV when the `bindVolume` is true.
 		if err := CreatePersistentVolumeClaimWithRetries(client, namespace, pvc); err != nil {
-			lock.Lock()
-			defer lock.Unlock()
-			createError = fmt.Errorf("error creating PVC: %s", err)
+			saveErr(fmt.Errorf("error creating PVC: %w", err))
 			return
 		}
 
 		// We need to update statuses separately, as creating pv/pvc resets status to the default one.
 		if _, err := client.CoreV1().PersistentVolumeClaims(namespace).UpdateStatus(ctx, pvc, metav1.UpdateOptions{}); err != nil {
-			lock.Lock()
-			defer lock.Unlock()
-			createError = fmt.Errorf("error updating PVC status: %s", err)
+			saveErr(fmt.Errorf("error updating PVC status: %w", err))
 			return
 		}
 
 		if err := CreatePersistentVolumeWithRetries(client, pv); err != nil {
-			lock.Lock()
-			defer lock.Unlock()
-			createError = fmt.Errorf("error creating PV: %s", err)
+			saveErr(fmt.Errorf("error creating PV: %w", err))
 			return
 		}
 		// We need to update statuses separately, as creating pv/pvc resets status to the default one.
 		if _, err := client.CoreV1().PersistentVolumes().UpdateStatus(ctx, pv, metav1.UpdateOptions{}); err != nil {
-			lock.Lock()
-			defer lock.Unlock()
-			createError = fmt.Errorf("error updating PV status: %s", err)
+			saveErr(fmt.Errorf("error updating PV status: %w", err))
 			return
 		}
 
 		// pod
 		pod, err := podTemplate.GetPodTemplate(i, count)
 		if err != nil {
-			lock.Lock()
-			defer lock.Unlock()
-			createError = fmt.Errorf("error getting pod template: %s", err)
+			saveErr(fmt.Errorf("error getting pod template: %w", err))
 			return
 		}
 		pod = pod.DeepCopy()
@@ -1270,19 +1271,17 @@ func CreatePodWithPersistentVolume(ctx context.Context, client clientset.Interfa
 			},
 		}
 		if err := makeCreatePod(client, namespace, pod); err != nil {
-			lock.Lock()
-			defer lock.Unlock()
-			createError = err
+			saveErr(err)
 			return
 		}
 	}
 
-	if count < 30 {
-		workqueue.ParallelizeUntil(ctx, count, count, createPodFunc)
-	} else {
-		workqueue.ParallelizeUntil(ctx, 30, count, createPodFunc)
+	workqueue.ParallelizeUntil(ctx, 30, count, createPodFunc)
+	var err error
+	if errp := createError.Load(); errp != nil {
+		err = *errp
 	}
-	return createError
+	return err
 }
 
 func NewCustomCreatePodStrategy(podTemplate PodTemplate) TestPodCreateStrategy {
@@ -1292,7 +1291,7 @@ func NewCustomCreatePodStrategy(podTemplate PodTemplate) TestPodCreateStrategy {
 }
 
 // volumeFactory creates an unique PersistentVolume for given integer.
-type volumeFactory func(uniqueID int) *v1.PersistentVolume
+type volumeFactory func(namePrefix string, uniqueID int) *v1.PersistentVolume
 
 // PodTemplate is responsible for creating a v1.Pod instance that is ready
 // to be sent to the API server.
@@ -1319,9 +1318,9 @@ func (s *staticPodTemplate) GetPodTemplate(index, count int) (*v1.Pod, error) {
 	return (*v1.Pod)(s), nil
 }
 
-func NewCreatePodWithPersistentVolumeStrategy(claimTemplate *v1.PersistentVolumeClaim, factory volumeFactory, podTemplate PodTemplate) TestPodCreateStrategy {
+func NewCreatePodWithPersistentVolumeStrategy(claimTemplate *v1.PersistentVolumeClaim, factory volumeFactory, podTemplate PodTemplate, bindVolume bool) TestPodCreateStrategy {
 	return func(ctx context.Context, client clientset.Interface, namespace string, podCount int) error {
-		return CreatePodWithPersistentVolume(ctx, client, namespace, claimTemplate, factory, podTemplate, podCount, true /* bindVolume */)
+		return CreatePodWithPersistentVolume(ctx, client, namespace, claimTemplate, factory, podTemplate, podCount, bindVolume)
 	}
 }
 
