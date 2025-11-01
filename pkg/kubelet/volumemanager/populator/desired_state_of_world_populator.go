@@ -40,6 +40,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/component-helpers/storage/ephemeral"
 	"k8s.io/kubernetes/pkg/kubelet/config"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
@@ -438,6 +439,13 @@ func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
 		}
 	}
 	if pvcSource != nil {
+		// Static pods cannot reference PersistentVolumeClaims as they run independently
+		// of the API server and cannot use API objects for volume references.
+		if kubetypes.IsStaticPod(pod) {
+			return nil, nil, "", fmt.Errorf(
+				"static pods may not reference persistentvolumeclaims")
+		}
+
 		logger.V(5).Info("Found PVC", "PVC", klog.KRef(pod.Namespace, pvcSource.ClaimName))
 		// If podVolume is a PVC, fetch the real PV behind the claim
 		pvc, err := dswp.getPVCExtractPV(
