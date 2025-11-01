@@ -271,6 +271,7 @@ leaderElection:
 					plugins.Score.Enabled = []config.Plugin{
 						{Name: "InterPodAffinity", Weight: 1},
 						{Name: "TaintToleration", Weight: 1},
+						{Name: "DynamicResources", Weight: 1},
 					}
 					return plugins
 				}(),

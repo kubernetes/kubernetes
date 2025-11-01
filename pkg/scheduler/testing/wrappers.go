@@ -1202,7 +1202,7 @@ func (wrapper *ResourceClaimWrapper) RequestWithNameCount(name, deviceClassName 
 
 // RequestWithPrioritizedList adds one device request with one subrequest
 // per provided deviceClassName.
-func (wrapper *ResourceClaimWrapper) RequestWithPrioritizedList(deviceClassNames ...string) *ResourceClaimWrapper {
+func (wrapper *ResourceClaimWrapper) RequestWithPrioritizedListFromDeviceClasses(deviceClassNames ...string) *ResourceClaimWrapper {
 	var prioritizedList []resourceapi.DeviceSubRequest
 	for i, deviceClassName := range deviceClassNames {
 		prioritizedList = append(prioritizedList, resourceapi.DeviceSubRequest{
@@ -1220,6 +1220,45 @@ func (wrapper *ResourceClaimWrapper) RequestWithPrioritizedList(deviceClassNames
 		},
 	)
 	return wrapper
+}
+
+func (wrapper *ResourceClaimWrapper) RequestWithPrioritizedList(subRequests ...resourceapi.DeviceSubRequest) *ResourceClaimWrapper {
+	return wrapper.NamedRequestWithPrioritizedList(fmt.Sprintf("req-%d", len(wrapper.Spec.Devices.Requests)+1), subRequests...)
+}
+
+func (wrapper *ResourceClaimWrapper) NamedRequestWithPrioritizedList(name string, subRequests ...resourceapi.DeviceSubRequest) *ResourceClaimWrapper {
+	wrapper.Spec.Devices.Requests = append(wrapper.Spec.Devices.Requests,
+		resourceapi.DeviceRequest{
+			Name:           name,
+			FirstAvailable: subRequests,
+		},
+	)
+	return wrapper
+}
+
+func SubRequest(name, deviceClassName string, count int64) resourceapi.DeviceSubRequest {
+	return resourceapi.DeviceSubRequest{
+		Name:            name,
+		AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
+		Count:           count,
+		DeviceClassName: deviceClassName,
+	}
+}
+
+func SubRequestWithSelector(name, deviceClassName, selector string) resourceapi.DeviceSubRequest {
+	return resourceapi.DeviceSubRequest{
+		Name:            name,
+		AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
+		Count:           1,
+		DeviceClassName: deviceClassName,
+		Selectors: []resourceapi.DeviceSelector{
+			{
+				CEL: &resourceapi.CELDeviceSelector{
+					Expression: selector,
+				},
+			},
+		},
+	}
 }
 
 // Allocation sets the allocation of the inner object.

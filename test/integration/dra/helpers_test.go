@@ -129,13 +129,20 @@ func createClaim(tCtx ktesting.TContext, namespace string, suffix string, class 
 }
 
 // createPod create a pod in the namespace, referencing the given claim.
-func createPod(tCtx ktesting.TContext, namespace string, suffix string, claim *resourceapi.ResourceClaim, pod *v1.Pod) *v1.Pod {
+func createPod(tCtx ktesting.TContext, namespace string, suffix string, pod *v1.Pod, claims ...*resourceapi.ResourceClaim) *v1.Pod {
 	tCtx.Helper()
 	pod = pod.DeepCopy()
 	pod.Name += suffix
 	podName := pod.Name
 	pod.Namespace = namespace
-	pod.Spec.ResourceClaims[0].ResourceClaimName = &claim.Name
+	var resourceClaims []v1.PodResourceClaim
+	for _, claim := range claims {
+		resourceClaims = append(resourceClaims, v1.PodResourceClaim{
+			Name:              claim.Name,
+			ResourceClaimName: &claim.Name,
+		})
+	}
+	pod.Spec.ResourceClaims = resourceClaims
 	pod, err := tCtx.Client().CoreV1().Pods(namespace).Create(tCtx, pod, metav1.CreateOptions{})
 	tCtx.ExpectNoError(err, "create pod "+podName)
 	tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
