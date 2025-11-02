@@ -25,7 +25,8 @@ cpuCFSQuota: true
 cpuCFSQuotaPeriod: 100ms
 cpuManagerPolicy: none
 cpuManagerReconcilePeriod: 10s
-crashLoopBackOff: {}
+crashLoopBackOff:
+  maxContainerRestartPeriod: 5m0s
 enableControllerAttachDetach: true
 enableDebugFlagsHandler: true
 enableDebuggingHandlers: true
