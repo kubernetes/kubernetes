@@ -5124,6 +5124,29 @@ func TestAllocator(t *testing.T,
 				),
 			},
 		},
+		"multi-host-resource-pool-with-stale-slice-for-current-node": {
+			claimsToAllocate: objects(claimWithRequest(claim0, req0, classA)),
+			classes:          objects(class(classA, driverA)),
+			slices: unwrap(
+				func() wrapResourceSlice {
+					s := slice(slice1, node1, pool1, driverA,
+						device(device1, nil, nil),
+					)
+					s.Spec.Pool.Generation = 1
+					s.Spec.Pool.ResourceSliceCount = 2
+					return s
+				}(),
+				func() wrapResourceSlice {
+					s := slice(slice2, node2, pool1, driverA,
+						device(device2, nil, nil),
+					)
+					s.Spec.Pool.Generation = 2
+					s.Spec.Pool.ResourceSliceCount = 2
+					return s
+				}(),
+			),
+			node: node(node1, region1),
+		},
 	}
 
 	for name, tc := range testcases {

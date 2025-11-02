@@ -126,8 +126,24 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 		// for the current node. This is necessary for "allocate all" mode (it rejects incomplete
 		// pools).
 		if isIncomplete {
+			// Find all the slices that belongs to the current pool. Doing this for each pool
+			// separately could be a big inefficient if there are multiple incomplete pools. But
+			// that is probably a rare situation.
 			slicesForPool := findSlicesForPool(slices, poolID)
+			// This allows to check ALL slices in the pool to make sure whether the pool is
+			// complete or not.
 			isIncomplete = poolIsIncomplete(slicesForPool)
+			// If the pool is truly incomplete after this check, then we need to find out if
+			// the slices we have in the pool object really is on the latest generation. If one of
+			// the slices that was filtered out earlier are on a newer generation, it is not.
+			if isIncomplete {
+				latestGeneration := findLatestGenerationInPool(slices)
+				// All slices in the pool are on the same generation, so if the first one is on an
+				// older generation, then they are all stale and must be removed from the pool.
+				if len(pool.Slices) > 0 && pool.Slices[0].Spec.Pool.Generation != latestGeneration {
+					pool.Slices = nil
+				}
+			}
 		}
 		pool.IsIncomplete = isIncomplete
 		pool.IsInvalid, pool.InvalidReason = poolIsInvalid(pool)
@@ -195,14 +211,27 @@ func findSlicesForPool(slices []*resourceapi.ResourceSlice, poolID PoolID) []*re
 
 // poolIsIncomplete checks if the provided ResourceSlices belong to a
 // complete pool. All provided ResourceSlices must belong to the same pool.
+//
+// For a pool to be complete, the following must be true:
+//   - All slices have the same generation
+//   - All slices agree on the number of ResourceSlices in the pool
+//   - The number of actual slices found must equal the expected number of
+//     slices in the pool.
 func poolIsIncomplete(slices []*resourceapi.ResourceSlice) bool {
 	if len(slices) == 0 {
 		return false
 	}
+	// Just take the resourceSliceCount from the first slice as the
+	// point of comparison. If this doesn't equal the count in all
+	// other ResourceSlices and the total number of slices in the pool,
+	// then the pool is not complete.
 	sliceCount := slices[0].Spec.Pool.ResourceSliceCount
 	if int64(len(slices)) != sliceCount {
 		return true
 	}
+	// Just take the generation of the first slice as the point of
+	// comparison. If this value is not the latest version, then
+	// the pool can't be complete.
 	gen := slices[0].Spec.Pool.Generation
 	for _, slice := range slices {
 		if slice.Spec.Pool.Generation != gen {
@@ -213,6 +242,16 @@ func poolIsIncomplete(slices []*resourceapi.ResourceSlice) bool {
 		}
 	}
 	return false
+}
+
+func findLatestGenerationInPool(slices []*resourceapi.ResourceSlice) int64 {
+	var latestGeneration int64
+	for _, slice := range slices {
+		if slice.Spec.Pool.Generation > latestGeneration {
+			latestGeneration = slice.Spec.Pool.Generation
+		}
+	}
+	return latestGeneration
 }
 
 func poolIsInvalid(pool *Pool) (bool, string) {
