@@ -33,6 +33,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/dynamic-resource-allocation/deviceclass/extendedresourcecache"
 	"k8s.io/klog/v2/ktesting"
 	_ "k8s.io/klog/v2/ktesting/init"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -719,9 +720,14 @@ func TestEnoughRequests(t *testing.T) {
 
 			client := fake.NewSimpleClientset(deviceClassWithExtendResourceName)
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
-
 			claimsCache := assumecache.NewAssumeCache(logger, informerFactory.Resource().V1().ResourceClaims().Informer(), "resource claim", "", nil)
 			draManager := dynamicresources.NewDRAManager(ctx, claimsCache, nil, informerFactory)
+			if test.draExtendedResourceEnabled {
+				cache := draManager.DeviceClassResolver().(*extendedresourcecache.ExtendedResourceCache)
+				if _, err := informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandler(cache); err != nil {
+					logger.Error(err, "failed to add device class informer event handler")
+				}
+			}
 			informerFactory.Start(ctx.Done())
 			t.Cleanup(func() {
 				// Now we can wait for all goroutines to stop.

@@ -368,7 +368,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 	},
 	{
 		Name:          "Pod rejected by the NodeResourcesFit plugin isn't requeued when a Node has the extended resource, and DRAExtendedResource is disabled",
-		EnablePlugins: []string{names.NodeResourcesFit},
+		EnablePlugins: []string{names.NodeResourcesFit, names.DynamicResources},
 		InitialNodes: []*v1.Node{
 			st.MakeNode().Name("fake-node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4", "example.com/gpu": "1"}).Obj(),
 		},
@@ -389,7 +389,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 	},
 	{
 		Name:          "Pod rejected by the NodeResourcesFit plugin isn't requeued when a Node has the extended resource, and DRAExtendedResource is enabled",
-		EnablePlugins: []string{names.NodeResourcesFit},
+		EnablePlugins: []string{names.NodeResourcesFit, names.DynamicResources},
 		InitialNodes: []*v1.Node{
 			st.MakeNode().Name("fake-node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4", "example.com/gpu": "1"}).Obj(),
 		},
@@ -410,7 +410,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 	},
 	{
 		Name:          "Pod rejected by the NodeResourcesFit plugin isn't requeued when a Node does not have the extended resource, and DRAExtendedResource is disabled",
-		EnablePlugins: []string{names.NodeResourcesFit},
+		EnablePlugins: []string{names.NodeResourcesFit, names.DynamicResources},
 		InitialNodes: []*v1.Node{
 			st.MakeNode().Name("fake-node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj(),
 		},
@@ -431,7 +431,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 	},
 	{
 		Name:          "Pod rejected by the NodeResourcesFit plugin is requeued when a Node does not have the extended resource, and DRAExtendedResource is enabled",
-		EnablePlugins: []string{names.NodeResourcesFit, names.NodeAffinity},
+		EnablePlugins: []string{names.NodeResourcesFit, names.NodeAffinity, names.DynamicResources},
 		InitialNodes: []*v1.Node{
 			st.MakeNode().Name("fake-node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj(),
 			st.MakeNode().Name("fake-node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Label("group", "b").Obj(),

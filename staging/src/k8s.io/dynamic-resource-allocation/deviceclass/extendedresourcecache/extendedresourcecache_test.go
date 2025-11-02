@@ -34,9 +34,6 @@ type deviceClassResolver interface {
 func TestNil(t *testing.T) {
 	var cache *ExtendedResourceCache
 	var resolver deviceClassResolver = cache
-	if resolver == nil {
-		t.Errorf("Expected a non-nil interface implementation, got instead: %#v", resolver)
-	}
 	if className := resolver.GetDeviceClass("example.com/gpu"); className != "" {
 		t.Errorf("Expected the empty class name from a nil instance, got instead: %q", className)
 	}

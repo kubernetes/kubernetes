@@ -750,8 +750,8 @@ func (pl *DynamicResources) filterExtendedResources(state *stateData, pod *v1.Po
 			continue
 		}
 		allocatable, okScalar := nodeInfo.GetAllocatable().GetScalarResources()[rName]
-		okDynamic := cache.GetDeviceClass(rName) != ""
-		if okDynamic {
+		isBackedByDRA := cache.GetDeviceClass(rName) != ""
+		if isBackedByDRA {
 			if allocatable > 0 {
 				// node provides the resource via device plugin
 				extendedResources[rName] = 0
