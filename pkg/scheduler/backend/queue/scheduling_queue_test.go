@@ -3407,7 +3407,6 @@ func TestSchedulerPodsMetric(t *testing.T) {
 	}
 
 	// Keep only the first test case with real metrics as a safety measure
-	// This is the single simple test case mentioned in issue #131553
 	tests := []struct {
 		name                       string
 		operations                 []operation
