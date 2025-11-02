@@ -51,11 +51,11 @@ func ValidateLeaseSpec(spec *coordination.LeaseSpec, fldPath *field.Path) field.
 
 	if spec.LeaseDurationSeconds != nil && *spec.LeaseDurationSeconds <= 0 {
 		fld := fldPath.Child("leaseDurationSeconds")
-		allErrs = append(allErrs, field.Invalid(fld, spec.LeaseDurationSeconds, "must be greater than 0"))
+		allErrs = append(allErrs, field.Invalid(fld, spec.LeaseDurationSeconds, "must be greater than 0").MarkCoveredByDeclarative())
 	}
 	if spec.LeaseTransitions != nil && *spec.LeaseTransitions < 0 {
 		fld := fldPath.Child("leaseTransitions")
-		allErrs = append(allErrs, field.Invalid(fld, spec.LeaseTransitions, "must be greater than or equal to 0"))
+		allErrs = append(allErrs, field.Invalid(fld, spec.LeaseTransitions, "must be greater than or equal to 0").MarkCoveredByDeclarative())
 	}
 	if spec.Strategy != nil {
 		allErrs = append(allErrs, ValidateCoordinatedLeaseStrategy(*spec.Strategy, fldPath.Child("strategy"))...)
