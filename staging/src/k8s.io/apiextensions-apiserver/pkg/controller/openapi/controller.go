@@ -17,6 +17,7 @@ limitations under the License.
 package openapi
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -133,18 +134,25 @@ func NewController(crdInformer informers.CustomResourceDefinitionInformer) *Cont
 	return c
 }
 
-// Run sets openAPIAggregationManager and starts workers
+// Deprecated: Use RunWithContext instead.
 func (c *Controller) Run(staticSpec *spec.Swagger, openAPIService *handler.OpenAPIService, stopCh <-chan struct{}) {
+	c.RunWithContext(wait.ContextForChannel(stopCh), staticSpec, openAPIService)
+}
+
+// RunWithContext sets openAPIAggregationManager and starts workers
+func (c *Controller) RunWithContext(ctx context.Context, staticSpec *spec.Swagger, openAPIService *handler.OpenAPIService) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
-	defer klog.Infof("Shutting down OpenAPI controller")
 
-	klog.Infof("Starting OpenAPI controller")
+	logger := klog.FromContext(ctx)
+	defer logger.Info("Shutting down OpenAPI controller")
+
+	logger.Info("Starting OpenAPI controller")
 
 	c.staticSpec = staticSpec
 	c.openAPIService = openAPIService
 
-	if !cache.WaitForCacheSync(stopCh, c.crdsSynced) {
+	if !cache.WaitForCacheSync(ctx.Done(), c.crdsSynced) {
 		utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
 		return
 	}
@@ -164,12 +172,12 @@ func (c *Controller) Run(staticSpec *spec.Swagger, openAPIService *handler.OpenA
 	c.updateSpecLocked()
 
 	// only start one worker thread since its a slow moving API
-	go wait.Until(c.runWorker, time.Second, stopCh)
+	go wait.UntilWithContext(ctx, c.runWorker, time.Second)
 
-	<-stopCh
+	<-ctx.Done()
 }
 
-func (c *Controller) runWorker() {
+func (c *Controller) runWorker(ctx context.Context) {
 	for c.processNextWorkItem() {
 	}
 }
