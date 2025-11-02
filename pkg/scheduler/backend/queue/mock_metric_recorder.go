@@ -24,9 +24,6 @@ import (
 type MockMetricAsyncRecorder struct {
 	mu                  sync.Mutex
 	pluginDurationCalls []pluginDurationCall
-	queueingHintCalls   []queueingHintCall
-	inFlightEventsCalls []inFlightEventsCall
-	flushMetricsCalls   int
 	IsStoppedCh         chan struct{}
 }
 
@@ -35,19 +32,6 @@ type pluginDurationCall struct {
 	pluginName     string
 	status         string
 	value          float64
-}
-
-type queueingHintCall struct {
-	pluginName string
-	event      string
-	hint       string
-	value      float64
-}
-
-type inFlightEventsCall struct {
-	eventLabel string
-	valueToAdd float64
-	forceFlush bool
 }
 
 // NewMockMetricAsyncRecorder creates a new mock recorder
@@ -69,34 +53,16 @@ func (m *MockMetricAsyncRecorder) ObservePluginDurationAsync(extensionPoint, plu
 	})
 }
 
-// ObserveQueueingHintDurationAsync records the call for verification
+// ObserveQueueingHintDurationAsync is a noop stub (not verified in tests)
 func (m *MockMetricAsyncRecorder) ObserveQueueingHintDurationAsync(pluginName, event, hint string, value float64) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.queueingHintCalls = append(m.queueingHintCalls, queueingHintCall{
-		pluginName: pluginName,
-		event:      event,
-		hint:       hint,
-		value:      value,
-	})
 }
 
-// ObserveInFlightEventsAsync records the call for verification
+// ObserveInFlightEventsAsync is a noop stub (not verified in tests)
 func (m *MockMetricAsyncRecorder) ObserveInFlightEventsAsync(eventLabel string, valueToAdd float64, forceFlush bool) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.inFlightEventsCalls = append(m.inFlightEventsCalls, inFlightEventsCall{
-		eventLabel: eventLabel,
-		valueToAdd: valueToAdd,
-		forceFlush: forceFlush,
-	})
 }
 
-// FlushMetrics records the flush call
+// FlushMetrics is a noop stub (not verified in tests)
 func (m *MockMetricAsyncRecorder) FlushMetrics() {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.flushMetricsCalls++
 }
 
 // GetPluginDurationCalls returns all plugin duration calls for verification
@@ -104,25 +70,4 @@ func (m *MockMetricAsyncRecorder) GetPluginDurationCalls() []pluginDurationCall 
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return append([]pluginDurationCall{}, m.pluginDurationCalls...)
-}
-
-// GetQueueingHintCalls returns all queueing hint calls for verification
-func (m *MockMetricAsyncRecorder) GetQueueingHintCalls() []queueingHintCall {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return append([]queueingHintCall{}, m.queueingHintCalls...)
-}
-
-// GetInFlightEventsCalls returns all in-flight events calls for verification
-func (m *MockMetricAsyncRecorder) GetInFlightEventsCalls() []inFlightEventsCall {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return append([]inFlightEventsCall{}, m.inFlightEventsCalls...)
-}
-
-// GetFlushMetricsCalls returns the number of flush calls
-func (m *MockMetricAsyncRecorder) GetFlushMetricsCalls() int {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return m.flushMetricsCalls
 }
