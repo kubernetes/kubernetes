@@ -23,6 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	resourcelisters "k8s.io/client-go/listers/resource/v1"
 	"k8s.io/client-go/tools/cache"
 	klog "k8s.io/klog/v2"
 )
@@ -30,8 +31,9 @@ import (
 // ExtendedResourceCache maintains a global cache of extended resource to device class mappings,
 // based on informer events. For that it implements the cache.ResourceEventHandler interface.
 type ExtendedResourceCache struct {
-	logger   klog.Logger
-	handlers []cache.ResourceEventHandler
+	deviceClassLister resourcelisters.DeviceClassLister
+	logger            klog.Logger
+	handlers          []cache.ResourceEventHandler
 
 	mutex sync.RWMutex
 	// mapping maps extended resource name to device class name
@@ -44,11 +46,12 @@ var _ cache.ResourceEventHandler = &ExtendedResourceCache{}
 // is responsible for registering the instance as a handler of DeviceClass events.
 //
 // Additional event handlers may be registered here or via AddEventHandler.
-func NewExtendedResourceCache(logger klog.Logger, handlers ...cache.ResourceEventHandler) *ExtendedResourceCache {
+func NewExtendedResourceCache(deviceClassLister resourcelisters.DeviceClassLister, logger klog.Logger, handlers ...cache.ResourceEventHandler) *ExtendedResourceCache {
 	cache := &ExtendedResourceCache{
-		logger:   logger,
-		handlers: handlers,
-		mapping:  make(map[v1.ResourceName]string),
+		deviceClassLister: deviceClassLister,
+		logger:            logger,
+		handlers:          handlers,
+		mapping:           make(map[v1.ResourceName]string),
 	}
 
 	return cache
@@ -138,6 +141,28 @@ func (c *ExtendedResourceCache) updateMapping(newDeviceClass, oldDeviceClass *re
 	}
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
+
+	var classWithSameExtendedResourceName *resourceapi.DeviceClass
+	if newDeviceClass.Spec.ExtendedResourceName != nil {
+		name := c.mapping[v1.ResourceName(*newDeviceClass.Spec.ExtendedResourceName)]
+		var err error
+		if c.deviceClassLister != nil && name != "" {
+			classWithSameExtendedResourceName, err = c.deviceClassLister.Get(name)
+		}
+		if err != nil {
+			c.logger.V(5).Info("Failed to get device class", "extendedResource", *newDeviceClass.Spec.ExtendedResourceName, "deviceClass", name, "error", err)
+		}
+	}
+	if classWithSameExtendedResourceName != nil {
+		if newDeviceClass.CreationTimestamp.Before(&classWithSameExtendedResourceName.CreationTimestamp) {
+			return
+		}
+		if classWithSameExtendedResourceName.CreationTimestamp.Equal(&newDeviceClass.CreationTimestamp) {
+			if classWithSameExtendedResourceName.Name <= newDeviceClass.Name {
+				return
+			}
+		}
+	}
 
 	// Remove old mappings first to handle ExtendedResourceName changes
 	if oldDeviceClass != nil {
