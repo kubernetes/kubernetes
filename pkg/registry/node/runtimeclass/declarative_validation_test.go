@@ -42,7 +42,7 @@ func mkRuntimeClassHandlerOnly(tweaks ...func(*node.RuntimeClass)) node.RuntimeC
 }
 
 func TestRuntimeClass_DeclarativeValidate_Handler(t *testing.T) {
-	apiVersions := []string{"v1"}
+	apiVersions := []string{"v1beta1"}
 
 	for _, apiVersion := range apiVersions {
 		t.Run(apiVersion, func(t *testing.T) {
@@ -58,10 +58,10 @@ func TestRuntimeClass_DeclarativeValidate_Handler(t *testing.T) {
 				obj          node.RuntimeClass
 				expectedErrs field.ErrorList
 			}{
-				//"valid": {
-				//	obj:          mkRuntimeClassHandlerOnly(),
-				//	expectedErrs: field.ErrorList{},
-				//},
+				//	"valid": {
+				//		obj:          mkRuntimeClassHandlerOnly(),
+				//		expectedErrs: field.ErrorList{},
+				//	},
 				//"missing handler": {
 				//	obj: mkRuntimeClassHandlerOnly(func(rc *node.RuntimeClass) {
 				//		rc.Handler = ""
@@ -70,19 +70,19 @@ func TestRuntimeClass_DeclarativeValidate_Handler(t *testing.T) {
 				//		field.Required(field.NewPath("handler"), ""),
 				//	},
 				//},
-				"invalid handler (not dnsLabel)": {
+				"invalid handler dns label": {
 					obj: mkRuntimeClassHandlerOnly(func(rc *node.RuntimeClass) {
-						rc.Handler = "Not-Valid" // uppercase + hyphen
+						rc.Handler = "asads$asdas"
 					}),
 					expectedErrs: field.ErrorList{
-						field.Invalid(field.NewPath("handler"), "Not-Valid", "must be a DNS label"),
+						field.Invalid(field.NewPath("handler"), "asads$asdas",
+							"must be a DNS label (at most 63 characters").WithOrigin("format=k8s-short-name"),
 					},
 				},
 			}
 
 			for name, tc := range tests {
 				t.Run(name, func(t *testing.T) {
-					// this checks: handwritten == declarative
 					apitesting.VerifyValidationEquivalence(
 						t,
 						ctx,
@@ -97,7 +97,7 @@ func TestRuntimeClass_DeclarativeValidate_Handler(t *testing.T) {
 }
 
 func TestRuntimeClass_DeclarativeValidate_ImmutableHandler(t *testing.T) {
-	apiVersions := []string{"v1"}
+	apiVersions := []string{"v1beta1"}
 
 	for _, apiVersion := range apiVersions {
 		t.Run(apiVersion, func(t *testing.T) {
@@ -130,7 +130,7 @@ func TestRuntimeClass_DeclarativeValidate_ImmutableHandler(t *testing.T) {
 							field.NewPath("handler"),
 							"gvisor",
 							apivalidation.FieldImmutableErrorMsg,
-						).MarkCoveredByDeclarative(),
+						),
 					},
 				},
 				//"old empty -> new set (allow for legacy objs)": {

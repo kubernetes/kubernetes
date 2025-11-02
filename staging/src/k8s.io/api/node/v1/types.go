@@ -50,9 +50,7 @@ type RuntimeClass struct {
 	// in a pod.
 	// The Handler must be lowercase, conform to the DNS Label (RFC 1123) requirements,
 	// and is immutable.
-	// +k8s:validation:Required
-	// +k8s:validation:Format=dnsLabel
-	// +k8s:immutable
+	// +k8s:format="k8s-short-name"
 	Handler string `json:"handler" protobuf:"bytes,2,opt,name=handler"`
 
 	// overhead represents the resource overhead associated with running a pod for a
