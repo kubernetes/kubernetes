@@ -45,10 +45,6 @@ func nodeMatches(node *v1.Node, nodeNameToMatch string, allNodesMatch bool, node
 	return false, nil
 }
 
-type poolIdentifier struct {
-	driver, pool string
-}
-
 // GatherPools collects information about all resource pools which provide
 // devices that are accessible from the given node.
 //
@@ -56,46 +52,9 @@ type poolIdentifier struct {
 // required slices available) or invalid (for example, device names not unique).
 // Both is recorded in the result.
 func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node *v1.Node, features Features) ([]*Pool, error) {
-	slicesByPool := make(map[poolIdentifier][]*resourceapi.ResourceSlice)
-	for _, slice := range slices {
-		poolID := poolIdentifier{
-			driver: slice.Spec.Driver,
-			pool:   slice.Spec.Pool.Name,
-		}
-		slicesByPool[poolID] = append(slicesByPool[poolID], slice)
-	}
-
-	// We need to check whether a pool is complete while we have all
-	// the slices. Once we discard slices that don't target the node, we
-	// no longer have the information needed to find out.
-	incompletePools := sets.New[poolIdentifier]()
-	for poolID, slices := range slicesByPool {
-		complete := true
-		sliceCount := len(slices)
-		generation := slices[0].Spec.Pool.Generation
-		for _, slice := range slices {
-			// If the number of slices in the pool specified in any of the slices
-			// doesn't match what we found, the pool is most likely being updated
-			// by the controller.
-			if slice.Spec.Pool.ResourceSliceCount != int64(sliceCount) {
-				complete = false
-			}
-			// If the generation of the pool isn't the same across all slices,
-			// the pool is most likely being updated by the controller. We can't
-			// allocate devices from it.
-			if slice.Spec.Pool.Generation != generation {
-				complete = false
-			}
-		}
-		// We still need to keep incomplete pools, since we need to make sure
-		// all devices available on a node is considered for allocationMode All.
-		if !complete {
-			incompletePools.Insert(poolID)
-		}
-	}
-
 	pools := make(map[PoolID]*Pool)
 	var slicesWithBindingConditions []*resourceapi.ResourceSlice
+
 	for _, slice := range slices {
 		if !features.PartitionableDevices && slice.Spec.PerDeviceNodeSelection != nil {
 			continue
@@ -161,8 +120,30 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 	// Find incomplete pools and flatten into a single slice.
 	result := make([]*Pool, 0, len(pools))
 	var resultWithBindingConditions []*Pool
-	for _, pool := range pools {
-		pool.IsIncomplete = incompletePools.Has(poolIdentifier{driver: pool.Driver.String(), pool: pool.Pool.String()})
+	for poolID, pool := range pools {
+		// If we have all slices, we are done. If not, then we need to start looking for slices
+		// which were filtered out above because their node selection made them look irrelevant
+		// for the current node. This is necessary for "allocate all" mode (it rejects incomplete
+		// pools).
+		isComplete := int64(len(pool.Slices)) == pool.Slices[0].Spec.Pool.ResourceSliceCount
+		if !isComplete {
+			isObsolete, numSlices := checkSlicesInPool(slices, poolID, pool.Slices[0].Spec.Pool.Generation)
+			if isObsolete {
+				// A more thorough check determined that the DRA driver is in the process
+				// of replacing the current generation. The newer one didn't have any slice
+				// which devices for the node, or we would have noticed sooner.
+				//
+				// Let's ignore the old device information by ignoring the pool.
+				continue
+			}
+			// Use the more complete number of slices to check for "incomplete pool".
+			//
+			// The slices that we return to the caller still don't represent the whole
+			// pool, but that's okay: we *want* to limit the result to relevant devices
+			// so the caller doesn't need to check node selectors unnecessarily.
+			isComplete = numSlices == pool.Slices[0].Spec.Pool.ResourceSliceCount
+		}
+		pool.IsIncomplete = !isComplete
 		pool.IsInvalid, pool.InvalidReason = poolIsInvalid(pool)
 		// if pool has binding conditions, add the pool to the end of the result
 		if poolHasBindingConditions(*pool) {
@@ -242,6 +223,37 @@ func poolHasBindingConditions(pool Pool) bool {
 		}
 	}
 	return false
+}
+
+// checkSlicesInPool is an expensive check of all slices in the pool.
+// The generation is what the caller wants to move ahead with.
+//
+// It returns:
+// - current generation is obsolete -> no further checking
+// - total number of slices with the generation
+//
+// Future TODO: detect inconsistent ResourceSliceCount, also in poolIsInvalid.
+func checkSlicesInPool(slices []*resourceapi.ResourceSlice, poolID PoolID, generation int64) (isObsolete bool, numSlices int64) {
+	// A cached index by pool ID would make this more efficient.
+	// It may be needed long-term to support features which always have to consider all slices.
+	for _, slice := range slices {
+		if slice.Spec.Driver != poolID.Driver.String() ||
+			slice.Spec.Pool.Name != poolID.Pool.String() {
+			// Different pool.
+			continue
+		}
+		switch {
+		case slice.Spec.Pool.Generation == generation:
+			numSlices++
+		case slice.Spec.Pool.Generation > generation:
+			// The caller must have missed some other slice in the pool.
+			// Abort!
+			return true, 0
+		default:
+			// Older generation, ignore.
+		}
+	}
+	return false, numSlices
 }
 
 type Pool struct {
