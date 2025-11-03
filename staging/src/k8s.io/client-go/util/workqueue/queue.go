@@ -169,12 +169,13 @@ func newQueue[T comparable](c clock.WithTicker, queue Queue[T], metrics queueMet
 		cond:                       sync.NewCond(&sync.Mutex{}),
 		metrics:                    metrics,
 		unfinishedWorkUpdatePeriod: updatePeriod,
+		stopCh:                     make(chan struct{}),
 	}
 
 	// Don't start the goroutine for a type of noMetrics so we don't consume
 	// resources unnecessarily
 	if _, ok := metrics.(noMetrics[T]); !ok {
-		go t.updateUnfinishedWorkLoop()
+		t.wg.Go(t.updateUnfinishedWorkLoop)
 	}
 
 	return t
@@ -210,6 +211,12 @@ type Typed[t comparable] struct {
 
 	unfinishedWorkUpdatePeriod time.Duration
 	clock                      clock.WithTicker
+
+	// wg manages goroutines started by the queue to allow graceful shutdown
+	// ShutDown() will wait for goroutines to exit before returning.
+	wg sync.WaitGroup
+
+	stopCh chan struct{}
 }
 
 // Add marks item as needing processing. When the queue is shutdown new
@@ -296,6 +303,10 @@ func (q *Typed[T]) Done(item T) {
 // goroutines will continue processing items in the queue until it is
 // empty and then receive the shutdown signal.
 func (q *Typed[T]) ShutDown() {
+	// Block until updateUnfinishedWorkLoop has exited to gracefully shut down
+	defer q.wg.Wait()
+	defer close(q.stopCh)
+
 	q.cond.L.Lock()
 	defer q.cond.L.Unlock()
 
@@ -333,17 +344,15 @@ func (q *Typed[T]) ShuttingDown() bool {
 func (q *Typed[T]) updateUnfinishedWorkLoop() {
 	t := q.clock.NewTicker(q.unfinishedWorkUpdatePeriod)
 	defer t.Stop()
-	for range t.C() {
-		if !func() bool {
+	for {
+		select {
+		case <-t.C():
 			q.cond.L.Lock()
-			defer q.cond.L.Unlock()
 			if !q.shuttingDown {
 				q.metrics.updateUnfinishedWork()
-				return true
 			}
-			return false
-
-		}() {
+			q.cond.L.Unlock()
+		case <-q.stopCh:
 			return
 		}
 	}
