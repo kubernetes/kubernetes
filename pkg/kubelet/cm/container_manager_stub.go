@@ -50,9 +50,10 @@ type containerManagerStub struct {
 var _ ContainerManager = &containerManagerStub{}
 
 func (cm *containerManagerStub) Start(ctx context.Context, _ *v1.Node, _ ActivePodsFunc, _ GetNodeFunc, _ config.SourcesReady, _ status.PodStatusProvider, _ internalapi.RuntimeService, _ bool) error {
-	klog.V(2).InfoS("Starting stub container manager")
-	cm.memoryManager = memorymanager.NewFakeManager(klog.FromContext(ctx))
-	cm.cpuManager = cpumanager.NewFakeManager(klog.FromContext(ctx))
+	logger := klog.FromContext(ctx)
+	logger.V(2).Info("Starting stub container manager")
+	cm.memoryManager = memorymanager.NewFakeManager(logger)
+	cm.cpuManager = cpumanager.NewFakeManager(logger)
 	return nil
 }
 
@@ -72,7 +73,7 @@ func (cm *containerManagerStub) GetQOSContainersInfo() QOSContainersInfo {
 	return QOSContainersInfo{}
 }
 
-func (cm *containerManagerStub) UpdateQOSCgroups() error {
+func (cm *containerManagerStub) UpdateQOSCgroups(logger klog.Logger) error {
 	return nil
 }
 
@@ -112,7 +113,7 @@ func (m *podContainerManagerStub) GetPodCgroupConfig(_ *v1.Pod, _ v1.ResourceNam
 	return nil, fmt.Errorf("not implemented")
 }
 
-func (m *podContainerManagerStub) SetPodCgroupConfig(pod *v1.Pod, resourceConfig *ResourceConfig) error {
+func (m *podContainerManagerStub) SetPodCgroupConfig(logger klog.Logger, pod *v1.Pod, resourceConfig *ResourceConfig) error {
 	return fmt.Errorf("not implemented")
 }
 

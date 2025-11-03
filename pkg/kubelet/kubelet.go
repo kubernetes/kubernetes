@@ -2056,10 +2056,12 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		}
 		if !podKilled || !runOnce {
 			if !pcm.Exists(pod) {
-				if err := kl.containerManager.UpdateQOSCgroups(); err != nil {
+				// TODO: Pass logger from context once contextual logging migration is complete
+				if err := kl.containerManager.UpdateQOSCgroups(klog.TODO()); err != nil {
 					klog.V(2).InfoS("Failed to update QoS cgroups while syncing pod", "pod", klog.KObj(pod), "err", err)
 				}
-				if err := pcm.EnsureExists(pod); err != nil {
+				// TODO: Pass logger from context once contextual logging migration is complete
+				if err := pcm.EnsureExists(klog.TODO(), pod); err != nil {
 					kl.recorder.Eventf(pod, v1.EventTypeWarning, events.FailedToCreatePodContainer, "unable to ensure pod container exists: %v", err)
 					return false, fmt.Errorf("failed to ensure that the pod: %v cgroups exist and are correctly applied: %v", pod.UID, err)
 				}
@@ -2340,7 +2342,7 @@ func (kl *Kubelet) SyncTerminatedPod(ctx context.Context, pod *v1.Pod, podStatus
 	if kl.cgroupsPerQOS {
 		pcm := kl.containerManager.NewPodContainerManager()
 		name, _ := pcm.GetPodContainerName(pod)
-		if err := pcm.Destroy(name); err != nil {
+		if err := pcm.Destroy(logger, name); err != nil {
 			return err
 		}
 		klog.V(4).InfoS("Pod termination removed cgroups", "pod", klog.KObj(pod), "podUID", pod.UID)
