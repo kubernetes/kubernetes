@@ -340,7 +340,6 @@ var objWithDeviceBindingConditions = &resource.ResourceClaim{
 					Exactly: &resource.ExactDeviceRequest{
 						DeviceClassName: "class",
 						AllocationMode:  resource.DeviceAllocationModeAll,
-						AdminAccess:     ptr.To(true),
 					},
 				},
 			},
@@ -1253,7 +1252,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 			},
 		},
 		"keep-fields-binding-conditions": {
-			oldObj:    objWithStatus,
+			oldObj:    obj,
 			newObj:    objWithDeviceBindingConditions,
 			expectObj: objWithDeviceBindingConditions,
 			verify: func(t *testing.T, as []testclient.Action) {
@@ -1282,7 +1281,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 			deviceStatusFeatureGate: true,
 		},
 		"drop-fields-binding-conditions": {
-			oldObj:    objWithStatus,
+			oldObj:    obj,
 			newObj:    objWithDeviceBindingConditions,
 			expectObj: objWithStatus,
 			verify: func(t *testing.T, as []testclient.Action) {
@@ -1294,7 +1293,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 			deviceStatusFeatureGate: true,
 		},
 		"drop-fields-binding-conditions-disable-feature-gate": {
-			oldObj:    objWithStatus,
+			oldObj:    obj,
 			newObj:    objWithDeviceBindingConditions,
 			expectObj: objWithStatus,
 			verify: func(t *testing.T, as []testclient.Action) {
@@ -1306,7 +1305,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 			deviceStatusFeatureGate: false,
 		},
 		"drop-fields-binding-conditions-disable-binding-conditions-feature-gate": {
-			oldObj:    objWithStatus,
+			oldObj:    obj,
 			newObj:    objWithDeviceBindingConditions,
 			expectObj: objWithStatus,
 			verify: func(t *testing.T, as []testclient.Action) {
