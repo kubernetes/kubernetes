@@ -128,12 +128,12 @@ func TestGracefulControllers(t *testing.T) {
 		// relies on discovery that isn't properly set up in fakes
 		names.NamespaceController,
 		names.GarbageCollectorController,
-		// fsnotify is not graceful
-		names.PersistentVolumeBinderController,
-		names.PersistentVolumeAttachDetachController,
-		names.PersistentVolumeExpanderController,
-		names.PersistentVolumeClaimProtectionController,
-		names.PersistentVolumeProtectionController,
+		// fsnotify is not graceful. Will be fixed in corresponding PR
+		// names.PersistentVolumeBinderController,
+		// names.PersistentVolumeAttachDetachController,
+		// names.PersistentVolumeExpanderController,
+		// names.PersistentVolumeClaimProtectionController,
+		// names.PersistentVolumeProtectionController,
 	)
 
 	for controllerName, controllerDesc := range controllerDescriptorMap {
@@ -143,7 +143,6 @@ func TestGracefulControllers(t *testing.T) {
 				return
 			}
 
-			// Start with a single controller as test
 			if skippedControllers.Has(controllerName) {
 				t.Skipf("Controller %s is not yet marked as graceful", controllerName)
 			}
