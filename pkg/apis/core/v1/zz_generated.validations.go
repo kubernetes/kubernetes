@@ -220,9 +220,6 @@ func Validate_Secret(ctx context.Context, op operation.Operation, fldPath *field
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-				earlyReturn = true
-			}
 			if earlyReturn {
 				return // do not proceed
 			}
