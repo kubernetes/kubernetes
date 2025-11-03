@@ -166,7 +166,9 @@ func (pl *PodTopologySpread) PreScore(
 		}
 
 		for i, c := range state.Constraints {
-			// Ignore parsing errors for backwards compatibility.
+			// Error is a parse error, and we can just regard them as unmatched because that 
+			// is how the tainttoleration plugin handles them. 
+
 			isMatched, _ := c.matchNodeInclusionPolicies(pod, node, requiredNodeAffinity)
 			if pl.enableNodeInclusionPolicyInPodTopologySpread && !isMatched {
 				continue

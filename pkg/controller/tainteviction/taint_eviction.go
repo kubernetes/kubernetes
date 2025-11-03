@@ -462,7 +462,6 @@ func (tc *Controller) processPodOnNode(
 	}
 	allTolerated, usedTolerations, err := v1helper.GetMatchingTolerations(taints, tolerations)
 	if err != nil {
-		logger.V(2).Error(err, "Failed to match tolerations for pod on node", "pod", podNamespacedName.String(), "node", klog.KRef("", nodeName))
 		return err
 	}
 	if !allTolerated {
