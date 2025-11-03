@@ -226,7 +226,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 		unschedulable      bool
 		expectedTaints     []v1.Taint
 		pods               []podCase
-		requireFeatureGate bool
+		enableFeatureGate *[]bool
 	}{
 		{
 			name: "not-ready node",
@@ -572,7 +572,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 					fits:        true,
 				},
 			},
-			requireFeatureGate: true,
+			enableFeatureGate: &[]bool{true},
 		},
 		{
 			name:           "node with numeric error-rate taint - pods with Lt toleration",
@@ -595,7 +595,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 					fits:        true,
 				},
 			},
-			requireFeatureGate: true,
+			enableFeatureGate: &[]bool{true},
 		},
 		{
 			name:           "node with multiple numeric taints - mixed tolerations",
@@ -626,7 +626,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 					fits: true,
 				},
 			},
-			requireFeatureGate: true,
+			enableFeatureGate: &[]bool{true},
 		},
 		{
 			name:           "node with numeric taint - pods with Lt toleration and NoExecute effect",
@@ -654,7 +654,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 					fits:        true,
 				},
 			},
-			requireFeatureGate: true,
+			enableFeatureGate: &[]bool{true},
 		},
 		{
 			name:           "node with numeric taint - pods with mixed NoExecute tolerations",
@@ -678,7 +678,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 					fits:        true,
 				},
 			},
-			requireFeatureGate: true,
+			enableFeatureGate: &[]bool{true},
 		},
 		{
 			name:           "node with numeric taint - pods with PreferNoSchedule effect and Gt toleration",
@@ -706,18 +706,18 @@ func TestTaintNodeByCondition(t *testing.T) {
 					fits:        true,
 				},
 			},
-			requireFeatureGate: true,
+			enableFeatureGate: &[]bool{true},
 		},
 	}
 
-	for _, featureGateEnabled := range []bool{true, false} {
-		for _, test := range tests {
-			t.Run(fmt.Sprintf("%s (TaintToleration Comparison Operators enabled: %v)", test.name, featureGateEnabled), func(t *testing.T) {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TaintTolerationComparisonOperators, featureGateEnabled)
-
-				if test.requireFeatureGate && !featureGateEnabled {
-					return
-				}
+	for _, test := range tests {
+		featureGateEnabled := []bool{true, false}
+		if test.enableFeatureGate != nil {
+			featureGateEnabled = *test.enableFeatureGate
+		}
+		for _, enabled := range featureGateEnabled {
+			t.Run(fmt.Sprintf("%s (TaintToleration Comparison Operators enabled: %v)", test.name, enabled), func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TaintTolerationComparisonOperators, enabled)
 				node := &v1.Node{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "node-1",
