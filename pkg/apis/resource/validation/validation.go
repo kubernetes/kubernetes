@@ -1155,23 +1155,9 @@ const (
 	keysCovered
 )
 
-// validateSlice ensures that a slice does not exceed a certain maximum size
-// and that all entries are valid.
-// A negative maxSize disables the length check.
-func validateSlice[T any](slice []T, maxSize int, validateItem func(T, *field.Path) field.ErrorList, fldPath *field.Path, opts ...validationOption) field.ErrorList {
+// validateItems validates each item in a slice.
+func validateItems[T any](slice []T, validateItem func(T, *field.Path) field.ErrorList, fldPath *field.Path, opts ...validationOption) field.ErrorList {
 	var allErrs field.ErrorList
-	if maxSize >= 0 && len(slice) > maxSize {
-		// Dumping the entire field into the error message is likely to be too long,
-		// in particular when it is already beyond the maximum size. Instead this
-		// just shows the number of entries.
-		err := field.TooMany(fldPath, len(slice), maxSize).WithOrigin("maxItems")
-		if slices.Contains(opts, sizeCovered) {
-			err = err.MarkCoveredByDeclarative()
-		}
-		allErrs = append(allErrs, err)
-		// maxSize check short-circuits for DOS protection
-		return allErrs
-	}
 	for i, item := range slice {
 		idxPath := fldPath.Index(i)
 		errs := validateItem(item, idxPath)
@@ -1183,14 +1169,40 @@ func validateSlice[T any](slice []T, maxSize int, validateItem func(T, *field.Pa
 	return allErrs
 }
 
+// validateSlice ensures that a slice does not exceed a certain maximum size
+// and that all entries are valid.
+// A negative maxSize disables the length check.
+func validateSlice[T any](slice []T, maxSize int, validateItem func(T, *field.Path) field.ErrorList, fldPath *field.Path, opts ...validationOption) field.ErrorList {
+	if maxSize >= 0 && len(slice) > maxSize {
+		// Dumping the entire field into the error message is likely to be too long,
+		// in particular when it is already beyond the maximum size. Instead this
+		// just shows the number of entries.
+		err := field.TooMany(fldPath, len(slice), maxSize).WithOrigin("maxItems")
+		if slices.Contains(opts, sizeCovered) {
+			err = err.MarkCoveredByDeclarative()
+		}
+		// maxSize check short-circuits for DOS protection
+		return field.ErrorList{err}
+	}
+	return validateItems(slice, validateItem, fldPath, opts...)
+}
+
 // validateSet ensures that a slice contains no duplicates, does not
 // exceed a certain maximum size and that all entries are valid.
 func validateSet[T any, K comparable](slice []T, maxSize int, validateItem func(item T, fldPath *field.Path) field.ErrorList, itemKey func(T) K, fldPath *field.Path, opts ...validationOption) field.ErrorList {
-	allErrs := validateSlice(slice, maxSize, validateItem, fldPath, opts...)
 	if maxSize >= 0 && len(slice) > maxSize {
+		// Dumping the entire field into the error message is likely to be too long,
+		// in particular when it is already beyond the maximum size. Instead this
+		// just shows the number of entries.
+		err := field.TooMany(fldPath, len(slice), maxSize).WithOrigin("maxItems")
+		if slices.Contains(opts, sizeCovered) {
+			err = err.MarkCoveredByDeclarative()
+		}
 		// maxSize check short-circuits for DOS protection
-		return allErrs
+		return field.ErrorList{err}
 	}
+
+	allErrs := validateItems(slice, validateItem, fldPath, opts...)
 
 	allItems := sets.New[K]()
 	for i, item := range slice {
