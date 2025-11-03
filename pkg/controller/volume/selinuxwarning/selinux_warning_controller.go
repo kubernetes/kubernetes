@@ -344,6 +344,7 @@ func (c *Controller) enqueueAllPodsForCSIDriver(csiDriverName string) {
 func (c *Controller) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
+	defer c.vpm.Shutdown()
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting SELinux warning controller")
 	defer logger.Info("Shutting down SELinux warning controller")

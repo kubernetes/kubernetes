@@ -326,6 +326,7 @@ type attachDetachController struct {
 func (adc *attachDetachController) Run(ctx context.Context) {
 	defer runtime.HandleCrash()
 	defer adc.pvcQueue.ShutDown()
+	defer adc.volumePluginMgr.Shutdown()
 
 	// Start events processing pipeline.
 	adc.broadcaster.StartStructuredLogging(3)
