@@ -52,18 +52,18 @@ func testDeclarativeValidateForDeclarative(t *testing.T, apiVersion string) {
 	}{
 		"valid opaque secret": {
 			input: makeValidSecret(
-				withName(testSecretName),
-				withNamespace(testNamespace),
-				withType(api.SecretTypeOpaque),
-				withData(map[string][]byte{"key": []byte("value")}),
+				tweakName(testSecretName),
+				tweakNamespace(testNamespace),
+				tweakType(api.SecretTypeOpaque),
+				tweakData(map[string][]byte{"key": []byte("value")}),
 			),
 		},
 		"valid tls secret": {
 			input: makeValidSecret(
-				withName("test-tls"),
-				withNamespace(testNamespace),
-				withType(api.SecretTypeTLS),
-				withData(map[string][]byte{
+				tweakName("test-tls"),
+				tweakNamespace(testNamespace),
+				tweakType(api.SecretTypeTLS),
+				tweakData(map[string][]byte{
 					api.TLSCertKey:       []byte("-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----"),
 					api.TLSPrivateKeyKey: []byte("-----BEGIN RSA PRIVATE KEY-----\ntest\n-----END RSA PRIVATE KEY-----"),
 				}),
@@ -71,11 +71,11 @@ func testDeclarativeValidateForDeclarative(t *testing.T, apiVersion string) {
 		},
 		"valid immutable secret": {
 			input: makeValidSecret(
-				withName("test-immutable"),
-				withNamespace(testNamespace),
-				withType(api.SecretTypeOpaque),
-				withImmutable(true),
-				withData(map[string][]byte{"key": []byte("value")}),
+				tweakName("test-immutable"),
+				tweakNamespace(testNamespace),
+				tweakType(api.SecretTypeOpaque),
+				tweakImmutable(true),
+				tweakData(map[string][]byte{"key": []byte("value")}),
 			),
 		},
 	}
@@ -107,59 +107,59 @@ func testValidateUpdateForDeclarative(t *testing.T, apiVersion string) {
 	}{
 		"valid update of secret data": {
 			old: makeValidSecret(
-				withName(testSecretName),
-				withNamespace(testNamespace),
-				withType(api.SecretTypeOpaque),
-				withData(map[string][]byte{"key": []byte("old-value")}),
+				tweakName(testSecretName),
+				tweakNamespace(testNamespace),
+				tweakType(api.SecretTypeOpaque),
+				tweakData(map[string][]byte{"key": []byte("old-value")}),
 			),
 			update: makeValidSecret(
-				withName(testSecretName),
-				withNamespace(testNamespace),
-				withType(api.SecretTypeOpaque),
-				withData(map[string][]byte{"key": []byte("new-value")}),
+				tweakName(testSecretName),
+				tweakNamespace(testNamespace),
+				tweakType(api.SecretTypeOpaque),
+				tweakData(map[string][]byte{"key": []byte("new-value")}),
 			),
 		},
 		"valid update to make secret immutable": {
 			old: makeValidSecret(
-				withName(testSecretName),
-				withNamespace(testNamespace),
-				withType(api.SecretTypeOpaque),
-				withData(map[string][]byte{"key": []byte("value")}),
+				tweakName(testSecretName),
+				tweakNamespace(testNamespace),
+				tweakType(api.SecretTypeOpaque),
+				tweakData(map[string][]byte{"key": []byte("value")}),
 			),
 			update: makeValidSecret(
-				withName(testSecretName),
-				withNamespace(testNamespace),
-				withType(api.SecretTypeOpaque),
-				withImmutable(true),
-				withData(map[string][]byte{"key": []byte("value")}),
+				tweakName(testSecretName),
+				tweakNamespace(testNamespace),
+				tweakType(api.SecretTypeOpaque),
+				tweakImmutable(true),
+				tweakData(map[string][]byte{"key": []byte("value")}),
 			),
 		},
 		"valid update of labels": {
 			old: makeValidSecret(
-				withName(testSecretName),
-				withNamespace(testNamespace),
-				withType(api.SecretTypeOpaque),
-				withLabels(map[string]string{"app": "v1"}),
+				tweakName(testSecretName),
+				tweakNamespace(testNamespace),
+				tweakType(api.SecretTypeOpaque),
+				tweakLabels(map[string]string{"app": "v1"}),
 			),
 			update: makeValidSecret(
-				withName(testSecretName),
-				withNamespace(testNamespace),
-				withType(api.SecretTypeOpaque),
-				withLabels(map[string]string{"app": "v2"}),
+				tweakName(testSecretName),
+				tweakNamespace(testNamespace),
+				tweakType(api.SecretTypeOpaque),
+				tweakLabels(map[string]string{"app": "v2"}),
 			),
 		},
 		"invalid update - type changed": {
 			old: makeValidSecret(
-				withName(testSecretName),
-				withNamespace(testNamespace),
-				withType(api.SecretTypeOpaque),
-				withData(map[string][]byte{"key": []byte("value")}),
+				tweakName(testSecretName),
+				tweakNamespace(testNamespace),
+				tweakType(api.SecretTypeOpaque),
+				tweakData(map[string][]byte{"key": []byte("value")}),
 			),
 			update: makeValidSecret(
-				withName(testSecretName),
-				withNamespace(testNamespace),
-				withType(api.SecretTypeTLS),
-				withData(map[string][]byte{
+				tweakName(testSecretName),
+				tweakNamespace(testNamespace),
+				tweakType(api.SecretTypeTLS),
+				tweakData(map[string][]byte{
 					api.TLSCertKey:       []byte("-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----"),
 					api.TLSPrivateKeyKey: []byte("-----BEGIN RSA PRIVATE KEY-----\ntest\n-----END RSA PRIVATE KEY-----"),
 				}),
@@ -179,8 +179,6 @@ func testValidateUpdateForDeclarative(t *testing.T, apiVersion string) {
 	}
 }
 
-// Helper functions to build secrets
-
 func makeValidSecret(mutators ...func(*api.Secret)) api.Secret {
 	secret := api.Secret{
 		ObjectMeta: metav1.ObjectMeta{},
@@ -192,37 +190,37 @@ func makeValidSecret(mutators ...func(*api.Secret)) api.Secret {
 	return secret
 }
 
-func withName(name string) func(*api.Secret) {
+func tweakName(name string) func(*api.Secret) {
 	return func(s *api.Secret) {
 		s.ObjectMeta.Name = name
 	}
 }
 
-func withNamespace(namespace string) func(*api.Secret) {
+func tweakNamespace(namespace string) func(*api.Secret) {
 	return func(s *api.Secret) {
 		s.ObjectMeta.Namespace = namespace
 	}
 }
 
-func withType(secretType api.SecretType) func(*api.Secret) {
+func tweakType(secretType api.SecretType) func(*api.Secret) {
 	return func(s *api.Secret) {
 		s.Type = secretType
 	}
 }
 
-func withData(data map[string][]byte) func(*api.Secret) {
+func tweakData(data map[string][]byte) func(*api.Secret) {
 	return func(s *api.Secret) {
 		s.Data = data
 	}
 }
 
-func withImmutable(immutable bool) func(*api.Secret) {
+func tweakImmutable(immutable bool) func(*api.Secret) {
 	return func(s *api.Secret) {
 		s.Immutable = &immutable
 	}
 }
 
-func withLabels(labels map[string]string) func(*api.Secret) {
+func tweakLabels(labels map[string]string) func(*api.Secret) {
 	return func(s *api.Secret) {
 		s.ObjectMeta.Labels = labels
 	}
