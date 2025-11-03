@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
+	"k8s.io/utils/ptr"
 )
 
 var _ fwk.PreFilterPlugin = &Fit{}
@@ -321,7 +322,7 @@ func (f *Fit) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, e
 	}
 	if f.enableDRAExtendedResource {
 		events = append(events,
-			// A pod might be waiting for an exteneded resurce fom a class to get created or modified.
+			// A pod might be waiting for an exteneded resurce from a class to get created or modified.
 			fwk.ClusterEventWithHint{Event: fwk.ClusterEvent{Resource: fwk.DeviceClass, ActionType: fwk.Add | fwk.Update}, QueueingHintFn: f.isSchedulableAfterDeviceClassEvent})
 	}
 	return events, nil
@@ -432,6 +433,7 @@ func (f *Fit) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1.Pod, oldO
 		EnablePodLevelResources:   f.enablePodLevelResources,
 		EnableDRAExtendedResource: f.enableDRAExtendedResource,
 	}
+
 	// Leaving in the queue, since the pod won't fit into the modified node anyway.
 	if !isFit(pod, modifiedNode, draManager, opts) {
 		logger.V(5).Info("node was created or updated, but it doesn't have enough resource(s) to accommodate this pod", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
@@ -459,29 +461,30 @@ func (f *Fit) isSchedulableAfterDeviceClassEvent(logger klog.Logger, pod *v1.Pod
 	if err != nil {
 		return fwk.Queue, err
 	}
-	if originalClass != nil && modifiedClass != nil && originalClass.Spec.ExtendedResourceName == modifiedClass.Spec.ExtendedResourceName {
+	if originalClass != nil && originalClass.Spec.ExtendedResourceName == modifiedClass.Spec.ExtendedResourceName {
+		logger.V(5).Info("device class has identical extended resource name pointer", "pod", klog.KObj(pod), "deviceclass", klog.KObj(modifiedClass))
 		return fwk.QueueSkip, nil
 	}
-	if originalClass != nil && modifiedClass != nil && originalClass.Spec.ExtendedResourceName != nil && modifiedClass.Spec.ExtendedResourceName != nil && *originalClass.Spec.ExtendedResourceName == *modifiedClass.Spec.ExtendedResourceName {
+	if originalClass != nil && ptr.Deref(originalClass.Spec.ExtendedResourceName, "") == ptr.Deref(modifiedClass.Spec.ExtendedResourceName, "") {
+		logger.V(5).Info("device class has identical extended resource name string", "pod", klog.KObj(pod), "deviceclass", klog.KObj(modifiedClass))
 		return fwk.QueueSkip, nil
 	}
-	if modifiedClass != nil {
-		if originalClass == nil {
-			// only check implicit extended resource name for Add, as device class name does not change during Update.
-			reqs := resource.PodRequests(pod, resource.PodResourcesOptions{})
-			if _, ok := reqs[v1.ResourceName(resourceapi.ResourceDeviceClassPrefix+modifiedClass.Name)]; ok {
-				logger.V(5).Info("device class was added, and may now fit the pod's resource requests", "pod", klog.KObj(pod), "deviceclass", klog.KObj(modifiedClass))
-				return fwk.Queue, nil
-			}
-		}
-		if modifiedClass.Spec.ExtendedResourceName != nil {
-			reqs := resource.PodRequests(pod, resource.PodResourcesOptions{})
-			if _, ok := reqs[v1.ResourceName(*modifiedClass.Spec.ExtendedResourceName)]; ok {
-				logger.V(5).Info("deivce class was created or updated, and may fit the pod's resoruce requests", "pod", klog.KObj(pod), "deviceclass", klog.KObj(modifiedClass))
-				return fwk.Queue, nil
-			}
+	if originalClass == nil {
+		// only check implicit extended resource name for Add, as device class name does not change during Update.
+		reqs := resource.PodRequests(pod, resource.PodResourcesOptions{})
+		if _, ok := reqs[v1.ResourceName(resourceapi.ResourceDeviceClassPrefix+modifiedClass.Name)]; ok {
+			logger.V(5).Info("device class was added, and may now fit the pod's resource requests", "pod", klog.KObj(pod), "deviceclass", klog.KObj(modifiedClass))
+			return fwk.Queue, nil
 		}
 	}
+	if modifiedClass.Spec.ExtendedResourceName != nil {
+		reqs := resource.PodRequests(pod, resource.PodResourcesOptions{})
+		if _, ok := reqs[v1.ResourceName(*modifiedClass.Spec.ExtendedResourceName)]; ok {
+			logger.V(5).Info("deivce class was created or updated, and may fit the pod's resoruce requests", "pod", klog.KObj(pod), "deviceclass", klog.KObj(modifiedClass))
+			return fwk.Queue, nil
+		}
+	}
+	logger.V(5).Info("updated deivce class extended resource name is either nil, or does not match pod's resource request", "pod", klog.KObj(pod), "deviceclass", klog.KObj(modifiedClass))
 	return fwk.QueueSkip, nil
 }
 
