@@ -2436,6 +2436,62 @@
     its new label found. Deleting the Node MUST succeed and its deletion MUST be confirmed.
   release: v1.32
   file: test/e2e/node/node_lifecycle.go
+- testname: In-place Pod Resize, burtable pod with multiple containers and various
+    operations
+  codename: '[sig-node] Pod InPlace Resize Container burstable pods - extended 6 containers
+    - various operations performed (including adding limits and requests) [Conformance]'
+  description: Issuing a Pod Resize request via the Pod Resize subresource patch endpoint
+    to modify CPU and memory requests and limits on a 6-container pod with various
+    operations MUST result in the Pod resources being updated as expected.
+  release: v1.35
+  file: test/e2e/common/node/pod_resize.go
+- testname: In-place Pod Resize, burstable pod resized with equivalents
+  codename: '[sig-node] Pod InPlace Resize Container burstable pods - extended resize
+    with equivalents [Conformance]'
+  description: Issuing an in-place Pod Resize request via the Pod Resize subresource
+    patch endpoint to modify CPU requests and limits using equivalent values (e.g.
+    2m -> 1m) MUST result in the updated Pod resources displayed correctly in the
+    status.
+  release: v1.35
+  file: test/e2e/common/node/pod_resize.go
+- testname: In-place Pod Resize, guaranteed pods with multiple containers, net increase
+  codename: '[sig-node] Pod InPlace Resize Container guaranteed pods with multiple
+    containers 3 containers - increase cpu & mem on c1, c2, decrease cpu & mem on
+    c3 - net increase [Conformance]'
+  description: Issuing an in-place Pod Resize request via the Pod Resize subresource
+    patch endpoint to modify CPU and memory requests and limits for a guaranteed pod
+    with 3 containers with a net increase MUST result in the Pod resources being updated
+    as expected.
+  release: v1.35
+  file: test/e2e/common/node/pod_resize.go
+- testname: In-place Pod Resize, guaranteed pods with multiple containers, net decrease
+  codename: '[sig-node] Pod InPlace Resize Container guaranteed pods with multiple
+    containers 3 containers - increase cpu & mem on c1, decrease cpu & mem on c2,
+    c3 - net decrease [Conformance]'
+  description: Issuing an in-place Pod Resize request via the Pod Resize subresource
+    patch endpoint to modify CPU and memory requests and limits for a pod with 3 containers
+    with a net decrease MUST result in the Pod resources being updated as expected.
+  release: v1.35
+  file: test/e2e/common/node/pod_resize.go
+- testname: In-place Pod Resize, guaranteed pods with multiple containers, various
+    operations
+  codename: '[sig-node] Pod InPlace Resize Container guaranteed pods with multiple
+    containers 3 containers - increase: CPU (c1,c3), memory (c2, c3) ; decrease: CPU
+    (c2) [Conformance]'
+  description: Issuing an in-place Pod Resize request via the Pod Resize subresource
+    patch endpoint to modify CPU and memory requests and limits for a pod with 3 containers
+    with various operations MUST result in the Pod resources being updated as expected.
+  release: v1.35
+  file: test/e2e/common/node/pod_resize.go
+- testname: In-place Pod Resize, read and replace endpoints
+  codename: '[sig-node] Pod InPlace Resize Container resize pod via the replace endpoint
+    [Conformance]'
+  description: Issuing a Pod Resize request via the Pod Resize subresource replace
+    endpoint MUST result in the Pod resources being updated as expected. The Pod object
+    fetched from the Pod Resize subresource MUST be equivalent to the Pod object fetched
+    from the main Pod endpoint after the resize is completed.
+  release: v1.35
+  file: test/e2e/common/node/pod_resize.go
 - testname: PodTemplate, delete a collection
   codename: '[sig-node] PodTemplates should delete a collection of pod templates [Conformance]'
   description: A set of Pod Templates is created with a label selector which MUST
