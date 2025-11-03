@@ -51,9 +51,9 @@ const (
 	flagCAFile               = "certificate-authority"
 	flagBearerToken          = "token"
 	flagImpersonate          = "as"
-	flagImpersonateUserExtra = "as-user-extra"
 	flagImpersonateUID       = "as-uid"
 	flagImpersonateGroup     = "as-group"
+	flagImpersonateUserExtra = "as-user-extra"
 	flagUsername             = "username"
 	flagPassword             = "password"
 	flagTimeout              = "request-timeout"
@@ -96,9 +96,9 @@ type ConfigFlags struct {
 	CAFile               *string
 	BearerToken          *string
 	Impersonate          *string
-	ImpersonateUserExtra *map[string]string
 	ImpersonateUID       *string
 	ImpersonateGroup     *[]string
+	ImpersonateUserExtra *[]string
 	Username             *string
 	Password             *string
 	Timeout              *string
@@ -185,10 +185,16 @@ func (f *ConfigFlags) toRawKubeConfigLoader() clientcmd.ClientConfig {
 	if f.Impersonate != nil {
 		overrides.AuthInfo.Impersonate = *f.Impersonate
 	}
-	if f.ImpersonateUserExtra != nil {
+	if f.ImpersonateUserExtra != nil && len(*f.ImpersonateUserExtra) > 0 {
 		userExtras := make(map[string][]string)
-		for key, val := range *f.ImpersonateUserExtra {
-			userExtras[key] = strings.Split(val, ",")
+		for _, extra := range *f.ImpersonateUserExtra {
+			parts := strings.SplitN(extra, "=", 2)
+			if len(parts) != 2 {
+				continue
+			}
+			key := parts[0]
+			value := parts[1]
+			userExtras[key] = append(userExtras[key], value)
 		}
 		overrides.AuthInfo.ImpersonateUserExtra = userExtras
 	}
@@ -379,14 +385,14 @@ func (f *ConfigFlags) AddFlags(flags *pflag.FlagSet) {
 	if f.Impersonate != nil {
 		flags.StringVar(f.Impersonate, flagImpersonate, *f.Impersonate, "Username to impersonate for the operation. User could be a regular user or a service account in a namespace.")
 	}
-	if f.ImpersonateUserExtra != nil {
-		flags.StringToStringVar(f.ImpersonateUserExtra, flagImpersonateUserExtra, *f.ImpersonateUserExtra, "User extras to impersonate for the operation. This is --as-user-extra key1='val1,val2' format.")
-	}
 	if f.ImpersonateUID != nil {
 		flags.StringVar(f.ImpersonateUID, flagImpersonateUID, *f.ImpersonateUID, "UID to impersonate for the operation.")
 	}
 	if f.ImpersonateGroup != nil {
 		flags.StringArrayVar(f.ImpersonateGroup, flagImpersonateGroup, *f.ImpersonateGroup, "Group to impersonate for the operation, this flag can be repeated to specify multiple groups.")
+	}
+	if f.ImpersonateUserExtra != nil {
+		flags.StringArrayVar(f.ImpersonateUserExtra, flagImpersonateUserExtra, *f.ImpersonateUserExtra, "User extras to impersonate for the operation, this flag can be repeated to specify multiple values for the same key.")
 	}
 	if f.Username != nil {
 		flags.StringVar(f.Username, flagUsername, *f.Username, "Username for basic authentication to the API server")
@@ -461,7 +467,7 @@ func (f *ConfigFlags) WithWarningPrinter(ioStreams genericiooptions.IOStreams) *
 // NewConfigFlags returns ConfigFlags with default values set
 func NewConfigFlags(usePersistentConfig bool) *ConfigFlags {
 	impersonateGroup := []string{}
-	impersonateUserExtra := make(map[string]string)
+	impersonateUserExtra := []string{}
 	insecure := false
 	disableCompression := false
 
@@ -482,9 +488,9 @@ func NewConfigFlags(usePersistentConfig bool) *ConfigFlags {
 		CAFile:               ptr.To(""),
 		BearerToken:          ptr.To(""),
 		Impersonate:          ptr.To(""),
-		ImpersonateUserExtra: &impersonateUserExtra,
 		ImpersonateUID:       ptr.To(""),
 		ImpersonateGroup:     &impersonateGroup,
+		ImpersonateUserExtra: &impersonateUserExtra,
 		DisableCompression:   &disableCompression,
 
 		usePersistentConfig: usePersistentConfig,
