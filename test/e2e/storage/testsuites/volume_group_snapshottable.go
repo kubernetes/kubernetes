@@ -185,17 +185,18 @@ func (s *VolumeGroupSnapshottableTestSuite) DefineTests(driver storageframework.
 				volumeListMap := snapshot.VGSContent.Object["status"].(map[string]interface{})
 				err = framework.Gomega().Expect(volumeListMap).NotTo(gomega.BeNil())
 				framework.ExpectNoError(err, "failed to get volume snapshot list")
-				volumeSnapshotHandlePairList := volumeListMap["volumeSnapshotHandlePairList"].([]interface{})
-				err = framework.Gomega().Expect(volumeSnapshotHandlePairList).NotTo(gomega.BeNil())
+				volumeSnapshotInfoList := volumeListMap["volumeSnapshotInfoList"].([]interface{})
+				err = framework.Gomega().Expect(volumeSnapshotInfoList).NotTo(gomega.BeNil())
 				framework.ExpectNoError(err, "failed to get volume snapshot list")
-				err = framework.Gomega().Expect(len(volumeSnapshotHandlePairList)).To(gomega.Equal(groupTest.numVolumes))
+				err = framework.Gomega().Expect(len(volumeSnapshotInfoList)).To(gomega.Equal(groupTest.numVolumes))
 				framework.ExpectNoError(err, "failed to get volume snapshot list")
 				claimSize := groupTest.volumeGroup[0][0].Pvc.Spec.Resources.Requests.Storage().String()
-				for _, volume := range volumeSnapshotHandlePairList {
+				for _, info := range volumeSnapshotInfoList {
 					// Create a PVC from the snapshot
-					volumeHandle := volume.(map[string]interface{})["volumeHandle"].(string)
+					volumeHandle := info.(map[string]interface{})["volumeHandle"].(string)
 					err = framework.Gomega().Expect(volumeHandle).NotTo(gomega.BeNil())
 					framework.ExpectNoError(err, "failed to get volume handle from volume")
+
 					uid := snapshot.VGS.Object["metadata"].(map[string]interface{})["uid"].(string)
 					err = framework.Gomega().Expect(uid).NotTo(gomega.BeNil())
 					framework.ExpectNoError(err, "failed to get uuid from content")

@@ -266,7 +266,7 @@ run_tests() {
   export KUBE_CONTAINER_RUNTIME=remote
   export KUBE_CONTAINER_RUNTIME_ENDPOINT=unix:///run/containerd/containerd.sock
   export KUBE_CONTAINER_RUNTIME_NAME=containerd
-  export SNAPSHOTTER_VERSION="${SNAPSHOTTER_VERSION:-v8.3.0}"
+  export SNAPSHOTTER_VERSION="${SNAPSHOTTER_VERSION:-v8.4.0}"
   echo "SNAPSHOTTER_VERSION is $SNAPSHOTTER_VERSION"
   # ginkgo can take forever to exit, so we run it in the background and save the
   # PID, bash will not run traps while waiting on a process, but it will while
