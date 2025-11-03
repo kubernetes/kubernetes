@@ -20,6 +20,7 @@ import (
 	"context"
 	"regexp"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -29,10 +30,15 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/server/healthz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes/fake"
 	cpnames "k8s.io/cloud-provider/names"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+
+	"go.uber.org/goleak"
 	"k8s.io/klog/v2/ktesting"
+	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/features"
 )
@@ -113,6 +119,74 @@ func TestControllerNamesDeclaration(t *testing.T) {
 
 func TestNewControllerDescriptorsShouldNotPanic(t *testing.T) {
 	NewControllerDescriptors()
+}
+
+func TestGracefulControllers(t *testing.T) {
+	controllerDescriptorMap := NewControllerDescriptors()
+
+	skippedControllers := sets.New(
+		// relies on discovery that isn't properly set up in fakes
+		names.NamespaceController,
+		names.GarbageCollectorController,
+		// fsnotify is not graceful
+		names.PersistentVolumeBinderController,
+		names.PersistentVolumeAttachDetachController,
+		names.PersistentVolumeExpanderController,
+		names.PersistentVolumeClaimProtectionController,
+		names.PersistentVolumeProtectionController,
+	)
+
+	for controllerName, controllerDesc := range controllerDescriptorMap {
+		t.Run(controllerName, func(t *testing.T) {
+			if controllerDesc.IsCloudProviderController() || controllerDesc.IsDisabledByDefault() {
+				t.Skipf("Skipping cloud provider and disabled controller, skipping %s", controllerName)
+				return
+			}
+
+			// Start with a single controller as test
+			if skippedControllers.Has(controllerName) {
+				t.Skipf("Controller %s is not yet marked as graceful", controllerName)
+			}
+
+			var wg sync.WaitGroup
+			defer wg.Wait()
+
+			defer goleak.VerifyNone(t)
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			testClientset := fake.NewClientset()
+			testClientBuilder := TestClientBuilder{clientset: testClientset}
+			testInformerFactory := informers.NewSharedInformerFactoryWithOptions(testClientset, 3*time.Minute)
+			config, err := options.NewDefaultComponentConfig()
+			if err != nil {
+				t.Fatal(err)
+			}
+			controllerContext := ControllerContext{
+				ClientBuilder:                   testClientBuilder,
+				ComponentConfig:                 config,
+				InformerFactory:                 testInformerFactory,
+				ObjectOrMetadataInformerFactory: testInformerFactory,
+				InformersStarted:                make(chan struct{}),
+			}
+
+			c, err := controllerDesc.GetControllerConstructor()(ctx, controllerContext, controllerName)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if c == nil {
+				// Tests that rely on specific feature gates or specific configurations will be skipped.
+				t.Skipf("Controller is nil %s", controllerName)
+			}
+			testInformerFactory.Start(ctx.Done())
+			close(controllerContext.InformersStarted)
+			wg.Go(func() {
+				c.Run(ctx)
+			})
+			// Allow some time for goroutines to start
+			time.Sleep(2 * time.Second)
+		})
+	}
 }
 
 func TestNewControllerDescriptorsAlwaysReturnsDescriptorsForAllControllers(t *testing.T) {
