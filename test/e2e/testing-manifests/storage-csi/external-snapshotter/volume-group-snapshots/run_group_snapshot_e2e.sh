@@ -272,7 +272,10 @@ run_tests() {
   # PID, bash will not run traps while waiting on a process, but it will while
   # running a builtin like `wait`, saving the PID also allows us to forward the
   # interrupt
-  
+
+  # Enable VolumeGroupSnapshot tests in csi-driver-hostpath
+  export CSI_PROW_ENABLE_GROUP_SNAPSHOT=true
+
   kubectl apply -f ./cluster/addons/volumesnapshots/crd/snapshot.storage.k8s.io_volumesnapshotclasses.yaml || exit 1
   kubectl apply -f ./cluster/addons/volumesnapshots/crd/snapshot.storage.k8s.io_volumesnapshotcontents.yaml || exit 1
   kubectl apply -f ./cluster/addons/volumesnapshots/crd/snapshot.storage.k8s.io_volumesnapshots.yaml || exit 1
