@@ -230,3 +230,5 @@ func (prober *fakeProber) Probe() (events []ProbeEvent, err error) {
 	}
 	return []ProbeEvent{}, nil
 }
+
+func (f *fakeProber) Shutdown() {}
