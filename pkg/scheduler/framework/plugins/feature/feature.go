@@ -38,6 +38,7 @@ type Features struct {
 	EnableVolumeAttributesClass                  bool
 	EnableCSIMigrationPortworx                   bool
 	EnableNodeInclusionPolicyInPodTopologySpread bool
+	EnableNominatedNodeNameForExpectation        bool
 	EnableMatchLabelKeysInPodTopologySpread      bool
 	EnableInPlacePodVerticalScaling              bool
 	EnableSidecarContainers                      bool
@@ -62,6 +63,7 @@ func NewSchedulerFeaturesFromGates(featureGate featuregate.FeatureGate) Features
 		EnableVolumeAttributesClass:                  featureGate.Enabled(features.VolumeAttributesClass),
 		EnableCSIMigrationPortworx:                   featureGate.Enabled(features.CSIMigrationPortworx),
 		EnableNodeInclusionPolicyInPodTopologySpread: featureGate.Enabled(features.NodeInclusionPolicyInPodTopologySpread),
+		EnableNominatedNodeNameForExpectation:        featureGate.Enabled(features.NominatedNodeNameForExpectation),
 		EnableMatchLabelKeysInPodTopologySpread:      featureGate.Enabled(features.MatchLabelKeysInPodTopologySpread),
 		EnableInPlacePodVerticalScaling:              featureGate.Enabled(features.InPlacePodVerticalScaling),
 		EnableSidecarContainers:                      featureGate.Enabled(features.SidecarContainers),
