@@ -159,9 +159,6 @@ type JobSpecApplyConfiguration struct {
 	// by RFC 1123. All characters trailing the first "/" must be valid HTTP Path
 	// characters as defined by RFC 3986. The value cannot exceed 63 characters.
 	// This field is immutable.
-	//
-	// This field is beta-level. The job controller accepts setting the field
-	// when the feature gate JobManagedBy is enabled (enabled by default).
 	ManagedBy *string `json:"managedBy,omitempty"`
 }
 
