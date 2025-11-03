@@ -67,10 +67,6 @@ const (
 	// beta: v1.30
 	//
 	// Allow the client to get a stream of individual items instead of chunking from the server.
-	//
-	// NOTE:
-	//  The feature is disabled in Beta by default because
-	//  it will only be turned on for selected control plane component(s).
 	WatchListClient Feature = "WatchListClient"
 )
 
@@ -95,5 +91,6 @@ var defaultVersionedKubernetesFeatureGates = map[Feature]VersionedSpecs{
 	},
 	WatchListClient: {
 		{Version: version.MustParse("1.30"), Default: false, PreRelease: Beta},
+		{Version: version.MustParse("1.35"), Default: true, PreRelease: Beta},
 	},
 }
