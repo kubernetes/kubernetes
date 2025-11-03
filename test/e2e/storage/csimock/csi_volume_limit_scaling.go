@@ -1,3 +1,19 @@
+/*
+Copyright 2025 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package csimock
 
 import (
@@ -23,28 +39,27 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
-// Tests for VolumeLimitScaling scheduling behavior with PreventPodSchedulingIfMissing
 var _ = utils.SIGDescribe("CSI Mock VolumeLimitScaling scheduling", func() {
 	f := framework.NewDefaultFramework("csi-mock-volumes-limit-sched")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
-	f.Context("VolumeLimitScaling scheduling gate", feature.Volumes, func() {
+	f.Context("VolumeLimitScaling scheduling", feature.Volumes, func() {
 		tests := []struct {
 			name              string
-			preventOptIn      *bool
 			featureTags       []interface{}
+			csiDriverPresent  bool
 			expectSchedulable bool
 		}{
 			{
-				name:              "prevent=true blocks scheduling when driver not installed",
-				preventOptIn:      ptr.To(true),
+				name:              "blocks scheduling when driver not installed and CSIDriver is present",
 				featureTags:       []interface{}{framework.WithFeatureGate(features.VolumeLimitScaling)},
+				csiDriverPresent:  true,
 				expectSchedulable: false,
 			},
 			{
-				name:              "prevent=false allows scheduling when driver not installed",
-				preventOptIn:      ptr.To(false),
+				name:              "allows scheduling when driver not installed and CSIDriver object is not present",
 				featureTags:       []interface{}{framework.WithFeatureGate(features.VolumeLimitScaling)},
+				csiDriverPresent:  false,
 				expectSchedulable: true,
 			},
 		}
@@ -57,13 +72,16 @@ var _ = utils.SIGDescribe("CSI Mock VolumeLimitScaling scheduling", func() {
 				fakeDriver := fmt.Sprintf("csi-mock-uninstalled-%s", f.Namespace.Name)
 				csiDriver := &storagev1.CSIDriver{
 					ObjectMeta: metav1.ObjectMeta{Name: fakeDriver},
-					Spec:       storagev1.CSIDriverSpec{PreventPodSchedulingIfMissing: tc.preventOptIn},
+					Spec:       storagev1.CSIDriverSpec{},
 				}
-				_, err := f.ClientSet.StorageV1().CSIDrivers().Create(ctx, csiDriver, metav1.CreateOptions{})
-				framework.ExpectNoError(err, "creating CSIDriver %s", fakeDriver)
-				ginkgo.DeferCleanup(func() {
-					_ = f.ClientSet.StorageV1().CSIDrivers().Delete(context.TODO(), fakeDriver, metav1.DeleteOptions{})
-				})
+
+				if tc.csiDriverPresent {
+					_, err := f.ClientSet.StorageV1().CSIDrivers().Create(ctx, csiDriver, metav1.CreateOptions{})
+					framework.ExpectNoError(err, "creating CSIDriver %s", fakeDriver)
+					ginkgo.DeferCleanup(func() {
+						_ = f.ClientSet.StorageV1().CSIDrivers().Delete(context.TODO(), fakeDriver, metav1.DeleteOptions{})
+					})
+				}
 
 				// Create a StorageClass that uses the fake driver with WaitForFirstConsumer
 				scTest := testsuites.StorageClassTest{

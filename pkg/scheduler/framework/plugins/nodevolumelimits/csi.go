@@ -285,7 +285,11 @@ func (pl *CSILimits) Filter(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, 
 
 	if pl.enableVolumeLimitScaling {
 		for _, driverName := range newVolumes {
-			if !pl.checkCSIDriverOnNode(driverName, csiNode) {
+			driverInstalled, err := pl.checkCSIDriverOnNode(driverName, csiNode)
+			if err != nil {
+				return fwk.AsStatus(err)
+			}
+			if !driverInstalled {
 				driverNotInstalledMsg := fmt.Sprintf("%s CSI driver is not installed on the node", driverName)
 				return fwk.NewStatus(fwk.Unschedulable, driverNotInstalledMsg)
 			}
@@ -348,24 +352,27 @@ func (pl *CSILimits) Filter(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, 
 	return nil
 }
 
-func (pl *CSILimits) checkCSIDriverOnNode(pluginName string, csiNode *storagev1.CSINode) bool {
+func (pl *CSILimits) checkCSIDriverOnNode(pluginName string, csiNode *storagev1.CSINode) (bool, error) {
 	// the registered driver must be a CSI driver to enforce this limit, if we can't find the driver,
 	// we assume the driver may not be a CSI driver and allow the pod to be scheduled.
 	_, err := pl.csiDriverLister.Get(pluginName)
 	if err != nil {
-		return true
+		if apierrors.IsNotFound(err) {
+			return true, nil
+		}
+		return false, err
 	}
 
 	if csiNode == nil {
-		return false
+		return false, nil
 	}
 
 	for _, driver := range csiNode.Spec.Drivers {
 		if driver.Name == pluginName {
-			return true
+			return true, nil
 		}
 	}
-	return false
+	return false, nil
 }
 
 // filterAttachableVolumes filters the attachable volumes from the pod and adds them to the result map.
