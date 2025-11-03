@@ -106,56 +106,53 @@ func NewDefaultKubectlCommand() *cobra.Command {
 func NewDefaultKubectlCommandWithArgs(o KubectlOptions) *cobra.Command {
 	cmd := NewKubectlCommand(o)
 
-	if o.PluginHandler == nil {
+	if o.PluginHandler == nil || len(o.Arguments) <= 1 {
 		return cmd
 	}
 
-	if len(o.Arguments) > 1 {
-		cmdPathPieces := o.Arguments[1:]
-
-		// only look for suitable extension executables if
-		// the specified command does not already exist
-		if foundCmd, foundArgs, err := cmd.Find(cmdPathPieces); err != nil {
-			// Also check the commands that will be added by Cobra.
-			// These commands are only added once rootCmd.Execute() is called, so we
-			// need to check them explicitly here.
-			var cmdName string // first "non-flag" arguments
-			for _, arg := range cmdPathPieces {
-				if !strings.HasPrefix(arg, "-") {
-					cmdName = arg
-					break
-				}
+	cmdPathPieces := o.Arguments[1:]
+	// only look for suitable extension executables if
+	// the specified command does not already exist
+	foundCmd, foundArgs, err := cmd.Find(cmdPathPieces)
+	if err != nil {
+		// Also check the commands that will be added by Cobra.
+		// These commands are only added once rootCmd.Execute() is called, so we
+		// need to check them explicitly here.
+		var cmdName string // first "non-flag" arguments
+		for _, arg := range cmdPathPieces {
+			if !strings.HasPrefix(arg, "-") {
+				cmdName = arg
+				break
 			}
+		}
 
-			switch cmdName {
-			case "help", cobra.ShellCompRequestCmd, cobra.ShellCompNoDescRequestCmd:
-				// Don't search for a plugin
-			default:
-				if err := HandlePluginCommand(o.PluginHandler, cmdPathPieces, 1); err != nil {
-					fmt.Fprintf(o.IOStreams.ErrOut, "Error: %v\n", err)
-					os.Exit(1)
-				}
+		switch cmdName {
+		case "help", cobra.ShellCompRequestCmd, cobra.ShellCompNoDescRequestCmd:
+			// Don't search for a plugin
+		default:
+			if err := HandlePluginCommand(o.PluginHandler, cmdPathPieces, 1); err != nil {
+				fmt.Fprintf(o.IOStreams.ErrOut, "Error: %v\n", err)
+				os.Exit(1)
 			}
-		} else if err == nil {
-			// Command exists(e.g. kubectl create), but it is not certain that
-			// subcommand also exists (e.g. kubectl create networkpolicy)
-			// we also have to eliminate kubectl create -f
-			if IsSubcommandPluginAllowed(foundCmd.Name()) && len(foundArgs) >= 1 && !strings.HasPrefix(foundArgs[0], "-") {
-				subcommand := foundArgs[0]
-				builtinSubcmdExist := false
-				for _, subcmd := range foundCmd.Commands() {
-					if subcmd.Name() == subcommand {
-						builtinSubcmdExist = true
-						break
-					}
-				}
+		}
+	}
+	// Command exists(e.g. kubectl create), but it is not certain that
+	// subcommand also exists (e.g. kubectl create networkpolicy)
+	// we also have to eliminate kubectl create -f
+	if IsSubcommandPluginAllowed(foundCmd.Name()) && len(foundArgs) >= 1 && !strings.HasPrefix(foundArgs[0], "-") {
+		subcommand := foundArgs[0]
+		builtinSubcmdExist := false
+		for _, subcmd := range foundCmd.Commands() {
+			if subcmd.Name() == subcommand {
+				builtinSubcmdExist = true
+				break
+			}
+		}
 
-				if !builtinSubcmdExist {
-					if err := HandlePluginCommand(o.PluginHandler, cmdPathPieces, len(cmdPathPieces)-len(foundArgs)+1); err != nil {
-						fmt.Fprintf(o.IOStreams.ErrOut, "Error: %v\n", err)
-						os.Exit(1)
-					}
-				}
+		if !builtinSubcmdExist {
+			if err := HandlePluginCommand(o.PluginHandler, cmdPathPieces, len(cmdPathPieces)-len(foundArgs)+1); err != nil {
+				fmt.Fprintf(o.IOStreams.ErrOut, "Error: %v\n", err)
+				os.Exit(1)
 			}
 		}
 	}
