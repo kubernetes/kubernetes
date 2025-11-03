@@ -1160,14 +1160,6 @@ const (
 // A negative maxSize disables the length check.
 func validateSlice[T any](slice []T, maxSize int, validateItem func(T, *field.Path) field.ErrorList, fldPath *field.Path, opts ...validationOption) field.ErrorList {
 	var allErrs field.ErrorList
-	for i, item := range slice {
-		idxPath := fldPath.Index(i)
-		errs := validateItem(item, idxPath)
-		if slices.Contains(opts, itemsCovered) {
-			errs = errs.MarkCoveredByDeclarative()
-		}
-		allErrs = append(allErrs, errs...)
-	}
 	if maxSize >= 0 && len(slice) > maxSize {
 		// Dumping the entire field into the error message is likely to be too long,
 		// in particular when it is already beyond the maximum size. Instead this
@@ -1177,6 +1169,16 @@ func validateSlice[T any](slice []T, maxSize int, validateItem func(T, *field.Pa
 			err = err.MarkCoveredByDeclarative()
 		}
 		allErrs = append(allErrs, err)
+		// maxSize check short-circuits for DOS protection
+		return allErrs
+	}
+	for i, item := range slice {
+		idxPath := fldPath.Index(i)
+		errs := validateItem(item, idxPath)
+		if slices.Contains(opts, itemsCovered) {
+			errs = errs.MarkCoveredByDeclarative()
+		}
+		allErrs = append(allErrs, errs...)
 	}
 	return allErrs
 }
@@ -1185,6 +1187,10 @@ func validateSlice[T any](slice []T, maxSize int, validateItem func(T, *field.Pa
 // exceed a certain maximum size and that all entries are valid.
 func validateSet[T any, K comparable](slice []T, maxSize int, validateItem func(item T, fldPath *field.Path) field.ErrorList, itemKey func(T) K, fldPath *field.Path, opts ...validationOption) field.ErrorList {
 	allErrs := validateSlice(slice, maxSize, validateItem, fldPath, opts...)
+	if maxSize >= 0 && len(slice) > maxSize {
+		// maxSize check short-circuits for DOS protection
+		return allErrs
+	}
 
 	allItems := sets.New[K]()
 	for i, item := range slice {
@@ -1225,6 +1231,8 @@ func validateMap[K ~string, T any](m map[K]T, maxSize, truncateKeyLen int, valid
 	var allErrs field.ErrorList
 	if maxSize >= 0 && len(m) > maxSize {
 		allErrs = append(allErrs, field.TooMany(fldPath, len(m), maxSize))
+		// maxSize check short-circuits for DOS protection
+		return allErrs
 	}
 	for key, item := range m {
 		keyPath := fldPath.Key(truncateIfTooLong(string(key), truncateKeyLen))
