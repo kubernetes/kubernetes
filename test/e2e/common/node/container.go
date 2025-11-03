@@ -43,7 +43,6 @@ type ConformanceContainer struct {
 	RestartPolicy    v1.RestartPolicy
 	Volumes          []v1.Volume
 	ImagePullSecrets []string
-	NodeName         string
 
 	PodClient          *e2epod.PodClient
 	podName            string
@@ -66,7 +65,6 @@ func (cc *ConformanceContainer) Create(ctx context.Context) {
 			Containers: []v1.Container{
 				cc.Container,
 			},
-			NodeName:         cc.NodeName,
 			SecurityContext:  cc.PodSecurityContext,
 			Volumes:          cc.Volumes,
 			ImagePullSecrets: imagePullSecrets,
