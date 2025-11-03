@@ -296,6 +296,11 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 		}
 
 		// Populate configs.
+
+		// Each class config gets added only once.
+		// We need to keep track of which class configs have already been added and at which position in the allocationResult.Devices.Config.
+		type configRange struct{ start, end int }
+		configIndexesForClass := make(map[string]configRange) // Key: class name / Value: position of the configs for the class in allocationResult.Devices.Config.
 		for requestIndex := range claim.Spec.Devices.Requests {
 			requestKey := requestIndices{claimIndex: claimIndex, requestIndex: requestIndex}
 			requestData := alloc.requestData[requestKey]
@@ -306,15 +311,29 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 			}
 
 			class := requestData.class
-			if class != nil {
-				for _, config := range class.Spec.Config {
-					allocationResult.Devices.Config = append(allocationResult.Devices.Config, resourceapi.DeviceAllocationConfiguration{
-						Source:              resourceapi.AllocationConfigSourceClass,
-						Requests:            nil, // All of them...
-						DeviceConfiguration: config.DeviceConfiguration,
-					})
-				}
+			if class == nil {
+				continue
 			}
+			configIndexes, exists := configIndexesForClass[class.Name]
+			if exists {
+				// The configs for the class have already been added.
+				// Just append the request name for the request class.
+				for i := configIndexes.start; i < configIndexes.end; i++ {
+					allocationResult.Devices.Config[i].Requests = append(allocationResult.Devices.Config[i].Requests, requestData.requestName())
+				}
+				continue
+			}
+
+			// Add all configs for the class once.
+			initialConfigLen := len(allocationResult.Devices.Config)
+			for _, config := range class.Spec.Config {
+				allocationResult.Devices.Config = append(allocationResult.Devices.Config, resourceapi.DeviceAllocationConfiguration{
+					Source:              resourceapi.AllocationConfigSourceClass,
+					Requests:            []string{requestData.requestName()},
+					DeviceConfiguration: config.DeviceConfiguration,
+				})
+			}
+			configIndexesForClass[class.Name] = configRange{start: initialConfigLen, end: len(allocationResult.Devices.Config)}
 		}
 		for _, config := range claim.Spec.Devices.Config {
 			// If Requests are empty, it applies to all. So it can just be included.
@@ -534,6 +553,13 @@ type requestData struct {
 
 	// pre-determined set of devices for allocating "all" devices
 	allDevices []deviceWithID
+}
+
+func (rd *requestData) requestName() string {
+	if rd.parentRequest != nil {
+		return fmt.Sprintf("%s/%s", rd.parentRequest.name(), rd.request.name())
+	}
+	return rd.request.name()
 }
 
 type deviceWithID struct {
