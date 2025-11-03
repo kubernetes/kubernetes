@@ -512,26 +512,6 @@ func validFirstDigit(str string) bool {
 	return str[0] == '-' || (str[0] == '0' && str == "0") || (str[0] >= '1' && str[0] <= '9')
 }
 
-// IsValidNumericString checks if a string is a valid numeric format (digits with optional leading minus sign)
-func IsValidNumericString(s string) bool {
-	if len(s) == 0 {
-		return false
-	}
-	start := 0
-	if s[0] == '-' {
-		start = 1
-		if start >= len(s) {
-			return false
-		}
-	}
-	for i := start; i < len(s); i++ {
-		if s[i] < '0' || s[i] > '9' {
-			return false
-		}
-	}
-	return true
-}
-
 // HasInvalidLabelValueInNodeSelectorTerms checks if there's an invalid label value
 // in one NodeSelectorTerm's MatchExpression values
 func HasInvalidLabelValueInNodeSelectorTerms(terms []core.NodeSelectorTerm) bool {

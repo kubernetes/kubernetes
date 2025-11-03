@@ -220,12 +220,12 @@ func TestTaintNodeByCondition(t *testing.T) {
 
 	// switch to table driven testings
 	tests := []struct {
-		name               string
-		existingTaints     []v1.Taint
-		nodeConditions     []v1.NodeCondition
-		unschedulable      bool
-		expectedTaints     []v1.Taint
-		pods               []podCase
+		name              string
+		existingTaints    []v1.Taint
+		nodeConditions    []v1.NodeCondition
+		unschedulable     bool
+		expectedTaints    []v1.Taint
+		pods              []podCase
 		enableFeatureGate *[]bool
 	}{
 		{

@@ -145,8 +145,8 @@ func (pl *NodeUnschedulable) Filter(ctx context.Context, _ fwk.CycleState, pod *
 		Key:    v1.TaintNodeUnschedulable,
 		Effect: v1.TaintEffectNoSchedule,
 	})
-	// Return UnschedulableAndUnresolvable, not error intentionally because the error from this function means a parse error,  
-    // which could be solved by a toleration's value change.
+	// Return UnschedulableAndUnresolvable, not error intentionally because the error from this function means a parse error,
+	// which could be solved by a toleration's value change.
 	if err != nil {
 		return fwk.NewStatus(fwk.UnschedulableAndUnresolvable).WithError(err)
 	}

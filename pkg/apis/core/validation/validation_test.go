@@ -29612,7 +29612,7 @@ func TestNumericTolerationsWithFeatureGate(t *testing.T) {
 				Effect:   core.TaintEffectNoSchedule,
 			},
 			featureGateOn: true,
-			errorMsg:      "value must contain only digits with an optional leading minus sign",
+			errorMsg:      fmt.Sprintf("tolerations[0].value: Invalid value: %q: value must be a valid integer for numeric operators", "high"),
 		},
 		{
 			name: "Gt operator with leading zeros and feature gate enabled (valid, parsed as 950)",
@@ -29643,7 +29643,7 @@ func TestNumericTolerationsWithFeatureGate(t *testing.T) {
 				Effect:   core.TaintEffectNoSchedule,
 			},
 			featureGateOn: true,
-			errorMsg:      "value must contain only digits with an optional leading minus sign",
+			errorMsg:      fmt.Sprintf("tolerations[0].value: Invalid value: %q: value must be a valid integer for numeric operators", "95.5"),
 		},
 		{
 			name: "Gt operator with just minus sign and feature gate enabled",
@@ -29654,7 +29654,7 @@ func TestNumericTolerationsWithFeatureGate(t *testing.T) {
 				Effect:   core.TaintEffectNoSchedule,
 			},
 			featureGateOn: true,
-			errorMsg:      "value must contain only digits with an optional leading minus sign",
+			errorMsg:      fmt.Sprintf("tolerations[0].value: Invalid value: %q: value must be a valid integer for numeric operators", "-"),
 		},
 		{
 			name: "Gt operator with plus sign and feature gate enabled",
@@ -29665,7 +29665,6 @@ func TestNumericTolerationsWithFeatureGate(t *testing.T) {
 				Effect:   core.TaintEffectNoSchedule,
 			},
 			featureGateOn: true,
-			errorMsg:      "value must contain only digits with an optional leading minus sign",
 		},
 		{
 			name: "Gt operator with space in value and feature gate enabled",
@@ -29676,7 +29675,7 @@ func TestNumericTolerationsWithFeatureGate(t *testing.T) {
 				Effect:   core.TaintEffectNoSchedule,
 			},
 			featureGateOn: true,
-			errorMsg:      "value must contain only digits with an optional leading minus sign",
+			errorMsg:      fmt.Sprintf("tolerations[0].value: Invalid value: %q: value must be a valid integer for numeric operators", "95 0"),
 		},
 		{
 			name: "Gt operator with empty value and feature gate enabled",
@@ -29687,7 +29686,7 @@ func TestNumericTolerationsWithFeatureGate(t *testing.T) {
 				Effect:   core.TaintEffectNoSchedule,
 			},
 			featureGateOn: true,
-			errorMsg:      "value must contain only digits with an optional leading minus sign",
+			errorMsg:      fmt.Sprintf("tolerations[0].value: Invalid value: %q: value must be a valid integer for numeric operators", ""),
 		},
 		{
 			name: "Lt operator with feature gate disabled",
