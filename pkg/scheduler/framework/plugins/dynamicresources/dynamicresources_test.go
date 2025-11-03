@@ -2314,11 +2314,11 @@ func setup(t *testing.T, args *config.DynamicResourcesArgs, nodes []*v1.Node, cl
 
 	tc.informerFactory = informers.NewSharedInformerFactory(tc.client, 0)
 	resourceSliceTrackerOpts := resourceslicetracker.Options{
-		EnableDeviceTaints: true,
-		SliceInformer:      tc.informerFactory.Resource().V1().ResourceSlices(),
-		TaintInformer:      tc.informerFactory.Resource().V1alpha3().DeviceTaintRules(),
-		ClassInformer:      tc.informerFactory.Resource().V1().DeviceClasses(),
-		KubeClient:         tc.client,
+		EnableDeviceTaintRules: true,
+		SliceInformer:          tc.informerFactory.Resource().V1().ResourceSlices(),
+		TaintInformer:          tc.informerFactory.Resource().V1alpha3().DeviceTaintRules(),
+		ClassInformer:          tc.informerFactory.Resource().V1().DeviceClasses(),
+		KubeClient:             tc.client,
 	}
 	resourceSliceTracker, err := resourceslicetracker.StartTracker(tCtx, resourceSliceTrackerOpts)
 	require.NoError(t, err, "couldn't start resource slice tracker")

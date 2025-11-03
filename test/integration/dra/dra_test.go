@@ -192,6 +192,14 @@ func TestDRA(t *testing.T) {
 				})
 			},
 		},
+		"slice-taints": {
+			features: map[featuregate.Feature]bool{
+				features.DRADeviceTaints: true,
+			},
+			f: func(tCtx ktesting.TContext) {
+				tCtx.Run("EvictClusterWithSlices", func(tCtx ktesting.TContext) { testEvictCluster(tCtx, false) })
+			},
+		},
 		"all": {
 			apis: map[schema.GroupVersion]bool{
 				resourcev1beta1.SchemeGroupVersion:  true,
@@ -206,6 +214,7 @@ func TestDRA(t *testing.T) {
 				features.DRADeviceBindingConditions:   true,
 				features.DRAConsumableCapacity:        true,
 				features.DRADeviceTaints:              true,
+				features.DRADeviceTaintRules:          true,
 				features.DRAPartitionableDevices:      true,
 				features.DRAPrioritizedList:           true,
 				features.DRAResourceClaimDeviceStatus: true,
@@ -222,7 +231,8 @@ func TestDRA(t *testing.T) {
 				tCtx.Run("ExtendedResource", func(tCtx ktesting.TContext) { testExtendedResource(tCtx, true) })
 				tCtx.Run("ResourceClaimDeviceStatus", func(tCtx ktesting.TContext) { testResourceClaimDeviceStatus(tCtx, true) })
 				tCtx.Run("MaxResourceSlice", testMaxResourceSlice)
-				tCtx.Run("EvictCluster", testEvictCluster)
+				tCtx.Run("EvictClusterWithRule", func(tCtx ktesting.TContext) { testEvictCluster(tCtx, true) })
+				tCtx.Run("EvictClusterWithSlices", func(tCtx ktesting.TContext) { testEvictCluster(tCtx, false) })
 			},
 		},
 	} {

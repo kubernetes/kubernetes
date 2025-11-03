@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
 	resourceac "k8s.io/client-go/applyconfigurations/resource/v1alpha3"
 	coreinformers "k8s.io/client-go/informers/core/v1"
@@ -57,6 +58,7 @@ import (
 	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/devicetainteviction/metrics"
 	"k8s.io/kubernetes/pkg/controller/tainteviction"
+	"k8s.io/kubernetes/pkg/features"
 	utilpod "k8s.io/kubernetes/pkg/util/pod"
 )
 
@@ -95,7 +97,7 @@ type Controller struct {
 	podLister     corelisters.PodLister
 	claimInformer resourceinformers.ResourceClaimInformer
 	sliceInformer resourceinformers.ResourceSliceInformer
-	taintInformer resourcealphainformers.DeviceTaintRuleInformer
+	ruleInformer  resourcealphainformers.DeviceTaintRuleInformer
 	classInformer resourceinformers.DeviceClassInformer
 	ruleLister    resourcealphalisters.DeviceTaintRuleLister
 	haveSynced    []cache.InformerSynced
@@ -713,7 +715,7 @@ func (tc *Controller) countTaintedDevices(rule *resourcealpha.DeviceTaintRule) (
 
 // New creates a new Controller that will use passed clientset to communicate with the API server.
 // Spawns no goroutines. That happens in Run.
-func New(c clientset.Interface, podInformer coreinformers.PodInformer, claimInformer resourceinformers.ResourceClaimInformer, sliceInformer resourceinformers.ResourceSliceInformer, taintInformer resourcealphainformers.DeviceTaintRuleInformer, classInformer resourceinformers.DeviceClassInformer, controllerName string) *Controller {
+func New(c clientset.Interface, podInformer coreinformers.PodInformer, claimInformer resourceinformers.ResourceClaimInformer, sliceInformer resourceinformers.ResourceSliceInformer, ruleInformer resourcealphainformers.DeviceTaintRuleInformer, classInformer resourceinformers.DeviceClassInformer, controllerName string) *Controller {
 	metrics.Register() // It would be nicer to pass the controller name here, but that probably would break generating https://kubernetes.io/docs/reference/instrumentation/metrics.
 
 	tc := &Controller{
@@ -724,9 +726,7 @@ func New(c clientset.Interface, podInformer coreinformers.PodInformer, claimInfo
 		podLister:       podInformer.Lister(),
 		claimInformer:   claimInformer,
 		sliceInformer:   sliceInformer,
-		taintInformer:   taintInformer,
 		classInformer:   classInformer,
-		ruleLister:      taintInformer.Lister(),
 		deletePodAt:     make(map[tainteviction.NamespacedObject]evictionAndReason),
 		allocatedClaims: make(map[types.NamespacedName]allocatedClaim),
 		pools:           make(map[poolID]pool),
@@ -736,10 +736,18 @@ func New(c clientset.Interface, podInformer coreinformers.PodInformer, claimInfo
 			podInformer.Informer().HasSynced,
 			claimInformer.Informer().HasSynced,
 			sliceInformer.Informer().HasSynced,
-			taintInformer.Informer().HasSynced,
 			classInformer.Informer().HasSynced,
 		},
 		metrics: metrics.Global,
+	}
+
+	// The informer for DeviceTaintRules only gets instantiated if the corresponding
+	// feature is enabled. If disabled, nothings is done with (eviction) or for (status)
+	// any DeviceTaintRule.
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaintRules) {
+		tc.ruleInformer = ruleInformer
+		tc.ruleLister = ruleInformer.Lister()
+		tc.haveSynced = append(tc.haveSynced, ruleInformer.Informer().HasSynced)
 	}
 
 	return tc
@@ -892,52 +900,54 @@ func (tc *Controller) Run(ctx context.Context, numWorkers int) error {
 	}()
 	tc.haveSynced = append(tc.haveSynced, podHandler.HasSynced)
 
-	ruleHandler, err := tc.taintInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj any) {
-			rule, ok := obj.(*resourcealpha.DeviceTaintRule)
-			if !ok {
-				logger.Error(nil, "Expected DeviceTaintRule", "actual", fmt.Sprintf("%T", obj))
-				return
-			}
-			tc.mutex.Lock()
-			defer tc.mutex.Unlock()
-			tc.handleRuleChange(nil, rule)
-		},
-		UpdateFunc: func(oldObj, newObj any) {
-			oldRule, ok := oldObj.(*resourcealpha.DeviceTaintRule)
-			if !ok {
-				logger.Error(nil, "Expected DeviceTaintRule", "actual", fmt.Sprintf("%T", oldObj))
-				return
-			}
-			newRule, ok := newObj.(*resourcealpha.DeviceTaintRule)
-			if !ok {
-				logger.Error(nil, "Expected DeviceTaintRule", "actual", fmt.Sprintf("%T", newObj))
-			}
-			tc.mutex.Lock()
-			defer tc.mutex.Unlock()
-			tc.handleRuleChange(oldRule, newRule)
-		},
-		DeleteFunc: func(obj any) {
-			if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
-				obj = tombstone.Obj
-			}
-			rule, ok := obj.(*resourcealpha.DeviceTaintRule)
-			if !ok {
-				logger.Error(nil, "Expected DeviceTaintRule", "actual", fmt.Sprintf("%T", obj))
-				return
-			}
-			tc.mutex.Lock()
-			defer tc.mutex.Unlock()
-			tc.handleRuleChange(rule, nil)
-		},
-	})
-	if err != nil {
-		return fmt.Errorf("adding DeviceTaintRule event handler: %w", err)
+	if tc.ruleInformer != nil {
+		ruleHandler, err := tc.ruleInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+			AddFunc: func(obj any) {
+				rule, ok := obj.(*resourcealpha.DeviceTaintRule)
+				if !ok {
+					logger.Error(nil, "Expected DeviceTaintRule", "actual", fmt.Sprintf("%T", obj))
+					return
+				}
+				tc.mutex.Lock()
+				defer tc.mutex.Unlock()
+				tc.handleRuleChange(nil, rule)
+			},
+			UpdateFunc: func(oldObj, newObj any) {
+				oldRule, ok := oldObj.(*resourcealpha.DeviceTaintRule)
+				if !ok {
+					logger.Error(nil, "Expected DeviceTaintRule", "actual", fmt.Sprintf("%T", oldObj))
+					return
+				}
+				newRule, ok := newObj.(*resourcealpha.DeviceTaintRule)
+				if !ok {
+					logger.Error(nil, "Expected DeviceTaintRule", "actual", fmt.Sprintf("%T", newObj))
+				}
+				tc.mutex.Lock()
+				defer tc.mutex.Unlock()
+				tc.handleRuleChange(oldRule, newRule)
+			},
+			DeleteFunc: func(obj any) {
+				if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
+					obj = tombstone.Obj
+				}
+				rule, ok := obj.(*resourcealpha.DeviceTaintRule)
+				if !ok {
+					logger.Error(nil, "Expected DeviceTaintRule", "actual", fmt.Sprintf("%T", obj))
+					return
+				}
+				tc.mutex.Lock()
+				defer tc.mutex.Unlock()
+				tc.handleRuleChange(rule, nil)
+			},
+		})
+		if err != nil {
+			return fmt.Errorf("adding DeviceTaintRule event handler: %w", err)
+		}
+		defer func() {
+			_ = tc.ruleInformer.Informer().RemoveEventHandler(ruleHandler)
+		}()
+		tc.haveSynced = append(tc.haveSynced, ruleHandler.HasSynced)
 	}
-	defer func() {
-		_ = tc.taintInformer.Informer().RemoveEventHandler(ruleHandler)
-	}()
-	tc.haveSynced = append(tc.haveSynced, ruleHandler.HasSynced)
 
 	sliceHandler, err := tc.sliceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj any) {

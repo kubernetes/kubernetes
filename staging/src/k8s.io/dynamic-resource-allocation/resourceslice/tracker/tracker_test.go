@@ -551,11 +551,11 @@ func TestListPatchedResourceSlices(t *testing.T) {
 		informerFactory := informers.NewSharedInformerFactoryWithOptions(kubeClient, 10*time.Minute)
 
 		opts := Options{
-			EnableDeviceTaints: true,
-			SliceInformer:      informerFactory.Resource().V1().ResourceSlices(),
-			TaintInformer:      informerFactory.Resource().V1alpha3().DeviceTaintRules(),
-			ClassInformer:      informerFactory.Resource().V1().DeviceClasses(),
-			KubeClient:         kubeClient,
+			EnableDeviceTaintRules: true,
+			SliceInformer:          informerFactory.Resource().V1().ResourceSlices(),
+			TaintInformer:          informerFactory.Resource().V1alpha3().DeviceTaintRules(),
+			ClassInformer:          informerFactory.Resource().V1().DeviceClasses(),
+			KubeClient:             kubeClient,
 		}
 		tracker, err := newTracker(ctx, opts)
 		require.NoError(t, err)
@@ -959,11 +959,11 @@ func BenchmarkEventHandlers(b *testing.B) {
 		kubeClient := fake.NewSimpleClientset()
 		informerFactory := informers.NewSharedInformerFactoryWithOptions(kubeClient, 10*time.Minute)
 		opts := Options{
-			EnableDeviceTaints: true,
-			SliceInformer:      informerFactory.Resource().V1().ResourceSlices(),
-			TaintInformer:      informerFactory.Resource().V1alpha3().DeviceTaintRules(),
-			ClassInformer:      informerFactory.Resource().V1().DeviceClasses(),
-			KubeClient:         kubeClient,
+			EnableDeviceTaintRules: true,
+			SliceInformer:          informerFactory.Resource().V1().ResourceSlices(),
+			TaintInformer:          informerFactory.Resource().V1alpha3().DeviceTaintRules(),
+			ClassInformer:          informerFactory.Resource().V1().DeviceClasses(),
+			KubeClient:             kubeClient,
 		}
 		tracker, err := newTracker(ctx, opts)
 		require.NoError(b, err)
