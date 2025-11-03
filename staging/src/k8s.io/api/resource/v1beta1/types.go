@@ -1836,7 +1836,7 @@ type DeviceClassSpec struct {
 	// If two classes are created at the same time, then the name of the class
 	// lexicographically sorted first is picked.
 	//
-	// This is an alpha field.
+	// This is a beta field.
 	// +optional
 	// +featureGate=DRAExtendedResource
 	// +k8s:optional
