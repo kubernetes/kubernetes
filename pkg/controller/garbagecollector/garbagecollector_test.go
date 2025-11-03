@@ -818,6 +818,14 @@ func TestGetDeletableResources(t *testing.T) {
 	}
 }
 
+type wrappedKubeClientWithUnsupportedWatchListSemantics struct {
+	kubernetes.Interface
+}
+
+func (c *wrappedKubeClientWithUnsupportedWatchListSemantics) IsWatchListSemanticsUnSupported() bool {
+	return true
+}
+
 // TestGarbageCollectorSync ensures that a discovery client error
 // or an informer sync error will not cause the garbage collector
 // to block infinitely.
@@ -889,10 +897,12 @@ func TestGarbageCollectorSync(t *testing.T) {
 	srv, clientConfig := testServerAndClientConfig(alternativeTestHandler)
 	defer srv.Close()
 	clientConfig.ContentConfig.NegotiatedSerializer = nil
-	client, err := kubernetes.NewForConfig(clientConfig)
+	kubeClient, err := kubernetes.NewForConfig(clientConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
+	// TODO(#115478): migrate this test to use fakeClient instead of the real client.
+	client := &wrappedKubeClientWithUnsupportedWatchListSemantics{kubeClient}
 
 	tweakableRM := meta.NewDefaultRESTMapper(nil)
 	tweakableRM.AddSpecific(schema.GroupVersionKind{Version: "v1", Kind: "Pod"}, schema.GroupVersionResource{Version: "v1", Resource: "pods"}, schema.GroupVersionResource{Version: "v1", Resource: "pod"}, meta.RESTScopeNamespace)
