@@ -869,6 +869,11 @@ func TestPodResizeRBAC(t *testing.T) {
 					{
 						Name:  "fake-name",
 						Image: "fakeimage",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU: resource.MustParse("100m"),
+							},
+						},
 					},
 				},
 			},
@@ -929,7 +934,7 @@ func TestPodResizeRBAC(t *testing.T) {
 			}
 			resp.Spec.Containers[0].Resources = v1.ResourceRequirements{
 				Requests: v1.ResourceList{
-					v1.ResourceEphemeralStorage: resource.MustParse("2Gi"),
+					v1.ResourceCPU: resource.MustParse("200m"),
 				},
 			}
 			_, err = saClient.CoreV1().Pods(ns.Name).UpdateResize(context.TODO(), resp.Name, resp, metav1.UpdateOptions{})

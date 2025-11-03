@@ -28309,6 +28309,21 @@ func TestValidatePodResize(t *testing.T) {
 			old:  mkPodWithInitContainers(getResources("100m", "0", "1Gi", ""), core.ResourceList{}, core.ContainerRestartPolicyAlways, resizePolicy(core.ResourceMemory, core.RestartContainer)),
 			new:  mkPodWithInitContainers(getResources("100m", "0", "2Gi", ""), core.ResourceList{}, core.ContainerRestartPolicyAlways, resizePolicy(core.ResourceMemory, core.NotRequired)),
 			err:  "spec: Forbidden: only cpu and memory resources are mutable",
+		}, {
+			test: "invalid: adding non-resizable resources to a container without resources",
+			old: podtest.MakePod("pod", podtest.SetContainers(
+				podtest.MakeContainer("c1"),
+			)),
+			new: podtest.MakePod("pod", podtest.SetContainers(
+				podtest.MakeContainer("c1",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Requests: core.ResourceList{
+							core.ResourceEphemeralStorage: resource.MustParse("10Gi"),
+						},
+					}),
+				),
+			)),
+			err: "spec: Forbidden: only cpu and memory resources are mutable",
 		},
 	}
 
