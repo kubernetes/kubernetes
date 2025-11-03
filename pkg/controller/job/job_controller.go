@@ -1040,6 +1040,9 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 				if isUpdated {
 					suspendCondChanged = true
 					jm.recorder.Event(&job, v1.EventTypeNormal, "Suspended", "Job suspended")
+					if feature.DefaultFeatureGate.Enabled(features.MutablePodResourcesForSuspendedJobs) {
+						job.Status.StartTime = nil
+					}
 				}
 			} else {
 				// Job not suspended.
