@@ -54,22 +54,21 @@ const (
 type frameworkImpl struct {
 	registry             Registry
 	snapshotSharedLister fwk.SharedLister
-
-	waitingPods       *waitingPodsMap
-	scorePluginWeight map[string]int
-	preEnqueuePlugins []fwk.PreEnqueuePlugin
-	enqueueExtensions []fwk.EnqueueExtensions
-	queueSortPlugins  []fwk.QueueSortPlugin
-	preFilterPlugins  []fwk.PreFilterPlugin
-	filterPlugins     []fwk.FilterPlugin
-	postFilterPlugins []fwk.PostFilterPlugin
-	preScorePlugins   []fwk.PreScorePlugin
-	scorePlugins      []fwk.ScorePlugin
-	reservePlugins    []fwk.ReservePlugin
-	preBindPlugins    []fwk.PreBindPlugin
-	bindPlugins       []fwk.BindPlugin
-	postBindPlugins   []fwk.PostBindPlugin
-	permitPlugins     []fwk.PermitPlugin
+	waitingPods          *waitingPodsMap
+	scorePluginWeight    map[string]int
+	preEnqueuePlugins    []fwk.PreEnqueuePlugin
+	enqueueExtensions    []fwk.EnqueueExtensions
+	queueSortPlugins     []fwk.QueueSortPlugin
+	preFilterPlugins     []fwk.PreFilterPlugin
+	filterPlugins        []fwk.FilterPlugin
+	postFilterPlugins    []fwk.PostFilterPlugin
+	preScorePlugins      []fwk.PreScorePlugin
+	scorePlugins         []fwk.ScorePlugin
+	reservePlugins       []fwk.ReservePlugin
+	preBindPlugins       []fwk.PreBindPlugin
+	bindPlugins          []fwk.BindPlugin
+	postBindPlugins      []fwk.PostBindPlugin
+	permitPlugins        []fwk.PermitPlugin
 
 	// pluginsMap contains all plugins, by name.
 	pluginsMap map[string]fwk.Plugin

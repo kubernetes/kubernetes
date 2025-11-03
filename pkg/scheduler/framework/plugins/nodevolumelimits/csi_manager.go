@@ -24,18 +24,18 @@ import (
 )
 
 // CSIManagerImpl is a implementation of the CSIManager interface.
-type CSIManagerImpl struct {
-	csiNodeListerImpl *csiNodeLister
+type DefaultCSIManager struct {
+	defaultCSINodeLister *csiNodeLister
 }
 
-var _ fwk.CSIManager = &CSIManagerImpl{}
+var _ fwk.CSIManager = &DefaultCSIManager{}
 
-func NewCSIManager(csinodeLister storagelisters.CSINodeLister) *CSIManagerImpl {
-	return &CSIManagerImpl{csiNodeListerImpl: NewCsiNodeLister(csinodeLister)}
+func NewCSIManager(csinodeLister storagelisters.CSINodeLister) *DefaultCSIManager {
+	return &DefaultCSIManager{defaultCSINodeLister: NewCsiNodeLister(csinodeLister)}
 }
 
-func (m *CSIManagerImpl) CSINodes() fwk.CSINodeLister {
-	return m.csiNodeListerImpl
+func (m *DefaultCSIManager) CSINodes() fwk.CSINodeLister {
+	return m.defaultCSINodeLister
 }
 
 type csiNodeLister struct {

@@ -344,8 +344,7 @@ func New(ctx context.Context,
 		}
 		draManager = dynamicresources.NewDRAManager(ctx, resourceClaimCache, resourceSliceTracker, informerFactory)
 	}
-	var sharedCSIManager fwk.CSIManager
-	sharedCSIManager = nodevolumelimits.NewCSIManager(informerFactory.Storage().V1().CSINodes().Lister())
+	sharedCSIManager := nodevolumelimits.NewCSIManager(informerFactory.Storage().V1().CSINodes().Lister())
 
 	var apiDispatcher *apidispatcher.APIDispatcher
 	if feature.DefaultFeatureGate.Enabled(features.SchedulerAsyncAPICalls) {
