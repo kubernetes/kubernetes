@@ -29,11 +29,15 @@ import (
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/dynamic-resource-allocation/deviceclass/extendedresourcecache"
 	"k8s.io/klog/v2/ktesting"
 	_ "k8s.io/klog/v2/ktesting/init"
 	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -153,7 +157,7 @@ func TestEnoughRequests(t *testing.T) {
 		args                       config.NodeResourcesFitArgs
 		podLevelResourcesEnabled   bool
 		draExtendedResourceEnabled bool
-		nilResourceToDeviceClass   bool
+		nilDRAManager              bool
 		wantInsufficientResources  []InsufficientResource
 		wantStatus                 *fwk.Status
 	}{
@@ -632,17 +636,21 @@ func TestEnoughRequests(t *testing.T) {
 			draExtendedResourceEnabled: true,
 			pod: newResourcePod(
 				framework.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceDRA: 1}}),
-			nodeInfo:                  framework.NewNodeInfo(newResourcePod(framework.Resource{MilliCPU: 0, Memory: 0})),
-			name:                      "extended resource backed by DRA",
+			nodeInfo: framework.NewNodeInfo(newResourcePod(framework.Resource{MilliCPU: 0, Memory: 0})),
+			name:     "extended resource backed by DRA",
+			// When DRAExtendedResource is enabled and there's a matching DeviceClass,
+			// the noderesources plugin delegates to DRA instead of reporting insufficient resources.
 			wantInsufficientResources: []InsufficientResource{},
 		},
 		{
 			draExtendedResourceEnabled: true,
+			nilDRAManager:              true,
 			pod: newResourcePod(
-				framework.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceDRA: 1}}),
-			nodeInfo:                  framework.NewNodeInfo(newResourcePod(framework.Resource{MilliCPU: 0, Memory: 0})),
-			name:                      "extended resource backed by DRA, nil resourceToDeviceClass",
-			nilResourceToDeviceClass:  true,
+				framework.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 1}}),
+			nodeInfo: framework.NewNodeInfo(newResourcePod(framework.Resource{MilliCPU: 0, Memory: 0})),
+			name:     "extended resource backed by DRA, nil draManager",
+			// When DRAExtendedResource is enabled but draManager is nil (e.g., kubelet path),
+			// the noderesources plugin delegates to DRA instead of reporting insufficient resources.
 			wantInsufficientResources: []InsufficientResource{},
 		},
 		{
@@ -690,8 +698,7 @@ func TestEnoughRequests(t *testing.T) {
 			pod: newResourcePod(
 				framework.Resource{ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 1}}),
 			nodeInfo:                  framework.NewNodeInfo(newResourcePod(framework.Resource{ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 0}})),
-			name:                      "extended resource was backed by Device Plugin (Allocatable: 0), nil resourceToDeviceClass",
-			nilResourceToDeviceClass:  true,
+			name:                      "extended resource was backed by Device Plugin (Allocatable: 0), global cache",
 			wantInsufficientResources: []InsufficientResource{},
 		},
 	}
@@ -699,6 +706,7 @@ func TestEnoughRequests(t *testing.T) {
 	for _, test := range enoughPodsTests {
 		t.Run(test.name, func(t *testing.T) {
 
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, test.draExtendedResourceEnabled)
 			node := v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 5, 20, 5), Allocatable: makeAllocatableResources(10, 20, 32, 5, 20, 5)}}
 			test.nodeInfo.SetNode(&node)
 
@@ -712,7 +720,14 @@ func TestEnoughRequests(t *testing.T) {
 
 			client := fake.NewSimpleClientset(deviceClassWithExtendResourceName)
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
-			draManager := dynamicresources.NewDRAManager(ctx, assumecache.NewAssumeCache(logger, informerFactory.Resource().V1().ResourceClaims().Informer(), "resource claim", "", nil), nil, informerFactory)
+			claimsCache := assumecache.NewAssumeCache(logger, informerFactory.Resource().V1().ResourceClaims().Informer(), "resource claim", "", nil)
+			draManager := dynamicresources.NewDRAManager(ctx, claimsCache, nil, informerFactory)
+			if test.draExtendedResourceEnabled {
+				cache := draManager.DeviceClassResolver().(*extendedresourcecache.ExtendedResourceCache)
+				if _, err := informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandler(cache); err != nil {
+					logger.Error(err, "failed to add device class informer event handler")
+				}
+			}
 			informerFactory.Start(ctx.Done())
 			t.Cleanup(func() {
 				// Now we can wait for all goroutines to stop.
@@ -740,10 +755,11 @@ func TestEnoughRequests(t *testing.T) {
 
 			opts := ResourceRequestsOptions{EnablePodLevelResources: test.podLevelResourcesEnabled, EnableDRAExtendedResource: test.draExtendedResourceEnabled}
 			state := computePodResourceRequest(test.pod, opts)
-			if test.draExtendedResourceEnabled && !test.nilResourceToDeviceClass {
-				state.resourceToDeviceClass = map[v1.ResourceName]string{extendedResourceDRA: deviceClassName}
+			var testDRAManager fwk.SharedDRAManager
+			if !test.nilDRAManager {
+				testDRAManager = draManager
 			}
-			gotInsufficientResources := fitsRequest(state, test.nodeInfo, p.(*Fit).ignoredResources, p.(*Fit).ignoredResourceGroups, opts)
+			gotInsufficientResources := fitsRequest(state, test.nodeInfo, p.(*Fit).ignoredResources, p.(*Fit).ignoredResourceGroups, testDRAManager, opts)
 			if diff := cmp.Diff(test.wantInsufficientResources, gotInsufficientResources); diff != "" {
 				t.Errorf("insufficient resources do not match (-want,+got):\n%s", diff)
 			}
@@ -1723,7 +1739,7 @@ func TestIsFit(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			if got := isFit(tc.pod, tc.node, ResourceRequestsOptions{EnablePodLevelResources: tc.podLevelResourcesEnabled}); got != tc.expected {
+			if got := isFit(tc.pod, tc.node, nil, ResourceRequestsOptions{EnablePodLevelResources: tc.podLevelResourcesEnabled}); got != tc.expected {
 				t.Errorf("expected: %v, got: %v", tc.expected, got)
 			}
 		})
@@ -1932,68 +1948,8 @@ func TestHaveAnyRequestedResourcesIncreased(t *testing.T) {
 	}
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			if got := haveAnyRequestedResourcesIncreased(tc.pod, tc.originalNode, tc.modifiedNode, ResourceRequestsOptions{EnableDRAExtendedResource: tc.draExtendedResourceEnabled}); got != tc.expected {
+			if got := haveAnyRequestedResourcesIncreased(tc.pod, tc.originalNode, tc.modifiedNode, nil, ResourceRequestsOptions{EnableDRAExtendedResource: tc.draExtendedResourceEnabled}); got != tc.expected {
 				t.Errorf("expected: %v, got: %v", tc.expected, got)
-			}
-		})
-	}
-}
-func TestWithDeviceClass(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	client := fake.NewClientset(deviceClassWithExtendResourceName)
-	informerFactory := informers.NewSharedInformerFactory(client, 0)
-	draManager := dynamicresources.NewDRAManager(ctx, assumecache.NewAssumeCache(logger, informerFactory.Resource().V1().ResourceClaims().Informer(), "resource claim", "", nil), nil, informerFactory)
-	informerFactory.Start(ctx.Done())
-	t.Cleanup(func() {
-		// Now we can wait for all goroutines to stop.
-		informerFactory.Shutdown()
-	})
-	informerFactory.WaitForCacheSync(ctx.Done())
-
-	testCases := map[string]struct {
-		state                         *preFilterState
-		expectedResourceToDeviceClass map[v1.ResourceName]string
-	}{
-
-		"regular extended resource name": {
-			state: &preFilterState{
-				Resource: framework.Resource{
-					ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 1},
-				},
-			},
-			expectedResourceToDeviceClass: map[v1.ResourceName]string{
-				v1.ResourceName("deviceclass.resource.kubernetes.io/device-class-name"): deviceClassName,
-				v1.ResourceName("extended.resource.dra.io/something"):                   deviceClassName,
-			},
-		},
-		"implicit extended resource name": {
-			state: &preFilterState{
-				Resource: framework.Resource{
-					ScalarResources: map[v1.ResourceName]int64{v1.ResourceName("deviceclass.resource.kubernetes.io/" + deviceClassName): 1},
-				},
-			},
-			expectedResourceToDeviceClass: map[v1.ResourceName]string{
-				v1.ResourceName("deviceclass.resource.kubernetes.io/device-class-name"): deviceClassName,
-				v1.ResourceName("extended.resource.dra.io/something"):                   deviceClassName,
-			},
-		},
-		"no extended resource name": {
-			state: &preFilterState{
-				Resource: framework.Resource{
-					MilliCPU: 1000,
-				},
-			},
-			expectedResourceToDeviceClass: nil,
-		},
-	}
-	for name, tc := range testCases {
-		t.Run(name, func(t *testing.T) {
-			withDeviceClass(tc.state, draManager)
-			if diff := cmp.Diff(tc.state.resourceToDeviceClass, tc.expectedResourceToDeviceClass); diff != "" {
-				t.Error("resourceToDeviceClass doesn't match (-expected +actual):\n", diff)
 			}
 		})
 	}

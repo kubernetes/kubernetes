@@ -54,6 +54,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	apicalls "k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
@@ -436,12 +437,13 @@ func TestPreCheckForNode(t *testing.T) {
 // test for informers of resources we care about is registered
 func TestAddAllEventHandlers(t *testing.T) {
 	tests := []struct {
-		name                   string
-		gvkMap                 map[fwk.EventResource]fwk.ActionType
-		enableDRA              bool
-		enableDRADeviceTaints  bool
-		expectStaticInformers  map[reflect.Type]bool
-		expectDynamicInformers map[schema.GroupVersionResource]bool
+		name                      string
+		gvkMap                    map[fwk.EventResource]fwk.ActionType
+		enableDRA                 bool
+		enableDRADeviceTaints     bool
+		enableDRAExtendedResource bool
+		expectStaticInformers     map[reflect.Type]bool
+		expectDynamicInformers    map[schema.GroupVersionResource]bool
 	}{
 		{
 			name:   "default handlers in framework",
@@ -502,6 +504,25 @@ func TestAddAllEventHandlers(t *testing.T) {
 				reflect.TypeOf(&resourceapi.ResourceSlice{}):        true,
 				reflect.TypeOf(&resourcealphaapi.DeviceTaintRule{}): true,
 				reflect.TypeOf(&resourceapi.DeviceClass{}):          true,
+			},
+			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
+		},
+		{
+			name: "DRA extended resource enabled with DRA manager",
+			gvkMap: map[fwk.EventResource]fwk.ActionType{
+				fwk.ResourceClaim: fwk.Add,
+				fwk.ResourceSlice: fwk.Add,
+				fwk.DeviceClass:   fwk.Add,
+			},
+			enableDRA:                 true,
+			enableDRAExtendedResource: true,
+			expectStaticInformers: map[reflect.Type]bool{
+				reflect.TypeOf(&v1.Pod{}):                    true,
+				reflect.TypeOf(&v1.Node{}):                   true,
+				reflect.TypeOf(&v1.Namespace{}):              true,
+				reflect.TypeOf(&resourceapi.ResourceClaim{}): true,
+				reflect.TypeOf(&resourceapi.ResourceSlice{}): true,
+				reflect.TypeOf(&resourceapi.DeviceClass{}):   true,
 			},
 			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
 		},
@@ -569,6 +590,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.DynamicResourceAllocation: tt.enableDRA,
 				features.DRADeviceTaints:           tt.enableDRADeviceTaints,
+				features.DRAExtendedResource:       tt.enableDRAExtendedResource,
 			})
 
 			logger, ctx := ktesting.NewTestContext(t)
@@ -587,6 +609,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 			dynInformerFactory := dynamicinformer.NewDynamicSharedInformerFactory(dynclient, 0)
 			var resourceClaimCache *assumecache.AssumeCache
 			var resourceSliceTracker *resourceslicetracker.Tracker
+			var draManager fwk.SharedDRAManager
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
 				resourceClaimInformer := informerFactory.Resource().V1().ResourceClaims().Informer()
 				resourceClaimCache = assumecache.NewAssumeCache(logger, resourceClaimInformer, "ResourceClaim", "", nil)
@@ -604,9 +627,13 @@ func TestAddAllEventHandlers(t *testing.T) {
 				if err != nil {
 					t.Fatalf("couldn't start resource slice tracker: %v", err)
 				}
+
+				if tt.enableDRAExtendedResource {
+					draManager = dynamicresources.NewDRAManager(ctx, resourceClaimCache, resourceSliceTracker, informerFactory)
+				}
 			}
 
-			if err := addAllEventHandlers(&testSched, informerFactory, dynInformerFactory, resourceClaimCache, resourceSliceTracker, tt.gvkMap); err != nil {
+			if err := addAllEventHandlers(&testSched, informerFactory, dynInformerFactory, resourceClaimCache, resourceSliceTracker, draManager, tt.gvkMap); err != nil {
 				t.Fatalf("Add event handlers failed, error = %v", err)
 			}
 

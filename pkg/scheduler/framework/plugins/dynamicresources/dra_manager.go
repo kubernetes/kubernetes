@@ -28,6 +28,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	resourcelisters "k8s.io/client-go/listers/resource/v1"
+	"k8s.io/dynamic-resource-allocation/deviceclass/extendedresourcecache"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/dynamic-resource-allocation/structured"
 	"k8s.io/klog/v2"
@@ -42,9 +43,10 @@ var _ fwk.SharedDRAManager = &DefaultDRAManager{}
 // from API informers, and uses an AssumeCache and a map of in-flight allocations in order
 // to avoid race conditions when modifying ResourceClaims.
 type DefaultDRAManager struct {
-	resourceClaimTracker *claimTracker
-	resourceSliceLister  *resourceSliceLister
-	deviceClassLister    *deviceClassLister
+	resourceClaimTracker  *claimTracker
+	resourceSliceLister   *resourceSliceLister
+	deviceClassLister     *deviceClassLister
+	extendedResourceCache *extendedresourcecache.ExtendedResourceCache
 }
 
 func NewDRAManager(ctx context.Context, claimsCache *assumecache.AssumeCache, resourceSliceTracker *resourceslicetracker.Tracker, informerFactory informers.SharedInformerFactory) *DefaultDRAManager {
@@ -59,6 +61,10 @@ func NewDRAManager(ctx context.Context, claimsCache *assumecache.AssumeCache, re
 		},
 		resourceSliceLister: &resourceSliceLister{tracker: resourceSliceTracker},
 		deviceClassLister:   &deviceClassLister{classLister: informerFactory.Resource().V1().DeviceClasses().Lister()},
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
+		manager.extendedResourceCache = extendedresourcecache.NewExtendedResourceCache(logger)
 	}
 
 	// Reacting to events is more efficient than iterating over the list
@@ -78,6 +84,16 @@ func (s *DefaultDRAManager) ResourceSlices() fwk.ResourceSliceLister {
 
 func (s *DefaultDRAManager) DeviceClasses() fwk.DeviceClassLister {
 	return s.deviceClassLister
+}
+
+// DeviceClassResolver will always return a valid interface implementation. It
+// wraps a nil extendedresourcecache.ExtendedResourceCache if the feature is
+// disabled.
+//
+// That's okay, extendedresourcecache.ExtendedResourceCache.GetDeviceClass
+// returns the empty string if called for nil.
+func (s *DefaultDRAManager) DeviceClassResolver() fwk.DeviceClassResolver {
+	return s.extendedResourceCache
 }
 
 var _ fwk.ResourceSliceLister = &resourceSliceLister{}

@@ -33,6 +33,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	corev1nodeaffinity "k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
+	"k8s.io/dynamic-resource-allocation/deviceclass/extendedresourcecache"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -482,6 +483,7 @@ func addAllEventHandlers(
 	dynInformerFactory dynamicinformer.DynamicSharedInformerFactory,
 	resourceClaimCache *assumecache.AssumeCache,
 	resourceSliceTracker *resourceslicetracker.Tracker,
+	draManager fwk.SharedDRAManager,
 	gvkMap map[fwk.EventResource]fwk.ActionType,
 ) error {
 	var (
@@ -629,8 +631,20 @@ func addAllEventHandlers(
 			}
 		case fwk.DeviceClass:
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+				handler := cache.ResourceEventHandler(buildEvtResHandler(at, fwk.DeviceClass))
+				if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
+					// Inject updating of the cache before the scheduler event handlers ("chaining")
+					// to ensure that the cache gets updated before the scheduler kicks off
+					// pod scheduling based on a DeviceClass event.
+					//
+					// We know that this is a DefaultDRAManager and we know that it
+					// uses an ExtendedResourceCache, so no need for type checks.
+					erCache := draManager.DeviceClassResolver().(*extendedresourcecache.ExtendedResourceCache)
+					erCache.AddEventHandler(handler)
+					handler = erCache
+				}
 				if handlerRegistration, err = informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandler(
-					buildEvtResHandler(at, fwk.DeviceClass),
+					handler,
 				); err != nil {
 					return err
 				}
@@ -709,7 +723,7 @@ func preCheckForNode(nodeInfo *framework.NodeInfo) queue.PreEnqueueCheck {
 // returns all failures.
 func AdmissionCheck(pod *v1.Pod, nodeInfo *framework.NodeInfo, includeAllFailures bool) []AdmissionResult {
 	var admissionResults []AdmissionResult
-	insufficientResources := noderesources.Fits(pod, nodeInfo, noderesources.ResourceRequestsOptions{
+	insufficientResources := noderesources.Fits(pod, nodeInfo, nil, noderesources.ResourceRequestsOptions{
 		EnablePodLevelResources:   utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
 		EnableDRAExtendedResource: utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource),
 	})

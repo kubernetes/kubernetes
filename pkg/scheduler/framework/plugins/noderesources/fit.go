@@ -32,7 +32,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources/extended"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
@@ -105,8 +104,6 @@ func (f *Fit) ScoreExtensions() fwk.ScoreExtensions {
 // preFilterState computed at PreFilter and used at Filter.
 type preFilterState struct {
 	framework.Resource
-	// resourceToDeviceClass holds the mapping of extended resource to device class name.
-	resourceToDeviceClass map[v1.ResourceName]string
 }
 
 // Clone the prefilter state.
@@ -187,9 +184,39 @@ func NewFit(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.
 	}, nil
 }
 
+// ResourceRequestsOptions contains feature gate flags for resource request computation.
 type ResourceRequestsOptions struct {
 	EnablePodLevelResources   bool
 	EnableDRAExtendedResource bool
+}
+
+// shouldDelegateResourceToDRA checks if the given resource should be delegated to the DRA plugin.
+// It returns true if:
+//  1. The resource is not a scalar resource in the node's allocatable (not provided by device plugin)
+//  2. Either:
+//     a. A device class mapping exists for the resource in the cache (when draManager is available), OR
+//     b. draManager is nil (e.g., kubelet admission check) and the resource name suggests it's a DRA resource
+func shouldDelegateResourceToDRA(rName v1.ResourceName, nodeInfo fwk.NodeInfo, draManager fwk.SharedDRAManager, opts ResourceRequestsOptions) bool {
+	if !opts.EnableDRAExtendedResource {
+		return false
+	}
+
+	if allocatable := nodeInfo.GetAllocatable().GetScalarResources()[rName]; allocatable > 0 {
+		return false
+	}
+
+	// If draManager is available, check the cache for a mapping
+	if draManager != nil {
+		cache := draManager.DeviceClassResolver()
+		return cache.GetDeviceClass(rName) != ""
+	}
+
+	// If draManager is nil (e.g., kubelet admission check), delegate resources that are not in
+	// the node's allocatable. This allows pod to be admitted even when the kubelet
+	// doesn't have access to the device class cache.
+	// This can be removed once we have the fix for kubelet to admit pods with
+	// implicit extended resources or node's allocatable for the extended resource is zero.
+	return true
 }
 
 // computePodResourceRequest returns a framework.Resource that covers the largest
@@ -232,34 +259,6 @@ func computePodResourceRequest(pod *v1.Pod, opts ResourceRequestsOptions) *preFi
 	return result
 }
 
-// withDeviceClass adds resource to device class mapping to preFilterState.
-func withDeviceClass(result *preFilterState, draManager fwk.SharedDRAManager) *fwk.Status {
-	hasExtendedResource := false
-	for rName, rQuant := range result.ScalarResources {
-		// Skip in case request quantity is zero
-		if rQuant == 0 {
-			continue
-		}
-
-		if schedutil.IsDRAExtendedResourceName(rName) {
-			hasExtendedResource = true
-			break
-		}
-	}
-	if hasExtendedResource {
-		resourceToDeviceClass, err := extended.DeviceClassMapping(draManager)
-		if err != nil {
-			return fwk.AsStatus(err)
-		}
-		result.resourceToDeviceClass = resourceToDeviceClass
-		if len(resourceToDeviceClass) == 0 {
-			// ensure it is empty map, not nil.
-			result.resourceToDeviceClass = make(map[v1.ResourceName]string, 0)
-		}
-	}
-	return nil
-}
-
 // PreFilter invoked at the prefilter extension point.
 func (f *Fit) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
 	if !f.enableSidecarContainers && hasRestartableInitContainer(pod) {
@@ -271,11 +270,6 @@ func (f *Fit) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.
 		return nil, fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "Pod has a restartable init container and the SidecarContainers feature is disabled")
 	}
 	result := computePodResourceRequest(pod, ResourceRequestsOptions{EnablePodLevelResources: f.enablePodLevelResources})
-	if f.enableDRAExtendedResource {
-		if err := withDeviceClass(result, f.handle.SharedDRAManager()); err != nil {
-			return nil, err
-		}
-	}
 
 	cycleState.Write(preFilterStateKey, result)
 	return nil, nil
@@ -421,8 +415,18 @@ func (f *Fit) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1.Pod, oldO
 	if err != nil {
 		return fwk.Queue, err
 	}
+	// Use the DRA manager's extended resource cache for event handlers
+	var draManager fwk.SharedDRAManager
+	if f.enableDRAExtendedResource {
+		draManager = f.handle.SharedDRAManager()
+	}
+
+	opts := ResourceRequestsOptions{
+		EnablePodLevelResources:   f.enablePodLevelResources,
+		EnableDRAExtendedResource: f.enableDRAExtendedResource,
+	}
 	// Leaving in the queue, since the pod won't fit into the modified node anyway.
-	if !isFit(pod, modifiedNode, ResourceRequestsOptions{EnablePodLevelResources: f.enablePodLevelResources, EnableDRAExtendedResource: f.enableDRAExtendedResource}) {
+	if !isFit(pod, modifiedNode, draManager, opts) {
 		logger.V(5).Info("node was created or updated, but it doesn't have enough resource(s) to accommodate this pod", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
 		return fwk.QueueSkip, nil
 	}
@@ -432,7 +436,7 @@ func (f *Fit) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1.Pod, oldO
 		return fwk.Queue, nil
 	}
 	// The pod will fit, but since there was no increase in available resources, the change won't make the pod schedulable.
-	if !haveAnyRequestedResourcesIncreased(pod, originalNode, modifiedNode, ResourceRequestsOptions{EnablePodLevelResources: f.enablePodLevelResources, EnableDRAExtendedResource: f.enableDRAExtendedResource}) {
+	if !haveAnyRequestedResourcesIncreased(pod, originalNode, modifiedNode, draManager, opts) {
 		logger.V(5).Info("node was updated, but haven't changed the pod's resource requestments fit assessment", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
 		return fwk.QueueSkip, nil
 	}
@@ -442,7 +446,7 @@ func (f *Fit) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1.Pod, oldO
 }
 
 // haveAnyRequestedResourcesIncreased returns true if any of the resources requested by the pod have increased or if allowed pod number increased.
-func haveAnyRequestedResourcesIncreased(pod *v1.Pod, originalNode, modifiedNode *v1.Node, opts ResourceRequestsOptions) bool {
+func haveAnyRequestedResourcesIncreased(pod *v1.Pod, originalNode, modifiedNode *v1.Node, draManager fwk.SharedDRAManager, opts ResourceRequestsOptions) bool {
 	podRequest := computePodResourceRequest(pod, opts)
 	originalNodeInfo := framework.NewNodeInfo()
 	originalNodeInfo.SetNode(originalNode)
@@ -476,18 +480,8 @@ func haveAnyRequestedResourcesIncreased(pod *v1.Pod, originalNode, modifiedNode 
 			return true
 		}
 
-		if opts.EnableDRAExtendedResource {
-			allocatable := modifiedNodeInfo.GetAllocatable().GetScalarResources()[rName]
-			_, okDynamic := podRequest.resourceToDeviceClass[rName]
-
-			if (okDynamic || podRequest.resourceToDeviceClass == nil) && allocatable == 0 {
-				// The extended resource request matches a device class or no device class mapping
-				// provided and node's Allocatable is 0 (i.e. it was never provided by the node's
-				// device plugin or it's not provided by the node's device plugin anymore),
-				// then leave it to the dynamicresources plugin to evaluate whether it can be
-				// satisfied by DRA resources.
-				return true
-			}
+		if shouldDelegateResourceToDRA(rName, modifiedNodeInfo, draManager, opts) {
+			return true
 		}
 	}
 	return false
@@ -495,13 +489,14 @@ func haveAnyRequestedResourcesIncreased(pod *v1.Pod, originalNode, modifiedNode 
 
 // isFit checks if the pod fits the node. If the node is nil, it returns false.
 // It constructs a fake NodeInfo object for the node and checks if the pod fits the node.
-func isFit(pod *v1.Pod, node *v1.Node, opts ResourceRequestsOptions) bool {
+func isFit(pod *v1.Pod, node *v1.Node, draManager fwk.SharedDRAManager, opts ResourceRequestsOptions) bool {
 	if node == nil {
 		return false
 	}
 	nodeInfo := framework.NewNodeInfo()
 	nodeInfo.SetNode(node)
-	return len(Fits(pod, nodeInfo, opts)) == 0
+
+	return len(Fits(pod, nodeInfo, draManager, opts)) == 0
 }
 
 // Filter invoked at the filter extension point.
@@ -513,9 +508,17 @@ func (f *Fit) Filter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod
 		return fwk.AsStatus(err)
 	}
 
-	insufficientResources := fitsRequest(s, nodeInfo, f.ignoredResources, f.ignoredResourceGroups, ResourceRequestsOptions{
+	var draManager fwk.SharedDRAManager
+	if f.enableDRAExtendedResource {
+		draManager = f.handle.SharedDRAManager()
+	}
+
+	opts := ResourceRequestsOptions{
 		EnablePodLevelResources:   f.enablePodLevelResources,
-		EnableDRAExtendedResource: f.enableDRAExtendedResource})
+		EnableDRAExtendedResource: f.enableDRAExtendedResource,
+	}
+
+	insufficientResources := fitsRequest(s, nodeInfo, f.ignoredResources, f.ignoredResourceGroups, draManager, opts)
 
 	if len(insufficientResources) != 0 {
 		// We will keep all failure reasons.
@@ -558,11 +561,11 @@ type InsufficientResource struct {
 }
 
 // Fits checks if node have enough resources to host the pod.
-func Fits(pod *v1.Pod, nodeInfo fwk.NodeInfo, opts ResourceRequestsOptions) []InsufficientResource {
-	return fitsRequest(computePodResourceRequest(pod, opts), nodeInfo, nil, nil, opts)
+func Fits(pod *v1.Pod, nodeInfo fwk.NodeInfo, draManager fwk.SharedDRAManager, opts ResourceRequestsOptions) []InsufficientResource {
+	return fitsRequest(computePodResourceRequest(pod, opts), nodeInfo, nil, nil, draManager, opts)
 }
 
-func fitsRequest(podRequest *preFilterState, nodeInfo fwk.NodeInfo, ignoredExtendedResources, ignoredResourceGroups sets.Set[string], opts ResourceRequestsOptions) []InsufficientResource {
+func fitsRequest(podRequest *preFilterState, nodeInfo fwk.NodeInfo, ignoredExtendedResources, ignoredResourceGroups sets.Set[string], draManager fwk.SharedDRAManager, opts ResourceRequestsOptions) []InsufficientResource {
 	insufficientResources := make([]InsufficientResource, 0, 4)
 
 	allowedPodNumber := nodeInfo.GetAllocatable().GetAllowedPodNumber()
@@ -633,18 +636,8 @@ func fitsRequest(podRequest *preFilterState, nodeInfo fwk.NodeInfo, ignoredExten
 			}
 		}
 
-		if opts.EnableDRAExtendedResource {
-			allocatable := nodeInfo.GetAllocatable().GetScalarResources()[rName]
-			_, okDynamic := podRequest.resourceToDeviceClass[rName]
-
-			if (okDynamic || podRequest.resourceToDeviceClass == nil) && allocatable == 0 {
-				// The extended resource request matches a device class or no device class mapping
-				// provided and node's Allocatable is 0 (i.e. it was never provided by the node's
-				// device plugin or it's not provided by the node's device plugin anymore),
-				// then leave it to the dynamicresources plugin to evaluate whether it can be
-				// satisfied by DRA resources.
-				continue
-			}
+		if shouldDelegateResourceToDRA(rName, nodeInfo, draManager, opts) {
+			continue
 		}
 		if rQuant > (nodeInfo.GetAllocatable().GetScalarResources()[rName] - nodeInfo.GetRequested().GetScalarResources()[rName]) {
 			insufficientResources = append(insufficientResources, InsufficientResource{
