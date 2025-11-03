@@ -32,7 +32,7 @@ type nonePolicy struct {
 var _ Policy = &nonePolicy{}
 
 // PolicyNone name of none policy
-const PolicyNone policyName = "none"
+const PolicyNone policyName = "None"
 
 // NewNonePolicy returns a cpuset manager policy that does nothing
 func NewNonePolicy(cpuPolicyOptions map[string]string) (Policy, error) {
