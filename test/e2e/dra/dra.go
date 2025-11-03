@@ -1955,10 +1955,10 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 	// It is okay to use the same context multiple times (like "control plane"),
 	// as long as the test names the still remain unique overall.
 
-	framework.Context("control plane", framework.WithLabel("ConformanceCandidate") /* TODO: replace with framework.WithConformance() */, func() { singleNodeTests(false) })
+	framework.Context("control plane", func() { singleNodeTests(false) })
 	framework.Context("kubelet", feature.DynamicResourceAllocation, "on single node", func() { singleNodeTests(true) })
 
-	framework.Context("control plane", framework.WithLabel("ConformanceCandidate") /* TODO: replace with framework.WithConformance() */, func() { multiNodeTests(false) })
+	framework.Context("control plane", func() { multiNodeTests(false) })
 	framework.Context("kubelet", feature.DynamicResourceAllocation, "on multiple nodes", func() { multiNodeTests(true) })
 
 	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(features.DRAPrioritizedList), prioritizedListTests)
@@ -2408,7 +2408,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		//
 		// Could become a conformance test because it only depends
 		// on the apiserver.
-		f.It("creates slices", framework.WithLabel("ConformanceCandidate") /* TODO: replace with framework.WithConformance() */, func(ctx context.Context) {
+		f.It("creates slices", func(ctx context.Context) {
 			// Define desired resource slices.
 			driverName := f.Namespace.Name
 			numSlices := 100
@@ -2552,7 +2552,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			}).Should(gomega.Succeed())
 		})
 
-		f.It("truncates the name of a generated resource claim", framework.WithLabel("ConformanceCandidate") /* TODO: replace with framework.WithConformance() */, func(ctx context.Context) {
+		f.It("truncates the name of a generated resource claim", func(ctx context.Context) {
 			pod, template := b.PodInline()
 			pod.Name = strings.Repeat("p", 63)
 			pod.Spec.ResourceClaims[0].Name = strings.Repeat("c", 63)
@@ -2562,7 +2562,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			b.TestPod(ctx, f, pod)
 		})
 
-		f.It("supports count/resourceclaims.resource.k8s.io ResourceQuota", framework.WithLabel("ConformanceCandidate") /* TODO: replace with framework.WithConformance() */, func(ctx context.Context) {
+		f.It("supports count/resourceclaims.resource.k8s.io ResourceQuota", func(ctx context.Context) {
 			claim := &resourceapi.ResourceClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "claim-0",
@@ -2697,7 +2697,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		driver := drautils.NewDriver(f, nodes, drautils.DriverResources(1))
 		driver.WithKubelet = false
 
-		f.It("must apply per-node permission checks", framework.WithLabel("ConformanceCandidate") /* TODO: replace with framework.WithConformance() */, func(ctx context.Context) {
+		f.It("must apply per-node permission checks", func(ctx context.Context) {
 			// All of the operations use the client set of a kubelet plugin for
 			// a fictional node which both don't exist, so nothing interferes
 			// when we actually manage to create a slice.
