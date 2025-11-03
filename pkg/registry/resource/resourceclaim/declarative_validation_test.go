@@ -92,7 +92,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			},
 		},
 		"invalid requests, too many AND duplicate name (short-circuit check)": {
-			input: mkValidResourceClaim(tweakDevicesRequestsTooManyAndDuplicate(33)),
+			input: mkValidResourceClaim(tweakDevicesRequests(33), tweakAddDeviceRequest(mkDeviceRequest("req-0"))),
 			expectedErrs: field.ErrorList{
 				// We expect ONLY TooMany, suppressing the Duplicate error because of short-circuiting
 				field.TooMany(field.NewPath("spec", "devices", "requests"), 33, 32).WithOrigin("maxItems"),
@@ -503,20 +503,6 @@ func tweakDevicesRequests(items int) func(*resource.ResourceClaim) {
 		// The first request already exists in the valid template
 		for i := 1; i < items; i++ {
 			rc.Spec.Devices.Requests = append(rc.Spec.Devices.Requests, mkDeviceRequest(fmt.Sprintf("req-%d", i)))
-		}
-	}
-}
-
-func tweakDevicesRequestsTooManyAndDuplicate(count int) func(*resource.ResourceClaim) {
-	return func(rc *resource.ResourceClaim) {
-		// Ensure we have 'count' requests total.
-		// Base claim already has 1 ("req-0").
-		for i := 1; i < count; i++ {
-			rc.Spec.Devices.Requests = append(rc.Spec.Devices.Requests, mkDeviceRequest(fmt.Sprintf("req-%d", i)))
-		}
-		// Force a duplicate if we have enough items by setting the last one to match the first
-		if count > 1 {
-			rc.Spec.Devices.Requests[count-1].Name = "req-0"
 		}
 	}
 }
