@@ -155,7 +155,14 @@ type LeaderElectionConfig struct {
 	// ensure all code guarded by this lease has successfully completed
 	// prior to cancelling the context, or you may have two processes
 	// simultaneously acting on the critical path.
+	// This should be used in conjunction with GracefulOnStoppedLeading to ensure
+	// that the OnStartedLeading function has returned before releasing the lock.
 	ReleaseOnCancel bool
+
+	// GracefulOnStoppedLeading waits for OnStartedLeading to terminate before
+	// calling OnStoppedLeading. To remain backwards compatible with older
+	// controllers that are not shut down gracefully, this defaults to false.
+	GracefulOnStoppedLeading bool
 
 	// Name is the name of the resource lock for debugging
 	Name string
@@ -215,9 +222,17 @@ func (le *LeaderElector) Run(ctx context.Context) {
 	if !le.acquire(ctx) {
 		return // ctx signalled done
 	}
+	var wg sync.WaitGroup
+	if le.config.GracefulOnStoppedLeading {
+		defer wg.Wait()
+	}
+
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	go le.config.Callbacks.OnStartedLeading(ctx)
+
+	wg.Go(func() {
+		le.config.Callbacks.OnStartedLeading(ctx)
+	})
 	le.renew(ctx)
 }
 

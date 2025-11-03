@@ -1190,3 +1190,63 @@ func TestFastPathLeaderElection(t *testing.T) {
 		})
 	}
 }
+
+func TestEnableGracefulRelease(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	var lock rl.Interface
+	objectMeta := metav1.ObjectMeta{Namespace: "foo", Name: "bar"}
+	recorder := record.NewFakeRecorder(100)
+	resourceLockConfig := rl.ResourceLockConfig{
+		Identity:      "baz",
+		EventRecorder: recorder,
+	}
+	c := &fake.Clientset{}
+
+	lock = &rl.LeaseLock{
+		LeaseMeta:  objectMeta,
+		LockConfig: resourceLockConfig,
+		Client:     c.CoordinationV1(),
+	}
+
+	onStartedLeadingCalled := make(chan struct{})
+	onStoppedLeadingCalled := make(chan struct{})
+
+	onStartedLeadingCompleted := make(chan struct{})
+
+	lec := LeaderElectionConfig{
+		Lock:          lock,
+		LeaseDuration: 60 * time.Second,
+		RenewDeadline: 15 * time.Second,
+		RetryPeriod:   5 * time.Second,
+		Callbacks: LeaderCallbacks{
+			OnStartedLeading: func(c context.Context) {
+				close(onStartedLeadingCalled)
+				<-c.Done()
+				<-onStartedLeadingCompleted
+			},
+			OnStoppedLeading: func() {
+				close(onStoppedLeadingCalled)
+			},
+		},
+		GracefulOnStoppedLeading: true,
+	}
+	le, err := NewLeaderElector(lec)
+	if err != nil {
+		t.Fatalf("failed to create leader elector: %v", err)
+	}
+
+	go le.Run(ctx)
+	<-onStartedLeadingCalled
+	cancel()
+	select {
+	case <-onStoppedLeadingCalled:
+		t.Error("OnStoppedLeading called before OnStartedLeading returned")
+	case <-time.After(5 * time.Second):
+		// OnStartedLeading is still running as expected
+	}
+	close(onStartedLeadingCompleted)
+	<-onStoppedLeadingCalled
+}
