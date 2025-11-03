@@ -77,7 +77,7 @@ func makeResizableContainer(tcInfo ResizableContainerInfo) v1.Container {
 	return tc
 }
 
-func MakePodWithResizableContainers(ns, name, timeStamp string, tcInfo []ResizableContainerInfo) *v1.Pod {
+func MakePodWithResizableContainers(ns, name, timeStamp string, tcInfo []ResizableContainerInfo, podResources *v1.ResourceRequirements) *v1.Pod {
 	testInitContainers, testContainers := separateContainers(tcInfo)
 
 	minGracePeriodSeconds := int64(0)
@@ -97,6 +97,11 @@ func MakePodWithResizableContainers(ns, name, timeStamp string, tcInfo []Resizab
 			TerminationGracePeriodSeconds: &minGracePeriodSeconds,
 		},
 	}
+
+	if podResources != nil {
+		pod.Spec.Resources = podResources
+	}
+
 	return pod
 }
 
@@ -154,7 +159,7 @@ func VerifyPodResizePolicy(gotPod *v1.Pod, wantInfo []ResizableContainerInfo) {
 	}
 }
 
-func VerifyPodResources(gotPod *v1.Pod, wantInfo []ResizableContainerInfo) {
+func VerifyPodResources(gotPod *v1.Pod, wantInfo []ResizableContainerInfo, wantPodResources *v1.ResourceRequirements) {
 	ginkgo.GinkgoHelper()
 
 	gotCtrs := append(append([]v1.Container{}, gotPod.Spec.Containers...), gotPod.Spec.InitContainers...)
@@ -171,6 +176,8 @@ func VerifyPodResources(gotPod *v1.Pod, wantInfo []ResizableContainerInfo) {
 			gomega.Expect(gotCtr.Resources).To(gomega.BeComparableTo(wantCtr.Resources))
 		}
 	}
+	gomega.Expect(gotPod.Spec.Resources).To(gomega.BeComparableTo(wantPodResources))
+
 }
 
 func VerifyPodStatusResources(gotPod *v1.Pod, wantInfo []ResizableContainerInfo) error {
@@ -213,6 +220,63 @@ func verifyPodContainersStatusResources(gotCtrStatuses []v1.ContainerStatus, wan
 	}
 
 	return utilerrors.NewAggregate(errs)
+}
+
+func VerifyPodCgroupValues(ctx context.Context, f *framework.Framework, pod *v1.Pod) error {
+	aggregatedReqs, aggregatedLims := AggregateContainerResources(pod.Spec)
+	cpuReq := aggregatedReqs[v1.ResourceCPU]
+	cpuLim := aggregatedLims[v1.ResourceCPU]
+	memLim := aggregatedLims[v1.ResourceMemory]
+	if pod.Spec.Resources != nil {
+		cpuReq = pod.Spec.Resources.Requests[v1.ResourceCPU]
+		if pod.Spec.Resources.Limits != nil {
+			if podCPULim, found := pod.Spec.Resources.Limits[v1.ResourceCPU]; found {
+				cpuLim = podCPULim
+			}
+			if podMemLim, found := pod.Spec.Resources.Limits[v1.ResourceMemory]; found {
+				memLim = podMemLim
+			}
+		}
+	}
+
+	cgroupResources := &cgroups.ContainerResources{
+		CPUReq: cpuReq.String(),
+		MemLim: memLim.String(),
+		CPULim: cpuLim.String(),
+		// memory requests are not set in cgroup
+	}
+
+	return cgroups.VerifyPodCgroups(ctx, f, pod, cgroupResources)
+}
+
+func AggregateContainerResources(spec v1.PodSpec) (v1.ResourceList, v1.ResourceList) {
+	// Pre-allocate map memory based on the test's scope, as only
+	// 'cpu' and 'memory' resources will be tracked.
+	aggregatedReqs := make(v1.ResourceList, 2)
+	aggregatedLims := make(v1.ResourceList, 2)
+
+	for _, container := range spec.Containers {
+		addResourceList(aggregatedReqs, container.Resources.Requests)
+		addResourceList(aggregatedLims, container.Resources.Limits)
+	}
+
+	for _, container := range spec.InitContainers {
+		addResourceList(aggregatedReqs, container.Resources.Requests)
+		addResourceList(aggregatedLims, container.Resources.Limits)
+	}
+
+	return aggregatedReqs, aggregatedLims
+}
+
+// TODO: move this to a common helper method and re-use in pod-level resources
+// related tests
+func addResourceList(des, src v1.ResourceList) {
+	for name, quantity := range src {
+		if value, found := des[name]; found {
+			quantity.Add(value)
+		}
+		des[name] = quantity.DeepCopy()
+	}
 }
 
 func VerifyPodContainersCgroupValues(ctx context.Context, f *framework.Framework, pod *v1.Pod, tcInfo []ResizableContainerInfo) error {
@@ -329,6 +393,7 @@ func ExpectPodResized(ctx context.Context, f *framework.Framework, resizedPod *v
 
 	// Verify Pod Containers Cgroup Values
 	var errs []error
+
 	if cgroupErrs := VerifyPodContainersCgroupValues(ctx, f, resizedPod, expectedContainers); cgroupErrs != nil {
 		errs = append(errs, fmt.Errorf("container cgroup values don't match expected: %w", formatErrors(cgroupErrs)))
 	}
@@ -353,11 +418,11 @@ func ExpectPodResized(ctx context.Context, f *framework.Framework, resizedPod *v
 	}
 }
 
-func MakeResizePatch(originalContainers, desiredContainers []ResizableContainerInfo) []byte {
-	original, err := json.Marshal(MakePodWithResizableContainers("", "", "", originalContainers))
+func MakeResizePatch(originalContainers, desiredContainers []ResizableContainerInfo, originPodResources, desiredPodResources *v1.ResourceRequirements) []byte {
+	original, err := json.Marshal(MakePodWithResizableContainers("", "", "", originalContainers, originPodResources))
 	framework.ExpectNoError(err)
 
-	desired, err := json.Marshal(MakePodWithResizableContainers("", "", "", desiredContainers))
+	desired, err := json.Marshal(MakePodWithResizableContainers("", "", "", desiredContainers, desiredPodResources))
 	framework.ExpectNoError(err)
 
 	patch, err := strategicpatch.CreateTwoWayMergePatch(original, desired, v1.Pod{})
