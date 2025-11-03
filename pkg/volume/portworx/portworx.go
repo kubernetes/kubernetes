@@ -308,8 +308,9 @@ func (b *portworxVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterAr
 	notMnt, err := b.mounter.IsLikelyNotMountPoint(dir)
 	klog.Infof("Portworx Volume set up. Dir: %s %v %v", dir, !notMnt, err)
 	if err != nil && !os.IsNotExist(err) {
-		klog.Errorf("Cannot validate mountpoint: %s", dir)
-		return err
+		// don't log error details from client calls in events
+		klog.V(4).Infof("Cannot validate mountpoint %s: %v", dir, err)
+		return fmt.Errorf("failed to validate mountpoint: see kube-controller-manager.log for details")
 	}
 	if !notMnt {
 		return nil
@@ -319,7 +320,9 @@ func (b *portworxVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterAr
 	attachOptions[attachContextKey] = dir
 	attachOptions[attachHostKey] = b.plugin.host.GetHostName()
 	if _, err := b.manager.AttachVolume(b, attachOptions); err != nil {
-		return err
+		// don't log error details from client calls in events
+		klog.V(4).Infof("Failed to attach volume %s: %v", b.volumeID, err)
+		return fmt.Errorf("failed to attach volume: see kube-controller-manager.log for details")
 	}
 
 	klog.V(4).Infof("Portworx Volume %s attached", b.volumeID)
@@ -329,7 +332,9 @@ func (b *portworxVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterAr
 	}
 
 	if err := b.manager.MountVolume(b, dir); err != nil {
-		return err
+		// don't log error details from client calls in events
+		klog.V(4).Infof("Failed to mount volume %s: %v", b.volumeID, err)
+		return fmt.Errorf("failed to mount volume: see kube-controller-manager.log for details")
 	}
 	if !b.readOnly {
 		// Since portworxVolume is in process of being removed from in-tree, we avoid larger refactor to add progress tracking for ownership operation
@@ -362,12 +367,16 @@ func (c *portworxVolumeUnmounter) TearDownAt(dir string) error {
 	klog.Infof("Portworx Volume TearDown of %s", dir)
 
 	if err := c.manager.UnmountVolume(c, dir); err != nil {
-		return err
+		// don't log error details from client calls in events
+		klog.V(4).Infof("Failed to unmount volume %s: %v", c.volumeID, err)
+		return fmt.Errorf("failed to unmount volume: see kube-controller-manager.log for details")
 	}
 
 	// Call Portworx Detach Volume.
 	if err := c.manager.DetachVolume(c); err != nil {
-		return err
+		// don't log error details from client calls in events
+		klog.V(4).Infof("Failed to detach volume %s: %v", c.volumeID, err)
+		return fmt.Errorf("failed to detach volume: see kube-controller-manager.log for details")
 	}
 
 	return nil
@@ -384,7 +393,13 @@ func (d *portworxVolumeDeleter) GetPath() string {
 }
 
 func (d *portworxVolumeDeleter) Delete() error {
-	return d.manager.DeleteVolume(d)
+	err := d.manager.DeleteVolume(d)
+	if err != nil {
+		// don't log error details from client calls in events
+		klog.V(4).Infof("Failed to delete volume %s: %v", d.volumeID, err)
+		return fmt.Errorf("failed to delete volume: see kube-controller-manager.log for details")
+	}
+	return nil
 }
 
 type portworxVolumeProvisioner struct {
@@ -405,7 +420,9 @@ func (c *portworxVolumeProvisioner) Provision(selectedNode *v1.Node, allowedTopo
 
 	volumeID, sizeGiB, labels, err := c.manager.CreateVolume(c)
 	if err != nil {
-		return nil, err
+		// don't log error details from client calls in events
+		klog.V(4).Infof("Failed to create volume: %v", err)
+		return nil, fmt.Errorf("failed to create volume: see kube-controller-manager.log for details")
 	}
 
 	pv := &v1.PersistentVolume{
