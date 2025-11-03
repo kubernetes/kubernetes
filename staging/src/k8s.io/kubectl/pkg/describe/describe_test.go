@@ -36,7 +36,6 @@ import (
 	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
-	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	policyv1 "k8s.io/api/policy/v1"
@@ -5158,7 +5157,7 @@ func TestDescribeEvents(t *testing.T) {
 			}, events),
 		},
 		"EndpointSliceDescriber": &EndpointSliceDescriber{
-			fake.NewClientset(&discoveryv1beta1.EndpointSlice{
+			fake.NewClientset(&discoveryv1.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "bar",
 					Namespace: "foo",
@@ -6600,100 +6599,35 @@ func TestDescribeEndpointSlice(t *testing.T) {
 	protocolTCP := corev1.ProtocolTCP
 	port80 := int32(80)
 
-	testcases := map[string]struct {
-		input  *fake.Clientset
-		output string
-	}{
-		"EndpointSlices v1beta1": {
-			input: fake.NewClientset(&discoveryv1beta1.EndpointSlice{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "foo.123",
-					Namespace: "bar",
-				},
-				AddressType: discoveryv1beta1.AddressTypeIPv4,
-				Endpoints: []discoveryv1beta1.Endpoint{
-					{
-						Addresses:  []string{"1.2.3.4", "1.2.3.5"},
-						Conditions: discoveryv1beta1.EndpointConditions{Ready: ptr.To(true)},
-						TargetRef:  &corev1.ObjectReference{Kind: "Pod", Name: "test-123"},
-						Topology: map[string]string{
-							"topology.kubernetes.io/zone":   "us-central1-a",
-							"topology.kubernetes.io/region": "us-central1",
-						},
-					}, {
-						Addresses:  []string{"1.2.3.6", "1.2.3.7"},
-						Conditions: discoveryv1beta1.EndpointConditions{Ready: ptr.To(true)},
-						TargetRef:  &corev1.ObjectReference{Kind: "Pod", Name: "test-124"},
-						Topology: map[string]string{
-							"topology.kubernetes.io/zone":   "us-central1-b",
-							"topology.kubernetes.io/region": "us-central1",
-						},
-					},
-				},
-				Ports: []discoveryv1beta1.EndpointPort{
-					{
-						Protocol: &protocolTCP,
-						Port:     &port80,
-					},
-				},
-			}),
-
-			output: `Name:         foo.123
-Namespace:    bar
-Labels:       <none>
-Annotations:  <none>
-AddressType:  IPv4
-Ports:
-  Name     Port  Protocol
-  ----     ----  --------
-  <unset>  80    TCP
-Endpoints:
-  - Addresses:  1.2.3.4,1.2.3.5
-    Conditions:
-      Ready:    true
-    Hostname:   <unset>
-    TargetRef:  Pod/test-123
-    Topology:   topology.kubernetes.io/region=us-central1
-                topology.kubernetes.io/zone=us-central1-a
-  - Addresses:  1.2.3.6,1.2.3.7
-    Conditions:
-      Ready:    true
-    Hostname:   <unset>
-    TargetRef:  Pod/test-124
-    Topology:   topology.kubernetes.io/region=us-central1
-                topology.kubernetes.io/zone=us-central1-b
-Events:         <none>` + "\n",
+	input := fake.NewClientset(&discoveryv1.EndpointSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "foo.123",
+			Namespace: "bar",
 		},
-		"EndpointSlices v1": {
-			input: fake.NewClientset(&discoveryv1.EndpointSlice{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "foo.123",
-					Namespace: "bar",
-				},
-				AddressType: discoveryv1.AddressTypeIPv4,
-				Endpoints: []discoveryv1.Endpoint{
-					{
-						Addresses:  []string{"1.2.3.4", "1.2.3.5"},
-						Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
-						TargetRef:  &corev1.ObjectReference{Kind: "Pod", Name: "test-123"},
-						Zone:       ptr.To("us-central1-a"),
-						NodeName:   ptr.To("node-1"),
-					}, {
-						Addresses:  []string{"1.2.3.6", "1.2.3.7"},
-						Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
-						TargetRef:  &corev1.ObjectReference{Kind: "Pod", Name: "test-124"},
-						NodeName:   ptr.To("node-2"),
-					},
-				},
-				Ports: []discoveryv1.EndpointPort{
-					{
-						Protocol: &protocolTCP,
-						Port:     &port80,
-					},
-				},
-			}),
+		AddressType: discoveryv1.AddressTypeIPv4,
+		Endpoints: []discoveryv1.Endpoint{
+			{
+				Addresses:  []string{"1.2.3.4", "1.2.3.5"},
+				Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+				TargetRef:  &corev1.ObjectReference{Kind: "Pod", Name: "test-123"},
+				Zone:       ptr.To("us-central1-a"),
+				NodeName:   ptr.To("node-1"),
+			}, {
+				Addresses:  []string{"1.2.3.6", "1.2.3.7"},
+				Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+				TargetRef:  &corev1.ObjectReference{Kind: "Pod", Name: "test-124"},
+				NodeName:   ptr.To("node-2"),
+			},
+		},
+		Ports: []discoveryv1.EndpointPort{
+			{
+				Protocol: &protocolTCP,
+				Port:     &port80,
+			},
+		},
+	})
 
-			output: `Name:         foo.123
+	output := `Name:         foo.123
 Namespace:    bar
 Labels:       <none>
 Annotations:  <none>
@@ -6717,23 +6651,17 @@ Endpoints:
     TargetRef:  Pod/test-124
     NodeName:   node-2
     Zone:       <unset>
-Events:         <none>` + "\n",
-		},
-	}
+Events:         <none>` + "\n"
 
-	for name, tc := range testcases {
-		t.Run(name, func(t *testing.T) {
-			c := &describeClient{T: t, Namespace: "foo", Interface: tc.input}
-			d := EndpointSliceDescriber{c}
-			out, err := d.Describe("bar", "foo.123", DescriberSettings{ShowEvents: true})
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-			if out != tc.output {
-				t.Log(out)
-				t.Errorf("expected :\n%s\nbut got output:\n%s", tc.output, out)
-			}
-		})
+	c := &describeClient{T: t, Namespace: "foo", Interface: input}
+	d := EndpointSliceDescriber{c}
+	out, err := d.Describe("bar", "foo.123", DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if out != output {
+		t.Log(out)
+		t.Errorf("expected :\n%s\nbut got output:\n%s", output, out)
 	}
 }
 
