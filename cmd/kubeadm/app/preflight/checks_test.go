@@ -39,6 +39,7 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
@@ -1065,12 +1066,18 @@ func TestContainerRuntimeCheck(t *testing.T) {
 func TestContainerRuntimeVersionCheck(t *testing.T) {
 	tests := []struct {
 		name           string
+		criSocket      string
 		prepare        func(*utilruntime.FakeImpl)
 		expectErrors   int
 		expectWarnings int
 	}{
 		{
 			name: "ok",
+		},
+		{
+			name:           "dry run",
+			criSocket:      constants.DefaultCRISocketDryRun,
+			expectWarnings: 1,
 		},
 		{
 			name: "runtime config not implemented",
@@ -1094,8 +1101,11 @@ func TestContainerRuntimeVersionCheck(t *testing.T) {
 			if test.prepare != nil {
 				test.prepare(mock)
 			}
+			if len(test.criSocket) > 0 {
+				mock = nil
+			}
 
-			warnings, errors := ContainerRuntimeVersionCheck{impl: mock}.Check()
+			warnings, errors := ContainerRuntimeVersionCheck{impl: mock, criSocket: test.criSocket}.Check()
 			if len(warnings) != test.expectWarnings {
 				t.Errorf("expected %d warning(s) but got %d: %q", test.expectWarnings, len(warnings), warnings)
 			}

@@ -30,4 +30,7 @@ const (
 
 	// DefaultCRISocket defines the default CRI socket
 	DefaultCRISocket = CRISocketContainerd
+
+	// DefaultCRISocketDryRun is the default CRI socket for dry run
+	DefaultCRISocketDryRun = "npipe:////./pipe/dry-run-cri-socket"
 )

@@ -118,6 +118,14 @@ func (ContainerRuntimeVersionCheck) Name() string {
 // Check validates the container runtime version compatibility with kubelet.
 func (crvc ContainerRuntimeVersionCheck) Check() (warnings, errorList []error) {
 	klog.V(1).Infoln("validating the container runtime version compatibility")
+	compatibilityError := errors.New("You must update your container runtime to a version that supports the CRI method RuntimeConfig. " +
+		"Falling back to using cgroupDriver from kubelet config will be removed in 1.36. " +
+		"For more information, see https://git.k8s.io/enhancements/keps/sig-node/4033-group-driver-detection-over-cri")
+
+	if crvc.criSocket == kubeadmconstants.DefaultCRISocketDryRun {
+		return []error{compatibilityError}, nil
+	}
+
 	containerRuntime := utilruntime.NewContainerRuntime(crvc.criSocket)
 	if crvc.impl != nil {
 		containerRuntime.SetImpl(crvc.impl)
@@ -134,10 +142,7 @@ func (crvc ContainerRuntimeVersionCheck) Check() (warnings, errorList []error) {
 	if !ok {
 		// TODO: return an error once the kubelet version is 1.36 or higher.
 		// https://github.com/kubernetes/kubeadm/issues/3229
-		err := errors.New("You must update your container runtime to a version that supports the CRI method RuntimeConfig. " +
-			"Falling back to using cgroupDriver from kubelet config will be removed in 1.36. " +
-			"For more information, see https://git.k8s.io/enhancements/keps/sig-node/4033-group-driver-detection-over-cri")
-		warnings = append(warnings, err)
+		warnings = append(warnings, compatibilityError)
 	}
 
 	return warnings, errorList
