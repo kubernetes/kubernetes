@@ -200,14 +200,14 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		// Group=certificates.k8s.io, Version=v1alpha1
 	case certificatesv1alpha1.SchemeGroupVersion.WithResource("clustertrustbundles"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Certificates().V1alpha1().ClusterTrustBundles().Informer()}, nil
-	case certificatesv1alpha1.SchemeGroupVersion.WithResource("podcertificaterequests"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Certificates().V1alpha1().PodCertificateRequests().Informer()}, nil
 
 		// Group=certificates.k8s.io, Version=v1beta1
 	case certificatesv1beta1.SchemeGroupVersion.WithResource("certificatesigningrequests"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Certificates().V1beta1().CertificateSigningRequests().Informer()}, nil
 	case certificatesv1beta1.SchemeGroupVersion.WithResource("clustertrustbundles"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Certificates().V1beta1().ClusterTrustBundles().Informer()}, nil
+	case certificatesv1beta1.SchemeGroupVersion.WithResource("podcertificaterequests"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Certificates().V1beta1().PodCertificateRequests().Informer()}, nil
 
 		// Group=coordination.k8s.io, Version=v1
 	case coordinationv1.SchemeGroupVersion.WithResource("leases"):

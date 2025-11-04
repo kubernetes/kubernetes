@@ -3903,6 +3903,13 @@ func (in *PodCertificateProjection) DeepCopyInto(out *PodCertificateProjection) 
 		*out = new(int32)
 		**out = **in
 	}
+	if in.UserAnnotations != nil {
+		in, out := &in.UserAnnotations, &out.UserAnnotations
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	return
 }
 
