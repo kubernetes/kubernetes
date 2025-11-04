@@ -48,7 +48,6 @@ import (
 	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
 	nodeutil "k8s.io/component-helpers/node/util"
 	"k8s.io/controller-manager/pkg/features"
-	_ "k8s.io/controller-manager/pkg/features/register"
 )
 
 const (
