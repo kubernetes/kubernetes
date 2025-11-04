@@ -90,6 +90,7 @@ func init() {
 			return retval
 		},
 		failRequiresFeatures: []featuregate.Feature{"ProcMountType"},
+		failRequiresError:    true, // the only combination that can fail the 1.35 baseline check also fails validation
 		generateFail: func(p *corev1.Pod) []*corev1.Pod {
 			p = ensureSecurityContext(p)
 			return []*corev1.Pod{
