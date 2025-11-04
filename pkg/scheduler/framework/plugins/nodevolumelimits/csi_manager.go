@@ -23,15 +23,15 @@ import (
 	fwk "k8s.io/kube-scheduler/framework"
 )
 
-// CSIManagerImpl is a implementation of the CSIManager interface.
+// DefaultCSIManager is an implementation of the CSIManager interface.
 type DefaultCSIManager struct {
 	defaultCSINodeLister *csiNodeLister
 }
 
 var _ fwk.CSIManager = &DefaultCSIManager{}
 
-func NewCSIManager(csinodeLister storagelisters.CSINodeLister) *DefaultCSIManager {
-	return &DefaultCSIManager{defaultCSINodeLister: NewCsiNodeLister(csinodeLister)}
+func NewCSIManager(csiNodeLister storagelisters.CSINodeLister) *DefaultCSIManager {
+	return &DefaultCSIManager{defaultCSINodeLister: NewCSINodeLister(csiNodeLister)}
 }
 
 func (m *DefaultCSIManager) CSINodes() fwk.CSINodeLister {
@@ -44,7 +44,7 @@ type csiNodeLister struct {
 
 var _ fwk.CSINodeLister = &csiNodeLister{}
 
-func NewCsiNodeLister(csinodeLister storagelisters.CSINodeLister) *csiNodeLister {
+func NewCSINodeLister(csinodeLister storagelisters.CSINodeLister) *csiNodeLister {
 	return &csiNodeLister{csinodeLister: csinodeLister}
 }
 

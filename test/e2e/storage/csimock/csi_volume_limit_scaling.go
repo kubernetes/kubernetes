@@ -30,7 +30,6 @@ import (
 	"k8s.io/utils/ptr"
 
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eevents "k8s.io/kubernetes/test/e2e/framework/events"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -39,26 +38,23 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
-var _ = utils.SIGDescribe("CSI Mock VolumeLimitScaling scheduling", func() {
+var _ = utils.SIGDescribe("CSI Mock VolumeLimitScaling scheduling", framework.WithFeatureGate(features.VolumeLimitScaling), func() {
 	f := framework.NewDefaultFramework("csi-mock-volumes-limit-sched")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
-	f.Context("VolumeLimitScaling scheduling", feature.Volumes, func() {
+	f.Context("VolumeLimitScaling scheduling", func() {
 		tests := []struct {
 			name              string
-			featureTags       []interface{}
 			csiDriverPresent  bool
 			expectSchedulable bool
 		}{
 			{
 				name:              "blocks scheduling when driver not installed and CSIDriver is present",
-				featureTags:       []interface{}{framework.WithFeatureGate(features.VolumeLimitScaling)},
 				csiDriverPresent:  true,
 				expectSchedulable: false,
 			},
 			{
 				name:              "allows scheduling when driver not installed and CSIDriver object is not present",
-				featureTags:       []interface{}{framework.WithFeatureGate(features.VolumeLimitScaling)},
 				csiDriverPresent:  false,
 				expectSchedulable: true,
 			},
@@ -143,7 +139,6 @@ var _ = utils.SIGDescribe("CSI Mock VolumeLimitScaling scheduling", func() {
 
 			// Compose It with feature tags
 			args := []interface{}{tc.name, testFunc}
-			args = append(args, tc.featureTags...)
 			framework.It(args...)
 		}
 	})

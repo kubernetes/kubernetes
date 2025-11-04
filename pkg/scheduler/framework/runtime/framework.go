@@ -80,7 +80,6 @@ type frameworkImpl struct {
 	sharedDRAManager fwk.SharedDRAManager
 	logger           klog.Logger
 
-	// for tracking CSI node limits
 	sharedCSIManager fwk.CSIManager
 
 	metricsRecorder          *metrics.MetricAsyncRecorder
