@@ -55,6 +55,7 @@ import (
 	discoveryendpoint "k8s.io/apiserver/pkg/endpoints/discovery/aggregated"
 	"k8s.io/apiserver/pkg/endpoints/filterlatency"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
+	"k8s.io/apiserver/pkg/endpoints/filters/impersonation"
 	apiopenapi "k8s.io/apiserver/pkg/endpoints/openapi"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	genericfeatures "k8s.io/apiserver/pkg/features"
@@ -1030,8 +1031,13 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	}
 
 	handler = filterlatency.TrackCompleted(handler)
-	handler = genericapifilters.WithImpersonation(handler, c.Authorization.Authorizer, c.Serializer)
-	handler = filterlatency.TrackStarted(handler, c.TracerProvider, "impersonation")
+	if c.FeatureGate.Enabled(genericfeatures.ConstrainedImpersonation) {
+		handler = impersonation.WithConstrainedImpersonation(handler, c.Authorization.Authorizer, c.Serializer)
+		handler = filterlatency.TrackStarted(handler, c.TracerProvider, "constrainedimpersonation")
+	} else {
+		handler = impersonation.WithImpersonation(handler, c.Authorization.Authorizer, c.Serializer)
+		handler = filterlatency.TrackStarted(handler, c.TracerProvider, "impersonation")
+	}
 
 	handler = filterlatency.TrackCompleted(handler)
 	handler = genericapifilters.WithAudit(handler, c.AuditBackend, c.AuditPolicyRuleEvaluator, c.LongRunningFunc)
