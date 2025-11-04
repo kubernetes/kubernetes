@@ -352,7 +352,8 @@ const (
 	// Enables support of configurable HPA scale-up and scale-down tolerances.
 	HPAConfigurableTolerance featuregate.Feature = "HPAConfigurableTolerance"
 
-	// owner: @dxist
+	// owner: @johanneswuerbach
+	// kep: https://kep.k8s.io/2021
 	//
 	// Enables support of HPA scaling to zero pods when an object or custom metric is configured.
 	HPAScaleToZero featuregate.Feature = "HPAScaleToZero"
