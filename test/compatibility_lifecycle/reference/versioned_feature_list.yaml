@@ -725,6 +725,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.32"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.35"
 - name: JobPodReplacementPolicy
   versionedSpecs:
   - default: false

@@ -1593,6 +1593,9 @@ func TestDelayTerminalPhaseCondition(t *testing.T) {
 			} else if !test.enableJobPodReplacementPolicy {
 				// TODO: this will be removed in 1.37.
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.33"))
+			} else if !test.enableJobManagedBy {
+				// TODO: this will be removed in 1.38.
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.34"))
 			}
 			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.JobPodReplacementPolicy: test.enableJobPodReplacementPolicy,
@@ -2150,6 +2153,8 @@ func TestManagedBy(t *testing.T) {
 	for name, test := range testCases {
 		t.Run(name, func(t *testing.T) {
 			resetMetrics()
+			// TODO: this will be removed in 1.38.
+			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.34"))
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobManagedBy, test.enableJobManagedBy)
 
 			ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
@@ -2197,6 +2202,8 @@ func TestManagedBy(t *testing.T) {
 // and is disabled again with re-enabling of the feature gate.
 func TestManagedBy_Reenabling(t *testing.T) {
 	customControllerName := "example.com/custom-job-controller"
+	// TODO: this will be removed in 1.38.
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.34"))
 	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobManagedBy, true)
 
 	closeFn, restConfig, clientSet, ns := setup(t, "managed-by-reenabling")
