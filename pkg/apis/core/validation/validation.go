@@ -6240,11 +6240,11 @@ func validatePodResizeContainerOrdering(newPod, oldPod *core.Pod, specPath *fiel
 // dropCPUMemoryResourcesFromContainer deletes the cpu and memory resources from the container, and copies them from the old pod container resources if present.
 func dropCPUMemoryResourcesFromContainer(container *core.Container, oldPodSpecContainer *core.Container) {
 	dropCPUMemoryUpdates := func(resourceList, oldResourceList core.ResourceList) core.ResourceList {
-		if oldResourceList == nil {
-			return nil
-		}
 		var mungedResourceList core.ResourceList
 		if resourceList == nil {
+			if oldResourceList == nil {
+				return nil
+			}
 			mungedResourceList = make(core.ResourceList)
 		} else {
 			mungedResourceList = resourceList.DeepCopy()
