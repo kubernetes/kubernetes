@@ -200,39 +200,64 @@ func TestMustAttemptPullMetrics(t *testing.T) {
 	})
 
 	expectedMetrics := make(map[string]int)
-	require.True(t, imageManager.MustAttemptImagePull(ctx, "docker.io/testing/broken", "testbrokenrecord", nil, nil))
+	mustPull, err := imageManager.MustAttemptImagePull(ctx, "docker.io/testing/broken", "testbrokenrecord", nil)
+	require.NoError(t, err)
+	require.True(t, mustPull)
 	expectedMetrics[string(checkResultError)]++
 	cmpMustAttemptPullMetrics(t, expectedMetrics)
 
-	require.True(t, imageManager.MustAttemptImagePull(ctx, "docker.io/testing/broken", "testbrokenrecord", nil, nil))
-	require.True(t, imageManager.MustAttemptImagePull(ctx, "docker.io/testing/broken", "testbrokenrecord", nil, nil))
+	mustPull, err = imageManager.MustAttemptImagePull(ctx, "docker.io/testing/broken", "testbrokenrecord", nil)
+	require.NoError(t, err)
+	require.True(t, mustPull)
+	mustPull, err = imageManager.MustAttemptImagePull(ctx, "docker.io/testing/broken", "testbrokenrecord", nil)
+	require.NoError(t, err)
+	require.True(t, mustPull)
 	expectedMetrics[string(checkResultError)] += 2
 
-	require.False(t, imageManager.MustAttemptImagePull(ctx, "docker.io/testing/test", "testimage-anonpull", nil, nil))
+	mustPull, err = imageManager.MustAttemptImagePull(ctx, "docker.io/testing/test", "testimage-anonpull", nil)
+	require.NoError(t, err)
+	require.False(t, mustPull)
 	expectedMetrics[string(checkResultCredentialRecordFound)]++
 	cmpMustAttemptPullMetrics(t, expectedMetrics)
 
-	require.False(t, imageManager.MustAttemptImagePull(ctx, "docker.io/testing/test", "testimage-anonpull", nil, nil))
-	require.False(t, imageManager.MustAttemptImagePull(ctx, "docker.io/testing/test", "testimage-anonpull", nil, nil))
-	require.False(t, imageManager.MustAttemptImagePull(ctx, "docker.io/testing/test", "testimage-anonpull", nil, nil))
+	mustPull, err = imageManager.MustAttemptImagePull(ctx, "docker.io/testing/test", "testimage-anonpull", nil)
+	require.NoError(t, err)
+	require.False(t, mustPull)
+	mustPull, err = imageManager.MustAttemptImagePull(ctx, "docker.io/testing/test", "testimage-anonpull", nil)
+	require.NoError(t, err)
+	require.False(t, mustPull)
+	mustPull, err = imageManager.MustAttemptImagePull(ctx, "docker.io/testing/test", "testimage-anonpull", nil)
+	require.NoError(t, err)
+	require.False(t, mustPull)
 	expectedMetrics[string(checkResultCredentialRecordFound)] += 3
 	cmpMustAttemptPullMetrics(t, expectedMetrics)
 
-	require.False(t, imageManager.MustAttemptImagePull(ctx, "docker.io/testing/policyexempt", "policyallowed", nil, nil))
+	mustPull, err = imageManager.MustAttemptImagePull(ctx, "docker.io/testing/policyexempt", "policyallowed", nil)
+	require.NoError(t, err)
+	require.False(t, mustPull)
 	expectedMetrics[string(checkResultCredentialPolicyAllowed)]++
 	cmpMustAttemptPullMetrics(t, expectedMetrics)
 
-	require.False(t, imageManager.MustAttemptImagePull(ctx, "docker.io/testing/policyexempt", "policyallowed", nil, nil))
+	mustPull, err = imageManager.MustAttemptImagePull(ctx, "docker.io/testing/policyexempt", "policyallowed", nil)
+	require.NoError(t, err)
+	require.False(t, mustPull)
 	expectedMetrics[string(checkResultCredentialPolicyAllowed)]++
 	cmpMustAttemptPullMetrics(t, expectedMetrics)
 
-	require.True(t, imageManager.MustAttemptImagePull(ctx, "docker.io/testing/norecords", "somewhatunknown", nil, nil))
+	mustPull, err = imageManager.MustAttemptImagePull(ctx, "docker.io/testing/norecords", "somewhatunknown", nil)
+	require.NoError(t, err)
+	require.True(t, mustPull)
 	expectedMetrics[string(checkResultMustAuthenticate)]++
 	cmpMustAttemptPullMetrics(t, expectedMetrics)
 
-	require.False(t, imageManager.MustAttemptImagePull(ctx, "docker.io/testing/test", "testimageref", []kubeletconfig.ImagePullSecret{
-		{UID: "testsecretuid", Namespace: "default", Name: "pull-secret", CredentialHash: "testsecrethash"},
-	}, nil))
+	mustPull, err = imageManager.MustAttemptImagePull(ctx, "docker.io/testing/test", "testimageref",
+		func() ([]kubeletconfig.ImagePullSecret, *kubeletconfig.ImagePullServiceAccount, error) {
+			return []kubeletconfig.ImagePullSecret{
+				{UID: "testsecretuid", Namespace: "default", Name: "pull-secret", CredentialHash: "testsecrethash"},
+			}, nil, nil
+		})
+	require.NoError(t, err)
+	require.False(t, mustPull)
 	expectedMetrics[string(checkResultCredentialRecordFound)]++
 	cmpMustAttemptPullMetrics(t, expectedMetrics)
 }
