@@ -1273,19 +1273,6 @@ func TestAsyncPreemption(t *testing.T) {
 						t.Fatalf("Error registering a filter: %v", err)
 					}
 
-					// Register fake plugin that will reserve some fake resources for one pod.
-					// This could be used to check scheduler's behavior when the victim has to unreserve these resources to let the preemptor schedule.
-					reservingPluginName := "reservingPlugin"
-					err = registry.Register(reservingPluginName, func(ctx context.Context, o runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
-						return &reservingPlugin{
-							name:               reservingPluginName,
-							nameOfPodToReserve: reservingPodName,
-						}, nil
-					})
-					if err != nil {
-						t.Fatalf("Error registering a reserving plugin: %v", err)
-					}
-
 					// Register fake bind plugin that will block on binding for the specified pod name, until it receives a resume signal via the blockBindingChannel.
 					blockBindingChannel := make(chan struct{})
 					defer close(blockBindingChannel)
@@ -1305,6 +1292,19 @@ func TestAsyncPreemption(t *testing.T) {
 					})
 					if err != nil {
 						t.Fatalf("Error registering a bind plugin: %v", err)
+					}
+
+					// Register fake plugin that will reserve some fake resources for one pod.
+					// This could be used to check scheduler's behavior when the victim has to unreserve these resources to let the preemptor schedule.
+					reservingPluginName := "reservingPlugin"
+					err = registry.Register(reservingPluginName, func(ctx context.Context, o runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
+						return &reservingPlugin{
+							name:               reservingPluginName,
+							nameOfPodToReserve: reservingPodName,
+						}, nil
+					})
+					if err != nil {
+						t.Fatalf("Error registering a reserving plugin: %v", err)
 					}
 
 					cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
