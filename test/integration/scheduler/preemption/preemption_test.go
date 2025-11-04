@@ -1217,13 +1217,9 @@ func TestAsyncPreemption(t *testing.T) {
 				t.Run(fmt.Sprintf("%s (Async API calls enabled: %v, NominatedNodeNameForExpectation enabled: %v)", test.name, asyncAPICallsEnabled, nominatedNodeNameForExpectationEnabled), func(t *testing.T) {
 					featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 						features.SchedulerAsyncAPICalls:          asyncAPICallsEnabled,
-<<<<<<< HEAD
-						features.NominatedNodeNameForExpectation: nominatedNodeNameForExpectationEnabled})
-=======
 						features.NominatedNodeNameForExpectation: nominatedNodeNameForExpectationEnabled,
 						features.SchedulerAsyncPreemption:        true,
 					})
->>>>>>> 43950c19331 (blabla)
 
 					// We need to use a custom preemption plugin to test async preemption behavior
 					delayedPreemptionPluginName := "delay-preemption"
@@ -1370,6 +1366,16 @@ func TestAsyncPreemption(t *testing.T) {
 					for _, scenario := range test.scenarios {
 						t.Logf("Running scenario: %s", scenario.name)
 						switch {
+						case scenario.createNode != "":
+							newNode := st.MakeNode().Name(scenario.createNode).Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj()
+							if _, err := cs.CoreV1().Nodes().Create(ctx, newNode, metav1.CreateOptions{}); err != nil {
+								t.Fatalf("Failed to create an initial Node %q: %v", newNode.Name, err)
+							}
+							defer func() {
+								if err := cs.CoreV1().Nodes().Delete(ctx, newNode.Name, metav1.DeleteOptions{}); err != nil {
+									t.Fatalf("Failed to delete the Node %q: %v", newNode.Name, err)
+								}
+							}()
 						case scenario.createPod != nil:
 							if scenario.createPod.count == nil {
 								scenario.createPod.count = ptr.To(1)
