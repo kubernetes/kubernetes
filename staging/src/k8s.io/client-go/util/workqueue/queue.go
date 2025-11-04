@@ -348,17 +348,21 @@ func (q *Typed[T]) ShuttingDown() bool {
 	return q.shuttingDown
 }
 
+func (q *Typed[T]) updateUnfinishedWork() {
+	q.cond.L.Lock()
+	defer q.cond.L.Unlock()
+	if !q.shuttingDown {
+		q.metrics.updateUnfinishedWork()
+	}
+}
+
 func (q *Typed[T]) updateUnfinishedWorkLoop() {
 	t := q.clock.NewTicker(q.unfinishedWorkUpdatePeriod)
 	defer t.Stop()
 	for {
 		select {
 		case <-t.C():
-			q.cond.L.Lock()
-			if !q.shuttingDown {
-				q.metrics.updateUnfinishedWork()
-			}
-			q.cond.L.Unlock()
+			q.updateUnfinishedWork()
 		case <-q.stopCh:
 			return
 		}
