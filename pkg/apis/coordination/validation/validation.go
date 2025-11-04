@@ -165,19 +165,19 @@ func ValidateCoordinatedLeaseStrategy(strategy coordination.CoordinatedLeaseStra
 
 // Helper function that creates errors with Origin already set
 func ValidatePositiveInt32(value int32, fldPath *field.Path) field.ErrorList {
-    if value < 1 {
-        return field.ErrorList{
-            field.Invalid(fldPath, value, "must be greater than or equal to 1").WithOrigin("minimum"),
-        }
-    }
-    return field.ErrorList{}
+	if value < 1 {
+		return field.ErrorList{
+			field.Invalid(fldPath, value, "must be greater than or equal to 1").WithOrigin("minimum"),
+		}
+	}
+	return field.ErrorList{}
 }
 
 func ValidateNonnegativeInt32(value int32, fldPath *field.Path) field.ErrorList {
-    if value < 0 {
-        return field.ErrorList{
-            field.Invalid(fldPath, value, "must be greater than or equal to 0").WithOrigin("minimum"),
-        }
-    }
-    return field.ErrorList{}
+	if value < 0 {
+		return field.ErrorList{
+			field.Invalid(fldPath, value, "must be greater than or equal to 0").WithOrigin("minimum"),
+		}
+	}
+	return field.ErrorList{}
 }
