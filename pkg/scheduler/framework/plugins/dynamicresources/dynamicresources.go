@@ -73,10 +73,6 @@ const (
 	// some actual ResourceClaim in the apiserver.
 	specialClaimInMemName = "<extended-resources>"
 
-	// BindingTimeoutDefaultSeconds is the default timeout for waiting for
-	// BindingConditions to be ready.
-	BindingTimeoutDefaultSeconds = 600
-
 	// AssumeExtendedResourceTimeoutDefaultSeconds is the default timeout for waiting
 	// for the extended resource claim to be updated in assumed cache.
 	AssumeExtendedResourceTimeoutDefaultSeconds = 120
@@ -161,13 +157,14 @@ type nodeAllocation struct {
 
 // DynamicResources is a plugin that ensures that ResourceClaims are allocated.
 type DynamicResources struct {
-	enabled       bool
-	fts           feature.Features
-	filterTimeout time.Duration
-	fh            fwk.Handle
-	clientset     kubernetes.Interface
-	celCache      *cel.Cache
-	draManager    fwk.SharedDRAManager
+	enabled        bool
+	fts            feature.Features
+	filterTimeout  time.Duration
+	bindingTimeout time.Duration
+	fh             fwk.Handle
+	clientset      kubernetes.Interface
+	celCache       *cel.Cache
+	draManager     fwk.SharedDRAManager
 }
 
 // New initializes a new plugin and returns it.
@@ -189,7 +186,10 @@ func New(ctx context.Context, plArgs runtime.Object, fh fwk.Handle, fts feature.
 		enabled:       true,
 		fts:           fts,
 		filterTimeout: ptr.Deref(args.FilterTimeout, metav1.Duration{}).Duration,
-
+		bindingTimeout: ptr.Deref(
+			args.BindingTimeout,
+			metav1.Duration{Duration: config.DynamicResourcesBindingTimeoutDefault},
+		).Duration,
 		fh:        fh,
 		clientset: fh.ClientSet(),
 		// This is a LRU cache for compiled CEL expressions. The most
@@ -1320,7 +1320,7 @@ func (pl *DynamicResources) PreBind(ctx context.Context, cs fwk.CycleState, pod 
 
 	// We need to wait for the device to be attached to the node.
 	pl.fh.EventRecorder().Eventf(pod, nil, v1.EventTypeNormal, "BindingConditionsPending", "Scheduling", "waiting for binding conditions for device on node %s", nodeName)
-	err = wait.PollUntilContextTimeout(ctx, 5*time.Second, time.Duration(BindingTimeoutDefaultSeconds)*time.Second, true,
+	err = wait.PollUntilContextTimeout(ctx, 5*time.Second, pl.bindingTimeout, true,
 		func(ctx context.Context) (bool, error) {
 			return pl.isPodReadyForBinding(state)
 		})
@@ -1627,7 +1627,7 @@ func (pl *DynamicResources) isClaimTimeout(claim *resourceapi.ResourceClaim) boo
 		if deviceRequest.BindingConditions == nil {
 			continue
 		}
-		if claim.Status.Allocation.AllocationTimestamp.Add(time.Duration(BindingTimeoutDefaultSeconds) * time.Second).Before(time.Now()) {
+		if claim.Status.Allocation.AllocationTimestamp.Add(pl.bindingTimeout).Before(time.Now()) {
 			return true
 		}
 	}

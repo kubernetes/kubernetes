@@ -1797,7 +1797,10 @@ func TestPlugin(t *testing.T) {
 		"prebind-fail-with-binding-timeout": {
 			enableDRADeviceBindingConditions:   true,
 			enableDRAResourceClaimDeviceStatus: true,
-			pod:                                podWithClaimName,
+			args: &config.DynamicResourcesArgs{
+				BindingTimeout: &metav1.Duration{Duration: 600 * time.Second},
+			},
+			pod: podWithClaimName,
 			claims: func() []*resourceapi.ResourceClaim {
 				claim := allocatedClaim.DeepCopy()
 				claim.Status.Allocation = allocationResultWithBindingConditions.DeepCopy()

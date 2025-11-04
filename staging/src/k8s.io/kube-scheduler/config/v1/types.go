@@ -432,6 +432,33 @@ type DynamicResourcesArgs struct {
 	//
 	// Setting it to zero completely disables the timeout.
 	FilterTimeout *metav1.Duration `json:"filterTimeout"`
+
+	// BindingTimeout limits how long the PreBind extension point may wait for
+	// ResourceClaim device BindingConditions to become satisfied when such
+	// conditions are present. While waiting, the scheduler periodically checks
+	// device status. If the timeout elapses before all required conditions are
+	// true (or any bindingFailureConditions become true), the allocation is
+	// cleared and the Pod re-enters scheduling queue. Note that the same or other node may be
+	// chosen if feasible; otherwise the Pod is placed in the unschedulable queue and
+	// retried based on cluster changes and backoff.
+	//
+	// Defaults & feature gates:
+	//   - Defaults to 10 minutes when the DRADeviceBindingConditions feature gate is enabled.
+	//   - Has effect only when BOTH DRADeviceBindingConditions and
+	//     DRAResourceClaimDeviceStatus are enabled; otherwise omit this field.
+	//   - When DRADeviceBindingConditions is disabled, setting this field is considered an error.
+	//
+	// Valid values:
+	//   - >=1s (non-zero). No upper bound is enforced.
+	//
+	// Tuning guidance:
+	//   - Lower values reduce time-to-retry when devices aren’t ready but can
+	//     increase churn if drivers typically need longer to report readiness.
+	//   - Review scheduler latency metrics (e.g. PreBind duration in
+	//     `scheduler_framework_extension_point_duration_seconds`) and driver
+	//     readiness behavior before tightening this timeout.
+	BindingTimeout *metav1.Duration `json:"bindingTimeout,omitempty"`
 }
 
 const DynamicResourcesFilterTimeoutDefault = 10 * time.Second
+const DynamicResourcesBindingTimeoutDefault = 600 * time.Second
