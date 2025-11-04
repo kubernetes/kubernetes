@@ -17,6 +17,7 @@ limitations under the License.
 package allocation
 
 import (
+	"context"
 	"fmt"
 	goruntime "runtime"
 	"strings"
@@ -1832,7 +1833,7 @@ func makeAllocationManager(t *testing.T, runtime *containertest.FakeRuntime, all
 	)
 	allocationManager.SetContainerRuntime(runtime)
 
-	getNode := func() (*v1.Node, error) {
+	getNode := func(context.Context, bool) (*v1.Node, error) {
 		return &v1.Node{
 			Status: v1.NodeStatus{
 				Capacity: v1.ResourceList{
