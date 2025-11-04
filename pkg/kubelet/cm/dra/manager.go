@@ -778,116 +778,116 @@ func (m *Manager) GetContainerClaimInfos(pod *v1.Pod, container *v1.Container) (
 // UpdateAllocatedResourcesStatus updates the health status of allocated DRA resources in the pod's container statuses.
 func (m *Manager) UpdateAllocatedResourcesStatus(pod *v1.Pod, status *v1.PodStatus) {
 	logger := klog.FromContext(context.Background())
-	for _, container := range pod.Spec.Containers {
-		// Get all the DRA claim details associated with this specific container.
-		claimInfos, err := m.GetContainerClaimInfos(pod, &container)
-		if err != nil {
-			logger.Error(err, "Failed to get claim infos for container", "pod", klog.KObj(pod), "container", container.Name)
+	for i := range status.ContainerStatuses {
+		containerStatus := &status.ContainerStatuses[i]
+
+		// Find the corresponding container spec in the pod spec.
+		var containerSpec *v1.Container
+		for j := range pod.Spec.Containers {
+			if pod.Spec.Containers[j].Name == containerStatus.Name {
+				containerSpec = &pod.Spec.Containers[j]
+				break
+			}
+		}
+
+		// Skip if there's no matching container spec or it has no resource claims.
+		if containerSpec == nil || len(containerSpec.Resources.Claims) == 0 {
 			continue
 		}
 
-		// Find the corresponding container status
-		for i, containerStatus := range status.ContainerStatuses {
-			if containerStatus.Name != container.Name {
+		resourceStatusMap := make(map[v1.ResourceName]*v1.ResourceStatus)
+		if containerStatus.AllocatedResourcesStatus != nil {
+			for j := range containerStatus.AllocatedResourcesStatus {
+				resourceStatusMap[containerStatus.AllocatedResourcesStatus[j].Name] = &containerStatus.AllocatedResourcesStatus[j]
+			}
+		}
+
+		// Iterate through the claims requested by this specific container.
+		for _, claim := range containerSpec.Resources.Claims {
+			// Find the actual name of the ResourceClaim object.
+			var actualClaimName string
+			for _, podClaimStatus := range pod.Status.ResourceClaimStatuses {
+				if podClaimStatus.Name == claim.Name {
+					if podClaimStatus.ResourceClaimName != nil {
+						actualClaimName = *podClaimStatus.ResourceClaimName
+					}
+					break
+				}
+			}
+
+			if actualClaimName == "" {
+				logger.V(4).Info("Could not find generated name for resource claim in pod status", "pod", klog.KObj(pod), "container", containerSpec.Name, "claimName", claim.Name)
 				continue
 			}
 
-			// Ensure the slice exists. Use a map for efficient updates by resource name.
-			resourceStatusMap := make(map[v1.ResourceName]*v1.ResourceStatus)
-			if status.ContainerStatuses[i].AllocatedResourcesStatus != nil {
-				for idx := range status.ContainerStatuses[i].AllocatedResourcesStatus {
-					// Store pointers to modify in place
-					resourceStatusMap[status.ContainerStatuses[i].AllocatedResourcesStatus[idx].Name] = &status.ContainerStatuses[i].AllocatedResourcesStatus[idx]
-				}
-			} else {
-				status.ContainerStatuses[i].AllocatedResourcesStatus = []v1.ResourceStatus{}
-			}
+			func() {
+				m.cache.RLock()
+				defer m.cache.RUnlock()
 
-			// Loop through each claim associated with the container
-			for _, claimInfo := range claimInfos {
-				var resourceName v1.ResourceName
-				foundClaimInSpec := false
-				for _, cClaim := range container.Resources.Claims {
-					if cClaim.Name == claimInfo.ClaimName {
-						if cClaim.Request == "" {
-							resourceName = v1.ResourceName(fmt.Sprintf("claim:%s", cClaim.Name))
-						} else {
-							resourceName = v1.ResourceName(fmt.Sprintf("claim:%s/%s", cClaim.Name, cClaim.Request))
-						}
-						foundClaimInSpec = true
-						break
-					}
-				}
-				if !foundClaimInSpec {
-					logger.V(4).Info("Could not find matching resource claim in container spec", "pod", klog.KObj(pod), "container", container.Name, "claimName", claimInfo.ClaimName)
-					continue
+				// Use the actual claim name to look up claim info.
+				claimInfo, exists := m.cache.get(actualClaimName, pod.Namespace)
+				if !exists {
+					logger.V(4).Info("Could not find claim info for resource claim", "pod", klog.KObj(pod), "container", containerSpec.Name, "claimName", actualClaimName)
+					return
 				}
 
-				// Get or create the ResourceStatus entry for this claim
+				resourceName := v1.ResourceName(fmt.Sprintf("claim:%s", claim.Name))
+				if claim.Request != "" {
+					resourceName = v1.ResourceName(fmt.Sprintf("claim:%s/%s", claim.Name, claim.Request))
+				}
+
 				resStatus, ok := resourceStatusMap[resourceName]
-
 				if !ok {
-					// Create a new entry and add it to the map and the slice
 					newStatus := v1.ResourceStatus{
 						Name:      resourceName,
 						Resources: []v1.ResourceHealth{},
 					}
-					status.ContainerStatuses[i].AllocatedResourcesStatus = append(status.ContainerStatuses[i].AllocatedResourcesStatus, newStatus)
-					// Get pointer to the newly added element *after* appending
-					resStatus = &status.ContainerStatuses[i].AllocatedResourcesStatus[len(status.ContainerStatuses[i].AllocatedResourcesStatus)-1]
+					// Append and get a pointer to the new element.
+					if containerStatus.AllocatedResourcesStatus == nil {
+						containerStatus.AllocatedResourcesStatus = []v1.ResourceStatus{}
+					}
+					containerStatus.AllocatedResourcesStatus = append(containerStatus.AllocatedResourcesStatus, newStatus)
+					resStatus = &containerStatus.AllocatedResourcesStatus[len(containerStatus.AllocatedResourcesStatus)-1]
 					resourceStatusMap[resourceName] = resStatus
 				}
 
-				// Clear previous health entries for this resource before adding current ones
-				// Ensures we only report current health for allocated devices.
+				// Clear previous health entries before adding current ones.
 				resStatus.Resources = []v1.ResourceHealth{}
 
-				// Iterate through the map holding the state specific to each driver
 				for driverName, driverState := range claimInfo.DriverState {
-					// Iterate through each specific device allocated by this driver
 					for _, device := range driverState.Devices {
-
 						healthStr := m.healthInfoCache.getHealthInfo(driverName, device.PoolName, device.DeviceName)
 
-						// Convert internal health string to API type
 						var health v1.ResourceHealthStatus
 						switch healthStr {
 						case "Healthy":
 							health = v1.ResourceHealthStatusHealthy
 						case "Unhealthy":
 							health = v1.ResourceHealthStatusUnhealthy
-						default: // Catches "Unknown" or any other case
+						default:
 							health = v1.ResourceHealthStatusUnknown
 						}
 
-						// Create the ResourceHealth entry
-						resourceHealth := v1.ResourceHealth{
-							Health: health,
-						}
-
-						// Use first CDI device ID as ResourceID, with fallback
+						resourceHealth := v1.ResourceHealth{Health: health}
 						if len(device.CDIDeviceIDs) > 0 {
 							resourceHealth.ResourceID = v1.ResourceID(device.CDIDeviceIDs[0])
 						} else {
-							// Fallback ID if no CDI ID is present
 							resourceHealth.ResourceID = v1.ResourceID(fmt.Sprintf("%s/%s/%s", driverName, device.PoolName, device.DeviceName))
 						}
-
-						// Append the health status for this specific device/resource ID
 						resStatus.Resources = append(resStatus.Resources, resourceHealth)
 					}
 				}
-			}
-			// Rebuild the slice from the map values to ensure correctness
-			finalStatuses := make([]v1.ResourceStatus, 0, len(resourceStatusMap))
-			for _, rs := range resourceStatusMap {
-				// Only add if it actually has resource health entries populated
-				if len(rs.Resources) > 0 {
-					finalStatuses = append(finalStatuses, *rs)
-				}
-			}
-			status.ContainerStatuses[i].AllocatedResourcesStatus = finalStatuses
+			}()
 		}
+
+		// Rebuild the slice from map to ensure correctness and remove empty entries.
+		finalStatuses := make([]v1.ResourceStatus, 0, len(resourceStatusMap))
+		for _, rs := range resourceStatusMap {
+			if len(rs.Resources) > 0 {
+				finalStatuses = append(finalStatuses, *rs)
+			}
+		}
+		containerStatus.AllocatedResourcesStatus = finalStatuses
 	}
 }
 
