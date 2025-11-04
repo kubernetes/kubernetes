@@ -27,7 +27,7 @@ import (
 //
 // Validation specifies the CEL expression which is used to apply the validation.
 type ValidationApplyConfiguration struct {
-	// Expression represents the expression which will be evaluated by CEL.
+	// expression represents the expression which will be evaluated by CEL.
 	// ref: https://github.com/google/cel-spec
 	// CEL expressions have access to the contents of the API request/response, organized into CEL variables as well as some other useful variables:
 	//
@@ -69,7 +69,7 @@ type ValidationApplyConfiguration struct {
 	// non-intersecting keys are appended, retaining their partial order.
 	// Required.
 	Expression *string `json:"expression,omitempty"`
-	// Message represents the message displayed when validation fails. The message is required if the Expression contains
+	// message represents the message displayed when validation fails. The message is required if the Expression contains
 	// line breaks. The message must not contain line breaks.
 	// If unset, the message is "failed rule: {Rule}".
 	// e.g. "must be a URL with the host matching spec.host"
@@ -77,7 +77,7 @@ type ValidationApplyConfiguration struct {
 	// The message must not contain line breaks.
 	// If unset, the message is "failed Expression: {Expression}".
 	Message *string `json:"message,omitempty"`
-	// Reason represents a machine-readable description of why this validation failed.
+	// reason represents a machine-readable description of why this validation failed.
 	// If this is the first validation in the list to fail, this reason, as well as the
 	// corresponding HTTP response code, are used in the
 	// HTTP response to the client.

@@ -62,7 +62,7 @@ type ParamRefApplyConfiguration struct {
 	// One of `name` or `selector` must be set, but `name` and `selector` are
 	// mutually exclusive properties. If one is set, the other must be unset.
 	Selector *metav1.LabelSelectorApplyConfiguration `json:"selector,omitempty"`
-	// `parameterNotFoundAction` controls the behavior of the binding when the resource
+	// parameterNotFoundAction controls the behavior of the binding when the resource
 	// exists, and name or selector is valid, but there are no parameters
 	// matched by the binding. If the value is set to `Allow`, then no
 	// matched parameters will be treated as successful validation by the binding.
