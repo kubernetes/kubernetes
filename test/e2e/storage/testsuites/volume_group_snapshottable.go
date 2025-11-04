@@ -21,7 +21,6 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -32,8 +31,8 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2estatefulset "k8s.io/kubernetes/test/e2e/framework/statefulset"
@@ -102,6 +101,10 @@ func (s *VolumeGroupSnapshottableTestSuite) DefineTests(driver storageframework.
 	f := framework.NewDefaultFramework("volumegroupsnapshottable")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	ginkgo.Describe("VolumeGroupSnapshottable", func() {
+		var tk *e2ekubectl.TestKubeconfig
+		ginkgo.BeforeEach(func() {
+			tk = e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, f.Namespace.Name)
+		})
 
 		ginkgo.Context("", func() {
 			var (
@@ -207,18 +210,17 @@ func (s *VolumeGroupSnapshottableTestSuite) DefineTests(driver storageframework.
 			}
 
 			writeTestDataToVolumes := func(ctx context.Context) map[string]string {
-				dataPath := "/mnt/data"
+				mountPath := "/mnt/data"
+				writePath := fmt.Sprintf("%s/testfile", mountPath)
 				originalMntTestData := make(map[string]string)
 
 				ginkgo.By("writing test data to all StatefulSet volumes")
 				for i, pod := range groupTest.pods {
 					// For StatefulSet, each pod has one PVC named "data-{statefulset-name}-{index}"
 					pvcName := fmt.Sprintf("data-%s-%d", groupTest.statefulSet.Name, i)
-					testData := fmt.Sprintf("hello from StatefulSet PVC %s in pod %s namespace %s", pvcName, pod.Name, f.Namespace.Name)
+					testData := fmt.Sprintf("HelloFromStatefulSetPVC%d", i)
 					originalMntTestData[pvcName] = testData
-
-					writeCommand := fmt.Sprintf("echo '%s' > %s/testfile; sync", testData, dataPath)
-					_, err := e2eoutput.LookForStringInPodExec(pod.Namespace, pod.Name, []string{"sh", "-c", writeCommand}, "", time.Minute)
+					err := tk.WriteFileViaContainer(pod.Name, pod.Spec.Containers[0].Name, writePath, testData)
 					framework.ExpectNoError(err, "failed to write test data to StatefulSet pod %s", pod.Name)
 				}
 				return originalMntTestData
@@ -338,7 +340,6 @@ func (s *VolumeGroupSnapshottableTestSuite) DefineTests(driver storageframework.
 					dataPath := "/mnt/volume"
 					mountPath := fmt.Sprintf("%s%d", dataPath, volumeIndex+1)
 					readPath := fmt.Sprintf("%s/testfile", mountPath)
-					commands := e2evolume.GenerateReadFileCmd(readPath)
 
 					// Extract original PVC name from restored PVC name
 					const restoredPrefix = "restored-"
@@ -351,9 +352,9 @@ func (s *VolumeGroupSnapshottableTestSuite) DefineTests(driver storageframework.
 						framework.Failf("no test data found for original PVC %s", originalPVCName)
 					}
 
-					_, err = e2eoutput.LookForStringInPodExec(restoredPod.Namespace, restoredPod.Name, commands, expectedData, time.Minute)
-					if err != nil {
-						dataConsistencyCheckErrors = append(dataConsistencyCheckErrors, fmt.Sprintf("volume %s (from %s): %v", pvc.Name, originalPVCName, err))
+					restoredData, err := tk.ReadFileViaContainer(restoredPod.Name, restoredPod.Spec.Containers[0].Name, readPath)
+					if err != nil || !strings.Contains(restoredData, expectedData) {
+						dataConsistencyCheckErrors = append(dataConsistencyCheckErrors, fmt.Sprintf("volume %s (from %s), expectedData: %s, restoredData: %s : err: %v", pvc.Name, originalPVCName, expectedData, restoredData, err))
 					} else {
 						framework.Logf("data consistency verified for StatefulSet volume %s (from %s): found expected data '%s'", pvc.Name, originalPVCName, expectedData)
 					}
