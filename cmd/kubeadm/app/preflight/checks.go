@@ -123,7 +123,8 @@ func (crvc ContainerRuntimeVersionCheck) Check() (warnings, errorList []error) {
 		"For more information, see https://git.k8s.io/enhancements/keps/sig-node/4033-group-driver-detection-over-cri")
 
 	if crvc.criSocket == kubeadmconstants.DefaultCRISocketDryRun {
-		return []error{compatibilityError}, nil
+		klog.Warning("[dryrun] would run the ContainerRuntimeVersion preflight check to ensure that the container runtime supports the CRI method RuntimeConfig")
+		return nil, nil
 	}
 
 	containerRuntime := utilruntime.NewContainerRuntime(crvc.criSocket)
