@@ -113,8 +113,7 @@ func TestControllerSync(t *testing.T) {
 			errors:          noerrors,
 			// Custom test function that generates a delete event
 			test: func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
-				obj := ctrl.claims.List()[0]
-				claim := obj.(*v1.PersistentVolumeClaim)
+				claim := ctrl.claims.List()[0]
 				reactor.DeleteClaimEvent(claim)
 				return nil
 			},
@@ -153,8 +152,7 @@ func TestControllerSync(t *testing.T) {
 			// event will be generated to trigger "deleteVolume" call for metric reporting
 			test: func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
 				test.initialVolumes[0].Annotations[volume.AnnDynamicallyProvisioned] = "gcr.io/vendor-csi"
-				obj := ctrl.claims.List()[0]
-				claim := obj.(*v1.PersistentVolumeClaim)
+				claim := ctrl.claims.List()[0]
 				reactor.DeleteClaimEvent(claim)
 				err := wait.Poll(10*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
 					return len(ctrl.claims.ListKeys()) == 0, nil
@@ -183,8 +181,7 @@ func TestControllerSync(t *testing.T) {
 			// "deleteClaim" to remove the claim from controller's cache and mark bound volume to be released
 			test: func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
 				// should have been provisioned by external provisioner
-				obj := ctrl.claims.List()[0]
-				claim := obj.(*v1.PersistentVolumeClaim)
+				claim := ctrl.claims.List()[0]
 				reactor.DeleteClaimEvent(claim)
 				// wait until claim is cleared from cache, i.e., deleteClaim is called
 				err := wait.Poll(10*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
@@ -230,8 +227,7 @@ func TestControllerSync(t *testing.T) {
 				// Wait for the PVC to get fully processed. This avoids races between PV controller and DeleteClaimEvent
 				// below.
 				err = wait.Poll(10*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-					obj := ctrl.claims.List()[0]
-					claim := obj.(*v1.PersistentVolumeClaim)
+					claim := ctrl.claims.List()[0]
 					return claim.Status.Phase == v1.ClaimLost, nil
 				})
 				if err != nil {
@@ -239,8 +235,7 @@ func TestControllerSync(t *testing.T) {
 				}
 
 				// trying to remove the claim as well
-				obj := ctrl.claims.List()[0]
-				claim := obj.(*v1.PersistentVolumeClaim)
+				claim := ctrl.claims.List()[0]
 				reactor.DeleteClaimEvent(claim)
 				// wait until claim is cleared from cache, i.e., deleteClaim is called
 				err = wait.Poll(10*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
@@ -277,8 +272,7 @@ func TestControllerSync(t *testing.T) {
 					return err
 				}
 				// delete the claim
-				obj := ctrl.claims.List()[0]
-				claim := obj.(*v1.PersistentVolumeClaim)
+				claim := ctrl.claims.List()[0]
 				reactor.DeleteClaimEvent(claim)
 				// wait until claim is cleared from cache, i.e., deleteClaim is called
 				err = wait.Poll(10*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
@@ -402,7 +396,7 @@ func TestControllerSync(t *testing.T) {
 	}
 }
 
-func storeVersion(t *testing.T, prefix string, c cache.Store, version string, expectedReturn bool) {
+func storeVersion(t *testing.T, prefix string, c cache.TypedStore[*v1.PersistentVolume], version string, expectedReturn bool) {
 	pv := newVolume("pvName", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimDelete, classEmpty)
 	pv.ResourceVersion = version
 	logger, _ := ktesting.NewTestContext(t)
@@ -416,16 +410,12 @@ func storeVersion(t *testing.T, prefix string, c cache.Store, version string, ex
 
 	// find the stored version
 
-	pvObj, found, err := c.GetByKey("pvName")
+	pv, found, err := c.GetByKey("pvName")
 	if err != nil {
 		t.Errorf("expected volume 'pvName' in the cache, got error instead: %v", err)
 	}
 	if !found {
 		t.Errorf("expected volume 'pvName' in the cache but it was not found")
-	}
-	pv, ok := pvObj.(*v1.PersistentVolume)
-	if !ok {
-		t.Errorf("expected volume in the cache, got different object instead: %#v", pvObj)
 	}
 
 	if ret {
@@ -442,7 +432,7 @@ func storeVersion(t *testing.T, prefix string, c cache.Store, version string, ex
 // TestControllerCache tests func storeObjectUpdate()
 func TestControllerCache(t *testing.T) {
 	// Cache under test
-	c := cache.NewStore(cache.DeletionHandlingMetaNamespaceKeyFunc)
+	c := cache.NewTypedStore[*v1.PersistentVolume](cache.DeletionHandlingMetaNamespaceKeyFunc)
 
 	// Store new PV
 	storeVersion(t, "Step1", c, "1", true)
@@ -459,7 +449,7 @@ func TestControllerCache(t *testing.T) {
 }
 
 func TestControllerCacheParsingError(t *testing.T) {
-	c := cache.NewStore(cache.DeletionHandlingMetaNamespaceKeyFunc)
+	c := cache.NewTypedStore[*v1.PersistentVolume](cache.DeletionHandlingMetaNamespaceKeyFunc)
 	// There must be something in the cache to compare with
 	storeVersion(t, "Step1", c, "1", true)
 

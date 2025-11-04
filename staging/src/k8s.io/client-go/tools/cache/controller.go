@@ -169,7 +169,9 @@ func (c *controller) RunWithContext(ctx context.Context) {
 			c.config.WatchErrorHandler(r, err)
 		}
 	} else if c.config.WatchErrorHandlerWithContext != nil {
-		r.watchErrorHandler = c.config.WatchErrorHandlerWithContext
+		r.watchErrorHandler = func(ctx context.Context, r *Reflector, err error) {
+			c.config.WatchErrorHandlerWithContext(ctx, r, err)
+		}
 	}
 
 	c.reflectorMutex.Lock()
