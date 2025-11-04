@@ -147,7 +147,7 @@ linters:
       # Commentstart - Ignore commentstart issues for existing API group
       # TODO: For each existing API group, we aim to remove it over time.
       - text: "godoc for field .* should start with '.* ...'"
-        path: "staging/src/k8s.io/api/(admissionregistration|apiserverinternal|apps|authorization|autoscaling|batch|certificates|coordination|core|discovery|events|extensions|flowcontrol|imagepolicy|networking|node|policy|rbac|resource|scheduling|storage|storagemigration)"
+        path: "staging/src/k8s.io/api/(apiserverinternal|apps|authorization|autoscaling|batch|certificates|coordination|core|discovery|events|extensions|flowcontrol|imagepolicy|networking|node|policy|rbac|resource|scheduling|storage|storagemigration)"
       - text: "field .* is missing godoc comment"
         path: "staging/src/k8s.io/api/autoscaling/"
       
