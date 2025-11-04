@@ -240,13 +240,12 @@ run_tests() {
   export KUBE_CONTAINER_RUNTIME=remote
   export KUBE_CONTAINER_RUNTIME_ENDPOINT=unix:///run/containerd/containerd.sock
   export KUBE_CONTAINER_RUNTIME_NAME=containerd
-  export SNAPSHOTTER_VERSION="${SNAPSHOTTER_VERSION:-v8.3.0}"
+  export SNAPSHOTTER_VERSION="${SNAPSHOTTER_VERSION:-v8.4.0}"
   echo "SNAPSHOTTER_VERSION is $SNAPSHOTTER_VERSION"
-  # ginkgo can take forever to exit, so we run it in the background and save the
-  # PID, bash will not run traps while waiting on a process, but it will while
-  # running a builtin like `wait`, saving the PID also allows us to forward the
-  # interrupt
-  
+
+  # Enable VolumeGroupSnapshot tests in csi-driver-hostpath
+  export CSI_PROW_ENABLE_GROUP_SNAPSHOT=true
+
   kubectl apply -f ./cluster/addons/volumesnapshots/crd/snapshot.storage.k8s.io_volumesnapshotclasses.yaml || exit 1
   kubectl apply -f ./cluster/addons/volumesnapshots/crd/snapshot.storage.k8s.io_volumesnapshotcontents.yaml || exit 1
   kubectl apply -f ./cluster/addons/volumesnapshots/crd/snapshot.storage.k8s.io_volumesnapshots.yaml || exit 1
@@ -261,6 +260,10 @@ sed "s|image: registry.k8s.io/sig-storage/snapshot-controller:.*|image: registry
  kubectl apply -f - || exit 1
 
 
+  # ginkgo can take forever to exit, so we run it in the background and save the
+  # PID, bash will not run traps while waiting on a process, but it will while
+  # running a builtin like `wait`, saving the PID also allows us to forward the
+  # interrupt
   ./hack/ginkgo-e2e.sh \
     '--provider=skeleton' "--num-nodes=${NUM_NODES}" \
     "--ginkgo.focus=${FOCUS}" "--ginkgo.skip=${SKIP}" "--ginkgo.label-filter=${LABEL_FILTER}" \
