@@ -58,6 +58,12 @@ const (
 	// Refactor informers to deliver watch stream events in order instead of out of order.
 	InOrderInformers Feature = "InOrderInformers"
 
+	// owner: @yue9944882
+	// beta: v1.35
+	//
+	// Allow InOrderInformer to process incoming events in batches to expedite the process rate.
+	InOrderInformersBatchProcess Feature = "InOrderInformersBatchProcess"
+
 	// owner: @enj, @michaelasp
 	// alpha: v1.30
 	// GA: v1.35
@@ -88,6 +94,9 @@ var defaultVersionedKubernetesFeatureGates = map[Feature]VersionedSpecs{
 	},
 	InOrderInformers: {
 		{Version: version.MustParse("1.33"), Default: true, PreRelease: Beta},
+	},
+	InOrderInformersBatchProcess: {
+		{Version: version.MustParse("1.35"), Default: true, PreRelease: Beta},
 	},
 	InformerResourceVersion: {
 		{Version: version.MustParse("1.30"), Default: false, PreRelease: Alpha},
