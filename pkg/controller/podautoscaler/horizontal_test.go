@@ -5425,10 +5425,6 @@ func TestMultipleHPAs(t *testing.T) {
 		return handled, obj, err
 	})
 
-	testClient.AddReactor("delete", "horizontalpodautoscalers", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-		return true, nil, nil
-	})
-
 	informerFactory := informers.NewSharedInformerFactory(testClient, controller.NoResyncPeriodFunc())
 
 	tCtx := ktesting.Init(t)
@@ -5468,15 +5464,6 @@ func TestMultipleHPAs(t *testing.T) {
 
 	assert.Len(t, processedHPA, hpaCount, "Expected to process all HPAs")
 	assert.Equal(t, hpaCount, hpaController.monitor.(*mockMonitor).GetObjectsCount(), "Expected objects count to match number of HPAs")
-
-	// Test HPA deletion
-	hpaName := "dummy-hpa-0"
-
-	// Delete the HPA through the API
-	err := testClient.AutoscalingV2().HorizontalPodAutoscalers(testNamespace).Delete(tCtx, hpaName, metav1.DeleteOptions{})
-	if err != nil {
-		t.Fatalf("Failed to delete HPA: %v", err)
-	}
 
 	// Simulate the watch event for deletion
 	hpaWatcher.Delete(&hpaList[0])
