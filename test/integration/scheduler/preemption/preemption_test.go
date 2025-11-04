@@ -1062,7 +1062,7 @@ func TestAsyncPreemption(t *testing.T) {
 			// Victim pod takes long in binding. Preemptor pod attempts preemption, goes to unschedulable, then the victim's graceful termination is initiated.
 			// Preemptor pod is woken up by the Pod/Update event (working like AssignedPodDeleted), but is still unschedulable, because victim has to unreserve its resources.
 			// After resuming binding for a victim, it releases the resources in its failure handler, preemptor is woken up again and ultimately scheduled.
-			name: "victim blocked in binding, preemptor pod gets scheduled after victim-in-binding is under graceful termination and its resources are unreserved",
+			name: "victim blocked in binding, preemptor gets scheduled after victim is under graceful termination and its resources are unreserved",
 			scenarios: []scenario{
 				{
 					name: "create victim Pod that is going to be blocked in binding",
