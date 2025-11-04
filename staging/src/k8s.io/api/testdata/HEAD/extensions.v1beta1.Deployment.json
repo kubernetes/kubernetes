@@ -1860,7 +1860,8 @@
     "rollbackTo": {
       "revision": 1
     },
-    "progressDeadlineSeconds": 9
+    "progressDeadlineSeconds": 9,
+    "podReplacementPolicy": "podReplacementPolicyValue"
   },
   "status": {
     "observedGeneration": 1,
