@@ -232,7 +232,7 @@ func (ev *Evaluator) IsPodRunningPreemption(podUID types.UID) bool {
 
 	victim, ok := ev.lastVictimsPendingPreemption[podUID]
 	if !ok {
-		// Pod has not triggered preemption of the last victim yet.
+		// Since pod is in `preempting` but last victim is not registered yet, the async preemption is pending.
 		return true
 	}
 	// Pod is waiting for preemption of one last victim. We can check if the victim has already been deleted.
@@ -592,13 +592,6 @@ func (ev *Evaluator) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName 
 			// We do not return as this error is not critical.
 		}
 
-		if len(victimPods) == 0 {
-			ev.mu.Lock()
-			ev.preempting.Delete(pod.UID)
-			ev.mu.Unlock()
-			return
-		}
-
 		if len(victimPods) > 1 {
 			// We can evict all victims in parallel, but the last one.
 			// We have to remove the pod from the preempting map before the last one is evicted
@@ -607,8 +600,8 @@ func (ev *Evaluator) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName 
 			// and the pod could end up stucking at the unschedulable pod pool
 			// by all the pod removal events being ignored.
 			// In order to prevent requesting preemption of the same pod multiple times for the same preemptor,
-			// preemptor is marked as "waiting for preemption of a victim" (by adding it to preempting map) and
-			// for optimization purposes the last victim is recorded in lastVictimsPendingPreemption.
+			// preemptor is marked as "waiting for preemption of a victim" (by adding it to preempting map).
+			// For optimization purposes the last victim is recorded in lastVictimsPendingPreemption.
 			ev.Handler.Parallelizer().Until(ctx, len(victimPods)-1, preemptPod, ev.PluginName)
 			if err := errCh.ReceiveError(); err != nil {
 				utilruntime.HandleErrorWithContext(ctx, err, "Error occurred during async preemption")
