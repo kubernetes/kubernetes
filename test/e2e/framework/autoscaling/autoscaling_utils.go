@@ -29,6 +29,7 @@ import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	crdclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -479,6 +480,11 @@ func (rc *ResourceConsumer) GetReplicas(ctx context.Context) (int, error) {
 		}
 		_, err = rc.resourceClient.Update(ctx, crdInstance, metav1.UpdateOptions{})
 		if err != nil {
+			if apierrors.IsConflict(err) {
+				// Return a retryable error for conflicts - the object was modified concurrently.
+				// The polling mechanism will retry this call with the updated version.
+				return 0, gomega.TryAgainAfter(time.Second).Wrap(err)
+			}
 			return 0, err
 		}
 		return int(scale.Spec.Replicas), nil
@@ -517,6 +523,7 @@ func (rc *ResourceConsumer) EnsureDesiredReplicasInRange(ctx context.Context, mi
 		framework.Logf("Error getting HPA: %s", err)
 	} else {
 		framework.Logf("HPA status: %+v", as.Status)
+		framework.Logf("HPA current CPU utilization percentage: %+v", *as.Status.CurrentCPUUtilizationPercentage)
 	}
 	framework.ExpectNoError(desiredReplicasErr)
 }
