@@ -83,12 +83,20 @@ func testOptionalListMapKey(tCtx ktesting.TContext) {
 	requireManagedFields := func(what string, obj *unstructured.Unstructured, expectedManagedFields any) {
 		tCtx.Helper()
 		actualManagedFields, _, _ := unstructured.NestedFieldCopy(obj.Object, "metadata", "managedFields")
-		// Strip non-deterministic time.
 		if actualManagedFields != nil {
 			managers := actualManagedFields.([]any)
 			for i := range managers {
+				// Strip non-deterministic time.
 				unstructured.RemoveNestedField(managers[i].(map[string]any), "time")
 			}
+			// Sort by manager. There should be at most one entry per manager, so
+			// no need for a tie breaker. Semantically the order is irrelevant,
+			// so we don't need to expect a specific one here.
+			//
+			// The order turned out to be non-deterministic (test flake!) without this.
+			slices.SortFunc(managers, func(a, b any) int {
+				return strings.Compare(a.(map[string]any)["manager"].(string), b.(map[string]any)["manager"].(string))
+			})
 		}
 		require.Equal(tCtx, dump(expectedManagedFields), dump(actualManagedFields), "%s:\n%s", what, dump(obj))
 	}
