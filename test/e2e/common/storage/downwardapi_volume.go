@@ -66,7 +66,7 @@ var _ = SIGDescribe("Downward API volume", func() {
 		Description: A Pod is configured with DownwardAPIVolumeSource with the volumesource mode set to -r-------- and DownwardAPIVolumeFiles contains a item for the Pod name. The container runtime MUST be able to access Pod name from the specified path on the mounted volume.
 		This test is marked LinuxOnly since Windows does not support setting specific file permissions.
 	*/
-	framework.ConformanceIt("should set DefaultMode on files [LinuxOnly]", f.WithNodeConformance(), func(ctx context.Context) {
+	framework.ConformanceIt("should set DefaultMode on files", f.WithNodeConformance(), f.WithLinuxOnly(), func(ctx context.Context) {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		defaultMode := int32(0400)
 		pod := downwardAPIVolumePodForModeTest(podName, "/etc/podinfo/podname", nil, &defaultMode)
@@ -82,7 +82,7 @@ var _ = SIGDescribe("Downward API volume", func() {
 		Description: A Pod is configured with DownwardAPIVolumeSource and DownwardAPIVolumeFiles contains a item for the Pod name with the file mode set to -r--------. The container runtime MUST be able to access Pod name from the specified path on the mounted volume.
 		This test is marked LinuxOnly since Windows does not support setting specific file permissions.
 	*/
-	framework.ConformanceIt("should set mode on item file [LinuxOnly]", f.WithNodeConformance(), func(ctx context.Context) {
+	framework.ConformanceIt("should set mode on item file", f.WithNodeConformance(), f.WithLinuxOnly(), func(ctx context.Context) {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		mode := int32(0400)
 		pod := downwardAPIVolumePodForModeTest(podName, "/etc/podinfo/podname", &mode, nil)
@@ -92,7 +92,7 @@ var _ = SIGDescribe("Downward API volume", func() {
 		})
 	})
 
-	f.It("should provide podname as non-root with fsgroup [LinuxOnly]", func(ctx context.Context) {
+	f.It("should provide podname as non-root with fsgroup", f.WithLinuxOnly(), func(ctx context.Context) {
 		// Windows does not support RunAsUser / FSGroup SecurityContext options.
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 		podName := "metadata-volume-" + string(uuid.NewUUID())
@@ -107,7 +107,7 @@ var _ = SIGDescribe("Downward API volume", func() {
 		})
 	})
 
-	f.It("should provide podname as non-root with fsgroup and defaultMode [LinuxOnly]", func(ctx context.Context) {
+	f.It("should provide podname as non-root with fsgroup and defaultMode", f.WithLinuxOnly(), func(ctx context.Context) {
 		// Windows does not support RunAsUser / FSGroup SecurityContext options, and it does not support setting file permissions.
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 		podName := "metadata-volume-" + string(uuid.NewUUID())

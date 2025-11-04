@@ -252,7 +252,7 @@ func verifyMemoryPinning(f *framework.Framework, ctx context.Context, pod *v1.Po
 }
 
 // Serial because the test updates kubelet configuration.
-var _ = SIGDescribe("Memory Manager", "[LinuxOnly]", framework.WithDisruptive(), framework.WithSerial(), feature.MemoryManager, func() {
+var _ = SIGDescribe("Memory Manager", framework.WithDisruptive(), framework.WithSerial(), feature.MemoryManager, framework.WithLinuxOnly(), func() {
 	// TODO: add more complex tests that will include interaction between CPUManager, MemoryManager and TopologyManager
 	var (
 		allNUMANodes             []int
