@@ -1077,7 +1077,8 @@ func TestContainerRuntimeVersionCheck(t *testing.T) {
 		{
 			name:           "dry run",
 			criSocket:      constants.DefaultCRISocketDryRun,
-			expectWarnings: 1,
+			expectWarnings: 0,
+			expectErrors: 0,
 		},
 		{
 			name: "runtime config not implemented",
