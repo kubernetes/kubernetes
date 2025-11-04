@@ -113,12 +113,12 @@ message AuditAnnotation {
 
 // ExpressionWarning is a warning information that targets a specific expression.
 message ExpressionWarning {
-  // The path to the field that refers the expression.
+  // fieldRef is the path to the field that refers to the expression.
   // For example, the reference to the expression of the first item of
   // validations is "spec.validations[0].expression"
   optional string fieldRef = 2;
 
-  // The content of type checking information in a human-readable form.
+  // warning contains the content of type checking information in a human-readable form.
   // Each line of the warning contains the type that the expression is checked
   // against, followed by the type check error from the compiler.
   optional string warning = 3;
@@ -194,7 +194,7 @@ message JSONPatch {
 }
 
 message MatchCondition {
-  // Name is an identifier for this match condition, used for strategic merging of MatchConditions,
+  // name is an identifier for this match condition, used for strategic merging of MatchConditions,
   // as well as providing an identifier for logging purposes. A good name should be descriptive of
   // the associated expression.
   // Name must be a qualified name consisting of alphanumeric characters, '-', '_' or '.', and
@@ -205,7 +205,7 @@ message MatchCondition {
   // Required.
   optional string name = 1;
 
-  // Expression represents the expression which will be evaluated by CEL. Must evaluate to bool.
+  // expression represents the expression which will be evaluated by CEL. Must evaluate to bool.
   // CEL expressions have access to the contents of the AdmissionRequest and Authorizer, organized into CEL variables:
   //
   // 'object' - The object from the incoming request. The value is null for DELETE requests.
@@ -226,7 +226,7 @@ message MatchCondition {
 // The exclude rules take precedence over include rules (if a resource matches both, it is excluded)
 // +structType=atomic
 message MatchResources {
-  // NamespaceSelector decides whether to run the admission control policy on an object based
+  // namespaceSelector decides whether to run the admission control policy on an object based
   // on whether the namespace for that object matches the selector. If the
   // object itself is a namespace, the matching is performed on
   // object.metadata.labels. If the object is another cluster scoped resource,
@@ -272,7 +272,7 @@ message MatchResources {
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector namespaceSelector = 1;
 
-  // ObjectSelector decides whether to run the policy based on if the
+  // objectSelector decides whether to run the policy based on if the
   // object has matching labels. objectSelector is evaluated against both
   // the oldObject and newObject that would be sent to the policy's expression (CEL), and
   // is considered to match if either object matches the selector. A null
@@ -286,13 +286,13 @@ message MatchResources {
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector objectSelector = 2;
 
-  // ResourceRules describes what operations on what resources/subresources the admission policy matches.
+  // resourceRules describes what operations on what resources/subresources the admission policy matches.
   // The policy cares about an operation if it matches _any_ Rule.
   // +listType=atomic
   // +optional
   repeated NamedRuleWithOperations resourceRules = 3;
 
-  // ExcludeResourceRules describes what operations on what resources/subresources the policy should not care about.
+  // excludeResourceRules describes what operations on what resources/subresources the policy should not care about.
   // The exclude rules take precedence over include rules (if a resource matches both, it is excluded)
   // +listType=atomic
   // +optional
@@ -319,11 +319,11 @@ message MatchResources {
 
 // MutatingAdmissionPolicy describes the definition of an admission mutation policy that mutates the object coming into admission chain.
 message MutatingAdmissionPolicy {
-  // Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
+  // metadata is the standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // Specification of the desired behavior of the MutatingAdmissionPolicy.
+  // spec defines the desired behavior of the MutatingAdmissionPolicy.
   optional MutatingAdmissionPolicySpec spec = 2;
 }
 
@@ -339,17 +339,17 @@ message MutatingAdmissionPolicy {
 // Adding/removing policies, bindings, or params can not affect whether a
 // given (policy, binding, param) combination is within its own CEL budget.
 message MutatingAdmissionPolicyBinding {
-  // Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
+  // metadata is the standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // Specification of the desired behavior of the MutatingAdmissionPolicyBinding.
+  // spec defines the desired behavior of the MutatingAdmissionPolicyBinding.
   optional MutatingAdmissionPolicyBindingSpec spec = 2;
 }
 
 // MutatingAdmissionPolicyBindingList is a list of MutatingAdmissionPolicyBinding.
 message MutatingAdmissionPolicyBindingList {
-  // Standard list metadata.
+  // metadata is the standard list metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
@@ -387,7 +387,7 @@ message MutatingAdmissionPolicyBindingSpec {
 
 // MutatingAdmissionPolicyList is a list of MutatingAdmissionPolicy.
 message MutatingAdmissionPolicyList {
-  // Standard list metadata.
+  // metadata is the standard list metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
@@ -507,7 +507,7 @@ message Mutation {
 // NamedRuleWithOperations is a tuple of Operations and Resources with ResourceNames.
 // +structType=atomic
 message NamedRuleWithOperations {
-  // ResourceNames is an optional white list of names that the rule applies to.  An empty set means that everything is allowed.
+  // resourceNames is an optional white list of names that the rule applies to.  An empty set means that everything is allowed.
   // +listType=atomic
   // +optional
   repeated string resourceNames = 1;
@@ -519,12 +519,12 @@ message NamedRuleWithOperations {
 // ParamKind is a tuple of Group Kind and Version.
 // +structType=atomic
 message ParamKind {
-  // APIVersion is the API group version the resources belong to.
+  // apiVersion is the API group version the resources belong to.
   // In format of "group/version".
   // Required.
   optional string apiVersion = 1;
 
-  // Kind is the API kind the resources belong to.
+  // kind is the API kind the resources belong to.
   // Required.
   optional string kind = 2;
 }
@@ -533,7 +533,7 @@ message ParamKind {
 // expressions of rules applied by a policy binding.
 // +structType=atomic
 message ParamRef {
-  // `name` is the name of the resource being referenced.
+  // name is the name of the resource being referenced.
   //
   // `name` and `selector` are mutually exclusive properties. If one is set,
   // the other must be unset.
@@ -571,7 +571,7 @@ message ParamRef {
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 3;
 
-  // `parameterNotFoundAction` controls the behavior of the binding when the resource
+  // parameterNotFoundAction controls the behavior of the binding when the resource
   // exists, and name or selector is valid, but there are no parameters
   // matched by the binding. If the value is set to `Allow`, then no
   // matched parameters will be treated as successful validation by the binding.
@@ -587,7 +587,7 @@ message ParamRef {
 // TypeChecking contains results of type checking the expressions in the
 // ValidatingAdmissionPolicy
 message TypeChecking {
-  // The type checking warnings for each expression.
+  // expressionWarnings contains the type checking warnings for each expression.
   // +optional
   // +listType=atomic
   repeated ExpressionWarning expressionWarnings = 1;
@@ -595,14 +595,14 @@ message TypeChecking {
 
 // ValidatingAdmissionPolicy describes the definition of an admission validation policy that accepts or rejects an object without changing it.
 message ValidatingAdmissionPolicy {
-  // Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
+  // metadata is the standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // Specification of the desired behavior of the ValidatingAdmissionPolicy.
+  // spec defines the desired behavior of the ValidatingAdmissionPolicy.
   optional ValidatingAdmissionPolicySpec spec = 2;
 
-  // The status of the ValidatingAdmissionPolicy, including warnings that are useful to determine if the policy
+  // status represents the current status of the ValidatingAdmissionPolicy, including warnings that are useful to determine if the policy
   // behaves in the expected way.
   // Populated by the system.
   // Read-only.
@@ -622,17 +622,17 @@ message ValidatingAdmissionPolicy {
 // Adding/removing policies, bindings, or params can not affect whether a
 // given (policy, binding, param) combination is within its own CEL budget.
 message ValidatingAdmissionPolicyBinding {
-  // Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
+  // metadata is the standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // Specification of the desired behavior of the ValidatingAdmissionPolicyBinding.
+  // spec defines the desired behavior of the ValidatingAdmissionPolicyBinding.
   optional ValidatingAdmissionPolicyBindingSpec spec = 2;
 }
 
 // ValidatingAdmissionPolicyBindingList is a list of ValidatingAdmissionPolicyBinding.
 message ValidatingAdmissionPolicyBindingList {
-  // Standard list metadata.
+  // metadata is the standard list metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
@@ -643,7 +643,7 @@ message ValidatingAdmissionPolicyBindingList {
 
 // ValidatingAdmissionPolicyBindingSpec is the specification of the ValidatingAdmissionPolicyBinding.
 message ValidatingAdmissionPolicyBindingSpec {
-  // PolicyName references a ValidatingAdmissionPolicy name which the ValidatingAdmissionPolicyBinding binds to.
+  // policyName references a ValidatingAdmissionPolicy name which the ValidatingAdmissionPolicyBinding binds to.
   // If the referenced resource does not exist, this binding is considered invalid and will be ignored
   // Required.
   optional string policyName = 1;
@@ -655,7 +655,7 @@ message ValidatingAdmissionPolicyBindingSpec {
   // +optional
   optional ParamRef paramRef = 2;
 
-  // MatchResources declares what resources match this binding and will be validated by it.
+  // matchResources declares what resources match this binding and will be validated by it.
   // Note that this is intersected with the policy's matchConstraints, so only requests that are matched by the policy can be selected by this.
   // If this is unset, all resources matched by the policy are validated by this binding
   // When resourceRules is unset, it does not constrain resource matching. If a resource is matched by the other fields of this object, it will be validated.
@@ -708,7 +708,7 @@ message ValidatingAdmissionPolicyBindingSpec {
 
 // ValidatingAdmissionPolicyList is a list of ValidatingAdmissionPolicy.
 message ValidatingAdmissionPolicyList {
-  // Standard list metadata.
+  // metadata is the standard list metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
@@ -719,21 +719,21 @@ message ValidatingAdmissionPolicyList {
 
 // ValidatingAdmissionPolicySpec is the specification of the desired behavior of the AdmissionPolicy.
 message ValidatingAdmissionPolicySpec {
-  // ParamKind specifies the kind of resources used to parameterize this policy.
+  // paramKind specifies the kind of resources used to parameterize this policy.
   // If absent, there are no parameters for this policy and the param CEL variable will not be provided to validation expressions.
   // If ParamKind refers to a non-existent kind, this policy definition is mis-configured and the FailurePolicy is applied.
   // If paramKind is specified but paramRef is unset in ValidatingAdmissionPolicyBinding, the params variable will be null.
   // +optional
   optional ParamKind paramKind = 1;
 
-  // MatchConstraints specifies what resources this policy is designed to validate.
+  // matchConstraints specifies what resources this policy is designed to validate.
   // The AdmissionPolicy cares about a request if it matches _all_ Constraints.
   // However, in order to prevent clusters from being put into an unstable state that cannot be recovered from via the API
   // ValidatingAdmissionPolicy cannot match ValidatingAdmissionPolicy and ValidatingAdmissionPolicyBinding.
   // Required.
   optional MatchResources matchConstraints = 2;
 
-  // Validations contain CEL expressions which is used to apply the validation.
+  // validations contain CEL expressions which is used to apply the validation.
   // Validations and AuditAnnotations may not both be empty; a minimum of one Validations or AuditAnnotations is
   // required.
   // +listType=atomic
@@ -764,7 +764,7 @@ message ValidatingAdmissionPolicySpec {
   // +optional
   repeated AuditAnnotation auditAnnotations = 5;
 
-  // MatchConditions is a list of conditions that must be met for a request to be validated.
+  // matchConditions is a list of conditions that must be met for a request to be validated.
   // Match conditions filter requests that have already been matched by the rules,
   // namespaceSelector, and objectSelector. An empty list of matchConditions matches all requests.
   // There are a maximum of 64 match conditions allowed.
@@ -786,7 +786,7 @@ message ValidatingAdmissionPolicySpec {
   // +optional
   repeated MatchCondition matchConditions = 6;
 
-  // Variables contain definitions of variables that can be used in composition of other expressions.
+  // variables contain definitions of variables that can be used in composition of other expressions.
   // Each variable is defined as a named CEL expression.
   // The variables defined here will be available under `variables` in other expressions of the policy
   // except MatchConditions because MatchConditions are evaluated before the rest of the policy.
@@ -803,16 +803,16 @@ message ValidatingAdmissionPolicySpec {
 
 // ValidatingAdmissionPolicyStatus represents the status of a ValidatingAdmissionPolicy.
 message ValidatingAdmissionPolicyStatus {
-  // The generation observed by the controller.
+  // observedGeneration is the generation observed by the controller.
   // +optional
   optional int64 observedGeneration = 1;
 
-  // The results of type checking for each expression.
+  // typeChecking contains the results of type checking for each expression.
   // Presence of this field indicates the completion of the type checking.
   // +optional
   optional TypeChecking typeChecking = 2;
 
-  // The conditions represent the latest available observations of a policy's current state.
+  // conditions represent the latest available observations of a policy's current state.
   // +optional
   // +listType=map
   // +listMapKey=type
@@ -821,7 +821,7 @@ message ValidatingAdmissionPolicyStatus {
 
 // Validation specifies the CEL expression which is used to apply the validation.
 message Validation {
-  // Expression represents the expression which will be evaluated by CEL.
+  // expression represents the expression which will be evaluated by CEL.
   // ref: https://github.com/google/cel-spec
   // CEL expressions have access to the contents of the API request/response, organized into CEL variables as well as some other useful variables:
   //
@@ -864,7 +864,7 @@ message Validation {
   // Required.
   optional string Expression = 1;
 
-  // Message represents the message displayed when validation fails. The message is required if the Expression contains
+  // message represents the message displayed when validation fails. The message is required if the Expression contains
   // line breaks. The message must not contain line breaks.
   // If unset, the message is "failed rule: {Rule}".
   // e.g. "must be a URL with the host matching spec.host"
@@ -874,7 +874,7 @@ message Validation {
   // +optional
   optional string message = 2;
 
-  // Reason represents a machine-readable description of why this validation failed.
+  // reason represents a machine-readable description of why this validation failed.
   // If this is the first validation in the list to fail, this reason, as well as the
   // corresponding HTTP response code, are used in the
   // HTTP response to the client.
@@ -899,12 +899,12 @@ message Validation {
 
 // Variable is the definition of a variable that is used for composition.
 message Variable {
-  // Name is the name of the variable. The name must be a valid CEL identifier and unique among all variables.
+  // name is the name of the variable. The name must be a valid CEL identifier and unique among all variables.
   // The variable can be accessed in other expressions through `variables`
   // For example, if name is "foo", the variable will be available as `variables.foo`
   optional string Name = 1;
 
-  // Expression is the expression that will be evaluated as the value of the variable.
+  // expression is the expression that will be evaluated as the value of the variable.
   // The CEL expression has access to the same identifiers as the CEL expressions in Validation.
   optional string Expression = 2;
 }
