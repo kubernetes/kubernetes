@@ -154,6 +154,8 @@ var _ = SIGDescribe("Container Runtime Conformance Test", func() {
 						return true, nil
 					})
 					if err != nil {
+						credsContent, readErr := os.ReadFile(configFile)
+						framework.Logf("credentials read error: %v; credentials used:\n%v", readErr, credsContent)
 						framework.Failf("Failed to read container status: %v; last observed error from wait loop: %v", err, latestErr)
 					}
 				})

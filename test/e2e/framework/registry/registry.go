@@ -137,7 +137,7 @@ func User1DockerSecret(registryAddress string) *v1.Secret {
 	return &v1.Secret{
 		Type: v1.SecretTypeDockerConfigJson,
 		Data: map[string][]byte{
-			v1.DockerConfigJsonKey: fmt.Appendf(nil, dockerCredsFmt, "http://"+registryAddress, user1creds),
+			v1.DockerConfigJsonKey: fmt.Appendf(nil, dockerCredsFmt, registryAddress, user1creds),
 		},
 	}
 }
