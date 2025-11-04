@@ -350,7 +350,7 @@ func getInternalCfg(cfgPath string, client kubernetes.Interface, cfg kubeadmapiv
 		getNodeRegistration := true
 		getAPIEndpoint := staticpodutil.IsControlPlaneNode()
 		getComponentConfigs := true
-		internalcfg, err := configutil.FetchInitConfigurationFromCluster(client, printer, logPrefix, getNodeRegistration, getAPIEndpoint, getComponentConfigs)
+		internalcfg, err := configutil.FetchInitConfigurationFromCluster(client, printer, logPrefix, getNodeRegistration, getAPIEndpoint, getComponentConfigs, false)
 		if err == nil {
 			printer.Println() // add empty line to separate the FetchInitConfigurationFromCluster output from the command output
 			// certificate renewal or expiration checking doesn't depend on a running cluster, which means the CertificatesDir

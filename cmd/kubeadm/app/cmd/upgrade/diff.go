@@ -107,7 +107,7 @@ func validateManifestsPath(manifests ...string) (err error) {
 }
 
 // FetchInitConfigurationFunc defines the signature of the function which will fetch InitConfiguration from cluster.
-type FetchInitConfigurationFunc func(client clientset.Interface, printer output.Printer, logPrefix string, getNodeRegistration, getAPIEndpoint, getComponentConfigs bool) (*kubeadmapi.InitConfiguration, error)
+type FetchInitConfigurationFunc func(client clientset.Interface, printer output.Printer, logPrefix string, getNodeRegistration, getAPIEndpoint, getComponentConfigs, dryRun bool) (*kubeadmapi.InitConfiguration, error)
 
 func runDiff(fs *pflag.FlagSet, flags *diffFlags, args []string, fetchInitConfigurationFromCluster FetchInitConfigurationFunc) error {
 	externalCfg := &v1beta4.UpgradeConfiguration{}
@@ -123,7 +123,7 @@ func runDiff(fs *pflag.FlagSet, flags *diffFlags, args []string, fetchInitConfig
 	getNodeRegistration := true
 	getAPIEndpoint := staticpodutil.IsControlPlaneNode()
 	getComponentConfigs := false
-	initCfg, err := fetchInitConfigurationFromCluster(client, &output.TextPrinter{}, "upgrade/diff", getNodeRegistration, getAPIEndpoint, getComponentConfigs)
+	initCfg, err := fetchInitConfigurationFromCluster(client, &output.TextPrinter{}, "upgrade/diff", getNodeRegistration, getAPIEndpoint, getComponentConfigs, false)
 	if err != nil {
 		return err
 	}

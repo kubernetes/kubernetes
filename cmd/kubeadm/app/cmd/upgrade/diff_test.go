@@ -44,7 +44,7 @@ func createTestRunDiffFile(contents []byte) (string, error) {
 	return file.Name(), nil
 }
 
-func fakeFetchInitConfig(client clientset.Interface, printer output.Printer, logPrefix string, getNodeRegistration, getAPIEndpoint, getComponentConfigs bool) (*kubeadmapi.InitConfiguration, error) {
+func fakeFetchInitConfig(client clientset.Interface, printer output.Printer, logPrefix string, getNodeRegistration, getAPIEndpoint, getComponentConfigs, dryRun bool) (*kubeadmapi.InitConfiguration, error) {
 	return &kubeadmapi.InitConfiguration{
 		ClusterConfiguration: kubeadmapi.ClusterConfiguration{
 			KubernetesVersion: "v1.0.1",

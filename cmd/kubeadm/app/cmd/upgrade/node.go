@@ -205,7 +205,7 @@ func newNodeData(cmd *cobra.Command, nodeOptions *nodeOptions, out io.Writer) (*
 	getNodeRegistration := true
 	getAPIEndpoint := isControlPlaneNode
 	getComponentConfigs := true
-	initCfg, err := configutil.FetchInitConfigurationFromCluster(client, nil, "upgrade", getNodeRegistration, getAPIEndpoint, getComponentConfigs)
+	initCfg, err := configutil.FetchInitConfigurationFromCluster(client, nil, "upgrade", getNodeRegistration, getAPIEndpoint, getComponentConfigs, *dryRun)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to fetch the kubeadm-config ConfigMap")
 	}
