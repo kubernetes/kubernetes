@@ -147,13 +147,15 @@ var _ = SIGDescribe("Container Runtime Conformance Test", func() {
 
 					ginkgo.By("check the container status")
 					var latestErr error
-					err = wait.PollUntilContextCancel(ctx, node.ContainerStatusPollInterval, true, func(ctx context.Context) (bool, error) {
+					err = wait.PollUntilContextTimeout(ctx, node.ContainerStatusPollInterval, node.ContainerStatusRetryTimeout, true, func(ctx context.Context) (bool, error) {
 						if latestErr = checkContainerStatus(ctx); latestErr != nil {
 							return false, nil
 						}
 						return true, nil
 					})
 					if err != nil {
+						credsContent, readErr := os.ReadFile(configFile)
+						framework.Logf("credentials read error: %v; credentials used:\n%v", readErr, credsContent)
 						framework.Failf("Failed to read container status: %v; last observed error from wait loop: %v", err, latestErr)
 					}
 				})

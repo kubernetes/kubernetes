@@ -263,7 +263,7 @@ while true; do sleep 1; done
 			ginkgo.BeforeEach(func(ctx context.Context) {
 				var err error
 
-				registryAddress, _, err = e2eregistry.SetupRegistry(ctx, f, false)
+				registryAddress, _, err = e2eregistry.SetupRegistry(ctx, f, true)
 				framework.ExpectNoError(err)
 				// we need to wait for the registry to be removed and so we need to delete the whole NS ourselves
 				ginkgo.DeferCleanup(func(ctx context.Context) {
