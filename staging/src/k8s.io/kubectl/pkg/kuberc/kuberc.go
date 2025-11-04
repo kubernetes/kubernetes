@@ -307,18 +307,15 @@ func (p *Preferences) applyAliases(rootCmd *cobra.Command, kuberc *config.Prefer
 	return args, nil
 }
 
-// DefaultGetPreferences returns KubeRCConfiguration.
-// If users sets kuberc file explicitly in --kuberc flag, it has the highest
-// priority. If not specified, it looks for in KUBERC environment variable.
-// If KUBERC is also not set, it falls back to default .kuberc file at the same location
-// where kubeconfig's defaults are residing in.
-// If KUBERC is set to "off", kuberc will be turned off and original behaviors in kubectl will be applied.
-func DefaultGetPreferences(kuberc string, errOut io.Writer) (*config.Preference, error) {
+// LoadKuberc returns the correct kuberc file. Explicitly specified is always highest priority.
+// If it isn't set, KUBERC environment variable is the next choice.
+// If none of them is set, default kuberc location will be used.
+func LoadKuberc(kuberc string) (string, bool, error) {
 	if val := os.Getenv("KUBERC"); val == "off" {
 		if kuberc != "" {
-			return nil, fmt.Errorf("disabling kuberc via KUBERC=off and passing kuberc flag are mutually exclusive")
+			return "", false, fmt.Errorf("disabling kuberc via KUBERC=off and passing kuberc flag are mutually exclusive")
 		}
-		return nil, nil
+		return "", false, nil
 	}
 	kubeRCFile := RecommendedKubeRCFile
 	explicitly := false
@@ -327,9 +324,28 @@ func DefaultGetPreferences(kuberc string, errOut io.Writer) (*config.Preference,
 		explicitly = true
 	}
 
-	if kubeRCFile == "" && os.Getenv("KUBERC") != "" {
+	if kubeRCFile == RecommendedKubeRCFile && os.Getenv("KUBERC") != "" {
 		kubeRCFile = os.Getenv("KUBERC")
 		explicitly = true
+	}
+
+	return kubeRCFile, explicitly, nil
+}
+
+// DefaultGetPreferences returns KubeRCConfiguration.
+// If users sets kuberc file explicitly in --kuberc flag, it has the highest
+// priority. If not specified, it looks for in KUBERC environment variable.
+// If KUBERC is also not set, it falls back to default .kuberc file at the same location
+// where kubeconfig's defaults are residing in.
+// If KUBERC is set to "off", kuberc will be turned off and original behaviors in kubectl will be applied.
+func DefaultGetPreferences(kuberc string, errOut io.Writer) (*config.Preference, error) {
+	kubeRCFile, explicitly, err := LoadKuberc(kuberc)
+	if err != nil {
+		return nil, err
+	}
+
+	if kubeRCFile == "" {
+		return nil, nil
 	}
 
 	preference, err := decodePreference(kubeRCFile)

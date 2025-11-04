@@ -1,5 +1,5 @@
 /*
-Copyright 2025 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,12 +19,10 @@ package kuberc
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
 	"k8s.io/kubectl/pkg/kuberc"
-	"sigs.k8s.io/yaml"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
@@ -32,6 +30,7 @@ import (
 	"k8s.io/kubectl/pkg/config/v1beta1"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
+	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -53,19 +52,19 @@ var (
 
 	setExample = templates.Examples(i18n.T(`
 		# Set default output format for 'get' command
-		kubectl kuberc set --section defaults --command get --option output=wide
+		kubectl alpha kuberc set --section defaults --command get --option output=wide
 
 		# Set default output format for a subcommand
-		kubectl kuberc set --section defaults --command "set env" --option output=yaml
+		kubectl alpha kuberc set --section defaults --command "set env" --option output=yaml
 
 		# Create an alias 'getn' for 'get' command with prepended 'nodes' resource
-		kubectl kuberc set --section aliases --name getn --command get --prependarg nodes --option output=wide
+		kubectl alpha kuberc set --section aliases --name getn --command get --prependarg nodes --option output=wide
 
 		# Create an alias 'runx' for 'run' command with appended arguments
-		kubectl kuberc set --section aliases --name runx --command run --option image=nginx --appendarg "--" --appendarg custom-arg1
+		kubectl alpha kuberc set --section aliases --name runx --command run --option image=nginx --appendarg "--" --appendarg custom-arg1
 
 		# Overwrite an existing default
-		kubectl kuberc set --section defaults --command get --option output=json --overwrite`))
+		kubectl alpha kuberc set --section defaults --command get --option output=json --overwrite`))
 )
 
 // SetOptions contains the options for setting kuberc configuration
@@ -124,12 +123,12 @@ func NewCmdKubeRCSet(streams genericiooptions.IOStreams) *cobra.Command {
 
 // Complete sets default values for SetOptions
 func (o *SetOptions) Complete(cmd *cobra.Command) error {
-	if env := os.Getenv("KUBERC"); env != "off" {
-		if o.KubeRCFile == "" {
-			o.KubeRCFile = kuberc.RecommendedKubeRCFile
-		}
+	kubeRCFile, _, err := kuberc.LoadKuberc(o.KubeRCFile)
+	if err != nil {
+		return err
 	}
 
+	o.KubeRCFile = kubeRCFile
 	return nil
 }
 
@@ -170,17 +169,17 @@ func (o *SetOptions) Run() error {
 		return err
 	}
 
-	if o.Section == sectionDefaults {
-		if err := o.setDefaults(pref, optionDefaults); err != nil {
-			return err
-		}
-	} else {
-		if err := o.setAlias(pref, optionDefaults); err != nil {
-			return err
-		}
+	switch o.Section {
+	case sectionDefaults:
+		err = o.setDefaults(pref, optionDefaults)
+	case sectionAliases:
+		err = o.setAlias(pref, optionDefaults)
+	}
+	if err != nil {
+		return err
 	}
 
-	return o.savePreference(pref)
+	return SavePreference(pref, o.KubeRCFile, o.Out)
 }
 
 // loadOrCreatePreference loads existing preference or creates a new one
@@ -278,25 +277,5 @@ func (o *SetOptions) setAlias(pref *v1beta1.Preference, options []v1beta1.Comman
 		Options:     options,
 	})
 
-	return nil
-}
-
-// savePreference saves the preference to the kuberc file
-func (o *SetOptions) savePreference(pref *v1beta1.Preference) error {
-	dir := filepath.Dir(o.KubeRCFile)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return fmt.Errorf("failed to create directory %s: %w", dir, err)
-	}
-
-	data, err := yaml.Marshal(pref)
-	if err != nil {
-		return fmt.Errorf("failed to marshal preferences: %w", err)
-	}
-
-	if err := os.WriteFile(o.KubeRCFile, data, 0644); err != nil {
-		return fmt.Errorf("failed to write kuberc file: %w", err)
-	}
-
-	fmt.Fprintf(o.Out, "Updated %s\n", o.KubeRCFile) // nolint:errcheck
 	return nil
 }

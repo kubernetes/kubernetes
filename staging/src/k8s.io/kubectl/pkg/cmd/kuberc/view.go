@@ -1,5 +1,5 @@
 /*
-Copyright 2025 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,26 +19,23 @@ package kuberc
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
-	"k8s.io/kubectl/pkg/kuberc"
-	"sigs.k8s.io/yaml"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/config/v1beta1"
+	"k8s.io/kubectl/pkg/kuberc"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
+	"sigs.k8s.io/yaml"
 )
 
 var (
-	viewLong = templates.LongDesc(i18n.T(`
-		Display the current kuberc configuration.
-
-		The kuberc file contains command aliases and default flag values
-		for kubectl commands. This command displays the contents of the
-		kuberc file in the specified output format.`))
+	viewLong = templates.LongDesc(i18n.T(`Display the contents of the kuberc file in the specified output format.`))
 
 	viewExample = templates.Examples(i18n.T(`
 		# View kuberc configuration in YAML format (default)
@@ -54,7 +51,10 @@ var (
 // ViewOptions contains the options for viewing kuberc configuration
 type ViewOptions struct {
 	KubeRCFile string
+	Explicit   bool
 	PrintFlags *genericclioptions.PrintFlags
+
+	preferences kuberc.PreferencesHandler
 
 	genericiooptions.IOStreams
 }
@@ -62,8 +62,9 @@ type ViewOptions struct {
 // NewCmdKubeRCView returns a Command instance for 'kuberc view' sub command
 func NewCmdKubeRCView(streams genericiooptions.IOStreams) *cobra.Command {
 	o := &ViewOptions{
-		PrintFlags: genericclioptions.NewPrintFlags("").WithDefaultOutput("yaml"),
-		IOStreams:  streams,
+		PrintFlags:  genericclioptions.NewPrintFlags("").WithDefaultOutput("yaml"),
+		IOStreams:   streams,
+		preferences: kuberc.NewPreferences(),
 	}
 
 	cmd := &cobra.Command{
@@ -79,7 +80,7 @@ func NewCmdKubeRCView(streams genericiooptions.IOStreams) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&o.KubeRCFile, "kuberc", o.KubeRCFile, "Path to the kuberc file to view")
+	o.preferences.AddFlags(cmd.Flags())
 	o.PrintFlags.AddFlags(cmd)
 
 	return cmd
@@ -87,13 +88,17 @@ func NewCmdKubeRCView(streams genericiooptions.IOStreams) *cobra.Command {
 
 // Complete sets default values for ViewOptions
 func (o *ViewOptions) Complete(cmd *cobra.Command) error {
-	if env := os.Getenv("KUBERC"); env != "" && env != "off" {
-		o.KubeRCFile = env
-	} else if env != "off" {
-		if o.KubeRCFile == "" {
-			o.KubeRCFile = kuberc.RecommendedKubeRCFile
-		}
+	if cmd.Flags().Changed("kuberc") {
+		o.KubeRCFile = cmd.Flag("kuberc").Value.String()
 	}
+
+	kubeRCFile, explicit, err := kuberc.LoadKuberc(o.KubeRCFile)
+	if err != nil {
+		return err
+	}
+
+	o.Explicit = explicit
+	o.KubeRCFile = kubeRCFile
 	return nil
 }
 
@@ -110,10 +115,49 @@ func (o *ViewOptions) Run() error {
 
 	data, err := os.ReadFile(o.KubeRCFile)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if !os.IsNotExist(err) {
+			return fmt.Errorf("error reading kuberc file: %w", err)
+		}
+		if o.Explicit {
 			return fmt.Errorf("kuberc file not found at %s", o.KubeRCFile)
 		}
-		return fmt.Errorf("error reading kuberc file: %w", err)
+		fmt.Fprintf(o.Out, "kuberc file not found at %s\n", o.KubeRCFile)                                        //nolint:errcheck
+		fmt.Fprintf(o.Out, "Would you like to generate a default kuberc file with recommended options? (y/N): ") //nolint:errcheck
+		var input string
+		_, err := fmt.Fscanln(o.In, &input)
+		if err != nil {
+			return nil
+		}
+
+		if strings.EqualFold(input, "y") {
+			pref := &v1beta1.Preference{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "kubectl.config.k8s.io/v1beta1",
+					Kind:       "Preference",
+				},
+				Defaults: []v1beta1.CommandDefaults{
+					{
+						Command: "apply",
+						Options: []v1beta1.CommandOptionDefault{
+							{
+								Name:    "server-side",
+								Default: "true",
+							},
+						},
+					},
+					{
+						Command: "delete",
+						Options: []v1beta1.CommandOptionDefault{
+							{
+								Name:    "interactive",
+								Default: "true",
+							},
+						},
+					},
+				},
+			}
+			return SavePreference(pref, o.KubeRCFile, o.Out)
+		}
 	}
 
 	var pref *v1beta1.Preference

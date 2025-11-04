@@ -1,5 +1,5 @@
 /*
-Copyright 2025 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,7 +17,14 @@ limitations under the License.
 package kuberc
 
 import (
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+
 	"github.com/spf13/cobra"
+	"k8s.io/kubectl/pkg/config/v1beta1"
+	"sigs.k8s.io/yaml"
 
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -27,10 +34,9 @@ import (
 
 var (
 	kubercLong = templates.LongDesc(i18n.T(`
-		Manage kuberc configuration files.
+		Manage user preferences (kuberc) file.
 
-		The kuberc file allows you to define command aliases and default flag values
-		for kubectl commands, making it easier to customize your kubectl experience.`))
+		The kuberc file allows you to customize your kubectl experience.`))
 
 	kubercExample = templates.Examples(i18n.T(`
 		# View the current kuberc configuration
@@ -58,4 +64,24 @@ func NewCmdKubeRC(streams genericiooptions.IOStreams) *cobra.Command {
 	cmd.AddCommand(NewCmdKubeRCSet(streams))
 
 	return cmd
+}
+
+// SavePreference saves the preference to the kuberc file
+func SavePreference(pref *v1beta1.Preference, file string, out io.Writer) error {
+	dir := filepath.Dir(file)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("failed to create directory %s: %w", dir, err)
+	}
+
+	data, err := yaml.Marshal(pref)
+	if err != nil {
+		return fmt.Errorf("failed to marshal preferences: %w", err)
+	}
+
+	if err := os.WriteFile(file, data, 0644); err != nil {
+		return fmt.Errorf("failed to write kuberc file: %w", err)
+	}
+
+	fmt.Fprintf(out, "Updated %s\n", file) // nolint:errcheck
+	return nil
 }
