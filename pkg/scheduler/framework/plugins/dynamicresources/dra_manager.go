@@ -51,7 +51,6 @@ type DefaultDRAManager struct {
 
 func NewDRAManager(ctx context.Context, claimsCache *assumecache.AssumeCache, resourceSliceTracker *resourceslicetracker.Tracker, informerFactory informers.SharedInformerFactory) *DefaultDRAManager {
 	logger := klog.FromContext(ctx)
-	dcLister := informerFactory.Resource().V1().DeviceClasses().Lister()
 	manager := &DefaultDRAManager{
 		resourceClaimTracker: &claimTracker{
 			cache:               claimsCache,
@@ -60,11 +59,11 @@ func NewDRAManager(ctx context.Context, claimsCache *assumecache.AssumeCache, re
 			logger:              logger,
 		},
 		resourceSliceLister: &resourceSliceLister{tracker: resourceSliceTracker},
-		deviceClassLister:   &deviceClassLister{classLister: dcLister},
+		deviceClassLister:   &deviceClassLister{classLister: informerFactory.Resource().V1().DeviceClasses().Lister()},
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
-		manager.extendedResourceCache = extendedresourcecache.NewExtendedResourceCache(dcLister, logger)
+		manager.extendedResourceCache = extendedresourcecache.NewExtendedResourceCache(logger)
 	}
 
 	// Reacting to events is more efficient than iterating over the list

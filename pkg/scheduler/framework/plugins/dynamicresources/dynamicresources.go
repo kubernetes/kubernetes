@@ -414,7 +414,7 @@ func hasDeviceClassMappedExtendedResource(reqs v1.ResourceList, cache fwk.Device
 			continue
 		}
 		if schedutil.IsDRAExtendedResourceName(rName) {
-			if cache.GetDeviceClass(rName) != "" {
+			if cache.GetDeviceClass(rName) != nil {
 				return true
 			}
 		}
@@ -750,7 +750,7 @@ func (pl *DynamicResources) filterExtendedResources(state *stateData, pod *v1.Po
 			continue
 		}
 		allocatable, okScalar := nodeInfo.GetAllocatable().GetScalarResources()[rName]
-		isBackedByDRA := cache.GetDeviceClass(rName) != ""
+		isBackedByDRA := cache.GetDeviceClass(rName) != nil
 		if isBackedByDRA {
 			if allocatable > 0 {
 				// node provides the resource via device plugin
@@ -825,9 +825,9 @@ func createDeviceRequests(pod *v1.Pod, extendedResources map[v1.ResourceName]int
 			if !ok || crq == 0 {
 				continue
 			}
-			className := cache.GetDeviceClass(r)
+			class := cache.GetDeviceClass(r)
 			// skip if the request does not map to a device class
-			if className == "" {
+			if class == nil {
 				continue
 			}
 			keys := make([]string, 0, len(creqs))
@@ -851,7 +851,7 @@ func createDeviceRequests(pod *v1.Pod, extendedResources map[v1.ResourceName]int
 				resourceapi.DeviceRequest{
 					Name: fmt.Sprintf("container-%d-request-%d", i, ridx), // need to be container name index - extended resource name index
 					Exactly: &resourceapi.ExactDeviceRequest{
-						DeviceClassName: className, // map external resource name -> device class name
+						DeviceClassName: class.Name, // map external resource name -> device class name
 						AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
 						Count:           crq,
 					},

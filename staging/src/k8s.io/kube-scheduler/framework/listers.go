@@ -114,7 +114,7 @@ type DeviceClassResolver interface {
 	// GetDeviceClass returns the device class name for the given extended resource name.
 	// Returns empty string if no mapping exists for the resource name or
 	// the DRAExtendedResource feature is disabled.
-	GetDeviceClass(resourceName v1.ResourceName) string
+	GetDeviceClass(resourceName v1.ResourceName) *resourceapi.DeviceClass
 }
 
 // SharedDRAManager can be used to obtain DRA objects, and track modifications to them in-memory - mainly by the DRA plugin.

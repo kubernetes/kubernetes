@@ -23,7 +23,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	resourcelisters "k8s.io/client-go/listers/resource/v1"
 	"k8s.io/client-go/tools/cache"
 	klog "k8s.io/klog/v2"
 )
@@ -31,13 +30,12 @@ import (
 // ExtendedResourceCache maintains a global cache of extended resource to device class mappings,
 // based on informer events. For that it implements the cache.ResourceEventHandler interface.
 type ExtendedResourceCache struct {
-	deviceClassLister resourcelisters.DeviceClassLister
-	logger            klog.Logger
-	handlers          []cache.ResourceEventHandler
+	logger   klog.Logger
+	handlers []cache.ResourceEventHandler
 
 	mutex sync.RWMutex
 	// mapping maps extended resource name to device class name
-	mapping map[v1.ResourceName]string
+	mapping map[v1.ResourceName]*resourceapi.DeviceClass
 }
 
 var _ cache.ResourceEventHandler = &ExtendedResourceCache{}
@@ -46,12 +44,11 @@ var _ cache.ResourceEventHandler = &ExtendedResourceCache{}
 // is responsible for registering the instance as a handler of DeviceClass events.
 //
 // Additional event handlers may be registered here or via AddEventHandler.
-func NewExtendedResourceCache(deviceClassLister resourcelisters.DeviceClassLister, logger klog.Logger, handlers ...cache.ResourceEventHandler) *ExtendedResourceCache {
+func NewExtendedResourceCache(logger klog.Logger, handlers ...cache.ResourceEventHandler) *ExtendedResourceCache {
 	cache := &ExtendedResourceCache{
-		deviceClassLister: deviceClassLister,
-		logger:            logger,
-		handlers:          handlers,
-		mapping:           make(map[v1.ResourceName]string),
+		logger:   logger,
+		handlers: handlers,
+		mapping:  make(map[v1.ResourceName]*resourceapi.DeviceClass),
 	}
 
 	return cache
@@ -73,9 +70,9 @@ func (c *ExtendedResourceCache) AddEventHandler(handler cache.ResourceEventHandl
 //
 // This (and only this) method may be called on a nil ExtendedResourceCache. The nil
 // instance always returns the empty string.
-func (c *ExtendedResourceCache) GetDeviceClass(resourceName v1.ResourceName) string {
+func (c *ExtendedResourceCache) GetDeviceClass(resourceName v1.ResourceName) *resourceapi.DeviceClass {
 	if c == nil {
-		return ""
+		return nil
 	}
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
@@ -144,14 +141,7 @@ func (c *ExtendedResourceCache) updateMapping(newDeviceClass, oldDeviceClass *re
 
 	var classWithSameExtendedResourceName *resourceapi.DeviceClass
 	if newDeviceClass.Spec.ExtendedResourceName != nil {
-		name := c.mapping[v1.ResourceName(*newDeviceClass.Spec.ExtendedResourceName)]
-		var err error
-		if c.deviceClassLister != nil && name != "" {
-			classWithSameExtendedResourceName, err = c.deviceClassLister.Get(name)
-		}
-		if err != nil {
-			c.logger.V(5).Info("Failed to get device class", "extendedResource", *newDeviceClass.Spec.ExtendedResourceName, "deviceClass", name, "error", err)
-		}
+		classWithSameExtendedResourceName = c.mapping[v1.ResourceName(*newDeviceClass.Spec.ExtendedResourceName)]
 	}
 	if classWithSameExtendedResourceName != nil {
 		if newDeviceClass.CreationTimestamp.Before(&classWithSameExtendedResourceName.CreationTimestamp) {
@@ -174,14 +164,14 @@ func (c *ExtendedResourceCache) updateMapping(newDeviceClass, oldDeviceClass *re
 
 	// Add new mappings
 	if newDeviceClass.Spec.ExtendedResourceName != nil {
-		c.mapping[v1.ResourceName(*newDeviceClass.Spec.ExtendedResourceName)] = newDeviceClass.Name
+		c.mapping[v1.ResourceName(*newDeviceClass.Spec.ExtendedResourceName)] = newDeviceClass
 		c.logger.V(5).Info("Updated extended resource cache for explicit mapping",
 			"extendedResource", *newDeviceClass.Spec.ExtendedResourceName,
 			"deviceClass", newDeviceClass.Name)
 	}
 	// Always add the default mapping
 	defaultResourceName := v1.ResourceName(resourceapi.ResourceDeviceClassPrefix + newDeviceClass.Name)
-	c.mapping[defaultResourceName] = newDeviceClass.Name
+	c.mapping[defaultResourceName] = newDeviceClass
 	c.logger.V(5).Info("Updated extended resource cache for default mapping",
 		"extendedResource", defaultResourceName,
 		"deviceClass", newDeviceClass.Name)

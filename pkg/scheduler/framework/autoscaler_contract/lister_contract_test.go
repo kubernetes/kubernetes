@@ -145,6 +145,6 @@ func (s *sharedDRAManagerContract) DeviceClassResolver() fwk.DeviceClassResolver
 
 type deviceClassResolverContract struct{}
 
-func (d *deviceClassResolverContract) GetDeviceClass(_ v1.ResourceName) string {
-	return ""
+func (d *deviceClassResolverContract) GetDeviceClass(_ v1.ResourceName) *resourceapi.DeviceClass {
+	return nil
 }

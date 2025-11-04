@@ -208,7 +208,7 @@ func shouldDelegateResourceToDRA(rName v1.ResourceName, nodeInfo fwk.NodeInfo, d
 	// If draManager is available, check the cache for a mapping
 	if draManager != nil {
 		cache := draManager.DeviceClassResolver()
-		return cache.GetDeviceClass(rName) != ""
+		return cache.GetDeviceClass(rName) != nil
 	}
 
 	// If draManager is nil (e.g., kubelet admission check), delegate resources that are not in
