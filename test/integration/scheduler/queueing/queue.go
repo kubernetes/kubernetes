@@ -2532,9 +2532,9 @@ func RunTestCoreResourceEnqueue(t *testing.T, tt *CoreResourceEnqueueTestCase) {
 		}
 	}
 
-	for _, class := range tt.InitialDeviceClasses {
-		if _, err := cs.ResourceV1().DeviceClasses().Create(ctx, class, metav1.CreateOptions{}); err != nil {
-			t.Fatalf("Failed to create an initial DeviceClass %q: %v", class.Name, err)
+	for _, deviceClass := range tt.InitialDeviceClasses {
+		if _, err := cs.ResourceV1().DeviceClasses().Create(ctx, deviceClass, metav1.CreateOptions{}); err != nil {
+			t.Fatalf("Failed to create a DeviceClass %q: %v", deviceClass.Name, err)
 		}
 	}
 
