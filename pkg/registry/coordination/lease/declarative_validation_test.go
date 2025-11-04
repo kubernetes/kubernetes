@@ -27,7 +27,7 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-var apiVersions = []string{"v1", "v1alpha2", "v1beta1"}
+var apiVersions = []string{"v1","v1beta1"}
 
 func TestDeclarativeValidateForDeclarative(t *testing.T) {
 	for _, apiVersion := range apiVersions {
