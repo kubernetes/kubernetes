@@ -43,6 +43,14 @@ func WithTransform(transform cache.TransformFunc) SharedInformerOption {
 	}
 }
 
+// WithTransform sets a transform on all informers.
+func WithName(name string) SharedInformerOption {
+	return func(factory *metadataSharedInformerFactory) *metadataSharedInformerFactory {
+		factory.name = name
+		return factory
+	}
+}
+
 // NewSharedInformerFactory constructs a new instance of metadataSharedInformerFactory for all namespaces.
 func NewSharedInformerFactory(client metadata.Interface, defaultResync time.Duration) SharedInformerFactory {
 	return NewFilteredSharedInformerFactory(client, defaultResync, metav1.NamespaceAll, nil)
@@ -84,6 +92,7 @@ type metadataSharedInformerFactory struct {
 	defaultResync time.Duration
 	namespace     string
 	transform     cache.TransformFunc
+	name          string
 
 	lock      sync.Mutex
 	informers map[schema.GroupVersionResource]informers.GenericInformer
@@ -112,6 +121,9 @@ func (f *metadataSharedInformerFactory) ForResource(gvr schema.GroupVersionResou
 
 	informer = NewFilteredMetadataInformer(f.client, gvr, f.namespace, f.defaultResync, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 	informer.Informer().SetTransform(f.transform)
+	if f.name != "" {
+		informer.Informer().SetName(f.name)
+	}
 	f.informers[key] = informer
 
 	return informer

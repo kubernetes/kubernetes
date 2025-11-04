@@ -63,6 +63,7 @@ import (
 	logsapi "k8s.io/component-base/logs/api/v1"
 	metricsfeatures "k8s.io/component-base/metrics/features"
 	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
+	fifometrics "k8s.io/component-base/metrics/prometheus/fifo"
 	"k8s.io/component-base/metrics/prometheus/slis"
 	"k8s.io/component-base/term"
 	utilversion "k8s.io/component-base/version"
@@ -481,14 +482,16 @@ func CreateControllerContext(ctx context.Context, s *config.CompletedConfig, roo
 		return obj, nil
 	}
 
-	versionedClient, err := rootClientBuilder.Client("shared-informers")
+	sharedInformersName := "shared-informers"
+	versionedClient, err := rootClientBuilder.Client(sharedInformersName)
 	if err != nil {
-		return ControllerContext{}, fmt.Errorf("failed to create Kubernetes client for %q: %w", "shared-informers", err)
+		return ControllerContext{}, fmt.Errorf("failed to create Kubernetes client for %q: %w", sharedInformersName, err)
 	}
 
-	sharedInformers := informers.NewSharedInformerFactoryWithOptions(versionedClient, ResyncPeriod(s)(), informers.WithTransform(trim))
+	sharedInformers := informers.NewSharedInformerFactoryWithOptions(versionedClient, ResyncPeriod(s)(), informers.WithTransform(trim), informers.WithName(sharedInformersName))
 
-	metadataConfig, err := rootClientBuilder.Config("metadata-informers")
+	metadataInformersName := "metadata-informers"
+	metadataConfig, err := rootClientBuilder.Config(metadataInformersName)
 	if err != nil {
 		return ControllerContext{}, fmt.Errorf("failed to create metadata client config: %w", err)
 	}
@@ -498,7 +501,7 @@ func CreateControllerContext(ctx context.Context, s *config.CompletedConfig, roo
 		return ControllerContext{}, fmt.Errorf("failed to create metadata client: %w", err)
 	}
 
-	metadataInformers := metadatainformer.NewSharedInformerFactoryWithOptions(metadataClient, ResyncPeriod(s)(), metadatainformer.WithTransform(trim))
+	metadataInformers := metadatainformer.NewSharedInformerFactoryWithOptions(metadataClient, ResyncPeriod(s)(), metadatainformer.WithTransform(trim), metadatainformer.WithName(metadataInformersName))
 
 	// If apiserver is not running we should wait for some time and fail only then. This is particularly
 	// important when we start apiserver and controller manager at the same time.
@@ -547,6 +550,8 @@ func CreateControllerContext(ctx context.Context, s *config.CompletedConfig, roo
 	}
 
 	controllersmetrics.Register()
+	fifometrics.Register()
+
 	return controllerContext, nil
 }
 
