@@ -6797,7 +6797,7 @@ func ValidateNonEmptySelector(selectorMap map[string]string, fldPath *field.Path
 func ValidatePodTemplateSpecForRC(template *core.PodTemplateSpec, selectorMap map[string]string, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if template == nil {
-		allErrs = append(allErrs, field.Required(fldPath, ""))
+		allErrs = append(allErrs, field.Required(fldPath, "")).MarkCoveredByDeclarative()
 	} else {
 		selector := labels.Set(selectorMap).AsSelector()
 		if !selector.Empty() {
