@@ -451,14 +451,15 @@ func TestBlockOwnerDeletionAdmission(t *testing.T) {
 		Name:       "node",
 	}
 
-	expectNoError := func(err error) bool {
+	expectNoError := func(err error, userName string) bool {
 		return err == nil
 	}
-	expectCantSetBlockOwnerDeletionError := func(err error) bool {
+	expectCantSetBlockOwnerDeletionError := func(err error, userName string) bool  {
 		if err == nil {
 			return false
 		}
-		return strings.Contains(err.Error(), "cannot set blockOwnerDeletion if an ownerReference refers to a resource you can't set finalizers on")
+		errorFormatted := fmt.Sprintf("cannot set blockOwnerDeletion if an ownerReference refers to a resource %v can't set finalizers on", userName)
+		return strings.Contains(err.Error(), errorFormatted)
 	}
 	tests := []struct {
 		name               string
@@ -469,7 +470,7 @@ func TestBlockOwnerDeletionAdmission(t *testing.T) {
 		newObj             runtime.Object
 		restMapperOverride meta.RESTMapper
 
-		checkError func(error) bool
+		checkError func(error, string) bool
 	}{
 		// cases for create
 		{
@@ -678,7 +679,7 @@ func TestBlockOwnerDeletionAdmission(t *testing.T) {
 			attributes := apiserveradmission.NewAttributesRecord(tc.newObj, tc.oldObj, schema.GroupVersionKind{}, metav1.NamespaceDefault, "foo", tc.resource, tc.subresource, operation, options, false, user)
 
 			err = gcAdmit.Validate(context.TODO(), attributes, nil)
-			if !tc.checkError(err) {
+			if !tc.checkError(err, user.Name) {
 				t.Fatal(err)
 			}
 		})

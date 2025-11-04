@@ -146,7 +146,7 @@ func (a *gcPermissionsEnforcement) Validate(ctx context.Context, attributes admi
 		for _, record := range records {
 			decision, reason, err := a.authorizer.Authorize(ctx, record)
 			if decision != authorizer.DecisionAllow {
-				return admission.NewForbidden(attributes, fmt.Errorf("cannot set blockOwnerDeletion if an ownerReference refers to a resource you can't set finalizers on: %v, %v", reason, err))
+				return admission.NewForbidden(attributes, fmt.Errorf("cannot set blockOwnerDeletion if an ownerReference refers to a resource %v can't set finalizers on: %v, %w", attributes.GetUserInfo().GetName(), reason, err))
 			}
 		}
 	}
