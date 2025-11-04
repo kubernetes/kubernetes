@@ -61,8 +61,6 @@ type OptionalVariableDeclarations struct {
 	// variables are declared. When declared, the authorizer variables are
 	// expected to be non-null.
 	HasAuthorizer bool
-	// StrictCost specifies if the CEL cost limitation is strict for extended libraries as well as native libraries.
-	StrictCost bool
 	// HasPatchTypes specifies if JSONPatch, Object, Object.metadata and similar types are available in CEL. These can be used
 	// to initialize the typed objects in CEL required to create patches.
 	HasPatchTypes bool

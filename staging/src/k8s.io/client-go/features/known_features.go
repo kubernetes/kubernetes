@@ -16,6 +16,10 @@ limitations under the License.
 
 package features
 
+import (
+	"k8s.io/apimachinery/pkg/util/version"
+)
+
 // Every feature gate should have an entry here following this template:
 //
 // // owner: @username
@@ -54,8 +58,9 @@ const (
 	// Refactor informers to deliver watch stream events in order instead of out of order.
 	InOrderInformers Feature = "InOrderInformers"
 
-	// owner: @nilekhc
+	// owner: @enj, @michaelasp
 	// alpha: v1.30
+	// GA: v1.35
 	InformerResourceVersion Feature = "InformerResourceVersion"
 
 	// owner: @p0lyn0mial
@@ -69,15 +74,26 @@ const (
 	WatchListClient Feature = "WatchListClient"
 )
 
-// defaultKubernetesFeatureGates consists of all known Kubernetes-specific feature keys.
+// defaultVersionedKubernetesFeatureGates consists of all known Kubernetes-specific feature keys.
 //
 // To add a new feature, define a key for it above and add it here.
 // After registering with the binary, the features are, by default, controllable using environment variables.
 // For more details, please see envVarFeatureGates implementation.
-var defaultKubernetesFeatureGates = map[Feature]FeatureSpec{
-	ClientsAllowCBOR:        {Default: false, PreRelease: Alpha},
-	ClientsPreferCBOR:       {Default: false, PreRelease: Alpha},
-	InOrderInformers:        {Default: true, PreRelease: Beta},
-	InformerResourceVersion: {Default: false, PreRelease: Alpha},
-	WatchListClient:         {Default: false, PreRelease: Beta},
+var defaultVersionedKubernetesFeatureGates = map[Feature]VersionedSpecs{
+	ClientsAllowCBOR: {
+		{Version: version.MustParse("1.32"), Default: false, PreRelease: Alpha},
+	},
+	ClientsPreferCBOR: {
+		{Version: version.MustParse("1.32"), Default: false, PreRelease: Alpha},
+	},
+	InOrderInformers: {
+		{Version: version.MustParse("1.33"), Default: true, PreRelease: Beta},
+	},
+	InformerResourceVersion: {
+		{Version: version.MustParse("1.30"), Default: false, PreRelease: Alpha},
+		{Version: version.MustParse("1.35"), Default: true, PreRelease: GA},
+	},
+	WatchListClient: {
+		{Version: version.MustParse("1.30"), Default: false, PreRelease: Beta},
+	},
 }

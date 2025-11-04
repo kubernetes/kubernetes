@@ -147,6 +147,67 @@ func TestSetEmulationVersion(t *testing.T) {
 	}
 }
 
+func TestSetMinCompatibilityVersion(t *testing.T) {
+	tests := []struct {
+		name                         string
+		binaryVersion                string
+		emulationVersion             string
+		minCompatibilityVersion      string
+		emulationVersionFloor        string
+		minCompatibilityVersionFloor string
+	}{
+		{
+			name:                         "normal case",
+			binaryVersion:                "v1.34",
+			emulationVersion:             "v1.32",
+			minCompatibilityVersion:      "v1.30",
+			emulationVersionFloor:        "v1.31",
+			minCompatibilityVersionFloor: "v1.30",
+		},
+		{
+			name:                         "minCompatibilityVersion equal to emulationVersion",
+			binaryVersion:                "v1.34",
+			emulationVersion:             "v1.34",
+			minCompatibilityVersion:      "v1.34",
+			emulationVersionFloor:        "v1.31",
+			minCompatibilityVersionFloor: "v1.31",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			effective := NewEffectiveVersionFromString(test.binaryVersion, test.emulationVersionFloor, test.minCompatibilityVersionFloor)
+
+			emulationVersion := version.MustParseGeneric(test.emulationVersion)
+			effective.SetEmulationVersion(emulationVersion)
+			if !effective.EmulationVersion().EqualTo(emulationVersion) {
+				t.Errorf("expected emulationVersion %s, got %s", emulationVersion.String(), effective.EmulationVersion().String())
+			}
+			minCompatibilityVersion := version.MustParseGeneric(test.minCompatibilityVersion)
+			effective.SetMinCompatibilityVersion(minCompatibilityVersion)
+			if !effective.MinCompatibilityVersion().EqualTo(minCompatibilityVersion) {
+				t.Errorf("expected minCompatibilityVersion %s, got %s", minCompatibilityVersion.String(), effective.MinCompatibilityVersion().String())
+			}
+			// verify emulationVersion is not changed
+			if !effective.EmulationVersion().EqualTo(emulationVersion) {
+				t.Errorf("expected emulationVersion %s, got %s", emulationVersion.String(), effective.EmulationVersion().String())
+			}
+			errs := effective.Validate()
+			if len(errs) > 0 {
+				t.Fatalf("expected no Validate errors, errors found %+v", errs)
+				return
+			}
+			// if SetEmulationVersion is called again, it would change the minCompatibilityVersion back to emulationVersion - 1
+			effective.SetEmulationVersion(emulationVersion)
+			if !effective.EmulationVersion().EqualTo(emulationVersion) {
+				t.Errorf("expected emulationVersion %s, got %s", emulationVersion.String(), effective.EmulationVersion().String())
+			}
+			if !effective.MinCompatibilityVersion().EqualTo(emulationVersion.SubtractMinor(1)) {
+				t.Errorf("expected minCompatibilityVersion %s, got %s", emulationVersion.SubtractMinor(1).String(), effective.MinCompatibilityVersion().String())
+			}
+		})
+	}
+}
+
 func TestInfo(t *testing.T) {
 	tests := []struct {
 		name                          string

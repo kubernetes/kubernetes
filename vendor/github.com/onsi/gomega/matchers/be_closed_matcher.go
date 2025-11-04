@@ -12,7 +12,7 @@ import (
 type BeClosedMatcher struct {
 }
 
-func (matcher *BeClosedMatcher) Match(actual interface{}) (success bool, err error) {
+func (matcher *BeClosedMatcher) Match(actual any) (success bool, err error) {
 	if !isChan(actual) {
 		return false, fmt.Errorf("BeClosed matcher expects a channel.  Got:\n%s", format.Object(actual, 1))
 	}
@@ -39,10 +39,10 @@ func (matcher *BeClosedMatcher) Match(actual interface{}) (success bool, err err
 	return closed, nil
 }
 
-func (matcher *BeClosedMatcher) FailureMessage(actual interface{}) (message string) {
+func (matcher *BeClosedMatcher) FailureMessage(actual any) (message string) {
 	return format.Message(actual, "to be closed")
 }
 
-func (matcher *BeClosedMatcher) NegatedFailureMessage(actual interface{}) (message string) {
+func (matcher *BeClosedMatcher) NegatedFailureMessage(actual any) (message string) {
 	return format.Message(actual, "to be open")
 }

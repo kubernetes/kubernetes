@@ -155,6 +155,13 @@ message CustomResourceDefinitionCondition {
   // message is a human-readable message indicating details about last transition.
   // +optional
   optional string message = 5;
+
+  // observedGeneration represents the .metadata.generation that the condition was set based upon.
+  // For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+  // with respect to the current state of the instance.
+  // +featureGate=CRDObservedGenerationTracking
+  // +optional
+  optional int64 observedGeneration = 6;
 }
 
 // CustomResourceDefinitionList is a list of CustomResourceDefinition objects.
@@ -263,6 +270,11 @@ message CustomResourceDefinitionStatus {
   // +optional
   // +listType=atomic
   repeated string storedVersions = 3;
+
+  // The generation observed by the CRD controller.
+  // +featureGate=CRDObservedGenerationTracking
+  // +optional
+  optional int64 observedGeneration = 4;
 }
 
 // CustomResourceDefinitionVersion describes a version for CRD.

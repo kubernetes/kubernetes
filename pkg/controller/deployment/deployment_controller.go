@@ -24,6 +24,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"sync"
 	"time"
 
 	apps "k8s.io/api/apps/v1"
@@ -167,20 +168,25 @@ func (dc *DeploymentController) Run(ctx context.Context, workers int) {
 	dc.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: dc.client.CoreV1().Events("")})
 	defer dc.eventBroadcaster.Shutdown()
 
-	defer dc.queue.ShutDown()
-
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting controller", "controller", "deployment")
-	defer logger.Info("Shutting down controller", "controller", "deployment")
+
+	var wg sync.WaitGroup
+	defer func() {
+		logger.Info("Shutting down controller", "controller", "deployment")
+		dc.queue.ShutDown()
+		wg.Wait()
+	}()
 
 	if !cache.WaitForNamedCacheSyncWithContext(ctx, dc.dListerSynced, dc.rsListerSynced, dc.podListerSynced) {
 		return
 	}
 
 	for i := 0; i < workers; i++ {
-		go wait.UntilWithContext(ctx, dc.worker, time.Second)
+		wg.Go(func() {
+			wait.UntilWithContext(ctx, dc.worker, time.Second)
+		})
 	}
-
 	<-ctx.Done()
 }
 

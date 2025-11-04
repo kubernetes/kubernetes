@@ -344,12 +344,12 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 		},
 		// --
 
-		// k8s.io/kubernetes/pkg/apis/storagemigration/v1alpha1
-		gvr("storagemigration.k8s.io", "v1alpha1", "storageversionmigrations"): {
-			Stub:              `{"metadata": {"name": "test-migration"}, "spec":{"resource": {"group": "test-group", "resource": "test-resource", "version": "test-version"}}}`,
+		// k8s.io/kubernetes/pkg/apis/storagemigration/v1beta1
+		gvr("storagemigration.k8s.io", "v1beta1", "storageversionmigrations"): {
+			Stub:              `{"metadata": {"name": "test-migration"}, "spec":{"resource": {"group": "test-group", "resource": "test-resource"}}}`,
 			ExpectedEtcdPath:  "/registry/storageversionmigrations/test-migration",
-			IntroducedVersion: "1.30",
-			RemovedVersion:    "1.36",
+			IntroducedVersion: "1.35",
+			RemovedVersion:    "1.41",
 		},
 		// --
 

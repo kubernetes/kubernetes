@@ -45,10 +45,13 @@ import (
 	cgotesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/events"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/dynamic-resource-allocation/deviceclass/extendedresourcecache"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/dynamic-resource-allocation/structured"
 	kubeschedulerconfigv1 "k8s.io/kube-scheduler/config/v1"
 	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	configv1 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -158,8 +161,9 @@ var (
 	workerNode3      = &st.MakeNode().Name(node3Name).Label("kubernetes.io/hostname", node3Name).Node
 	workerNode3Slice = st.MakeResourceSlice(node3Name, driver).Device("instance-1", map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{attrName: {BoolValue: ptr.To(true)}}).Obj()
 
-	workerNodeWithExtendedResource = &st.MakeNode().Name(nodeName).Label("kubernetes.io/hostname", nodeName).Capacity(map[v1.ResourceName]string{v1.ResourceName(extendedResourceName): "1"}).Node
-	brokenSelector                 = resourceapi.DeviceSelector{
+	workerNodeWithExtendedResource                = &st.MakeNode().Name(nodeName).Label("kubernetes.io/hostname", nodeName).Capacity(map[v1.ResourceName]string{v1.ResourceName(extendedResourceName): "1"}).Node
+	workerNodeWithExtendedResourceZeroAllocatable = &st.MakeNode().Name(nodeName).Label("kubernetes.io/hostname", nodeName).Capacity(map[v1.ResourceName]string{v1.ResourceName(extendedResourceName): "0"}).Node
+	brokenSelector                                = resourceapi.DeviceSelector{
 		CEL: &resourceapi.CELDeviceSelector{
 			// Not set for workerNode.
 			Expression: fmt.Sprintf(`device.attributes["%s"].%s`, driver, attrName),
@@ -358,12 +362,11 @@ var (
 				Annotations(map[string]string{"resource.kubernetes.io/extended-resource-claim": "true"}).
 				OwnerRef(
 			metav1.OwnerReference{
-				APIVersion:         "v1",
-				Kind:               "Pod",
-				Name:               podName,
-				UID:                types.UID(podUID),
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				APIVersion: "v1",
+				Kind:       "Pod",
+				Name:       podName,
+				UID:        types.UID(podUID),
+				Controller: ptr.To(true),
 			}).
 		RequestWithName("container-0-request-0", className).
 		Allocation(extendedResourceAllocationResult).
@@ -375,12 +378,11 @@ var (
 					Annotations(map[string]string{"resource.kubernetes.io/extended-resource-claim": "true"}).
 					OwnerRef(
 			metav1.OwnerReference{
-				APIVersion:         "v1",
-				Kind:               "Pod",
-				Name:               podName,
-				UID:                types.UID(podUID),
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				APIVersion: "v1",
+				Kind:       "Pod",
+				Name:       podName,
+				UID:        types.UID(podUID),
+				Controller: ptr.To(true),
 			}).
 		RequestWithName("container-0-request-0", className).
 		Allocation(extendedResourceAllocationResult).
@@ -392,12 +394,11 @@ var (
 					Annotations(map[string]string{"resource.kubernetes.io/extended-resource-claim": "true"}).
 					OwnerRef(
 			metav1.OwnerReference{
-				APIVersion:         "v1",
-				Kind:               "Pod",
-				Name:               podName,
-				UID:                types.UID(podUID),
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				APIVersion: "v1",
+				Kind:       "Pod",
+				Name:       podName,
+				UID:        types.UID(podUID),
+				Controller: ptr.To(true),
 			}).
 		RequestWithName("container-0-request-0", className).
 		RequestWithNameCount("container-0-request-1", className, 2).
@@ -410,12 +411,11 @@ var (
 						Annotations(map[string]string{"resource.kubernetes.io/extended-resource-claim": "true"}).
 						OwnerRef(
 			metav1.OwnerReference{
-				APIVersion:         "v1",
-				Kind:               "Pod",
-				Name:               podName,
-				UID:                types.UID(podUID),
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				APIVersion: "v1",
+				Kind:       "Pod",
+				Name:       podName,
+				UID:        types.UID(podUID),
+				Controller: ptr.To(true),
 			}).
 		RequestWithName("container-0-request-0", className).
 		RequestWithNameCount("container-0-request-1", className, 2).
@@ -428,12 +428,11 @@ var (
 							Annotations(map[string]string{"resource.kubernetes.io/extended-resource-claim": "true"}).
 							OwnerRef(
 			metav1.OwnerReference{
-				APIVersion:         "v1",
-				Kind:               "Pod",
-				Name:               podName,
-				UID:                types.UID(podUID),
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				APIVersion: "v1",
+				Kind:       "Pod",
+				Name:       podName,
+				UID:        types.UID(podUID),
+				Controller: ptr.To(true),
 			}).
 		RequestWithName("container-0-request-0", className).
 		RequestWithNameCount("container-1-request-0", className, 2).
@@ -446,12 +445,11 @@ var (
 								Annotations(map[string]string{"resource.kubernetes.io/extended-resource-claim": "true"}).
 								OwnerRef(
 			metav1.OwnerReference{
-				APIVersion:         "v1",
-				Kind:               "Pod",
-				Name:               podName,
-				UID:                types.UID(podUID),
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				APIVersion: "v1",
+				Kind:       "Pod",
+				Name:       podName,
+				UID:        types.UID(podUID),
+				Controller: ptr.To(true),
 			}).
 		RequestWithName("container-0-request-0", className).
 		RequestWithNameCount("container-1-request-0", className, 2).
@@ -464,12 +462,11 @@ var (
 					Annotations(map[string]string{"resource.kubernetes.io/extended-resource-claim": "true"}).
 					OwnerRef(
 			metav1.OwnerReference{
-				APIVersion:         "v1",
-				Kind:               "Pod",
-				Name:               podName,
-				UID:                types.UID(podUID),
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				APIVersion: "v1",
+				Kind:       "Pod",
+				Name:       podName,
+				UID:        types.UID(podUID),
+				Controller: ptr.To(true),
 			}).
 		RequestWithName("container-0-request-0", className).
 		Allocation(extendedResourceAllocationResultNode2).
@@ -1423,6 +1420,38 @@ func TestPlugin(t *testing.T) {
 			classes:                            []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
 			want:                               want{},
 		},
+		"extended-resource-name-with-zero-allocatable": {
+			enableDRAExtendedResource: true,
+			nodes:                     []*v1.Node{workerNodeWithExtendedResourceZeroAllocatable},
+			pod:                       podWithExtendedResourceName,
+			classes:                   []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
+			objs:                      []apiruntime.Object{workerNodeSlice, podWithExtendedResourceName},
+			want: want{
+				reserve: result{
+					inFlightClaim: extendedResourceClaimNoName,
+				},
+				prebind: result{
+					assumedClaim: reserve(extendedResourceClaim, podWithExtendedResourceName),
+					added:        []metav1.Object{reserve(extendedResourceClaim, podWithExtendedResourceName)},
+				},
+				postbind: result{
+					assumedClaim: reserve(extendedResourceClaim, podWithExtendedResourceName),
+				},
+			},
+		},
+		"non-DRA-extended-resource-name-with-zero-allocatable": {
+			enableDRAExtendedResource: true,
+			nodes:                     []*v1.Node{workerNodeWithExtendedResourceZeroAllocatable},
+			pod:                       podWithExtendedResourceName,
+			classes:                   []*resourceapi.DeviceClass{deviceClass},
+			objs:                      []apiruntime.Object{workerNodeSlice, podWithExtendedResourceName},
+			want: want{
+				prefilter: result{
+					status: fwk.NewStatus(fwk.Skip),
+				},
+				prebindPreFlight: fwk.NewStatus(fwk.Skip),
+			},
+		},
 		"extended-resource-name-no-resource": {
 			enableDRAExtendedResource: true,
 			pod:                       podWithExtendedResourceName,
@@ -1937,12 +1966,11 @@ func TestPlugin(t *testing.T) {
 		// We can run in parallel because logging is per-test.
 		tc := tc
 		t.Run(name, func(t *testing.T) {
-			t.Parallel()
 			nodes := tc.nodes
 			if nodes == nil {
 				nodes = []*v1.Node{workerNode}
 			}
-			features := feature.Features{
+			feats := feature.Features{
 				EnableDRAAdminAccess:               tc.enableDRAAdminAccess,
 				EnableDRADeviceBindingConditions:   tc.enableDRADeviceBindingConditions,
 				EnableDRAResourceClaimDeviceStatus: tc.enableDRAResourceClaimDeviceStatus,
@@ -1952,7 +1980,9 @@ func TestPlugin(t *testing.T) {
 				EnableDRAPrioritizedList:           tc.enableDRAPrioritizedList,
 				EnableDRAExtendedResource:          tc.enableDRAExtendedResource,
 			}
-			testCtx := setup(t, tc.args, nodes, tc.claims, tc.classes, tc.objs, features, tc.failPatch)
+
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, tc.enableDRAExtendedResource)
+			testCtx := setup(t, tc.args, nodes, tc.claims, tc.classes, tc.objs, feats, tc.failPatch)
 			initialObjects := testCtx.listAll(t)
 
 			status := testCtx.p.PreEnqueue(testCtx.ctx, tc.pod)
@@ -2304,6 +2334,13 @@ func setup(t *testing.T, args *config.DynamicResourcesArgs, nodes []*v1.Node, cl
 	registeredHandler := claimsCache.AddEventHandler(cache.ResourceEventHandlerFuncs{})
 
 	tc.draManager = NewDRAManager(tCtx, claimsCache, resourceSliceTracker, tc.informerFactory)
+	if features.EnableDRAExtendedResource {
+		cache := tc.draManager.DeviceClassResolver().(*extendedresourcecache.ExtendedResourceCache)
+		if _, err := tc.informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandler(cache); err != nil {
+			tCtx.Logger().Error(err, "failed to add device class informer event handler")
+		}
+	}
+
 	opts := []runtime.Option{
 		runtime.WithClientSet(tc.client),
 		runtime.WithInformerFactory(tc.informerFactory),
@@ -2669,6 +2706,15 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 	}
 }
 
+// mockDeviceClassResolver is a simple mock implementation of fwk.DeviceClassResolver for testing
+type mockDeviceClassResolver struct {
+	mapping map[v1.ResourceName]string
+}
+
+func (m *mockDeviceClassResolver) GetDeviceClass(resourceName v1.ResourceName) string {
+	return m.mapping[resourceName]
+}
+
 func Test_createDeviceRequests(t *testing.T) {
 	pod1 := st.MakePod().Name(podName).Namespace(namespace).
 		UID(podUID).
@@ -2763,7 +2809,7 @@ func Test_createDeviceRequests(t *testing.T) {
 	testcases := map[string]struct {
 		pod                *v1.Pod
 		extendedResources  map[v1.ResourceName]int64
-		deviceClassMapping map[v1.ResourceName]string
+		cache              fwk.DeviceClassResolver
 		wantDeviceRequests []resourceapi.DeviceRequest
 	}{
 		"nil": {
@@ -2773,38 +2819,38 @@ func Test_createDeviceRequests(t *testing.T) {
 		"one resource match": {
 			pod:                pod1,
 			extendedResources:  res,
-			deviceClassMapping: devMap,
+			cache:              &mockDeviceClassResolver{mapping: devMap},
 			wantDeviceRequests: []resourceapi.DeviceRequest{devReq},
 		},
 		"one resource match, one resource not match": {
 			pod:                pod1,
 			extendedResources:  res2,
-			deviceClassMapping: devMap,
+			cache:              &mockDeviceClassResolver{mapping: devMap},
 			wantDeviceRequests: []resourceapi.DeviceRequest{devReq},
 		},
 		"two resources match": {
 			pod:                pod1,
 			extendedResources:  res2,
-			deviceClassMapping: devMap2,
+			cache:              &mockDeviceClassResolver{mapping: devMap2},
 			wantDeviceRequests: []resourceapi.DeviceRequest{devReq, devReq2},
 		},
 		"two containers match": {
 			pod:                pod2,
 			extendedResources:  res2,
-			deviceClassMapping: devMap2,
+			cache:              &mockDeviceClassResolver{mapping: devMap2},
 			wantDeviceRequests: []resourceapi.DeviceRequest{devReq, devReq3},
 		},
 		"one init container, one regular container": {
 			pod:                podInit,
 			extendedResources:  resInit,
-			deviceClassMapping: devMapInit,
+			cache:              &mockDeviceClassResolver{mapping: devMapInit},
 			wantDeviceRequests: []resourceapi.DeviceRequest{devReq2Init, devReqInit},
 		},
 	}
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			gotDeviceRequests := createDeviceRequests(tc.pod, tc.extendedResources, tc.deviceClassMapping)
+			gotDeviceRequests := createDeviceRequests(tc.pod, tc.extendedResources, tc.cache)
 			if len(tc.wantDeviceRequests) != len(gotDeviceRequests) {
 				t.Fatalf("different length, want %#v, got %#v", tc.wantDeviceRequests, gotDeviceRequests)
 			}

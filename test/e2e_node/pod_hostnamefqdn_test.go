@@ -63,7 +63,7 @@ func testPod(podnamebase string) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:  "test-container",
-					Image: imageutils.GetE2EImage(imageutils.BusyBox),
+					Image: imageutils.GetE2EImage(imageutils.JessieDnsutils),
 				},
 			},
 			RestartPolicy: v1.RestartPolicyNever,

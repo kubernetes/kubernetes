@@ -34,9 +34,10 @@ run_kubectl_events_tests() {
     # Post-condition: namespace 'test-events' is created.
     kube::test::get_object_assert 'namespaces/test-events' "{{$id_field}}" 'test-events'
 
-    # Pre-condition: event does not exist for Cronjob/pi in any namespace
+    # Pre-condition: event does not exist for CronJob/pi in any namespace
     output_message=$(kubectl events -A "${kube_flags[@]:?}" 2>&1)
-    kube::test::if_has_not_string "${output_message}" "Warning" "InvalidSchedule" "Cronjob/pi"
+    kube::test::if_has_not_string "${output_message}" "InvalidSchedule"
+    kube::test::if_has_not_string "${output_message}" "CronJob/pi"
 
     # Pre-condition: cronjob does not exist in test-events namespace
     kube::test::get_object_assert 'cronjob --namespace=test-events' "{{range.items}}{{ if eq $id_field \"pi\" }}found{{end}}{{end}}:" ':'
@@ -100,54 +101,68 @@ __EOF__
     # Post-Condition: assertion object exists
     kube::test::get_object_assert 'cronjob/pi --namespace=test-events' "{{$id_field}}" 'pi'
 
-    # Post-Condition: events --all-namespaces returns event for Cronjob/pi
+    # Post-Condition: events --all-namespaces returns event for CronJob/pi
     output_message=$(kubectl events -A "${kube_flags[@]:?}" 2>&1)
-    kube::test::if_has_string "${output_message}" "Warning" "InvalidSchedule" "Cronjob/pi"
+    kube::test::if_has_string "${output_message}" "InvalidSchedule"
+    kube::test::if_has_string "${output_message}" "CronJob/pi"
 
-    # Post-Condition: events for test-events namespace returns event for Cronjob/pi
+    # Post-Condition: events for test-events namespace returns event for CronJob/pi
     output_message=$(kubectl events -n test-events "${kube_flags[@]:?}" 2>&1)
-    kube::test::if_has_string "${output_message}" "Warning" "InvalidSchedule" "Cronjob/pi"
+    kube::test::if_has_string "${output_message}" "InvalidSchedule"
+    kube::test::if_has_string "${output_message}" "CronJob/pi"
 
-    # Post-Condition: events returns event for Cronjob/pi when --for flag is used
-    output_message=$(kubectl events -n test-events --for=Cronjob/pi "${kube_flags[@]:?}" 2>&1)
-    kube::test::if_has_string "${output_message}" "Warning" "InvalidSchedule" "Cronjob/pi"
+    # Post-Condition: events returns event for CronJob/pi when --for flag is used
+    output_message=$(kubectl events -n test-events --for=CronJob/pi "${kube_flags[@]:?}" 2>&1)
+    kube::test::if_has_string "${output_message}" "InvalidSchedule"
+    kube::test::if_has_string "${output_message}" "CronJob/pi"
 
-    # Post-Condition: events returns event for fully qualified Cronjob.v1.batch/pi when --for flag is used
+    # Post-Condition: events returns event for fully qualified CronJob.v1.batch/pi when --for flag is used
     output_message=$(kubectl events -n test-events --for Cronjob.v1.batch/pi "${kube_flags[@]:?}" 2>&1)
-    kube::test::if_has_string "${output_message}" "Warning" "InvalidSchedule" "Cronjob/pi"
+    kube::test::if_has_string "${output_message}" "InvalidSchedule"
+    kube::test::if_has_string "${output_message}" "CronJob/pi"
 
     # Post-Condition: events not returns event for fully qualified Cronjob.v1.example.com/pi when --for flag is used
     output_message=$(kubectl events -n test-events --for Cronjob.v1.example.com/pi "${kube_flags[@]:?}" 2>&1)
-    kube::test::if_has_not_string "${output_message}" "Warning" "InvalidSchedule" "Cronjob/pi"
+    kube::test::if_has_not_string "${output_message}" "InvalidSchedule"
+    kube::test::if_has_not_string "${output_message}" "CronJob/pi"
 
-    # Post-Condition: events returns event for fully qualified without version Cronjob.batch/pi when --for flag is used
-    output_message=$(kubectl events -n test-events --for=Cronjob.batch/pi "${kube_flags[@]:?}" 2>&1)
-    kube::test::if_has_string "${output_message}" "Warning" "InvalidSchedule" "Cronjob/pi"
+    # Post-Condition: events returns event for fully qualified without version CronJob.batch/pi when --for flag is used
+    output_message=$(kubectl events -n test-events --for=CronJob.batch/pi "${kube_flags[@]:?}" 2>&1)
+    kube::test::if_has_string "${output_message}" "InvalidSchedule"
+    kube::test::if_has_string "${output_message}" "CronJob/pi"
 
-    # Post-Condition: events returns event for Cronjob/pi when watch is enabled
-    output_message=$(kubectl events -n test-events --for=Cronjob/pi --watch --request-timeout=1 "${kube_flags[@]:?}" 2>&1)
-    kube::test::if_has_string "${output_message}" "Warning" "InvalidSchedule" "Cronjob/pi"
+    # Post-Condition: events returns event for CronJob/pi when watch is enabled
+    output_message=$(kubectl events -n test-events --for=CronJob/pi --watch --request-timeout=1 "${kube_flags[@]:?}" 2>&1)
+    kube::test::if_has_string "${output_message}" "InvalidSchedule"
+    kube::test::if_has_string "${output_message}" "CronJob/pi"
 
-    # Post-Condition: events returns event for Cronjob/pi when filtered by Warning
-    output_message=$(kubectl events -n test-events --for=Cronjob/pi --types=Warning "${kube_flags[@]:?}" 2>&1)
-    kube::test::if_has_string "${output_message}" "Warning" "InvalidSchedule" "Cronjob/pi"
+    # Post-Condition: events returns event for CronJob/pi when filtered by Warning
+    output_message=$(kubectl events -n test-events --for=CronJob/pi --types=Warning "${kube_flags[@]:?}" 2>&1)
+    kube::test::if_has_string "${output_message}" "InvalidSchedule"
+    kube::test::if_has_string "${output_message}" "CronJob/pi"
 
-    # Post-Condition: events not returns event for Cronjob/pi when filtered only by Normal
-    output_message=$(kubectl events -n test-events --for=Cronjob/pi --types=Normal "${kube_flags[@]:?}" 2>&1)
-    kube::test::if_has_not_string "${output_message}" "Warning" "InvalidSchedule" "Cronjob/pi"
+    # Post-Condition: events not returns event for CronJob/pi when filtered only by Normal
+    output_message=$(kubectl events -n test-events --for=CronJob/pi --types=Normal "${kube_flags[@]:?}" 2>&1)
+    kube::test::if_has_not_string "${output_message}" "InvalidSchedule"
+    kube::test::if_has_not_string "${output_message}" "CronJob/pi"
 
-    # Post-Condition: events returns event for Cronjob/pi without headers
-    output_message=$(kubectl events -n test-events --for=Cronjob/pi --no-headers "${kube_flags[@]:?}" 2>&1)
-    kube::test::if_has_not_string "${output_message}" "LAST SEEN" "TYPE" "REASON"
-    kube::test::if_has_string "${output_message}" "Warning" "InvalidSchedule" "Cronjob/pi"
+    # Post-Condition: events returns event for CronJob/pi without headers
+    output_message=$(kubectl events -n test-events --for=CronJob/pi --no-headers "${kube_flags[@]:?}" 2>&1)
+    kube::test::if_has_not_string "${output_message}" "LAST SEEN"
+    kube::test::if_has_string "${output_message}" "InvalidSchedule"
+    kube::test::if_has_string "${output_message}" "CronJob/pi"
 
-    # Post-Condition: events returns event for Cronjob/pi in json format
-    output_message=$(kubectl events -n test-events --for=Cronjob/pi --output=json "${kube_flags[@]:?}" 2>&1)
-    kube::test::if_has_string "${output_message}" "Warning" "InvalidSchedule" "Cronjob/pi"
+    # Post-Condition: events returns event for CronJob/pi in json format
+    output_message=$(kubectl events -n test-events --for=CronJob/pi --output=json "${kube_flags[@]:?}" 2>&1)
+    kube::test::if_has_string "${output_message}" '"reason": "InvalidSchedule"'
+    kube::test::if_has_string "${output_message}" '"kind": "CronJob"'
+    kube::test::if_has_string "${output_message}" '"name": "pi"'
 
-    # Post-Condition: events returns event for Cronjob/pi in yaml format
-    output_message=$(kubectl events -n test-events --for=Cronjob/pi --output=yaml "${kube_flags[@]:?}" 2>&1)
-    kube::test::if_has_string "${output_message}" "Warning" "InvalidSchedule" "Cronjob/pi"
+    # Post-Condition: events returns event for CronJob/pi in yaml format
+    output_message=$(kubectl events -n test-events --for=CronJob/pi --output=yaml "${kube_flags[@]:?}" 2>&1)
+    kube::test::if_has_string "${output_message}" "reason: InvalidSchedule"
+    kube::test::if_has_string "${output_message}" "kind: CronJob"
+    kube::test::if_has_string "${output_message}" "name: pi"
 
     #Clean up
     kubectl delete cronjob pi --namespace=test-events

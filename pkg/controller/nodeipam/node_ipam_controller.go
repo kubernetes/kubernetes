@@ -19,6 +19,8 @@ package nodeipam
 import (
 	"context"
 	"fmt"
+	"net"
+
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -30,7 +32,6 @@ import (
 	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam"
-	"net"
 )
 
 // ipamController is an interface abstracting an interface for
@@ -132,7 +133,7 @@ func NewNodeIpamController(
 
 // Run starts an asynchronous loop that monitors the status of cluster nodes.
 func (nc *Controller) Run(ctx context.Context) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	// Start event processing pipeline.
 	nc.eventBroadcaster.StartStructuredLogging(3)
@@ -146,12 +147,10 @@ func (nc *Controller) Run(ctx context.Context) {
 	}
 
 	if nc.allocatorType == ipam.IPAMFromClusterAllocatorType || nc.allocatorType == ipam.IPAMFromCloudAllocatorType {
-		go nc.legacyIPAM.Run(ctx)
+		nc.legacyIPAM.Run(ctx)
 	} else {
-		go nc.cidrAllocator.Run(ctx)
+		nc.cidrAllocator.Run(ctx)
 	}
-
-	<-ctx.Done()
 }
 
 // RunWithMetrics is a wrapper for Run that also tracks starting and stopping of the nodeipam controller with additional metric

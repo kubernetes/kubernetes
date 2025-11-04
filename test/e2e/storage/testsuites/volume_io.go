@@ -44,13 +44,13 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
-// MD5 hashes of the test file corresponding to each file size.
+// sha256 hashes of the test file corresponding to each file size.
 // Test files are generated in testVolumeIO()
 // If test file generation algorithm changes, these must be recomputed.
-var md5hashes = map[int64]string{
-	storageframework.FileSizeSmall:  "5c34c2813223a7ca05a3c2f38c0d1710",
-	storageframework.FileSizeMedium: "f2fa202b1ffeedda5f3a58bd1ae81104",
-	storageframework.FileSizeLarge:  "8d763edc71bd16217664793b5a15e403",
+var sha256sum = map[int64]string{
+	storageframework.FileSizeSmall:  "aa39c2cbd49a28425c977d229b43e1ff9579ecd98cea7b466982bab04753f2ab",
+	storageframework.FileSizeMedium: "5f718f3b7788352e1450c6c14c6051f0298d49ac6af18c5a1ce3cd3b5947de24",
+	storageframework.FileSizeLarge:  "11b058d55b088031fbdec33e3e896c032550ff20ca0ed37f76ad1d5d155c5f50",
 }
 
 const mountPath = "/opt"
@@ -270,18 +270,18 @@ func verifyFile(ctx context.Context, f *framework.Framework, pod *v1.Pod, fpath 
 	}
 
 	ginkgo.By("verifying file hash")
-	rtnstr, stderr, err = e2epod.ExecShellInPodWithFullOutput(ctx, f, pod.Name, fmt.Sprintf("md5sum %s | cut -d' ' -f1", fpath))
+	rtnstr, stderr, err = e2epod.ExecShellInPodWithFullOutput(ctx, f, pod.Name, fmt.Sprintf("sha256sum %s | cut -d' ' -f1", fpath))
 	if err != nil {
-		return fmt.Errorf("unable to test file hash via `md5sum %s`: %v\nstdout: %s\nstderr: %s", fpath, err, rtnstr, stderr)
+		return fmt.Errorf("unable to test file hash via `sha256sum %s`: %v\nstdout: %s\nstderr: %s", fpath, err, rtnstr, stderr)
 	}
 	actualHash := strings.TrimSuffix(rtnstr, "\n")
-	expectedHash, ok := md5hashes[expectSize]
+	expectedHash, ok := sha256sum[expectSize]
 	if !ok {
 		return fmt.Errorf("file hash is unknown for file size %d. Was a new file size added to the test suite?",
 			expectSize)
 	}
 	if actualHash != expectedHash {
-		return fmt.Errorf("MD5 hash is incorrect for file %s with size %d. Expected: `%s`; Actual: `%s`",
+		return fmt.Errorf("SHA256 hash is incorrect for file %s with size %d. Expected: `%s`; Actual: `%s`",
 			fpath, expectSize, expectedHash, actualHash)
 	}
 

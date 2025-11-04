@@ -27,9 +27,11 @@ import (
 
 type defaultImpl struct{}
 
-type impl interface {
+// Impl is an interface for the container runtime implementation.
+type Impl interface {
 	NewRemoteRuntimeService(endpoint string, connectionTimeout time.Duration) (criapi.RuntimeService, error)
 	NewRemoteImageService(endpoint string, connectionTimeout time.Duration) (criapi.ImageManagerService, error)
+	RuntimeConfig(ctx context.Context, runtimeService criapi.RuntimeService) (*runtimeapi.RuntimeConfigResponse, error)
 	Status(ctx context.Context, runtimeService criapi.RuntimeService, verbose bool) (*runtimeapi.StatusResponse, error)
 	ListPodSandbox(ctx context.Context, runtimeService criapi.RuntimeService, filter *runtimeapi.PodSandboxFilter) ([]*runtimeapi.PodSandbox, error)
 	StopPodSandbox(ctx context.Context, runtimeService criapi.RuntimeService, sandboxID string) error
@@ -44,6 +46,10 @@ func (*defaultImpl) NewRemoteRuntimeService(endpoint string, connectionTimeout t
 
 func (*defaultImpl) NewRemoteImageService(endpoint string, connectionTimeout time.Duration) (criapi.ImageManagerService, error) {
 	return criclient.NewRemoteImageService(endpoint, connectionTimeout, nil, nil)
+}
+
+func (*defaultImpl) RuntimeConfig(ctx context.Context, runtimeService criapi.RuntimeService) (*runtimeapi.RuntimeConfigResponse, error) {
+	return runtimeService.RuntimeConfig(ctx)
 }
 
 func (*defaultImpl) Status(ctx context.Context, runtimeService criapi.RuntimeService, verbose bool) (*runtimeapi.StatusResponse, error) {

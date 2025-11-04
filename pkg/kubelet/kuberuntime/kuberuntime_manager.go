@@ -46,6 +46,7 @@ import (
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	crierror "k8s.io/cri-api/pkg/errors"
+	remote "k8s.io/cri-client/pkg"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -765,7 +766,7 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 		return resizeResult
 	}
 
-	setPodCgroupConfig := func(rName v1.ResourceName, setLimitValue bool) error {
+	setPodCgroupConfig := func(logger klog.Logger, rName v1.ResourceName, setLimitValue bool) error {
 		var err error
 		resizedResources := &cm.ResourceConfig{}
 		switch rName {
@@ -783,7 +784,7 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 			}
 			resizedResources.Memory = podResources.Memory
 		}
-		err = pcm.SetPodCgroupConfig(pod, resizedResources)
+		err = pcm.SetPodCgroupConfig(logger, pod, resizedResources)
 		if err != nil {
 			logger.Error(err, "Failed to set cgroup config", "resource", rName, "pod", klog.KObj(pod))
 			return err
@@ -803,12 +804,14 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 		var err error
 		// At upsizing, limits should expand prior to requests in order to keep "requests <= limits".
 		if newPodCgLimValue > currPodCgLimValue {
-			if err = setPodCgroupConfig(rName, true); err != nil {
+			// TODO: Pass logger from context once contextual logging migration is complete
+			if err = setPodCgroupConfig(klog.TODO(), rName, true); err != nil {
 				return err
 			}
 		}
 		if newPodCgReqValue > currPodCgReqValue {
-			if err = setPodCgroupConfig(rName, false); err != nil {
+			// TODO: Pass logger from context once contextual logging migration is complete
+			if err = setPodCgroupConfig(klog.TODO(), rName, false); err != nil {
 				return err
 			}
 		}
@@ -820,12 +823,14 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 		}
 		// At downsizing, requests should shrink prior to limits in order to keep "requests <= limits".
 		if newPodCgReqValue < currPodCgReqValue {
-			if err = setPodCgroupConfig(rName, false); err != nil {
+			// TODO: Pass logger from context once contextual logging migration is complete
+			if err = setPodCgroupConfig(klog.TODO(), rName, false); err != nil {
 				return err
 			}
 		}
 		if newPodCgLimValue < currPodCgLimValue {
-			if err = setPodCgroupConfig(rName, true); err != nil {
+			// TODO(#127825): Pass logger from context once contextual logging migration is complete
+			if err = setPodCgroupConfig(klog.TODO(), rName, true); err != nil {
 				return err
 			}
 		}
@@ -1111,7 +1116,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		// allocated cpus are released immediately. If the container is restarted, cpus will be re-allocated
 		// to it.
 		if containerStatus != nil && containerStatus.State != kubecontainer.ContainerStateRunning {
-			if err := m.internalLifecycle.PostStopContainer(containerStatus.ID.ID); err != nil {
+			if err := m.internalLifecycle.PostStopContainer(logger, containerStatus.ID.ID); err != nil {
 				logger.Error(err, "Internal container post-stop lifecycle hook failed for container in pod with error",
 					"containerName", container.Name, "pod", klog.KObj(pod))
 			}
@@ -1634,9 +1639,10 @@ func (m *kubeGenericRuntimeManager) doBackOff(ctx context.Context, pod *v1.Pod, 
 			m.recorder.Eventf(containerRef, v1.EventTypeWarning, events.BackOffStartContainer,
 				fmt.Sprintf("Back-off restarting failed container %s in pod %s", container.Name, format.Pod(pod)))
 		}
-		err := fmt.Errorf("back-off %s restarting failed container=%s pod=%s", backOff.Get(key), container.Name, format.Pod(pod))
+		backoff := backOff.Get(key)
+		err := fmt.Errorf("back-off %s restarting failed container=%s pod=%s", backoff, container.Name, format.Pod(pod))
 		logger.V(3).Info("Back-off restarting failed container", "err", err.Error())
-		return true, err.Error(), kubecontainer.ErrCrashLoopBackOff
+		return true, err.Error(), kubecontainer.NewBackoffError(kubecontainer.ErrCrashLoopBackOff, ts.Add(backoff))
 	}
 
 	backOff.Next(key, ts)
@@ -1818,7 +1824,13 @@ func (m *kubeGenericRuntimeManager) GetContainerStatus(ctx context.Context, podU
 	if err != nil {
 		return nil, fmt.Errorf("runtime container status: %w", err)
 	}
-	return m.convertToKubeContainerStatus(ctx, podUID, resp.GetStatus()), nil
+
+	status := resp.GetStatus()
+	if status == nil {
+		return nil, remote.ErrContainerStatusNil
+	}
+
+	return m.convertToKubeContainerStatus(ctx, podUID, status), nil
 }
 
 // GarbageCollect removes dead containers using the specified container gc policy.

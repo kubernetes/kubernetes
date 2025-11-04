@@ -111,26 +111,8 @@ func SortControllerRevisions(revisions []*apps.ControllerRevision) {
 // EqualRevision returns true if lhs and rhs are either both nil, or both point to non-nil ControllerRevisions that
 // contain semantically equivalent data. Otherwise this method returns false.
 func EqualRevision(lhs *apps.ControllerRevision, rhs *apps.ControllerRevision) bool {
-	var lhsHash, rhsHash *uint32
 	if lhs == nil || rhs == nil {
 		return lhs == rhs
-	}
-	if hs, found := lhs.Labels[ControllerRevisionHashLabel]; found {
-		hash, err := strconv.ParseInt(hs, 10, 32)
-		if err == nil {
-			lhsHash = new(uint32)
-			*lhsHash = uint32(hash)
-		}
-	}
-	if hs, found := rhs.Labels[ControllerRevisionHashLabel]; found {
-		hash, err := strconv.ParseInt(hs, 10, 32)
-		if err == nil {
-			rhsHash = new(uint32)
-			*rhsHash = uint32(hash)
-		}
-	}
-	if lhsHash != nil && rhsHash != nil && *lhsHash != *rhsHash {
-		return false
 	}
 	return bytes.Equal(lhs.Data.Raw, rhs.Data.Raw) && apiequality.Semantic.DeepEqual(lhs.Data.Object, rhs.Data.Object)
 }

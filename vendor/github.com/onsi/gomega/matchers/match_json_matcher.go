@@ -9,18 +9,18 @@ import (
 )
 
 type MatchJSONMatcher struct {
-	JSONToMatch      interface{}
-	firstFailurePath []interface{}
+	JSONToMatch      any
+	firstFailurePath []any
 }
 
-func (matcher *MatchJSONMatcher) Match(actual interface{}) (success bool, err error) {
+func (matcher *MatchJSONMatcher) Match(actual any) (success bool, err error) {
 	actualString, expectedString, err := matcher.prettyPrint(actual)
 	if err != nil {
 		return false, err
 	}
 
-	var aval interface{}
-	var eval interface{}
+	var aval any
+	var eval any
 
 	// this is guarded by prettyPrint
 	json.Unmarshal([]byte(actualString), &aval)
@@ -30,17 +30,17 @@ func (matcher *MatchJSONMatcher) Match(actual interface{}) (success bool, err er
 	return equal, nil
 }
 
-func (matcher *MatchJSONMatcher) FailureMessage(actual interface{}) (message string) {
+func (matcher *MatchJSONMatcher) FailureMessage(actual any) (message string) {
 	actualString, expectedString, _ := matcher.prettyPrint(actual)
 	return formattedMessage(format.Message(actualString, "to match JSON of", expectedString), matcher.firstFailurePath)
 }
 
-func (matcher *MatchJSONMatcher) NegatedFailureMessage(actual interface{}) (message string) {
+func (matcher *MatchJSONMatcher) NegatedFailureMessage(actual any) (message string) {
 	actualString, expectedString, _ := matcher.prettyPrint(actual)
 	return formattedMessage(format.Message(actualString, "not to match JSON of", expectedString), matcher.firstFailurePath)
 }
 
-func (matcher *MatchJSONMatcher) prettyPrint(actual interface{}) (actualFormatted, expectedFormatted string, err error) {
+func (matcher *MatchJSONMatcher) prettyPrint(actual any) (actualFormatted, expectedFormatted string, err error) {
 	actualString, ok := toString(actual)
 	if !ok {
 		return "", "", fmt.Errorf("MatchJSONMatcher matcher requires a string, stringer, or []byte.  Got actual:\n%s", format.Object(actual, 1))

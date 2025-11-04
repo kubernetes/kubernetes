@@ -42,7 +42,7 @@ type compiler struct {
 // NewDefaultCompiler returns a new Compiler following the default compatibility version.
 // Note: the compiler construction depends on feature gates and the compatibility version to be initialized.
 func NewDefaultCompiler() Compiler {
-	return NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true))
+	return NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()))
 }
 
 // NewCompiler returns a new Compiler.

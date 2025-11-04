@@ -29,7 +29,6 @@ import (
 	utilcompatibility "k8s.io/apiserver/pkg/util/compatibility"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
-	restclient "k8s.io/client-go/rest"
 	"k8s.io/component-base/compatibility"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -52,11 +51,10 @@ type TearDownFunc func()
 
 // TestServer return values supplied by kube-test-ApiServer
 type TestServer struct {
-	LoopbackClientConfig *restclient.Config // Rest client config using the magic token
-	Options              *options.KubeControllerManagerOptions
-	Config               *kubecontrollerconfig.Config
-	TearDownFn           TearDownFunc // TearDown function
-	TmpDir               string       // Temp Dir used, by the apiserver
+	Options    *options.KubeControllerManagerOptions
+	Config     *kubecontrollerconfig.Config
+	TearDownFn TearDownFunc // TearDown function
+	TmpDir     string       // Temp Dir used, by the apiserver
 }
 
 // StartTestServer starts a kube-controller-manager. A rest client config and a tear-down func,
@@ -99,6 +97,7 @@ func StartTestServer(t *testing.T, ctx context.Context, customFlags []string) (r
 	featureGate := utilfeature.DefaultMutableFeatureGate.DeepCopy()
 	effectiveVersion := utilcompatibility.DefaultKubeEffectiveVersionForTest()
 	effectiveVersion.SetEmulationVersion(featureGate.EmulationVersion())
+	effectiveVersion.SetMinCompatibilityVersion(featureGate.MinCompatibilityVersion())
 	componentGlobalsRegistry := compatibility.NewComponentGlobalsRegistry()
 	if err := componentGlobalsRegistry.Register(compatibility.DefaultKubeComponent, effectiveVersion, featureGate); err != nil {
 		return result, err
@@ -118,8 +117,8 @@ func StartTestServer(t *testing.T, ctx context.Context, customFlags []string) (r
 	}
 	// If the local ComponentGlobalsRegistry is changed by the flags,
 	// we need to copy the new feature values back to the DefaultFeatureGate because most feature checks still use the DefaultFeatureGate.
-	if !featureGate.EmulationVersion().EqualTo(utilfeature.DefaultMutableFeatureGate.EmulationVersion()) {
-		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultMutableFeatureGate, effectiveVersion.EmulationVersion())
+	if !featureGate.EmulationVersion().EqualTo(utilfeature.DefaultMutableFeatureGate.EmulationVersion()) || !featureGate.MinCompatibilityVersion().EqualTo(utilfeature.DefaultMutableFeatureGate.MinCompatibilityVersion()) {
+		featuregatetesting.SetFeatureGateVersionsDuringTest(t, utilfeature.DefaultMutableFeatureGate, effectiveVersion.EmulationVersion(), effectiveVersion.MinCompatibilityVersion())
 	}
 	featureOverrides := map[featuregate.Feature]bool{}
 	for f := range utilfeature.DefaultMutableFeatureGate.GetAll() {
@@ -156,7 +155,7 @@ func StartTestServer(t *testing.T, ctx context.Context, customFlags []string) (r
 	}(ctx)
 
 	logger.Info("Waiting for /healthz to be ok...")
-	client, err := kubernetes.NewForConfig(config.LoopbackClientConfig)
+	client, err := kubernetes.NewForConfig(config.Kubeconfig)
 	if err != nil {
 		return result, fmt.Errorf("failed to create a client: %v", err)
 	}
@@ -182,7 +181,6 @@ func StartTestServer(t *testing.T, ctx context.Context, customFlags []string) (r
 	}
 
 	// from here the caller must call tearDown
-	result.LoopbackClientConfig = config.LoopbackClientConfig
 	result.Options = s
 	result.Config = config
 	result.TearDownFn = tearDown

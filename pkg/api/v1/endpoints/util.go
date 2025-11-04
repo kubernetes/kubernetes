@@ -18,12 +18,12 @@ package endpoints
 
 import (
 	"bytes"
-	"crypto/md5"
 	"encoding/hex"
 	"hash"
+	"hash/fnv"
 	"sort"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 )
@@ -154,7 +154,7 @@ func hashAddresses(addrs addressSet) string {
 		slice = append(slice, addrReady{k, ready})
 	}
 	sort.Sort(addrsReady(slice))
-	hasher := md5.New()
+	hasher := fnv.New128a()
 	hashutil.DeepHashObject(hasher, slice)
 	return hex.EncodeToString(hasher.Sum(nil)[0:])
 }
@@ -210,7 +210,7 @@ type subsetsByHash []v1.EndpointSubset
 func (sl subsetsByHash) Len() int      { return len(sl) }
 func (sl subsetsByHash) Swap(i, j int) { sl[i], sl[j] = sl[j], sl[i] }
 func (sl subsetsByHash) Less(i, j int) bool {
-	hasher := md5.New()
+	hasher := fnv.New128a()
 	h1 := hashObject(hasher, sl[i])
 	h2 := hashObject(hasher, sl[j])
 	return bytes.Compare(h1, h2) < 0
@@ -229,7 +229,7 @@ type portsByHash []v1.EndpointPort
 func (sl portsByHash) Len() int      { return len(sl) }
 func (sl portsByHash) Swap(i, j int) { sl[i], sl[j] = sl[j], sl[i] }
 func (sl portsByHash) Less(i, j int) bool {
-	hasher := md5.New()
+	hasher := fnv.New128a()
 	h1 := hashObject(hasher, sl[i])
 	h2 := hashObject(hasher, sl[j])
 	return bytes.Compare(h1, h2) < 0

@@ -236,7 +236,7 @@ func extractRunningGoroutines() ([]types.Goroutine, error) {
 		}
 		functionCall.Filename = line[:delimiterIdx]
 		line = strings.Split(line[delimiterIdx+1:], " ")[0]
-		lineNumber, err := strconv.ParseInt(line, 10, 64)
+		lineNumber, err := strconv.ParseInt(line, 10, 32)
 		functionCall.Line = int(lineNumber)
 		if err != nil {
 			return nil, types.GinkgoErrors.FailedToParseStackTrace(fmt.Sprintf("Invalid function call line number: %s\n%s", line, err.Error()))

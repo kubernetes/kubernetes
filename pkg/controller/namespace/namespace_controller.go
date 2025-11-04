@@ -18,6 +18,7 @@ package namespace
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"golang.org/x/time/rate"
@@ -196,18 +197,27 @@ func (nm *NamespaceController) syncNamespaceFromKey(ctx context.Context, key str
 // Run starts observing the system with the specified number of workers.
 func (nm *NamespaceController) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrashWithContext(ctx)
-	defer nm.queue.ShutDown()
+
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting namespace controller")
-	defer logger.Info("Shutting down namespace controller")
+
+	var wg sync.WaitGroup
+	defer func() {
+		logger.Info("Shutting down namespace controller")
+		nm.queue.ShutDown()
+		wg.Wait()
+	}()
 
 	if !cache.WaitForNamedCacheSyncWithContext(ctx, nm.listerSynced) {
 		return
 	}
 
 	logger.V(5).Info("Starting workers of namespace controller")
+
 	for i := 0; i < workers; i++ {
-		go wait.UntilWithContext(ctx, nm.worker, time.Second)
+		wg.Go(func() {
+			wait.UntilWithContext(ctx, nm.worker, time.Second)
+		})
 	}
 	<-ctx.Done()
 }

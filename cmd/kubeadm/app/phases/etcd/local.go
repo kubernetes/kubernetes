@@ -205,8 +205,8 @@ func GetEtcdPodSpec(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.A
 	return staticpodutil.ComponentPod(
 		v1.Container{
 			Name:            kubeadmconstants.Etcd,
-			Command:         getEtcdCommand(cfg, endpoint, nodeName, initialCluster),
-			Image:           images.GetEtcdImage(cfg),
+			Command:         getEtcdCommand(cfg, endpoint, nodeName, initialCluster, kubeadmconstants.SupportedEtcdVersion),
+			Image:           images.GetEtcdImage(cfg, kubeadmconstants.SupportedEtcdVersion),
 			ImagePullPolicy: v1.PullIfNotPresent,
 			// Mount the etcd datadir path read-write so etcd can store data in a more persistent manner
 			VolumeMounts: []v1.VolumeMount{
@@ -240,7 +240,7 @@ func GetEtcdPodSpec(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.A
 }
 
 // getEtcdCommand builds the right etcd command from the given config object
-func getEtcdCommand(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.APIEndpoint, nodeName string, initialCluster []etcdutil.Member) []string {
+func getEtcdCommand(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.APIEndpoint, nodeName string, initialCluster []etcdutil.Member, supportedEtcdVersion map[uint8]string) []string {
 	// localhost IP family should be the same that the AdvertiseAddress
 	etcdLocalhostAddress := "127.0.0.1"
 	if utilsnet.IsIPv6String(endpoint.AdvertiseAddress) {
@@ -265,7 +265,7 @@ func getEtcdCommand(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.A
 		{Name: "listen-metrics-urls", Value: fmt.Sprintf("http://%s", net.JoinHostPort(etcdLocalhostAddress, strconv.Itoa(kubeadmconstants.EtcdMetricsPort)))},
 	}
 
-	etcdImageTag := images.GetEtcdImageTag(cfg)
+	etcdImageTag := images.GetEtcdImageTag(cfg, supportedEtcdVersion)
 	if etcdVersion, err := version.ParseSemantic(etcdImageTag); err == nil && etcdVersion.AtLeast(version.MustParseSemantic("3.6.0")) {
 		// Arguments used by Etcd 3.6.0+.
 		// TODO: Start always using these once kubeadm only supports etcd >= 3.6.0 for all its supported k8s versions.

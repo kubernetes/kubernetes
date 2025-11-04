@@ -234,8 +234,6 @@
         "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus",
         "github.com/grpc-ecosystem/go-grpc-middleware/v2",
         "github.com/grpc-ecosystem/grpc-gateway/v2",
-        "github.com/onsi/ginkgo/v2",
-        "github.com/onsi/gomega",
         "github.com/prometheus/common",
         "github.com/spf13/cobra",
         "github.com/stretchr/objx",

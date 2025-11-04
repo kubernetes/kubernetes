@@ -54,7 +54,7 @@ func (strategy) NamespaceScoped() bool {
 // and should not be modified by the user.
 func (strategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	fields := map[fieldpath.APIVersion]*fieldpath.Set{
-		"storagemigration.k8s.io/v1alpha1": fieldpath.NewSet(
+		"storagemigration.k8s.io/v1beta1": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("status"),
 		),
 	}
@@ -113,7 +113,7 @@ var StatusStrategy = statusStrategy{Strategy}
 // and should not be modified by the user.
 func (statusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	fields := map[fieldpath.APIVersion]*fieldpath.Set{
-		"storagemigration.k8s.io/v1alpha1": fieldpath.NewSet(
+		"storagemigration.k8s.io/v1beta1": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("metadata"),
 			fieldpath.MakePathOrDie("spec"),
 		),

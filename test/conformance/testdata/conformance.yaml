@@ -2458,6 +2458,27 @@
     The PodTemplate must be deleted.
   release: v1.19
   file: test/e2e/common/node/podtemplates.go
+- testname: Pods Generation, graceful delete
+  codename: '[sig-node] Pods Extended (pod generation) Pod Generation custom-set generation
+    on new pods and graceful delete [Conformance]'
+  description: Create a Pod, ensure that triggering a graceful delete causes the generation
+    to be updated.
+  release: v1.35
+  file: test/e2e/node/pods.go
+- testname: Pods Generation, 500 updates
+  codename: '[sig-node] Pods Extended (pod generation) Pod Generation issue 500 podspec
+    updates and verify generation and observedGeneration eventually converge [Conformance]'
+  description: Create a Pod, issue 499 podSpec updates and verify generation and observedGeneration
+    eventually converge to 500.
+  release: v1.35
+  file: test/e2e/node/pods.go
+- testname: Pods Generation, updates
+  codename: '[sig-node] Pods Extended (pod generation) Pod Generation pod generation
+    should start at 1 and increment per update [Conformance]'
+  description: Create a Pod, and perform a few updates, ensuring that the pod's metadata.generation
+    and status.observedGeneration are updated as expected.
+  release: v1.35
+  file: test/e2e/node/pods.go
 - testname: Pods, QOS
   codename: '[sig-node] Pods Extended Pods Set QOS Class should be set on Pods with
     matching resource requests and limits for memory and cpu [Conformance]'
@@ -2853,6 +2874,31 @@
     lifecycle of a container.
   release: v1.19
   file: test/e2e/common/node/expansion.go
+- testname: CRUD operations for deviceclasses
+  codename: '[sig-node] [DRA] CRUD Tests resource.k8s.io/v1 DeviceClass [Conformance]'
+  description: kube-apiserver must support create/update/list/patch/delete operations
+    for resource.k8s.io/v1 DeviceClass.
+  release: v1.35
+  file: test/e2e/dra/dra.go
+- testname: CRUD operations for resourceclaims
+  codename: '[sig-node] [DRA] CRUD Tests resource.k8s.io/v1 ResourceClaim [Conformance]'
+  description: kube-apiserver must support create/update/list/patch/delete operations
+    for resource.k8s.io/v1 ResourceClaim.
+  release: v1.35
+  file: test/e2e/dra/dra.go
+- testname: CRUD operations for resourceclaimtemplates
+  codename: '[sig-node] [DRA] CRUD Tests resource.k8s.io/v1 ResourceClaimTemplate
+    [Conformance]'
+  description: kube-apiserver must support create/update/list/patch/delete operations
+    for resource.k8s.io/v1 ResourceClaimTemplate.
+  release: v1.35
+  file: test/e2e/dra/dra.go
+- testname: CRUD operations for resoureslices
+  codename: '[sig-node] [DRA] CRUD Tests resource.k8s.io/v1 ResourceSlice [Conformance]'
+  description: kube-apiserver must support create/update/list/patch/delete operations
+    for resource.k8s.io/v1 ResourceSlice.
+  release: v1.35
+  file: test/e2e/dra/dra.go
 - testname: LimitRange, resources
   codename: '[sig-scheduling] LimitRange should create a LimitRange with defaults
     and ensure pod has those defaults applied. [Conformance]'

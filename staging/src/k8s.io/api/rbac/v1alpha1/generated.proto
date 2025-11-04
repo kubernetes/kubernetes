@@ -190,6 +190,8 @@ message RoleRef {
   optional string kind = 2;
 
   // Name is the name of resource being referenced
+  // +required
+  // +k8s:required
   optional string name = 3;
 }
 
@@ -208,6 +210,8 @@ message Subject {
   optional string apiVersion = 2;
 
   // Name of the object being referenced.
+  // +required
+  // +k8s:required
   optional string name = 3;
 
   // Namespace of the referenced object.  If the object kind is non-namespace, such as "User" or "Group", and this value is not empty

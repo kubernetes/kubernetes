@@ -406,8 +406,9 @@ func startServiceAccountTestServerAndWaitForCaches(ctx context.Context, t *testi
 		return rootClientset, clientConfig, stop, informers, err
 	}
 	go tokenController.Run(ctx, 1)
-
+	logger := klog.FromContext(ctx)
 	serviceAccountController, err := serviceaccountcontroller.NewServiceAccountsController(
+		logger,
 		informers.Core().V1().ServiceAccounts(),
 		informers.Core().V1().Namespaces(),
 		rootClientset,

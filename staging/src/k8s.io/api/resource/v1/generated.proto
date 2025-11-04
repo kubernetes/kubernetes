@@ -90,6 +90,7 @@ message AllocatedDeviceStatus {
   // NetworkData contains network-related information specific to the device.
   //
   // +optional
+  // +k8s:optional
   optional NetworkDeviceData networkData = 6;
 }
 
@@ -314,6 +315,8 @@ message CounterSet {
   // The maximum number of counters in all sets is 32.
   //
   // +required
+  // +k8s:required
+  // +k8s:eachKey=+k8s:format=k8s-short-name
   map<string, Counter> counters = 2;
 }
 
@@ -429,6 +432,8 @@ message Device {
   // +optional
   // +listType=atomic
   // +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
+  // +k8s:optional
+  // +k8s:maxItems=4
   repeated string bindingConditions = 10;
 
   // BindingFailureConditions defines the conditions for binding failure.
@@ -445,6 +450,8 @@ message Device {
   // +optional
   // +listType=atomic
   // +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
+  // +k8s:optional
+  // +k8s:maxItems=4
   repeated string bindingFailureConditions = 11;
 
   // AllowMultipleAllocations marks whether the device is allowed to be allocated to multiple DeviceRequests.
@@ -476,6 +483,10 @@ message DeviceAllocationConfiguration {
   //
   // +optional
   // +listType=atomic
+  // +k8s:optional
+  // +k8s:listType=atomic
+  // +k8s:unique=set
+  // +k8s:maxItems=32
   repeated string requests = 2;
 
   optional DeviceConfiguration deviceConfiguration = 3;
@@ -487,6 +498,7 @@ message DeviceAllocationResult {
   //
   // +optional
   // +listType=atomic
+  // +k8s:optional
   // +k8s:maxItems=32
   repeated DeviceRequestAllocationResult results = 1;
 
@@ -500,6 +512,7 @@ message DeviceAllocationResult {
   //
   // +optional
   // +listType=atomic
+  // +k8s:optional
   // +k8s:maxItems=64
   repeated DeviceAllocationConfiguration config = 2;
 }
@@ -509,26 +522,30 @@ message DeviceAttribute {
   // IntValue is a number.
   //
   // +optional
-  // +oneOf=ValueType
+  // +k8s:optional
+  // +k8s:unionMember
   optional int64 int = 2;
 
   // BoolValue is a true/false value.
   //
   // +optional
-  // +oneOf=ValueType
+  // +k8s:optional
+  // +k8s:unionMember
   optional bool bool = 3;
 
   // StringValue is a string. Must not be longer than 64 characters.
   //
   // +optional
-  // +oneOf=ValueType
+  // +k8s:optional
+  // +k8s:unionMember
   optional string string = 4;
 
   // VersionValue is a semantic version according to semver.org spec 2.0.0.
   // Must not be longer than 64 characters.
   //
   // +optional
-  // +oneOf=ValueType
+  // +k8s:optional
+  // +k8s:unionMember
   optional string version = 5;
 }
 
@@ -565,6 +582,7 @@ message DeviceClaim {
   //
   // +optional
   // +listType=atomic
+  // +k8s:optional
   // +k8s:listType=atomic
   // +k8s:unique=map
   // +k8s:listMapKey=name
@@ -576,6 +594,7 @@ message DeviceClaim {
   //
   // +optional
   // +listType=atomic
+  // +k8s:optional
   // +k8s:maxItems=32
   repeated DeviceConstraint constraints = 2;
 
@@ -585,6 +604,7 @@ message DeviceClaim {
   //
   // +optional
   // +listType=atomic
+  // +k8s:optional
   // +k8s:maxItems=32
   repeated DeviceClaimConfiguration config = 3;
 }
@@ -600,6 +620,7 @@ message DeviceClaimConfiguration {
   //
   // +optional
   // +listType=atomic
+  // +k8s:optional
   // +k8s:listType=atomic
   // +k8s:unique=set
   // +k8s:maxItems=32
@@ -618,6 +639,8 @@ message DeviceClaimConfiguration {
 message DeviceClass {
   // Standard object metadata
   // +optional
+  // +k8s:subfield(name)=+k8s:optional
+  // +k8s:subfield(name)=+k8s:format=k8s-long-name
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec defines what can be allocated and how to configure it.
@@ -712,6 +735,7 @@ message DeviceConstraint {
   //
   // +optional
   // +listType=atomic
+  // +k8s:optional
   // +k8s:listType=atomic
   // +k8s:unique=set
   // +k8s:maxItems=32
@@ -732,6 +756,8 @@ message DeviceConstraint {
   //
   // +optional
   // +oneOf=ConstraintType
+  // +k8s:optional
+  // +k8s:format=k8s-resource-fully-qualified-name
   optional string matchAttribute = 2;
 
   // DistinctAttribute requires that all devices in question have this
@@ -768,6 +794,8 @@ message DeviceCounterConsumption {
   // 16 counters each).
   //
   // +required
+  // +k8s:required
+  // +k8s:eachKey=+k8s:format=k8s-short-name
   map<string, Counter> counters = 2;
 }
 
@@ -818,6 +846,7 @@ message DeviceRequest {
   // +oneOf=deviceRequestType
   // +listType=atomic
   // +featureGate=DRAPrioritizedList
+  // +k8s:optional
   // +k8s:listType=atomic
   // +k8s:unique=map
   // +k8s:listMapKey=name
@@ -901,6 +930,7 @@ message DeviceRequestAllocationResult {
   // +optional
   // +listType=atomic
   // +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
+  // +k8s:optional
   // +k8s:maxItems=4
   repeated string bindingConditions = 7;
 
@@ -913,6 +943,7 @@ message DeviceRequestAllocationResult {
   // +optional
   // +listType=atomic
   // +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
+  // +k8s:optional
   // +k8s:maxItems=4
   repeated string bindingFailureConditions = 8;
 
@@ -992,6 +1023,7 @@ message DeviceSubRequest {
   //
   // +optional
   // +listType=atomic
+  // +k8s:optional
   // +k8s:maxItems=32
   repeated DeviceSelector selectors = 3;
 
@@ -1088,6 +1120,7 @@ message DeviceTaint {
   // nodes is not valid here.
   //
   // +required
+  // +k8s:required
   optional string effect = 3;
 
   // TimeAdded represents the time at which the taint was added.
@@ -1166,6 +1199,7 @@ message ExactDeviceRequest {
   //
   // +optional
   // +listType=atomic
+  // +k8s:optional
   // +k8s:maxItems=32
   repeated DeviceSelector selectors = 2;
 
@@ -1265,6 +1299,8 @@ message NetworkDeviceData {
   // Must not be longer than 256 characters.
   //
   // +optional
+  // +k8s:optional
+  // +k8s:maxLength=256
   optional string interfaceName = 1;
 
   // IPs lists the network addresses assigned to the device's network interface.
@@ -1275,6 +1311,10 @@ message NetworkDeviceData {
   //
   // +optional
   // +listType=atomic
+  // +k8s:optional
+  // +k8s:listType=atomic
+  // +k8s:unique=set
+  // +k8s:maxItems=16
   repeated string ips = 2;
 
   // HardwareAddress represents the hardware address (e.g. MAC Address) of the device's network interface.
@@ -1282,6 +1322,8 @@ message NetworkDeviceData {
   // Must not be longer than 128 characters.
   //
   // +optional
+  // +k8s:optional
+  // +k8s:maxLength=128
   optional string hardwareAddress = 3;
 }
 
@@ -1620,6 +1662,7 @@ message ResourceSliceSpec {
   //
   // +optional
   // +listType=atomic
+  // +k8s:optional
   repeated Device devices = 6;
 
   // PerDeviceNodeSelection defines whether the access from nodes to

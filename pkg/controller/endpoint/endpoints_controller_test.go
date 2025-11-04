@@ -1008,6 +1008,63 @@ func TestSyncEndpointsItemsPreexistingIdentical(t *testing.T) {
 	endpointsHandler.ValidateRequestCount(t, 0)
 }
 
+func TestSyncEndpointsItemsPreexistingIdenticalUnsorted(t *testing.T) {
+	ns := metav1.NamespaceDefault
+	testServer, endpointsHandler := makeTestServer(t, ns)
+	defer testServer.Close()
+	tCtx := ktesting.Init(t)
+	endpoints := newController(tCtx, testServer.URL, 0*time.Second)
+	pod0 := testPod(ns, 0, 1, true, ipv4only)
+	pod1 := testPod(ns, 1, 1, true, ipv4only)
+
+	subsets := []v1.EndpointSubset{{
+		Addresses: []v1.EndpointAddress{
+			// known to not be packed correctly according to the current hash
+			{IP: pod1.Status.PodIPs[0].IP, NodeName: &emptyNodeName, TargetRef: &v1.ObjectReference{Kind: "Pod", Name: pod1.Name, Namespace: ns}},
+			{IP: pod0.Status.PodIPs[0].IP, NodeName: &emptyNodeName, TargetRef: &v1.ObjectReference{Kind: "Pod", Name: pod0.Name, Namespace: ns}},
+		},
+		Ports: []v1.EndpointPort{{Port: 8080, Protocol: "TCP"}},
+	}}
+
+	// Assert that endpoints are not repacked correctly according to the current hash.
+	// We want to prove that this does not cause a re-sync.
+	repacked := endptspkg.RepackSubsets(subsets)
+	if reflect.DeepEqual(subsets, repacked) {
+		t.Errorf("subsets were already in sorted order")
+	}
+
+	endpoints.endpointsStore.Add(&v1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			ResourceVersion: "1",
+			Name:            "foo",
+			Namespace:       ns,
+			Labels: map[string]string{
+				LabelManagedBy: ControllerName,
+			},
+		},
+		Subsets: subsets,
+	})
+
+	endpoints.podStore.Add(pod0)
+	endpoints.podStore.Add(pod1)
+
+	endpoints.serviceStore.Add(&v1.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: metav1.NamespaceDefault},
+		Spec: v1.ServiceSpec{
+			Selector:   map[string]string{"foo": "bar"},
+			Ports:      []v1.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)}},
+			IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
+		},
+	})
+	err := endpoints.syncService(tCtx, ns+"/foo")
+	if err != nil {
+		t.Errorf("Unexpected error syncing service %v", err)
+	}
+
+	// syncing should've been a no-op
+	endpointsHandler.ValidateRequestCount(t, 0)
+}
+
 func TestSyncEndpointsItems(t *testing.T) {
 	ns := "other"
 	testServer, endpointsHandler := makeTestServer(t, ns)

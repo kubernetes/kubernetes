@@ -97,7 +97,7 @@ func NewLegacySATokenCleaner(saInformer coreinformers.ServiceAccountInformer, se
 }
 
 func (tc *LegacySATokenCleaner) Run(ctx context.Context) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting legacy service account token cleaner controller")

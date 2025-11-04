@@ -12,7 +12,7 @@ import (
 // Equal uses reflect.DeepEqual to compare actual with expected.  Equal is strict about
 // types when performing comparisons.
 // It is an error for both actual and expected to be nil.  Use BeNil() instead.
-func Equal(expected interface{}) types.GomegaMatcher {
+func Equal(expected any) types.GomegaMatcher {
 	return &matchers.EqualMatcher{
 		Expected: expected,
 	}
@@ -22,7 +22,7 @@ func Equal(expected interface{}) types.GomegaMatcher {
 // This is done by converting actual to have the type of expected before
 // attempting equality with reflect.DeepEqual.
 // It is an error for actual and expected to be nil.  Use BeNil() instead.
-func BeEquivalentTo(expected interface{}) types.GomegaMatcher {
+func BeEquivalentTo(expected any) types.GomegaMatcher {
 	return &matchers.BeEquivalentToMatcher{
 		Expected: expected,
 	}
@@ -31,7 +31,7 @@ func BeEquivalentTo(expected interface{}) types.GomegaMatcher {
 // BeComparableTo uses gocmp.Equal from github.com/google/go-cmp (instead of reflect.DeepEqual) to perform a deep comparison.
 // You can pass cmp.Option as options.
 // It is an error for actual and expected to be nil.  Use BeNil() instead.
-func BeComparableTo(expected interface{}, opts ...cmp.Option) types.GomegaMatcher {
+func BeComparableTo(expected any, opts ...cmp.Option) types.GomegaMatcher {
 	return &matchers.BeComparableToMatcher{
 		Expected: expected,
 		Options:  opts,
@@ -41,7 +41,7 @@ func BeComparableTo(expected interface{}, opts ...cmp.Option) types.GomegaMatche
 // BeIdenticalTo uses the == operator to compare actual with expected.
 // BeIdenticalTo is strict about types when performing comparisons.
 // It is an error for both actual and expected to be nil.  Use BeNil() instead.
-func BeIdenticalTo(expected interface{}) types.GomegaMatcher {
+func BeIdenticalTo(expected any) types.GomegaMatcher {
 	return &matchers.BeIdenticalToMatcher{
 		Expected: expected,
 	}
@@ -139,7 +139,7 @@ func Succeed() types.GomegaMatcher {
 // Error interface
 //
 // The optional second argument is a description of the error function, if used.  This is required when passing a function but is ignored in all other cases.
-func MatchError(expected interface{}, functionErrorDescription ...any) types.GomegaMatcher {
+func MatchError(expected any, functionErrorDescription ...any) types.GomegaMatcher {
 	return &matchers.MatchErrorMatcher{
 		Expected:           expected,
 		FuncErrDescription: functionErrorDescription,
@@ -202,11 +202,11 @@ func BeClosed() types.GomegaMatcher {
 //	Expect(myThing.IsValid()).Should(BeTrue())
 //
 // Finally, if you want to match the received object as well as get the actual received value into a variable, so you can reason further about the value received,
-// you can pass a pointer to a variable of the approriate type first, and second a matcher:
+// you can pass a pointer to a variable of the appropriate type first, and second a matcher:
 //
 //	var myThing thing
 //	Eventually(thingChan).Should(Receive(&myThing, ContainSubstring("bar")))
-func Receive(args ...interface{}) types.GomegaMatcher {
+func Receive(args ...any) types.GomegaMatcher {
 	return &matchers.ReceiveMatcher{
 		Args: args,
 	}
@@ -224,7 +224,7 @@ func Receive(args ...interface{}) types.GomegaMatcher {
 //
 // Of course, the value is actually sent to the channel.  The point of `BeSent` is less to make an assertion about the availability of the channel (which is typically an implementation detail that your test should not be concerned with).
 // Rather, the point of `BeSent` is to make it possible to easily and expressively write tests that can timeout on blocked channel sends.
-func BeSent(arg interface{}) types.GomegaMatcher {
+func BeSent(arg any) types.GomegaMatcher {
 	return &matchers.BeSentMatcher{
 		Arg: arg,
 	}
@@ -233,7 +233,7 @@ func BeSent(arg interface{}) types.GomegaMatcher {
 // MatchRegexp succeeds if actual is a string or stringer that matches the
 // passed-in regexp.  Optional arguments can be provided to construct a regexp
 // via fmt.Sprintf().
-func MatchRegexp(regexp string, args ...interface{}) types.GomegaMatcher {
+func MatchRegexp(regexp string, args ...any) types.GomegaMatcher {
 	return &matchers.MatchRegexpMatcher{
 		Regexp: regexp,
 		Args:   args,
@@ -243,7 +243,7 @@ func MatchRegexp(regexp string, args ...interface{}) types.GomegaMatcher {
 // ContainSubstring succeeds if actual is a string or stringer that contains the
 // passed-in substring.  Optional arguments can be provided to construct the substring
 // via fmt.Sprintf().
-func ContainSubstring(substr string, args ...interface{}) types.GomegaMatcher {
+func ContainSubstring(substr string, args ...any) types.GomegaMatcher {
 	return &matchers.ContainSubstringMatcher{
 		Substr: substr,
 		Args:   args,
@@ -253,7 +253,7 @@ func ContainSubstring(substr string, args ...interface{}) types.GomegaMatcher {
 // HavePrefix succeeds if actual is a string or stringer that contains the
 // passed-in string as a prefix.  Optional arguments can be provided to construct
 // via fmt.Sprintf().
-func HavePrefix(prefix string, args ...interface{}) types.GomegaMatcher {
+func HavePrefix(prefix string, args ...any) types.GomegaMatcher {
 	return &matchers.HavePrefixMatcher{
 		Prefix: prefix,
 		Args:   args,
@@ -263,7 +263,7 @@ func HavePrefix(prefix string, args ...interface{}) types.GomegaMatcher {
 // HaveSuffix succeeds if actual is a string or stringer that contains the
 // passed-in string as a suffix.  Optional arguments can be provided to construct
 // via fmt.Sprintf().
-func HaveSuffix(suffix string, args ...interface{}) types.GomegaMatcher {
+func HaveSuffix(suffix string, args ...any) types.GomegaMatcher {
 	return &matchers.HaveSuffixMatcher{
 		Suffix: suffix,
 		Args:   args,
@@ -273,7 +273,7 @@ func HaveSuffix(suffix string, args ...interface{}) types.GomegaMatcher {
 // MatchJSON succeeds if actual is a string or stringer of JSON that matches
 // the expected JSON.  The JSONs are decoded and the resulting objects are compared via
 // reflect.DeepEqual so things like key-ordering and whitespace shouldn't matter.
-func MatchJSON(json interface{}) types.GomegaMatcher {
+func MatchJSON(json any) types.GomegaMatcher {
 	return &matchers.MatchJSONMatcher{
 		JSONToMatch: json,
 	}
@@ -282,7 +282,7 @@ func MatchJSON(json interface{}) types.GomegaMatcher {
 // MatchXML succeeds if actual is a string or stringer of XML that matches
 // the expected XML.  The XMLs are decoded and the resulting objects are compared via
 // reflect.DeepEqual so things like whitespaces shouldn't matter.
-func MatchXML(xml interface{}) types.GomegaMatcher {
+func MatchXML(xml any) types.GomegaMatcher {
 	return &matchers.MatchXMLMatcher{
 		XMLToMatch: xml,
 	}
@@ -291,7 +291,7 @@ func MatchXML(xml interface{}) types.GomegaMatcher {
 // MatchYAML succeeds if actual is a string or stringer of YAML that matches
 // the expected YAML.  The YAML's are decoded and the resulting objects are compared via
 // reflect.DeepEqual so things like key-ordering and whitespace shouldn't matter.
-func MatchYAML(yaml interface{}) types.GomegaMatcher {
+func MatchYAML(yaml any) types.GomegaMatcher {
 	return &matchers.MatchYAMLMatcher{
 		YAMLToMatch: yaml,
 	}
@@ -338,7 +338,7 @@ func BeZero() types.GomegaMatcher {
 //
 //	var findings []string
 //	Expect([]string{"Foo", "FooBar"}).Should(ContainElement(ContainSubString("Bar", &findings)))
-func ContainElement(element interface{}, result ...interface{}) types.GomegaMatcher {
+func ContainElement(element any, result ...any) types.GomegaMatcher {
 	return &matchers.ContainElementMatcher{
 		Element: element,
 		Result:  result,
@@ -358,7 +358,7 @@ func ContainElement(element interface{}, result ...interface{}) types.GomegaMatc
 //	Expect(2).Should(BeElementOf(1, 2))
 //
 // Actual must be typed.
-func BeElementOf(elements ...interface{}) types.GomegaMatcher {
+func BeElementOf(elements ...any) types.GomegaMatcher {
 	return &matchers.BeElementOfMatcher{
 		Elements: elements,
 	}
@@ -368,7 +368,7 @@ func BeElementOf(elements ...interface{}) types.GomegaMatcher {
 // BeKeyOf() always uses Equal() to perform the match between actual and the map keys.
 //
 //	Expect("foo").Should(BeKeyOf(map[string]bool{"foo": true, "bar": false}))
-func BeKeyOf(element interface{}) types.GomegaMatcher {
+func BeKeyOf(element any) types.GomegaMatcher {
 	return &matchers.BeKeyOfMatcher{
 		Map: element,
 	}
@@ -388,14 +388,14 @@ func BeKeyOf(element interface{}) types.GomegaMatcher {
 //
 //	Expect([]string{"Foo", "FooBar"}).Should(ConsistOf([]string{"FooBar", "Foo"}))
 //
-// Note that Go's type system does not allow you to write this as ConsistOf([]string{"FooBar", "Foo"}...) as []string and []interface{} are different types - hence the need for this special rule.
-func ConsistOf(elements ...interface{}) types.GomegaMatcher {
+// Note that Go's type system does not allow you to write this as ConsistOf([]string{"FooBar", "Foo"}...) as []string and []any are different types - hence the need for this special rule.
+func ConsistOf(elements ...any) types.GomegaMatcher {
 	return &matchers.ConsistOfMatcher{
 		Elements: elements,
 	}
 }
 
-// HaveExactElements succeeds if actual contains elements that precisely match the elemets passed into the matcher. The ordering of the elements does matter.
+// HaveExactElements succeeds if actual contains elements that precisely match the elements passed into the matcher. The ordering of the elements does matter.
 // By default HaveExactElements() uses Equal() to match the elements, however custom matchers can be passed in instead.  Here are some examples:
 //
 //	Expect([]string{"Foo", "FooBar"}).Should(HaveExactElements("Foo", "FooBar"))
@@ -403,7 +403,7 @@ func ConsistOf(elements ...interface{}) types.GomegaMatcher {
 //	Expect([]string{"Foo", "FooBar"}).Should(HaveExactElements(ContainSubstring("Foo"), ContainSubstring("Foo")))
 //
 // Actual must be an array or slice.
-func HaveExactElements(elements ...interface{}) types.GomegaMatcher {
+func HaveExactElements(elements ...any) types.GomegaMatcher {
 	return &matchers.HaveExactElementsMatcher{
 		Elements: elements,
 	}
@@ -417,7 +417,7 @@ func HaveExactElements(elements ...interface{}) types.GomegaMatcher {
 //
 // Actual must be an array, slice or map.
 // For maps, ContainElements searches through the map's values.
-func ContainElements(elements ...interface{}) types.GomegaMatcher {
+func ContainElements(elements ...any) types.GomegaMatcher {
 	return &matchers.ContainElementsMatcher{
 		Elements: elements,
 	}
@@ -432,7 +432,7 @@ func ContainElements(elements ...interface{}) types.GomegaMatcher {
 //
 // Actual must be an array, slice or map.
 // For maps, HaveEach searches through the map's values.
-func HaveEach(element interface{}) types.GomegaMatcher {
+func HaveEach(element any) types.GomegaMatcher {
 	return &matchers.HaveEachMatcher{
 		Element: element,
 	}
@@ -443,7 +443,7 @@ func HaveEach(element interface{}) types.GomegaMatcher {
 // matcher can be passed in instead:
 //
 //	Expect(map[string]string{"Foo": "Bar", "BazFoo": "Duck"}).Should(HaveKey(MatchRegexp(`.+Foo$`)))
-func HaveKey(key interface{}) types.GomegaMatcher {
+func HaveKey(key any) types.GomegaMatcher {
 	return &matchers.HaveKeyMatcher{
 		Key: key,
 	}
@@ -455,7 +455,7 @@ func HaveKey(key interface{}) types.GomegaMatcher {
 //
 //	Expect(map[string]string{"Foo": "Bar", "BazFoo": "Duck"}).Should(HaveKeyWithValue("Foo", "Bar"))
 //	Expect(map[string]string{"Foo": "Bar", "BazFoo": "Duck"}).Should(HaveKeyWithValue(MatchRegexp(`.+Foo$`), "Bar"))
-func HaveKeyWithValue(key interface{}, value interface{}) types.GomegaMatcher {
+func HaveKeyWithValue(key any, value any) types.GomegaMatcher {
 	return &matchers.HaveKeyWithValueMatcher{
 		Key:   key,
 		Value: value,
@@ -483,7 +483,7 @@ func HaveKeyWithValue(key interface{}, value interface{}) types.GomegaMatcher {
 //	Expect(book).To(HaveField("Title", ContainSubstring("Les"))
 //	Expect(book).To(HaveField("Author.FirstName", Equal("Victor"))
 //	Expect(book).To(HaveField("Author.DOB.Year()", BeNumerically("<", 1900))
-func HaveField(field string, expected interface{}) types.GomegaMatcher {
+func HaveField(field string, expected any) types.GomegaMatcher {
 	return &matchers.HaveFieldMatcher{
 		Field:    field,
 		Expected: expected,
@@ -535,7 +535,7 @@ func HaveValue(matcher types.GomegaMatcher) types.GomegaMatcher {
 //	Expect(1.0).Should(BeNumerically(">=", 1.0))
 //	Expect(1.0).Should(BeNumerically("<", 3))
 //	Expect(1.0).Should(BeNumerically("<=", 1.0))
-func BeNumerically(comparator string, compareTo ...interface{}) types.GomegaMatcher {
+func BeNumerically(comparator string, compareTo ...any) types.GomegaMatcher {
 	return &matchers.BeNumericallyMatcher{
 		Comparator: comparator,
 		CompareTo:  compareTo,
@@ -562,7 +562,7 @@ func BeTemporally(comparator string, compareTo time.Time, threshold ...time.Dura
 //	Expect(5).Should(BeAssignableToTypeOf(-1))        // different values same type
 //	Expect("foo").Should(BeAssignableToTypeOf("bar")) // different values same type
 //	Expect(struct{ Foo string }{}).Should(BeAssignableToTypeOf(struct{ Foo string }{}))
-func BeAssignableToTypeOf(expected interface{}) types.GomegaMatcher {
+func BeAssignableToTypeOf(expected any) types.GomegaMatcher {
 	return &matchers.AssignableToTypeOfMatcher{
 		Expected: expected,
 	}
@@ -581,7 +581,7 @@ func Panic() types.GomegaMatcher {
 // matcher can be passed in instead:
 //
 //	Expect(fn).Should(PanicWith(MatchRegexp(`.+Foo$`)))
-func PanicWith(expected interface{}) types.GomegaMatcher {
+func PanicWith(expected any) types.GomegaMatcher {
 	return &matchers.PanicMatcher{Expected: expected}
 }
 
@@ -610,7 +610,7 @@ func BeADirectory() types.GomegaMatcher {
 //	Expect(resp).Should(HaveHTTPStatus(http.StatusOK))   // asserts that resp.StatusCode == 200
 //	Expect(resp).Should(HaveHTTPStatus("404 Not Found")) // asserts that resp.Status == "404 Not Found"
 //	Expect(resp).Should(HaveHTTPStatus(http.StatusOK, http.StatusNoContent))   // asserts that resp.StatusCode == 200 || resp.StatusCode == 204
-func HaveHTTPStatus(expected ...interface{}) types.GomegaMatcher {
+func HaveHTTPStatus(expected ...any) types.GomegaMatcher {
 	return &matchers.HaveHTTPStatusMatcher{Expected: expected}
 }
 
@@ -618,7 +618,7 @@ func HaveHTTPStatus(expected ...interface{}) types.GomegaMatcher {
 // Actual must be either a *http.Response or *httptest.ResponseRecorder.
 // Expected must be a string header name, followed by a header value which
 // can be a string, or another matcher.
-func HaveHTTPHeaderWithValue(header string, value interface{}) types.GomegaMatcher {
+func HaveHTTPHeaderWithValue(header string, value any) types.GomegaMatcher {
 	return &matchers.HaveHTTPHeaderWithValueMatcher{
 		Header: header,
 		Value:  value,
@@ -628,7 +628,7 @@ func HaveHTTPHeaderWithValue(header string, value interface{}) types.GomegaMatch
 // HaveHTTPBody matches if the body matches.
 // Actual must be either a *http.Response or *httptest.ResponseRecorder.
 // Expected must be either a string, []byte, or other matcher
-func HaveHTTPBody(expected interface{}) types.GomegaMatcher {
+func HaveHTTPBody(expected any) types.GomegaMatcher {
 	return &matchers.HaveHTTPBodyMatcher{Expected: expected}
 }
 
@@ -687,15 +687,15 @@ func Not(matcher types.GomegaMatcher) types.GomegaMatcher {
 //	 Expect(1).To(WithTransform(failingplus1, Equal(2)))
 //
 // And(), Or(), Not() and WithTransform() allow matchers to be composed into complex expressions.
-func WithTransform(transform interface{}, matcher types.GomegaMatcher) types.GomegaMatcher {
+func WithTransform(transform any, matcher types.GomegaMatcher) types.GomegaMatcher {
 	return matchers.NewWithTransformMatcher(transform, matcher)
 }
 
 // Satisfy matches the actual value against the `predicate` function.
-// The given predicate must be a function of one paramter that returns bool.
+// The given predicate must be a function of one parameter that returns bool.
 //
 //	var isEven = func(i int) bool { return i%2 == 0 }
 //	Expect(2).To(Satisfy(isEven))
-func Satisfy(predicate interface{}) types.GomegaMatcher {
+func Satisfy(predicate any) types.GomegaMatcher {
 	return matchers.NewSatisfyMatcher(predicate)
 }

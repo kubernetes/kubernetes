@@ -19,3 +19,16 @@
   path: "staging/src/k8s.io/api/resource/"
 - text: "Conditions field in AllocatedDeviceStatus has incorrect tags, should be: `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,5,rep,name=conditions\"`"
   path: "staging/src/k8s.io/api/resource/"
+
+
+# Pre-existing issues from the conflictmarkers linter
+# The Error field in some older API types is marked as both optional and required.
+# This is incorrect, but cannot be changed without breaking changes.
+- text: "field PortStatus.Error has conflicting markers: optional_vs_required: {\\[optional\\], \\[kubebuilder:validation:Required\\]}. fields cannot be both optional and required"
+  path: "staging/src/k8s.io/api/core/v1/types.go"
+- text: "field IngressPortStatus.Error has conflicting markers: optional_vs_required: {\\[optional\\], \\[kubebuilder:validation:Required\\]}. fields cannot be both optional and required"
+  path: "staging/src/k8s.io/api/extensions/v1beta1/types.go"
+- text: "field IngressPortStatus.Error has conflicting markers: optional_vs_required: {\\[optional\\], \\[kubebuilder:validation:Required\\]}. fields cannot be both optional and required"
+  path: "staging/src/k8s.io/api/networking/v1/types.go"
+- text: "field IngressPortStatus.Error has conflicting markers: optional_vs_required: {\\[optional\\], \\[kubebuilder:validation:Required\\]}. fields cannot be both optional and required"
+  path: "staging/src/k8s.io/api/networking/v1beta1/types.go"

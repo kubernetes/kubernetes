@@ -23,6 +23,9 @@ import (
 	"strings"
 	"time"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	criapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -43,7 +46,7 @@ var defaultKnownCRISockets = []string{
 type ContainerRuntime interface {
 	Connect() error
 	Close()
-	SetImpl(impl)
+	SetImpl(Impl)
 	IsRunning() error
 	ListKubeContainers() ([]string, error)
 	RemoveContainers(containers []string) error
@@ -51,11 +54,12 @@ type ContainerRuntime interface {
 	PullImagesInParallel(images []string, ifNotPresent bool) error
 	ImageExists(image string) bool
 	SandboxImage() (string, error)
+	IsRuntimeConfigImplemented() (bool, error)
 }
 
 // CRIRuntime is a struct that interfaces with the CRI
 type CRIRuntime struct {
-	impl           impl
+	impl           Impl
 	criSocket      string
 	runtimeService criapi.RuntimeService
 	imageService   criapi.ImageManagerService
@@ -73,7 +77,7 @@ func NewContainerRuntime(criSocket string) ContainerRuntime {
 }
 
 // SetImpl can be used to set the internal implementation for testing purposes.
-func (runtime *CRIRuntime) SetImpl(impl impl) {
+func (runtime *CRIRuntime) SetImpl(impl Impl) {
 	runtime.impl = impl
 }
 
@@ -313,4 +317,19 @@ func (runtime *CRIRuntime) SandboxImage() (string, error) {
 	}
 
 	return c.SandboxImage, nil
+}
+
+// IsRuntimeConfigImplemented checks if the container runtime supports the RuntimeConfig gRPC method
+func (runtime *CRIRuntime) IsRuntimeConfigImplemented() (bool, error) {
+	ctx, cancel := defaultContext()
+	defer cancel()
+	_, err := runtime.impl.RuntimeConfig(ctx, runtime.runtimeService)
+	if err != nil {
+		s, ok := status.FromError(err)
+		if !ok || s.Code() != codes.Unimplemented {
+			return false, errors.Wrap(err, "failed to call RuntimeConfig gRPC method")
+		}
+		return false, nil
+	}
+	return true, nil
 }

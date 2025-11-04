@@ -849,6 +849,11 @@ func (m *ManagerImpl) allocateContainerResources(ctx context.Context, pod *v1.Po
 		resource := string(k)
 		needed := int(v.Value())
 		logger.V(3).Info("Looking for needed resources", "resourceName", resource, "pod", klog.KObj(pod), "containerName", container.Name, "needed", needed)
+		if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) && isDRAExtendedResource(pod, container.Name, resource) {
+			// Skip extended resources managed by DRA
+			logger.V(3).Info("Skipping allocation for DRA-backed extended resource", "resourceName", resource, "pod", klog.KObj(pod), "containerName", container.Name)
+			continue
+		}
 		if !m.isDevicePluginResource(resource) {
 			continue
 		}
@@ -1086,6 +1091,20 @@ func (m *ManagerImpl) isDevicePluginResource(resource string) bool {
 	// a resource we have previously allocated.
 	if registeredResource || allocatedResource {
 		return true
+	}
+	return false
+}
+
+// isDRAExtendedResource checks if the specified resource for a given container
+// in the provided pod is an extended resource managed by DRA.
+func isDRAExtendedResource(pod *v1.Pod, containerName, resourceName string) bool {
+	claimStatus := pod.Status.ExtendedResourceClaimStatus
+	if claimStatus != nil {
+		for _, resMap := range claimStatus.RequestMappings {
+			if resMap.ContainerName == containerName && resMap.ResourceName == resourceName {
+				return true
+			}
+		}
 	}
 	return false
 }

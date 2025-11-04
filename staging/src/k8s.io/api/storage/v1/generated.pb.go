@@ -187,6 +187,16 @@ func (m *CSIDriverSpec) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.ServiceAccountTokenInSecrets != nil {
+		i--
+		if *m.ServiceAccountTokenInSecrets {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i--
+		dAtA[i] = 0x50
+	}
 	if m.NodeAllocatableUpdatePeriodSeconds != nil {
 		i = encodeVarintGenerated(dAtA, i, uint64(*m.NodeAllocatableUpdatePeriodSeconds))
 		i--
@@ -1291,6 +1301,9 @@ func (m *CSIDriverSpec) Size() (n int) {
 	if m.NodeAllocatableUpdatePeriodSeconds != nil {
 		n += 1 + sovGenerated(uint64(*m.NodeAllocatableUpdatePeriodSeconds))
 	}
+	if m.ServiceAccountTokenInSecrets != nil {
+		n += 2
+	}
 	return n
 }
 
@@ -1687,6 +1700,7 @@ func (this *CSIDriverSpec) String() string {
 		`RequiresRepublish:` + valueToStringGenerated(this.RequiresRepublish) + `,`,
 		`SELinuxMount:` + valueToStringGenerated(this.SELinuxMount) + `,`,
 		`NodeAllocatableUpdatePeriodSeconds:` + valueToStringGenerated(this.NodeAllocatableUpdatePeriodSeconds) + `,`,
+		`ServiceAccountTokenInSecrets:` + valueToStringGenerated(this.ServiceAccountTokenInSecrets) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -2463,6 +2477,27 @@ func (m *CSIDriverSpec) Unmarshal(dAtA []byte) error {
 				}
 			}
 			m.NodeAllocatableUpdatePeriodSeconds = &v
+		case 10:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ServiceAccountTokenInSecrets", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			b := bool(v != 0)
+			m.ServiceAccountTokenInSecrets = &b
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])

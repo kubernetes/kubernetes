@@ -33,8 +33,8 @@ import (
 // Each individual mutation is compiled into MutationEvaluationFunc and
 // returned is a PolicyEvaluator in the same order as the mutations appeared in the policy.
 func compilePolicy(policy *Policy) PolicyEvaluator {
-	opts := plugincel.OptionalVariableDeclarations{HasParams: policy.Spec.ParamKind != nil, StrictCost: true, HasAuthorizer: true}
-	compiler, err := plugincel.NewCompositedCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true))
+	opts := plugincel.OptionalVariableDeclarations{HasParams: policy.Spec.ParamKind != nil, HasAuthorizer: true}
+	compiler, err := plugincel.NewCompositedCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()))
 	if err != nil {
 		return PolicyEvaluator{Error: &apiservercel.Error{
 			Type:   apiservercel.ErrorTypeInternal,

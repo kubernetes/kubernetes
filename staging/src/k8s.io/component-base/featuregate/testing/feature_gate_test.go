@@ -556,6 +556,130 @@ func TestDetectEmulationVersionLeakToOtherSubtest(t *gotest.T) {
 	})
 }
 
+func TestSetFeatureGateVersionsInTest(t *gotest.T) {
+	t.Cleanup(cleanup)
+	originalEmuVer := version.MustParse("1.31")
+	originalMinCompatVer := version.MustParse("1.30")
+	gate := featuregate.NewVersionedFeatureGateWithMinCompatibility(originalEmuVer, originalMinCompatVer)
+
+	assert.True(t, gate.EmulationVersion().EqualTo(originalEmuVer))
+	assert.True(t, gate.MinCompatibilityVersion().EqualTo(originalMinCompatVer))
+
+	newEmuVer := version.MustParse("1.29")
+	newMinCompatVer := version.MustParse("1.27")
+
+	SetFeatureGateVersionsDuringTest(t, gate, newEmuVer, newMinCompatVer)
+	assert.True(t, gate.EmulationVersion().EqualTo(newEmuVer))
+	assert.True(t, gate.MinCompatibilityVersion().EqualTo(newMinCompatVer))
+
+	t.Run("Subtest", func(t *gotest.T) {
+		assert.True(t, gate.EmulationVersion().EqualTo(newEmuVer))
+		assert.True(t, gate.MinCompatibilityVersion().EqualTo(newMinCompatVer))
+		newerEmuVer := version.MustParse("1.27")
+		newerMinCompatVer := version.MustParse("1.26")
+		SetFeatureGateVersionsDuringTest(t, gate, newerEmuVer, newerMinCompatVer)
+		assert.True(t, gate.EmulationVersion().EqualTo(newerEmuVer))
+		assert.True(t, gate.MinCompatibilityVersion().EqualTo(newerMinCompatVer))
+	})
+	assert.True(t, gate.EmulationVersion().EqualTo(newEmuVer))
+	assert.True(t, gate.MinCompatibilityVersion().EqualTo(newMinCompatVer))
+
+	t.Run("ParallelSubtest", func(t *gotest.T) {
+		assert.True(t, gate.EmulationVersion().EqualTo(newEmuVer))
+		assert.True(t, gate.MinCompatibilityVersion().EqualTo(newMinCompatVer))
+		t.Parallel()
+		assert.True(t, gate.EmulationVersion().EqualTo(newEmuVer))
+		assert.True(t, gate.MinCompatibilityVersion().EqualTo(newMinCompatVer))
+	})
+	assert.True(t, gate.EmulationVersion().EqualTo(newEmuVer))
+	assert.True(t, gate.MinCompatibilityVersion().EqualTo(newMinCompatVer))
+}
+
+func TestDetectVersionsLeakToMainTest(t *gotest.T) {
+	t.Cleanup(cleanup)
+	originalEmuVer := version.MustParse("1.31")
+	originalMinCompatVer := version.MustParse("1.30")
+	gate := featuregate.NewVersionedFeatureGateWithMinCompatibility(originalEmuVer, originalMinCompatVer)
+	assert.True(t, gate.EmulationVersion().EqualTo(originalEmuVer))
+	assert.True(t, gate.MinCompatibilityVersion().EqualTo(originalMinCompatVer))
+
+	newEmuVer := version.MustParse("1.29")
+	newMinCompatVer := version.MustParse("1.28")
+
+	// Subtest setting feature gate and calling parallel will leak it out
+	t.Run("LeakingSubtest", func(t *gotest.T) {
+		fakeT := &ignoreFatalT{T: t}
+		SetFeatureGateVersionsDuringTest(fakeT, gate, newEmuVer, newMinCompatVer)
+		// Calling t.Parallel in subtest will resume the main test body
+		t.Parallel()
+		// Leaked from main test
+		assert.True(t, gate.EmulationVersion().EqualTo(originalEmuVer))
+		assert.True(t, gate.MinCompatibilityVersion().EqualTo(originalMinCompatVer))
+	})
+	// Leaked from subtest
+	assert.True(t, gate.EmulationVersion().EqualTo(newEmuVer))
+	assert.True(t, gate.MinCompatibilityVersion().EqualTo(newMinCompatVer))
+	fakeT := &ignoreFatalT{T: t}
+	SetFeatureGateVersionsDuringTest(fakeT, gate, originalEmuVer, originalMinCompatVer)
+	assert.True(t, fakeT.fatalRecorded)
+}
+
+func TestNoLeakFromSameVersionsToMainTest(t *gotest.T) {
+	t.Cleanup(cleanup)
+	originalEmuVer := version.MustParse("1.31")
+	originalMinCompatVer := version.MustParse("1.30")
+	gate := featuregate.NewVersionedFeatureGateWithMinCompatibility(originalEmuVer, originalMinCompatVer)
+	assert.True(t, gate.EmulationVersion().EqualTo(originalEmuVer))
+	assert.True(t, gate.MinCompatibilityVersion().EqualTo(originalMinCompatVer))
+
+	newEmuVer := version.MustParse("1.31")
+	newMinCompatVer := version.MustParse("1.30")
+
+	// Subtest setting feature gate and calling parallel will leak it out
+	t.Run("LeakingSubtest", func(t *gotest.T) {
+		SetFeatureGateVersionsDuringTest(t, gate, newEmuVer, newMinCompatVer)
+		// Calling t.Parallel in subtest will resume the main test body
+		t.Parallel()
+		// Leaked from main test
+		assert.True(t, gate.EmulationVersion().EqualTo(originalEmuVer))
+		assert.True(t, gate.MinCompatibilityVersion().EqualTo(originalMinCompatVer))
+	})
+	// Leaked from subtest
+	assert.True(t, gate.EmulationVersion().EqualTo(newEmuVer))
+	assert.True(t, gate.MinCompatibilityVersion().EqualTo(newMinCompatVer))
+	SetFeatureGateVersionsDuringTest(t, gate, originalEmuVer, originalMinCompatVer)
+}
+
+func TestDetectVersionsLeakToOtherSubtest(t *gotest.T) {
+	t.Cleanup(cleanup)
+	originalEmuVer := version.MustParse("1.31")
+	originalMinCompatVer := version.MustParse("1.30")
+	gate := featuregate.NewVersionedFeatureGateWithMinCompatibility(originalEmuVer, originalMinCompatVer)
+	assert.True(t, gate.EmulationVersion().EqualTo(originalEmuVer))
+	assert.True(t, gate.MinCompatibilityVersion().EqualTo(originalMinCompatVer))
+
+	subtestName := "Subtest"
+	newEmuVer := version.MustParse("1.29")
+	newMinCompatVer := version.MustParse("1.28")
+
+	// Subtest setting feature gate and calling parallel will leak it out
+	t.Run(subtestName, func(t *gotest.T) {
+		fakeT := &ignoreFatalT{T: t}
+		SetFeatureGateVersionsDuringTest(fakeT, gate, newEmuVer, newMinCompatVer)
+		t.Parallel()
+	})
+	// Add suffix to name to prevent tests with the same prefix.
+	t.Run(subtestName+"Suffix", func(t *gotest.T) {
+		// Leaked newEmulationVersion and newMinCompatibilityVersion
+		assert.True(t, gate.EmulationVersion().EqualTo(newEmuVer))
+		assert.True(t, gate.MinCompatibilityVersion().EqualTo(newMinCompatVer))
+
+		fakeT := &ignoreFatalT{T: t}
+		SetFeatureGateVersionsDuringTest(fakeT, gate, originalEmuVer, originalMinCompatVer)
+		assert.True(t, fakeT.fatalRecorded)
+	})
+}
+
 type ignoreFatalT struct {
 	*gotest.T
 	fatalRecorded bool
@@ -596,6 +720,6 @@ func (f *ignoreErrorT) Errorf(format string, args ...any) {
 
 func cleanup() {
 	featureFlagOverride = map[featuregate.Feature]string{}
-	emulationVersionOverride = ""
-	emulationVersionOverrideValue = nil
+	versionsOverride = ""
+	versionsOverrideValue = ""
 }

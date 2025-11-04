@@ -213,7 +213,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 		for i, constraint := range claim.Spec.Devices.Constraints {
 			switch {
 			case constraint.MatchAttribute != nil:
-				matchAttribute := draapi.FullyQualifiedName(*constraint.MatchAttribute)
+				matchAttribute := resourceapi.FullyQualifiedName(*constraint.MatchAttribute)
 				logger := alloc.logger
 				if loggerV := alloc.logger.V(6); loggerV.Enabled() {
 					logger = klog.LoggerWithName(logger, "matchAttributeConstraint")
@@ -286,6 +286,11 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 		}
 
 		// Populate configs.
+
+		// Each class config gets added only once.
+		// We need to keep track of which class configs have already been added and at which position in the allocationResult.Devices.Config.
+		type configRange struct{ start, end int }
+		configIndexesForClass := make(map[string]configRange) // Key: class name / Value: position of the configs for the class in allocationResult.Devices.Config.
 		for requestIndex := range claim.Spec.Devices.Requests {
 			requestKey := requestIndices{claimIndex: claimIndex, requestIndex: requestIndex}
 			requestData := alloc.requestData[requestKey]
@@ -296,15 +301,29 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 			}
 
 			class := requestData.class
-			if class != nil {
-				for _, config := range class.Spec.Config {
-					allocationResult.Devices.Config = append(allocationResult.Devices.Config, resourceapi.DeviceAllocationConfiguration{
-						Source:              resourceapi.AllocationConfigSourceClass,
-						Requests:            nil, // All of them...
-						DeviceConfiguration: config.DeviceConfiguration,
-					})
-				}
+			if class == nil {
+				continue
 			}
+			configIndexes, exists := configIndexesForClass[class.Name]
+			if exists {
+				// The configs for the class have already been added.
+				// Just append the request name for the request class.
+				for i := configIndexes.start; i < configIndexes.end; i++ {
+					allocationResult.Devices.Config[i].Requests = append(allocationResult.Devices.Config[i].Requests, requestData.requestName())
+				}
+				continue
+			}
+
+			// Add all configs for the class once.
+			initialConfigLen := len(allocationResult.Devices.Config)
+			for _, config := range class.Spec.Config {
+				allocationResult.Devices.Config = append(allocationResult.Devices.Config, resourceapi.DeviceAllocationConfiguration{
+					Source:              resourceapi.AllocationConfigSourceClass,
+					Requests:            []string{requestData.requestName()},
+					DeviceConfiguration: config.DeviceConfiguration,
+				})
+			}
+			configIndexesForClass[class.Name] = configRange{start: initialConfigLen, end: len(allocationResult.Devices.Config)}
 		}
 		for _, config := range claim.Spec.Devices.Config {
 			// If Requests are empty, it applies to all. So it can just be included.
@@ -472,7 +491,7 @@ type allocator struct {
 
 // counterSets is a map with the name of counter sets to the counters in
 // the set.
-type counterSets map[draapi.UniqueString]map[string]draapi.Counter
+type counterSets map[draapi.UniqueString]map[string]resourceapi.Counter
 
 // matchKey identifies a device/request pair.
 type matchKey struct {
@@ -515,6 +534,13 @@ type requestData struct {
 
 	// pre-determined set of devices for allocating "all" devices
 	allDevices []deviceWithID
+}
+
+func (rd *requestData) requestName() string {
+	if rd.parentRequest != nil {
+		return fmt.Sprintf("%s/%s", rd.parentRequest.name(), rd.request.name())
+	}
+	return rd.request.name()
 }
 
 type deviceWithID struct {
@@ -564,9 +590,9 @@ type constraint interface {
 type matchAttributeConstraint struct {
 	logger        klog.Logger // Includes name and attribute name, so no need to repeat in log messages.
 	requestNames  sets.Set[string]
-	attributeName draapi.FullyQualifiedName
+	attributeName resourceapi.FullyQualifiedName
 
-	attribute  *draapi.DeviceAttribute
+	attribute  *resourceapi.DeviceAttribute
 	numDevices int
 }
 
@@ -646,9 +672,9 @@ func (m *matchAttributeConstraint) matches(requestName, subRequestName string) b
 	}
 }
 
-func lookupAttribute(device *draapi.Device, deviceID DeviceID, attributeName draapi.FullyQualifiedName) *draapi.DeviceAttribute {
+func lookupAttribute(device *draapi.Device, deviceID DeviceID, attributeName resourceapi.FullyQualifiedName) *resourceapi.DeviceAttribute {
 	// Fully-qualified match?
-	if attr, ok := device.Attributes[draapi.QualifiedName(attributeName)]; ok {
+	if attr, ok := device.Attributes[resourceapi.QualifiedName(attributeName)]; ok {
 		return &attr
 	}
 	index := strings.Index(string(attributeName), "/")
@@ -664,7 +690,7 @@ func lookupAttribute(device *draapi.Device, deviceID DeviceID, attributeName dra
 	}
 
 	// Domain matches the driver, so let's check just the ID.
-	if attr, ok := device.Attributes[draapi.QualifiedName(attributeName[index+1:])]; ok {
+	if attr, ok := device.Attributes[resourceapi.QualifiedName(attributeName[index+1:])]; ok {
 		return &attr
 	}
 
@@ -1112,7 +1138,7 @@ func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error
 	if !found {
 		availableCountersForSlice = make(counterSets, len(slice.Spec.SharedCounters))
 		for _, counterSet := range slice.Spec.SharedCounters {
-			availableCountersForCounterSet := make(map[string]draapi.Counter, len(counterSet.Counters))
+			availableCountersForCounterSet := make(map[string]resourceapi.Counter, len(counterSet.Counters))
 			for name, c := range counterSet.Counters {
 				availableCountersForCounterSet[name] = c
 			}
@@ -1171,7 +1197,7 @@ func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error
 	for _, deviceCounterConsumption := range device.ConsumesCounters {
 		consumedCountersForCounterSet, found := consumedCountersForSlice[deviceCounterConsumption.CounterSet]
 		if !found {
-			consumedCountersForCounterSet = make(map[string]draapi.Counter)
+			consumedCountersForCounterSet = make(map[string]resourceapi.Counter)
 			consumedCountersForSlice[deviceCounterConsumption.CounterSet] = consumedCountersForCounterSet
 		}
 		for name, c := range deviceCounterConsumption.Counters {

@@ -499,12 +499,12 @@ var (
 	// SupportedEtcdVersion lists officially supported etcd versions with corresponding Kubernetes releases
 	// If you are updating the versions in this map, make sure to also update:
 	// - MinExternalEtcdVersion: with the minimum etcd version from this map.
-	// - DefaultEtcdVersion: with etcd version used for the current k8s release.
+	// - DefaultEtcdVersion: with etcd version used for the current k8s release (0).
+	// The maximum length of the map should be 2, as kubeadm supports a maximum skew of -1
+	// with the control plane version.
 	SupportedEtcdVersion = map[uint8]string{
-		32: "3.5.24-0",
-		33: "3.5.24-0",
-		34: "3.5.24-0",
-		35: "3.6.5-0",
+		uint8(getSkewedKubernetesVersion(-1).Minor()): "3.5.24-0",
+		uint8(getSkewedKubernetesVersion(0).Minor()):  "3.6.5-0",
 	}
 
 	// KubeadmCertsClusterRoleName sets the name for the ClusterRole that allows

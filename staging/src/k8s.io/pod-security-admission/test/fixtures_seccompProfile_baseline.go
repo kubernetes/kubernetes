@@ -31,7 +31,7 @@ The check implementation looks at the appropriate value based on version.
 func init() {
 	fixtureData_baseline_1_0 := fixtureGenerator{
 		expectErrorSubstring: "seccompProfile",
-		generatePass: func(p *corev1.Pod) []*corev1.Pod {
+		generatePass: func(p *corev1.Pod, _ api.Level) []*corev1.Pod {
 			// don't generate fixtures if minimal valid pod already has seccomp config
 			if val, ok := p.Annotations[annotationKeyPod]; ok &&
 				val == corev1.SeccompProfileRuntimeDefault {
@@ -67,7 +67,7 @@ func init() {
 
 	fixtureData_baseline_1_19 := fixtureGenerator{
 		expectErrorSubstring: "seccompProfile",
-		generatePass: func(p *corev1.Pod) []*corev1.Pod {
+		generatePass: func(p *corev1.Pod, _ api.Level) []*corev1.Pod {
 			// don't generate fixtures if minimal valid pod already has seccomp config
 			if p.Spec.SecurityContext != nil &&
 				p.Spec.SecurityContext.SeccompProfile != nil &&
