@@ -463,15 +463,15 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		EnableDRAExtendedResource: true,
 	},
 	{
-		Name:          "Pod rejected by the NodeResourcesFit plugin is requeued when created a DeviceClass having the extended resource matching pod's requests, and DRAExtendedResource is enabled",
-		EnablePlugins: []string{names.NodeResourcesFit, names.NodeAffinity},
+		Name:          "Pod rejected by the NodeResourcesFit plugin is requeued when created DeviceClass having the extended resource matching pod's requests, and DRAExtendedResource is enabled",
+		EnablePlugins: []string{names.NodeResourcesFit},
 		InitialNodes: []*v1.Node{
 			st.MakeNode().Name("fake-node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj(),
-			st.MakeNode().Name("fake-node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Label("group", "b").Obj(),
 		},
 		Pods: []*v1.Pod{
 			// - Pod1 requests available amount of CPU (in fake-node1), but will be rejected by NodeAffinity plugin. Note that the NodeResourceFit plugin will register for QHints because it rejected fake-node2.
 			st.MakePod().Name("pod1").Res(map[v1.ResourceName]string{v1.ResourceCPU: "4", "example.com/gpu": "1"}).NodeAffinityIn("group", []string{"b"}, st.NodeSelectorTypeMatchExpressions).Container("image").Obj(),
+			st.MakePod().Name("pod2").Res(map[v1.ResourceName]string{v1.ResourceCPU: "4", "example.com/othergpu": "1"}).NodeAffinityIn("group", []string{"b"}, st.NodeSelectorTypeMatchExpressions).Container("image").Obj(),
 		},
 		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
 			// Trigger a DeviceClass Create event that has the extended resource name that matches pod's resource request.
@@ -486,7 +486,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		EnableDRAExtendedResource: true,
 	},
 	{
-		Name:                 "Pod rejected by the NodeResourcesFit plugin is requeued when a DeviceClass has the extended resource, and DRAExtendedResource is enabled",
+		Name:                 "Pod rejected by the NodeResourcesFit plugin is requeued when updated DeviceClass has the extended resource, and DRAExtendedResource is enabled",
 		EnablePlugins:        []string{names.NodeResourcesFit, names.NodeAffinity},
 		InitialDeviceClasses: []*resourceapi.DeviceClass{{ObjectMeta: metav1.ObjectMeta{Name: "fake-class"}, Spec: resourceapi.DeviceClassSpec{ExtendedResourceName: nil}}},
 		InitialNodes: []*v1.Node{

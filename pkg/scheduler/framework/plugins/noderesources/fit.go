@@ -461,15 +461,12 @@ func (f *Fit) isSchedulableAfterDeviceClassEvent(logger klog.Logger, pod *v1.Pod
 	if err != nil {
 		return fwk.Queue, err
 	}
-	if originalClass != nil && originalClass.Spec.ExtendedResourceName == modifiedClass.Spec.ExtendedResourceName {
-		logger.V(5).Info("device class has identical extended resource name pointer", "pod", klog.KObj(pod), "deviceclass", klog.KObj(modifiedClass))
-		return fwk.QueueSkip, nil
-	}
-	if originalClass != nil && ptr.Deref(originalClass.Spec.ExtendedResourceName, "") == ptr.Deref(modifiedClass.Spec.ExtendedResourceName, "") {
-		logger.V(5).Info("device class has identical extended resource name string", "pod", klog.KObj(pod), "deviceclass", klog.KObj(modifiedClass))
-		return fwk.QueueSkip, nil
-	}
-	if originalClass == nil {
+	if originalClass != nil {
+		if ptr.Deref(originalClass.Spec.ExtendedResourceName, "") == ptr.Deref(modifiedClass.Spec.ExtendedResourceName, "") {
+			logger.V(5).Info("device class has identical extended resource name", "pod", klog.KObj(pod), "deviceclass", klog.KObj(modifiedClass))
+			return fwk.QueueSkip, nil
+		}
+	} else {
 		// only check implicit extended resource name for Add, as device class name does not change during Update.
 		reqs := resource.PodRequests(pod, resource.PodResourcesOptions{})
 		if _, ok := reqs[v1.ResourceName(resourceapi.ResourceDeviceClassPrefix+modifiedClass.Name)]; ok {
@@ -480,11 +477,11 @@ func (f *Fit) isSchedulableAfterDeviceClassEvent(logger klog.Logger, pod *v1.Pod
 	if modifiedClass.Spec.ExtendedResourceName != nil {
 		reqs := resource.PodRequests(pod, resource.PodResourcesOptions{})
 		if _, ok := reqs[v1.ResourceName(*modifiedClass.Spec.ExtendedResourceName)]; ok {
-			logger.V(5).Info("deivce class was created or updated, and may fit the pod's resoruce requests", "pod", klog.KObj(pod), "deviceclass", klog.KObj(modifiedClass))
+			logger.V(5).Info("device class was created or updated, and may fit the pod's resoruce requests", "pod", klog.KObj(pod), "deviceclass", klog.KObj(modifiedClass))
 			return fwk.Queue, nil
 		}
 	}
-	logger.V(5).Info("updated deivce class extended resource name is either nil, or does not match pod's resource request", "pod", klog.KObj(pod), "deviceclass", klog.KObj(modifiedClass))
+	logger.V(5).Info("created or updated deivce class extended resource name is either nil, or does not match pod's resource request", "pod", klog.KObj(pod), "deviceclass", klog.KObj(modifiedClass))
 	return fwk.QueueSkip, nil
 }
 

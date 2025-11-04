@@ -1768,9 +1768,21 @@ func Test_isSchedulableAfterDeviceClassChange(t *testing.T) {
 			},
 			expectedHint: fwk.Queue,
 		},
-		"queue-on-class-add-with-implicit-extended-resource-name-not-matching": {
+		"skip-on-class-add-with-implicit-extended-resource-name-not-matching": {
 			pod: newResourcePod(framework.Resource{
 				ScalarResources: map[v1.ResourceName]int64{"deviceclass.resource.kubernetes.io/gpuclass": 1},
+			}),
+			newObj: &resourceapi.DeviceClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "myclass",
+				},
+				Spec: resourceapi.DeviceClassSpec{ExtendedResourceName: ptr.To("example.com/gpu")},
+			},
+			expectedHint: fwk.QueueSkip,
+		},
+		"skip-on-class-add-with-explicit-extended-resource-name-not-matching": {
+			pod: newResourcePod(framework.Resource{
+				ScalarResources: map[v1.ResourceName]int64{"example.com/othergpu": 1},
 			}),
 			newObj: &resourceapi.DeviceClass{
 				ObjectMeta: metav1.ObjectMeta{
