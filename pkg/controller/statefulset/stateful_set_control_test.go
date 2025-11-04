@@ -31,6 +31,7 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/utils/lru"
 	"k8s.io/utils/ptr"
 
 	apps "k8s.io/api/apps/v1"
@@ -855,7 +856,7 @@ func TestStatefulSetControl_getSetRevisions(t *testing.T) {
 		informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 		spc := NewStatefulPodControlFromManager(newFakeObjectManager(informerFactory), &noopRecorder{})
 		ssu := newFakeStatefulSetStatusUpdater(informerFactory.Apps().V1().StatefulSets())
-		ssc := defaultStatefulSetControl{spc, ssu, history.NewFakeHistory(informerFactory.Apps().V1().ControllerRevisions())}
+		ssc := defaultStatefulSetControl{spc, ssu, history.NewFakeHistory(informerFactory.Apps().V1().ControllerRevisions()), lru.New(maxRevisionEqualityCacheEntries)}
 
 		stop := make(chan struct{})
 		defer close(stop)
