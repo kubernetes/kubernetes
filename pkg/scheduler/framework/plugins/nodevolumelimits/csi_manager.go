@@ -39,7 +39,7 @@ func (m *DefaultCSIManager) CSINodes() fwk.CSINodeLister {
 }
 
 type csiNodeLister struct {
-	csinodeLister storagelisters.CSINodeLister
+	csiNodeLister storagelisters.CSINodeLister
 }
 
 var _ fwk.CSINodeLister = &csiNodeLister{}
