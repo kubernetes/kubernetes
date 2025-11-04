@@ -445,7 +445,6 @@ func (m *ManagerImpl) GetCapacity() (v1.ResourceList, v1.ResourceList, []string)
 	// Use logger.TODO() because we currently do not have a proper logger to pass in.
 	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
 	logger := klog.TODO()
-	needsUpdateCheckpoint := false
 	var capacity = v1.ResourceList{}
 	var allocatable = v1.ResourceList{}
 	deletedResources := sets.New[string]()
@@ -459,10 +458,7 @@ func (m *ManagerImpl) GetCapacity() (v1.ResourceList, v1.ResourceList, []string)
 			if !ok {
 				logger.Info("Unexpected: healthyDevices and endpoints are out of sync")
 			}
-			delete(m.endpoints, resourceName)
-			delete(m.healthyDevices, resourceName)
 			deletedResources.Insert(resourceName)
-			needsUpdateCheckpoint = true
 		} else {
 			capacity[v1.ResourceName(resourceName)] = *resource.NewQuantity(int64(devices.Len()), resource.DecimalSI)
 			allocatable[v1.ResourceName(resourceName)] = *resource.NewQuantity(int64(devices.Len()), resource.DecimalSI)
@@ -474,10 +470,7 @@ func (m *ManagerImpl) GetCapacity() (v1.ResourceList, v1.ResourceList, []string)
 			if !ok {
 				logger.Info("Unexpected: unhealthyDevices and endpoints became out of sync")
 			}
-			delete(m.endpoints, resourceName)
-			delete(m.unhealthyDevices, resourceName)
 			deletedResources.Insert(resourceName)
-			needsUpdateCheckpoint = true
 		} else {
 			capacityCount := capacity[v1.ResourceName(resourceName)]
 			unhealthyCount := *resource.NewQuantity(int64(devices.Len()), resource.DecimalSI)
@@ -485,8 +478,16 @@ func (m *ManagerImpl) GetCapacity() (v1.ResourceList, v1.ResourceList, []string)
 			capacity[v1.ResourceName(resourceName)] = capacityCount
 		}
 	}
+
+	for resourceName := range deletedResources {
+		delete(m.endpoints, resourceName)
+		delete(m.healthyDevices, resourceName)
+		delete(m.unhealthyDevices, resourceName)
+	}
+
 	m.mutex.Unlock()
-	if needsUpdateCheckpoint {
+
+	if deletedResources.Len() > 0 {
 		if err := m.writeCheckpoint(logger); err != nil {
 			logger.Error(err, "Failed to write checkpoint file")
 		}
