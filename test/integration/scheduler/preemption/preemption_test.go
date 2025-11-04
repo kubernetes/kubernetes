@@ -776,7 +776,7 @@ func TestAsyncPreemption(t *testing.T) {
 			},
 		},
 		{
-			name: "Lower priority Pod can select the same place where the higher priority ", //Pod is preempting if the node is big enough",
+			name: "Lower priority Pod can select the same place where the higher priority Pod is preempting if the node is big enough",
 			scenarios: []scenario{
 				{
 					name: "create scheduled Pod",
@@ -1217,7 +1217,13 @@ func TestAsyncPreemption(t *testing.T) {
 				t.Run(fmt.Sprintf("%s (Async API calls enabled: %v, NominatedNodeNameForExpectation enabled: %v)", test.name, asyncAPICallsEnabled, nominatedNodeNameForExpectationEnabled), func(t *testing.T) {
 					featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 						features.SchedulerAsyncAPICalls:          asyncAPICallsEnabled,
+<<<<<<< HEAD
 						features.NominatedNodeNameForExpectation: nominatedNodeNameForExpectationEnabled})
+=======
+						features.NominatedNodeNameForExpectation: nominatedNodeNameForExpectationEnabled,
+						features.SchedulerAsyncPreemption:        true,
+					})
+>>>>>>> 43950c19331 (blabla)
 
 					// We need to use a custom preemption plugin to test async preemption behavior
 					delayedPreemptionPluginName := "delay-preemption"
@@ -1265,6 +1271,19 @@ func TestAsyncPreemption(t *testing.T) {
 					})
 					if err != nil {
 						t.Fatalf("Error registering a filter: %v", err)
+					}
+
+					// Register fake plugin that will reserve some fake resources for one pod.
+					// This could be used to check scheduler's behavior when the victim has to unreserve these resources to let the preemptor schedule.
+					reservingPluginName := "reservingPlugin"
+					err = registry.Register(reservingPluginName, func(ctx context.Context, o runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
+						return &reservingPlugin{
+							name:               reservingPluginName,
+							nameOfPodToReserve: reservingPodName,
+						}, nil
+					})
+					if err != nil {
+						t.Fatalf("Error registering a reserving plugin: %v", err)
 					}
 
 					// Register fake bind plugin that will block on binding for the specified pod name, until it receives a resume signal via the blockBindingChannel.
@@ -1331,8 +1350,6 @@ func TestAsyncPreemption(t *testing.T) {
 					}
 					testCtx.Scheduler.SchedulingQueue.Run(logger)
 					defer testCtx.Scheduler.SchedulingQueue.Close()
-
-					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerAsyncPreemption, true)
 
 					createdPods := []*v1.Pod{}
 					defer testutils.CleanupPods(testCtx.Ctx, cs, t, createdPods)
@@ -1431,8 +1448,8 @@ func TestAsyncPreemption(t *testing.T) {
 							}); err != nil {
 								t.Fatalf("Expected the pod %s to be running preemption", createdPods[*scenario.podRunningPreemption].Name)
 							}
-							if err := testutils.WaitForNominatedNodeNameWithTimeout(ctx, cs, createdPods[*scenario.podRunningPreemption], 200*time.Millisecond); err != nil {
-								t.Fatalf("Expected the pod %s to have NominatedNodeName set while waiting for preemption to complete", createdPods[*scenario.podRunningPreemption].Name)
+							if err := testutils.WaitForNominatedNodeNameWithTimeout(ctx, cs, createdPods[*scenario.podRunningPreemption], 100*time.Millisecond); err != nil {
+								t.Fatalf("Expected NominatedNodeName to be set in pod %s while waiting for preemption to complete", createdPods[*scenario.podRunningPreemption].Name)
 							}
 						case scenario.resumeBind:
 							blockBindingChannel <- struct{}{}
