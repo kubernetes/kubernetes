@@ -5470,57 +5470,29 @@ Parameters:
   Kind:      ConfigMap
   Name:      example-parameters` + "\n"
 
-	tests := map[string]struct {
-		input  *fake.Clientset
-		output string
-	}{
-		"basic IngressClass (v1beta1)": {
-			input: fake.NewClientset(&networkingv1beta1.IngressClass{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "example-class",
-				},
-				Spec: networkingv1beta1.IngressClassSpec{
-					Controller: "example.com/controller",
-					Parameters: &networkingv1beta1.IngressClassParametersReference{
-						APIGroup: ptr.To("v1"),
-						Kind:     "ConfigMap",
-						Name:     "example-parameters",
-					},
-				},
-			}),
-			output: expectedOut,
+	input := fake.NewClientset(&networkingv1.IngressClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "example-class",
 		},
-		"basic IngressClass (v1)": {
-			input: fake.NewClientset(&networkingv1.IngressClass{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "example-class",
-				},
-				Spec: networkingv1.IngressClassSpec{
-					Controller: "example.com/controller",
-					Parameters: &networkingv1.IngressClassParametersReference{
-						APIGroup: ptr.To("v1"),
-						Kind:     "ConfigMap",
-						Name:     "example-parameters",
-					},
-				},
-			}),
-			output: expectedOut,
+		Spec: networkingv1.IngressClassSpec{
+			Controller: "example.com/controller",
+			Parameters: &networkingv1.IngressClassParametersReference{
+				APIGroup: ptr.To("v1"),
+				Kind:     "ConfigMap",
+				Name:     "example-parameters",
+			},
 		},
-	}
+	})
 
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			c := &describeClient{T: t, Namespace: "foo", Interface: test.input}
-			d := IngressClassDescriber{c}
-			out, err := d.Describe("", "example-class", DescriberSettings{})
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-			if out != expectedOut {
-				t.Log(out)
-				t.Errorf("expected : %q\n but got output:\n %q", test.output, out)
-			}
-		})
+	c := &describeClient{T: t, Namespace: "foo", Interface: input}
+	d := IngressClassDescriber{c}
+	out, err := d.Describe("", "example-class", DescriberSettings{})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if out != expectedOut {
+		t.Log(out)
+		t.Errorf("expected : %q\n but got output:\n %q", expectedOut, out)
 	}
 }
 
