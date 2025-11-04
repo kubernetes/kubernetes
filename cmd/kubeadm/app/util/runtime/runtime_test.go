@@ -24,8 +24,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	v1 "k8s.io/cri-api/pkg/apis/runtime/v1"
 
@@ -34,12 +32,11 @@ import (
 )
 
 var errTest = errors.New("test")
-var errNotImplemented = status.New(codes.Unimplemented, "not implemented").Err()
 
 func TestNewContainerRuntime(t *testing.T) {
 	for _, tc := range []struct {
 		name        string
-		prepare     func(*FakeImpl)
+		prepare     func(*fakeImpl)
 		shouldError bool
 	}{
 		{
@@ -48,14 +45,14 @@ func TestNewContainerRuntime(t *testing.T) {
 		},
 		{
 			name: "invalid: new runtime service fails",
-			prepare: func(mock *FakeImpl) {
+			prepare: func(mock *fakeImpl) {
 				mock.NewRemoteRuntimeServiceReturns(nil, errTest)
 			},
 			shouldError: true,
 		},
 		{
 			name: "invalid: new image service fails",
-			prepare: func(mock *FakeImpl) {
+			prepare: func(mock *fakeImpl) {
 				mock.NewRemoteImageServiceReturns(nil, errTest)
 			},
 			shouldError: true,
@@ -63,7 +60,7 @@ func TestNewContainerRuntime(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			containerRuntime := NewContainerRuntime("")
-			mock := &FakeImpl{}
+			mock := &fakeImpl{}
 			if tc.prepare != nil {
 				tc.prepare(mock)
 			}
@@ -79,7 +76,7 @@ func TestNewContainerRuntime(t *testing.T) {
 func TestIsRunning(t *testing.T) {
 	for _, tc := range []struct {
 		name        string
-		prepare     func(*FakeImpl)
+		prepare     func(*fakeImpl)
 		shouldError bool
 	}{
 		{
@@ -88,14 +85,14 @@ func TestIsRunning(t *testing.T) {
 		},
 		{
 			name: "invalid: runtime status fails",
-			prepare: func(mock *FakeImpl) {
+			prepare: func(mock *fakeImpl) {
 				mock.StatusReturns(nil, errTest)
 			},
 			shouldError: true,
 		},
 		{
 			name: "invalid: runtime condition status not 'true'",
-			prepare: func(mock *FakeImpl) {
+			prepare: func(mock *fakeImpl) {
 				mock.StatusReturns(&v1.StatusResponse{Status: &v1.RuntimeStatus{
 					Conditions: []*v1.RuntimeCondition{
 						{
@@ -110,7 +107,7 @@ func TestIsRunning(t *testing.T) {
 		},
 		{
 			name: "valid: runtime condition type does not match",
-			prepare: func(mock *FakeImpl) {
+			prepare: func(mock *fakeImpl) {
 				mock.StatusReturns(&v1.StatusResponse{Status: &v1.RuntimeStatus{
 					Conditions: []*v1.RuntimeCondition{
 						{
@@ -126,7 +123,7 @@ func TestIsRunning(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			containerRuntime := NewContainerRuntime("")
-			mock := &FakeImpl{}
+			mock := &fakeImpl{}
 			if tc.prepare != nil {
 				tc.prepare(mock)
 			}
@@ -143,12 +140,12 @@ func TestListKubeContainers(t *testing.T) {
 	for _, tc := range []struct {
 		name        string
 		expected    []string
-		prepare     func(*FakeImpl)
+		prepare     func(*fakeImpl)
 		shouldError bool
 	}{
 		{
 			name: "valid",
-			prepare: func(mock *FakeImpl) {
+			prepare: func(mock *fakeImpl) {
 				mock.ListPodSandboxReturns([]*v1.PodSandbox{
 					{Id: "first"},
 					{Id: "second"},
@@ -159,7 +156,7 @@ func TestListKubeContainers(t *testing.T) {
 		},
 		{
 			name: "invalid: list pod sandbox fails",
-			prepare: func(mock *FakeImpl) {
+			prepare: func(mock *fakeImpl) {
 				mock.ListPodSandboxReturns(nil, errTest)
 			},
 			shouldError: true,
@@ -167,7 +164,7 @@ func TestListKubeContainers(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			containerRuntime := NewContainerRuntime("")
-			mock := &FakeImpl{}
+			mock := &fakeImpl{}
 			if tc.prepare != nil {
 				tc.prepare(mock)
 			}
@@ -184,12 +181,12 @@ func TestListKubeContainers(t *testing.T) {
 func TestSandboxImage(t *testing.T) {
 	for _, tc := range []struct {
 		name, expected string
-		prepare        func(*FakeImpl)
+		prepare        func(*fakeImpl)
 		shouldError    bool
 	}{
 		{
 			name: "valid",
-			prepare: func(mock *FakeImpl) {
+			prepare: func(mock *fakeImpl) {
 				mock.StatusReturns(&v1.StatusResponse{Info: map[string]string{
 					"config": `{"sandboxImage": "pause"}`,
 				}}, nil)
@@ -199,14 +196,14 @@ func TestSandboxImage(t *testing.T) {
 		},
 		{
 			name: "invalid: runtime status fails",
-			prepare: func(mock *FakeImpl) {
+			prepare: func(mock *fakeImpl) {
 				mock.StatusReturns(nil, errTest)
 			},
 			shouldError: true,
 		},
 		{
 			name: "invalid: no config JSON",
-			prepare: func(mock *FakeImpl) {
+			prepare: func(mock *fakeImpl) {
 				mock.StatusReturns(&v1.StatusResponse{Info: map[string]string{
 					"config": "wrong",
 				}}, nil)
@@ -215,7 +212,7 @@ func TestSandboxImage(t *testing.T) {
 		},
 		{
 			name: "invalid: no config",
-			prepare: func(mock *FakeImpl) {
+			prepare: func(mock *fakeImpl) {
 				mock.StatusReturns(&v1.StatusResponse{Info: map[string]string{}}, nil)
 			},
 			shouldError: true,
@@ -223,7 +220,7 @@ func TestSandboxImage(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			containerRuntime := NewContainerRuntime("")
-			mock := &FakeImpl{}
+			mock := &fakeImpl{}
 			if tc.prepare != nil {
 				tc.prepare(mock)
 			}
@@ -241,7 +238,7 @@ func TestRemoveContainers(t *testing.T) {
 	for _, tc := range []struct {
 		name        string
 		containers  []string
-		prepare     func(*FakeImpl)
+		prepare     func(*fakeImpl)
 		shouldError bool
 	}{
 		{
@@ -255,7 +252,7 @@ func TestRemoveContainers(t *testing.T) {
 		{
 			name:       "invalid: remove pod sandbox fails",
 			containers: []string{"1"},
-			prepare: func(mock *FakeImpl) {
+			prepare: func(mock *fakeImpl) {
 				mock.RemovePodSandboxReturns(errTest)
 			},
 			shouldError: true,
@@ -263,7 +260,7 @@ func TestRemoveContainers(t *testing.T) {
 		{
 			name:       "invalid: stop pod sandbox fails",
 			containers: []string{"1"},
-			prepare: func(mock *FakeImpl) {
+			prepare: func(mock *fakeImpl) {
 				mock.StopPodSandboxReturns(errTest)
 			},
 			shouldError: true,
@@ -271,7 +268,7 @@ func TestRemoveContainers(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			containerRuntime := NewContainerRuntime("")
-			mock := &FakeImpl{}
+			mock := &fakeImpl{}
 			if tc.prepare != nil {
 				tc.prepare(mock)
 			}
@@ -287,7 +284,7 @@ func TestRemoveContainers(t *testing.T) {
 func TestPullImage(t *testing.T) {
 	for _, tc := range []struct {
 		name        string
-		prepare     func(*FakeImpl)
+		prepare     func(*fakeImpl)
 		shouldError bool
 	}{
 		{
@@ -295,7 +292,7 @@ func TestPullImage(t *testing.T) {
 		},
 		{
 			name: "invalid: pull image fails",
-			prepare: func(mock *FakeImpl) {
+			prepare: func(mock *fakeImpl) {
 				mock.PullImageReturns("", errTest)
 			},
 			shouldError: true,
@@ -303,7 +300,7 @@ func TestPullImage(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			containerRuntime := NewContainerRuntime("")
-			mock := &FakeImpl{}
+			mock := &fakeImpl{}
 			if tc.prepare != nil {
 				tc.prepare(mock)
 			}
@@ -320,11 +317,11 @@ func TestImageExists(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
 		expected bool
-		prepare  func(*FakeImpl)
+		prepare  func(*fakeImpl)
 	}{
 		{
 			name: "valid",
-			prepare: func(mock *FakeImpl) {
+			prepare: func(mock *fakeImpl) {
 				mock.ImageStatusReturns(&v1.ImageStatusResponse{
 					Image: &v1.Image{},
 				}, nil)
@@ -333,7 +330,7 @@ func TestImageExists(t *testing.T) {
 		},
 		{
 			name: "invalid: image status fails",
-			prepare: func(mock *FakeImpl) {
+			prepare: func(mock *fakeImpl) {
 				mock.ImageStatusReturns(nil, errTest)
 			},
 			expected: false,
@@ -341,7 +338,7 @@ func TestImageExists(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			containerRuntime := NewContainerRuntime("")
-			mock := &FakeImpl{}
+			mock := &fakeImpl{}
 			if tc.prepare != nil {
 				tc.prepare(mock)
 			}
@@ -469,7 +466,7 @@ func TestPullImagesInParallel(t *testing.T) {
 	for _, tc := range []struct {
 		name         string
 		ifNotPresent bool
-		prepare      func(*FakeImpl)
+		prepare      func(*fakeImpl)
 		shouldError  bool
 	}{
 		{
@@ -481,7 +478,7 @@ func TestPullImagesInParallel(t *testing.T) {
 		},
 		{
 			name: "invalid: pull fails",
-			prepare: func(mock *FakeImpl) {
+			prepare: func(mock *fakeImpl) {
 				mock.PullImageReturns("", errTest)
 			},
 			shouldError: true,
@@ -489,7 +486,7 @@ func TestPullImagesInParallel(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			containerRuntime := NewContainerRuntime("")
-			mock := &FakeImpl{}
+			mock := &fakeImpl{}
 			if tc.prepare != nil {
 				tc.prepare(mock)
 			}
@@ -498,54 +495,6 @@ func TestPullImagesInParallel(t *testing.T) {
 			err := containerRuntime.PullImagesInParallel([]string{"first", "second"}, tc.ifNotPresent)
 
 			assert.Equal(t, tc.shouldError, err != nil)
-		})
-	}
-}
-
-func TestIsRuntimeConfigEnabled(t *testing.T) {
-	for _, tc := range []struct {
-		name        string
-		prepare     func(*FakeImpl)
-		shouldError bool
-		expected    bool
-	}{
-		{
-			name: "valid: RuntimeConfig gRPC method is implemented",
-			prepare: func(mock *FakeImpl) {
-				mock.RuntimeConfigReturns(&v1.RuntimeConfigResponse{}, nil)
-			},
-			shouldError: false,
-			expected:    true,
-		},
-		{
-			name: "invalid: RuntimeConfig gRPC method is not implemented",
-			prepare: func(mock *FakeImpl) {
-				mock.RuntimeConfigReturns(nil, errNotImplemented)
-			},
-			shouldError: false,
-			expected:    false,
-		},
-		{
-			name: "invalid: RuntimeConfig gRPC method returns an error",
-			prepare: func(mock *FakeImpl) {
-				mock.RuntimeConfigReturns(nil, errTest)
-			},
-			shouldError: true,
-			expected:    false,
-		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			containerRuntime := NewContainerRuntime("")
-			mock := &FakeImpl{}
-			if tc.prepare != nil {
-				tc.prepare(mock)
-			}
-			containerRuntime.SetImpl(mock)
-
-			enabled, err := containerRuntime.IsRuntimeConfigImplemented()
-
-			assert.Equal(t, tc.shouldError, err != nil)
-			assert.Equal(t, tc.expected, enabled)
 		})
 	}
 }

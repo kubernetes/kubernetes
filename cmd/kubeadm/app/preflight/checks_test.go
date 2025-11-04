@@ -28,8 +28,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/lithammer/dedent"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
@@ -41,7 +39,6 @@ import (
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
-	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
 )
 
 var (
@@ -1020,87 +1017,6 @@ func TestJoinIPCheck(t *testing.T) {
 			}
 			if diff := cmp.Diff(checkList, rt.expStr); diff != "" {
 				t.Fatalf("unexpected file content check (-want,+got):\n%s", diff)
-			}
-		})
-	}
-}
-
-func TestContainerRuntimeCheck(t *testing.T) {
-	tests := []struct {
-		name           string
-		prepare        func(*utilruntime.FakeImpl)
-		expectErrors   int
-		expectWarnings int
-	}{
-		{
-			name: "ok",
-		},
-		{
-			name: "container runtime is not running",
-			prepare: func(mock *utilruntime.FakeImpl) {
-				mock.StatusReturns(nil, errors.New("not running"))
-			},
-			expectErrors: 1,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			mock := &utilruntime.FakeImpl{}
-			if test.prepare != nil {
-				test.prepare(mock)
-			}
-
-			warnings, errors := ContainerRuntimeCheck{impl: mock}.Check()
-			if len(warnings) != test.expectWarnings {
-				t.Errorf("expected %d warning(s) but got %d: %q", test.expectWarnings, len(warnings), warnings)
-			}
-			if len(errors) != test.expectErrors {
-				t.Errorf("expected %d error(s) but got %d: %q", test.expectErrors, len(errors), errors)
-			}
-		})
-	}
-}
-
-func TestContainerRuntimeVersionCheck(t *testing.T) {
-	tests := []struct {
-		name           string
-		prepare        func(*utilruntime.FakeImpl)
-		expectErrors   int
-		expectWarnings int
-	}{
-		{
-			name: "ok",
-		},
-		{
-			name: "runtime config not implemented",
-			prepare: func(mock *utilruntime.FakeImpl) {
-				mock.RuntimeConfigReturns(nil, status.New(codes.Unimplemented, "not implemented").Err())
-			},
-			expectWarnings: 1,
-		},
-		{
-			name: "call RuntimeConfig fails",
-			prepare: func(mock *utilruntime.FakeImpl) {
-				mock.RuntimeConfigReturns(nil, status.New(codes.DeadlineExceeded, "deadline exceeded").Err())
-			},
-			expectErrors: 1,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			mock := &utilruntime.FakeImpl{}
-			if test.prepare != nil {
-				test.prepare(mock)
-			}
-
-			warnings, errors := ContainerRuntimeVersionCheck{impl: mock}.Check()
-			if len(warnings) != test.expectWarnings {
-				t.Errorf("expected %d warning(s) but got %d: %q", test.expectWarnings, len(warnings), warnings)
-			}
-			if len(errors) != test.expectErrors {
-				t.Errorf("expected %d error(s) but got %d: %q", test.expectErrors, len(errors), errors)
 			}
 		})
 	}

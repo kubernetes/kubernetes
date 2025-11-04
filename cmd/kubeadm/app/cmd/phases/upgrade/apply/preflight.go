@@ -70,7 +70,7 @@ func runPreflight(c workflow.RunData) error {
 	if err := preflight.RunRootCheckOnly(ignorePreflightErrors); err != nil {
 		return err
 	}
-	if err := preflight.RunUpgradeChecks(utilsexec.New(), initCfg, ignorePreflightErrors); err != nil {
+	if err := preflight.RunUpgradeChecks(utilsexec.New(), ignorePreflightErrors); err != nil {
 		return err
 	}
 
