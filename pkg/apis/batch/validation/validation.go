@@ -914,6 +914,15 @@ func IsConditionTrue(list []batch.JobCondition, cType batch.JobConditionType) bo
 	return false
 }
 
+func IsConditionFalse(list []batch.JobCondition, cType batch.JobConditionType) bool {
+	for _, c := range list {
+		if c.Type == cType && c.Status == api.ConditionFalse {
+			return true
+		}
+	}
+	return false
+}
+
 func validateFailedIndexesNotOverlapCompleted(completedIndexesStr string, failedIndexesStr string, completions int32) error {
 	if len(completedIndexesStr) == 0 || len(failedIndexesStr) == 0 {
 		return nil
