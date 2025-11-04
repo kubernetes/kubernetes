@@ -132,12 +132,14 @@ kubeadmConfigPatches:
         value: "${KIND_CLUSTER_LOG_LEVEL}"
   ---
   kind: InitConfiguration
+  apiVersion: kubeadm.k8s.io/v1beta4
   nodeRegistration:
     kubeletExtraArgs:
       - name: "v"
         value: "${KIND_CLUSTER_LOG_LEVEL}"
   ---
   kind: JoinConfiguration
+  apiVersion: kubeadm.k8s.io/v1beta4
   nodeRegistration:
     kubeletExtraArgs:
       - name: "v"
@@ -159,11 +161,13 @@ kubeadmConfigPatches:
       "v": "${KIND_CLUSTER_LOG_LEVEL}"
   ---
   kind: InitConfiguration
+  apiVersion: kubeadm.k8s.io/v1beta3
   nodeRegistration:
     kubeletExtraArgs:
      "v": "${KIND_CLUSTER_LOG_LEVEL}"
   ---
   kind: JoinConfiguration
+  apiVersion: kubeadm.k8s.io/v1beta3
   nodeRegistration:
     kubeletExtraArgs:
       "v": "${KIND_CLUSTER_LOG_LEVEL}"
