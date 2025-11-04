@@ -30,15 +30,16 @@ import (
 	v1alpha1 "k8s.io/apiserver/pkg/server/statusz/api/v1alpha1"
 )
 
+var delimiters = []string{":", ": ", "=", " "}
+
 // statuszTextSerializer implements runtime.Serializer for text/plain output.
 type statuszTextSerializer struct {
-	componentName string
-	reg           statuszRegistry
+	reg statuszRegistry
 }
 
 // Encode writes the statusz information in plain text format to the given writer, using the provided obj.
 func (s statuszTextSerializer) Encode(obj runtime.Object, w io.Writer) error {
-	if _, err := fmt.Fprintf(w, headerFmt, s.componentName); err != nil {
+	if _, err := fmt.Fprintf(w, headerFmt, s.reg.componentName()); err != nil {
 		return err
 	}
 

@@ -38,7 +38,6 @@ import (
 )
 
 var (
-	delimiters            = []string{":", ": ", "=", " "}
 	nonDebuggingEndpoints = map[string]bool{
 		"/apis":        true,
 		"/api":         true,
@@ -68,8 +67,9 @@ type mux interface {
 
 type ListedPathsOption []string
 
-func NewRegistry(effectiveVersion compatibility.EffectiveVersion, opts ...Option) statuszRegistry {
+func NewRegistry(componentName string, effectiveVersion compatibility.EffectiveVersion, opts ...Option) statuszRegistry {
 	r := &registry{
+		name:             componentName,
 		effectiveVersion: effectiveVersion,
 	}
 	for _, opt := range opts {
@@ -79,13 +79,13 @@ func NewRegistry(effectiveVersion compatibility.EffectiveVersion, opts ...Option
 	return r
 }
 
-func Install(m mux, componentName string, reg statuszRegistry) {
+func Install(m mux, reg statuszRegistry) {
 	scheme := runtime.NewScheme()
 	utilruntime.Must(v1alpha1.AddToScheme(scheme))
 	codecFactory := serializer.NewCodecFactory(
 		scheme,
 		serializer.WithSerializer(func(_ runtime.ObjectCreater, _ runtime.ObjectTyper) runtime.SerializerInfo {
-			textSerializer := statuszTextSerializer{componentName, reg}
+			textSerializer := statuszTextSerializer{reg}
 			return runtime.SerializerInfo{
 				MediaType:        "text/plain",
 				MediaTypeType:    "text",
@@ -96,12 +96,12 @@ func Install(m mux, componentName string, reg statuszRegistry) {
 			}
 		}),
 	)
-	m.Handle(DefaultStatuszPath, handleStatusz(componentName, reg, codecFactory, negotiate.StatuszEndpointRestrictions{}))
+	m.Handle(DefaultStatuszPath, handleStatusz(reg, codecFactory, negotiate.StatuszEndpointRestrictions{}))
 }
 
-func handleStatusz(componentName string, reg statuszRegistry, serializer runtime.NegotiatedSerializer, restrictions negotiate.StatuszEndpointRestrictions) http.HandlerFunc {
+func handleStatusz(reg statuszRegistry, serializer runtime.NegotiatedSerializer, restrictions negotiate.StatuszEndpointRestrictions) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		obj := statusz(componentName, reg)
+		obj := statusz(reg)
 		acceptHeader := r.Header.Get("Accept")
 		if strings.TrimSpace(acceptHeader) == "" {
 			writePlainTextResponse(obj, serializer, w)
@@ -198,7 +198,7 @@ func writeResponse(obj runtime.Object, serializer runtime.NegotiatedSerializer, 
 	)
 }
 
-func statusz(componentName string, reg statuszRegistry) *v1alpha1.Statusz {
+func statusz(reg statuszRegistry) *v1alpha1.Statusz {
 	startTime := reg.processStartTime()
 	upTimeSeconds := max(0, int64(time.Since(startTime).Seconds()))
 	goVersion := reg.goVersion()
@@ -215,7 +215,7 @@ func statusz(componentName string, reg statuszRegistry) *v1alpha1.Statusz {
 			APIVersion: fmt.Sprintf("%s/%s", GroupName, Version),
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: componentName,
+			Name: reg.componentName(),
 		},
 		StartTime:        metav1.Time{Time: startTime},
 		UptimeSeconds:    upTimeSeconds,

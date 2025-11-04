@@ -461,7 +461,7 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 	s.installReadyz()
 
 	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentStatusz) {
-		statusz.Install(s.Handler.NonGoRestfulMux, "apiserver", statusz.NewRegistry(s.EffectiveVersion, statusz.WithListedPaths(s.ListedPaths())))
+		statusz.Install(s.Handler.NonGoRestfulMux, statusz.NewRegistry("apiserver", s.EffectiveVersion, statusz.WithListedPaths(s.ListedPaths())))
 	}
 
 	return preparedGenericAPIServer{s}
