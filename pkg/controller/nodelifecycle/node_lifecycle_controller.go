@@ -457,12 +457,16 @@ func (nc *Controller) Run(ctx context.Context) {
 		})
 	defer nc.broadcaster.Shutdown()
 
-	// Close node update queue to cleanup go routine.
-	defer nc.nodeUpdateQueue.ShutDown()
-	defer nc.podUpdateQueue.ShutDown()
-
 	logger.Info("Starting node controller")
-	defer logger.Info("Shutting down node controller")
+
+	// Close node update queue to cleanup go routine.
+	var wg sync.WaitGroup
+	defer func() {
+		logger.Info("Shutting down node controller")
+		nc.nodeUpdateQueue.ShutDown()
+		nc.podUpdateQueue.ShutDown()
+		wg.Wait()
+	}()
 
 	if !cache.WaitForNamedCacheSyncWithContext(ctx, nc.leaseInformerSynced, nc.nodeInformerSynced, nc.podInformerSynced, nc.daemonSetInformerSynced) {
 		return
@@ -470,7 +474,9 @@ func (nc *Controller) Run(ctx context.Context) {
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.SeparateTaintEvictionController) {
 		logger.Info("Starting", "controller", taintEvictionController)
-		go nc.taintManager.Run(ctx)
+		wg.Go(func() {
+			nc.taintManager.Run(ctx)
+		})
 	}
 
 	// Start workers to reconcile labels and/or update NoSchedule taint for nodes.
@@ -479,24 +485,31 @@ func (nc *Controller) Run(ctx context.Context) {
 		// the item is flagged when got from queue: if new event come, the new item will
 		// be re-queued until "Done", so no more than one worker handle the same item and
 		// no event missed.
-		go wait.UntilWithContext(ctx, nc.doNodeProcessingPassWorker, time.Second)
+		wg.Go(func() {
+			wait.UntilWithContext(ctx, nc.doNodeProcessingPassWorker, time.Second)
+		})
 	}
 
 	for i := 0; i < podUpdateWorkerSize; i++ {
-		go wait.UntilWithContext(ctx, nc.doPodProcessingWorker, time.Second)
+		wg.Go(func() {
+			wait.UntilWithContext(ctx, nc.doPodProcessingWorker, time.Second)
+		})
 	}
 
 	// Handling taint based evictions. Because we don't want a dedicated logic in TaintManager for NC-originated
 	// taints and we normally don't rate limit evictions caused by taints, we need to rate limit adding taints.
-	go wait.UntilWithContext(ctx, nc.doNoExecuteTaintingPass, scheduler.NodeEvictionPeriod)
+	wg.Go(func() {
+		wait.UntilWithContext(ctx, nc.doNoExecuteTaintingPass, scheduler.NodeEvictionPeriod)
+	})
 
 	// Incorporate the results of node health signal pushed from kubelet to master.
-	go wait.UntilWithContext(ctx, func(ctx context.Context) {
-		if err := nc.monitorNodeHealth(ctx); err != nil {
-			logger.Error(err, "Error monitoring node health")
-		}
-	}, nc.nodeMonitorPeriod)
-
+	wg.Go(func() {
+		wait.UntilWithContext(ctx, func(ctx context.Context) {
+			if err := nc.monitorNodeHealth(ctx); err != nil {
+				logger.Error(err, "Error monitoring node health")
+			}
+		}, nc.nodeMonitorPeriod)
+	})
 	<-ctx.Done()
 }
 

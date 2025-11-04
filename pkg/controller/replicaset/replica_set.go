@@ -236,21 +236,26 @@ func (rsc *ReplicaSetController) Run(ctx context.Context, workers int) {
 	rsc.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: rsc.kubeClient.CoreV1().Events("")})
 	defer rsc.eventBroadcaster.Shutdown()
 
-	defer rsc.queue.ShutDown()
-
 	controllerName := strings.ToLower(rsc.Kind)
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting controller", "name", controllerName)
-	defer logger.Info("Shutting down controller", "name", controllerName)
+
+	var wg sync.WaitGroup
+	defer func() {
+		logger.Info("Shutting down controller", "name", controllerName)
+		rsc.queue.ShutDown()
+		wg.Wait()
+	}()
 
 	if !cache.WaitForNamedCacheSyncWithContext(ctx, rsc.podListerSynced, rsc.rsListerSynced) {
 		return
 	}
 
 	for i := 0; i < workers; i++ {
-		go wait.UntilWithContext(ctx, rsc.worker, time.Second)
+		wg.Go(func() {
+			wait.UntilWithContext(ctx, rsc.worker, time.Second)
+		})
 	}
-
 	<-ctx.Done()
 }
 

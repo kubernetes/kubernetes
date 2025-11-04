@@ -19,6 +19,7 @@ package storageversiongc
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	apiserverinternalv1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
@@ -92,13 +93,18 @@ func NewStorageVersionGC(ctx context.Context, clientset kubernetes.Interface, le
 
 // Run starts one worker.
 func (c *Controller) Run(ctx context.Context) {
-	logger := klog.FromContext(ctx)
 	defer utilruntime.HandleCrash()
-	defer c.leaseQueue.ShutDown()
-	defer c.storageVersionQueue.ShutDown()
-	defer logger.Info("Shutting down storage version garbage collector")
 
+	logger := klog.FromContext(ctx)
 	logger.Info("Starting storage version garbage collector")
+
+	var wg sync.WaitGroup
+	defer func() {
+		logger.Info("Shutting down storage version garbage collector")
+		c.leaseQueue.ShutDown()
+		c.storageVersionQueue.ShutDown()
+		wg.Wait()
+	}()
 
 	if !cache.WaitForCacheSync(ctx.Done(), c.leasesSynced, c.storageVersionSynced) {
 		utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
@@ -110,9 +116,12 @@ func (c *Controller) Run(ctx context.Context) {
 	// runLeaseWorker handles legit identity lease deletion, while runStorageVersionWorker
 	// handles storageversion creation/update with non-existing id. The latter should rarely
 	// happen. It's okay for the two workers to conflict on update.
-	go wait.UntilWithContext(ctx, c.runLeaseWorker, time.Second)
-	go wait.UntilWithContext(ctx, c.runStorageVersionWorker, time.Second)
-
+	wg.Go(func() {
+		wait.UntilWithContext(ctx, c.runLeaseWorker, time.Second)
+	})
+	wg.Go(func() {
+		wait.UntilWithContext(ctx, c.runStorageVersionWorker, time.Second)
+	})
 	<-ctx.Done()
 }
 
