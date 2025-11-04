@@ -43,6 +43,13 @@ type RealFIFOOptions struct {
 	// If set, will be called for objects before enqueueing them. Please
 	// see the comment on TransformFunc for details.
 	Transformer TransformFunc
+
+	// Identifier is used to identify the FIFO used in logs and metrics.
+	Identifier *Identifier
+
+	// If set, metricsProvider will be used to create metrics for the FIFO.
+	// This allows consumers to provide their own metrics implementation.
+	MetricsProvider FIFOMetricsProvider
 }
 
 const (
@@ -86,6 +93,11 @@ type RealFIFO struct {
 
 	// batchSize determines the maximum number of objects we can combine into a batch.
 	batchSize int
+
+	// metrics tracks basic metric information about the FIFO.
+	metrics *fifoMetrics
+
+	identfier *Identifier
 }
 
 var (
@@ -175,22 +187,32 @@ func (f *RealFIFO) addToItems_locked(deltaActionType DeltaType, skipTransform bo
 // Add inserts an item, and puts it in the queue. The item is only enqueued
 // if it doesn't already exist in the set.
 func (f *RealFIFO) Add(obj interface{}) error {
+	var size int
+	defer func() {
+		f.metrics.numberOfQueuedItem.Set(float64(size))
+	}()
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
 	f.populated = true
 	retErr := f.addToItems_locked(Added, false, obj)
+	size = len(f.items)
 
 	return retErr
 }
 
 // Update is the same as Add in this implementation.
 func (f *RealFIFO) Update(obj interface{}) error {
+	var size int
+	defer func() {
+		f.metrics.numberOfQueuedItem.Set(float64(size))
+	}()
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
 	f.populated = true
 	retErr := f.addToItems_locked(Updated, false, obj)
+	size = len(f.items)
 
 	return retErr
 }
@@ -199,11 +221,16 @@ func (f *RealFIFO) Update(obj interface{}) error {
 // this implementation assumes the consumer only cares about the objects,
 // not the order in which they were created/added.
 func (f *RealFIFO) Delete(obj interface{}) error {
+	var size int
+	defer func() {
+		f.metrics.numberOfQueuedItem.Set(float64(size))
+	}()
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
 	f.populated = true
 	retErr := f.addToItems_locked(Deleted, false, obj)
+	size = len(f.items)
 
 	return retErr
 }
@@ -221,8 +248,19 @@ func (f *RealFIFO) IsClosed() bool {
 // process function is called under lock, so it is safe
 // update data structures in it that need to be in sync with the queue.
 func (f *RealFIFO) Pop(process PopProcessFunc) (interface{}, error) {
+	var size int
+	defer func() {
+		f.metrics.numberOfQueuedItem.Set(float64(size))
+	}()
 	f.lock.Lock()
 	defer f.lock.Unlock()
+	delta, err := f.popLocked(process)
+	size = len(f.items)
+
+	return delta, err
+}
+
+func (f *RealFIFO) popLocked(process PopProcessFunc) (interface{}, error) {
 
 	for len(f.items) == 0 {
 		// When the queue is empty, invocation of Pop() is blocked until new item is enqueued.
@@ -250,9 +288,9 @@ func (f *RealFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 	// and new items can't be added until processing finish.
 	// https://github.com/kubernetes/kubernetes/issues/103789
 	if len(f.items) > 10 {
-		id, _ := f.keyOf(item)
 		trace := utiltrace.New("RealFIFO Pop Process",
-			utiltrace.Field{Key: "ID", Value: id},
+			utiltrace.Field{Key: "Name", Value: f.identfier.Name},
+			utiltrace.Field{Key: "ItemType", Value: f.identfier.ItemType},
 			utiltrace.Field{Key: "Depth", Value: len(f.items)},
 			utiltrace.Field{Key: "Reason", Value: "slow event handlers blocking the queue"})
 		defer trace.LogIfLong(100 * time.Millisecond)
@@ -264,9 +302,19 @@ func (f *RealFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 }
 
 func (f *RealFIFO) PopBatch(process ProcessBatchFunc) error {
+	var size int
+	defer func() {
+		f.metrics.numberOfQueuedItem.Set(float64(size))
+	}()
 	f.lock.Lock()
 	defer f.lock.Unlock()
+	err := f.popBatchLocked(process)
+	size = len(f.items)
 
+	return err
+}
+
+func (f *RealFIFO) popBatchLocked(process ProcessBatchFunc) error {
 	for len(f.items) == 0 {
 		// When the queue is empty, invocation of Pop() is blocked until new item is enqueued.
 		// When Close() is called, the f.closed is set and the condition is broadcasted.
@@ -318,9 +366,9 @@ func (f *RealFIFO) PopBatch(process ProcessBatchFunc) error {
 	// and new items can't be added until processing finish.
 	// https://github.com/kubernetes/kubernetes/issues/103789
 	if len(f.items) > 10 {
-		id, _ := f.keyOf(deltas[0])
 		trace := utiltrace.New("RealFIFO PopBatch Process",
-			utiltrace.Field{Key: "ID", Value: id},
+			utiltrace.Field{Key: "Name", Value: f.identfier.Name},
+			utiltrace.Field{Key: "ItemType", Value: f.identfier.ItemType},
 			utiltrace.Field{Key: "Depth", Value: len(f.items)},
 			utiltrace.Field{Key: "Reason", Value: "slow event handlers blocking the queue"},
 			utiltrace.Field{Key: "BatchSize", Value: len(deltas)})
@@ -336,9 +384,18 @@ func (f *RealFIFO) PopBatch(process ProcessBatchFunc) error {
 // 2. finds items in knownObjects that are not in newItems and creates synthetic deletes for them
 // 3. adds the newItems to the queue
 func (f *RealFIFO) Replace(newItems []interface{}, resourceVersion string) error {
+	var size int
+	defer func() {
+		f.metrics.numberOfQueuedItem.Set(float64(size))
+	}()
 	f.lock.Lock()
 	defer f.lock.Unlock()
+	err := f.replaceLocked(newItems, resourceVersion)
+	size = len(f.items)
+	return err
+}
 
+func (f *RealFIFO) replaceLocked(newItems []interface{}, resourceVersion string) error {
 	// determine the keys of everything we're adding.  We cannot add the items until after the synthetic deletes have been
 	// created for items that don't existing in newItems
 	newKeys := sets.Set[string]{}
@@ -441,9 +498,19 @@ func (f *RealFIFO) Replace(newItems []interface{}, resourceVersion string) error
 // Resync will ensure that every object in the Store has its key in the queue.
 // This should be a no-op, because that property is maintained by all operations.
 func (f *RealFIFO) Resync() error {
-	// TODO this cannot logically be done by the FIFO, it can only be done by the indexer
+	var size int
+	defer func() {
+		f.metrics.numberOfQueuedItem.Set(float64(size))
+	}()
 	f.lock.Lock()
 	defer f.lock.Unlock()
+	err := f.resyncLocked()
+	size = len(f.items)
+	return err
+}
+
+func (f *RealFIFO) resyncLocked() error {
+	// TODO this cannot logically be done by the FIFO, it can only be done by the indexer
 
 	if f.knownObjects == nil {
 		return nil
@@ -518,6 +585,8 @@ func NewRealFIFOWithOptions(opts RealFIFOOptions) *RealFIFO {
 		knownObjects: opts.KnownObjects,
 		transformer:  opts.Transformer,
 		batchSize:    defaultBatchSize,
+		identfier:    opts.Identifier,
+		metrics:      newFIFOMetrics(opts.Identifier, opts.MetricsProvider),
 	}
 
 	f.cond.L = &f.lock
