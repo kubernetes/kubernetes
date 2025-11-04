@@ -17,6 +17,7 @@ limitations under the License.
 package extendedresourcecache
 
 import (
+	"cmp"
 	"fmt"
 	"sync"
 
@@ -139,16 +140,29 @@ func (c *ExtendedResourceCache) updateMapping(newDeviceClass, oldDeviceClass *re
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
+	// Different DeviceClasses could specify the same ExtendedResourceName.
+	// If we find such a clash, we need to pick one of them.
+	//
+	// Such a clash should be rare, but can occur while migrating from one
+	// DeviceClass to another. To support such a migration, we prefer the
+	// newer DeviceClass. The name serves as tie-breaker.
+	//
+	// The implicit deviceclass.resource.kubernetes.io/<class name> is always
+	// unique and also cannot appear in a different class as ExtendedResourceName
+	// (prevented by validation), so we don't need to do the same check for
+	// implicit mappings.
 	var classWithSameExtendedResourceName *resourceapi.DeviceClass
 	if newDeviceClass.Spec.ExtendedResourceName != nil {
 		classWithSameExtendedResourceName = c.mapping[v1.ResourceName(*newDeviceClass.Spec.ExtendedResourceName)]
 	}
 	if classWithSameExtendedResourceName != nil {
-		if newDeviceClass.CreationTimestamp.Before(&classWithSameExtendedResourceName.CreationTimestamp) {
+		switch cmp.Compare(newDeviceClass.CreationTimestamp.UnixNano(), classWithSameExtendedResourceName.CreationTimestamp.UnixNano()) {
+		case -1:
+			// New class is older, keep the current more recent one.
 			return
-		}
-		if classWithSameExtendedResourceName.CreationTimestamp.Equal(&newDeviceClass.CreationTimestamp) {
-			if classWithSameExtendedResourceName.Name <= newDeviceClass.Name {
+		case 0:
+			// Equal, arbitrarily prefer "lower" name.
+			if newDeviceClass.Name >= classWithSameExtendedResourceName.Name {
 				return
 			}
 		}
