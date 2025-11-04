@@ -20,7 +20,6 @@
 - text: "Conditions field in AllocatedDeviceStatus has incorrect tags, should be: `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,5,rep,name=conditions\"`"
   path: "staging/src/k8s.io/api/resource/"
 
-
 # Pre-existing issues from the conflictmarkers linter
 # The Error field in some older API types is marked as both optional and required.
 # This is incorrect, but cannot be changed without breaking changes.
