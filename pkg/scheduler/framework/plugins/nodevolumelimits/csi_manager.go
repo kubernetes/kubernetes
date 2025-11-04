@@ -25,33 +25,33 @@ import (
 
 // DefaultCSIManager is an implementation of the CSIManager interface.
 type DefaultCSIManager struct {
-	defaultCSINodeLister *csiNodeLister
+	csiNodeLister *csiNodeListerWrapper
 }
 
 var _ fwk.CSIManager = &DefaultCSIManager{}
 
 func NewCSIManager(csiNodeLister storagelisters.CSINodeLister) *DefaultCSIManager {
-	return &DefaultCSIManager{defaultCSINodeLister: NewCSINodeLister(csiNodeLister)}
+	return &DefaultCSIManager{csiNodeLister: NewCSINodeLister(csiNodeLister)}
 }
 
 func (m *DefaultCSIManager) CSINodes() fwk.CSINodeLister {
-	return m.defaultCSINodeLister
+	return m.csiNodeLister
 }
 
-type csiNodeLister struct {
+type csiNodeListerWrapper struct {
 	csiNodeLister storagelisters.CSINodeLister
 }
 
-var _ fwk.CSINodeLister = &csiNodeLister{}
+var _ fwk.CSINodeLister = &csiNodeListerWrapper{}
 
-func NewCSINodeLister(csinodeLister storagelisters.CSINodeLister) *csiNodeLister {
-	return &csiNodeLister{csinodeLister: csinodeLister}
+func NewCSINodeLister(csiNodeLister storagelisters.CSINodeLister) *csiNodeListerWrapper {
+	return &csiNodeListerWrapper{csiNodeLister: csiNodeLister}
 }
 
-func (l *csiNodeLister) List() ([]*storagev1.CSINode, error) {
-	return l.csinodeLister.List(labels.Everything())
+func (l *csiNodeListerWrapper) List() ([]*storagev1.CSINode, error) {
+	return l.csiNodeLister.List(labels.Everything())
 }
 
-func (l *csiNodeLister) Get(name string) (*storagev1.CSINode, error) {
-	return l.csinodeLister.Get(name)
+func (l *csiNodeListerWrapper) Get(name string) (*storagev1.CSINode, error) {
+	return l.csiNodeLister.Get(name)
 }

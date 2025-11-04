@@ -360,7 +360,7 @@ func (pl *CSILimits) checkCSIDriverOnNode(pluginName string, csiNode *storagev1.
 		if apierrors.IsNotFound(err) {
 			return true, nil
 		}
-		return false, err
+		return false, fmt.Errorf("error getting CSIDriver for provider %s: %w", pluginName, err)
 	}
 
 	if csiNode == nil {
