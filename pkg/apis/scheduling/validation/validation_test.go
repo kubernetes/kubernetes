@@ -246,7 +246,9 @@ func TestValidateWorkload(t *testing.T) {
 				w.Spec.PodGroups = append(w.Spec.PodGroups, scheduling.PodGroup{
 					Name: fmt.Sprintf("group-%v", i),
 					Policy: scheduling.PodGroupPolicy{
-						Basic: &scheduling.BasicSchedulingPolicy{},
+						Gang: &scheduling.GangSchedulingPolicy{
+							MinCount: 1,
+						},
 					},
 				})
 			}
@@ -262,11 +264,6 @@ func TestValidateWorkload(t *testing.T) {
 		}),
 		"no policy set": mkWorkload(func(w *scheduling.Workload) {
 			w.Spec.PodGroups[0].Policy = scheduling.PodGroupPolicy{}
-		}),
-		"two policies": mkWorkload(func(w *scheduling.Workload) {
-			w.Spec.PodGroups[0].Policy.Gang = &scheduling.GangSchedulingPolicy{
-				MinCount: 2,
-			}
 		}),
 		"zero min count in gang": mkWorkload(func(w *scheduling.Workload) {
 			w.Spec.PodGroups[1].Policy.Gang.MinCount = 0
@@ -339,7 +336,9 @@ func TestValidateWorkloadUpdate(t *testing.T) {
 				w.Spec.PodGroups = append(w.Spec.PodGroups, scheduling.PodGroup{
 					Name: "group3",
 					Policy: scheduling.PodGroupPolicy{
-						Basic: &scheduling.BasicSchedulingPolicy{},
+						Gang: &scheduling.GangSchedulingPolicy{
+							MinCount: 1,
+						},
 					},
 				})
 			}),
@@ -392,7 +391,9 @@ func mkWorkload(tweaks ...func(w *scheduling.Workload)) *scheduling.Workload {
 			PodGroups: []scheduling.PodGroup{{
 				Name: "group1",
 				Policy: scheduling.PodGroupPolicy{
-					Basic: &scheduling.BasicSchedulingPolicy{},
+					Gang: &scheduling.GangSchedulingPolicy{
+						MinCount: 1,
+					},
 				},
 			}, {
 				Name: "group2",

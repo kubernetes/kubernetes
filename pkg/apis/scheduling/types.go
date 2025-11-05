@@ -181,28 +181,12 @@ type PodGroup struct {
 
 // PodGroupPolicy defines the scheduling configuration for a PodGroup.
 type PodGroupPolicy struct {
-	// Basic specifies that the pods in this group should be scheduled using
-	// standard Kubernetes scheduling behavior.
-	//
-	// +optional
-	// +oneOf=PolicySelection
-	Basic *BasicSchedulingPolicy
-
 	// Gang specifies that the pods in this group should be scheduled using
 	// all-or-nothing semantics.
 	//
 	// +optional
 	// +oneOf=PolicySelection
 	Gang *GangSchedulingPolicy
-}
-
-// BasicSchedulingPolicy indicates that standard Kubernetes
-// scheduling behavior should be used.
-type BasicSchedulingPolicy struct {
-	// This is intentionally empty. Its presence indicates that the basic
-	// scheduling policy should be applied. In the future, new fields may appear,
-	// describing such constraints on a pod group level without "all or nothing"
-	// (gang) scheduling.
 }
 
 // GangSchedulingPolicy defines the parameters for gang scheduling.
