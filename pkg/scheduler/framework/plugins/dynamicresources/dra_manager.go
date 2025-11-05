@@ -90,7 +90,7 @@ func (s *DefaultDRAManager) DeviceClasses() fwk.DeviceClassLister {
 // disabled.
 //
 // That's okay, extendedresourcecache.ExtendedResourceCache.GetDeviceClass
-// returns the empty string if called for nil.
+// returns nil if called for nil.
 func (s *DefaultDRAManager) DeviceClassResolver() fwk.DeviceClassResolver {
 	return s.extendedResourceCache
 }

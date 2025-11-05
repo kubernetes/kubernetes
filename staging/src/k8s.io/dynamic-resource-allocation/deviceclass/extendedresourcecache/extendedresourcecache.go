@@ -35,7 +35,7 @@ type ExtendedResourceCache struct {
 	handlers []cache.ResourceEventHandler
 
 	mutex sync.RWMutex
-	// mapping maps extended resource name to device class name
+	// mapping maps extended resource name to device class
 	mapping map[v1.ResourceName]*resourceapi.DeviceClass
 }
 
@@ -66,11 +66,11 @@ func (c *ExtendedResourceCache) AddEventHandler(handler cache.ResourceEventHandl
 	c.handlers = append(c.handlers, handler)
 }
 
-// GetDeviceClass returns the device class name for the given extended resource name.
-// Returns empty string if the resource name is not found in the cache.
+// GetDeviceClass returns the device class for the given extended resource name.
+// Returns nil if the resource name is not found in the cache.
 //
 // This (and only this) method may be called on a nil ExtendedResourceCache. The nil
-// instance always returns the empty string.
+// instance always returns nil.
 func (c *ExtendedResourceCache) GetDeviceClass(resourceName v1.ResourceName) *resourceapi.DeviceClass {
 	if c == nil {
 		return nil
