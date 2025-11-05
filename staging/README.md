@@ -78,8 +78,8 @@ import (
 5. Make sure that the `.github/PULL_REQUEST_TEMPLATE.md` and `CONTRIBUTING.md`
    files mention that PRs are not directly accepted to the repo.
 
-6. Ensure that `docs.go` file is added. Refer to
-   [#kubernetes/kubernetes#91354](https://github.com/kubernetes/kubernetes/blob/release-1.24/staging/src/k8s.io/client-go/doc.go)
+6. Ensure that the `docs.go` file is added. Refer to
+   [kubernetes/kubernetes#91354](https://github.com/kubernetes/kubernetes/blob/release-1.24/staging/src/k8s.io/client-go/doc.go)
    for reference.
 
 7. NOTE: Do not edit go.mod or go.sum in the new repo (staging/src/k8s.io/<newrepo>/) manually. Run the following instead:
