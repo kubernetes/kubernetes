@@ -248,6 +248,10 @@ var (
 	KubeletCredentialProviders = framework.WithFeature(framework.ValidFeatures.Add("KubeletCredentialProviders"))
 
 	// Owner: sig-node
+	// Marks tests that require a cluster with KubeletInUserNamespace <https://kep.k8s.io/2033>
+	KubeletInUserNamespace = framework.WithFeature(framework.ValidFeatures.Add("KubeletInUserNamespace"))
+
+	// Owner: sig-node
 	// TODO: document the feature (when to use this feature for a test)
 	KubeletSecurity = framework.WithFeature(framework.ValidFeatures.Add("KubeletSecurity"))
 
