@@ -118,13 +118,13 @@ func TestTolerationToleratesTaint(t *testing.T) {
 		{
 			description: "toleration with Gt operator - taint value less than toleration value, expect not tolerated",
 			toleration: Toleration{
-				Key:      "node.example.com/priority-level",
+				Key:      "node.kubernetes.io/sla",
 				Operator: TolerationOpGt,
 				Value:    "950",
 				Effect:   TaintEffectNoSchedule,
 			},
 			taint: Taint{
-				Key:    "node.example.com/priority-level",
+				Key:    "node.kubernetes.io/sla",
 				Value:  "800",
 				Effect: TaintEffectNoSchedule,
 			},
@@ -133,13 +133,13 @@ func TestTolerationToleratesTaint(t *testing.T) {
 		{
 			description: "toleration with Gt operator - taint value greater than toleration value, expect tolerated",
 			toleration: Toleration{
-				Key:      "node.example.com/priority-level",
+				Key:      "node.kubernetes.io/sla",
 				Operator: TolerationOpGt,
 				Value:    "750",
 				Effect:   TaintEffectNoSchedule,
 			},
 			taint: Taint{
-				Key:    "node.example.com/priority-level",
+				Key:    "node.kubernetes.io/sla",
 				Value:  "950",
 				Effect: TaintEffectNoSchedule,
 			},
@@ -148,13 +148,13 @@ func TestTolerationToleratesTaint(t *testing.T) {
 		{
 			description: "toleration with Lt operator - taint value greater than toleration value, expect not tolerated",
 			toleration: Toleration{
-				Key:      "node.example.com/priority-level",
+				Key:      "node.kubernetes.io/sla",
 				Operator: TolerationOpLt,
 				Value:    "800",
 				Effect:   TaintEffectNoSchedule,
 			},
 			taint: Taint{
-				Key:    "node.example.com/priority-level",
+				Key:    "node.kubernetes.io/sla",
 				Value:  "950",
 				Effect: TaintEffectNoSchedule,
 			},
@@ -163,13 +163,13 @@ func TestTolerationToleratesTaint(t *testing.T) {
 		{
 			description: "toleration with Lt operator - taint value less than toleration value, expect tolerated",
 			toleration: Toleration{
-				Key:      "node.example.com/priority-level",
+				Key:      "node.kubernetes.io/sla",
 				Operator: TolerationOpLt,
 				Value:    "950",
 				Effect:   TaintEffectNoSchedule,
 			},
 			taint: Taint{
-				Key:    "node.example.com/priority-level",
+				Key:    "node.kubernetes.io/sla",
 				Value:  "800",
 				Effect: TaintEffectNoSchedule,
 			},
@@ -178,13 +178,13 @@ func TestTolerationToleratesTaint(t *testing.T) {
 		{
 			description: "toleration with Gt operator and taint with equal numeric value, expect not tolerated",
 			toleration: Toleration{
-				Key:      "node.example.com/priority-level",
+				Key:      "node.kubernetes.io/sla",
 				Operator: TolerationOpGt,
 				Value:    "950",
 				Effect:   TaintEffectNoSchedule,
 			},
 			taint: Taint{
-				Key:    "node.example.com/priority-level",
+				Key:    "node.kubernetes.io/sla",
 				Value:  "950",
 				Effect: TaintEffectNoSchedule,
 			},
@@ -193,13 +193,13 @@ func TestTolerationToleratesTaint(t *testing.T) {
 		{
 			description: "toleration with Gt operator and taint with non-numeric value, expect not tolerated",
 			toleration: Toleration{
-				Key:      "node.example.com/priority-level",
+				Key:      "node.kubernetes.io/sla",
 				Operator: TolerationOpGt,
 				Value:    "950",
 				Effect:   TaintEffectNoSchedule,
 			},
 			taint: Taint{
-				Key:    "node.example.com/priority-level",
+				Key:    "node.kubernetes.io/sla",
 				Value:  "high",
 				Effect: TaintEffectNoSchedule,
 			},
@@ -238,13 +238,7 @@ func TestTolerationToleratesTaint(t *testing.T) {
 		},
 	}
 	for _, tc := range testCases {
-		tolerated, err := tc.toleration.ToleratesTaint(&tc.taint)
-		if err != nil && !tc.expectError {
-			t.Errorf("test case [%s] unexpected error %v", tc.description, err)
-		} else if err == nil && tc.expectError {
-			t.Errorf("test case [%s] expected error, but got none", tc.description)
-		}
-		if tc.expectTolerated != tolerated {
+		if tolerated := tc.toleration.ToleratesTaint(&tc.taint); tc.expectTolerated != tolerated {
 			t.Errorf("[%s] expect %v, got %v: toleration %+v, taint %s", tc.description, tc.expectTolerated, tolerated, tc.toleration, tc.taint.ToString())
 		}
 	}

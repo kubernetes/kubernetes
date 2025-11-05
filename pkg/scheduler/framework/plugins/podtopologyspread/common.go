@@ -39,24 +39,20 @@ type topologySpreadConstraint struct {
 	NodeTaintsPolicy   v1.NodeInclusionPolicy
 }
 
-func (tsc *topologySpreadConstraint) matchNodeInclusionPolicies(pod *v1.Pod, node *v1.Node, require nodeaffinity.RequiredNodeAffinity) (bool, error) {
+func (tsc *topologySpreadConstraint) matchNodeInclusionPolicies(pod *v1.Pod, node *v1.Node, require nodeaffinity.RequiredNodeAffinity) bool {
 	if tsc.NodeAffinityPolicy == v1.NodeInclusionPolicyHonor {
 		// We ignore parsing errors here for backwards compatibility.
 		if match, _ := require.Match(node); !match {
-			return false, nil
+			return false
 		}
 	}
 
 	if tsc.NodeTaintsPolicy == v1.NodeInclusionPolicyHonor {
-		_, untolerated, err := v1helper.FindMatchingUntoleratedTaint(node.Spec.Taints, pod.Spec.Tolerations, helper.DoNotScheduleTaintsFilterFunc())
-		if err != nil {
-			return false, err
-		}
-		if untolerated {
-			return false, nil
+		if _, untolerated := v1helper.FindMatchingUntoleratedTaint(node.Spec.Taints, pod.Spec.Tolerations, helper.DoNotScheduleTaintsFilterFunc()); untolerated {
+			return false
 		}
 	}
-	return true, nil
+	return true
 }
 
 // buildDefaultConstraints builds the constraints for a pod using

@@ -230,21 +230,21 @@ func TestTaintTolerationScore(t *testing.T) {
 			},
 		},
 		{
-			name: "Numeric Gt operator: pod with Gt toleration prefers nodes with matching priority-level taint",
+			name: "Numeric Gt operator: pod with Gt toleration prefers nodes with matching SLA taint",
 			pod: podWithTolerations("pod1", []v1.Toleration{{
-				Key:      "node.example.com/priority-level",
+				Key:      "node.kubernetes.io/sla",
 				Operator: "Gt",
 				Value:    "950",
 				Effect:   v1.TaintEffectPreferNoSchedule,
 			}}),
 			nodes: []*v1.Node{
 				nodeWithTaints("nodeA", []v1.Taint{{
-					Key:    "node.example.com/priority-level",
+					Key:    "node.kubernetes.io/sla",
 					Value:  "800",
 					Effect: v1.TaintEffectPreferNoSchedule,
 				}}),
 				nodeWithTaints("nodeB", []v1.Taint{{
-					Key:    "node.example.com/priority-level",
+					Key:    "node.kubernetes.io/sla",
 					Value:  "999",
 					Effect: v1.TaintEffectPreferNoSchedule,
 				}}),
@@ -255,21 +255,21 @@ func TestTaintTolerationScore(t *testing.T) {
 			},
 		},
 		{
-			name: "Numeric Lt operator: pod with Lt toleration prefers nodes with matching priority-level taint",
+			name: "Numeric Lt operator: pod with Lt toleration prefers nodes with matching SLA taint",
 			pod: podWithTolerations("pod1", []v1.Toleration{{
-				Key:      "node.example.com/priority-level",
+				Key:      "node.kubernetes.io/sla",
 				Operator: "Lt",
 				Value:    "800",
 				Effect:   v1.TaintEffectPreferNoSchedule,
 			}}),
 			nodes: []*v1.Node{
 				nodeWithTaints("nodeA", []v1.Taint{{
-					Key:    "node.example.com/priority-level",
+					Key:    "node.kubernetes.io/sla",
 					Value:  "950",
 					Effect: v1.TaintEffectPreferNoSchedule,
 				}}),
 				nodeWithTaints("nodeB", []v1.Taint{{
-					Key:    "node.example.com/priority-level",
+					Key:    "node.kubernetes.io/sla",
 					Value:  "700",
 					Effect: v1.TaintEffectPreferNoSchedule,
 				}}),
@@ -387,33 +387,35 @@ func TestTaintTolerationFilter(t *testing.T) {
 			node: nodeWithTaints("nodeA", []v1.Taint{{Key: "dedicated", Value: "user1", Effect: "PreferNoSchedule"}}),
 		},
 		{
-			name:       "Pod with Gt toleration cannot be scheduled on node when taint value is lower than threshold",
-			pod:        podWithTolerations("pod1", []v1.Toleration{{Key: "node.example.com/priority-level", Operator: "Gt", Value: "950", Effect: "NoSchedule"}}),
-			node:       nodeWithTaints("nodeA", []v1.Taint{{Key: "node.example.com/priority-level", Value: "800", Effect: "NoSchedule"}}),
-			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "node(s) had untolerated taint(s)"),
+			name: "Pod with Gt toleration cannot be scheduled on node when taint value is lower than threshold",
+			pod:  podWithTolerations("pod1", []v1.Toleration{{Key: "node.kubernetes.io/sla", Operator: "Gt", Value: "950", Effect: "NoSchedule"}}),
+			node: nodeWithTaints("nodeA", []v1.Taint{{Key: "node.kubernetes.io/sla", Value: "800", Effect: "NoSchedule"}}),
+			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable,
+				"node(s) had untolerated taint {node.kubernetes.io/sla: 800}"),
 		},
 		{
 			name: "Pod with Gt toleration can be scheduled on node when taint value is higher than threshold",
-			pod:  podWithTolerations("pod1", []v1.Toleration{{Key: "node.example.com/priority-level", Operator: "Gt", Value: "750", Effect: "NoSchedule"}}),
-			node: nodeWithTaints("nodeA", []v1.Taint{{Key: "node.example.com/priority-level", Value: "950", Effect: "NoSchedule"}}),
+			pod:  podWithTolerations("pod1", []v1.Toleration{{Key: "node.kubernetes.io/sla", Operator: "Gt", Value: "750", Effect: "NoSchedule"}}),
+			node: nodeWithTaints("nodeA", []v1.Taint{{Key: "node.kubernetes.io/sla", Value: "950", Effect: "NoSchedule"}}),
 		},
 		{
-			name:       "Pod with Lt toleration cannot be scheduled on node when taint value is higher than threshold",
-			pod:        podWithTolerations("pod1", []v1.Toleration{{Key: "node.example.com/priority-level", Operator: "Lt", Value: "800", Effect: "NoSchedule"}}),
-			node:       nodeWithTaints("nodeA", []v1.Taint{{Key: "node.example.com/priority-level", Value: "950", Effect: "NoSchedule"}}),
-			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "node(s) had untolerated taint(s)"),
+			name: "Pod with Lt toleration cannot be scheduled on node when taint value is higher than threshold",
+			pod:  podWithTolerations("pod1", []v1.Toleration{{Key: "node.kubernetes.io/sla", Operator: "Lt", Value: "800", Effect: "NoSchedule"}}),
+			node: nodeWithTaints("nodeA", []v1.Taint{{Key: "node.kubernetes.io/sla", Value: "950", Effect: "NoSchedule"}}),
+			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable,
+				"node(s) had untolerated taint {node.kubernetes.io/sla: 950}"),
 		},
 		{
 			name: "Pod with Lt toleration can be scheduled on node when taint value is lower than threshold",
-			pod:  podWithTolerations("pod1", []v1.Toleration{{Key: "node.example.com/priority-level", Operator: "Lt", Value: "950", Effect: "NoSchedule"}}),
-			node: nodeWithTaints("nodeA", []v1.Taint{{Key: "node.example.com/priority-level", Value: "800", Effect: "NoSchedule"}}),
+			pod:  podWithTolerations("pod1", []v1.Toleration{{Key: "node.kubernetes.io/sla", Operator: "Lt", Value: "950", Effect: "NoSchedule"}}),
+			node: nodeWithTaints("nodeA", []v1.Taint{{Key: "node.kubernetes.io/sla", Value: "800", Effect: "NoSchedule"}}),
 		},
 		{
 			name: "Pod with Gt toleration cannot be scheduled on node with non-numeric taint value",
-			pod:  podWithTolerations("pod1", []v1.Toleration{{Key: "node.example.com/priority-level", Operator: "Gt", Value: "950", Effect: "NoSchedule"}}),
-			node: nodeWithTaints("nodeA", []v1.Taint{{Key: "node.example.com/priority-level", Value: "high", Effect: "NoSchedule"}}),
+			pod:  podWithTolerations("pod1", []v1.Toleration{{Key: "node.kubernetes.io/sla", Operator: "Gt", Value: "950", Effect: "NoSchedule"}}),
+			node: nodeWithTaints("nodeA", []v1.Taint{{Key: "node.kubernetes.io/sla", Value: "high", Effect: "NoSchedule"}}),
 			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable,
-				"failed to parse taint value high as int64, err: strconv.ParseInt: parsing \"high\": invalid syntax"),
+				"node(s) had untolerated taint {node.kubernetes.io/sla: high}"),
 		},
 	}
 	for _, test := range tests {

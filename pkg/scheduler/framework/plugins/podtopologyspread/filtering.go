@@ -175,12 +175,12 @@ func (pl *PodTopologySpread) RemovePod(ctx context.Context, cycleState fwk.Cycle
 	return nil
 }
 
-func (pl *PodTopologySpread) updateWithPod(s *preFilterState, updatedPod, preemptorPod *v1.Pod, node *v1.Node, delta int) *fwk.Status {
+func (pl *PodTopologySpread) updateWithPod(s *preFilterState, updatedPod, preemptorPod *v1.Pod, node *v1.Node, delta int) {
 	if s == nil || updatedPod.Namespace != preemptorPod.Namespace || node == nil {
-		return nil
+		return
 	}
 	if !nodeLabelsMatchSpreadConstraints(node.Labels, s.Constraints) {
-		return nil
+		return
 	}
 
 	requiredSchedulingTerm := nodeaffinity.GetRequiredNodeAffinity(preemptorPod)
@@ -188,7 +188,7 @@ func (pl *PodTopologySpread) updateWithPod(s *preFilterState, updatedPod, preemp
 		// spreading is applied to nodes that pass those filters.
 		// Ignore parsing errors for backwards compatibility.
 		if match, _ := requiredSchedulingTerm.Match(node); !match {
-			return nil
+			return
 		}
 	}
 
@@ -197,11 +197,9 @@ func (pl *PodTopologySpread) updateWithPod(s *preFilterState, updatedPod, preemp
 		if !constraint.Selector.Matches(podLabelSet) {
 			continue
 		}
-		isMatched, err := constraint.matchNodeInclusionPolicies(preemptorPod, node, requiredSchedulingTerm)
-		if err != nil {
-			return fwk.NewStatus(fwk.UnschedulableAndUnresolvable).WithError(err)
-		}
-		if pl.enableNodeInclusionPolicyInPodTopologySpread && !isMatched {
+
+		if pl.enableNodeInclusionPolicyInPodTopologySpread &&
+			!constraint.matchNodeInclusionPolicies(preemptorPod, node, requiredSchedulingTerm) {
 			continue
 		}
 
@@ -209,7 +207,6 @@ func (pl *PodTopologySpread) updateWithPod(s *preFilterState, updatedPod, preemp
 		s.TpValueToMatchNum[i][v] += delta
 		s.CriticalPaths[i].update(v, s.TpValueToMatchNum[i][v])
 	}
-	return nil
 }
 
 // getPreFilterState fetches a pre-computed preFilterState.
@@ -273,9 +270,8 @@ func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod,
 
 		tpCounts := make([]topologyCount, 0, len(constraints))
 		for i, c := range constraints {
-			// Ignore parsing errors for backwards compatibility.
-			isMatched, _ := c.matchNodeInclusionPolicies(pod, node, requiredNodeAffinity)
-			if pl.enableNodeInclusionPolicyInPodTopologySpread && !isMatched {
+			if pl.enableNodeInclusionPolicyInPodTopologySpread &&
+				!c.matchNodeInclusionPolicies(pod, node, requiredNodeAffinity) {
 				continue
 			}
 

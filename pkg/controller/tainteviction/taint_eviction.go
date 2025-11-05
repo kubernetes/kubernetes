@@ -455,28 +455,25 @@ func (tc *Controller) processPodOnNode(
 	tolerations []v1.Toleration,
 	taints []v1.Taint,
 	now time.Time,
-) error {
+) {
 	logger := klog.FromContext(ctx)
 	if len(taints) == 0 {
 		tc.cancelWorkWithEvent(logger, podNamespacedName)
 	}
-	allTolerated, usedTolerations, err := v1helper.GetMatchingTolerations(taints, tolerations)
-	if err != nil {
-		return err
-	}
+	allTolerated, usedTolerations := v1helper.GetMatchingTolerations(taints, tolerations)
 	if !allTolerated {
 		logger.V(2).Info("Not all taints are tolerated after update for pod on node", "pod", podNamespacedName.String(), "node", klog.KRef("", nodeName))
 		// We're canceling scheduled work (if any), as we're going to delete the Pod right away.
 		tc.cancelWorkWithEvent(logger, podNamespacedName)
 		tc.taintEvictionQueue.AddWork(ctx, NewWorkArgs(podNamespacedName.Name, podNamespacedName.Namespace), now, now)
-		return nil
+		return
 	}
 	minTolerationTime := getMinTolerationTime(usedTolerations)
 	// getMinTolerationTime returns negative value to denote infinite toleration.
 	if minTolerationTime < 0 {
 		logger.V(4).Info("Current tolerations for pod tolerate forever, cancelling any scheduled deletion", "pod", podNamespacedName.String())
 		tc.cancelWorkWithEvent(logger, podNamespacedName)
-		return nil
+		return
 	}
 
 	startTime := now
@@ -485,12 +482,11 @@ func (tc *Controller) processPodOnNode(
 	if scheduledEviction != nil {
 		startTime = scheduledEviction.CreatedAt
 		if startTime.Add(minTolerationTime).Before(triggerTime) {
-			return nil
+			return
 		}
 		tc.cancelWorkWithEvent(logger, podNamespacedName)
 	}
 	tc.taintEvictionQueue.AddWork(ctx, NewWorkArgs(podNamespacedName.Name, podNamespacedName.Namespace), startTime, triggerTime)
-	return nil
 }
 
 func (tc *Controller) handlePodUpdate(ctx context.Context, podUpdate podUpdateItem) {
@@ -531,11 +527,7 @@ func (tc *Controller) handlePodUpdate(ctx context.Context, podUpdate podUpdateIt
 	if !ok {
 		return
 	}
-	err = tc.processPodOnNode(ctx, podNamespacedName, nodeName, pod.Spec.Tolerations, taints, time.Now())
-	if err != nil {
-		logger.Error(err, "Failed to process pod on node", "nodeName", nodeName)
-		return
-	}
+	tc.processPodOnNode(ctx, podNamespacedName, nodeName, pod.Spec.Tolerations, taints, time.Now())
 }
 
 func (tc *Controller) handleNodeUpdate(ctx context.Context, nodeUpdate nodeUpdateItem) {
@@ -591,11 +583,7 @@ func (tc *Controller) handleNodeUpdate(ctx context.Context, nodeUpdate nodeUpdat
 	now := time.Now()
 	for _, pod := range pods {
 		podNamespacedName := types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}
-		err = tc.processPodOnNode(ctx, podNamespacedName, node.Name, pod.Spec.Tolerations, taints, now)
-		if err != nil {
-			logger.Error(err, "Failed to process pod on node", "node", klog.KObj(node))
-			return
-		}
+		tc.processPodOnNode(ctx, podNamespacedName, node.Name, pod.Spec.Tolerations, taints, now)
 	}
 }
 

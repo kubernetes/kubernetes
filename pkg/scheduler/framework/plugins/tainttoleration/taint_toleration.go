@@ -42,7 +42,7 @@ var _ fwk.PreScorePlugin = &TaintToleration{}
 var _ fwk.ScorePlugin = &TaintToleration{}
 var _ fwk.EnqueueExtensions = &TaintToleration{}
 
-const (
+const (errReason := fmt.Sprintf("node(s) had untolerated taint {%s: %s}", taint.Key, taint.Value)
 	// Name is the name of the plugin used in the plugin registry and configurations.
 	Name = names.TaintToleration
 	// preScoreStateKey is the key in CycleState to TaintToleration pre-computed data for Scoring.
@@ -92,16 +92,10 @@ func (pl *TaintToleration) isSchedulableAfterNodeChange(logger klog.Logger, pod 
 
 	wasUntolerated := true
 	if originalNode != nil {
-		_, wasUntolerated, err = v1helper.FindMatchingUntoleratedTaint(originalNode.Spec.Taints, pod.Spec.Tolerations, helper.DoNotScheduleTaintsFilterFunc())
-		if err != nil {
-			return fwk.Queue, err
-		}
+		_, wasUntolerated = v1helper.FindMatchingUntoleratedTaint(originalNode.Spec.Taints, pod.Spec.Tolerations, helper.DoNotScheduleTaintsFilterFunc())
 	}
 
-	_, isUntolerated, err := v1helper.FindMatchingUntoleratedTaint(modifiedNode.Spec.Taints, pod.Spec.Tolerations, helper.DoNotScheduleTaintsFilterFunc())
-	if err != nil {
-		return fwk.Queue, err
-	}
+	_, isUntolerated := v1helper.FindMatchingUntoleratedTaint(modifiedNode.Spec.Taints, pod.Spec.Tolerations, helper.DoNotScheduleTaintsFilterFunc())
 
 	if wasUntolerated && !isUntolerated {
 		logger.V(5).Info("node was created or updated, and this may make the Pod rejected by TaintToleration plugin in the previous scheduling cycle schedulable", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
@@ -115,19 +109,14 @@ func (pl *TaintToleration) isSchedulableAfterNodeChange(logger klog.Logger, pod 
 // Filter invoked at the filter extension point.
 func (pl *TaintToleration) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
 	node := nodeInfo.Node()
-	errStatus := fwk.NewStatus(fwk.UnschedulableAndUnresolvable)
-	taint, isUntolerated, err := v1helper.FindMatchingUntoleratedTaint(node.Spec.Taints, pod.Spec.Tolerations, helper.DoNotScheduleTaintsFilterFunc())
-	if err != nil {
-		errStatus.AppendReason(err.Error())
-		return errStatus
-	}
+
+	taint, isUntolerated := v1helper.FindMatchingUntoleratedTaint(node.Spec.Taints, pod.Spec.Tolerations, helper.DoNotScheduleTaintsFilterFunc())
 	if !isUntolerated {
 		return nil
 	}
 
 	klog.FromContext(ctx).V(4).Info("node had untolerated taints", "node", klog.KObj(node), "pod", klog.KObj(pod), "untoleratedTaint", taint)
-	errStatus.AppendReason("node(s) had untolerated taint(s)")
-	return errStatus
+	return errStatus.WithReason("node(s) had untolerated taint(s)")
 }
 
 // preScoreState computed at PreScore and used at Score.
@@ -176,17 +165,14 @@ func getPreScoreState(cycleState fwk.CycleState) (*preScoreState, error) {
 }
 
 // CountIntolerableTaintsPreferNoSchedule gives the count of intolerable taints of a pod with effect PreferNoSchedule
-func countIntolerableTaintsPreferNoSchedule(taints []v1.Taint, tolerations []v1.Toleration) (intolerableTaints int, err error) {
+func countIntolerableTaintsPreferNoSchedule(taints []v1.Taint, tolerations []v1.Toleration) (intolerableTaints int) {
 	for _, taint := range taints {
 		// check only on taints that have effect PreferNoSchedule
 		if taint.Effect != v1.TaintEffectPreferNoSchedule {
 			continue
 		}
-		isTolerated, err := v1helper.TolerationsTolerateTaint(tolerations, &taint)
-		if err != nil {
-			return 0, err
-		}
-		if !isTolerated {
+
+		if !v1helper.TolerationsTolerateTaint(tolerations, &taint) {
 			intolerableTaints++
 		}
 	}
@@ -202,11 +188,7 @@ func (pl *TaintToleration) Score(ctx context.Context, state fwk.CycleState, pod 
 		return 0, fwk.AsStatus(err)
 	}
 
-	count, err := countIntolerableTaintsPreferNoSchedule(node.Spec.Taints, s.tolerationsPreferNoSchedule)
-	if err != nil {
-		return 0, fwk.NewStatus(fwk.UnschedulableAndUnresolvable).WithError(err)
-	}
-	score := int64(count)
+	score := int64(countIntolerableTaintsPreferNoSchedule(node.Spec.Taints, s.tolerationsPreferNoSchedule))
 	return score, nil
 }
 

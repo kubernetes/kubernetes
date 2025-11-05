@@ -330,15 +330,8 @@ func GetReadySchedulableNodes(ctx context.Context, c clientset.Interface) (nodes
 		return nil, fmt.Errorf("listing schedulable nodes error: %w", err)
 	}
 	Filter(nodes, func(node v1.Node) bool {
-		isUntaint, err := isNodeUntainted(&node)
-		if err != nil {
-			return false
-		}
-		return IsNodeSchedulable(&node) && isUntaint
+		return IsNodeSchedulable(&node) && isNodeUntainted(&node)
 	})
-	if err != nil {
-		return nil, fmt.Errorf("filtering schedulable nodes error: %w", err)
-	}
 	if len(nodes.Items) == 0 {
 		return nil, fmt.Errorf("there are currently no ready, schedulable nodes in the cluster")
 	}
@@ -393,13 +386,13 @@ func GetReadyNodesIncludingTainted(ctx context.Context, c clientset.Interface) (
 
 // isNodeUntainted tests whether a fake pod can be scheduled on "node", given its current taints.
 // TODO: need to discuss wether to return bool and error type
-func isNodeUntainted(node *v1.Node) (bool, error) {
+func isNodeUntainted(node *v1.Node) bool {
 	return isNodeUntaintedWithNonblocking(node, "")
 }
 
 // isNodeUntaintedWithNonblocking tests whether a fake pod can be scheduled on "node"
 // but allows for taints in the list of non-blocking taints.
-func isNodeUntaintedWithNonblocking(node *v1.Node, nonblockingTaints string) (bool, error) {
+func isNodeUntaintedWithNonblocking(node *v1.Node, nonblockingTaints string) bool {
 	// Simple lookup for nonblocking taints based on comma-delimited list.
 	nonblockingTaintsMap := map[string]struct{}{}
 	for _, t := range strings.Split(nonblockingTaints, ",") {
@@ -423,7 +416,7 @@ func isNodeUntaintedWithNonblocking(node *v1.Node, nonblockingTaints string) (bo
 	return toleratesTaintsWithNoScheduleNoExecuteEffects(n.Spec.Taints, nil)
 }
 
-func toleratesTaintsWithNoScheduleNoExecuteEffects(taints []v1.Taint, tolerations []v1.Toleration) (bool, error) {
+func toleratesTaintsWithNoScheduleNoExecuteEffects(taints []v1.Taint, tolerations []v1.Toleration) bool {
 	filteredTaints := []v1.Taint{}
 	for _, taint := range taints {
 		if taint.Effect == v1.TaintEffectNoExecute || taint.Effect == v1.TaintEffectNoSchedule {
@@ -431,31 +424,23 @@ func toleratesTaintsWithNoScheduleNoExecuteEffects(taints []v1.Taint, toleration
 		}
 	}
 
-	toleratesTaint := func(taint v1.Taint) (bool, error) {
+	toleratesTaint := func(taint v1.Taint) bool {
 		for _, toleration := range tolerations {
-			isTolerated, err := toleration.ToleratesTaint(&taint)
-			if err != nil {
-				return false, err
-			}
-			if isTolerated {
-				return true, nil
+			if toleration.ToleratesTaint(&taint) {
+				return true
 			}
 		}
 
-		return false, nil
+		return false
 	}
 
 	for _, taint := range filteredTaints {
-		isTolerated, err := toleratesTaint(taint)
-		if err != nil {
-			return false, nil
-		}
-		if !isTolerated {
-			return false, nil
+		if !toleratesTaint(taint) {
+			return false
 		}
 	}
 
-	return true, nil
+	return true
 }
 
 // IsNodeSchedulable returns true if:
@@ -482,12 +467,8 @@ func IsNodeReady(node *v1.Node) bool {
 // 1) doesn't have "unschedulable" field set
 // 2) it also returns true from IsNodeReady
 // 3) it also returns true from isNodeUntainted
-func isNodeSchedulableWithoutTaints(node *v1.Node) (bool, error) {
-	isUntaint, err := isNodeUntainted(node)
-	if err != nil {
-		return false, err
-	}
-	return (isUntaint && IsNodeSchedulable(node)), nil
+func isNodeSchedulableWithoutTaints(node *v1.Node) bool {
+	return IsNodeSchedulable(node) && isNodeUntainted(node)
 }
 
 // hasNonblockingTaint returns true if the node contains at least

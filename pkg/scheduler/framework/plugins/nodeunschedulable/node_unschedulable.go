@@ -84,14 +84,10 @@ func (pl *NodeUnschedulable) isSchedulableAfterPodTolerationChange(logger klog.L
 		// - Taint can be added, but can't be modified nor removed.
 		// - If the Pod already has the toleration, it shouldn't have rejected by this plugin in the first place.
 		//   Meaning, here this Pod has been rejected by this plugin, and hence it shouldn't have the toleration yet.
-		isTolerated, err := v1helper.TolerationsTolerateTaint(modifiedPod.Spec.Tolerations, &v1.Taint{
+		if v1helper.TolerationsTolerateTaint(modifiedPod.Spec.Tolerations, &v1.Taint{
 			Key:    v1.TaintNodeUnschedulable,
 			Effect: v1.TaintEffectNoSchedule,
-		})
-		if err != nil {
-			return fwk.Queue, err
-		}
-		if isTolerated {
+		}) {
 			// This update makes the pod tolerate the unschedulable taint.
 			logger.V(5).Info("a new toleration is added for the unschedulable Pod, and it may make it schedulable", "pod", klog.KObj(modifiedPod))
 			return fwk.Queue, nil
@@ -141,15 +137,10 @@ func (pl *NodeUnschedulable) Filter(ctx context.Context, _ fwk.CycleState, pod *
 	}
 
 	// If pod tolerate unschedulable taint, it's also tolerate `node.Spec.Unschedulable`.
-	podToleratesUnschedulable, err := v1helper.TolerationsTolerateTaint(pod.Spec.Tolerations, &v1.Taint{
+	podToleratesUnschedulable := v1helper.TolerationsTolerateTaint(pod.Spec.Tolerations, &v1.Taint{
 		Key:    v1.TaintNodeUnschedulable,
 		Effect: v1.TaintEffectNoSchedule,
 	})
-	// Return UnschedulableAndUnresolvable, not error intentionally because the error from this function means a parse error,
-	// which could be solved by a toleration's value change.
-	if err != nil {
-		return fwk.NewStatus(fwk.UnschedulableAndUnresolvable).WithError(err)
-	}
 	if !podToleratesUnschedulable {
 		return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, ErrReasonUnschedulable)
 	}

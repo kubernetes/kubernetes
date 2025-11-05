@@ -17,7 +17,6 @@ limitations under the License.
 package v1
 
 import (
-	"fmt"
 	"strconv"
 )
 
@@ -42,47 +41,47 @@ func (t *Toleration) MatchToleration(tolerationToMatch *Toleration) bool {
 //     this combination means to match all taint values and all taint keys.
 //  4. If toleration.operator is 'Lt' or 'Gt', numeric comparison is performed
 //     between toleration.value and taint.value.
-func (t *Toleration) ToleratesTaint(taint *Taint) (bool, error) {
+func (t *Toleration) ToleratesTaint(taint *Taint) bool {
 	if len(t.Effect) > 0 && t.Effect != taint.Effect {
-		return false, nil
+		return false
 	}
 
 	if len(t.Key) > 0 && t.Key != taint.Key {
-		return false, nil
+		return false
 	}
 
 	// TODO: Use proper defaulting when Toleration becomes a field of PodSpec
 	switch t.Operator {
 	// empty operator means Equal
 	case "", TolerationOpEqual:
-		return t.Value == taint.Value, nil
+		return t.Value == taint.Value
 	case TolerationOpExists:
-		return true, nil
+		return true
 	case TolerationOpLt, TolerationOpGt:
 		return compareNumericValues(t.Value, taint.Value, t.Operator)
 	default:
-		return false, nil
+		return false
 	}
 }
 
 // compareNumericValues performs numeric comparison between toleration and taint values
-func compareNumericValues(tolerationVal, taintVal string, op TolerationOperator) (bool, error) {
+func compareNumericValues(tolerationVal, taintVal string, op TolerationOperator) bool {
 	tVal, err := strconv.ParseInt(tolerationVal, 10, 64)
 	if err != nil {
-		return false, fmt.Errorf("failed to parse toleration value %s as int64, err: %w", tolerationVal, err)
+		return false
 	}
 
 	tntVal, err := strconv.ParseInt(taintVal, 10, 64)
 	if err != nil {
-		return false, fmt.Errorf("failed to parse taint value %s as int64, err: %w", taintVal, err)
+		return false
 	}
 
 	switch op {
 	case TolerationOpLt:
-		return tntVal < tVal, nil
+		return tntVal < tVal
 	case TolerationOpGt:
-		return tntVal > tVal, nil
+		return tntVal > tVal
 	default:
-		return false, nil
+		return false
 	}
 }
