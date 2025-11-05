@@ -23,7 +23,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -39,13 +38,13 @@ var (
 
 	viewExample = templates.Examples(i18n.T(`
 		# View kuberc configuration in YAML format (default)
-		kubectl kuberc view
+		kubectl alpha kuberc view
 
 		# View kuberc configuration in JSON format
-		kubectl kuberc view --output json
+		kubectl alpha kuberc view --output json
 
 		# View a specific kuberc file
-		kubectl kuberc view --kuberc /path/to/kuberc`))
+		kubectl alpha kuberc view --kuberc /path/to/kuberc`))
 )
 
 // ViewOptions contains the options for viewing kuberc configuration
@@ -104,15 +103,15 @@ func (o *ViewOptions) Complete(cmd *cobra.Command) error {
 
 // Validate validates the ViewOptions
 func (o *ViewOptions) Validate() error {
+	if o.KubeRCFile == "" {
+		return fmt.Errorf("KUBERC is disabled via KUBERC=off environment variable")
+	}
+
 	return nil
 }
 
 // Run executes the view command
 func (o *ViewOptions) Run() error {
-	if o.KubeRCFile == "" {
-		return fmt.Errorf("KUBERC is disabled via KUBERC=off environment variable")
-	}
-
 	data, err := os.ReadFile(o.KubeRCFile)
 	if err != nil {
 		if !os.IsNotExist(err) {
@@ -130,33 +129,8 @@ func (o *ViewOptions) Run() error {
 		}
 
 		if strings.EqualFold(input, "y") {
-			pref := &v1beta1.Preference{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: "kubectl.config.k8s.io/v1beta1",
-					Kind:       "Preference",
-				},
-				Defaults: []v1beta1.CommandDefaults{
-					{
-						Command: "apply",
-						Options: []v1beta1.CommandOptionDefault{
-							{
-								Name:    "server-side",
-								Default: "true",
-							},
-						},
-					},
-					{
-						Command: "delete",
-						Options: []v1beta1.CommandOptionDefault{
-							{
-								Name:    "interactive",
-								Default: "true",
-							},
-						},
-					},
-				},
-			}
-			return SavePreference(pref, o.KubeRCFile, o.Out)
+			pref := kuberc.CreateDefaultPreference()
+			return kuberc.SavePreference(pref, o.KubeRCFile, o.Out)
 		}
 	}
 

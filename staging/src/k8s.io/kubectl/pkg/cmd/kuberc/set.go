@@ -78,6 +78,8 @@ type SetOptions struct {
 	AppendArgs  []string
 	Overwrite   bool
 
+	preferences kuberc.PreferencesHandler
+
 	genericiooptions.IOStreams
 }
 
@@ -87,6 +89,7 @@ func NewSetOptions(ioStreams genericiooptions.IOStreams) *SetOptions {
 		Options:     []string{},
 		PrependArgs: []string{},
 		AppendArgs:  []string{},
+		preferences: kuberc.NewPreferences(),
 	}
 }
 
@@ -107,7 +110,7 @@ func NewCmdKubeRCSet(streams genericiooptions.IOStreams) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&o.KubeRCFile, "file", o.KubeRCFile, "Path to the kuberc file to modify. If it is not specified, default kuberc location will be used.")
+	o.preferences.AddFlags(cmd.Flags())
 	cmd.Flags().StringVar(&o.Section, "section", o.Section, "Section to modify: 'defaults' or 'aliases'")
 	cmd.MarkFlagRequired("section") // nolint:errcheck
 	cmd.Flags().StringVar(&o.Command, "command", o.Command, "Command to configure (e.g., 'get', 'create', 'set env')")
@@ -123,6 +126,10 @@ func NewCmdKubeRCSet(streams genericiooptions.IOStreams) *cobra.Command {
 
 // Complete sets default values for SetOptions
 func (o *SetOptions) Complete(cmd *cobra.Command) error {
+	if cmd.Flags().Changed("kuberc") {
+		o.KubeRCFile = cmd.Flag("kuberc").Value.String()
+	}
+
 	kubeRCFile, _, err := kuberc.LoadKuberc(o.KubeRCFile)
 	if err != nil {
 		return err
@@ -179,7 +186,7 @@ func (o *SetOptions) Run() error {
 		return err
 	}
 
-	return SavePreference(pref, o.KubeRCFile, o.Out)
+	return kuberc.SavePreference(pref, o.KubeRCFile, o.Out)
 }
 
 // loadOrCreatePreference loads existing preference or creates a new one

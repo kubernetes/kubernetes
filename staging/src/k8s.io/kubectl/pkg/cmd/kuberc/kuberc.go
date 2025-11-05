@@ -17,15 +17,7 @@ limitations under the License.
 package kuberc
 
 import (
-	"fmt"
-	"io"
-	"os"
-	"path/filepath"
-
 	"github.com/spf13/cobra"
-	"k8s.io/kubectl/pkg/config/v1beta1"
-	"sigs.k8s.io/yaml"
-
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
@@ -64,24 +56,4 @@ func NewCmdKubeRC(streams genericiooptions.IOStreams) *cobra.Command {
 	cmd.AddCommand(NewCmdKubeRCSet(streams))
 
 	return cmd
-}
-
-// SavePreference saves the preference to the kuberc file
-func SavePreference(pref *v1beta1.Preference, file string, out io.Writer) error {
-	dir := filepath.Dir(file)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return fmt.Errorf("failed to create directory %s: %w", dir, err)
-	}
-
-	data, err := yaml.Marshal(pref)
-	if err != nil {
-		return fmt.Errorf("failed to marshal preferences: %w", err)
-	}
-
-	if err := os.WriteFile(file, data, 0644); err != nil {
-		return fmt.Errorf("failed to write kuberc file: %w", err)
-	}
-
-	fmt.Fprintf(out, "Updated %s\n", file) // nolint:errcheck
-	return nil
 }
