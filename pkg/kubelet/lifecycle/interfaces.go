@@ -16,7 +16,7 @@ limitations under the License.
 
 package lifecycle
 
-import "k8s.io/api/core/v1"
+import v1 "k8s.io/api/core/v1"
 
 // PodAdmitAttributes is the context for a pod admission decision.
 // The member fields of this struct should never be mutated.
@@ -25,7 +25,19 @@ type PodAdmitAttributes struct {
 	Pod *v1.Pod
 	// all pods bound to the kubelet excluding the pod being evaluated
 	OtherPods []*v1.Pod
+	// the operation being performed; either "add" or "resize"
+	Operation Operation
 }
+
+// Operation represents the type of operation being performed on a pod.
+type Operation string
+
+const (
+	// AddOperation indicates that the pod is being added to the kubelet.
+	AddOperation Operation = "create"
+	// ResizeOperation indicates that the pod is being resized.
+	ResizeOperation Operation = "resize"
+)
 
 // PodAdmitResult provides the result of a pod admission decision.
 type PodAdmitResult struct {
