@@ -494,3 +494,5 @@ func (*VsphereVirtualDiskVolumeSource) ProtoMessage() {}
 func (*WeightedPodAffinityTerm) ProtoMessage() {}
 
 func (*WindowsSecurityContextOptions) ProtoMessage() {}
+
+func (*WorkloadReference) ProtoMessage() {}
