@@ -334,6 +334,7 @@ func newTestKubeletWithImageList(
 		kubelet.GetActivePods,
 		kubelet.podManager.GetPodByUID,
 		config.NewSourcesReady(func(_ sets.Set[string]) bool { return enableResizing }),
+		kubelet.recorder,
 	)
 	kubelet.allocationManager.SetContainerRuntime(fakeRuntime)
 	volumeStatsAggPeriod := time.Second * 10
@@ -3811,18 +3812,24 @@ func TestSyncPodWithErrorsDuringInPlacePodResize(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
+	kubelet.recorder = record.NewFakeRecorder(20)
 
 	pod := podWithUIDNameNsSpec("12345678", "foo", "new", v1.PodSpec{
 		Containers: []v1.Container{
 			{Name: "bar"},
 		},
 	})
+	pod.Generation = 2
+	kubelet.podManager.SetPods([]*v1.Pod{pod})
+	kubelet.statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", 1)
 
 	testCases := []struct {
 		name                     string
 		syncResults              *kubecontainer.PodSyncResult
+		podResizeInProgress      bool
 		expectedErr              string
 		expectedResizeConditions []*v1.PodCondition
+		expectedEvent            string
 	}{
 		{
 			name: "pod resize error returned from the runtime",
@@ -3834,13 +3841,16 @@ func TestSyncPodWithErrorsDuringInPlacePodResize(t *testing.T) {
 					Message: "could not resize pod",
 				}},
 			},
-			expectedErr: "failed to \"ResizePodInPlace\" for \"12345678\" with ResizePodInPlaceError: \"could not resize pod\"",
+			podResizeInProgress: true,
+			expectedErr:         "failed to \"ResizePodInPlace\" for \"12345678\" with ResizePodInPlaceError: \"could not resize pod\"",
 			expectedResizeConditions: []*v1.PodCondition{{
-				Type:    v1.PodResizeInProgress,
-				Status:  v1.ConditionTrue,
-				Reason:  v1.PodReasonError,
-				Message: "could not resize pod",
+				Type:               v1.PodResizeInProgress,
+				Status:             v1.ConditionTrue,
+				Reason:             v1.PodReasonError,
+				Message:            "could not resize pod",
+				ObservedGeneration: 1,
 			}},
+			expectedEvent: "Warning ResizeError Pod resize error: {\"containers\":[{\"name\":\"bar\",\"resources\":{}}],\"generation\":1,\"error\":\"could not resize pod\"}",
 		},
 		{
 			name: "pod resize error cleared upon successful run",
@@ -3851,6 +3861,7 @@ func TestSyncPodWithErrorsDuringInPlacePodResize(t *testing.T) {
 				}},
 			},
 			expectedResizeConditions: nil,
+			expectedEvent:            "Normal ResizeCompleted Pod resize completed: {\"containers\":[{\"name\":\"bar\",\"resources\":{}}],\"generation\":1}",
 		},
 		{
 			name: "sync results have a non-resize error",
@@ -3889,7 +3900,7 @@ func TestSyncPodWithErrorsDuringInPlacePodResize(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			testKubelet.fakeRuntime.SyncResults = tc.syncResults
-			kubelet.podManager.SetPods([]*v1.Pod{pod})
+			testKubelet.fakeRuntime.PodResizeInProgress = tc.podResizeInProgress
 			isTerminal, err := kubelet.SyncPod(context.Background(), kubetypes.SyncPodUpdate, pod, nil, &kubecontainer.PodStatus{})
 			require.False(t, isTerminal)
 			if tc.expectedErr == "" {
@@ -3905,6 +3916,20 @@ func TestSyncPodWithErrorsDuringInPlacePodResize(t *testing.T) {
 				c.LastTransitionTime = metav1.Time{}
 			}
 			require.Equal(t, tc.expectedResizeConditions, gotResizeConditions)
+
+			fakeRecorder := kubelet.recorder.(*record.FakeRecorder)
+			found := false
+			for len(fakeRecorder.Events) > 0 {
+				event := <-fakeRecorder.Events
+				if event == tc.expectedEvent {
+					found = true
+				} else if strings.Contains(event, "Resize") {
+					t.Errorf("Received unexpected resize event: %q", event)
+				}
+			}
+			if tc.expectedEvent != "" {
+				require.True(t, found, "Expected event %q not found", tc.expectedEvent)
+			}
 		})
 	}
 }

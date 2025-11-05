@@ -37,6 +37,8 @@ const (
 	ResizeDeferred                 = "ResizeDeferred"
 	ResizeInfeasible               = "ResizeInfeasible"
 	ResizeCompleted                = "ResizeCompleted"
+	ResizeStarted                  = "ResizeStarted"
+	ResizeError                    = "ResizeError"
 )
 
 // Image event reason list
