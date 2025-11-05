@@ -102,7 +102,8 @@ func SetupRegistry(ctx context.Context, f *framework.Framework, podOnly bool) (s
 		podNodes = append(podNodes, pod.Spec.NodeName)
 	}
 
-	return "localhost:5000", podNodes, nil
+	// returning the IPv4 form here, IPv6 is causing issues in node-conformance on dual-stack
+	return "127.0.0.1:5000", podNodes, nil
 }
 
 func podManifest(podTestLabel string) (*v1.Pod, error) {
