@@ -141,5 +141,12 @@ done
 grep -r image: hostpath/hostpath/csi-hostpath-plugin.yaml | while read -r image; do
     version=$(echo "$image" | sed -e 's/.*:\(.*\)/\1/')
     image=$(echo "$image" | sed -e 's/.*image: \([^:]*\).*/\1/')
-    sed -i '' -e "s;$image:.*;$image:$version;" mock/*.yaml
+
+    if sed --version >/dev/null 2>&1; then
+        # GNU sed, `-i ''` fails
+        sed -i -e "s;$image:.*;$image:$version;" mock/*.yaml
+    else
+        # BSD sed (macOS)
+        sed -i '' -e "s;$image:.*;$image:$version;" mock/*.yaml
+    fi
 done
