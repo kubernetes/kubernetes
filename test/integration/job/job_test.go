@@ -4614,6 +4614,118 @@ func TestDelayedJobUpdateEvent(t *testing.T) {
 
 }
 
+// TestMutableSchedulingDirectivesForSuspendedJobs verifies that scheduling directives
+// can be mutated when the feature is enabled for a suspended JOb.
+func TestMutableSchedulingDirectivesForSuspendedJobs(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.MutableSchedulingDirectivesForSuspendedJobs, true)
+
+	closeFn, restConfig, clientSet, ns := setup(t, "mutable-scheduling-directives-for-suspended-jobs")
+	t.Cleanup(closeFn)
+	ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
+	t.Cleanup(cancel)
+
+	job, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
+		Spec: batchv1.JobSpec{
+			Parallelism: ptr.To[int32](1),
+			Completions: ptr.To[int32](2),
+			Suspend:     ptr.To(false),
+		},
+	})
+	if err != nil {
+		t.Fatalf("Failed to create Job: %v", err)
+	}
+
+	// await for the Job to be running and the status.startTime set
+	validateJobsPodsStatusOnly(ctx, t, clientSet, job, podsByStatus{
+		Active:      1,
+		Ready:       ptr.To[int32](0),
+		Terminating: ptr.To[int32](0),
+	})
+
+	job, err = clientSet.BatchV1().Jobs(ns.Name).Get(ctx, job.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to get Job: %v", err)
+	}
+	if job.Status.StartTime == nil {
+		t.Fatalf("Job startTime was not set")
+	}
+
+	// verify an update to an unsuspended Job would fail
+	jobCopy := job.DeepCopy()
+	jobCopy.Spec.Template.Spec.NodeSelector = map[string]string{
+		"key": "value",
+	}
+
+	_, err = clientSet.BatchV1().Jobs(job.Namespace).Update(ctx, jobCopy, metav1.UpdateOptions{})
+	if err == nil {
+		t.Fatalf("update of scheduling directives succeeded for unsuspended job %s", klog.KObj(jobCopy))
+	}
+
+	// suspend the Job
+	job.Spec.Suspend = ptr.To(true)
+	job, err = clientSet.BatchV1().Jobs(ns.Name).Update(ctx, job, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to suspend Job: %v", err)
+	}
+
+	// await for the Job to have no active Pods and have the JobSuspended condition
+	validateJobsPodsStatusOnly(ctx, t, clientSet, job, podsByStatus{
+		Active:      0,
+		Ready:       ptr.To[int32](0),
+		Terminating: ptr.To[int32](0),
+	})
+
+	job, err = clientSet.BatchV1().Jobs(ns.Name).Get(ctx, job.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to get Job: %v", err)
+	}
+
+	if job.Status.StartTime != nil {
+		t.Fatalf("Job startTime was not cleaned")
+	}
+
+	if getJobConditionStatus(ctx, job, batchv1.JobSuspended) != v1.ConditionTrue {
+		t.Fatalf("JobSuspended condition was not set to True")
+	}
+
+	// since the Job is suspended the update is now accepted
+	job.Spec.Template.Spec.NodeSelector = map[string]string{
+		"key": "value",
+	}
+
+	job, err = clientSet.BatchV1().Jobs(job.Namespace).Update(ctx, job, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("update of scheduling directives failed for suspended job %s", klog.KObj(job))
+	}
+
+	// resume the Job again and the Pods get created
+	job.Spec.Suspend = ptr.To(false)
+	job, err = clientSet.BatchV1().Jobs(ns.Name).Update(ctx, job, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to resume Job: %v", err)
+	}
+
+	// await for the Job to be running again and assert on the status
+	validateJobsPodsStatusOnly(ctx, t, clientSet, job, podsByStatus{
+		Active:      1,
+		Ready:       ptr.To[int32](0),
+		Terminating: ptr.To[int32](0),
+	})
+
+	job, err = clientSet.BatchV1().Jobs(ns.Name).Get(ctx, job.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to get Job: %v", err)
+	}
+
+	if getJobConditionStatus(ctx, job, batchv1.JobSuspended) != v1.ConditionFalse {
+		t.Error("JobSuspended condition was not set to False")
+	}
+
+	if job.Status.StartTime == nil {
+		t.Error("Job startTime was not set after resume")
+	}
+}
+
 type podsByStatus struct {
 	Active      int
 	Ready       *int32

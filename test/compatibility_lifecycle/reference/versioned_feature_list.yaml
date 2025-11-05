@@ -1061,6 +1061,12 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.35"
+- name: MutableSchedulingDirectivesForSuspendedJobs
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.35"
 - name: MutatingAdmissionPolicy
   versionedSpecs:
   - default: false
