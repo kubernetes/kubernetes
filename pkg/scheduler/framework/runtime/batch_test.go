@@ -180,7 +180,7 @@ func newTestNodes(n []string) *testSortedScoredNodes {
 }
 
 func newTestSigFunc(sig *string) PodSignatureFunc {
-	return func(p *v1.Pod) string {
+	return func(h fwk.Handle, ctx context.Context, p *v1.Pod) string {
 		return *sig
 	}
 }

@@ -335,7 +335,7 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.OpportunisticBatching) {
-		f.batch = newOpportunisticBatch(f, noBatchSignatures)
+		f.batch = newOpportunisticBatch(f, signUsingFramework)
 	}
 
 	if len(f.extenders) > 0 {
@@ -809,6 +809,12 @@ func (f *frameworkImpl) computeBatchablePlugins() error {
 func (f *frameworkImpl) SignPod(ctx context.Context, pod *v1.Pod) (string, *fwk.Status) {
 	logger := klog.FromContext(ctx)
 
+	startTime := time.Now()
+	var status *fwk.Status
+	defer func() {
+		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.Sign, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
+	}()
+
 	if !f.enableSignatures {
 		return fwk.Unsignable, nil
 	}
@@ -834,12 +840,10 @@ func (f *frameworkImpl) SignPod(ctx context.Context, pod *v1.Pod) (string, *fwk.
 		}
 	}
 
-	startTime := time.Now()
 	sigBytes, err := json.Marshal(sig)
 	if err != nil {
 		return "", fwk.AsStatus(fmt.Errorf("error marshalling signature object %w", err))
 	}
-	f.metricsRecorder.ObservePluginDurationAsync(metrics.Sign, "_Json", "Success", metrics.SinceInSeconds(startTime))
 
 	return string(sigBytes), nil
 }
