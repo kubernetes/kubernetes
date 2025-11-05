@@ -3151,10 +3151,10 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 
 // mockDeviceClassResolver is a simple mock implementation of fwk.DeviceClassResolver for testing
 type mockDeviceClassResolver struct {
-	mapping map[v1.ResourceName]string
+	mapping map[v1.ResourceName]*resourceapi.DeviceClass
 }
 
-func (m *mockDeviceClassResolver) GetDeviceClass(resourceName v1.ResourceName) string {
+func (m *mockDeviceClassResolver) GetDeviceClass(resourceName v1.ResourceName) *resourceapi.DeviceClass {
 	return m.mapping[resourceName]
 }
 
@@ -3197,16 +3197,36 @@ func Test_createDeviceRequests(t *testing.T) {
 		v1.ResourceName(extendedResourceName):          1,
 		v1.ResourceName(extendedResourceName + "init"): 2,
 	}
-	devMap := map[v1.ResourceName]string{
-		v1.ResourceName(extendedResourceName): "class",
+	devMap := map[v1.ResourceName]*resourceapi.DeviceClass{
+		v1.ResourceName(extendedResourceName): {
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "class",
+			},
+		},
 	}
-	devMap2 := map[v1.ResourceName]string{
-		v1.ResourceName(extendedResourceName):       "class",
-		v1.ResourceName(extendedResourceName + "1"): "class1",
+	devMap2 := map[v1.ResourceName]*resourceapi.DeviceClass{
+		v1.ResourceName(extendedResourceName): {
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "class",
+			},
+		},
+		v1.ResourceName(extendedResourceName + "1"): {
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "class1",
+			},
+		},
 	}
-	devMapInit := map[v1.ResourceName]string{
-		v1.ResourceName(extendedResourceName):          "class",
-		v1.ResourceName(extendedResourceName + "init"): "classInit",
+	devMapInit := map[v1.ResourceName]*resourceapi.DeviceClass{
+		v1.ResourceName(extendedResourceName): {
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "class",
+			},
+		},
+		v1.ResourceName(extendedResourceName + "init"): {
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "classInit",
+			},
+		},
 	}
 	devReq := resourceapi.DeviceRequest{
 		Name: "container-0-request-0",

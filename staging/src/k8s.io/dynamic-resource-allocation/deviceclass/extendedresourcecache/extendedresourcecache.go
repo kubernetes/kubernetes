@@ -17,6 +17,7 @@ limitations under the License.
 package extendedresourcecache
 
 import (
+	"cmp"
 	"fmt"
 	"sync"
 
@@ -34,8 +35,8 @@ type ExtendedResourceCache struct {
 	handlers []cache.ResourceEventHandler
 
 	mutex sync.RWMutex
-	// mapping maps extended resource name to device class name
-	mapping map[v1.ResourceName]string
+	// mapping maps extended resource name to device class
+	mapping map[v1.ResourceName]*resourceapi.DeviceClass
 }
 
 var _ cache.ResourceEventHandler = &ExtendedResourceCache{}
@@ -48,7 +49,7 @@ func NewExtendedResourceCache(logger klog.Logger, handlers ...cache.ResourceEven
 	cache := &ExtendedResourceCache{
 		logger:   logger,
 		handlers: handlers,
-		mapping:  make(map[v1.ResourceName]string),
+		mapping:  make(map[v1.ResourceName]*resourceapi.DeviceClass),
 	}
 
 	return cache
@@ -65,14 +66,14 @@ func (c *ExtendedResourceCache) AddEventHandler(handler cache.ResourceEventHandl
 	c.handlers = append(c.handlers, handler)
 }
 
-// GetDeviceClass returns the device class name for the given extended resource name.
-// Returns empty string if the resource name is not found in the cache.
+// GetDeviceClass returns the device class for the given extended resource name.
+// Returns nil if the resource name is not found in the cache.
 //
 // This (and only this) method may be called on a nil ExtendedResourceCache. The nil
-// instance always returns the empty string.
-func (c *ExtendedResourceCache) GetDeviceClass(resourceName v1.ResourceName) string {
+// instance always returns nil.
+func (c *ExtendedResourceCache) GetDeviceClass(resourceName v1.ResourceName) *resourceapi.DeviceClass {
 	if c == nil {
-		return ""
+		return nil
 	}
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
@@ -139,6 +140,34 @@ func (c *ExtendedResourceCache) updateMapping(newDeviceClass, oldDeviceClass *re
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
+	// Different DeviceClasses could specify the same ExtendedResourceName.
+	// If we find such a clash, we need to pick one of them.
+	//
+	// Such a clash should be rare, but can occur while migrating from one
+	// DeviceClass to another. To support such a migration, we prefer the
+	// newer DeviceClass. The name serves as tie-breaker.
+	//
+	// The implicit deviceclass.resource.kubernetes.io/<class name> is always
+	// unique and also cannot appear in a different class as ExtendedResourceName
+	// (prevented by validation), so we don't need to do the same check for
+	// implicit mappings.
+	var classWithSameExtendedResourceName *resourceapi.DeviceClass
+	if newDeviceClass.Spec.ExtendedResourceName != nil {
+		classWithSameExtendedResourceName = c.mapping[v1.ResourceName(*newDeviceClass.Spec.ExtendedResourceName)]
+	}
+	if classWithSameExtendedResourceName != nil {
+		switch cmp.Compare(newDeviceClass.CreationTimestamp.UnixNano(), classWithSameExtendedResourceName.CreationTimestamp.UnixNano()) {
+		case -1:
+			// New class is older, keep the current more recent one.
+			return
+		case 0:
+			// Equal, arbitrarily prefer "lower" name.
+			if newDeviceClass.Name >= classWithSameExtendedResourceName.Name {
+				return
+			}
+		}
+	}
+
 	// Remove old mappings first to handle ExtendedResourceName changes
 	if oldDeviceClass != nil {
 		delete(c.mapping, v1.ResourceName(resourceapi.ResourceDeviceClassPrefix+oldDeviceClass.Name))
@@ -149,14 +178,14 @@ func (c *ExtendedResourceCache) updateMapping(newDeviceClass, oldDeviceClass *re
 
 	// Add new mappings
 	if newDeviceClass.Spec.ExtendedResourceName != nil {
-		c.mapping[v1.ResourceName(*newDeviceClass.Spec.ExtendedResourceName)] = newDeviceClass.Name
+		c.mapping[v1.ResourceName(*newDeviceClass.Spec.ExtendedResourceName)] = newDeviceClass
 		c.logger.V(5).Info("Updated extended resource cache for explicit mapping",
 			"extendedResource", *newDeviceClass.Spec.ExtendedResourceName,
 			"deviceClass", newDeviceClass.Name)
 	}
 	// Always add the default mapping
 	defaultResourceName := v1.ResourceName(resourceapi.ResourceDeviceClassPrefix + newDeviceClass.Name)
-	c.mapping[defaultResourceName] = newDeviceClass.Name
+	c.mapping[defaultResourceName] = newDeviceClass
 	c.logger.V(5).Info("Updated extended resource cache for default mapping",
 		"extendedResource", defaultResourceName,
 		"deviceClass", newDeviceClass.Name)

@@ -51,7 +51,6 @@ type DefaultDRAManager struct {
 
 func NewDRAManager(ctx context.Context, claimsCache *assumecache.AssumeCache, resourceSliceTracker *resourceslicetracker.Tracker, informerFactory informers.SharedInformerFactory) *DefaultDRAManager {
 	logger := klog.FromContext(ctx)
-
 	manager := &DefaultDRAManager{
 		resourceClaimTracker: &claimTracker{
 			cache:               claimsCache,
@@ -91,7 +90,7 @@ func (s *DefaultDRAManager) DeviceClasses() fwk.DeviceClassLister {
 // disabled.
 //
 // That's okay, extendedresourcecache.ExtendedResourceCache.GetDeviceClass
-// returns the empty string if called for nil.
+// returns nil if called for nil.
 func (s *DefaultDRAManager) DeviceClassResolver() fwk.DeviceClassResolver {
 	return s.extendedResourceCache
 }
