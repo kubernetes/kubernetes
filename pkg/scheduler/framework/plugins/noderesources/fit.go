@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
+	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -35,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
+	"k8s.io/utils/ptr"
 )
 
 var _ fwk.PreFilterPlugin = &Fit{}
@@ -314,10 +316,16 @@ func (f *Fit) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, e
 		nodeActionType = fwk.Add | fwk.UpdateNodeAllocatable
 	}
 
-	return []fwk.ClusterEventWithHint{
+	events := []fwk.ClusterEventWithHint{
 		{Event: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: podActionType}, QueueingHintFn: f.isSchedulableAfterPodEvent},
 		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: nodeActionType}, QueueingHintFn: f.isSchedulableAfterNodeChange},
-	}, nil
+	}
+	if f.enableDRAExtendedResource {
+		events = append(events,
+			// A pod might be waiting for an exteneded resurce from a class to get created or modified.
+			fwk.ClusterEventWithHint{Event: fwk.ClusterEvent{Resource: fwk.DeviceClass, ActionType: fwk.Add | fwk.Update}, QueueingHintFn: f.isSchedulableAfterDeviceClassEvent})
+	}
+	return events, nil
 }
 
 // isSchedulableAfterPodEvent is invoked whenever a pod deleted or scaled down. It checks whether
@@ -425,6 +433,7 @@ func (f *Fit) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1.Pod, oldO
 		EnablePodLevelResources:   f.enablePodLevelResources,
 		EnableDRAExtendedResource: f.enableDRAExtendedResource,
 	}
+
 	// Leaving in the queue, since the pod won't fit into the modified node anyway.
 	if !isFit(pod, modifiedNode, draManager, opts) {
 		logger.V(5).Info("node was created or updated, but it doesn't have enough resource(s) to accommodate this pod", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
@@ -443,6 +452,37 @@ func (f *Fit) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1.Pod, oldO
 
 	logger.V(5).Info("node was updated, and may now fit the pod's resource requests", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
 	return fwk.Queue, nil
+}
+
+// isSchedulableAfterDeviceClassChange is invoked whenever a device class added or changed. It checks whether
+// that change could make a previously unschedulable pod schedulable.
+func (f *Fit) isSchedulableAfterDeviceClassEvent(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+	originalClass, modifiedClass, err := schedutil.As[*resourceapi.DeviceClass](oldObj, newObj)
+	if err != nil {
+		return fwk.Queue, err
+	}
+	if originalClass != nil {
+		if ptr.Deref(originalClass.Spec.ExtendedResourceName, "") == ptr.Deref(modifiedClass.Spec.ExtendedResourceName, "") {
+			logger.V(5).Info("device class has identical extended resource name", "pod", klog.KObj(pod), "deviceclass", klog.KObj(modifiedClass))
+			return fwk.QueueSkip, nil
+		}
+	} else {
+		// only check implicit extended resource name for Add, as device class name does not change during Update.
+		reqs := resource.PodRequests(pod, resource.PodResourcesOptions{})
+		if _, ok := reqs[v1.ResourceName(resourceapi.ResourceDeviceClassPrefix+modifiedClass.Name)]; ok {
+			logger.V(5).Info("device class was added, and may now fit the pod's resource requests", "pod", klog.KObj(pod), "deviceclass", klog.KObj(modifiedClass))
+			return fwk.Queue, nil
+		}
+	}
+	if modifiedClass.Spec.ExtendedResourceName != nil {
+		reqs := resource.PodRequests(pod, resource.PodResourcesOptions{})
+		if _, ok := reqs[v1.ResourceName(*modifiedClass.Spec.ExtendedResourceName)]; ok {
+			logger.V(5).Info("device class was created or updated, and may fit the pod's resoruce requests", "pod", klog.KObj(pod), "deviceclass", klog.KObj(modifiedClass))
+			return fwk.Queue, nil
+		}
+	}
+	logger.V(5).Info("created or updated deivce class extended resource name is either nil, or does not match pod's resource request", "pod", klog.KObj(pod), "deviceclass", klog.KObj(modifiedClass))
+	return fwk.QueueSkip, nil
 }
 
 // haveAnyRequestedResourcesIncreased returns true if any of the resources requested by the pod have increased or if allowed pod number increased.
