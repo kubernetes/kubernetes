@@ -62,6 +62,10 @@ type Store interface {
 	// will be used to get the latest resource version of the store.
 	ObserveResourceVersion(rv string)
 
+	// PauseObservingResourceVersion will pause observing the internal resource
+	// version until an ObserveResourceVersion call occurs.
+	PauseObservingResourceVersion()
+
 	// Get returns the accumulator associated with the given object's key
 	Get(obj interface{}) (item interface{}, exists bool, err error)
 
@@ -299,12 +303,22 @@ func (c *cache) ListKeys() []string {
 	return c.cacheStorage.ListKeys()
 }
 
+// GetObservedResourceVersion gets the storage's newest observed resource
+// version.
 func (c *cache) GetObservedResourceVersion() string {
 	return c.cacheStorage.GetObservedResourceVersion()
 }
 
+// ObserveResourceVersion observes a new resource version, updating it in the
+// store.
 func (c *cache) ObserveResourceVersion(rv string) {
 	c.cacheStorage.ObserveResourceVersion(rv)
+}
+
+// PauseObservingResourceVersion will pause observing the internal resource
+// version until an ObserveResourceVersion call occurs.
+func (c *cache) PauseObservingResourceVersion() {
+	c.cacheStorage.PauseObservingResourceVersion()
 }
 
 // GetIndexers returns the indexers of cache

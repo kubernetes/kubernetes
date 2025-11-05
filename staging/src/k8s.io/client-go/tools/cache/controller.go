@@ -613,7 +613,10 @@ func processDeltas(
 		obj := d.Object
 
 		switch d.Type {
-		case Sync, Replaced, Added, Updated:
+		case Replaced:
+			clientState.PauseObservingResourceVersion()
+			fallthrough
+		case Sync, Added, Updated:
 			if old, exists, err := clientState.Get(obj); err == nil && exists {
 				if err := clientState.Update(obj); err != nil {
 					return err
@@ -635,6 +638,7 @@ func processDeltas(
 			if !ok {
 				return fmt.Errorf("bookmark delta did not contain string: %T", obj)
 			}
+			clientState.ObserveResourceVersion(resourceVersion)
 			handler.OnBookmark(resourceVersion)
 		}
 	}
@@ -676,7 +680,12 @@ func processDeltasInBatch(
 	for _, d := range deltas {
 		obj := d.Object
 		switch d.Type {
-		case Sync, Replaced, Added, Updated:
+		case Replaced:
+			callbacks = append(callbacks, func() {
+				clientState.PauseObservingResourceVersion()
+			})
+			fallthrough
+		case Sync, Added, Updated:
 			// it will only return one old object for each because items are unique
 			if old, exists, err := clientState.Get(obj); err == nil && exists {
 				txn := Transaction{
@@ -705,6 +714,15 @@ func processDeltasInBatch(
 			txns = append(txns, txn)
 			callbacks = append(callbacks, func() {
 				handler.OnDelete(obj)
+			})
+		case Bookmark:
+			resourceVersion, ok := obj.(string)
+			if !ok {
+				return fmt.Errorf("bookmark delta did not contain string: %T", obj)
+			}
+			callbacks = append(callbacks, func() {
+				clientState.ObserveResourceVersion(resourceVersion)
+				handler.OnBookmark(resourceVersion)
 			})
 		}
 	}

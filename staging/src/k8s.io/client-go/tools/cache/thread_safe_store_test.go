@@ -179,6 +179,7 @@ func TestThreadSafeStoreRV(t *testing.T) {
 
 	t.Run("Add Update and Delete", func(t *testing.T) {
 		store := NewThreadSafeStore(Indexers{}, Indices{}).(*threadSafeMap)
+		store.processRV = true
 
 		// Add obj with RV "10"
 		store.Add("key1", &metav1.ObjectMeta{ResourceVersion: "10"})
@@ -267,10 +268,28 @@ func TestThreadSafeStoreRV(t *testing.T) {
 		if rv := store.GetObservedResourceVersion(); rv != "50" {
 			t.Errorf("Expected RV to be \"50\" after transaction, got %q", rv)
 		}
+
+		// Pause RV update
+		store.PauseObservingResourceVersion()
+		store.Update("key11", &metav1.ObjectMeta{ResourceVersion: "60"})
+		store.DeleteWithObject("key12", &metav1.ObjectMeta{ResourceVersion: "70"})
+		if rv := store.GetObservedResourceVersion(); rv != "50" {
+			t.Errorf("Expected RV to remain \"50\" after updating because we are paused, got %q", rv)
+		}
+		store.ObserveResourceVersion("80")
+		if rv := store.GetObservedResourceVersion(); rv != "80" {
+			t.Errorf("Expected RV to be updated to \"80\" because we physically observed it, got %q", rv)
+		}
+		store.Update("key13", &metav1.ObjectMeta{ResourceVersion: "90"})
+		if rv := store.GetObservedResourceVersion(); rv != "90" {
+			t.Errorf("Expected RV to be updated to \"90\" after updating because we should be unpaused after observing, got %q", rv)
+		}
 	})
 
 	t.Run("Replace", func(t *testing.T) {
 		store := NewThreadSafeStore(Indexers{}, Indices{}).(*threadSafeMap)
+		store.processRV = true
+
 		store.Add("key1", &metav1.ObjectMeta{ResourceVersion: "10"})
 
 		if rv := store.GetObservedResourceVersion(); rv != "10" {
@@ -291,6 +310,8 @@ func TestThreadSafeStoreRV(t *testing.T) {
 
 	t.Run("Delete", func(t *testing.T) {
 		store := NewThreadSafeStore(Indexers{}, Indices{}).(*threadSafeMap)
+		store.processRV = true
+
 		store.Add("key1", &metav1.ObjectMeta{ResourceVersion: "10"})
 
 		if rv := store.GetObservedResourceVersion(); rv != "10" {
@@ -306,6 +327,7 @@ func TestThreadSafeStoreRV(t *testing.T) {
 
 	t.Run("Concurrency", func(t *testing.T) {
 		store := NewThreadSafeStore(Indexers{}, Indices{}).(*threadSafeMap)
+		store.processRV = true
 
 		var wg sync.WaitGroup
 		numWriters := 50
@@ -340,6 +362,7 @@ func TestThreadSafeStoreRV(t *testing.T) {
 			t.Errorf("Expected final RV to be %q after concurrent access, got %q", expectedRV, rv)
 		}
 	})
+
 }
 
 func BenchmarkIndexer(b *testing.B) {
