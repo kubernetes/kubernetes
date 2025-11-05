@@ -134,7 +134,7 @@ func (cache *healthInfoCache) getHealthInfo(driverName, poolName, deviceName str
 				if timeout == 0 {
 					timeout = DefaultHealthTimeout
 				}
-				
+
 				// Check if device health has timed out
 				if now.Sub(device.LastUpdated) > timeout {
 					res = state.DeviceHealthStatusUnknown
@@ -173,7 +173,7 @@ func (cache *healthInfoCache) updateHealthInfo(driverName string, devices []stat
 
 			existingDevice, ok := currentDriver.Devices[key]
 
-			if !ok || existingDevice.Health != reportedDevice.Health {
+			if !ok || existingDevice.Health != reportedDevice.Health || existingDevice.HealthCheckTimeout != reportedDevice.HealthCheckTimeout {
 				changedDevices = append(changedDevices, reportedDevice)
 			}
 
@@ -190,7 +190,7 @@ func (cache *healthInfoCache) updateHealthInfo(driverName string, devices []stat
 				if timeout == 0 {
 					timeout = DefaultHealthTimeout
 				}
-				
+
 				// Mark as unknown if the device health has timed out
 				if existingDevice.Health != state.DeviceHealthStatusUnknown && now.Sub(existingDevice.LastUpdated) > timeout {
 					existingDevice.Health = state.DeviceHealthStatusUnknown
