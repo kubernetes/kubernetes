@@ -31,6 +31,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	flagzv1alpha1 "k8s.io/apiserver/pkg/server/flagz/api/v1alpha1"
 	"k8s.io/apiserver/pkg/server/statusz/api/v1alpha1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/util/retry"
@@ -43,10 +44,6 @@ import (
 )
 
 func TestEndpointHandlers(t *testing.T) {
-	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.ComponentFlagz: true,
-	})
-
 	server, configStr, _, err := startTestAPIServer(t)
 	if err != nil {
 		t.Fatalf("Failed to start kube-apiserver server: %v", err)
@@ -125,16 +122,6 @@ func TestEndpointHandlers(t *testing.T) {
 			path:             "/readyz",
 			useBrokenConfig:  true,
 			wantResponseCode: http.StatusInternalServerError,
-		},
-		{
-			name:             "/flagz",
-			path:             "/flagz",
-			requestHeader:    map[string]string{"Accept": "text/plain"},
-			wantResponseCode: http.StatusOK,
-			wantResponseBodyRegx: `^\n` +
-				`kube-scheduler flags\n` +
-				`Warning: This endpoint is not meant to be machine parseable, ` +
-				`has no formatting compatibility guarantees and is for debugging purposes only.`,
 		},
 	}
 
@@ -217,9 +204,10 @@ func TestEndpointHandlers(t *testing.T) {
 	}
 }
 
-func TestSchedulerStatusz(t *testing.T) {
+func TestSchedulerZPages(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 		features.ComponentStatusz: true,
+		features.ComponentFlagz:   true,
 	})
 
 	server, configStr, _, err := startTestAPIServer(t)
@@ -242,7 +230,7 @@ func TestSchedulerStatusz(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	result, err := kubeschedulertesting.StartTestServer(
 		t, ctx,
-		[]string{"--kubeconfig", apiserverConfig.Name(), "--leader-elect=false", "--authorization-always-allow-paths=/statusz"},
+		[]string{"--kubeconfig", apiserverConfig.Name(), "--leader-elect=false", "--authorization-always-allow-paths=/statusz,/flagz"},
 	)
 	if err != nil {
 		t.Fatalf("Failed to start kube-scheduler server: %v", err)
@@ -256,8 +244,8 @@ func TestSchedulerStatusz(t *testing.T) {
 		t.Fatalf("Failed to get client from test server: %v", err)
 	}
 
-	wantBodyStr := "kube-scheduler statusz\nWarning: This endpoint is not meant to be machine parseable"
-	wantBodyJSON := &v1alpha1.Statusz{
+	statuszWantBodyStr := "kube-scheduler statusz\nWarning: This endpoint is not meant to be machine parseable"
+	statuszWantBodyJSON := &v1alpha1.Statusz{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Statusz",
 			APIVersion: "config.k8s.io/v1alpha1",
@@ -265,10 +253,21 @@ func TestSchedulerStatusz(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "kube-scheduler",
 		},
-		Paths: []string{"/configz", "/healthz", "/livez", "/metrics", "/readyz"},
+		Paths: []string{"/configz", "/flagz", "/healthz", "/livez", "/metrics", "/readyz"},
 	}
 
-	for _, tc := range []struct {
+	flagzWantBodyStr := "kube-scheduler flagz\nWarning: This endpoint is not meant to be machine parseable"
+	flagzWantBodyJSON := &flagzv1alpha1.Flagz{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Flagz",
+			APIVersion: "config.k8s.io/v1alpha1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "kube-scheduler",
+		},
+	}
+
+	statuszTestCases := []struct {
 		name         string
 		acceptHeader string
 		wantStatus   int
@@ -279,19 +278,19 @@ func TestSchedulerStatusz(t *testing.T) {
 			name:         "text plain response",
 			acceptHeader: "text/plain",
 			wantStatus:   http.StatusOK,
-			wantBodySub:  wantBodyStr,
+			wantBodySub:  statuszWantBodyStr,
 		},
 		{
 			name:         "structured json response",
 			acceptHeader: "application/json;v=v1alpha1;g=config.k8s.io;as=Statusz",
 			wantStatus:   http.StatusOK,
-			wantJSON:     wantBodyJSON,
+			wantJSON:     statuszWantBodyJSON,
 		},
 		{
 			name:         "no accept header (defaults to text)",
 			acceptHeader: "",
 			wantStatus:   http.StatusOK,
-			wantBodySub:  wantBodyStr,
+			wantBodySub:  statuszWantBodyStr,
 		},
 		{
 			name:         "invalid accept header",
@@ -312,16 +311,72 @@ func TestSchedulerStatusz(t *testing.T) {
 			name:         "wildcard accept header",
 			acceptHeader: "*/*",
 			wantStatus:   http.StatusOK,
-			wantBodySub:  wantBodyStr,
+			wantBodySub:  statuszWantBodyStr,
 		},
 		{
 			name:         "bad json header fall back wildcard",
 			acceptHeader: "application/json;v=foo;g=config.k8s.io;as=Statusz,*/*",
 			wantStatus:   http.StatusOK,
-			wantBodySub:  wantBodyStr,
+			wantBodySub:  statuszWantBodyStr,
 		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
+	}
+
+	flagzTestCases := []struct {
+		name         string
+		acceptHeader string
+		wantStatus   int
+		wantBodySub  string               // for text/plain
+		wantJSON     *flagzv1alpha1.Flagz // for structured json
+	}{
+		{
+			name:         "text plain response",
+			acceptHeader: "text/plain",
+			wantStatus:   http.StatusOK,
+			wantBodySub:  flagzWantBodyStr,
+		},
+		{
+			name:         "structured json response",
+			acceptHeader: "application/json;v=v1alpha1;g=config.k8s.io;as=Flagz",
+			wantStatus:   http.StatusOK,
+			wantJSON:     flagzWantBodyJSON,
+		},
+		{
+			name:         "no accept header (defaults to text)",
+			acceptHeader: "",
+			wantStatus:   http.StatusOK,
+			wantBodySub:  flagzWantBodyStr,
+		},
+		{
+			name:         "invalid accept header",
+			acceptHeader: "application/xml",
+			wantStatus:   http.StatusNotAcceptable,
+		},
+		{
+			name:         "application/json without params",
+			acceptHeader: "application/json",
+			wantStatus:   http.StatusNotAcceptable,
+		},
+		{
+			name:         "application/json with missing as",
+			acceptHeader: "application/json;v=v1alpha1;g=config.k8s.io",
+			wantStatus:   http.StatusNotAcceptable,
+		},
+		{
+			name:         "wildcard accept header",
+			acceptHeader: "*/*",
+			wantStatus:   http.StatusOK,
+			wantBodySub:  flagzWantBodyStr,
+		},
+		{
+			name:         "bad json header fall back wildcard",
+			acceptHeader: "application/json;v=foo;g=config.k8s.io;as=Flagz,*/*",
+			wantStatus:   http.StatusOK,
+			wantBodySub:  flagzWantBodyStr,
+		},
+	}
+
+	for _, tc := range statuszTestCases {
+		t.Run("statusz_"+tc.name, func(t *testing.T) {
 			req, err := http.NewRequest(http.MethodGet, base+"/statusz", nil)
 			if err != nil {
 				t.Fatalf("failed to request: %v", err)
@@ -366,6 +421,55 @@ func TestSchedulerStatusz(t *testing.T) {
 					}
 					if diff := cmp.Diff(tc.wantJSON.Paths, got.Paths); diff != "" {
 						t.Errorf("Paths mismatch (-want,+got):\n%s", diff)
+					}
+				}
+			}
+		})
+	}
+
+	for _, tc := range flagzTestCases {
+		t.Run("flagz_"+tc.name, func(t *testing.T) {
+			req, err := http.NewRequest(http.MethodGet, base+"/flagz", nil)
+			if err != nil {
+				t.Fatalf("failed to request: %v", err)
+			}
+
+			req.Header.Set("Accept", tc.acceptHeader)
+			r, err := client.Do(req)
+			if err != nil {
+				t.Fatalf("failed to GET /flagz: %v", err)
+			}
+
+			body, err := io.ReadAll(r.Body)
+			if err != nil {
+				t.Fatalf("failed to read response body: %v", err)
+			}
+
+			if err = r.Body.Close(); err != nil {
+				t.Fatalf("failed to close response body: %v", err)
+			}
+
+			if r.StatusCode != tc.wantStatus {
+				t.Fatalf("want status %d, got %d", tc.wantStatus, r.StatusCode)
+			}
+
+			if tc.wantStatus == http.StatusOK {
+				if tc.wantBodySub != "" {
+					if !strings.Contains(string(body), tc.wantBodySub) {
+						t.Errorf("body missing expected substring: %q\nGot:\n%s", tc.wantBodySub, string(body))
+					}
+				}
+				if tc.wantJSON != nil {
+					var got flagzv1alpha1.Flagz
+					if err := json.Unmarshal(body, &got); err != nil {
+						t.Fatalf("error unmarshalling JSON: %v", err)
+					}
+					// Only check static fields, since others are dynamic
+					if got.TypeMeta != tc.wantJSON.TypeMeta {
+						t.Errorf("TypeMeta mismatch: want %+v, got %+v", tc.wantJSON.TypeMeta, got.TypeMeta)
+					}
+					if got.ObjectMeta.Name != tc.wantJSON.ObjectMeta.Name {
+						t.Errorf("ObjectMeta.Name mismatch: want %q, got %q", tc.wantJSON.ObjectMeta.Name, got.ObjectMeta.Name)
 					}
 				}
 			}
