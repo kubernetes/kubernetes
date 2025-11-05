@@ -212,7 +212,6 @@ func describerMap(clientConfig *rest.Config) (map[schema.GroupKind]ResourceDescr
 		{Group: autoscalingv2.GroupName, Kind: "HorizontalPodAutoscaler"}:    &HorizontalPodAutoscalerDescriber{c},
 		{Group: extensionsv1beta1.GroupName, Kind: "Ingress"}:                &IngressDescriber{c},
 		{Group: networkingv1beta1.GroupName, Kind: "Ingress"}:                &IngressDescriber{c},
-		{Group: networkingv1beta1.GroupName, Kind: "IngressClass"}:           &IngressClassDescriber{c},
 		{Group: networkingv1.GroupName, Kind: "Ingress"}:                     &IngressDescriber{c},
 		{Group: networkingv1.GroupName, Kind: "IngressClass"}:                &IngressClassDescriber{c},
 		{Group: networkingv1beta1.GroupName, Kind: "ServiceCIDR"}:            &ServiceCIDRDescriber{c},
@@ -2820,45 +2819,14 @@ type IngressClassDescriber struct {
 
 func (i *IngressClassDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	var events *corev1.EventList
-	// try IngressClass/v1 first (v1.19) and fallback to IngressClass/v1beta if an err occurs
 	netV1, err := i.client.NetworkingV1().IngressClasses().Get(context.TODO(), name, metav1.GetOptions{})
-	if err == nil {
-		if describerSettings.ShowEvents {
-			events, _ = searchEvents(i.client.CoreV1(), netV1, describerSettings.ChunkSize)
-		}
-		return i.describeIngressClassV1(netV1, events)
+	if err != nil {
+		return "", err
 	}
-	netV1beta1, err := i.client.NetworkingV1beta1().IngressClasses().Get(context.TODO(), name, metav1.GetOptions{})
-	if err == nil {
-		if describerSettings.ShowEvents {
-			events, _ = searchEvents(i.client.CoreV1(), netV1beta1, describerSettings.ChunkSize)
-		}
-		return i.describeIngressClassV1beta1(netV1beta1, events)
+	if describerSettings.ShowEvents {
+		events, _ = searchEvents(i.client.CoreV1(), netV1, describerSettings.ChunkSize)
 	}
-	return "", err
-}
-
-func (i *IngressClassDescriber) describeIngressClassV1beta1(ic *networkingv1beta1.IngressClass, events *corev1.EventList) (string, error) {
-	return tabbedString(func(out io.Writer) error {
-		w := NewPrefixWriter(out)
-		w.Write(LEVEL_0, "Name:\t%s\n", ic.Name)
-		printLabelsMultiline(w, "Labels", ic.Labels)
-		printAnnotationsMultiline(w, "Annotations", ic.Annotations)
-		w.Write(LEVEL_0, "Controller:\t%v\n", ic.Spec.Controller)
-
-		if ic.Spec.Parameters != nil {
-			w.Write(LEVEL_0, "Parameters:\n")
-			if ic.Spec.Parameters.APIGroup != nil {
-				w.Write(LEVEL_1, "APIGroup:\t%v\n", *ic.Spec.Parameters.APIGroup)
-			}
-			w.Write(LEVEL_1, "Kind:\t%v\n", ic.Spec.Parameters.Kind)
-			w.Write(LEVEL_1, "Name:\t%v\n", ic.Spec.Parameters.Name)
-		}
-		if events != nil {
-			DescribeEvents(events, w)
-		}
-		return nil
-	})
+	return i.describeIngressClassV1(netV1, events)
 }
 
 func (i *IngressClassDescriber) describeIngressClassV1(ic *networkingv1.IngressClass, events *corev1.EventList) (string, error) {
