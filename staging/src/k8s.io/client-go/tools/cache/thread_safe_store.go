@@ -56,6 +56,7 @@ type ThreadSafeStore interface {
 	IndexKeys(indexName, indexedValue string) ([]string, error)
 	ObserveResourceVersion(rv string)
 	GetObservedResourceVersion() string
+	PauseObservingResourceVersion()
 	ListIndexFuncValues(name string) []string
 	ByIndex(indexName, indexedValue string) ([]interface{}, error)
 	GetIndexers() Indexers
@@ -247,8 +248,9 @@ type threadSafeMap struct {
 	items map[string]interface{}
 
 	// index implements the indexing functionality
-	index *storeIndex
-	rv    string
+	index     *storeIndex
+	rv        string
+	processRV bool
 }
 
 func (c *threadSafeMap) Transaction(txns ...ThreadSafeStoreTransaction) {
@@ -263,7 +265,7 @@ func (c *threadSafeMap) Transaction(txns ...ThreadSafeStoreTransaction) {
 		if txn.Object != nil {
 			rv, rvErr := c.rvFromObject(txn.Object)
 			if rvErr == nil {
-				c.raiseRV(rv)
+				c.raiseRVLocked(rv)
 			}
 		}
 
@@ -291,7 +293,7 @@ func (c *threadSafeMap) Update(key string, obj interface{}) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	if rvErr == nil {
-		c.raiseRV(rv)
+		c.raiseRVLocked(rv)
 	}
 	c.updateLocked(key, obj)
 }
@@ -315,7 +317,7 @@ func (c *threadSafeMap) DeleteWithObject(key string, obj interface{}) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	if obj != nil && rvErr == nil {
-		c.raiseRV(rv)
+		c.raiseRVLocked(rv)
 	}
 	c.deleteLocked(key)
 }
@@ -383,9 +385,12 @@ func (c *threadSafeMap) rvFromObject(obj interface{}) (rv string, err error) {
 	return rv, nil
 }
 
-// raiseRV updates the threadSafeMaps RV if and only if it is greater than
+// raiseRVLocked updates the threadSafeMaps RV if and only if it is greater than
 // the currently stored RV.
-func (c *threadSafeMap) raiseRV(rv string) {
+func (c *threadSafeMap) raiseRVLocked(rv string) {
+	if !c.processRV {
+		return
+	}
 	if c.rv == "" {
 		c.rv = rv
 		return
@@ -424,10 +429,12 @@ func (c *threadSafeMap) GetObservedResourceVersion() string {
 	return c.rv
 }
 
-// ObserveResourceVersion sets the latest resource version that the store has seen.
+// ObserveResourceVersion sets the latest resource version that the store has
+// seen. It also unpauses processing of resource versions.
 func (c *threadSafeMap) ObserveResourceVersion(rv string) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
+	c.processRV = true
 	if c.rv == "" {
 		_, err := resourceversion.CompareResourceVersion(rv, rv)
 		if err == nil {
@@ -442,6 +449,15 @@ func (c *threadSafeMap) ObserveResourceVersion(rv string) {
 	if cmp < 0 {
 		c.rv = rv
 	}
+
+}
+
+// PauseObservingResourceVersion pauses updating the resource version through
+// internal calls.
+func (c *threadSafeMap) PauseObservingResourceVersion() {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	c.processRV = false
 }
 
 // ByIndex returns a list of the items whose indexed values in the given index include the given indexed value
