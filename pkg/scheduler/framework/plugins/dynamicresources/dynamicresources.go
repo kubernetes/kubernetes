@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"iter"
 	"slices"
 	"sort"
 	"strings"
@@ -52,6 +53,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
@@ -207,6 +209,7 @@ var _ fwk.PreEnqueuePlugin = &DynamicResources{}
 var _ fwk.PreFilterPlugin = &DynamicResources{}
 var _ fwk.FilterPlugin = &DynamicResources{}
 var _ fwk.PostFilterPlugin = &DynamicResources{}
+var _ fwk.ScorePlugin = &DynamicResources{}
 var _ fwk.ReservePlugin = &DynamicResources{}
 var _ fwk.EnqueueExtensions = &DynamicResources{}
 var _ fwk.PreBindPlugin = &DynamicResources{}
@@ -1073,6 +1076,76 @@ func (pl *DynamicResources) PostFilter(ctx context.Context, cs fwk.CycleState, p
 		return nil, fwk.NewStatus(fwk.Unschedulable, "deletion of ResourceClaim completed")
 	}
 	return nil, fwk.NewStatus(fwk.Unschedulable, "still not schedulable")
+}
+
+func (pl *DynamicResources) Score(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) (int64, *fwk.Status) {
+	if !pl.enabled {
+		return 0, nil
+	}
+	logger := klog.FromContext(ctx)
+
+	state, err := getStateData(cs)
+	if err != nil {
+		return 0, statusError(logger, err)
+	}
+
+	// If there are no claims, no need to do anything.
+	if state.claims.empty() {
+		return 0, nil
+	}
+
+	allocations, found := state.nodeAllocations[nodeInfo.Node().Name]
+	if !found {
+		return 0, nil
+	}
+
+	score, err := computeScore(state.claims.all(), allocations)
+	if err != nil {
+		return 0, statusError(logger, err)
+	}
+	return score, nil
+}
+
+func computeScore(iterator iter.Seq2[int, *resourceapi.ResourceClaim], allocations nodeAllocation) (int64, error) {
+	var score int64
+	for i, claim := range iterator {
+		// Collect the names for all allocated subrequests.
+		allocatedSubRequests := sets.New[string]()
+		if i >= len(allocations.allocationResults) {
+			return 0, fmt.Errorf("number of allocations %d is smaller than number of claims", len(allocations.allocationResults))
+		}
+		allocation := allocations.allocationResults[i]
+		for _, res := range allocation.Devices.Results {
+			request := res.Request
+			if resourceclaim.IsSubRequestRef(request) {
+				allocatedSubRequests.Insert(request)
+			}
+		}
+
+		for _, req := range claim.Spec.Devices.Requests {
+			if req.Exactly != nil {
+				continue
+			}
+			for i, subReq := range req.FirstAvailable {
+				subRequestRef := resourceclaim.CreateSubRequestRef(req.Name, subReq.Name)
+				if allocatedSubRequests.Has(subRequestRef) {
+					score += int64(resourceapi.FirstAvailableDeviceRequestMaxSize - i)
+				}
+			}
+		}
+	}
+	return score, nil
+}
+
+func (pl *DynamicResources) ScoreExtensions() fwk.ScoreExtensions {
+	return pl
+}
+
+func (pl *DynamicResources) NormalizeScore(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, scores fwk.NodeScoreList) *fwk.Status {
+	if !pl.enabled {
+		return nil
+	}
+	return helper.DefaultNormalizeScore(fwk.MaxNodeScore, false, scores)
 }
 
 // Reserve reserves claims for the pod.
