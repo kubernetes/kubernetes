@@ -1885,6 +1885,12 @@
     lockToDefault: false
     preRelease: GA
     version: "1.34"
+- name: VolumeLimitScaling
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.35"
 - name: WatchCacheInitializationPostStartHook
   versionedSpecs:
   - default: false

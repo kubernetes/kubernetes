@@ -19,6 +19,7 @@ package framework
 import (
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/dynamic-resource-allocation/structured"
@@ -47,6 +48,13 @@ type StorageInfoLister interface {
 type SharedLister interface {
 	NodeInfos() NodeInfoLister
 	StorageInfos() StorageInfoLister
+}
+
+type CSINodeLister interface {
+	// List returns a list of all CSINodes.
+	List() ([]*storagev1.CSINode, error)
+	// Get returns the CSINode with the given name.
+	Get(name string) (*storagev1.CSINode, error)
 }
 
 // ResourceSliceLister can be used to obtain ResourceSlices.
@@ -126,4 +134,12 @@ type SharedDRAManager interface {
 	ResourceSlices() ResourceSliceLister
 	DeviceClasses() DeviceClassLister
 	DeviceClassResolver() DeviceClassResolver
+}
+
+// CSIManager can be used to obtain CSINode objects, and track changes to CSINode objects in-memory.
+// The plugin's default implementation obtains the objects from the API. A different implementation can be
+// plugged into the framework in order to simulate the state of CSINode objects. For example, Cluster Autoscaler
+// can use this to provide the correct CSINode object state to the CSINode plugin when simulating scheduling changes in-memory.
+type CSIManager interface {
+	CSINodes() CSINodeLister
 }
