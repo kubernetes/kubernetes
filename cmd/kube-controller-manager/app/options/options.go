@@ -155,6 +155,7 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 		},
 		DeviceTaintEvictionController: &DeviceTaintEvictionControllerOptions{
 			&componentConfig.DeviceTaintEvictionController,
+		},
 		ResourceClaimController: &ResourceClaimControllerOptions{
 			&componentConfig.ResourceClaimController,
 		},
@@ -351,6 +352,8 @@ func (s *KubeControllerManagerOptions) ApplyTo(c *kubecontrollerconfig.Config, a
 		return err
 	}
 	if err := s.DeviceTaintEvictionController.ApplyTo(&c.ComponentConfig.DeviceTaintEvictionController); err != nil {
+		return err
+	}
 	if err := s.ResourceClaimController.ApplyTo(&c.ComponentConfig.ResourceClaimController); err != nil {
 		return err
 	}
