@@ -23,9 +23,27 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/core"
 )
+
+func addConversionFuncs(scheme *runtime.Scheme) error {
+	// Add field label conversions for ReplicaSet.
+	// Fixes https://github.com/kubernetes/kubernetes/issues/135136
+	if err := scheme.AddFieldLabelConversionFunc(SchemeGroupVersion.WithKind("ReplicaSet"),
+		func(label, value string) (string, string, error) {
+			switch label {
+			case "metadata.name", "metadata.namespace", "status.replicas":
+				return label, value, nil
+			default:
+				return "", "", fmt.Errorf("field label not supported for apps/v1.ReplicaSet: %s", label)
+			}
+		}); err != nil {
+		return err
+	}
+	return nil
+}
 
 // Convert_apps_DeploymentSpec_To_v1_DeploymentSpec is defined here, because public
 // conversion is not auto-generated due to existing warnings.
@@ -64,8 +82,6 @@ func Convert_apps_Deployment_To_v1_Deployment(in *apps.Deployment, out *appsv1.D
 		return err
 	}
 
-	out.Annotations = deepCopyStringMap(out.Annotations) // deep copy because we modify it below
-
 	// Copy deprecated rollbackTo field to annotation for roundtrip
 	// TODO: remove this conversion after we delete extensions/v1beta1 and apps/v1beta1 Deployment
 	if in.Spec.RollbackTo != nil {
@@ -80,27 +96,8 @@ func Convert_apps_Deployment_To_v1_Deployment(in *apps.Deployment, out *appsv1.D
 	return nil
 }
 
-func Convert_apps_DaemonSet_To_v1_DaemonSet(in *apps.DaemonSet, out *appsv1.DaemonSet, s conversion.Scope) error {
-	if err := autoConvert_apps_DaemonSet_To_v1_DaemonSet(in, out, s); err != nil {
-		return err
-	}
-
-	out.Annotations = deepCopyStringMap(out.Annotations) // deep copy annotations because we change them below
-	out.Annotations[appsv1.DeprecatedTemplateGeneration] = strconv.FormatInt(in.Spec.TemplateGeneration, 10)
-	return nil
-}
-
-// Convert_apps_DaemonSetSpec_To_v1_DaemonSetSpec is defined here, because public
-// conversion is not auto-generated due to existing warnings.
 func Convert_apps_DaemonSetSpec_To_v1_DaemonSetSpec(in *apps.DaemonSetSpec, out *appsv1.DaemonSetSpec, s conversion.Scope) error {
 	if err := autoConvert_apps_DaemonSetSpec_To_v1_DaemonSetSpec(in, out, s); err != nil {
-		return err
-	}
-	return nil
-}
-
-func Convert_v1_DaemonSet_To_apps_DaemonSet(in *appsv1.DaemonSet, out *apps.DaemonSet, s conversion.Scope) error {
-	if err := autoConvert_v1_DaemonSet_To_apps_DaemonSet(in, out, s); err != nil {
 		return err
 	}
 	if value, ok := in.Annotations[appsv1.DeprecatedTemplateGeneration]; ok {
@@ -112,6 +109,7 @@ func Convert_v1_DaemonSet_To_apps_DaemonSet(in *appsv1.DaemonSet, out *apps.Daem
 			delete(out.Annotations, appsv1.DeprecatedTemplateGeneration)
 		}
 	}
+
 	return nil
 }
 
@@ -141,6 +139,7 @@ func Convert_v1_StatefulSetSpec_To_apps_StatefulSetSpec(in *appsv1.StatefulSetSp
 			out.VolumeClaimTemplates[i].Kind = ""
 		}
 	}
+
 	return nil
 }
 
@@ -162,5 +161,6 @@ func Convert_apps_StatefulSetSpec_To_v1_StatefulSetSpec(in *apps.StatefulSetSpec
 			out.VolumeClaimTemplates[i].Kind = "PersistentVolumeClaim"
 		}
 	}
+
 	return nil
 }
