@@ -1332,7 +1332,15 @@ func RunBenchmarkPerfScheduling(b *testing.B, configFile string, topicName strin
 			}
 		})
 	}
-	if err := dataItems2JSONFile(dataItems, strings.ReplaceAll(b.Name(), "/", "_")+"_benchmark_"+topicName); err != nil {
+	// Different top-level BenchmarkPerfScheduling* tests are supported as long as they use unique topic names.
+	// The final JSON file then is always called BenchmarkPerfScheduling_benchmark_<topic name>_<date+time>.json
+	// because that is what perf-dash is configured to read:
+	// https://github.com/kubernetes/perf-tests/blob/581139e45e79cf04b9c2777b82677957f1e7f90b/perfdash/config.go#L520-L525
+	namePrefix := b.Name()
+	namePrefix = regexp.MustCompile(`^BenchmarkPerfScheduling[^/]*`).ReplaceAllString(namePrefix, "BenchmarkPerfScheduling")
+	namePrefix = strings.ReplaceAll(namePrefix, "/", "_")
+	namePrefix += "_benchmark_" + topicName
+	if err := dataItems2JSONFile(dataItems, namePrefix); err != nil {
 		b.Fatalf("unable to write measured data %+v: %v", dataItems, err)
 	}
 }
