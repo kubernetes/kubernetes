@@ -526,6 +526,10 @@ type QueuedPodInfo struct {
 	// That's why we need to distinguish ConsecutiveErrorsCount for the error status and UnschedulableCount for the unschedulable status.
 	// See https://github.com/kubernetes/kubernetes/issues/128744 for the discussion.
 	ConsecutiveErrorsCount int
+	// FlushedFromUnschedulableAt tracks when this pod was last flushed from unschedulablePods
+	// due to timeout. This is used to detect if the pod becomes schedulable soon after flush,
+	// which may indicate missing queue hint optimizations or event handling bugs.
+	FlushedFromUnschedulableAt *time.Time
 	// The time when the pod is added to the queue for the first time. The pod may be added
 	// back to the queue multiple times before it's successfully scheduled.
 	// It shouldn't be updated once initialized. It's used to record the e2e scheduling

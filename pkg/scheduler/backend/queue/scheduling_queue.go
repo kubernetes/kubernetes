@@ -948,6 +948,8 @@ func (p *PriorityQueue) flushUnschedulablePodsLeftover(logger klog.Logger) {
 	for _, pInfo := range p.unschedulablePods.podInfoMap {
 		lastScheduleTime := pInfo.Timestamp
 		if currentTime.Sub(lastScheduleTime) > p.podMaxInUnschedulablePodsDuration {
+			// Mark this pod as flushed so we can detect if it schedules soon after
+			pInfo.FlushedFromUnschedulableAt = &currentTime
 			podsToMove = append(podsToMove, pInfo)
 		}
 	}
