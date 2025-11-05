@@ -66,9 +66,9 @@ func Validate_StorageClass(ctx context.Context, op operation.Operation, fldPath 
 
 	// field storagev1beta1.StorageClass.Provisioner
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call field-attached validations
@@ -81,7 +81,7 @@ func Validate_StorageClass(ctx context.Context, op operation.Operation, fldPath 
 				return // do not proceed
 			}
 			return
-		}(fldPath.Child("provisioner"), &obj.Provisioner, safe.Field(oldObj, func(oldObj *storagev1beta1.StorageClass) *string { return &oldObj.Provisioner }))...)
+		}(fldPath.Child("provisioner"), &obj.Provisioner, safe.Field(oldObj, func(oldObj *storagev1beta1.StorageClass) *string { return &oldObj.Provisioner }), oldObj != nil)...)
 
 	// field storagev1beta1.StorageClass.Parameters has no validation
 	// field storagev1beta1.StorageClass.ReclaimPolicy has no validation
@@ -100,15 +100,15 @@ func Validate_StorageClassList(ctx context.Context, op operation.Operation, fldP
 
 	// field storagev1beta1.StorageClassList.Items
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []storagev1beta1.StorageClass) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj []storagev1beta1.StorageClass, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
 			// iterate the list and call the type's validation function
 			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_StorageClass)...)
 			return
-		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *storagev1beta1.StorageClassList) []storagev1beta1.StorageClass { return oldObj.Items }))...)
+		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *storagev1beta1.StorageClassList) []storagev1beta1.StorageClass { return oldObj.Items }), oldObj != nil)...)
 
 	return errs
 }
