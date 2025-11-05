@@ -24,6 +24,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -48,6 +49,7 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
+	"k8s.io/kubernetes/test/e2e/storage/utils"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -795,4 +797,19 @@ func trimSpaceNewlineInString(s string) string {
 	s = re.ReplaceAllString(s, "")
 	// Replace spaces to account for cases like "\r\n " that could lead to false negatives
 	return strings.ReplaceAll(s, " ", "")
+}
+
+func pidOfKubelet(ctx context.Context, hostExec utils.HostExec, node *v1.Node) int {
+	cmd := "pidof kubelet"
+	kubeletPid, err := hostExec.IssueCommandWithResult(ctx, cmd, node)
+	framework.ExpectNoError(err, "Checking kubelet pid")
+	framework.Logf("pidof kubelet returns %s", kubeletPid)
+	// In rare cases in the CI, we are seeing two pids for kubelet.
+	// We did some investigating and the last entry of this list is the one that we want
+	// Higher pids are more likely to be created after the first one
+	kubeletPids := strings.Split(strings.TrimSuffix(kubeletPid, "\n"), " ")
+	kubeletPidChosen := kubeletPids[len(kubeletPids)-1]
+	pid, err := strconv.Atoi(kubeletPidChosen)
+	framework.ExpectNoError(err, "Converting kubelet pid to int")
+	return pid
 }
