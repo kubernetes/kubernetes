@@ -2523,14 +2523,15 @@
   file: test/e2e/node/pods.go
 - testname: Pods Generation, 500 updates
   codename: '[sig-node] Pods Extended (pod generation) Pod Generation issue 500 podspec
-    updates and verify generation and observedGeneration eventually converge [Conformance]'
+    updates and verify generation and observedGeneration eventually converge [MinimumKubeletVersion:1.34]
+    [Conformance]'
   description: Create a Pod, issue 499 podSpec updates and verify generation and observedGeneration
     eventually converge to 500.
   release: v1.35
   file: test/e2e/node/pods.go
 - testname: Pods Generation, updates
   codename: '[sig-node] Pods Extended (pod generation) Pod Generation pod generation
-    should start at 1 and increment per update [Conformance]'
+    should start at 1 and increment per update [MinimumKubeletVersion:1.34] [Conformance]'
   description: Create a Pod, and perform a few updates, ensuring that the pod's metadata.generation
     and status.observedGeneration are updated as expected.
   release: v1.35

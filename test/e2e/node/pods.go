@@ -434,7 +434,7 @@ var _ = SIGDescribe("Pods Extended (pod generation)", func() {
 			Testname: Pods Generation, updates
 			Description: Create a Pod, and perform a few updates, ensuring that the pod's metadata.generation and status.observedGeneration are updated as expected.
 		*/
-		framework.ConformanceIt("pod generation should start at 1 and increment per update", func(ctx context.Context) {
+		framework.ConformanceIt("pod generation should start at 1 and increment per update [MinimumKubeletVersion:1.34]", func(ctx context.Context) {
 			ginkgo.By("creating the pod")
 			podName := "pod-generation-" + string(uuid.NewUUID())
 			pod := e2epod.NewAgnhostPod(f.Namespace.Name, podName, nil, nil, nil)
@@ -580,7 +580,7 @@ var _ = SIGDescribe("Pods Extended (pod generation)", func() {
 			Testname: Pods Generation, 500 updates
 			Description: Create a Pod, issue 499 podSpec updates and verify generation and observedGeneration eventually converge to 500.
 		*/
-		framework.ConformanceIt("issue 500 podspec updates and verify generation and observedGeneration eventually converge", func(ctx context.Context) {
+		framework.ConformanceIt("issue 500 podspec updates and verify generation and observedGeneration eventually converge [MinimumKubeletVersion:1.34]", func(ctx context.Context) {
 			ginkgo.By("creating the pod")
 			name := "pod-generation-" + string(uuid.NewUUID())
 			value := strconv.Itoa(time.Now().Nanosecond())
