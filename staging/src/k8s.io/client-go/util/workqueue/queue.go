@@ -19,8 +19,10 @@ package workqueue
 import (
 	"sync"
 	"time"
+	"context"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+    "k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 )
 
@@ -330,6 +332,7 @@ func (q *Typed[T]) ShuttingDown() bool {
 	return q.shuttingDown
 }
 
+// Contextual logging: updateUnfinishedWorkLoopWithContext should be used instead of updateUnfinishedWorkLoop
 func (q *Typed[T]) updateUnfinishedWorkLoop() {
 	t := q.clock.NewTicker(q.unfinishedWorkUpdatePeriod)
 	defer t.Stop()
@@ -347,4 +350,28 @@ func (q *Typed[T]) updateUnfinishedWorkLoop() {
 			return
 		}
 	}
+}
+
+func (q *Typed[T]) updateUnfinishedWorkLoopWithContext(ctx context.Context) {
+    logger := klog.FromContext(ctx)
+    logger.V(4).Info("Starting updateUnfinishedWorkLoopWithContext", "queue", q.metrics.queueName)
+
+    t := q.clock.NewTicker(q.unfinishedWorkUpdatePeriod)
+    defer t.Stop()
+
+    for {
+        select {
+        case <-ctx.Done():
+            logger.V(4).Info("Stopping updateUnfinishedWorkLoopWithContext", "queue", q.metrics.queueName)
+            return
+        case <-t.C():
+            func() {
+                q.cond.L.Lock()
+                defer q.cond.L.Unlock()
+                if !q.shuttingDown {
+                    q.metrics.updateUnfinishedWork()
+                }
+            }()
+        }
+    }
 }
