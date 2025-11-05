@@ -894,6 +894,8 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(logger klog.Logger, pInfo *
 	// We changed ConsecutiveErrorsCount or UnschedulableCount plus Timestamp, and now the calculated backoff time should be different,
 	// removing the cached backoff time.
 	pInfo.BackoffExpiration = time.Time{}
+	// Clear the flush flag since the pod is returning to the queue after a scheduling attempt.
+	pInfo.WasFlushedFromUnschedulable = false
 
 	if !p.isSchedulingQueueHintEnabled {
 		// fall back to the old behavior which doesn't depend on the queueing hint.
@@ -949,7 +951,7 @@ func (p *PriorityQueue) flushUnschedulablePodsLeftover(logger klog.Logger) {
 		lastScheduleTime := pInfo.Timestamp
 		if currentTime.Sub(lastScheduleTime) > p.podMaxInUnschedulablePodsDuration {
 			// Mark this pod as flushed so we can detect if it schedules soon after
-			pInfo.FlushedFromUnschedulableAt = &currentTime
+			pInfo.WasFlushedFromUnschedulable = true
 			podsToMove = append(podsToMove, pInfo)
 		}
 	}
@@ -1235,6 +1237,13 @@ func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(logger klog.Logger, podIn
 			// QueueingHintFn determined that this Pod isn't worth putting to activeQ or backoffQ by this event.
 			logger.V(5).Info("Event is not making pod schedulable", "pod", klog.KObj(pInfo.Pod), "event", event.Label())
 			continue
+		}
+
+		// Clear the flush flag if this pod is being moved by an event (not by timeout flush).
+		// EventUnschedulableTimeout is the event used by flushUnschedulablePodsLeftover,
+		// where the flag is set to true before calling this function.
+		if event != framework.EventUnschedulableTimeout {
+			pInfo.WasFlushedFromUnschedulable = false
 		}
 
 		p.unschedulablePods.delete(pInfo.Pod, pInfo.Gated())

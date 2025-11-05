@@ -341,7 +341,7 @@ func (sched *Scheduler) bindingCycle(
 		metrics.PodSchedulingSLIDuration.WithLabelValues(getAttemptsLabel(assumedPodInfo)).Observe(metrics.SinceInSeconds(*assumedPodInfo.InitialAttemptTimestamp))
 	}
 	// Count pods scheduled after being flushed from unschedulablePods
-	if assumedPodInfo.FlushedFromUnschedulableAt != nil {
+	if assumedPodInfo.WasFlushedFromUnschedulable {
 		metrics.PodScheduledAfterFlush.Inc()
 	}
 	// Run "postbind" plugins.
