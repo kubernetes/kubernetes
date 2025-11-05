@@ -38,6 +38,14 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
+	// type ItemList
+	scheme.AddValidationFunc((*ItemList)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_ItemList(ctx, op, nil /* fldPath */, obj.(*ItemList), safe.Cast[*ItemList](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
 	// type StructSlice
 	scheme.AddValidationFunc((*StructSlice)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
 		switch op.Request.SubresourcePath() {
@@ -47,6 +55,49 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
 	return nil
+}
+
+// Validate_Item validates an instance of Item according
+// to declarative validation rules in the API schema.
+func Validate_Item(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Item) (errs field.ErrorList) {
+	// field Item.Key has no validation
+
+	// field Item.Data
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj map[string]string) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Data")...)
+			return
+		}(fldPath.Child("data"), obj.Data, safe.Field(oldObj, func(oldObj *Item) map[string]string { return oldObj.Data }))...)
+
+	return errs
+}
+
+// Validate_ItemList validates an instance of ItemList according
+// to declarative validation rules in the API schema.
+func Validate_ItemList(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *ItemList) (errs field.ErrorList) {
+	// field ItemList.TypeMeta has no validation
+
+	// field ItemList.Items
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []Item) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			// lists with map semantics require unique keys
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a Item, b Item) bool { return a.Key == b.Key })...)
+			// iterate the list and call the type's validation function
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, func(a Item, b Item) bool { return a.Key == b.Key }, validate.SemanticDeepEqual, Validate_Item)...)
+			return
+		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *ItemList) []Item { return oldObj.Items }))...)
+
+	return errs
 }
 
 // Validate_MixedKeyStruct validates an instance of MixedKeyStruct according

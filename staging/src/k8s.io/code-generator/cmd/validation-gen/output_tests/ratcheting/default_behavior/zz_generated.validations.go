@@ -38,6 +38,14 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
+	// type MixComparableStruct
+	scheme.AddValidationFunc((*MixComparableStruct)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_MixComparableStruct(ctx, op, nil /* fldPath */, obj.(*MixComparableStruct), safe.Cast[*MixComparableStruct](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
 	// type StructEmbedded
 	scheme.AddValidationFunc((*StructEmbedded)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
 		switch op.Request.SubresourcePath() {
@@ -117,6 +125,27 @@ func Validate_DirectComparableStruct(ctx context.Context, op operation.Operation
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field intField")...)
 			return
 		}(fldPath.Child("intField"), &obj.IntField, safe.Field(oldObj, func(oldObj *DirectComparableStruct) *int { return &oldObj.IntField }))...)
+
+	return errs
+}
+
+// Validate_MixComparableStruct validates an instance of MixComparableStruct according
+// to declarative validation rules in the API schema.
+func Validate_MixComparableStruct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *MixComparableStruct) (errs field.ErrorList) {
+	// field MixComparableStruct.TypeMeta has no validation
+	// field MixComparableStruct.Primitive has no validation
+
+	// field MixComparableStruct.NonComparable
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []string) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field NonComparable")...)
+			return
+		}(fldPath.Child("NonComparable"), obj.NonComparable, safe.Field(oldObj, func(oldObj *MixComparableStruct) []string { return oldObj.NonComparable }))...)
 
 	return errs
 }

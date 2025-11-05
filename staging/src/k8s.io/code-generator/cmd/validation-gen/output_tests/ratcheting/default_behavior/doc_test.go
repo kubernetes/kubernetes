@@ -175,3 +175,12 @@ func Test_StructEmbedded(t *testing.T) {
 
 	st.Value(mkTest()).OldValue(mkTest()).ExpectValid()
 }
+
+// This test is to prove the bug of ratcheting behavior mistakenly skip validation on nil vs not found.
+// TODO: update this test once the ratcheting behavior is fixed.
+func Test_Mix(t *testing.T) {
+	st := localSchemeBuilder.Test(t)
+	st.Value(&MixComparableStruct{
+		Primitive: "a",
+	}).OldValue(nil).ExpectValid()
+}

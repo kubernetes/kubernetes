@@ -99,3 +99,19 @@ func Test_StructSlice(t *testing.T) {
 		MapSliceMixedKeyField:      []MixedKeyStruct{{Key1: ptr.To("a"), Key2: "1", Data: "A"}, {Key1: ptr.To("b"), Key2: "2", Data: "B"}},
 	}).ExpectValid()
 }
+
+// This test is to prove the bug of ratcheting behavior mistakenly skip validation on nil vs not found.
+// TODO: update this test once the ratcheting behavior is fixed.
+func Test_Items(t *testing.T) {
+	st := localSchemeBuilder.Test(t)
+
+	st.Value(&ItemList{
+		Items: []Item{
+			{Key: "valid2"},
+		},
+	}).OldValue(&ItemList{
+		Items: []Item{
+			{Key: "valid1"},
+		},
+	}).ExpectValid()
+}

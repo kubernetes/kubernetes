@@ -142,3 +142,12 @@ type NestedNonDirectComparableStruct struct {
 	// +k8s:validateFalse="field nonDirectComparableStructField"
 	NonDirectComparableStructField NonDirectComparableStruct `json:"nonDirectComparableStructField"`
 }
+
+type MixComparableStruct struct {
+	TypeMeta int
+
+	Primitive string `json:"Primitive"`
+
+	// +k8s:validateFalse="field NonComparable"
+	NonComparable []string `json:"NonComparable"`
+}
