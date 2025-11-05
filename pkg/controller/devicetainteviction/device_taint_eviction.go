@@ -551,8 +551,7 @@ func (tc *Controller) maybeUpdateRuleStatus(ctx context.Context, ruleRef taintev
 			allocatedClaims: maps.Clone(tc.allocatedClaims),
 			pools:           tc.pools,
 			simulateRule:    ruleEvict,
-			// TODO: stub implementation
-			workqueue: workqueue.NewTypedRateLimitingQueueWithConfig(workqueue.DefaultTypedControllerRateLimiter[workItem](), workqueue.TypedRateLimitingQueueConfig[workItem]{}),
+			workqueue:       &NOPQueue[workItem]{},
 		}
 		defer tc.workqueue.ShutDown()
 
