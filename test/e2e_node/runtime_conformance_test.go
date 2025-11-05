@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -147,7 +148,7 @@ var _ = SIGDescribe("Container Runtime Conformance Test", func() {
 
 					ginkgo.By("check the container status")
 					var latestErr error
-					err = wait.PollUntilContextTimeout(ctx, node.ContainerStatusPollInterval, node.ContainerStatusRetryTimeout, true, func(ctx context.Context) (bool, error) {
+					err = wait.PollUntilContextTimeout(ctx, time.Second*2, node.ContainerStatusRetryTimeout, true, func(ctx context.Context) (bool, error) {
 						if latestErr = checkContainerStatus(ctx); latestErr != nil {
 							return false, nil
 						}
