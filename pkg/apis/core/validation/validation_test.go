@@ -29615,7 +29615,7 @@ func TestNumericTolerationsWithFeatureGate(t *testing.T) {
 			errorMsg:      fmt.Sprintf("tolerations[0].value: Invalid value: %q: value must be a valid integer for numeric operators", "high"),
 		},
 		{
-			name: "Gt operator with leading zeros and feature gate enabled (valid, parsed as 950)",
+			name: "Gt operator with leading zeros and feature gate enabled (invalid - strict validation)",
 			toleration: core.Toleration{
 				Key:      "node.kubernetes.io/sla",
 				Operator: core.TolerationOpGt,
@@ -29623,6 +29623,7 @@ func TestNumericTolerationsWithFeatureGate(t *testing.T) {
 				Effect:   core.TaintEffectNoSchedule,
 			},
 			featureGateOn: true,
+			errorMsg:      fmt.Sprintf("tolerations[0].value: Invalid value: %q: value must be a valid integer for numeric operators", "0950"),
 		},
 		{
 			name: "Gt operator with value '0' and feature gate enabled (valid)",
@@ -29657,7 +29658,7 @@ func TestNumericTolerationsWithFeatureGate(t *testing.T) {
 			errorMsg:      fmt.Sprintf("tolerations[0].value: Invalid value: %q: value must be a valid integer for numeric operators", "-"),
 		},
 		{
-			name: "Gt operator with plus sign and feature gate enabled",
+			name: "Gt operator with plus sign and feature gate enabled (invalid - strict validation)",
 			toleration: core.Toleration{
 				Key:      "test-key",
 				Operator: core.TolerationOpGt,
@@ -29665,6 +29666,7 @@ func TestNumericTolerationsWithFeatureGate(t *testing.T) {
 				Effect:   core.TaintEffectNoSchedule,
 			},
 			featureGateOn: true,
+			errorMsg:      fmt.Sprintf("tolerations[0].value: Invalid value: %q: value must be a valid integer for numeric operators", "+100"),
 		},
 		{
 			name: "Gt operator with space in value and feature gate enabled",

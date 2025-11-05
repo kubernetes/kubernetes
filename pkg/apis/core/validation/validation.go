@@ -40,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/api/validate"
+	"k8s.io/apimachinery/pkg/api/validate/content"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
@@ -4374,18 +4375,24 @@ func ValidateTolerations(tolerations []core.Toleration, fldPath *field.Path, opt
 				allErrors = append(allErrors, field.Invalid(idxPath.Child("operator"), toleration.Value, "value must be empty when `operator` is 'Exists'"))
 			}
 		case core.TolerationOpLt, core.TolerationOpGt:
-			// Numeric comparison operators require validation option
+			// numeric comparison operators require validation option
 			if !opts.AllowTaintTolerationComparisonOperators {
 				validValues := []core.TolerationOperator{core.TolerationOpEqual, core.TolerationOpExists, core.TolerationOpLt, core.TolerationOpGt}
 				allErrors = append(allErrors, field.NotSupported(idxPath.Child("operator"), toleration.Operator, validValues))
 				break
 			}
 
-			// Validate value is parseable as int64
-			if _, err := strconv.ParseInt(toleration.Value, 10, 64); err != nil {
+			// validate value is decimal integer
+			if errs := content.IsDecimalInteger(toleration.Value); len(errs) != 0 {
 				allErrors = append(allErrors, field.Invalid(idxPath.Child("value"),
 					toleration.Value, "value must be a valid integer for numeric operators"))
 				break
+			}
+
+			// validate value is within int64 range
+			if _, err := strconv.ParseInt(toleration.Value, 10, 64); err != nil {
+				allErrors = append(allErrors, field.Invalid(idxPath.Child("value"),
+					toleration.Value, "value must be a valid integer for numeric operators"))
 			}
 		default:
 			validValues := []core.TolerationOperator{core.TolerationOpEqual, core.TolerationOpExists}
