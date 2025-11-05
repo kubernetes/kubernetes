@@ -726,7 +726,7 @@ func TestValidateConfig(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			err := ValidateConfig([]byte(test.cfg), test.allowExperimental)
+			err := ValidateConfig([]byte(test.cfg), true, test.allowExperimental)
 			if (err != nil) != test.expectedError {
 				t.Fatalf("expected error: %v, got: %v, error: %v", test.expectedError, (err != nil), err)
 			}
