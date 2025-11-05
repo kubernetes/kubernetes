@@ -37,7 +37,7 @@ set -xe
 cd "$(dirname "$0")"
 
 # Remove stale files.
-rm -rf external-attacher external-provisioner external-resizer external-snapshotter external-health-monitor hostpath csi-driver-host-path
+rm -rf external-attacher external-provisioner external-resizer external-snapshotter/csi-snapshotter external-health-monitor hostpath csi-driver-host-path
 
 # Check out desired release.
 git clone https://github.com/kubernetes-csi/csi-driver-host-path.git
