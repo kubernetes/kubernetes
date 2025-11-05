@@ -200,6 +200,13 @@ func (c *ClusterRoleAggregationController) Run(ctx context.Context, workers int)
 		wg.Wait()
 	}()
 
+	var wg sync.WaitGroup
+	defer func() {
+		logger.Info("Shutting down ClusterRoleAggregator controller")
+		c.queue.ShutDown()
+		wg.Wait()
+	}()
+
 	if !cache.WaitForNamedCacheSyncWithContext(ctx, c.clusterRolesSynced) {
 		return
 	}

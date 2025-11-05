@@ -68,6 +68,10 @@ func (prober *flexVolumeProber) Init() error {
 	return nil
 }
 
+func (prober *flexVolumeProber) Shutdown() {
+	prober.watcher.Close()
+}
+
 // If probeAllNeeded is true, probe all pluginDir
 // else probe events in eventsMap
 func (prober *flexVolumeProber) Probe() (events []volume.ProbeEvent, err error) {
