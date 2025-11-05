@@ -660,7 +660,49 @@ func validatePodTemplateUpdate(spec, oldSpec batch.JobSpec, fldPath *field.Path,
 		oldTemplate.Labels = template.Labels                             // +k8s:verify-mutation:reason=clone
 		oldTemplate.Spec.SchedulingGates = template.Spec.SchedulingGates // +k8s:verify-mutation:reason=clone
 	}
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(template, oldTemplate, fldPath.Child("template"))...)
+	suspended := oldSpec.Suspend != nil && *oldSpec.Suspend
+	if !suspended {
+		// if the job isn't suspended, then we cannot allow any mutation of the template
+		allErrs = append(allErrs, apivalidation.ValidateImmutableField(template, oldTemplate, fldPath.Child("template"))...)
+	} else {
+		if !opts.AllowMutablePodResources {
+			allErrs = append(allErrs, apivalidation.ValidateImmutableField(template, oldTemplate, fldPath.Child("template"))...)
+		} else {
+			// Only allow container resource updates when AllowMutablePodResources is true
+			allErrs = append(allErrs, validatePodResourceUpdatesOnly(template.Spec, oldTemplate.Spec, fldPath.Child("template.spec"))...)
+		}
+	}
+	return allErrs
+}
+
+// validatePodResourceUpdatesOnly will validate that only container resources are updated.
+func validatePodResourceUpdatesOnly(newPod api.PodSpec, oldPod api.PodSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	// Create a deep copy of the old pod spec to modify
+	oldPodCopy := oldPod.DeepCopy()
+	// Update container resources in the copy to match the new pod spec
+	if len(newPod.Containers) == len(oldPodCopy.Containers) {
+		for i := range newPod.Containers {
+			if oldPodCopy.Containers[i].Name == newPod.Containers[i].Name {
+				oldPodCopy.Containers[i].Resources = newPod.Containers[i].Resources // +k8s:verify-mutation:reason=clone
+			}
+		}
+	}
+
+	// Update init container resources in the copy to match the new pod spec
+	if len(newPod.InitContainers) == len(oldPodCopy.InitContainers) {
+		for i := range newPod.InitContainers {
+			if oldPodCopy.InitContainers[i].Name == newPod.InitContainers[i].Name {
+				oldPodCopy.InitContainers[i].Resources = newPod.InitContainers[i].Resources // +k8s:verify-mutation:reason=clone
+			}
+		}
+	}
+
+	// Validate that the modified copy is identical to the new pod spec
+	// This ensures only container resources were changed
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(newPod, *oldPodCopy, fldPath)...)
+
 	return allErrs
 }
 
@@ -1023,6 +1065,8 @@ type JobValidationOptions struct {
 	AllowMutableSchedulingDirectives bool
 	// Require Job to have the label on batch.kubernetes.io/job-name and batch.kubernetes.io/controller-uid
 	RequirePrefixedLabels bool
+	// Allow mutable pod resources
+	AllowMutablePodResources bool
 }
 
 type JobStatusValidationOptions struct {

@@ -1055,6 +1055,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.35"
+- name: MutablePodResourcesForSuspendedJobs
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.35"
 - name: MutatingAdmissionPolicy
   versionedSpecs:
   - default: false

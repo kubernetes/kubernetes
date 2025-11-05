@@ -22,6 +22,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -1004,7 +1005,7 @@ func TestJobStrategy_ValidateUpdate(t *testing.T) {
 				{Type: field.ErrorTypeInvalid, Field: "spec.completions"},
 			},
 		},
-		"updating node selector for unsuspended job disallowed": {
+		"updating node selector for unsuspended job disallowed with MutablePodResourcesForSuspendedJobs disabled": {
 			job: &batch.Job{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:            "myjob",
@@ -1026,7 +1027,7 @@ func TestJobStrategy_ValidateUpdate(t *testing.T) {
 				{Type: field.ErrorTypeInvalid, Field: "spec.template"},
 			},
 		},
-		"updating node selector for suspended but previously started job disallowed": {
+		"updating node selector for suspended but previously started job disallowed with MutablePodResourcesForSuspendedJobs disabled": {
 			job: &batch.Job{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:            "myjob",
@@ -1052,7 +1053,7 @@ func TestJobStrategy_ValidateUpdate(t *testing.T) {
 				{Type: field.ErrorTypeInvalid, Field: "spec.template"},
 			},
 		},
-		"updating node selector for suspended and not previously started job allowed": {
+		"updating node selector for suspended and not previously started job allowed with MutablePodResourcesForSuspendedJobs disabled": {
 			job: &batch.Job{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:            "myjob",
@@ -1186,6 +1187,273 @@ func TestJobStrategy_ValidateUpdate(t *testing.T) {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, utilversion.MustParse("1.32"))
 			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobBackoffLimitPerIndex, tc.enableJobBackoffLimitPerIndex)
+			newJob := tc.job.DeepCopy()
+			tc.update(newJob)
+			errs := Strategy.ValidateUpdate(ctx, newJob, tc.job)
+			if diff := cmp.Diff(tc.wantErrs, errs, ignoreErrValueDetail); diff != "" {
+				t.Errorf("Unexpected errors (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestJobStrategy_ValidateUpdate_MutablePodResources(t *testing.T) {
+	ctx := genericapirequest.NewDefaultContext()
+	now := metav1.Now()
+	validSelector := &metav1.LabelSelector{
+		MatchLabels: map[string]string{"a": "b"},
+	}
+	validPodTemplateSpec := api.PodTemplateSpec{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: validSelector.MatchLabels,
+		},
+		Spec: podtest.MakePodSpec(podtest.SetRestartPolicy(api.RestartPolicyOnFailure)),
+	}
+
+	cases := map[string]struct {
+		enableFeatureGate bool
+		job               *batch.Job
+		update            func(*batch.Job)
+		wantErrs          field.ErrorList
+	}{
+		"feature gate disabled - pod resource updates rejected": {
+			enableFeatureGate: false,
+			job: &batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "myjob",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "0",
+				},
+				Spec: batch.JobSpec{
+					Selector:       validSelector,
+					Template:       validPodTemplateSpec,
+					ManualSelector: ptr.To(true),
+					Parallelism:    ptr.To[int32](1),
+					Suspend:        ptr.To(true),
+				},
+				Status: batch.JobStatus{
+					Active: 0,
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobSuspended,
+							Status: api.ConditionStatus(metav1.ConditionTrue),
+						},
+					},
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Template.Spec.Containers[0].Resources.Requests = api.ResourceList{
+					api.ResourceCPU: resource.MustParse("200m"),
+				}
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "spec.template"},
+			},
+		},
+		"feature gate enabled - job suspended, but with remaining active Pods  resource updates rejected": {
+			enableFeatureGate: true,
+			job: &batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "myjob",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "0",
+				},
+				Spec: batch.JobSpec{
+					Selector:       validSelector,
+					Template:       validPodTemplateSpec,
+					ManualSelector: ptr.To(true),
+					Parallelism:    ptr.To[int32](1),
+					Suspend:        ptr.To(true),
+				},
+				Status: batch.JobStatus{
+					Active: 1,
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobSuspended,
+							Status: api.ConditionStatus(metav1.ConditionFalse),
+						},
+					},
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Template.Spec.Containers[0].Resources.Requests = api.ResourceList{
+					api.ResourceCPU: resource.MustParse("200m"),
+				}
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "spec.template"},
+			},
+		},
+		"feature gate enabled - job suspended, with the suspended condition, but pods remain active - reject": {
+			enableFeatureGate: true,
+			job: &batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "myjob",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "0",
+				},
+				Spec: batch.JobSpec{
+					Selector:       validSelector,
+					Template:       validPodTemplateSpec,
+					ManualSelector: ptr.To(true),
+					Parallelism:    ptr.To[int32](1),
+					Suspend:        ptr.To(true),
+				},
+				Status: batch.JobStatus{
+					Active: 1,
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobSuspended,
+							Status: api.ConditionStatus(metav1.ConditionTrue),
+						},
+					},
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Template.Spec.Containers[0].Resources.Requests = api.ResourceList{
+					api.ResourceCPU: resource.MustParse("200m"),
+				}
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "spec.template"},
+			},
+		},
+		"feature gate enabled - unsuspended job resource updates rejected": {
+			enableFeatureGate: true,
+			job: &batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "myjob",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "0",
+				},
+				Spec: batch.JobSpec{
+					Selector:       validSelector,
+					Template:       validPodTemplateSpec,
+					ManualSelector: ptr.To(true),
+					Parallelism:    ptr.To[int32](1),
+					Suspend:        ptr.To(false),
+				},
+				Status: batch.JobStatus{
+					Active: 1,
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobSuspended,
+							Status: api.ConditionStatus(metav1.ConditionFalse),
+						},
+					},
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Template.Spec.Containers[0].Resources.Requests = api.ResourceList{
+					api.ResourceCPU: resource.MustParse("200m"),
+				}
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "spec.template"},
+			},
+		},
+		"feature gate enabled - suspended but started job resource updates allowed": {
+			enableFeatureGate: true,
+			job: &batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "myjob",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "0",
+				},
+				Spec: batch.JobSpec{
+					Selector:       validSelector,
+					Template:       validPodTemplateSpec,
+					ManualSelector: ptr.To(true),
+					Parallelism:    ptr.To[int32](1),
+					Suspend:        ptr.To(true),
+				},
+				Status: batch.JobStatus{
+					StartTime: &now,
+					Active:    0,
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobSuspended,
+							Status: api.ConditionStatus(metav1.ConditionTrue),
+						},
+					},
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Template.Spec.Containers[0].Resources.Requests = api.ResourceList{
+					api.ResourceCPU: resource.MustParse("200m"),
+				}
+			},
+		},
+		"feature gate enabled - suspended and not started job resource updates allowed": {
+			enableFeatureGate: true,
+			job: &batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "myjob",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "0",
+				},
+				Spec: batch.JobSpec{
+					Selector:       validSelector,
+					Template:       validPodTemplateSpec,
+					ManualSelector: ptr.To(true),
+					Parallelism:    ptr.To[int32](1),
+					Suspend:        ptr.To(true),
+				},
+				Status: batch.JobStatus{
+					Active: 0,
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobSuspended,
+							Status: api.ConditionStatus(metav1.ConditionTrue),
+						},
+					},
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Template.Spec.Containers[0].Resources.Requests = api.ResourceList{
+					api.ResourceCPU: resource.MustParse("200m"),
+				}
+			},
+		},
+		"feature gate enabled - non-resource field updates still rejected": {
+			enableFeatureGate: true,
+			job: &batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "myjob",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "0",
+				},
+				Spec: batch.JobSpec{
+					Selector:       validSelector,
+					Template:       validPodTemplateSpec,
+					ManualSelector: ptr.To(true),
+					Parallelism:    ptr.To[int32](1),
+					Suspend:        ptr.To(true),
+				},
+				Status: batch.JobStatus{
+					Active: 0,
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobSuspended,
+							Status: api.ConditionStatus(metav1.ConditionTrue),
+						},
+					},
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Template.Spec.Containers[0].Image = "different-image"
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "spec.template.spec"},
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, utilversion.MustParse("1.35"))
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MutablePodResourcesForSuspendedJobs, tc.enableFeatureGate)
+
 			newJob := tc.job.DeepCopy()
 			tc.update(newJob)
 			errs := Strategy.ValidateUpdate(ctx, newJob, tc.job)
