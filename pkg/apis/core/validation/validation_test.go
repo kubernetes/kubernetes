@@ -15284,7 +15284,37 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 		),
 		old:  *podtest.MakePod("foo"),
 		err:  "Duplicate value: \"ctr\"",
-		test: "invalid container name and extended resource name in requestMapping in ExtendedResourceClaimStatus",
+		test: "invalid duplicate container name,, extended resource name, and request name in requestMapping in ExtendedResourceClaimStatus",
+	}, {
+		new: *podtest.MakePod("foo",
+			podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(
+				podtest.MakeResourceRequirements(
+					map[string]string{
+						string("example.com/gpu"): "1",
+					},
+					map[string]string{
+						string("example.com/gpu"): "1",
+					})))),
+			podtest.SetStatus(core.PodStatus{
+				ExtendedResourceClaimStatus: &core.PodExtendedResourceClaimStatus{
+					ResourceClaimName: "xyz",
+					RequestMappings: []core.ContainerExtendedResourceRequest{
+						{
+							ContainerName: "ctr",
+							ResourceName:  "example.com/gpu",
+							RequestName:   "container-0-request-0",
+						},
+						{
+							ContainerName: "ctr",
+							ResourceName:  "example.com/gpu",
+							RequestName:   "container-1-request-0",
+						},
+					},
+				},
+			}),
+		),
+		old:  *podtest.MakePod("foo"),
+		test: "valid duplicate container name,, extended resource name in requestMapping in ExtendedResourceClaimStatus",
 	}, {
 		new: *podtest.MakePod("foo",
 			podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(

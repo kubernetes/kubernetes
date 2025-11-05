@@ -90,6 +90,7 @@ var (
 	namespace                    = "default"
 	attrName                     = resourceapi.QualifiedName("healthy") // device attribute only available on non-default node
 	extendedResourceName         = "example.com/gpu"
+	extendedResourceName2        = "example.com/gpu2"
 	implicitExtendedResourceName = "deviceclass.resource.kubernetes.io/my-resource-class"
 
 	deviceClass = &resourceapi.DeviceClass{
@@ -105,7 +106,14 @@ var (
 			ExtendedResourceName: &extendedResourceName,
 		},
 	}
-
+	deviceClassWithExtendResourceName2 = &resourceapi.DeviceClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: className + "2",
+		},
+		Spec: resourceapi.DeviceClassSpec{
+			ExtendedResourceName: &extendedResourceName2,
+		},
+	}
 	podWithClaimName = st.MakePod().Name(podName).Namespace(namespace).
 				UID(podUID).
 				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimName: &claimName}).
@@ -138,6 +146,13 @@ var (
 					UID(podUID).
 					Req(map[v1.ResourceName]string{
 			v1.ResourceName(extendedResourceName): "1",
+		}).
+		Obj()
+	podWithExtendedResourceName2 = st.MakePod().Name(podName).Namespace(namespace).
+					UID(podUID).
+					Req(map[v1.ResourceName]string{
+			v1.ResourceName(extendedResourceName):  "1",
+			v1.ResourceName(extendedResourceName2): "1",
 		}).
 		Obj()
 	podWithImplicitExtendedResourceName = st.MakePod().Name(podName).Namespace(namespace).
@@ -285,6 +300,19 @@ var (
 				Pool:    nodeName,
 				Device:  "instance-1",
 				Request: "container-0-request-0",
+			}},
+		},
+		NodeSelector: func() *v1.NodeSelector {
+			return st.MakeNodeSelector().In("metadata.name", []string{nodeName}, st.NodeSelectorTypeMatchFields).Obj()
+		}(),
+	}
+	extendedResourceAllocationResult2 = &resourceapi.AllocationResult{
+		Devices: resourceapi.DeviceAllocationResult{
+			Results: []resourceapi.DeviceRequestAllocationResult{{
+				Driver:  driver,
+				Pool:    nodeName,
+				Device:  "instance-1",
+				Request: "container-0-request-1",
 			}},
 		},
 		NodeSelector: func() *v1.NodeSelector {
@@ -513,6 +541,22 @@ var (
 		RequestWithName("container-0-request-0", className).
 		Allocation(extendedResourceAllocationResult).
 		Obj()
+	extendedResourceClaim2 = st.MakeResourceClaim().
+				Name("my-pod-extended-resources-0").
+				GenerateName("my-pod-extended-resources-").
+				Namespace(namespace).
+				Annotations(map[string]string{"resource.kubernetes.io/extended-resource-claim": "true"}).
+				OwnerRef(
+			metav1.OwnerReference{
+				APIVersion: "v1",
+				Kind:       "Pod",
+				Name:       podName,
+				UID:        types.UID(podUID),
+				Controller: ptr.To(true),
+			}).
+		RequestWithName("container-0-request-1", className+"2").
+		Allocation(extendedResourceAllocationResult2).
+		Obj()
 	extendedResourceClaimNoName = st.MakeResourceClaim().
 					Name(specialClaimInMemName).
 					GenerateName("my-pod-extended-resources-").
@@ -528,6 +572,22 @@ var (
 			}).
 		RequestWithName("container-0-request-0", className).
 		Allocation(extendedResourceAllocationResult).
+		Obj()
+	extendedResourceClaimNoName2 = st.MakeResourceClaim().
+					Name(specialClaimInMemName).
+					GenerateName("my-pod-extended-resources-").
+					Namespace(namespace).
+					Annotations(map[string]string{"resource.kubernetes.io/extended-resource-claim": "true"}).
+					OwnerRef(
+			metav1.OwnerReference{
+				APIVersion: "v1",
+				Kind:       "Pod",
+				Name:       podName,
+				UID:        types.UID(podUID),
+				Controller: ptr.To(true),
+			}).
+		RequestWithName("container-0-request-1", className+"2").
+		Allocation(extendedResourceAllocationResult2).
 		Obj()
 	implicitExtendedResourceClaim = st.MakeResourceClaim().
 					Name("my-pod-extended-resources-0").
@@ -1579,6 +1639,27 @@ func TestPlugin(t *testing.T) {
 			metrics: func(t *testing.T, g compbasemetrics.Gatherer) {
 				_, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
 				require.ErrorContains(t, err, "not found")
+			},
+		},
+		"extended-resource-one-device-plugin-one-dra": {
+			enableDRAExtendedResource:          true,
+			enableDRADeviceBindingConditions:   true,
+			enableDRAResourceClaimDeviceStatus: true,
+			nodes:                              []*v1.Node{workerNodeWithExtendedResource},
+			pod:                                podWithExtendedResourceName2,
+			classes:                            []*resourceapi.DeviceClass{deviceClassWithExtendResourceName, deviceClassWithExtendResourceName2},
+			objs:                               []apiruntime.Object{workerNodeSlice, podWithExtendedResourceName2},
+			want: want{
+				reserve: result{
+					inFlightClaims: []metav1.Object{extendedResourceClaimNoName2},
+				},
+				prebind: result{
+					assumedClaim: reserve(extendedResourceClaim2, podWithExtendedResourceName2),
+					added:        []metav1.Object{reserve(extendedResourceClaim2, podWithExtendedResourceName2)},
+				},
+				postbind: result{
+					assumedClaim: reserve(extendedResourceClaim2, podWithExtendedResourceName2),
+				},
 			},
 		},
 		"extended-resource-name-with-zero-allocatable": {
@@ -3158,7 +3239,7 @@ func (m *mockDeviceClassResolver) GetDeviceClass(resourceName v1.ResourceName) *
 	return m.mapping[resourceName]
 }
 
-func Test_createDeviceRequests(t *testing.T) {
+func Test_createRequestsAndMappings_requests(t *testing.T) {
 	pod1 := st.MakePod().Name(podName).Namespace(namespace).
 		UID(podUID).
 		Res(map[v1.ResourceName]string{
@@ -3180,6 +3261,33 @@ func Test_createDeviceRequests(t *testing.T) {
 		UID(podUID).
 		Res(map[v1.ResourceName]string{
 			v1.ResourceName(extendedResourceName): "1",
+		}).
+		InitReq(map[v1.ResourceName]string{
+			v1.ResourceName(extendedResourceName + "init"): "2",
+		}).
+		Obj()
+	podInit2 := st.MakePod().Name(podName).Namespace(namespace).
+		UID(podUID).
+		Res(map[v1.ResourceName]string{
+			v1.ResourceName(extendedResourceName): "1",
+		}).
+		InitReq(map[v1.ResourceName]string{
+			v1.ResourceName(extendedResourceName + "init"): "1",
+		}).
+		InitReq(map[v1.ResourceName]string{
+			v1.ResourceName(extendedResourceName + "init"): "2",
+		}).
+		Obj()
+	podInit3 := st.MakePod().Name(podName).Namespace(namespace).
+		UID(podUID).
+		Res(map[v1.ResourceName]string{
+			v1.ResourceName(extendedResourceName): "1",
+		}).
+		InitReq(map[v1.ResourceName]string{
+			v1.ResourceName(extendedResourceName + "init"): "1",
+		}).
+		SidecarReq(map[v1.ResourceName]string{
+			v1.ResourceName(extendedResourceName + "init"): "1",
 		}).
 		InitReq(map[v1.ResourceName]string{
 			v1.ResourceName(extendedResourceName + "init"): "2",
@@ -3260,8 +3368,48 @@ func Test_createDeviceRequests(t *testing.T) {
 			Count:           1,
 		},
 	}
+	devReqSidecar := resourceapi.DeviceRequest{
+		Name: "container-1-request-0",
+		Exactly: &resourceapi.ExactDeviceRequest{
+			DeviceClassName: "classInit",
+			AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
+			Count:           1,
+		},
+	}
 	devReq2Init := resourceapi.DeviceRequest{
+		Name: "container-1-request-0",
+		Exactly: &resourceapi.ExactDeviceRequest{
+			DeviceClassName: "classInit",
+			AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
+			Count:           2,
+		},
+	}
+	devReq6Init := resourceapi.DeviceRequest{
 		Name: "container-0-request-0",
+		Exactly: &resourceapi.ExactDeviceRequest{
+			DeviceClassName: "classInit",
+			AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
+			Count:           2,
+		},
+	}
+	devReq3Init := resourceapi.DeviceRequest{
+		Name: "container-2-request-0",
+		Exactly: &resourceapi.ExactDeviceRequest{
+			DeviceClassName: "class",
+			AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
+			Count:           1,
+		},
+	}
+	devReq4Init := resourceapi.DeviceRequest{
+		Name: "container-3-request-0",
+		Exactly: &resourceapi.ExactDeviceRequest{
+			DeviceClassName: "class",
+			AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
+			Count:           1,
+		},
+	}
+	devReq5Init := resourceapi.DeviceRequest{
+		Name: "container-2-request-0",
 		Exactly: &resourceapi.ExactDeviceRequest{
 			DeviceClassName: "classInit",
 			AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
@@ -3307,41 +3455,61 @@ func Test_createDeviceRequests(t *testing.T) {
 			pod:                podInit,
 			extendedResources:  resInit,
 			cache:              &mockDeviceClassResolver{mapping: devMapInit},
-			wantDeviceRequests: []resourceapi.DeviceRequest{devReq2Init, devReqInit},
+			wantDeviceRequests: []resourceapi.DeviceRequest{devReq6Init, devReqInit},
+		},
+		"two init containers, one regular container": {
+			pod:                podInit2,
+			extendedResources:  resInit,
+			cache:              &mockDeviceClassResolver{mapping: devMapInit},
+			wantDeviceRequests: []resourceapi.DeviceRequest{devReq2Init, devReq3Init},
+		},
+		"three init containers, one sidecar, one regular container": {
+			pod:                podInit3,
+			extendedResources:  resInit,
+			cache:              &mockDeviceClassResolver{mapping: devMapInit},
+			wantDeviceRequests: []resourceapi.DeviceRequest{devReqSidecar, devReq5Init, devReq4Init},
 		},
 	}
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			gotDeviceRequests := createDeviceRequests(tc.pod, tc.extendedResources, tc.cache)
+			logger, _ := ktesting.NewTestContext(t)
+			gotDeviceRequests, _ := createRequestsAndMappings(tc.pod, tc.extendedResources, logger, tc.cache)
 			if len(tc.wantDeviceRequests) != len(gotDeviceRequests) {
-				t.Fatalf("different length, want %#v, got %#v", tc.wantDeviceRequests, gotDeviceRequests)
+				t.Fatalf("different length, want %#v, len=%v, got %#v, len=%v", tc.wantDeviceRequests, len(tc.wantDeviceRequests), gotDeviceRequests, len(gotDeviceRequests))
 			}
 			sort.Slice(gotDeviceRequests, func(i, j int) bool { return gotDeviceRequests[i].Name < gotDeviceRequests[j].Name })
 			for i, r := range tc.wantDeviceRequests {
 				if r.Name != gotDeviceRequests[i].Name {
-					t.Fatalf("different name, want %#v, got %#v", r, gotDeviceRequests[i])
+					t.Errorf("different name, want %#v, got %#v", r, gotDeviceRequests[i])
 				}
 				if r.Exactly.DeviceClassName != gotDeviceRequests[i].Exactly.DeviceClassName {
-					t.Fatalf("different deviceClassName, want %#v, got %#v", r, gotDeviceRequests[i])
+					t.Errorf("different deviceClassName, want %#v, got %#v", r, gotDeviceRequests[i])
 				}
 				if r.Exactly.AllocationMode != gotDeviceRequests[i].Exactly.AllocationMode {
-					t.Fatalf("different allocationMode, want %#v, got %#v", r, gotDeviceRequests[i])
+					t.Errorf("different allocationMode, want %#v, got %#v", r, gotDeviceRequests[i])
 				}
 				if r.Exactly.Count != gotDeviceRequests[i].Exactly.Count {
-					t.Fatalf("different count, want %#v, got %#v", r, gotDeviceRequests[i])
+					t.Errorf("different count, want %#v, got %#v", r.Exactly.Count, gotDeviceRequests[i].Exactly.Count)
 				}
 			}
 		})
 	}
 }
 
-func Test_createRequestMappings(t *testing.T) {
+func Test_createRequestsAndMappings_mappings(t *testing.T) {
 	pod1 := st.MakePod().Name(podName).Namespace(namespace).
 		UID(podUID).
 		Res(map[v1.ResourceName]string{
 			v1.ResourceName(extendedResourceName):       "1",
 			v1.ResourceName(extendedResourceName + "1"): "2",
+		}).
+		Obj()
+	pod1InitImplicit := st.MakePod().Name(podName).Namespace(namespace).
+		UID(podUID).
+		InitReq(map[v1.ResourceName]string{
+			v1.ResourceName(extendedResourceName + "init"):                       "1",
+			v1.ResourceName(resourceapi.ResourceDeviceClassPrefix + "classInit"): "2",
 		}).
 		Obj()
 	pod2 := st.MakePod().Name(podName).Namespace(namespace).
@@ -3363,23 +3531,96 @@ func Test_createRequestMappings(t *testing.T) {
 			v1.ResourceName(extendedResourceName + "init"): "2",
 		}).
 		Obj()
-
-	claim := st.MakeResourceClaim().
-		Name(claimName).
-		Namespace(namespace).
-		RequestWithName("container-0-request-0", className).
+	podInit2 := st.MakePod().Name(podName).Namespace(namespace).
+		UID(podUID).
+		Res(map[v1.ResourceName]string{
+			v1.ResourceName(extendedResourceName): "1",
+		}).
+		InitReq(map[v1.ResourceName]string{
+			v1.ResourceName(extendedResourceName + "init"): "1",
+		}).
+		InitReq(map[v1.ResourceName]string{
+			v1.ResourceName(extendedResourceName + "init"): "2",
+		}).
 		Obj()
-	claim2 := st.MakeResourceClaim().
-		Name(claimName).
-		Namespace(namespace).
-		RequestWithName("container-0-request-0", className).
-		RequestWithName("container-1-request-0", className).
+	podInitImplicit := st.MakePod().Name(podName).Namespace(namespace).
+		UID(podUID).
+		Res(map[v1.ResourceName]string{
+			v1.ResourceName(extendedResourceName): "1",
+		}).
+		InitReq(map[v1.ResourceName]string{
+			v1.ResourceName(extendedResourceName + "init"): "1",
+		}).
+		InitReq(map[v1.ResourceName]string{
+			v1.ResourceName(resourceapi.ResourceDeviceClassPrefix + "classInit"): "2",
+		}).
 		Obj()
-
+	podInit3 := st.MakePod().Name(podName).Namespace(namespace).
+		UID(podUID).
+		Res(map[v1.ResourceName]string{
+			v1.ResourceName(extendedResourceName): "1",
+		}).
+		InitReq(map[v1.ResourceName]string{
+			v1.ResourceName(extendedResourceName + "init"): "1",
+		}).
+		SidecarReq(map[v1.ResourceName]string{
+			v1.ResourceName(extendedResourceName + "init"): "1",
+		}).
+		InitReq(map[v1.ResourceName]string{
+			v1.ResourceName(extendedResourceName + "init"): "2",
+		}).
+		Obj()
+	res := map[v1.ResourceName]int64{
+		v1.ResourceName(extendedResourceName):       1,
+		v1.ResourceName(extendedResourceName + "1"): 2,
+	}
+	resInit := map[v1.ResourceName]int64{
+		v1.ResourceName(extendedResourceName):          1,
+		v1.ResourceName(extendedResourceName + "init"): 2,
+	}
+	resInitImplicit := map[v1.ResourceName]int64{
+		v1.ResourceName(extendedResourceName):                                1,
+		v1.ResourceName(extendedResourceName + "init"):                       2,
+		v1.ResourceName(resourceapi.ResourceDeviceClassPrefix + "classInit"): 2,
+	}
+	devMap := map[v1.ResourceName]*resourceapi.DeviceClass{
+		v1.ResourceName(extendedResourceName): {
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "class",
+			},
+		},
+		v1.ResourceName(extendedResourceName + "1"): {
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "class1",
+			},
+		},
+	}
+	devMapInit := map[v1.ResourceName]*resourceapi.DeviceClass{
+		v1.ResourceName(extendedResourceName): {
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "class",
+			},
+		},
+		v1.ResourceName(extendedResourceName + "init"): {
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "classInit",
+			},
+		},
+		v1.ResourceName(resourceapi.ResourceDeviceClassPrefix + "classInit"): {
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "classInit",
+			},
+		},
+	}
 	cer := v1.ContainerExtendedResourceRequest{
 		ContainerName: "con0",
 		ResourceName:  extendedResourceName,
 		RequestName:   "container-0-request-0",
+	}
+	cer1 := v1.ContainerExtendedResourceRequest{
+		ContainerName: "con0",
+		ResourceName:  extendedResourceName + "1",
+		RequestName:   "container-0-request-1",
 	}
 	cer2 := v1.ContainerExtendedResourceRequest{
 		ContainerName: "con1",
@@ -3391,60 +3632,143 @@ func Test_createRequestMappings(t *testing.T) {
 		ResourceName:  extendedResourceName,
 		RequestName:   "container-1-request-0",
 	}
+	cer4 := v1.ContainerExtendedResourceRequest{
+		ContainerName: "con0",
+		ResourceName:  extendedResourceName,
+		RequestName:   "container-2-request-0",
+	}
+	cer5 := v1.ContainerExtendedResourceRequest{
+		ContainerName: "con0",
+		ResourceName:  extendedResourceName,
+		RequestName:   "container-3-request-0",
+	}
 	cerInit := v1.ContainerExtendedResourceRequest{
+		ContainerName: "init-con0",
+		ResourceName:  extendedResourceName + "init",
+		RequestName:   "container-1-request-0",
+	}
+	cerInit0 := v1.ContainerExtendedResourceRequest{
 		ContainerName: "init-con0",
 		ResourceName:  extendedResourceName + "init",
 		RequestName:   "container-0-request-0",
 	}
+	cerInit1 := v1.ContainerExtendedResourceRequest{
+		ContainerName: "init-con0",
+		ResourceName:  extendedResourceName + "init",
+		RequestName:   "container-1-request-0",
+	}
+	cerInit2 := v1.ContainerExtendedResourceRequest{
+		ContainerName: "init-con1",
+		ResourceName:  extendedResourceName + "init",
+		RequestName:   "container-1-request-0",
+	}
+	cerInit3 := v1.ContainerExtendedResourceRequest{
+		ContainerName: "init-con2",
+		ResourceName:  extendedResourceName + "init",
+		RequestName:   "container-2-request-0",
+	}
+	cerSidecar := v1.ContainerExtendedResourceRequest{
+		ContainerName: "sidecar-con1",
+		ResourceName:  extendedResourceName + "init",
+		RequestName:   "container-1-request-0",
+	}
+
+	cerInitImplicit := v1.ContainerExtendedResourceRequest{
+		ContainerName: "init-con0",
+		ResourceName:  extendedResourceName + "init",
+		RequestName:   "container-0-request-0",
+	}
+	cerInit4Implicit := v1.ContainerExtendedResourceRequest{
+		ContainerName: "init-con0",
+		ResourceName:  extendedResourceName + "init",
+		RequestName:   "container-0-request-1",
+	}
+	cerInit2Implicit := v1.ContainerExtendedResourceRequest{
+		ContainerName: "init-con1",
+		ResourceName:  resourceapi.ResourceDeviceClassPrefix + "classInit",
+		RequestName:   "container-1-request-0",
+	}
+	cerInit3Implicit := v1.ContainerExtendedResourceRequest{
+		ContainerName: "init-con0",
+		ResourceName:  resourceapi.ResourceDeviceClassPrefix + "classInit",
+		RequestName:   "container-0-request-0",
+	}
 
 	testcases := map[string]struct {
-		claim           *resourceapi.ResourceClaim
-		pod             *v1.Pod
-		wantReqMappings []v1.ContainerExtendedResourceRequest
+		pod                *v1.Pod
+		extnededResources  map[v1.ResourceName]int64
+		deviceClassMapping fwk.DeviceClassResolver
+		wantReqMappings    []v1.ContainerExtendedResourceRequest
 	}{
-		"one container, one request": {
-			claim:           claim,
-			pod:             pod1,
-			wantReqMappings: []v1.ContainerExtendedResourceRequest{cer},
+		"one container, two requests": {
+			pod:                pod1,
+			extnededResources:  res,
+			deviceClassMapping: &mockDeviceClassResolver{devMap},
+			wantReqMappings:    []v1.ContainerExtendedResourceRequest{cer, cer1},
 		},
-		"two containers, one request": {
-			claim:           claim,
-			pod:             pod2,
-			wantReqMappings: []v1.ContainerExtendedResourceRequest{cer},
-		},
-		"one init container, one regular container, one request": {
-			claim:           claim,
-			pod:             podInit,
-			wantReqMappings: []v1.ContainerExtendedResourceRequest{cerInit},
+		"one container, one explicit and one implicit request": {
+			pod:                pod1InitImplicit,
+			extnededResources:  resInitImplicit,
+			deviceClassMapping: &mockDeviceClassResolver{devMapInit},
+			wantReqMappings:    []v1.ContainerExtendedResourceRequest{cerInit3Implicit, cerInit4Implicit},
 		},
 		"two containers, two requests": {
-			claim:           claim2,
-			pod:             pod2,
-			wantReqMappings: []v1.ContainerExtendedResourceRequest{cer, cer2},
+			pod:                pod2,
+			extnededResources:  res,
+			deviceClassMapping: &mockDeviceClassResolver{devMap},
+			wantReqMappings:    []v1.ContainerExtendedResourceRequest{cer, cer2},
 		},
-		"two containers (one is init container), two requests": {
-			claim:           claim2,
-			pod:             podInit,
-			wantReqMappings: []v1.ContainerExtendedResourceRequest{cerInit, cer3},
+		"one init container, one regular container, one request": {
+			pod:                podInit,
+			extnededResources:  resInit,
+			deviceClassMapping: &mockDeviceClassResolver{devMapInit},
+			wantReqMappings:    []v1.ContainerExtendedResourceRequest{cerInit0, cer3},
+		},
+		"three containers (two are init container), two requests": {
+			pod:                podInit2,
+			extnededResources:  resInit,
+			deviceClassMapping: &mockDeviceClassResolver{devMapInit},
+			wantReqMappings:    []v1.ContainerExtendedResourceRequest{cerInit, cerInit2, cer4},
+		},
+		"three containers (two are init container), both explicit and implicit resources": {
+			pod:                podInitImplicit,
+			extnededResources:  resInitImplicit,
+			deviceClassMapping: &mockDeviceClassResolver{devMapInit},
+			wantReqMappings:    []v1.ContainerExtendedResourceRequest{cerInitImplicit, cerInit2Implicit, cer4},
+		},
+		"four containers (two are init container, one sidecar), three requests": {
+			pod:                podInit3,
+			extnededResources:  resInit,
+			deviceClassMapping: &mockDeviceClassResolver{devMapInit},
+			wantReqMappings:    []v1.ContainerExtendedResourceRequest{cerInit1, cerSidecar, cerInit3, cer5},
 		},
 	}
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			gotReqMappings := createRequestMappings(tc.claim, tc.pod)
+			logger, _ := ktesting.NewTestContext(t)
+			_, gotReqMappings := createRequestsAndMappings(tc.pod, tc.extnededResources, logger, tc.deviceClassMapping)
 			if len(tc.wantReqMappings) != len(gotReqMappings) {
 				t.Fatalf("different length, want %#v, got %#v", tc.wantReqMappings, gotReqMappings)
 			}
-			sort.Slice(gotReqMappings, func(i, j int) bool { return gotReqMappings[i].RequestName < gotReqMappings[j].RequestName })
+			sort.Slice(gotReqMappings, func(i, j int) bool {
+				if gotReqMappings[i].RequestName < gotReqMappings[j].RequestName {
+					return true
+				}
+				if gotReqMappings[i].RequestName > gotReqMappings[j].RequestName {
+					return false
+				}
+				return gotReqMappings[i].ContainerName < gotReqMappings[j].ContainerName
+			})
 			for i, r := range tc.wantReqMappings {
 				if r.RequestName != gotReqMappings[i].RequestName {
-					t.Fatalf("different request name, want %#v, got %#v", r, gotReqMappings[i])
+					t.Errorf("different request name, want %#v, got %#v", r, gotReqMappings[i])
 				}
 				if r.ContainerName != gotReqMappings[i].ContainerName {
-					t.Fatalf("different container name, want %#v, got %#v", r, gotReqMappings[i])
+					t.Errorf("different container name, want %#v, got %#v", r, gotReqMappings[i])
 				}
 				if r.ResourceName != gotReqMappings[i].ResourceName {
-					t.Fatalf("different resource name, want %#v, got %#v", r, gotReqMappings[i])
+					t.Errorf("different resource name, want %#v, got %#v", r, gotReqMappings[i])
 				}
 			}
 		})
