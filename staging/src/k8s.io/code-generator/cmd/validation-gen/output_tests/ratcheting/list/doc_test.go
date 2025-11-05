@@ -100,8 +100,6 @@ func Test_StructSlice(t *testing.T) {
 	}).ExpectValid()
 }
 
-// This test is to prove the bug of ratcheting behavior mistakenly skip validation on nil vs not found.
-// TODO: update this test once the ratcheting behavior is fixed.
 func Test_Items(t *testing.T) {
 	st := localSchemeBuilder.Test(t)
 
@@ -113,5 +111,7 @@ func Test_Items(t *testing.T) {
 		Items: []Item{
 			{Key: "valid1"},
 		},
-	}).ExpectValid()
+	}).ExpectValidateFalseByPath(map[string][]string{
+		"items[0].data": {"field Data"},
+	})
 }

@@ -116,15 +116,15 @@ func Validate_DirectComparableStruct(ctx context.Context, op operation.Operation
 
 	// field DirectComparableStruct.IntField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *int) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *int, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call field-attached validations
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field intField")...)
 			return
-		}(fldPath.Child("intField"), &obj.IntField, safe.Field(oldObj, func(oldObj *DirectComparableStruct) *int { return &oldObj.IntField }))...)
+		}(fldPath.Child("intField"), &obj.IntField, safe.Field(oldObj, func(oldObj *DirectComparableStruct) *int { return &oldObj.IntField }), oldObj != nil)...)
 
 	return errs
 }
@@ -137,15 +137,15 @@ func Validate_MixComparableStruct(ctx context.Context, op operation.Operation, f
 
 	// field MixComparableStruct.NonComparable
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []string) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj []string, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
 			// call field-attached validations
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field NonComparable")...)
 			return
-		}(fldPath.Child("NonComparable"), obj.NonComparable, safe.Field(oldObj, func(oldObj *MixComparableStruct) []string { return oldObj.NonComparable }))...)
+		}(fldPath.Child("NonComparable"), obj.NonComparable, safe.Field(oldObj, func(oldObj *MixComparableStruct) []string { return oldObj.NonComparable }), oldObj != nil)...)
 
 	return errs
 }
@@ -165,9 +165,9 @@ func Validate_NestedDirectComparableStruct(ctx context.Context, op operation.Ope
 
 	// field NestedDirectComparableStruct.DirectComparableStructField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *DirectComparableStruct) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *DirectComparableStruct, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call field-attached validations
@@ -177,7 +177,7 @@ func Validate_NestedDirectComparableStruct(ctx context.Context, op operation.Ope
 			return
 		}(fldPath.Child("directComparableStructField"), &obj.DirectComparableStructField, safe.Field(oldObj, func(oldObj *NestedDirectComparableStruct) *DirectComparableStruct {
 			return &oldObj.DirectComparableStructField
-		}))...)
+		}), oldObj != nil)...)
 
 	return errs
 }
@@ -189,9 +189,9 @@ func Validate_NestedNonDirectComparableStruct(ctx context.Context, op operation.
 
 	// field NestedNonDirectComparableStruct.NonDirectComparableStructField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *NonDirectComparableStruct) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *NonDirectComparableStruct, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
 			// call field-attached validations
@@ -201,7 +201,7 @@ func Validate_NestedNonDirectComparableStruct(ctx context.Context, op operation.
 			return
 		}(fldPath.Child("nonDirectComparableStructField"), &obj.NonDirectComparableStructField, safe.Field(oldObj, func(oldObj *NestedNonDirectComparableStruct) *NonDirectComparableStruct {
 			return &oldObj.NonDirectComparableStructField
-		}))...)
+		}), oldObj != nil)...)
 
 	return errs
 }
@@ -213,15 +213,15 @@ func Validate_NonDirectComparableStruct(ctx context.Context, op operation.Operat
 
 	// field NonDirectComparableStruct.IntPtrField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *int) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *int, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call field-attached validations
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field intPtrField")...)
 			return
-		}(fldPath.Child("intPtrField"), obj.IntPtrField, safe.Field(oldObj, func(oldObj *NonDirectComparableStruct) *int { return oldObj.IntPtrField }))...)
+		}(fldPath.Child("intPtrField"), obj.IntPtrField, safe.Field(oldObj, func(oldObj *NonDirectComparableStruct) *int { return oldObj.IntPtrField }), oldObj != nil)...)
 
 	return errs
 }
@@ -241,9 +241,9 @@ func Validate_StructEmbedded(ctx context.Context, op operation.Operation, fldPat
 
 	// field StructEmbedded.DirectComparableStruct
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *DirectComparableStruct) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *DirectComparableStruct, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call field-attached validations
@@ -251,13 +251,13 @@ func Validate_StructEmbedded(ctx context.Context, op operation.Operation, fldPat
 			// call the type's validation function
 			errs = append(errs, Validate_DirectComparableStruct(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("directComparableStruct"), &obj.DirectComparableStruct, safe.Field(oldObj, func(oldObj *StructEmbedded) *DirectComparableStruct { return &oldObj.DirectComparableStruct }))...)
+		}(fldPath.Child("directComparableStruct"), &obj.DirectComparableStruct, safe.Field(oldObj, func(oldObj *StructEmbedded) *DirectComparableStruct { return &oldObj.DirectComparableStruct }), oldObj != nil)...)
 
 	// field StructEmbedded.NonDirectComparableStruct
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *NonDirectComparableStruct) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *NonDirectComparableStruct, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
 			// call field-attached validations
@@ -265,13 +265,13 @@ func Validate_StructEmbedded(ctx context.Context, op operation.Operation, fldPat
 			// call the type's validation function
 			errs = append(errs, Validate_NonDirectComparableStruct(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("nonDirectComparableStruct"), &obj.NonDirectComparableStruct, safe.Field(oldObj, func(oldObj *StructEmbedded) *NonDirectComparableStruct { return &oldObj.NonDirectComparableStruct }))...)
+		}(fldPath.Child("nonDirectComparableStruct"), &obj.NonDirectComparableStruct, safe.Field(oldObj, func(oldObj *StructEmbedded) *NonDirectComparableStruct { return &oldObj.NonDirectComparableStruct }), oldObj != nil)...)
 
 	// field StructEmbedded.NestedDirectComparableStructField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *NestedDirectComparableStruct) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *NestedDirectComparableStruct, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call field-attached validations
@@ -281,13 +281,13 @@ func Validate_StructEmbedded(ctx context.Context, op operation.Operation, fldPat
 			return
 		}(fldPath.Child("nestedDirectComparableStructField"), &obj.NestedDirectComparableStructField, safe.Field(oldObj, func(oldObj *StructEmbedded) *NestedDirectComparableStruct {
 			return &oldObj.NestedDirectComparableStructField
-		}))...)
+		}), oldObj != nil)...)
 
 	// field StructEmbedded.NestedNonDirectComparableStructField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *NestedNonDirectComparableStruct) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *NestedNonDirectComparableStruct, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
 			// call field-attached validations
@@ -297,7 +297,7 @@ func Validate_StructEmbedded(ctx context.Context, op operation.Operation, fldPat
 			return
 		}(fldPath.Child("nestedNonDirectComparableStructField"), &obj.NestedNonDirectComparableStructField, safe.Field(oldObj, func(oldObj *StructEmbedded) *NestedNonDirectComparableStruct {
 			return &oldObj.NestedNonDirectComparableStructField
-		}))...)
+		}), oldObj != nil)...)
 
 	return errs
 }
@@ -309,9 +309,9 @@ func Validate_StructMap(ctx context.Context, op operation.Operation, fldPath *fi
 
 	// field StructMap.MapKeyField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj map[S]string) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj map[S]string, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
 			// call field-attached validations
@@ -319,13 +319,13 @@ func Validate_StructMap(ctx context.Context, op operation.Operation, fldPath *fi
 			// iterate the map and call the key type's validation function
 			errs = append(errs, validate.EachMapKey(ctx, op, fldPath, obj, oldObj, Validate_S)...)
 			return
-		}(fldPath.Child("mapKeyField"), obj.MapKeyField, safe.Field(oldObj, func(oldObj *StructMap) map[S]string { return oldObj.MapKeyField }))...)
+		}(fldPath.Child("mapKeyField"), obj.MapKeyField, safe.Field(oldObj, func(oldObj *StructMap) map[S]string { return oldObj.MapKeyField }), oldObj != nil)...)
 
 	// field StructMap.MapValueField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj map[string]S) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj map[string]S, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
 			// call field-attached validations
@@ -333,13 +333,13 @@ func Validate_StructMap(ctx context.Context, op operation.Operation, fldPath *fi
 			// iterate the map and call the value type's validation function
 			errs = append(errs, validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, Validate_S)...)
 			return
-		}(fldPath.Child("mapValueField"), obj.MapValueField, safe.Field(oldObj, func(oldObj *StructMap) map[string]S { return oldObj.MapValueField }))...)
+		}(fldPath.Child("mapValueField"), obj.MapValueField, safe.Field(oldObj, func(oldObj *StructMap) map[string]S { return oldObj.MapValueField }), oldObj != nil)...)
 
 	// field StructMap.AliasMapKeyTypeField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj AliasMapKeyType) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj AliasMapKeyType, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
 			// call field-attached validations
@@ -347,13 +347,13 @@ func Validate_StructMap(ctx context.Context, op operation.Operation, fldPath *fi
 			// call the type's validation function
 			errs = append(errs, Validate_AliasMapKeyType(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("aliasMapKeyTypeField"), obj.AliasMapKeyTypeField, safe.Field(oldObj, func(oldObj *StructMap) AliasMapKeyType { return oldObj.AliasMapKeyTypeField }))...)
+		}(fldPath.Child("aliasMapKeyTypeField"), obj.AliasMapKeyTypeField, safe.Field(oldObj, func(oldObj *StructMap) AliasMapKeyType { return oldObj.AliasMapKeyTypeField }), oldObj != nil)...)
 
 	// field StructMap.AliasMapValueTypeField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj AliasMapValueType) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj AliasMapValueType, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
 			// call field-attached validations
@@ -361,7 +361,7 @@ func Validate_StructMap(ctx context.Context, op operation.Operation, fldPath *fi
 			// call the type's validation function
 			errs = append(errs, Validate_AliasMapValueType(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("aliasMapValueTypeField"), obj.AliasMapValueTypeField, safe.Field(oldObj, func(oldObj *StructMap) AliasMapValueType { return oldObj.AliasMapValueTypeField }))...)
+		}(fldPath.Child("aliasMapValueTypeField"), obj.AliasMapValueTypeField, safe.Field(oldObj, func(oldObj *StructMap) AliasMapValueType { return oldObj.AliasMapValueTypeField }), oldObj != nil)...)
 
 	return errs
 }
@@ -373,21 +373,21 @@ func Validate_StructPrimitive(ctx context.Context, op operation.Operation, fldPa
 
 	// field StructPrimitive.IntField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *int) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *int, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call field-attached validations
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field intField")...)
 			return
-		}(fldPath.Child("intField"), &obj.IntField, safe.Field(oldObj, func(oldObj *StructPrimitive) *int { return &oldObj.IntField }))...)
+		}(fldPath.Child("intField"), &obj.IntField, safe.Field(oldObj, func(oldObj *StructPrimitive) *int { return &oldObj.IntField }), oldObj != nil)...)
 
 	// field StructPrimitive.IntPtrField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *int) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *int, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call field-attached validations
@@ -400,7 +400,7 @@ func Validate_StructPrimitive(ctx context.Context, op operation.Operation, fldPa
 			}
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field intPtrField")...)
 			return
-		}(fldPath.Child("intPtrField"), obj.IntPtrField, safe.Field(oldObj, func(oldObj *StructPrimitive) *int { return oldObj.IntPtrField }))...)
+		}(fldPath.Child("intPtrField"), obj.IntPtrField, safe.Field(oldObj, func(oldObj *StructPrimitive) *int { return oldObj.IntPtrField }), oldObj != nil)...)
 
 	return errs
 }
@@ -412,9 +412,9 @@ func Validate_StructSlice(ctx context.Context, op operation.Operation, fldPath *
 
 	// field StructSlice.SliceField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []S) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj []S, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
 			// call field-attached validations
@@ -422,13 +422,13 @@ func Validate_StructSlice(ctx context.Context, op operation.Operation, fldPath *
 			// iterate the list and call the type's validation function
 			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_S)...)
 			return
-		}(fldPath.Child("sliceField"), obj.SliceField, safe.Field(oldObj, func(oldObj *StructSlice) []S { return oldObj.SliceField }))...)
+		}(fldPath.Child("sliceField"), obj.SliceField, safe.Field(oldObj, func(oldObj *StructSlice) []S { return oldObj.SliceField }), oldObj != nil)...)
 
 	// field StructSlice.TypeDefSliceField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj MySlice) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj MySlice, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
 			// call field-attached validations
@@ -436,7 +436,7 @@ func Validate_StructSlice(ctx context.Context, op operation.Operation, fldPath *
 			// call the type's validation function
 			errs = append(errs, Validate_MySlice(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("typedefSliceField"), obj.TypeDefSliceField, safe.Field(oldObj, func(oldObj *StructSlice) MySlice { return oldObj.TypeDefSliceField }))...)
+		}(fldPath.Child("typedefSliceField"), obj.TypeDefSliceField, safe.Field(oldObj, func(oldObj *StructSlice) MySlice { return oldObj.TypeDefSliceField }), oldObj != nil)...)
 
 	return errs
 }
@@ -448,9 +448,9 @@ func Validate_StructStruct(ctx context.Context, op operation.Operation, fldPath 
 
 	// field StructStruct.DirectComparableStructField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *DirectComparableStruct) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *DirectComparableStruct, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call field-attached validations
@@ -458,13 +458,13 @@ func Validate_StructStruct(ctx context.Context, op operation.Operation, fldPath 
 			// call the type's validation function
 			errs = append(errs, Validate_DirectComparableStruct(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("directComparableStructField"), &obj.DirectComparableStructField, safe.Field(oldObj, func(oldObj *StructStruct) *DirectComparableStruct { return &oldObj.DirectComparableStructField }))...)
+		}(fldPath.Child("directComparableStructField"), &obj.DirectComparableStructField, safe.Field(oldObj, func(oldObj *StructStruct) *DirectComparableStruct { return &oldObj.DirectComparableStructField }), oldObj != nil)...)
 
 	// field StructStruct.NonDirectComparableStructField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *NonDirectComparableStruct) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *NonDirectComparableStruct, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
 			// call field-attached validations
@@ -472,13 +472,13 @@ func Validate_StructStruct(ctx context.Context, op operation.Operation, fldPath 
 			// call the type's validation function
 			errs = append(errs, Validate_NonDirectComparableStruct(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("nonDirectComparableStructField"), &obj.NonDirectComparableStructField, safe.Field(oldObj, func(oldObj *StructStruct) *NonDirectComparableStruct { return &oldObj.NonDirectComparableStructField }))...)
+		}(fldPath.Child("nonDirectComparableStructField"), &obj.NonDirectComparableStructField, safe.Field(oldObj, func(oldObj *StructStruct) *NonDirectComparableStruct { return &oldObj.NonDirectComparableStructField }), oldObj != nil)...)
 
 	// field StructStruct.DirectComparableStructPtr
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *DirectComparableStruct) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *DirectComparableStruct, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call field-attached validations
@@ -486,13 +486,13 @@ func Validate_StructStruct(ctx context.Context, op operation.Operation, fldPath 
 			// call the type's validation function
 			errs = append(errs, Validate_DirectComparableStruct(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("directComparableStructPtrField"), obj.DirectComparableStructPtr, safe.Field(oldObj, func(oldObj *StructStruct) *DirectComparableStruct { return oldObj.DirectComparableStructPtr }))...)
+		}(fldPath.Child("directComparableStructPtrField"), obj.DirectComparableStructPtr, safe.Field(oldObj, func(oldObj *StructStruct) *DirectComparableStruct { return oldObj.DirectComparableStructPtr }), oldObj != nil)...)
 
 	// field StructStruct.NonDirectComparableStructPtr
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *NonDirectComparableStruct) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *NonDirectComparableStruct, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
 			// call field-attached validations
@@ -500,13 +500,13 @@ func Validate_StructStruct(ctx context.Context, op operation.Operation, fldPath 
 			// call the type's validation function
 			errs = append(errs, Validate_NonDirectComparableStruct(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("nonDirectComparableStructPtrField"), obj.NonDirectComparableStructPtr, safe.Field(oldObj, func(oldObj *StructStruct) *NonDirectComparableStruct { return oldObj.NonDirectComparableStructPtr }))...)
+		}(fldPath.Child("nonDirectComparableStructPtrField"), obj.NonDirectComparableStructPtr, safe.Field(oldObj, func(oldObj *StructStruct) *NonDirectComparableStruct { return oldObj.NonDirectComparableStructPtr }), oldObj != nil)...)
 
 	// field StructStruct.DirectComparableStruct
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *DirectComparableStruct) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *DirectComparableStruct, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call field-attached validations
@@ -514,13 +514,13 @@ func Validate_StructStruct(ctx context.Context, op operation.Operation, fldPath 
 			// call the type's validation function
 			errs = append(errs, Validate_DirectComparableStruct(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(safe.Value(fldPath, func() *field.Path { return fldPath.Child("DirectComparableStruct") }), &obj.DirectComparableStruct, safe.Field(oldObj, func(oldObj *StructStruct) *DirectComparableStruct { return &oldObj.DirectComparableStruct }))...)
+		}(safe.Value(fldPath, func() *field.Path { return fldPath.Child("DirectComparableStruct") }), &obj.DirectComparableStruct, safe.Field(oldObj, func(oldObj *StructStruct) *DirectComparableStruct { return &oldObj.DirectComparableStruct }), oldObj != nil)...)
 
 	// field StructStruct.NonDirectComparableStruct
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *NonDirectComparableStruct) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *NonDirectComparableStruct, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
 			// call field-attached validations
@@ -528,7 +528,7 @@ func Validate_StructStruct(ctx context.Context, op operation.Operation, fldPath 
 			// call the type's validation function
 			errs = append(errs, Validate_NonDirectComparableStruct(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(safe.Value(fldPath, func() *field.Path { return fldPath.Child("NonDirectComparableStruct") }), &obj.NonDirectComparableStruct, safe.Field(oldObj, func(oldObj *StructStruct) *NonDirectComparableStruct { return &oldObj.NonDirectComparableStruct }))...)
+		}(safe.Value(fldPath, func() *field.Path { return fldPath.Child("NonDirectComparableStruct") }), &obj.NonDirectComparableStruct, safe.Field(oldObj, func(oldObj *StructStruct) *NonDirectComparableStruct { return &oldObj.NonDirectComparableStruct }), oldObj != nil)...)
 
 	return errs
 }
