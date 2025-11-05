@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edaemonset "k8s.io/kubernetes/test/e2e/framework/daemonset"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -74,6 +75,23 @@ func SetupRegistry(ctx context.Context, f *framework.Framework, podOnly bool) (s
 		podClient := e2epod.NewPodClient(f)
 		pod = podClient.Create(ctx, pod)
 		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod))
+		output := e2epod.ExecShellInPod(ctx, f, pod.Name, "curl -v http://127.0.0.1:5000/v2/")
+		framework.Logf("pod ipv4 registry output: %s", output)
+		output = e2epod.ExecShellInPod(ctx, f, pod.Name, "curl -v http://[::1]:5000/v2/")
+		framework.Logf("podipv6 registry output: %s", output)
+		output = e2epod.ExecShellInPod(ctx, f, pod.Name, "curl -v http://localhost:5000/v2/")
+		framework.Logf("pod localhost registry output: %s", output)
+		node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, framework.TestContext.NodeName, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+		r, err := e2essh.IssueSSHCommandWithResult(ctx, "curl -v http://127.0.0.1:5000/v2/", framework.TestContext.Provider, node)
+		framework.ExpectNoError(err)
+		framework.Logf("node ipv4 registry output: stdout: %s, stderr: %s, code: %d", r.Stdout, r.Stderr, r.Code)
+		r, err = e2essh.IssueSSHCommandWithResult(ctx, "curl -v http://[::1]:5000/v2/", framework.TestContext.Provider, node)
+		framework.ExpectNoError(err)
+		framework.Logf("node ipv6 registry output: stdout: %s, stderr: %s, code: %d", r.Stdout, r.Stderr, r.Code)
+		r, err = e2essh.IssueSSHCommandWithResult(ctx, "curl -v http://localhost:5000/v2/", framework.TestContext.Provider, node)
+		framework.ExpectNoError(err)
+		framework.Logf("node localhost registry output: stdout: %s, stderr: %s, code: %d", r.Stdout, r.Stderr, r.Code)
 	} else {
 		labels := map[string]string{"kube-e2e": podTestLabel}
 		daemonset := e2edaemonset.NewDaemonSet("", "", labels, nil, nil, nil)
