@@ -23,12 +23,16 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/config"
 	"k8s.io/kubectl/pkg/config/scheme"
+	"k8s.io/kubectl/pkg/config/v1beta1"
+	"sigs.k8s.io/yaml"
 )
 
 // decodePreference iterates over the yamls in kuberc file to find the supported kuberc version.
@@ -98,4 +102,55 @@ func decodePreference(kubercFile string) (*config.Preference, error) {
 	// empty doc
 	klog.V(5).Infof("kuberc: no preferences found in %s", kubercFile)
 	return nil, nil
+}
+
+// SavePreference saves the preference to the kuberc file
+func SavePreference(pref *v1beta1.Preference, file string, out io.Writer) error {
+	dir := filepath.Dir(file)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("failed to create directory %s: %w", dir, err)
+	}
+
+	data, err := yaml.Marshal(pref)
+	if err != nil {
+		return fmt.Errorf("failed to marshal preferences: %w", err)
+	}
+
+	if err := os.WriteFile(file, data, 0644); err != nil {
+		return fmt.Errorf("failed to write kuberc file: %w", err)
+	}
+
+	fmt.Fprintf(out, "Updated %s\n", file) // nolint:errcheck
+	return nil
+}
+
+// CreateDefaultPreference returns Preference object with
+// some default configurations.
+func CreateDefaultPreference() *v1beta1.Preference {
+	return &v1beta1.Preference{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "kubectl.config.k8s.io/v1beta1",
+			Kind:       "Preference",
+		},
+		Defaults: []v1beta1.CommandDefaults{
+			{
+				Command: "apply",
+				Options: []v1beta1.CommandOptionDefault{
+					{
+						Name:    "server-side",
+						Default: "true",
+					},
+				},
+			},
+			{
+				Command: "delete",
+				Options: []v1beta1.CommandOptionDefault{
+					{
+						Name:    "interactive",
+						Default: "true",
+					},
+				},
+			},
+		},
+	}
 }
