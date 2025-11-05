@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"time"
 
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
+
 	csipbv1 "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -582,43 +584,40 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 				}
 
 				if test.expectedQuotaUsage != nil {
-					validateQuotaUsage(ctx, m, currentQuota, test.expectedQuotaUsage)
+                // Use uncached client to avoid watch/cache lag when validating quota usage
+					uncachedClient := f.ClientSet.CoreV1()
+					validateQuotaUsage(ctx, m, currentQuota, test.expectedQuotaUsage, uncachedClient)
 				}
 			})
 		}
 	})
 })
 
-func validateQuotaUsage(ctx context.Context, m *mockDriverSetup, currentQuota, expectedQuota *v1.ResourceQuota) {
-	ginkgo.By("Waiting for resource quota usage to be updated")
-	var err error
-	var quota *v1.ResourceQuota
-	var usedCount resource.Quantity
-	var usedSize resource.Quantity
+func validateQuotaUsage(ctx context.Context, m *mockDriverSetup, currentQuota, expectedQuota *v1.ResourceQuota, uncachedClient corev1client.CoreV1Interface) {
+    ginkgo.By("Waiting for resource quota usage to be updated")
+    var (
+		quota     *v1.ResourceQuota
+        usedCount resource.Quantity
+        usedSize  resource.Quantity
+    )
 
-	expectedCount := expectedQuota.Status.Used[pvcCountQuotaKey]
-	expectedUsedSize := expectedQuota.Status.Used[pvcSizeQuotaKey]
+    expectedCount := expectedQuota.Status.Used[pvcCountQuotaKey]
+    expectedUsedSize := expectedQuota.Status.Used[pvcSizeQuotaKey]
 
-	waitErr := wait.PollUntilContextTimeout(ctx, resizePollInterval, csiResizeWaitPeriod, true, func(pollContext context.Context) (bool, error) {
-		quota, err = m.cs.CoreV1().ResourceQuotas(currentQuota.Namespace).Get(pollContext, currentQuota.Name, metav1.GetOptions{})
-		if err != nil {
-			return false, fmt.Errorf("error fetching resource quota %q: %w", expectedQuota.Name, err)
-		}
-		if quota.Status.Used == nil {
-			return false, nil
-		}
-		usedCount = quota.Status.Used[pvcCountQuotaKey]
-		usedSize = quota.Status.Used[pvcSizeQuotaKey]
-		if usedCount.Cmp(expectedCount) == 0 && usedSize.Cmp(expectedUsedSize) == 0 {
-			return true, nil
-		}
-		return false, nil
-	})
-
-	if waitErr != nil {
-		framework.Failf("error while waiting for resource quota usage to be updated, currentlyUsed: %s/%s, expected: %s/%s: %v", usedCount.String(), usedSize.String(), expectedCount.String(), expectedUsedSize.String(), waitErr)
-	}
+    gomega.Eventually(func() bool {
+        q, err := uncachedClient.ResourceQuotas(currentQuota.Namespace).Get(ctx, currentQuota.Name, metav1.GetOptions{})
+        if err != nil || q.Status.Used == nil {
+            return false
+        }
+        quota = q
+        usedCount = quota.Status.Used[pvcCountQuotaKey]
+        usedSize = quota.Status.Used[pvcSizeQuotaKey]
+        return usedCount.Cmp(expectedCount) == 0 && usedSize.Cmp(expectedUsedSize) == 0
+    }, csiResizeWaitPeriod, resizePollInterval).Should(gomega.BeTrue(),
+        fmt.Sprintf("resource quota usage did not converge; currentlyUsed: %s/%s, expected: %s/%s",
+            usedCount.String(), usedSize.String(), expectedCount.String(), expectedUsedSize.String()))
 }
+
 
 func validateRecoveryBehaviour(ctx context.Context, pvc *v1.PersistentVolumeClaim, m *mockDriverSetup, test recoveryTest) {
 	var err error
@@ -647,8 +646,10 @@ func validateRecoveryBehaviour(ctx context.Context, pvc *v1.PersistentVolumeClai
 		framework.Failf("error updating pvc size %q", pvc.Name)
 	}
 
-	// if expansion failed on controller with final error, then recovery should be possible
-	if test.simulatedCSIDriverError == expansionFailedOnControllerWithInfeasibleError {
+	// If expansion failed on controller (infeasible or final), recovery should be possible.
+	// Wait for the recovery resize to settle before checking quota.
+	if test.simulatedCSIDriverError == expansionFailedOnControllerWithInfeasibleError ||
+	test.simulatedCSIDriverError == expansionFailedOnControllerWithFinalError {
 		validateExpansionSuccess(ctx, pvc, m, test, test.recoverySize.String())
 		return
 	}
