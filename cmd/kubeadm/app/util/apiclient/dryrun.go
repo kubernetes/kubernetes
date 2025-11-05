@@ -43,6 +43,7 @@ import (
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
@@ -561,17 +562,18 @@ func getJob(namespace, name string) *batchv1.Job {
 
 // getNode returns a fake Node object.
 func getNode(name string) *corev1.Node {
-	return &corev1.Node{
+	node := &corev1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Labels: map[string]string{
 				"kubernetes.io/hostname": name,
 			},
-			Annotations: map[string]string{
-				constants.AnnotationKubeadmCRISocket: "dry-run-cri-socket",
-			},
 		},
 	}
+	if !features.InitFeatureGates[features.NodeLocalCRISocket].Default {
+		node.Annotations[constants.AnnotationKubeadmCRISocket] = "dry-run-cri-socket"
+	}
+	return node
 }
 
 // getConfigMap returns a fake ConfigMap object.
