@@ -127,6 +127,10 @@ for image in $images; do
                     path="csi-snapshotter"
                     rbac="rbac-csi-snapshotter.yaml"
                     ;;
+                external-snapshot-metadata)
+                    # Another special case. There is no e2e test that needs the RBAC manifest + it's on an unusual place.
+                    continue
+                    ;;
             esac
             ;;
     esac
