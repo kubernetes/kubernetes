@@ -137,7 +137,7 @@ func doGuaranteedPodResizeTests(f *framework.Framework) {
 			Testname: In-place Pod Resize, guaranteed pods with multiple containers, net increase
 			Description: Issuing an in-place Pod Resize request via the Pod Resize subresource patch endpoint to modify CPU and memory requests and limits for a guaranteed pod with 3 containers with a net increase MUST result in the Pod resources being updated as expected.
 		*/
-		framework.ConformanceIt("3 containers - increase cpu & mem on c1, c2, decrease cpu & mem on c3 - net increase", func(ctx context.Context) {
+		framework.ConformanceIt("3 containers - increase cpu & mem on c1, c2, decrease cpu & mem on c3 - net increase [MinimumKubeletVersion:1.34]", func(ctx context.Context) {
 			originalContainers := makeGuaranteedContainers(3, v1.NotRequired, v1.NotRequired, false, false, originalCPU, originalMem)
 			for i := range originalContainers {
 				originalContainers[i].CPUPolicy = nil
@@ -167,7 +167,7 @@ func doGuaranteedPodResizeTests(f *framework.Framework) {
 			Testname: In-place Pod Resize, guaranteed pods with multiple containers, net decrease
 			Description: Issuing an in-place Pod Resize request via the Pod Resize subresource patch endpoint to modify CPU and memory requests and limits for a pod with 3 containers with a net decrease MUST result in the Pod resources being updated as expected.
 		*/
-		framework.ConformanceIt("3 containers - increase cpu & mem on c1, decrease cpu & mem on c2, c3 - net decrease", func(ctx context.Context) {
+		framework.ConformanceIt("3 containers - increase cpu & mem on c1, decrease cpu & mem on c2, c3 - net decrease [MinimumKubeletVersion:1.34]", func(ctx context.Context) {
 			originalContainers := makeGuaranteedContainers(3, v1.NotRequired, v1.NotRequired, false, false, originalCPU, originalMem)
 			for i := range originalContainers {
 				originalContainers[i].CPUPolicy = nil
@@ -197,7 +197,7 @@ func doGuaranteedPodResizeTests(f *framework.Framework) {
 			Testname: In-place Pod Resize, guaranteed pods with multiple containers, various operations
 			Description: Issuing an in-place Pod Resize request via the Pod Resize subresource patch endpoint to modify CPU and memory requests and limits for a pod with 3 containers with various operations MUST result in the Pod resources being updated as expected.
 		*/
-		framework.ConformanceIt("3 containers - increase: CPU (c1,c3), memory (c2, c3) ; decrease: CPU (c2)", func(ctx context.Context) {
+		framework.ConformanceIt("3 containers - increase: CPU (c1,c3), memory (c2, c3) ; decrease: CPU (c2) [MinimumKubeletVersion:1.34]", func(ctx context.Context) {
 			originalContainers := makeGuaranteedContainers(3, v1.NotRequired, v1.NotRequired, false, false, originalCPU, originalMem)
 			for i := range originalContainers {
 				originalContainers[i].CPUPolicy = nil
@@ -272,7 +272,7 @@ func doBurstablePodResizeTests(f *framework.Framework) {
 			Testname: In-place Pod Resize, burtable pod with multiple containers and various operations
 			Description: Issuing a Pod Resize request via the Pod Resize subresource patch endpoint to modify CPU and memory requests and limits on a 6-container pod with various operations MUST result in the Pod resources being updated as expected.
 		*/
-		framework.ConformanceIt("6 containers - various operations performed (including adding limits and requests)", func(ctx context.Context) {
+		framework.ConformanceIt("6 containers - various operations performed (including adding limits and requests) [MinimumKubeletVersion:1.34]", func(ctx context.Context) {
 			originalContainers := []podresize.ResizableContainerInfo{
 				{
 					// c1 starts with CPU requests only; increase CPU requests + add CPU limits
@@ -335,7 +335,7 @@ func doBurstablePodResizeTests(f *framework.Framework) {
 			Testname: In-place Pod Resize, burstable pod resized with equivalents
 			Description: Issuing an in-place Pod Resize request via the Pod Resize subresource patch endpoint to modify CPU requests and limits using equivalent values (e.g. 2m -> 1m) MUST result in the updated Pod resources displayed correctly in the status.
 		*/
-		framework.ConformanceIt("resize with equivalents", func(ctx context.Context) {
+		framework.ConformanceIt("resize with equivalents [MinimumKubeletVersion:1.34]", func(ctx context.Context) {
 			originalContainers := []podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
@@ -711,7 +711,7 @@ func doPodResizeReadAndReplaceTests(f *framework.Framework) {
 		Testname: In-place Pod Resize, read and replace endpoints
 		Description: Issuing a Pod Resize request via the Pod Resize subresource replace endpoint MUST result in the Pod resources being updated as expected. The Pod object fetched from the Pod Resize subresource MUST be equivalent to the Pod object fetched from the main Pod endpoint after the resize is completed.
 	*/
-	framework.ConformanceIt("resize pod via the replace endpoint", func(ctx context.Context) {
+	framework.ConformanceIt("resize pod via the replace endpoint [MinimumKubeletVersion:1.34]", func(ctx context.Context) {
 		podClient := e2epod.NewPodClient(f)
 		original := []podresize.ResizableContainerInfo{{
 			Name:      "c1",
