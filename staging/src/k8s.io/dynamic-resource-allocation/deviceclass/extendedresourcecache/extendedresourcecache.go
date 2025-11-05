@@ -35,8 +35,10 @@ type ExtendedResourceCache struct {
 	handlers []cache.ResourceEventHandler
 
 	mutex sync.RWMutex
-	// mapping maps extended resource name to device class
-	mapping map[v1.ResourceName]*resourceapi.DeviceClass
+	// resourceName2class maps extended resource name to device class
+	resourceName2class map[v1.ResourceName]*resourceapi.DeviceClass
+	// class2ResourceName maps device class name to extended resource name
+	class2ResourceName map[string]string
 }
 
 var _ cache.ResourceEventHandler = &ExtendedResourceCache{}
@@ -47,9 +49,10 @@ var _ cache.ResourceEventHandler = &ExtendedResourceCache{}
 // Additional event handlers may be registered here or via AddEventHandler.
 func NewExtendedResourceCache(logger klog.Logger, handlers ...cache.ResourceEventHandler) *ExtendedResourceCache {
 	cache := &ExtendedResourceCache{
-		logger:   logger,
-		handlers: handlers,
-		mapping:  make(map[v1.ResourceName]*resourceapi.DeviceClass),
+		logger:             logger,
+		handlers:           handlers,
+		resourceName2class: make(map[v1.ResourceName]*resourceapi.DeviceClass),
+		class2ResourceName: make(map[string]string),
 	}
 
 	return cache
@@ -77,7 +80,19 @@ func (c *ExtendedResourceCache) GetDeviceClass(resourceName v1.ResourceName) *re
 	}
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
-	return c.mapping[resourceName]
+	return c.resourceName2class[resourceName]
+}
+
+// GetExtendedResource returns the extended resource name for the given device class name.
+// Returns empty string if the class name is not found in the cache.
+func (c *ExtendedResourceCache) GetExtendedResource(className string) string {
+	if c == nil {
+		return ""
+	}
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
+
+	return c.class2ResourceName[className]
 }
 
 // OnAdd handles the addition of a new device class.
@@ -87,7 +102,8 @@ func (c *ExtendedResourceCache) OnAdd(obj interface{}, isInInitialList bool) {
 		utilruntime.HandleErrorWithLogger(c.logger, nil, "Expected DeviceClass", "actual", fmt.Sprintf("%T", obj))
 		return
 	}
-	c.updateMapping(deviceClass, nil)
+	c.updateResourceName2class(deviceClass, nil)
+	c.updateClass2ResourceName(deviceClass)
 
 	for _, handler := range c.handlers {
 		handler.OnAdd(obj, isInInitialList)
@@ -106,7 +122,8 @@ func (c *ExtendedResourceCache) OnUpdate(oldObj, newObj interface{}) {
 		utilruntime.HandleErrorWithLogger(c.logger, nil, "Expected DeviceClass", "actual", fmt.Sprintf("%T", oldObj))
 		return
 	}
-	c.updateMapping(deviceClass, oldDeviceClass)
+	c.updateResourceName2class(deviceClass, oldDeviceClass)
+	c.updateClass2ResourceName(deviceClass)
 
 	for _, handler := range c.handlers {
 		handler.OnUpdate(oldObj, newObj)
@@ -123,20 +140,18 @@ func (c *ExtendedResourceCache) OnDelete(obj interface{}) {
 		utilruntime.HandleErrorWithLogger(c.logger, nil, "Expected DeviceClass", "actual", fmt.Sprintf("%T", obj))
 		return
 	}
-	c.removeMapping(deviceClass)
+	c.removeResourceName2class(deviceClass)
+	c.removeClass2ResourceName(deviceClass)
 
 	for _, handler := range c.handlers {
 		handler.OnDelete(obj)
 	}
 }
 
-// updateMapping updates the cache with the device class mapping.
+// updateResourceName2class updates the cache with the device class mapping.
 // It first removes any existing mappings for this device class to handle
 // ExtendedResourceName changes, then adds the new mappings.
-func (c *ExtendedResourceCache) updateMapping(newDeviceClass, oldDeviceClass *resourceapi.DeviceClass) {
-	if newDeviceClass == nil {
-		return
-	}
+func (c *ExtendedResourceCache) updateResourceName2class(newDeviceClass, oldDeviceClass *resourceapi.DeviceClass) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
@@ -153,7 +168,7 @@ func (c *ExtendedResourceCache) updateMapping(newDeviceClass, oldDeviceClass *re
 	// implicit mappings.
 	var classWithSameExtendedResourceName *resourceapi.DeviceClass
 	if newDeviceClass.Spec.ExtendedResourceName != nil {
-		classWithSameExtendedResourceName = c.mapping[v1.ResourceName(*newDeviceClass.Spec.ExtendedResourceName)]
+		classWithSameExtendedResourceName = c.resourceName2class[v1.ResourceName(*newDeviceClass.Spec.ExtendedResourceName)]
 	}
 	if classWithSameExtendedResourceName != nil {
 		switch cmp.Compare(newDeviceClass.CreationTimestamp.UnixNano(), classWithSameExtendedResourceName.CreationTimestamp.UnixNano()) {
@@ -170,43 +185,63 @@ func (c *ExtendedResourceCache) updateMapping(newDeviceClass, oldDeviceClass *re
 
 	// Remove old mappings first to handle ExtendedResourceName changes
 	if oldDeviceClass != nil {
-		delete(c.mapping, v1.ResourceName(resourceapi.ResourceDeviceClassPrefix+oldDeviceClass.Name))
+		delete(c.resourceName2class, v1.ResourceName(resourceapi.ResourceDeviceClassPrefix+oldDeviceClass.Name))
 		if oldDeviceClass.Spec.ExtendedResourceName != nil {
-			delete(c.mapping, v1.ResourceName(*oldDeviceClass.Spec.ExtendedResourceName))
+			delete(c.resourceName2class, v1.ResourceName(*oldDeviceClass.Spec.ExtendedResourceName))
 		}
 	}
 
 	// Add new mappings
 	if newDeviceClass.Spec.ExtendedResourceName != nil {
-		c.mapping[v1.ResourceName(*newDeviceClass.Spec.ExtendedResourceName)] = newDeviceClass
+		c.resourceName2class[v1.ResourceName(*newDeviceClass.Spec.ExtendedResourceName)] = newDeviceClass
 		c.logger.V(5).Info("Updated extended resource cache for explicit mapping",
 			"extendedResource", *newDeviceClass.Spec.ExtendedResourceName,
 			"deviceClass", newDeviceClass.Name)
 	}
 	// Always add the default mapping
 	defaultResourceName := v1.ResourceName(resourceapi.ResourceDeviceClassPrefix + newDeviceClass.Name)
-	c.mapping[defaultResourceName] = newDeviceClass
+	c.resourceName2class[defaultResourceName] = newDeviceClass
 	c.logger.V(5).Info("Updated extended resource cache for default mapping",
 		"extendedResource", defaultResourceName,
 		"deviceClass", newDeviceClass.Name)
 }
 
-// removeMapping removes the device class mapping from the cache.
-// It searches for all mappings to the given device class name and removes them,
-// because the ExtendedResourceName in the deviceClass object may be stale.
-func (c *ExtendedResourceCache) removeMapping(deviceClass *resourceapi.DeviceClass) {
-	if deviceClass == nil {
+// updateClass2ResourceName updates the cache with the device class mapping.
+func (c *ExtendedResourceCache) updateClass2ResourceName(deviceClass *resourceapi.DeviceClass) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	if deviceClass.Spec.ExtendedResourceName == nil {
+		delete(c.class2ResourceName, deviceClass.Name)
 		return
 	}
+
+	c.class2ResourceName[deviceClass.Name] = *deviceClass.Spec.ExtendedResourceName
+	c.logger.V(5).Info("Updated device class mapping", "deviceClass", deviceClass.Name, "extendedResource", *deviceClass.Spec.ExtendedResourceName)
+}
+
+// removeResourceName2class removes the device class mapping from the cache.
+// It searches for all mappings to the given device class name and removes them,
+// because the ExtendedResourceName in the deviceClass object may be stale.
+func (c *ExtendedResourceCache) removeResourceName2class(deviceClass *resourceapi.DeviceClass) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
 	// Remove the default mapping
-	delete(c.mapping, v1.ResourceName(resourceapi.ResourceDeviceClassPrefix+deviceClass.Name))
+	delete(c.resourceName2class, v1.ResourceName(resourceapi.ResourceDeviceClassPrefix+deviceClass.Name))
 	// Remove the explicit mapping
 	if deviceClass.Spec.ExtendedResourceName != nil {
-		delete(c.mapping, v1.ResourceName(*deviceClass.Spec.ExtendedResourceName))
+		delete(c.resourceName2class, v1.ResourceName(*deviceClass.Spec.ExtendedResourceName))
 	}
 	c.logger.V(5).Info("Removed extended resource from cache",
 		"deviceClass", deviceClass.Name)
+}
+
+// removeClass2ResourceName removes the device class mapping from the cache.
+func (c *ExtendedResourceCache) removeClass2ResourceName(deviceClass *resourceapi.DeviceClass) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	delete(c.class2ResourceName, deviceClass.Name)
+	c.logger.V(5).Info("Removed device class", "deviceClass", deviceClass.Name)
 }

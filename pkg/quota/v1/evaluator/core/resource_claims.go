@@ -23,13 +23,19 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 	quota "k8s.io/apiserver/pkg/quota/v1"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	corev1listers "k8s.io/client-go/listers/core/v1"
+	"k8s.io/dynamic-resource-allocation/deviceclass/extendedresourcecache"
 	resourceinternal "k8s.io/kubernetes/pkg/apis/resource"
 	resourceversioned "k8s.io/kubernetes/pkg/apis/resource/v1"
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/clock"
 )
 
 // The name used for object count quota. This evaluator takes over counting
@@ -38,14 +44,15 @@ import (
 var ClaimObjectCountName = generic.ObjectCountQuotaResourceNameFor(resourceapi.SchemeGroupVersion.WithResource("resourceclaims").GroupResource())
 
 // V1ResourceByDeviceClass returns a quota resource name by device class.
+// gpuclass -> gpuclass.deviceclass.resource.k8s.io/devices
 func V1ResourceByDeviceClass(className string) corev1.ResourceName {
 	return corev1.ResourceName(className + corev1.ResourceClaimsPerClass)
 }
 
 // NewResourceClaimEvaluator returns an evaluator that can evaluate resource claims
-func NewResourceClaimEvaluator(f quota.ListerForResourceFunc) quota.Evaluator {
+func NewResourceClaimEvaluator(f quota.ListerForResourceFunc, m *extendedresourcecache.ExtendedResourceCache, podsGetter corev1listers.PodLister) quota.Evaluator {
 	listFuncByNamespace := generic.ListResourceUsingListerFunc(f, resourceapi.SchemeGroupVersion.WithResource("resourceclaims"))
-	claimEvaluator := &claimEvaluator{listFuncByNamespace: listFuncByNamespace}
+	claimEvaluator := &claimEvaluator{listFuncByNamespace: listFuncByNamespace, deviceClassMapping: m, podsGetter: podsGetter}
 	return claimEvaluator
 }
 
@@ -53,6 +60,10 @@ func NewResourceClaimEvaluator(f quota.ListerForResourceFunc) quota.Evaluator {
 type claimEvaluator struct {
 	// listFuncByNamespace knows how to list resource claims
 	listFuncByNamespace generic.ListFuncByNamespace
+	// a global cache of device class and extended resource mapping
+	deviceClassMapping *extendedresourcecache.ExtendedResourceCache
+	// podsGetter is used to get pods
+	podsGetter corev1listers.PodLister
 }
 
 // Constraints verifies that all required resources are present on the item.
@@ -98,9 +109,89 @@ func (p *claimEvaluator) MatchingResources(items []corev1.ResourceName) []corev1
 		if item == ClaimObjectCountName /* object count quota fields */ ||
 			strings.HasSuffix(string(item), corev1.ResourceClaimsPerClass /* by device class */) {
 			result = append(result, item)
+			continue
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
+			if strings.HasPrefix(string(item), corev1.ResourceImplicitExtendedClaimsPerClass /* by implicit extended resource name */) {
+				className := string(item[len(corev1.ResourceImplicitExtendedClaimsPerClass):])
+				if p.deviceClassMapping.GetExtendedResource(className) != "" {
+					result = append(result, item)
+					continue
+				}
+			}
+			if isExtendedResourceNameForQuota(item) /* by extended resource name */ {
+				resourceName := string(item[len(corev1.DefaultResourceRequestsPrefix):])
+				if p.deviceClassMapping.GetDeviceClass(corev1.ResourceName(resourceName)) != nil {
+					result = append(result, item)
+				}
+			}
 		}
 	}
 	return result
+}
+
+func (p *claimEvaluator) addExtendedResourceQuota(resourceClaimUsage map[corev1.ResourceName]resource.Quantity, podUsage corev1.ResourceList) {
+	extendedResourceUsage := make(map[corev1.ResourceName]resource.Quantity)
+	for name, quantity := range resourceClaimUsage {
+		// e.g. myclass
+		deviceClassName, isDeviceClassUsage := strings.CutSuffix(string(name), corev1.ResourceClaimsPerClass)
+		if !isDeviceClassUsage || len(deviceClassName) == 0 {
+			continue
+		}
+
+		// requests.deviceclass.resource.kubernetes.io/myclass
+		extendedResourceUsage[corev1.ResourceName(corev1.ResourceImplicitExtendedClaimsPerClass+deviceClassName)] = quantity
+
+		// e.g. example.com/mygpu
+		if extendedResourceName := p.deviceClassMapping.GetExtendedResource(deviceClassName); len(extendedResourceName) > 0 {
+			// requests.example.com/gpu
+			extendedResourceUsage[corev1.ResourceName(corev1.DefaultResourceRequestsPrefix+extendedResourceName)] = quantity
+		}
+	}
+
+	for name, quantity := range extendedResourceUsage {
+		// Subtract any amount already accounted for in the pod
+		if podQuantity, found := podUsage[name]; found {
+			quantity.Sub(podQuantity)
+		}
+		// Add any remaining amount to the resource claim resources
+		if quantity.CmpInt64(0) > 0 {
+			resourceClaimUsage[name] = quantity
+		}
+	}
+}
+
+// Verify extended resource claim owning pod exists, and the pod's ExtendedResourceClaimStatus points
+// back to the claim if it's not nil, and returns the pod's quota usage. If any error is encountered, nil is returned.
+func (p *claimEvaluator) getVerifiedPodUsage(claim *resourceapi.ResourceClaim) corev1.ResourceList {
+	if claim.Annotations[resourceapi.ExtendedResourceClaimAnnotation] != "true" {
+		return nil
+	}
+	controllerRef := metav1.GetControllerOf(claim)
+	if controllerRef == nil {
+		return nil
+	}
+	if controllerRef.Kind != "Pod" || controllerRef.APIVersion != "v1" {
+		return nil
+	}
+	if p.podsGetter == nil {
+		return nil
+	}
+	pod, err := p.podsGetter.Pods(claim.Namespace).Get(controllerRef.Name)
+	if err != nil {
+		return nil
+	}
+	if controllerRef.UID != pod.UID {
+		return nil
+	}
+	if pod.Status.ExtendedResourceClaimStatus != nil && pod.Status.ExtendedResourceClaimStatus.ResourceClaimName != claim.Name {
+		return nil
+	}
+	quotaReqs, err := PodUsageFunc(pod, clock.RealClock{})
+	if err != nil {
+		return nil
+	}
+	return quotaReqs
 }
 
 // Usage knows how to measure usage associated with item.
@@ -166,6 +257,10 @@ func (p *claimEvaluator) Usage(item runtime.Object) (corev1.ResourceList, error)
 		default:
 			// Some unknown, future request type. Cannot do quota for it.
 		}
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
+		p.addExtendedResourceQuota(result, p.getVerifiedPodUsage(claim))
 	}
 
 	return result, nil
