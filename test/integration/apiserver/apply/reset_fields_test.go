@@ -409,6 +409,9 @@ spec:
 	}
 	t.Logf("result: %s", string(result))
 	newManagedFields, err := getManagedFields(result)
+	if err != nil {
+		t.Fatalf("failed to get managed fields: %v", err)
+	}
 	// newManagedFields should include oldManagedFields
 	var applyManagerFound, subresourceManagerFound bool
 	for i, field := range newManagedFields {
