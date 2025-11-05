@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/onsi/gomega"
+	gtypes "github.com/onsi/gomega/types"
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
@@ -201,4 +202,28 @@ func waitForNotFound[T any](tCtx ktesting.TContext, get func(context.Context, st
 		_, err := get(tCtx, name, metav1.GetOptions{})
 		return err
 	}).WithTimeout(60*time.Second).Should(gomega.MatchError(apierrors.IsNotFound, "IsNotFound"), "Object %T %s should have been removed.", t, name)
+}
+
+func waitForClaim(tCtx ktesting.TContext, namespace, claimName string, timeout time.Duration, match gtypes.GomegaMatcher, description ...any) *resourceapi.ResourceClaim {
+	tCtx.Helper()
+	var latestClaim *resourceapi.ResourceClaim
+	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) *resourceapi.ResourceClaim {
+		c, err := tCtx.Client().ResourceV1().ResourceClaims(namespace).Get(tCtx, claimName, metav1.GetOptions{})
+		tCtx.ExpectNoError(err, "get claim")
+		latestClaim = c
+		return latestClaim
+	}).WithTimeout(timeout).WithPolling(time.Second).Should(match, description...)
+	return latestClaim
+}
+
+func waitForClaimAllocatedToDevice(tCtx ktesting.TContext, namespace, claimName string, timeout time.Duration) *resourceapi.ResourceClaim {
+	tCtx.Helper()
+	return waitForClaim(
+		tCtx,
+		namespace,
+		claimName,
+		timeout,
+		gomega.HaveField("Status.Allocation", gomega.Not(gomega.BeNil())),
+		"Claim should have been allocated.",
+	)
 }
