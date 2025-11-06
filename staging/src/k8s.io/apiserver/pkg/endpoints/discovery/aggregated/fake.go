@@ -122,6 +122,18 @@ func (f *recorderResourceManager) SetGroupVersionPriority(gv metav1.GroupVersion
 	})
 }
 
+func (f *recorderResourceManager) SetPeerDiscoveryProvider(provider PeerDiscoveryProvider) {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+
+	f.Actions = append(f.Actions, recorderResourceManagerAction{
+		Type:    "SetPeerDiscoveryProvider",
+		Group:   "",
+		Version: "",
+		Value:   provider,
+	})
+}
+
 func (f *recorderResourceManager) AddGroupVersion(groupName string, value apidiscoveryv2.APIVersionDiscovery) {
 	f.lock.Lock()
 	defer f.lock.Unlock()

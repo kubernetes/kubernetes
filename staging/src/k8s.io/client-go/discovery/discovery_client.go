@@ -60,7 +60,6 @@ const (
 	defaultBurst = 300
 
 	AcceptV1 = runtime.ContentTypeJSON
-	AcceptV1 = runtime.ContentTypeJSON
 	// Aggregated discovery content-type (v2beta1). NOTE: content-type parameters
 	// MUST be ordered (g, v, as) for server in "Accept" header (BUT we are resilient
 	// to ordering when comparing returned values in "Content-Type" header).

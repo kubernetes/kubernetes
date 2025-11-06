@@ -490,7 +490,7 @@ func (rdm *resourceDiscoveryManager) fetchFromCache() *cachedGroupList {
 	}
 	etag, err := calculateETag(response)
 	if err != nil {
-		klog.Errorf("failed to calculate etag for discovery document: %s", etag)
+		klog.Errorf("failed to calculate etag for discovery document: %v", err)
 		etag = ""
 	}
 	cached := &cachedGroupList{
