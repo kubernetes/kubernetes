@@ -176,6 +176,9 @@ const (
 	PodInfeasibleResizesKey          = "pod_infeasible_resizes_total"
 	PodInProgressResizesKey          = "pod_in_progress_resizes"
 	PodDeferredAcceptedResizesKey    = "pod_deferred_accepted_resizes_total"
+
+	// Metric key for podcertificate states.
+	PodCertificateStatesKey = "podcertificate_states"
 )
 
 type imageSizeBucket struct {

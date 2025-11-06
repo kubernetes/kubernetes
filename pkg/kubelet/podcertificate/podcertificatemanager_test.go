@@ -219,6 +219,7 @@ func TestFullFlow(t *testing.T) {
 	node1PodCertificateManager := NewIssuingManager(
 		kc,
 		node1PodManager,
+		nil,
 		informerFactory.Certificates().V1beta1().PodCertificateRequests(),
 		informerFactory.Core().V1().Nodes(),
 		types.NodeName(node1.ObjectMeta.Name),

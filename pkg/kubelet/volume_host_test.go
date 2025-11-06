@@ -22,6 +22,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/kubernetes/pkg/kubelet/podcertificate"
 )
 
 type recordingPodCertificateManager struct {
@@ -45,6 +46,10 @@ func (f *recordingPodCertificateManager) GetPodCertificateCredentialBundle(ctx c
 func (f *recordingPodCertificateManager) TrackPod(ctx context.Context, pod *corev1.Pod) {}
 
 func (f *recordingPodCertificateManager) ForgetPod(ctx context.Context, pod *corev1.Pod) {}
+
+func (f *recordingPodCertificateManager) MetricReport() *podcertificate.MetricReport {
+	return &podcertificate.MetricReport{}
+}
 
 // Check that GetPodCertificateCredentialBundle forwards its arguments in the
 // correct order.  Seems excessive, but we got here because I put the arguments
