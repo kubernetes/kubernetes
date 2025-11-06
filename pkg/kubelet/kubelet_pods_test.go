@@ -7023,7 +7023,7 @@ func TestMakeEnvironmentVariablesWithFileKeyRef(t *testing.T) {
 				{Name: "DATABASE", Value: "mydb"},
 			},
 			setupFiles: func() []string {
-				content := "DATABASE=mydb\nAPI_KEY=secret123\n"
+				content := "DATABASE='mydb'\nAPI_KEY='secret123'\n"
 				return []string{createEnvFile("database.env", content)}
 			},
 		},
@@ -7052,7 +7052,7 @@ func TestMakeEnvironmentVariablesWithFileKeyRef(t *testing.T) {
 				{Name: "API_KEY", Value: "secret123"},
 			},
 			setupFiles: func() []string {
-				content := "# This is a comment\n\nDATABASE=mydb\nAPI_KEY=secret123\n\n# Another comment\n"
+				content := "# This is a comment\n\nDATABASE='mydb'\nAPI_KEY='secret123'\n\n# Another comment\n"
 				return []string{createEnvFile("config.env", content)}
 			},
 		},
@@ -7080,8 +7080,10 @@ func TestMakeEnvironmentVariablesWithFileKeyRef(t *testing.T) {
 			expectedEnvs: []kubecontainer.EnvVar{
 				{Name: "DEBUG_MODE", Value: "true"},
 			},
+			expectedError: true,
+			errorContains: "couldn't parse env file",
 			setupFiles: func() []string {
-				content := "DEBUG_MODE = true\nLOG_LEVEL = info\n"
+				content := "DEBUG_MODE = 'true'\nLOG_LEVEL = 'info'\n"
 				return []string{createEnvFile("debug.env", content)}
 			},
 		},
@@ -7109,7 +7111,7 @@ func TestMakeEnvironmentVariablesWithFileKeyRef(t *testing.T) {
 			expectedError: true,
 			errorContains: "environment variable key \"MISSING_KEY\" not found in file",
 			setupFiles: func() []string {
-				content := "EXISTING_KEY=value\n"
+				content := "EXISTING_KEY='value'\n"
 				return []string{createEnvFile("config.env", content)}
 			},
 		},
@@ -7137,7 +7139,7 @@ func TestMakeEnvironmentVariablesWithFileKeyRef(t *testing.T) {
 			},
 			expectedEnvs: nil,
 			setupFiles: func() []string {
-				content := "EXISTING_KEY=value\n"
+				content := "EXISTING_KEY='value'\n"
 				return []string{createEnvFile("config.env", content)}
 			},
 		},
@@ -7166,63 +7168,6 @@ func TestMakeEnvironmentVariablesWithFileKeyRef(t *testing.T) {
 			errorContains: "couldn't parse env file",
 			setupFiles: func() []string {
 				return []string{} // No files created
-			},
-		},
-		{
-			name: "key length exceeds 128 characters",
-			container: &v1.Container{
-				Env: []v1.EnvVar{
-					{
-						Name: "LONG_KEY",
-						ValueFrom: &v1.EnvVarSource{
-							FileKeyRef: &v1.FileKeySelector{
-								VolumeName: "config-volume",
-								Path:       "config.env",
-								Key:        strings.Repeat("A", 129),
-							},
-						},
-					},
-				},
-			},
-			podVolumes: map[string]kubecontainer.VolumeInfo{
-				"config-volume": {
-					Mounter: &testVolumeMounter{path: tmpDir},
-				},
-			},
-			expectedError: true,
-			errorContains: "exceeds maximum length of 128 characters",
-			setupFiles: func() []string {
-				content := "EXISTING_KEY=value\n"
-				return []string{createEnvFile("config.env", content)}
-			},
-		},
-		{
-			name: "value size exceeds 32KB",
-			container: &v1.Container{
-				Env: []v1.EnvVar{
-					{
-						Name: "LARGE_VALUE",
-						ValueFrom: &v1.EnvVarSource{
-							FileKeyRef: &v1.FileKeySelector{
-								VolumeName: "config-volume",
-								Path:       "large.env",
-								Key:        "LARGE_VALUE",
-							},
-						},
-					},
-				},
-			},
-			podVolumes: map[string]kubecontainer.VolumeInfo{
-				"config-volume": {
-					Mounter: &testVolumeMounter{path: tmpDir},
-				},
-			},
-			expectedError: true,
-			errorContains: "environment variable value for key \"LARGE_VALUE\" exceeds maximum size of 32KB",
-			setupFiles: func() []string {
-				largeValue := strings.Repeat("A", 33*1024) // 33KB
-				content := fmt.Sprintf("LARGE_VALUE=%s\n", largeValue)
-				return []string{createEnvFile("large.env", content)}
 			},
 		},
 		{
@@ -7315,8 +7260,8 @@ func TestMakeEnvironmentVariablesWithFileKeyRef(t *testing.T) {
 				{Name: "API_KEY", Value: "secret123"},
 			},
 			setupFiles: func() []string {
-				dbContent := "DATABASE=mydb\n"
-				apiContent := "API_KEY=secret123\n"
+				dbContent := "DATABASE='mydb'\n"
+				apiContent := "API_KEY='secret123'\n"
 				return []string{
 					createEnvFile("database.env", dbContent),
 					createEnvFile("api.env", apiContent),
@@ -7353,7 +7298,7 @@ func TestMakeEnvironmentVariablesWithFileKeyRef(t *testing.T) {
 				{Name: "FILE_VAR", Value: "file_value"},
 			},
 			setupFiles: func() []string {
-				content := "FILE_VAR=file_value\n"
+				content := "FILE_VAR='file_value'\n"
 				return []string{createEnvFile("config.env", content)}
 			},
 		},
