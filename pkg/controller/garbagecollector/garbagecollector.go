@@ -131,9 +131,6 @@ func (gc *GarbageCollector) resyncMonitors(logger klog.Logger, deletableResource
 // Run starts garbage collector workers.
 func (gc *GarbageCollector) Run(ctx context.Context, workers int, initialSyncTimeout time.Duration) {
 	defer utilruntime.HandleCrash()
-	defer gc.attemptToDelete.ShutDown()
-	defer gc.attemptToOrphan.ShutDown()
-	defer gc.dependencyGraphBuilder.graphChanges.ShutDown()
 
 	// Start events processing pipeline.
 	gc.eventBroadcaster.StartStructuredLogging(3)
@@ -142,9 +139,20 @@ func (gc *GarbageCollector) Run(ctx context.Context, workers int, initialSyncTim
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting controller", "controller", "garbagecollector")
-	defer logger.Info("Shutting down controller", "controller", "garbagecollector")
 
-	go gc.dependencyGraphBuilder.Run(ctx)
+	var wg sync.WaitGroup
+	defer func() {
+		logger.Info("Shutting down controller", "controller", "garbagecollector")
+		gc.dependencyGraphBuilder.graphChanges.ShutDown()
+		gc.attemptToOrphan.ShutDown()
+		gc.attemptToDelete.ShutDown()
+		wg.Wait()
+	}()
+
+	// Start dependency graph builder.
+	wg.Go(func() {
+		gc.dependencyGraphBuilder.Run(ctx)
+	})
 
 	// Create a new context that is cancelled after the initialSyncTimeout.
 	syncCtx, cancel := context.WithTimeout(ctx, initialSyncTimeout)
@@ -162,10 +170,13 @@ func (gc *GarbageCollector) Run(ctx context.Context, workers int, initialSyncTim
 
 	// gc workers
 	for i := 0; i < workers; i++ {
-		go wait.UntilWithContext(ctx, gc.runAttemptToDeleteWorker, 1*time.Second)
-		go wait.Until(func() { gc.runAttemptToOrphanWorker(logger) }, 1*time.Second, ctx.Done())
+		wg.Go(func() {
+			wait.UntilWithContext(ctx, gc.runAttemptToDeleteWorker, 1*time.Second)
+		})
+		wg.Go(func() {
+			wait.Until(func() { gc.runAttemptToOrphanWorker(logger) }, 1*time.Second, ctx.Done())
+		})
 	}
-
 	<-ctx.Done()
 }
 

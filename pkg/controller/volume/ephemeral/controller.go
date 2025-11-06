@@ -19,6 +19,7 @@ package ephemeral
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"k8s.io/klog/v2"
@@ -168,19 +169,26 @@ func (ec *ephemeralController) onPVCDelete(obj interface{}) {
 
 func (ec *ephemeralController) Run(ctx context.Context, workers int) {
 	defer runtime.HandleCrash()
-	defer ec.queue.ShutDown()
+
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting ephemeral volume controller")
-	defer logger.Info("Shutting down ephemeral volume controller")
+
+	var wg sync.WaitGroup
+	defer func() {
+		logger.Info("Shutting down ephemeral volume controller")
+		ec.queue.ShutDown()
+		wg.Wait()
+	}()
 
 	if !cache.WaitForNamedCacheSyncWithContext(ctx, ec.podSynced, ec.pvcsSynced) {
 		return
 	}
 
 	for i := 0; i < workers; i++ {
-		go wait.UntilWithContext(ctx, ec.runWorker, time.Second)
+		wg.Go(func() {
+			wait.UntilWithContext(ctx, ec.runWorker, time.Second)
+		})
 	}
-
 	<-ctx.Done()
 }
 

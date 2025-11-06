@@ -107,9 +107,7 @@ func (tc *LegacySATokenCleaner) Run(ctx context.Context) {
 		return
 	}
 
-	go wait.UntilWithContext(ctx, tc.evaluateSATokens, tc.syncInterval)
-
-	<-ctx.Done()
+	wait.UntilWithContext(ctx, tc.evaluateSATokens, tc.syncInterval)
 }
 
 func (tc *LegacySATokenCleaner) evaluateSATokens(ctx context.Context) {
