@@ -1289,129 +1289,12 @@ func TestDropNodeInclusionPolicyFields(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		enabled     bool
 		podSpec     *api.PodSpec
 		oldPodSpec  *api.PodSpec
 		wantPodSpec *api.PodSpec
 	}{
 		{
-			name:    "feature disabled, both pods don't use the fields",
-			enabled: false,
-			oldPodSpec: &api.PodSpec{
-				TopologySpreadConstraints: []api.TopologySpreadConstraint{},
-			},
-			podSpec: &api.PodSpec{
-				TopologySpreadConstraints: []api.TopologySpreadConstraint{},
-			},
-			wantPodSpec: &api.PodSpec{
-				TopologySpreadConstraints: []api.TopologySpreadConstraint{},
-			},
-		},
-		{
-			name:    "feature disabled, only old pod use NodeAffinityPolicy field",
-			enabled: false,
-			oldPodSpec: &api.PodSpec{
-				TopologySpreadConstraints: []api.TopologySpreadConstraint{
-					{NodeAffinityPolicy: &honor},
-				},
-			},
-			podSpec: &api.PodSpec{
-				TopologySpreadConstraints: []api.TopologySpreadConstraint{},
-			},
-			wantPodSpec: &api.PodSpec{
-				TopologySpreadConstraints: []api.TopologySpreadConstraint{},
-			},
-		},
-		{
-			name:    "feature disabled, only old pod use NodeTaintsPolicy field",
-			enabled: false,
-			oldPodSpec: &api.PodSpec{
-				TopologySpreadConstraints: []api.TopologySpreadConstraint{
-					{NodeTaintsPolicy: &ignore},
-				},
-			},
-			podSpec: &api.PodSpec{
-				TopologySpreadConstraints: []api.TopologySpreadConstraint{},
-			},
-			wantPodSpec: &api.PodSpec{
-				TopologySpreadConstraints: []api.TopologySpreadConstraint{},
-			},
-		},
-		{
-			name:    "feature disabled, only current pod use NodeAffinityPolicy field",
-			enabled: false,
-			oldPodSpec: &api.PodSpec{
-				TopologySpreadConstraints: []api.TopologySpreadConstraint{},
-			},
-			podSpec: &api.PodSpec{
-				TopologySpreadConstraints: []api.TopologySpreadConstraint{
-					{NodeAffinityPolicy: &honor},
-				},
-			},
-			wantPodSpec: &api.PodSpec{
-				TopologySpreadConstraints: []api.TopologySpreadConstraint{{
-					NodeAffinityPolicy: nil,
-				}},
-			},
-		},
-		{
-			name:    "feature disabled, only current pod use NodeTaintsPolicy field",
-			enabled: false,
-			oldPodSpec: &api.PodSpec{
-				TopologySpreadConstraints: []api.TopologySpreadConstraint{},
-			},
-			podSpec: &api.PodSpec{
-				TopologySpreadConstraints: []api.TopologySpreadConstraint{
-					{NodeTaintsPolicy: &ignore},
-				},
-			},
-			wantPodSpec: &api.PodSpec{
-				TopologySpreadConstraints: []api.TopologySpreadConstraint{
-					{NodeTaintsPolicy: nil},
-				},
-			},
-		},
-		{
-			name:    "feature disabled, both pods use NodeAffinityPolicy fields",
-			enabled: false,
-			oldPodSpec: &api.PodSpec{
-				TopologySpreadConstraints: []api.TopologySpreadConstraint{
-					{NodeAffinityPolicy: &honor},
-				},
-			},
-			podSpec: &api.PodSpec{
-				TopologySpreadConstraints: []api.TopologySpreadConstraint{
-					{NodeAffinityPolicy: &ignore},
-				},
-			},
-			wantPodSpec: &api.PodSpec{
-				TopologySpreadConstraints: []api.TopologySpreadConstraint{
-					{NodeAffinityPolicy: &ignore},
-				},
-			},
-		},
-		{
-			name:    "feature disabled, both pods use NodeTaintsPolicy fields",
-			enabled: false,
-			oldPodSpec: &api.PodSpec{
-				TopologySpreadConstraints: []api.TopologySpreadConstraint{
-					{NodeTaintsPolicy: &ignore},
-				},
-			},
-			podSpec: &api.PodSpec{
-				TopologySpreadConstraints: []api.TopologySpreadConstraint{
-					{NodeTaintsPolicy: &honor},
-				},
-			},
-			wantPodSpec: &api.PodSpec{
-				TopologySpreadConstraints: []api.TopologySpreadConstraint{
-					{NodeTaintsPolicy: &honor},
-				},
-			},
-		},
-		{
-			name:    "feature enabled, both pods use the fields",
-			enabled: true,
+			name: "both pods use the fields",
 			oldPodSpec: &api.PodSpec{
 				TopologySpreadConstraints: []api.TopologySpreadConstraint{
 					{
@@ -1438,8 +1321,7 @@ func TestDropNodeInclusionPolicyFields(t *testing.T) {
 			},
 		},
 		{
-			name:    "feature enabled, only old pod use NodeAffinityPolicy field",
-			enabled: true,
+			name: "only old pod use NodeAffinityPolicy field",
 			oldPodSpec: &api.PodSpec{
 				TopologySpreadConstraints: []api.TopologySpreadConstraint{
 					{
@@ -1455,8 +1337,7 @@ func TestDropNodeInclusionPolicyFields(t *testing.T) {
 			},
 		},
 		{
-			name:    "feature enabled, only old pod use NodeTaintsPolicy field",
-			enabled: true,
+			name: "only old pod use NodeTaintsPolicy field",
 			oldPodSpec: &api.PodSpec{
 				TopologySpreadConstraints: []api.TopologySpreadConstraint{
 					{
@@ -1472,8 +1353,7 @@ func TestDropNodeInclusionPolicyFields(t *testing.T) {
 			},
 		},
 		{
-			name:    "feature enabled, only current pod use NodeAffinityPolicy field",
-			enabled: true,
+			name: "only current pod use NodeAffinityPolicy field",
 			oldPodSpec: &api.PodSpec{
 				TopologySpreadConstraints: []api.TopologySpreadConstraint{},
 			},
@@ -1493,8 +1373,7 @@ func TestDropNodeInclusionPolicyFields(t *testing.T) {
 			},
 		},
 		{
-			name:    "feature enabled, only current pod use NodeTaintsPolicy field",
-			enabled: true,
+			name: "only current pod use NodeTaintsPolicy field",
 			oldPodSpec: &api.PodSpec{
 				TopologySpreadConstraints: []api.TopologySpreadConstraint{},
 			},
@@ -1517,12 +1396,6 @@ func TestDropNodeInclusionPolicyFields(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if !test.enabled {
-				// TODO: this will be removed in 1.36
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, test.enabled)
-			}
-
 			dropDisabledFields(test.podSpec, nil, test.oldPodSpec, nil)
 			if diff := cmp.Diff(test.wantPodSpec, test.podSpec); diff != "" {
 				t.Errorf("unexpected pod spec (-want, +got):\n%s", diff)
@@ -3214,78 +3087,47 @@ func TestDropSidecarContainers(t *testing.T) {
 	}
 
 	podInfo := []struct {
-		description         string
-		hasSidecarContainer bool
-		pod                 func() *api.Pod
+		description string
+		pod         func() *api.Pod
 	}{
 		{
-			description:         "has a sidecar container",
-			hasSidecarContainer: true,
-			pod:                 podWithSidecarContainers,
+			description: "has a sidecar container",
+			pod:         podWithSidecarContainers,
 		},
 		{
-			description:         "does not have a sidecar container",
-			hasSidecarContainer: false,
-			pod:                 podWithoutSidecarContainers,
+			description: "does not have a sidecar container",
+			pod:         podWithoutSidecarContainers,
 		},
 		{
-			description:         "is nil",
-			hasSidecarContainer: false,
-			pod:                 func() *api.Pod { return nil },
+			description: "is nil",
+			pod:         func() *api.Pod { return nil },
 		},
 	}
 
-	for _, enabled := range []bool{true, false} {
-		for _, oldPodInfo := range podInfo {
-			for _, newPodInfo := range podInfo {
-				oldPodHasSidecarContainer, oldPod := oldPodInfo.hasSidecarContainer, oldPodInfo.pod()
-				newPodHasSidecarContainer, newPod := newPodInfo.hasSidecarContainer, newPodInfo.pod()
-				if newPod == nil {
-					continue
+	for _, oldPodInfo := range podInfo {
+		for _, newPodInfo := range podInfo {
+			oldPod := oldPodInfo.pod()
+			newPod := newPodInfo.pod()
+			if newPod == nil {
+				continue
+			}
+
+			t.Run(fmt.Sprintf("old pod %v, new pod %v", oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
+				var oldPodSpec *api.PodSpec
+				if oldPod != nil {
+					oldPodSpec = &oldPod.Spec
+				}
+				dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
+
+				// old pod should never be changed
+				if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
+					t.Errorf("old pod changed: %v", cmp.Diff(oldPod, oldPodInfo.pod()))
 				}
 
-				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
-					if !enabled {
-						// TODO: Remove this in v1.36
-						featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
-						featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, false)
-					}
-
-					var oldPodSpec *api.PodSpec
-					if oldPod != nil {
-						oldPodSpec = &oldPod.Spec
-					}
-					dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
-
-					// old pod should never be changed
-					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
-						t.Errorf("old pod changed: %v", cmp.Diff(oldPod, oldPodInfo.pod()))
-					}
-
-					switch {
-					case enabled || oldPodHasSidecarContainer:
-						// new pod shouldn't change if feature enabled or if old pod has
-						// any sidecar container
-						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
-							t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
-						}
-					case newPodHasSidecarContainer:
-						// new pod should be changed
-						if reflect.DeepEqual(newPod, newPodInfo.pod()) {
-							t.Errorf("new pod was not changed")
-						}
-						// new pod should not have any sidecar container
-						if !reflect.DeepEqual(newPod, podWithoutSidecarContainers()) {
-							t.Errorf("new pod has a sidecar container: %v", cmp.Diff(newPod, podWithoutSidecarContainers()))
-						}
-					default:
-						// new pod should not need to be changed
-						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
-							t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
-						}
-					}
-				})
-			}
+				if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+					t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
+				}
+			})
 		}
 	}
 }
