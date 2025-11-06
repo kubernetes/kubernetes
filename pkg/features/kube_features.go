@@ -2089,6 +2089,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	kcmfeatures.CloudControllerManagerWatchBasedRoutesReconciliation: {
+		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	kcmfeatures.CloudControllerManagerWebhook: {
 		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
 	},
@@ -2504,6 +2508,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	genericfeatures.WatchFromStorageWithoutResourceVersion: {},
 
 	genericfeatures.WatchList: {},
+
+	kcmfeatures.CloudControllerManagerWatchBasedRoutesReconciliation: {},
 
 	kcmfeatures.CloudControllerManagerWebhook: {},
 
