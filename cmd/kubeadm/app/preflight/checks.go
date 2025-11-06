@@ -728,7 +728,7 @@ func (evc ExternalEtcdVersionCheck) Check() (warnings, errorList []error) {
 	klog.V(1).Infoln("validating the external etcd version")
 
 	// Return quickly if the user isn't using external etcd
-	if evc.Etcd.External.Endpoints == nil {
+	if len(evc.Etcd.External.HTTPEndpoints) == 0 {
 		return nil, nil
 	}
 
@@ -744,7 +744,7 @@ func (evc ExternalEtcdVersionCheck) Check() (warnings, errorList []error) {
 	}
 
 	client := evc.getHTTPClient(config)
-	for _, endpoint := range evc.Etcd.External.Endpoints {
+	for _, endpoint := range evc.Etcd.External.HTTPEndpoints {
 		if _, err := url.Parse(endpoint); err != nil {
 			errorList = append(errorList, errors.Wrapf(err, "failed to parse external etcd endpoint %s", endpoint))
 			continue
