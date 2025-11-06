@@ -211,7 +211,6 @@ func describerMap(clientConfig *rest.Config) (map[schema.GroupKind]ResourceDescr
 		{Group: discoveryv1.GroupName, Kind: "EndpointSlice"}:                &EndpointSliceDescriber{c},
 		{Group: autoscalingv2.GroupName, Kind: "HorizontalPodAutoscaler"}:    &HorizontalPodAutoscalerDescriber{c},
 		{Group: extensionsv1beta1.GroupName, Kind: "Ingress"}:                &IngressDescriber{c},
-		{Group: networkingv1beta1.GroupName, Kind: "Ingress"}:                &IngressDescriber{c},
 		{Group: networkingv1.GroupName, Kind: "Ingress"}:                     &IngressDescriber{c},
 		{Group: networkingv1.GroupName, Kind: "IngressClass"}:                &IngressClassDescriber{c},
 		{Group: networkingv1beta1.GroupName, Kind: "ServiceCIDR"}:            &ServiceCIDRDescriber{c},
@@ -2604,50 +2603,14 @@ type IngressDescriber struct {
 func (i *IngressDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	var events *corev1.EventList
 
-	// try ingress/v1 first (v1.19) and fallback to ingress/v1beta if an err occurs
 	netV1, err := i.client.NetworkingV1().Ingresses(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-	if err == nil {
-		if describerSettings.ShowEvents {
-			events, _ = searchEvents(i.client.CoreV1(), netV1, describerSettings.ChunkSize)
-		}
-		return i.describeIngressV1(netV1, events)
-	}
-	netV1beta1, err := i.client.NetworkingV1beta1().Ingresses(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-	if err == nil {
-		if describerSettings.ShowEvents {
-			events, _ = searchEvents(i.client.CoreV1(), netV1beta1, describerSettings.ChunkSize)
-		}
-		return i.describeIngressV1beta1(netV1beta1, events)
-	}
-	return "", err
-}
-
-func (i *IngressDescriber) describeBackendV1beta1(ns string, backend *networkingv1beta1.IngressBackend) string {
-	endpointSliceList, err := i.client.DiscoveryV1().EndpointSlices(ns).List(context.TODO(), metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("%s=%s", discoveryv1.LabelServiceName, backend.ServiceName),
-	})
 	if err != nil {
-		return fmt.Sprintf("<error: %v>", err)
+		return "", err
 	}
-	service, err := i.client.CoreV1().Services(ns).Get(context.TODO(), backend.ServiceName, metav1.GetOptions{})
-	if err != nil {
-		return fmt.Sprintf("<error: %v>", err)
+	if describerSettings.ShowEvents {
+		events, _ = searchEvents(i.client.CoreV1(), netV1, describerSettings.ChunkSize)
 	}
-	spName := ""
-	for i := range service.Spec.Ports {
-		sp := &service.Spec.Ports[i]
-		switch backend.ServicePort.Type {
-		case intstr.String:
-			if backend.ServicePort.StrVal == sp.Name {
-				spName = sp.Name
-			}
-		case intstr.Int:
-			if int32(backend.ServicePort.IntVal) == sp.Port {
-				spName = sp.Name
-			}
-		}
-	}
-	return formatEndpointSlices(endpointSliceList.Items, sets.New(spName))
+	return i.describeIngressV1(netV1, events)
 }
 
 func (i *IngressDescriber) describeBackendV1(ns string, backend *networkingv1.IngressBackend) string {
@@ -2737,69 +2700,6 @@ func (i *IngressDescriber) describeIngressV1(ing *networkingv1.Ingress, events *
 		}
 		return nil
 	})
-}
-
-func (i *IngressDescriber) describeIngressV1beta1(ing *networkingv1beta1.Ingress, events *corev1.EventList) (string, error) {
-	return tabbedString(func(out io.Writer) error {
-		w := NewPrefixWriter(out)
-		w.Write(LEVEL_0, "Name:\t%v\n", ing.Name)
-		printLabelsMultiline(w, "Labels", ing.Labels)
-		w.Write(LEVEL_0, "Namespace:\t%v\n", ing.Namespace)
-		w.Write(LEVEL_0, "Address:\t%v\n", ingressLoadBalancerStatusStringerV1beta1(ing.Status.LoadBalancer, true))
-		ingressClassName := "<none>"
-		if ing.Spec.IngressClassName != nil {
-			ingressClassName = *ing.Spec.IngressClassName
-		}
-		w.Write(LEVEL_0, "Ingress Class:\t%v\n", ingressClassName)
-		def := ing.Spec.Backend
-		ns := ing.Namespace
-		if def == nil {
-			w.Write(LEVEL_0, "Default backend:\t<default>\n")
-		} else {
-			w.Write(LEVEL_0, "Default backend:\t%s\n", i.describeBackendV1beta1(ns, def))
-		}
-		if len(ing.Spec.TLS) != 0 {
-			describeIngressTLSV1beta1(w, ing.Spec.TLS)
-		}
-		w.Write(LEVEL_0, "Rules:\n  Host\tPath\tBackends\n")
-		w.Write(LEVEL_1, "----\t----\t--------\n")
-		count := 0
-		for _, rules := range ing.Spec.Rules {
-
-			if rules.HTTP == nil {
-				continue
-			}
-			count++
-			host := rules.Host
-			if len(host) == 0 {
-				host = "*"
-			}
-			w.Write(LEVEL_1, "%s\t\n", host)
-			for _, path := range rules.HTTP.Paths {
-				w.Write(LEVEL_2, "\t%s \t%s (%s)\n", path.Path, backendStringer(&path.Backend), i.describeBackendV1beta1(ing.Namespace, &path.Backend))
-			}
-		}
-		if count == 0 {
-			w.Write(LEVEL_1, "%s\t%s \t<default>\n", "*", "*")
-		}
-		printAnnotationsMultiline(w, "Annotations", ing.Annotations)
-
-		if events != nil {
-			DescribeEvents(events, w)
-		}
-		return nil
-	})
-}
-
-func describeIngressTLSV1beta1(w PrefixWriter, ingTLS []networkingv1beta1.IngressTLS) {
-	w.Write(LEVEL_0, "TLS:\n")
-	for _, t := range ingTLS {
-		if t.SecretName == "" {
-			w.Write(LEVEL_1, "SNI routes %v\n", strings.Join(t.Hosts, ","))
-		} else {
-			w.Write(LEVEL_1, "%v terminates %v\n", t.SecretName, strings.Join(t.Hosts, ","))
-		}
-	}
 }
 
 func describeIngressTLSV1(w PrefixWriter, ingTLS []networkingv1.IngressTLS) {
@@ -5403,14 +5303,6 @@ func serviceBackendStringer(backend *networkingv1.IngressServiceBackend) string 
 	return fmt.Sprintf("%v:%v", backend.Name, bPort)
 }
 
-// backendStringer behaves just like a string interface and converts the given backend to a string.
-func backendStringer(backend *networkingv1beta1.IngressBackend) string {
-	if backend == nil {
-		return ""
-	}
-	return fmt.Sprintf("%v:%v", backend.ServiceName, backend.ServicePort.String())
-}
-
 // findNodeRoles returns the roles of a given node.
 // The roles are determined by looking for:
 // * a node-role.kubernetes.io/<role>="" label
@@ -5434,26 +5326,6 @@ func findNodeRoles(node *corev1.Node) []string {
 // ingressLoadBalancerStatusStringerV1 behaves mostly like a string interface and converts the given status to a string.
 // `wide` indicates whether the returned value is meant for --o=wide output. If not, it's clipped to 16 bytes.
 func ingressLoadBalancerStatusStringerV1(s networkingv1.IngressLoadBalancerStatus, wide bool) string {
-	ingress := s.Ingress
-	result := sets.New[string]()
-	for i := range ingress {
-		if ingress[i].IP != "" {
-			result.Insert(ingress[i].IP)
-		} else if ingress[i].Hostname != "" {
-			result.Insert(ingress[i].Hostname)
-		}
-	}
-
-	r := strings.Join(sets.List(result), ",")
-	if !wide && len(r) > LoadBalancerWidth {
-		r = r[0:(LoadBalancerWidth-3)] + "..."
-	}
-	return r
-}
-
-// ingressLoadBalancerStatusStringerV1beta1 behaves mostly like a string interface and converts the given status to a string.
-// `wide` indicates whether the returned value is meant for --o=wide output. If not, it's clipped to 16 bytes.
-func ingressLoadBalancerStatusStringerV1beta1(s networkingv1beta1.IngressLoadBalancerStatus, wide bool) string {
 	ingress := s.Ingress
 	result := sets.New[string]()
 	for i := range ingress {
