@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
 	resourceac "k8s.io/client-go/applyconfigurations/resource/v1alpha3"
 	coreinformers "k8s.io/client-go/informers/core/v1"
@@ -57,6 +58,7 @@ import (
 	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/devicetainteviction/metrics"
 	"k8s.io/kubernetes/pkg/controller/tainteviction"
+	"k8s.io/kubernetes/pkg/features"
 	utilpod "k8s.io/kubernetes/pkg/util/pod"
 )
 
@@ -95,7 +97,7 @@ type Controller struct {
 	podLister     corelisters.PodLister
 	claimInformer resourceinformers.ResourceClaimInformer
 	sliceInformer resourceinformers.ResourceSliceInformer
-	taintInformer resourcealphainformers.DeviceTaintRuleInformer
+	ruleInformer  resourcealphainformers.DeviceTaintRuleInformer
 	classInformer resourceinformers.DeviceClassInformer
 	ruleLister    resourcealphalisters.DeviceTaintRuleLister
 	haveSynced    []cache.InformerSynced
@@ -125,14 +127,14 @@ type Controller struct {
 	// pools indexes all slices by driver and pool name.
 	pools map[poolID]pool
 
-	// taintRuleStats tracks information about work that was done for a specific DeviceTaintRule instance.
-	taintRuleStats map[types.UID]taintRuleStats
+	// evictingRules tracks all DeviceTaintRules by name which cause pod eviction.
+	evictingRules map[string]*resourcealpha.DeviceTaintRule
 
-	// simulateRule is set only during simulation of a None effect.
+	// taintRuleStats tracks information about work that was done for a specific DeviceTaintRule instance.
 	//
-	// During such a simulation the corresponding rule from ruleLister
-	// has EffectNone and this one here has EffectNoExecute.
-	simulateRule *resourcealpha.DeviceTaintRule
+	// This is potentially a different set of rules than in evictingRules because a rule which is no
+	// longer evicting might have evicted in the past and thus can have some relevant stats.
+	taintRuleStats map[types.UID]taintRuleStats
 }
 
 type taintRuleStats struct {
@@ -548,9 +550,8 @@ func (tc *Controller) maybeUpdateRuleStatus(ctx context.Context, ruleRef taintev
 			deletePodAt:     make(map[tainteviction.NamespacedObject]evictionAndReason),
 			allocatedClaims: maps.Clone(tc.allocatedClaims),
 			pools:           tc.pools,
-			simulateRule:    ruleEvict,
-			// TODO: stub implementation
-			workqueue: workqueue.NewTypedRateLimitingQueueWithConfig(workqueue.DefaultTypedControllerRateLimiter[workItem](), workqueue.TypedRateLimitingQueueConfig[workItem]{}),
+			evictingRules:   make(map[string]*resourcealpha.DeviceTaintRule),
+			workqueue:       &NOPQueue[workItem]{},
 		}
 		defer tc.workqueue.ShutDown()
 
@@ -713,7 +714,7 @@ func (tc *Controller) countTaintedDevices(rule *resourcealpha.DeviceTaintRule) (
 
 // New creates a new Controller that will use passed clientset to communicate with the API server.
 // Spawns no goroutines. That happens in Run.
-func New(c clientset.Interface, podInformer coreinformers.PodInformer, claimInformer resourceinformers.ResourceClaimInformer, sliceInformer resourceinformers.ResourceSliceInformer, taintInformer resourcealphainformers.DeviceTaintRuleInformer, classInformer resourceinformers.DeviceClassInformer, controllerName string) *Controller {
+func New(c clientset.Interface, podInformer coreinformers.PodInformer, claimInformer resourceinformers.ResourceClaimInformer, sliceInformer resourceinformers.ResourceSliceInformer, ruleInformer resourcealphainformers.DeviceTaintRuleInformer, classInformer resourceinformers.DeviceClassInformer, controllerName string) *Controller {
 	metrics.Register() // It would be nicer to pass the controller name here, but that probably would break generating https://kubernetes.io/docs/reference/instrumentation/metrics.
 
 	tc := &Controller{
@@ -724,22 +725,29 @@ func New(c clientset.Interface, podInformer coreinformers.PodInformer, claimInfo
 		podLister:       podInformer.Lister(),
 		claimInformer:   claimInformer,
 		sliceInformer:   sliceInformer,
-		taintInformer:   taintInformer,
 		classInformer:   classInformer,
-		ruleLister:      taintInformer.Lister(),
 		deletePodAt:     make(map[tainteviction.NamespacedObject]evictionAndReason),
 		allocatedClaims: make(map[types.NamespacedName]allocatedClaim),
 		pools:           make(map[poolID]pool),
+		evictingRules:   make(map[string]*resourcealpha.DeviceTaintRule),
 		taintRuleStats:  make(map[types.UID]taintRuleStats),
 		// Instantiate all informers now to ensure that they get started.
 		haveSynced: []cache.InformerSynced{
 			podInformer.Informer().HasSynced,
 			claimInformer.Informer().HasSynced,
 			sliceInformer.Informer().HasSynced,
-			taintInformer.Informer().HasSynced,
 			classInformer.Informer().HasSynced,
 		},
 		metrics: metrics.Global,
+	}
+
+	// The informer for DeviceTaintRules only gets instantiated if the corresponding
+	// feature is enabled. If disabled, nothings is done with (eviction) or for (status)
+	// any DeviceTaintRule.
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaintRules) {
+		tc.ruleInformer = ruleInformer
+		tc.ruleLister = ruleInformer.Lister()
+		tc.haveSynced = append(tc.haveSynced, ruleInformer.Informer().HasSynced)
 	}
 
 	return tc
@@ -892,52 +900,54 @@ func (tc *Controller) Run(ctx context.Context, numWorkers int) error {
 	}()
 	tc.haveSynced = append(tc.haveSynced, podHandler.HasSynced)
 
-	ruleHandler, err := tc.taintInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj any) {
-			rule, ok := obj.(*resourcealpha.DeviceTaintRule)
-			if !ok {
-				logger.Error(nil, "Expected DeviceTaintRule", "actual", fmt.Sprintf("%T", obj))
-				return
-			}
-			tc.mutex.Lock()
-			defer tc.mutex.Unlock()
-			tc.handleRuleChange(nil, rule)
-		},
-		UpdateFunc: func(oldObj, newObj any) {
-			oldRule, ok := oldObj.(*resourcealpha.DeviceTaintRule)
-			if !ok {
-				logger.Error(nil, "Expected DeviceTaintRule", "actual", fmt.Sprintf("%T", oldObj))
-				return
-			}
-			newRule, ok := newObj.(*resourcealpha.DeviceTaintRule)
-			if !ok {
-				logger.Error(nil, "Expected DeviceTaintRule", "actual", fmt.Sprintf("%T", newObj))
-			}
-			tc.mutex.Lock()
-			defer tc.mutex.Unlock()
-			tc.handleRuleChange(oldRule, newRule)
-		},
-		DeleteFunc: func(obj any) {
-			if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
-				obj = tombstone.Obj
-			}
-			rule, ok := obj.(*resourcealpha.DeviceTaintRule)
-			if !ok {
-				logger.Error(nil, "Expected DeviceTaintRule", "actual", fmt.Sprintf("%T", obj))
-				return
-			}
-			tc.mutex.Lock()
-			defer tc.mutex.Unlock()
-			tc.handleRuleChange(rule, nil)
-		},
-	})
-	if err != nil {
-		return fmt.Errorf("adding DeviceTaintRule event handler: %w", err)
+	if tc.ruleInformer != nil {
+		ruleHandler, err := tc.ruleInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+			AddFunc: func(obj any) {
+				rule, ok := obj.(*resourcealpha.DeviceTaintRule)
+				if !ok {
+					logger.Error(nil, "Expected DeviceTaintRule", "actual", fmt.Sprintf("%T", obj))
+					return
+				}
+				tc.mutex.Lock()
+				defer tc.mutex.Unlock()
+				tc.handleRuleChange(nil, rule)
+			},
+			UpdateFunc: func(oldObj, newObj any) {
+				oldRule, ok := oldObj.(*resourcealpha.DeviceTaintRule)
+				if !ok {
+					logger.Error(nil, "Expected DeviceTaintRule", "actual", fmt.Sprintf("%T", oldObj))
+					return
+				}
+				newRule, ok := newObj.(*resourcealpha.DeviceTaintRule)
+				if !ok {
+					logger.Error(nil, "Expected DeviceTaintRule", "actual", fmt.Sprintf("%T", newObj))
+				}
+				tc.mutex.Lock()
+				defer tc.mutex.Unlock()
+				tc.handleRuleChange(oldRule, newRule)
+			},
+			DeleteFunc: func(obj any) {
+				if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
+					obj = tombstone.Obj
+				}
+				rule, ok := obj.(*resourcealpha.DeviceTaintRule)
+				if !ok {
+					logger.Error(nil, "Expected DeviceTaintRule", "actual", fmt.Sprintf("%T", obj))
+					return
+				}
+				tc.mutex.Lock()
+				defer tc.mutex.Unlock()
+				tc.handleRuleChange(rule, nil)
+			},
+		})
+		if err != nil {
+			return fmt.Errorf("adding DeviceTaintRule event handler: %w", err)
+		}
+		defer func() {
+			_ = tc.ruleInformer.Informer().RemoveEventHandler(ruleHandler)
+		}()
+		tc.haveSynced = append(tc.haveSynced, ruleHandler.HasSynced)
 	}
-	defer func() {
-		_ = tc.taintInformer.Informer().RemoveEventHandler(ruleHandler)
-	}()
-	tc.haveSynced = append(tc.haveSynced, ruleHandler.HasSynced)
 
 	sliceHandler, err := tc.sliceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj any) {
@@ -1213,23 +1223,7 @@ func (tc *Controller) claimEvictionTime(claim *resourceapi.ResourceClaim) *evict
 // allEvictingDeviceTaints allows iterating over all DeviceTaintRules with NoExecute effect which affect the allocated device.
 // A taint may come from either the ResourceSlice informer (not the tracker!) or from a DeviceTaintRule, but not both.
 func (tc *Controller) allEvictingDeviceTaints(allocatedDevice resourceapi.DeviceRequestAllocationResult, slice *resourceapi.ResourceSlice, device *resourceapi.Device) iter.Seq[trackedTaint] {
-	var rules []*resourcealpha.DeviceTaintRule
-	var err error
-	if tc.ruleLister != nil {
-		rules, err = tc.ruleLister.List(labels.Everything())
-		if err != nil {
-			// TODO: instead of listing and handling an error, keep track of rules in the informer event handler?
-			utilruntime.HandleErrorWithLogger(tc.logger, err, "Local cache failed to list DeviceTaintRules")
-			return func(yield func(trackedTaint) bool) {}
-		}
-	}
-
-	if tc.simulateRule != nil {
-		// Mix the rule for which we simulate EffectNoExecute into the set of
-		// rules which will be evaluated. Typically this is the only rule
-		// during simulation.
-		rules = append(rules, tc.simulateRule)
-	}
+	evictingRules := tc.evictingRules
 
 	return func(yield func(trackedTaint) bool) {
 		if device != nil {
@@ -1244,9 +1238,8 @@ func (tc *Controller) allEvictingDeviceTaints(allocatedDevice resourceapi.Device
 			}
 		}
 
-		for _, rule := range rules {
-			if rule.Spec.Taint.Effect != resourcealpha.DeviceTaintEffectNoExecute ||
-				!ruleMatchesDevice(rule, allocatedDevice.Driver, allocatedDevice.Pool, allocatedDevice.Device) {
+		for _, rule := range evictingRules {
+			if !ruleMatchesDevice(rule, allocatedDevice.Driver, allocatedDevice.Pool, allocatedDevice.Device) {
 				continue
 			}
 
@@ -1289,6 +1282,7 @@ func (tc *Controller) handleRuleChange(oldRule, newRule *resourcealpha.DeviceTai
 	if newRule == nil {
 		// Clean up to avoid memory leak.
 		delete(tc.taintRuleStats, oldRule.UID)
+		delete(tc.evictingRules, oldRule.Name)
 		// Removal from the work queue is handled when a worker handles the work item.
 		// A work queue does not support canceling work.
 	}
@@ -1301,6 +1295,13 @@ func (tc *Controller) handleRuleChange(oldRule, newRule *resourcealpha.DeviceTai
 	}
 
 	// Rule spec changes should be rare. Simply do a brute-force re-evaluation of all allocated claims.
+	// Same with trying to avoid delete+add in evictingRules, the logic just becomes unnecessarily complex.
+	if oldRule != nil && oldRule.Spec.Taint.Effect == resourcealpha.DeviceTaintEffectNoExecute {
+		delete(tc.evictingRules, oldRule.Name)
+	}
+	if newRule != nil && newRule.Spec.Taint.Effect == resourcealpha.DeviceTaintEffectNoExecute {
+		tc.evictingRules[newRule.Name] = newRule
+	}
 	for name, oldAllocatedClaim := range tc.allocatedClaims {
 		newAllocatedClaim := allocatedClaim{
 			ResourceClaim: oldAllocatedClaim.ResourceClaim,

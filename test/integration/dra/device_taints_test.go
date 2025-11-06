@@ -30,18 +30,21 @@ import (
 	resourcealpha "k8s.io/api/resource/v1alpha3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
+	resourcealphainformers "k8s.io/client-go/informers/resource/v1alpha3"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/controller/devicetainteviction"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 
 // testEvictCluster simulates a cluster with many scheduled pods where each
 // pod uses it's own ResourceClaim with one device. Then all those
-// devices get tainted with a single DeviceTaintRule, causing eviction of
-// all pods at once.
-func testEvictCluster(tCtx ktesting.TContext) {
+// devices get tainted with a single DeviceTaintRule (causing eviction of all pods at once)
+// or by updating the slices (more gradual).
+func testEvictCluster(tCtx ktesting.TContext, useRule bool) {
 	tCtx.Parallel()
 
 	var wg sync.WaitGroup
@@ -58,6 +61,7 @@ func testEvictCluster(tCtx ktesting.TContext) {
 	driverName := "driver-" + namespace
 	poolName := "cluster"
 
+	var slices []*resourceapi.ResourceSlice
 	for i := range numSlices {
 		slice := &resourceapi.ResourceSlice{
 			ObjectMeta: metav1.ObjectMeta{
@@ -77,7 +81,7 @@ func testEvictCluster(tCtx ktesting.TContext) {
 				Name: fmt.Sprintf("device-%d", i*devicesPerSlice+e),
 			})
 		}
-		createSlice(tCtx, slice)
+		slices = append(slices, createSlice(tCtx, slice))
 	}
 
 	for i := range numPods {
@@ -125,11 +129,15 @@ func testEvictCluster(tCtx ktesting.TContext) {
 	// Create a new factory and sync it so that when the controller starts, it is up-to-date.
 	// This works as long as this is the only test running it.
 	informerFactory := informers.NewSharedInformerFactory(tCtx.Client(), 0)
+	var ruleInformer resourcealphainformers.DeviceTaintRuleInformer
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaintRules) {
+		ruleInformer = informerFactory.Resource().V1alpha3().DeviceTaintRules()
+	}
 	controller := devicetainteviction.New(tCtx.Client(),
 		informerFactory.Core().V1().Pods(),
 		informerFactory.Resource().V1().ResourceClaims(),
 		informerFactory.Resource().V1().ResourceSlices(),
-		informerFactory.Resource().V1alpha3().DeviceTaintRules(),
+		ruleInformer,
 		informerFactory.Resource().V1().DeviceClasses(),
 		"device-taint-eviction",
 	)
@@ -188,18 +196,35 @@ func testEvictCluster(tCtx ktesting.TContext) {
 		},
 	}
 
-	must(tCtx, tCtx.Client().ResourceV1alpha3().DeviceTaintRules().Create, rule, metav1.CreateOptions{})
+	if useRule {
+		// Evict through DeviceTaintRule.
+		must(tCtx, tCtx.Client().ResourceV1alpha3().DeviceTaintRules().Create, rule, metav1.CreateOptions{})
+		tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
+			err := tCtx.Client().ResourceV1alpha3().DeviceTaintRules().Delete(tCtx, ruleName, metav1.DeleteOptions{})
+			if apierrors.IsNotFound(err) {
+				return
+			}
+			tCtx.ExpectNoError(err)
+		})
+	} else {
+		// Evict by tainting each device.
+		for i, slice := range slices {
+			slice = slice.DeepCopy()
+			slice.Spec.Pool.Generation++
+			for i := range slice.Spec.Devices {
+				slice.Spec.Devices[i].Taints = []resourceapi.DeviceTaint{{
+					Key:    "testing",
+					Effect: resourceapi.DeviceTaintEffectNoExecute,
+				}}
+			}
+			slices[i] = must(tCtx, tCtx.Client().ResourceV1().ResourceSlices().Update, slice, metav1.UpdateOptions{})
+		}
+	}
+
 	getRule := func(tCtx ktesting.TContext) *resourcealpha.DeviceTaintRule {
 		rule = must(tCtx, tCtx.Client().ResourceV1alpha3().DeviceTaintRules().Get, ruleName, metav1.GetOptions{})
 		return rule
 	}
-	tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
-		err := tCtx.Client().ResourceV1alpha3().DeviceTaintRules().Delete(tCtx, ruleName, metav1.DeleteOptions{})
-		if apierrors.IsNotFound(err) {
-			return
-		}
-		tCtx.ExpectNoError(err)
-	})
 
 	// Evict and wait for pods to be gone.
 	start := time.Now()
@@ -214,10 +239,12 @@ func testEvictCluster(tCtx ktesting.TContext) {
 	duration := time.Since(start)
 	tCtx.Logf("Evicted %d pods in %s.", numPods, duration)
 
-	// Check condition.
-	ktesting.Eventually(tCtx, getRule).WithPolling(10 * time.Second).Should(gomega.HaveField("Status.Conditions", gomega.ConsistOf(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
-		"Type":    gomega.Equal(resourcealpha.DeviceTaintConditionEvictionInProgress),
-		"Status":  gomega.Equal(metav1.ConditionFalse),
-		"Message": gomega.Equal(fmt.Sprintf("%d pods evicted since starting the controller.", numPods)),
-	}))))
+	if useRule {
+		// Check condition.
+		ktesting.Eventually(tCtx, getRule).WithPolling(10 * time.Second).Should(gomega.HaveField("Status.Conditions", gomega.ConsistOf(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+			"Type":    gomega.Equal(resourcealpha.DeviceTaintConditionEvictionInProgress),
+			"Status":  gomega.Equal(metav1.ConditionFalse),
+			"Message": gomega.Equal(fmt.Sprintf("%d pods evicted since starting the controller.", numPods)),
+		}))))
+	}
 }

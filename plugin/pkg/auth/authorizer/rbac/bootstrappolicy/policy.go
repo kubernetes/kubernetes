@@ -645,7 +645,7 @@ func ClusterRoles() []rbacv1.ClusterRole {
 				rbacv1helpers.NewRule("create", "delete").Groups(resourceGroup).Resources("resourceclaims").RuleOrDie(),
 			)
 		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaints) {
+		if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaintRules) {
 			kubeSchedulerRules = append(kubeSchedulerRules, rbacv1helpers.NewRule(Read...).Groups(resourceGroup).Resources("devicetaintrules").RuleOrDie())
 		}
 	}

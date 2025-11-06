@@ -36,7 +36,6 @@ import (
 	gomegatypes "github.com/onsi/gomega/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"k8s.io/apimachinery/pkg/watch"
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
@@ -45,14 +44,18 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	metricstestutil "k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/devicetainteviction/metrics"
 	"k8s.io/kubernetes/pkg/controller/tainteviction"
 	controllertestutil "k8s.io/kubernetes/pkg/controller/testutil"
+	"k8s.io/kubernetes/pkg/features"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
@@ -84,6 +87,13 @@ func l[T any](items ...T) []T {
 
 // setup creates a controller which is ready to have its handle* methods called.
 func setup(tCtx ktesting.TContext) *testContext {
+	featuregatetesting.SetFeatureGatesDuringTest(tCtx, utilfeature.DefaultFeatureGate,
+		featuregatetesting.FeatureOverrides{
+			features.DRADeviceTaints:     true,
+			features.DRADeviceTaintRules: true,
+		},
+	)
+
 	fakeClientset := fake.NewClientset()
 	informerFactory := informers.NewSharedInformerFactory(fakeClientset, 0)
 	controller := New(fakeClientset,
@@ -2083,6 +2093,12 @@ func newTestController(tCtx ktesting.TContext, clientSet *fake.Clientset) *Contr
 
 	informerFactory := informers.NewSharedInformerFactory(clientSet, 0)
 
+	featuregatetesting.SetFeatureGatesDuringTest(tCtx, utilfeature.DefaultFeatureGate,
+		featuregatetesting.FeatureOverrides{
+			features.DRADeviceTaints:     true,
+			features.DRADeviceTaintRules: true,
+		},
+	)
 	controller := New(tCtx.Client(),
 		informerFactory.Core().V1().Pods(),
 		informerFactory.Resource().V1().ResourceClaims(),

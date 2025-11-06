@@ -55,7 +55,7 @@ const (
 // DeviceTaintRules applied. It is backed by informers to process
 // potential changes to resolved ResourceSlices asynchronously.
 type Tracker struct {
-	enableDeviceTaints bool
+	enableDeviceTaintRules bool
 
 	resourceSliceLister   resourcelisters.ResourceSliceLister
 	resourceSlices        cache.SharedIndexInformer
@@ -99,14 +99,14 @@ type Tracker struct {
 
 // Options configure a [Tracker].
 type Options struct {
-	// EnableDeviceTaints controls whether DeviceTaintRules
+	// EnableDeviceTaintRules controls whether DeviceTaintRules
 	// will be reflected in ResourceSlices reported by the tracker.
 	//
 	// If false, then TaintInformer and ClassInformer
 	// are not needed. The tracker turns into
 	// a thin wrapper around the underlying
 	// SliceInformer, with no processing of its own.
-	EnableDeviceTaints bool
+	EnableDeviceTaintRules bool
 	// EnableConsumableCapacity defines whether the CEL compiler supports the DRAConsumableCapacity feature.
 	EnableConsumableCapacity bool
 
@@ -121,7 +121,7 @@ type Options struct {
 
 // StartTracker creates and initializes informers for a new [Tracker].
 func StartTracker(ctx context.Context, opts Options) (finalT *Tracker, finalErr error) {
-	if !opts.EnableDeviceTaints {
+	if !opts.EnableDeviceTaintRules {
 		// Minimal wrapper. All public methods shortcut by calling the underlying informer.
 		return &Tracker{
 			resourceSliceLister: opts.SliceInformer.Lister(),
@@ -148,14 +148,14 @@ func StartTracker(ctx context.Context, opts Options) (finalT *Tracker, finalErr 
 // newTracker is used in testing to construct a tracker without informer event handlers.
 func newTracker(ctx context.Context, opts Options) (finalT *Tracker, finalErr error) {
 	t := &Tracker{
-		enableDeviceTaints:    opts.EnableDeviceTaints,
-		resourceSliceLister:   opts.SliceInformer.Lister(),
-		resourceSlices:        opts.SliceInformer.Informer(),
-		deviceTaints:          opts.TaintInformer.Informer(),
-		deviceClasses:         opts.ClassInformer.Informer(),
-		patchedResourceSlices: cache.NewStore(cache.MetaNamespaceKeyFunc),
-		handleError:           utilruntime.HandleErrorWithContext,
-		eventQueue:            *buffer.NewRing[func()](buffer.RingOptions{InitialSize: 0, NormalSize: 4}),
+		enableDeviceTaintRules: opts.EnableDeviceTaintRules,
+		resourceSliceLister:    opts.SliceInformer.Lister(),
+		resourceSlices:         opts.SliceInformer.Informer(),
+		deviceTaints:           opts.TaintInformer.Informer(),
+		deviceClasses:          opts.ClassInformer.Informer(),
+		patchedResourceSlices:  cache.NewStore(cache.MetaNamespaceKeyFunc),
+		handleError:            utilruntime.HandleErrorWithContext,
+		eventQueue:             *buffer.NewRing[func()](buffer.RingOptions{InitialSize: 0, NormalSize: 4}),
 	}
 	defer func() {
 		// If we don't return the tracker, stop the partially initialized instance.
@@ -220,7 +220,7 @@ func (t *Tracker) initInformers(ctx context.Context) error {
 // point is possible and will emit events with up-to-date ResourceSlice
 // objects.
 func (t *Tracker) HasSynced() bool {
-	if !t.enableDeviceTaints {
+	if !t.enableDeviceTaintRules {
 		return t.resourceSlices.HasSynced()
 	}
 
@@ -239,7 +239,7 @@ func (t *Tracker) HasSynced() bool {
 
 // Stop ends all background activity and blocks until that shutdown is complete.
 func (t *Tracker) Stop() {
-	if !t.enableDeviceTaints {
+	if !t.enableDeviceTaintRules {
 		return
 	}
 
@@ -254,7 +254,7 @@ func (t *Tracker) Stop() {
 // ListPatchedResourceSlices returns all ResourceSlices in the cluster with
 // modifications from DeviceTaints applied.
 func (t *Tracker) ListPatchedResourceSlices() ([]*resourceapi.ResourceSlice, error) {
-	if !t.enableDeviceTaints {
+	if !t.enableDeviceTaintRules {
 		return t.resourceSliceLister.List(labels.Everything())
 	}
 
@@ -270,7 +270,7 @@ func (t *Tracker) ListPatchedResourceSlices() ([]*resourceapi.ResourceSlice, err
 // All currently know ResourceSlices get delivered via Add events
 // before this method returns.
 func (t *Tracker) AddEventHandler(handler cache.ResourceEventHandler) (cache.ResourceEventHandlerRegistration, error) {
-	if !t.enableDeviceTaints {
+	if !t.enableDeviceTaintRules {
 		return t.resourceSlices.AddEventHandler(handler)
 	}
 

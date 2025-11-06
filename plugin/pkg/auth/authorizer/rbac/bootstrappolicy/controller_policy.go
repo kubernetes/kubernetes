@@ -216,23 +216,31 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			},
 		})
 		if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaints) {
+			rules := []rbacv1.PolicyRule{
+				// Deletes pods to evict them.
+				rbacv1helpers.NewRule("get", "list", "watch", "delete").Groups(legacyGroup).Resources("pods").RuleOrDie(),
+				// Sets pod conditions.
+				rbacv1helpers.NewRule("update", "patch").Groups(legacyGroup).Resources("pods/status").RuleOrDie(),
+				// The rest is read-only.
+				rbacv1helpers.NewRule("get", "list", "watch").Groups(resourceGroup).Resources("resourceclaims").RuleOrDie(),
+				rbacv1helpers.NewRule("get", "list", "watch").Groups(resourceGroup).Resources("resourceslices").RuleOrDie(),
+				rbacv1helpers.NewRule("get", "list", "watch").Groups(resourceGroup).Resources("deviceclasses").RuleOrDie(),
+				eventsRule(),
+			}
+
+			if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaintRules) {
+				rules = append(rules,
+					// Sets DeviceTaintRule conditions.
+					rbacv1helpers.NewRule("update", "patch").Groups(resourceGroup).Resources("devicetaintrules/status").RuleOrDie(),
+					// Read-only for spec.
+					rbacv1helpers.NewRule("get", "list", "watch").Groups(resourceGroup).Resources("devicetaintrules").RuleOrDie(),
+				)
+			}
+
 			addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
 				// Same name as in k8s.io/kubernetes/cmd/kube-controller-manager/names.
 				ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "device-taint-eviction-controller"},
-				Rules: []rbacv1.PolicyRule{
-					// Deletes pods to evict them.
-					rbacv1helpers.NewRule("get", "list", "watch", "delete").Groups(legacyGroup).Resources("pods").RuleOrDie(),
-					// Sets pod conditions.
-					rbacv1helpers.NewRule("update", "patch").Groups(legacyGroup).Resources("pods/status").RuleOrDie(),
-					// Sets DeviceTaintRule conditions.
-					rbacv1helpers.NewRule("update", "patch").Groups(resourceGroup).Resources("devicetaintrules/status").RuleOrDie(),
-					// The rest is read-only.
-					rbacv1helpers.NewRule("get", "list", "watch").Groups(resourceGroup).Resources("resourceclaims").RuleOrDie(),
-					rbacv1helpers.NewRule("get", "list", "watch").Groups(resourceGroup).Resources("resourceslices").RuleOrDie(),
-					rbacv1helpers.NewRule("get", "list", "watch").Groups(resourceGroup).Resources("deviceclasses").RuleOrDie(),
-					rbacv1helpers.NewRule("get", "list", "watch").Groups(resourceGroup).Resources("devicetaintrules").RuleOrDie(),
-					eventsRule(),
-				},
+				Rules:      rules,
 			})
 		}
 	}

@@ -1991,7 +1991,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			b.TestPod(ctx, f, pod)
 		})
 
-		f.It("DeviceTaintRule evicts pod", func(ctx context.Context) {
+		f.It("DeviceTaintRule evicts pod", f.WithFeatureGate(features.DRADeviceTaintRules), func(ctx context.Context) {
 			pod, template := b.PodInline()
 			template.Spec.Spec.Devices.Requests[0].Exactly.Tolerations = []resourceapi.DeviceToleration{{
 				Effect:   resourceapi.DeviceTaintEffectNoSchedule,
