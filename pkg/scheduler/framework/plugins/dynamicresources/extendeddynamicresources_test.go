@@ -563,3 +563,112 @@ func Test_createRequestsAndMappings_mappings(t *testing.T) {
 		})
 	}
 }
+
+// Test_createRequestsAndMappings_deterministic verifies that the function produces
+// consistent, deterministic output regardless of Go's map iteration order.
+// This is critical for reproducible pod status and reliable testing.
+func Test_createRequestsAndMappings_deterministic(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
+	// Create a pod with multiple extended resources
+	// Use resource names that would be in different orders if not sorted
+	pod := st.MakePod().Name(podName).Namespace(namespace).
+		UID(podUID).
+		Res(map[v1.ResourceName]string{
+			"zzz.example.com/resource": "1", // Would be last alphabetically
+			"aaa.example.com/resource": "1", // Would be first alphabetically  
+			"mmm.example.com/resource": "1", // Would be middle alphabetically
+		}).
+		Obj()
+
+	// Map of extended resources (maps have non-deterministic iteration order)
+	extendedResources := map[v1.ResourceName]int64{
+		"zzz.example.com/resource": 1,
+		"aaa.example.com/resource": 1,
+		"mmm.example.com/resource": 1,
+	}
+
+	// Mock device class resolver with DeviceClass objects
+	cache := &mockDeviceClassResolver{
+		mapping: map[v1.ResourceName]*resourceapi.DeviceClass{
+			"zzz.example.com/resource": {ObjectMeta: metav1.ObjectMeta{Name: "zzz-class"}},
+			"aaa.example.com/resource": {ObjectMeta: metav1.ObjectMeta{Name: "aaa-class"}},
+			"mmm.example.com/resource": {ObjectMeta: metav1.ObjectMeta{Name: "mmm-class"}},
+		},
+	}
+
+	// Run the function multiple times
+	const iterations = 10
+	var firstDeviceRequests []resourceapi.DeviceRequest
+	var firstMappings []v1.ContainerExtendedResourceRequest
+
+	for i := 0; i < iterations; i++ {
+		deviceRequests, mappings := createRequestsAndMappings(pod, extendedResources, logger, cache)
+
+		if i == 0 {
+			// Save first result
+			firstDeviceRequests = deviceRequests
+			firstMappings = mappings
+		} else {
+			// Verify all subsequent results match the first
+			if len(deviceRequests) != len(firstDeviceRequests) {
+				t.Fatalf("iteration %d: different device request count: got %d, want %d",
+					i, len(deviceRequests), len(firstDeviceRequests))
+			}
+
+			for j, req := range deviceRequests {
+				if req.Name != firstDeviceRequests[j].Name {
+					t.Errorf("iteration %d: device request %d has different name: got %q, want %q",
+						i, j, req.Name, firstDeviceRequests[j].Name)
+				}
+				if req.Exactly.DeviceClassName != firstDeviceRequests[j].Exactly.DeviceClassName {
+					t.Errorf("iteration %d: device request %d has different class: got %q, want %q",
+						i, j, req.Exactly.DeviceClassName, firstDeviceRequests[j].Exactly.DeviceClassName)
+				}
+			}
+
+			if len(mappings) != len(firstMappings) {
+				t.Fatalf("iteration %d: different mappings count: got %d, want %d",
+					i, len(mappings), len(firstMappings))
+			}
+
+			for j, mapping := range mappings {
+				if mapping.ResourceName != firstMappings[j].ResourceName {
+					t.Errorf("iteration %d: mapping %d has different resource name: got %q, want %q",
+						i, j, mapping.ResourceName, firstMappings[j].ResourceName)
+				}
+			}
+		}
+	}
+
+	// Verify the output is in sorted order (alphabetically by resource name)
+	// The device requests should be sorted by their names which are derived from sorted resource names
+	expectedOrder := []string{
+		"aaa.example.com/resource", // First alphabetically
+		"mmm.example.com/resource", // Middle alphabetically
+		"zzz.example.com/resource", // Last alphabetically
+	}
+
+	// Verify mappings contain resources in sorted order
+	seenResources := make(map[string]bool)
+	var resourceOrder []string
+	for _, mapping := range firstMappings {
+		if !seenResources[mapping.ResourceName] {
+			seenResources[mapping.ResourceName] = true
+			resourceOrder = append(resourceOrder, mapping.ResourceName)
+		}
+	}
+
+	for i, resource := range expectedOrder {
+		if i >= len(resourceOrder) {
+			t.Errorf("missing resource in output: %s", resource)
+			continue
+		}
+		if resourceOrder[i] != resource {
+			t.Errorf("resource at position %d: got %q, want %q", i, resourceOrder[i], resource)
+		}
+	}
+
+	t.Logf("✓ Function produced consistent output across %d iterations", iterations)
+	t.Logf("✓ Resources processed in sorted order: %v", resourceOrder)
+}
