@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	kubeapiserveradmission "k8s.io/apiserver/pkg/admission"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	basecompatibility "k8s.io/component-base/compatibility"
@@ -150,7 +151,7 @@ func TestValidateUnknownVersionInteroperabilityProxy(t *testing.T) {
 				PeerAdvertiseAddress: test.peerAdvertiseAddress,
 			}
 			if test.featureEnabled {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.UnknownVersionInteroperabilityProxy, true)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.UnknownVersionInteroperabilityProxy, true)
 			}
 			var errMessageGot string
 			if errs := validateUnknownVersionInteroperabilityProxyFlags(options); len(errs) > 0 {
