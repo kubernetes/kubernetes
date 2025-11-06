@@ -202,7 +202,7 @@ func (pl *PodTopologySpread) updateWithPod(logger klog.Logger, s *preFilterState
 		}
 
 		if pl.enableNodeInclusionPolicyInPodTopologySpread &&
-			!constraint.matchNodeInclusionPolicies(logger, preemptorPod, node, requiredSchedulingTerm) {
+			!constraint.matchNodeInclusionPolicies(logger, preemptorPod, node, requiredSchedulingTerm, pl.enableTaintTolerationComparisonOperators) {
 			continue
 		}
 
@@ -275,7 +275,7 @@ func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod,
 		tpCounts := make([]topologyCount, 0, len(constraints))
 		for i, c := range constraints {
 			if pl.enableNodeInclusionPolicyInPodTopologySpread &&
-				!c.matchNodeInclusionPolicies(logger, pod, node, requiredNodeAffinity) {
+				!c.matchNodeInclusionPolicies(logger, pod, node, requiredNodeAffinity, pl.enableTaintTolerationComparisonOperators) {
 				continue
 			}
 

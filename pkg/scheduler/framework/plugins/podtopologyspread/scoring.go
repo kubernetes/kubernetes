@@ -170,7 +170,8 @@ func (pl *PodTopologySpread) PreScore(
 
 		for i, c := range state.Constraints {
 			if pl.enableNodeInclusionPolicyInPodTopologySpread &&
-				!c.matchNodeInclusionPolicies(logger, pod, node, requiredNodeAffinity) {
+				!c.matchNodeInclusionPolicies(logger, pod, node, requiredNodeAffinity,
+					pl.enableTaintTolerationComparisonOperators) {
 				continue
 			}
 

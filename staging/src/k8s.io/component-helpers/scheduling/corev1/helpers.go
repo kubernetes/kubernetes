@@ -70,6 +70,25 @@ func TolerationsTolerateTaint(logger klog.Logger, tolerations []v1.Toleration, t
 	return false
 }
 
+// FilterTolerationsWithComparisonOperators returns a filtered list of tolerations,
+// optionally excluding tolerations with comparison operators (Lt, Gt) when the feature flag is disabled.
+func FilterTolerationsWithComparisonOperators(tolerations []v1.Toleration, enableComparisonOperators bool) ([]v1.Toleration, bool) {
+	if enableComparisonOperators {
+		return tolerations, false
+	}
+
+	filtered := []v1.Toleration{}
+	hasFiltered := false
+	for _, toleration := range tolerations {
+		if toleration.Operator == v1.TolerationOpLt || toleration.Operator == v1.TolerationOpGt {
+			hasFiltered = true
+			continue
+		}
+		filtered = append(filtered, toleration)
+	}
+	return filtered, hasFiltered
+}
+
 type taintsFilterFunc func(*v1.Taint) bool
 
 // FindMatchingUntoleratedTaint checks if the given tolerations tolerates

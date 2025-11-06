@@ -69,6 +69,7 @@ type PodTopologySpread struct {
 	enableNodeInclusionPolicyInPodTopologySpread bool
 	enableMatchLabelKeysInPodTopologySpread      bool
 	enableSchedulingQueueHint                    bool
+	enableTaintTolerationComparisonOperators     bool
 }
 
 var _ fwk.PreFilterPlugin = &PodTopologySpread{}
@@ -104,6 +105,7 @@ func New(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.Fea
 		enableNodeInclusionPolicyInPodTopologySpread: fts.EnableNodeInclusionPolicyInPodTopologySpread,
 		enableMatchLabelKeysInPodTopologySpread:      fts.EnableMatchLabelKeysInPodTopologySpread,
 		enableSchedulingQueueHint:                    fts.EnableSchedulingQueueHint,
+		enableTaintTolerationComparisonOperators:     fts.EnableTaintTolerationComparisonOperators,
 	}
 	if args.DefaultingType == config.SystemDefaulting {
 		pl.defaultConstraints = systemDefaultConstraints

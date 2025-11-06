@@ -33,8 +33,9 @@ import (
 
 // TaintToleration is a plugin that checks if a pod tolerates a node's taints.
 type TaintToleration struct {
-	handle                    fwk.Handle
-	enableSchedulingQueueHint bool
+	handle                                   fwk.Handle
+	enableSchedulingQueueHint                bool
+	enableTaintTolerationComparisonOperators bool
 }
 
 var _ fwk.FilterPlugin = &TaintToleration{}
@@ -54,6 +55,18 @@ const (
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *TaintToleration) Name() string {
 	return Name
+}
+
+// filterTolerationsForScheduling filters tolerations to exclude comparison operators (Lt, Gt)
+// when the feature gate is disabled, and logs when filtering occurs.
+func (pl *TaintToleration) filterTolerationsForScheduling(logger klog.Logger, pod *v1.Pod) []v1.Toleration {
+	filtered, hasFiltered := v1helper.FilterTolerationsWithComparisonOperators(pod.Spec.Tolerations, pl.enableTaintTolerationComparisonOperators)
+	if hasFiltered {
+		logger.V(4).Info("Pod has tolerations with comparison operators (Lt/Gt) which are ignored because TaintTolerationComparisonOperators feature gate is disabled",
+			"pod", klog.KObj(pod),
+			"namespace", pod.Namespace)
+	}
+	return filtered
 }
 
 // EventsToRegister returns the possible events that may make a Pod
@@ -90,12 +103,14 @@ func (pl *TaintToleration) isSchedulableAfterNodeChange(logger klog.Logger, pod 
 		return fwk.Queue, err
 	}
 
+	tolerations := pl.filterTolerationsForScheduling(logger, pod)
+
 	wasUntolerated := true
 	if originalNode != nil {
-		_, wasUntolerated = v1helper.FindMatchingUntoleratedTaint(logger, originalNode.Spec.Taints, pod.Spec.Tolerations, helper.DoNotScheduleTaintsFilterFunc())
+		_, wasUntolerated = v1helper.FindMatchingUntoleratedTaint(logger, originalNode.Spec.Taints, tolerations, helper.DoNotScheduleTaintsFilterFunc())
 	}
 
-	_, isUntolerated := v1helper.FindMatchingUntoleratedTaint(logger, modifiedNode.Spec.Taints, pod.Spec.Tolerations, helper.DoNotScheduleTaintsFilterFunc())
+	_, isUntolerated := v1helper.FindMatchingUntoleratedTaint(logger, modifiedNode.Spec.Taints, tolerations, helper.DoNotScheduleTaintsFilterFunc())
 
 	if wasUntolerated && !isUntolerated {
 		logger.V(5).Info("node was created or updated, and this may make the Pod rejected by TaintToleration plugin in the previous scheduling cycle schedulable", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
@@ -111,7 +126,8 @@ func (pl *TaintToleration) Filter(ctx context.Context, state fwk.CycleState, pod
 	logger := klog.FromContext(ctx)
 	node := nodeInfo.Node()
 
-	taint, isUntolerated := v1helper.FindMatchingUntoleratedTaint(logger, node.Spec.Taints, pod.Spec.Tolerations, helper.DoNotScheduleTaintsFilterFunc())
+	tolerations := pl.filterTolerationsForScheduling(logger, pod)
+	taint, isUntolerated := v1helper.FindMatchingUntoleratedTaint(logger, node.Spec.Taints, tolerations, helper.DoNotScheduleTaintsFilterFunc())
 	if !isUntolerated {
 		return nil
 	}
@@ -144,7 +160,9 @@ func getAllTolerationPreferNoSchedule(tolerations []v1.Toleration) (tolerationLi
 
 // PreScore builds and writes cycle state used by Score and NormalizeScore.
 func (pl *TaintToleration) PreScore(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) *fwk.Status {
-	tolerationsPreferNoSchedule := getAllTolerationPreferNoSchedule(pod.Spec.Tolerations)
+	logger := klog.FromContext(ctx)
+	tolerations := pl.filterTolerationsForScheduling(logger, pod)
+	tolerationsPreferNoSchedule := getAllTolerationPreferNoSchedule(tolerations)
 	state := &preScoreState{
 		tolerationsPreferNoSchedule: tolerationsPreferNoSchedule,
 	}
@@ -208,8 +226,9 @@ func (pl *TaintToleration) ScoreExtensions() fwk.ScoreExtensions {
 // New initializes a new plugin and returns it.
 func New(_ context.Context, _ runtime.Object, h fwk.Handle, fts feature.Features) (fwk.Plugin, error) {
 	return &TaintToleration{
-		handle:                    h,
-		enableSchedulingQueueHint: fts.EnableSchedulingQueueHint,
+		handle:                                   h,
+		enableSchedulingQueueHint:                fts.EnableSchedulingQueueHint,
+		enableTaintTolerationComparisonOperators: fts.EnableTaintTolerationComparisonOperators,
 	}, nil
 }
 

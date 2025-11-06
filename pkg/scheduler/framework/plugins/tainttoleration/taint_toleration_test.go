@@ -433,6 +433,92 @@ func TestTaintTolerationFilter(t *testing.T) {
 	}
 }
 
+func TestTaintTolerationFilterWithFeatureGate(t *testing.T) {
+	tests := []struct {
+		name                               string
+		pod                                *v1.Pod
+		node                               *v1.Node
+		enableTaintTolerationComparisonOps bool
+		wantStatus                         *fwk.Status
+	}{
+		{
+			name:                               "Pod with Gt toleration can be scheduled when feature gate is enabled and taint value is higher",
+			pod:                                podWithTolerations("pod1", []v1.Toleration{{Key: "node.kubernetes.io/sla", Operator: "Gt", Value: "750", Effect: "NoSchedule"}}),
+			node:                               nodeWithTaints("nodeA", []v1.Taint{{Key: "node.kubernetes.io/sla", Value: "950", Effect: "NoSchedule"}}),
+			enableTaintTolerationComparisonOps: true,
+			wantStatus:                         nil,
+		},
+		{
+			name: "Pod with Gt toleration cannot be scheduled when feature gate is disabled",
+			pod: podWithTolerations("pod1", []v1.Toleration{
+				{Key: "node.kubernetes.io/sla", Operator: "Gt", Value: "750", Effect: "NoSchedule"},
+			}),
+			node:                               nodeWithTaints("nodeA", []v1.Taint{{Key: "node.kubernetes.io/sla", Value: "950", Effect: "NoSchedule"}}),
+			enableTaintTolerationComparisonOps: false,
+			wantStatus:                         fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "node(s) had untolerated taint(s)"),
+		},
+		{
+			name:                               "Pod with Lt toleration can be scheduled when feature gate is enabled and taint value is lower",
+			pod:                                podWithTolerations("pod1", []v1.Toleration{{Key: "node.kubernetes.io/sla", Operator: "Lt", Value: "950", Effect: "NoSchedule"}}),
+			node:                               nodeWithTaints("nodeA", []v1.Taint{{Key: "node.kubernetes.io/sla", Value: "800", Effect: "NoSchedule"}}),
+			enableTaintTolerationComparisonOps: true,
+			wantStatus:                         nil,
+		},
+		{
+			name: "Pod with Lt toleration cannot be scheduled when feature gate is disabled",
+			pod: podWithTolerations("pod1", []v1.Toleration{
+				{Key: "node.kubernetes.io/sla", Operator: "Lt", Value: "950", Effect: "NoSchedule"},
+			}),
+			node:                               nodeWithTaints("nodeA", []v1.Taint{{Key: "node.kubernetes.io/sla", Value: "800", Effect: "NoSchedule"}}),
+			enableTaintTolerationComparisonOps: false,
+			wantStatus:                         fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "node(s) had untolerated taint(s)"),
+		},
+		{
+			name: "Pod with mixed tolerations (Equal and Gt) when feature gate is disabled - only Equal is honored",
+			pod: podWithTolerations("pod1", []v1.Toleration{
+				{Key: "dedicated", Operator: "Equal", Value: "user1", Effect: "NoSchedule"},
+				{Key: "node.kubernetes.io/sla", Operator: "Gt", Value: "750", Effect: "NoSchedule"},
+			}),
+			node: nodeWithTaints("nodeA", []v1.Taint{
+				{Key: "dedicated", Value: "user1", Effect: "NoSchedule"},
+			}),
+			enableTaintTolerationComparisonOps: false,
+			wantStatus:                         nil,
+		},
+		{
+			name: "Pod with mixed tolerations, Gt toleration needed but filtered out when feature gate is disabled",
+			pod: podWithTolerations("pod1", []v1.Toleration{
+				{Key: "dedicated", Operator: "Equal", Value: "user1", Effect: "NoSchedule"},
+				{Key: "node.kubernetes.io/sla", Operator: "Gt", Value: "750", Effect: "NoSchedule"},
+			}),
+			node: nodeWithTaints("nodeA", []v1.Taint{
+				{Key: "dedicated", Value: "user1", Effect: "NoSchedule"},
+				{Key: "node.kubernetes.io/sla", Value: "950", Effect: "NoSchedule"},
+			}),
+			enableTaintTolerationComparisonOps: false,
+			wantStatus:                         fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "node(s) had untolerated taint(s)"),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			nodeInfo := framework.NewNodeInfo()
+			nodeInfo.SetNode(test.node)
+			p, err := New(ctx, nil, nil, feature.Features{
+				EnableTaintTolerationComparisonOperators: test.enableTaintTolerationComparisonOps,
+			})
+			if err != nil {
+				t.Fatalf("creating plugin: %v", err)
+			}
+			gotStatus := p.(fwk.FilterPlugin).Filter(ctx, nil, test.pod, nodeInfo)
+			if diff := cmp.Diff(test.wantStatus, gotStatus); diff != "" {
+				t.Errorf("Unexpected status (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestIsSchedulableAfterNodeChange(t *testing.T) {
 	tests := []struct {
 		name         string

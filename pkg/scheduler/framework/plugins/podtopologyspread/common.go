@@ -40,7 +40,7 @@ type topologySpreadConstraint struct {
 	NodeTaintsPolicy   v1.NodeInclusionPolicy
 }
 
-func (tsc *topologySpreadConstraint) matchNodeInclusionPolicies(logger klog.Logger, pod *v1.Pod, node *v1.Node, require nodeaffinity.RequiredNodeAffinity) bool {
+func (tsc *topologySpreadConstraint) matchNodeInclusionPolicies(logger klog.Logger, pod *v1.Pod, node *v1.Node, require nodeaffinity.RequiredNodeAffinity, enableComparisonOperators bool) bool {
 	if tsc.NodeAffinityPolicy == v1.NodeInclusionPolicyHonor {
 		// We ignore parsing errors here for backwards compatibility.
 		if match, _ := require.Match(node); !match {
@@ -49,7 +49,8 @@ func (tsc *topologySpreadConstraint) matchNodeInclusionPolicies(logger klog.Logg
 	}
 
 	if tsc.NodeTaintsPolicy == v1.NodeInclusionPolicyHonor {
-		if _, untolerated := v1helper.FindMatchingUntoleratedTaint(logger, node.Spec.Taints, pod.Spec.Tolerations, helper.DoNotScheduleTaintsFilterFunc()); untolerated {
+		tolerations, _ := v1helper.FilterTolerationsWithComparisonOperators(pod.Spec.Tolerations, enableComparisonOperators)
+		if _, untolerated := v1helper.FindMatchingUntoleratedTaint(logger, node.Spec.Taints, tolerations, helper.DoNotScheduleTaintsFilterFunc()); untolerated {
 			return false
 		}
 	}
