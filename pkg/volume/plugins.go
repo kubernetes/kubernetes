@@ -121,6 +121,9 @@ type DynamicPluginProber interface {
 
 	// aggregates events for successful drivers and errors for failed drivers
 	Probe() (events []ProbeEvent, err error)
+
+	// Shutdown cleans up resources used by the prober
+	Shutdown()
 }
 
 // VolumePlugin is an interface to volume plugins that can be used on a
@@ -613,6 +616,16 @@ func (pm *VolumePluginMgr) InitPlugins(plugins []VolumePlugin, prober DynamicPlu
 	return utilerrors.NewAggregate(allErrs)
 }
 
+// Shutdown cleans up the volume plugin manager.
+func (pm *VolumePluginMgr) Shutdown() {
+	pm.mutex.Lock()
+	defer pm.mutex.Unlock()
+
+	if pm.prober != nil {
+		pm.prober.Shutdown()
+	}
+}
+
 func (pm *VolumePluginMgr) initProbedPlugin(probedPlugin VolumePlugin) error {
 	name := probedPlugin.GetPluginName()
 	if errs := validation.IsQualifiedName(name); len(errs) != 0 {
@@ -1029,3 +1042,4 @@ type dummyPluginProber struct{}
 
 func (*dummyPluginProber) Init() error                  { return nil }
 func (*dummyPluginProber) Probe() ([]ProbeEvent, error) { return nil, nil }
+func (*dummyPluginProber) Shutdown()                    {}

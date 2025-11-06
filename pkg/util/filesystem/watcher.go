@@ -36,6 +36,9 @@ type FSWatcher interface {
 
 	// Add a filesystem path to watch
 	AddWatch(path string) error
+
+	// Close stops the watcher.
+	Close()
 }
 
 // FSEventHandler is called when a fsnotify event occurs.
@@ -48,6 +51,7 @@ type fsnotifyWatcher struct {
 	watcher      *fsnotify.Watcher
 	eventHandler FSEventHandler
 	errorHandler FSErrorHandler
+	stopCh       chan struct{}
 }
 
 var _ FSWatcher = &fsnotifyWatcher{}
@@ -55,7 +59,9 @@ var _ FSWatcher = &fsnotifyWatcher{}
 // NewFsnotifyWatcher returns an implementation of FSWatcher that continuously listens for
 // fsnotify events and calls the event handler as soon as an event is received.
 func NewFsnotifyWatcher() FSWatcher {
-	return &fsnotifyWatcher{}
+	return &fsnotifyWatcher{
+		stopCh: make(chan struct{}),
+	}
 }
 
 func (w *fsnotifyWatcher) AddWatch(path string) error {
@@ -87,9 +93,20 @@ func (w *fsnotifyWatcher) Run() {
 				if w.errorHandler != nil {
 					w.errorHandler(err)
 				}
+			case <-w.stopCh:
+				return
 			}
 		}
 	}()
+}
+
+func (w *fsnotifyWatcher) Close() {
+	select {
+	case <-w.stopCh:
+	// Already closed.
+	default:
+		close(w.stopCh)
+	}
 }
 
 type watchAddRemover interface {
