@@ -668,7 +668,7 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 		if err != nil {
 			return nil, statusError(logger, err)
 		}
-		features := allocatorFeatures(pl.fts)
+		features := AllocatorFeatures(pl.fts)
 		allocator, err := structured.NewAllocator(ctx, features, *allocatedState, pl.draManager.DeviceClasses(), slices, pl.celCache)
 		if err != nil {
 			return nil, statusError(logger, err)
@@ -680,7 +680,7 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 	return nil, nil
 }
 
-func allocatorFeatures(fts feature.Features) structured.Features {
+func AllocatorFeatures(fts feature.Features) structured.Features {
 	return structured.Features{
 		AdminAccess:            fts.EnableDRAAdminAccess,
 		PrioritizedList:        fts.EnableDRAPrioritizedList,

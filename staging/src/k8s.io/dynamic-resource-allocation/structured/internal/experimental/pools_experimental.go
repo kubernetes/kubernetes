@@ -28,7 +28,7 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-func nodeMatches(node *v1.Node, nodeNameToMatch string, allNodesMatch bool, nodeSelector *v1.NodeSelector) (bool, error) {
+func NodeMatches(node *v1.Node, nodeNameToMatch string, allNodesMatch bool, nodeSelector *v1.NodeSelector) (bool, error) {
 	switch {
 	case nodeNameToMatch != "":
 		return node != nil && node.Name == nodeNameToMatch, nil
@@ -61,7 +61,7 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 		}
 
 		if nodeName, allNodes := ptr.Deref(slice.Spec.NodeName, ""), ptr.Deref(slice.Spec.AllNodes, false); nodeName != "" || allNodes || slice.Spec.NodeSelector != nil {
-			match, err := nodeMatches(node, nodeName, allNodes, slice.Spec.NodeSelector)
+			match, err := NodeMatches(node, nodeName, allNodes, slice.Spec.NodeSelector)
 			if err != nil {
 				return nil, fmt.Errorf("failed to perform node selection for slice %s: %w", slice.Name, err)
 			}
@@ -80,7 +80,7 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 			}
 		} else if ptr.Deref(slice.Spec.PerDeviceNodeSelection, false) {
 			for _, device := range slice.Spec.Devices {
-				match, err := nodeMatches(node, ptr.Deref(device.NodeName, ""), ptr.Deref(device.AllNodes, false), device.NodeSelector)
+				match, err := NodeMatches(node, ptr.Deref(device.NodeName, ""), ptr.Deref(device.AllNodes, false), device.NodeSelector)
 				if err != nil {
 					return nil, fmt.Errorf("failed to perform node selection for device %s in slice %s: %w",
 						device.String(), slice.Name, err)
