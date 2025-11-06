@@ -155,6 +155,13 @@ linters:
       - text: "Conditions field in AllocatedDeviceStatus has incorrect tags, should be: `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,5,rep,name=conditions\"`"
         path: "staging/src/k8s.io/api/resource/"
       
+      # Commentstart - Ignore commentstart issues for existing API group
+      # TODO: For each existing API group, we aim to remove it over time.
+      - text: "godoc for field .* should start with '.* ...'"
+        path: "staging/src/k8s.io/api/(admissionregistration|apidiscovery|apiserverinternal|apps|authentication|authorization|autoscaling|batch|certificates|coordination|core|discovery|events|extensions|flowcontrol|imagepolicy|networking|node|policy|rbac|resource|scheduling|storage|storagemigration)"
+      - text: "field .* is missing godoc comment"
+        path: "staging/src/k8s.io/api/autoscaling/"
+      
       # Pre-existing issues from the conflictmarkers linter
       # The Error field in some older API types is marked as both optional and required.
       # This is incorrect, but cannot be changed without breaking changes.
@@ -313,7 +320,7 @@ linters:
             disable:
               - '*'
             enable:
-              # - "commentstart" # Ensure comments start with the serialized version of the field name.
+              - "commentstart" # Ensure comments start with the serialized version of the field name.
               - "conditions" # Ensure conditions have the correct json tags and markers.
               - "conflictingmarkers" # Detect mutually exclusive markers on the same field.
               # - "integers" # Ensure only int32 and int64 are used for integers.
