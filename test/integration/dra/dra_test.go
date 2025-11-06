@@ -47,6 +47,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	resourceapiac "k8s.io/client-go/applyconfigurations/resource/v1"
@@ -842,12 +843,16 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 						},
 					},
 					{
-						SharedCounters: []resourceapi.CounterSet{{
-							Name: "gpu-0",
-							Counters: map[string]resourceapi.Counter{
-								"mem": {Value: resource.MustParse("1")},
+						SharedCounters: []resourceapi.CounterSet{
+							{
+								Name: "gpu-0",
+								Counters: map[string]resourceapi.Counter{
+									"mem": {Value: resource.MustParse("1")},
+								},
 							},
-						}},
+						},
+					},
+					{
 						Devices: []resourceapi.Device{
 							{
 								Name: "device-tainted-default",
@@ -910,32 +915,46 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 			Devices:        sl.Devices,
 		})
 	}
-	for _, disabled := range disabledFeatures {
-		switch disabled {
-		case features.DRADeviceTaints:
-			for i := range expectedSliceSpecs {
-				for e := range expectedSliceSpecs[i].Devices {
-					expectedSliceSpecs[i].Devices[e].Taints = nil
+
+	// Keep track of the disabled features used in each slice. This allows us to check
+	// that we get the right set of features listed in the droppedFields error.
+	disabledFeaturesBySlice := make([]sets.Set[featuregate.Feature], len(resources.Pools[poolName].Slices))
+	for i := range expectedSliceSpecs {
+		disabledFeaturesForSlice := sets.New[featuregate.Feature]()
+		for _, disabled := range disabledFeatures {
+			switch disabled {
+			case features.DRADeviceTaints:
+				for e, device := range expectedSliceSpecs[i].Devices {
+					if device.Taints != nil {
+						expectedSliceSpecs[i].Devices[e].Taints = nil
+						disabledFeaturesForSlice.Insert(disabled)
+					}
 				}
-			}
-		case features.DRAPartitionableDevices:
-			for i := range expectedSliceSpecs {
-				expectedSliceSpecs[i].SharedCounters = nil
-				for e := range expectedSliceSpecs[i].Devices {
-					expectedSliceSpecs[i].Devices[e].ConsumesCounters = nil
+			case features.DRAPartitionableDevices:
+				if expectedSliceSpecs[i].SharedCounters != nil {
+					expectedSliceSpecs[i].SharedCounters = nil
+					disabledFeaturesForSlice.Insert(disabled)
 				}
-			}
-		case features.DRADeviceBindingConditions:
-			for i := range expectedSliceSpecs {
-				for e := range expectedSliceSpecs[i].Devices {
-					expectedSliceSpecs[i].Devices[e].BindingConditions = nil
-					expectedSliceSpecs[i].Devices[e].BindingFailureConditions = nil
-					expectedSliceSpecs[i].Devices[e].BindsToNode = nil
+				for e, device := range expectedSliceSpecs[i].Devices {
+					if device.ConsumesCounters != nil {
+						expectedSliceSpecs[i].Devices[e].ConsumesCounters = nil
+						disabledFeaturesForSlice.Insert(disabled)
+					}
 				}
+			case features.DRADeviceBindingConditions:
+				for e, device := range expectedSliceSpecs[i].Devices {
+					if device.BindingConditions != nil || device.BindingFailureConditions != nil || device.BindsToNode != nil {
+						expectedSliceSpecs[i].Devices[e].BindingConditions = nil
+						expectedSliceSpecs[i].Devices[e].BindingFailureConditions = nil
+						expectedSliceSpecs[i].Devices[e].BindsToNode = nil
+						disabledFeaturesForSlice.Insert(disabled)
+					}
+				}
+			default:
+				tCtx.Fatalf("faulty test, case for %s missing", disabled)
 			}
-		default:
-			tCtx.Fatalf("faulty test, case for %s missing", disabled)
 		}
+		disabledFeaturesBySlice[i] = disabledFeaturesForSlice
 	}
 	var expectedSlices []any
 	for _, spec := range expectedSliceSpecs {
@@ -1050,10 +1069,13 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 				var droppedFields *resourceslice.DroppedFieldsError
 				if errors.As(err, &droppedFields) {
 					var disabled []string
-					for _, feature := range disabledFeatures {
+					for _, feature := range disabledFeaturesBySlice[droppedFields.SliceIndex].UnsortedList() {
 						disabled = append(disabled, string(feature))
 					}
-					assert.ErrorContains(tCtx, err, fmt.Sprintf("pool %q, slice #1: some fields were dropped by the apiserver, probably because these features are disabled: %s", poolName, strings.Join(disabled, " ")))
+					// Make sure the error is about the right resource pool.
+					assert.Equal(tCtx, poolName, droppedFields.PoolName)
+					// Make sure the error identifies the correct disabled features.
+					assert.ElementsMatch(tCtx, disabled, droppedFields.DisabledFeatures())
 					gotDroppedFieldError.Store(true)
 				} else if validationErrorsOkay.Load() && apierrors.IsInvalid(err) {
 					gotValidationError.Store(true)
@@ -1133,6 +1155,9 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 			slices, err := tCtx.Client().ResourceV1().ResourceSlices().List(tCtx, listDriverSlices)
 			tCtx.ExpectNoError(err, "list slices")
 			for _, slice := range slices.Items {
+				if len(slice.Spec.Devices) == 0 {
+					continue
+				}
 				if slice.Spec.Devices[0].Attributes == nil {
 					slice.Spec.Devices[0].Attributes = make(map[resourceapi.QualifiedName]resourceapi.DeviceAttribute)
 				}

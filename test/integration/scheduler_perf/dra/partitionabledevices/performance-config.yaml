@@ -32,7 +32,10 @@
     nodeTemplatePath: ../templates/node-with-dra-test-driver.yaml
     countParam: $nodesWithDRA
   - opcode: createAny
-    templatePath: ../templates/resourceslice-partitionable.yaml
+    templatePath: ../templates/resourceslice-partitionable-countersets.yaml
+    countParam: $resourceSlices
+  - opcode: createAny
+    templatePath: ../templates/resourceslice-partitionable-devices.yaml
     countParam: $resourceSlices
   - opcode: createAny
     templatePath: ../templates/deviceclass.yaml
@@ -106,7 +109,10 @@
     nodeTemplatePath: ../templates/node-with-dra-test-driver.yaml
     countParam: $nodesWithDRA
   - opcode: createAny
-    templatePath: ../templates/resourceslice-partitionable-backtracking.yaml
+    templatePath: ../templates/resourceslice-partitionable-backtracking-countersets.yaml
+    countParam: $resourceSlices
+  - opcode: createAny
+    templatePath: ../templates/resourceslice-partitionable-backtracking-devices.yaml
     countParam: $resourceSlices
   - opcode: createAny
     templatePath: ../templates/deviceclass.yaml
