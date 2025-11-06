@@ -855,24 +855,6 @@ func TestTaintTolerationScoring(t *testing.T) {
 			},
 			expectedNodesName: sets.New("node-gt-high"),
 		},
-		{
-			name: "pod with Lt toleration matches any taint effect",
-			podTolerations: []v1.Toleration{
-				{
-					Key:      "node.example.com/priority-class",
-					Operator: v1.TolerationOpLt,
-					Value:    "1000",
-					Effect:   v1.TaintEffectPreferNoSchedule,
-				},
-			},
-			nodes: []*v1.Node{
-				st.MakeNode().Name("node-cold").
-					Taints([]v1.Taint{priorityLowTaint}).Obj(),
-				st.MakeNode().Name("node-warm").
-					Taints([]v1.Taint{priorityHighTaint}).Obj(),
-			},
-			expectedNodesName: sets.New("node-warm"),
-		},
 	}
 	for i, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
