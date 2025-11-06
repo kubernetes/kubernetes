@@ -15,7 +15,7 @@ spec:
       serviceAccountName: csi-mock
       containers:
         - name: csi-provisioner
-          image: registry.k8s.io/sig-storage/csi-provisioner:v5.1.0
+          image: registry.k8s.io/sig-storage/csi-provisioner:v6.0.0
           args:
             - "--csi-address=$(ADDRESS)"
             # Topology support is needed for the pod rescheduling test
@@ -35,7 +35,7 @@ spec:
             - mountPath: /csi
               name: socket-dir
         - name: driver-registrar
-          image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.13.0
+          image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.15.0
           args:
             - --v=5
             - --csi-address=/csi/csi.sock
@@ -53,7 +53,7 @@ spec:
           - mountPath: /registration
             name: registration-dir
         - name: mock
-          image: registry.k8s.io/sig-storage/hostpathplugin:v1.16.1
+          image: registry.k8s.io/sig-storage/hostpathplugin:v1.17.0
           args:
             - -v=5
             - -nodeid=$(KUBE_NODE_NAME)
