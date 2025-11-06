@@ -126,6 +126,9 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 				"AllAlpha": false,
 				"AllBeta":  true,
 			}
+			obj.CrashLoopBackOff = kubeletconfig.CrashLoopBackOffConfig{
+				MaxContainerRestartPeriod: &metav1.Duration{Duration: 5 * time.Minute},
+			}
 		},
 
 		// tokenAttributes field is only supported in v1 CredentialProvider

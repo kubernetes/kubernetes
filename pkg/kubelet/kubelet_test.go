@@ -3270,6 +3270,9 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 		ContainerLogMaxSize:                       "10Mi",
 		ContainerLogMaxFiles:                      5,
 		MemoryThrottlingFactor:                    ptr.To[float64](0),
+		CrashLoopBackOff: kubeletconfiginternal.CrashLoopBackOffConfig{
+			MaxContainerRestartPeriod: &metav1.Duration{Duration: 5 * time.Minute},
+		},
 	}
 	var prober volume.DynamicPluginProber
 	tp := noopoteltrace.NewTracerProvider()
@@ -3735,60 +3738,46 @@ func TestCrashLoopBackOffConfiguration(t *testing.T) {
 	testCases := []struct {
 		name            string
 		featureGates    []featuregate.Feature
-		nodeDecay       metav1.Duration
+		configuredMax   metav1.Duration
 		expectedInitial time.Duration
 		expectedMax     time.Duration
 	}{
 		{
-			name:            "Prior behavior",
-			expectedMax:     time.Duration(300 * time.Second),
-			expectedInitial: time.Duration(10 * time.Second),
-		},
-		{
-			name:            "New default only",
-			featureGates:    []featuregate.Feature{features.ReduceDefaultCrashLoopBackOffDecay},
-			expectedMax:     time.Duration(60 * time.Second),
-			expectedInitial: time.Duration(1 * time.Second),
-		},
-		{
 			name:            "Faster per node config; only node config configured",
-			featureGates:    []featuregate.Feature{features.KubeletCrashLoopBackOffMax},
-			nodeDecay:       metav1.Duration{Duration: 2 * time.Second},
+			configuredMax:   metav1.Duration{Duration: 2 * time.Second},
 			expectedMax:     time.Duration(2 * time.Second),
 			expectedInitial: time.Duration(2 * time.Second),
 		},
 		{
 			name:            "Faster per node config; new default and node config configured",
-			featureGates:    []featuregate.Feature{features.KubeletCrashLoopBackOffMax, features.ReduceDefaultCrashLoopBackOffDecay},
-			nodeDecay:       metav1.Duration{Duration: 2 * time.Second},
+			featureGates:    []featuregate.Feature{features.ReduceDefaultCrashLoopBackOffDecay},
+			configuredMax:   metav1.Duration{Duration: 2 * time.Second},
 			expectedMax:     time.Duration(2 * time.Second),
 			expectedInitial: time.Duration(1 * time.Second),
 		},
 		{
 			name:            "Slower per node config; new default and node config configured, set A",
-			featureGates:    []featuregate.Feature{features.KubeletCrashLoopBackOffMax, features.ReduceDefaultCrashLoopBackOffDecay},
-			nodeDecay:       metav1.Duration{Duration: 10 * time.Second},
+			featureGates:    []featuregate.Feature{features.ReduceDefaultCrashLoopBackOffDecay},
+			configuredMax:   metav1.Duration{Duration: 10 * time.Second},
 			expectedMax:     time.Duration(10 * time.Second),
 			expectedInitial: time.Duration(1 * time.Second),
 		},
 		{
 			name:            "Slower per node config; new default and node config configured, set B",
-			featureGates:    []featuregate.Feature{features.KubeletCrashLoopBackOffMax, features.ReduceDefaultCrashLoopBackOffDecay},
-			nodeDecay:       metav1.Duration{Duration: 300 * time.Second},
+			featureGates:    []featuregate.Feature{features.ReduceDefaultCrashLoopBackOffDecay},
+			configuredMax:   metav1.Duration{Duration: 300 * time.Second},
 			expectedMax:     time.Duration(300 * time.Second),
 			expectedInitial: time.Duration(1 * time.Second),
 		},
 		{
 			name:            "Slower per node config; only node config configured, set A",
-			featureGates:    []featuregate.Feature{features.KubeletCrashLoopBackOffMax},
-			nodeDecay:       metav1.Duration{Duration: 11 * time.Second},
+			configuredMax:   metav1.Duration{Duration: 11 * time.Second},
 			expectedMax:     time.Duration(11 * time.Second),
 			expectedInitial: time.Duration(10 * time.Second),
 		},
 		{
 			name:            "Slower per node config; only node config configured, set B",
-			featureGates:    []featuregate.Feature{features.KubeletCrashLoopBackOffMax},
-			nodeDecay:       metav1.Duration{Duration: 300 * time.Second},
+			configuredMax:   metav1.Duration{Duration: 300 * time.Second},
 			expectedMax:     time.Duration(300 * time.Second),
 			expectedInitial: time.Duration(10 * time.Second),
 		},
@@ -3801,8 +3790,8 @@ func TestCrashLoopBackOffConfiguration(t *testing.T) {
 			for _, f := range tc.featureGates {
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, f, true)
 			}
-			if tc.nodeDecay.Duration > 0 {
-				kubeCfg.CrashLoopBackOff.MaxContainerRestartPeriod = &tc.nodeDecay
+			if tc.configuredMax.Duration > 0 {
+				kubeCfg.CrashLoopBackOff.MaxContainerRestartPeriod = &tc.configuredMax
 			}
 
 			resultMax, resultInitial := newCrashLoopBackOff(kubeCfg)
