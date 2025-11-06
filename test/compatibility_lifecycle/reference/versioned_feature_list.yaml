@@ -1925,6 +1925,12 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.28"
+- name: UserNamespacesHostNetworkSupport
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.35"
 - name: UserNamespacesSupport
   versionedSpecs:
   - default: false

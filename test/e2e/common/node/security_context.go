@@ -126,6 +126,81 @@ var _ = SIGDescribe("Security Context", func() {
 			}
 		})
 
+		f.It("must create a user namespace and use host network when hostUsers is false and hostNetwork is true [LinuxOnly]", feature.UserNamespacesHostNetworkSupport, framework.WithFeatureGate(features.UserNamespacesHostNetworkSupport),
+			feature.UserNamespacesSupport, framework.WithFeatureGate(features.UserNamespacesSupport), func(ctx context.Context) {
+				// with hostUsers=false the pod must use a new user namespace.
+				// with hostNetwork=true the pod must use the host network namespace.
+				podClient := e2epod.PodClientNS(f, f.Namespace.Name)
+
+				// Schedule pods on the same node to ensure they share the same host network namespace.
+				targetNode, err := findLinuxNode(ctx, f)
+				framework.ExpectNoError(err, "Error finding Linux node")
+
+				makePodForHostNetTest := func(nodeName string) *v1.Pod {
+					return &v1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "userns-hostnet-" + string(uuid.NewUUID()),
+						},
+						Spec: v1.PodSpec{
+							NodeName: nodeName,
+							Containers: []v1.Container{
+								{
+									Name:    containerName,
+									Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+									Command: []string{"sh", "-c", "cat /proc/self/uid_map && readlink /proc/self/ns/net"},
+								},
+							},
+							RestartPolicy: v1.RestartPolicyNever,
+							HostUsers:     ptr.To(false),
+							HostNetwork:   true,
+						},
+					}
+				}
+
+				createdPod1 := podClient.Create(ctx, makePodForHostNetTest(targetNode.Name))
+				createdPod2 := podClient.Create(ctx, makePodForHostNetTest(targetNode.Name))
+				ginkgo.DeferCleanup(func(ctx context.Context) {
+					ginkgo.By("delete the pods")
+					podClient.DeleteSync(ctx, createdPod1.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
+					podClient.DeleteSync(ctx, createdPod2.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
+				})
+				getLogs := func(pod *v1.Pod) (string, string, error) {
+					err := e2epod.WaitForPodSuccessInNamespaceTimeout(ctx, f.ClientSet, pod.Name, f.Namespace.Name, f.Timeouts.PodStart)
+					if err != nil {
+						return "", "", err
+					}
+					podStatus, err := podClient.Get(ctx, pod.Name, metav1.GetOptions{})
+					if err != nil {
+						return "", "", err
+					}
+					logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, podStatus.Name, containerName)
+					if err != nil {
+						return "", "", err
+					}
+					parts := strings.Split(strings.TrimSpace(logs), "\n")
+					if len(parts) != 2 {
+						return "", "", fmt.Errorf("expected 2 lines of logs, got %d: %q", len(parts), logs)
+					}
+					return parts[0], parts[1], nil
+				}
+
+				uidMap1, netNs1, err := getLogs(createdPod1)
+				framework.ExpectNoError(err)
+				uidMap2, netNs2, err := getLogs(createdPod2)
+				framework.ExpectNoError(err)
+
+				// 65536 is the size used for a user namespace.  Verify that the value is present
+				// in the /proc/self/uid_map file.
+				gomega.Expect(uidMap1).To(gomega.ContainSubstring("65536"), "user namespace not created for pod1")
+				gomega.Expect(uidMap2).To(gomega.ContainSubstring("65536"), "user namespace not created for pod2")
+
+				// Check they are in different user namespaces.
+				gomega.Expect(uidMap1).NotTo(gomega.Equal(uidMap2), "two different pods are running with the same user namespace configuration")
+
+				// Check they are in the same network namespace (the host's one).
+				gomega.Expect(netNs1).To(gomega.Equal(netNs2), "two different pods with hostNetwork=true should be in the same network namespace, but they are not. NetNS1: %s, NetNS2: %s", netNs1, netNs2)
+			})
+
 		f.It("must create the user namespace in the configured hostUID/hostGID range [LinuxOnly]", feature.UserNamespacesSupport, framework.WithFeatureGate(features.UserNamespacesSupport), func(ctx context.Context) {
 			// We need to check with the binary "getsubuids" the mappings for the kubelet.
 			// If something is not present, we skip the test as the node wasn't configured to run this test.
