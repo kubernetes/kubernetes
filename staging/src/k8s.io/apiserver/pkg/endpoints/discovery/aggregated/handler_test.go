@@ -134,7 +134,7 @@ func fetchPath(handler http.Handler, acceptPrefix string, path string, etag stri
 func fetchPathHelper(handler http.Handler, accept string, path string, etag string) (*http.Response, []byte) {
 	// Expect json-formatted apis group list
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(request.MethodGet, discoveryPath, nil)
+	req := httptest.NewRequest(request.MethodGet, path, nil)
 
 	// Ask for JSON response
 	req.Header.Set("Accept", accept)

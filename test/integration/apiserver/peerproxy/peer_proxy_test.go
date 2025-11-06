@@ -38,7 +38,6 @@ import (
 	"k8s.io/klog/v2"
 	kastesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	controlplaneapiserver "k8s.io/kubernetes/pkg/controlplane/apiserver"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 
 	"k8s.io/kubernetes/test/integration/framework"
 	testutil "k8s.io/kubernetes/test/utils"
@@ -57,8 +56,8 @@ func TestPeerProxiedRequest(t *testing.T) {
 
 	// enable feature flags
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.APIServerIdentity:                       true,
-		kubefeatures.UnknownVersionInteroperabilityProxy: true,
+		features.APIServerIdentity:                   true,
+		features.UnknownVersionInteroperabilityProxy: true,
 	})
 
 	// create sharedetcd
@@ -120,8 +119,8 @@ func TestPeerProxiedRequestToThirdServerAfterFirstDies(t *testing.T) {
 
 	// enable feature flags
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.APIServerIdentity:                       true,
-		kubefeatures.UnknownVersionInteroperabilityProxy: true,
+		features.APIServerIdentity:                   true,
+		features.UnknownVersionInteroperabilityProxy: true,
 	})
 
 	// create sharedetcd
