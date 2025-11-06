@@ -736,6 +736,7 @@ const (
 	// owner: @munnerz
 	// kep: https://kep.k8s.io/4742
 	// alpha: v1.33
+	// beta: v1.35
 	//
 	// Enables the PodTopologyLabelsAdmission admission plugin that mutates `pod/binding`
 	// requests by copying the `topology.kubernetes.io/{zone,region}` labels from the assigned
@@ -1610,6 +1611,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	PodTopologyLabelsAdmission: {
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	PortForwardWebsockets: {
