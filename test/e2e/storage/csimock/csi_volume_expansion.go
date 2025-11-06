@@ -584,7 +584,7 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 				}
 
 				if test.expectedQuotaUsage != nil {
-                // Use uncached client to avoid watch/cache lag when validating quota usage
+					// Use uncached client to avoid watch/cache lag when validating quota usage
 					uncachedClient := f.ClientSet.CoreV1()
 					validateQuotaUsage(ctx, m, currentQuota, test.expectedQuotaUsage, uncachedClient)
 				}
@@ -594,30 +594,29 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 })
 
 func validateQuotaUsage(ctx context.Context, m *mockDriverSetup, currentQuota, expectedQuota *v1.ResourceQuota, uncachedClient corev1client.CoreV1Interface) {
-    ginkgo.By("Waiting for resource quota usage to be updated")
-    var (
+	ginkgo.By("Waiting for resource quota usage to be updated")
+	var (
 		quota     *v1.ResourceQuota
-        usedCount resource.Quantity
-        usedSize  resource.Quantity
-    )
+		usedCount resource.Quantity
+		usedSize  resource.Quantity
+	)
 
-    expectedCount := expectedQuota.Status.Used[pvcCountQuotaKey]
-    expectedUsedSize := expectedQuota.Status.Used[pvcSizeQuotaKey]
+	expectedCount := expectedQuota.Status.Used[pvcCountQuotaKey]
+	expectedUsedSize := expectedQuota.Status.Used[pvcSizeQuotaKey]
 
-    gomega.Eventually(func() bool {
-        q, err := uncachedClient.ResourceQuotas(currentQuota.Namespace).Get(ctx, currentQuota.Name, metav1.GetOptions{})
-        if err != nil || q.Status.Used == nil {
-            return false
-        }
-        quota = q
-        usedCount = quota.Status.Used[pvcCountQuotaKey]
-        usedSize = quota.Status.Used[pvcSizeQuotaKey]
-        return usedCount.Cmp(expectedCount) == 0 && usedSize.Cmp(expectedUsedSize) == 0
-    }, csiResizeWaitPeriod, resizePollInterval).Should(gomega.BeTrue(),
-        fmt.Sprintf("resource quota usage did not converge; currentlyUsed: %s/%s, expected: %s/%s",
-            usedCount.String(), usedSize.String(), expectedCount.String(), expectedUsedSize.String()))
+	gomega.Eventually(func() bool {
+		q, err := uncachedClient.ResourceQuotas(currentQuota.Namespace).Get(ctx, currentQuota.Name, metav1.GetOptions{})
+		if err != nil || q.Status.Used == nil {
+			return false
+		}
+		quota = q
+		usedCount = quota.Status.Used[pvcCountQuotaKey]
+		usedSize = quota.Status.Used[pvcSizeQuotaKey]
+		return usedCount.Cmp(expectedCount) == 0 && usedSize.Cmp(expectedUsedSize) == 0
+	}, csiResizeWaitPeriod, resizePollInterval).Should(gomega.BeTrue(),
+		fmt.Sprintf("resource quota usage did not converge; currentlyUsed: %s/%s, expected: %s/%s",
+			usedCount.String(), usedSize.String(), expectedCount.String(), expectedUsedSize.String()))
 }
-
 
 func validateRecoveryBehaviour(ctx context.Context, pvc *v1.PersistentVolumeClaim, m *mockDriverSetup, test recoveryTest) {
 	var err error
@@ -649,7 +648,7 @@ func validateRecoveryBehaviour(ctx context.Context, pvc *v1.PersistentVolumeClai
 	// If expansion failed on controller (infeasible or final), recovery should be possible.
 	// Wait for the recovery resize to settle before checking quota.
 	if test.simulatedCSIDriverError == expansionFailedOnControllerWithInfeasibleError ||
-	test.simulatedCSIDriverError == expansionFailedOnControllerWithFinalError {
+		test.simulatedCSIDriverError == expansionFailedOnControllerWithFinalError {
 		validateExpansionSuccess(ctx, pvc, m, test, test.recoverySize.String())
 		return
 	}
