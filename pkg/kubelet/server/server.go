@@ -194,17 +194,7 @@ func ListenAndServeKubeletServer(
 
 	if tlsOptions != nil {
 		s.TLSConfig = tlsOptions.Config
-		certFile := tlsOptions.CertFile
-		keyFile := tlsOptions.KeyFile
-		if tlsOptions.Config.GetCertificate != nil {
-			// GetCertificate is only preferred over the certificate files if
-			// the ClientHelloInfo.ServerName is set, which it is not when
-			// connecting to a host by IP address. Clear the files to force the
-			// use of GetCertificate.
-			certFile = ""
-			keyFile = ""
-		}
-		if err := s.ListenAndServeTLS(certFile, keyFile); err != nil {
+		if err := s.ListenAndServeTLS(tlsOptions.CertFile, tlsOptions.KeyFile); err != nil {
 			logger.Error(err, "Failed to listen and serve")
 			os.Exit(1)
 		}
