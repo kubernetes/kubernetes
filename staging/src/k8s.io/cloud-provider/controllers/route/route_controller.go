@@ -119,9 +119,9 @@ func New(
 			// - Node .Status.Addresses is changed
 			// - Node .Spec.PodCIDRs is changed
 			cache.ResourceEventHandlerFuncs{
-				AddFunc:    rc.enqueueReconcile,
+				AddFunc:    rc.enqueueClusterReconcile,
 				UpdateFunc: rc.handleNodeUpdate,
-				DeleteFunc: rc.enqueueReconcile,
+				DeleteFunc: rc.enqueueClusterReconcile,
 			},
 		)
 		if err != nil {
@@ -132,9 +132,8 @@ func New(
 	return rc, nil
 }
 
-func (rc *RouteController) enqueueReconcile(_ interface{}) {
-	// reconcileNodeRoutes always reconciles the full cluster. It does not make sense to have
-	// separate entries in the workqueue per node, but a single one for the whole cluster is enough.
+// enqueueClusterReconcile enqueues a route reconciliation of the cluster.
+func (rc *RouteController) enqueueClusterReconcile(_ interface{}) {
 	rc.workqueue.AddRateLimited("routes")
 }
 
@@ -155,7 +154,7 @@ func (rc *RouteController) handleNodeUpdate(oldObj, newObj interface{}) {
 	diffInNodeAddresses := !reflect.DeepEqual(oldNode.Status.Addresses, newNode.Status.Addresses)
 
 	if diffInPodCIDR || diffInNodeAddresses || resync {
-		rc.enqueueReconcile(newObj)
+		rc.enqueueClusterReconcile(newObj)
 	}
 }
 
