@@ -155,6 +155,9 @@ type GenericAPIServer struct {
 	// AggregatedDiscoveryGroupManager serves /apis in an aggregated form.
 	AggregatedDiscoveryGroupManager discoveryendpoint.ResourceManager
 
+	// PeerAggregatedDiscoveryManager serves /apis aggregated from all peer apiservers.
+	PeerAggregatedDiscoveryManager discoveryendpoint.PeerAggregatedResourceManager
+
 	// AggregatedLegacyDiscoveryGroupManager serves /api in an aggregated form.
 	AggregatedLegacyDiscoveryGroupManager discoveryendpoint.ResourceManager
 
@@ -859,7 +862,8 @@ func (s *GenericAPIServer) InstallLegacyAPIGroup(apiPrefix string, apiGroupInfo 
 	// Install the version handler.
 	// Add a handler at /<apiPrefix> to enumerate the supported api versions.
 	legacyRootAPIHandler := discovery.NewLegacyRootAPIHandler(s.discoveryAddresses, s.Serializer, apiPrefix)
-	wrapped := discoveryendpoint.WrapAggregatedDiscoveryToHandler(legacyRootAPIHandler, s.AggregatedLegacyDiscoveryGroupManager)
+	// No peer-to-peer discovery for legacy API group.
+	wrapped := discoveryendpoint.WrapAggregatedDiscoveryToHandler(legacyRootAPIHandler, s.AggregatedLegacyDiscoveryGroupManager, s.AggregatedLegacyDiscoveryGroupManager)
 	s.Handler.GoRestfulContainer.Add(wrapped.GenerateWebService("/api", metav1.APIVersions{}))
 	s.registerStorageReadinessCheck("", apiGroupInfo)
 
