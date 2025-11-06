@@ -4304,6 +4304,97 @@ func TestAllocator(t *testing.T,
 				},
 			},
 		},
+		"consumable-capacity-disabled-feature": {
+			features: Features{
+				DeviceBindingAndStatus: true, // add to forcefully use experimenting allocator
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(ptr.To(one))),
+			),
+			classes:       objects(class(classA, driverA)),
+			slices:        unwrap(sliceWithOneDevice(slice1, node1, pool1, driverA)),
+			node:          node(node1, region1),
+			expectResults: nil,
+			expectError:   gomega.MatchError(gomega.ContainSubstring("claim claim-0, request req-0: has capacity requests, but the DRAConsumableCapacity feature is disabled")),
+		},
+		"consumable-capacity-disabled-feature-with-prioritized-list": {
+			features: Features{
+				PrioritizedList:        true,
+				DeviceBindingAndStatus: true, // add to forcefully use experimenting allocator
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(
+					requestWithPrioritizedList(
+						req0,
+						subRequest(subReq0, classA, 1).withCapacityRequest(ptr.To(one)),
+						subRequest(subReq1, classA, 1).withCapacityRequest(ptr.To(one)),
+					),
+				),
+			),
+			classes:       objects(class(classA, driverA)),
+			slices:        unwrap(sliceWithOneDevice(slice1, node1, pool1, driverA)),
+			node:          node(node1, region1),
+			expectResults: nil,
+			expectError:   gomega.MatchError(gomega.ContainSubstring("claim claim-0, subrequest subReq-0: has capacity requests, but the DRAConsumableCapacity feature is disabled")),
+		},
+		"consumable-capacity-multi-allocatable-device-with-missing-capacity-request": {
+			features: Features{
+				ConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(ptr.To(one))),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrap(
+				slice(slice1, node1, pool1, driverA,
+					device(device1, map[resourceapi.QualifiedName]resource.Quantity{capacity1: one}, nil).withAllowMultipleAllocations(),
+				),
+			),
+			node:          node(node1, region1),
+			expectResults: []any{},
+		},
+		"consumable-capacity-multi-allocatable-device-allocation-mode-all-with-missing-capacity-request": {
+			features: Features{
+				ConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(allDeviceRequest(req0, classA).withCapacityRequest(ptr.To(one))),
+			),
+			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
+			slices: unwrap(
+				slice(slice1, node1, pool1, driverA,
+					device(device1, map[resourceapi.QualifiedName]resource.Quantity{capacity1: one}, nil).withAllowMultipleAllocations(),
+				),
+			),
+			node:          node(node1, region1),
+			expectResults: []any{},
+		},
+		"consumable-capacity-multi-allocatable-device-without-capacity-without-capacity-request": {
+			features: Features{
+				ConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(deviceRequest(req0, classA, 1)),
+				claim(claim1).withRequests(deviceRequest(req0, classA, 1)),
+			),
+			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
+			slices: unwrap(
+				slice(slice1, node1, pool1, driverA,
+					device(device1, nil, nil).withAllowMultipleAllocations(),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{ // both share the same device; no capacity is consumed since none is defined.
+				allocationResult(
+					localNodeSelector(node1),
+					deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacity(&fixedShareID, nil),
+				),
+				allocationResult(
+					localNodeSelector(node1),
+					deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacity(&fixedShareID, nil),
+				),
+			},
+		},
 		"consumable-capacity-multi-allocatable-device-without-policy-without-capacity-request": {
 			features: Features{
 				ConsumableCapacity: true,

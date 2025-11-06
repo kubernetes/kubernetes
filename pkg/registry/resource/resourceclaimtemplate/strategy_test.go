@@ -585,6 +585,7 @@ func TestStrategyUpdate(t *testing.T) {
 		adminAccess            bool
 		deviceTaints           bool
 		prioritizedList        bool
+		consumableCapacity     bool
 		expectValidationErrors []string
 		expectObj              *resource.ResourceClaimTemplate
 		verify                 func(*testing.T, []testclient.Action)
@@ -808,6 +809,39 @@ func TestStrategyUpdate(t *testing.T) {
 				}
 			},
 		},
+		"keep-existing-fields-consumable-capacity": {
+			oldObj:             objWithCapacityRequests,
+			newObj:             objWithCapacityRequests,
+			consumableCapacity: true,
+			expectObj:          objWithCapacityRequests,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"keep-existing-fields-consumable-capacity-disabled-feature": {
+			oldObj:             objWithCapacityRequests,
+			newObj:             objWithCapacityRequests,
+			consumableCapacity: false,
+			expectObj:          objWithCapacityRequests,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"drop-fields-consumable-capacity": {
+			oldObj:                 obj,
+			newObj:                 objWithCapacityRequests,
+			consumableCapacity:     false,
+			expectValidationErrors: []string{fieldImmutableError}, // Spec is immutable.
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
 	}
 
 	for name, tc := range testcases {
@@ -818,6 +852,7 @@ func TestStrategyUpdate(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAAdminAccess, tc.adminAccess)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRADeviceTaints, tc.deviceTaints)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPrioritizedList, tc.prioritizedList)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAConsumableCapacity, tc.consumableCapacity)
 			strategy := NewStrategy(mockNSClient)
 
 			oldObj := tc.oldObj.DeepCopy()
