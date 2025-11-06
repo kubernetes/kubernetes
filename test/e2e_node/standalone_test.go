@@ -378,11 +378,8 @@ var _ = SIGDescribe(feature.StandaloneMode, framework.WithSerial(), func() {
 				return nil
 			}, f.Timeouts.PodStart, time.Second*5).Should(gomega.Succeed())
 
-			ginkgo.By("stopping the kubelet")
-			restartKubelet := mustStopKubelet(ctx, f)
-
 			ginkgo.By("restarting the kubelet")
-			restartKubelet(ctx)
+			restartKubelet(ctx, true)
 
 			gomega.Eventually(ctx, func() bool {
 				return kubeletHealthCheck(kubeletHealthCheckURL)
