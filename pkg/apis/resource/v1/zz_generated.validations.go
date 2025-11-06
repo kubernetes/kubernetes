@@ -193,6 +193,33 @@ func Validate_AllocationResult(ctx context.Context, op operation.Operation, fldP
 	return errs
 }
 
+// Validate_CounterSet validates an instance of CounterSet according
+// to declarative validation rules in the API schema.
+func Validate_CounterSet(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1.CounterSet) (errs field.ErrorList) {
+	// field resourcev1.CounterSet.Name
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			errs = append(errs, validate.ShortName(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("name"), &obj.Name, safe.Field(oldObj, func(oldObj *resourcev1.CounterSet) *string { return &oldObj.Name }), oldObj != nil)...)
+
+	// field resourcev1.CounterSet.Counters has no validation
+	return errs
+}
+
 // Validate_Device validates an instance of Device according
 // to declarative validation rules in the API schema.
 func Validate_Device(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1.Device) (errs field.ErrorList) {
@@ -213,7 +240,37 @@ func Validate_Device(ctx context.Context, op operation.Operation, fldPath *field
 		}), oldObj != nil)...)
 
 	// field resourcev1.Device.Capacity has no validation
-	// field resourcev1.Device.ConsumesCounters has no validation
+
+	// field resourcev1.Device.ConsumesCounters
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []resourcev1.DeviceCounterConsumption, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 2); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// lists with map semantics require unique keys
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a resourcev1.DeviceCounterConsumption, b resourcev1.DeviceCounterConsumption) bool {
+				return a.CounterSet == b.CounterSet
+			})...)
+			// iterate the list and call the type's validation function
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, func(a resourcev1.DeviceCounterConsumption, b resourcev1.DeviceCounterConsumption) bool {
+				return a.CounterSet == b.CounterSet
+			}, validate.SemanticDeepEqual, Validate_DeviceCounterConsumption)...)
+			return
+		}(fldPath.Child("consumesCounters"), obj.ConsumesCounters, safe.Field(oldObj, func(oldObj *resourcev1.Device) []resourcev1.DeviceCounterConsumption { return oldObj.ConsumesCounters }), oldObj != nil)...)
+
 	// field resourcev1.Device.NodeName has no validation
 	// field resourcev1.Device.NodeSelector has no validation
 	// field resourcev1.Device.AllNodes has no validation
@@ -869,6 +926,33 @@ func Validate_DeviceConstraint(ctx context.Context, op operation.Operation, fldP
 		}(fldPath.Child("matchAttribute"), obj.MatchAttribute, safe.Field(oldObj, func(oldObj *resourcev1.DeviceConstraint) *resourcev1.FullyQualifiedName { return oldObj.MatchAttribute }), oldObj != nil)...)
 
 	// field resourcev1.DeviceConstraint.DistinctAttribute has no validation
+	return errs
+}
+
+// Validate_DeviceCounterConsumption validates an instance of DeviceCounterConsumption according
+// to declarative validation rules in the API schema.
+func Validate_DeviceCounterConsumption(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1.DeviceCounterConsumption) (errs field.ErrorList) {
+	// field resourcev1.DeviceCounterConsumption.CounterSet
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			errs = append(errs, validate.ShortName(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("counterSet"), &obj.CounterSet, safe.Field(oldObj, func(oldObj *resourcev1.DeviceCounterConsumption) *string { return &oldObj.CounterSet }), oldObj != nil)...)
+
+	// field resourcev1.DeviceCounterConsumption.Counters has no validation
 	return errs
 }
 
@@ -1707,6 +1791,32 @@ func Validate_ResourceSliceSpec(ctx context.Context, op operation.Operation, fld
 		}(fldPath.Child("devices"), obj.Devices, safe.Field(oldObj, func(oldObj *resourcev1.ResourceSliceSpec) []resourcev1.Device { return oldObj.Devices }), oldObj != nil)...)
 
 	// field resourcev1.ResourceSliceSpec.PerDeviceNodeSelection has no validation
-	// field resourcev1.ResourceSliceSpec.SharedCounters has no validation
+
+	// field resourcev1.ResourceSliceSpec.SharedCounters
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []resourcev1.CounterSet, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 8); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// lists with map semantics require unique keys
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a resourcev1.CounterSet, b resourcev1.CounterSet) bool { return a.Name == b.Name })...)
+			// iterate the list and call the type's validation function
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, func(a resourcev1.CounterSet, b resourcev1.CounterSet) bool { return a.Name == b.Name }, validate.SemanticDeepEqual, Validate_CounterSet)...)
+			return
+		}(fldPath.Child("sharedCounters"), obj.SharedCounters, safe.Field(oldObj, func(oldObj *resourcev1.ResourceSliceSpec) []resourcev1.CounterSet { return oldObj.SharedCounters }), oldObj != nil)...)
+
 	return errs
 }
