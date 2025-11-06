@@ -164,7 +164,6 @@ func TestTaintNodeByCondition(t *testing.T) {
 	priorityClassPreferTaint := v1.Taint{Key: "node.example.com/priority-class", Value: "950", Effect: v1.TaintEffectPreferNoSchedule}
 	errorRateTaint := v1.Taint{Key: "node.example.com/error-rate", Value: "5", Effect: v1.TaintEffectNoSchedule}
 	cpuUtilizationTaint := v1.Taint{Key: "node.example.com/cpu-utilization", Value: "75", Effect: v1.TaintEffectNoExecute}
-	cpuUtilizationLowTaint := v1.Taint{Key: "node.example.com/cpu-utilization", Value: "60", Effect: v1.TaintEffectNoExecute}
 
 	priorityClassGtToleration := v1.Toleration{
 		Key:      "node.example.com/priority-class",
@@ -220,13 +219,13 @@ func TestTaintNodeByCondition(t *testing.T) {
 
 	// switch to table driven testings
 	tests := []struct {
-		name              string
-		existingTaints    []v1.Taint
-		nodeConditions    []v1.NodeCondition
-		unschedulable     bool
-		expectedTaints    []v1.Taint
-		pods              []podCase
-		enableFeatureGate *[]bool
+		name                                       string
+		existingTaints                             []v1.Taint
+		nodeConditions                             []v1.NodeCondition
+		unschedulable                              bool
+		expectedTaints                             []v1.Taint
+		pods                                       []podCase
+		enableTaintTolerationComparisonOperatorsFG *[]bool
 	}{
 		{
 			name: "not-ready node",
@@ -572,7 +571,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 					fits:        true,
 				},
 			},
-			enableFeatureGate: &[]bool{true},
+			enableTaintTolerationComparisonOperatorsFG: &[]bool{true},
 		},
 		{
 			name:           "node with numeric error-rate taint - pods with Lt toleration",
@@ -595,7 +594,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 					fits:        true,
 				},
 			},
-			enableFeatureGate: &[]bool{true},
+			enableTaintTolerationComparisonOperatorsFG: &[]bool{true},
 		},
 		{
 			name:           "node with multiple numeric taints - mixed tolerations",
@@ -626,10 +625,10 @@ func TestTaintNodeByCondition(t *testing.T) {
 					fits: true,
 				},
 			},
-			enableFeatureGate: &[]bool{true},
+			enableTaintTolerationComparisonOperatorsFG: &[]bool{true},
 		},
 		{
-			name:           "node with numeric taint - pods with Lt toleration and NoExecute effect",
+			name:           "node with numeric taint - pods with Lt or Gt tolerations, and NoExecute effect",
 			existingTaints: []v1.Taint{cpuUtilizationTaint},
 			nodeConditions: []v1.NodeCondition{
 				{
@@ -654,31 +653,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 					fits:        true,
 				},
 			},
-			enableFeatureGate: &[]bool{true},
-		},
-		{
-			name:           "node with numeric taint - pods with mixed NoExecute tolerations",
-			existingTaints: []v1.Taint{cpuUtilizationLowTaint},
-			nodeConditions: []v1.NodeCondition{
-				{
-					Type:   v1.NodeReady,
-					Status: v1.ConditionTrue,
-				},
-			},
-			expectedTaints: []v1.Taint{cpuUtilizationLowTaint},
-			pods: []podCase{
-				{
-					pod:         burstablePod,
-					tolerations: []v1.Toleration{cpuUtilizationGtToleration},
-					fits:        true,
-				},
-				{
-					pod:         burstablePod,
-					tolerations: []v1.Toleration{cpuUtilizationLtToleration},
-					fits:        true,
-				},
-			},
-			enableFeatureGate: &[]bool{true},
+			enableTaintTolerationComparisonOperatorsFG: &[]bool{true},
 		},
 		{
 			name:           "node with numeric taint - pods with PreferNoSchedule effect and Gt toleration",
@@ -706,14 +681,14 @@ func TestTaintNodeByCondition(t *testing.T) {
 					fits:        true,
 				},
 			},
-			enableFeatureGate: &[]bool{true},
+			enableTaintTolerationComparisonOperatorsFG: &[]bool{true},
 		},
 	}
 
 	for _, test := range tests {
 		featureGateEnabled := []bool{true, false}
-		if test.enableFeatureGate != nil {
-			featureGateEnabled = *test.enableFeatureGate
+		if test.enableTaintTolerationComparisonOperatorsFG != nil {
+			featureGateEnabled = *test.enableTaintTolerationComparisonOperatorsFG
 		}
 		for _, enabled := range featureGateEnabled {
 			t.Run(fmt.Sprintf("%s (TaintToleration Comparison Operators enabled: %v)", test.name, enabled), func(t *testing.T) {

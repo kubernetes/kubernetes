@@ -393,9 +393,10 @@ func TestCreateNode(t *testing.T) {
 
 			controller.NodeUpdated(nil, item.node)
 
-		verifyPodActions(t, item.description, fakeClientset, item.expectPatch, item.expectDelete)
+			verifyPodActions(t, item.description, fakeClientset, item.expectPatch, item.expectDelete)
 
-		cancel()
+			cancel()
+		})
 	}
 }
 

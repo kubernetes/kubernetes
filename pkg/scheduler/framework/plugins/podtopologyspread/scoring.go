@@ -121,7 +121,6 @@ func (pl *PodTopologySpread) PreScore(
 	pod *v1.Pod,
 	filteredNodes []fwk.NodeInfo,
 ) *fwk.Status {
-	logger := klog.FromContext(ctx)
 
 	allNodes, err := pl.sharedLister.NodeInfos().List()
 	if err != nil {
@@ -133,6 +132,7 @@ func (pl *PodTopologySpread) PreScore(
 		return fwk.NewStatus(fwk.Skip)
 	}
 
+	logger := klog.FromContext(ctx)
 	state := &preScoreState{
 		IgnoredNodes: sets.New[string](),
 	}

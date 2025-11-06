@@ -4383,16 +4383,13 @@ func ValidateTolerations(tolerations []core.Toleration, fldPath *field.Path, opt
 			}
 
 			// validate value is decimal integer
-			if errs := content.IsDecimalInteger(toleration.Value); len(errs) != 0 {
-				allErrors = append(allErrors, field.Invalid(idxPath.Child("value"),
-					toleration.Value, "value must be a valid integer for numeric operators"))
-				break
+			for _, msg := range content.IsDecimalInteger(toleration.Value) {
+				allErrors = append(allErrors, field.Invalid(idxPath.Child("value"), toleration.Value, msg))
 			}
 
 			// validate value is within int64 range
 			if _, err := strconv.ParseInt(toleration.Value, 10, 64); err != nil {
-				allErrors = append(allErrors, field.Invalid(idxPath.Child("value"),
-					toleration.Value, "value must be a valid integer for numeric operators"))
+				allErrors = append(allErrors, field.Invalid(idxPath.Child("value"), toleration.Value, err.Error()))
 			}
 		default:
 			validValues := []core.TolerationOperator{core.TolerationOpEqual, core.TolerationOpExists}

@@ -17,8 +17,13 @@ limitations under the License.
 package v1
 
 import (
-	"k8s.io/klog/v2"
+	"errors"
 	"strconv"
+	"strings"
+
+	"k8s.io/apimachinery/pkg/api/validate/content"
+
+	"k8s.io/klog/v2"
 )
 
 // MatchToleration checks if the toleration matches tolerationToMatch. Tolerations are unique by <key,effect,operator,value>,
@@ -67,15 +72,26 @@ func (t *Toleration) ToleratesTaint(logger klog.Logger, taint *Taint) bool {
 
 // compareNumericValues performs numeric comparison between toleration and taint values
 func compareNumericValues(logger klog.Logger, tolerationVal, taintVal string, op TolerationOperator) bool {
+
+	errorMsgs := content.IsDecimalInteger(tolerationVal)
+	if len(errorMsgs) > 0 {
+		logger.Error(errors.New(strings.Join(errorMsgs, ",")), "failed to parse toleration value as int64", "toleration", tolerationVal)
+		return false
+	}
 	tVal, err := strconv.ParseInt(tolerationVal, 10, 64)
 	if err != nil {
-		logger.Error(err, "failed to parse toleration value  %d as int64", tVal)
+		logger.Error(err, "failed to parse toleration value as int64", "toleration", tolerationVal)
 		return false
 	}
 
+	errorMsgs = content.IsDecimalInteger(taintVal)
+	if len(errorMsgs) > 0 {
+		logger.Error(errors.New(strings.Join(errorMsgs, ",")), "failed to parse taint value as int64", "taint", taintVal)
+		return false
+	}
 	tntVal, err := strconv.ParseInt(taintVal, 10, 64)
 	if err != nil {
-		logger.Error(err, "failed to parse taint value %d as int64 ", tntVal)
+		logger.Error(err, "failed to parse taint value as int64 ", "taint", taintVal)
 		return false
 	}
 

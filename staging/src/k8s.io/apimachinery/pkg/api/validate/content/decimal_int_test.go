@@ -18,6 +18,7 @@ package content
 
 import (
 	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -172,7 +173,7 @@ func TestIsDecimalInteger(t *testing.T) {
 				} else if tc.errContains != "" {
 					found := false
 					for _, err := range errs {
-						if containsSubstring(err, tc.errContains) {
+						if strings.Contains(err, tc.errContains) {
 							found = true
 							break
 						}
@@ -230,11 +231,6 @@ func TestIsDecimalInteger(t *testing.T) {
 			t.Errorf("IsDecimalInteger should reject %q (stricter than strconv)", case_)
 		}
 	}
-}
-
-// containsSubstring is a simple helper to check if a string contains a substring (case-insensitive)
-func containsSubstring(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || indexOfSubstring(s, substr) >= 0)
 }
 
 func indexOfSubstring(s, substr string) int {

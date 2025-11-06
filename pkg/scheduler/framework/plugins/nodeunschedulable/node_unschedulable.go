@@ -130,13 +130,13 @@ func (pl *NodeUnschedulable) Name() string {
 
 // Filter invoked at the filter extension point.
 func (pl *NodeUnschedulable) Filter(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
-	logger := klog.FromContext(ctx)
 	node := nodeInfo.Node()
 
 	if !node.Spec.Unschedulable {
 		return nil
 	}
 
+	logger := klog.FromContext(ctx)
 	// If pod tolerate unschedulable taint, it's also tolerate `node.Spec.Unschedulable`.
 	podToleratesUnschedulable := v1helper.TolerationsTolerateTaint(logger, pod.Spec.Tolerations, &v1.Taint{
 		Key:    v1.TaintNodeUnschedulable,

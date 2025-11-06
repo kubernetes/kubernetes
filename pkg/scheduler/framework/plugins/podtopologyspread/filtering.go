@@ -235,7 +235,6 @@ type topologyCount struct {
 
 // calPreFilterState computes preFilterState describing how pods are spread on topologies.
 func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod, allNodes []fwk.NodeInfo) (*preFilterState, error) {
-	logger := klog.FromContext(ctx)
 	constraints, err := pl.getConstraints(pod)
 	if err != nil {
 		return nil, fmt.Errorf("get constraints from pod: %w", err)
@@ -244,6 +243,7 @@ func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod,
 		return &preFilterState{}, nil
 	}
 
+	logger := klog.FromContext(ctx)
 	s := preFilterState{
 		Constraints:       constraints,
 		CriticalPaths:     make([]*criticalPaths, len(constraints)),

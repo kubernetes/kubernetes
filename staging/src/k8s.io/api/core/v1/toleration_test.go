@@ -244,3 +244,248 @@ func TestTolerationToleratesTaint(t *testing.T) {
 		}
 	}
 }
+
+func TestCompareNumericValues(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	testCases := []struct {
+		description    string
+		tolerationVal  string
+		taintVal       string
+		operator       TolerationOperator
+		expectedResult bool
+	}{
+		// Valid Gt operator cases
+		{
+			description:    "Gt operator - taint value greater than toleration value, expect true",
+			tolerationVal:  "100",
+			taintVal:       "200",
+			operator:       TolerationOpGt,
+			expectedResult: true,
+		},
+		{
+			description:    "Gt operator - taint value less than toleration value, expect false",
+			tolerationVal:  "200",
+			taintVal:       "100",
+			operator:       TolerationOpGt,
+			expectedResult: false,
+		},
+		{
+			description:    "Gt operator - taint value equal to toleration value, expect false",
+			tolerationVal:  "100",
+			taintVal:       "100",
+			operator:       TolerationOpGt,
+			expectedResult: false,
+		},
+		{
+			description:    "Gt operator - negative numbers, taint greater, expect true",
+			tolerationVal:  "-100",
+			taintVal:       "-50",
+			operator:       TolerationOpGt,
+			expectedResult: true,
+		},
+		{
+			description:    "Gt operator - negative numbers, taint less, expect false",
+			tolerationVal:  "-50",
+			taintVal:       "-100",
+			operator:       TolerationOpGt,
+			expectedResult: false,
+		},
+		{
+			description:    "Gt operator - zero and positive, expect true",
+			tolerationVal:  "0",
+			taintVal:       "1",
+			operator:       TolerationOpGt,
+			expectedResult: true,
+		},
+		{
+			description:    "Gt operator - large int64 values, taint greater, expect true",
+			tolerationVal:  "9223372036854775806",
+			taintVal:       "9223372036854775807",
+			operator:       TolerationOpGt,
+			expectedResult: true,
+		},
+
+		// Valid Lt operator cases
+		{
+			description:    "Lt operator - taint value less than toleration value, expect true",
+			tolerationVal:  "200",
+			taintVal:       "100",
+			operator:       TolerationOpLt,
+			expectedResult: true,
+		},
+		{
+			description:    "Lt operator - taint value greater than toleration value, expect false",
+			tolerationVal:  "100",
+			taintVal:       "200",
+			operator:       TolerationOpLt,
+			expectedResult: false,
+		},
+		{
+			description:    "Lt operator - taint value equal to toleration value, expect false",
+			tolerationVal:  "100",
+			taintVal:       "100",
+			operator:       TolerationOpLt,
+			expectedResult: false,
+		},
+		{
+			description:    "Lt operator - negative numbers, taint less, expect true",
+			tolerationVal:  "-50",
+			taintVal:       "-100",
+			operator:       TolerationOpLt,
+			expectedResult: true,
+		},
+		{
+			description:    "Lt operator - negative numbers, taint greater, expect false",
+			tolerationVal:  "-100",
+			taintVal:       "-50",
+			operator:       TolerationOpLt,
+			expectedResult: false,
+		},
+		{
+			description:    "Lt operator - zero and negative, expect true",
+			tolerationVal:  "0",
+			taintVal:       "-1",
+			operator:       TolerationOpLt,
+			expectedResult: true,
+		},
+
+		// Invalid toleration values - should return false
+		{
+			description:    "Gt operator - invalid toleration value (non-numeric), expect false",
+			tolerationVal:  "abc",
+			taintVal:       "100",
+			operator:       TolerationOpGt,
+			expectedResult: false,
+		},
+		{
+			description:    "Gt operator - invalid toleration value (empty string), expect false",
+			tolerationVal:  "",
+			taintVal:       "100",
+			operator:       TolerationOpGt,
+			expectedResult: false,
+		},
+		{
+			description:    "Gt operator - invalid toleration value (leading zero), expect false",
+			tolerationVal:  "0100",
+			taintVal:       "200",
+			operator:       TolerationOpGt,
+			expectedResult: false,
+		},
+		{
+			description:    "Gt operator - invalid toleration value (plus sign), expect false",
+			tolerationVal:  "+100",
+			taintVal:       "200",
+			operator:       TolerationOpGt,
+			expectedResult: false,
+		},
+		{
+			description:    "Gt operator - invalid toleration value (floating point), expect false",
+			tolerationVal:  "100.5",
+			taintVal:       "200",
+			operator:       TolerationOpGt,
+			expectedResult: false,
+		},
+		{
+			description:    "Gt operator - invalid toleration value (just minus sign), expect false",
+			tolerationVal:  "-",
+			taintVal:       "100",
+			operator:       TolerationOpGt,
+			expectedResult: false,
+		},
+
+		// Invalid taint values - should return false
+		{
+			description:    "Gt operator - invalid taint value (non-numeric), expect false",
+			tolerationVal:  "100",
+			taintVal:       "xyz",
+			operator:       TolerationOpGt,
+			expectedResult: false,
+		},
+		{
+			description:    "Gt operator - invalid taint value (empty string), expect false",
+			tolerationVal:  "100",
+			taintVal:       "",
+			operator:       TolerationOpGt,
+			expectedResult: false,
+		},
+		{
+			description:    "Gt operator - invalid taint value (leading zero), expect false",
+			tolerationVal:  "100",
+			taintVal:       "0200",
+			operator:       TolerationOpGt,
+			expectedResult: false,
+		},
+		{
+			description:    "Lt operator - invalid taint value (plus sign), expect false",
+			tolerationVal:  "100",
+			taintVal:       "+200",
+			operator:       TolerationOpLt,
+			expectedResult: false,
+		},
+		{
+			description:    "Lt operator - invalid taint value (spaces), expect false",
+			tolerationVal:  "100",
+			taintVal:       " 200 ",
+			operator:       TolerationOpLt,
+			expectedResult: false,
+		},
+
+		// Invalid operator - should return false
+		{
+			description:    "Equal operator (unsupported for numeric comparison), expect false",
+			tolerationVal:  "100",
+			taintVal:       "100",
+			operator:       TolerationOpEqual,
+			expectedResult: false,
+		},
+		{
+			description:    "Exists operator (unsupported for numeric comparison), expect false",
+			tolerationVal:  "100",
+			taintVal:       "100",
+			operator:       TolerationOpExists,
+			expectedResult: false,
+		},
+
+		// Edge cases with zero
+		{
+			description:    "Gt operator - both zero, expect false",
+			tolerationVal:  "0",
+			taintVal:       "0",
+			operator:       TolerationOpGt,
+			expectedResult: false,
+		},
+		{
+			description:    "Lt operator - both zero, expect false",
+			tolerationVal:  "0",
+			taintVal:       "0",
+			operator:       TolerationOpLt,
+			expectedResult: false,
+		},
+
+		// Int64 boundary cases
+		{
+			description:    "Gt operator - max int64 as taint, expect true",
+			tolerationVal:  "0",
+			taintVal:       "9223372036854775807",
+			operator:       TolerationOpGt,
+			expectedResult: true,
+		},
+		{
+			description:    "Lt operator - min int64 as taint, expect true",
+			tolerationVal:  "0",
+			taintVal:       "-9223372036854775808",
+			operator:       TolerationOpLt,
+			expectedResult: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			result := compareNumericValues(logger, tc.tolerationVal, tc.taintVal, tc.operator)
+			if result != tc.expectedResult {
+				t.Errorf("[%s] expected %v, got %v: tolerationVal=%q, taintVal=%q, operator=%v",
+					tc.description, tc.expectedResult, result, tc.tolerationVal, tc.taintVal, tc.operator)
+			}
+		})
+	}
+}

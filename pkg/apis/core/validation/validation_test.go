@@ -29612,7 +29612,7 @@ func TestNumericTolerationsWithFeatureGate(t *testing.T) {
 				Effect:   core.TaintEffectNoSchedule,
 			},
 			featureGateOn: true,
-			errorMsg:      fmt.Sprintf("tolerations[0].value: Invalid value: %q: value must be a valid integer for numeric operators", "high"),
+			errorMsg:      fmt.Sprintf("tolerations[0].value: Invalid value: %q: must be a valid decimal integer in canonical form", "high"),
 		},
 		{
 			name: "Gt operator with leading zeros and feature gate enabled (invalid - strict validation)",
@@ -29623,7 +29623,7 @@ func TestNumericTolerationsWithFeatureGate(t *testing.T) {
 				Effect:   core.TaintEffectNoSchedule,
 			},
 			featureGateOn: true,
-			errorMsg:      fmt.Sprintf("tolerations[0].value: Invalid value: %q: value must be a valid integer for numeric operators", "0950"),
+			errorMsg:      fmt.Sprintf("tolerations[0].value: Invalid value: %q: must be a valid decimal integer in canonical form", "0950"),
 		},
 		{
 			name: "Gt operator with value '0' and feature gate enabled (valid)",
@@ -29644,7 +29644,7 @@ func TestNumericTolerationsWithFeatureGate(t *testing.T) {
 				Effect:   core.TaintEffectNoSchedule,
 			},
 			featureGateOn: true,
-			errorMsg:      fmt.Sprintf("tolerations[0].value: Invalid value: %q: value must be a valid integer for numeric operators", "95.5"),
+			errorMsg:      fmt.Sprintf("tolerations[0].value: Invalid value: %q: must be a valid decimal integer in canonical form", "95.5"),
 		},
 		{
 			name: "Gt operator with just minus sign and feature gate enabled",
@@ -29655,7 +29655,7 @@ func TestNumericTolerationsWithFeatureGate(t *testing.T) {
 				Effect:   core.TaintEffectNoSchedule,
 			},
 			featureGateOn: true,
-			errorMsg:      fmt.Sprintf("tolerations[0].value: Invalid value: %q: value must be a valid integer for numeric operators", "-"),
+			errorMsg:      fmt.Sprintf("tolerations[0].value: Invalid value: %q: must be a valid decimal integer in canonical form", "-"),
 		},
 		{
 			name: "Gt operator with plus sign and feature gate enabled (invalid - strict validation)",
@@ -29666,7 +29666,7 @@ func TestNumericTolerationsWithFeatureGate(t *testing.T) {
 				Effect:   core.TaintEffectNoSchedule,
 			},
 			featureGateOn: true,
-			errorMsg:      fmt.Sprintf("tolerations[0].value: Invalid value: %q: value must be a valid integer for numeric operators", "+100"),
+			errorMsg:      fmt.Sprintf("tolerations[0].value: Invalid value: %q: must be a valid decimal integer in canonical form", "+100"),
 		},
 		{
 			name: "Gt operator with space in value and feature gate enabled",
@@ -29677,7 +29677,7 @@ func TestNumericTolerationsWithFeatureGate(t *testing.T) {
 				Effect:   core.TaintEffectNoSchedule,
 			},
 			featureGateOn: true,
-			errorMsg:      fmt.Sprintf("tolerations[0].value: Invalid value: %q: value must be a valid integer for numeric operators", "95 0"),
+			errorMsg:      fmt.Sprintf("tolerations[0].value: Invalid value: %q: must be a valid decimal integer in canonical form", "95 0"),
 		},
 		{
 			name: "Gt operator with empty value and feature gate enabled",
@@ -29688,7 +29688,7 @@ func TestNumericTolerationsWithFeatureGate(t *testing.T) {
 				Effect:   core.TaintEffectNoSchedule,
 			},
 			featureGateOn: true,
-			errorMsg:      fmt.Sprintf("tolerations[0].value: Invalid value: %q: value must be a valid integer for numeric operators", ""),
+			errorMsg:      fmt.Sprintf("tolerations[0].value: Invalid value: %q: must be non-empty", ""),
 		},
 		{
 			name: "Lt operator with feature gate disabled",
@@ -29720,7 +29720,7 @@ func TestNumericTolerationsWithFeatureGate(t *testing.T) {
 				Effect:   core.TaintEffectNoSchedule,
 			},
 			featureGateOn: true,
-			errorMsg:      "value must be a valid integer for numeric operators",
+			errorMsg:      fmt.Sprintf("tolerations[0].value: Invalid value: %q: strconv.ParseInt: parsing %q: value out of range", "9223372036854775808", "9223372036854775808"),
 		},
 	}
 
