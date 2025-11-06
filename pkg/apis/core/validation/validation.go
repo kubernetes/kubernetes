@@ -6936,22 +6936,16 @@ func ValidateNodeSpecificAnnotations(annotations map[string]string, fldPath *fie
 
 // ValidateNode tests if required fields in the node are set.
 func ValidateNode(node *core.Node) field.ErrorList {
-	fldPath := field.NewPath("metadata")
-	allErrs := ValidateObjectMeta(&node.ObjectMeta, false, ValidateNodeName, fldPath)
-	allErrs = append(allErrs, ValidateNodeSpecificAnnotations(node.ObjectMeta.Annotations, fldPath.Child("annotations"))...)
-	if len(node.Spec.Taints) > 0 {
-		allErrs = append(allErrs, validateNodeTaints(node.Spec.Taints, fldPath.Child("taints"))...)
-	}
+	metadataPath := field.NewPath("metadata")
+	allErrs := ValidateObjectMeta(&node.ObjectMeta, false, ValidateNodeName, metadataPath)
+	allErrs = append(allErrs, ValidateNodeSpecificAnnotations(node.ObjectMeta.Annotations, metadataPath.Child("annotations"))...)
 
-	// Only validate spec.
-	// All status fields are optional and can be updated later.
-	// That said, if specified, we need to ensure they are valid.
-	allErrs = append(allErrs, ValidateNodeResources(node)...)
-	allErrs = append(allErrs, validateNodeSwapStatus(node.Status.NodeInfo.Swap, fldPath.Child("nodeSwapStatus"))...)
+	// Validate NodeSpec
+	specPath := field.NewPath("spec")
 
 	// validate PodCIDRS only if we need to
 	if len(node.Spec.PodCIDRs) > 0 {
-		podCIDRsField := field.NewPath("spec", "podCIDRs")
+		podCIDRsField := specPath.Child("podCIDRs")
 
 		// all PodCIDRs should be valid ones
 		for idx, value := range node.Spec.PodCIDRs {
@@ -6970,59 +6964,76 @@ func ValidateNode(node *core.Node) field.ErrorList {
 		}
 	}
 
-	return allErrs
-}
-
-// ValidateNodeResources is used to make sure a node has valid capacity and allocatable values.
-func ValidateNodeResources(node *core.Node) field.ErrorList {
-	allErrs := field.ErrorList{}
-
-	// Validate resource quantities in capacity.
-	for k, v := range node.Status.Capacity {
-		resPath := field.NewPath("status", "capacity", string(k))
-		allErrs = append(allErrs, ValidateResourceQuantityValue(k, v, resPath)...)
+	if len(node.Spec.Taints) > 0 {
+		allErrs = append(allErrs, validateNodeTaints(node.Spec.Taints, specPath.Child("taints"))...)
 	}
 
-	// Validate resource quantities in allocatable.
-	for k, v := range node.Status.Allocatable {
-		resPath := field.NewPath("status", "allocatable", string(k))
-		allErrs = append(allErrs, ValidateResourceQuantityValue(k, v, resPath)...)
-	}
-	return allErrs
-}
-
-// ValidateNodeUpdate tests to make sure a node update can be applied.  Modifies oldNode.
-func ValidateNodeUpdate(node, oldNode *core.Node) field.ErrorList {
-	fldPath := field.NewPath("metadata")
-	allErrs := ValidateObjectMetaUpdate(&node.ObjectMeta, &oldNode.ObjectMeta, fldPath)
-	allErrs = append(allErrs, ValidateNodeSpecificAnnotations(node.ObjectMeta.Annotations, fldPath.Child("annotations"))...)
-
-	// TODO: Enable the code once we have better core object.status update model. Currently,
-	// anyone can update node status.
-	// if !apiequality.Semantic.DeepEqual(node.Status, core.NodeStatus{}) {
-	// 	allErrs = append(allErrs, field.Invalid("status", node.Status, "must be empty"))
-	// }
-
-	allErrs = append(allErrs, ValidateNodeResources(node)...)
+	// Validate NodeStatus
+	statusPath := field.NewPath("status")
+	allErrs = append(allErrs, validateNodeResources(&node.Status, statusPath)...)
+	allErrs = append(allErrs, validateNodeSwapStatus(node.Status.NodeInfo.Swap, statusPath.Child("nodeInfo", "swap"))...)
 
 	// Validate no duplicate addresses in node status.
 	addresses := make(map[core.NodeAddress]bool)
+	addressesPath := statusPath.Child("addresses")
 	for i, address := range node.Status.Addresses {
 		if _, ok := addresses[address]; ok {
-			allErrs = append(allErrs, field.Duplicate(field.NewPath("status", "addresses").Index(i), address))
+			allErrs = append(allErrs, field.Duplicate(addressesPath.Index(i), address))
 		}
 		addresses[address] = true
 	}
+
+	if node.Status.Config != nil {
+		allErrs = append(allErrs, validateNodeConfigStatus(node.Status.Config, statusPath.Child("config"))...)
+	}
+
+	return allErrs
+}
+
+// validateNodeResources is used to make sure a node has valid capacity and allocatable values.
+func validateNodeResources(nodeStatus *core.NodeStatus, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	// Validate resource quantities in capacity.
+	capacityPath := fldPath.Child("capacity")
+	for k, v := range nodeStatus.Capacity {
+		allErrs = append(allErrs, ValidateResourceQuantityValue(k, v, capacityPath.Key(k.String()))...)
+	}
+
+	// Validate resource quantities in allocatable.
+	allocatablePath := fldPath.Child("allocatable")
+	for k, v := range nodeStatus.Allocatable {
+		allErrs = append(allErrs, ValidateResourceQuantityValue(k, v, allocatablePath.Key(k.String()))...)
+	}
+	return allErrs
+}
+
+// ValidateNodeUpdate tests to make sure a node update can be applied.
+// This validation is applied to regular node updates and also to status updates.
+func ValidateNodeUpdate(node, oldNode *core.Node) field.ErrorList {
+	allErrs := ValidateNode(node)
+
+	allErrs = append(allErrs, ValidateObjectMetaUpdate(&node.ObjectMeta, &oldNode.ObjectMeta, field.NewPath("metadata"))...)
+
+	// Validate Spec Updates:
+	// spec only has a few fields, so check the ones we don't allow changing
+	//  1. PodCIDRs - immutable after first set - checked
+	//  2. ProviderID - immutable after first set - checked
+	//  3. Unschedulable - allowed to change
+	//  4. Taints - allowed to change
+	//  5. ConfigSource - allowed to change (and checked)
+	//  6. DoNotUseExternalID - immutable - checked
+	specPath := field.NewPath("spec")
 
 	// Allow the controller manager to assign a CIDR to a node if it doesn't have one.
 	if len(oldNode.Spec.PodCIDRs) > 0 {
 		// compare the entire slice
 		if len(oldNode.Spec.PodCIDRs) != len(node.Spec.PodCIDRs) {
-			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "podCIDRs"), "node updates may not change podCIDR except from \"\" to valid"))
+			allErrs = append(allErrs, field.Forbidden(specPath.Child("podCIDRs"), "node updates may not change podCIDR except from \"\" to valid"))
 		} else {
 			for idx, value := range oldNode.Spec.PodCIDRs {
 				if value != node.Spec.PodCIDRs[idx] {
-					allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "podCIDRs"), "node updates may not change podCIDR except from \"\" to valid"))
+					allErrs = append(allErrs, field.Forbidden(specPath.Child("podCIDRs"), "node updates may not change podCIDR except from \"\" to valid"))
 				}
 			}
 		}
@@ -7030,33 +7041,16 @@ func ValidateNodeUpdate(node, oldNode *core.Node) field.ErrorList {
 
 	// Allow controller manager updating provider ID when not set
 	if len(oldNode.Spec.ProviderID) > 0 && oldNode.Spec.ProviderID != node.Spec.ProviderID {
-		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "providerID"), "node updates may not change providerID except from \"\" to valid"))
+		allErrs = append(allErrs, field.Forbidden(specPath.Child("providerID"), "node updates may not change providerID except from \"\" to valid"))
 	}
 
 	if node.Spec.ConfigSource != nil {
-		allErrs = append(allErrs, validateNodeConfigSourceSpec(node.Spec.ConfigSource, field.NewPath("spec", "configSource"))...)
-	}
-	if node.Status.Config != nil {
-		allErrs = append(allErrs, validateNodeConfigStatus(node.Status.Config, field.NewPath("status", "config"))...)
-	}
-
-	// update taints
-	if len(node.Spec.Taints) > 0 {
-		allErrs = append(allErrs, validateNodeTaints(node.Spec.Taints, fldPath.Child("taints"))...)
+		allErrs = append(allErrs, validateNodeConfigSourceSpec(node.Spec.ConfigSource, specPath.Child("configSource"))...)
 	}
 
 	if node.Spec.DoNotUseExternalID != oldNode.Spec.DoNotUseExternalID {
-		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "externalID"), "may not be updated"))
+		allErrs = append(allErrs, field.Forbidden(specPath.Child("externalID"), "may not be updated"))
 	}
-
-	// status and metadata are allowed change (barring restrictions above), so separately test spec field.
-	// spec only has a few fields, so check the ones we don't allow changing
-	//  1. PodCIDRs - immutable after first set - checked above
-	//  2. ProviderID - immutable after first set - checked above
-	//  3. Unschedulable - allowed to change
-	//  4. Taints - allowed to change
-	//  5. ConfigSource - allowed to change (and checked above)
-	//  6. DoNotUseExternalID - immutable - checked above
 
 	return allErrs
 }

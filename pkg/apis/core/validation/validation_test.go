@@ -18442,6 +18442,17 @@ func TestValidateNode(t *testing.T) {
 				PodCIDRs: []string{"192.168.000.000/16"},
 			},
 		},
+		"no-duplicate-node-address": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "abc",
+			},
+			Status: core.NodeStatus{
+				Addresses: []core.NodeAddress{
+					{Type: core.NodeHostName, Address: "cluster-foo.region-a.node-bar"},
+					{Type: core.NodeInternalDNS, Address: "cluster-foo.region-a.node-bar"},
+				},
+			},
+		},
 	}
 	for name, legacyCase := range legacyValidationCases {
 		t.Run(name, func(t *testing.T) {
@@ -18668,6 +18679,30 @@ func TestValidateNode(t *testing.T) {
 				PodCIDRs: []string{"10.0.0.1/16", "10.0.0.1/16"},
 			},
 		},
+		"duplicate-node-address": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "abc",
+			},
+			Status: core.NodeStatus{
+				Addresses: []core.NodeAddress{
+					{Type: core.NodeExternalIP, Address: "1.1.1.1"},
+					{Type: core.NodeHostName, Address: "cluster-foo.region-a.node-bar"},
+					{Type: core.NodeExternalIP, Address: "1.1.1.1"},
+				},
+			},
+		},
+		"invalid-node-config-status": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "abc",
+			},
+			Status: core.NodeStatus{
+				Config: &core.NodeConfigStatus{
+					Active: &core.NodeConfigSource{
+						ConfigMap: &core.ConfigMapNodeConfigSource{},
+					},
+				},
+			},
+		},
 	}
 	for k, v := range errorCases {
 		t.Run(k, func(t *testing.T) {
@@ -18703,19 +18738,26 @@ func TestValidateNode(t *testing.T) {
 
 func TestValidateNodeUpdate(t *testing.T) {
 	tests := []struct {
+		name    string
 		oldNode core.Node
 		node    core.Node
 		valid   bool
 	}{
-		{core.Node{}, core.Node{}, true},
-		{core.Node{
+		{"no-change", core.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo"},
+		}, core.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo"},
+		}, true},
+		{"rename-node", core.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "foo"}},
 			core.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "bar"},
 			}, false},
-		{core.Node{
+		{"update-labels", core.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   "foo",
 				Labels: map[string]string{"foo": "bar"},
@@ -18726,7 +18768,7 @@ func TestValidateNodeUpdate(t *testing.T) {
 				Labels: map[string]string{"foo": "baz"},
 			},
 		}, true},
-		{core.Node{
+		{"add-labels", core.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "foo",
 			},
@@ -18736,7 +18778,7 @@ func TestValidateNodeUpdate(t *testing.T) {
 				Labels: map[string]string{"foo": "baz"},
 			},
 		}, true},
-		{core.Node{
+		{"replace-labels", core.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   "foo",
 				Labels: map[string]string{"bar": "foo"},
@@ -18747,7 +18789,7 @@ func TestValidateNodeUpdate(t *testing.T) {
 				Labels: map[string]string{"foo": "baz"},
 			},
 		}, true},
-		{core.Node{
+		{"set-pod-cidr", core.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "foo",
 			},
@@ -18762,7 +18804,7 @@ func TestValidateNodeUpdate(t *testing.T) {
 				PodCIDRs: []string{"192.168.0.0/16"},
 			},
 		}, true},
-		{core.Node{
+		{"change-pod-cidr", core.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "foo",
 			},
@@ -18777,7 +18819,7 @@ func TestValidateNodeUpdate(t *testing.T) {
 				PodCIDRs: []string{"192.168.0.0/16"},
 			},
 		}, false},
-		{core.Node{
+		{"update-capacity", core.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "foo",
 			},
@@ -18798,7 +18840,7 @@ func TestValidateNodeUpdate(t *testing.T) {
 				},
 			},
 		}, true},
-		{core.Node{
+		{"update-labels-and-capacity", core.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   "foo",
 				Labels: map[string]string{"bar": "foo"},
@@ -18821,7 +18863,7 @@ func TestValidateNodeUpdate(t *testing.T) {
 				},
 			},
 		}, true},
-		{core.Node{
+		{"update-labels-remove-addresses", core.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   "foo",
 				Labels: map[string]string{"bar": "foo"},
@@ -18837,7 +18879,7 @@ func TestValidateNodeUpdate(t *testing.T) {
 				Labels: map[string]string{"bar": "fooobaz"},
 			},
 		}, true},
-		{core.Node{
+		{"update-label-key-case", core.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   "foo",
 				Labels: map[string]string{"foo": "baz"},
@@ -18848,7 +18890,7 @@ func TestValidateNodeUpdate(t *testing.T) {
 				Labels: map[string]string{"Foo": "baz"},
 			},
 		}, true},
-		{core.Node{
+		{"update-unschedulable-true", core.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "foo",
 			},
@@ -18863,7 +18905,7 @@ func TestValidateNodeUpdate(t *testing.T) {
 				Unschedulable: true,
 			},
 		}, true},
-		{core.Node{
+		{"invalid-duplicate-node-addresses", core.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "foo",
 			},
@@ -18881,7 +18923,7 @@ func TestValidateNodeUpdate(t *testing.T) {
 				},
 			},
 		}, false},
-		{core.Node{
+		{"add-valid-node-addresses", core.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "foo",
 			},
@@ -18899,7 +18941,7 @@ func TestValidateNodeUpdate(t *testing.T) {
 				},
 			},
 		}, true},
-		{core.Node{
+		{"add-valid-prefer-avoid-pods-annotation", core.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "foo",
 			},
@@ -18908,30 +18950,30 @@ func TestValidateNodeUpdate(t *testing.T) {
 				Name: "foo",
 				Annotations: map[string]string{
 					core.PreferAvoidPodsAnnotationKey: `
-							{
-							    "preferAvoidPods": [
-							        {
-							            "podSignature": {
-							                "podController": {
-							                    "apiVersion": "v1",
-							                    "kind": "ReplicationController",
-							                    "name": "foo",
+                            {
+                                "preferAvoidPods": [
+                                    {
+                                        "podSignature": {
+                                            "podController": {
+                                                "apiVersion": "v1",
+                                                "kind": "ReplicationController",
+                                                "name": "foo",
                                                                            "uid": "abcdef123456",
                                                                            "controller": true
-							                }
-							            },
-							            "reason": "some reason",
-							            "message": "some message"
-							        }
-							    ]
-							}`,
+                                            }
+                                        },
+                                        "reason": "some reason",
+                                        "message": "some message"
+                                    }
+                                ]
+                            }`,
 				},
 			},
 			Spec: core.NodeSpec{
 				Unschedulable: false,
 			},
 		}, true},
-		{core.Node{
+		{"invalid-prefer-avoid-pods-no-signature", core.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "foo",
 			},
@@ -18940,18 +18982,18 @@ func TestValidateNodeUpdate(t *testing.T) {
 				Name: "foo",
 				Annotations: map[string]string{
 					core.PreferAvoidPodsAnnotationKey: `
-							{
-							    "preferAvoidPods": [
-							        {
-							            "reason": "some reason",
-							            "message": "some message"
-							        }
-							    ]
-							}`,
+                            {
+                                "preferAvoidPods": [
+                                    {
+                                        "reason": "some reason",
+                                        "message": "some message"
+                                    }
+                                ]
+                            }`,
 				},
 			},
 		}, false},
-		{core.Node{
+		{"invalid-prefer-avoid-pods-controller-false", core.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "foo",
 			},
@@ -18960,27 +19002,27 @@ func TestValidateNodeUpdate(t *testing.T) {
 				Name: "foo",
 				Annotations: map[string]string{
 					core.PreferAvoidPodsAnnotationKey: `
-							{
-							    "preferAvoidPods": [
-							        {
-							            "podSignature": {
-							                "podController": {
-							                    "apiVersion": "v1",
-							                    "kind": "ReplicationController",
-							                    "name": "foo",
-							                    "uid": "abcdef123456",
-							                    "controller": false
-							                }
-							            },
-							            "reason": "some reason",
-							            "message": "some message"
-							        }
-							    ]
-							}`,
+                            {
+                                "preferAvoidPods": [
+                                    {
+                                        "podSignature": {
+                                            "podController": {
+                                                "apiVersion": "v1",
+                                                "kind": "ReplicationController",
+                                                "name": "foo",
+                                                "uid": "abcdef123456",
+                                                "controller": false
+                                            }
+                                        },
+                                        "reason": "some reason",
+                                        "message": "some message"
+                                    }
+                                ]
+                            }`,
 				},
 			},
 		}, false},
-		{core.Node{
+		{"valid-extended-resources", core.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "valid-extended-resources",
 			},
@@ -18997,7 +19039,7 @@ func TestValidateNodeUpdate(t *testing.T) {
 				},
 			},
 		}, true},
-		{core.Node{
+		{"invalid-fractional-extended-capacity", core.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "invalid-fractional-extended-capacity",
 			},
@@ -19013,7 +19055,7 @@ func TestValidateNodeUpdate(t *testing.T) {
 				},
 			},
 		}, false},
-		{core.Node{
+		{"invalid-fractional-extended-allocatable", core.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "invalid-fractional-extended-allocatable",
 			},
@@ -19034,7 +19076,7 @@ func TestValidateNodeUpdate(t *testing.T) {
 				},
 			},
 		}, false},
-		{core.Node{
+		{"update-provider-id-when-not-set", core.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "update-provider-id-when-not-set",
 			},
@@ -19046,7 +19088,7 @@ func TestValidateNodeUpdate(t *testing.T) {
 				ProviderID: "provider:///new",
 			},
 		}, true},
-		{core.Node{
+		{"update-provider-id-when-set", core.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "update-provider-id-when-set",
 			},
@@ -19061,7 +19103,7 @@ func TestValidateNodeUpdate(t *testing.T) {
 				ProviderID: "provider:///new",
 			},
 		}, false},
-		{core.Node{
+		{"pod-cidrs-as-is", core.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "pod-cidrs-as-is",
 			},
@@ -19076,7 +19118,7 @@ func TestValidateNodeUpdate(t *testing.T) {
 				PodCIDRs: []string{"192.168.0.0/16"},
 			},
 		}, true},
-		{core.Node{
+		{"pod-cidrs-as-is-dual-stack", core.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "pod-cidrs-as-is-2",
 			},
@@ -19091,7 +19133,7 @@ func TestValidateNodeUpdate(t *testing.T) {
 				PodCIDRs: []string{"192.168.0.0/16", "2000::/10"},
 			},
 		}, true},
-		{core.Node{
+		{"pod-cidrs-not-same-length", core.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "pod-cidrs-not-same-length",
 			},
@@ -19106,7 +19148,7 @@ func TestValidateNodeUpdate(t *testing.T) {
 				PodCIDRs: []string{"192.168.0.0/16", "2000::/10"},
 			},
 		}, false},
-		{core.Node{
+		{"pod-cidrs-not-same-order", core.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "pod-cidrs-not-same",
 			},
@@ -19122,17 +19164,19 @@ func TestValidateNodeUpdate(t *testing.T) {
 			},
 		}, false},
 	}
-	for i, test := range tests {
-		test.oldNode.ObjectMeta.ResourceVersion = "1"
-		test.node.ObjectMeta.ResourceVersion = "1"
-		errs := ValidateNodeUpdate(&test.node, &test.oldNode)
-		if test.valid && len(errs) > 0 {
-			t.Errorf("%d: Unexpected error: %v", i, errs)
-			t.Logf("%#v vs %#v", test.oldNode.ObjectMeta, test.node.ObjectMeta)
-		}
-		if !test.valid && len(errs) == 0 {
-			t.Errorf("%d: Unexpected non-error", i)
-		}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			test.oldNode.ObjectMeta.ResourceVersion = "1"
+			test.node.ObjectMeta.ResourceVersion = "1"
+			errs := ValidateNodeUpdate(&test.node, &test.oldNode)
+			if test.valid && len(errs) > 0 {
+				t.Errorf("Unexpected error: %v", errs)
+				t.Logf("%#v vs %#v", test.oldNode.ObjectMeta, test.node.ObjectMeta)
+			}
+			if !test.valid && len(errs) == 0 {
+				t.Errorf("Expected error but got none")
+			}
+		})
 	}
 }
 
