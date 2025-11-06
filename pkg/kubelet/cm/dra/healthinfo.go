@@ -188,6 +188,7 @@ func (cache *healthInfoCache) updateHealthInfo(driverName string, devices []stat
 			if _, wasReported := reportedKeys[key]; !wasReported {
 				if existingDevice.Health != state.DeviceHealthStatusUnknown && now.Sub(existingDevice.LastUpdated) > healthTimeout {
 					existingDevice.Health = state.DeviceHealthStatusUnknown
+					existingDevice.Message = ""
 					existingDevice.LastUpdated = now
 					currentDriver.Devices[key] = existingDevice
 
