@@ -19,6 +19,7 @@ package cacher
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -60,6 +61,8 @@ func TestConsistencyCheckerDigest(t *testing.T) {
 				ResourceVersion: "1",
 				CacheDigest:     "cbf29ce484222325",
 				EtcdDigest:      "cbf29ce484222325",
+				CacheKeys:       &[]namespaceNameRV{},
+				EtcdKeys:        &[]namespaceNameRV{},
 			},
 			expectConsistent: true,
 		},
@@ -77,6 +80,8 @@ func TestConsistencyCheckerDigest(t *testing.T) {
 				ResourceVersion: "2",
 				CacheDigest:     "86bf3a5e80d1c5cb",
 				EtcdDigest:      "86bf3a5e80d1c5cb",
+				CacheKeys:       &[]namespaceNameRV{{Namespace: "default", Name: "pod", RV: "2"}},
+				EtcdKeys:        &[]namespaceNameRV{{Namespace: "default", Name: "pod", RV: "2"}},
 			},
 			expectConsistent: true,
 		},
@@ -94,6 +99,8 @@ func TestConsistencyCheckerDigest(t *testing.T) {
 				ResourceVersion: "2",
 				CacheDigest:     "4ae4e750bd825b17",
 				EtcdDigest:      "f940a60af965b03",
+				CacheKeys:       &[]namespaceNameRV{{Namespace: "kube-system", Name: "pod", RV: "2"}},
+				EtcdKeys:        &[]namespaceNameRV{{Namespace: "kube-public", Name: "pod", RV: "2"}},
 			},
 			expectConsistent: false,
 		},
@@ -111,6 +118,8 @@ func TestConsistencyCheckerDigest(t *testing.T) {
 				ResourceVersion: "2",
 				CacheDigest:     "c9120494e4c1897d",
 				EtcdDigest:      "c9156494e4c46274",
+				CacheKeys:       &[]namespaceNameRV{{Namespace: "default", Name: "pod2", RV: "2"}},
+				EtcdKeys:        &[]namespaceNameRV{{Namespace: "default", Name: "pod3", RV: "2"}},
 			},
 			expectConsistent: false,
 		},
@@ -128,6 +137,8 @@ func TestConsistencyCheckerDigest(t *testing.T) {
 				ResourceVersion: "4",
 				CacheDigest:     "86bf3a5e80d1c5ca",
 				EtcdDigest:      "86bf3a5e80d1c5cd",
+				CacheKeys:       &[]namespaceNameRV{{Namespace: "default", Name: "pod", RV: "3"}},
+				EtcdKeys:        &[]namespaceNameRV{{Namespace: "default", Name: "pod", RV: "4"}},
 			},
 			expectConsistent: false,
 		},
@@ -146,6 +157,8 @@ func TestConsistencyCheckerDigest(t *testing.T) {
 				ResourceVersion: "3",
 				CacheDigest:     "1859bac707c2cb2b",
 				EtcdDigest:      "11d147fc800df0e0",
+				CacheKeys:       &[]namespaceNameRV{{Namespace: "Default", Name: "pod", RV: "2"}},
+				EtcdKeys:        &[]namespaceNameRV{{Namespace: "Default", Name: "pod", RV: "2"}, {Namespace: "Default", Name: "pod", RV: "3"}},
 			},
 			expectConsistent: false,
 		},
@@ -199,13 +212,45 @@ func TestConsistencyCheckerDigest(t *testing.T) {
 			if err != nil {
 				return
 			}
-			if *digest != tc.expectDigest {
+			if digest.ResourceVersion != tc.expectDigest.ResourceVersion || digest.CacheDigest != tc.expectDigest.CacheDigest || digest.EtcdDigest != tc.expectDigest.EtcdDigest || !reflect.DeepEqual(digest.CacheKeys, tc.expectDigest.CacheKeys) || !reflect.DeepEqual(digest.EtcdKeys, tc.expectDigest.EtcdKeys) {
 				t.Errorf("Expect: %+v Got: %+v", &tc.expectDigest, *digest)
 			}
 
 			checker.check(context.Background())
 			if cacher.consistent != tc.expectConsistent {
 				t.Errorf("Expect: %+v Got: %+v", tc.expectConsistent, cacher.consistent)
+			}
+		})
+	}
+}
+
+func TestEnrichErrorMessageKVs(t *testing.T) {
+	// enrichErrorMessageKVs is invoked only when digests are different.
+	// Thus, the testcases don't cover any scenarios that they are identical.
+	testCases := []struct {
+		desc         string
+		etcdKeyList  []namespaceNameRV
+		cacheKeyList []namespaceNameRV
+		expectOutput []interface{}
+	}{
+		{
+			desc:         "mismatch items",
+			etcdKeyList:  []namespaceNameRV{{Namespace: "default", Name: "pod1", RV: "1"}, {Namespace: "default", Name: "pod3", RV: "3"}},
+			cacheKeyList: []namespaceNameRV{{Namespace: "default", Name: "pod2", RV: "2"}, {Namespace: "default", Name: "pod3", RV: "3"}},
+			expectOutput: []interface{}{"etcdLength", 2, "cacheLength", 2, "missingKeysInCache", []namespaceNameRV{{Namespace: "default", Name: "pod1", RV: "1"}}, "additionalKeysInCache", []namespaceNameRV{{Namespace: "default", Name: "pod2", RV: "2"}}},
+		},
+		{
+			desc:         "wrong ordering",
+			etcdKeyList:  []namespaceNameRV{{Namespace: "default", Name: "pod1", RV: "1"}, {Namespace: "default", Name: "pod2", RV: "2"}, {Namespace: "default", Name: "pod3", RV: "3"}},
+			cacheKeyList: []namespaceNameRV{{Namespace: "default", Name: "pod1", RV: "1"}, {Namespace: "default", Name: "pod3", RV: "3"}, {Namespace: "default", Name: "pod2", RV: "2"}},
+			expectOutput: []interface{}{"etcdLength", 3, "cacheLength", 3, "first mismatching item in etcd list", namespaceNameRV{Namespace: "default", Name: "pod2", RV: "2"}, "first mismatching item in cache list", namespaceNameRV{Namespace: "default", Name: "pod3", RV: "3"}},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			actual := enrichErrorMessageKVs(&tc.etcdKeyList, &tc.cacheKeyList)
+			if !reflect.DeepEqual(actual, tc.expectOutput) {
+				t.Errorf("Expect output: %#v, got: %#v", tc.expectOutput, actual)
 			}
 		})
 	}
