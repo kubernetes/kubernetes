@@ -117,7 +117,9 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 		result:               make([]internalAllocationResult, len(claims)),
 	}
 	alloc.logger.V(5).Info("Starting allocation", "numClaims", len(alloc.claimsToAllocate))
-	defer alloc.logger.V(5).Info("Done with allocation", "success", len(finalResult) == len(alloc.claimsToAllocate), "err", finalErr)
+	defer func() {
+		alloc.logger.V(5).Info("Done with allocation", "success", len(finalResult) == len(alloc.claimsToAllocate), "err", finalErr)
+	}()
 
 	// First determine all eligible pools.
 	pools, err := GatherPools(ctx, alloc.slices, node, a.features)
