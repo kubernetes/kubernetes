@@ -1239,13 +1239,6 @@ func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(logger klog.Logger, podIn
 			continue
 		}
 
-		// Clear the flush flag if this pod is being moved by an event (not by timeout flush).
-		// EventUnschedulableTimeout is the event used by flushUnschedulablePodsLeftover,
-		// where the flag is set to true before calling this function.
-		if event != framework.EventUnschedulableTimeout {
-			pInfo.WasFlushedFromUnschedulable = false
-		}
-
 		p.unschedulablePods.delete(pInfo.Pod, pInfo.Gated())
 		queue := p.requeuePodWithQueueingStrategy(logger, pInfo, schedulingHint, event.Label())
 		if queue == activeQ || (p.isPopFromBackoffQEnabled && queue == backoffQ) {
