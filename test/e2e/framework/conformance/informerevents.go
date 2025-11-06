@@ -124,6 +124,9 @@ func (er *eventRecorder) OnDelete(obj any) {
 	})
 }
 
+func (er *eventRecorder) OnBookmark(resourceVersion string) {
+}
+
 // list returns a shallow copy of the current list of events.
 func (er *eventRecorder) list() eventList {
 	er.mutex.Lock()

@@ -137,6 +137,22 @@ func (c *ExpirationCache) List() []interface{} {
 	return list
 }
 
+// GetObservedResourceVersion returns the latest resource version that the cache has seen.
+func (c *ExpirationCache) GetObservedResourceVersion() string {
+	return c.cacheStorage.GetObservedResourceVersion()
+}
+
+// ObserveResourceVersion observes a new resource version in the cache.
+func (c *ExpirationCache) ObserveResourceVersion(rv string) {
+	c.cacheStorage.ObserveResourceVersion(rv)
+}
+
+// PauseObservingResourceVersion will pause observing the internal resource
+// version until an ObserveResourceVersion call occurs.
+func (c *ExpirationCache) PauseObservingResourceVersion() {
+	c.cacheStorage.PauseObservingResourceVersion()
+}
+
 // ListKeys returns a list of all keys in the expiration cache.
 func (c *ExpirationCache) ListKeys() []string {
 	return c.cacheStorage.ListKeys()
