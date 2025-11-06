@@ -31,7 +31,7 @@ type APICacher interface {
 	// PatchPodStatus sends a patch request for a Pod's status.
 	// The patch could be first applied to the cached Pod object and then the API call is executed asynchronously.
 	// It returns a channel that can be used to wait for the call's completion.
-	PatchPodStatus(pod *v1.Pod, condition *v1.PodCondition, nominatingInfo *NominatingInfo) (<-chan error, error)
+	PatchPodStatus(pod *v1.Pod, conditions []*v1.PodCondition, nominatingInfo *NominatingInfo) (<-chan error, error)
 
 	// BindPod sends a binding request. The binding could be first applied to the cached Pod object
 	// and then the API call is executed asynchronously.
@@ -51,7 +51,7 @@ type APICacher interface {
 // APICallImplementations define constructors for each APICall that is used by the scheduler internally.
 type APICallImplementations[T, K APICall] struct {
 	// PodStatusPatch is a constructor used to create APICall object for pod status patch.
-	PodStatusPatch func(pod *v1.Pod, condition *v1.PodCondition, nominatingInfo *NominatingInfo) T
+	PodStatusPatch func(pod *v1.Pod, conditions []*v1.PodCondition, nominatingInfo *NominatingInfo) T
 	// PodBinding is a constructor used to create APICall object for pod binding.
 	PodBinding func(binding *v1.Binding) K
 }

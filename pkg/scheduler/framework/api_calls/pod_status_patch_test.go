@@ -47,49 +47,49 @@ func TestPodStatusPatchCall_IsNoOp(t *testing.T) {
 	tests := []struct {
 		name           string
 		pod            *v1.Pod
-		condition      *v1.PodCondition
+		conditions     []*v1.PodCondition
 		nominatingInfo *fwk.NominatingInfo
 		want           bool
 	}{
 		{
 			name:           "No-op when condition and node name match",
 			pod:            podWithNode,
-			condition:      &v1.PodCondition{Type: v1.PodScheduled, Status: v1.ConditionFalse},
+			conditions:     []*v1.PodCondition{{Type: v1.PodScheduled, Status: v1.ConditionFalse}},
 			nominatingInfo: &fwk.NominatingInfo{NominatedNodeName: "node-a", NominatingMode: fwk.ModeOverride},
 			want:           true,
 		},
 		{
 			name:           "Not no-op when condition is different",
 			pod:            podWithNode,
-			condition:      &v1.PodCondition{Type: v1.PodScheduled, Status: v1.ConditionTrue},
+			conditions:     []*v1.PodCondition{{Type: v1.PodScheduled, Status: v1.ConditionTrue}},
 			nominatingInfo: &fwk.NominatingInfo{NominatedNodeName: "node-a", NominatingMode: fwk.ModeOverride},
 			want:           false,
 		},
 		{
 			name:           "Not no-op when nominated node name is different",
 			pod:            podWithNode,
-			condition:      &v1.PodCondition{Type: v1.PodScheduled, Status: v1.ConditionFalse},
+			conditions:     []*v1.PodCondition{{Type: v1.PodScheduled, Status: v1.ConditionFalse}},
 			nominatingInfo: &fwk.NominatingInfo{NominatedNodeName: "node-b", NominatingMode: fwk.ModeOverride},
 			want:           false,
 		},
 		{
 			name:           "No-op when condition is nil and node name matches",
 			pod:            podWithNode,
-			condition:      nil,
+			conditions:     nil,
 			nominatingInfo: &fwk.NominatingInfo{NominatedNodeName: "node-a", NominatingMode: fwk.ModeOverride},
 			want:           true,
 		},
 		{
 			name:           "Not no-op when condition is nil but node name differs",
 			pod:            podWithNode,
-			condition:      nil,
+			conditions:     nil,
 			nominatingInfo: &fwk.NominatingInfo{NominatedNodeName: "node-b", NominatingMode: fwk.ModeOverride},
 			want:           false,
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			call := NewPodStatusPatchCall(test.pod, test.condition, test.nominatingInfo)
+			call := NewPodStatusPatchCall(test.pod, test.conditions, test.nominatingInfo)
 			if got := call.IsNoOp(); got != test.want {
 				t.Errorf("Expected IsNoOp() to return %v, but got %v", test.want, got)
 			}
@@ -105,7 +105,7 @@ func TestPodStatusPatchCall_Merge(t *testing.T) {
 	}
 
 	t.Run("Merges nominating info and condition from the old call", func(t *testing.T) {
-		oldCall := NewPodStatusPatchCall(pod, &v1.PodCondition{Type: v1.PodScheduled, Status: v1.ConditionFalse},
+		oldCall := NewPodStatusPatchCall(pod, []*v1.PodCondition{{Type: v1.PodScheduled, Status: v1.ConditionFalse}},
 			&fwk.NominatingInfo{NominatedNodeName: "node-a", NominatingMode: fwk.ModeOverride},
 		)
 		newCall := NewPodStatusPatchCall(pod, nil, &fwk.NominatingInfo{NominatingMode: fwk.ModeNoop})
@@ -116,14 +116,14 @@ func TestPodStatusPatchCall_Merge(t *testing.T) {
 		if newCall.nominatingInfo.NominatedNodeName != "node-a" {
 			t.Errorf("Expected NominatedNodeName to be node-a, but got: %v", newCall.nominatingInfo.NominatedNodeName)
 		}
-		if newCall.newCondition == nil || newCall.newCondition.Type != v1.PodScheduled {
-			t.Errorf("Expected PodScheduled condition, but got: %v", newCall.newCondition)
+		if len(newCall.newConditions) == 0 || newCall.newConditions[0].Type != v1.PodScheduled {
+			t.Errorf("Expected PodScheduled condition, but got: %v", newCall.newConditions)
 		}
 	})
 
 	t.Run("Doesn't overwrite nominating info and condition of a new call", func(t *testing.T) {
 		oldCall := NewPodStatusPatchCall(pod, nil, &fwk.NominatingInfo{NominatingMode: fwk.ModeNoop})
-		newCall := NewPodStatusPatchCall(pod, &v1.PodCondition{Type: v1.PodScheduled, Status: v1.ConditionFalse},
+		newCall := NewPodStatusPatchCall(pod, []*v1.PodCondition{{Type: v1.PodScheduled, Status: v1.ConditionFalse}},
 			&fwk.NominatingInfo{NominatedNodeName: "node-b", NominatingMode: fwk.ModeOverride})
 
 		if err := newCall.Merge(oldCall); err != nil {
@@ -132,8 +132,8 @@ func TestPodStatusPatchCall_Merge(t *testing.T) {
 		if newCall.nominatingInfo.NominatedNodeName != "node-b" {
 			t.Errorf("Expected NominatedNodeName to be node-b, but got: %v", newCall.nominatingInfo.NominatedNodeName)
 		}
-		if newCall.newCondition == nil || newCall.newCondition.Type != v1.PodScheduled {
-			t.Errorf("Expected PodScheduled condition, but got: %v", newCall.newCondition)
+		if len(newCall.newConditions) == 0 || newCall.newConditions[0].Type != v1.PodScheduled {
+			t.Errorf("Expected PodScheduled condition, but got: %v", newCall.newConditions)
 		}
 	})
 }
@@ -217,7 +217,7 @@ func TestPodStatusPatchCall_Execute(t *testing.T) {
 			return true, nil, nil
 		})
 
-		call := NewPodStatusPatchCall(pod, &v1.PodCondition{Type: v1.PodScheduled, Status: v1.ConditionFalse},
+		call := NewPodStatusPatchCall(pod, []*v1.PodCondition{{Type: v1.PodScheduled, Status: v1.ConditionFalse}},
 			&fwk.NominatingInfo{NominatingMode: fwk.ModeNoop})
 		if err := call.Execute(ctx, client); err != nil {
 			t.Fatalf("Unexpected error returned by Execute(): %v", err)

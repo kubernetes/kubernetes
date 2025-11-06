@@ -131,7 +131,7 @@ type SchedulingQueue interface {
 
 	// PatchPodStatus handles the pod status update by sending an update API call through API dispatcher.
 	// This method should be used only if the SchedulerAsyncAPICalls feature gate is enabled.
-	PatchPodStatus(pod *v1.Pod, condition *v1.PodCondition, nominatingInfo *fwk.NominatingInfo) (<-chan error, error)
+	PatchPodStatus(pod *v1.Pod, conditions []*v1.PodCondition, nominatingInfo *fwk.NominatingInfo) (<-chan error, error)
 
 	// The following functions are supposed to be used only for testing or debugging.
 	GetPod(name, namespace string) (*framework.QueuedPodInfo, bool)
@@ -1360,10 +1360,10 @@ func (p *PriorityQueue) PendingPods() ([]*v1.Pod, string) {
 
 // PatchPodStatus handles the pod status update by sending an update API call through API dispatcher.
 // This method should be used only if the SchedulerAsyncAPICalls feature gate is enabled.
-func (p *PriorityQueue) PatchPodStatus(pod *v1.Pod, condition *v1.PodCondition, nominatingInfo *fwk.NominatingInfo) (<-chan error, error) {
+func (p *PriorityQueue) PatchPodStatus(pod *v1.Pod, conditions []*v1.PodCondition, nominatingInfo *fwk.NominatingInfo) (<-chan error, error) {
 	// Don't store anything in the cache. This might be extended in the next releases.
 	onFinish := make(chan error, 1)
-	err := p.apiDispatcher.Add(apicalls.Implementations.PodStatusPatch(pod, condition, nominatingInfo), fwk.APICallOptions{
+	err := p.apiDispatcher.Add(apicalls.Implementations.PodStatusPatch(pod, conditions, nominatingInfo), fwk.APICallOptions{
 		OnFinish: onFinish,
 	})
 	if fwk.IsUnexpectedError(err) {
