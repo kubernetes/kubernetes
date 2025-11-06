@@ -267,14 +267,6 @@ type ActualStateOfWorldAttacherUpdater interface {
 	// Marks the specified volume as detached from the specified node
 	MarkVolumeAsDetached(volumeName v1.UniqueVolumeName, nodeName types.NodeName)
 
-	// Marks desire to detach the specified volume (remove the volume from the node's
-	// volumesToReportAsAttached list)
-	RemoveVolumeFromReportAsAttached(volumeName v1.UniqueVolumeName, nodeName types.NodeName) error
-
-	// Unmarks the desire to detach for the specified volume (add the volume back to
-	// the node's volumesToReportAsAttached list)
-	AddVolumeToReportAsAttached(logger klog.Logger, volumeName v1.UniqueVolumeName, nodeName types.NodeName)
-
 	// InitializeClaimSize sets pvc claim size by reading pvc.Status.Capacity
 	InitializeClaimSize(logger klog.Logger, volumeName v1.UniqueVolumeName, claimSize resource.Quantity)
 
