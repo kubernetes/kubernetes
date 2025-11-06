@@ -2858,7 +2858,7 @@
   file: test/e2e/common/node/security_context.go
 - testname: Sysctls, reject invalid sysctls
   codename: '[sig-node] Sysctls [LinuxOnly] [NodeConformance] should reject invalid
-    sysctls [MinimumKubeletVersion:1.21] [Conformance]'
+    sysctls [Conformance]'
   description: 'Pod is created with one valid and two invalid sysctls. Pod should
     not apply invalid sysctls. [LinuxOnly]: This test is marked as LinuxOnly since
     Windows does not support sysctls'
@@ -2866,7 +2866,7 @@
   file: test/e2e/common/node/sysctl.go
 - testname: Sysctl, test sysctls
   codename: '[sig-node] Sysctls [LinuxOnly] [NodeConformance] should support sysctls
-    [MinimumKubeletVersion:1.21] [Environment:NotInUserNS] [Conformance]'
+    [Environment:NotInUserNS] [Conformance]'
   description: 'Pod is created with kernel.shm_rmid_forced sysctl. Kernel.shm_rmid_forced
     must be set to 1 [LinuxOnly]: This test is marked as LinuxOnly since Windows does
     not support sysctls [Environment:NotInUserNS]: The test fails in UserNS (as expected):
