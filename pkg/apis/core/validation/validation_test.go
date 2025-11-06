@@ -14543,6 +14543,21 @@ func TestValidatePodUpdate(t *testing.T) {
 			),
 			err:  "pod updates may not change fields other than",
 			test: "memory limit change with pod-level resources",
+		}, {
+			new: *podtest.MakePod("pod",
+				podtest.SetWorkloadRef(&core.WorkloadReference{
+					Name:     "w",
+					PodGroup: "pg",
+				}),
+			),
+			old: *podtest.MakePod("pod",
+				podtest.SetWorkloadRef(&core.WorkloadReference{
+					Name:     "w2",
+					PodGroup: "pg",
+				}),
+			),
+			err:  "pod updates may not change fields other than",
+			test: "updated workloadRef",
 		},
 	}
 
@@ -22952,6 +22967,7 @@ func TestValidateOSFields(t *testing.T) {
 		"Overhead",
 		"Tolerations",
 		"TopologySpreadConstraints",
+		"WorkloadRef",
 	)
 
 	expect := sets.NewString().Union(osSpecificFields).Union(osNeutralFields)
@@ -29671,6 +29687,76 @@ func TestValidateNodeDeclaredFeatures(t *testing.T) {
 					t.Errorf("Unexpected error: %v", errs)
 				}
 			})
+		}
+	}
+}
+
+func TestValidateWorkloadReference(t *testing.T) {
+	successCases := map[string]*core.Pod{
+		"correct": podtest.MakePod("", podtest.SetWorkloadRef(&core.WorkloadReference{
+			Name:               "workload",
+			PodGroup:           "group",
+			PodGroupReplicaKey: "replica",
+		})),
+		"no replica key": podtest.MakePod("", podtest.SetWorkloadRef(&core.WorkloadReference{
+			Name:               "workload",
+			PodGroup:           "group",
+			PodGroupReplicaKey: "",
+		})),
+	}
+	for name, pod := range successCases {
+		errs := ValidatePodSpec(&pod.Spec, &pod.ObjectMeta, field.NewPath("field"), PodValidationOptions{})
+		if len(errs) != 0 {
+			t.Errorf("Expected success for %q: %v", name, errs)
+		}
+	}
+
+	failureCases := map[string]*core.Pod{
+		"empty workload name": podtest.MakePod("", podtest.SetWorkloadRef(&core.WorkloadReference{
+			Name:               "",
+			PodGroup:           "group",
+			PodGroupReplicaKey: "replica",
+		})),
+		"incorrect workload name": podtest.MakePod("", podtest.SetWorkloadRef(&core.WorkloadReference{
+			Name:               ".workload",
+			PodGroup:           "group",
+			PodGroupReplicaKey: "replica",
+		})),
+		"too long workload name": podtest.MakePod("", podtest.SetWorkloadRef(&core.WorkloadReference{
+			Name:               strings.Repeat("w", 254),
+			PodGroup:           "group",
+			PodGroupReplicaKey: "replica",
+		})),
+		"empty pod group": podtest.MakePod("", podtest.SetWorkloadRef(&core.WorkloadReference{
+			Name:               "workload",
+			PodGroup:           "",
+			PodGroupReplicaKey: "replica",
+		})),
+		"incorrect pod group": podtest.MakePod("", podtest.SetWorkloadRef(&core.WorkloadReference{
+			Name:               "workload",
+			PodGroup:           ".group",
+			PodGroupReplicaKey: "replica",
+		})),
+		"too long pod group": podtest.MakePod("", podtest.SetWorkloadRef(&core.WorkloadReference{
+			Name:               "workload",
+			PodGroup:           strings.Repeat("g", 64),
+			PodGroupReplicaKey: "replica",
+		})),
+		"incorrect replica key": podtest.MakePod("", podtest.SetWorkloadRef(&core.WorkloadReference{
+			Name:               "workload",
+			PodGroup:           "group",
+			PodGroupReplicaKey: ".replica",
+		})),
+		"too long replica key": podtest.MakePod("", podtest.SetWorkloadRef(&core.WorkloadReference{
+			Name:               "workload",
+			PodGroup:           "group",
+			PodGroupReplicaKey: strings.Repeat("r", 64),
+		})),
+	}
+	for name, pod := range failureCases {
+		errs := ValidatePodSpec(&pod.Spec, &pod.ObjectMeta, field.NewPath("field"), PodValidationOptions{})
+		if len(errs) == 0 {
+			t.Errorf("Expected failure for %q", name)
 		}
 	}
 }

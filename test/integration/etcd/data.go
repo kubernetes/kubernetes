@@ -515,6 +515,15 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 		},
 		// --
 
+		// k8s.io/kubernetes/pkg/apis/scheduling/v1alpha1
+		gvr("scheduling.k8s.io", "v1alpha1", "workloads"): {
+			Stub:              `{"metadata": {"name": "w1"}, "spec": {"podGroups": [{"name": "group1", "policy": {"basic": {}}}]}}`,
+			ExpectedEtcdPath:  "/registry/workloads/" + namespace + "/w1",
+			IntroducedVersion: "1.35",
+			RemovedVersion:    "1.41",
+		},
+		// --
+
 		// k8s.io/kube-aggregator/pkg/apis/apiregistration/v1
 		// depends on aggregator using the same ungrouped RESTOptionsGetter as the kube apiserver, not SimpleRestOptionsFactory in aggregator.go
 		gvr("apiregistration.k8s.io", "v1", "apiservices"): {
