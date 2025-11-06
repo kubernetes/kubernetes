@@ -90,7 +90,7 @@ func TestQuota(t *testing.T) {
 
 	discoveryFunc := clientset.Discovery().ServerPreferredNamespacedResources
 	listerFuncForResource := generic.ListerFuncForResourceFunc(informers.ForResource)
-	qc := quotainstall.NewQuotaConfigurationForControllers(listerFuncForResource)
+	qc := quotainstall.NewQuotaConfigurationForControllers(listerFuncForResource, nil)
 	informersStarted := make(chan struct{})
 	resourceQuotaControllerOptions := &resourcequotacontroller.ControllerOptions{
 		QuotaClient:               clientset.CoreV1(),
@@ -319,7 +319,7 @@ plugins:
 
 	discoveryFunc := clientset.Discovery().ServerPreferredNamespacedResources
 	listerFuncForResource := generic.ListerFuncForResourceFunc(informers.ForResource)
-	qc := quotainstall.NewQuotaConfigurationForControllers(listerFuncForResource)
+	qc := quotainstall.NewQuotaConfigurationForControllers(listerFuncForResource, nil)
 	informersStarted := make(chan struct{})
 	resourceQuotaControllerOptions := &resourcequotacontroller.ControllerOptions{
 		QuotaClient:               clientset.CoreV1(),
@@ -445,7 +445,7 @@ plugins:
 
 	discoveryFunc := clientset.Discovery().ServerPreferredNamespacedResources
 	listerFuncForResource := generic.ListerFuncForResourceFunc(informers.ForResource)
-	qc := quotainstall.NewQuotaConfigurationForControllers(listerFuncForResource)
+	qc := quotainstall.NewQuotaConfigurationForControllers(listerFuncForResource, nil)
 	informersStarted := make(chan struct{})
 	resourceQuotaControllerOptions := &resourcequotacontroller.ControllerOptions{
 		QuotaClient:               clientset.CoreV1(),
