@@ -388,6 +388,12 @@ const (
 	// Enables the image volume source.
 	ImageVolume featuregate.Feature = "ImageVolume"
 
+	// owner: @ndixita
+	// kep: https://kep.k8s.io/5419
+	//
+	// Enables specifying resources at pod-level.
+	InPlacePodLevelResourcesVerticalScaling featuregate.Feature = "InPlacePodLevelResourcesVerticalScaling"
+
 	// owner: @vinaykul,@tallclair
 	// kep: http://kep.k8s.io/1287
 	//
@@ -1348,6 +1354,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Beta},
 	},
 
+	InPlacePodLevelResourcesVerticalScaling: {
+		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	InPlacePodVerticalScaling: {
 		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
@@ -2230,6 +2240,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	ImageMaximumGCAge: {},
 
 	ImageVolume: {},
+
+	InPlacePodLevelResourcesVerticalScaling: {InPlacePodVerticalScaling, PodLevelResources},
 
 	InPlacePodVerticalScaling: {},
 
