@@ -36,6 +36,7 @@ import (
 	typedv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	ipprfeature "k8s.io/component-helpers/nodedeclaredfeatures/features/inplacepodresize"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	rbachelper "k8s.io/kubernetes/pkg/apis/rbac/v1"
 	"k8s.io/kubernetes/pkg/features"
@@ -1497,5 +1498,144 @@ func TestRelaxedDNSSearchValidation(t *testing.T) {
 		if tc.valid {
 			integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
 		}
+	}
+}
+
+func TestNodeDeclaredFeatureAdmission(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.NodeDeclaredFeatures:      true,
+		features.InPlacePodVerticalScaling: true,
+	})
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	defer server.TearDownFn()
+	client := clientset.NewForConfigOrDie(server.ClientConfig)
+	ns := framework.CreateNamespaceOrDie(client, "pod-resize-feature-admission", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+	nodeName := "test-node"
+	testPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: "test-pod-",
+		},
+		Spec: v1.PodSpec{
+			NodeName: nodeName,
+			Containers: []v1.Container{
+				{
+					Name:  "test-container",
+					Image: "fakeimage",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("1Gi")},
+						Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("1Gi")},
+					},
+				},
+			},
+			RestartPolicy: v1.RestartPolicyAlways,
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodRunning,
+			ContainerStatuses: []v1.ContainerStatus{
+				{
+					Name:  "test-container",
+					Ready: true,
+					AllocatedResources: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("1"),
+						v1.ResourceMemory: resource.MustParse("1Gi"),
+					},
+				},
+			},
+		},
+	}
+
+	testCases := []struct {
+		name                 string
+		nodeDeclaredFeatures []string
+		nodeVersion          string
+		podUpdateFn          func(pod *v1.Pod)
+		expectError          string
+	}{
+		{
+			name:                 "admission fails when required feature is not declared on node",
+			nodeDeclaredFeatures: []string{"SomeOtherFeature"},
+			nodeVersion:          "1.35.0",
+			podUpdateFn: func(pod *v1.Pod) {
+				pod.Spec.Containers[0].Resources.Requests[v1.ResourceCPU] = resource.MustParse("2")
+				pod.Spec.Containers[0].Resources.Limits[v1.ResourceCPU] = resource.MustParse("2")
+			},
+			expectError: "pod update requires features GuaranteedQoSPodCPUResize which are not available on node",
+		},
+
+		{
+			name:                 "admission succeeds when required feature is declared on node",
+			nodeDeclaredFeatures: []string{ipprfeature.GuaranteedQoSPodCPUResize},
+			nodeVersion:          "1.35.0",
+			podUpdateFn: func(pod *v1.Pod) {
+				pod.Spec.Containers[0].Resources.Requests[v1.ResourceCPU] = resource.MustParse("2")
+				pod.Spec.Containers[0].Resources.Limits[v1.ResourceCPU] = resource.MustParse("2")
+			},
+			expectError: "",
+		},
+
+		{
+			name:                 "admission succeeds when pod update does not require any declared feature",
+			nodeDeclaredFeatures: []string{"SomeOtherFeature"},
+			nodeVersion:          "1.35.0",
+			podUpdateFn: func(pod *v1.Pod) {
+				pod.ObjectMeta.Labels = map[string]string{"foo": "bar"}
+			},
+			expectError: "",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+
+			node := &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: nodeName,
+				},
+				Status: v1.NodeStatus{
+					NodeInfo:         v1.NodeSystemInfo{KubeletVersion: tc.nodeVersion},
+					DeclaredFeatures: tc.nodeDeclaredFeatures,
+				},
+			}
+			_, err := client.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("Failed to create node: %v", err)
+			}
+			defer func() {
+				err := client.CoreV1().Nodes().Delete(context.TODO(), nodeName, metav1.DeleteOptions{})
+				if err != nil {
+					t.Fatalf("Failed to delete Node %v", err)
+				}
+			}()
+
+			createdPod, err := client.CoreV1().Pods(ns.Name).Create(context.TODO(), testPod, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("Failed to create pod: %v", err)
+			}
+			defer func() {
+				err := client.CoreV1().Pods(ns.Name).Delete(context.TODO(), createdPod.Name, metav1.DeleteOptions{})
+				if err != nil {
+					t.Fatalf("Failed to delete Node %v", err)
+				}
+			}()
+
+			podToUpdate := createdPod.DeepCopy()
+			tc.podUpdateFn(podToUpdate)
+
+			_, err = client.CoreV1().Pods(ns.Name).UpdateResize(context.TODO(), podToUpdate.Name, podToUpdate, metav1.UpdateOptions{})
+
+			if tc.expectError == "" {
+				if err != nil {
+					t.Errorf("Expected no error, but got: %v", err)
+				}
+			} else {
+				if err == nil {
+					t.Errorf("Expected error containing %q, but got no error", tc.expectError)
+				} else if !strings.Contains(err.Error(), tc.expectError) {
+					t.Errorf("Expected error containing %q, but got: %v", tc.expectError, err)
+				}
+			}
+		})
 	}
 }

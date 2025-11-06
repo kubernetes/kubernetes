@@ -1101,6 +1101,12 @@
     lockToDefault: true
     preRelease: GA
     version: "1.33"
+- name: NodeDeclaredFeatures
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.35"
 - name: NodeInclusionPolicyInPodTopologySpread
   versionedSpecs:
   - default: false

@@ -24,6 +24,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	"github.com/stretchr/testify/mock"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -33,6 +34,9 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
+	ndffeatures "k8s.io/component-helpers/nodedeclaredfeatures/features"
+	ndftesting "k8s.io/component-helpers/nodedeclaredfeatures/testing"
 	"k8s.io/component-helpers/storage/volume"
 	"k8s.io/kubernetes/pkg/features"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -2929,6 +2933,129 @@ func TestNodeAffinityFilter(t *testing.T) {
 					podUnschedulable(cs, testPod.Namespace, testPod.Name))
 				if err != nil {
 					t.Errorf("Test Failed: Expected pod %s/%s to be unschedulable but got error: %v", testPod.Namespace, testPod.Name, err)
+				}
+			}
+		})
+	}
+}
+
+func TestNodeDeclaredFeaturesFilter(t *testing.T) {
+	// Helper to create a pod that requires the feature.
+	podRequiringFeatureA := st.MakePod().Name("pod-req-feature-a").
+		UID("pod-req-feature").
+		Containers([]v1.Container{{Name: "container-req-feature-a", Image: imageutils.GetPauseImageName()}}).Obj()
+
+	// Helper to create a pod that does NOT require the feature.
+	podWithoutRequirement := st.MakePod().Name("pod-no-req").UID("pod-no-req").
+		Containers([]v1.Container{{Name: "container-no-req", Image: imageutils.GetPauseImageName()}}).
+		Obj()
+
+	nodeWithFeatureA := st.MakeNode().Name("node-with-feature-a").DeclaredFeatures([]string{"FeatureA"}).Obj()
+
+	nodeWithFeatureB := st.MakeNode().Name("node-with-feature-b").DeclaredFeatures([]string{"FeatureB"}).Obj()
+	nodeWithFeatureB.Status.DeclaredFeatures = []string{"FeatureB"}
+
+	nodeWithoutFeatures := st.MakeNode().Name("node-without-features").Obj()
+	nodeWithoutFeatures.Status.DeclaredFeatures = []string{}
+
+	nodeWithMultipleFeatures := st.MakeNode().Name("node-with-multiple-features").DeclaredFeatures([]string{"FeatureA", "FeatureB"}).Obj()
+
+	mockFeature := ndftesting.NewMockFeature(t)
+	mockFeature.EXPECT().Name().Return("FeatureA").Maybe()
+	mockFeature.EXPECT().InferForScheduling(mock.Anything).RunAndReturn(func(podInfo *ndf.PodInfo) bool {
+		return podInfo.Spec.Containers[0].Name == "container-req-feature-a"
+	})
+	mockFeature.EXPECT().MaxVersion().Return(nil).Maybe()
+	mockFeature.EXPECT().InferForUpdate(mock.Anything, mock.Anything).Return(false).Maybe()
+	mockFeature.EXPECT().Discover(mock.Anything).Return(false).Maybe()
+
+	tests := []struct {
+		name           string
+		pod            *v1.Pod
+		nodes          []*v1.Node
+		featureEnabled bool
+		expectedNode   string
+	}{
+		{
+			name:           "Feature gate disabled",
+			pod:            podRequiringFeatureA.DeepCopy(),
+			nodes:          []*v1.Node{nodeWithoutFeatures},
+			featureEnabled: false,
+			expectedNode:   "node-without-features",
+		},
+		{
+			name:           "pod without feature requirement schedulable on node without features",
+			pod:            podWithoutRequirement.DeepCopy(),
+			nodes:          []*v1.Node{nodeWithoutFeatures},
+			featureEnabled: true,
+			expectedNode:   "node-without-features",
+		},
+		{
+			name:           "pod without feature requirement schedulable on node with features",
+			pod:            podWithoutRequirement.DeepCopy(),
+			nodes:          []*v1.Node{nodeWithFeatureA},
+			featureEnabled: true,
+			expectedNode:   "node-with-feature-a",
+		},
+		{
+			name:           "pod with feature requirement schedulable on node with the feature",
+			pod:            podRequiringFeatureA.DeepCopy(),
+			nodes:          []*v1.Node{nodeWithFeatureA, nodeWithFeatureB},
+			featureEnabled: true,
+			expectedNode:   "node-with-feature-a",
+		},
+		{
+			name:           "pod with feature requirement not schedulable on node without features",
+			pod:            podRequiringFeatureA.DeepCopy(),
+			nodes:          []*v1.Node{nodeWithFeatureB},
+			featureEnabled: true,
+			expectedNode:   "",
+		},
+		{
+			name:           "pod with feature requirement schedulable on node with multiple features",
+			pod:            podRequiringFeatureA.DeepCopy(),
+			nodes:          []*v1.Node{nodeWithMultipleFeatures, nodeWithoutFeatures},
+			featureEnabled: true,
+			expectedNode:   "node-with-multiple-features",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, tt.featureEnabled)
+			if tt.featureEnabled {
+				originalAllFeatures := ndffeatures.AllFeatures
+				ndffeatures.AllFeatures = []ndf.Feature{mockFeature}
+				defer func() {
+					ndffeatures.AllFeatures = originalAllFeatures
+				}()
+			}
+			testCtx := testutils.InitTestSchedulerWithNS(t, "node-features-filter")
+			cs := testCtx.ClientSet
+			ns := testCtx.NS.Name
+			for _, node := range tt.nodes {
+				if _, err := testutils.CreateNode(testCtx.ClientSet, node); err != nil {
+					t.Fatalf("Failed to create node %v: %v", node.Name, err)
+				}
+			}
+			// Ensure nodes are present in scheduler cache.
+			if err := testutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, len(tt.nodes)); err != nil {
+				t.Fatalf("Failed to wait for nodes in cache: %v", err)
+			}
+
+			tt.pod.Namespace = ns
+			if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, tt.pod, metav1.CreateOptions{}); err != nil {
+				t.Fatalf("Failed to create pod %v: %v", tt.pod.Name, err)
+			}
+			if tt.expectedNode != "" {
+				err := wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false, testutils.PodScheduledIn(cs, tt.pod.Namespace, tt.pod.Name, []string{tt.expectedNode}))
+				if err != nil {
+					t.Errorf("Expected pod to be scheduled, but it was not: %v", err)
+				}
+			} else {
+				err := wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false, testutils.PodUnschedulable(cs, tt.pod.Namespace, tt.pod.Name))
+				if err != nil {
+					t.Errorf("Expected pod to be unschedulable, but it was not: %v", err)
 				}
 			}
 		})

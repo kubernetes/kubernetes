@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/mock"
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -33,6 +34,9 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
+	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
+	ndffeatures "k8s.io/component-helpers/nodedeclaredfeatures/features"
+	ndftesting "k8s.io/component-helpers/nodedeclaredfeatures/testing"
 	"k8s.io/component-helpers/storage/volume"
 	configv1 "k8s.io/kube-scheduler/config/v1"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -92,6 +96,8 @@ type CoreResourceEnqueueTestCase struct {
 	// EnabledRAExtendedResource indicates wether the test case should run with feature gate
 	// DRAExtendedResource enabled or not.
 	EnableDRAExtendedResource bool
+	// EnableNodeDeclaredFeatures indicates if the test case runs with the NodeDeclaredFeatures feature gate enabled.
+	EnableNodeDeclaredFeatures bool
 }
 
 var (
@@ -2470,6 +2476,111 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		WantRequeuedPods:          sets.New("pod1"),
 		EnableSchedulingQueueHint: sets.New(true),
 	},
+	{
+		Name:                       "pod becomes schedulable after node update with required feature",
+		EnableNodeDeclaredFeatures: true,
+		EnableSchedulingQueueHint:  sets.New(true),
+		EnablePlugins:              []string{names.NodeDeclaredFeatures},
+		InitialNodes: []*v1.Node{
+			st.MakeNode().Name("node-1").Obj(),
+		},
+		Pods: []*v1.Pod{
+			st.MakePod().Name("pod1").Container("pause").Tolerations([]v1.Toleration{{Key: "featureA", Effect: v1.TaintEffectNoExecute, TolerationSeconds: ptr.To(int64(200))}}).Obj(),
+		},
+		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+			node, err := testCtx.ClientSet.CoreV1().Nodes().Get(testCtx.Ctx, "node-1", metav1.GetOptions{})
+			if err != nil {
+				return nil, err
+			}
+			updatedNode := node.DeepCopy()
+			updatedNode.Status.DeclaredFeatures = []string{"FeatureA"}
+			if _, err := testCtx.ClientSet.CoreV1().Nodes().UpdateStatus(testCtx.Ctx, updatedNode, metav1.UpdateOptions{}); err != nil {
+				return nil, fmt.Errorf("failed to update node status: %w", err)
+			}
+			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.UpdateNodeDeclaredFeature}: 1}, nil
+		},
+		WantRequeuedPods: sets.New("pod1"),
+	},
+	{
+		Name:                       "pod remains unschedulable after node update that does not update declared features",
+		EnableNodeDeclaredFeatures: true,
+		EnableSchedulingQueueHint:  sets.New(true),
+		EnablePlugins:              []string{names.NodeDeclaredFeatures},
+		InitialNodes: []*v1.Node{
+			st.MakeNode().Name("node-1").Obj(),
+		},
+		Pods: []*v1.Pod{
+			st.MakePod().Name("pod1").Container("pause").Tolerations([]v1.Toleration{{Key: "featureA", Effect: v1.TaintEffectNoExecute, TolerationSeconds: ptr.To(int64(200))}}).Obj(),
+		},
+		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+			node, err := testCtx.ClientSet.CoreV1().Nodes().Get(testCtx.Ctx, "node-1", metav1.GetOptions{})
+			if err != nil {
+				return nil, err
+			}
+			updatedNode := node.DeepCopy()
+			if updatedNode.Labels == nil {
+				updatedNode.Labels = make(map[string]string)
+			}
+			updatedNode.Labels["foo"] = "bar"
+			if _, err := testCtx.ClientSet.CoreV1().Nodes().Update(testCtx.Ctx, updatedNode, metav1.UpdateOptions{}); err != nil {
+				return nil, fmt.Errorf("failed to update node status: %w", err)
+			}
+			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.UpdateNodeDeclaredFeature}: 0}, nil
+		},
+		WantRequeuedPods: sets.Set[string]{},
+	},
+	{
+		Name:                       "pod becomes schedulable after pod update that removes feature requirement",
+		EnableNodeDeclaredFeatures: true,
+		EnableSchedulingQueueHint:  sets.New(true),
+		EnablePlugins:              []string{names.NodeDeclaredFeatures},
+		InitialNodes: []*v1.Node{
+			st.MakeNode().Name("node-1").Obj(),
+		},
+		Pods: []*v1.Pod{
+			st.MakePod().Name("pod1").Container("pause").Tolerations([]v1.Toleration{{Key: "featureA", Effect: v1.TaintEffectNoExecute, TolerationSeconds: ptr.To(int64(200))}}).Obj(),
+		},
+		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+			pod, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Get(testCtx.Ctx, "pod1", metav1.GetOptions{})
+			if err != nil {
+				return nil, err
+			}
+			updatedPod := pod.DeepCopy()
+			// Modify toleration so that we no longer require the feature.
+			updatedPod.Spec.Tolerations[0].TolerationSeconds = ptr.To(int64(0))
+			if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Update(testCtx.Ctx, updatedPod, metav1.UpdateOptions{}); err != nil {
+				return nil, err
+			}
+			return map[fwk.ClusterEvent]uint64{{Resource: unschedulablePod, ActionType: fwk.Update}: 1}, nil
+		},
+		WantRequeuedPods: sets.New("pod1"),
+	},
+	{
+		Name:                       "pod remains unschedulable after pod update that does not remove feature requirement",
+		EnableNodeDeclaredFeatures: true,
+		EnableSchedulingQueueHint:  sets.New(true),
+		EnablePlugins:              []string{names.NodeDeclaredFeatures},
+		InitialNodes: []*v1.Node{
+			st.MakeNode().Name("node-1").Obj(),
+		},
+		Pods: []*v1.Pod{
+			st.MakePod().Name("pod1").Container("pause").Tolerations([]v1.Toleration{{Key: "featureA", Effect: v1.TaintEffectNoExecute, TolerationSeconds: ptr.To(int64(200))}}).Obj(),
+		},
+		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+			pod, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Get(testCtx.Ctx, "pod1", metav1.GetOptions{})
+			if err != nil {
+				return nil, err
+			}
+			updatedPod := pod.DeepCopy()
+			updatedPod.Labels = make(map[string]string)
+			updatedPod.Labels["foo"] = "bar"
+			if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Update(testCtx.Ctx, updatedPod, metav1.UpdateOptions{}); err != nil {
+				return nil, err
+			}
+			return map[fwk.ClusterEvent]uint64{{Resource: unschedulablePod, ActionType: fwk.Update}: 1}, nil
+		},
+		WantRequeuedPods: sets.Set[string]{},
+	},
 }
 
 // TestCoreResourceEnqueue verify Pods failed by in-tree default plugins can be
@@ -2480,6 +2591,24 @@ func RunTestCoreResourceEnqueue(t *testing.T, tt *CoreResourceEnqueueTestCase) {
 	if tt.EnableDRAExtendedResource {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, true)
 	}
+	if tt.EnableNodeDeclaredFeatures {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
+
+		mockFeature := ndftesting.NewMockFeature(t)
+		mockFeature.EXPECT().Name().Return("FeatureA").Maybe()
+		mockFeature.EXPECT().InferForScheduling(mock.Anything).RunAndReturn(func(podInfo *ndf.PodInfo) bool {
+			return len(podInfo.Spec.Tolerations) > 0 && podInfo.Spec.Tolerations[0].TolerationSeconds != nil &&
+				*podInfo.Spec.Tolerations[0].TolerationSeconds > 0
+		})
+		mockFeature.EXPECT().MaxVersion().Return(nil).Maybe()
+
+		originalAllFeatures := ndffeatures.AllFeatures
+		ndffeatures.AllFeatures = []ndf.Feature{mockFeature}
+		defer func() {
+			ndffeatures.AllFeatures = originalAllFeatures
+		}()
+	}
+
 	logger, _ := ktesting.NewTestContext(t)
 
 	opts := []scheduler.Option{scheduler.WithPodInitialBackoffSeconds(0), scheduler.WithPodMaxBackoffSeconds(0)}

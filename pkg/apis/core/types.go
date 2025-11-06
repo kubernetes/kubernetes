@@ -5595,6 +5595,10 @@ type NodeStatus struct {
 	// +featureGate=SupplementalGroupsPolicy
 	// +optional
 	Features *NodeFeatures
+	// DeclaredFeatures represents the declared features of a node.
+	// +featureGate=NodeDeclaredFeatures
+	// +optional
+	DeclaredFeatures []string
 }
 
 // UniqueVolumeName defines the name of attached volume

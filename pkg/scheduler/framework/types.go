@@ -33,6 +33,7 @@ import (
 	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/api/resource"
+	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
 	resourcehelper "k8s.io/component-helpers/resource"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
@@ -196,6 +197,9 @@ type NodeInfo struct {
 	// Whenever NodeInfo changes, generation is bumped.
 	// This is used to avoid cloning it if the object didn't change.
 	Generation int64
+
+	// DeclaredFeatures is a set of features published by the node
+	DeclaredFeatures ndf.FeatureSet
 }
 
 func (n *NodeInfo) GetPods() []fwk.PodInfo {
@@ -236,6 +240,11 @@ func (n *NodeInfo) GetPVCRefCounts() map[string]int {
 
 func (n *NodeInfo) GetGeneration() int64 {
 	return n.Generation
+}
+
+// GetNodeDeclaredFeatures returns the declared feature set of the node
+func (n *NodeInfo) GetNodeDeclaredFeatures() ndf.FeatureSet {
+	return n.DeclaredFeatures
 }
 
 // NodeInfo implements KMetadata, so for example klog.KObjSlice(nodes) works
@@ -284,6 +293,7 @@ func (n *NodeInfo) SnapshotConcrete() *NodeInfo {
 		ImageStates:      make(map[string]*fwk.ImageStateSummary),
 		PVCRefCounts:     make(map[string]int),
 		Generation:       n.Generation,
+		DeclaredFeatures: n.DeclaredFeatures.Clone(),
 	}
 	if len(n.Pods) > 0 {
 		clone.Pods = append([]fwk.PodInfo(nil), n.Pods...)
@@ -460,6 +470,9 @@ func (n *NodeInfo) updatePVCRefCounts(pod *v1.Pod, add bool) {
 func (n *NodeInfo) SetNode(node *v1.Node) {
 	n.node = node
 	n.Allocatable = NewResource(node.Status.Allocatable)
+	if utilfeature.DefaultFeatureGate.Enabled(features.NodeDeclaredFeatures) {
+		n.DeclaredFeatures = ndf.NewFeatureSet(node.Status.DeclaredFeatures...)
+	}
 	n.Generation = nextGeneration()
 }
 

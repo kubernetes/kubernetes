@@ -2983,6 +2983,12 @@ message NodeStatus {
   // +featureGate=SupplementalGroupsPolicy
   // +optional
   optional NodeFeatures features = 13;
+
+  // DeclaredFeatures represents the features related to feature gates that are declared by the node.
+  // +featureGate=NodeDeclaredFeatures
+  // +optional
+  // +listType=atomic
+  repeated string declaredFeatures = 14;
 }
 
 // NodeSwapStatus represents swap memory information.

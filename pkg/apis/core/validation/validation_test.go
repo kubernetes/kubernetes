@@ -43,6 +43,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	ndf "k8s.io/component-helpers/nodedeclaredfeatures/features"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
 	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
 	"k8s.io/kubernetes/pkg/apis/core"
@@ -29526,5 +29527,142 @@ func TestValidateContainerStateTransition(t *testing.T) {
 				t.Errorf("Unexpected error(s): %v", errs)
 			}
 		})
+	}
+}
+
+func TestAllRegistedNodeDeclaredFeatures(t *testing.T) {
+	// Test that feature registry is valid.
+	for _, feature := range ndf.AllFeatures {
+		if err := validateNodeDeclaredFeatureName(feature.Name()); err != nil {
+			t.Fatalf("ValidateFeatures() = %v, want nil", err)
+		}
+	}
+	// Soft limit to catch potential uncontrolled growth of node registered features.
+	const maxNodeDeclaredFeatures = 128
+	if len(ndf.AllFeatures) > maxNodeDeclaredFeatures {
+		t.Errorf("Number of registered node declared features (%d) exceeds the limit of %d. Please review if this is expected and update the threshold if necessary.", len(ndf.AllFeatures), maxNodeDeclaredFeatures)
+	}
+}
+
+func TestValidateNodeDeclaredFeatures(t *testing.T) {
+	makeNode := func(declaredFeatures []string) *core.Node {
+		node := makeNode("test-node", nil)
+		node.Status.DeclaredFeatures = declaredFeatures
+		node.ObjectMeta.ResourceVersion = "1"
+		return &node
+	}
+	testCases := []struct {
+		name             string
+		declaredFeatures []string
+		expectErr        bool
+		expectedErrType  field.ErrorType
+		expectedErrPath  string
+		expectedErrMsg   string
+	}{
+		{
+			name:             "empty feature list",
+			declaredFeatures: []string{},
+			expectErr:        false,
+		},
+		{
+			name:             "valid features",
+			declaredFeatures: []string{"AnotherFeature", "MyFeature", "MyFeature/SubFeature"},
+			expectErr:        false,
+		},
+		{
+			name:             "duplicate feature names",
+			declaredFeatures: []string{"MyFeature", "MyFeature"},
+			expectErr:        true,
+			expectedErrType:  field.ErrorTypeDuplicate,
+			expectedErrPath:  "status.declaredFeatures[1]",
+			expectedErrMsg:   "Duplicate value",
+		},
+		{
+			name:             "unsorted feature names",
+			declaredFeatures: []string{"MyFeature", "AnotherFeature"},
+			expectErr:        true,
+			expectedErrType:  field.ErrorTypeInvalid,
+			expectedErrPath:  "status.declaredFeatures[1]",
+			expectedErrMsg:   "list must be sorted alphabetically",
+		},
+		{
+			name:             "mixed valid and invalid",
+			declaredFeatures: []string{"AnotherFeature", "invalid", "MyFeature"},
+			expectErr:        true,
+		},
+		{
+			name:             "invalid feature name format",
+			declaredFeatures: []string{"myFeature"},
+			expectErr:        true,
+			expectedErrType:  field.ErrorTypeInvalid,
+			expectedErrPath:  "status.declaredFeatures[0]",
+			expectedErrMsg:   "invalid feature name",
+		},
+		{
+			name:             "invalid feature name - kebab-case",
+			declaredFeatures: []string{"Feature-name"},
+			expectErr:        true,
+			expectedErrType:  field.ErrorTypeInvalid,
+			expectedErrPath:  "status.declaredFeatures[0]",
+			expectedErrMsg:   "invalid feature name",
+		},
+		{
+			name:             "invalid feature name - ends with slash",
+			declaredFeatures: []string{"FeatureA/"},
+			expectErr:        true,
+			expectedErrType:  field.ErrorTypeInvalid,
+			expectedErrPath:  "status.declaredFeatures[0]",
+			expectedErrMsg:   "invalid feature name",
+		},
+		{
+			name:             "invalid feature name - name too long",
+			declaredFeatures: []string{"F" + strings.Repeat("e", validation.DNS1123SubdomainMaxLength)},
+			expectErr:        true,
+			expectedErrType:  field.ErrorTypeInvalid,
+			expectedErrPath:  "status.declaredFeatures[0]",
+			expectedErrMsg:   "invalid feature name",
+		},
+	}
+
+	for _, tc := range testCases {
+		for _, op := range []string{"create", "update"} {
+			t.Run(strings.Join([]string{tc.name, op}, "-"), func(t *testing.T) {
+				var errs field.ErrorList
+				if op == "create" {
+					errs = ValidateNode(makeNode(tc.declaredFeatures))
+				} else {
+					errs = ValidateNodeUpdate(makeNode(tc.declaredFeatures), makeNode([]string{}))
+				}
+				if tc.expectErr {
+					if len(errs) == 0 {
+						t.Errorf("Expected error but got none")
+					} else {
+						found := false
+						for _, err := range errs {
+							t.Logf("DEBUG: tc.expectedErrType: %v err.Type:%v err.Field :%v  tc.expectedErrPath:%v", tc.expectedErrType, err.Type, err.Field, tc.expectedErrPath)
+							t.Logf("DEBUG: err.Type == tc.expectedErrType:%v err.Field == tc.expectedErrPath:%v", err.Type == tc.expectedErrType, err.Field == tc.expectedErrPath)
+							t.Logf("DEBUG: tc.expectedErrMsg: %v err.Error() :%v contains:%v", tc.expectedErrMsg, err.Error(), strings.Contains(err.Error(), tc.expectedErrMsg))
+							if tc.expectedErrType != "" && err.Type == tc.expectedErrType && err.Field == tc.expectedErrPath {
+								if tc.expectedErrMsg != "" && strings.Contains(err.Error(), tc.expectedErrMsg) {
+									found = true
+									break
+								} else if tc.expectedErrMsg == "" {
+									found = true
+									break
+								}
+							} else if tc.expectedErrType == "" {
+								found = true
+								break
+							}
+						}
+						if !found && tc.expectErr {
+							t.Errorf("Expected error with type `%s` on field `%s` containing `%q` but got `%v`", tc.expectedErrType, tc.expectedErrPath, tc.expectedErrMsg, errs)
+						}
+					}
+				} else if len(errs) > 0 {
+					t.Errorf("Unexpected error: %v", errs)
+				}
+			})
+		}
 	}
 }
