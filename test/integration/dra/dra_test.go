@@ -237,6 +237,7 @@ func TestDRA(t *testing.T) {
 				tCtx.Run("MaxResourceSlice", testMaxResourceSlice)
 				tCtx.Run("EvictClusterWithRule", func(tCtx ktesting.TContext) { testEvictCluster(tCtx, true) })
 				tCtx.Run("EvictClusterWithSlices", func(tCtx ktesting.TContext) { testEvictCluster(tCtx, false) })
+				tCtx.Run("InvalidResourceSlices", testInvalidResourceSlices)
 			},
 		},
 	} {
@@ -1774,4 +1775,127 @@ func testDeviceBindingConditions(tCtx ktesting.TContext, enabled bool) {
 	})
 	tCtx.ExpectNoError(err, "add binding condition to second claim")
 	waitForPodScheduled(tCtx, namespace, pod.Name)
+}
+
+func testInvalidResourceSlices(tCtx ktesting.TContext) {
+	driverNamePlaceholder := "driver"
+	startScheduler(tCtx)
+	testCases := map[string]struct {
+		slices                        []*st.ResourceSliceWrapper
+		expectPodToSchedule           bool
+		expectedPodScheduledCondition gstruct.Fields
+		expectedPool                  string
+	}{
+		"invalid-one-node-and-valid-other": {
+			slices: []*st.ResourceSliceWrapper{
+				func() *st.ResourceSliceWrapper {
+					invalidPoolSlice := st.MakeResourceSlice("worker-0", driverNamePlaceholder).Devices("device-1")
+					invalidPoolSlice.Name += "-1"
+					invalidPoolSlice.Spec.Pool.ResourceSliceCount = 2
+					return invalidPoolSlice
+				}(),
+				func() *st.ResourceSliceWrapper {
+					invalidPoolSlice := st.MakeResourceSlice("worker-0", driverNamePlaceholder).Devices("device-1")
+					invalidPoolSlice.Name += "-2"
+					invalidPoolSlice.Spec.Pool.ResourceSliceCount = 2
+					return invalidPoolSlice
+				}(),
+				func() *st.ResourceSliceWrapper {
+					validPoolSlice := st.MakeResourceSlice("worker-1", driverNamePlaceholder).Devices("device-1")
+					return validPoolSlice
+				}(),
+			},
+			expectPodToSchedule: true,
+			expectedPodScheduledCondition: gstruct.Fields{
+				"Type":   gomega.Equal(v1.PodScheduled),
+				"Status": gomega.Equal(v1.ConditionTrue),
+			},
+			expectedPool: "worker-1",
+		},
+		"only-invalid-for-one-node": {
+			slices: []*st.ResourceSliceWrapper{
+				func() *st.ResourceSliceWrapper {
+					invalidPoolSlice := st.MakeResourceSlice("worker-0", driverNamePlaceholder).Devices("device-1")
+					invalidPoolSlice.Name += "-1"
+					invalidPoolSlice.Spec.Pool.ResourceSliceCount = 2
+					return invalidPoolSlice
+				}(),
+				func() *st.ResourceSliceWrapper {
+					invalidPoolSlice := st.MakeResourceSlice("worker-0", driverNamePlaceholder).Devices("device-1")
+					invalidPoolSlice.Name += "-2"
+					invalidPoolSlice.Spec.Pool.ResourceSliceCount = 2
+					return invalidPoolSlice
+				}(),
+			},
+			expectPodToSchedule: false,
+			expectedPodScheduledCondition: gstruct.Fields{
+				"Type":    gomega.Equal(v1.PodScheduled),
+				"Status":  gomega.Equal(v1.ConditionFalse),
+				"Message": gomega.Equal("0/8 nodes are available: 1 invalid resource pools were encountered, 7 cannot allocate all claims. still not schedulable, preemption: 0/8 nodes are available: 8 Preemption is not helpful for scheduling."),
+			},
+		},
+		"invalid-for-all-nodes": {
+			slices: func() []*st.ResourceSliceWrapper {
+				var slices []*st.ResourceSliceWrapper
+				for i := 0; i < 8; i++ {
+					nodeName := fmt.Sprintf("worker-%d", i)
+					invalidPoolSlice1 := st.MakeResourceSlice(nodeName, driverNamePlaceholder).Devices("device-1")
+					invalidPoolSlice1.Name += "-1"
+					invalidPoolSlice1.Spec.Pool.ResourceSliceCount = 2
+
+					invalidPoolSlice2 := st.MakeResourceSlice(nodeName, driverNamePlaceholder).Devices("device-1")
+					invalidPoolSlice2.Name += "-2"
+					invalidPoolSlice2.Spec.Pool.ResourceSliceCount = 2
+					slices = append(slices, invalidPoolSlice1, invalidPoolSlice2)
+				}
+				return slices
+			}(),
+			expectPodToSchedule: false,
+			expectedPodScheduledCondition: gstruct.Fields{
+				"Type":    gomega.Equal(v1.PodScheduled),
+				"Status":  gomega.Equal(v1.ConditionFalse),
+				"Message": gomega.Equal("0/8 nodes are available: 8 invalid resource pools were encountered. still not schedulable, preemption: 0/8 nodes are available: 8 Preemption is not helpful for scheduling."),
+			},
+		},
+	}
+
+	for tn, tc := range testCases {
+		tCtx.Run(tn, func(tCtx ktesting.TContext) {
+			namespace := createTestNamespace(tCtx, nil)
+			class, driverName := createTestClass(tCtx, namespace)
+			for _, slice := range tc.slices {
+				// update the driver since we don't know the actual name until the
+				// class is created.
+				slice.Spec.Driver = driverName
+				createSlice(tCtx, slice.Obj())
+			}
+
+			claim := createClaim(tCtx, namespace, "", class, claim)
+			pod := createPod(tCtx, namespace, "", podWithClaimName, claim)
+			schedulingAttempted := gomega.HaveField("Status.Conditions", gomega.ContainElement(
+				gstruct.MatchFields(gstruct.IgnoreExtras, tc.expectedPodScheduledCondition),
+			))
+			ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) *v1.Pod {
+				pod, err := tCtx.Client().CoreV1().Pods(namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
+				tCtx.ExpectNoError(err, "get pod")
+				return pod
+			}).WithTimeout(10 * time.Second).WithPolling(time.Second).Should(schedulingAttempted)
+
+			// Only check the ResourceClaim if we expected the Pod to schedule.
+			if tc.expectPodToSchedule {
+				ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) *resourceapi.ResourceClaim {
+					c, err := tCtx.Client().ResourceV1().ResourceClaims(namespace).Get(tCtx, claim.Name, metav1.GetOptions{})
+					tCtx.ExpectNoError(err)
+					return c
+				}).WithTimeout(10 * time.Second).WithPolling(time.Second).Should(gomega.HaveField("Status.Allocation", gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+					"Devices": gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+						"Results": gomega.HaveExactElements(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+							"Driver": gomega.Equal(driverName),
+							"Pool":   gomega.Equal(tc.expectedPool),
+						})),
+					}),
+				}))))
+			}
+		})
+	}
 }

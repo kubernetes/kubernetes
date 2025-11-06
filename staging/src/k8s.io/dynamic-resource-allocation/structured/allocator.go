@@ -34,6 +34,20 @@ import (
 	"k8s.io/dynamic-resource-allocation/structured/schedulerapi"
 )
 
+// ErrFailedAllocationOnNode is the base error for errors returned by Allocate
+// which, in contrast to other errors, only affect the one node and not
+// the entire scheduling attempt.
+//
+// The scheduler is expected to check for this with
+//
+//	errors.Is(err, structured.ErrFailedAllocation)
+//
+// and then use the error string as explanation for
+// the unscheduable status.
+//
+// It has no text of its own and can be used with fmt.Errorf("%wsome other error", ErrFailedAllocationOnNode).
+var ErrFailedAllocationOnNode = internal.ErrFailedAllocationOnNode
+
 // To keep the code in different packages simple, type aliases are used everywhere.
 // Functions are wrappers instead of variables to enable compiler optimization.
 // The Allocator interface is defined twice intentionally: that way, the docs
