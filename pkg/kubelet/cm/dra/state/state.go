@@ -96,4 +96,9 @@ type DeviceHealth struct {
 
 	// LastUpdated keeps track of the last health status update of this device.
 	LastUpdated time.Time
+
+	// HealthCheckTimeout is the timeout for the health check of the device.
+	// Zero value means use the default timeout (DefaultHealthTimeout).
+	// This ensures backward compatibility with existing data.
+	HealthCheckTimeout time.Duration
 }

@@ -931,11 +931,29 @@ func (m *Manager) HandleWatchResourcesStream(ctx context.Context, stream draheal
 			default:
 				health = state.DeviceHealthStatusUnknown
 			}
+
+			// Extract the health check timeout from the gRPC response
+			// If not specified, zero, or negative, use the default timeout
+			timeout := DefaultHealthTimeout
+			timeoutSeconds := d.GetHealthCheckTimeoutSeconds()
+			if timeoutSeconds > 0 {
+				timeout = time.Duration(timeoutSeconds) * time.Second
+			} else if timeoutSeconds < 0 {
+				// Log warning for negative timeout values and use default
+				logger.V(4).Info("Ignoring negative health check timeout, using default",
+					"pluginName", pluginName,
+					"poolName", d.GetDevice().GetPoolName(),
+					"deviceName", d.GetDevice().GetDeviceName(),
+					"providedTimeout", timeoutSeconds,
+					"defaultTimeout", DefaultHealthTimeout)
+			}
+
 			devices[i] = state.DeviceHealth{
-				PoolName:    d.GetDevice().GetPoolName(),
-				DeviceName:  d.GetDevice().GetDeviceName(),
-				Health:      health,
-				LastUpdated: time.Unix(d.GetLastUpdatedTime(), 0),
+				PoolName:           d.GetDevice().GetPoolName(),
+				DeviceName:         d.GetDevice().GetDeviceName(),
+				Health:             health,
+				LastUpdated:        time.Unix(d.GetLastUpdatedTime(), 0),
+				HealthCheckTimeout: timeout,
 			}
 		}
 
