@@ -51,11 +51,12 @@ type DriverState struct {
 }
 
 // Device is how a DRA driver described an allocated device in a claim
-// to kubelet. RequestName and CDI device IDs are optional.
+// to kubelet. RequestName, ShareID, and CDI device IDs are optional.
 // +k8s:deepcopy-gen=true
 type Device struct {
 	PoolName     string
 	DeviceName   string
+	ShareID      *types.UID
 	RequestNames []string
 	CDIDeviceIDs []string
 }

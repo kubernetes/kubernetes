@@ -199,6 +199,10 @@ type Device struct {
 	// Each ID must be of the form "<vendor ID>/<class>=<unique name>".
 	// May be empty.
 	CDIDeviceIDs []string
+
+	// ShareID identifes the device share.
+	// May be empty.
+	ShareID *types.UID
 }
 
 // Option implements the functional options pattern for Start.
@@ -870,6 +874,7 @@ func (d *nodePluginImplementation) NodePrepareResources(ctx context.Context, req
 				PoolName:     result.PoolName,
 				DeviceName:   result.DeviceName,
 				CdiDeviceIds: result.CDIDeviceIDs,
+				ShareId:      (*string)(result.ShareID),
 			}
 			devices = append(devices, device)
 		}

@@ -2744,10 +2744,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			framework.ExpectNoError(err)
 			gomega.Expect(scheduledPod).ToNot(gomega.BeNil())
 
-			var shareIDStr *string
-			if shareID := allocatedResourceClaim.Status.Allocation.Devices.Results[0].ShareID; shareID != nil {
-				shareIDStr = ptr.To(string(*shareID))
-			}
+			shareID := (*string)(allocatedResourceClaim.Status.Allocation.Devices.Results[0].ShareID)
 
 			ginkgo.By("Setting the device status a first time")
 			allocatedResourceClaim.Status.Devices = append(allocatedResourceClaim.Status.Devices,
@@ -2755,7 +2752,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 					Driver:     allocatedResourceClaim.Status.Allocation.Devices.Results[0].Driver,
 					Pool:       allocatedResourceClaim.Status.Allocation.Devices.Results[0].Pool,
 					Device:     allocatedResourceClaim.Status.Allocation.Devices.Results[0].Device,
-					ShareID:    shareIDStr,
+					ShareID:    shareID,
 					Conditions: []metav1.Condition{{Type: "a", Status: "True", Message: "c", Reason: "d", LastTransitionTime: metav1.NewTime(time.Now().Truncate(time.Second))}},
 					Data:       &runtime.RawExtension{Raw: []byte(`{"foo":"bar"}`)},
 					NetworkData: &resourceapi.NetworkDeviceData{
@@ -2780,7 +2777,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 				Driver:     allocatedResourceClaim.Status.Allocation.Devices.Results[0].Driver,
 				Pool:       allocatedResourceClaim.Status.Allocation.Devices.Results[0].Pool,
 				Device:     allocatedResourceClaim.Status.Allocation.Devices.Results[0].Device,
-				ShareID:    shareIDStr,
+				ShareID:    shareID,
 				Conditions: []metav1.Condition{{Type: "e", Status: "True", Message: "g", Reason: "h", LastTransitionTime: metav1.NewTime(time.Now().Truncate(time.Second))}},
 				Data:       &runtime.RawExtension{Raw: []byte(`{"bar":"foo"}`)},
 				NetworkData: &resourceapi.NetworkDeviceData{

@@ -1644,14 +1644,10 @@ func addStatusAllocationDevicesResults(resourceClaim *resource.ResourceClaim, dr
 }
 
 func addStatusDevices(resourceClaim *resource.ResourceClaim, driver string, pool string, device string, shareID *types.UID) {
-	var shareIDStr *string
-	if shareID != nil {
-		shareIDStr = ptr.To(string(*shareID))
-	}
 	resourceClaim.Status.Devices = append(resourceClaim.Status.Devices, resource.AllocatedDeviceStatus{
 		Driver:  driver,
 		Pool:    pool,
 		Device:  device,
-		ShareID: shareIDStr,
+		ShareID: (*string)(shareID),
 	})
 }

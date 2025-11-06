@@ -48,7 +48,7 @@ import (
 	"k8s.io/klog/v2"
 
 	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
-	drapb "k8s.io/kubelet/pkg/apis/dra/v1beta1"
+	drapb "k8s.io/kubelet/pkg/apis/dra/v1"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/resourceupdates"
@@ -59,6 +59,11 @@ const (
 	driverClassName = "test"
 	podName         = "test-pod"
 	containerName   = "test-container"
+)
+
+var (
+	shareID  = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+	shareUID = types.UID(shareID)
 )
 
 type fakeDRADriverGRPCServer struct {
@@ -533,6 +538,24 @@ func genClaimInfoStateWithExtendedResource(cdiDeviceID string) state.ClaimInfoSt
 	return s
 }
 
+func genClaimInfoStateWithShareID(cdiDeviceID string) state.ClaimInfoState {
+	s := state.ClaimInfoState{
+		ClaimUID:  claimUID,
+		ClaimName: claimName,
+		Namespace: namespace,
+		PodUIDs:   sets.New[string](podUID),
+		DriverState: map[string]state.DriverState{
+			driverName: {},
+		},
+	}
+	if cdiDeviceID != "" {
+		s.DriverState[driverName] = state.DriverState{Devices: []state.Device{
+			{PoolName: poolName, DeviceName: deviceName, ShareID: &shareUID, RequestNames: []string{requestName}, CDIDeviceIDs: []string{cdiDeviceID}},
+		}}
+	}
+	return s
+}
+
 func TestGetResources(t *testing.T) {
 	kubeClient := fake.NewSimpleClientset()
 
@@ -616,6 +639,7 @@ func TestPrepareResources(t *testing.T) {
 	claimName := claimName
 	fakeKubeClient := fake.NewSimpleClientset()
 	anotherClaimUID := types.UID("another-claim-uid")
+	shareUID := types.UID(shareID)
 
 	for _, test := range []struct {
 		description         string
@@ -782,6 +806,31 @@ func TestPrepareResources(t *testing.T) {
 			claimInfo:      genTestClaimInfo(anotherClaimUID, []string{podUID}, false),
 			expectedErrMsg: fmt.Sprintf("old ResourceClaim with same name %s and different UID %s still exists", claimName, anotherClaimUID),
 		},
+		{
+			description: "should prepare resources with share id",
+			driverName:  driverName,
+			pod:         genTestPod(),
+			claim: func() *resourceapi.ResourceClaim {
+				claim := genTestClaim(claimName, driverName, deviceName, podUID)
+				claim.Status.Allocation.Devices.Results[0].ShareID = &shareUID
+				return claim
+			}(),
+			expectedClaimInfoState: genClaimInfoStateWithShareID(cdiID),
+			resp: &drapb.NodePrepareResourcesResponse{Claims: map[string]*drapb.NodePrepareResourceResponse{
+				string(claimUID): {
+					Devices: []*drapb.Device{
+						{
+							PoolName:     poolName,
+							DeviceName:   deviceName,
+							RequestNames: []string{requestName},
+							ShareId:      &shareID,
+							CdiDeviceIds: []string{cdiID},
+						},
+					},
+				},
+			}},
+			expectedPrepareCalls: 1,
+		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
 			backgroundCtx, cancel := context.WithCancel(context.Background())
@@ -824,6 +873,7 @@ func TestPrepareResources(t *testing.T) {
 			}
 
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAConsumableCapacity, true)
 			err = manager.PrepareResources(backgroundCtx, test.pod)
 
 			assert.Equal(t, test.expectedPrepareCalls, draServerInfo.server.prepareResourceCalls.Load())
