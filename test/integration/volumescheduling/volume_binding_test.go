@@ -186,92 +186,92 @@ func TestVolumeBinding(t *testing.T) {
 	}
 
 	for name, test := range cases {
-		klog.Infof("Running test %v", name)
-
-		// Create two StorageClasses
-		suffix := rand.String(4)
-		classes := map[string]*storagev1.StorageClass{}
-		classes[classImmediate] = makeStorageClass(fmt.Sprintf("immediate-%v", suffix), &modeImmediate)
-		classes[classWait] = makeStorageClass(fmt.Sprintf("wait-%v", suffix), &modeWait)
-		for _, sc := range classes {
-			if _, err := config.client.StorageV1().StorageClasses().Create(context.TODO(), sc, metav1.CreateOptions{}); err != nil {
-				t.Fatalf("Failed to create StorageClass %q: %v", sc.Name, err)
+		t.Run(name, func(t *testing.T) {
+			// Create two StorageClasses
+			suffix := rand.String(4)
+			classes := map[string]*storagev1.StorageClass{}
+			classes[classImmediate] = makeStorageClass(fmt.Sprintf("immediate-%v", suffix), &modeImmediate)
+			classes[classWait] = makeStorageClass(fmt.Sprintf("wait-%v", suffix), &modeWait)
+			for _, sc := range classes {
+				if _, err := config.client.StorageV1().StorageClasses().Create(context.TODO(), sc, metav1.CreateOptions{}); err != nil {
+					t.Fatalf("Failed to create StorageClass %q: %v", sc.Name, err)
+				}
 			}
-		}
 
-		// Create PVs
-		for _, pvConfig := range test.pvs {
-			pv := makePV(pvConfig.name, classes[pvConfig.scName].Name, pvConfig.preboundPVC, config.ns, pvConfig.node)
-			if _, err := config.client.CoreV1().PersistentVolumes().Create(context.TODO(), pv, metav1.CreateOptions{}); err != nil {
-				t.Fatalf("Failed to create PersistentVolume %q: %v", pv.Name, err)
+			// Create PVs
+			for _, pvConfig := range test.pvs {
+				pv := makePV(pvConfig.name, classes[pvConfig.scName].Name, pvConfig.preboundPVC, config.ns, pvConfig.node)
+				if _, err := config.client.CoreV1().PersistentVolumes().Create(context.TODO(), pv, metav1.CreateOptions{}); err != nil {
+					t.Fatalf("Failed to create PersistentVolume %q: %v", pv.Name, err)
+				}
 			}
-		}
 
-		for _, pvConfig := range test.unboundPvs {
-			pv := makePV(pvConfig.name, classes[pvConfig.scName].Name, pvConfig.preboundPVC, config.ns, pvConfig.node)
-			if _, err := config.client.CoreV1().PersistentVolumes().Create(context.TODO(), pv, metav1.CreateOptions{}); err != nil {
-				t.Fatalf("Failed to create PersistentVolume %q: %v", pv.Name, err)
+			for _, pvConfig := range test.unboundPvs {
+				pv := makePV(pvConfig.name, classes[pvConfig.scName].Name, pvConfig.preboundPVC, config.ns, pvConfig.node)
+				if _, err := config.client.CoreV1().PersistentVolumes().Create(context.TODO(), pv, metav1.CreateOptions{}); err != nil {
+					t.Fatalf("Failed to create PersistentVolume %q: %v", pv.Name, err)
+				}
 			}
-		}
 
-		// Wait for PVs to become available to avoid race condition in PV controller
-		// https://github.com/kubernetes/kubernetes/issues/85320
-		for _, pvConfig := range test.pvs {
-			if err := waitForPVPhase(config.client, pvConfig.name, v1.VolumeAvailable); err != nil {
-				t.Fatalf("PersistentVolume %q failed to become available: %v", pvConfig.name, err)
+			// Wait for PVs to become available to avoid race condition in PV controller
+			// https://github.com/kubernetes/kubernetes/issues/85320
+			for _, pvConfig := range test.pvs {
+				if err := waitForPVPhase(config.client, pvConfig.name, v1.VolumeAvailable); err != nil {
+					t.Fatalf("PersistentVolume %q failed to become available: %v", pvConfig.name, err)
+				}
 			}
-		}
 
-		for _, pvConfig := range test.unboundPvs {
-			if err := waitForPVPhase(config.client, pvConfig.name, v1.VolumeAvailable); err != nil {
-				t.Fatalf("PersistentVolume %q failed to become available: %v", pvConfig.name, err)
+			for _, pvConfig := range test.unboundPvs {
+				if err := waitForPVPhase(config.client, pvConfig.name, v1.VolumeAvailable); err != nil {
+					t.Fatalf("PersistentVolume %q failed to become available: %v", pvConfig.name, err)
+				}
 			}
-		}
 
-		// Create PVCs
-		for _, pvcConfig := range test.pvcs {
-			pvc := makePVC(pvcConfig.name, config.ns, &classes[pvcConfig.scName].Name, pvcConfig.preboundPV)
-			if _, err := config.client.CoreV1().PersistentVolumeClaims(config.ns).Create(context.TODO(), pvc, metav1.CreateOptions{}); err != nil {
-				t.Fatalf("Failed to create PersistentVolumeClaim %q: %v", pvc.Name, err)
+			// Create PVCs
+			for _, pvcConfig := range test.pvcs {
+				pvc := makePVC(pvcConfig.name, config.ns, &classes[pvcConfig.scName].Name, pvcConfig.preboundPV)
+				if _, err := config.client.CoreV1().PersistentVolumeClaims(config.ns).Create(context.TODO(), pvc, metav1.CreateOptions{}); err != nil {
+					t.Fatalf("Failed to create PersistentVolumeClaim %q: %v", pvc.Name, err)
+				}
 			}
-		}
-		for _, pvcConfig := range test.unboundPvcs {
-			pvc := makePVC(pvcConfig.name, config.ns, &classes[pvcConfig.scName].Name, pvcConfig.preboundPV)
-			if _, err := config.client.CoreV1().PersistentVolumeClaims(config.ns).Create(context.TODO(), pvc, metav1.CreateOptions{}); err != nil {
-				t.Fatalf("Failed to create PersistentVolumeClaim %q: %v", pvc.Name, err)
+			for _, pvcConfig := range test.unboundPvcs {
+				pvc := makePVC(pvcConfig.name, config.ns, &classes[pvcConfig.scName].Name, pvcConfig.preboundPV)
+				if _, err := config.client.CoreV1().PersistentVolumeClaims(config.ns).Create(context.TODO(), pvc, metav1.CreateOptions{}); err != nil {
+					t.Fatalf("Failed to create PersistentVolumeClaim %q: %v", pvc.Name, err)
+				}
 			}
-		}
 
-		// Create Pod
-		if _, err := config.client.CoreV1().Pods(config.ns).Create(context.TODO(), test.pod, metav1.CreateOptions{}); err != nil {
-			t.Fatalf("Failed to create Pod %q: %v", test.pod.Name, err)
-		}
-		if test.shouldFail {
-			if err := waitForPodUnschedulable(config.client, test.pod); err != nil {
-				t.Errorf("Pod %q was not unschedulable: %v", test.pod.Name, err)
+			// Create Pod
+			if _, err := config.client.CoreV1().Pods(config.ns).Create(context.TODO(), test.pod, metav1.CreateOptions{}); err != nil {
+				t.Fatalf("Failed to create Pod %q: %v", test.pod.Name, err)
 			}
-		} else {
-			if err := waitForPodToSchedule(config.client, test.pod); err != nil {
-				t.Errorf("Failed to schedule Pod %q: %v", test.pod.Name, err)
+			if test.shouldFail {
+				if err := waitForPodUnschedulable(config.client, test.pod); err != nil {
+					t.Errorf("Pod %q was not unschedulable: %v", test.pod.Name, err)
+				}
+			} else {
+				if err := waitForPodToSchedule(config.client, test.pod); err != nil {
+					t.Errorf("Failed to schedule Pod %q: %v", test.pod.Name, err)
+				}
 			}
-		}
 
-		// Validate PVC/PV binding
-		for _, pvc := range test.pvcs {
-			validatePVCPhase(t, config.client, pvc.name, config.ns, v1.ClaimBound, false)
-		}
-		for _, pvc := range test.unboundPvcs {
-			validatePVCPhase(t, config.client, pvc.name, config.ns, v1.ClaimPending, false)
-		}
-		for _, pv := range test.pvs {
-			validatePVPhase(t, config.client, pv.name, v1.VolumeBound)
-		}
-		for _, pv := range test.unboundPvs {
-			validatePVPhase(t, config.client, pv.name, v1.VolumeAvailable)
-		}
+			// Validate PVC/PV binding
+			for _, pvc := range test.pvcs {
+				validatePVCPhase(t, config.client, pvc.name, config.ns, v1.ClaimBound, false)
+			}
+			for _, pvc := range test.unboundPvcs {
+				validatePVCPhase(t, config.client, pvc.name, config.ns, v1.ClaimPending, false)
+			}
+			for _, pv := range test.pvs {
+				validatePVPhase(t, config.client, pv.name, v1.VolumeBound)
+			}
+			for _, pv := range test.unboundPvs {
+				validatePVPhase(t, config.client, pv.name, v1.VolumeAvailable)
+			}
 
-		// Force delete objects, but they still may not be immediately removed
-		deleteTestObjects(config.client, config.ns, deleteOption)
+			// Force delete objects, but they still may not be immediately removed
+			deleteTestObjects(config.client, config.ns, deleteOption)
+		})
 	}
 }
 
@@ -340,57 +340,57 @@ func TestVolumeBindingRescheduling(t *testing.T) {
 	}
 
 	for name, test := range cases {
-		klog.Infof("Running test %v", name)
-
-		if test.pod == nil {
-			t.Fatal("pod is required for this test")
-		}
-
-		// Create unbound pvc
-		for _, pvcConfig := range test.pvcs {
-			pvc := makePVC(pvcConfig.name, config.ns, &storageClassName, "")
-			if _, err := config.client.CoreV1().PersistentVolumeClaims(config.ns).Create(context.TODO(), pvc, metav1.CreateOptions{}); err != nil {
-				t.Fatalf("Failed to create PersistentVolumeClaim %q: %v", pvc.Name, err)
+		t.Run(name, func(t *testing.T) {
+			if test.pod == nil {
+				t.Fatal("pod is required for this test")
 			}
-		}
 
-		// Create PVs
-		for _, pvConfig := range test.pvs {
-			pv := makePV(pvConfig.name, sharedClasses[pvConfig.scName].Name, pvConfig.preboundPVC, config.ns, pvConfig.node)
-			if _, err := config.client.CoreV1().PersistentVolumes().Create(context.TODO(), pv, metav1.CreateOptions{}); err != nil {
-				t.Fatalf("Failed to create PersistentVolume %q: %v", pv.Name, err)
+			// Create unbound pvc
+			for _, pvcConfig := range test.pvcs {
+				pvc := makePVC(pvcConfig.name, config.ns, &storageClassName, "")
+				if _, err := config.client.CoreV1().PersistentVolumeClaims(config.ns).Create(context.TODO(), pvc, metav1.CreateOptions{}); err != nil {
+					t.Fatalf("Failed to create PersistentVolumeClaim %q: %v", pvc.Name, err)
+				}
 			}
-		}
 
-		// Create pod
-		if _, err := config.client.CoreV1().Pods(config.ns).Create(context.TODO(), test.pod, metav1.CreateOptions{}); err != nil {
-			t.Fatalf("Failed to create Pod %q: %v", test.pod.Name, err)
-		}
-
-		// Wait for pod is unschedulable.
-		klog.Infof("Waiting for pod is unschedulable")
-		if err := waitForPodUnschedulable(config.client, test.pod); err != nil {
-			t.Errorf("Failed as Pod %s was not unschedulable: %v", test.pod.Name, err)
-		}
-
-		// Trigger
-		test.trigger(config)
-
-		// Wait for pod is scheduled or unschedulable.
-		if !test.shouldFail {
-			klog.Infof("Waiting for pod is scheduled")
-			if err := waitForPodToSchedule(config.client, test.pod); err != nil {
-				t.Errorf("Failed to schedule Pod %q: %v", test.pod.Name, err)
+			// Create PVs
+			for _, pvConfig := range test.pvs {
+				pv := makePV(pvConfig.name, sharedClasses[pvConfig.scName].Name, pvConfig.preboundPVC, config.ns, pvConfig.node)
+				if _, err := config.client.CoreV1().PersistentVolumes().Create(context.TODO(), pv, metav1.CreateOptions{}); err != nil {
+					t.Fatalf("Failed to create PersistentVolume %q: %v", pv.Name, err)
+				}
 			}
-		} else {
+
+			// Create pod
+			if _, err := config.client.CoreV1().Pods(config.ns).Create(context.TODO(), test.pod, metav1.CreateOptions{}); err != nil {
+				t.Fatalf("Failed to create Pod %q: %v", test.pod.Name, err)
+			}
+
+			// Wait for pod is unschedulable.
 			klog.Infof("Waiting for pod is unschedulable")
 			if err := waitForPodUnschedulable(config.client, test.pod); err != nil {
 				t.Errorf("Failed as Pod %s was not unschedulable: %v", test.pod.Name, err)
 			}
-		}
 
-		// Force delete objects, but they still may not be immediately removed
-		deleteTestObjects(config.client, config.ns, deleteOption)
+			// Trigger
+			test.trigger(config)
+
+			// Wait for pod is scheduled or unschedulable.
+			if !test.shouldFail {
+				klog.Infof("Waiting for pod is scheduled")
+				if err := waitForPodToSchedule(config.client, test.pod); err != nil {
+					t.Errorf("Failed to schedule Pod %q: %v", test.pod.Name, err)
+				}
+			} else {
+				klog.Infof("Waiting for pod is unschedulable")
+				if err := waitForPodUnschedulable(config.client, test.pod); err != nil {
+					t.Errorf("Failed as Pod %s was not unschedulable: %v", test.pod.Name, err)
+				}
+			}
+
+			// Force delete objects, but they still may not be immediately removed
+			deleteTestObjects(config.client, config.ns, deleteOption)
+		})
 	}
 }
 
@@ -1285,6 +1285,7 @@ func makeNode(index int) *v1.Node {
 }
 
 func validatePVCPhase(t *testing.T, client clientset.Interface, pvcName string, ns string, phase v1.PersistentVolumeClaimPhase, isProvisioned bool) {
+	t.Helper()
 	claim, err := client.CoreV1().PersistentVolumeClaims(ns).Get(context.TODO(), pvcName, metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("Failed to get PVC %v/%v: %v", ns, pvcName, err)
