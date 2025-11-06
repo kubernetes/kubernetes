@@ -122,7 +122,7 @@ type introducedInterface interface {
 	APILifecycleIntroduced() (major, minor int)
 }
 
-func emulatedStorageVersion(binaryVersionOfResource schema.GroupVersion, example runtime.Object, effectiveVersion version.EffectiveVersion, scheme *runtime.Scheme) (schema.GroupVersion, error) {
+func emulatedStorageVersion(binaryVersionOfResource schema.GroupVersion, example runtime.Object, effectiveVersion basecompatibility.EffectiveVersion, scheme *runtime.Scheme) (schema.GroupVersion, error) {
 	if example == nil || effectiveVersion == nil {
 		return binaryVersionOfResource, nil
 	}
