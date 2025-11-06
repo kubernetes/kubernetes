@@ -32,9 +32,8 @@ import (
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
+	"k8s.io/utils/ptr"
 )
-
-var falseVar = false
 
 var _ = SIGDescribe("DefaultProcMount [LinuxOnly]", framework.WithNodeConformance(), func() {
 	f := framework.NewDefaultFramework("proc-mount-default-test")
@@ -49,7 +48,7 @@ var _ = SIGDescribe("ProcMount [LinuxOnly]", feature.ProcMountType, feature.User
 	f := framework.NewDefaultFramework("proc-mount-baseline-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
-	f.It("will fail to unmask proc mounts if not privileged", func(ctx context.Context) {
+	f.It("will fail to unmask proc mounts if not in user namespace", func(ctx context.Context) {
 		if !supportsUserNS(ctx, f) {
 			e2eskipper.Skipf("runtime does not support user namespaces")
 		}
@@ -69,18 +68,11 @@ var _ = SIGDescribe("ProcMount [LinuxOnly]", feature.ProcMountType, feature.User
 						},
 					},
 				},
-				HostUsers: &falseVar,
+				HostUsers: ptr.To(true),
 			},
 		}, metav1.CreateOptions{})
 		gomega.Expect(err).To(gomega.HaveOccurred())
 	})
-})
-
-var _ = SIGDescribe("ProcMount [LinuxOnly]", feature.ProcMountType, feature.UserNamespacesSupport, func() {
-	f := framework.NewDefaultFramework("proc-mount-privileged-test")
-
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
-
 	f.It("will unmask proc mounts if requested", func(ctx context.Context) {
 		if !supportsUserNS(ctx, f) {
 			e2eskipper.Skipf("runtime does not support user namespaces")
