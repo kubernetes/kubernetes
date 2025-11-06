@@ -1,10 +1,31 @@
+/*
+Copyright 2025 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package dynamicresources
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"sort"
+	"time"
+
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/scheduler/metrics"
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
@@ -19,9 +40,40 @@ import (
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
+	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
 	"k8s.io/kubernetes/pkg/util/slice"
 	"k8s.io/utils/ptr"
 )
+
+// Extended Resources Backed by DRA - Scheduler Plugin Workflow by each extension points
+//
+// PreFilter - preFilterExtendedResources()
+// - for pods using extended resources, find existing claim or create in-memory claim with temporary name "<extended-resources>"
+// - the in-memory claim is used to track and allocate resources, claim object is created in PreBind extension point.
+// - store the claim in stateData for Filter extension point
+//
+// Filter - filterExtendedResources()
+// - if stale claim with Spec is identified, return Unschedulable for PostFilter extension point to cleanup
+// - check which resources satisfied by device plugin vs need DRA
+// - if extended resources need to be allocated through DRA, create node-specific claim
+//
+// PostFilter
+// - if extended resource claim has real name (not "<extended-resources>"):
+//   - it's stale from prior cycle -> delete it -> trigger retry
+//
+// Reserve
+// - Store allocation results from Filter in stateData
+// - Mark the claim as "allocation in-flight" via SignalClaimPendingAllocation()
+//
+// Unreserve
+// - Remove claim from in-flight allocations and restore assume cache
+// - Delete claim from API server if it has real name
+//
+// PreBind - bindClaim()
+// - For "<extended-resources>" claims: create in API server and update stateData
+// - Update claim status: add finalizer, allocation, and pod reservation
+// - Store in assume cache (poll for extended resource claims)
+// - Update pod.Status.ExtendedResourceClaimStatus with request mappings
 
 const (
 	// specialClaimInMemName is the name of the special resource claim that
@@ -123,40 +175,41 @@ func (pl *DynamicResources) preFilterExtendedResources(pod *v1.Pod, logger klog.
 	// - Kick off deallocation in the background.
 	// - Mark the pod as unschedulable. Successful deallocation will make it schedulable again.
 	extendedResourceClaim := findExtendedResourceClaim(pod, resourceClaims)
-	if extendedResourceClaim == nil {
-		// Create one special claim for all extended resources backed by DRA in the Pod.
-		// Create the ResourceClaim with pod as owner, with a generated name that uses
-		// <pod name>-extended-resources- as base. The final name will get truncated if it
-		// would be too long.
-		extendedResourceClaim = &resourceapi.ResourceClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: pod.Namespace,
-				Name:      specialClaimInMemName,
-				// fake temporary UID for use in SignalClaimPendingAllocation
-				UID:          types.UID(uuid.NewUUID()),
-				GenerateName: pod.Name + "-extended-resources-",
-				OwnerReferences: []metav1.OwnerReference{
-					{
-						APIVersion: "v1",
-						Kind:       "Pod",
-						Name:       pod.Name,
-						UID:        pod.UID,
-						Controller: ptr.To(true),
-					},
-				},
-				Annotations: map[string]string{
-					resourceapi.ExtendedResourceClaimAnnotation: "true",
+	if extendedResourceClaim != nil {
+		return extendedResourceClaim, nil
+	}
+	// Create one special claim for all extended resources backed by DRA in the Pod.
+	// Create the ResourceClaim with pod as owner, with a generated name that uses
+	// <pod name>-extended-resources- as base. The final name will get truncated if it
+	// would be too long.
+	return &resourceapi.ResourceClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: pod.Namespace,
+			Name:      specialClaimInMemName,
+			// fake temporary UID for use in SignalClaimPendingAllocation
+			UID:          types.UID(uuid.NewUUID()),
+			GenerateName: pod.Name + "-extended-resources-",
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "v1",
+					Kind:       "Pod",
+					Name:       pod.Name,
+					UID:        pod.UID,
+					Controller: ptr.To(true),
 				},
 			},
-			Spec: resourceapi.ResourceClaimSpec{},
-		}
-	}
-	return extendedResourceClaim, nil
+			Annotations: map[string]string{
+				resourceapi.ExtendedResourceClaimAnnotation: "true",
+			},
+		},
+		Spec: resourceapi.ResourceClaimSpec{},
+	}, nil
 }
 
 // filterExtendedResources computes the special claim's Requests based on the
-// node's Allocatable. It returns the special claim updated to match what needs
-// to be allocated through DRA for the node or nil if nothing needs to be allocated.
+// node's Allocatable. It returns:
+// - nil if nothing needs to be allocated, all the extended resources are satisfied by device plugin, or
+// - the special claim updated to match what needs to be allocated through DRA for the node
 //
 // It returns an error when the pod's extended resource requests cannot be allocated
 // from node's Allocatable, nor matching any device class's explicit or implicit
@@ -360,7 +413,17 @@ func createRequestsAndMappings(pod *v1.Pod, extendedResources map[v1.ResourceNam
 	// all mappings across all containers and resource types
 	var mappings []v1.ContainerExtendedResourceRequest
 
+	// Sort resource names to ensure deterministic ordering of device requests and mappings.
+	// Maps have non-deterministic iteration order in Go, so we extract and sort the keys.
+	resourceNames := make([]v1.ResourceName, 0, len(extendedResources))
 	for resource := range extendedResources {
+		resourceNames = append(resourceNames, resource)
+	}
+	sort.Slice(resourceNames, func(i, j int) bool {
+		return resourceNames[i] < resourceNames[j]
+	})
+
+	for _, resource := range resourceNames {
 		class := deviceClassMapping.GetDeviceClass(resource)
 		// skip if the resource does not map to a device class
 		if class == nil {
@@ -427,4 +490,127 @@ func createRequestsAndMappings(pod *v1.Pod, extendedResources map[v1.ResourceNam
 		return deviceRequests[i].Name < deviceRequests[j].Name
 	})
 	return deviceRequests, mappings
+}
+
+// waitForExtendedClaimInAssumeCache polls the assume cache until the extended resource claim
+// becomes visible. This is necessary because extended resource claims are created in the API
+// server, and the informer update may not have reached the assume cache yet.
+//
+// AssumeClaimAfterAPICall returns ErrNotFound when the informer update hasn't arrived,
+// so we poll with a timeout.
+func (pl *DynamicResources) waitForExtendedClaimInAssumeCache(
+	ctx context.Context,
+	logger klog.Logger,
+	claim *resourceapi.ResourceClaim,
+) {
+	pollErr := wait.PollUntilContextTimeout(
+		ctx,
+		1*time.Second,
+		time.Duration(AssumeExtendedResourceTimeoutDefaultSeconds)*time.Second,
+		true,
+		func(ctx context.Context) (bool, error) {
+			if err := pl.draManager.ResourceClaims().AssumeClaimAfterAPICall(claim); err != nil {
+				if errors.Is(err, assumecache.ErrNotFound) {
+					return false, nil
+				}
+				logger.V(5).Info("Claim not stored in assume cache", "claim", klog.KObj(claim), "err", err)
+				return false, err
+			}
+			return true, nil
+		},
+	)
+
+	if pollErr != nil {
+		logger.V(5).Info("Claim not stored in assume cache after retries", "claim", klog.KObj(claim), "err", pollErr)
+		// Note: We log but don't fail - the claim was created successfully
+	}
+}
+
+// createExtendedResourceClaimInAPI creates an extended resource claim in the API server.
+func (pl *DynamicResources) createExtendedResourceClaimInAPI(
+	ctx context.Context,
+	logger klog.Logger,
+	pod *v1.Pod,
+	nodeName string,
+	state *stateData,
+) (*resourceapi.ResourceClaim, error) {
+	logger.V(5).Info("preparing to create claim for extended resources", "pod", klog.KObj(pod), "node", nodeName)
+	// Get the node-specific claim that was prepared during Filter phase
+	nodeAllocation, ok := state.nodeAllocations[nodeName]
+	if !ok || nodeAllocation.extendedResourceClaim == nil {
+		return nil, fmt.Errorf("extended resource claim not found for node %s", nodeName)
+	}
+	claim := nodeAllocation.extendedResourceClaim.DeepCopy()
+
+	logger.V(5).Info("create claim for extended resources", "pod", klog.KObj(pod), "node", nodeName, "resourceclaim", klog.Format(claim))
+	// Clear fields which must or can not be set during creation.
+	claim.Status.Allocation = nil
+	claim.Name = ""
+	claim.UID = ""
+
+	createdClaim, err := pl.clientset.ResourceV1().ResourceClaims(claim.Namespace).Create(ctx, claim, metav1.CreateOptions{})
+	if err != nil {
+		metrics.ResourceClaimCreatesTotal.WithLabelValues("failure").Inc()
+		return nil, fmt.Errorf("create claim for extended resources %v: %w", klog.KObj(claim), err)
+	}
+	metrics.ResourceClaimCreatesTotal.WithLabelValues("success").Inc()
+	logger.V(5).Info("created claim for extended resources", "pod", klog.KObj(pod), "node", nodeName, "resourceclaim", klog.Format(createdClaim))
+
+	return createdClaim, nil
+}
+
+// patchPodExtendedResourceClaimStatus updates the pod's status with information about
+// the extended resource claim.
+func (pl *DynamicResources) patchPodExtendedResourceClaimStatus(
+	ctx context.Context,
+	pod *v1.Pod,
+	claim *resourceapi.ResourceClaim,
+	nodeName string,
+	state *stateData,
+) error {
+	var cer []v1.ContainerExtendedResourceRequest
+	if nodeAllocation, ok := state.nodeAllocations[nodeName]; ok {
+		cer = nodeAllocation.containerResourceRequestMappings
+	}
+	if len(cer) == 0 {
+		return fmt.Errorf("nil or empty request mappings, no update of pod %s/%s ExtendedResourceClaimStatus", pod.Namespace, pod.Name)
+	}
+
+	podStatusCopy := pod.Status.DeepCopy()
+	podStatusCopy.ExtendedResourceClaimStatus = &v1.PodExtendedResourceClaimStatus{
+		RequestMappings:   cer,
+		ResourceClaimName: claim.Name,
+	}
+	err := schedutil.PatchPodStatus(ctx, pl.clientset, pod.Name, pod.Namespace, &pod.Status, podStatusCopy)
+	if err != nil {
+		return fmt.Errorf("update pod %s/%s ExtendedResourceClaimStatus: %w", pod.Namespace, pod.Name, err)
+	}
+	return nil
+}
+
+// unreserveExtendedResourceClaim cleans up the scheduler-owned extended resource claim
+// when scheduling fails. It reverts the assume cache, and deletes the claim from the API
+// server if it was already created.
+func (pl *DynamicResources) unreserveExtendedResourceClaim(ctx context.Context, logger klog.Logger, pod *v1.Pod, state *stateData) {
+	extendedResourceClaim := state.claims.extendedResourceClaim()
+	if extendedResourceClaim == nil {
+		// there is no extended resource claim
+		return
+	}
+
+	// If the claim was marked as pending allocation (in-flight), remove that marker and restore
+	// the assumed claim state to what it was before this scheduling attempt.
+	if deleted := pl.draManager.ResourceClaims().RemoveClaimPendingAllocation(state.claims.getInitialExtendedResourceClaimUID()); deleted {
+		pl.draManager.ResourceClaims().AssumedClaimRestore(extendedResourceClaim.Namespace, extendedResourceClaim.Name)
+	}
+	if isSpecialClaimName(extendedResourceClaim.Name) {
+		// In memory temporary extended resource claim does not need to be deleted
+		return
+	}
+	// Claim was written to API server, need to delete it to prevent orphaned resources.
+	logger.V(5).Info("delete extended resource backed by DRA", "resourceclaim", klog.KObj(extendedResourceClaim), "pod", klog.KObj(pod), "claim.UID", extendedResourceClaim.UID)
+	extendedResourceClaim = extendedResourceClaim.DeepCopy()
+	if err := pl.deleteClaim(ctx, extendedResourceClaim, logger); err != nil {
+		logger.Error(err, "delete", "resourceclaim", klog.KObj(extendedResourceClaim))
+	}
 }
