@@ -398,6 +398,7 @@ type PersistentVolumeSpec struct {
 	VolumeMode *PersistentVolumeMode
 	// NodeAffinity defines constraints that limit what nodes this volume can be accessed from.
 	// This field influences the scheduling of pods that use this volume.
+	// This field is mutable if MutablePVNodeAffinity feature gate is enabled.
 	// +optional
 	NodeAffinity *VolumeNodeAffinity
 	// Name of VolumeAttributesClass to which this persistent volume belongs. Empty value
