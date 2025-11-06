@@ -422,7 +422,7 @@ func formatSlice(v reflect.Value, indentation uint) string {
 	l := v.Len()
 	result := make([]string, l)
 	longest := 0
-	for i := 0; i < l; i++ {
+	for i := range l {
 		result[i] = formatValue(v.Index(i), indentation+1)
 		if len(result[i]) > longest {
 			longest = len(result[i])
@@ -462,7 +462,7 @@ func formatStruct(v reflect.Value, indentation uint) string {
 	l := v.NumField()
 	result := []string{}
 	longest := 0
-	for i := 0; i < l; i++ {
+	for i := range l {
 		structField := t.Field(i)
 		fieldEntry := v.Field(i)
 		representation := fmt.Sprintf("%s: %s", structField.Name, formatValue(fieldEntry, indentation+1))

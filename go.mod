@@ -37,7 +37,7 @@ require (
 	github.com/moby/ipvs v1.1.0
 	github.com/moby/sys/userns v0.1.0
 	github.com/mrunalp/fileutils v0.5.1
-	github.com/onsi/gomega v0.0.0-20251031173942-4203bdba264b
+	github.com/onsi/gomega v1.38.2
 	github.com/opencontainers/cgroups v0.0.3
 	github.com/opencontainers/selinux v1.11.1
 	github.com/pmezard/go-difflib v1.0.0
@@ -217,6 +217,7 @@ require (
 )
 
 replace (
+	github.com/onsi/gomega => github.com/pohly/gomega v0.0.0-20251031173942-4203bdba264b
 	k8s.io/api => ./staging/src/k8s.io/api
 	k8s.io/apiextensions-apiserver => ./staging/src/k8s.io/apiextensions-apiserver
 	k8s.io/apimachinery => ./staging/src/k8s.io/apimachinery
@@ -250,5 +251,3 @@ replace (
 	k8s.io/sample-cli-plugin => ./staging/src/k8s.io/sample-cli-plugin
 	k8s.io/sample-controller => ./staging/src/k8s.io/sample-controller
 )
-
-replace github.com/onsi/gomega => github.com/pohly/gomega v0.0.0-20251031173942-4203bdba264b

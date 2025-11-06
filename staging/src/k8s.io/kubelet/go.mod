@@ -8,8 +8,6 @@ godebug default=go1.25
 
 require (
 	github.com/emicklei/go-restful/v3 v3.12.2
-	github.com/stretchr/testify v1.11.1
-	go.uber.org/goleak v1.3.0
 	google.golang.org/grpc v1.75.0-dev
 	google.golang.org/protobuf v1.36.8
 	k8s.io/api v0.0.0
@@ -38,7 +36,6 @@ require (
 	github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
-	github.com/onsi/gomega v0.0.0-20251031173942-4203bdba264b
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_golang v1.23.2 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
@@ -58,7 +55,6 @@ require (
 	golang.org/x/time v0.9.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250818200422-3122310a409c // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20251031162619-7c7e24fa61bc // indirect
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
@@ -76,5 +72,3 @@ replace (
 	k8s.io/kms => ../kms
 	k8s.io/kube-openapi => github.com/pohly/kube-openapi v0.0.0-20251031162619-7c7e24fa61bc
 )
-
-replace github.com/onsi/gomega => github.com/pohly/gomega v0.0.0-20251031173942-4203bdba264b

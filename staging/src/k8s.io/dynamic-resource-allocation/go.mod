@@ -9,9 +9,7 @@ godebug default=go1.25
 require (
 	github.com/blang/semver/v4 v4.0.0
 	github.com/google/cel-go v0.26.0
-	github.com/google/go-cmp v0.7.0
-	github.com/onsi/gomega v0.0.0-20251031173942-4203bdba264b
-	github.com/stretchr/testify v1.11.1
+	github.com/onsi/gomega v1.38.2
 	go.etcd.io/etcd/client/pkg/v3 v3.6.5
 	google.golang.org/grpc v1.75.0-dev
 	k8s.io/api v0.0.0
@@ -37,6 +35,7 @@ require (
 	github.com/go-openapi/jsonreference v0.20.2 // indirect
 	github.com/go-openapi/swag v0.23.0 // indirect
 	github.com/google/gnostic-models v0.7.0 // indirect
+	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
@@ -83,6 +82,7 @@ require (
 )
 
 replace (
+	github.com/onsi/gomega => github.com/pohly/gomega v0.0.0-20251031173942-4203bdba264b
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/apiserver => ../apiserver
@@ -94,5 +94,3 @@ replace (
 	k8s.io/kube-openapi => github.com/pohly/kube-openapi v0.0.0-20251031162619-7c7e24fa61bc
 	k8s.io/kubelet => ../kubelet
 )
-
-replace github.com/onsi/gomega => github.com/pohly/gomega v0.0.0-20251031173942-4203bdba264b
