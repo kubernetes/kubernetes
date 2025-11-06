@@ -3973,6 +3973,301 @@ func TestJobStrategy_GetAttrs(t *testing.T) {
 	}
 }
 
+func TestJobStrategy_ValidateUpdate_MutableSchedulingDirectives(t *testing.T) {
+	ctx := genericapirequest.NewDefaultContext()
+	now := metav1.Now()
+	validSelector := &metav1.LabelSelector{
+		MatchLabels: map[string]string{"a": "b"},
+	}
+	validPodTemplateSpec := api.PodTemplateSpec{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: validSelector.MatchLabels,
+		},
+		Spec: podtest.MakePodSpec(podtest.SetRestartPolicy(api.RestartPolicyOnFailure)),
+	}
+
+	cases := map[string]struct {
+		enableFeatureGate bool
+		job               *batch.Job
+		update            func(*batch.Job)
+		wantErrs          field.ErrorList
+	}{
+		"feature gate disabled - scheduling directives update allowed for suspended job never started": {
+			enableFeatureGate: false,
+			job: &batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "myjob",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "0",
+				},
+				Spec: batch.JobSpec{
+					Selector:       validSelector,
+					Template:       validPodTemplateSpec,
+					ManualSelector: ptr.To(true),
+					Parallelism:    ptr.To[int32](1),
+					Suspend:        ptr.To(true),
+				},
+				Status: batch.JobStatus{
+					Active:    0,
+					StartTime: nil,
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobSuspended,
+							Status: api.ConditionStatus(metav1.ConditionTrue),
+						},
+					},
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Template.Spec.NodeSelector = map[string]string{
+					"key": "value",
+				}
+			},
+		},
+		"feature gate enabled - scheduling directives update allowed for suspended job never started": {
+			enableFeatureGate: true,
+			job: &batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "myjob",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "0",
+				},
+				Spec: batch.JobSpec{
+					Selector:       validSelector,
+					Template:       validPodTemplateSpec,
+					ManualSelector: ptr.To(true),
+					Parallelism:    ptr.To[int32](1),
+					Suspend:        ptr.To(true),
+				},
+				Status: batch.JobStatus{
+					Active:    0,
+					StartTime: nil,
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobSuspended,
+							Status: api.ConditionStatus(metav1.ConditionTrue),
+						},
+					},
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Template.Spec.NodeSelector = map[string]string{
+					"key": "value",
+				}
+			},
+		},
+		"feature gate disabled - scheduling directives update rejected for unsuspended Job": {
+			enableFeatureGate: false,
+			job: &batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "myjob",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "0",
+				},
+				Spec: batch.JobSpec{
+					Selector:       validSelector,
+					Template:       validPodTemplateSpec,
+					ManualSelector: ptr.To(true),
+					Parallelism:    ptr.To[int32](1),
+					Suspend:        ptr.To(true),
+				},
+				Status: batch.JobStatus{
+					Active:    1,
+					StartTime: &now,
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Template.Spec.NodeSelector = map[string]string{
+					"key": "value",
+				}
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "spec.template"},
+			},
+		},
+		"feature gate enabled - scheduling directives update rejected for unsuspended Job": {
+			enableFeatureGate: true,
+			job: &batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "myjob",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "0",
+				},
+				Spec: batch.JobSpec{
+					Selector:       validSelector,
+					Template:       validPodTemplateSpec,
+					ManualSelector: ptr.To(true),
+					Parallelism:    ptr.To[int32](1),
+					Suspend:        ptr.To(false),
+				},
+				Status: batch.JobStatus{
+					Active:    1,
+					StartTime: &now,
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Template.Spec.NodeSelector = map[string]string{
+					"key": "value",
+				}
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "spec.template"},
+			},
+		},
+		"feature gate disabled - scheduling directives update rejected for suspended Job which was running in the past": {
+			enableFeatureGate: false,
+			job: &batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "myjob",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "0",
+				},
+				Spec: batch.JobSpec{
+					Selector:       validSelector,
+					Template:       validPodTemplateSpec,
+					ManualSelector: ptr.To(true),
+					Parallelism:    ptr.To[int32](1),
+					Suspend:        ptr.To(true),
+				},
+				Status: batch.JobStatus{
+					StartTime: &now,
+					Active:    0,
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobSuspended,
+							Status: api.ConditionStatus(metav1.ConditionTrue),
+						},
+					},
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Template.Spec.NodeSelector = map[string]string{
+					"key": "value",
+				}
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "spec.template"},
+			},
+		},
+		"feature gate enabled - scheduling directives update allowed for suspended Job which was running in the past": {
+			enableFeatureGate: true,
+			job: &batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "myjob",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "0",
+				},
+				Spec: batch.JobSpec{
+					Selector:       validSelector,
+					Template:       validPodTemplateSpec,
+					ManualSelector: ptr.To(true),
+					Parallelism:    ptr.To[int32](1),
+					Suspend:        ptr.To(true),
+				},
+				Status: batch.JobStatus{
+					StartTime: &now,
+					Active:    0,
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobSuspended,
+							Status: api.ConditionStatus(metav1.ConditionTrue),
+						},
+					},
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Template.Spec.NodeSelector = map[string]string{
+					"key": "value",
+				}
+			},
+		},
+		"feature gate enabled - scheduling directives update rejected for suspended Job still have active pods": {
+			enableFeatureGate: true,
+			job: &batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "myjob",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "0",
+				},
+				Spec: batch.JobSpec{
+					Selector:       validSelector,
+					Template:       validPodTemplateSpec,
+					ManualSelector: ptr.To(true),
+					Parallelism:    ptr.To[int32](1),
+					Suspend:        ptr.To(true),
+				},
+				Status: batch.JobStatus{
+					StartTime: &now,
+					Active:    1,
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobSuspended,
+							Status: api.ConditionStatus(metav1.ConditionTrue),
+						},
+					},
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Template.Spec.NodeSelector = map[string]string{
+					"key": "value",
+				}
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "spec.template"},
+			},
+		},
+		"feature gate enabled - scheduling directives update rejected for suspended Job without Suspended condition": {
+			enableFeatureGate: true,
+			job: &batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "myjob",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "0",
+				},
+				Spec: batch.JobSpec{
+					Selector:       validSelector,
+					Template:       validPodTemplateSpec,
+					ManualSelector: ptr.To(true),
+					Parallelism:    ptr.To[int32](1),
+					Suspend:        ptr.To(true),
+				},
+				Status: batch.JobStatus{
+					StartTime: &now,
+					Active:    1,
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobSuspended,
+							Status: api.ConditionStatus(metav1.ConditionFalse),
+						},
+					},
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Template.Spec.NodeSelector = map[string]string{
+					"key": "value",
+				}
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "spec.template"},
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, utilversion.MustParse("1.35"))
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MutableSchedulingDirectivesForSuspendedJobs, tc.enableFeatureGate)
+
+			newJob := tc.job.DeepCopy()
+			tc.update(newJob)
+			errs := Strategy.ValidateUpdate(ctx, newJob, tc.job)
+			if diff := cmp.Diff(tc.wantErrs, errs, ignoreErrValueDetail); diff != "" {
+				t.Errorf("Unexpected errors (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestJobToSelectiableFields(t *testing.T) {
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
 		"batch/v1",

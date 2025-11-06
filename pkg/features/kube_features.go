@@ -602,6 +602,12 @@ const (
 	// Enables mutable pod resources for suspended Jobs, regardless of whether they have started before.
 	MutablePodResourcesForSuspendedJobs featuregate.Feature = "MutablePodResourcesForSuspendedJobs"
 
+	// owner: @mimowo
+	// kep: https://kep.k8s.io/5440
+	//
+	// Enables mutable scheduling directives for suspended Jobs, regardless of whether they have started before.
+	MutableSchedulingDirectivesForSuspendedJobs featuregate.Feature = "MutableSchedulingDirectivesForSuspendedJobs"
+
 	// owner: @danwinship
 	// kep: https://kep.k8s.io/3866
 	//
@@ -1472,6 +1478,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
+	MutableSchedulingDirectivesForSuspendedJobs: {
+		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	NFTablesProxyMode: {
 		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
@@ -2225,6 +2235,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	MutableCSINodeAllocatableCount: {},
 
 	MutablePodResourcesForSuspendedJobs: {},
+
+	MutableSchedulingDirectivesForSuspendedJobs: {},
 
 	NFTablesProxyMode: {},
 
