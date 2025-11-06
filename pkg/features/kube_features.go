@@ -2259,7 +2259,7 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	ImageVolume: {},
 
-	InPlacePodLevelResourcesVerticalScaling: {InPlacePodVerticalScaling, PodLevelResources},
+	InPlacePodLevelResourcesVerticalScaling: {InPlacePodVerticalScaling, PodLevelResources, NodeDeclaredFeatures},
 
 	InPlacePodVerticalScaling: {},
 
