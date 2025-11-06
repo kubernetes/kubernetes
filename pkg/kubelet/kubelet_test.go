@@ -491,6 +491,7 @@ func TestSyncLoopAbort(t *testing.T) {
 	// The syncLoop waits on time.After(resyncInterval), set it really big so that we don't race for
 	// the channel close
 	kubelet.resyncInterval = time.Second * 30
+	kubelet.podHousekeepingPeriod = time.Second * 2
 
 	ch := make(chan kubetypes.PodUpdate)
 	close(ch)

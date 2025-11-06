@@ -72484,6 +72484,12 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 							Ref:         ref(kubeletconfigv1beta1.UserNamespaces{}.OpenAPIModelName()),
 						},
 					},
+					"podHousekeepingPeriod": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PodHousekeepingPeriod is the interval to specify the frequency for performing global pod cleanup tasks. Specifying a high value for this will result in low frequency for lower performance overhead but may result in high latency to remove orphaned resources and remove unwanted pods. Default: 2s",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
+						},
+					},
 				},
 				Required: []string{"containerRuntimeEndpoint"},
 			},
