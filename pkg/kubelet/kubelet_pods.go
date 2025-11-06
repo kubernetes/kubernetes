@@ -59,6 +59,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/envvars"
 	"k8s.io/kubernetes/pkg/kubelet/images"
+	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -2446,6 +2447,31 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 			// TODO(random-liu): Handle this in a cleaner way.
 			s := podStatus.FindContainerStatusByName(container.Name)
 			if s != nil && s.State == kubecontainer.ContainerStateExited && s.ExitCode == 0 {
+				continue
+			}
+			// When pod status is not persisted, init container status may be lost.
+			// This can occur in the following scenarios:
+			// 1. Static pods
+			// 2. Regular pods where init container status failed to sync to the API server
+			//    (e.g., due to control plane issues, though this is rare)
+			//
+			// In these cases, if the init container has already been removed from the runtime,
+			// kubelet cannot determine its status. However, we can infer that non-restartable
+			// init containers have completed successfully if regular containers have been created.
+			// Note: Restartable init containers (sidecars) should remain in waiting state and
+			// will be restarted by the kubelet.
+			isSidecar := container.RestartPolicy != nil && *container.RestartPolicy == v1.ContainerRestartPolicyAlways
+			if s == nil &&
+				kuberuntime.HasAnyRegularContainerCreated(pod, podStatus) &&
+				!isSidecar &&
+				statuses[container.Name].State.Waiting != nil {
+				statuses[container.Name].State = v1.ContainerState{
+					Terminated: &v1.ContainerStateTerminated{
+						Reason:   "Completed",
+						Message:  "Unable to get init container status from container runtime and pod has been initialized, treat it as exited normally",
+						ExitCode: 0,
+					},
+				}
 				continue
 			}
 		}
