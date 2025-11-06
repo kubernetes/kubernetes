@@ -27,6 +27,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -42,6 +43,7 @@ import (
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/authutil"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/utils/ptr"
 )
 
 func TestPodTopologyLabels(t *testing.T) {
@@ -1497,5 +1499,299 @@ func TestRelaxedDNSSearchValidation(t *testing.T) {
 		if tc.valid {
 			integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
 		}
+	}
+}
+
+func TestPodLevelResourcesValidationAndDefaulting(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+
+	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	client := clientset.NewForConfigOrDie(server.ClientConfig)
+
+	ns := framework.CreateNamespaceOrDie(client, "pod-level-resources", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+	cReq := ptr.To(resource.MustParse("1"))
+	cLim := ptr.To(resource.MustParse("2"))
+	pReq := ptr.To(resource.MustParse("3"))
+	pLim := ptr.To(resource.MustParse("4"))
+
+	aggReq := ptr.To(resource.MustParse("2")) // aggregated request for the 2 container cases
+	aggLim := ptr.To(resource.MustParse("4")) // aggregated limit for the 2 containers cases
+
+	// For generating test case names.
+	quantityName := func(q *resource.Quantity) string {
+		switch q {
+		case cReq:
+			return "cReq"
+		case cLim:
+			return "cLim"
+		case pReq:
+			return "pReq"
+		case pLim:
+			return "pLim"
+		case nil:
+			return ""
+		}
+		return q.String()
+	}
+	resourceSummary := func(reqs, lims *resource.Quantity) string {
+		if reqs == nil && lims == nil {
+			return "none"
+		}
+		summary := quantityName(reqs) + "+" + quantityName(lims)
+		return strings.Trim(summary, "+") // Remove + if either reqs or lims is nil
+	}
+
+	res := v1.ResourceCPU
+	resourceList := func(value *resource.Quantity) v1.ResourceList {
+		if value != nil {
+			return v1.ResourceList{res: *value}
+		}
+		return nil
+	}
+
+	type resources struct {
+		podReqs, podLims             *resource.Quantity
+		containerReqs, containerLims *resource.Quantity
+	}
+
+	tests := []struct {
+		initial         resources
+		secondContainer bool
+		expected        resources
+		expectError     bool
+	}{
+		{
+			initial:  resources{nil, nil, nil, nil},
+			expected: resources{nil, nil, nil, nil},
+		}, {
+			initial:  resources{nil, nil, nil, cLim},
+			expected: resources{nil, nil, cLim, cLim},
+		}, {
+			initial:  resources{nil, nil, cReq, nil},
+			expected: resources{nil, nil, cReq, nil},
+		}, {
+			initial:  resources{nil, nil, cReq, cLim},
+			expected: resources{nil, nil, cReq, cLim},
+		}, {
+			initial:  resources{nil, pLim, nil, nil},
+			expected: resources{pLim, pLim, nil, nil},
+		}, {
+			initial:  resources{nil, pLim, nil, cLim},
+			expected: resources{cLim, pLim, cLim, cLim}, // Pod requests default to container requests
+		}, {
+			initial:  resources{nil, pLim, cReq, nil},
+			expected: resources{cReq, pLim, cReq, nil}, // Pod requests default to container requests
+		}, {
+			initial:  resources{nil, pLim, cReq, cLim},
+			expected: resources{cReq, pLim, cReq, cLim}, // Pod requests default to container requests
+		}, {
+			initial:  resources{pReq, nil, nil, nil},
+			expected: resources{pReq, nil, nil, nil},
+		}, {
+			initial:  resources{pReq, nil, nil, cLim},
+			expected: resources{pReq, nil, cLim, cLim},
+		}, {
+			initial:  resources{pReq, nil, cReq, nil},
+			expected: resources{pReq, nil, cReq, nil},
+		}, {
+			initial:  resources{pReq, nil, cReq, cLim},
+			expected: resources{pReq, nil, cReq, cLim},
+		}, {
+			initial:  resources{pReq, pLim, nil, nil},
+			expected: resources{pReq, pLim, nil, nil},
+		}, {
+			initial:  resources{pReq, pLim, nil, cLim},
+			expected: resources{pReq, pLim, cLim, cLim},
+		}, {
+			initial:  resources{pReq, pLim, cReq, nil},
+			expected: resources{pReq, pLim, cReq, nil},
+		}, {
+			initial:  resources{pReq, pLim, cReq, cLim},
+			expected: resources{pReq, pLim, cReq, cLim},
+		},
+		// 2 Container cases
+		{
+			secondContainer: true,
+			initial:         resources{nil, nil, nil, nil},
+			expected:        resources{nil, nil, nil, nil},
+		}, {
+			secondContainer: true,
+			initial:         resources{nil, nil, nil, cLim},
+			expected:        resources{nil, nil, cLim, cLim},
+		}, {
+			secondContainer: true,
+			initial:         resources{nil, nil, cReq, nil},
+			expected:        resources{nil, nil, cReq, nil},
+		}, {
+			secondContainer: true,
+			initial:         resources{nil, nil, cReq, cLim},
+			expected:        resources{nil, nil, cReq, cLim},
+		}, {
+			secondContainer: true,
+			initial:         resources{nil, pLim, nil, nil},
+			expected:        resources{pLim, pLim, nil, nil},
+		}, {
+			secondContainer: true,
+			initial:         resources{nil, pLim, nil, cLim},
+			expected:        resources{aggLim, pLim, cLim, cLim},
+		}, {
+			secondContainer: true,
+			initial:         resources{nil, pLim, cReq, nil},
+			expected:        resources{aggReq, pLim, cReq, nil},
+		}, {
+			secondContainer: true,
+			initial:         resources{nil, pLim, cReq, cLim},
+			expected:        resources{aggReq, pLim, cReq, cLim},
+		}, {
+			secondContainer: true,
+			initial:         resources{pReq, nil, nil, nil},
+			expected:        resources{pReq, nil, nil, nil},
+		}, {
+			secondContainer: true,
+			initial:         resources{pReq, nil, nil, cLim},
+			expectError:     true, // pReq(3) < 2 * cLim(2)
+		}, {
+			secondContainer: true,
+			initial:         resources{pReq, nil, cReq, nil},
+			expected:        resources{pReq, nil, cReq, nil},
+		}, {
+			secondContainer: true,
+			initial:         resources{pReq, nil, cReq, cLim},
+			expected:        resources{pReq, nil, cReq, cLim},
+		}, {
+			secondContainer: true,
+			initial:         resources{pReq, pLim, nil, nil},
+			expected:        resources{pReq, pLim, nil, nil},
+		}, {
+			secondContainer: true,
+			initial:         resources{pReq, pLim, nil, cLim},
+			expectError:     true, // pReq(3) < 2 * cLim(2)
+		}, {
+			secondContainer: true,
+			initial:         resources{pReq, pLim, cReq, nil},
+			expected:        resources{pReq, pLim, cReq, nil},
+		}, {
+			secondContainer: true,
+			initial:         resources{pReq, pLim, cReq, cLim},
+			expected:        resources{pReq, pLim, cReq, cLim},
+		},
+		// The following test cases invert the container & pod values to test error conditions.
+		{
+			initial:     resources{nil, cLim, nil, pLim},
+			expectError: true, // cLim < pLim
+		}, {
+			initial:     resources{nil, cLim, pReq, nil},
+			expectError: true, // Pod defaulted reqs to pReq > cLim
+		}, {
+			initial:     resources{nil, cLim, pReq, pLim},
+			expectError: true, // Pod defaulted reqs to pReq > cLim
+		}, {
+			initial:     resources{nil, cLim, cReq, pLim},
+			expectError: true, // Individual container limits must be <= pod limits
+		}, {
+			initial:     resources{cReq, nil, nil, pLim},
+			expectError: true, // Container defaulted reqs to pLim > cReq
+		}, {
+			initial:     resources{cReq, nil, pReq, nil},
+			expectError: true, // cReq < pReq
+		}, {
+			initial:     resources{cReq, nil, pReq, pLim},
+			expectError: true, // cReq < pReq
+		}, {
+			secondContainer: true,
+			initial:         resources{nil, cLim, nil, cLim},
+			expectError:     true, // pod req defaults to 2x cLim
+		}, {
+			secondContainer: true,
+			initial:         resources{nil, cLim, cReq, cLim},
+			expected:        resources{aggReq, cLim, cReq, cLim}, // aggReq == cLim
+		},
+	}
+
+	for i, test := range tests {
+		testName := fmt.Sprintf("%d_pod:%s_container:%s", i,
+			resourceSummary(test.initial.podReqs, test.initial.podLims),
+			resourceSummary(test.initial.containerReqs, test.initial.containerLims))
+		if test.secondContainer {
+			testName += "_2containers"
+		}
+		t.Run(testName, func(t *testing.T) {
+			var podResources *v1.ResourceRequirements
+			if test.initial.podReqs != nil || test.initial.podLims != nil {
+				podResources = &v1.ResourceRequirements{
+					Requests: resourceList(test.initial.podReqs),
+					Limits:   resourceList(test.initial.podLims),
+				}
+			}
+			containerResources := v1.ResourceRequirements{
+				Requests: resourceList(test.initial.containerReqs),
+				Limits:   resourceList(test.initial.containerLims),
+			}
+
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test",
+				},
+				Spec: v1.PodSpec{
+					Resources: podResources,
+					Containers: []v1.Container{
+						{
+							Name:      "fake-name",
+							Image:     "fakeimage",
+							Resources: containerResources,
+						},
+					},
+				},
+			}
+
+			if test.secondContainer {
+				c2 := pod.Spec.Containers[0].DeepCopy()
+				c2.Name = "fake-name2"
+				pod.Spec.Containers = append(pod.Spec.Containers, *c2)
+			}
+
+			result, err := client.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
+			if !test.expectError && err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			} else if test.expectError {
+				if err == nil {
+					t.Fatalf("Expected an error, but received none")
+				} else if !apierrors.IsInvalid(err) {
+					t.Fatalf("Expected an Invalid error, but got: %v", err)
+				} else {
+					return
+				}
+			}
+
+			if test.expected.podReqs != nil || test.expected.podLims != nil {
+				expectedPodResources := &v1.ResourceRequirements{
+					Requests: resourceList(test.expected.podReqs),
+					Limits:   resourceList(test.expected.podLims),
+				}
+				if !apiequality.Semantic.DeepEqual(result.Spec.Resources, expectedPodResources) {
+					t.Errorf("Expected pod resources %s; got: %s", expectedPodResources.String(), result.Spec.Resources.String())
+				}
+			} else if result.Spec.Resources != nil {
+				t.Errorf("Expected empty pod resources, but got: %s", result.Spec.Resources.String())
+			}
+
+			expectedContainerResources := v1.ResourceRequirements{
+				Requests: resourceList(test.expected.containerReqs),
+				Limits:   resourceList(test.expected.containerLims),
+			}
+			if !apiequality.Semantic.DeepEqual(result.Spec.Containers[0].Resources, expectedContainerResources) {
+				t.Errorf("Expected container resources %s; got: %s", expectedContainerResources.String(), result.Spec.Containers[0].Resources.String())
+			}
+			if test.secondContainer {
+				if !apiequality.Semantic.DeepEqual(result.Spec.Containers[1].Resources, expectedContainerResources) {
+					t.Errorf("Expected second container resources %s; got: %s", expectedContainerResources.String(), result.Spec.Containers[1].Resources.String())
+				}
+			}
+		})
 	}
 }
