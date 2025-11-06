@@ -2223,11 +2223,33 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			b.Create(ctx, claim, pod2)
 			b.TestPod(ctx, f, pod2)
 
+			// Expect 5 extended and implicit devices / requests resources to be consumed:
+			//
+			// - external claim, requesting 1 device:
+			//   - 1 deviceclass
+			//   - 1 extended request
+			//   - 1 implicit deviceclaim request
+			//
+			// - pod, requesting 4 devices:
+			//   - sidecar init container
+			//     - 1 extended request
+			//     - 1 implicit deviceclaim request
+			//   - main container
+			//     - 1 extended request
+			//     - 1 implicit deviceclaim request
+			//   - other init containers reuse the later sidecar/main container resource
+			//
+			// - extended resourceclaim auto-created from the pod, requesting 4 devices
+			//   - 4 deviceclasses
+			//   - 2 extended resource requests (4 minus 2 already counted from the pod)
+			//   - 2 implicit deviceclaim requests (4 minus 2 already counted from the pod)
+			consumedDevices := "5"
+
 			usedResources := v1.ResourceList{}
 			usedResources[v1.ResourceName("count/resourceclaims.resource.k8s.io")] = resource.MustParse("2")
-			usedResources[v1.ResourceName(fmt.Sprintf("requests.%s", b.ExtendedResourceName(0)))] = resource.MustParse("9")
-			usedResources[v1.ResourceName(fmt.Sprintf("requests.%s", "deviceclass.resource.kubernetes.io/"+b.ClassName()))] = resource.MustParse("9")
-			usedResources[v1.ResourceName(fmt.Sprintf("%s.deviceclass.resource.k8s.io/devices", b.Class(0).Name))] = resource.MustParse("9")
+			usedResources[v1.ResourceName(fmt.Sprintf("requests.%s", b.ExtendedResourceName(0)))] = resource.MustParse(consumedDevices)
+			usedResources[v1.ResourceName(fmt.Sprintf("requests.%s", "deviceclass.resource.kubernetes.io/"+b.ClassName()))] = resource.MustParse(consumedDevices)
+			usedResources[v1.ResourceName(fmt.Sprintf("%s.deviceclass.resource.k8s.io/devices", b.Class(0).Name))] = resource.MustParse(consumedDevices)
 
 			gomega.Eventually(ctx, framework.GetObject(f.ClientSet.CoreV1().ResourceQuotas(quota.Namespace).Get, quota.Name, metav1.GetOptions{})).
 				Should(gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
