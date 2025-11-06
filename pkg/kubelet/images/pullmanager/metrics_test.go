@@ -17,6 +17,7 @@ limitations under the License.
 package pullmanager
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -200,41 +201,50 @@ func TestMustAttemptPullMetrics(t *testing.T) {
 	})
 
 	expectedMetrics := make(map[string]int)
-	require.True(t, imageManager.MustAttemptImagePull(ctx, "docker.io/testing/broken", "testbrokenrecord", nil, nil))
+	testMustAttemptImagePull(t, true, imageManager, ctx, "docker.io/testing/broken", "testbrokenrecord", nil)
 	expectedMetrics[string(checkResultError)]++
 	cmpMustAttemptPullMetrics(t, expectedMetrics)
 
-	require.True(t, imageManager.MustAttemptImagePull(ctx, "docker.io/testing/broken", "testbrokenrecord", nil, nil))
-	require.True(t, imageManager.MustAttemptImagePull(ctx, "docker.io/testing/broken", "testbrokenrecord", nil, nil))
+	testMustAttemptImagePull(t, true, imageManager, ctx, "docker.io/testing/broken", "testbrokenrecord", nil)
+	testMustAttemptImagePull(t, true, imageManager, ctx, "docker.io/testing/broken", "testbrokenrecord", nil)
 	expectedMetrics[string(checkResultError)] += 2
 
-	require.False(t, imageManager.MustAttemptImagePull(ctx, "docker.io/testing/test", "testimage-anonpull", nil, nil))
+	testMustAttemptImagePull(t, false, imageManager, ctx, "docker.io/testing/test", "testimage-anonpull", nil)
 	expectedMetrics[string(checkResultCredentialRecordFound)]++
 	cmpMustAttemptPullMetrics(t, expectedMetrics)
 
-	require.False(t, imageManager.MustAttemptImagePull(ctx, "docker.io/testing/test", "testimage-anonpull", nil, nil))
-	require.False(t, imageManager.MustAttemptImagePull(ctx, "docker.io/testing/test", "testimage-anonpull", nil, nil))
-	require.False(t, imageManager.MustAttemptImagePull(ctx, "docker.io/testing/test", "testimage-anonpull", nil, nil))
+	testMustAttemptImagePull(t, false, imageManager, ctx, "docker.io/testing/test", "testimage-anonpull", nil)
+	testMustAttemptImagePull(t, false, imageManager, ctx, "docker.io/testing/test", "testimage-anonpull", nil)
+	testMustAttemptImagePull(t, false, imageManager, ctx, "docker.io/testing/test", "testimage-anonpull", nil)
 	expectedMetrics[string(checkResultCredentialRecordFound)] += 3
 	cmpMustAttemptPullMetrics(t, expectedMetrics)
 
-	require.False(t, imageManager.MustAttemptImagePull(ctx, "docker.io/testing/policyexempt", "policyallowed", nil, nil))
+	testMustAttemptImagePull(t, false, imageManager, ctx, "docker.io/testing/policyexempt", "policyallowed", nil)
 	expectedMetrics[string(checkResultCredentialPolicyAllowed)]++
 	cmpMustAttemptPullMetrics(t, expectedMetrics)
 
-	require.False(t, imageManager.MustAttemptImagePull(ctx, "docker.io/testing/policyexempt", "policyallowed", nil, nil))
+	testMustAttemptImagePull(t, false, imageManager, ctx, "docker.io/testing/policyexempt", "policyallowed", nil)
 	expectedMetrics[string(checkResultCredentialPolicyAllowed)]++
 	cmpMustAttemptPullMetrics(t, expectedMetrics)
 
-	require.True(t, imageManager.MustAttemptImagePull(ctx, "docker.io/testing/norecords", "somewhatunknown", nil, nil))
+	testMustAttemptImagePull(t, true, imageManager, ctx, "docker.io/testing/norecords", "somewhatunknown", nil)
 	expectedMetrics[string(checkResultMustAuthenticate)]++
 	cmpMustAttemptPullMetrics(t, expectedMetrics)
 
-	require.False(t, imageManager.MustAttemptImagePull(ctx, "docker.io/testing/test", "testimageref", []kubeletconfig.ImagePullSecret{
-		{UID: "testsecretuid", Namespace: "default", Name: "pull-secret", CredentialHash: "testsecrethash"},
-	}, nil))
+	testMustAttemptImagePull(t, false, imageManager, ctx, "docker.io/testing/test", "testimageref",
+		func() ([]kubeletconfig.ImagePullSecret, *kubeletconfig.ImagePullServiceAccount, error) {
+			return []kubeletconfig.ImagePullSecret{
+				{UID: "testsecretuid", Namespace: "default", Name: "pull-secret", CredentialHash: "testsecrethash"},
+			}, nil, nil
+		})
 	expectedMetrics[string(checkResultCredentialRecordFound)]++
 	cmpMustAttemptPullMetrics(t, expectedMetrics)
+}
+
+func testMustAttemptImagePull(t *testing.T, expected bool, f *PullManager, ctx context.Context, image, imageRef string, getPodCredentials GetPodCredentials) {
+	mustPull, err := f.MustAttemptImagePull(ctx, image, imageRef, getPodCredentials)
+	require.NoError(t, err)
+	require.Equal(t, expected, mustPull)
 }
 
 func cmpFSIntents(t *testing.T, expected uint) {
