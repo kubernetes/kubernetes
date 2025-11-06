@@ -185,3 +185,7 @@ func (f *recorderResourceManager) ServeHTTP(http.ResponseWriter, *http.Request) 
 func (f *recorderResourceManager) WithSource(source Source) ResourceManager {
 	panic("unimplemented")
 }
+
+func (f *recorderResourceManager) AddInvalidationCallback(callback func()) {
+	panic("unimplemented")
+}
