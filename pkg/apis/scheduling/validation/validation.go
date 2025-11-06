@@ -133,31 +133,21 @@ func validatePodGroupPolicy(policy *scheduling.PodGroupPolicy, fldPath *field.Pa
 	var allErrs field.ErrorList
 	var setFields []string
 
-	if policy.Basic != nil {
-		setFields = append(setFields, "`basic`")
-	}
 	if policy.Gang != nil {
 		setFields = append(setFields, "`gang`")
 	}
 
 	switch {
 	case len(setFields) == 0:
-		allErrs = append(allErrs, field.Required(fldPath, "exactly one of `basic`, `gang` is required"))
+		allErrs = append(allErrs, field.Required(fldPath, "exactly one of `gang` is required"))
 	case len(setFields) > 1:
 		allErrs = append(allErrs, field.Invalid(fldPath, fmt.Sprintf("{%s}", strings.Join(setFields, ", ")),
-			"exactly one of `basic`, `gang` is required, but multiple fields are set"))
-	case policy.Basic != nil:
-		allErrs = append(allErrs, validatBasicSchedulingPolicy(policy.Basic, fldPath.Child("basic"))...)
+			"exactly one of `gang` is required, but multiple fields are set"))
 	case policy.Gang != nil:
 		allErrs = append(allErrs, validateGangSchedulingPolicy(policy.Gang, fldPath.Child("gang"))...)
 	}
 
 	return allErrs
-}
-
-func validatBasicSchedulingPolicy(policy *scheduling.BasicSchedulingPolicy, fldPath *field.Path) field.ErrorList {
-	// BasicSchedulingPolicy has no fields.
-	return nil
 }
 
 func validateGangSchedulingPolicy(policy *scheduling.GangSchedulingPolicy, fldPath *field.Path) field.ErrorList {
