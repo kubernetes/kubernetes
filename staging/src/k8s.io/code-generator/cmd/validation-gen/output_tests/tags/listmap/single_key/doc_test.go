@@ -162,3 +162,20 @@ func TestRatcheting(t *testing.T) {
 	st.Value(&struct1).OldValue(&struct2).ExpectValid()
 	st.Value(&struct2).OldValue(&struct1).ExpectValid()
 }
+
+func TestUniquenessPtrKey(t *testing.T) {
+	st := localSchemeBuilder.Test(t)
+
+	st.Value(&Struct{
+		ListPtrKeyField: []PtrKeyStruct{
+			{ptr.To("key1"), "one"},
+			{ptr.To("key2"), "two"},
+			{ptr.To("key2"), "three"}, // duplicate key
+			{nil, "four"},
+			{nil, "five"}, // duplicate nil key
+		},
+	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+		field.Duplicate(field.NewPath("listPtrKeyField").Index(2), nil),
+		field.Duplicate(field.NewPath("listPtrKeyField").Index(4), nil),
+	})
+}

@@ -609,6 +609,7 @@ func Convert_kubeadm_Etcd_To_v1beta4_Etcd(in *kubeadm.Etcd, out *Etcd, s convers
 
 func autoConvert_v1beta4_ExternalEtcd_To_kubeadm_ExternalEtcd(in *ExternalEtcd, out *kubeadm.ExternalEtcd, s conversion.Scope) error {
 	out.Endpoints = *(*[]string)(unsafe.Pointer(&in.Endpoints))
+	out.HTTPEndpoints = *(*[]string)(unsafe.Pointer(&in.HTTPEndpoints))
 	out.CAFile = in.CAFile
 	out.CertFile = in.CertFile
 	out.KeyFile = in.KeyFile
@@ -622,6 +623,7 @@ func Convert_v1beta4_ExternalEtcd_To_kubeadm_ExternalEtcd(in *ExternalEtcd, out 
 
 func autoConvert_kubeadm_ExternalEtcd_To_v1beta4_ExternalEtcd(in *kubeadm.ExternalEtcd, out *ExternalEtcd, s conversion.Scope) error {
 	out.Endpoints = *(*[]string)(unsafe.Pointer(&in.Endpoints))
+	out.HTTPEndpoints = *(*[]string)(unsafe.Pointer(&in.HTTPEndpoints))
 	out.CAFile = in.CAFile
 	out.CertFile = in.CertFile
 	out.KeyFile = in.KeyFile

@@ -247,10 +247,26 @@ type ListSelectorTerm struct {
 	Value any
 }
 
+// StabilityLevel indicates the stability of a validation tag.
+type StabilityLevel string
+
+const (
+	// Alpha indicates that a tag's semantics may change in the future.
+	Alpha StabilityLevel = "Alpha"
+	// Beta indicates that a tag's semantics will remain unchanged for the
+	// foreseeable future. This is used for soaking tags before qualifying to stable.
+	Beta StabilityLevel = "Beta"
+	// Stable indicates that a tag's semantics will remain unchanged for the
+	// foreseeable future.
+	Stable StabilityLevel = "Stable"
+)
+
 // TagDoc describes a comment-tag and its usage.
 type TagDoc struct {
 	// Tag is the tag name, without the leading '+'.
 	Tag string
+	// StabilityLevel is the stability level of the tag.
+	StabilityLevel StabilityLevel
 	// Args lists any arguments this tag might take.
 	Args []TagArgDoc
 	// Usage is how the tag is used, including arguments.

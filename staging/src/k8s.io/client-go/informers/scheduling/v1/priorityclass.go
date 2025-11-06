@@ -56,7 +56,7 @@ func NewPriorityClassInformer(client kubernetes.Interface, resyncPeriod time.Dur
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredPriorityClassInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
+		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
@@ -81,7 +81,7 @@ func NewFilteredPriorityClassInformer(client kubernetes.Interface, resyncPeriod 
 				}
 				return client.SchedulingV1().PriorityClasses().Watch(ctx, options)
 			},
-		},
+		}, client),
 		&apischedulingv1.PriorityClass{},
 		resyncPeriod,
 		indexers,

@@ -40,12 +40,43 @@ type ValidateFunc func(ctx context.Context, obj runtime.Object) field.ErrorList
 type ValidateUpdateFunc func(ctx context.Context, obj, old runtime.Object) field.ErrorList
 
 // VerifyVersionedValidationEquivalence tests that all versions of an API return equivalent validation errors.
-func VerifyVersionedValidationEquivalence(t *testing.T, obj, old runtime.Object, subResources ...string) {
+// It accepts optional configuration to handle path normalization across API versions where structures differ.
+func VerifyVersionedValidationEquivalence(t *testing.T, obj, old runtime.Object, testConfigs ...ValidationTestConfig) {
 	t.Helper()
+
+	opts := &validationOption{}
+	for _, testcfg := range testConfigs {
+		testcfg(opts)
+	}
 
 	// Accumulate errors from all versioned validation, per version.
 	all := map[string]field.ErrorList{}
 	accumulate := func(t *testing.T, gv string, errs field.ErrorList) {
+		// If normalization rules are provided, apply them to the field paths of generated errors.
+		// This allows comparing errors between API versions that have structural differences
+		// (e.g. flattened vs nested fields).
+		// We must normalize in place before sorting.
+		for i := range errs {
+			currentPath := errs[i].Field
+			for _, rule := range opts.NormalizationRules {
+				normalized := rule.Regexp.ReplaceAllString(currentPath, rule.Replacement)
+				if normalized != currentPath {
+					errs[i].Field = normalized
+					// Apply only the first matching rule per error
+					break
+				}
+			}
+			// Re-sort the error list based primarily on the normalized field paths
+			// to ensure errors align correctly during index-by-index comparison,
+			// regardless of their original structure.
+			sort.Slice(errs, func(i, j int) bool {
+				if errs[i].Field != errs[j].Field {
+					return errs[i].Field < errs[j].Field
+				}
+				// Secondary sort by full error string for determinism when fields are equal
+				return errs[i].Error() < errs[j].Error()
+			})
+		}
 		all[gv] = errs
 	}
 	// Convert versioned object to internal format before validation.
@@ -58,7 +89,7 @@ func VerifyVersionedValidationEquivalence(t *testing.T, obj, old runtime.Object,
 		return
 	}
 	if old == nil {
-		runtimetest.RunValidationForEachVersion(t, legacyscheme.Scheme, []string{}, internalObj, accumulate, subResources...)
+		runtimetest.RunValidationForEachVersion(t, legacyscheme.Scheme, []string{}, internalObj, accumulate, opts.SubResources...)
 	} else {
 		// Convert old versioned object to internal format before validation.
 		// runtimetest.RunUpdateValidationForEachVersion requires unversioned (internal) objects as input.
@@ -69,7 +100,7 @@ func VerifyVersionedValidationEquivalence(t *testing.T, obj, old runtime.Object,
 		if internalOld == nil {
 			return
 		}
-		runtimetest.RunUpdateValidationForEachVersion(t, legacyscheme.Scheme, []string{}, internalObj, internalOld, accumulate, subResources...)
+		runtimetest.RunUpdateValidationForEachVersion(t, legacyscheme.Scheme, []string{}, internalObj, internalOld, accumulate, opts.SubResources...)
 	}
 
 	// Make a copy so we can modify it.
@@ -104,13 +135,19 @@ func VerifyVersionedValidationEquivalence(t *testing.T, obj, old runtime.Object,
 			}
 			next := false
 			for i := range lv {
-				if l, r := lv[i], rv[i]; l.Type != r.Type || l.Detail != r.Detail {
-					t.Errorf("different errors\n%s: %v\n%s: %v", lk, fmtErrs(lv), rk, fmtErrs(rv))
+				// We don't use reflect.DeepEqual here because unversioned and versioned
+				// validation might have different bad values (e.g. pointer vs value).
+				// We also don't use ErrorMatcher here because it doesn't handle re-sorting
+				// required after normalization in multi-error scenarios within this specific loop structure.
+				l, r := lv[i], rv[i]
+				// Compare field (already normalized), type, detail, and origin.
+				if l.Type != r.Type || l.Field != r.Field || l.Detail != r.Detail || l.Origin != r.Origin {
+					t.Errorf("different errors at index %d\n%s: %v\n%s: %v", i, lk, l.Error(), rk, r.Error())
 					next = true
-					break
 				}
 			}
 			if next {
+				t.Errorf("complete error lists for context:\n%s: %v\n%s: %v", lk, fmtErrs(lv), rk, fmtErrs(rv))
 				continue
 			}
 		}
@@ -127,7 +164,7 @@ func fmtErrs(errs field.ErrorList) string {
 	}
 	buf := bytes.Buffer{}
 	for _, e := range errs {
-		buf.WriteString("\n")
+		buf.WriteString("\n\t")
 		buf.WriteString(strconv.Quote(e.Error()))
 	}
 
@@ -200,7 +237,7 @@ func VerifyValidationEquivalence(t *testing.T, ctx context.Context, obj runtime.
 	verifyValidationEquivalence(t, expectedErrs, func() field.ErrorList {
 		return validateFn(ctx, obj)
 	}, opts)
-	VerifyVersionedValidationEquivalence(t, obj, nil, opts.SubResources...)
+	VerifyVersionedValidationEquivalence(t, obj, nil, testConfigs...)
 }
 
 // VerifyUpdateValidationEquivalence provides a helper for testing the migration from
@@ -225,7 +262,7 @@ func VerifyUpdateValidationEquivalence(t *testing.T, ctx context.Context, obj, o
 	verifyValidationEquivalence(t, expectedErrs, func() field.ErrorList {
 		return validateUpdateFn(ctx, obj, old)
 	}, opts)
-	VerifyVersionedValidationEquivalence(t, obj, old, opts.SubResources...)
+	VerifyVersionedValidationEquivalence(t, obj, old, testConfigs...)
 }
 
 // verifyValidationEquivalence is a generic helper that verifies validation equivalence with and without declarative validation.
@@ -241,8 +278,10 @@ func verifyValidationEquivalence(t *testing.T, expectedErrs field.ErrorList, run
 	// 1) the DeclarativeValidationTakeover won't take effect if DeclarativeValidation is disabled.
 	// 2) the validation output, when only DeclarativeValidation is enabled, is the same as when both gates are disabled.
 	t.Run("with declarative validation", func(t *testing.T) {
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeclarativeValidation, true)
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeclarativeValidationTakeover, true)
+		featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+			features.DeclarativeValidation:         true,
+			features.DeclarativeValidationTakeover: true,
+		})
 		declarativeTakeoverErrs = runValidations()
 
 		if len(expectedErrs) > 0 {
@@ -253,8 +292,10 @@ func verifyValidationEquivalence(t *testing.T, expectedErrs field.ErrorList, run
 	})
 
 	t.Run("hand written validation", func(t *testing.T) {
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeclarativeValidationTakeover, false)
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeclarativeValidation, false)
+		featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+			features.DeclarativeValidationTakeover: false,
+			features.DeclarativeValidation:         false,
+		})
 		imperativeErrs = runValidations()
 
 		if len(expectedErrs) > 0 {

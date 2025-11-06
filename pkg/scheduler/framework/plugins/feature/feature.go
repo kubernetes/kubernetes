@@ -37,6 +37,7 @@ type Features struct {
 	EnableDynamicResourceAllocation              bool
 	EnableVolumeAttributesClass                  bool
 	EnableCSIMigrationPortworx                   bool
+	EnableVolumeLimitScaling                     bool
 	EnableNodeInclusionPolicyInPodTopologySpread bool
 	EnableMatchLabelKeysInPodTopologySpread      bool
 	EnableInPlacePodVerticalScaling              bool
@@ -45,6 +46,8 @@ type Features struct {
 	EnableAsyncPreemption                        bool
 	EnablePodLevelResources                      bool
 	EnableStorageCapacityScoring                 bool
+	EnableNodeDeclaredFeatures                   bool
+	EnableGangScheduling                         bool
 }
 
 // NewSchedulerFeaturesFromGates copies the current state of the feature gates into the struct.
@@ -61,6 +64,7 @@ func NewSchedulerFeaturesFromGates(featureGate featuregate.FeatureGate) Features
 		EnableDynamicResourceAllocation:              featureGate.Enabled(features.DynamicResourceAllocation),
 		EnableVolumeAttributesClass:                  featureGate.Enabled(features.VolumeAttributesClass),
 		EnableCSIMigrationPortworx:                   featureGate.Enabled(features.CSIMigrationPortworx),
+		EnableVolumeLimitScaling:                     featureGate.Enabled(features.VolumeLimitScaling),
 		EnableNodeInclusionPolicyInPodTopologySpread: featureGate.Enabled(features.NodeInclusionPolicyInPodTopologySpread),
 		EnableMatchLabelKeysInPodTopologySpread:      featureGate.Enabled(features.MatchLabelKeysInPodTopologySpread),
 		EnableInPlacePodVerticalScaling:              featureGate.Enabled(features.InPlacePodVerticalScaling),
@@ -70,5 +74,7 @@ func NewSchedulerFeaturesFromGates(featureGate featuregate.FeatureGate) Features
 		EnablePodLevelResources:                      featureGate.Enabled(features.PodLevelResources),
 		EnableDRAPartitionableDevices:                featureGate.Enabled(features.DRAPartitionableDevices),
 		EnableStorageCapacityScoring:                 featureGate.Enabled(features.StorageCapacityScoring),
+		EnableNodeDeclaredFeatures:                   featureGate.Enabled(features.NodeDeclaredFeatures),
+		EnableGangScheduling:                         featureGate.Enabled(features.GangScheduling),
 	}
 }

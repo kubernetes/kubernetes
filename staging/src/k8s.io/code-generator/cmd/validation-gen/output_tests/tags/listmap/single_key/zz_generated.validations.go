@@ -65,9 +65,9 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 
 	// field Struct.ListField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []OtherStruct) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj []OtherStruct, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
 			// call field-attached validations
@@ -82,13 +82,13 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			// lists with map semantics require unique keys
 			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a OtherStruct, b OtherStruct) bool { return a.KeyField == b.KeyField })...)
 			return
-		}(fldPath.Child("listField"), obj.ListField, safe.Field(oldObj, func(oldObj *Struct) []OtherStruct { return oldObj.ListField }))...)
+		}(fldPath.Child("listField"), obj.ListField, safe.Field(oldObj, func(oldObj *Struct) []OtherStruct { return oldObj.ListField }), oldObj != nil)...)
 
 	// field Struct.ListTypedefField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []OtherTypedefStruct) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj []OtherTypedefStruct, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
 			// call field-attached validations
@@ -103,13 +103,13 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			// lists with map semantics require unique keys
 			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a OtherTypedefStruct, b OtherTypedefStruct) bool { return a.KeyField == b.KeyField })...)
 			return
-		}(fldPath.Child("listTypedefField"), obj.ListTypedefField, safe.Field(oldObj, func(oldObj *Struct) []OtherTypedefStruct { return oldObj.ListTypedefField }))...)
+		}(fldPath.Child("listTypedefField"), obj.ListTypedefField, safe.Field(oldObj, func(oldObj *Struct) []OtherTypedefStruct { return oldObj.ListTypedefField }), oldObj != nil)...)
 
 	// field Struct.TypedefField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj ListType) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj ListType, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
 			// call field-attached validations
@@ -124,13 +124,13 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			// call the type's validation function
 			errs = append(errs, Validate_ListType(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("typedefField"), obj.TypedefField, safe.Field(oldObj, func(oldObj *Struct) ListType { return oldObj.TypedefField }))...)
+		}(fldPath.Child("typedefField"), obj.TypedefField, safe.Field(oldObj, func(oldObj *Struct) ListType { return oldObj.TypedefField }), oldObj != nil)...)
 
 	// field Struct.ListComparableField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []OtherStruct) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj []OtherStruct, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
 			// call field-attached validations
@@ -140,13 +140,13 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			// lists with map semantics require unique keys
 			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a OtherStruct, b OtherStruct) bool { return a.KeyField == b.KeyField })...)
 			return
-		}(fldPath.Child("listComparableField"), obj.ListComparableField, safe.Field(oldObj, func(oldObj *Struct) []OtherStruct { return oldObj.ListComparableField }))...)
+		}(fldPath.Child("listComparableField"), obj.ListComparableField, safe.Field(oldObj, func(oldObj *Struct) []OtherStruct { return oldObj.ListComparableField }), oldObj != nil)...)
 
 	// field Struct.ListNonComparableField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []NonComparableStruct) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj []NonComparableStruct, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
 			// call field-attached validations
@@ -156,7 +156,22 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			// lists with map semantics require unique keys
 			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a NonComparableStruct, b NonComparableStruct) bool { return a.KeyField == b.KeyField })...)
 			return
-		}(fldPath.Child("listNonComparableField"), obj.ListNonComparableField, safe.Field(oldObj, func(oldObj *Struct) []NonComparableStruct { return oldObj.ListNonComparableField }))...)
+		}(fldPath.Child("listNonComparableField"), obj.ListNonComparableField, safe.Field(oldObj, func(oldObj *Struct) []NonComparableStruct { return oldObj.ListNonComparableField }), oldObj != nil)...)
+
+	// field Struct.ListPtrKeyField
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []PtrKeyStruct, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			// lists with map semantics require unique keys
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a PtrKeyStruct, b PtrKeyStruct) bool {
+				return ((a.KeyField == nil && b.KeyField == nil) || (a.KeyField != nil && b.KeyField != nil && *a.KeyField == *b.KeyField))
+			})...)
+			return
+		}(fldPath.Child("listPtrKeyField"), obj.ListPtrKeyField, safe.Field(oldObj, func(oldObj *Struct) []PtrKeyStruct { return oldObj.ListPtrKeyField }), oldObj != nil)...)
 
 	return errs
 }

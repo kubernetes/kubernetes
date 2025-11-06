@@ -245,16 +245,18 @@ type ValidationTester struct {
 	*ValidationTestBuilder
 	value        any
 	oldValue     any
+	isUpdate     bool
 	options      []string
 	subresources []string
 }
 
-// OldValue sets the oldValue for this ValidationTester. When oldValue is set to
-// a non-nil value, update validation will be used to test validation.
+// OldValue sets the oldValue for this ValidationTester. When oldValue is set,
+// update validation will be used to test validation.
 // oldValue must be the same type as value.
 // Returns ValidationTester to support call chaining.
 func (v *ValidationTester) OldValue(oldValue any) *ValidationTester {
 	v.oldValue = oldValue
+	v.isUpdate = true
 	return v
 }
 
@@ -263,6 +265,7 @@ func (v *ValidationTester) OldValue(oldValue any) *ValidationTester {
 func (v *ValidationTester) OldValueFuzzed(oldValue any) *ValidationTester {
 	randfiller().Fill(oldValue)
 	v.oldValue = oldValue
+	v.isUpdate = true
 	return v
 }
 
@@ -370,11 +373,8 @@ func (v *ValidationTester) ExpectMatches(matcher field.ErrorMatcher, expected fi
 }
 
 func (v *ValidationTester) validate() field.ErrorList {
-	var errs field.ErrorList
-	if v.oldValue == nil {
-		errs = v.s.Validate(context.Background(), v.options, v.value, v.subresources...)
-	} else {
-		errs = v.s.ValidateUpdate(context.Background(), v.options, v.value, v.oldValue, v.subresources...)
+	if v.isUpdate {
+		return v.s.ValidateUpdate(context.Background(), v.options, v.value, v.oldValue, v.subresources...)
 	}
-	return errs
+	return v.s.Validate(context.Background(), v.options, v.value, v.subresources...)
 }

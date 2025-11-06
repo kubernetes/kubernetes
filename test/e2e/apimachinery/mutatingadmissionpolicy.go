@@ -19,11 +19,12 @@ package apimachinery
 import (
 	"context"
 	"fmt"
+	"time"
+
 	admissionregistrationv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/utils/ptr"
-	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -181,7 +182,7 @@ var _ = SIGDescribe("MutatingAdmissionPolicy [Privileged:ClusterAdmin]", feature
 	   The mutatingadmisionpolicy resource must support create, get,
 	     list, watch, update, patch, delete, and deletecollection.
 	*/
-	framework.It("should support MutatingAdmissionPolicy API operations", func(ctx context.Context) {
+	framework.It("should support MutatingAdmissionPolicy v1alpha1 API operations", func(ctx context.Context) {
 		mapVersion := "v1alpha1"
 		ginkgo.By("getting /apis")
 		{
@@ -409,7 +410,7 @@ var _ = SIGDescribe("MutatingAdmissionPolicy [Privileged:ClusterAdmin]", feature
 	   The MutatingadmissionPolicyBinding resource must support create, get,
 	     list, watch, update, patch, delete, and deletecollection.
 	*/
-	framework.It("should support MutatingAdmissionPolicyBinding API operations", func(ctx context.Context) {
+	framework.It("should support MutatingAdmissionPolicyBinding v1alpha1 API operations", func(ctx context.Context) {
 		mapbVersion := "v1alpha1"
 		ginkgo.By("getting /apis")
 		{
@@ -603,7 +604,7 @@ var _ = SIGDescribe("MutatingAdmissionPolicy [Privileged:ClusterAdmin]", feature
 	   The mutatingadmisionpolicy resource must support create, get,
 	     list, watch, update, patch, delete, and deletecollection.
 	*/
-	framework.It("should support MutatingAdmissionPolicy API operations", func(ctx context.Context) {
+	framework.It("should support MutatingAdmissionPolicy v1beta1 API operations", func(ctx context.Context) {
 		mapVersion := "v1beta1"
 		ginkgo.By("getting /apis")
 		{
@@ -831,7 +832,7 @@ var _ = SIGDescribe("MutatingAdmissionPolicy [Privileged:ClusterAdmin]", feature
 	   The MutatingadmissionPolicyBinding resource must support create, get,
 	     list, watch, update, patch, delete, and deletecollection.
 	*/
-	framework.It("should support MutatingAdmissionPolicyBinding API operations", func(ctx context.Context) {
+	framework.It("should support MutatingAdmissionPolicyBinding v1beta1 API operations", func(ctx context.Context) {
 		mapbVersion := "v1beta1"
 		ginkgo.By("getting /apis")
 		{

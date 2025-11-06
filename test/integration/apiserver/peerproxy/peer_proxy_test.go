@@ -56,8 +56,10 @@ func TestPeerProxiedRequest(t *testing.T) {
 	transport.DialerStopCh = ctx.Done()
 
 	// enable feature flags
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIServerIdentity, true)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.UnknownVersionInteroperabilityProxy, true)
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.APIServerIdentity:                       true,
+		kubefeatures.UnknownVersionInteroperabilityProxy: true,
+	})
 
 	// create sharedetcd
 	etcd := framework.SharedEtcd()
@@ -117,8 +119,10 @@ func TestPeerProxiedRequestToThirdServerAfterFirstDies(t *testing.T) {
 	transport.DialerStopCh = ctx.Done()
 
 	// enable feature flags
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIServerIdentity, true)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.UnknownVersionInteroperabilityProxy, true)
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.APIServerIdentity:                       true,
+		kubefeatures.UnknownVersionInteroperabilityProxy: true,
+	})
 
 	// create sharedetcd
 	etcd := framework.SharedEtcd()

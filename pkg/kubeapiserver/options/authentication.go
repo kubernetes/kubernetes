@@ -295,11 +295,6 @@ func (o *BuiltInAuthenticationOptions) Validate() []error {
 		}
 	}
 
-	// verify that if ServiceAccountTokenNodeBinding is enabled, ServiceAccountTokenNodeBindingValidation is also enabled.
-	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountTokenNodeBinding) && !utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountTokenNodeBindingValidation) {
-		allErrors = append(allErrors, fmt.Errorf("the %q feature gate can only be enabled if the %q feature gate is also enabled", features.ServiceAccountTokenNodeBinding, features.ServiceAccountTokenNodeBindingValidation))
-	}
-
 	if o.WebHook != nil {
 		retryBackoff := o.WebHook.RetryBackoff
 		if retryBackoff != nil && retryBackoff.Steps <= 0 {
@@ -748,6 +743,7 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(
 		authenticatorConfig.EgressLookup = egressSelector.Lookup
 	}
 
+	authenticatorConfig.APIServerID = apiServerID
 	// var openAPIV3SecuritySchemes spec3.SecuritySchemes
 	authenticator, updateAuthenticationConfig, openAPIV2SecurityDefinitions, openAPIV3SecuritySchemes, err := authenticatorConfig.New(ctx)
 	if err != nil {

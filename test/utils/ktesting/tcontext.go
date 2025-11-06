@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/onsi/gomega"
@@ -91,6 +92,31 @@ type TContext interface {
 	// Only supported in Go unit tests or benchmarks. It fails the current
 	// test when called elsewhere.
 	Run(name string, f func(tCtx TContext)) bool
+
+	// SyncTest uses [synctest.Test] to execute the callback inside a bubble.
+	// Creates a new subtest if the name is non-empty, otherwise it creates
+	// the bubble directly in the current test context.
+	//
+	// Only works in Go unit tests.
+	SyncTest(name string, f func(tCtx TContext)) bool
+
+	// IsSyncTest returns true if the context was created by SyncTest.
+	//
+	// Inside such a context, Wait is usable. This can be used in
+	// code which runs inside synctest bubbles and outside:
+	// - Inside a bubble, Wait can be used to block until
+	//   background activity has settled down (= "durably blocked").
+	//   Eventually and Consistently both call Wait and then check
+	//   the condition.
+	// - Outside, polling or some synchronization mechanism has to be used.
+	IsSyncTest() bool
+
+	// Wait calls [synctest.Wait] and thus ensures that all background
+	// activity has settled down (= "durably blocked").
+	//
+	// Only works inside a bubble started by SyncTest (can be checked with
+	// IsSyncTest), panics elsewhere.
+	Wait()
 
 	// Cancel can be invoked to cancel the context before the test is completed.
 	// Tests which use the context to control goroutines and then wait for
@@ -358,7 +384,8 @@ func InitCtx(ctx context.Context, tb TB, _ ...InitOption) TContext {
 // A simpler API is to use TContext.Run as replacement
 // for [testing.T.Run].
 func WithTB(parentCtx TContext, tb TB) TContext {
-	tCtx := InitCtx(klog.NewContext(parentCtx, newLogger(tb, false /* don't buffer log output */)), tb)
+	// TODO: honor the initial settings for logging.
+	tCtx := InitCtx(klog.NewContext(parentCtx, newLogger(tb, false /* don't buffer log output */)), withKlogHeader(tb))
 
 	tCtx = WithCancel(tCtx)
 	tCtx = WithClients(tCtx,
@@ -371,25 +398,51 @@ func WithTB(parentCtx TContext, tb TB) TContext {
 	return tCtx
 }
 
-// run implements the different Run methods. It's not an exported
+// run implements the different Run and SyncTest methods. It's not an exported
 // method because tCtx.Run is more discoverable (same usage as
 // with normal Go).
-func run(tCtx TContext, name string, cb func(tCtx TContext)) bool {
+func run(tCtx TContext, name string, syncTest bool, cb func(tCtx TContext)) bool {
 	tCtx.Helper()
 	switch tb := tCtx.TB().(type) {
-	case interface {
-		Run(string, func(t *testing.T)) bool
-	}:
+	case *testing.T:
+		if syncTest {
+			f := func(t *testing.T) {
+				// We must not propagate the parent's
+				// cancellation channel into the bubble,
+				// it causes "panic: receive on synctest channel from outside bubble".
+				//
+				// Sync tests shouldn't need the overall suite timeout,
+				// so this seems okay.
+				cb(synctestContext{TContext: WithTB(WithoutCancel(tCtx), t)})
+			}
+			if name != "" {
+				return tb.Run(name, func(t *testing.T) { synctest.Test(t, f) })
+			}
+			synctest.Test(tb, f)
+			return true
+		}
 		return tb.Run(name, func(t *testing.T) { cb(WithTB(tCtx, t)) })
-	case interface {
-		Run(string, func(t *testing.B)) bool
-	}:
-		return tb.Run(name, func(b *testing.B) { cb(WithTB(tCtx, b)) })
-	default:
-		tCtx.Fatalf("Run not implemented, underlying %T does not support it", tCtx.TB())
+	case *testing.B:
+		if !syncTest {
+			return tb.Run(name, func(b *testing.B) { cb(WithTB(tCtx, b)) })
+		}
 	}
 
+	what := "Run"
+	if syncTest {
+		what = "SyncTest"
+	}
+	tCtx.Fatalf("%s not implemented, underlying %T does not support it", what, tCtx.TB())
+
 	return false
+}
+
+type synctestContext struct {
+	TContext
+}
+
+func (s synctestContext) IsSyncTest() bool {
+	return true
 }
 
 // WithContext constructs a new TContext with a different Context instance.
@@ -482,7 +535,19 @@ func cleanupCtx(tCtx TContext, cb func(TContext)) {
 }
 
 func (cCtx tContext) Run(name string, cb func(tCtx TContext)) bool {
-	return run(cCtx, name, cb)
+	return run(cCtx, name, false, cb)
+}
+
+func (cCtx tContext) SyncTest(name string, cb func(tCtx TContext)) bool {
+	return run(cCtx, name, true, cb)
+}
+
+func (cCtx tContext) IsSyncTest() bool {
+	return false
+}
+
+func (cCtx tContext) Wait() {
+	synctest.Wait()
 }
 
 func (tCtx tContext) Logger() klog.Logger {

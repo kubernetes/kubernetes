@@ -1,0 +1,13 @@
+apiVersion: resource.k8s.io/v1alpha3
+kind: DeviceTaintRule
+metadata:
+  name: example
+spec:
+  # The entire hardware installation is broken.
+  # Evict all pods and don't schedule new ones.
+  deviceSelector:
+    driver: test-driver.cdi.k8s.io
+  taint:
+    key: dra.example.com/unhealthy
+    value: "Down"
+    effect: NoExecute

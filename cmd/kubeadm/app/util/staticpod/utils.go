@@ -18,15 +18,16 @@ package staticpod
 
 import (
 	"bytes"
-	"crypto/md5"
 	"fmt"
 	"hash"
+	"hash/fnv"
 	"io"
 	"math"
 	"net/url"
 	"os"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/pmezard/go-difflib/difflib"
 
@@ -42,6 +43,7 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/patches"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/users"
 )
 
 const (
@@ -50,6 +52,11 @@ const (
 
 	// kubeSchedulerBindAddressArg represents the bind-address argument of the kube-scheduler configuration.
 	kubeSchedulerBindAddressArg = "bind-address"
+)
+
+var (
+	usersAndGroups     *users.UsersAndGroups
+	usersAndGroupsOnce sync.Once
 )
 
 // ComponentPod returns a Pod object from the container, volume and annotations specifications
@@ -366,7 +373,7 @@ func ManifestFilesAreEqual(path1, path2 string) (bool, string, error) {
 		return false, "", err
 	}
 
-	hasher := md5.New()
+	hasher := fnv.New128a()
 	DeepHashObject(hasher, pod1)
 	hash1 := hasher.Sum(nil)[0:]
 	DeepHashObject(hasher, pod2)
@@ -409,6 +416,16 @@ func getProbeAddress(addr string) string {
 		return ""
 	}
 	return addr
+}
+
+// GetUsersAndGroups returns the local usersAndGroups, but first creates it
+// in a thread safe way once.
+func GetUsersAndGroups() (*users.UsersAndGroups, error) {
+	var err error
+	usersAndGroupsOnce.Do(func() {
+		usersAndGroups, err = users.AddUsersAndGroups()
+	})
+	return usersAndGroups, err
 }
 
 // DeepHashObject writes specified object to hash using the spew library

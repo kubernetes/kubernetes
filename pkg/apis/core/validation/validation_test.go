@@ -34,6 +34,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -42,6 +43,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	ndf "k8s.io/component-helpers/nodedeclaredfeatures/features"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
 	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
 	"k8s.io/kubernetes/pkg/apis/core"
@@ -1239,9 +1241,10 @@ func multipleVolumeNodeAffinity(terms [][]topologyPair) *core.VolumeNodeAffinity
 
 func TestValidateVolumeNodeAffinityUpdate(t *testing.T) {
 	scenarios := map[string]struct {
-		isExpectedFailure bool
-		oldPV             *core.PersistentVolume
-		newPV             *core.PersistentVolume
+		mutablePVNodeAffinity bool
+		isExpectedFailure     bool
+		oldPV                 *core.PersistentVolume
+		newPV                 *core.PersistentVolume
 	}{
 		"nil-nothing-changed": {
 			isExpectedFailure: false,
@@ -1506,9 +1509,16 @@ func TestValidateVolumeNodeAffinityUpdate(t *testing.T) {
 			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelInstanceType, "-1")),
 			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelInstanceTypeStable, "-1")),
 		},
+		"MutablePVNodeAffinity": {
+			mutablePVNodeAffinity: true,
+			isExpectedFailure:     false,
+			oldPV:                 testVolumeWithNodeAffinity(simpleVolumeNodeAffinity("foo", "bar")),
+			newPV:                 testVolumeWithNodeAffinity(simpleVolumeNodeAffinity("foo", "baz")),
+		},
 	}
 
 	for name, scenario := range scenarios {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MutablePVNodeAffinity, scenario.mutablePVNodeAffinity)
 		originalNewPV := scenario.newPV.DeepCopy()
 		originalOldPV := scenario.oldPV.DeepCopy()
 		opts := ValidationOptionsForPersistentVolume(scenario.newPV, scenario.oldPV)
@@ -3105,8 +3115,10 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecoverVolumeExpansionFailure, scenario.enableRecoverFromExpansion)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, scenario.enableVolumeAttributesClass)
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.RecoverVolumeExpansionFailure: scenario.enableRecoverFromExpansion,
+				features.VolumeAttributesClass:         scenario.enableVolumeAttributesClass,
+			})
 
 			scenario.oldClaim.ResourceVersion = "1"
 			scenario.newClaim.ResourceVersion = "1"
@@ -11192,6 +11204,27 @@ func TestValidatePod(t *testing.T) {
 				},
 			}),
 		),
+		"valid PodCertificate projected volume source, user config is not nil": *podtest.MakePod("valid-podcertificate-5",
+			podtest.SetVolumes(core.Volume{
+				Name: "projected-volume",
+				VolumeSource: core.VolumeSource{
+					Projected: &core.ProjectedVolumeSource{
+						Sources: []core.VolumeProjection{
+							{
+								PodCertificate: &core.PodCertificateProjection{
+									SignerName:           "example.com/foo",
+									KeyType:              "ED25519",
+									MaxExpirationSeconds: ptr.To[int32](3600),
+									KeyPath:              "key.pem",
+									CertificateChainPath: "certificates.pem",
+									UserAnnotations:      map[string]string{"test.domain/attribute": "test-value"},
+								},
+							},
+						},
+					},
+				},
+			}),
+		),
 		"ephemeral volume + PVC, no conflict between them": *podtest.MakePod("valid-extended",
 			podtest.SetVolumes(
 				core.Volume{Name: "pvc", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "my-pvc"}}},
@@ -12840,6 +12873,75 @@ func TestValidatePod(t *testing.T) {
 				}),
 			),
 		},
+		"PodCertificate projected volume with bad user annotations, invalid key": {
+			expectedError: "regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]') with an optional DNS subdomain prefix",
+			spec: *podtest.MakePod("pod1",
+				podtest.SetVolumes(core.Volume{
+					Name: "projected-volume",
+					VolumeSource: core.VolumeSource{
+						Projected: &core.ProjectedVolumeSource{
+							Sources: []core.VolumeProjection{
+								{
+									PodCertificate: &core.PodCertificateProjection{
+										SignerName:           "example.com/foo",
+										KeyType:              "ED25519",
+										KeyPath:              "key.pem",
+										CertificateChainPath: "certificates.pem",
+										UserAnnotations:      map[string]string{"only/one/slash": "bar"},
+									},
+								},
+							},
+						},
+					},
+				}),
+			),
+		},
+		"PodCertificate projected volume with bad user annotations, too long key prefix size": {
+			expectedError: "prefix part must be no more than 253 bytes",
+			spec: *podtest.MakePod("pod1",
+				podtest.SetVolumes(core.Volume{
+					Name: "projected-volume",
+					VolumeSource: core.VolumeSource{
+						Projected: &core.ProjectedVolumeSource{
+							Sources: []core.VolumeProjection{
+								{
+									PodCertificate: &core.PodCertificateProjection{
+										SignerName:           "example.com/foo",
+										KeyType:              "ED25519",
+										KeyPath:              "key.pem",
+										CertificateChainPath: "certificates.pem",
+										UserAnnotations:      map[string]string{strings.Repeat("a", 254) + "/foo": "bar"},
+									},
+								},
+							},
+						},
+					},
+				}),
+			),
+		},
+		"PodCertificate projected volume with bad user annotations, too long total key/value size": {
+			expectedError: "may not be more than 262144 bytes",
+			spec: *podtest.MakePod("pod1",
+				podtest.SetVolumes(core.Volume{
+					Name: "projected-volume",
+					VolumeSource: core.VolumeSource{
+						Projected: &core.ProjectedVolumeSource{
+							Sources: []core.VolumeProjection{
+								{
+									PodCertificate: &core.PodCertificateProjection{
+										SignerName:           "example.com/foo",
+										KeyType:              "ED25519",
+										KeyPath:              "key.pem",
+										CertificateChainPath: "certificates.pem",
+										UserAnnotations:      map[string]string{"domain/a": strings.Repeat("d", apimachineryvalidation.TotalAnnotationSizeLimitB)},
+									},
+								},
+							},
+						},
+					},
+				}),
+			),
+		},
 		"final PVC name for ephemeral volume must be valid": {
 			expectedError: "spec.volumes[1].name: Invalid value: \"" + longVolName + "\": PVC name \"" + longPodName + "-" + longVolName + "\": must be no more than 253 characters",
 			spec: *podtest.MakePod(longPodName,
@@ -14441,6 +14543,21 @@ func TestValidatePodUpdate(t *testing.T) {
 			),
 			err:  "pod updates may not change fields other than",
 			test: "memory limit change with pod-level resources",
+		}, {
+			new: *podtest.MakePod("pod",
+				podtest.SetWorkloadRef(&core.WorkloadReference{
+					Name:     "w",
+					PodGroup: "pg",
+				}),
+			),
+			old: *podtest.MakePod("pod",
+				podtest.SetWorkloadRef(&core.WorkloadReference{
+					Name:     "w2",
+					PodGroup: "pg",
+				}),
+			),
+			err:  "pod updates may not change fields other than",
+			test: "updated workloadRef",
 		},
 	}
 
@@ -15191,7 +15308,37 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 		),
 		old:  *podtest.MakePod("foo"),
 		err:  "Duplicate value: \"ctr\"",
-		test: "invalid container name and extended resource name in requestMapping in ExtendedResourceClaimStatus",
+		test: "invalid duplicate container name,, extended resource name, and request name in requestMapping in ExtendedResourceClaimStatus",
+	}, {
+		new: *podtest.MakePod("foo",
+			podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(
+				podtest.MakeResourceRequirements(
+					map[string]string{
+						string("example.com/gpu"): "1",
+					},
+					map[string]string{
+						string("example.com/gpu"): "1",
+					})))),
+			podtest.SetStatus(core.PodStatus{
+				ExtendedResourceClaimStatus: &core.PodExtendedResourceClaimStatus{
+					ResourceClaimName: "xyz",
+					RequestMappings: []core.ContainerExtendedResourceRequest{
+						{
+							ContainerName: "ctr",
+							ResourceName:  "example.com/gpu",
+							RequestName:   "container-0-request-0",
+						},
+						{
+							ContainerName: "ctr",
+							ResourceName:  "example.com/gpu",
+							RequestName:   "container-1-request-0",
+						},
+					},
+				},
+			}),
+		),
+		old:  *podtest.MakePod("foo"),
+		test: "valid duplicate container name,, extended resource name in requestMapping in ExtendedResourceClaimStatus",
 	}, {
 		new: *podtest.MakePod("foo",
 			podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(
@@ -17567,9 +17714,14 @@ func TestValidateServiceCreate(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PreferSameTrafficDistribution, tc.newTrafficDist)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RelaxedServiceNameValidation, tc.relaxedServiceNames)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, !tc.legacyIPs)
+			if !tc.newTrafficDist {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
+			}
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.PreferSameTrafficDistribution: tc.newTrafficDist,
+				features.RelaxedServiceNameValidation:  tc.relaxedServiceNames,
+				features.StrictIPCIDRValidation:        !tc.legacyIPs,
+			})
 			svc := makeValidService()
 			tc.tweakSvc(&svc)
 			errs := ValidateServiceCreate(&svc)
@@ -20291,8 +20443,10 @@ func TestValidateServiceUpdate(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, true)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RelaxedServiceNameValidation, tc.relaxedServiceNames)
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.StrictIPCIDRValidation:       true,
+				features.RelaxedServiceNameValidation: tc.relaxedServiceNames,
+			})
 
 			oldSvc := makeValidService()
 			newSvc := makeValidService()
@@ -22813,6 +22967,7 @@ func TestValidateOSFields(t *testing.T) {
 		"Overhead",
 		"Tolerations",
 		"TopologySpreadConstraints",
+		"WorkloadRef",
 	)
 
 	expect := sets.NewString().Union(osSpecificFields).Union(osNeutralFields)
@@ -24196,8 +24351,10 @@ func TestCrossNamespaceSource(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AnyVolumeDataSource, true)
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CrossNamespaceVolumeDataSource, true)
+		featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+			features.AnyVolumeDataSource:            true,
+			features.CrossNamespaceVolumeDataSource: true,
+		})
 		opts := PersistentVolumeClaimSpecValidationOptions{}
 		if tc.expectedFail {
 			if errs := ValidatePersistentVolumeClaimSpec(tc.claimSpec, field.NewPath("spec"), opts); len(errs) == 0 {
@@ -26901,17 +27058,14 @@ func TestValidateLoadBalancerStatus(t *testing.T) {
 
 	testCases := []struct {
 		name             string
-		ipModeEnabled    bool
 		legacyIPs        bool
-		nonLBAllowed     bool
 		tweakOldLBStatus func(s *core.LoadBalancerStatus)
 		tweakLBStatus    func(s *core.LoadBalancerStatus)
 		tweakSvcSpec     func(s *core.ServiceSpec)
 		numErrs          int
 	}{
 		{
-			name:         "type is not LB",
-			nonLBAllowed: false,
+			name: "type is not LB",
 			tweakSvcSpec: func(s *core.ServiceSpec) {
 				s.Type = core.ServiceTypeClusterIP
 			},
@@ -26922,20 +27076,7 @@ func TestValidateLoadBalancerStatus(t *testing.T) {
 			},
 			numErrs: 1,
 		}, {
-			name:         "type is not LB. back-compat",
-			nonLBAllowed: true,
-			tweakSvcSpec: func(s *core.ServiceSpec) {
-				s.Type = core.ServiceTypeClusterIP
-			},
-			tweakLBStatus: func(s *core.LoadBalancerStatus) {
-				s.Ingress = []core.LoadBalancerIngress{{
-					IP: "1.2.3.4",
-				}}
-			},
-			numErrs: 0,
-		}, {
-			name:          "valid vip ipMode",
-			ipModeEnabled: true,
+			name: "valid vip ipMode",
 			tweakLBStatus: func(s *core.LoadBalancerStatus) {
 				s.Ingress = []core.LoadBalancerIngress{{
 					IP:     "1.2.3.4",
@@ -26944,8 +27085,7 @@ func TestValidateLoadBalancerStatus(t *testing.T) {
 			},
 			numErrs: 0,
 		}, {
-			name:          "valid proxy ipMode",
-			ipModeEnabled: true,
+			name: "valid proxy ipMode",
 			tweakLBStatus: func(s *core.LoadBalancerStatus) {
 				s.Ingress = []core.LoadBalancerIngress{{
 					IP:     "1.2.3.4",
@@ -26954,8 +27094,7 @@ func TestValidateLoadBalancerStatus(t *testing.T) {
 			},
 			numErrs: 0,
 		}, {
-			name:          "invalid ipMode",
-			ipModeEnabled: true,
+			name: "invalid ipMode",
 			tweakLBStatus: func(s *core.LoadBalancerStatus) {
 				s.Ingress = []core.LoadBalancerIngress{{
 					IP:     "1.2.3.4",
@@ -26964,8 +27103,7 @@ func TestValidateLoadBalancerStatus(t *testing.T) {
 			},
 			numErrs: 1,
 		}, {
-			name:          "missing ipMode with LoadbalancerIPMode enabled",
-			ipModeEnabled: true,
+			name: "missing ipMode",
 			tweakLBStatus: func(s *core.LoadBalancerStatus) {
 				s.Ingress = []core.LoadBalancerIngress{{
 					IP: "1.2.3.4",
@@ -26973,17 +27111,7 @@ func TestValidateLoadBalancerStatus(t *testing.T) {
 			},
 			numErrs: 1,
 		}, {
-			name:          "missing ipMode with LoadbalancerIPMode disabled",
-			ipModeEnabled: false,
-			tweakLBStatus: func(s *core.LoadBalancerStatus) {
-				s.Ingress = []core.LoadBalancerIngress{{
-					IP: "1.2.3.4",
-				}}
-			},
-			numErrs: 0,
-		}, {
-			name:          "missing ip with ipMode present",
-			ipModeEnabled: true,
+			name: "missing ip with ipMode present",
 			tweakLBStatus: func(s *core.LoadBalancerStatus) {
 				s.Ingress = []core.LoadBalancerIngress{{
 					IPMode: &ipModeProxy,
@@ -26991,9 +27119,8 @@ func TestValidateLoadBalancerStatus(t *testing.T) {
 			},
 			numErrs: 1,
 		}, {
-			name:          "legacy IP with legacy validation",
-			ipModeEnabled: true,
-			legacyIPs:     true,
+			name:      "legacy IP with legacy validation",
+			legacyIPs: true,
 			tweakLBStatus: func(s *core.LoadBalancerStatus) {
 				s.Ingress = []core.LoadBalancerIngress{{
 					IP:     "001.002.003.004",
@@ -27002,8 +27129,7 @@ func TestValidateLoadBalancerStatus(t *testing.T) {
 			},
 			numErrs: 0,
 		}, {
-			name:          "legacy IP with strict validation",
-			ipModeEnabled: true,
+			name: "legacy IP with strict validation",
 			tweakLBStatus: func(s *core.LoadBalancerStatus) {
 				s.Ingress = []core.LoadBalancerIngress{{
 					IP:     "001.002.003.004",
@@ -27063,15 +27189,7 @@ func TestValidateLoadBalancerStatus(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			if !tc.ipModeEnabled {
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.31"))
-			} else {
-				// (This feature gate doesn't exist in 1.31 so we can't set it
-				// when testing !ipModeEnabled.)
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, !tc.legacyIPs)
-			}
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, tc.ipModeEnabled)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowServiceLBStatusOnNonLB, tc.nonLBAllowed)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, !tc.legacyIPs)
 			oldStatus := core.LoadBalancerStatus{}
 			if tc.tweakOldLBStatus != nil {
 				tc.tweakOldLBStatus(&oldStatus)
@@ -28337,6 +28455,21 @@ func TestValidatePodResize(t *testing.T) {
 			old:  mkPodWithInitContainers(getResources("100m", "0", "1Gi", ""), core.ResourceList{}, core.ContainerRestartPolicyAlways, resizePolicy(core.ResourceMemory, core.RestartContainer)),
 			new:  mkPodWithInitContainers(getResources("100m", "0", "2Gi", ""), core.ResourceList{}, core.ContainerRestartPolicyAlways, resizePolicy(core.ResourceMemory, core.NotRequired)),
 			err:  "spec: Forbidden: only cpu and memory resources are mutable",
+		}, {
+			test: "invalid: adding non-resizable resources to a container without resources",
+			old: podtest.MakePod("pod", podtest.SetContainers(
+				podtest.MakeContainer("c1"),
+			)),
+			new: podtest.MakePod("pod", podtest.SetContainers(
+				podtest.MakeContainer("c1",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Requests: core.ResourceList{
+							core.ResourceEphemeralStorage: resource.MustParse("10Gi"),
+						},
+					}),
+				),
+			)),
+			err: "spec: Forbidden: only cpu and memory resources are mutable",
 		},
 	}
 
@@ -29418,5 +29551,212 @@ func TestValidateContainerStateTransition(t *testing.T) {
 				t.Errorf("Unexpected error(s): %v", errs)
 			}
 		})
+	}
+}
+
+func TestAllRegistedNodeDeclaredFeatures(t *testing.T) {
+	// Test that feature registry is valid.
+	for _, feature := range ndf.AllFeatures {
+		if err := validateNodeDeclaredFeatureName(feature.Name()); err != nil {
+			t.Fatalf("ValidateFeatures() = %v, want nil", err)
+		}
+	}
+	// Soft limit to catch potential uncontrolled growth of node registered features.
+	const maxNodeDeclaredFeatures = 128
+	if len(ndf.AllFeatures) > maxNodeDeclaredFeatures {
+		t.Errorf("Number of registered node declared features (%d) exceeds the limit of %d. Please review if this is expected and update the threshold if necessary.", len(ndf.AllFeatures), maxNodeDeclaredFeatures)
+	}
+}
+
+func TestValidateNodeDeclaredFeatures(t *testing.T) {
+	makeNode := func(declaredFeatures []string) *core.Node {
+		node := makeNode("test-node", nil)
+		node.Status.DeclaredFeatures = declaredFeatures
+		node.ObjectMeta.ResourceVersion = "1"
+		return &node
+	}
+	testCases := []struct {
+		name             string
+		declaredFeatures []string
+		expectErr        bool
+		expectedErrType  field.ErrorType
+		expectedErrPath  string
+		expectedErrMsg   string
+	}{
+		{
+			name:             "empty feature list",
+			declaredFeatures: []string{},
+			expectErr:        false,
+		},
+		{
+			name:             "valid features",
+			declaredFeatures: []string{"AnotherFeature", "MyFeature", "MyFeature/SubFeature"},
+			expectErr:        false,
+		},
+		{
+			name:             "duplicate feature names",
+			declaredFeatures: []string{"MyFeature", "MyFeature"},
+			expectErr:        true,
+			expectedErrType:  field.ErrorTypeDuplicate,
+			expectedErrPath:  "status.declaredFeatures[1]",
+			expectedErrMsg:   "Duplicate value",
+		},
+		{
+			name:             "unsorted feature names",
+			declaredFeatures: []string{"MyFeature", "AnotherFeature"},
+			expectErr:        true,
+			expectedErrType:  field.ErrorTypeInvalid,
+			expectedErrPath:  "status.declaredFeatures[1]",
+			expectedErrMsg:   "list must be sorted alphabetically",
+		},
+		{
+			name:             "mixed valid and invalid",
+			declaredFeatures: []string{"AnotherFeature", "invalid", "MyFeature"},
+			expectErr:        true,
+		},
+		{
+			name:             "invalid feature name format",
+			declaredFeatures: []string{"myFeature"},
+			expectErr:        true,
+			expectedErrType:  field.ErrorTypeInvalid,
+			expectedErrPath:  "status.declaredFeatures[0]",
+			expectedErrMsg:   "invalid feature name",
+		},
+		{
+			name:             "invalid feature name - kebab-case",
+			declaredFeatures: []string{"Feature-name"},
+			expectErr:        true,
+			expectedErrType:  field.ErrorTypeInvalid,
+			expectedErrPath:  "status.declaredFeatures[0]",
+			expectedErrMsg:   "invalid feature name",
+		},
+		{
+			name:             "invalid feature name - ends with slash",
+			declaredFeatures: []string{"FeatureA/"},
+			expectErr:        true,
+			expectedErrType:  field.ErrorTypeInvalid,
+			expectedErrPath:  "status.declaredFeatures[0]",
+			expectedErrMsg:   "invalid feature name",
+		},
+		{
+			name:             "invalid feature name - name too long",
+			declaredFeatures: []string{"F" + strings.Repeat("e", validation.DNS1123SubdomainMaxLength)},
+			expectErr:        true,
+			expectedErrType:  field.ErrorTypeInvalid,
+			expectedErrPath:  "status.declaredFeatures[0]",
+			expectedErrMsg:   "invalid feature name",
+		},
+	}
+
+	for _, tc := range testCases {
+		for _, op := range []string{"create", "update"} {
+			t.Run(strings.Join([]string{tc.name, op}, "-"), func(t *testing.T) {
+				var errs field.ErrorList
+				if op == "create" {
+					errs = ValidateNode(makeNode(tc.declaredFeatures))
+				} else {
+					errs = ValidateNodeUpdate(makeNode(tc.declaredFeatures), makeNode([]string{}))
+				}
+				if tc.expectErr {
+					if len(errs) == 0 {
+						t.Errorf("Expected error but got none")
+					} else {
+						found := false
+						for _, err := range errs {
+							t.Logf("DEBUG: tc.expectedErrType: %v err.Type:%v err.Field :%v  tc.expectedErrPath:%v", tc.expectedErrType, err.Type, err.Field, tc.expectedErrPath)
+							t.Logf("DEBUG: err.Type == tc.expectedErrType:%v err.Field == tc.expectedErrPath:%v", err.Type == tc.expectedErrType, err.Field == tc.expectedErrPath)
+							t.Logf("DEBUG: tc.expectedErrMsg: %v err.Error() :%v contains:%v", tc.expectedErrMsg, err.Error(), strings.Contains(err.Error(), tc.expectedErrMsg))
+							if tc.expectedErrType != "" && err.Type == tc.expectedErrType && err.Field == tc.expectedErrPath {
+								if tc.expectedErrMsg != "" && strings.Contains(err.Error(), tc.expectedErrMsg) {
+									found = true
+									break
+								} else if tc.expectedErrMsg == "" {
+									found = true
+									break
+								}
+							} else if tc.expectedErrType == "" {
+								found = true
+								break
+							}
+						}
+						if !found && tc.expectErr {
+							t.Errorf("Expected error with type `%s` on field `%s` containing `%q` but got `%v`", tc.expectedErrType, tc.expectedErrPath, tc.expectedErrMsg, errs)
+						}
+					}
+				} else if len(errs) > 0 {
+					t.Errorf("Unexpected error: %v", errs)
+				}
+			})
+		}
+	}
+}
+
+func TestValidateWorkloadReference(t *testing.T) {
+	successCases := map[string]*core.Pod{
+		"correct": podtest.MakePod("", podtest.SetWorkloadRef(&core.WorkloadReference{
+			Name:               "workload",
+			PodGroup:           "group",
+			PodGroupReplicaKey: "replica",
+		})),
+		"no replica key": podtest.MakePod("", podtest.SetWorkloadRef(&core.WorkloadReference{
+			Name:               "workload",
+			PodGroup:           "group",
+			PodGroupReplicaKey: "",
+		})),
+	}
+	for name, pod := range successCases {
+		errs := ValidatePodSpec(&pod.Spec, &pod.ObjectMeta, field.NewPath("field"), PodValidationOptions{})
+		if len(errs) != 0 {
+			t.Errorf("Expected success for %q: %v", name, errs)
+		}
+	}
+
+	failureCases := map[string]*core.Pod{
+		"empty workload name": podtest.MakePod("", podtest.SetWorkloadRef(&core.WorkloadReference{
+			Name:               "",
+			PodGroup:           "group",
+			PodGroupReplicaKey: "replica",
+		})),
+		"incorrect workload name": podtest.MakePod("", podtest.SetWorkloadRef(&core.WorkloadReference{
+			Name:               ".workload",
+			PodGroup:           "group",
+			PodGroupReplicaKey: "replica",
+		})),
+		"too long workload name": podtest.MakePod("", podtest.SetWorkloadRef(&core.WorkloadReference{
+			Name:               strings.Repeat("w", 254),
+			PodGroup:           "group",
+			PodGroupReplicaKey: "replica",
+		})),
+		"empty pod group": podtest.MakePod("", podtest.SetWorkloadRef(&core.WorkloadReference{
+			Name:               "workload",
+			PodGroup:           "",
+			PodGroupReplicaKey: "replica",
+		})),
+		"incorrect pod group": podtest.MakePod("", podtest.SetWorkloadRef(&core.WorkloadReference{
+			Name:               "workload",
+			PodGroup:           ".group",
+			PodGroupReplicaKey: "replica",
+		})),
+		"too long pod group": podtest.MakePod("", podtest.SetWorkloadRef(&core.WorkloadReference{
+			Name:               "workload",
+			PodGroup:           strings.Repeat("g", 64),
+			PodGroupReplicaKey: "replica",
+		})),
+		"incorrect replica key": podtest.MakePod("", podtest.SetWorkloadRef(&core.WorkloadReference{
+			Name:               "workload",
+			PodGroup:           "group",
+			PodGroupReplicaKey: ".replica",
+		})),
+		"too long replica key": podtest.MakePod("", podtest.SetWorkloadRef(&core.WorkloadReference{
+			Name:               "workload",
+			PodGroup:           "group",
+			PodGroupReplicaKey: strings.Repeat("r", 64),
+		})),
+	}
+	for name, pod := range failureCases {
+		errs := ValidatePodSpec(&pod.Spec, &pod.ObjectMeta, field.NewPath("field"), PodValidationOptions{})
+		if len(errs) == 0 {
+			t.Errorf("Expected failure for %q", name)
+		}
 	}
 }

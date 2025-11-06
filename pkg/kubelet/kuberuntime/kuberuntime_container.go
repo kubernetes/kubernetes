@@ -266,7 +266,7 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 		return err.Error(), ErrCreateContainerConfig
 	}
 
-	err = m.internalLifecycle.PreCreateContainer(pod, container, containerConfig)
+	err = m.internalLifecycle.PreCreateContainer(logger, pod, container, containerConfig)
 	if err != nil {
 		s, _ := grpcstatus.FromError(err)
 		m.recordContainerEvent(ctx, pod, container, "", v1.EventTypeWarning, events.FailedToCreateContainer, "Internal PreCreateContainer hook failed: %v", s.Message())
@@ -279,7 +279,7 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 		m.recordContainerEvent(ctx, pod, container, containerID, v1.EventTypeWarning, events.FailedToCreateContainer, "Error: %v", s.Message())
 		return s.Message(), ErrCreateContainer
 	}
-	err = m.internalLifecycle.PreStartContainer(pod, container, containerID)
+	err = m.internalLifecycle.PreStartContainer(logger, pod, container, containerID)
 	if err != nil {
 		s, _ := grpcstatus.FromError(err)
 		m.recordContainerEvent(ctx, pod, container, containerID, v1.EventTypeWarning, events.FailedToStartContainer, "Internal PreStartContainer hook failed: %v", s.Message())
@@ -1113,9 +1113,7 @@ func (m *kubeGenericRuntimeManager) computeInitContainerActions(ctx context.Cont
 		case kubecontainer.ContainerStateRunning:
 			if !podutil.IsRestartableInitContainer(container) {
 				break
-			}
-
-			if podutil.IsRestartableInitContainer(container) {
+			} else { // If container is restartable
 				if container.StartupProbe != nil {
 					startup, found := m.startupManager.Get(status.ID)
 					if !found {
@@ -1185,9 +1183,6 @@ func (m *kubeGenericRuntimeManager) computeInitContainerActions(ctx context.Cont
 					// computePodResizeAction updates 'changes' if resize policy requires restarting this container
 					break
 				}
-			} else { // init container
-				// nothing do to but wait for it to finish
-				break
 			}
 
 		// If the init container failed and the restart policy is Never, the pod is terminal.
@@ -1354,7 +1349,7 @@ func (m *kubeGenericRuntimeManager) removeContainer(ctx context.Context, contain
 	logger := klog.FromContext(ctx)
 	logger.V(4).Info("Removing container", "containerID", containerID)
 	// Call internal container post-stop lifecycle hook.
-	if err := m.internalLifecycle.PostStopContainer(containerID); err != nil {
+	if err := m.internalLifecycle.PostStopContainer(logger, containerID); err != nil {
 		return err
 	}
 

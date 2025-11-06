@@ -53,7 +53,7 @@ func TestValidateClass(t *testing.T) {
 			class:        testClass(""),
 		},
 		"bad-name": {
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("metadata", "name"), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')")},
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("metadata", "name"), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')").MarkCoveredByDeclarative()},
 			class:        testClass(badName),
 		},
 		"generate-name": {
@@ -181,7 +181,7 @@ func TestValidateClass(t *testing.T) {
 			}(),
 		},
 		"bad-extended-resource-name": {
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "extendedResourceName"), "example.com", "must be a valid extended resource name")},
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "extendedResourceName"), "example.com", "must be a valid extended resource name").MarkCoveredByDeclarative().WithOrigin("format=k8s-extended-resource-name")},
 			class: func() *resource.DeviceClass {
 				class := testClass(goodName)
 				class.Spec.ExtendedResourceName = ptr.To(string("example.com"))

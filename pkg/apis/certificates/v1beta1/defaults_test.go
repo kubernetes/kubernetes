@@ -86,7 +86,7 @@ func TestIsKubeletServingCSR(t *testing.T) {
 			exp:    false,
 		},
 		"does not default to kubelet-serving if it specifies an emailAddress SAN": {
-			req:    newCSR(kubeletServerPEMOptions, pemOptions{emailAddresses: []string{"something"}}),
+			req:    newCSR(kubeletServerPEMOptions, pemOptions{emailAddresses: []string{"something@example.com"}}),
 			usages: kubeletServerUsages,
 			exp:    false,
 		},
@@ -131,7 +131,7 @@ func TestIsKubeletClientCSR(t *testing.T) {
 			exp:    false,
 		},
 		"does not default to kube-apiserver-client-kubelet if an emailAddress is set": {
-			req:    newCSR(kubeletClientPEMOptions, pemOptions{emailAddresses: []string{"something"}}),
+			req:    newCSR(kubeletClientPEMOptions, pemOptions{emailAddresses: []string{"something@example.com"}}),
 			usages: kubeletClientUsages,
 			exp:    false,
 		},
@@ -326,7 +326,7 @@ func TestSetDefaults_CertificateSigningRequestSpec_KubeletServing(t *testing.T) 
 		},
 		"does not default to kubelet-serving if it specifies an emailAddress SAN": {
 			csr: capi.CertificateSigningRequestSpec{
-				Request:  csrWithOpts(kubeletServerPEMOptions, pemOptions{emailAddresses: []string{"something"}}),
+				Request:  csrWithOpts(kubeletServerPEMOptions, pemOptions{emailAddresses: []string{"something@example.com"}}),
 				Usages:   kubeletServerUsages,
 				Username: kubeletServerPEMOptions.cn,
 			},

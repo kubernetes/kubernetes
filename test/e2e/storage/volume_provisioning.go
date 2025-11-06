@@ -345,8 +345,8 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				Client:       c,
 				Name:         "default",
 				Timeouts:     f.Timeouts,
-				ClaimSize:    "2Gi",
-				ExpectedSize: "2Gi",
+				ClaimSize:    "10Gi",
+				ExpectedSize: "10Gi",
 			}
 
 			test.Claim = e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
@@ -370,7 +370,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			test := testsuites.StorageClassTest{
 				Name:      "default",
 				Timeouts:  f.Timeouts,
-				ClaimSize: "2Gi",
+				ClaimSize: "10Gi",
 			}
 
 			ginkgo.By("setting the is-default StorageClass annotation to false")
@@ -407,7 +407,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			test := testsuites.StorageClassTest{
 				Name:      "default",
 				Timeouts:  f.Timeouts,
-				ClaimSize: "2Gi",
+				ClaimSize: "10Gi",
 			}
 
 			ginkgo.By("removing the is-default StorageClass annotation")
@@ -444,7 +444,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				Name:        "AWS EBS with invalid KMS key",
 				Provisioner: "kubernetes.io/aws-ebs",
 				Timeouts:    f.Timeouts,
-				ClaimSize:   "2Gi",
+				ClaimSize:   "10Gi",
 				Parameters:  map[string]string{"kmsKeyId": "arn:aws:kms:us-east-1:123456789012:key/55555555-5555-5555-5555-555555555555"},
 			}
 

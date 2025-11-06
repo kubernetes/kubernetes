@@ -818,6 +818,14 @@ func TestGetDeletableResources(t *testing.T) {
 	}
 }
 
+type wrappedKubeClientWithUnsupportedWatchListSemantics struct {
+	kubernetes.Interface
+}
+
+func (c *wrappedKubeClientWithUnsupportedWatchListSemantics) IsWatchListSemanticsUnSupported() bool {
+	return true
+}
+
 // TestGarbageCollectorSync ensures that a discovery client error
 // or an informer sync error will not cause the garbage collector
 // to block infinitely.
@@ -889,10 +897,12 @@ func TestGarbageCollectorSync(t *testing.T) {
 	srv, clientConfig := testServerAndClientConfig(alternativeTestHandler)
 	defer srv.Close()
 	clientConfig.ContentConfig.NegotiatedSerializer = nil
-	client, err := kubernetes.NewForConfig(clientConfig)
+	kubeClient, err := kubernetes.NewForConfig(clientConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
+	// TODO(#115478): migrate this test to use fakeClient instead of the real client.
+	client := &wrappedKubeClientWithUnsupportedWatchListSemantics{kubeClient}
 
 	tweakableRM := meta.NewDefaultRESTMapper(nil)
 	tweakableRM.AddSpecific(schema.GroupVersionKind{Version: "v1", Kind: "Pod"}, schema.GroupVersionResource{Version: "v1", Resource: "pods"}, schema.GroupVersionResource{Version: "v1", Resource: "pod"}, meta.RESTScopeNamespace)
@@ -906,17 +916,24 @@ func TestGarbageCollectorSync(t *testing.T) {
 
 	sharedInformers := informers.NewSharedInformerFactory(client, 0)
 
+	var wg sync.WaitGroup
+	defer wg.Wait()
+
 	logger, tCtx := ktesting.NewTestContext(t)
 	defer tCtx.Cancel("test has completed")
+
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
+
 	gc, err := NewGarbageCollector(tCtx, client, metadataClient, rm, map[schema.GroupResource]struct{}{}, sharedInformers, alwaysStarted)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	syncPeriod := 200 * time.Millisecond
-	go gc.Run(tCtx, 1, syncPeriod)
+	wg.Go(func() {
+		gc.Run(tCtx, 1, syncPeriod)
+	})
 	// The pseudo-code of GarbageCollector.Sync():
 	// GarbageCollector.Sync(client, period, stopCh):
 	//    wait.Until() loops with `period` until the `stopCh` is closed :
@@ -931,7 +948,9 @@ func TestGarbageCollectorSync(t *testing.T) {
 	// The 1s sleep in the test allows GetDeletableResources and
 	// gc.resyncMonitors to run ~5 times to ensure the changes to the
 	// fakeDiscoveryClient are picked up.
-	go gc.Sync(tCtx, fakeDiscoveryClient, syncPeriod)
+	wg.Go(func() {
+		gc.Sync(tCtx, fakeDiscoveryClient, syncPeriod)
+	})
 
 	// Wait until the sync discovers the initial resources
 	time.Sleep(1 * time.Second)

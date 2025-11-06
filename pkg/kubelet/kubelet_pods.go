@@ -124,11 +124,15 @@ func parseGetSubIdsOutput(input string) (uint32, uint32, error) {
 // If subordinate user or group ID ranges are specified for the kubelet user and the getsubids tool
 // is installed, then the single mapping specified both for user and group IDs will be used.
 // If the tool is not installed, or there are no IDs configured, the default mapping is returned.
-// The default mapping includes the entire IDs range except IDs below 65536.
-func (kl *Kubelet) getKubeletMappings() (uint32, uint32, error) {
+// The default mapping includes the entire IDs range except IDs below idsPerPod.
+func (kl *Kubelet) getKubeletMappings(idsPerPod uint32) (uint32, uint32, error) {
 	// default mappings to return if there is no specific configuration
-	const defaultFirstID = 1 << 16
-	const defaultLen = 1<<32 - defaultFirstID
+	defaultFirstID := idsPerPod
+	// We cast defaultFirstID to 64 bits, as otherwise any operation (including subtraction)
+	// fires the overflow detection (go is not smart enough to realize that if we subtract a
+	// non-negative number, it fits in 32 bits).
+	// Then we cast it back to 32 bits, as this what the function returns.
+	defaultLen := uint32((1 << 32) - uint64(defaultFirstID))
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) {
 		return defaultFirstID, defaultLen, nil
@@ -928,12 +932,6 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 					return result, fmt.Errorf("failed to get host path for volume %q: %w", volume, err)
 				}
 
-				// Validate key length, must not exceed 128 characters.
-				// TODO: @HirazawaUi This limit will be relaxed after the EnvFiles feature gate beta stage.
-				if len(key) > 128 {
-					return result, fmt.Errorf("environment variable key %q exceeds maximum length of 128 characters", key)
-				}
-
 				// Construct the full path to the environment variable file
 				// by combining hostPath with the specified path in FileKeyRef
 				envFilePath, err := securejoin.SecureJoin(hostPath, f.Path)
@@ -945,12 +943,6 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 				if err != nil {
 					klog.ErrorS(err, "Failed to parse env file", "pod", klog.KObj(pod))
 					return result, fmt.Errorf("couldn't parse env file")
-				}
-
-				// Validate value size, must not exceed 32KB.
-				// TODO: @HirazawaUi This limit will be relaxed after the EnvFiles feature gate beta stage.
-				if len(runtimeVal) > 32*1024 {
-					return result, fmt.Errorf("environment variable value for key %q exceeds maximum size of 32KB", key)
 				}
 
 				// If the key was not found, and it's not optional, return an error
@@ -1046,7 +1038,8 @@ func (kl *Kubelet) killPod(ctx context.Context, pod *v1.Pod, p kubecontainer.Pod
 	if err := kl.containerRuntime.KillPod(ctx, pod, p, gracePeriodOverride); err != nil {
 		return err
 	}
-	if err := kl.containerManager.UpdateQOSCgroups(); err != nil {
+	// TODO: Pass logger from context once contextual logging migration is complete
+	if err := kl.containerManager.UpdateQOSCgroups(klog.TODO()); err != nil {
 		klog.V(2).InfoS("Failed to update QoS cgroups while killing pod", "err", err)
 	}
 	return nil
@@ -2404,6 +2397,14 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 			oldStatusPtr = &oldStatus
 		}
 		status := convertContainerStatus(cStatus, oldStatusPtr)
+		if !utilfeature.DefaultFeatureGate.Enabled(features.ChangeContainerStatusOnKubeletRestart) {
+			if cStatus.State == kubecontainer.ContainerStateRunning {
+				if oldStatus, ok := oldStatuses[status.Name]; ok && oldStatus.Started != nil {
+					status.Started = oldStatus.Started
+				}
+			}
+		}
+
 		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 			allocatedContainer := kubecontainer.GetContainerSpec(pod, cName)
 			if allocatedContainer != nil {
@@ -2582,17 +2583,24 @@ func (kl *Kubelet) cleanupOrphanedPodCgroups(pcm cm.PodContainerManager, cgroupP
 		// process in the cgroup to the minimum value while we wait.
 		if podVolumesExist := kl.podVolumesExist(uid); podVolumesExist {
 			klog.V(3).InfoS("Orphaned pod found, but volumes not yet removed.  Reducing cpu to minimum", "podUID", uid)
-			if err := pcm.ReduceCPULimits(val); err != nil {
+			// TODO: Pass logger from context once contextual logging migration is complete
+			if err := pcm.ReduceCPULimits(klog.TODO(), val); err != nil {
 				klog.InfoS("Failed to reduce cpu time for pod pending volume cleanup", "podUID", uid, "err", err)
 			}
 			continue
 		}
 		klog.V(3).InfoS("Orphaned pod found, removing pod cgroups", "podUID", uid)
-		// Destroy all cgroups of pod that should not be running,
-		// by first killing all the attached processes to these cgroups.
-		// We ignore errors thrown by the method, as the housekeeping loop would
-		// again try to delete these unwanted pod cgroups
-		go pcm.Destroy(val)
+		// Destroy all cgroups of pods that should not be running,
+		// by first killing all the attached processes in these cgroups.
+		// The error return value of Destroy is explicitly checked and logged,
+		// but errors are tolerated since the housekeeping loop loop would
+		// again try to delete these unwanted pod cgroups.
+		// TODO: Pass logger from context once contextual logging migration is complete
+		go func() {
+			if err := pcm.Destroy(klog.TODO(), val); err != nil {
+				klog.InfoS("Failed to destroy orphaned pod cgroup", "podUID", uid, "err", err)
+			}
+		}()
 	}
 }
 

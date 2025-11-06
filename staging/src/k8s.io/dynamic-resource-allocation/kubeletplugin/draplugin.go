@@ -58,8 +58,8 @@ type DRAPlugin interface {
 	// for the given ResourceClaims. This is used to implement
 	// the gRPC NodePrepareResources call.
 	//
-	// It gets called with the complete list of claims that are needed
-	// by some pod. In contrast to the gRPC call, the helper has
+	// It gets called with the complete list of claims handled by this DRA driver
+	// that are needed by some pod. In contrast to the gRPC call, the helper has
 	// already retrieved the actual ResourceClaim objects.
 	//
 	// In addition to that, the helper also:

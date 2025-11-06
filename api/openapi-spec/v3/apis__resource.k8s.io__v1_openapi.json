@@ -401,7 +401,7 @@
             "description": "NodeSelector defines the nodes where the device is available.\n\nMust use exactly one term.\n\nMust only be set if Spec.PerDeviceNodeSelection is set to true. At most one of NodeName, NodeSelector and AllNodes can be set."
           },
           "taints": {
-            "description": "If specified, these are the driver-defined taints.\n\nThe maximum number of taints is 4.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
+            "description": "If specified, these are the driver-defined taints.\n\nThe maximum number of taints is 16. If taints are set for any device in a ResourceSlice, then the maximum number of allowed devices per ResourceSlice is 64 instead of 128.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
             "items": {
               "allOf": [
                 {
@@ -980,7 +980,7 @@
         "properties": {
           "effect": {
             "default": "",
-            "description": "The effect of the taint on claims that do not tolerate the taint and through such claims on the pods using them. Valid effects are NoSchedule and NoExecute. PreferNoSchedule as used for nodes is not valid here.",
+            "description": "The effect of the taint on claims that do not tolerate the taint and through such claims on the pods using them.\n\nValid effects are None, NoSchedule and NoExecute. PreferNoSchedule as used for nodes is not valid here. More effects may get added in the future. Consumers must treat unknown effects like None.",
             "type": "string"
           },
           "key": {
@@ -1571,7 +1571,7 @@
             "type": "boolean"
           },
           "devices": {
-            "description": "Devices lists some or all of the devices in this pool.\n\nMust not have more than 128 entries.",
+            "description": "Devices lists some or all of the devices in this pool.\n\nMust not have more than 128 entries. If any device uses taints the limit is 64.",
             "items": {
               "allOf": [
                 {
@@ -2160,7 +2160,7 @@
           {
             "group": "storagemigration.k8s.io",
             "kind": "DeleteOptions",
-            "version": "v1alpha1"
+            "version": "v1beta1"
           }
         ]
       },
@@ -2853,7 +2853,7 @@
           {
             "group": "storagemigration.k8s.io",
             "kind": "WatchEvent",
-            "version": "v1alpha1"
+            "version": "v1beta1"
           }
         ]
       },

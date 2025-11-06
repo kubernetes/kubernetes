@@ -35,6 +35,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig"
 	utilstore "k8s.io/kubernetes/pkg/kubelet/util/store"
 	"k8s.io/kubernetes/pkg/registry/core/service/allocator"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
@@ -129,13 +130,21 @@ func (m *UsernsManager) readMappingsFromFile(pod types.UID) ([]byte, error) {
 	return fstore.Read(mappingsFile)
 }
 
-func MakeUserNsManager(logger klog.Logger, kl userNsPodsManager) (*UsernsManager, error) {
-	kubeletMappingID, kubeletMappingLen, err := kl.GetKubeletMappings()
+func MakeUserNsManager(logger klog.Logger, kl userNsPodsManager, idsPerPod *int64) (*UsernsManager, error) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) {
+		return nil, nil
+	}
+
+	userNsLength := uint32(kubeletconfig.DefaultKubeletUserNamespacesIDsPerPod)
+	if idsPerPod != nil {
+		// The value is already validated as part of kubelet config validation, so we can safely
+		// cast it.
+		userNsLength = uint32(*idsPerPod)
+	}
+	kubeletMappingID, kubeletMappingLen, err := kl.GetKubeletMappings(userNsLength)
 	if err != nil {
 		return nil, fmt.Errorf("kubelet mappings: %w", err)
 	}
-
-	userNsLength := kl.GetUserNamespacesIDsPerPod()
 
 	if userNsLength%userNsUnitLength != 0 {
 		return nil, fmt.Errorf("kubelet user namespace length %v is not a multiple of %d", userNsLength, userNsUnitLength)
@@ -166,11 +175,6 @@ func MakeUserNsManager(logger klog.Logger, kl userNsPodsManager) (*UsernsManager
 		userNsLength: userNsLength,
 	}
 
-	// do not bother reading the list of pods if user namespaces are not enabled.
-	if !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) {
-		return &m, nil
-	}
-
 	found, err := kl.ListPodsFromDisk()
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -182,7 +186,7 @@ func MakeUserNsManager(logger klog.Logger, kl userNsPodsManager) (*UsernsManager
 	for _, podUID := range found {
 		logger.V(5).Info("reading pod from disk for user namespace", "podUID", podUID)
 		if err := m.recordPodMappings(logger, podUID); err != nil {
-			return nil, fmt.Errorf("record pod mappings: %w", err)
+			return nil, fmt.Errorf("record pod mappings for existing pod %q: %w", podUID, err)
 		}
 	}
 

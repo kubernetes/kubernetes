@@ -1058,8 +1058,13 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.description, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicResourceAllocation, tc.enabled)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, tc.extendedEnabled)
+			if !tc.enabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
+			}
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.DynamicResourceAllocation: tc.enabled,
+				features.DRAExtendedResource:       tc.extendedEnabled,
+			})
 
 			oldPod := tc.oldPod.DeepCopy()
 			newPod := tc.newPod.DeepCopy()
@@ -1229,97 +1234,47 @@ func TestDropDisabledPodStatusFields_ObservedGeneration(t *testing.T) {
 		name          string
 		podStatus     *api.PodStatus
 		oldPodStatus  *api.PodStatus
-		featureGateOn bool
 		wantPodStatus *api.PodStatus
 	}{
-		{
-			name:          "old=without, new=without / feature gate off",
-			oldPodStatus:  podWithoutObservedGen(),
-			podStatus:     podWithoutObservedGen(),
-			featureGateOn: false,
-			wantPodStatus: podWithoutObservedGen(),
-		},
 		{
 			name:          "old=without, new=without / feature gate on",
 			oldPodStatus:  podWithoutObservedGen(),
 			podStatus:     podWithoutObservedGen(),
-			featureGateOn: true,
-			wantPodStatus: podWithoutObservedGen(),
-		},
-		{
-			name:          "old=without, new=with / feature gate off",
-			oldPodStatus:  podWithoutObservedGen(),
-			podStatus:     podWithObservedGen(),
-			featureGateOn: false,
 			wantPodStatus: podWithoutObservedGen(),
 		},
 		{
 			name:          "old=with, new=without / feature gate on",
 			oldPodStatus:  podWithObservedGen(),
 			podStatus:     podWithoutObservedGen(),
-			featureGateOn: true,
 			wantPodStatus: podWithoutObservedGen(),
-		},
-		{
-			name:          "old=with, new=with / feature gate off",
-			oldPodStatus:  podWithObservedGen(),
-			podStatus:     podWithObservedGen(),
-			featureGateOn: false,
-			wantPodStatus: podWithObservedGen(),
 		},
 		{
 			name:          "old=with, new=with / feature gate on",
 			oldPodStatus:  podWithObservedGen(),
 			podStatus:     podWithObservedGen(),
-			featureGateOn: true,
 			wantPodStatus: podWithObservedGen(),
-		},
-		{
-			name:          "old=without, new=withInConditions / feature gate off",
-			oldPodStatus:  podWithoutObservedGen(),
-			podStatus:     podWithObservedGenInConditions(),
-			featureGateOn: false,
-			wantPodStatus: podWithoutObservedGen(),
 		},
 		{
 			name:          "old=without, new=withInConditions / feature gate on",
 			oldPodStatus:  podWithoutObservedGen(),
 			podStatus:     podWithObservedGenInConditions(),
-			featureGateOn: true,
 			wantPodStatus: podWithObservedGenInConditions(),
-		},
-		{
-			name:          "old=withInConditions, new=without / feature gate off",
-			oldPodStatus:  podWithObservedGenInConditions(),
-			podStatus:     podWithoutObservedGen(),
-			featureGateOn: false,
-			wantPodStatus: podWithoutObservedGen(),
 		},
 		{
 			name:          "old=withInConditions, new=without / feature gate on",
 			oldPodStatus:  podWithObservedGenInConditions(),
 			podStatus:     podWithoutObservedGen(),
-			featureGateOn: true,
 			wantPodStatus: podWithoutObservedGen(),
-		},
-		{
-			name:          "old=withInConditions, new=withInCondtions / feature gate off",
-			oldPodStatus:  podWithObservedGenInConditions(),
-			podStatus:     podWithObservedGenInConditions(),
-			featureGateOn: false,
-			wantPodStatus: podWithObservedGenInConditions(),
 		},
 		{
 			name:          "old=withInConditions, new=withInCondtions / feature gate on",
 			oldPodStatus:  podWithObservedGenInConditions(),
 			podStatus:     podWithObservedGenInConditions(),
-			featureGateOn: true,
 			wantPodStatus: podWithObservedGenInConditions(),
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodObservedGenerationTracking, tt.featureGateOn)
 			dropDisabledPodStatusFields(tt.podStatus, tt.oldPodStatus, &api.PodSpec{}, &api.PodSpec{})
 			if !reflect.DeepEqual(tt.podStatus, tt.wantPodStatus) {
 				t.Errorf("dropDisabledStatusFields() = %v, want %v", tt.podStatus, tt.wantPodStatus)
@@ -2790,8 +2745,10 @@ func TestOldPodViolatesMatchLabelKeysValidationOption(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodTopologySpread, tc.matchLabelKeysEnabled)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodTopologySpreadSelectorMerge, tc.matchLabelKeysSelectorMergeEnabled)
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.MatchLabelKeysInPodTopologySpread:              tc.matchLabelKeysEnabled,
+				features.MatchLabelKeysInPodTopologySpreadSelectorMerge: tc.matchLabelKeysSelectorMergeEnabled,
+			})
 			gotOptions := GetValidationOptionsFromPodSpecAndMeta(&api.PodSpec{}, tc.oldPodSpec, nil, nil)
 			if tc.wantOption != gotOptions.OldPodViolatesMatchLabelKeysValidation {
 				t.Errorf("Got OldPodViolatesMatchLabelKeysValidation=%t, want %t", gotOptions.OldPodViolatesMatchLabelKeysValidation, tc.wantOption)
@@ -2851,8 +2808,10 @@ func TestOldPodViolatesLegacyMatchLabelKeysValidationOption(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodTopologySpread, tc.matchLabelKeysEnabled)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodTopologySpreadSelectorMerge, tc.matchLabelKeysSelectorMergeEnabled)
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.MatchLabelKeysInPodTopologySpread:              tc.matchLabelKeysEnabled,
+				features.MatchLabelKeysInPodTopologySpreadSelectorMerge: tc.matchLabelKeysSelectorMergeEnabled,
+			})
 			gotOptions := GetValidationOptionsFromPodSpecAndMeta(&api.PodSpec{}, tc.oldPodSpec, nil, nil)
 			if tc.wantOption != gotOptions.OldPodViolatesLegacyMatchLabelKeysValidation {
 				t.Errorf("Got OldPodViolatesLegacyMatchLabelKeysValidation=%t, want %t", gotOptions.OldPodViolatesLegacyMatchLabelKeysValidation, tc.wantOption)
@@ -2943,6 +2902,7 @@ func TestValidateAllowNonLocalProjectedTokenPathOption(t *testing.T) {
 }
 
 func TestDropInPlacePodVerticalScaling(t *testing.T) {
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
 	podWithInPlaceVerticalScaling := func() *api.Pod {
 		return &api.Pod{
 			Spec: api.PodSpec{
@@ -3331,6 +3291,8 @@ func TestDropSidecarContainers(t *testing.T) {
 }
 
 func TestDropClusterTrustBundleProjectedVolumes(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ClusterTrustBundle, true)
+
 	testCases := []struct {
 		description                         string
 		clusterTrustBundleProjectionEnabled bool
@@ -4102,6 +4064,8 @@ func TestDropSupplementalGroupsPolicy(t *testing.T) {
 						"feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description,
 					),
 					func(t *testing.T) {
+						// Set emulation version so that the feature gate can be disabled in the test
+						featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
 						featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SupplementalGroupsPolicy, enabled)
 
 						var oldPodSpec *api.PodSpec
@@ -4442,6 +4406,7 @@ func TestDropSELinuxChangePolicy(t *testing.T) {
 }
 
 func TestValidateAllowSidecarResizePolicy(t *testing.T) {
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
 	restartPolicyAlways := api.ContainerRestartPolicyAlways
 	testCases := []struct {
 		name       string
@@ -6249,6 +6214,101 @@ func TestHasUserNamespacesWithVolumeDevices(t *testing.T) {
 			actual := hasUserNamespacesWithVolumeDevices(test.spec)
 			if test.expected != actual {
 				t.Errorf("expected %v, got %v", test.expected, actual)
+			}
+		})
+	}
+}
+
+func TestDisabledWorkload(t *testing.T) {
+	podWithWorkload := &api.Pod{
+		Spec: api.PodSpec{
+			WorkloadRef: &api.WorkloadReference{
+				Name:     "w",
+				PodGroup: "pg",
+			},
+		},
+	}
+	podWithoutWorkload := &api.Pod{
+		Spec: api.PodSpec{},
+	}
+
+	tests := []struct {
+		name    string
+		enabled bool
+		oldPod  *api.Pod
+		newPod  *api.Pod
+		wantPod *api.Pod
+	}{
+		{
+			name:    "old with workload / new with workload / disabled",
+			oldPod:  podWithWorkload,
+			newPod:  podWithWorkload,
+			wantPod: podWithWorkload,
+		},
+		{
+			name:    "old without workload / new with workload / disabled",
+			oldPod:  podWithoutWorkload,
+			newPod:  podWithWorkload,
+			wantPod: podWithoutWorkload,
+		},
+		{
+			name:    "old with workload / new without workload / disabled",
+			oldPod:  podWithWorkload,
+			newPod:  podWithoutWorkload,
+			wantPod: podWithoutWorkload,
+		},
+		{
+			name:    "old without workload / new without workload / disabled",
+			oldPod:  podWithoutWorkload,
+			newPod:  podWithoutWorkload,
+			wantPod: podWithoutWorkload,
+		},
+		{
+			name:    "old with workload / new with workload / enabled",
+			enabled: true,
+			oldPod:  podWithWorkload,
+			newPod:  podWithWorkload,
+			wantPod: podWithWorkload,
+		},
+		{
+			name:    "old without workload / new with workload / enabled",
+			enabled: true,
+			oldPod:  podWithoutWorkload,
+			newPod:  podWithWorkload,
+			wantPod: podWithWorkload,
+		},
+		{
+			name:    "old with workload / new without workload / enabled",
+			enabled: true,
+			oldPod:  podWithWorkload,
+			newPod:  podWithoutWorkload,
+			wantPod: podWithoutWorkload,
+		},
+		{
+			name:    "old without workload / new without workload / enabled",
+			enabled: true,
+			oldPod:  podWithoutWorkload,
+			newPod:  podWithoutWorkload,
+			wantPod: podWithoutWorkload,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, tc.enabled)
+
+			oldPod := tc.oldPod.DeepCopy()
+			newPod := tc.newPod.DeepCopy()
+			wantPod := tc.wantPod
+			DropDisabledPodFields(newPod, oldPod)
+
+			// Old pod should be never changed
+			if diff := cmp.Diff(oldPod, tc.oldPod); diff != "" {
+				t.Errorf("Old pod changed (-want,+got): %s", diff)
+			}
+
+			if diff := cmp.Diff(wantPod, newPod); diff != "" {
+				t.Errorf("New pod changed (-want,+got): %s", diff)
 			}
 		})
 	}

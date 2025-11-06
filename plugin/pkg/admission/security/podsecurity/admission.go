@@ -27,7 +27,6 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/apps/install"
 	_ "k8s.io/kubernetes/pkg/apis/batch/install"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
-	"k8s.io/kubernetes/pkg/features"
 
 	admissionv1 "k8s.io/api/admission/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -44,7 +43,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/component-base/compatibility"
-	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/apps"
@@ -70,8 +68,6 @@ func Register(plugins *admission.Plugins) {
 // Plugin holds state for and implements the admission plugin.
 type Plugin struct {
 	*admission.Handler
-
-	inspectedFeatureGates bool
 
 	inspectedEffectiveVersion bool
 	emulationVersion          *podsecurityadmissionapi.Version
@@ -173,16 +169,8 @@ func (p *Plugin) InspectEffectiveVersion(version compatibility.EffectiveVersion)
 	}
 }
 
-func (p *Plugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
-	p.inspectedFeatureGates = true
-	policy.RelaxPolicyForUserNamespacePods(featureGates.Enabled(features.UserNamespacesPodSecurityStandards))
-}
-
 // ValidateInitialization ensures all required options are set
 func (p *Plugin) ValidateInitialization() error {
-	if !p.inspectedFeatureGates {
-		return fmt.Errorf("%s did not see feature gates", PluginName)
-	}
 	if !p.inspectedEffectiveVersion {
 		return fmt.Errorf("%s did not see effective version", PluginName)
 	}

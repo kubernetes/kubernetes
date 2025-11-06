@@ -90,6 +90,7 @@ message AllocatedDeviceStatus {
   // NetworkData contains network-related information specific to the device.
   //
   // +optional
+  // +k8s:optional
   optional NetworkDeviceData networkData = 6;
 }
 
@@ -184,7 +185,9 @@ message BasicDevice {
 
   // If specified, these are the driver-defined taints.
   //
-  // The maximum number of taints is 4.
+  // The maximum number of taints is 16. If taints are set for
+  // any device in a ResourceSlice, then the maximum number of
+  // allowed devices per ResourceSlice is 64 instead of 128.
   //
   // This is an alpha field and requires enabling the DRADeviceTaints
   // feature gate.
@@ -221,6 +224,8 @@ message BasicDevice {
   // +optional
   // +listType=atomic
   // +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
+  // +k8s:optional
+  // +k8s:maxItems=4
   repeated string bindingConditions = 9;
 
   // BindingFailureConditions defines the conditions for binding failure.
@@ -237,6 +242,8 @@ message BasicDevice {
   // +optional
   // +listType=atomic
   // +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
+  // +k8s:optional
+  // +k8s:maxItems=4
   repeated string bindingFailureConditions = 10;
 
   // AllowMultipleAllocations marks whether the device is allowed to be allocated to multiple DeviceRequests.
@@ -472,6 +479,7 @@ message DeviceAllocationConfiguration {
   // or from a claim.
   //
   // +required
+  // +k8s:required
   optional string source = 1;
 
   // Requests lists the names of requests where the configuration applies.
@@ -483,6 +491,10 @@ message DeviceAllocationConfiguration {
   //
   // +optional
   // +listType=atomic
+  // +k8s:optional
+  // +k8s:listType=atomic
+  // +k8s:unique=set
+  // +k8s:maxItems=32
   repeated string requests = 2;
 
   optional DeviceConfiguration deviceConfiguration = 3;
@@ -494,6 +506,8 @@ message DeviceAllocationResult {
   //
   // +optional
   // +listType=atomic
+  // +k8s:optional
+  // +k8s:maxItems=32
   repeated DeviceRequestAllocationResult results = 1;
 
   // This field is a combination of all the claim and class configuration parameters.
@@ -506,6 +520,8 @@ message DeviceAllocationResult {
   //
   // +optional
   // +listType=atomic
+  // +k8s:optional
+  // +k8s:maxItems=64
   repeated DeviceAllocationConfiguration config = 2;
 }
 
@@ -514,26 +530,30 @@ message DeviceAttribute {
   // IntValue is a number.
   //
   // +optional
-  // +oneOf=ValueType
+  // +k8s:optional
+  // +k8s:unionMember
   optional int64 int = 2;
 
   // BoolValue is a true/false value.
   //
   // +optional
-  // +oneOf=ValueType
+  // +k8s:optional
+  // +k8s:unionMember
   optional bool bool = 3;
 
   // StringValue is a string. Must not be longer than 64 characters.
   //
   // +optional
-  // +oneOf=ValueType
+  // +k8s:optional
+  // +k8s:unionMember
   optional string string = 4;
 
   // VersionValue is a semantic version according to semver.org spec 2.0.0.
   // Must not be longer than 64 characters.
   //
   // +optional
-  // +oneOf=ValueType
+  // +k8s:optional
+  // +k8s:unionMember
   optional string version = 5;
 }
 
@@ -570,6 +590,10 @@ message DeviceClaim {
   //
   // +optional
   // +listType=atomic
+  // +k8s:optional
+  // +k8s:listType=atomic
+  // +k8s:unique=map
+  // +k8s:listMapKey=name
   // +k8s:maxItems=32
   repeated DeviceRequest requests = 1;
 
@@ -578,6 +602,7 @@ message DeviceClaim {
   //
   // +optional
   // +listType=atomic
+  // +k8s:optional
   // +k8s:maxItems=32
   repeated DeviceConstraint constraints = 2;
 
@@ -587,6 +612,7 @@ message DeviceClaim {
   //
   // +optional
   // +listType=atomic
+  // +k8s:optional
   // +k8s:maxItems=32
   repeated DeviceClaimConfiguration config = 3;
 }
@@ -602,6 +628,9 @@ message DeviceClaimConfiguration {
   //
   // +optional
   // +listType=atomic
+  // +k8s:optional
+  // +k8s:listType=atomic
+  // +k8s:unique=set
   // +k8s:maxItems=32
   repeated string requests = 1;
 
@@ -618,6 +647,8 @@ message DeviceClaimConfiguration {
 message DeviceClass {
   // Standard object metadata
   // +optional
+  // +k8s:subfield(name)=+k8s:optional
+  // +k8s:subfield(name)=+k8s:format=k8s-long-name
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec defines what can be allocated and how to configure it.
@@ -681,6 +712,8 @@ message DeviceClassSpec {
   // This is an alpha field.
   // +optional
   // +featureGate=DRAExtendedResource
+  // +k8s:optional
+  // +k8s:format=k8s-extended-resource-name
   optional string extendedResourceName = 4;
 }
 
@@ -710,6 +743,9 @@ message DeviceConstraint {
   //
   // +optional
   // +listType=atomic
+  // +k8s:optional
+  // +k8s:listType=atomic
+  // +k8s:unique=set
   // +k8s:maxItems=32
   repeated string requests = 1;
 
@@ -728,6 +764,8 @@ message DeviceConstraint {
   //
   // +optional
   // +oneOf=ConstraintType
+  // +k8s:optional
+  // +k8s:format=k8s-resource-fully-qualified-name
   optional string matchAttribute = 2;
 
   // DistinctAttribute requires that all devices in question have this
@@ -809,6 +847,7 @@ message DeviceRequest {
   //
   // +optional
   // +listType=atomic
+  // +k8s:optional
   // +k8s:maxItems=32
   repeated DeviceSelector selectors = 3;
 
@@ -835,6 +874,7 @@ message DeviceRequest {
   // requests with unknown modes.
   //
   // +optional
+  // +k8s:optional
   optional string allocationMode = 4;
 
   // Count is used only when the count mode is "ExactCount". Must be greater than zero.
@@ -884,6 +924,10 @@ message DeviceRequest {
   // +oneOf=deviceRequestType
   // +listType=atomic
   // +featureGate=DRAPrioritizedList
+  // +k8s:optional
+  // +k8s:listType=atomic
+  // +k8s:unique=map
+  // +k8s:listMapKey=name
   // +k8s:maxItems=8
   repeated DeviceSubRequest firstAvailable = 7;
 
@@ -952,6 +996,8 @@ message DeviceRequestAllocationResult {
   // vendor of the driver. It should use only lower case characters.
   //
   // +required
+  // +k8s:format=k8s-long-name-caseless
+  // +k8s:required
   optional string driver = 2;
 
   // This name together with the driver name and the device name field
@@ -994,6 +1040,7 @@ message DeviceRequestAllocationResult {
   // +optional
   // +listType=atomic
   // +featureGate=DRADeviceTaints
+  // +k8s:optional
   // +k8s:maxItems=16
   repeated DeviceToleration tolerations = 6;
 
@@ -1006,6 +1053,8 @@ message DeviceRequestAllocationResult {
   // +optional
   // +listType=atomic
   // +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
+  // +k8s:optional
+  // +k8s:maxItems=4
   repeated string bindingConditions = 7;
 
   // BindingFailureConditions contains a copy of the BindingFailureConditions
@@ -1017,6 +1066,8 @@ message DeviceRequestAllocationResult {
   // +optional
   // +listType=atomic
   // +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
+  // +k8s:optional
+  // +k8s:maxItems=4
   repeated string bindingFailureConditions = 8;
 
   // ShareID uniquely identifies an individual allocation share of the device,
@@ -1085,6 +1136,8 @@ message DeviceSubRequest {
   // to reference.
   //
   // +required
+  // +k8s:required
+  // +k8s:format=k8s-long-name
   optional string deviceClassName = 2;
 
   // Selectors define criteria which must be satisfied by a specific
@@ -1186,10 +1239,13 @@ message DeviceTaint {
 
   // The effect of the taint on claims that do not tolerate the taint
   // and through such claims on the pods using them.
-  // Valid effects are NoSchedule and NoExecute. PreferNoSchedule as used for
-  // nodes is not valid here.
+  //
+  // Valid effects are None, NoSchedule and NoExecute. PreferNoSchedule as used for
+  // nodes is not valid here. More effects may get added in the future.
+  // Consumers must treat unknown effects like None.
   //
   // +required
+  // +k8s:required
   optional string effect = 3;
 
   // TimeAdded represents the time at which the taint was added.
@@ -1207,6 +1263,8 @@ message DeviceToleration {
   // Must be a label name.
   //
   // +optional
+  // +k8s:optional
+  // +k8s:format=k8s-label-key
   optional string key = 1;
 
   // Operator represents a key's relationship to the value.
@@ -1253,6 +1311,8 @@ message NetworkDeviceData {
   // Must not be longer than 256 characters.
   //
   // +optional
+  // +k8s:optional
+  // +k8s:maxLength=256
   optional string interfaceName = 1;
 
   // IPs lists the network addresses assigned to the device's network interface.
@@ -1265,6 +1325,10 @@ message NetworkDeviceData {
   //
   // +optional
   // +listType=atomic
+  // +k8s:optional
+  // +k8s:listType=atomic
+  // +k8s:unique=set
+  // +k8s:maxItems=16
   repeated string ips = 2;
 
   // HardwareAddress represents the hardware address (e.g. MAC Address) of the device's network interface.
@@ -1272,6 +1336,8 @@ message NetworkDeviceData {
   // Must not be longer than 128 characters.
   //
   // +optional
+  // +k8s:optional
+  // +k8s:maxLength=128
   optional string hardwareAddress = 3;
 }
 
@@ -1374,6 +1440,7 @@ message ResourceClaimStatus {
   //
   // +optional
   // +k8s:optional
+  // +k8s:update=NoModify
   optional AllocationResult allocation = 1;
 
   // ReservedFor indicates which entities are currently allowed to use
@@ -1404,6 +1471,7 @@ message ResourceClaimStatus {
   // +k8s:optional
   // +k8s:listType=map
   // +k8s:listMapKey=uid
+  // +k8s:maxItems=256
   repeated ResourceClaimConsumerReference reservedFor = 2;
 
   // Devices contains the status of each device allocated for this
@@ -1418,6 +1486,11 @@ message ResourceClaimStatus {
   // +listMapKey=pool
   // +listMapKey=shareID
   // +featureGate=DRAResourceClaimDeviceStatus
+  // +k8s:listType=map
+  // +k8s:listMapKey=driver
+  // +k8s:listMapKey=device
+  // +k8s:listMapKey=pool
+  // +k8s:listMapKey=shareID
   repeated AllocatedDeviceStatus devices = 4;
 }
 
@@ -1599,10 +1672,11 @@ message ResourceSliceSpec {
 
   // Devices lists some or all of the devices in this pool.
   //
-  // Must not have more than 128 entries.
+  // Must not have more than 128 entries. If any device uses taints the limit is 64.
   //
   // +optional
   // +listType=atomic
+  // +k8s:optional
   repeated Device devices = 6;
 
   // PerDeviceNodeSelection defines whether the access from nodes to

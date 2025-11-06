@@ -108,6 +108,25 @@ func TestValidateResourceSlice(t *testing.T) {
 			wantFailures: field.ErrorList{field.TooMany(field.NewPath("spec", "devices"), resourceapi.ResourceSliceMaxDevices+1, resourceapi.ResourceSliceMaxDevices)},
 			slice:        testResourceSlice(goodName, goodName, goodName, resourceapi.ResourceSliceMaxDevices+1),
 		},
+		"good-taints": {
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, goodName, resourceapi.ResourceSliceMaxDevicesWithTaints)
+				for i := range slice.Spec.Devices {
+					slice.Spec.Devices[i].Taints = []resourceapi.DeviceTaint{{Key: "example.com/taint", Effect: resourceapi.DeviceTaintEffectNoExecute}}
+				}
+				return slice
+			}(),
+		},
+		"too-large-taints": {
+			wantFailures: field.ErrorList{field.TooMany(field.NewPath("spec", "devices"), resourceapi.ResourceSliceMaxDevicesWithTaints+1, resourceapi.ResourceSliceMaxDevicesWithTaints)},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, goodName, resourceapi.ResourceSliceMaxDevicesWithTaints+1)
+				for i := range slice.Spec.Devices {
+					slice.Spec.Devices[i].Taints = []resourceapi.DeviceTaint{{Key: "example.com/taint", Effect: resourceapi.DeviceTaintEffectNoExecute}}
+				}
+				return slice
+			}(),
+		},
 		"missing-name": {
 			wantFailures: field.ErrorList{field.Required(field.NewPath("metadata", "name"), "name or generateName is required")},
 			slice:        testResourceSlice("", goodName, driverName, 1),
@@ -336,8 +355,8 @@ func TestValidateResourceSlice(t *testing.T) {
 		"bad-attribute": {
 			wantFailures: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "devices").Index(1).Child("attributes").Key(badName), badName, "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_' (e.g. 'my_name',  or 'MY_NAME',  or 'MyName', regex used for validation is '[A-Za-z_][A-Za-z0-9_]*')"),
-				field.Required(field.NewPath("spec", "devices").Index(1).Child("attributes").Key(badName), "exactly one value must be specified"),
-				field.Invalid(field.NewPath("spec", "devices").Index(2).Child("attributes").Key(goodName), resourceapi.DeviceAttribute{StringValue: ptr.To("x"), VersionValue: ptr.To("1.2.3")}, "exactly one value must be specified"),
+				field.Invalid(field.NewPath("spec", "devices").Index(1).Child("attributes").Key(badName), "", "exactly one value must be specified").MarkCoveredByDeclarative(),
+				field.Invalid(field.NewPath("spec", "devices").Index(2).Child("attributes").Key(goodName), resourceapi.DeviceAttribute{StringValue: ptr.To("x"), VersionValue: ptr.To("1.2.3")}, "exactly one value must be specified").MarkCoveredByDeclarative(),
 				field.Invalid(field.NewPath("spec", "devices").Index(3).Child("attributes").Key(goodName).Child("version"), strings.Repeat("x", resourceapi.DeviceAttributeMaxValueLength+1), "must be a string compatible with semver.org spec 2.0.0"),
 				field.TooLongMaxLength(field.NewPath("spec", "devices").Index(3).Child("attributes").Key(goodName).Child("version"), strings.Repeat("x", resourceapi.DeviceAttributeMaxValueLength+1), resourceapi.DeviceAttributeMaxValueLength),
 				field.TooLongMaxLength(field.NewPath("spec", "devices").Index(4).Child("attributes").Key(goodName).Child("string"), strings.Repeat("x", resourceapi.DeviceAttributeMaxValueLength+1), resourceapi.DeviceAttributeMaxValueLength),
@@ -410,8 +429,8 @@ func TestValidateResourceSlice(t *testing.T) {
 		},
 		"bad-attribute-empty-domain-and-c-identifier": {
 			wantFailures: field.ErrorList{
-				field.Required(field.NewPath("spec", "devices").Index(1).Child("attributes").Key("/"), "the domain must not be empty"),
-				field.Required(field.NewPath("spec", "devices").Index(1).Child("attributes").Key("/"), "the name must not be empty"),
+				field.Invalid(field.NewPath("spec", "devices").Index(1).Child("attributes").Key("/"), "", "the domain must not be empty"),
+				field.Invalid(field.NewPath("spec", "devices").Index(1).Child("attributes").Key("/"), "", "the name must not be empty"),
 			},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, goodName, 2)
@@ -493,11 +512,11 @@ func TestValidateResourceSlice(t *testing.T) {
 				return field.ErrorList{
 					field.Invalid(fldPath.Index(2).Child("key"), "", "name part must be non-empty"),
 					field.Invalid(fldPath.Index(2).Child("key"), "", "name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')"),
-					field.Required(fldPath.Index(2).Child("effect"), ""),
+					field.Required(fldPath.Index(2).Child("effect"), "").MarkCoveredByDeclarative(),
 
 					field.Invalid(fldPath.Index(3).Child("key"), badName, "name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')"),
 					field.Invalid(fldPath.Index(3).Child("value"), badName, "a valid label must be an empty string or consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyValue',  or 'my_value',  or '12345', regex used for validation is '(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?')"),
-					field.NotSupported(fldPath.Index(3).Child("effect"), resourceapi.DeviceTaintEffect("some-other-op"), []resourceapi.DeviceTaintEffect{resourceapi.DeviceTaintEffectNoExecute, resourceapi.DeviceTaintEffectNoSchedule}),
+					field.NotSupported(fldPath.Index(3).Child("effect"), resourceapi.DeviceTaintEffect("some-other-effect"), []resourceapi.DeviceTaintEffect{resourceapi.DeviceTaintEffectNoExecute, resourceapi.DeviceTaintEffectNoSchedule, resourceapi.DeviceTaintEffectNone}).MarkCoveredByDeclarative(),
 				}
 			}(),
 			slice: func() *resourceapi.ResourceSlice {
@@ -522,7 +541,7 @@ func TestValidateResourceSlice(t *testing.T) {
 						// Invalid strings.
 						Key:    badName,
 						Value:  badName,
-						Effect: "some-other-op",
+						Effect: "some-other-effect",
 					},
 				}
 				return slice
@@ -818,11 +837,11 @@ func TestValidateResourceSlice(t *testing.T) {
 			slice: testResourceSliceWithBindingConditions(goodName, goodName, driverName, 1, []string{"example.com/condition1", "condition2"}, []string{"example.com/condition3", "condition4"}),
 		},
 		"too-many-binding-conditions": {
-			wantFailures: field.ErrorList{field.TooMany(field.NewPath("spec", "devices").Index(0).Child("bindingConditions"), resourceapi.BindingConditionsMaxSize+1, resourceapi.BindingConditionsMaxSize)},
+			wantFailures: field.ErrorList{field.TooMany(field.NewPath("spec", "devices").Index(0).Child("bindingConditions"), resourceapi.BindingConditionsMaxSize+1, resourceapi.BindingConditionsMaxSize).MarkCoveredByDeclarative()},
 			slice:        testResourceSliceWithBindingConditions(goodName, goodName, driverName, 1, []string{"condition1", "condition2", "condition3", "condition4", "condition5"}, []string{"condition6", "condition7"}),
 		},
 		"too-many-binding-failure-conditions": {
-			wantFailures: field.ErrorList{field.TooMany(field.NewPath("spec", "devices").Index(0).Child("bindingFailureConditions"), resourceapi.BindingConditionsMaxSize+1, resourceapi.BindingConditionsMaxSize)},
+			wantFailures: field.ErrorList{field.TooMany(field.NewPath("spec", "devices").Index(0).Child("bindingFailureConditions"), resourceapi.BindingConditionsMaxSize+1, resourceapi.BindingConditionsMaxSize).MarkCoveredByDeclarative()},
 			slice:        testResourceSliceWithBindingConditions(goodName, goodName, driverName, 1, []string{"condition1", "condition2"}, []string{"condition3", "condition4", "condition5", "condition6", "condition7"}),
 		},
 		"invalid-binding-conditions": {
@@ -867,6 +886,17 @@ func TestValidateResourceSlice(t *testing.T) {
 func TestValidateResourceSliceUpdate(t *testing.T) {
 	name := "valid"
 	validResourceSlice := testResourceSlice(name, name, name, 1)
+	invalidResourceSliceWithTaints := validResourceSlice.DeepCopy()
+	invalidResourceSliceWithTaints.Spec.Devices[0].Taints = []resourceapi.DeviceTaint{
+		{
+			Key:    "unhealthy-power",
+			Effect: resourceapi.DeviceTaintEffectNoExecute,
+		},
+		{
+			Key:    "unhealthy-mem",
+			Effect: "some-other-effect",
+		},
+	}
 
 	scenarios := map[string]struct {
 		oldResourceSlice *resourceapi.ResourceSlice
@@ -935,6 +965,31 @@ func TestValidateResourceSliceUpdate(t *testing.T) {
 						}},
 					}},
 				}
+				return slice
+			},
+		},
+		"invalid-new-effect-in-old-device": {
+			wantFailures:     field.ErrorList{field.NotSupported(field.NewPath("spec", "devices").Index(0).Child("taints").Index(1).Child("effect"), resourceapi.DeviceTaintEffect("some-other-effect"), []resourceapi.DeviceTaintEffect{resourceapi.DeviceTaintEffectNoExecute, resourceapi.DeviceTaintEffectNoSchedule, resourceapi.DeviceTaintEffectNone})}.MarkCoveredByDeclarative(),
+			oldResourceSlice: validResourceSlice,
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				slice.Spec.Devices[0].Taints = invalidResourceSliceWithTaints.Spec.Devices[0].Taints
+				return slice
+			},
+		},
+		"valid-old-effect": {
+			oldResourceSlice: invalidResourceSliceWithTaints,
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				slice.Spec.Devices[0].Attributes["foo"] = resourceapi.DeviceAttribute{StringValue: ptr.To("bar")}
+				return slice
+			},
+		},
+		"invalid-new-effect-in-new-device": {
+			wantFailures:     field.ErrorList{field.NotSupported(field.NewPath("spec", "devices").Index(1).Child("taints").Index(1).Child("effect"), resourceapi.DeviceTaintEffect("some-other-effect"), []resourceapi.DeviceTaintEffect{resourceapi.DeviceTaintEffectNoExecute, resourceapi.DeviceTaintEffectNoSchedule, resourceapi.DeviceTaintEffectNone})}.MarkCoveredByDeclarative(),
+			oldResourceSlice: invalidResourceSliceWithTaints,
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				device := slice.Spec.Devices[0].DeepCopy()
+				device.Name += "-other"
+				slice.Spec.Devices = append(slice.Spec.Devices, *device)
 				return slice
 			},
 		},

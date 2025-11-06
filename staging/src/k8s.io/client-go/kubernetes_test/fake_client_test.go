@@ -26,7 +26,15 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/util/watchlist"
 )
+
+func TestDoesClientSupportWatchListSemantics(t *testing.T) {
+	target := fake.NewClientset()
+	if !watchlist.DoesClientNotSupportWatchListSemantics(target) {
+		t.Fatalf("NewSimpleClientset should NOT support WatchList semantics")
+	}
+}
 
 // This test proves that the kube fake client does not return GVKs.  This is consistent with actual client (see tests below)
 // and should not be changed unless the decoding behavior and somehow literal creation (`&corev1.ConfigMap{}`) behavior change.

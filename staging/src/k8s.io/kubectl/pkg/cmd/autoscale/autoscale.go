@@ -362,6 +362,10 @@ func (o *AutoscaleOptions) createHorizontalPodAutoscalerV2(refName string, mappi
 		scaler.Spec.MinReplicas = &o.Min
 	}
 
+	if o.enforceNamespace {
+		scaler.ObjectMeta.Namespace = o.namespace
+	}
+
 	metrics := []autoscalingv2.MetricSpec{}
 
 	// add CPU metric if any of the CPU targets are specified
@@ -468,6 +472,10 @@ func (o *AutoscaleOptions) createHorizontalPodAutoscalerV1(refName string, mappi
 	if o.CPUPercent >= 0 {
 		c := int32(o.CPUPercent)
 		scaler.Spec.TargetCPUUtilizationPercentage = &c
+	}
+
+	if o.enforceNamespace {
+		scaler.ObjectMeta.Namespace = o.namespace
 	}
 
 	return &scaler

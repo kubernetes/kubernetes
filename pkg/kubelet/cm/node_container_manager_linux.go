@@ -28,7 +28,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
@@ -42,7 +41,7 @@ const (
 )
 
 // createNodeAllocatableCgroups creates Node Allocatable Cgroup when CgroupsPerQOS flag is specified as true
-func (cm *containerManagerImpl) createNodeAllocatableCgroups() error {
+func (cm *containerManagerImpl) createNodeAllocatableCgroups(logger klog.Logger) error {
 	nodeAllocatable := cm.internalCapacity
 	// Use Node Allocatable limits instead of capacity if the user requested enforcing node allocatable.
 	nc := cm.NodeConfig.NodeAllocatableConfig
@@ -58,15 +57,15 @@ func (cm *containerManagerImpl) createNodeAllocatableCgroups() error {
 	if cm.cgroupManager.Exists(cgroupConfig.Name) {
 		return nil
 	}
-	if err := cm.cgroupManager.Create(cgroupConfig); err != nil {
-		klog.ErrorS(err, "Failed to create cgroup", "cgroupName", cm.cgroupRoot)
+	if err := cm.cgroupManager.Create(logger, cgroupConfig); err != nil {
+		logger.Error(err, "Failed to create cgroup", "cgroupName", cm.cgroupRoot)
 		return err
 	}
 	return nil
 }
 
 // enforceNodeAllocatableCgroups enforce Node Allocatable Cgroup settings.
-func (cm *containerManagerImpl) enforceNodeAllocatableCgroups() error {
+func (cm *containerManagerImpl) enforceNodeAllocatableCgroups(logger klog.Logger) error {
 	nc := cm.NodeConfig.NodeAllocatableConfig
 
 	// We need to update limits on node allocatable cgroup no matter what because
@@ -77,7 +76,7 @@ func (cm *containerManagerImpl) enforceNodeAllocatableCgroups() error {
 		nodeAllocatable = cm.getNodeAllocatableInternalAbsolute()
 	}
 
-	klog.V(4).InfoS("Attempting to enforce Node Allocatable", "config", nc)
+	logger.V(4).Info("Attempting to enforce Node Allocatable", "config", nc)
 
 	cgroupConfig := &CgroupConfig{
 		Name:               cm.cgroupRoot,
@@ -96,7 +95,7 @@ func (cm *containerManagerImpl) enforceNodeAllocatableCgroups() error {
 	if len(cm.cgroupRoot) > 0 {
 		go func() {
 			for {
-				err := cm.cgroupManager.Update(cgroupConfig)
+				err := cm.cgroupManager.Update(logger, cgroupConfig)
 				if err == nil {
 					cm.recorder.Event(nodeRef, v1.EventTypeNormal, events.SuccessfulNodeAllocatableEnforcement, "Updated Node Allocatable limit across pods")
 					return
@@ -109,8 +108,8 @@ func (cm *containerManagerImpl) enforceNodeAllocatableCgroups() error {
 	}
 	// Now apply kube reserved and system reserved limits if required.
 	if nc.EnforceNodeAllocatable.Has(kubetypes.SystemReservedEnforcementKey) {
-		klog.V(2).InfoS("Enforcing system reserved on cgroup", "cgroupName", nc.SystemReservedCgroupName, "limits", nc.SystemReserved)
-		if err := cm.enforceExistingCgroup(nc.SystemReservedCgroupName, nc.SystemReserved, false); err != nil {
+		logger.V(2).Info("Enforcing system reserved on cgroup", "cgroupName", nc.SystemReservedCgroupName, "limits", nc.SystemReserved)
+		if err := cm.enforceExistingCgroup(logger, nc.SystemReservedCgroupName, nc.SystemReserved, false); err != nil {
 			message := fmt.Sprintf("Failed to enforce System Reserved Cgroup Limits on %q: %v", nc.SystemReservedCgroupName, err)
 			cm.recorder.Event(nodeRef, v1.EventTypeWarning, events.FailedNodeAllocatableEnforcement, message)
 			return errors.New(message)
@@ -118,8 +117,8 @@ func (cm *containerManagerImpl) enforceNodeAllocatableCgroups() error {
 		cm.recorder.Eventf(nodeRef, v1.EventTypeNormal, events.SuccessfulNodeAllocatableEnforcement, "Updated limits on system reserved cgroup %v", nc.SystemReservedCgroupName)
 	}
 	if nc.EnforceNodeAllocatable.Has(kubetypes.KubeReservedEnforcementKey) {
-		klog.V(2).InfoS("Enforcing kube reserved on cgroup", "cgroupName", nc.KubeReservedCgroupName, "limits", nc.KubeReserved)
-		if err := cm.enforceExistingCgroup(nc.KubeReservedCgroupName, nc.KubeReserved, false); err != nil {
+		logger.V(2).Info("Enforcing kube reserved on cgroup", "cgroupName", nc.KubeReservedCgroupName, "limits", nc.KubeReserved)
+		if err := cm.enforceExistingCgroup(logger, nc.KubeReservedCgroupName, nc.KubeReserved, false); err != nil {
 			message := fmt.Sprintf("Failed to enforce Kube Reserved Cgroup Limits on %q: %v", nc.KubeReservedCgroupName, err)
 			cm.recorder.Event(nodeRef, v1.EventTypeWarning, events.FailedNodeAllocatableEnforcement, message)
 			return errors.New(message)
@@ -128,8 +127,8 @@ func (cm *containerManagerImpl) enforceNodeAllocatableCgroups() error {
 	}
 
 	if nc.EnforceNodeAllocatable.Has(kubetypes.SystemReservedCompressibleEnforcementKey) {
-		klog.V(2).InfoS("Enforcing system reserved compressible on cgroup", "cgroupName", nc.SystemReservedCgroupName, "limits", nc.SystemReserved)
-		if err := cm.enforceExistingCgroup(nc.SystemReservedCgroupName, nc.SystemReserved, true); err != nil {
+		logger.V(2).Info("Enforcing system reserved compressible on cgroup", "cgroupName", nc.SystemReservedCgroupName, "limits", nc.SystemReserved)
+		if err := cm.enforceExistingCgroup(logger, nc.SystemReservedCgroupName, nc.SystemReserved, true); err != nil {
 			message := fmt.Sprintf("Failed to enforce System Reserved Compressible Cgroup Limits on %q: %v", nc.SystemReservedCgroupName, err)
 			cm.recorder.Event(nodeRef, v1.EventTypeWarning, events.FailedNodeAllocatableEnforcement, message)
 			return errors.New(message)
@@ -138,8 +137,8 @@ func (cm *containerManagerImpl) enforceNodeAllocatableCgroups() error {
 	}
 
 	if nc.EnforceNodeAllocatable.Has(kubetypes.KubeReservedCompressibleEnforcementKey) {
-		klog.V(2).InfoS("Enforcing kube reserved compressible on cgroup", "cgroupName", nc.KubeReservedCgroupName, "limits", nc.KubeReserved)
-		if err := cm.enforceExistingCgroup(nc.KubeReservedCgroupName, nc.KubeReserved, true); err != nil {
+		logger.V(2).Info("Enforcing kube reserved compressible on cgroup", "cgroupName", nc.KubeReservedCgroupName, "limits", nc.KubeReserved)
+		if err := cm.enforceExistingCgroup(logger, nc.KubeReservedCgroupName, nc.KubeReserved, true); err != nil {
 			message := fmt.Sprintf("Failed to enforce Kube Reserved Compressible Cgroup Limits on %q: %v", nc.KubeReservedCgroupName, err)
 			cm.recorder.Event(nodeRef, v1.EventTypeWarning, events.FailedNodeAllocatableEnforcement, message)
 			return errors.New(message)
@@ -150,7 +149,7 @@ func (cm *containerManagerImpl) enforceNodeAllocatableCgroups() error {
 }
 
 // enforceExistingCgroup updates the limits `rl` on existing cgroup `cName` using `cgroupManager` interface.
-func (cm *containerManagerImpl) enforceExistingCgroup(cNameStr string, rl v1.ResourceList, compressibleResources bool) error {
+func (cm *containerManagerImpl) enforceExistingCgroup(logger klog.Logger, cNameStr string, rl v1.ResourceList, compressibleResources bool) error {
 	cName := cm.cgroupManager.CgroupName(cNameStr)
 	rp := cm.getCgroupConfig(rl, compressibleResources)
 	if rp == nil {
@@ -172,11 +171,11 @@ func (cm *containerManagerImpl) enforceExistingCgroup(cNameStr string, rl v1.Res
 		Name:               cName,
 		ResourceParameters: rp,
 	}
-	klog.V(4).InfoS("Enforcing limits on cgroup", "cgroupName", cName, "cpuShares", cgroupConfig.ResourceParameters.CPUShares, "memory", cgroupConfig.ResourceParameters.Memory, "pidsLimit", cgroupConfig.ResourceParameters.PidsLimit)
+	logger.V(4).Info("Enforcing limits on cgroup", "cgroupName", cName, "cpuShares", cgroupConfig.ResourceParameters.CPUShares, "memory", cgroupConfig.ResourceParameters.Memory, "pidsLimit", cgroupConfig.ResourceParameters.PidsLimit)
 	if err := cm.cgroupManager.Validate(cgroupConfig.Name); err != nil {
 		return err
 	}
-	if err := cm.cgroupManager.Update(cgroupConfig); err != nil {
+	if err := cm.cgroupManager.Update(logger, cgroupConfig); err != nil {
 		return err
 	}
 	return nil
@@ -320,9 +319,9 @@ func (cm *containerManagerImpl) validateNodeAllocatable() error {
 // Using ObjectReference for events as the node maybe not cached; refer to #42701 for detail.
 func nodeRefFromNode(nodeName string) *v1.ObjectReference {
 	return &v1.ObjectReference{
-		Kind:      "Node",
-		Name:      nodeName,
-		UID:       types.UID(nodeName),
-		Namespace: "",
+		APIVersion: "v1",
+		Kind:       "Node",
+		Name:       nodeName,
+		Namespace:  "",
 	}
 }

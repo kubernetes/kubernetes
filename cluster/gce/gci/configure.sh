@@ -528,6 +528,7 @@ function install-containerd-ubuntu {
     socat \
     curl \
     gnupg2 \
+    nfs-common \
     software-properties-common \
     lsb-release
 
@@ -660,7 +661,7 @@ EOF
 
 function ensure-containerd-runtime {
   # Install containerd/runc if requested
-  if [[ -n "${UBUNTU_INSTALL_CONTAINERD_VERSION:-}" || -n "${UBUNTU_INSTALL_RUNC_VERSION:-}" ]]; then
+  if [[ ( -n "${UBUNTU_INSTALL_CONTAINERD_VERSION:-}" || -n "${UBUNTU_INSTALL_RUNC_VERSION:-}" ) && "$(lsb_release -si)" == "Ubuntu" ]]; then
     log-wrap "InstallContainerdUbuntu" install-containerd-ubuntu
   fi
   if [[ -n "${COS_INSTALL_CONTAINERD_VERSION:-}" || -n "${COS_INSTALL_RUNC_VERSION:-}" ]]; then

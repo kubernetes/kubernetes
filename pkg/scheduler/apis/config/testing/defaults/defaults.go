@@ -42,7 +42,7 @@ var PluginsV1 = &config.Plugins{
 			{Name: names.VolumeZone},
 			{Name: names.PodTopologySpread, Weight: 2},
 			{Name: names.InterPodAffinity, Weight: 2},
-			{Name: names.DynamicResources},
+			{Name: names.DynamicResources, Weight: 2},
 			{Name: names.DefaultPreemption},
 			{Name: names.NodeResourcesBalancedAllocation, Weight: 1},
 			{Name: names.ImageLocality, Weight: 1},
@@ -132,6 +132,9 @@ var ExpandedPluginsV1 = &config.Plugins{
 			// Weight is doubled because:
 			// - This is a score coming from user preference.
 			{Name: names.InterPodAffinity, Weight: 2},
+			// Weight is doubled because:
+			// - This is a score coming from user preference.
+			{Name: names.DynamicResources, Weight: 2},
 			{Name: names.NodeResourcesBalancedAllocation, Weight: 1},
 			{Name: names.ImageLocality, Weight: 1},
 		},

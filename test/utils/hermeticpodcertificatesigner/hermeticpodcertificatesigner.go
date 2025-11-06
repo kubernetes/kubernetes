@@ -27,16 +27,18 @@ import (
 	"fmt"
 	"net/url"
 	"path"
+	"strings"
 	"time"
 
-	certsv1alpha1 "k8s.io/api/certificates/v1alpha1"
+	certsv1beta1 "k8s.io/api/certificates/v1beta1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/wait"
-	certinformersv1alpha1 "k8s.io/client-go/informers/certificates/v1alpha1"
+	certinformersv1beta1 "k8s.io/client-go/informers/certificates/v1beta1"
 	"k8s.io/client-go/kubernetes"
-	certlistersv1alpha1 "k8s.io/client-go/listers/certificates/v1alpha1"
+	certlistersv1beta1 "k8s.io/client-go/listers/certificates/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
@@ -44,23 +46,24 @@ import (
 	"k8s.io/utils/ptr"
 )
 
+const SpiffePathKey = "spiffe/path-overriding"
+
 // Controller is an in-memory signing controller for PodCertificateRequests.
 type Controller struct {
-	clock clock.PassiveClock
-
+	clock      clock.PassiveClock
 	signerName string
 
 	kc          kubernetes.Interface
 	pcrInformer cache.SharedIndexInformer
 	pcrQueue    workqueue.TypedRateLimitingInterface[string]
-
-	caKeys  []crypto.PrivateKey
-	caCerts [][]byte
+	pcrLister   certlistersv1beta1.PodCertificateRequestLister
+	caKeys      []crypto.PrivateKey
+	caCerts     [][]byte
 }
 
 // New creates a new Controller.
 func New(clock clock.PassiveClock, signerName string, caKeys []crypto.PrivateKey, caCerts [][]byte, kc kubernetes.Interface) *Controller {
-	pcrInformer := certinformersv1alpha1.NewFilteredPodCertificateRequestInformer(kc, metav1.NamespaceAll, 24*time.Hour, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+	pcrInformer := certinformersv1beta1.NewFilteredPodCertificateRequestInformer(kc, metav1.NamespaceAll, 24*time.Hour, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 		func(opts *metav1.ListOptions) {
 			opts.FieldSelector = fields.OneTermEqualSelector("spec.signerName", signerName).String()
 		},
@@ -72,6 +75,7 @@ func New(clock clock.PassiveClock, signerName string, caKeys []crypto.PrivateKey
 		kc:          kc,
 		pcrInformer: pcrInformer,
 		pcrQueue:    workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]()),
+		pcrLister:   certlistersv1beta1.NewPodCertificateRequestLister(pcrInformer.GetIndexer()),
 		caKeys:      caKeys,
 		caCerts:     caCerts,
 	}
@@ -105,13 +109,65 @@ func New(clock clock.PassiveClock, signerName string, caKeys []crypto.PrivateKey
 
 func (c *Controller) Run(ctx context.Context) {
 	defer c.pcrQueue.ShutDown()
+	prefix := strings.Replace(c.signerName, "/", ":", 1)
+	ctbName := prefix + ":primary-bundle"
+	defer func() {
+		klog.Infof("Deleting ClusterTrustBundle %s", ctbName)
+		err := c.kc.CertificatesV1beta1().ClusterTrustBundles().Delete(context.Background(), ctbName, metav1.DeleteOptions{})
+		if err != nil && !k8serrors.IsNotFound(err) {
+			klog.Errorf("Failed to delete ClusterTrustBundle %s: %v", ctbName, err)
+		}
+	}()
+
 	go c.pcrInformer.Run(ctx.Done())
 	if !cache.WaitForCacheSync(ctx.Done(), c.pcrInformer.HasSynced) {
 		return
 	}
 
 	go wait.UntilWithContext(ctx, c.runWorker, time.Second)
+	go wait.JitterUntilWithContext(ctx, c.ensureTrustBundle, 1*time.Minute, 1.0, true)
 	<-ctx.Done()
+}
+
+func (c *Controller) ensureTrustBundle(ctx context.Context) {
+	// Create a ClusterTrustBundle with the signer's CA.
+	prefix := strings.Replace(c.signerName, "/", ":", 1)
+	ctbName := prefix + ":primary-bundle"
+	caCertPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: c.caCerts[0]})
+	wantCTB := &certsv1beta1.ClusterTrustBundle{
+		ObjectMeta: metav1.ObjectMeta{Name: ctbName},
+		Spec: certsv1beta1.ClusterTrustBundleSpec{
+			SignerName:  c.signerName,
+			TrustBundle: string(caCertPEM),
+		},
+	}
+
+	klog.Infof("Getting ClusterTrustBundle %s", ctbName)
+	ctb, err := c.kc.CertificatesV1beta1().ClusterTrustBundles().Get(ctx, wantCTB.ObjectMeta.Name, metav1.GetOptions{})
+	if k8serrors.IsNotFound(err) {
+		_, err := c.kc.CertificatesV1beta1().ClusterTrustBundles().Create(ctx, wantCTB, metav1.CreateOptions{})
+		if err != nil {
+			klog.Errorf("Failed to create ClusterTrustBundle %s: %v", ctbName, err)
+			return
+		}
+		return
+	} else if err != nil {
+		klog.Errorf("Failed to get ClusterTrustBundle %s: %v", ctbName, err)
+		return
+	}
+
+	if apiequality.Semantic.DeepEqual(wantCTB.Spec, ctb.Spec) {
+		klog.Info("ClusterTrustBundle already in correct state")
+		return
+	}
+
+	ctb = ctb.DeepCopy()
+	ctb.Spec = wantCTB.Spec
+
+	_, err = c.kc.CertificatesV1beta1().ClusterTrustBundles().Update(ctx, ctb, metav1.UpdateOptions{})
+	if err != nil {
+		klog.Errorf("Failed to update ClusterTrustBundle %s: %v", ctbName, err)
+	}
 }
 
 func (c *Controller) runWorker(ctx context.Context) {
@@ -134,7 +190,7 @@ func (c *Controller) processNextWorkItem(ctx context.Context) bool {
 		return true
 	}
 
-	pcr, err := certlistersv1alpha1.NewPodCertificateRequestLister(c.pcrInformer.GetIndexer()).PodCertificateRequests(namespace).Get(name)
+	pcr, err := c.pcrLister.PodCertificateRequests(namespace).Get(name)
 	if k8serrors.IsNotFound(err) {
 		c.pcrQueue.Forget(key)
 		return true
@@ -154,7 +210,7 @@ func (c *Controller) processNextWorkItem(ctx context.Context) bool {
 	return true
 }
 
-func (c *Controller) handlePCR(ctx context.Context, pcr *certsv1alpha1.PodCertificateRequest) error {
+func (c *Controller) handlePCR(ctx context.Context, pcr *certsv1beta1.PodCertificateRequest) error {
 	if pcr.Spec.SignerName != c.signerName {
 		return nil
 	}
@@ -187,22 +243,32 @@ func (c *Controller) handlePCR(ctx context.Context, pcr *certsv1alpha1.PodCertif
 	if requestedLifetime < lifetime {
 		lifetime = requestedLifetime
 	}
-
+	path := path.Join("ns", pcr.ObjectMeta.Namespace, "sa", pcr.Spec.ServiceAccountName)
+	if pcr.Spec.UnverifiedUserAnnotations != nil {
+		if value, exist := pcr.Spec.UnverifiedUserAnnotations[SpiffePathKey]; exist {
+			path = value
+		}
+	}
 	spiffeURI := &url.URL{
 		Scheme: "spiffe",
 		Host:   "cluster.local",
-		Path:   path.Join("ns", pcr.ObjectMeta.Namespace, "sa", pcr.Spec.ServiceAccountName),
+		Path:   path,
 	}
 
 	notBefore := c.clock.Now().Add(-2 * time.Minute)
 	notAfter := notBefore.Add(lifetime)
 	beginRefreshAt := notAfter.Add(-30 * time.Minute)
+	// Construct DNS names
+	dnsNames := []string{
+		fmt.Sprintf("server.%s.svc", pcr.ObjectMeta.Namespace),
+	}
 	template := &x509.Certificate{
 		URIs:        []*url.URL{spiffeURI},
 		NotBefore:   notBefore,
 		NotAfter:    notAfter,
 		KeyUsage:    x509.KeyUsageDigitalSignature,
 		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+		DNSNames:    dnsNames,
 	}
 
 	signingCert, err := x509.ParseCertificate(c.caCerts[len(c.caCerts)-1])
@@ -238,7 +304,7 @@ func (c *Controller) handlePCR(ctx context.Context, pcr *certsv1alpha1.PodCertif
 	pcr = pcr.DeepCopy()
 	pcr.Status.Conditions = []metav1.Condition{
 		{
-			Type:               certsv1alpha1.PodCertificateRequestConditionTypeIssued,
+			Type:               certsv1beta1.PodCertificateRequestConditionTypeIssued,
 			Status:             metav1.ConditionTrue,
 			Reason:             "Reason",
 			Message:            "Issued",
@@ -250,11 +316,10 @@ func (c *Controller) handlePCR(ctx context.Context, pcr *certsv1alpha1.PodCertif
 	pcr.Status.BeginRefreshAt = ptr.To(metav1.NewTime(beginRefreshAt))
 	pcr.Status.NotAfter = ptr.To(metav1.NewTime(notAfter))
 
-	_, err = c.kc.CertificatesV1alpha1().PodCertificateRequests(pcr.ObjectMeta.Namespace).UpdateStatus(ctx, pcr, metav1.UpdateOptions{})
+	_, err = c.kc.CertificatesV1beta1().PodCertificateRequests(pcr.ObjectMeta.Namespace).UpdateStatus(ctx, pcr, metav1.UpdateOptions{})
 	if err != nil {
 		return fmt.Errorf("while updating PodCertificateRequest: %w", err)
 	}
-
 	return nil
 }
 

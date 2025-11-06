@@ -83,6 +83,16 @@ type worker struct {
 	proberDurationUnknownMetricLabels    metrics.Labels
 }
 
+// isInitContainer checks if the worker's container is in the pod's init containers
+func (w *worker) isInitContainer() bool {
+	for _, initContainer := range w.pod.Spec.InitContainers {
+		if initContainer.Name == w.container.Name {
+			return true
+		}
+	}
+	return false
+}
+
 // Creates and starts a new probe worker.
 func newWorker(
 	m *manager,
@@ -237,8 +247,25 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 		if !w.containerID.IsEmpty() {
 			w.resultsManager.Remove(w.containerID)
 		}
+
 		w.containerID = kubecontainer.ParseContainerID(c.ContainerID)
-		w.resultsManager.Set(w.containerID, w.initialValue, w.pod)
+		if !utilfeature.DefaultFeatureGate.Enabled(features.ChangeContainerStatusOnKubeletRestart) {
+			// On kubelet restart, we don't want to immediately set the probe result to Failure,
+			// as this could cause a container that was Ready to become NotReady.
+			isRestart := false
+			if c.State.Running != nil {
+				containerStartTime := c.State.Running.StartedAt.Time
+				if !containerStartTime.IsZero() && containerStartTime.Before(kubeletRestartGracePeriod(w.probeManager.start)) {
+					isRestart = true
+				}
+			}
+			if !isRestart {
+				w.resultsManager.Set(w.containerID, w.initialValue, w.pod)
+			}
+		} else {
+			w.resultsManager.Set(w.containerID, w.initialValue, w.pod)
+		}
+
 		// We've got a new container; resume probing.
 		w.onHold = false
 	}
@@ -254,12 +281,20 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 		if !w.containerID.IsEmpty() {
 			w.resultsManager.Set(w.containerID, results.Failure, w.pod)
 		}
+
+		isRestartableInitContainer := w.isInitContainer() &&
+			w.container.RestartPolicy != nil && *w.container.RestartPolicy == v1.ContainerRestartPolicyAlways
+
 		// Abort if the container will not be restarted.
 		if utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) {
-			return c.State.Terminated != nil || podutil.IsContainerRestartable(w.pod.Spec, w.container)
+			if c.State.Terminated == nil {
+				return true
+			}
+			return podutil.ContainerShouldRestart(w.container, w.pod.Spec, c.State.Terminated.ExitCode)
 		}
 		return c.State.Terminated == nil ||
-			w.pod.Spec.RestartPolicy != v1.RestartPolicyNever
+			w.pod.Spec.RestartPolicy != v1.RestartPolicyNever ||
+			isRestartableInitContainer
 	}
 
 	// Graceful shutdown of the pod.

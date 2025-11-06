@@ -32,12 +32,12 @@ import (
 	genericregistry "k8s.io/apiserver/pkg/registry/generic"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
+	"k8s.io/apiserver/pkg/server/flagz"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientgoinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	zpagesfeatures "k8s.io/component-base/zpages/features"
-	"k8s.io/component-base/zpages/flagz"
 	"k8s.io/component-helpers/apimachinery/lease"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
@@ -262,26 +262,31 @@ func (c completedConfig) New(name string, delegationTarget genericapiserver.Dele
 	})
 
 	if utilfeature.DefaultFeatureGate.Enabled(apiserverfeatures.APIServerIdentity) {
-		s.GenericAPIServer.AddPostStartHookOrDie("start-kube-apiserver-identity-lease-controller", func(hookContext genericapiserver.PostStartHookContext) error {
-			leaseName := s.GenericAPIServer.APIServerID
-			holderIdentity := s.GenericAPIServer.APIServerID + "_" + string(uuid.NewUUID())
+		leaseName := s.GenericAPIServer.APIServerID
+		holderIdentity := s.GenericAPIServer.APIServerID + "_" + string(uuid.NewUUID())
+		peeraddress := getPeerAddress(c.Extra.PeerAdvertiseAddress, c.Generic.PublicAddress, publicServicePort)
 
-			peeraddress := getPeerAddress(c.Extra.PeerAdvertiseAddress, c.Generic.PublicAddress, publicServicePort)
-			// must replace ':,[]' in [ip:port] to be able to store this as a valid label value
-			controller := lease.NewController(
-				clock.RealClock{},
-				client,
-				holderIdentity,
-				int32(IdentityLeaseDurationSeconds),
-				nil,
-				IdentityLeaseRenewIntervalPeriod,
-				leaseName,
-				metav1.NamespaceSystem,
-				// TODO: receive identity label value as a parameter when post start hook is moved to generic apiserver.
-				labelAPIServerHeartbeatFunc(name, peeraddress))
-			go controller.Run(hookContext)
+		// must replace ':,[]' in [ip:port] to be able to store this as a valid label value
+		controller := lease.NewController(
+			clock.RealClock{},
+			client,
+			holderIdentity,
+			int32(IdentityLeaseDurationSeconds),
+			nil,
+			IdentityLeaseRenewIntervalPeriod,
+			leaseName,
+			metav1.NamespaceSystem,
+			// TODO: receive identity label value as a parameter when post start hook is moved to generic apiserver.
+			labelAPIServerHeartbeatFunc(name, peeraddress),
+		)
+		s.GenericAPIServer.AddPostStartHookOrDie("start-kube-apiserver-identity-lease-controller", func(hookContext genericapiserver.PostStartHookContext) error {
+			return controller.Start(hookContext.Done())
+		})
+		s.GenericAPIServer.AddPreShutdownHookOrDie("stop-kube-apiserver-identity-lease-controller", func() error {
+			controller.Stop()
 			return nil
 		})
+
 		// TODO: move this into generic apiserver and make the lease identity value configurable
 		s.GenericAPIServer.AddPostStartHookOrDie("start-kube-apiserver-identity-lease-garbage-collector", func(hookContext genericapiserver.PostStartHookContext) error {
 			go apiserverleasegc.NewAPIServerLeaseGC(

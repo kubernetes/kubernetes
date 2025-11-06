@@ -90,6 +90,9 @@ type Event struct {
 	// Impersonated user information.
 	// +optional
 	ImpersonatedUser *authnv1.UserInfo `json:"impersonatedUser,omitempty" protobuf:"bytes,7,opt,name=impersonatedUser"`
+	// AuthenticationMetadata contains details about how the request was authenticated.
+	// +optional
+	AuthenticationMetadata *AuthenticationMetadata `json:"authenticationMetadata,omitempty" protobuf:"bytes,17,opt,name=authenticationMetadata"`
 	// Source IPs, from where the request originated and intermediate proxies.
 	// The source IPs are listed from (in order):
 	// 1. X-Forwarded-For request header IPs
@@ -140,6 +143,13 @@ type Event struct {
 	// should be short. Annotations are included in the Metadata level.
 	// +optional
 	Annotations map[string]string `json:"annotations,omitempty" protobuf:"bytes,15,rep,name=annotations"`
+}
+
+type AuthenticationMetadata struct {
+	// ImpersonationConstraint is the verb associated with the constrained impersonation mode that was used to authorize
+	// the ImpersonatedUser associated with this audit event.  It is only set when constrained impersonation was used.
+	// +optional
+	ImpersonationConstraint string `json:"impersonationConstraint,omitempty" protobuf:"bytes,1,opt,name=impersonationConstraint"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

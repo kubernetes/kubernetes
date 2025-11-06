@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"iter"
 	"slices"
 	"sort"
 	"strings"
@@ -51,9 +52,10 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources/extended"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
+	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
 	"k8s.io/kubernetes/pkg/util/slice"
@@ -73,10 +75,6 @@ const (
 	// It's intentionally not a valid ResourceClaim name to avoid conflicts with
 	// some actual ResourceClaim in the apiserver.
 	specialClaimInMemName = "<extended-resources>"
-
-	// BindingTimeoutDefaultSeconds is the default timeout for waiting for
-	// BindingConditions to be ready.
-	BindingTimeoutDefaultSeconds = 600
 
 	// AssumeExtendedResourceTimeoutDefaultSeconds is the default timeout for waiting
 	// for the extended resource claim to be updated in assumed cache.
@@ -140,8 +138,6 @@ func (d *stateData) Clone() fwk.StateData {
 type draExtendedResource struct {
 	// May have extended resource backed by DRA.
 	podScalarResources map[v1.ResourceName]int64
-	// The mapping of extended resource to device class name
-	resourceToDeviceClass map[v1.ResourceName]string
 }
 
 type informationForClaim struct {
@@ -160,17 +156,21 @@ type nodeAllocation struct {
 	// extendedResourceClaim has the special claim for extended resource backed by DRA
 	// created during Filter for the nodes.
 	extendedResourceClaim *resourceapi.ResourceClaim
+	// containerResourceRequestMappings has the container, extended resource, and device request mappings
+	// calculated at the Filter phase, and used at the PreBind phase.
+	containerResourceRequestMappings []v1.ContainerExtendedResourceRequest
 }
 
 // DynamicResources is a plugin that ensures that ResourceClaims are allocated.
 type DynamicResources struct {
-	enabled       bool
-	fts           feature.Features
-	filterTimeout time.Duration
-	fh            fwk.Handle
-	clientset     kubernetes.Interface
-	celCache      *cel.Cache
-	draManager    fwk.SharedDRAManager
+	enabled        bool
+	fts            feature.Features
+	filterTimeout  time.Duration
+	bindingTimeout time.Duration
+	fh             fwk.Handle
+	clientset      kubernetes.Interface
+	celCache       *cel.Cache
+	draManager     fwk.SharedDRAManager
 }
 
 // New initializes a new plugin and returns it.
@@ -192,7 +192,10 @@ func New(ctx context.Context, plArgs runtime.Object, fh fwk.Handle, fts feature.
 		enabled:       true,
 		fts:           fts,
 		filterTimeout: ptr.Deref(args.FilterTimeout, metav1.Duration{}).Duration,
-
+		bindingTimeout: ptr.Deref(
+			args.BindingTimeout,
+			metav1.Duration{Duration: config.DynamicResourcesBindingTimeoutDefault},
+		).Duration,
 		fh:        fh,
 		clientset: fh.ClientSet(),
 		// This is a LRU cache for compiled CEL expressions. The most
@@ -209,6 +212,7 @@ var _ fwk.PreEnqueuePlugin = &DynamicResources{}
 var _ fwk.PreFilterPlugin = &DynamicResources{}
 var _ fwk.FilterPlugin = &DynamicResources{}
 var _ fwk.PostFilterPlugin = &DynamicResources{}
+var _ fwk.ScorePlugin = &DynamicResources{}
 var _ fwk.ReservePlugin = &DynamicResources{}
 var _ fwk.EnqueueExtensions = &DynamicResources{}
 var _ fwk.PreBindPlugin = &DynamicResources{}
@@ -410,15 +414,14 @@ func (pl *DynamicResources) foreachPodResourceClaim(pod *v1.Pod, cb func(podReso
 
 // hasDeviceClassMappedExtendedResource returns true when the given resource list has an extended resource, that has
 // a mapping to a device class.
-func hasDeviceClassMappedExtendedResource(reqs v1.ResourceList, deviceClassMapping map[v1.ResourceName]string) bool {
+func hasDeviceClassMappedExtendedResource(reqs v1.ResourceList, cache fwk.DeviceClassResolver) bool {
 	for rName, rValue := range reqs {
 		if rValue.IsZero() {
 			// We only care about the resources requested by the pod we are trying to schedule.
 			continue
 		}
 		if schedutil.IsDRAExtendedResourceName(rName) {
-			_, ok := deviceClassMapping[rName]
-			if ok {
+			if cache.GetDeviceClass(rName) != nil {
 				return true
 			}
 		}
@@ -461,18 +464,14 @@ func (pl *DynamicResources) preFilterExtendedResources(pod *v1.Pod, logger klog.
 		return nil, nil
 	}
 
-	deviceClassMapping, err := extended.DeviceClassMapping(pl.draManager)
-	if err != nil {
-		return nil, statusError(logger, err, "retrieving extended resource to DeviceClass mapping")
-	}
-
+	// Try to build device class mapping from cache
+	cache := pl.draManager.DeviceClassResolver()
 	reqs := resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{})
-	hasExtendedResource := hasDeviceClassMappedExtendedResource(reqs, deviceClassMapping)
+
+	hasExtendedResource := hasDeviceClassMappedExtendedResource(reqs, cache)
 	if !hasExtendedResource {
 		return nil, nil
 	}
-
-	s.draExtendedResource.resourceToDeviceClass = deviceClassMapping
 	r := framework.NewResource(reqs)
 	s.draExtendedResource.podScalarResources = r.ScalarResources
 
@@ -506,12 +505,11 @@ func (pl *DynamicResources) preFilterExtendedResources(pod *v1.Pod, logger klog.
 				GenerateName: pod.Name + "-extended-resources-",
 				OwnerReferences: []metav1.OwnerReference{
 					{
-						APIVersion:         "v1",
-						Kind:               "Pod",
-						Name:               pod.Name,
-						UID:                pod.UID,
-						Controller:         ptr.To(true),
-						BlockOwnerDeletion: ptr.To(true),
+						APIVersion: "v1",
+						Kind:       "Pod",
+						Name:       pod.Name,
+						UID:        pod.UID,
+						Controller: ptr.To(true),
 					},
 				},
 				Annotations: map[string]string{
@@ -734,21 +732,22 @@ func getStateData(cs fwk.CycleState) (*stateData, error) {
 // It returns an error when the pod's extended resource requests cannot be allocated
 // from node's Allocatable, nor matching any device class's explicit or implicit
 // ExtendedResourceName.
-func (pl *DynamicResources) filterExtendedResources(state *stateData, pod *v1.Pod, nodeInfo fwk.NodeInfo, logger klog.Logger) (*resourceapi.ResourceClaim, *fwk.Status) {
+func (pl *DynamicResources) filterExtendedResources(state *stateData, pod *v1.Pod, nodeInfo fwk.NodeInfo, logger klog.Logger) (*resourceapi.ResourceClaim, []v1.ContainerExtendedResourceRequest, *fwk.Status) {
 	extendedResourceClaim := state.claims.extendedResourceClaim()
 	if extendedResourceClaim == nil {
 		// Nothing to do.
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	// The claim is from the prior scheduling cycle, return unschedulable such that it can be
 	// deleted at the PostFilter phase, and retry anew.
 	if extendedResourceClaim.Spec.Devices.Requests != nil {
-		return nil, statusUnschedulable(logger, "cannot schedule extended resource claim", "pod", klog.KObj(pod), "node", klog.KObj(nodeInfo.Node()), "claim", klog.KObj(extendedResourceClaim))
+		return nil, nil, statusUnschedulable(logger, "cannot schedule extended resource claim", "pod", klog.KObj(pod), "node", klog.KObj(nodeInfo.Node()), "claim", klog.KObj(extendedResourceClaim))
 	}
 
 	extendedResources := make(map[v1.ResourceName]int64)
 	hasExtendedResource := false
+	cache := pl.draManager.DeviceClassResolver()
 	for rName, rQuant := range state.draExtendedResource.podScalarResources {
 		if !schedutil.IsDRAExtendedResourceName(rName) {
 			continue
@@ -757,25 +756,18 @@ func (pl *DynamicResources) filterExtendedResources(state *stateData, pod *v1.Po
 		if rQuant == 0 {
 			continue
 		}
-
-		_, okScalar := nodeInfo.GetAllocatable().GetScalarResources()[rName]
-		_, okDynamic := state.draExtendedResource.resourceToDeviceClass[rName]
-		if okDynamic {
-			if okScalar {
-				// node provides the resource via device plugin
-				extendedResources[rName] = 0
-			} else {
-				// node needs to provide the resource via DRA
-				extendedResources[rName] = rQuant
-				hasExtendedResource = true
-			}
+		allocatable, okScalar := nodeInfo.GetAllocatable().GetScalarResources()[rName]
+		isBackedByDRA := cache.GetDeviceClass(rName) != nil
+		if isBackedByDRA && allocatable == 0 {
+			// node needs to provide the resource via DRA
+			extendedResources[rName] = rQuant
+			hasExtendedResource = true
 		} else if !okScalar {
 			// has request neither provided by device plugin, nor backed by DRA,
 			// hence the pod does not fit the node.
-			return nil, statusUnschedulable(logger, "cannot fit resource", "pod", klog.KObj(pod), "node", klog.KObj(nodeInfo.Node()), "resource", rName)
+			return nil, nil, statusUnschedulable(logger, "cannot fit resource", "pod", klog.KObj(pod), "node", klog.KObj(nodeInfo.Node()), "resource", rName)
 		}
 	}
-
 	// No extended resources backed by DRA on this node.
 	// The pod may have extended resources, but they are all backed by device
 	// plugin, hence the noderesources plugin should have checked if the node
@@ -784,93 +776,23 @@ func (pl *DynamicResources) filterExtendedResources(state *stateData, pod *v1.Po
 	if state.claims.noUserClaim() && !hasExtendedResource {
 		// It cannot be allocated when reaching here, as the claim from prior scheduling cycle
 		// would return unschedulable earlier in this function.
-		return nil, nil
+		return nil, nil, nil
 	}
-
-	// Each node needs its own, potentially different variant of the claim.
-	nodeExtendedResourceClaim := extendedResourceClaim.DeepCopy()
-	nodeExtendedResourceClaim.Spec.Devices.Requests = createDeviceRequests(pod, extendedResources, state.draExtendedResource.resourceToDeviceClass)
 
 	if extendedResourceClaim.Status.Allocation != nil {
 		// If it is already allocated, then we cannot simply allocate it again.
 		//
 		// It cannot be allocated when reaching here, as the claim found from prior scheduling cycle
 		// would return unschedulable earlier in this function.
-		return nil, nil
+		return nil, nil, nil
 	}
 
-	return nodeExtendedResourceClaim, nil
-}
+	// Each node needs its own, potentially different variant of the claim.
+	nodeExtendedResourceClaim := extendedResourceClaim.DeepCopy()
+	reqs, mappings := createRequestsAndMappings(pod, extendedResources, logger, cache)
+	nodeExtendedResourceClaim.Spec.Devices.Requests = reqs
 
-// createDeviceRequests computes the special claim's Requests based on the pod's extended resources
-// that are not satisfied by the node's Allocatable.
-//
-// the device request name has the format: container-%d-request-%d,
-// the first %d is the container's index in the pod's initContainer and containers
-// the second %d is the extended resource's index in that container's sorted resource requests.
-func createDeviceRequests(pod *v1.Pod, extendedResources map[v1.ResourceName]int64, deviceClassMapping map[v1.ResourceName]string) []resourceapi.DeviceRequest {
-	var deviceRequests []resourceapi.DeviceRequest
-	// Creating the extended resource claim's Requests by
-	// iterating over the containers, and the resources in the containers,
-	// and create one request per <container, extended resource>.
-
-	// pod level resources currently have only cpu and memory, they are not considered here for now.
-	// if extended resources are added to pod level resources in the future, they need to be
-	// supported separately.
-	containers := slices.Clone(pod.Spec.InitContainers)
-	containers = append(containers, pod.Spec.Containers...)
-	for r := range extendedResources {
-		for i, c := range containers {
-			creqs := c.Resources.Requests
-			if creqs == nil {
-				continue
-			}
-			var rQuant resource.Quantity
-			var ok bool
-			if rQuant, ok = creqs[r]; !ok {
-				continue
-			}
-			crq, ok := (&rQuant).AsInt64()
-			if !ok || crq == 0 {
-				continue
-			}
-			className, ok := deviceClassMapping[r]
-			// skip if the request does not map to a device class
-			if !ok || className == "" {
-				continue
-			}
-			keys := make([]string, 0, len(creqs))
-			for k := range creqs {
-				keys = append(keys, k.String())
-			}
-			// resource requests in a container is a map, their names must
-			// be sorted to determine the resource's index order.
-			slice.SortStrings(keys)
-			ridx := 0
-			for j := range keys {
-				if keys[j] == r.String() {
-					ridx = j
-					break
-				}
-			}
-			// i is the index of the container if the list of initContainers + containers.
-			// ridx is the index of the extended resource request in the sorted all requests in the container.
-			// crq is the quantity of the extended resource request.
-			deviceRequests = append(deviceRequests,
-				resourceapi.DeviceRequest{
-					Name: fmt.Sprintf("container-%d-request-%d", i, ridx), // need to be container name index - extended resource name index
-					Exactly: &resourceapi.ExactDeviceRequest{
-						DeviceClassName: className, // map external resource name -> device class name
-						AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
-						Count:           crq,
-					},
-				})
-		}
-	}
-	sort.Slice(deviceRequests, func(i, j int) bool {
-		return deviceRequests[i].Name < deviceRequests[j].Name
-	})
-	return deviceRequests
+	return nodeExtendedResourceClaim, mappings, nil
 }
 
 // Filter invoked at the filter extension point.
@@ -896,7 +818,7 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 
 	logger := klog.FromContext(ctx)
 	node := nodeInfo.Node()
-	nodeExtendedResourceClaim, status := pl.filterExtendedResources(state, pod, nodeInfo, logger)
+	nodeExtendedResourceClaim, containerResourceRequestMappings, status := pl.filterExtendedResources(state, pod, nodeInfo, logger)
 	if status != nil {
 		return status
 	}
@@ -1011,8 +933,9 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 
 	if state.allocator != nil {
 		state.nodeAllocations[node.Name] = nodeAllocation{
-			allocationResults:     allocations,
-			extendedResourceClaim: nodeExtendedResourceClaim,
+			allocationResults:                allocations,
+			extendedResourceClaim:            nodeExtendedResourceClaim,
+			containerResourceRequestMappings: containerResourceRequestMappings,
 		}
 	}
 
@@ -1081,6 +1004,76 @@ func (pl *DynamicResources) PostFilter(ctx context.Context, cs fwk.CycleState, p
 		return nil, fwk.NewStatus(fwk.Unschedulable, "deletion of ResourceClaim completed")
 	}
 	return nil, fwk.NewStatus(fwk.Unschedulable, "still not schedulable")
+}
+
+func (pl *DynamicResources) Score(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) (int64, *fwk.Status) {
+	if !pl.enabled {
+		return 0, nil
+	}
+	logger := klog.FromContext(ctx)
+
+	state, err := getStateData(cs)
+	if err != nil {
+		return 0, statusError(logger, err)
+	}
+
+	// If there are no claims, no need to do anything.
+	if state.claims.empty() {
+		return 0, nil
+	}
+
+	allocations, found := state.nodeAllocations[nodeInfo.Node().Name]
+	if !found {
+		return 0, nil
+	}
+
+	score, err := computeScore(state.claims.all(), allocations)
+	if err != nil {
+		return 0, statusError(logger, err)
+	}
+	return score, nil
+}
+
+func computeScore(iterator iter.Seq2[int, *resourceapi.ResourceClaim], allocations nodeAllocation) (int64, error) {
+	var score int64
+	for i, claim := range iterator {
+		// Collect the names for all allocated subrequests.
+		allocatedSubRequests := sets.New[string]()
+		if i >= len(allocations.allocationResults) {
+			return 0, fmt.Errorf("number of allocations %d is smaller than number of claims", len(allocations.allocationResults))
+		}
+		allocation := allocations.allocationResults[i]
+		for _, res := range allocation.Devices.Results {
+			request := res.Request
+			if resourceclaim.IsSubRequestRef(request) {
+				allocatedSubRequests.Insert(request)
+			}
+		}
+
+		for _, req := range claim.Spec.Devices.Requests {
+			if req.Exactly != nil {
+				continue
+			}
+			for i, subReq := range req.FirstAvailable {
+				subRequestRef := resourceclaim.CreateSubRequestRef(req.Name, subReq.Name)
+				if allocatedSubRequests.Has(subRequestRef) {
+					score += int64(resourceapi.FirstAvailableDeviceRequestMaxSize - i)
+				}
+			}
+		}
+	}
+	return score, nil
+}
+
+func (pl *DynamicResources) ScoreExtensions() fwk.ScoreExtensions {
+	return pl
+}
+
+func (pl *DynamicResources) NormalizeScore(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, scores fwk.NodeScoreList) *fwk.Status {
+	if !pl.enabled {
+		return nil
+	}
+	return helper.DefaultNormalizeScore(fwk.MaxNodeScore, false, scores)
 }
 
 // Reserve reserves claims for the pod.
@@ -1329,7 +1322,7 @@ func (pl *DynamicResources) PreBind(ctx context.Context, cs fwk.CycleState, pod 
 
 	// We need to wait for the device to be attached to the node.
 	pl.fh.EventRecorder().Eventf(pod, nil, v1.EventTypeNormal, "BindingConditionsPending", "Scheduling", "waiting for binding conditions for device on node %s", nodeName)
-	err = wait.PollUntilContextTimeout(ctx, 5*time.Second, time.Duration(BindingTimeoutDefaultSeconds)*time.Second, true,
+	err = wait.PollUntilContextTimeout(ctx, 5*time.Second, pl.bindingTimeout, true,
 		func(ctx context.Context) (bool, error) {
 			return pl.isPodReadyForBinding(state)
 		})
@@ -1364,55 +1357,167 @@ func (pl *DynamicResources) PreBindPreFlight(ctx context.Context, cs fwk.CycleSt
 	return nil
 }
 
-// createRequestMappings creates the requestMappings for the special extended resource claim.
-// For each device request in the claim, it finds the container name, and
-// the extended resource name in that container matching the device request.
-// the device request name has the format: container-%d-request-%d,
-// the first %d is the container's index in the pod's initContainer and containers
-// the second %d is the extended resource's index in that container's sorted resource requests.
-func createRequestMappings(claim *resourceapi.ResourceClaim, pod *v1.Pod) []v1.ContainerExtendedResourceRequest {
-	var cer []v1.ContainerExtendedResourceRequest
-	deviceReqNames := make([]string, 0, len(claim.Spec.Devices.Requests))
-	for _, r := range claim.Spec.Devices.Requests {
-		deviceReqNames = append(deviceReqNames, r.Name)
+func partitionContainerIndices(containers []v1.Container, numInitContainers int) ([]int, []int) {
+	longLivedContainerIndices := make([]int, 0, len(containers))
+	shortLivedInitContainerIndices := make([]int, 0, numInitContainers)
+	for i, c := range containers {
+		isInit := i < numInitContainers
+		isSidecar := c.RestartPolicy != nil && *c.RestartPolicy == v1.ContainerRestartPolicyAlways
+		if isInit && !isSidecar {
+			shortLivedInitContainerIndices = append(shortLivedInitContainerIndices, i)
+			continue
+		}
+		longLivedContainerIndices = append(longLivedContainerIndices, i)
 	}
-	// pod level resources currently have only cpu and memory, they are not considered here for now.
-	// if extended resources are added to pod level resources in the future, they need to be
-	// supported separately.
+	return longLivedContainerIndices, shortLivedInitContainerIndices
+}
+
+// createResourceRequestAndMappings returns the request and mappings for the given container and resource.
+// reusableRequests is a list of other DeviceRequests this container can use before requesting its own.
+// items in reusableRequests may be nil.
+// The returned request may be nil if no additional request was required.
+// The returned mappings may be empty if this container does not use this resource.
+func createResourceRequestAndMappings(containerIndex int, container *v1.Container, rName v1.ResourceName, className string, reusableRequests []*resourceapi.DeviceRequest) (*resourceapi.DeviceRequest, []v1.ContainerExtendedResourceRequest) {
+	var mappings []v1.ContainerExtendedResourceRequest
+	creqs := container.Resources.Requests
+	if creqs == nil {
+		return nil, nil
+	}
+	var rQuant resource.Quantity
+	var ok bool
+	if rQuant, ok = creqs[rName]; !ok {
+		return nil, nil
+	}
+	crq, ok := (&rQuant).AsInt64()
+	if !ok || crq == 0 {
+		return nil, nil
+	}
+	sum := int64(0)
+	for _, r := range reusableRequests {
+		if r != nil {
+			sum += r.Exactly.Count
+			mappings = append(mappings, v1.ContainerExtendedResourceRequest{
+				ContainerName: container.Name,
+				ResourceName:  rName.String(),
+				RequestName:   r.Name,
+			})
+			if sum >= crq {
+				return nil, mappings
+			}
+		}
+	}
+	keys := make([]string, 0, len(creqs))
+	for k := range creqs {
+		keys = append(keys, k.String())
+	}
+	// resource requests in a container is a map, their names must
+	// be sorted to determine the resource's index order.
+	slice.SortStrings(keys)
+	ridx := 0
+	for j := range keys {
+		if keys[j] == rName.String() {
+			ridx = j
+			break
+		}
+	}
+	// containerIndex is the index of the container in the list of initContainers + containers.
+	// ridx is the index of the extended resource request in the sorted all requests in the container.
+	// crq is the quantity of the extended resource request.
+	reqName := fmt.Sprintf("container-%d-request-%d", containerIndex, ridx)
+	deviceReq := resourceapi.DeviceRequest{
+		Name: reqName, // need to be container name index - extended resource name index
+		Exactly: &resourceapi.ExactDeviceRequest{
+			DeviceClassName: className,
+			AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
+			Count:           crq - sum, // the extra devices to request
+		},
+	}
+	mappings = append(mappings, v1.ContainerExtendedResourceRequest{
+		ContainerName: container.Name,
+		ResourceName:  rName.String(),
+		RequestName:   reqName,
+	})
+
+	return &deviceReq, mappings
+}
+
+func createRequestsAndMappings(pod *v1.Pod, extendedResources map[v1.ResourceName]int64, logger klog.Logger, deviceClassMapping fwk.DeviceClassResolver) ([]resourceapi.DeviceRequest, []v1.ContainerExtendedResourceRequest) {
 	containers := slices.Clone(pod.Spec.InitContainers)
 	containers = append(containers, pod.Spec.Containers...)
-	for i, c := range containers {
-		creqs := c.Resources.Requests
-		keys := make([]string, 0, len(creqs))
-		for k := range creqs {
-			keys = append(keys, k.String())
+	longLivedContainerIndices, shortLivedInitContainerIndices := partitionContainerIndices(containers, len(pod.Spec.InitContainers))
+
+	// all requests across all containers and resource types
+	var deviceRequests []resourceapi.DeviceRequest
+	// all mappings across all containers and resource types
+	var mappings []v1.ContainerExtendedResourceRequest
+
+	for resource := range extendedResources {
+		class := deviceClassMapping.GetDeviceClass(resource)
+		// skip if the resource does not map to a device class
+		if class == nil {
+			continue
 		}
-		// resource requests in a container is a map, their names must
-		// be sorted to determine the resource's index order.
-		slice.SortStrings(keys)
-		for rName := range creqs {
-			ridx := 0
-			for j := range keys {
-				if keys[j] == rName.String() {
-					ridx = j
-					break
+
+		// shortLivedResourceMappings is the mapping of container+resource→request for short lived containers (init non-sidecar container)
+		var shortLivedResourceMappings []v1.ContainerExtendedResourceRequest
+		// longLivedResourceMappings is the mapping of container+resource→request for long lived containers (init sidecar or regular container)
+		var longLivedResourceMappings []v1.ContainerExtendedResourceRequest
+
+		// longLivedResourceRequests is the list of requests for a given resource by long-lived containers.
+		// The length of this list is the same as the length of containers.
+		// Entries may be nil if the container at that index did not produce a request for that resource.
+		// Requests at later indices are reusable by non-sidecar initContainers at earlier indices.
+		longLivedResourceRequests := make([]*resourceapi.DeviceRequest, len(containers))
+		for _, i := range longLivedContainerIndices {
+			containerRequest, containerMappings := createResourceRequestAndMappings(i, &containers[i], resource, class.Name, nil)
+			longLivedResourceRequests[i] = containerRequest                                     // might be nil
+			longLivedResourceMappings = append(longLivedResourceMappings, containerMappings...) // might be zero-length
+		}
+
+		// maxShortLivedResourceRequest is the maximum request for a given resource by short-lived containers
+		var maxShortLivedResourceRequest *resourceapi.DeviceRequest
+		// shortLivedRequestNames is all request names for a given resource by short-lived containers. All mappings to any name in
+		// this set will be replaced by maxShortLivedResourceRequest.Name.
+		shortLivedRequestNames := sets.New[string]()
+		for _, i := range shortLivedInitContainerIndices {
+			containerRequest, containerMappings := createResourceRequestAndMappings(i, &containers[i], resource, class.Name, longLivedResourceRequests[i:])
+			if containerRequest != nil {
+				shortLivedRequestNames.Insert(containerRequest.Name)
+				if maxShortLivedResourceRequest == nil || maxShortLivedResourceRequest.Exactly.Count < containerRequest.Exactly.Count {
+					maxShortLivedResourceRequest = containerRequest
 				}
 			}
-			for _, devReqName := range deviceReqNames {
-				// During filter phase, device request name is set to be
-				// container name index "-" extended resource name index
-				if fmt.Sprintf("container-%d-request-%d", i, ridx) == devReqName {
-					cer = append(cer,
-						v1.ContainerExtendedResourceRequest{
-							ContainerName: c.Name,
-							ResourceName:  rName.String(),
-							RequestName:   devReqName,
-						})
+			shortLivedResourceMappings = append(shortLivedResourceMappings, containerMappings...) // might be zero-length
+		}
+
+		// rewrite mappings to short-lived requests to use the maximum short-lived request name
+		if maxShortLivedResourceRequest != nil && len(shortLivedRequestNames) > 1 {
+			shortLivedRequestNames.Delete(maxShortLivedResourceRequest.Name)
+			for i := range shortLivedResourceMappings {
+				if shortLivedRequestNames.Has(shortLivedResourceMappings[i].RequestName) {
+					shortLivedResourceMappings[i].RequestName = maxShortLivedResourceRequest.Name
 				}
 			}
 		}
+
+		// append non-nil requests
+		if maxShortLivedResourceRequest != nil {
+			deviceRequests = append(deviceRequests, *maxShortLivedResourceRequest)
+		}
+		for _, request := range longLivedResourceRequests {
+			if request != nil {
+				deviceRequests = append(deviceRequests, *request)
+			}
+		}
+		// append mappings
+		mappings = append(mappings, longLivedResourceMappings...)
+		mappings = append(mappings, shortLivedResourceMappings...)
 	}
-	return cer
+
+	sort.Slice(deviceRequests, func(i, j int) bool {
+		return deviceRequests[i].Name < deviceRequests[j].Name
+	})
+	return deviceRequests, mappings
 }
 
 // bindClaim gets called by PreBind for claim which is not reserved for the pod yet.
@@ -1486,8 +1591,10 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 		var err error
 		claim, err = pl.clientset.ResourceV1().ResourceClaims(claim.Namespace).Create(ctx, claim, metav1.CreateOptions{})
 		if err != nil {
+			metrics.ResourceClaimCreatesTotal.WithLabelValues("failure").Inc()
 			return nil, fmt.Errorf("create claim for extended resources %v: %w", klog.KObj(claim), err)
 		}
+		metrics.ResourceClaimCreatesTotal.WithLabelValues("success").Inc()
 		resourceClaimModified = true
 		logger.V(5).Info("created claim for extended resources", "pod", klog.KObj(pod), "node", nodeName, "resourceclaim", klog.Format(claim))
 
@@ -1569,7 +1676,14 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 	// Patch the pod status with the new information about the generated
 	// special resource claim.
 	if isExtendedResourceClaim {
-		cer := createRequestMappings(claim, pod)
+		var cer []v1.ContainerExtendedResourceRequest
+		if nodeAllocation, ok := state.nodeAllocations[nodeName]; ok {
+			cer = nodeAllocation.containerResourceRequestMappings
+		}
+		if len(cer) == 0 {
+			return nil, fmt.Errorf("nil or empty request mappings, no update of pod %s/%s ExtendedResourceClaimStatus", pod.Namespace, pod.Name)
+		}
+
 		podStatusCopy := pod.Status.DeepCopy()
 		podStatusCopy.ExtendedResourceClaimStatus = &v1.PodExtendedResourceClaimStatus{
 			RequestMappings:   cer,
@@ -1636,7 +1750,7 @@ func (pl *DynamicResources) isClaimTimeout(claim *resourceapi.ResourceClaim) boo
 		if deviceRequest.BindingConditions == nil {
 			continue
 		}
-		if claim.Status.Allocation.AllocationTimestamp.Add(time.Duration(BindingTimeoutDefaultSeconds) * time.Second).Before(time.Now()) {
+		if claim.Status.Allocation.AllocationTimestamp.Add(pl.bindingTimeout).Before(time.Now()) {
 			return true
 		}
 	}

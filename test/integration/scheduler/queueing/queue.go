@@ -22,7 +22,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/mock"
 	v1 "k8s.io/api/core/v1"
+	resourceapi "k8s.io/api/resource/v1"
+	schedulingapi "k8s.io/api/scheduling/v1alpha1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,6 +35,9 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
+	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
+	ndffeatures "k8s.io/component-helpers/nodedeclaredfeatures/features"
+	ndftesting "k8s.io/component-helpers/nodedeclaredfeatures/testing"
 	"k8s.io/component-helpers/storage/volume"
 	configv1 "k8s.io/kube-scheduler/config/v1"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -44,6 +50,13 @@ import (
 	testutils "k8s.io/kubernetes/test/integration/util"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
+)
+
+type rejectingPhase string
+
+const (
+	rejectingPhasePreEnqueue      rejectingPhase = "PreEnqueue"
+	rejectingPhaseSchedulingCycle rejectingPhase = "SchedulingCycle"
 )
 
 type CoreResourceEnqueueTestCase struct {
@@ -70,9 +83,21 @@ type CoreResourceEnqueueTestCase struct {
 	InitialStorageCapacities []*storagev1.CSIStorageCapacity
 	// InitialVolumeAttachment is the list of VolumeAttachment to be created at first.
 	InitialVolumeAttachment []*storagev1.VolumeAttachment
+	// InitialDeviceClasses are the list of DeviceClass to be created at first.
+	InitialDeviceClasses []*resourceapi.DeviceClass
+	// InitialWorkloads is the list of Workloads to be created at first.
+	InitialWorkloads []*schedulingapi.Workload
 	// Pods are the list of Pods to be created.
 	// All of them are expected to be unschedulable at first.
 	Pods []*v1.Pod
+	// ExpectedInitialRejectingPhase specifies how Pods are supposed to be initially rejected.
+	// rejectingPhase could be either "PreEnqueue" or "SchedulingCycle". Depending on the value:
+	// - "PreEnqueue": test case waits for the Pods to be observed by the scheduler
+	//   and put in the unschedulable pods pool, being blocked at the PreEnqueue gate.
+	// - "SchedulingCycle": test case lets pods experience scheduling cycle once,
+	//   being rejected by PreFilter or Filter gates.
+	// Defaults to "SchedulingCycle".
+	ExpectedInitialRejectingPhase rejectingPhase
 	// TriggerFn is the function that triggers the event to move Pods.
 	// It returns the map keyed with ClusterEvents to be triggered by this function,
 	// and valued with the number of triggering of the event.
@@ -89,6 +114,11 @@ type CoreResourceEnqueueTestCase struct {
 	// EnabledRAExtendedResource indicates wether the test case should run with feature gate
 	// DRAExtendedResource enabled or not.
 	EnableDRAExtendedResource bool
+	// EnableNodeDeclaredFeatures indicates if the test case runs with the NodeDeclaredFeatures feature gate enabled.
+	EnableNodeDeclaredFeatures bool
+	// EnableGangScheduling indicates wether the test case should run with feature gates
+	// GenericWorkload and GangScheduling enabled or not.
+	EnableGangScheduling bool
 }
 
 var (
@@ -124,7 +154,8 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.UpdateNodeAllocatable}: 1}, nil
 		},
-		WantRequeuedPods: sets.New("pod2"),
+		WantRequeuedPods:          sets.New("pod2"),
+		EnableSchedulingQueueHint: sets.New(true),
 	},
 	{
 		Name:          "Pod rejected by the PodAffinity plugin is requeued when a new Node is created and turned to ready",
@@ -365,7 +396,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 	},
 	{
 		Name:          "Pod rejected by the NodeResourcesFit plugin isn't requeued when a Node has the extended resource, and DRAExtendedResource is disabled",
-		EnablePlugins: []string{names.NodeResourcesFit},
+		EnablePlugins: []string{names.NodeResourcesFit, names.DynamicResources},
 		InitialNodes: []*v1.Node{
 			st.MakeNode().Name("fake-node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4", "example.com/gpu": "1"}).Obj(),
 		},
@@ -386,7 +417,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 	},
 	{
 		Name:          "Pod rejected by the NodeResourcesFit plugin isn't requeued when a Node has the extended resource, and DRAExtendedResource is enabled",
-		EnablePlugins: []string{names.NodeResourcesFit},
+		EnablePlugins: []string{names.NodeResourcesFit, names.DynamicResources},
 		InitialNodes: []*v1.Node{
 			st.MakeNode().Name("fake-node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4", "example.com/gpu": "1"}).Obj(),
 		},
@@ -407,7 +438,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 	},
 	{
 		Name:          "Pod rejected by the NodeResourcesFit plugin isn't requeued when a Node does not have the extended resource, and DRAExtendedResource is disabled",
-		EnablePlugins: []string{names.NodeResourcesFit},
+		EnablePlugins: []string{names.NodeResourcesFit, names.DynamicResources},
 		InitialNodes: []*v1.Node{
 			st.MakeNode().Name("fake-node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj(),
 		},
@@ -428,10 +459,20 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 	},
 	{
 		Name:          "Pod rejected by the NodeResourcesFit plugin is requeued when a Node does not have the extended resource, and DRAExtendedResource is enabled",
-		EnablePlugins: []string{names.NodeResourcesFit, names.NodeAffinity},
+		EnablePlugins: []string{names.NodeResourcesFit, names.NodeAffinity, names.DynamicResources},
 		InitialNodes: []*v1.Node{
 			st.MakeNode().Name("fake-node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj(),
 			st.MakeNode().Name("fake-node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Label("group", "b").Obj(),
+		},
+		InitialDeviceClasses: []*resourceapi.DeviceClass{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "gpu-device-class",
+				},
+				Spec: resourceapi.DeviceClassSpec{
+					ExtendedResourceName: ptr.To("example.com/gpu"),
+				},
+			},
 		},
 		Pods: []*v1.Pod{
 			// - Pod1 requests available amount of CPU (in fake-node1), but will be rejected by NodeAffinity plugin. Note that the NodeResourceFit plugin will register for QHints because it rejected fake-node2.
@@ -444,6 +485,53 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 				return nil, fmt.Errorf("failed to update fake-node: %w", err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.UpdateNodeAllocatable}: 1}, nil
+		},
+		WantRequeuedPods:          sets.New("pod1"),
+		EnableSchedulingQueueHint: sets.New(true),
+		EnableDRAExtendedResource: true,
+	},
+	{
+		Name:          "Pod rejected by the NodeResourcesFit plugin is requeued when created DeviceClass having the extended resource matching pod's requests, and DRAExtendedResource is enabled",
+		EnablePlugins: []string{names.NodeResourcesFit},
+		InitialNodes: []*v1.Node{
+			st.MakeNode().Name("fake-node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj(),
+		},
+		Pods: []*v1.Pod{
+			// - Pod1 requests available amount of CPU (in fake-node1), but will be rejected due to lack of extended resource exampe.com/gpu.
+			st.MakePod().Name("pod1").Res(map[v1.ResourceName]string{v1.ResourceCPU: "4", "example.com/gpu": "1"}).Container("image").Obj(),
+			st.MakePod().Name("pod2").Res(map[v1.ResourceName]string{v1.ResourceCPU: "4", "example.com/othergpu": "1"}).Container("image").Obj(),
+		},
+		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+			// Trigger a DeviceClass Create event that has the extended resource name that matches pod's resource request.
+			if _, err := testCtx.ClientSet.ResourceV1().DeviceClasses().Create(testCtx.Ctx, &resourceapi.DeviceClass{ObjectMeta: metav1.ObjectMeta{Name: "fake-class"}, Spec: resourceapi.DeviceClassSpec{ExtendedResourceName: ptr.To("example.com/gpu")}}, metav1.CreateOptions{}); err != nil {
+				return nil, fmt.Errorf("failed to create the fake-class: %w", err)
+			}
+
+			return map[fwk.ClusterEvent]uint64{{Resource: fwk.DeviceClass, ActionType: fwk.Add}: 1}, nil
+		},
+		WantRequeuedPods:          sets.New("pod1"),
+		EnableSchedulingQueueHint: sets.New(true),
+		EnableDRAExtendedResource: true,
+	},
+	{
+		Name:                 "Pod rejected by the NodeResourcesFit plugin is requeued when updated DeviceClass has the extended resource, and DRAExtendedResource is enabled",
+		EnablePlugins:        []string{names.NodeResourcesFit},
+		InitialDeviceClasses: []*resourceapi.DeviceClass{{ObjectMeta: metav1.ObjectMeta{Name: "fake-class"}, Spec: resourceapi.DeviceClassSpec{ExtendedResourceName: nil}}},
+		InitialNodes: []*v1.Node{
+			st.MakeNode().Name("fake-node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj(),
+		},
+		Pods: []*v1.Pod{
+			// - Pod1 requests available amount of CPU (in fake-node1), but will be rejected due to lack of extended resource example.com/gpu.
+			st.MakePod().Name("pod1").Res(map[v1.ResourceName]string{v1.ResourceCPU: "4", "example.com/gpu": "1"}).Container("image").Obj(),
+			st.MakePod().Name("pod2").Res(map[v1.ResourceName]string{v1.ResourceCPU: "4", "example.com/othergpu": "1"}).Container("image").Obj(),
+		},
+		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+			// Trigger a DeviceClass Update event that adds the extended resource name that matches pod's resource request.
+			if _, err := testCtx.ClientSet.ResourceV1().DeviceClasses().Update(testCtx.Ctx, &resourceapi.DeviceClass{ObjectMeta: metav1.ObjectMeta{Name: "fake-class"}, Spec: resourceapi.DeviceClassSpec{ExtendedResourceName: ptr.To("example.com/gpu")}}, metav1.UpdateOptions{}); err != nil {
+				return nil, fmt.Errorf("failed to update the fake-class: %w", err)
+			}
+
+			return map[fwk.ClusterEvent]uint64{{Resource: fwk.DeviceClass, ActionType: fwk.Update}: 1}, nil
 		},
 		WantRequeuedPods:          sets.New("pod1"),
 		EnableSchedulingQueueHint: sets.New(true),
@@ -2410,6 +2498,158 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		WantRequeuedPods:          sets.New("pod1"),
 		EnableSchedulingQueueHint: sets.New(true),
 	},
+	{
+		Name:                       "pod becomes schedulable after node update with required feature",
+		EnableNodeDeclaredFeatures: true,
+		EnableSchedulingQueueHint:  sets.New(true),
+		EnablePlugins:              []string{names.NodeDeclaredFeatures},
+		InitialNodes: []*v1.Node{
+			st.MakeNode().Name("node-1").Obj(),
+		},
+		Pods: []*v1.Pod{
+			st.MakePod().Name("pod1").Container("pause").Tolerations([]v1.Toleration{{Key: "featureA", Effect: v1.TaintEffectNoExecute, TolerationSeconds: ptr.To(int64(200))}}).Obj(),
+		},
+		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+			node, err := testCtx.ClientSet.CoreV1().Nodes().Get(testCtx.Ctx, "node-1", metav1.GetOptions{})
+			if err != nil {
+				return nil, err
+			}
+			updatedNode := node.DeepCopy()
+			updatedNode.Status.DeclaredFeatures = []string{"FeatureA"}
+			if _, err := testCtx.ClientSet.CoreV1().Nodes().UpdateStatus(testCtx.Ctx, updatedNode, metav1.UpdateOptions{}); err != nil {
+				return nil, fmt.Errorf("failed to update node status: %w", err)
+			}
+			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.UpdateNodeDeclaredFeature}: 1}, nil
+		},
+		WantRequeuedPods: sets.New("pod1"),
+	},
+	{
+		Name:                       "pod remains unschedulable after node update that does not update declared features",
+		EnableNodeDeclaredFeatures: true,
+		EnableSchedulingQueueHint:  sets.New(true),
+		EnablePlugins:              []string{names.NodeDeclaredFeatures},
+		InitialNodes: []*v1.Node{
+			st.MakeNode().Name("node-1").Obj(),
+		},
+		Pods: []*v1.Pod{
+			st.MakePod().Name("pod1").Container("pause").Tolerations([]v1.Toleration{{Key: "featureA", Effect: v1.TaintEffectNoExecute, TolerationSeconds: ptr.To(int64(200))}}).Obj(),
+		},
+		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+			node, err := testCtx.ClientSet.CoreV1().Nodes().Get(testCtx.Ctx, "node-1", metav1.GetOptions{})
+			if err != nil {
+				return nil, err
+			}
+			updatedNode := node.DeepCopy()
+			if updatedNode.Labels == nil {
+				updatedNode.Labels = make(map[string]string)
+			}
+			updatedNode.Labels["foo"] = "bar"
+			if _, err := testCtx.ClientSet.CoreV1().Nodes().Update(testCtx.Ctx, updatedNode, metav1.UpdateOptions{}); err != nil {
+				return nil, fmt.Errorf("failed to update node status: %w", err)
+			}
+			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.UpdateNodeDeclaredFeature}: 0}, nil
+		},
+		WantRequeuedPods: sets.Set[string]{},
+	},
+	{
+		Name:                       "pod becomes schedulable after pod update that removes feature requirement",
+		EnableNodeDeclaredFeatures: true,
+		EnableSchedulingQueueHint:  sets.New(true),
+		EnablePlugins:              []string{names.NodeDeclaredFeatures},
+		InitialNodes: []*v1.Node{
+			st.MakeNode().Name("node-1").Obj(),
+		},
+		Pods: []*v1.Pod{
+			st.MakePod().Name("pod1").Container("pause").Tolerations([]v1.Toleration{{Key: "featureA", Effect: v1.TaintEffectNoExecute, TolerationSeconds: ptr.To(int64(200))}}).Obj(),
+		},
+		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+			pod, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Get(testCtx.Ctx, "pod1", metav1.GetOptions{})
+			if err != nil {
+				return nil, err
+			}
+			updatedPod := pod.DeepCopy()
+			// Modify toleration so that we no longer require the feature.
+			updatedPod.Spec.Tolerations[0].TolerationSeconds = ptr.To(int64(0))
+			if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Update(testCtx.Ctx, updatedPod, metav1.UpdateOptions{}); err != nil {
+				return nil, err
+			}
+			return map[fwk.ClusterEvent]uint64{{Resource: unschedulablePod, ActionType: fwk.Update}: 1}, nil
+		},
+		WantRequeuedPods: sets.New("pod1"),
+	},
+	{
+		Name:                       "pod remains unschedulable after pod update that does not remove feature requirement",
+		EnableNodeDeclaredFeatures: true,
+		EnableSchedulingQueueHint:  sets.New(true),
+		EnablePlugins:              []string{names.NodeDeclaredFeatures},
+		InitialNodes: []*v1.Node{
+			st.MakeNode().Name("node-1").Obj(),
+		},
+		Pods: []*v1.Pod{
+			st.MakePod().Name("pod1").Container("pause").Tolerations([]v1.Toleration{{Key: "featureA", Effect: v1.TaintEffectNoExecute, TolerationSeconds: ptr.To(int64(200))}}).Obj(),
+		},
+		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+			pod, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Get(testCtx.Ctx, "pod1", metav1.GetOptions{})
+			if err != nil {
+				return nil, err
+			}
+			updatedPod := pod.DeepCopy()
+			updatedPod.Labels = make(map[string]string)
+			updatedPod.Labels["foo"] = "bar"
+			if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Update(testCtx.Ctx, updatedPod, metav1.UpdateOptions{}); err != nil {
+				return nil, err
+			}
+			return map[fwk.ClusterEvent]uint64{{Resource: unschedulablePod, ActionType: fwk.Update}: 1}, nil
+		},
+		WantRequeuedPods: sets.Set[string]{},
+	},
+	{
+		Name:          "Pod rejected by the GangScheduling plugin is requeued when a new pod with matching workload reference is created",
+		EnablePlugins: []string{names.GangScheduling},
+		InitialNodes: []*v1.Node{
+			st.MakeNode().Name("fake-node1").Obj(),
+		},
+		InitialWorkloads: []*schedulingapi.Workload{
+			st.MakeWorkload().Name("w1").PodGroup(st.MakePodGroup().Name("pg1").MinCount(2).Obj()).Obj(),
+		},
+		Pods: []*v1.Pod{
+			st.MakePod().Name("pod1").Container("image").WorkloadRef(&v1.WorkloadReference{Name: "w1", PodGroup: "pg1"}).Obj(),
+			st.MakePod().Name("pod2").Container("image").WorkloadRef(&v1.WorkloadReference{Name: "w1", PodGroup: "pg2"}).Obj(),
+		},
+		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+			pod := st.MakePod().Name("pod3").Container("image").WorkloadRef(&v1.WorkloadReference{Name: "w1", PodGroup: "pg1"}).Obj()
+			if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Create(testCtx.Ctx, pod, metav1.CreateOptions{}); err != nil {
+				return nil, fmt.Errorf("failed to create Pod %q: %w", pod.Name, err)
+			}
+			return map[fwk.ClusterEvent]uint64{framework.EventUnscheduledPodAdd: 1}, nil
+		},
+		ExpectedInitialRejectingPhase: rejectingPhasePreEnqueue,
+		WantRequeuedPods:              sets.New("pod1", "pod3"),
+		EnableSchedulingQueueHint:     sets.New(true),
+		EnableGangScheduling:          true,
+	},
+	{
+		Name:          "Pod rejected by the GangScheduling plugin is requeued when a matching workload is created",
+		EnablePlugins: []string{names.GangScheduling},
+		InitialNodes: []*v1.Node{
+			st.MakeNode().Name("fake-node1").Obj(),
+		},
+		Pods: []*v1.Pod{
+			st.MakePod().Name("pod1").Container("image").WorkloadRef(&v1.WorkloadReference{Name: "w1", PodGroup: "pg1"}).Obj(),
+			st.MakePod().Name("pod2").Container("image").WorkloadRef(&v1.WorkloadReference{Name: "w1", PodGroup: "pg2"}).Obj(),
+		},
+		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+			workload := st.MakeWorkload().Name("w1").PodGroup(st.MakePodGroup().Name("pg1").MinCount(1).Obj()).Obj()
+			if _, err := testCtx.ClientSet.SchedulingV1alpha1().Workloads(testCtx.NS.Name).Create(testCtx.Ctx, workload, metav1.CreateOptions{}); err != nil {
+				return nil, fmt.Errorf("failed to create Workload %q: %w", workload.Name, err)
+			}
+			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Workload, ActionType: fwk.Add}: 1}, nil
+		},
+		ExpectedInitialRejectingPhase: rejectingPhasePreEnqueue,
+		WantRequeuedPods:              sets.New("pod1"),
+		EnableSchedulingQueueHint:     sets.New(true),
+		EnableGangScheduling:          true,
+	},
 }
 
 // TestCoreResourceEnqueue verify Pods failed by in-tree default plugins can be
@@ -2419,6 +2659,29 @@ func RunTestCoreResourceEnqueue(t *testing.T, tt *CoreResourceEnqueueTestCase) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	if tt.EnableDRAExtendedResource {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, true)
+	}
+	if tt.EnableNodeDeclaredFeatures {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
+
+		mockFeature := ndftesting.NewMockFeature(t)
+		mockFeature.EXPECT().Name().Return("FeatureA").Maybe()
+		mockFeature.EXPECT().InferForScheduling(mock.Anything).RunAndReturn(func(podInfo *ndf.PodInfo) bool {
+			return len(podInfo.Spec.Tolerations) > 0 && podInfo.Spec.Tolerations[0].TolerationSeconds != nil &&
+				*podInfo.Spec.Tolerations[0].TolerationSeconds > 0
+		})
+		mockFeature.EXPECT().MaxVersion().Return(nil).Maybe()
+
+		originalAllFeatures := ndffeatures.AllFeatures
+		ndffeatures.AllFeatures = []ndf.Feature{mockFeature}
+		defer func() {
+			ndffeatures.AllFeatures = originalAllFeatures
+		}()
+	}
+	if tt.EnableGangScheduling {
+		featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+			features.GenericWorkload: true,
+			features.GangScheduling:  true,
+		})
 	}
 	logger, _ := ktesting.NewTestContext(t)
 
@@ -2471,6 +2734,12 @@ func RunTestCoreResourceEnqueue(t *testing.T, tt *CoreResourceEnqueueTestCase) {
 		}
 	}
 
+	for _, deviceClass := range tt.InitialDeviceClasses {
+		if _, err := cs.ResourceV1().DeviceClasses().Create(ctx, deviceClass, metav1.CreateOptions{}); err != nil {
+			t.Fatalf("Failed to create a DeviceClass %q: %v", deviceClass.Name, err)
+		}
+	}
+
 	for _, csinode := range tt.InitialCSINodes {
 		if _, err := testCtx.ClientSet.StorageV1().CSINodes().Create(ctx, csinode, metav1.CreateOptions{}); err != nil {
 			t.Fatalf("Failed to create a CSINode %q: %v", csinode.Name, err)
@@ -2514,6 +2783,13 @@ func RunTestCoreResourceEnqueue(t *testing.T, tt *CoreResourceEnqueueTestCase) {
 		}
 	}
 
+	for _, wl := range tt.InitialWorkloads {
+		wl.Namespace = ns
+		if _, err := cs.SchedulingV1alpha1().Workloads(ns).Create(testCtx.Ctx, wl, metav1.CreateOptions{}); err != nil {
+			t.Fatalf("Failed to create a Workload %q: %v", wl.Name, err)
+		}
+	}
+
 	for _, pod := range tt.InitialPods {
 		if _, err := cs.CoreV1().Pods(ns).Create(ctx, pod, metav1.CreateOptions{}); err != nil {
 			t.Fatalf("Failed to create an initial Pod %q: %v", pod.Name, err)
@@ -2526,34 +2802,47 @@ func RunTestCoreResourceEnqueue(t *testing.T, tt *CoreResourceEnqueueTestCase) {
 		}
 	}
 
-	// Wait for the tt.Pods to be present in the scheduling active queue.
-	if err := wait.PollUntilContextTimeout(ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
-		pendingPods, _ := testCtx.Scheduler.SchedulingQueue.PendingPods()
-		return len(pendingPods) == len(tt.Pods) && len(testCtx.Scheduler.SchedulingQueue.PodsInActiveQ()) == len(tt.Pods), nil
-	}); err != nil {
-		t.Fatalf("Failed to wait for all pods to be present in the scheduling queue: %v", err)
-	}
-
-	t.Log("Confirmed Pods in the scheduling queue, starting to schedule them")
-
-	// Pop all pods out. They should become unschedulable.
-	for i := 0; i < len(tt.Pods); i++ {
-		testCtx.Scheduler.ScheduleOne(testCtx.Ctx)
-	}
-	// Wait for the tt.Pods to be still present in the scheduling (unschedulable) queue.
-	if err := wait.PollUntilContextTimeout(ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
-		activePodsCount := len(testCtx.Scheduler.SchedulingQueue.PodsInActiveQ())
-		if activePodsCount > 0 {
-			return false, fmt.Errorf("active queue was expected to be empty, but found %v Pods", activePodsCount)
+	switch tt.ExpectedInitialRejectingPhase {
+	case rejectingPhasePreEnqueue:
+		// Wait for the tt.Pods to be unschedulable in the scheduling queue.
+		if err := wait.PollUntilContextTimeout(ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
+			pendingPods, _ := testCtx.Scheduler.SchedulingQueue.PendingPods()
+			return len(pendingPods) == len(tt.Pods) && len(testCtx.Scheduler.SchedulingQueue.PodsInActiveQ()) == 0, nil
+		}); err != nil {
+			t.Fatalf("Failed to wait for all pods to be present in the scheduling queue: %v", err)
+		}
+		t.Log("All pods are waiting as unschedulable, will trigger triggerFn")
+	case rejectingPhaseSchedulingCycle:
+		fallthrough
+	default: // Defaults to rejectingPhaseSchedulingCycle.
+		// Wait for the tt.Pods to be present in the scheduling active queue.
+		if err := wait.PollUntilContextTimeout(ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
+			pendingPods, _ := testCtx.Scheduler.SchedulingQueue.PendingPods()
+			return len(pendingPods) == len(tt.Pods) && len(testCtx.Scheduler.SchedulingQueue.PodsInActiveQ()) == len(tt.Pods), nil
+		}); err != nil {
+			t.Fatalf("Failed to wait for all pods to be present in the scheduling queue: %v", err)
 		}
 
-		pendingPods, _ := testCtx.Scheduler.SchedulingQueue.PendingPods()
-		return len(pendingPods) == len(tt.Pods), nil
-	}); err != nil {
-		t.Fatalf("Failed to wait for all pods to remain in the scheduling queue after scheduling attempts: %v", err)
-	}
+		t.Log("Confirmed Pods in the scheduling queue, starting to schedule them")
 
-	t.Log("finished initial schedulings for all Pods, will trigger triggerFn")
+		// Pop all pods out. They should become unschedulable.
+		for i := 0; i < len(tt.Pods); i++ {
+			testCtx.Scheduler.ScheduleOne(testCtx.Ctx)
+		}
+		// Wait for the tt.Pods to be still present in the scheduling (unschedulable) queue.
+		if err := wait.PollUntilContextTimeout(ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
+			activePodsCount := len(testCtx.Scheduler.SchedulingQueue.PodsInActiveQ())
+			if activePodsCount > 0 {
+				return false, fmt.Errorf("active queue was expected to be empty, but found %v Pods", activePodsCount)
+			}
+
+			pendingPods, _ := testCtx.Scheduler.SchedulingQueue.PendingPods()
+			return len(pendingPods) == len(tt.Pods), nil
+		}); err != nil {
+			t.Fatalf("Failed to wait for all pods to remain in the scheduling queue after scheduling attempts: %v", err)
+		}
+		t.Log("finished initial schedulings for all Pods, will trigger triggerFn")
+	}
 
 	legacyregistry.Reset() // reset the metric before triggering
 	wantTriggeredEvents, err := tt.TriggerFn(testCtx)

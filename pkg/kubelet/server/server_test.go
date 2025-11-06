@@ -57,11 +57,11 @@ import (
 	"k8s.io/kubernetes/test/utils/ktesting"
 
 	// Do some initialization to decode the query parameters correctly.
+	"k8s.io/apiserver/pkg/server/flagz"
 	"k8s.io/apiserver/pkg/server/healthz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	zpagesfeatures "k8s.io/component-base/zpages/features"
-	"k8s.io/component-base/zpages/flagz"
 	"k8s.io/kubelet/pkg/cri/streaming"
 	"k8s.io/kubelet/pkg/cri/streaming/portforward"
 	remotecommandserver "k8s.io/kubelet/pkg/cri/streaming/remotecommand"
@@ -674,9 +674,11 @@ func TestInstallAuthNotRequiredHandlers(t *testing.T) {
 func TestAuthFilters(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	// Enable features.ContainerCheckpoint during test
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerCheckpoint, true)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, zpagesfeatures.ComponentStatusz, true)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, zpagesfeatures.ComponentFlagz, true)
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.ContainerCheckpoint:    true,
+		zpagesfeatures.ComponentStatusz: true,
+		zpagesfeatures.ComponentFlagz:   true,
+	})
 
 	fw := newServerTest(tCtx)
 	defer fw.testHTTPServer.Close()

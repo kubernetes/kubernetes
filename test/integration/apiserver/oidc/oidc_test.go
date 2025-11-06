@@ -27,6 +27,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -48,16 +49,21 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/features"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	authenticationconfigmetrics "k8s.io/apiserver/pkg/server/options/authenticationconfig/metrics"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/plugin/pkg/authenticator/token/oidc"
 	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd/api"
 	certutil "k8s.io/client-go/util/cert"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeapiserverapptesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/kubeapiserver/options"
+	"k8s.io/kubernetes/pkg/util/slice"
 	"k8s.io/kubernetes/test/integration/framework"
 	utilsoidc "k8s.io/kubernetes/test/utils/oidc"
 	"k8s.io/kubernetes/test/utils/oidc/handlers"
@@ -133,6 +139,8 @@ func TestStructuredAuthenticationConfig(t *testing.T) {
 }
 
 func runTests(t *testing.T, useAuthenticationConfig bool) {
+	genericapiserver.SetHostnameFuncForTests("testAPIServerID")
+
 	var tests = []singleTest[*rsa.PrivateKey, *rsa.PublicKey]{
 		{
 			name: "ID token is ok",
@@ -1585,18 +1593,7 @@ jwt:
 			}
 
 			adminClient := kubernetes.NewForConfigOrDie(apiServer.ClientConfig)
-			body, err := adminClient.RESTClient().Get().AbsPath("/metrics").DoRaw(ctx)
-			require.NoError(t, err)
-			var gotMetricStrings []string
-			trimFP := regexp.MustCompile(`(.*)(} \d+\.\d+.*)`)
-			for _, line := range strings.Split(string(body), "\n") {
-				if strings.HasPrefix(line, "apiserver_authentication_config_controller_") {
-					if strings.Contains(line, "_seconds") {
-						line = trimFP.ReplaceAllString(line, `$1`) + "} FP" // ignore floating point metric values
-					}
-					gotMetricStrings = append(gotMetricStrings, line)
-				}
-			}
+			gotMetricStrings := getMetrics(t, ctx, adminClient, "apiserver_authentication_config_controller_")
 			if diff := cmp.Diff(tt.wantMetricStrings, gotMetricStrings); diff != "" {
 				t.Errorf("unexpected metrics diff (-want +got): %s", diff)
 			}
@@ -1744,6 +1741,11 @@ jwt:
 }
 
 func TestMultipleJWTAuthenticators(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthenticationConfigurationJWKSMetrics, true)
+
+	genericapiserver.SetHostnameFuncForTests("testAPIServerID")
+	oidc.ResetMetrics()
+
 	caCertContent1, _, caFilePath1, caKeyFilePath1 := generateCert(t)
 	signingPrivateKey1, publicKey1 := rsaGenerateKey(t)
 	oidcServer1 := utilsoidc.BuildAndRunTestServer(t, caFilePath1, caKeyFilePath1, "")
@@ -1846,6 +1848,260 @@ jwt:
 		Groups:   []string{"system:role1", "system:role2", "system:role3", "system:role4", "system:authenticated"},
 		UID:      "1234",
 	}, res.Status.UserInfo)
+
+	jwtIssuerHash1 := fmt.Sprintf("sha256:%x", sha256.Sum256([]byte(oidcServer1.URL())))
+	jwtIssuerHash2 := fmt.Sprintf("sha256:%x", sha256.Sum256([]byte("https://example.com")))
+
+	keySetHash1 := fetchJWKSAndComputeHash(t, oidcServer1.URL(), caCertContent1)
+	keySetHash2 := fetchJWKSAndComputeHash(t, oidcServer2.URL(), caCertContent2)
+
+	wantMetricStrings := []string{
+		fmt.Sprintf(`apiserver_authentication_jwt_authenticator_jwks_fetch_last_key_set_info{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",hash="%s",jwt_issuer_hash="%s"} 1`, keySetHash1, jwtIssuerHash1),
+		fmt.Sprintf(`apiserver_authentication_jwt_authenticator_jwks_fetch_last_key_set_info{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",hash="%s",jwt_issuer_hash="%s"} 1`, keySetHash2, jwtIssuerHash2),
+		fmt.Sprintf(`apiserver_authentication_jwt_authenticator_jwks_fetch_last_timestamp_seconds{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",jwt_issuer_hash="%s",result="success"} FP`, jwtIssuerHash1),
+		fmt.Sprintf(`apiserver_authentication_jwt_authenticator_jwks_fetch_last_timestamp_seconds{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",jwt_issuer_hash="%s",result="success"} FP`, jwtIssuerHash2),
+	}
+	adminClient := kubernetes.NewForConfigOrDie(apiServer.ClientConfig)
+	gotMetricStrings := getMetrics(t, ctx, adminClient, "apiserver_authentication_jwt_authenticator_jwks_")
+
+	wantMetricStrings = slice.SortStrings(wantMetricStrings)
+
+	if diff := cmp.Diff(wantMetricStrings, gotMetricStrings); diff != "" {
+		t.Errorf("unexpected metrics diff (-want +got): %s", diff)
+	}
+}
+
+// TestJWKSMetricsCleanupOnIssuerRemoval tests that metrics are cleaned up when an issuer is removed.
+// 1. Start with two issuers configured and verify that metrics for both issuers exist.
+// 2. Remove one issuer from the config and verify that metrics for the removed issuer are deleted.
+func TestJWKSMetricsCleanupOnIssuerRemoval(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthenticationConfigurationJWKSMetrics, true)
+
+	genericapiserver.SetHostnameFuncForTests("testAPIServerID")
+	oidc.ResetMetrics()
+
+	const hardCodedTokenCacheTTLAndPollInterval = 10 * time.Second
+	origUpdateAuthenticationConfigTimeout := options.UpdateAuthenticationConfigTimeout
+	t.Cleanup(func() { options.UpdateAuthenticationConfigTimeout = origUpdateAuthenticationConfigTimeout })
+	options.UpdateAuthenticationConfigTimeout = 2 * hardCodedTokenCacheTTLAndPollInterval
+
+	caCertContent1, _, caFilePath1, caKeyFilePath1 := generateCert(t)
+	signingPrivateKey1, publicKey1 := rsaGenerateKey(t)
+	oidcServer1 := utilsoidc.BuildAndRunTestServer(t, caFilePath1, caKeyFilePath1, "")
+
+	caCertContent2, _, caFilePath2, caKeyFilePath2 := generateCert(t)
+	signingPrivateKey2, publicKey2 := rsaGenerateKey(t)
+	oidcServer2 := utilsoidc.BuildAndRunTestServer(t, caFilePath2, caKeyFilePath2, "")
+
+	authenticationConfig := fmt.Sprintf(`
+apiVersion: apiserver.config.k8s.io/v1
+kind: AuthenticationConfiguration
+jwt:
+- issuer:
+    url: %s
+    audiences:
+    - foo
+    audienceMatchPolicy: MatchAny
+    certificateAuthority: |
+        %s
+  claimMappings:
+    username:
+      expression: "'k8s-' + claims.sub"
+- issuer:
+    url: %s
+    audiences:
+    - bar
+    audienceMatchPolicy: MatchAny
+    certificateAuthority: |
+        %s
+  claimMappings:
+    username:
+      expression: "'k8s-' + claims.sub"
+`, oidcServer1.URL(), indentCertificateAuthority(string(caCertContent1)), oidcServer2.URL(), indentCertificateAuthority(string(caCertContent2)))
+
+	oidcServer1.JwksHandler().EXPECT().KeySet().RunAndReturn(utilsoidc.DefaultJwksHandlerBehavior(t, publicKey1)).Maybe()
+	oidcServer2.JwksHandler().EXPECT().KeySet().RunAndReturn(utilsoidc.DefaultJwksHandlerBehavior(t, publicKey2)).Maybe()
+
+	apiServer := startTestAPIServerForOIDC(t, apiServerOIDCConfig{
+		authenticationConfigYAML: authenticationConfig,
+	}, publicKey1)
+
+	idTokenLifetime := time.Second * 1200
+	oidcServer1.TokenHandler().EXPECT().Token().RunAndReturn(utilsoidc.TokenHandlerBehaviorReturningPredefinedJWT(
+		t,
+		signingPrivateKey1,
+		map[string]interface{}{
+			"iss": oidcServer1.URL(),
+			"sub": defaultOIDCClaimedUsername,
+			"aud": "foo",
+			"exp": time.Now().Add(idTokenLifetime).Unix(),
+		},
+		defaultStubAccessToken,
+		defaultStubRefreshToken,
+	)).Times(1)
+
+	oidcServer2.TokenHandler().EXPECT().Token().RunAndReturn(utilsoidc.TokenHandlerBehaviorReturningPredefinedJWT(
+		t,
+		signingPrivateKey2,
+		map[string]interface{}{
+			"iss": oidcServer2.URL(),
+			"sub": defaultOIDCClaimedUsername,
+			"aud": "bar",
+			"exp": time.Now().Add(idTokenLifetime).Unix(),
+		},
+		defaultStubAccessToken,
+		defaultStubRefreshToken,
+	)).Times(1)
+
+	ctx := testContext(t)
+
+	tokenURL1, err := oidcServer1.TokenURL()
+	require.NoError(t, err)
+	tokenURL2, err := oidcServer2.TokenURL()
+	require.NoError(t, err)
+
+	client1 := configureClientFetchingOIDCCredentials(t, apiServer.ClientConfig, caCertContent1, caFilePath1, oidcServer1.URL(), tokenURL1)
+	_, err = client1.AuthenticationV1().SelfSubjectReviews().Create(ctx, &authenticationv1.SelfSubjectReview{}, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	client2 := configureClientFetchingOIDCCredentials(t, apiServer.ClientConfig, caCertContent2, caFilePath2, oidcServer2.URL(), tokenURL2)
+	_, err = client2.AuthenticationV1().SelfSubjectReviews().Create(ctx, &authenticationv1.SelfSubjectReview{}, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	jwtIssuerHash1 := getHash(oidcServer1.URL())
+	jwtIssuerHash2 := getHash(oidcServer2.URL())
+
+	keySetHash1 := fetchJWKSAndComputeHash(t, oidcServer1.URL(), caCertContent1)
+	keySetHash2 := fetchJWKSAndComputeHash(t, oidcServer2.URL(), caCertContent2)
+
+	adminClient := kubernetes.NewForConfigOrDie(apiServer.ClientConfig)
+
+	// Check that metrics exist for both the issuers with correct jwt_issuer_hash + hash combos
+	wantMetricStrings := []string{
+		fmt.Sprintf(`apiserver_authentication_jwt_authenticator_jwks_fetch_last_key_set_info{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",hash="%s",jwt_issuer_hash="%s"} 1`, keySetHash1, jwtIssuerHash1),
+		fmt.Sprintf(`apiserver_authentication_jwt_authenticator_jwks_fetch_last_key_set_info{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",hash="%s",jwt_issuer_hash="%s"} 1`, keySetHash2, jwtIssuerHash2),
+		fmt.Sprintf(`apiserver_authentication_jwt_authenticator_jwks_fetch_last_timestamp_seconds{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",jwt_issuer_hash="%s",result="success"} FP`, jwtIssuerHash1),
+		fmt.Sprintf(`apiserver_authentication_jwt_authenticator_jwks_fetch_last_timestamp_seconds{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",jwt_issuer_hash="%s",result="success"} FP`, jwtIssuerHash2),
+	}
+	gotMetricStrings := getMetrics(t, ctx, adminClient, "apiserver_authentication_jwt_authenticator_jwks_")
+
+	wantMetricStrings = slice.SortStrings(wantMetricStrings)
+	if diff := cmp.Diff(wantMetricStrings, gotMetricStrings); diff != "" {
+		t.Errorf("unexpected metrics before reload diff (-want +got): %s", diff)
+	}
+
+	// Now update the config to only have ONE issuer (remove issuer 2)
+	newAuthenticationConfig := fmt.Sprintf(`
+apiVersion: apiserver.config.k8s.io/v1
+kind: AuthenticationConfiguration
+jwt:
+- issuer:
+    url: %s
+    audiences:
+    - foo
+    audienceMatchPolicy: MatchAny
+    certificateAuthority: |
+        %s
+  claimMappings:
+    username:
+      expression: "'k8s-' + claims.sub"
+`, oidcServer1.URL(), indentCertificateAuthority(string(caCertContent1)))
+
+	authConfigFilePath := apiServer.ServerOpts.Authentication.AuthenticationConfigFile
+
+	tempFile, err := os.CreateTemp(filepath.Dir(authConfigFilePath), "auth-config-*.yaml")
+	require.NoError(t, err)
+	_, err = tempFile.Write([]byte(newAuthenticationConfig))
+	require.NoError(t, err)
+	err = tempFile.Close()
+	require.NoError(t, err)
+
+	err = os.Rename(tempFile.Name(), authConfigFilePath)
+	require.NoError(t, err)
+
+	newAuthConfigHash := getHash(newAuthenticationConfig)
+
+	// Wait for config reload by polling for the new config hash
+	err = wait.PollUntilContextTimeout(ctx, time.Second, 3*hardCodedTokenCacheTTLAndPollInterval, true, func(ctx context.Context) (done bool, err error) {
+		body, err := adminClient.RESTClient().Get().AbsPath("/metrics").DoRaw(ctx)
+		if err != nil {
+			return false, err
+		}
+
+		metricsStr := string(body)
+		expectedConfigHashMetric := fmt.Sprintf(`apiserver_authentication_config_controller_last_config_info{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",hash="%s"} 1`, newAuthConfigHash)
+		return strings.Contains(metricsStr, expectedConfigHashMetric), nil
+	})
+	require.NoError(t, err, "config reload not detected")
+
+	// Wait for metric cleanup by polling until issuer 2 metrics are removed
+	wantMetricStringsAfterReload := []string{
+		fmt.Sprintf(`apiserver_authentication_jwt_authenticator_jwks_fetch_last_key_set_info{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",hash="%s",jwt_issuer_hash="%s"} 1`, keySetHash1, jwtIssuerHash1),
+		fmt.Sprintf(`apiserver_authentication_jwt_authenticator_jwks_fetch_last_timestamp_seconds{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",jwt_issuer_hash="%s",result="success"} FP`, jwtIssuerHash1),
+	}
+	wantMetricStringsAfterReload = slice.SortStrings(wantMetricStringsAfterReload)
+
+	err = wait.PollUntilContextTimeout(ctx, time.Second, 120*time.Second, true, func(ctx context.Context) (done bool, err error) {
+		gotMetricStrings := getMetrics(t, ctx, adminClient, "apiserver_authentication_jwt_authenticator_jwks_")
+		diff := cmp.Diff(wantMetricStringsAfterReload, gotMetricStrings)
+		return len(diff) == 0, nil
+	})
+	require.NoError(t, err, "metrics cleanup not completed - issuer 2 metrics still present")
+}
+
+// fetchJWKSAndComputeHash fetches the JWKS from the given server URL using the provided CA certificate,
+// and returns the hash of the keyset bytes (computed the same way as the authenticator does).
+func fetchJWKSAndComputeHash(t *testing.T, serverURL string, caCertContent []byte) string {
+	t.Helper()
+
+	caCertPool := x509.NewCertPool()
+	caCertPool.AppendCertsFromPEM(caCertContent)
+	httpClient := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{RootCAs: caCertPool},
+		},
+	}
+
+	resp, err := httpClient.Get(serverURL + "/jwks")
+	require.NoError(t, err)
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	keySetBytes, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+
+	return getHash(string(keySetBytes))
+}
+
+// getMetrics fetches metrics from the API server and returns only metrics matching the given prefixes.
+// Floating point values in metrics ending with "_seconds" are normalized to "FP" for consistent comparison.
+// Results are sorted alphabetically.
+func getMetrics(t *testing.T, ctx context.Context, adminClient *kubernetes.Clientset, prefixes ...string) []string {
+	t.Helper()
+
+	body, err := adminClient.RESTClient().Get().AbsPath("/metrics").DoRaw(ctx)
+	require.NoError(t, err)
+
+	var gotMetricStrings []string
+	trimFP := regexp.MustCompile(`(.*)(} \d+\.\d+.*)`)
+	for _, line := range strings.Split(string(body), "\n") {
+		matched := false
+		for _, prefix := range prefixes {
+			if strings.HasPrefix(line, prefix) {
+				matched = true
+				break
+			}
+		}
+		if matched {
+			if strings.Contains(line, "_seconds") {
+				line = trimFP.ReplaceAllString(line, `$1`) + "} FP" // ignore floating point metric values
+			}
+			gotMetricStrings = append(gotMetricStrings, line)
+		}
+	}
+
+	return slice.SortStrings(gotMetricStrings)
 }
 
 func rsaGenerateKey(t *testing.T) (*rsa.PrivateKey, *rsa.PublicKey) {

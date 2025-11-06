@@ -34,6 +34,7 @@ import (
 	cronjobconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/cronjob/config/v1alpha1"
 	daemonconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/daemon/config/v1alpha1"
 	deploymentconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/deployment/config/v1alpha1"
+	devicetaintevictionconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/devicetainteviction/config/v1alpha1"
 	endpointconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/endpoint/config/v1alpha1"
 	endpointsliceconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/endpointslice/config/v1alpha1"
 	endpointslicemirroringconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/endpointslicemirroring/config/v1alpha1"
@@ -224,6 +225,9 @@ func autoConvert_v1alpha1_KubeControllerManagerConfiguration_To_config_KubeContr
 	if err := validatingadmissionpolicystatusconfigv1alpha1.Convert_v1alpha1_ValidatingAdmissionPolicyStatusControllerConfiguration_To_config_ValidatingAdmissionPolicyStatusControllerConfiguration(&in.ValidatingAdmissionPolicyStatusController, &out.ValidatingAdmissionPolicyStatusController, s); err != nil {
 		return err
 	}
+	if err := devicetaintevictionconfigv1alpha1.Convert_v1alpha1_DeviceTaintEvictionControllerConfiguration_To_config_DeviceTaintEvictionControllerConfiguration(&in.DeviceTaintEvictionController, &out.DeviceTaintEvictionController, s); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -242,6 +246,9 @@ func autoConvert_config_KubeControllerManagerConfiguration_To_v1alpha1_KubeContr
 	if err := attachdetachconfigv1alpha1.Convert_config_AttachDetachControllerConfiguration_To_v1alpha1_AttachDetachControllerConfiguration(&in.AttachDetachController, &out.AttachDetachController, s); err != nil {
 		return err
 	}
+	if err := cronjobconfigv1alpha1.Convert_config_CronJobControllerConfiguration_To_v1alpha1_CronJobControllerConfiguration(&in.CronJobController, &out.CronJobController, s); err != nil {
+		return err
+	}
 	if err := signerconfigv1alpha1.Convert_config_CSRSigningControllerConfiguration_To_v1alpha1_CSRSigningControllerConfiguration(&in.CSRSigningController, &out.CSRSigningController, s); err != nil {
 		return err
 	}
@@ -251,7 +258,7 @@ func autoConvert_config_KubeControllerManagerConfiguration_To_v1alpha1_KubeContr
 	if err := deploymentconfigv1alpha1.Convert_config_DeploymentControllerConfiguration_To_v1alpha1_DeploymentControllerConfiguration(&in.DeploymentController, &out.DeploymentController, s); err != nil {
 		return err
 	}
-	if err := statefulsetconfigv1alpha1.Convert_config_StatefulSetControllerConfiguration_To_v1alpha1_StatefulSetControllerConfiguration(&in.StatefulSetController, &out.StatefulSetController, s); err != nil {
+	if err := devicetaintevictionconfigv1alpha1.Convert_config_DeviceTaintEvictionControllerConfiguration_To_v1alpha1_DeviceTaintEvictionControllerConfiguration(&in.DeviceTaintEvictionController, &out.DeviceTaintEvictionController, s); err != nil {
 		return err
 	}
 	if err := Convert_config_DeprecatedControllerConfiguration_To_v1alpha1_DeprecatedControllerConfiguration(&in.DeprecatedController, &out.DeprecatedController, s); err != nil {
@@ -276,9 +283,6 @@ func autoConvert_config_KubeControllerManagerConfiguration_To_v1alpha1_KubeContr
 		return err
 	}
 	if err := jobconfigv1alpha1.Convert_config_JobControllerConfiguration_To_v1alpha1_JobControllerConfiguration(&in.JobController, &out.JobController, s); err != nil {
-		return err
-	}
-	if err := cronjobconfigv1alpha1.Convert_config_CronJobControllerConfiguration_To_v1alpha1_CronJobControllerConfiguration(&in.CronJobController, &out.CronJobController, s); err != nil {
 		return err
 	}
 	if err := serviceaccountconfigv1alpha1.Convert_config_LegacySATokenCleanerConfiguration_To_v1alpha1_LegacySATokenCleanerConfiguration(&in.LegacySATokenCleaner, &out.LegacySATokenCleaner, s); err != nil {
@@ -312,6 +316,9 @@ func autoConvert_config_KubeControllerManagerConfiguration_To_v1alpha1_KubeContr
 		return err
 	}
 	if err := serviceconfigv1alpha1.Convert_config_ServiceControllerConfiguration_To_v1alpha1_ServiceControllerConfiguration(&in.ServiceController, &out.ServiceController, s); err != nil {
+		return err
+	}
+	if err := statefulsetconfigv1alpha1.Convert_config_StatefulSetControllerConfiguration_To_v1alpha1_StatefulSetControllerConfiguration(&in.StatefulSetController, &out.StatefulSetController, s); err != nil {
 		return err
 	}
 	if err := ttlafterfinishedconfigv1alpha1.Convert_config_TTLAfterFinishedControllerConfiguration_To_v1alpha1_TTLAfterFinishedControllerConfiguration(&in.TTLAfterFinishedController, &out.TTLAfterFinishedController, s); err != nil {

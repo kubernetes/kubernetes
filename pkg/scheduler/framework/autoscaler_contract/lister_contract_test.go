@@ -21,10 +21,11 @@ limitations under the License.
 package contract
 
 import (
+	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/dynamic-resource-allocation/structured"
+	"k8s.io/dynamic-resource-allocation/structured/schedulerapi"
 	fwk "k8s.io/kube-scheduler/framework"
 )
 
@@ -34,6 +35,7 @@ var _ fwk.SharedLister = &shareListerContract{}
 var _ fwk.ResourceSliceLister = &resourceSliceListerContract{}
 var _ fwk.DeviceClassLister = &deviceClassListerContract{}
 var _ fwk.ResourceClaimTracker = &resourceClaimTrackerContract{}
+var _ fwk.DeviceClassResolver = &deviceClassResolverContract{}
 var _ fwk.SharedDRAManager = &sharedDRAManagerContract{}
 
 type nodeInfoListerContract struct{}
@@ -96,11 +98,11 @@ func (r *resourceClaimTrackerContract) Get(_, _ string) (*resourceapi.ResourceCl
 	return nil, nil
 }
 
-func (r *resourceClaimTrackerContract) ListAllAllocatedDevices() (sets.Set[structured.DeviceID], error) {
+func (r *resourceClaimTrackerContract) ListAllAllocatedDevices() (sets.Set[schedulerapi.DeviceID], error) {
 	return nil, nil
 }
 
-func (r *resourceClaimTrackerContract) GatherAllocatedState() (*structured.AllocatedState, error) {
+func (r *resourceClaimTrackerContract) GatherAllocatedState() (*schedulerapi.AllocatedState, error) {
 	return nil, nil
 }
 
@@ -134,5 +136,15 @@ func (s *sharedDRAManagerContract) ResourceSlices() fwk.ResourceSliceLister {
 }
 
 func (s *sharedDRAManagerContract) DeviceClasses() fwk.DeviceClassLister {
+	return nil
+}
+
+func (s *sharedDRAManagerContract) DeviceClassResolver() fwk.DeviceClassResolver {
+	return nil
+}
+
+type deviceClassResolverContract struct{}
+
+func (d *deviceClassResolverContract) GetDeviceClass(_ v1.ResourceName) *resourceapi.DeviceClass {
 	return nil
 }

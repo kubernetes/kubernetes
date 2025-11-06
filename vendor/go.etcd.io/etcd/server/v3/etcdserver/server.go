@@ -974,6 +974,12 @@ func (s *EtcdServer) Cleanup() {
 	}
 }
 
+func (s *EtcdServer) Defragment() error {
+	s.bemu.Lock()
+	defer s.bemu.Unlock()
+	return s.be.Defrag()
+}
+
 func (s *EtcdServer) applyAll(ep *etcdProgress, apply *toApply) {
 	s.applySnapshot(ep, apply)
 	s.applyEntries(ep, apply)
@@ -1035,11 +1041,21 @@ func (s *EtcdServer) applySnapshot(ep *etcdProgress, toApply *toApply) {
 	// wait for raftNode to persist snapshot onto the disk
 	<-toApply.notifyc
 
+	bemuUnlocked := false
+	s.bemu.Lock()
+	defer func() {
+		if !bemuUnlocked {
+			s.bemu.Unlock()
+		}
+	}()
+
 	// gofail: var applyBeforeOpenSnapshot struct{}
 	newbe, err := serverstorage.OpenSnapshotBackend(s.Cfg, s.snapshotter, toApply.snapshot, s.beHooks)
 	if err != nil {
 		lg.Panic("failed to open snapshot backend", zap.Error(err))
 	}
+	lg.Info("applySnapshot: opened snapshot backend")
+	// gofail: var applyAfterOpenSnapshot struct{}
 
 	// We need to set the backend to consistIndex before recovering the lessor,
 	// because lessor.Recover will commit the boltDB transaction, accordingly it
@@ -1069,11 +1085,14 @@ func (s *EtcdServer) applySnapshot(ep *etcdProgress, toApply *toApply) {
 
 	lg.Info("restored mvcc store", zap.Uint64("consistent-index", s.consistIndex.ConsistentIndex()))
 
+	oldbe := s.be
+	s.be = newbe
+	s.bemu.Unlock()
+	bemuUnlocked = true
+
 	// Closing old backend might block until all the txns
 	// on the backend are finished.
 	// We do not want to wait on closing the old backend.
-	s.bemu.Lock()
-	oldbe := s.be
 	go func() {
 		lg.Info("closing old backend file")
 		defer func() {
@@ -1083,9 +1102,6 @@ func (s *EtcdServer) applySnapshot(ep *etcdProgress, toApply *toApply) {
 			lg.Panic("failed to close old backend", zap.Error(err))
 		}
 	}()
-
-	s.be = newbe
-	s.bemu.Unlock()
 
 	lg.Info("restoring alarm store")
 

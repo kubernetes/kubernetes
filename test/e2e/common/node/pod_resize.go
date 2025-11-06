@@ -24,10 +24,11 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/common/node/framework/cgroups"
 	"k8s.io/kubernetes/test/e2e/common/node/framework/podresize"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -35,6 +36,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
@@ -127,60 +129,99 @@ func doGuaranteedPodResizeTests(f *framework.Framework) {
 		ginkgo.Entry("cpu & mem restart + resize initContainers", v1.RestartContainer, v1.RestartContainer, true),
 	)
 
-	ginkgo.DescribeTable("guaranteed pods with multiple containers", func(ctx context.Context, expectedContainers []podresize.ResizableContainerInfo) {
-		originalContainers := makeGuaranteedContainers(3, v1.NotRequired, v1.NotRequired, false, false, originalCPU, originalMem)
-		for i := range originalContainers {
-			originalContainers[i].CPUPolicy = nil
-			originalContainers[i].MemPolicy = nil
-		}
+	// All tests will perform the requested resize, and once completed, will roll back the change.
+	// This results in coverage of both the operation as described, and its reverse.
+	ginkgo.Describe("guaranteed pods with multiple containers", func() {
+		/*
+			Release: v1.35
+			Testname: In-place Pod Resize, guaranteed pods with multiple containers, net increase
+			Description: Issuing an in-place Pod Resize request via the Pod Resize subresource patch endpoint to modify CPU and memory requests and limits for a guaranteed pod with 3 containers with a net increase MUST result in the Pod resources being updated as expected.
+		*/
+		framework.ConformanceIt("3 containers - increase cpu & mem on c1, c2, decrease cpu & mem on c3 - net increase [MinimumKubeletVersion:1.34]", func(ctx context.Context) {
+			originalContainers := makeGuaranteedContainers(3, v1.NotRequired, v1.NotRequired, false, false, originalCPU, originalMem)
+			for i := range originalContainers {
+				originalContainers[i].CPUPolicy = nil
+				originalContainers[i].MemPolicy = nil
+			}
 
-		doPatchAndRollback(ctx, f, originalContainers, expectedContainers, true)
-	},
-		// All tests will perform the requested resize, and once completed, will roll back the change.
-		// This results in coverage of both the operation as described, and its reverse.
-		ginkgo.Entry("3 containers - increase cpu & mem on c1, c2, decrease cpu & mem on c3 - net increase", []podresize.ResizableContainerInfo{
-			{
-				Name:      "c1",
-				Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(0, increasedCPU), CPULim: offsetCPU(0, increasedCPU), MemReq: offsetMemory(0, increasedMem), MemLim: offsetMemory(0, increasedMem)},
-			},
-			{
-				Name:      "c2",
-				Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(1, increasedCPU), CPULim: offsetCPU(1, increasedCPU), MemReq: offsetMemory(1, increasedMem), MemLim: offsetMemory(1, increasedMem)},
-			},
-			{
-				Name:      "c3",
-				Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(2, reducedCPU), CPULim: offsetCPU(2, reducedCPU), MemReq: offsetMemory(2, reducedMem), MemLim: offsetMemory(2, reducedMem)},
-			},
-		}),
-		ginkgo.Entry("3 containers - increase cpu & mem on c1, decrease cpu & mem on c2, c3 - net decrease", []podresize.ResizableContainerInfo{
-			{
-				Name:      "c1",
-				Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(0, increasedCPU), CPULim: offsetCPU(0, increasedCPU), MemReq: offsetMemory(0, increasedMem), MemLim: offsetMemory(0, increasedMem)},
-			},
-			{
-				Name:      "c2",
-				Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(1, reducedCPU), CPULim: offsetCPU(1, reducedCPU), MemReq: offsetMemory(1, reducedMem), MemLim: offsetMemory(1, reducedMem)},
-			},
-			{
-				Name:      "c3",
-				Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(2, reducedCPU), CPULim: offsetCPU(2, reducedCPU), MemReq: offsetMemory(2, reducedMem), MemLim: offsetMemory(2, reducedMem)},
-			},
-		}),
-		ginkgo.Entry("3 containers - increase: CPU (c1,c3), memory (c2, c3) ; decrease: CPU (c2)", []podresize.ResizableContainerInfo{
-			{
-				Name:      "c1",
-				Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(0, increasedCPU), CPULim: offsetCPU(0, increasedCPU), MemReq: offsetMemory(0, originalMem), MemLim: offsetMemory(0, originalMem)},
-			},
-			{
-				Name:      "c2",
-				Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(1, reducedCPU), CPULim: offsetCPU(1, reducedCPU), MemReq: offsetMemory(1, increasedMem), MemLim: offsetMemory(1, increasedMem)},
-			},
-			{
-				Name:      "c3",
-				Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(2, increasedCPU), CPULim: offsetCPU(2, increasedCPU), MemReq: offsetMemory(2, increasedMem), MemLim: offsetMemory(2, increasedMem)},
-			},
-		}),
-	)
+			expectedContainers := []podresize.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(0, increasedCPU), CPULim: offsetCPU(0, increasedCPU), MemReq: offsetMemory(0, increasedMem), MemLim: offsetMemory(0, increasedMem)},
+				},
+				{
+					Name:      "c2",
+					Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(1, increasedCPU), CPULim: offsetCPU(1, increasedCPU), MemReq: offsetMemory(1, increasedMem), MemLim: offsetMemory(1, increasedMem)},
+				},
+				{
+					Name:      "c3",
+					Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(2, reducedCPU), CPULim: offsetCPU(2, reducedCPU), MemReq: offsetMemory(2, reducedMem), MemLim: offsetMemory(2, reducedMem)},
+				},
+			}
+
+			doPatchAndRollback(ctx, f, originalContainers, expectedContainers, true)
+		})
+
+		/*
+			Release: v1.35
+			Testname: In-place Pod Resize, guaranteed pods with multiple containers, net decrease
+			Description: Issuing an in-place Pod Resize request via the Pod Resize subresource patch endpoint to modify CPU and memory requests and limits for a pod with 3 containers with a net decrease MUST result in the Pod resources being updated as expected.
+		*/
+		framework.ConformanceIt("3 containers - increase cpu & mem on c1, decrease cpu & mem on c2, c3 - net decrease [MinimumKubeletVersion:1.34]", func(ctx context.Context) {
+			originalContainers := makeGuaranteedContainers(3, v1.NotRequired, v1.NotRequired, false, false, originalCPU, originalMem)
+			for i := range originalContainers {
+				originalContainers[i].CPUPolicy = nil
+				originalContainers[i].MemPolicy = nil
+			}
+
+			expectedContainers := []podresize.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(0, increasedCPU), CPULim: offsetCPU(0, increasedCPU), MemReq: offsetMemory(0, increasedMem), MemLim: offsetMemory(0, increasedMem)},
+				},
+				{
+					Name:      "c2",
+					Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(1, reducedCPU), CPULim: offsetCPU(1, reducedCPU), MemReq: offsetMemory(1, reducedMem), MemLim: offsetMemory(1, reducedMem)},
+				},
+				{
+					Name:      "c3",
+					Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(2, reducedCPU), CPULim: offsetCPU(2, reducedCPU), MemReq: offsetMemory(2, reducedMem), MemLim: offsetMemory(2, reducedMem)},
+				},
+			}
+
+			doPatchAndRollback(ctx, f, originalContainers, expectedContainers, true)
+		})
+
+		/*
+			Release: v1.35
+			Testname: In-place Pod Resize, guaranteed pods with multiple containers, various operations
+			Description: Issuing an in-place Pod Resize request via the Pod Resize subresource patch endpoint to modify CPU and memory requests and limits for a pod with 3 containers with various operations MUST result in the Pod resources being updated as expected.
+		*/
+		framework.ConformanceIt("3 containers - increase: CPU (c1,c3), memory (c2, c3) ; decrease: CPU (c2) [MinimumKubeletVersion:1.34]", func(ctx context.Context) {
+			originalContainers := makeGuaranteedContainers(3, v1.NotRequired, v1.NotRequired, false, false, originalCPU, originalMem)
+			for i := range originalContainers {
+				originalContainers[i].CPUPolicy = nil
+				originalContainers[i].MemPolicy = nil
+			}
+
+			expectedContainers := []podresize.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(0, increasedCPU), CPULim: offsetCPU(0, increasedCPU), MemReq: offsetMemory(0, originalMem), MemLim: offsetMemory(0, originalMem)},
+				},
+				{
+					Name:      "c2",
+					Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(1, reducedCPU), CPULim: offsetCPU(1, reducedCPU), MemReq: offsetMemory(1, increasedMem), MemLim: offsetMemory(1, increasedMem)},
+				},
+				{
+					Name:      "c3",
+					Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(2, increasedCPU), CPULim: offsetCPU(2, increasedCPU), MemReq: offsetMemory(2, increasedMem), MemLim: offsetMemory(2, increasedMem)},
+				},
+			}
+
+			doPatchAndRollback(ctx, f, originalContainers, expectedContainers, true)
+		})
+	})
 }
 
 func doBurstablePodResizeTests(f *framework.Framework) {
@@ -225,11 +266,14 @@ func doBurstablePodResizeTests(f *framework.Framework) {
 	// - adding limits where only requests were previously set
 	// - adding requests where none were previously set
 	// - resizing with equivalents (e.g. 2m -> 1m)
-	ginkgo.DescribeTable("burstable pods - extended", func(ctx context.Context, originalContainers, expectedContainers []podresize.ResizableContainerInfo, doRollback bool) {
-		doPatchAndRollback(ctx, f, originalContainers, expectedContainers, doRollback)
-	},
-		ginkgo.Entry("6 containers - various operations performed (including adding limits and requests)",
-			[]podresize.ResizableContainerInfo{
+	ginkgo.Describe("burstable pods - extended", func() {
+		/*
+			Release: v1.35
+			Testname: In-place Pod Resize, burtable pod with multiple containers and various operations
+			Description: Issuing a Pod Resize request via the Pod Resize subresource patch endpoint to modify CPU and memory requests and limits on a 6-container pod with various operations MUST result in the Pod resources being updated as expected.
+		*/
+		framework.ConformanceIt("6 containers - various operations performed (including adding limits and requests) [MinimumKubeletVersion:1.34]", func(ctx context.Context) {
+			originalContainers := []podresize.ResizableContainerInfo{
 				{
 					// c1 starts with CPU requests only; increase CPU requests + add CPU limits
 					Name:      "c1",
@@ -255,8 +299,8 @@ func doBurstablePodResizeTests(f *framework.Framework) {
 					Name:      "c5",
 					Resources: &cgroups.ContainerResources{MemReq: originalMem},
 				},
-			},
-			[]podresize.ResizableContainerInfo{
+			}
+			expectedContainers := []podresize.ResizableContainerInfo{
 				{
 					// c1 starts with CPU requests only; increase CPU requests + add CPU limits
 					Name:      "c1",
@@ -282,26 +326,31 @@ func doBurstablePodResizeTests(f *framework.Framework) {
 					Name:      "c5",
 					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, MemReq: increasedMem},
 				},
-			},
-			false,
-		),
-		ginkgo.Entry("resize with equivalents",
-			[]podresize.ResizableContainerInfo{
+			}
+			doPatchAndRollback(ctx, f, originalContainers, expectedContainers, false)
+		})
+
+		/*
+			Release: v1.35
+			Testname: In-place Pod Resize, burstable pod resized with equivalents
+			Description: Issuing an in-place Pod Resize request via the Pod Resize subresource patch endpoint to modify CPU requests and limits using equivalent values (e.g. 2m -> 1m) MUST result in the updated Pod resources displayed correctly in the status.
+		*/
+		framework.ConformanceIt("resize with equivalents [MinimumKubeletVersion:1.34]", func(ctx context.Context) {
+			originalContainers := []podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
 					Resources: &cgroups.ContainerResources{CPUReq: "2m", CPULim: "10m"},
 				},
-			},
-			[]podresize.ResizableContainerInfo{
+			}
+			expectedContainers := []podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
 					Resources: &cgroups.ContainerResources{CPUReq: "1m", CPULim: "5m"},
 				},
-			},
-			true,
-		),
-	)
-
+			}
+			doPatchAndRollback(ctx, f, originalContainers, expectedContainers, true)
+		})
+	})
 }
 
 func doPodResizePatchErrorTests(f *framework.Framework) {
@@ -656,15 +705,97 @@ func doPodResizeMemoryLimitDecreaseTest(f *framework.Framework) {
 	})
 }
 
-// NOTE: Pod resize scheduler resource quota tests are out of scope in e2e_node tests,
-//       because in e2e_node tests
-//          a) scheduler and controller manager is not running by the Node e2e
-//          b) api-server in services doesn't start with --enable-admission-plugins=ResourceQuota
-//             and is not possible to start it from TEST_ARGS
-//       Above tests are performed by doSheduletTests() and doPodResizeResourceQuotaTests()
-//       in test/e2e/node/pod_resize.go
+func doPodResizeReadAndReplaceTests(f *framework.Framework) {
+	/*
+		Release: v1.35
+		Testname: In-place Pod Resize, read and replace endpoints
+		Description: Issuing a Pod Resize request via the Pod Resize subresource replace endpoint MUST result in the Pod resources being updated as expected. The Pod object fetched from the Pod Resize subresource MUST be equivalent to the Pod object fetched from the main Pod endpoint after the resize is completed.
+	*/
+	framework.ConformanceIt("resize pod via the replace endpoint [MinimumKubeletVersion:1.34]", func(ctx context.Context) {
+		podClient := e2epod.NewPodClient(f)
+		original := []podresize.ResizableContainerInfo{{
+			Name:      "c1",
+			Resources: &cgroups.ContainerResources{CPUReq: originalCPU, MemReq: originalMem},
+		}}
+		desiredContainers := []podresize.ResizableContainerInfo{{
+			Name:      "c1",
+			Resources: &cgroups.ContainerResources{CPUReq: increasedCPU, MemReq: increasedMem},
+		}}
+		desired := v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse(increasedCPU),
+				v1.ResourceMemory: resource.MustParse(increasedMem),
+			},
+		}
 
-var _ = SIGDescribe("Pod InPlace Resize Container", framework.WithFeatureGate(features.InPlacePodVerticalScaling), func() {
+		ginkgo.By("creating and verifying pod")
+		pod := createAndVerifyPod(ctx, f, podClient, original)
+		gomega.Expect(pod.Generation).To(gomega.BeEquivalentTo(1))
+
+		podToUpdate, err := podClient.Get(ctx, pod.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err, "failed to get pod")
+		podToUpdate.Spec.Containers[0].Resources = desired
+
+		ginkgo.By("updating the pod resources")
+		_, err = podClient.UpdateResize(ctx, pod.Name, podToUpdate, metav1.UpdateOptions{})
+		framework.ExpectNoError(err, "failed to resize pod")
+
+		ginkgo.By("fetching updated pod")
+		updatedPod, err := podClient.Get(ctx, pod.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err, "failed to get pod")
+
+		ginkgo.By("verifying pod resources")
+		podresize.VerifyPodResources(updatedPod, desiredContainers)
+		gomega.Expect(updatedPod.Generation).To(gomega.BeEquivalentTo(2))
+
+		ginkgo.By("verifying pod resources after patch")
+		expected := podresize.UpdateExpectedContainerRestarts(ctx, updatedPod, desiredContainers)
+		resizedPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, updatedPod, expected)
+		podresize.ExpectPodResized(ctx, f, resizedPod, expected)
+
+		ginkgo.By("verifying pod fetched from resize subresource")
+		framework.ExpectNoError(framework.Gomega().
+			Eventually(ctx, framework.RetryNotFound(framework.GetObject(f.ClientSet.CoreV1().Pods(pod.Namespace).Get, pod.Name, metav1.GetOptions{}))).
+			WithTimeout(f.Timeouts.PodStart).
+			Should(framework.MakeMatcher(func(pod *v1.Pod) (func() string, error) {
+				// For some reason, the pod object returned from the client doesn't have the GVK populated.
+				pod.Kind = "Pod"
+				pod.APIVersion = "v1"
+
+				ginkgo.By("verifying pod fetched from resize subresource")
+				podResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
+				unstruct, err := f.DynamicClient.Resource(podResource).Namespace(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{}, "resize")
+				if err != nil {
+					return func() string {
+						return fmt.Sprintf("failed to fetch pod after resize: %v", err.Error())
+					}, nil
+				}
+				updatedPodFromResize, err := unstructuredToPod(unstruct)
+				if err != nil {
+					return func() string {
+						return fmt.Sprintf("couldn't convert result to pod object: %v", err.Error())
+					}, nil
+				}
+				if !apiequality.Semantic.DeepEqual(pod, updatedPodFromResize) {
+					return func() string {
+						return fmt.Sprintf("pod from resize subresource not equivalent to pod; %s", cmp.Diff(pod, updatedPodFromResize))
+					}, nil
+				}
+
+				return nil, nil
+			})),
+		)
+	})
+}
+
+// NOTE: Pod resize scheduler, resource quota, limit ranger, deferred resize tests are out of scope in e2e_node tests,
+//
+//	because in e2e_node tests
+//	   a) scheduler and controller manager is not running by the Node e2e
+//	   b) api-server in services doesn't start with --enable-admission-plugins=ResourceQuota
+//	      and is not possible to start it from TEST_ARGS
+//	Above tests in test/e2e/node/pod_resize.go
+var _ = SIGDescribe("Pod InPlace Resize Container", func() {
 	f := framework.NewDefaultFramework("pod-resize-tests")
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
@@ -677,6 +808,7 @@ var _ = SIGDescribe("Pod InPlace Resize Container", framework.WithFeatureGate(fe
 
 	doGuaranteedPodResizeTests(f)
 	doBurstablePodResizeTests(f)
+	doPodResizeReadAndReplaceTests(f)
 	doPodResizePatchErrorTests(f)
 	doPodResizeMemoryLimitDecreaseTest(f)
 })

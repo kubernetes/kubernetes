@@ -330,7 +330,7 @@ func TestGetNodeRegistration(t *testing.T) {
 			}
 
 			cfg := &kubeadmapi.InitConfiguration{}
-			err = GetNodeRegistration(cfgPath, client, &cfg.NodeRegistration, &cfg.ClusterConfiguration)
+			err = GetNodeRegistration(cfgPath, client, &cfg.NodeRegistration)
 			if rt.expectedError != (err != nil) {
 				t.Errorf("unexpected return err from getNodeRegistration: %v", err)
 				return

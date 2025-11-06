@@ -186,13 +186,17 @@ func validationOptionsForJob(newJob, oldJob *batch.Job) batchvalidation.JobValid
 	}
 	if oldJob != nil {
 		opts.AllowInvalidLabelValueInSelector = opts.AllowInvalidLabelValueInSelector || metav1validation.LabelSelectorHasInvalidLabelValue(oldJob.Spec.Selector)
-
 		// Updating node affinity, node selector and tolerations is allowed
 		// only for suspended jobs that never started before.
 		suspended := oldJob.Spec.Suspend != nil && *oldJob.Spec.Suspend
 		notStarted := oldJob.Status.StartTime == nil
 		opts.AllowMutableSchedulingDirectives = suspended && notStarted
-
+		if utilfeature.DefaultFeatureGate.Enabled(features.MutablePodResourcesForSuspendedJobs) {
+			opts.AllowMutablePodResources = batchvalidation.IsConditionTrue(oldJob.Status.Conditions, batch.JobSuspended) && oldJob.Status.Active == 0
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.MutableSchedulingDirectivesForSuspendedJobs) {
+			opts.AllowMutableSchedulingDirectives = suspended && batchvalidation.IsConditionTrue(oldJob.Status.Conditions, batch.JobSuspended) && oldJob.Status.Active == 0
+		}
 		// Validation should not fail jobs if they don't have the new labels.
 		// This can be removed once we have high confidence that both labels exist (1.30 at least)
 		_, hadJobName := oldJob.Spec.Template.Labels[batch.JobNameLabel]
@@ -380,6 +384,11 @@ func getStatusValidationOptions(newJob, oldJob *batch.Job) batchvalidation.JobSt
 		isReadyChanged := !ptr.Equal(oldJob.Status.Ready, newJob.Status.Ready)
 		isTerminatingChanged := !ptr.Equal(oldJob.Status.Terminating, newJob.Status.Terminating)
 		isSuspendedWithZeroCompletions := ptr.Equal(newJob.Spec.Suspend, ptr.To(true)) && ptr.Equal(newJob.Spec.Completions, ptr.To[int32](0))
+		// Detect job resume via condition changes (JobSuspended: True -> False)
+		// This handles the case where the controller updates status after the user has already
+		// changed spec.suspend=false, which is the scenario from https://github.com/kubernetes/kubernetes/issues/134521
+		isJobResuming := batchvalidation.IsConditionTrue(oldJob.Status.Conditions, batch.JobSuspended) &&
+			batchvalidation.IsConditionFalse(newJob.Status.Conditions, batch.JobSuspended)
 
 		return batchvalidation.JobStatusValidationOptions{
 			// We allow to decrease the counter for succeeded pods for jobs which
@@ -397,7 +406,7 @@ func getStatusValidationOptions(newJob, oldJob *batch.Job) batchvalidation.JobSt
 			RejectFinishedJobWithActivePods:              isJobFinishedChanged || isActiveChanged,
 			RejectFinishedJobWithoutStartTime:            (isJobFinishedChanged || isStartTimeChanged) && !isSuspendedWithZeroCompletions,
 			RejectFinishedJobWithUncountedTerminatedPods: isJobFinishedChanged || isUncountedTerminatedPodsChanged,
-			RejectStartTimeUpdateForUnsuspendedJob:       isStartTimeChanged,
+			RejectStartTimeUpdateForUnsuspendedJob:       isStartTimeChanged && !isJobResuming,
 			RejectCompletionTimeBeforeStartTime:          isStartTimeChanged || isCompletionTimeChanged,
 			RejectMutatingCompletionTime:                 true,
 			RejectNotCompleteJobWithCompletionTime:       isJobCompleteChanged || isCompletionTimeChanged,

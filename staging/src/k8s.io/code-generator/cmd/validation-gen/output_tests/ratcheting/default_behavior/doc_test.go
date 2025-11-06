@@ -175,3 +175,12 @@ func Test_StructEmbedded(t *testing.T) {
 
 	st.Value(mkTest()).OldValue(mkTest()).ExpectValid()
 }
+
+func Test_Mix(t *testing.T) {
+	st := localSchemeBuilder.Test(t)
+	st.Value(&MixComparableStruct{
+		Primitive: "a",
+	}).OldValue(nil).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+		field.Invalid(field.NewPath("NonComparable"), "", ""),
+	})
+}

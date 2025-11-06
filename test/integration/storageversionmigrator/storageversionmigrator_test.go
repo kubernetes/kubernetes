@@ -26,7 +26,6 @@ import (
 
 	"go.uber.org/goleak"
 
-	svmv1alpha1 "k8s.io/api/storagemigration/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -52,8 +51,10 @@ import (
 // 7. Perform another Storage Version Migration for secrets
 // 8. Verify that the resource version of the secret is not updated. i.e. it was a no-op update
 func TestStorageVersionMigration(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StorageVersionMigrator, true)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, featuregate.Feature(clientgofeaturegate.InformerResourceVersion), true)
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.StorageVersionMigrator:                                  true,
+		featuregate.Feature(clientgofeaturegate.InformerResourceVersion): true,
+	})
 
 	// this makes the test super responsive. It's set to a default of 1 minute.
 	encryptionconfigcontroller.EncryptionConfigFileChangePollDuration = time.Second
@@ -78,9 +79,8 @@ func TestStorageVersionMigration(t *testing.T) {
 		ctx,
 		t,
 		svmName,
-		svmv1alpha1.GroupVersionResource{
+		metav1.GroupResource{
 			Group:    "",
-			Version:  "v1",
 			Resource: "secrets",
 		},
 	)
@@ -115,9 +115,8 @@ func TestStorageVersionMigration(t *testing.T) {
 		ctx,
 		t,
 		secondSVMName,
-		svmv1alpha1.GroupVersionResource{
+		metav1.GroupResource{
 			Group:    "",
-			Version:  "v1",
 			Resource: "secrets",
 		},
 	)
@@ -152,8 +151,10 @@ func TestStorageVersionMigration(t *testing.T) {
 // 10. Verify RV and Generations of CRs
 // 11. Verify the list of CRs at v2 works
 func TestStorageVersionMigrationWithCRD(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StorageVersionMigrator, true)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, featuregate.Feature(clientgofeaturegate.InformerResourceVersion), true)
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.StorageVersionMigrator:                                  true,
+		featuregate.Feature(clientgofeaturegate.InformerResourceVersion): true,
+	})
 	// decode errors are expected when using conversation webhooks
 	etcd3watcher.TestOnlySetFatalOnDecodeError(false)
 	t.Cleanup(func() { etcd3watcher.TestOnlySetFatalOnDecodeError(true) })
@@ -254,9 +255,8 @@ func TestStorageVersionMigrationWithCRD(t *testing.T) {
 	// migrate CRs from v1 to v2
 	svm, err := svmTest.createSVMResource(
 		ctx, t, "crdsvm",
-		svmv1alpha1.GroupVersionResource{
+		metav1.GroupResource{
 			Group:    crd.Spec.Group,
-			Version:  "v1",
 			Resource: crd.Spec.Names.Plural,
 		})
 	if err != nil {
@@ -300,8 +300,10 @@ func TestStorageVersionMigrationWithCRD(t *testing.T) {
 // It asserts that all migrations are successful and that none of the static instances
 // were changed after they were initially created (as the migrations must be a no-op).
 func TestStorageVersionMigrationDuringChaos(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StorageVersionMigrator, true)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, featuregate.Feature(clientgofeaturegate.InformerResourceVersion), true)
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.StorageVersionMigrator:                                  true,
+		featuregate.Feature(clientgofeaturegate.InformerResourceVersion): true,
+	})
 
 	ctx := ktesting.Init(t)
 
@@ -332,9 +334,8 @@ func TestStorageVersionMigrationDuringChaos(t *testing.T) {
 
 			svm, err := svmTest.createSVMResource(
 				ctx, t, "chaos-svm-"+strconv.Itoa(i),
-				svmv1alpha1.GroupVersionResource{
+				metav1.GroupResource{
 					Group:    crd.Spec.Group,
-					Version:  "v1",
 					Resource: crd.Spec.Names.Plural,
 				},
 			)

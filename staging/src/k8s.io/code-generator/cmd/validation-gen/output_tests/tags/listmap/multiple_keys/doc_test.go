@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	field "k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/utils/ptr"
 )
 
 func TestUniqueness(t *testing.T) {
@@ -161,4 +162,40 @@ func TestRatcheting(t *testing.T) {
 	})
 	st.Value(&struct1).OldValue(&struct2).ExpectValid()
 	st.Value(&struct2).OldValue(&struct1).ExpectValid()
+}
+
+func TestItemWithPtrKey(t *testing.T) {
+	st := localSchemeBuilder.Test(t)
+
+	st.Value(&Struct{
+		ListPtrKeyField: []PtrKeyStruct{
+			{Key1Field: ptr.To("target-ptr"), Key2Field: 42, DataField: "match"},
+			{Key1Field: ptr.To("target-ptr"), Key2Field: 99, DataField: "no match, int differs"},
+			{Key1Field: ptr.To("other"), Key2Field: 42, DataField: "no match, string differs"},
+			{Key1Field: nil, Key2Field: 42, DataField: "no match, nil string"},
+		},
+	}).ExpectValidateFalseByPath(map[string][]string{
+		`listPtrKeyField[0]`: {
+			"item ListPtrKeyField[key1Field=target-ptr,key2Field=42]",
+		},
+	})
+
+	st.Value(&Struct{
+		ListPtrKeyField: []PtrKeyStruct{
+			{Key1Field: ptr.To("other"), Key2Field: 42, DataField: "d1"},
+			{Key1Field: nil, Key2Field: 99, DataField: "d2"},
+		},
+	}).ExpectValid()
+
+	st.Value(&Struct{
+		ListMixedPtrKeyField: []MixedPtrKeyStruct{
+			{StringPtrKey: ptr.To("target-ptr"), StringKey: "target", DataField: "match"},
+			{StringPtrKey: ptr.To("target-ptr"), StringKey: "other", DataField: "no match"},
+			{StringPtrKey: nil, StringKey: "target", DataField: "no match"},
+		},
+	}).ExpectValidateFalseByPath(map[string][]string{
+		`listMixedPtrKeyField[0]`: {
+			"item ListMixedPtrKeyField",
+		},
+	})
 }

@@ -828,8 +828,10 @@ func TestValidateAuthenticationConfiguration(t *testing.T) {
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthenticationConfigurationEgressSelector, *tt.structuredAuthnEgressSelectorFeatureOverride)
 			}
 			if tt.gaOnly {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, "AllAlpha", false)
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, "AllBeta", false)
+				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+					"AllAlpha": false,
+					"AllBeta":  false,
+				})
 			}
 			got := ValidateAuthenticationConfiguration(authenticationcel.NewDefaultCompiler(), tt.in, tt.disallowedIssuers).ToAggregate()
 			if d := cmp.Diff(tt.want, errString(got)); d != "" {

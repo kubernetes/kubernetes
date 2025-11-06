@@ -217,7 +217,7 @@ func NewDaemonSetsController(
 	dsc.podLister = podInformer.Lister()
 	dsc.podStoreSynced = podInformer.Informer().HasSynced
 	controller.AddPodNodeNameIndexer(podInformer.Informer())
-	controller.AddPodControllerUIDIndexer(podInformer.Informer())
+	controller.AddPodControllerIndexer(podInformer.Informer())
 	dsc.podIndexer = podInformer.Informer().GetIndexer()
 
 	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -303,24 +303,32 @@ func (dsc *DaemonSetsController) Run(ctx context.Context, workers int) {
 	dsc.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: dsc.kubeClient.CoreV1().Events("")})
 	defer dsc.eventBroadcaster.Shutdown()
 
-	defer dsc.queue.ShutDown()
-	defer dsc.nodeUpdateQueue.ShutDown()
-
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting daemon sets controller")
-	defer logger.Info("Shutting down daemon sets controller")
+
+	var wg sync.WaitGroup
+	defer func() {
+		logger.Info("Shutting down daemon sets controller")
+		dsc.queue.ShutDown()
+		dsc.nodeUpdateQueue.ShutDown()
+		wg.Wait()
+	}()
 
 	if !cache.WaitForNamedCacheSyncWithContext(ctx, dsc.podStoreSynced, dsc.nodeStoreSynced, dsc.historyStoreSynced, dsc.dsStoreSynced) {
 		return
 	}
 
 	for i := 0; i < workers; i++ {
-		go wait.UntilWithContext(ctx, dsc.runWorker, time.Second)
-		go wait.UntilWithContext(ctx, dsc.runNodeUpdateWorker, time.Second)
+		wg.Go(func() {
+			wait.UntilWithContext(ctx, dsc.runWorker, time.Second)
+		})
+		wg.Go(func() {
+			wait.UntilWithContext(ctx, dsc.runNodeUpdateWorker, time.Second)
+		})
 	}
-
-	go wait.Until(dsc.failedPodsBackoff.GC, BackoffGCInterval, ctx.Done())
-
+	wg.Go(func() {
+		wait.Until(dsc.failedPodsBackoff.GC, BackoffGCInterval, ctx.Done())
+	})
 	<-ctx.Done()
 }
 
@@ -699,7 +707,7 @@ func (dsc *DaemonSetsController) getDaemonPods(ctx context.Context, ds *apps.Dae
 		return nil, err
 	}
 	// List all pods indexed to DS UID and Orphan pods
-	pods, err := controller.FilterPodsByOwner(dsc.podIndexer, &ds.ObjectMeta)
+	pods, err := controller.FilterPodsByOwner(dsc.podIndexer, &ds.ObjectMeta, "DaemonSet", true)
 	if err != nil {
 		return nil, err
 	}

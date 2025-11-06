@@ -33,6 +33,7 @@ import (
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/klog/v2/ktesting"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 
 	"k8s.io/mount-utils"
@@ -257,7 +258,7 @@ func TestGetCapacity(t *testing.T) {
 }
 
 func TestNewPodContainerManager(t *testing.T) {
-
+	logger, _ := ktesting.NewTestContext(t)
 	info := QOSContainersInfo{
 		Guaranteed: CgroupName{"guaranteed"},
 		BestEffort: CgroupName{"besteffort"},
@@ -279,7 +280,7 @@ func TestNewPodContainerManager(t *testing.T) {
 			cm: &containerManagerImpl{
 				qosContainerManager: &qosContainerManagerImpl{
 					qosContainersInfo: info,
-					cgroupManager:     NewCgroupManager(&CgroupSubsystems{}, ""),
+					cgroupManager:     NewCgroupManager(logger, &CgroupSubsystems{}, ""),
 				},
 
 				NodeConfig: QosDisabled,
@@ -290,7 +291,7 @@ func TestNewPodContainerManager(t *testing.T) {
 			cm: &containerManagerImpl{
 				qosContainerManager: &qosContainerManagerImpl{
 					qosContainersInfo: info,
-					cgroupManager:     NewCgroupManager(&CgroupSubsystems{}, ""),
+					cgroupManager:     NewCgroupManager(logger, &CgroupSubsystems{}, ""),
 				},
 
 				NodeConfig: QosEnabled,
@@ -301,7 +302,7 @@ func TestNewPodContainerManager(t *testing.T) {
 			cm: &containerManagerImpl{
 				qosContainerManager: &qosContainerManagerImpl{
 					qosContainersInfo: info,
-					cgroupManager:     NewCgroupManager(&CgroupSubsystems{}, "systemd"),
+					cgroupManager:     NewCgroupManager(logger, &CgroupSubsystems{}, "systemd"),
 				},
 
 				NodeConfig: QosEnabled,
@@ -312,7 +313,7 @@ func TestNewPodContainerManager(t *testing.T) {
 			cm: &containerManagerImpl{
 				qosContainerManager: &qosContainerManagerImpl{
 					qosContainersInfo: info,
-					cgroupManager:     NewCgroupManager(&CgroupSubsystems{}, "systemd"),
+					cgroupManager:     NewCgroupManager(logger, &CgroupSubsystems{}, "systemd"),
 				},
 
 				NodeConfig: QosDisabled,

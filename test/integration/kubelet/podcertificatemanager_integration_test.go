@@ -18,13 +18,15 @@ package kubelet
 
 import (
 	"context"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"slices"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	certsv1alpha1 "k8s.io/api/certificates/v1alpha1"
+	certsv1beta1 "k8s.io/api/certificates/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -55,7 +57,7 @@ func TestPodCertificateManager(t *testing.T) {
 		[]string{
 			"--authorization-mode=Node,RBAC",
 			"--feature-gates=AuthorizeNodeWithSelectors=true,PodCertificateRequest=true",
-			fmt.Sprintf("--runtime-config=%s=true", certsv1alpha1.SchemeGroupVersion),
+			fmt.Sprintf("--runtime-config=%s=true", certsv1beta1.SchemeGroupVersion),
 		},
 		framework.SharedEtcd(),
 	)
@@ -168,7 +170,8 @@ func TestPodCertificateManager(t *testing.T) {
 	node1PodCertificateManager := podcertificate.NewIssuingManager(
 		node1Client,
 		node1PodManager,
-		node1PCRInformerFactory.Certificates().V1alpha1().PodCertificateRequests(),
+		nil,
+		node1PCRInformerFactory.Certificates().V1beta1().PodCertificateRequests(),
 		node1NodeInformerFactory.Core().V1().Nodes(),
 		types.NodeName(node1.ObjectMeta.Name),
 		clock.RealClock{},
@@ -233,6 +236,7 @@ func TestPodCertificateManager(t *testing.T) {
 										SignerName:           signerName,
 										KeyType:              "ED25519",
 										CredentialBundlePath: "creds.pem",
+										UserAnnotations:      map[string]string{hermeticpodcertificatesigner.SpiffePathKey: "workload"},
 									},
 								},
 							},
@@ -260,9 +264,9 @@ func TestPodCertificateManager(t *testing.T) {
 
 	// Within a few seconds, we should see a PodCertificateRequest created for
 	// this pod.
-	var gotPCR *certsv1alpha1.PodCertificateRequest
+	var gotPCR *certsv1beta1.PodCertificateRequest
 	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 15*time.Second, true, func(ctx context.Context) (bool, error) {
-		pcrs, err := adminClient.CertificatesV1alpha1().PodCertificateRequests(workloadNS.ObjectMeta.Name).List(ctx, metav1.ListOptions{})
+		pcrs, err := adminClient.CertificatesV1beta1().PodCertificateRequests(workloadNS.ObjectMeta.Name).List(ctx, metav1.ListOptions{})
 		if err != nil {
 			return false, fmt.Errorf("while listing PodCertificateRequests: %w", err)
 		}
@@ -281,19 +285,20 @@ func TestPodCertificateManager(t *testing.T) {
 	// Check that the created PCR spec matches expectations.  Blank out fields on
 	// gotPCR that we don't care about.  Blank out status, because the
 	// controller might have already signed it.
-	wantPCR := &certsv1alpha1.PodCertificateRequest{
+	wantPCR := &certsv1beta1.PodCertificateRequest{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: workloadNS.ObjectMeta.Name,
 		},
-		Spec: certsv1alpha1.PodCertificateRequestSpec{
-			SignerName:           workloadPod.Spec.Volumes[0].VolumeSource.Projected.Sources[0].PodCertificate.SignerName,
-			PodName:              workloadPod.ObjectMeta.Name,
-			PodUID:               workloadPod.ObjectMeta.UID,
-			ServiceAccountName:   workloadSA.ObjectMeta.Name,
-			ServiceAccountUID:    workloadSA.ObjectMeta.UID,
-			NodeName:             types.NodeName(node1.ObjectMeta.Name),
-			NodeUID:              node1.ObjectMeta.UID,
-			MaxExpirationSeconds: ptr.To[int32](86400),
+		Spec: certsv1beta1.PodCertificateRequestSpec{
+			SignerName:                workloadPod.Spec.Volumes[0].VolumeSource.Projected.Sources[0].PodCertificate.SignerName,
+			PodName:                   workloadPod.ObjectMeta.Name,
+			PodUID:                    workloadPod.ObjectMeta.UID,
+			ServiceAccountName:        workloadSA.ObjectMeta.Name,
+			ServiceAccountUID:         workloadSA.ObjectMeta.UID,
+			NodeName:                  types.NodeName(node1.ObjectMeta.Name),
+			NodeUID:                   node1.ObjectMeta.UID,
+			MaxExpirationSeconds:      ptr.To[int32](86400),
+			UnverifiedUserAnnotations: map[string]string{hermeticpodcertificatesigner.SpiffePathKey: "workload"},
 		},
 	}
 	gotPCRClone := gotPCR.DeepCopy()
@@ -301,14 +306,14 @@ func TestPodCertificateManager(t *testing.T) {
 	gotPCRClone.ObjectMeta.Namespace = gotPCR.ObjectMeta.Namespace
 	gotPCRClone.Spec.PKIXPublicKey = nil
 	gotPCRClone.Spec.ProofOfPossession = nil
-	gotPCRClone.Status = certsv1alpha1.PodCertificateRequestStatus{}
+	gotPCRClone.Status = certsv1beta1.PodCertificateRequestStatus{}
 	if diff := cmp.Diff(gotPCRClone, wantPCR); diff != "" {
 		t.Fatalf("PodCertificateManager created a bad PCR; diff (-got +want)\n%s", diff)
 	}
 
 	// Wait some more time for the PCR to be issued.
 	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 15*time.Second, true, func(ctx context.Context) (bool, error) {
-		pcrs, err := adminClient.CertificatesV1alpha1().PodCertificateRequests(workloadNS.ObjectMeta.Name).List(ctx, metav1.ListOptions{})
+		pcrs, err := adminClient.CertificatesV1beta1().PodCertificateRequests(workloadNS.ObjectMeta.Name).List(ctx, metav1.ListOptions{})
 		if err != nil {
 			return false, fmt.Errorf("while listing PodCertificateRequests: %w", err)
 		}
@@ -321,9 +326,9 @@ func TestPodCertificateManager(t *testing.T) {
 
 		for _, cond := range gotPCR.Status.Conditions {
 			switch cond.Type {
-			case certsv1alpha1.PodCertificateRequestConditionTypeDenied,
-				certsv1alpha1.PodCertificateRequestConditionTypeFailed,
-				certsv1alpha1.PodCertificateRequestConditionTypeIssued:
+			case certsv1beta1.PodCertificateRequestConditionTypeDenied,
+				certsv1beta1.PodCertificateRequestConditionTypeFailed,
+				certsv1beta1.PodCertificateRequestConditionTypeIssued:
 				return true, nil
 			}
 		}
@@ -334,12 +339,24 @@ func TestPodCertificateManager(t *testing.T) {
 	}
 
 	isIssued := slices.ContainsFunc(gotPCR.Status.Conditions, func(cond metav1.Condition) bool {
-		return cond.Type == certsv1alpha1.PodCertificateRequestConditionTypeIssued
+		return cond.Type == certsv1beta1.PodCertificateRequestConditionTypeIssued
 	})
 	if !isIssued {
 		t.Fatalf("The test signingController didn't issue the PCR:\n%+v", gotPCR)
 	}
 
+	// Check the spiffe path has been overridden with the UserAnnotations.
+	issuedCertPem := []byte(gotPCR.Status.CertificateChain)
+	block, _ := pem.Decode(issuedCertPem)
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		t.Fatalf("Failed to parse the issued certificate: %v", err)
+	}
+
+	if cert.URIs[0].Path != "/workload" {
+		t.Logf("Certificate path is %s", cert.URIs[0].Path)
+		t.Fatalf("Failed to override the spiffe path with the user annotations")
+	}
 	// Now we know that the PCR was issued, so we can wait for the
 	// podcertificate manager to return some valid credentials.
 	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 15*time.Second, true, func(ctx context.Context) (bool, error) {

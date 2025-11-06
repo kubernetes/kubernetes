@@ -42,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
@@ -53,6 +54,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	. "k8s.io/kubernetes/pkg/controller/testutil"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
@@ -334,6 +336,7 @@ func TestSyncReplicaSetDormancy(t *testing.T) {
 	rsSpec.Status.Replicas = 1
 	rsSpec.Status.ReadyReplicas = 1
 	rsSpec.Status.AvailableReplicas = 1
+	rsSpec.Status.TerminatingReplicas = ptr.To[int32](0)
 	manager.syncReplicaSet(ctx, GetKey(rsSpec, t))
 	err := validateSyncReplicaSet(&fakePodControl, 1, 0, 0)
 	if err != nil {
@@ -710,7 +713,7 @@ func TestWatchPods(t *testing.T) {
 
 	// Start only the pod watcher and the workqueue, send a watch event,
 	// and make sure it hits the sync method for the right ReplicaSet.
-	go informers.Core().V1().Pods().Informer().Run(stopCh)
+	go informers.Core().V1().Pods().Informer().RunWithContext(ctx)
 	go manager.Run(ctx, 1)
 
 	pods := newPodList(nil, 1, v1.PodRunning, labelMap, testRSSpec, "pod")
@@ -1233,6 +1236,14 @@ func TestExpectationsOnRecreate(t *testing.T) {
 	ok := manager.processNextWorkItem(tCtx)
 	if !ok {
 		t.Fatal("queue is shutting down")
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.DeploymentReplicaSetTerminatingReplicas) {
+		// DeploymentReplicaSetTerminatingReplicas feature results in the "terminatingReplicas nil->0" update, so we need to do empty sync.
+		ok = manager.processNextWorkItem(tCtx)
+		if !ok {
+			t.Fatal("queue is shutting down")
+		}
 	}
 
 	err = validateSyncReplicaSet(&fakePodControl, 1, 0, 0)

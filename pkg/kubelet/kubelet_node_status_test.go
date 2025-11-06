@@ -3161,3 +3161,65 @@ func TestCalculateDelay(t *testing.T) {
 		assert.LessOrEqual(t, randomDelay.Abs(), kubelet.nodeStatusReportFrequency/2)
 	}
 }
+
+func TestSetNodeStatusDeclaredFeatures(t *testing.T) {
+	testCases := []struct {
+		name               string
+		featureGateEnabled bool
+		discoveredFeatures []string
+		expectedFeatures   []string
+	}{
+		{
+			name:               "Feature gate enabled, features discovered",
+			featureGateEnabled: true,
+			discoveredFeatures: []string{"feature1", "feature2"},
+			expectedFeatures:   []string{"feature1", "feature2"},
+		},
+		{
+			name:               "Feature gate disabled",
+			featureGateEnabled: false,
+			discoveredFeatures: []string{"feature1", "feature2"},
+			expectedFeatures:   nil,
+		},
+		{
+			name:               "Feature gate enabled, no features discovered",
+			featureGateEnabled: true,
+			discoveredFeatures: nil,
+			expectedFeatures:   nil,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, tc.featureGateEnabled)
+
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
+			kubelet := testKubelet.kubelet
+			kubelet.nodeDeclaredFeatures = tc.discoveredFeatures
+			kubelet.kubeClient = nil
+
+			kubeClient := testKubelet.fakeKubeClient
+			existingNode := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname}}
+			kubeClient.ReactionChain = fake.NewClientset(&v1.NodeList{Items: []v1.Node{existingNode}}).ReactionChain
+			kubelet.nodeLister = delegatingNodeLister{client: kubeClient}
+			machineInfo := &cadvisorapi.MachineInfo{}
+			kubelet.setCachedMachineInfo(machineInfo)
+
+			// We need to force a status update, so we make the last status report time old.
+			kubelet.lastStatusReportTime = time.Now().Add(-time.Hour)
+			require.NoError(t, kubelet.updateNodeStatus(context.TODO()))
+
+			actions := kubeClient.Actions()
+			// We expect a get and a patch
+			require.Len(t, actions, 2)
+			require.True(t, actions[1].Matches("patch", "nodes"))
+			require.Equal(t, "status", actions[1].GetSubresource())
+
+			updatedNode, err := applyNodeStatusPatch(&existingNode, actions[1].(core.PatchActionImpl).GetPatch())
+			require.NoError(t, err)
+
+			assert.Equal(t, tc.expectedFeatures, updatedNode.Status.DeclaredFeatures)
+		})
+	}
+}

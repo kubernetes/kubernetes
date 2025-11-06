@@ -28,6 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -99,11 +100,12 @@ type legacyProvider struct {
 	primaryServiceClusterIPAllocator ipallocator.Interface
 	serviceClusterIPAllocators       map[api.IPFamily]ipallocator.Interface
 	serviceNodePortAllocator         *portallocator.PortAllocator
+	authorizer                       authorizer.Authorizer
 
 	startServiceNodePortsRepair, startServiceClusterIPRepair func(onFirstSuccess func(), stopCh chan struct{})
 }
 
-func New(c Config) (*legacyProvider, error) {
+func New(c Config, authorizer authorizer.Authorizer) (*legacyProvider, error) {
 	rangeRegistries, serviceClusterIPAllocator, serviceIPAllocators, serviceNodePortAllocator, err := c.newServiceIPAllocators()
 	if err != nil {
 		return nil, err
@@ -115,6 +117,7 @@ func New(c Config) (*legacyProvider, error) {
 		primaryServiceClusterIPAllocator: serviceClusterIPAllocator,
 		serviceClusterIPAllocators:       serviceIPAllocators,
 		serviceNodePortAllocator:         serviceNodePortAllocator,
+		authorizer:                       authorizer,
 	}
 
 	// create service node port repair controller
@@ -193,6 +196,7 @@ func (p *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 		nodeStorage.KubeletConnectionInfo,
 		p.Proxy.Transport,
 		podDisruptionClient,
+		p.authorizer,
 	)
 	if err != nil {
 		return genericapiserver.APIGroupInfo{}, err
