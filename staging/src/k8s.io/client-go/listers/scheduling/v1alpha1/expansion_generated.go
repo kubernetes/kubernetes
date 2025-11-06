@@ -21,3 +21,11 @@ package v1alpha1
 // PriorityClassListerExpansion allows custom methods to be added to
 // PriorityClassLister.
 type PriorityClassListerExpansion interface{}
+
+// WorkloadListerExpansion allows custom methods to be added to
+// WorkloadLister.
+type WorkloadListerExpansion interface{}
+
+// WorkloadNamespaceListerExpansion allows custom methods to be added to
+// WorkloadNamespaceLister.
+type WorkloadNamespaceListerExpansion interface{}

@@ -7911,3 +7911,99 @@ func TestPrintStorageVersionMigrationList(t *testing.T) {
 		t.Errorf("mismatch: %s", cmp.Diff(expected, rows))
 	}
 }
+
+func TestPrintWorkload(t *testing.T) {
+	workload := &scheduling.Workload{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "workload1",
+			Namespace: "ns1",
+		},
+		Spec: scheduling.WorkloadSpec{
+			PodGroups: []scheduling.PodGroup{
+				{
+					Name: "foo",
+					Policy: scheduling.PodGroupPolicy{
+						Gang: &scheduling.GangSchedulingPolicy{
+							MinCount: 5,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// Columns: Name, Age
+	expected := []metav1.TableRow{{Cells: []interface{}{"workload1", "<unknown>"}}}
+
+	rows, err := printWorkload(workload, printers.GenerateOptions{})
+	if err != nil {
+		t.Fatalf("Error generating table rows for Workload: %#v", err)
+	}
+	rows[0].Object.Object = nil
+	if !reflect.DeepEqual(expected, rows) {
+		t.Errorf("mismatch: %s", cmp.Diff(expected, rows))
+	}
+}
+
+func TestPrintWorkloadList(t *testing.T) {
+	workloadList := &scheduling.WorkloadList{
+		Items: []scheduling.Workload{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "workload1",
+					Namespace: "ns1",
+				},
+				Spec: scheduling.WorkloadSpec{
+					PodGroups: []scheduling.PodGroup{
+						{
+							Name: "foo",
+							Policy: scheduling.PodGroupPolicy{
+								Gang: &scheduling.GangSchedulingPolicy{
+									MinCount: 5,
+								},
+							},
+						},
+					},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "workload2",
+					Namespace:         "ns1",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: scheduling.WorkloadSpec{
+					PodGroups: []scheduling.PodGroup{
+						{
+							Name: "bar",
+							Policy: scheduling.PodGroupPolicy{
+								Gang: &scheduling.GangSchedulingPolicy{
+									MinCount: 5,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// Columns: Name, Age
+	expected := []metav1.TableRow{
+		{Cells: []interface{}{"workload1", "<unknown>"}},
+		{Cells: []interface{}{"workload2", "0s"}},
+	}
+
+	rows, err := printWorkloadList(workloadList, printers.GenerateOptions{})
+	if err != nil {
+		t.Fatalf("Error generating table rows for WorkloadList: %#v", err)
+	}
+
+	for i := range rows {
+		rows[i].Object.Object = nil
+	}
+
+	if !reflect.DeepEqual(expected, rows) {
+		t.Errorf("mismatch: %s", cmp.Diff(expected, rows))
+	}
+}

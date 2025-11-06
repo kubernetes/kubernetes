@@ -1084,6 +1084,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.WeightedPodAffinityTermApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("WindowsSecurityContextOptions"):
 		return &applyconfigurationscorev1.WindowsSecurityContextOptionsApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("WorkloadReference"):
+		return &applyconfigurationscorev1.WorkloadReferenceApplyConfiguration{}
 
 		// Group=discovery.k8s.io, Version=v1
 	case discoveryv1.SchemeGroupVersion.WithKind("Endpoint"):
@@ -1886,8 +1888,20 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsschedulingv1.PriorityClassApplyConfiguration{}
 
 		// Group=scheduling.k8s.io, Version=v1alpha1
+	case schedulingv1alpha1.SchemeGroupVersion.WithKind("GangSchedulingPolicy"):
+		return &applyconfigurationsschedulingv1alpha1.GangSchedulingPolicyApplyConfiguration{}
+	case schedulingv1alpha1.SchemeGroupVersion.WithKind("PodGroup"):
+		return &applyconfigurationsschedulingv1alpha1.PodGroupApplyConfiguration{}
+	case schedulingv1alpha1.SchemeGroupVersion.WithKind("PodGroupPolicy"):
+		return &applyconfigurationsschedulingv1alpha1.PodGroupPolicyApplyConfiguration{}
 	case schedulingv1alpha1.SchemeGroupVersion.WithKind("PriorityClass"):
 		return &applyconfigurationsschedulingv1alpha1.PriorityClassApplyConfiguration{}
+	case schedulingv1alpha1.SchemeGroupVersion.WithKind("TypedLocalObjectReference"):
+		return &applyconfigurationsschedulingv1alpha1.TypedLocalObjectReferenceApplyConfiguration{}
+	case schedulingv1alpha1.SchemeGroupVersion.WithKind("Workload"):
+		return &applyconfigurationsschedulingv1alpha1.WorkloadApplyConfiguration{}
+	case schedulingv1alpha1.SchemeGroupVersion.WithKind("WorkloadSpec"):
+		return &applyconfigurationsschedulingv1alpha1.WorkloadSpecApplyConfiguration{}
 
 		// Group=scheduling.k8s.io, Version=v1beta1
 	case schedulingv1beta1.SchemeGroupVersion.WithKind("PriorityClass"):

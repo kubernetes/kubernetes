@@ -54,6 +54,7 @@ import (
 	resourcev1beta1 "k8s.io/api/resource/v1beta1"
 	resourcev1beta2 "k8s.io/api/resource/v1beta2"
 	schedulingapiv1 "k8s.io/api/scheduling/v1"
+	schedulingapiv1alpha1 "k8s.io/api/scheduling/v1alpha1"
 	storageapiv1 "k8s.io/api/storage/v1"
 	storageapiv1alpha1 "k8s.io/api/storage/v1alpha1"
 	storageapiv1beta1 "k8s.io/api/storage/v1beta1"
@@ -491,6 +492,7 @@ var (
 		coordinationv1alpha2.SchemeGroupVersion,
 		resourcev1alpha3.SchemeGroupVersion,
 		certificatesv1alpha1.SchemeGroupVersion,
+		schedulingapiv1alpha1.SchemeGroupVersion,
 		storageapiv1alpha1.SchemeGroupVersion,
 	}
 )

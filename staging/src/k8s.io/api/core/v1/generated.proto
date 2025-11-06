@@ -4727,6 +4727,18 @@ message PodSpec {
   // +featureGate=HostnameOverride
   // +optional
   optional string hostnameOverride = 41;
+
+  // WorkloadRef provides a reference to the Workload object that this Pod belongs to.
+  // This field is used by the scheduler to identify the PodGroup and apply the
+  // correct group scheduling policies. The Workload object referenced
+  // by this field may not exist at the time the Pod is created.
+  // This field is immutable, but a Workload object with the same name
+  // may be recreated with different policies. Doing this during pod scheduling
+  // may result in the placement not conforming to the expected policies.
+  //
+  // +featureGate=GenericWorkload
+  // +optional
+  optional WorkloadReference workloadRef = 42;
 }
 
 // PodStatus represents information about the status of a pod. Status may trail the actual
@@ -7213,5 +7225,35 @@ message WindowsSecurityContextOptions {
   // In addition, if HostProcess is true then HostNetwork must also be set to true.
   // +optional
   optional bool hostProcess = 4;
+}
+
+// WorkloadReference identifies the Workload object and PodGroup membership
+// that a Pod belongs to. The scheduler uses this information to apply
+// workload-aware scheduling semantics.
+message WorkloadReference {
+  // Name defines the name of the Workload object this Pod belongs to.
+  // Workload must be in the same namespace as the Pod.
+  // If it doesn't match any existing Workload, the Pod will remain unschedulable
+  // until a Workload object is created and observed by the kube-scheduler.
+  // It must be a DNS subdomain.
+  //
+  // +required
+  optional string name = 1;
+
+  // PodGroup is the name of the PodGroup within the Workload that this Pod
+  // belongs to. If it doesn't match any existing PodGroup within the Workload,
+  // the Pod will remain unschedulable until the Workload object is recreated
+  // and observed by the kube-scheduler. It must be a DNS label.
+  //
+  // +required
+  optional string podGroup = 2;
+
+  // PodGroupReplicaKey specifies the replica key of the PodGroup to which this
+  // Pod belongs. It is used to distinguish pods belonging to different replicas
+  // of the same pod group. The pod group policy is applied separately to each replica.
+  // When set, it must be a DNS label.
+  //
+  // +optional
+  optional string podGroupReplicaKey = 3;
 }
 
