@@ -104,3 +104,18 @@ type MixedKeyStruct struct {
 	Key2 string  `json:"key2"`
 	Data string  `json:"data"`
 }
+
+type Item struct {
+	Key string `json:"key"`
+
+	// +k8s:validateFalse="field Data"
+	Data map[string]string `json:"data"`
+}
+
+type ItemList struct {
+	TypeMeta int
+
+	// +k8s:listType=map
+	// +k8s:listMapKey=key
+	Items []Item `json:"items"`
+}
