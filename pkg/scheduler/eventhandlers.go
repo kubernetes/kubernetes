@@ -50,6 +50,8 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
 )
 
+// addNodeToCache adds a node to the scheduler's cache and updates the scheduling queue.
+// (thanks copilot)
 func (sched *Scheduler) addNodeToCache(obj interface{}) {
 	evt := fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Add}
 	start := time.Now()
