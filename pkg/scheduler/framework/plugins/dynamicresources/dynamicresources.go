@@ -50,9 +50,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
-	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
-	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
 	"k8s.io/utils/ptr"
 )
 
@@ -1005,25 +1003,7 @@ func (pl *DynamicResources) Unreserve(ctx context.Context, cs fwk.CycleState, po
 			}
 		}
 	}
-
-	extendedResourceClaim := state.claims.extendedResourceClaim()
-	if extendedResourceClaim == nil {
-		// there is no extended resource claim
-		return
-	}
-
-	if deleted := pl.draManager.ResourceClaims().RemoveClaimPendingAllocation(state.claims.getInitialExtendedResourceClaimUID()); deleted {
-		pl.draManager.ResourceClaims().AssumedClaimRestore(extendedResourceClaim.Namespace, extendedResourceClaim.Name)
-	}
-	if isSpecialClaimName(extendedResourceClaim.Name) {
-		// In memory temporary extended resource claim does not need to be deleted
-		return
-	}
-	logger.V(5).Info("delete extended resource backed by DRA", "resourceclaim", klog.KObj(extendedResourceClaim), "pod", klog.KObj(pod), "claim.UID", extendedResourceClaim.UID)
-	extendedResourceClaim = extendedResourceClaim.DeepCopy()
-	if err := pl.deleteClaim(ctx, extendedResourceClaim, logger); err != nil {
-		logger.Error(err, "delete", "resourceclaim", klog.KObj(extendedResourceClaim))
-	}
+	pl.unreserveExtendedResourceClaim(ctx, logger, pod, state)
 }
 
 // PreBind gets called in a separate goroutine after it has been determined
@@ -1132,23 +1112,7 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 		// completed, either successfully or with a failure.
 		if resourceClaimModified {
 			if isExtendedResourceClaim {
-				// Unlike other claims, extended resource claim is created in API server below.
-				// AssumeClaimAfterAPICall returns ErrNotFound when the informer update has not reached assumed cache yet.
-				// Hence we must poll and wait for it.
-				pollErr := wait.PollUntilContextTimeout(ctx, 1*time.Second, time.Duration(AssumeExtendedResourceTimeoutDefaultSeconds)*time.Second, true,
-					func(ctx context.Context) (bool, error) {
-						if err := pl.draManager.ResourceClaims().AssumeClaimAfterAPICall(claim); err != nil {
-							if errors.Is(err, assumecache.ErrNotFound) {
-								return false, nil
-							}
-							logger.V(5).Info("Claim not stored in assume cache", "claim", klog.KObj(claim), "err", err)
-							return false, err
-						}
-						return true, nil
-					})
-				if pollErr != nil {
-					logger.V(5).Info("Claim not stored in assume cache after retries", "claim", klog.KObj(claim), "err", pollErr)
-				}
+				pl.waitForExtendedClaimInAssumeCache(ctx, logger, claim)
 			} else {
 				// This can fail, but only for reasons that are okay (concurrent delete or update).
 				// Shouldn't happen in this case.
@@ -1166,28 +1130,13 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 
 	// Create the special claim for extended resource backed by DRA
 	if isExtendedResourceClaim && isSpecialClaimName(claim.Name) {
-		logger.V(5).Info("preparing to create claim for extended resources", "pod", klog.KObj(pod), "node", nodeName, "resourceclaim", klog.Format(claim))
-		// Replace claim template with instantiated claim for the node.
-		if nodeAllocation, ok := state.nodeAllocations[nodeName]; ok && nodeAllocation.extendedResourceClaim != nil {
-			claim = nodeAllocation.extendedResourceClaim.DeepCopy()
-		} else {
-			return nil, fmt.Errorf("extended resource claim not found for node %s", nodeName)
-		}
-		logger.V(5).Info("create claim for extended resources", "pod", klog.KObj(pod), "node", nodeName, "resourceclaim", klog.Format(claim))
-		// Clear fields which must or can not be set during creation.
-		claim.Status.Allocation = nil
-		claim.Name = ""
-		claim.UID = ""
 		var err error
-		claim, err = pl.clientset.ResourceV1().ResourceClaims(claim.Namespace).Create(ctx, claim, metav1.CreateOptions{})
+		claim, err = pl.createExtendedResourceClaimInAPI(ctx, logger, pod, nodeName, state)
 		if err != nil {
-			metrics.ResourceClaimCreatesTotal.WithLabelValues("failure").Inc()
-			return nil, fmt.Errorf("create claim for extended resources %v: %w", klog.KObj(claim), err)
+			return nil, err
 		}
-		metrics.ResourceClaimCreatesTotal.WithLabelValues("success").Inc()
-		resourceClaimModified = true
-		logger.V(5).Info("created claim for extended resources", "pod", klog.KObj(pod), "node", nodeName, "resourceclaim", klog.Format(claim))
 
+		resourceClaimModified = true
 		// Track the actual extended ResourceClaim from now.
 		// Relevant if we need to delete again in Unreserve.
 		if err := state.claims.updateExtendedResourceClaim(claim); err != nil {
@@ -1266,22 +1215,9 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 	// Patch the pod status with the new information about the generated
 	// special resource claim.
 	if isExtendedResourceClaim {
-		var cer []v1.ContainerExtendedResourceRequest
-		if nodeAllocation, ok := state.nodeAllocations[nodeName]; ok {
-			cer = nodeAllocation.containerResourceRequestMappings
-		}
-		if len(cer) == 0 {
-			return nil, fmt.Errorf("nil or empty request mappings, no update of pod %s/%s ExtendedResourceClaimStatus", pod.Namespace, pod.Name)
-		}
-
-		podStatusCopy := pod.Status.DeepCopy()
-		podStatusCopy.ExtendedResourceClaimStatus = &v1.PodExtendedResourceClaimStatus{
-			RequestMappings:   cer,
-			ResourceClaimName: claim.Name,
-		}
-		err := schedutil.PatchPodStatus(ctx, pl.clientset, pod.Name, pod.Namespace, &pod.Status, podStatusCopy)
+		err := pl.patchPodExtendedResourceClaimStatus(ctx, pod, claim, nodeName, state)
 		if err != nil {
-			return nil, fmt.Errorf("update pod %s/%s ExtendedResourceClaimStatus: %w", pod.Namespace, pod.Name, err)
+			return nil, err
 		}
 	}
 
