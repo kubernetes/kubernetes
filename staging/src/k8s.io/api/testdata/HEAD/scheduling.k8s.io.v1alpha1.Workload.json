@@ -53,7 +53,6 @@
       {
         "name": "nameValue",
         "policy": {
-          "basic": {},
           "gang": {
             "minCount": 1
           }

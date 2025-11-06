@@ -1158,7 +1158,6 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		resourcev1beta2.ResourceSliceSpec{}.OpenAPIModelName():                                                          schema_k8sio_api_resource_v1beta2_ResourceSliceSpec(ref),
 		schedulingv1.PriorityClass{}.OpenAPIModelName():                                                                 schema_k8sio_api_scheduling_v1_PriorityClass(ref),
 		schedulingv1.PriorityClassList{}.OpenAPIModelName():                                                             schema_k8sio_api_scheduling_v1_PriorityClassList(ref),
-		schedulingv1alpha1.BasicSchedulingPolicy{}.OpenAPIModelName():                                                   schema_k8sio_api_scheduling_v1alpha1_BasicSchedulingPolicy(ref),
 		schedulingv1alpha1.GangSchedulingPolicy{}.OpenAPIModelName():                                                    schema_k8sio_api_scheduling_v1alpha1_GangSchedulingPolicy(ref),
 		schedulingv1alpha1.PodGroup{}.OpenAPIModelName():                                                                schema_k8sio_api_scheduling_v1alpha1_PodGroup(ref),
 		schedulingv1alpha1.PodGroupPolicy{}.OpenAPIModelName():                                                          schema_k8sio_api_scheduling_v1alpha1_PodGroupPolicy(ref),
@@ -55081,17 +55080,6 @@ func schema_k8sio_api_scheduling_v1_PriorityClassList(ref common.ReferenceCallba
 	}
 }
 
-func schema_k8sio_api_scheduling_v1alpha1_BasicSchedulingPolicy(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "BasicSchedulingPolicy indicates that standard Kubernetes scheduling behavior should be used.",
-				Type:        []string{"object"},
-			},
-		},
-	}
-}
-
 func schema_k8sio_api_scheduling_v1alpha1_GangSchedulingPolicy(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -55152,12 +55140,6 @@ func schema_k8sio_api_scheduling_v1alpha1_PodGroupPolicy(ref common.ReferenceCal
 				Description: "PodGroupPolicy defines the scheduling configuration for a PodGroup.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
-					"basic": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Basic specifies that the pods in this group should be scheduled using standard Kubernetes scheduling behavior.",
-							Ref:         ref(schedulingv1alpha1.BasicSchedulingPolicy{}.OpenAPIModelName()),
-						},
-					},
 					"gang": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Gang specifies that the pods in this group should be scheduled using all-or-nothing semantics.",
@@ -55168,7 +55150,7 @@ func schema_k8sio_api_scheduling_v1alpha1_PodGroupPolicy(ref common.ReferenceCal
 			},
 		},
 		Dependencies: []string{
-			schedulingv1alpha1.BasicSchedulingPolicy{}.OpenAPIModelName(), schedulingv1alpha1.GangSchedulingPolicy{}.OpenAPIModelName()},
+			schedulingv1alpha1.GangSchedulingPolicy{}.OpenAPIModelName()},
 	}
 }
 

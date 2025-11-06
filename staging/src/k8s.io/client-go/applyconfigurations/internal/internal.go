@@ -14960,18 +14960,6 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: numeric
       default: 0
-- name: io.k8s.api.scheduling.v1alpha1.BasicSchedulingPolicy
-  map:
-    elementType:
-      scalar: untyped
-      list:
-        elementType:
-          namedType: __untyped_atomic_
-        elementRelationship: atomic
-      map:
-        elementType:
-          namedType: __untyped_deduced_
-        elementRelationship: separable
 - name: io.k8s.api.scheduling.v1alpha1.GangSchedulingPolicy
   map:
     fields:
@@ -14993,9 +14981,6 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.scheduling.v1alpha1.PodGroupPolicy
   map:
     fields:
-    - name: basic
-      type:
-        namedType: io.k8s.api.scheduling.v1alpha1.BasicSchedulingPolicy
     - name: gang
       type:
         namedType: io.k8s.api.scheduling.v1alpha1.GangSchedulingPolicy

@@ -29,11 +29,6 @@ import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 // Package-wide variables from generator "generated".
 option go_package = "k8s.io/api/scheduling/v1alpha1";
 
-// BasicSchedulingPolicy indicates that standard Kubernetes
-// scheduling behavior should be used.
-message BasicSchedulingPolicy {
-}
-
 // GangSchedulingPolicy defines the parameters for gang scheduling.
 message GangSchedulingPolicy {
   // MinCount is the minimum number of pods that must be schedulable or scheduled
@@ -60,13 +55,6 @@ message PodGroup {
 
 // PodGroupPolicy defines the scheduling configuration for a PodGroup.
 message PodGroupPolicy {
-  // Basic specifies that the pods in this group should be scheduled using
-  // standard Kubernetes scheduling behavior.
-  //
-  // +optional
-  // +oneOf=PolicySelection
-  optional BasicSchedulingPolicy basic = 2;
-
   // Gang specifies that the pods in this group should be scheduled using
   // all-or-nothing semantics.
   //

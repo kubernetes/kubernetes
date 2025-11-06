@@ -19039,10 +19039,6 @@
         }
       ]
     },
-    "io.k8s.api.scheduling.v1alpha1.BasicSchedulingPolicy": {
-      "description": "BasicSchedulingPolicy indicates that standard Kubernetes scheduling behavior should be used.",
-      "type": "object"
-    },
     "io.k8s.api.scheduling.v1alpha1.GangSchedulingPolicy": {
       "description": "GangSchedulingPolicy defines the parameters for gang scheduling.",
       "properties": {
@@ -19078,10 +19074,6 @@
     "io.k8s.api.scheduling.v1alpha1.PodGroupPolicy": {
       "description": "PodGroupPolicy defines the scheduling configuration for a PodGroup.",
       "properties": {
-        "basic": {
-          "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha1.BasicSchedulingPolicy",
-          "description": "Basic specifies that the pods in this group should be scheduled using standard Kubernetes scheduling behavior."
-        },
         "gang": {
           "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha1.GangSchedulingPolicy",
           "description": "Gang specifies that the pods in this group should be scheduled using all-or-nothing semantics."
