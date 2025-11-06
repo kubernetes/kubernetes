@@ -126,6 +126,22 @@ func TestUpdatePodFromAllocation(t *testing.T) {
 		},
 	}
 
+	podWithPodLevelResources := pod.DeepCopy()
+	podWithPodLevelResources.Spec.Resources = &v1.ResourceRequirements{
+		Requests: v1.ResourceList{
+			v1.ResourceCPU:    *resource.NewMilliQuantity(1200, resource.DecimalSI),
+			v1.ResourceMemory: *resource.NewQuantity(1700, resource.DecimalSI),
+		},
+		Limits: v1.ResourceList{
+			v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
+			v1.ResourceMemory: *resource.NewQuantity(2500, resource.DecimalSI),
+		},
+	}
+
+	podWithoutContainerResources := pod.DeepCopy()
+	podWithoutContainerResources.Spec.Containers[0].Resources = v1.ResourceRequirements{}
+	podWithoutContainerResources.Spec.InitContainers[0].Resources = v1.ResourceRequirements{}
+
 	resizedPod := pod.DeepCopy()
 	resizedPod.Spec.Containers[0].Resources.Requests[v1.ResourceCPU] = *resource.NewMilliQuantity(200, resource.DecimalSI)
 	resizedPod.Spec.InitContainers[0].Resources.Requests[v1.ResourceCPU] = *resource.NewMilliQuantity(300, resource.DecimalSI)
@@ -189,7 +205,7 @@ func TestUpdatePodFromAllocation(t *testing.T) {
 		expectUpdate: true,
 		expectPod:    resizedPod,
 	}, {
-		name: "with resized pod-level resource allocation",
+		name: "resized pod-level allocation",
 		pod:  pod,
 		allocated: state.PodResourceInfo{
 			ContainerResources: map[string]v1.ResourceRequirements{
@@ -203,6 +219,51 @@ func TestUpdatePodFromAllocation(t *testing.T) {
 		expectUpdate:                 true,
 		expectPod:                    resizedPodWithPodLevelResources,
 		inPlacePodLevelResizeEnabled: true,
+	}, {
+		name: "resized pod-level resources and allocation",
+		pod:  podWithPodLevelResources,
+		allocated: state.PodResourceInfo{
+			ContainerResources: map[string]v1.ResourceRequirements{
+				"c1":                  *resizedPod.Spec.Containers[0].Resources.DeepCopy(),
+				"c2":                  *resizedPod.Spec.Containers[1].Resources.DeepCopy(),
+				"c1-restartable-init": *resizedPod.Spec.InitContainers[0].Resources.DeepCopy(),
+				"c1-init":             *resizedPod.Spec.InitContainers[1].Resources.DeepCopy(),
+			},
+			PodLevelResources: resizedPodWithPodLevelResources.Spec.Resources.DeepCopy(),
+		},
+		expectUpdate:                 true,
+		expectPod:                    resizedPodWithPodLevelResources,
+		inPlacePodLevelResizeEnabled: true,
+	}, {
+		name: "resized pod-level resources and no container resources",
+		pod:  podWithoutContainerResources,
+		allocated: state.PodResourceInfo{
+			ContainerResources: map[string]v1.ResourceRequirements{
+				"c1":                  *resizedPod.Spec.Containers[0].Resources.DeepCopy(),
+				"c2":                  *resizedPod.Spec.Containers[1].Resources.DeepCopy(),
+				"c1-restartable-init": *resizedPod.Spec.InitContainers[0].Resources.DeepCopy(),
+				"c1-init":             *resizedPod.Spec.InitContainers[1].Resources.DeepCopy(),
+			},
+			PodLevelResources: resizedPodWithPodLevelResources.Spec.Resources.DeepCopy(),
+		},
+		expectUpdate:                 true,
+		expectPod:                    resizedPodWithPodLevelResources,
+		inPlacePodLevelResizeEnabled: true,
+	}, {
+		name: "resized pod-level resources with feature gate disabled",
+		pod:  podWithPodLevelResources,
+		allocated: state.PodResourceInfo{
+			ContainerResources: map[string]v1.ResourceRequirements{
+				"c1":                  *pod.Spec.Containers[0].Resources.DeepCopy(),
+				"c2":                  *pod.Spec.Containers[1].Resources.DeepCopy(),
+				"c1-restartable-init": *pod.Spec.InitContainers[0].Resources.DeepCopy(),
+				"c1-init":             *pod.Spec.InitContainers[1].Resources.DeepCopy(),
+			},
+			PodLevelResources: resizedPod.Spec.Resources.DeepCopy(),
+		},
+		expectUpdate:                 false,
+		expectPod:                    podWithPodLevelResources,
+		inPlacePodLevelResizeEnabled: false,
 	}}
 
 	for _, test := range tests {

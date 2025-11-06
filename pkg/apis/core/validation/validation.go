@@ -6389,17 +6389,14 @@ func validatePodLevelResourcesResize(newPod, oldPod *core.Pod, podSpecToMutate *
 	}
 
 	if oldPod.Spec.Resources != nil {
-		if oldPod.Spec.Resources.Requests != nil {
-			if newPod.Spec.Resources.Requests == nil || resourcesRemoved(newPod.Spec.Resources.Requests, oldPod.Spec.Resources.Requests) {
-				allErrs = append(allErrs, field.Forbidden(specPath.Child("resources").Child("requests"), "pod-level resource requests cannot be removed"))
-			}
+		if resourcesRemoved(newPod.Spec.Resources.Requests, oldPod.Spec.Resources.Requests) {
+			allErrs = append(allErrs, field.Forbidden(specPath.Child("resources").Child("requests"), "pod-level resource requests cannot be removed"))
 		}
 
-		if oldPod.Spec.Resources.Limits != nil {
-			if newPod.Spec.Resources.Limits == nil || resourcesRemoved(newPod.Spec.Resources.Limits, oldPod.Spec.Resources.Limits) {
-				allErrs = append(allErrs, field.Forbidden(specPath.Child("resources").Child("limits"), "pod-level resource limits cannot be removed"))
-			}
+		if resourcesRemoved(newPod.Spec.Resources.Limits, oldPod.Spec.Resources.Limits) {
+			allErrs = append(allErrs, field.Forbidden(specPath.Child("resources").Child("limits"), "pod-level resource limits cannot be removed"))
 		}
+
 	}
 
 	podSpecToMutate.Resources = dropCPUMemoryResourceRequirementsUpdates(podSpecToMutate.Resources, oldPod.Spec.Resources)
@@ -6435,7 +6432,9 @@ func dropCPUMemoryUpdates(resourceList, oldResourceList core.ResourceList) core.
 	return mungedResourceList
 }
 
-// dropCPUMemoryResourcesFromContainer deletes the cpu and memory resources from the container, and copies them from the old pod container resources if present.
+// dropCPUMemoryResourcesFromContainer deletes the cpu and memory resources from the
+// container, and copies them from the old pod container resources if present.
+// TODO(ndixita): refactor to reuse dropCPUMemoryResourceRequirementsUpdates
 func dropCPUMemoryResourcesFromContainer(container *core.Container, oldPodSpecContainer *core.Container) {
 	lim := dropCPUMemoryUpdates(container.Resources.Limits, oldPodSpecContainer.Resources.Limits)
 	req := dropCPUMemoryUpdates(container.Resources.Requests, oldPodSpecContainer.Resources.Requests)
@@ -6452,11 +6451,11 @@ func dropCPUMemoryResourceRequirementsUpdates(resources *core.ResourceRequiremen
 
 	var oldReqs, oldLims core.ResourceList
 	if oldPodResources != nil && oldPodResources.Requests != nil {
-		oldReqs = oldPodResources.Requests
+		oldReqs = oldPodResources.Requests // +k8s:verify-mutation:reason=clone'
 	}
 
 	if oldPodResources != nil && oldPodResources.Limits != nil {
-		oldLims = oldPodResources.Limits
+		oldLims = oldPodResources.Limits // +k8s:verify-mutation:reason=clone'
 	}
 
 	resources.Requests = dropCPUMemoryUpdates(resources.Requests, oldReqs)

@@ -2135,11 +2135,28 @@ func (kl *Kubelet) convertStatusToAPIStatus(pod *v1.Pod, podStatus *kubecontaine
 	return &apiPodStatus
 }
 
+func getEffectiveAllocatedResources(allocatedPod *v1.Pod) *v1.ResourceRequirements {
+	allocatedResources := allocatedPod.Spec.Resources
+	if allocatedResources == nil {
+		allocatedResources = &v1.ResourceRequirements{}
+	}
+	opts := resourcehelper.PodResourcesOptions{
+		SkipPodLevelResources: !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+	}
+	allocatedResources.Requests = resourcehelper.PodRequests(allocatedPod, opts)
+	allocatedResources.Limits = resourcehelper.PodLimits(allocatedPod, opts)
+	return allocatedResources
+}
+
 func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(allocatedPod *v1.Pod, oldPodStatus v1.PodStatus) *v1.ResourceRequirements {
 	if allocatedPod.Status.Phase != v1.PodRunning {
-		return allocatedPod.Spec.Resources.DeepCopy()
+		return getEffectiveAllocatedResources(allocatedPod)
 	}
 
+	// TODO(ndixita): Revisit the decision to output cgroup values in Pod Status.
+	// The internal rounding off logic can introduce minute variability, making the
+	// output inconsistent. We should decide if the information is useful enough to
+	//  outweigh the consistency issues,
 	pcm := kl.containerManager.NewPodContainerManager()
 	memoryConfig, err := pcm.GetPodCgroupConfig(allocatedPod, v1.ResourceMemory)
 	if err != nil {
