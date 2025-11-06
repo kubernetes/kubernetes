@@ -3551,38 +3551,6 @@ func TestDescribeJob(t *testing.T) {
 
 func TestDescribeIngress(t *testing.T) {
 	ingresClassName := "test"
-	backendV1beta1 := networkingv1beta1.IngressBackend{
-		ServiceName: "default-backend",
-		ServicePort: intstr.FromInt32(80),
-	}
-	v1beta1 := fake.NewClientset(&networkingv1beta1.Ingress{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "bar",
-			Labels: map[string]string{
-				"id1": "app1",
-				"id2": "app2",
-			},
-			Namespace: "foo",
-		},
-		Spec: networkingv1beta1.IngressSpec{
-			IngressClassName: &ingresClassName,
-			Rules: []networkingv1beta1.IngressRule{
-				{
-					Host: "foo.bar.com",
-					IngressRuleValue: networkingv1beta1.IngressRuleValue{
-						HTTP: &networkingv1beta1.HTTPIngressRuleValue{
-							Paths: []networkingv1beta1.HTTPIngressPath{
-								{
-									Path:    "/foo",
-									Backend: backendV1beta1,
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	})
 	backendV1 := networkingv1.IngressBackend{
 		Service: &networkingv1.IngressServiceBackend{
 			Name: "default-backend",
@@ -3635,23 +3603,6 @@ func TestDescribeIngress(t *testing.T) {
 		input  *fake.Clientset
 		output string
 	}{
-		"IngressRule.HTTP.Paths.Backend.Service v1beta1": {
-			input: v1beta1,
-			output: `Name:             bar
-Labels:           id1=app1
-                  id2=app2
-Namespace:        foo
-Address:          
-Ingress Class:    test
-Default backend:  <default>
-Rules:
-  Host         Path  Backends
-  ----         ----  --------
-  foo.bar.com  
-               /foo   default-backend:80 (<error: services "default-backend" not found>)
-Annotations:   <none>
-Events:        <none>` + "\n",
-		},
 		"IngressRule.HTTP.Paths.Backend.Service v1": {
 			input: netv1,
 			output: `Name:             bar
@@ -5232,7 +5183,7 @@ func TestDescribeEvents(t *testing.T) {
 			}, events),
 		},
 		"IngressDescriber": &IngressDescriber{
-			fake.NewClientset(&networkingv1beta1.Ingress{
+			fake.NewClientset(&networkingv1.Ingress{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "bar",
 					Namespace: "foo",
