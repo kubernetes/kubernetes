@@ -511,11 +511,7 @@ func NewMainKubelet(ctx context.Context,
 		LowThresholdPercent:  int(kubeCfg.ImageGCLowThresholdPercent),
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.ImageMaximumGCAge) {
-		imageGCPolicy.MaxAge = kubeCfg.ImageMaximumGCAge.Duration
-	} else if kubeCfg.ImageMaximumGCAge.Duration != 0 {
-		klog.InfoS("ImageMaximumGCAge flag enabled, but corresponding feature gate is not enabled. Ignoring flag.")
-	}
+	imageGCPolicy.MaxAge = kubeCfg.ImageMaximumGCAge.Duration
 
 	enforceNodeAllocatable := kubeCfg.EnforceNodeAllocatable
 	if experimentalNodeAllocatableIgnoreEvictionThreshold {
@@ -1641,8 +1637,7 @@ func (kl *Kubelet) StartGarbageCollection() {
 
 	// when the high threshold is set to 100, and the max age is 0 (or the max age feature is disabled)
 	// stub the image GC manager
-	if kl.kubeletConfiguration.ImageGCHighThresholdPercent == 100 &&
-		(!utilfeature.DefaultFeatureGate.Enabled(features.ImageMaximumGCAge) || kl.kubeletConfiguration.ImageMaximumGCAge.Duration == 0) {
+	if kl.kubeletConfiguration.ImageGCHighThresholdPercent == 100 && kl.kubeletConfiguration.ImageMaximumGCAge.Duration == 0 {
 		klog.V(2).InfoS("ImageGCHighThresholdPercent is set 100 and ImageMaximumGCAge is 0, Disable image GC")
 		return
 	}

@@ -626,17 +626,8 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			},
 			errMsg: "invalid configuration: enableSystemLogHandler is required for enableSystemLogQuery",
 		}, {
-			name: "imageMaximumGCAge should not be specified without feature gate",
-			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
-				conf.FeatureGates = map[string]bool{"ImageMaximumGCAge": false}
-				conf.ImageMaximumGCAge = metav1.Duration{Duration: 1}
-				return conf
-			},
-			errMsg: "invalid configuration: ImageMaximumGCAge feature gate is required for Kubelet configuration option imageMaximumGCAge",
-		}, {
 			name: "imageMaximumGCAge should not be negative",
 			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
-				conf.FeatureGates = map[string]bool{"ImageMaximumGCAge": true}
 				conf.ImageMaximumGCAge = metav1.Duration{Duration: -1}
 				return conf
 			},
@@ -644,7 +635,6 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		}, {
 			name: "imageMaximumGCAge should not be less than imageMinimumGCAge",
 			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
-				conf.FeatureGates = map[string]bool{"ImageMaximumGCAge": true}
 				conf.ImageMaximumGCAge = metav1.Duration{Duration: 1}
 				conf.ImageMinimumGCAge = metav1.Duration{Duration: 2}
 				return conf
