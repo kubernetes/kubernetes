@@ -1592,9 +1592,3 @@ func (wrapper *PodGroupWrapper) MinCount(count int32) *PodGroupWrapper {
 	wrapper.Policy.Gang.MinCount = count
 	return wrapper
 }
-
-// BasicPolicy sets the PodGroup policy to Basic.
-func (wrapper *PodGroupWrapper) BasicPolicy() *PodGroupWrapper {
-	wrapper.Policy.Basic = &schedulingapi.BasicSchedulingPolicy{}
-	return wrapper
-}
