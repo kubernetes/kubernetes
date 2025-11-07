@@ -510,6 +510,143 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			gomega.Expect(driver.Nodes[node].GetPreparedResources()).Should(gomega.Equal([]testdriverapp.ClaimID{{Name: newClaim.Name, UID: newClaim.UID}}), "Only new claim should be prepared now because new pod is running.")
 		})
 
+		ginkgo.Context("tombstone behavior", func() {
+			// Health updates arriving after pod deletion require keeping claim info in a "tombstoned" state for a grace period
+			// to allow post-mortem health status updates for terminated pods.
+			f.It("must not call NodeUnprepareResources repeatedly for tombstoned claims during reconciliation", f.WithLabel("KubeletMinVersion:1.34"), func(ctx context.Context) {
+				// This test verifies the fix for the reconcile loop repeatedly calling
+				// NodeUnprepareResources every 60 seconds for tombstoned claims.
+				// The tombstoned claim should only be unprepared once, then remain in
+				// the cache for the grace period (5 minutes) without triggering repeated calls.
+
+				claim := b.ExternalClaim()
+				pod := b.PodExternal()
+				node := nodes.NodeNames[0]
+				pod.Spec.NodeSelector = map[string]string{"kubernetes.io/hostname": node}
+
+				ginkgo.By("Creating and running pod with claim")
+				b.Create(ctx, claim, pod)
+				b.TestPod(ctx, f, pod)
+
+				unprepareMethod := drautils.MethodInstance{
+					NodeName:   node,
+					FullMethod: "/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodeUnprepareResources",
+				}
+
+				ginkgo.By("Recording initial NodeUnprepareResources call count")
+				initialUnprepareCount := driver.CallCount(unprepareMethod)
+
+				ginkgo.By("Force-deleting pod to create tombstone")
+				forceDelete := metav1.DeleteOptions{GracePeriodSeconds: ptr.To(int64(0))}
+				framework.ExpectNoError(f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(ctx, pod.Name, forceDelete))
+
+				ginkgo.By("Waiting for the first NodeUnprepareResources call (claim becomes tombstoned)")
+				gomega.Eventually(func() int64 {
+					return driver.CallCount(unprepareMethod)
+				}).WithTimeout(time.Minute).Should(gomega.BeNumerically(">", initialUnprepareCount), "NodeUnprepareResources should be called once for pod deletion")
+
+				unprepareCountAfterDelete := driver.CallCount(unprepareMethod)
+				gomega.Expect(unprepareCountAfterDelete).Should(gomega.Equal(initialUnprepareCount+1), "Expected exactly one NodeUnprepareResources call")
+
+				ginkgo.By("Waiting through 2+ reconciliation cycles (130+ seconds) to verify no repeated calls")
+				// Reconcile period is 60 seconds, so wait 130 seconds to cover 2+ cycles
+				gomega.Consistently(func() int64 {
+					return driver.CallCount(unprepareMethod)
+				}).WithTimeout(130*time.Second).WithPolling(10*time.Second).Should(gomega.Equal(unprepareCountAfterDelete), "NodeUnprepareResources should not be called repeatedly for tombstoned claim")
+
+				ginkgo.By("Verifying claim is still tombstoned (not deleted from cache)")
+				// The claim should eventually be cleaned up from the kubelet cache after the grace period,
+				// but during the grace period it should remain prepared on the driver side
+				gomega.Expect(driver.Nodes[node].GetPreparedResources()).Should(gomega.BeEmpty(), "Claim should have been unprepared")
+
+				// Clean up the claim
+				framework.ExpectNoError(f.ClientSet.ResourceV1().ResourceClaims(f.Namespace.Name).Delete(ctx, claim.Name, metav1.DeleteOptions{}))
+				gomega.Eventually(ctx, func(ctx context.Context) bool {
+					_, err := f.ClientSet.ResourceV1().ResourceClaims(f.Namespace.Name).Get(ctx, claim.Name, metav1.GetOptions{})
+					return apierrors.IsNotFound(err)
+				}).WithTimeout(time.Minute).Should(gomega.BeTrueBecause("Claim should be deleted"))
+			})
+
+			f.It("must allow pod deletion even when claim is tombstoned", f.WithLabel("KubeletMinVersion:1.34"), func(ctx context.Context) {
+				// This test verifies that PodMightNeedToUnprepareResources returns false
+				// for tombstoned claims, allowing pods to be deleted without blocking.
+				// Before the fix, tombstoned claims still had PodUIDs which prevented
+				// pod deletion, causing tests to timeout.
+
+				claim := b.ExternalClaim()
+				pod := b.PodExternal()
+				node := nodes.NodeNames[0]
+				pod.Spec.NodeSelector = map[string]string{"kubernetes.io/hostname": node}
+
+				ginkgo.By("Creating and running pod with claim")
+				b.Create(ctx, claim, pod)
+				b.TestPod(ctx, f, pod)
+
+				ginkgo.By("Force-deleting pod")
+				forceDelete := metav1.DeleteOptions{GracePeriodSeconds: ptr.To(int64(0))}
+				framework.ExpectNoError(f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(ctx, pod.Name, forceDelete))
+
+				ginkgo.By("Verifying pod is deleted promptly without blocking")
+				// Pod should be deleted within 1 minute even though claim is tombstoned
+				gomega.Eventually(ctx, func(ctx context.Context) bool {
+					_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
+					return apierrors.IsNotFound(err)
+				}).WithTimeout(time.Minute).Should(gomega.BeTrueBecause("Pod should be deleted despite tombstoned claim"))
+
+				ginkgo.By("Verifying claim was unprepared")
+				gomega.Eventually(func() []testdriverapp.ClaimID {
+					return driver.Nodes[node].GetPreparedResources()
+				}).WithTimeout(time.Minute).Should(gomega.BeEmpty(), "Claim should be unprepared")
+
+				// Clean up the claim
+				framework.ExpectNoError(f.ClientSet.ResourceV1().ResourceClaims(f.Namespace.Name).Delete(ctx, claim.Name, metav1.DeleteOptions{}))
+			})
+
+			f.It("must handle tombstoned claims with different UIDs correctly", f.WithLabel("KubeletMinVersion:1.34"), func(ctx context.Context) {
+				// This test verifies that PrepareResources can handle the scenario where:
+				// 1. Old claim is tombstoned (unprepared but still in cache)
+				// 2. New claim with same name but different UID is created
+				// 3. PrepareResources should delete the old tombstone and prepare the new claim
+				//
+				// This is a specific case of the "blocks new pod after force-delete" test
+				// that focuses on the tombstone cleanup logic.
+
+				claim := b.ExternalClaim()
+				pod := b.PodExternal()
+				node := nodes.NodeNames[0]
+				pod.Spec.NodeSelector = map[string]string{"kubernetes.io/hostname": node}
+
+				ginkgo.By("Creating first pod with claim")
+				oldClaim := b.Create(ctx, claim, pod)[0].(*resourceapi.ResourceClaim)
+				b.TestPod(ctx, f, pod)
+
+				ginkgo.By("Force-deleting first pod and claim")
+				forceDelete := metav1.DeleteOptions{GracePeriodSeconds: ptr.To(int64(0))}
+				framework.ExpectNoError(f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(ctx, pod.Name, forceDelete))
+				framework.ExpectNoError(f.ClientSet.ResourceV1().ResourceClaims(f.Namespace.Name).Delete(ctx, claim.Name, forceDelete))
+
+				ginkgo.By("Waiting for old claim to be unprepared and tombstoned")
+				gomega.Eventually(func() []testdriverapp.ClaimID {
+					return driver.Nodes[node].GetPreparedResources()
+				}).WithTimeout(time.Minute).Should(gomega.BeEmpty(), "Old claim should be unprepared")
+
+				// Wait a bit to ensure kubelet has processed the deletion and created tombstone
+				time.Sleep(5 * time.Second)
+
+				ginkgo.By("Creating new claim and pod with same name but different UID")
+				newClaim := b.Create(ctx, claim, pod)[0].(*resourceapi.ResourceClaim)
+				gomega.Expect(newClaim.UID).ShouldNot(gomega.Equal(oldClaim.UID), "New claim should have different UID")
+
+				ginkgo.By("Verifying new pod starts successfully with new claim")
+				b.TestPod(ctx, f, pod)
+
+				ginkgo.By("Verifying only new claim is prepared (old tombstone was cleared)")
+				preparedResources := driver.Nodes[node].GetPreparedResources()
+				gomega.Expect(preparedResources).Should(gomega.HaveLen(1), "Exactly one claim should be prepared")
+				gomega.Expect(preparedResources[0].UID).Should(gomega.Equal(newClaim.UID), "New claim UID should be prepared, not old tombstoned claim")
+			})
+		})
+
 		f.It("DaemonSet with admin access", f.WithFeatureGate(features.DRAAdminAccess), func(ctx context.Context) {
 			// Ensure namespace has the dra admin label.
 			_, err := f.ClientSet.CoreV1().Namespaces().Apply(ctx,

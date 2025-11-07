@@ -236,6 +236,12 @@ func (m *Manager) reconcileLoop(ctx context.Context) {
 	inactivePodClaims := make(map[string]*podClaims)
 	m.cache.RLock()
 	for _, claimInfo := range m.cache.claimInfo {
+		// Skip tombstoned claims - they've already been unprepared and are only
+		// kept for health status updates. Attempting to unprepare them again
+		// would cause unnecessary NodeUnprepareResources calls every reconcile cycle.
+		if claimInfo.isTombstoned() {
+			continue
+		}
 		for podUID := range claimInfo.PodUIDs {
 			if activePods.Has(podUID) {
 				continue
@@ -567,7 +573,24 @@ func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 				logger.V(6).Info("Created new claim info cache entry", "pod", klog.KObj(pod), "podClaim", podClaim.Name, "claim", klog.KObj(resourceClaim), "claimInfoEntry", claimInfo)
 			} else {
 				if claimInfo.ClaimUID != resourceClaim.UID {
-					return fmt.Errorf("old ResourceClaim with same name %s and different UID %s still exists (previous pod force-deleted?!)", resourceClaim.Name, claimInfo.ClaimUID)
+					// If the existing claim is tombstoned, it's safe to remove it and proceed
+					// with the new claim. This handles the force-delete scenario where the old
+					// claim has been unprepared (tombstoned) but a new claim with the same name
+					// is being prepared.
+					if claimInfo.isTombstoned() {
+						logger.V(5).Info("Removing tombstoned claim with different UID to allow new claim",
+							"pod", klog.KObj(pod),
+							"claim", klog.KObj(resourceClaim),
+							"oldClaimUID", claimInfo.ClaimUID,
+							"newClaimUID", resourceClaim.UID)
+						m.cache.delete(resourceClaim.Name, resourceClaim.Namespace)
+						// Now add the new claim
+						claimInfo = infos[i].claimInfo
+						m.cache.add(claimInfo)
+						logger.V(6).Info("Created new claim info cache entry after removing tombstone", "pod", klog.KObj(pod), "podClaim", podClaim.Name, "claim", klog.KObj(resourceClaim), "claimInfoEntry", claimInfo)
+					} else {
+						return fmt.Errorf("old ResourceClaim with same name %s and different UID %s still exists (previous pod force-deleted?!)", resourceClaim.Name, claimInfo.ClaimUID)
+					}
 				}
 				logger.V(6).Info("Found existing claim info cache entry", "pod", klog.KObj(pod), "podClaim", podClaim.Name, "claim", klog.KObj(resourceClaim), "claimInfoEntry", claimInfo)
 			}
@@ -828,6 +851,13 @@ func (m *Manager) unprepareResources(ctx context.Context, podUID types.UID, name
 
 			// Skip calling NodeUnprepareResource if claim info is not cached
 			if !exists {
+				return nil
+			}
+
+			// Skip calling NodeUnprepareResource if claim is already tombstoned.
+			// This prevents repeated calls when both the reconcile loop and the
+			// normal pod termination path try to unprepare the same claim.
+			if claimInfo.isTombstoned() {
 				return nil
 			}
 

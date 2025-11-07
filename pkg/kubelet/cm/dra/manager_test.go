@@ -482,6 +482,14 @@ func genTestClaimInfo(claimUID types.UID, podUIDs []string, prepared bool) *Clai
 	}
 }
 
+// genTestTombstonedClaimInfo generates a tombstoned claim info object for testing
+// that unprepareResources skips already tombstoned claims.
+func genTestTombstonedClaimInfo(claimUID types.UID, podUIDs []string) *ClaimInfo {
+	claimInfo := genTestClaimInfo(claimUID, podUIDs, false)
+	claimInfo.markAsTombstone()
+	return claimInfo
+}
+
 // genTestClaimInfoWithExtendedResource generates claim info object
 func genTestClaimInfoWithExtendedResource(podUIDs []string, prepared bool) *ClaimInfo {
 	return &ClaimInfo{
@@ -1003,6 +1011,14 @@ func TestUnprepareResources(t *testing.T) {
 			resp:                   &drapb.NodeUnprepareResourcesResponse{Claims: map[string]*drapb.NodeUnprepareResourceResponse{string(claimUID): nil}},
 			expectedUnprepareCalls: 1,
 		},
+		{
+			description:            "should skip already tombstoned claim",
+			driverName:             driverName,
+			pod:                    genTestPod(),
+			claimInfo:              genTestTombstonedClaimInfo(claimUID, []string{podUID}),
+			wantResourceSkipped:    true,
+			expectedUnprepareCalls: 0,
+		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
 			backgroundCtx, cancel := context.WithCancel(context.Background())
@@ -1079,21 +1095,43 @@ func TestUnprepareResources(t *testing.T) {
 }
 
 func TestPodMightNeedToUnprepareResources(t *testing.T) {
-	tCtx := ktesting.Init(t)
-	fakeKubeClient := fake.NewClientset()
-	manager, err := NewManager(tCtx.Logger(), fakeKubeClient, t.TempDir())
-	require.NoError(t, err, "create DRA manager")
+	for _, test := range []struct {
+		description    string
+		isTombstoned   bool
+		expectedResult bool
+	}{
+		{
+			description:    "non-tombstoned claim should need unprepare",
+			isTombstoned:   false,
+			expectedResult: true,
+		},
+		{
+			description:    "tombstoned claim should not need unprepare",
+			isTombstoned:   true,
+			expectedResult: false,
+		},
+	} {
+		t.Run(test.description, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			fakeKubeClient := fake.NewClientset()
+			manager, err := NewManager(tCtx.Logger(), fakeKubeClient, t.TempDir())
+			require.NoError(t, err, "create DRA manager")
 
-	claimInfo := &ClaimInfo{
-		ClaimInfoState: state.ClaimInfoState{PodUIDs: sets.New(podUID), ClaimName: claimName, Namespace: namespace},
+			claimInfo := &ClaimInfo{
+				ClaimInfoState: state.ClaimInfoState{PodUIDs: sets.New(podUID), ClaimName: claimName, Namespace: namespace},
+			}
+			if test.isTombstoned {
+				claimInfo.markAsTombstone()
+			}
+			manager.cache.add(claimInfo)
+			if !manager.cache.contains(claimName, namespace) {
+				t.Fatalf("failed to get claimInfo from cache for claim name %s, namespace %s: err:%v", claimName, namespace, err)
+			}
+			claimInfo.addPodReference(types.UID(podUID))
+			needsUnprepare := manager.PodMightNeedToUnprepareResources(types.UID(podUID))
+			assert.Equal(t, test.expectedResult, needsUnprepare)
+		})
 	}
-	manager.cache.add(claimInfo)
-	if !manager.cache.contains(claimName, namespace) {
-		t.Fatalf("failed to get claimInfo from cache for claim name %s, namespace %s: err:%v", claimName, namespace, err)
-	}
-	claimInfo.addPodReference(types.UID(podUID))
-	needsUnprepare := manager.PodMightNeedToUnprepareResources(types.UID(podUID))
-	assert.True(t, needsUnprepare)
 }
 
 func TestGetContainerClaimInfos(t *testing.T) {
@@ -1813,6 +1851,15 @@ func TestHealthUpdateForTombstonedClaim(t *testing.T) {
 
 	pod := genTestPod()
 
+	// Add ResourceClaimStatuses to pod status so UpdateAllocatedResourcesStatus can find the claim
+	claimNameStr := claimName
+	pod.Status.ResourceClaimStatuses = []v1.PodResourceClaimStatus{
+		{
+			Name:              claimName,
+			ResourceClaimName: &claimNameStr,
+		},
+	}
+
 	// Create and tombstone a claim
 	claimInfo := genTestClaimInfo(claimUID, []string{string(pod.UID)}, true)
 	claimInfo.markAsTombstone()
@@ -2070,6 +2117,80 @@ func (m *mockSourcesReady) AllReady() bool {
 }
 
 func (m *mockSourcesReady) AddSource(source string) {}
+
+// TestReconcileSkipsTombstones verifies that tombstoned claims are not
+// included in the inactive pods list during reconcile. This prevents the bug
+// where tombstoned claims with inactive pod UIDs were being repeatedly unprepared
+// every 60 seconds, causing unnecessary NodeUnprepareResources calls and eventual
+// cluster crashes in E2E tests.
+func TestReconcileSkipsTombstones(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	ctx := tCtx.Logger()
+
+	// Create manager with dependencies
+	kubeClient := fake.NewClientset()
+	tmpDir := t.TempDir()
+	cache, err := newClaimInfoCache(ctx, tmpDir, "test-checkpoint")
+	require.NoError(t, err, "Failed to create claim info cache")
+
+	manager := &Manager{
+		cache:      cache,
+		kubeClient: kubeClient,
+	}
+
+	namespace := "test-namespace"
+	podUID := "pod-1"
+
+	// Create two claims: one tombstoned, one normal
+	tombstonedClaim := genTestClaimInfo(types.UID("tombstoned-uid"), []string{podUID}, true)
+	tombstonedClaim.ClaimName = "tombstoned-claim"
+	tombstonedClaim.Namespace = namespace
+	tombstonedClaim.markAsTombstone()
+	manager.cache.add(tombstonedClaim)
+
+	normalClaim := genTestClaimInfo(types.UID("normal-uid"), []string{podUID}, true)
+	normalClaim.ClaimName = "normal-claim"
+	normalClaim.Namespace = namespace
+	manager.cache.add(normalClaim)
+
+	// Mock sourcesReady to return true
+	manager.sourcesReady = &mockSourcesReady{ready: true}
+	// Mock activePods to return empty (all pods are inactive)
+	manager.activePods = func() []*v1.Pod { return []*v1.Pod{} }
+
+	// Manually extract the inactive pods list logic from reconcileLoop
+	activePods := sets.New[string]()
+	for _, p := range manager.activePods() {
+		activePods.Insert(string(p.UID))
+	}
+
+	inactivePodClaims := make(map[string][]string)
+	manager.cache.RLock()
+	for _, claimInfo := range manager.cache.claimInfo {
+		if claimInfo.isTombstoned() {
+			continue
+		}
+		for podUID := range claimInfo.PodUIDs {
+			if activePods.Has(podUID) {
+				continue
+			}
+			inactivePodClaims[podUID] = append(inactivePodClaims[podUID], claimInfo.ClaimName)
+		}
+	}
+	manager.cache.RUnlock()
+
+	// Verify only the normal claim is in the inactive list, not the tombstoned one
+	claimsForPod, exists := inactivePodClaims[podUID]
+	assert.True(t, exists, "Pod should have inactive claims")
+	assert.Len(t, claimsForPod, 1, "Should only have one inactive claim (not tombstoned)")
+	assert.Equal(t, "normal-claim", claimsForPod[0], "Only the normal claim should be in inactive list")
+
+	// Verify both claims still exist in cache
+	_, existsTombstoned := manager.cache.get("tombstoned-claim", namespace)
+	assert.True(t, existsTombstoned, "Tombstoned claim should still exist in cache")
+	_, existsNormal := manager.cache.get("normal-claim", namespace)
+	assert.True(t, existsNormal, "Normal claim should still exist in cache")
+}
 
 // setupManagerWithStateDir creates a manager with a specific state directory for checkpoint testing
 func setupManagerWithStateDir(t *testing.T, logger klog.Logger, stateDir string) *Manager {

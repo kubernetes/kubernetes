@@ -135,6 +135,8 @@ func (info *ClaimInfo) isPrepared() bool {
 func (info *ClaimInfo) markAsTombstone() {
 	info.tombstoned = true
 	info.tombstoneTime = metav1.Now()
+	// Mark as unprepared since the claim has been successfully unprepared
+	info.prepared = false
 	// Also update the state for checkpoint persistence
 	info.ClaimInfoState.Tombstoned = true
 	info.ClaimInfoState.TombstoneTime = info.tombstoneTime
@@ -276,6 +278,12 @@ func (cache *claimInfoCache) delete(claimName, namespace string) {
 // to check if pod can enter termination status
 func (cache *claimInfoCache) hasPodReference(uid types.UID) bool {
 	for _, claimInfo := range cache.claimInfo {
+		// Skip tombstoned claims - they've already been unprepared and
+		// shouldn't prevent pod deletion. Tombstoned claims are kept only
+		// for health status updates, not for lifecycle management.
+		if claimInfo.isTombstoned() {
+			continue
+		}
 		if claimInfo.hasPodReference(uid) {
 			return true
 		}
