@@ -120,9 +120,6 @@ func TestDeclarativeValidateUpdateParametersName(t *testing.T) {
 						obj.Spec.Parameters.Name = ""
 					}),
 					expectedErrs: field.ErrorList{
-						// Still required on update. Unlike RuntimeClass.Handler,
-						// Parameters.Name is not immutable, so we only expect the
-						// "Required" error and NOT an additional "Forbidden" error.
 						field.Required(
 							field.NewPath("spec", "parameters", "name"),
 							"name is required",
