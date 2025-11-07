@@ -2582,6 +2582,33 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 				{Type: field.ErrorTypeRequired, Field: "status.startTime"},
 			},
 		},
+		"verify startTime can be updated when resuming job (JobSuspended: True -> False)": {
+			enableJobManagedBy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Status: batch.JobStatus{
+					StartTime: &now,
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobSuspended,
+							Status: api.ConditionTrue,
+						},
+					},
+				},
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Status: batch.JobStatus{
+					StartTime: &nowPlusMinute,
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobSuspended,
+							Status: api.ConditionFalse,
+						},
+					},
+				},
+			},
+		},
 		"invalid attempt to set completionTime before startTime": {
 			enableJobManagedBy: true,
 			job: &batch.Job{
