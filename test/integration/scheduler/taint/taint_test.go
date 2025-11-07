@@ -75,8 +75,6 @@ func TestTaintNodeByCondition(t *testing.T) {
 	admission.SetExternalKubeClientSet(externalClientset)
 	admission.SetExternalKubeInformerFactory(externalInformers)
 
-	testCtx = testutils.InitTestScheduler(t, testCtx)
-
 	cs := testCtx.ClientSet
 	nsName := testCtx.NS.Name
 
@@ -104,11 +102,9 @@ func TestTaintNodeByCondition(t *testing.T) {
 	// Waiting for all controllers to sync
 	externalInformers.Start(testCtx.Ctx.Done())
 	externalInformers.WaitForCacheSync(testCtx.Ctx.Done())
-	testutils.SyncSchedulerInformerFactory(testCtx)
 
-	// Run all controllers
+	// Run node lifecycle controller
 	go nc.Run(testCtx.Ctx)
-	go testCtx.Scheduler.Run(testCtx.Ctx)
 
 	// -------------------------------------------
 	// Test TaintNodeByCondition feature.
@@ -225,7 +221,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 		unschedulable                              bool
 		expectedTaints                             []v1.Taint
 		pods                                       []podCase
-		enableTaintTolerationComparisonOperatorsFG *[]bool
+		enableTaintTolerationComparisonOperatorsFG []bool
 	}{
 		{
 			name: "not-ready node",
@@ -571,7 +567,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 					fits:        true,
 				},
 			},
-			enableTaintTolerationComparisonOperatorsFG: &[]bool{true},
+			enableTaintTolerationComparisonOperatorsFG: []bool{true},
 		},
 		{
 			name:           "node with numeric error-rate taint - pods with Lt toleration",
@@ -594,7 +590,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 					fits:        true,
 				},
 			},
-			enableTaintTolerationComparisonOperatorsFG: &[]bool{true},
+			enableTaintTolerationComparisonOperatorsFG: []bool{true},
 		},
 		{
 			name:           "node with multiple numeric taints - mixed tolerations",
@@ -625,7 +621,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 					fits: true,
 				},
 			},
-			enableTaintTolerationComparisonOperatorsFG: &[]bool{true},
+			enableTaintTolerationComparisonOperatorsFG: []bool{true},
 		},
 		{
 			name:           "node with numeric taint - pods with Lt or Gt tolerations, and NoExecute effect",
@@ -653,7 +649,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 					fits:        true,
 				},
 			},
-			enableTaintTolerationComparisonOperatorsFG: &[]bool{true},
+			enableTaintTolerationComparisonOperatorsFG: []bool{true},
 		},
 		{
 			name:           "node with numeric taint - pods with PreferNoSchedule effect and Gt toleration",
@@ -681,18 +677,25 @@ func TestTaintNodeByCondition(t *testing.T) {
 					fits:        true,
 				},
 			},
-			enableTaintTolerationComparisonOperatorsFG: &[]bool{true},
+			enableTaintTolerationComparisonOperatorsFG: []bool{true},
 		},
 	}
 
 	for _, test := range tests {
 		featureGateEnabled := []bool{true, false}
-		if test.enableTaintTolerationComparisonOperatorsFG != nil {
-			featureGateEnabled = *test.enableTaintTolerationComparisonOperatorsFG
+		if len(test.enableTaintTolerationComparisonOperatorsFG) != 0 {
+			featureGateEnabled = test.enableTaintTolerationComparisonOperatorsFG
 		}
 		for _, enabled := range featureGateEnabled {
 			t.Run(fmt.Sprintf("%s (TaintToleration Comparison Operators enabled: %v)", test.name, enabled), func(t *testing.T) {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TaintTolerationComparisonOperators, enabled)
+				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+					features.TaintTolerationComparisonOperators: enabled,
+				})
+
+				testCtx := testutils.InitTestScheduler(t, testCtx)
+				testutils.SyncSchedulerInformerFactory(testCtx)
+				go testCtx.Scheduler.Run(testCtx.SchedulerCtx)
+
 				node := &v1.Node{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "node-1",
@@ -750,6 +753,11 @@ func TestTaintNodeByCondition(t *testing.T) {
 				testutils.CleanupPods(testCtx.Ctx, cs, t, pods)
 				testutils.CleanupNodes(cs, t)
 				testutils.WaitForSchedulerCacheCleanup(testCtx.Ctx, testCtx.Scheduler, t)
+
+				// Clean up scheduler context
+				if testCtx.SchedulerCloseFn != nil {
+					testCtx.SchedulerCloseFn()
+				}
 			})
 		}
 	}

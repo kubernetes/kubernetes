@@ -91,7 +91,7 @@ func compareNumericValues(logger klog.Logger, tolerationVal, taintVal string, op
 	}
 	tntVal, err := strconv.ParseInt(taintVal, 10, 64)
 	if err != nil {
-		logger.Error(err, "failed to parse taint value as int64 ", "taint", taintVal)
+		logger.Error(err, "failed to parse taint value as int64", "taint", taintVal)
 		return false
 	}
 
