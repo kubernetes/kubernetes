@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2022 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,12 +14,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// +k8s:conversion-gen=k8s.io/kubernetes/pkg/apis/scheduling
-// +k8s:conversion-gen-external-types=k8s.io/api/scheduling/v1alpha1
-// +groupName=scheduling.k8s.io
-// +k8s:defaulter-gen=TypeMeta
-// +k8s:defaulter-gen-input=k8s.io/api/scheduling/v1alpha1
-// +k8s:validation-gen=TypeMeta
-// +k8s:validation-gen-input=k8s.io/api/scheduling/v1alpha1
+package scheduling
 
-package v1alpha1
+import (
+	"fmt"
+
+	"k8s.io/kubernetes/pkg/apis/scheduling"
+)
+
+func GetWarningsForWorkload(workload *scheduling.Workload) []string {
+	var warnings []string
+
+	if workload != nil && len(workload.Spec.PodGroups) > 0 {
+		for _, podGroup := range workload.Spec.PodGroups {
+			if podGroup.Policy.Gang != nil && podGroup.Policy.Gang.MinCount <= 0 {
+				warnings = append(warnings, fmt.Sprintf("podGroup.policy.gang.minCount: must be greater than 0"))
+			}
+		}
+	}
+	return warnings
+}
