@@ -76,7 +76,7 @@ var _ = SIGDescribe("Container Runtime Conformance Test", func() {
 					})
 				})
 
-				f.It(testCase.description+"", f.WithNodeConformance(), f.WithSerial(), func(ctx context.Context) {
+				f.It(testCase.description+"", f.WithNodeConformance(), f.WithDisruptive(), f.WithSerial(), func(ctx context.Context) {
 					name := "image-pull-test"
 					container := node.ConformanceContainer{
 						PodClient: e2epod.NewPodClient(f),

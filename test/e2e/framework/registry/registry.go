@@ -102,8 +102,7 @@ func SetupRegistry(ctx context.Context, f *framework.Framework, podOnly bool) (s
 		podNodes = append(podNodes, pod.Spec.NodeName)
 	}
 
-	// returning the IPv4 form here, IPv6 is causing issues in node-conformance on dual-stack
-	return "127.0.0.1:5000", podNodes, nil
+	return "localhost:5000", podNodes, nil
 }
 
 func podManifest(podTestLabel string) (*v1.Pod, error) {
@@ -128,6 +127,9 @@ func podManifest(podTestLabel string) (*v1.Pod, error) {
 		},
 	}
 	pod.Spec.Containers[0].SecurityContext.RunAsUser = ptr.To[int64](5123)
+	// setting HostNetwork to true so that the registry is accessible on localhost:<hostport>
+	// and we don't have to deal with any CNI quirks.
+	pod.Spec.HostNetwork = true
 
 	return pod, nil
 }
