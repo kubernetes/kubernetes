@@ -4091,6 +4091,85 @@ func TestSuspendJob(t *testing.T) {
 	}
 }
 
+// TestStartTimeUpdateOnResume verifies that the job controller can update startTime
+// when resuming a suspended job (https://github.com/kubernetes/kubernetes/issues/134521).
+func TestStartTimeUpdateOnResume(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobManagedBy, true)
+
+	closeFn, restConfig, clientSet, ns := setup(t, "suspend-starttime-validation")
+	t.Cleanup(closeFn)
+	ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
+	t.Cleanup(cancel)
+
+	job, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
+		Spec: batchv1.JobSpec{
+			Parallelism: ptr.To[int32](1),
+			Completions: ptr.To[int32](2),
+			Suspend:     ptr.To(false),
+		},
+	})
+	if err != nil {
+		t.Fatalf("Failed to create Job: %v", err)
+	}
+
+	validateJobsPodsStatusOnly(ctx, t, clientSet, job, podsByStatus{
+		Active:      1,
+		Ready:       ptr.To[int32](0),
+		Terminating: ptr.To[int32](0),
+	})
+
+	job, err = clientSet.BatchV1().Jobs(ns.Name).Get(ctx, job.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to get Job: %v", err)
+	}
+	if job.Status.StartTime == nil {
+		t.Fatalf("Job startTime was not set")
+	}
+
+	job.Spec.Suspend = ptr.To(true)
+	job, err = clientSet.BatchV1().Jobs(ns.Name).Update(ctx, job, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to suspend Job: %v", err)
+	}
+
+	validateJobsPodsStatusOnly(ctx, t, clientSet, job, podsByStatus{
+		Active:      0,
+		Ready:       ptr.To[int32](0),
+		Terminating: ptr.To[int32](0),
+	})
+
+	job, err = clientSet.BatchV1().Jobs(ns.Name).Get(ctx, job.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to get Job: %v", err)
+	}
+	if getJobConditionStatus(ctx, job, batchv1.JobSuspended) != v1.ConditionTrue {
+		t.Fatalf("JobSuspended condition was not set to True")
+	}
+
+	job.Spec.Suspend = ptr.To(false)
+	job, err = clientSet.BatchV1().Jobs(ns.Name).Update(ctx, job, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to resume Job: %v", err)
+	}
+
+	validateJobsPodsStatusOnly(ctx, t, clientSet, job, podsByStatus{
+		Active:      1,
+		Ready:       ptr.To[int32](0),
+		Terminating: ptr.To[int32](0),
+	})
+
+	job, err = clientSet.BatchV1().Jobs(ns.Name).Get(ctx, job.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to get Job: %v", err)
+	}
+	if getJobConditionStatus(ctx, job, batchv1.JobSuspended) != v1.ConditionFalse {
+		t.Error("JobSuspended condition was not set to False")
+	}
+	if job.Status.StartTime == nil {
+		t.Error("Job startTime was not set after resume")
+	}
+}
+
 // TestSuspendJobWithZeroCompletions verifies the suspended Job with
 // completions=0 is marked as Complete.
 func TestSuspendJobWithZeroCompletions(t *testing.T) {
