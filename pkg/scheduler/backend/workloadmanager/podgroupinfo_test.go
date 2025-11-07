@@ -66,6 +66,10 @@ func TestPodGroupInfo_SchedulingTimeout(t *testing.T) {
 		t.Errorf("Expected positive timeout duration, got %v", timeout)
 	}
 
+	// Sleep for a while to ensure that the time has increased,
+	// especially when testing on Windows machines with lower resolution.
+	time.Sleep(10 * time.Millisecond)
+
 	deadline := *pgi.schedulingDeadline
 	newTimeout := pgi.SchedulingTimeout()
 	if !deadline.Equal(*pgi.schedulingDeadline) {
@@ -74,6 +78,10 @@ func TestPodGroupInfo_SchedulingTimeout(t *testing.T) {
 	if newTimeout >= timeout {
 		t.Errorf("Expected lower timeout duration: previous: %v, current: %v", timeout, newTimeout)
 	}
+
+	// Sleep for a while to ensure that the time has increased,
+	// especially when testing on Windows machines with lower resolution.
+	time.Sleep(10 * time.Millisecond)
 
 	pgi.schedulingDeadline = ptr.To(time.Now().Add(-1 * time.Second))
 	newTimeout = pgi.SchedulingTimeout()
