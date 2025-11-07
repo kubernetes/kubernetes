@@ -181,7 +181,9 @@ func TestDoProbe(t *testing.T) {
 }
 
 func TestDoProbeWithContainerRestartRules(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerRestartRules, true)
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.ContainerRestartRules: true,
+	})
 	TestDoProbe(t)
 
 	var (
@@ -298,8 +300,11 @@ func TestDoProbeWithContainerRestartRules(t *testing.T) {
 }
 
 func TestDoProbeWithContainerRestartAllContainers(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerRestartRules, true)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RestartAllContainersOnContainerExits, true)
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.ContainerRestartRules:                true,
+		features.NodeDeclaredFeatures:                 true,
+		features.RestartAllContainersOnContainerExits: true,
+	})
 	TestDoProbe(t)
 	TestDoProbeWithContainerRestartRules(t)
 

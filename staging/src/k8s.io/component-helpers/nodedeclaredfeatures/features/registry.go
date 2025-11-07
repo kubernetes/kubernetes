@@ -19,6 +19,7 @@ package features
 import (
 	"k8s.io/component-helpers/nodedeclaredfeatures"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/inplacepodresize"
+	"k8s.io/component-helpers/nodedeclaredfeatures/features/restartallcontainers"
 )
 
 // AllFeatures is the central registry for all declared features.
@@ -26,4 +27,5 @@ import (
 // discovery and inference logic.
 var AllFeatures = []nodedeclaredfeatures.Feature{
 	inplacepodresize.Feature,
+	restartallcontainers.Feature,
 }

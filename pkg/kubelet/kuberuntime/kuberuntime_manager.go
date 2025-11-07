@@ -1020,7 +1020,7 @@ func (m *kubeGenericRuntimeManager) updatePodContainerResources(ctx context.Cont
 }
 
 // computePodActions checks whether the pod spec has changed and returns the changes if true.
-func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, apiPodStatus *v1.PodStatus) podActions {
+func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, restartAllContainers bool) podActions {
 	logger := klog.FromContext(ctx)
 	logger.V(5).Info("Syncing Pod", "pod", klog.KObj(pod))
 
@@ -1035,30 +1035,19 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 	}
 
 	// Needs to kill and remove all containers in reverse order when the pod is marked for RestartAllContainers.
-	if utilfeature.DefaultFeatureGate.Enabled(features.RestartAllContainersOnContainerExits) {
-		allContainersRestarting := false
-		if apiPodStatus != nil {
-			for _, cond := range apiPodStatus.Conditions {
-				if cond.Type == v1.AllContainersRestarting && cond.Status == v1.ConditionTrue {
-					allContainersRestarting = true
-					break
-				}
-			}
-		}
-		if allContainersRestarting {
-			logger.V(3).Info("Pod marked for RestartAllContainers", "pod", klog.KObj(pod))
-			changes.KillPod = false
-			changes.CreateSandbox = false
-			// Kill and remove containers in reverse order. Source containers (which exited and triggered
-			// RestartAllContainers) are removed last.
-			sourceInitContainers, targetInitContainers := m.getContainersToRemove(ctx, pod.Spec.InitContainers, podStatus)
-			sourceContainers, targetContainers := m.getContainersToRemove(ctx, pod.Spec.Containers, podStatus)
-			changes.ContainersToRemove = append(changes.ContainersToRemove, targetContainers...)
-			changes.ContainersToRemove = append(changes.ContainersToRemove, targetInitContainers...)
-			changes.ContainersToRemove = append(changes.ContainersToRemove, sourceContainers...)
-			changes.ContainersToRemove = append(changes.ContainersToRemove, sourceInitContainers...)
-			return changes
-		}
+	if utilfeature.DefaultFeatureGate.Enabled(features.RestartAllContainersOnContainerExits) && restartAllContainers {
+		logger.V(3).Info("Pod marked for RestartAllContainers", "pod", klog.KObj(pod))
+		changes.KillPod = false
+		changes.CreateSandbox = false
+		// Kill and remove containers in reverse order. Source containers (which exited and triggered
+		// RestartAllContainers) are removed last.
+		sourceInitContainers, targetInitContainers := m.getContainersToRemove(ctx, pod.Spec.InitContainers, podStatus)
+		sourceContainers, targetContainers := m.getContainersToRemove(ctx, pod.Spec.Containers, podStatus)
+		changes.ContainersToRemove = append(changes.ContainersToRemove, targetContainers...)
+		changes.ContainersToRemove = append(changes.ContainersToRemove, targetInitContainers...)
+		changes.ContainersToRemove = append(changes.ContainersToRemove, sourceContainers...)
+		changes.ContainersToRemove = append(changes.ContainersToRemove, sourceInitContainers...)
+		return changes
 	}
 
 	// If we need to (re-)create the pod sandbox, everything will need to be
@@ -1282,10 +1271,10 @@ func (m *kubeGenericRuntimeManager) getContainersToRemove(ctx context.Context, c
 //  6. Create init containers.
 //  7. Resize running containers (if InPlacePodVerticalScaling==true)
 //  8. Create normal containers.
-func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff, apiPodStatus *v1.PodStatus) (result kubecontainer.PodSyncResult) {
+func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff, restartAllContainers bool) (result kubecontainer.PodSyncResult) {
 	logger := klog.FromContext(ctx)
 	// Step 1: Compute sandbox and container changes.
-	podContainerChanges := m.computePodActions(ctx, pod, podStatus, apiPodStatus)
+	podContainerChanges := m.computePodActions(ctx, pod, podStatus, restartAllContainers)
 	logger.V(3).Info("computePodActions got for pod", "podActions", podContainerChanges, "pod", klog.KObj(pod))
 	if podContainerChanges.CreateSandbox {
 		ref, err := ref.GetReference(legacyscheme.Scheme, pod)

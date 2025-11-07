@@ -3316,6 +3316,9 @@ func validateInitContainerRestartPolicy(restartPolicy *core.ContainerRestartPoli
 	var allErrors field.ErrorList
 
 	if restartPolicy == nil {
+		if len(restartRules) > 0 {
+			allErrors = append(allErrors, field.Required(fldPath.Child("restartPolicy"), "must specify restartPolicy when restart rules are used"))
+		}
 		return allErrors
 	}
 	if opts.AllowContainerRestartPolicyRules {
@@ -3665,6 +3668,14 @@ var supportedContainerRestartPolicyOperators = sets.New(
 	core.ContainerRestartRuleOnExitCodesOpNotIn,
 )
 
+// Supported actions depend on whether corresponding feature gates are enabled.
+var (
+	// Without AllowRestartAllContainers
+	supportedContainerRestartRuleActions = sets.New(core.ContainerRestartRuleActionRestart)
+	// With AllowRestartAllContainers
+	supportedContainerRestartRuleActionsWithRestartAllContainers = sets.New(core.ContainerRestartRuleActionRestart, core.ContainerRestartRuleActionRestartAllContainers)
+)
+
 // validateContainerRestartPolicy checks the container-level restartPolicy and restartPolicyRules are valid for
 // regular containers, init containers, and sidecar containers.
 func validateContainerRestartPolicy(policy *core.ContainerRestartPolicy, rules []core.ContainerRestartRule, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
@@ -3685,11 +3696,11 @@ func validateContainerRestartPolicy(policy *core.ContainerRestartPolicy, rules [
 	}
 	for i, rule := range rules {
 		policyRulesFld := fldPath.Child("restartPolicyRules").Index(i)
-		var supportedContainerRestartRuleActions = sets.New(core.ContainerRestartRuleActionRestart)
+		allowedActions := supportedContainerRestartRuleActions
 		if opts.AllowRestartAllContainers {
-			supportedContainerRestartRuleActions.Insert(core.ContainerRestartRuleActionRestartAllContainers)
+			allowedActions = supportedContainerRestartRuleActionsWithRestartAllContainers
 		}
-		if !supportedContainerRestartRuleActions.Has(rule.Action) {
+		if !allowedActions.Has(rule.Action) {
 			allErrs = append(allErrs, field.NotSupported(policyRulesFld.Child("action"), rule.Action, sets.List(supportedContainerRestartRuleActions)))
 		}
 
@@ -3809,8 +3820,8 @@ func validateInitContainers(containers []core.Container, os *core.PodOS, regular
 
 		restartAlways := false
 		// Apply the validation specific to init containers
+		allErrs = append(allErrs, validateInitContainerRestartPolicy(ctr.RestartPolicy, ctr.RestartPolicyRules, idxPath, opts)...)
 		if ctr.RestartPolicy != nil {
-			allErrs = append(allErrs, validateInitContainerRestartPolicy(ctr.RestartPolicy, ctr.RestartPolicyRules, idxPath, opts)...)
 			restartAlways = *ctr.RestartPolicy == core.ContainerRestartPolicyAlways
 		}
 

@@ -563,8 +563,11 @@ func TestGeneratePodInitializedCondition(t *testing.T) {
 			},
 		},
 	}
-
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RestartAllContainersOnContainerExits, true)
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.ContainerRestartRules:                true,
+		features.NodeDeclaredFeatures:                 true,
+		features.RestartAllContainersOnContainerExits: true,
+	})
 	for _, test := range tests {
 		test.expected.Type = v1.PodInitialized
 		pod := &v1.Pod{Spec: *test.spec}
@@ -648,7 +651,11 @@ func TestGeneratePodReadyToStartContainersCondition(t *testing.T) {
 }
 
 func TestGenerateAllContainersRestartingCondition(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RestartAllContainersOnContainerExits, true)
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.ContainerRestartRules:                true,
+		features.NodeDeclaredFeatures:                 true,
+		features.RestartAllContainersOnContainerExits: true,
+	})
 
 	restartPolicyNever := v1.ContainerRestartPolicyNever
 	defaultPod := &v1.Pod{

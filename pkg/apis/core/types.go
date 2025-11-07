@@ -3245,7 +3245,12 @@ type ContainerRestartRuleAction string
 
 // These are valid restart rule actions.
 const (
-	ContainerRestartRuleActionRestart              ContainerRestartRuleAction = "Restart"
+	// The container will be restarted if the rule matches. Only valid on normal init container and
+	// regular containers. Not valid on sidecar containers and ephemeral containers.
+	ContainerRestartRuleActionRestart ContainerRestartRuleAction = "Restart"
+	// All containers (except ephemeral containers) inside the pod will be terminated and restarted.
+	// Valid on normal init container, sidecar containers, and regular containers. Not valid on
+	// ephemeral containers.
 	ContainerRestartRuleActionRestartAllContainers ContainerRestartRuleAction = "RestartAllContainers"
 )
 

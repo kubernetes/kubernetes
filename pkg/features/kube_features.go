@@ -2373,7 +2373,7 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	// RestartAllContainersOnContainerExits introduces a new container restart rule action.
 	// All restart rules will be dropped by API if ContainerRestartRules feature is not enabled.
-	RestartAllContainersOnContainerExits: {ContainerRestartRules},
+	RestartAllContainersOnContainerExits: {ContainerRestartRules, NodeDeclaredFeatures},
 
 	RotateKubeletServerCertificate: {},
 

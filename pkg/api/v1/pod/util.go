@@ -492,6 +492,9 @@ func FindMatchingContainerRestartRule(container v1.Container, exitCode int32) (r
 // for the given pod. This is true if any container has a RestartAllContainers
 // action.
 func AllContainersCouldRestart(pod *v1.PodSpec) bool {
+	if pod == nil {
+		return false
+	}
 	for _, container := range pod.InitContainers {
 		for _, rule := range container.RestartPolicyRules {
 			if rule.Action == v1.ContainerRestartRuleActionRestartAllContainers {

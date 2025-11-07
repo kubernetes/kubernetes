@@ -1487,16 +1487,16 @@ func (_c *MockRuntime_Status_Call) RunAndReturn(run func(ctx context.Context) (*
 }
 
 // SyncPod provides a mock function for the type MockRuntime
-func (_mock *MockRuntime) SyncPod(ctx context.Context, pod *v10.Pod, podStatus *container.PodStatus, pullSecrets []v10.Secret, backOff *flowcontrol.Backoff, apiPodStatus *v10.PodStatus) container.PodSyncResult {
-	ret := _mock.Called(ctx, pod, podStatus, pullSecrets, backOff, apiPodStatus)
+func (_mock *MockRuntime) SyncPod(ctx context.Context, pod *v10.Pod, podStatus *container.PodStatus, pullSecrets []v10.Secret, backOff *flowcontrol.Backoff, restartAllContainers bool) container.PodSyncResult {
+	ret := _mock.Called(ctx, pod, podStatus, pullSecrets, backOff, restartAllContainers)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SyncPod")
 	}
 
 	var r0 container.PodSyncResult
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *v10.Pod, *container.PodStatus, []v10.Secret, *flowcontrol.Backoff, *v10.PodStatus) container.PodSyncResult); ok {
-		r0 = returnFunc(ctx, pod, podStatus, pullSecrets, backOff, apiPodStatus)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *v10.Pod, *container.PodStatus, []v10.Secret, *flowcontrol.Backoff, bool) container.PodSyncResult); ok {
+		r0 = returnFunc(ctx, pod, podStatus, pullSecrets, backOff, restartAllContainers)
 	} else {
 		r0 = ret.Get(0).(container.PodSyncResult)
 	}
@@ -1514,12 +1514,12 @@ type MockRuntime_SyncPod_Call struct {
 //   - podStatus *container.PodStatus
 //   - pullSecrets []v10.Secret
 //   - backOff *flowcontrol.Backoff
-//   - apiPodStatus *v10.PodStatus
-func (_e *MockRuntime_Expecter) SyncPod(ctx interface{}, pod interface{}, podStatus interface{}, pullSecrets interface{}, backOff interface{}, apiPodStatus interface{}) *MockRuntime_SyncPod_Call {
-	return &MockRuntime_SyncPod_Call{Call: _e.mock.On("SyncPod", ctx, pod, podStatus, pullSecrets, backOff, apiPodStatus)}
+//   - restartAllContainers bool
+func (_e *MockRuntime_Expecter) SyncPod(ctx interface{}, pod interface{}, podStatus interface{}, pullSecrets interface{}, backOff interface{}, restartAllContainers interface{}) *MockRuntime_SyncPod_Call {
+	return &MockRuntime_SyncPod_Call{Call: _e.mock.On("SyncPod", ctx, pod, podStatus, pullSecrets, backOff, restartAllContainers)}
 }
 
-func (_c *MockRuntime_SyncPod_Call) Run(run func(ctx context.Context, pod *v10.Pod, podStatus *container.PodStatus, pullSecrets []v10.Secret, backOff *flowcontrol.Backoff, apiPodStatus *v10.PodStatus)) *MockRuntime_SyncPod_Call {
+func (_c *MockRuntime_SyncPod_Call) Run(run func(ctx context.Context, pod *v10.Pod, podStatus *container.PodStatus, pullSecrets []v10.Secret, backOff *flowcontrol.Backoff, restartAllContainers bool)) *MockRuntime_SyncPod_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -1541,9 +1541,9 @@ func (_c *MockRuntime_SyncPod_Call) Run(run func(ctx context.Context, pod *v10.P
 		if args[4] != nil {
 			arg4 = args[4].(*flowcontrol.Backoff)
 		}
-		var arg5 *v10.PodStatus
+		var arg5 bool
 		if args[5] != nil {
-			arg5 = args[5].(*v10.PodStatus)
+			arg5 = args[5].(bool)
 		}
 		run(
 			arg0,
@@ -1562,7 +1562,7 @@ func (_c *MockRuntime_SyncPod_Call) Return(podSyncResult container.PodSyncResult
 	return _c
 }
 
-func (_c *MockRuntime_SyncPod_Call) RunAndReturn(run func(ctx context.Context, pod *v10.Pod, podStatus *container.PodStatus, pullSecrets []v10.Secret, backOff *flowcontrol.Backoff, apiPodStatus *v10.PodStatus) container.PodSyncResult) *MockRuntime_SyncPod_Call {
+func (_c *MockRuntime_SyncPod_Call) RunAndReturn(run func(ctx context.Context, pod *v10.Pod, podStatus *container.PodStatus, pullSecrets []v10.Secret, backOff *flowcontrol.Backoff, restartAllContainers bool) container.PodSyncResult) *MockRuntime_SyncPod_Call {
 	_c.Call.Return(run)
 	return _c
 }

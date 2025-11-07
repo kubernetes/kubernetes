@@ -29205,9 +29205,10 @@ func TestValidateContainerRestartPolicy(t *testing.T) {
 	podRestartPolicyAlways := core.RestartPolicyAlways
 
 	successCases := []struct {
-		Name               string
-		RestartPolicy      *core.ContainerRestartPolicy
-		RestartPolicyRules []core.ContainerRestartRule
+		Name                      string
+		RestartPolicy             *core.ContainerRestartPolicy
+		RestartPolicyRules        []core.ContainerRestartRule
+		AllowRestartAllContainers bool
 	}{
 		{
 			Name: "no-restart-policy-and-rules",
@@ -29231,6 +29232,17 @@ func TestValidateContainerRestartPolicy(t *testing.T) {
 					Values:   []int32{42},
 				},
 			}},
+		}, {
+			Name:          "restart-all-containers",
+			RestartPolicy: &containerRestartPolicyNever,
+			RestartPolicyRules: []core.ContainerRestartRule{{
+				Action: "RestartAllContainers",
+				ExitCodes: &core.ContainerRestartRuleOnExitCodes{
+					Operator: "In",
+					Values:   []int32{42},
+				},
+			}},
+			AllowRestartAllContainers: true,
 		},
 	}
 
@@ -29246,6 +29258,7 @@ func TestValidateContainerRestartPolicy(t *testing.T) {
 			}}
 			opts := PodValidationOptions{
 				AllowContainerRestartPolicyRules: true,
+				AllowRestartAllContainers:        tc.AllowRestartAllContainers,
 			}
 			errs := validateContainers(containers, podOS, volumeDevices, nil, defaultGracePeriod, field.NewPath("containers"), opts, &podRestartPolicyAlways, noUserNamespace)
 			if len(errs) > 0 {
@@ -29394,39 +29407,29 @@ func TestValidateContainerRestartPolicy(t *testing.T) {
 		})
 	}
 
-	// test cases sidecar containers
+	containerRestartPolicyAlways := core.ContainerRestartPolicyAlways
+	// test cases init containers
 	cases := []struct {
 		title              string
+		restartPolicy      *core.ContainerRestartPolicy
 		restartPolicyRules []core.ContainerRestartRule
 		opts               PodValidationOptions
 		expectedErrors     field.ErrorList
 	}{
 		{
 			"sidecar containers without restart policy rules",
+			&containerRestartPolicyAlways,
 			nil,
 			PodValidationOptions{
 				AllowContainerRestartPolicyRules: true,
 			},
 			nil,
-		},
-		{
-			"restart policy rules are not supported with restart policy Always without option",
-			[]core.ContainerRestartRule{{
-				Action: core.ContainerRestartRuleActionRestart,
-				ExitCodes: &core.ContainerRestartRuleOnExitCodes{
-					Operator: core.ContainerRestartRuleOnExitCodesOpIn,
-					Values:   []int32{1},
-				},
-			}},
-			PodValidationOptions{
-				AllowContainerRestartPolicyRules: true,
-			},
-			field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "initContainers[0].restartPolicyRules", BadValue: ""}},
 		},
 		{
 			"restart policy rules are supported with restart policy Always with option",
+			&containerRestartPolicyAlways,
 			[]core.ContainerRestartRule{{
-				Action: core.ContainerRestartRuleActionRestart,
+				Action: core.ContainerRestartRuleActionRestartAllContainers,
 				ExitCodes: &core.ContainerRestartRuleOnExitCodes{
 					Operator: core.ContainerRestartRuleOnExitCodesOpIn,
 					Values:   []int32{1},
@@ -29438,6 +29441,37 @@ func TestValidateContainerRestartPolicy(t *testing.T) {
 			},
 			nil,
 		},
+		{
+			"restart policy rules are not supported with restart policy Always without option",
+			&containerRestartPolicyAlways,
+			[]core.ContainerRestartRule{{
+				Action: core.ContainerRestartRuleActionRestartAllContainers,
+				ExitCodes: &core.ContainerRestartRuleOnExitCodes{
+					Operator: core.ContainerRestartRuleOnExitCodesOpIn,
+					Values:   []int32{1},
+				},
+			}},
+			PodValidationOptions{
+				AllowContainerRestartPolicyRules: true,
+			},
+			field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "initContainers[0].restartPolicyRules", BadValue: ""}},
+		},
+		{
+			"restart policy rules are not supported if no restart policy is set",
+			nil,
+			[]core.ContainerRestartRule{{
+				Action: core.ContainerRestartRuleActionRestartAllContainers,
+				ExitCodes: &core.ContainerRestartRuleOnExitCodes{
+					Operator: core.ContainerRestartRuleOnExitCodesOpIn,
+					Values:   []int32{1},
+				},
+			}},
+			PodValidationOptions{
+				AllowContainerRestartPolicyRules: true,
+				AllowRestartAllContainers:        true,
+			},
+			field.ErrorList{{Type: field.ErrorTypeRequired, Field: "initContainers[0].restartPolicy", BadValue: ""}},
+		},
 	}
 
 	for _, tc := range cases {
@@ -29447,7 +29481,7 @@ func TestValidateContainerRestartPolicy(t *testing.T) {
 				Image:                    "image",
 				ImagePullPolicy:          "IfNotPresent",
 				TerminationMessagePolicy: "File",
-				RestartPolicy:            &containerRestartPolicyAlways,
+				RestartPolicy:            tc.restartPolicy,
 				RestartPolicyRules:       tc.restartPolicyRules,
 			}}
 			errs := validateInitContainers(containers, podOS, nil, volumeDevices, nil, defaultGracePeriod, field.NewPath("initContainers"), tc.opts, &podRestartPolicyAlways, noUserNamespace)

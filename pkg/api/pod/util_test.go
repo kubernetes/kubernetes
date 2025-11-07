@@ -6314,7 +6314,7 @@ func TestDisabledWorkload(t *testing.T) {
 	}
 }
 
-func TestValidateContainerRestartRulesOnSidecarOption(t *testing.T) {
+func TestValidateRestartAllContainersOption(t *testing.T) {
 	policyAlways := api.ContainerRestartPolicyAlways
 	testCases := []struct {
 		name           string
@@ -6333,14 +6333,31 @@ func TestValidateContainerRestartRulesOnSidecarOption(t *testing.T) {
 			want:           false,
 		},
 		{
-			name: "old pod spec has sidecar container without rules",
+			name: "old pod spec has container without action",
 			oldPodSpec: &api.PodSpec{
-				InitContainers: []api.Container{{
-					RestartPolicy: &policyAlways,
+				Containers: []api.Container{{
+					Name: "container",
 				}},
 			},
 			featureEnabled: false,
 			want:           false,
+		},
+		{
+			name: "old pod spec has container with action",
+			oldPodSpec: &api.PodSpec{
+				Containers: []api.Container{{
+					Name: "container",
+					RestartPolicyRules: []api.ContainerRestartRule{{
+						Action: api.ContainerRestartRuleActionRestartAllContainers,
+						ExitCodes: &api.ContainerRestartRuleOnExitCodes{
+							Operator: api.ContainerRestartRuleOnExitCodesOpIn,
+							Values:   []int32{42},
+						},
+					}},
+				}},
+			},
+			featureEnabled: false,
+			want:           true,
 		},
 		{
 			name: "old pod spec has sidecar containers with rules",
@@ -6363,11 +6380,15 @@ func TestValidateContainerRestartRulesOnSidecarOption(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RestartAllContainersOnContainerExits, tc.featureEnabled)
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.ContainerRestartRules:                tc.featureEnabled,
+				features.NodeDeclaredFeatures:                 tc.featureEnabled,
+				features.RestartAllContainersOnContainerExits: tc.featureEnabled,
+			})
 			// The new pod doesn't impact the outcome.
 			gotOptions := GetValidationOptionsFromPodSpecAndMeta(nil, tc.oldPodSpec, nil, nil)
 			if tc.want != gotOptions.AllowRestartAllContainers {
-				t.Errorf("unexpected diff, want: %v, got: %v", tc.want, gotOptions.AllowInvalidPodDeletionCost)
+				t.Errorf("unexpected diff, want: %v, got: %v", tc.want, gotOptions.AllowRestartAllContainers)
 			}
 		})
 	}
