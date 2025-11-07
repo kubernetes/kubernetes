@@ -432,7 +432,6 @@ linters:
         - typeSwitchVar
         - underef
         - unslice
-        - valSwap
     revive:
       # Only these rules are enabled.
       rules:
