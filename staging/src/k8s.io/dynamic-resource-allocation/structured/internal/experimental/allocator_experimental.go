@@ -884,6 +884,10 @@ func lookupAttribute(device *draapi.Device, deviceID DeviceID, attributeName res
 // of the available devices, thereby avoiding different permutations. For example,
 // this means that for the devices [1, 2, 3], we will only attempt the following
 // possible allocations [1], [2], [3], [1, 2], [1, 3], [2, 3], and [1, 2, 3].
+//
+// The null startLocation (= all indices zero) means that all devices are considered.
+// The only situation where a non-null startLocation is used is when looking for the
+// next device within the same request.
 func (alloc *allocator) allocateOne(r deviceIndices, allocateSubRequest bool, startLocation deviceLocation) (bool, error) {
 	alloc.numAllocateOneInvocations.Add(1)
 
@@ -1133,6 +1137,10 @@ func (alloc *allocator) allocateOne(r deviceIndices, allocateSubRequest bool, st
 					sliceIndex:  sliceIndex,
 					deviceIndex: deviceIndex + 1,
 				}
+				// This is the allocation attempt for the next device in the same request.
+				// If allocateOne finds out that it is done with the request, it moves to
+				// the next without setting a start location, so each request is free to try
+				// all devices.
 				done, err := alloc.allocateOne(deviceKey, allocateSubRequest, nextLocation)
 				// If we found a solution, we can stop.
 				if err == nil && done {
