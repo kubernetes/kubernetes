@@ -949,7 +949,6 @@ func TestAllocator(t *testing.T,
 	}
 
 	testcases := map[string]struct {
-		onlyForChannels          []internal.AllocatorChannel
 		features                 Features
 		claimsToAllocate         []wrapResourceClaim
 		allocatedDevices         []DeviceID
