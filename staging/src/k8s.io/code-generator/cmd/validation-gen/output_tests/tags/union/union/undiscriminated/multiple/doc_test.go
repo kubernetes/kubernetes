@@ -26,29 +26,29 @@ func Test(t *testing.T) {
 	st := localSchemeBuilder.Test(t)
 
 	st.Value(&Struct{}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
-		field.Invalid(nil, nil, "must specify one of"),
-		field.Invalid(nil, nil, "must specify one of"),
+		field.Invalid(nil, nil, "must specify one of: `u1m1`, `u1m2`").WithOrigin("union"),
+		field.Invalid(nil, nil, "must specify one of: `u2m1`, `u2m2`").WithOrigin("union"),
 	})
 
 	st.Value(&Struct{U1M1: &M1{}, U2M1: &M1{}}).ExpectValid()
 	st.Value(&Struct{U1M2: &M2{}, U2M2: &M2{}}).ExpectValid()
 
 	st.Value(&Struct{U1M1: &M1{}, U1M2: &M2{}}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
-		field.Invalid(nil, nil, "must specify exactly one of"),
-		field.Invalid(nil, nil, "must specify one of"),
+		field.Invalid(nil, nil, "must specify exactly one of: `u1m1`, `u1m2`").WithOrigin("union"),
+		field.Invalid(nil, nil, "must specify one of: `u2m1`, `u2m2`").WithOrigin("union"),
 	})
 
 	st.Value(&Struct{U2M1: &M1{}, U2M2: &M2{}}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
-		field.Invalid(nil, nil, "must specify one of"),
-		field.Invalid(nil, nil, "must specify exactly one of"),
+		field.Invalid(nil, nil, "must specify one of: `u1m1`, `u1m2`").WithOrigin("union"),
+		field.Invalid(nil, nil, "must specify exactly one of: `u2m1`, `u2m2`").WithOrigin("union"),
 	})
 
 	st.Value(&Struct{
 		U1M1: &M1{}, U1M2: &M2{},
 		U2M1: &M1{}, U2M2: &M2{},
 	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
-		field.Invalid(nil, nil, "must specify exactly one of"),
-		field.Invalid(nil, nil, "must specify exactly one of"),
+		field.Invalid(nil, nil, "must specify exactly one of: `u1m1`, `u1m2`").WithOrigin("union"),
+		field.Invalid(nil, nil, "must specify exactly one of: `u2m1`, `u2m2`").WithOrigin("union"),
 	})
 
 	// Test validation ratcheting
