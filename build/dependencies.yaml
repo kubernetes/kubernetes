@@ -117,7 +117,7 @@ dependencies:
   # Golang
   # TODO: this should really be eliminated and controlled by .go-version
   - name: "golang: upstream version"
-    version: 4
+    version: 1.25.4
     refPaths:
     - path: .go-version
     - path: staging/publishing/rules.yaml
