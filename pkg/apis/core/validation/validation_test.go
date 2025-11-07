@@ -29433,8 +29433,8 @@ func TestValidateContainerRestartPolicy(t *testing.T) {
 				},
 			}},
 			PodValidationOptions{
-				AllowContainerRestartPolicyRules:           true,
-				AllowContainerRestartPolicyRulesOnSidecars: true,
+				AllowContainerRestartPolicyRules: true,
+				AllowRestartAllContainers:        true,
 			},
 			nil,
 		},
@@ -29618,10 +29618,11 @@ func TestValidateContainerStateTransition(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerRestartRules, true)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RestartAllContainersOnContainerExits, true)
-
-			errs := ValidateContainerStateTransition(tc.newStatuses, tc.oldStatuses, field.NewPath("field"), tc.podSpec)
+			opts := PodValidationOptions{
+				AllowContainerRestartPolicyRules: true,
+				AllowRestartAllContainers:        true,
+			}
+			errs := ValidateContainerStateTransition(tc.newStatuses, tc.oldStatuses, field.NewPath("field"), tc.podSpec, opts)
 
 			if tc.expectErr && len(errs) == 0 {
 				t.Errorf("Unexpected success")
@@ -29811,10 +29812,11 @@ func TestValidateInitContainerStateTransition(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerRestartRules, true)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RestartAllContainersOnContainerExits, true)
-
-			errs := ValidateInitContainerStateTransition(tc.newStatuses, tc.oldStatuses, field.NewPath("field"), tc.podSpec)
+			opts := PodValidationOptions{
+				AllowContainerRestartPolicyRules: true,
+				AllowRestartAllContainers:        true,
+			}
+			errs := ValidateInitContainerStateTransition(tc.newStatuses, tc.oldStatuses, field.NewPath("field"), tc.podSpec, opts)
 
 			if tc.expectErr && len(errs) == 0 {
 				t.Errorf("Unexpected success")

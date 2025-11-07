@@ -429,7 +429,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		AllowContainerRestartPolicyRules:                    utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules),
 		AllowUserNamespacesWithVolumeDevices:                false,
 		// The RestartAllContainers rule action is allowed on sidecars.
-		AllowContainerRestartPolicyRulesOnSidecars: utilfeature.DefaultFeatureGate.Enabled(features.RestartAllContainersOnContainerExits),
+		AllowRestartAllContainers: utilfeature.DefaultFeatureGate.Enabled(features.RestartAllContainersOnContainerExits),
 	}
 
 	// If old spec uses relaxed validation or enabled the RelaxedEnvironmentVariableValidation feature gate,
@@ -477,7 +477,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		opts.AllowSidecarResizePolicy = opts.AllowSidecarResizePolicy || hasRestartableInitContainerResizePolicy(oldPodSpec)
 
 		opts.AllowContainerRestartPolicyRules = opts.AllowContainerRestartPolicyRules || containerRestartRulesInUse(oldPodSpec)
-		opts.AllowContainerRestartPolicyRulesOnSidecars = opts.AllowContainerRestartPolicyRulesOnSidecars || containerRestartRulesInUseOnSidecar(oldPodSpec)
+		opts.AllowRestartAllContainers = opts.AllowRestartAllContainers || containerRestartRulesInUseOnSidecar(oldPodSpec)
 
 		// If old spec has userns and volume devices (doesn't work), we still allow
 		// modifications to it.

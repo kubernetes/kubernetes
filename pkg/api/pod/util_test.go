@@ -6366,7 +6366,7 @@ func TestValidateContainerRestartRulesOnSidecarOption(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RestartAllContainersOnContainerExits, tc.featureEnabled)
 			// The new pod doesn't impact the outcome.
 			gotOptions := GetValidationOptionsFromPodSpecAndMeta(nil, tc.oldPodSpec, nil, nil)
-			if tc.want != gotOptions.AllowContainerRestartPolicyRulesOnSidecars {
+			if tc.want != gotOptions.AllowRestartAllContainers {
 				t.Errorf("unexpected diff, want: %v, got: %v", tc.want, gotOptions.AllowInvalidPodDeletionCost)
 			}
 		})
