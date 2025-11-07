@@ -47,6 +47,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	resourceapiac "k8s.io/client-go/applyconfigurations/resource/v1"
@@ -237,6 +238,7 @@ func TestDRA(t *testing.T) {
 				tCtx.Run("MaxResourceSlice", testMaxResourceSlice)
 				tCtx.Run("EvictClusterWithRule", func(tCtx ktesting.TContext) { testEvictCluster(tCtx, true) })
 				tCtx.Run("EvictClusterWithSlices", func(tCtx ktesting.TContext) { testEvictCluster(tCtx, false) })
+				tCtx.Run("InvalidResourceSlices", testInvalidResourceSlices)
 			},
 		},
 	} {
@@ -841,12 +843,16 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 						},
 					},
 					{
-						SharedCounters: []resourceapi.CounterSet{{
-							Name: "gpu-0",
-							Counters: map[string]resourceapi.Counter{
-								"mem": {Value: resource.MustParse("1")},
+						SharedCounters: []resourceapi.CounterSet{
+							{
+								Name: "gpu-0",
+								Counters: map[string]resourceapi.Counter{
+									"mem": {Value: resource.MustParse("1")},
+								},
 							},
-						}},
+						},
+					},
+					{
 						Devices: []resourceapi.Device{
 							{
 								Name: "device-tainted-default",
@@ -909,32 +915,46 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 			Devices:        sl.Devices,
 		})
 	}
-	for _, disabled := range disabledFeatures {
-		switch disabled {
-		case features.DRADeviceTaints:
-			for i := range expectedSliceSpecs {
-				for e := range expectedSliceSpecs[i].Devices {
-					expectedSliceSpecs[i].Devices[e].Taints = nil
+
+	// Keep track of the disabled features used in each slice. This allows us to check
+	// that we get the right set of features listed in the droppedFields error.
+	disabledFeaturesBySlice := make([]sets.Set[featuregate.Feature], len(resources.Pools[poolName].Slices))
+	for i := range expectedSliceSpecs {
+		disabledFeaturesForSlice := sets.New[featuregate.Feature]()
+		for _, disabled := range disabledFeatures {
+			switch disabled {
+			case features.DRADeviceTaints:
+				for e, device := range expectedSliceSpecs[i].Devices {
+					if device.Taints != nil {
+						expectedSliceSpecs[i].Devices[e].Taints = nil
+						disabledFeaturesForSlice.Insert(disabled)
+					}
 				}
-			}
-		case features.DRAPartitionableDevices:
-			for i := range expectedSliceSpecs {
-				expectedSliceSpecs[i].SharedCounters = nil
-				for e := range expectedSliceSpecs[i].Devices {
-					expectedSliceSpecs[i].Devices[e].ConsumesCounters = nil
+			case features.DRAPartitionableDevices:
+				if expectedSliceSpecs[i].SharedCounters != nil {
+					expectedSliceSpecs[i].SharedCounters = nil
+					disabledFeaturesForSlice.Insert(disabled)
 				}
-			}
-		case features.DRADeviceBindingConditions:
-			for i := range expectedSliceSpecs {
-				for e := range expectedSliceSpecs[i].Devices {
-					expectedSliceSpecs[i].Devices[e].BindingConditions = nil
-					expectedSliceSpecs[i].Devices[e].BindingFailureConditions = nil
-					expectedSliceSpecs[i].Devices[e].BindsToNode = nil
+				for e, device := range expectedSliceSpecs[i].Devices {
+					if device.ConsumesCounters != nil {
+						expectedSliceSpecs[i].Devices[e].ConsumesCounters = nil
+						disabledFeaturesForSlice.Insert(disabled)
+					}
 				}
+			case features.DRADeviceBindingConditions:
+				for e, device := range expectedSliceSpecs[i].Devices {
+					if device.BindingConditions != nil || device.BindingFailureConditions != nil || device.BindsToNode != nil {
+						expectedSliceSpecs[i].Devices[e].BindingConditions = nil
+						expectedSliceSpecs[i].Devices[e].BindingFailureConditions = nil
+						expectedSliceSpecs[i].Devices[e].BindsToNode = nil
+						disabledFeaturesForSlice.Insert(disabled)
+					}
+				}
+			default:
+				tCtx.Fatalf("faulty test, case for %s missing", disabled)
 			}
-		default:
-			tCtx.Fatalf("faulty test, case for %s missing", disabled)
 		}
+		disabledFeaturesBySlice[i] = disabledFeaturesForSlice
 	}
 	var expectedSlices []any
 	for _, spec := range expectedSliceSpecs {
@@ -1049,10 +1069,13 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 				var droppedFields *resourceslice.DroppedFieldsError
 				if errors.As(err, &droppedFields) {
 					var disabled []string
-					for _, feature := range disabledFeatures {
+					for _, feature := range disabledFeaturesBySlice[droppedFields.SliceIndex].UnsortedList() {
 						disabled = append(disabled, string(feature))
 					}
-					assert.ErrorContains(tCtx, err, fmt.Sprintf("pool %q, slice #1: some fields were dropped by the apiserver, probably because these features are disabled: %s", poolName, strings.Join(disabled, " ")))
+					// Make sure the error is about the right resource pool.
+					assert.Equal(tCtx, poolName, droppedFields.PoolName)
+					// Make sure the error identifies the correct disabled features.
+					assert.ElementsMatch(tCtx, disabled, droppedFields.DisabledFeatures())
 					gotDroppedFieldError.Store(true)
 				} else if validationErrorsOkay.Load() && apierrors.IsInvalid(err) {
 					gotValidationError.Store(true)
@@ -1132,6 +1155,9 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 			slices, err := tCtx.Client().ResourceV1().ResourceSlices().List(tCtx, listDriverSlices)
 			tCtx.ExpectNoError(err, "list slices")
 			for _, slice := range slices.Items {
+				if len(slice.Spec.Devices) == 0 {
+					continue
+				}
 				if slice.Spec.Devices[0].Attributes == nil {
 					slice.Spec.Devices[0].Attributes = make(map[resourceapi.QualifiedName]resourceapi.DeviceAttribute)
 				}
@@ -1774,4 +1800,127 @@ func testDeviceBindingConditions(tCtx ktesting.TContext, enabled bool) {
 	})
 	tCtx.ExpectNoError(err, "add binding condition to second claim")
 	waitForPodScheduled(tCtx, namespace, pod.Name)
+}
+
+func testInvalidResourceSlices(tCtx ktesting.TContext) {
+	driverNamePlaceholder := "driver"
+	startScheduler(tCtx)
+	testCases := map[string]struct {
+		slices                        []*st.ResourceSliceWrapper
+		expectPodToSchedule           bool
+		expectedPodScheduledCondition gstruct.Fields
+		expectedPool                  string
+	}{
+		"invalid-one-node-and-valid-other": {
+			slices: []*st.ResourceSliceWrapper{
+				func() *st.ResourceSliceWrapper {
+					invalidPoolSlice := st.MakeResourceSlice("worker-0", driverNamePlaceholder).Devices("device-1")
+					invalidPoolSlice.Name += "-1"
+					invalidPoolSlice.Spec.Pool.ResourceSliceCount = 2
+					return invalidPoolSlice
+				}(),
+				func() *st.ResourceSliceWrapper {
+					invalidPoolSlice := st.MakeResourceSlice("worker-0", driverNamePlaceholder).Devices("device-1")
+					invalidPoolSlice.Name += "-2"
+					invalidPoolSlice.Spec.Pool.ResourceSliceCount = 2
+					return invalidPoolSlice
+				}(),
+				func() *st.ResourceSliceWrapper {
+					validPoolSlice := st.MakeResourceSlice("worker-1", driverNamePlaceholder).Devices("device-1")
+					return validPoolSlice
+				}(),
+			},
+			expectPodToSchedule: true,
+			expectedPodScheduledCondition: gstruct.Fields{
+				"Type":   gomega.Equal(v1.PodScheduled),
+				"Status": gomega.Equal(v1.ConditionTrue),
+			},
+			expectedPool: "worker-1",
+		},
+		"only-invalid-for-one-node": {
+			slices: []*st.ResourceSliceWrapper{
+				func() *st.ResourceSliceWrapper {
+					invalidPoolSlice := st.MakeResourceSlice("worker-0", driverNamePlaceholder).Devices("device-1")
+					invalidPoolSlice.Name += "-1"
+					invalidPoolSlice.Spec.Pool.ResourceSliceCount = 2
+					return invalidPoolSlice
+				}(),
+				func() *st.ResourceSliceWrapper {
+					invalidPoolSlice := st.MakeResourceSlice("worker-0", driverNamePlaceholder).Devices("device-1")
+					invalidPoolSlice.Name += "-2"
+					invalidPoolSlice.Spec.Pool.ResourceSliceCount = 2
+					return invalidPoolSlice
+				}(),
+			},
+			expectPodToSchedule: false,
+			expectedPodScheduledCondition: gstruct.Fields{
+				"Type":    gomega.Equal(v1.PodScheduled),
+				"Status":  gomega.Equal(v1.ConditionFalse),
+				"Message": gomega.Equal("0/8 nodes are available: 1 invalid resource pools were encountered, 7 cannot allocate all claims. still not schedulable, preemption: 0/8 nodes are available: 8 Preemption is not helpful for scheduling."),
+			},
+		},
+		"invalid-for-all-nodes": {
+			slices: func() []*st.ResourceSliceWrapper {
+				var slices []*st.ResourceSliceWrapper
+				for i := 0; i < 8; i++ {
+					nodeName := fmt.Sprintf("worker-%d", i)
+					invalidPoolSlice1 := st.MakeResourceSlice(nodeName, driverNamePlaceholder).Devices("device-1")
+					invalidPoolSlice1.Name += "-1"
+					invalidPoolSlice1.Spec.Pool.ResourceSliceCount = 2
+
+					invalidPoolSlice2 := st.MakeResourceSlice(nodeName, driverNamePlaceholder).Devices("device-1")
+					invalidPoolSlice2.Name += "-2"
+					invalidPoolSlice2.Spec.Pool.ResourceSliceCount = 2
+					slices = append(slices, invalidPoolSlice1, invalidPoolSlice2)
+				}
+				return slices
+			}(),
+			expectPodToSchedule: false,
+			expectedPodScheduledCondition: gstruct.Fields{
+				"Type":    gomega.Equal(v1.PodScheduled),
+				"Status":  gomega.Equal(v1.ConditionFalse),
+				"Message": gomega.Equal("0/8 nodes are available: 8 invalid resource pools were encountered. still not schedulable, preemption: 0/8 nodes are available: 8 Preemption is not helpful for scheduling."),
+			},
+		},
+	}
+
+	for tn, tc := range testCases {
+		tCtx.Run(tn, func(tCtx ktesting.TContext) {
+			namespace := createTestNamespace(tCtx, nil)
+			class, driverName := createTestClass(tCtx, namespace)
+			for _, slice := range tc.slices {
+				// update the driver since we don't know the actual name until the
+				// class is created.
+				slice.Spec.Driver = driverName
+				createSlice(tCtx, slice.Obj())
+			}
+
+			claim := createClaim(tCtx, namespace, "", class, claim)
+			pod := createPod(tCtx, namespace, "", podWithClaimName, claim)
+			schedulingAttempted := gomega.HaveField("Status.Conditions", gomega.ContainElement(
+				gstruct.MatchFields(gstruct.IgnoreExtras, tc.expectedPodScheduledCondition),
+			))
+			ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) *v1.Pod {
+				pod, err := tCtx.Client().CoreV1().Pods(namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
+				tCtx.ExpectNoError(err, "get pod")
+				return pod
+			}).WithTimeout(10 * time.Second).WithPolling(time.Second).Should(schedulingAttempted)
+
+			// Only check the ResourceClaim if we expected the Pod to schedule.
+			if tc.expectPodToSchedule {
+				ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) *resourceapi.ResourceClaim {
+					c, err := tCtx.Client().ResourceV1().ResourceClaims(namespace).Get(tCtx, claim.Name, metav1.GetOptions{})
+					tCtx.ExpectNoError(err)
+					return c
+				}).WithTimeout(10 * time.Second).WithPolling(time.Second).Should(gomega.HaveField("Status.Allocation", gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+					"Devices": gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+						"Results": gomega.HaveExactElements(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+							"Driver": gomega.Equal(driverName),
+							"Pool":   gomega.Equal(tc.expectedPool),
+						})),
+					}),
+				}))))
+			}
+		})
+	}
 }

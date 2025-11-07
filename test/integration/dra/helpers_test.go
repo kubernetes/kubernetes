@@ -33,6 +33,11 @@ import (
 	"k8s.io/utils/ptr"
 )
 
+const (
+	driverNameSuffix = ".driver"
+	classNameSuffix  = ".class"
+)
+
 // must can be wrapped around a Create/Update/Patch/Get/Delete call and handles the error checking:
 //
 //	pod = must(tCtx, tCtx.Client().CoreV1().Pods(namespace).Create, pod, metav1.CreateOptions{})
@@ -52,8 +57,10 @@ func createTestNamespace(tCtx ktesting.TContext, labels map[string]string) strin
 	tCtx.Helper()
 	name := regexp.MustCompile(`[^[:alnum:]_-]`).ReplaceAllString(tCtx.Name(), "-")
 	name = strings.ToLower(name)
-	if len(name) > 63 {
-		name = name[:30] + "--" + name[len(name)-30:]
+	// Make sure the generated name leaves enough room so we
+	// can use it as a prefix for the driver name.
+	if len(name) > (56 - len(driverNameSuffix)) {
+		name = name[:24] + "--" + name[len(name)-24:]
 	}
 	ns := &v1.Namespace{ObjectMeta: metav1.ObjectMeta{GenerateName: name + "-"}}
 	ns.Labels = labels
@@ -81,9 +88,9 @@ func createSlice(tCtx ktesting.TContext, slice *resourceapi.ResourceSlice) *reso
 // createTestClass creates a DeviceClass with a driver name derived from the test namespace
 func createTestClass(tCtx ktesting.TContext, namespace string) (*resourceapi.DeviceClass, string) {
 	tCtx.Helper()
-	driverName := namespace + ".driver"
+	driverName := namespace + driverNameSuffix
 	class := class.DeepCopy()
-	class.Name = namespace + ".class"
+	class.Name = namespace + classNameSuffix
 	class.Spec.Selectors = []resourceapi.DeviceSelector{{
 		CEL: &resourceapi.CELDeviceSelector{
 			Expression: fmt.Sprintf("device.driver == %q", driverName),

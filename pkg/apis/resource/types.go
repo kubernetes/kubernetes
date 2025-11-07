@@ -145,10 +145,13 @@ type ResourceSliceSpec struct {
 
 	// Devices lists some or all of the devices in this pool.
 	//
-	// Must not have more than 128 entries. If any device uses taints the limit is 64.
+	// Must not have more than 128 entries. If any device uses taints or consumes counters the limit is 64.
+	//
+	// Only one of Devices and SharedCounters can be set in a ResourceSlice.
 	//
 	// +optional
 	// +listType=atomic
+	// +zeroOrOneOf=ResourceSliceType
 	Devices []Device
 
 	// PerDeviceNodeSelection defines whether the access from nodes to
@@ -166,19 +169,22 @@ type ResourceSliceSpec struct {
 	// SharedCounters defines a list of counter sets, each of which
 	// has a name and a list of counters available.
 	//
-	// The names of the SharedCounters must be unique in the ResourceSlice.
+	// The names of the counter sets must be unique in the ResourcePool.
 	//
-	// The maximum number of counters in all sets is 32.
+	// Only one of Devices and SharedCounters can be set in a ResourceSlice.
+	//
+	// The maximum number of counter sets is 8.
 	//
 	// +optional
 	// +listType=atomic
 	// +featureGate=DRAPartitionableDevices
+	// +zeroOrOneOf=ResourceSliceType
 	SharedCounters []CounterSet
 }
 
 // CounterSet defines a named set of counters
 // that are available to be used by devices defined in the
-// ResourceSlice.
+// ResourcePool.
 //
 // The counters are not allocatable by themselves, but
 // can be referenced by devices. When a device is allocated,
@@ -194,7 +200,7 @@ type CounterSet struct {
 	// Counters defines the set of counters for this CounterSet
 	// The name of each counter must be unique in that set and must be a DNS label.
 	//
-	// The maximum number of counters in all sets is 32.
+	// The maximum number of counters is 32.
 	//
 	// +required
 	Counters map[string]Counter
@@ -243,14 +249,27 @@ type ResourcePool struct {
 
 const ResourceSliceMaxSharedCapacity = 128
 const ResourceSliceMaxDevices = 128
-const ResourceSliceMaxDevicesWithTaints = 64
+const ResourceSliceMaxDevicesWithTaintsOrConsumesCounters = 64
 const PoolNameMaxLength = validation.DNS1123SubdomainMaxLength // Same as for a single node name.
 const BindingConditionsMaxSize = 4
 const BindingFailureConditionsMaxSize = 4
 
-// Defines the max number of shared counters that can be specified
-// in a ResourceSlice. The number is summed up across all sets.
-const ResourceSliceMaxSharedCounters = 32
+// Defines the maximum number of counter sets (through the
+// SharedCounters field) that can be defined in a ResourceSlice.
+const ResourceSliceMaxCounterSets = 8
+
+// Defines the maximum number of counters that can be defined
+// in a counter set.
+const ResourceSliceMaxCountersPerCounterSet = 32
+
+// Defines the maximum number of device counter consumptions
+// (through the ConsumesCounters field) that can be defined per
+// device.
+const ResourceSliceMaxDeviceCounterConsumptionsPerDevice = 2
+
+// Defines the maximum number of counters that can be defined
+// per device counter consumption.
+const ResourceSliceMaxCountersPerDeviceCounterConsumption = 32
 
 // Device represents one individual hardware instance that can be selected based
 // on its attributes. Besides the name, exactly one field must be set.
@@ -283,10 +302,8 @@ type Device struct {
 	//
 	// There can only be a single entry per counterSet.
 	//
-	// The total number of device counter consumption entries
-	// must be <= 32. In addition, the total number in the
-	// entire ResourceSlice must be <= 1024 (for example,
-	// 64 devices with 16 counters each).
+	// The maximum number of device counter consumptions per
+	// device is 2.
 	//
 	// +optional
 	// +listType=atomic
@@ -405,10 +422,7 @@ type DeviceCounterConsumption struct {
 
 	// Counters defines the counters that will be consumed by the device.
 	//
-	// The maximum number counters in a device is 32.
-	// In addition, the maximum number of all counters
-	// in all devices is 1024 (for example, 64 devices with
-	// 16 counters each).
+	// The maximum number of counters is 32.
 	//
 	// +required
 	Counters map[string]Counter
@@ -533,14 +547,6 @@ type CapacityRequestPolicyRange struct {
 
 // Limit for the sum of the number of entries in both attributes and capacity.
 const ResourceSliceMaxAttributesAndCapacitiesPerDevice = 32
-
-// Limit for the total number of counters in each device.
-const ResourceSliceMaxCountersPerDevice = 32
-
-// Limit for the total number of counters defined in devices in
-// a ResourceSlice. We want to allow up to 64 devices to specify
-// up to 16 counters, so the limit for the ResourceSlice will be 1024.
-const ResourceSliceMaxDeviceCountersPerSlice = 1024 // 64 * 16
 
 // QualifiedName is the name of a device attribute or capacity.
 //
