@@ -7123,3 +7123,69 @@ func TestDescribeProjectedVolumesOptionalSecret(t *testing.T) {
 		t.Errorf("expected to find %q in output: %q", expectedOut, out)
 	}
 }
+
+func TestObjectConversion(t *testing.T) {	
+	fake := fake.NewSimpleClientset()
+	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+	d := PodDescriber{c}
+	testCases := []struct {
+		name string
+		object runtime.Object
+		expectedErrorMessage string
+	}{
+		{
+			name: "with unknown resource version",
+			object: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "v2",
+					"kind": "Pod",
+				},
+			},
+			expectedErrorMessage: "failed to convert unstructured to Pod: no kind \"Pod\" is registered for version \"v2\" in scheme \"k8s.io/kubectl/pkg/scheme/scheme.go:28\"",
+		},
+		{
+			name: "with unknown resource kind",
+			object: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "v1",
+					"kind": "Foo",
+				},
+			},
+			expectedErrorMessage: "failed to convert unstructured to Pod: no kind \"Foo\" is registered for version \"v1\" in scheme \"k8s.io/kubectl/pkg/scheme/scheme.go:28\"",
+		},
+		{
+			name: "with known but missmatched unstructured kind",
+			object: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "apps/v1",
+					"kind": "Deployment",
+				},
+			},
+			expectedErrorMessage: "failed to convert unstructured to Pod: converting (v1.Deployment) to (v1.Pod): unknown conversion",
+		},
+		{
+			name: "with unset unstructured kind",
+			object: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"metadata": map[string]interface{}{
+						"name": "test",
+					},
+				},
+			},
+			expectedErrorMessage: "failed to convert unstructured to Pod: Object 'Kind' is missing in 'unstructured object has no kind'",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := d.Describe(tc.object, DescriberSettings{ShowEvents: true})
+			errMsg := ""
+			if err != nil {
+				errMsg = err.Error()
+			}
+			if errMsg != tc.expectedErrorMessage {
+				t.Errorf("unexpected error: %v", err)
+			}
+		})
+	}
+}
