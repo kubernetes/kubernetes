@@ -24,11 +24,12 @@ import (
 func TestTolerationToleratesTaint(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 	testCases := []struct {
-		description     string
-		toleration      Toleration
-		taint           Taint
-		expectTolerated bool
-		expectError     bool
+		description                                string
+		toleration                                 Toleration
+		taint                                      Taint
+		expectTolerated                            bool
+		expectError                                bool
+		enableTaintTolerationComparisonOperatorsFG bool
 	}{
 		{
 			description: "toleration and taint have the same key and effect, and operator is Exists, and taint has no value, expect tolerated",
@@ -130,6 +131,7 @@ func TestTolerationToleratesTaint(t *testing.T) {
 				Effect: TaintEffectNoSchedule,
 			},
 			expectTolerated: false,
+			enableTaintTolerationComparisonOperatorsFG: true,
 		},
 		{
 			description: "toleration with Gt operator - taint value greater than toleration value, expect tolerated",
@@ -145,6 +147,7 @@ func TestTolerationToleratesTaint(t *testing.T) {
 				Effect: TaintEffectNoSchedule,
 			},
 			expectTolerated: true,
+			enableTaintTolerationComparisonOperatorsFG: true,
 		},
 		{
 			description: "toleration with Lt operator - taint value greater than toleration value, expect not tolerated",
@@ -160,6 +163,7 @@ func TestTolerationToleratesTaint(t *testing.T) {
 				Effect: TaintEffectNoSchedule,
 			},
 			expectTolerated: false,
+			enableTaintTolerationComparisonOperatorsFG: true,
 		},
 		{
 			description: "toleration with Lt operator - taint value less than toleration value, expect tolerated",
@@ -175,6 +179,7 @@ func TestTolerationToleratesTaint(t *testing.T) {
 				Effect: TaintEffectNoSchedule,
 			},
 			expectTolerated: true,
+			enableTaintTolerationComparisonOperatorsFG: true,
 		},
 		{
 			description: "toleration with Gt operator and taint with equal numeric value, expect not tolerated",
@@ -190,6 +195,7 @@ func TestTolerationToleratesTaint(t *testing.T) {
 				Effect: TaintEffectNoSchedule,
 			},
 			expectTolerated: false,
+			enableTaintTolerationComparisonOperatorsFG: true,
 		},
 		{
 			description: "toleration with Gt operator and taint with non-numeric value, expect not tolerated",
@@ -206,6 +212,7 @@ func TestTolerationToleratesTaint(t *testing.T) {
 			},
 			expectTolerated: false,
 			expectError:     true,
+			enableTaintTolerationComparisonOperatorsFG: true,
 		},
 		{
 			description: "toleration with Gt operator and negative numeric values - taint value less than threshold, expect not tolerated",
@@ -221,6 +228,7 @@ func TestTolerationToleratesTaint(t *testing.T) {
 				Effect: TaintEffectNoSchedule,
 			},
 			expectTolerated: false,
+			enableTaintTolerationComparisonOperatorsFG: true,
 		},
 		{
 			description: "toleration with Gt operator and large int64 values - taint value less than threshold, expect not tolerated",
@@ -236,10 +244,11 @@ func TestTolerationToleratesTaint(t *testing.T) {
 				Effect: TaintEffectNoSchedule,
 			},
 			expectTolerated: false,
+			enableTaintTolerationComparisonOperatorsFG: true,
 		},
 	}
 	for _, tc := range testCases {
-		if tolerated := tc.toleration.ToleratesTaint(logger, &tc.taint); tc.expectTolerated != tolerated {
+		if tolerated := tc.toleration.ToleratesTaint(logger, &tc.taint, tc.enableTaintTolerationComparisonOperatorsFG); tc.expectTolerated != tolerated {
 			t.Errorf("[%s] expect %v, got %v: toleration %+v, taint %s", tc.description, tc.expectTolerated, tolerated, tc.toleration, tc.taint.ToString())
 		}
 	}

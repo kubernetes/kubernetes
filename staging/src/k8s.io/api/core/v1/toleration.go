@@ -47,7 +47,9 @@ func (t *Toleration) MatchToleration(tolerationToMatch *Toleration) bool {
 //     this combination means to match all taint values and all taint keys.
 //  4. If toleration.operator is 'Lt' or 'Gt', numeric comparison is performed
 //     between toleration.value and taint.value.
-func (t *Toleration) ToleratesTaint(logger klog.Logger, taint *Taint) bool {
+//  5. If enableComparisonOperators is false and the toleration uses 'Lt' or 'Gt'
+//     operators, the toleration does not match (returns false).
+func (t *Toleration) ToleratesTaint(logger klog.Logger, taint *Taint, enableComparisonOperators bool) bool {
 	if len(t.Effect) > 0 && t.Effect != taint.Effect {
 		return false
 	}
@@ -64,6 +66,10 @@ func (t *Toleration) ToleratesTaint(logger klog.Logger, taint *Taint) bool {
 	case TolerationOpExists:
 		return true
 	case TolerationOpLt, TolerationOpGt:
+		// If comparison operators are disabled, this toleration doesn't match
+		if !enableComparisonOperators {
+			return false
+		}
 		return compareNumericValues(logger, t.Value, taint.Value, t.Operator)
 	default:
 		return false

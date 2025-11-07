@@ -644,138 +644,16 @@ func TestGetAvoidPodsFromNode(t *testing.T) {
 	}
 }
 
-func TestFilterTolerationsWithComparisonOperators(t *testing.T) {
-	testCases := []struct {
-		description               string
-		tolerations               []v1.Toleration
-		enableComparisonOperators bool
-		expectedTolerations       []v1.Toleration
-		expectedHasFiltered       bool
-	}{
-		{
-			description:               "empty tolerations, feature enabled",
-			tolerations:               []v1.Toleration{},
-			enableComparisonOperators: true,
-			expectedTolerations:       []v1.Toleration{},
-			expectedHasFiltered:       false,
-		},
-		{
-			description:               "empty tolerations, feature disabled",
-			tolerations:               []v1.Toleration{},
-			enableComparisonOperators: false,
-			expectedTolerations:       []v1.Toleration{},
-			expectedHasFiltered:       false,
-		},
-		{
-			description: "tolerations without Gt/Lt, feature enabled",
-			tolerations: []v1.Toleration{
-				{Key: "foo", Operator: v1.TolerationOpEqual, Value: "bar", Effect: v1.TaintEffectNoSchedule},
-				{Key: "baz", Operator: v1.TolerationOpExists, Effect: v1.TaintEffectNoExecute},
-			},
-			enableComparisonOperators: true,
-			expectedTolerations: []v1.Toleration{
-				{Key: "foo", Operator: v1.TolerationOpEqual, Value: "bar", Effect: v1.TaintEffectNoSchedule},
-				{Key: "baz", Operator: v1.TolerationOpExists, Effect: v1.TaintEffectNoExecute},
-			},
-			expectedHasFiltered: false,
-		},
-		{
-			description: "tolerations without Gt/Lt, feature disabled",
-			tolerations: []v1.Toleration{
-				{Key: "foo", Operator: v1.TolerationOpEqual, Value: "bar", Effect: v1.TaintEffectNoSchedule},
-				{Key: "baz", Operator: v1.TolerationOpExists, Effect: v1.TaintEffectNoExecute},
-			},
-			enableComparisonOperators: false,
-			expectedTolerations: []v1.Toleration{
-				{Key: "foo", Operator: v1.TolerationOpEqual, Value: "bar", Effect: v1.TaintEffectNoSchedule},
-				{Key: "baz", Operator: v1.TolerationOpExists, Effect: v1.TaintEffectNoExecute},
-			},
-			expectedHasFiltered: false,
-		},
-		{
-			description: "tolerations with Gt, feature enabled",
-			tolerations: []v1.Toleration{
-				{Key: "foo", Operator: v1.TolerationOpEqual, Value: "bar", Effect: v1.TaintEffectNoSchedule},
-				{Key: "sla", Operator: v1.TolerationOpGt, Value: "950", Effect: v1.TaintEffectNoSchedule},
-			},
-			enableComparisonOperators: true,
-			expectedTolerations: []v1.Toleration{
-				{Key: "foo", Operator: v1.TolerationOpEqual, Value: "bar", Effect: v1.TaintEffectNoSchedule},
-				{Key: "sla", Operator: v1.TolerationOpGt, Value: "950", Effect: v1.TaintEffectNoSchedule},
-			},
-			expectedHasFiltered: false,
-		},
-		{
-			description: "tolerations with Gt, feature disabled",
-			tolerations: []v1.Toleration{
-				{Key: "foo", Operator: v1.TolerationOpEqual, Value: "bar", Effect: v1.TaintEffectNoSchedule},
-				{Key: "sla", Operator: v1.TolerationOpGt, Value: "950", Effect: v1.TaintEffectNoSchedule},
-			},
-			enableComparisonOperators: false,
-			expectedTolerations: []v1.Toleration{
-				{Key: "foo", Operator: v1.TolerationOpEqual, Value: "bar", Effect: v1.TaintEffectNoSchedule},
-			},
-			expectedHasFiltered: true,
-		},
-		{
-			description: "tolerations with Lt, feature disabled",
-			tolerations: []v1.Toleration{
-				{Key: "foo", Operator: v1.TolerationOpEqual, Value: "bar", Effect: v1.TaintEffectNoSchedule},
-				{Key: "sla", Operator: v1.TolerationOpLt, Value: "100", Effect: v1.TaintEffectNoSchedule},
-			},
-			enableComparisonOperators: false,
-			expectedTolerations: []v1.Toleration{
-				{Key: "foo", Operator: v1.TolerationOpEqual, Value: "bar", Effect: v1.TaintEffectNoSchedule},
-			},
-			expectedHasFiltered: true,
-		},
-		{
-			description: "tolerations with both Gt and Lt, feature disabled",
-			tolerations: []v1.Toleration{
-				{Key: "foo", Operator: v1.TolerationOpEqual, Value: "bar", Effect: v1.TaintEffectNoSchedule},
-				{Key: "sla-min", Operator: v1.TolerationOpGt, Value: "950", Effect: v1.TaintEffectNoSchedule},
-				{Key: "sla-max", Operator: v1.TolerationOpLt, Value: "100", Effect: v1.TaintEffectNoSchedule},
-			},
-			enableComparisonOperators: false,
-			expectedTolerations: []v1.Toleration{
-				{Key: "foo", Operator: v1.TolerationOpEqual, Value: "bar", Effect: v1.TaintEffectNoSchedule},
-			},
-			expectedHasFiltered: true,
-		},
-		{
-			description: "only Gt/Lt tolerations, feature disabled",
-			tolerations: []v1.Toleration{
-				{Key: "sla-min", Operator: v1.TolerationOpGt, Value: "950", Effect: v1.TaintEffectNoSchedule},
-				{Key: "sla-max", Operator: v1.TolerationOpLt, Value: "100", Effect: v1.TaintEffectNoSchedule},
-			},
-			enableComparisonOperators: false,
-			expectedTolerations:       []v1.Toleration{},
-			expectedHasFiltered:       true,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.description, func(t *testing.T) {
-			filtered, hasFiltered := FilterTolerationsWithComparisonOperators(tc.tolerations, tc.enableComparisonOperators)
-			if hasFiltered != tc.expectedHasFiltered {
-				t.Errorf("expected hasFiltered=%v, got %v", tc.expectedHasFiltered, hasFiltered)
-			}
-			if !reflect.DeepEqual(filtered, tc.expectedTolerations) {
-				t.Errorf("expected tolerations %+v, got %+v", tc.expectedTolerations, filtered)
-			}
-		})
-	}
-}
-
 func TestFindMatchingUntoleratedTaint(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 	testCases := []struct {
-		description     string
-		tolerations     []v1.Toleration
-		taints          []v1.Taint
-		applyFilter     taintsFilterFunc
-		expectTolerated bool
-		expectError     bool
+		description                 string
+		tolerations                 []v1.Toleration
+		taints                      []v1.Taint
+		applyFilter                 taintsFilterFunc
+		expectTolerated             bool
+		expectError                 bool
+		enableComparisonOperatorsFG bool
 	}{
 		{
 			description:     "empty tolerations tolerate empty taints",
@@ -890,8 +768,9 @@ func TestFindMatchingUntoleratedTaint(t *testing.T) {
 					Effect: v1.TaintEffectNoSchedule,
 				},
 			},
-			applyFilter:     func(t *v1.Taint) bool { return true },
-			expectTolerated: false,
+			applyFilter:                 func(t *v1.Taint) bool { return true },
+			expectTolerated:             false,
+			enableComparisonOperatorsFG: true,
 		},
 		{
 			description: "numeric Gt operator with taint value above threshold, expect tolerated",
@@ -910,8 +789,9 @@ func TestFindMatchingUntoleratedTaint(t *testing.T) {
 					Effect: v1.TaintEffectNoSchedule,
 				},
 			},
-			applyFilter:     func(t *v1.Taint) bool { return true },
-			expectTolerated: true,
+			applyFilter:                 func(t *v1.Taint) bool { return true },
+			expectTolerated:             true,
+			enableComparisonOperatorsFG: true,
 		},
 		{
 			description: "numeric Lt operator with taint value above threshold, expect not tolerated",
@@ -930,8 +810,9 @@ func TestFindMatchingUntoleratedTaint(t *testing.T) {
 					Effect: v1.TaintEffectNoSchedule,
 				},
 			},
-			applyFilter:     func(t *v1.Taint) bool { return true },
-			expectTolerated: false,
+			applyFilter:                 func(t *v1.Taint) bool { return true },
+			expectTolerated:             false,
+			enableComparisonOperatorsFG: true,
 		},
 		{
 			description: "numeric Gt operator with non-numeric taint value, expect not tolerated",
@@ -950,14 +831,15 @@ func TestFindMatchingUntoleratedTaint(t *testing.T) {
 					Effect: v1.TaintEffectNoSchedule,
 				},
 			},
-			applyFilter:     func(t *v1.Taint) bool { return true },
-			expectTolerated: false,
-			expectError:     true,
+			applyFilter:                 func(t *v1.Taint) bool { return true },
+			expectTolerated:             false,
+			expectError:                 true,
+			enableComparisonOperatorsFG: true,
 		},
 	}
 
 	for _, tc := range testCases {
-		_, untolerated := FindMatchingUntoleratedTaint(logger, tc.taints, tc.tolerations, tc.applyFilter)
+		_, untolerated := FindMatchingUntoleratedTaint(logger, tc.taints, tc.tolerations, tc.applyFilter, tc.enableComparisonOperatorsFG)
 		if tc.expectTolerated != !untolerated {
 			filteredTaints := []v1.Taint{}
 			for _, taint := range tc.taints {

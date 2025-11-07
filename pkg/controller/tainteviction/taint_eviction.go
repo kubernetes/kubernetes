@@ -30,7 +30,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corev1informers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -39,14 +38,12 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
-	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/controller/tainteviction/metrics"
 	controllerutil "k8s.io/kubernetes/pkg/controller/util/node"
-	"k8s.io/kubernetes/pkg/features"
 	utilpod "k8s.io/kubernetes/pkg/util/pod"
 )
 
@@ -182,18 +179,6 @@ func getMinTolerationTime(tolerations []v1.Toleration) time.Duration {
 		return -1
 	}
 	return time.Duration(minTolerationTime) * time.Second
-}
-
-// filterTolerationsForEviction filters tolerations to exclude comparison operators (Lt, Gt)
-// when the feature gate is disabled, and logs when filtering occurs.
-func filterTolerationsForEviction(logger klog.Logger, tolerations []v1.Toleration, podName, podNamespace string) []v1.Toleration {
-	enableComparisonOperators := utilfeature.DefaultFeatureGate.Enabled(features.TaintTolerationComparisonOperators)
-	filtered, hasFiltered := corev1helpers.FilterTolerationsWithComparisonOperators(tolerations, enableComparisonOperators)
-	if hasFiltered {
-		logger.V(4).Info("Pod has tolerations with comparison operators (Lt/Gt) which are ignored because TaintTolerationComparisonOperators feature gate is disabled",
-			"pod", klog.KRef(podNamespace, podName))
-	}
-	return filtered
 }
 
 // New creates a new Controller that will use passed clientset to communicate with the API server.
@@ -542,8 +527,7 @@ func (tc *Controller) handlePodUpdate(ctx context.Context, podUpdate podUpdateIt
 	if !ok {
 		return
 	}
-	tolerations := filterTolerationsForEviction(logger, pod.Spec.Tolerations, pod.Name, pod.Namespace)
-	tc.processPodOnNode(ctx, podNamespacedName, nodeName, tolerations, taints, time.Now())
+	tc.processPodOnNode(ctx, podNamespacedName, nodeName, pod.Spec.Tolerations, taints, time.Now())
 }
 
 func (tc *Controller) handleNodeUpdate(ctx context.Context, nodeUpdate nodeUpdateItem) {
@@ -599,8 +583,7 @@ func (tc *Controller) handleNodeUpdate(ctx context.Context, nodeUpdate nodeUpdat
 	now := time.Now()
 	for _, pod := range pods {
 		podNamespacedName := types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}
-		tolerations := filterTolerationsForEviction(logger, pod.Spec.Tolerations, pod.Name, pod.Namespace)
-		tc.processPodOnNode(ctx, podNamespacedName, node.Name, tolerations, taints, now)
+		tc.processPodOnNode(ctx, podNamespacedName, node.Name, pod.Spec.Tolerations, taints, now)
 	}
 }
 

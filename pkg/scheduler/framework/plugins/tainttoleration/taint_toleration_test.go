@@ -292,10 +292,10 @@ func TestTaintTolerationScore(t *testing.T) {
 			state := framework.NewCycleState()
 			snapshot := cache.NewSnapshot(nil, test.nodes)
 			fh, _ := runtime.NewFramework(ctx, nil, nil, runtime.WithSnapshotSharedLister(snapshot))
-
 			p, err := New(ctx, nil, fh, feature.Features{
 				EnableTaintTolerationComparisonOperators: test.enableTaintTolerationComparisonOps,
 			})
+
 			if err != nil {
 				t.Fatalf("creating plugin: %v", err)
 			}
@@ -435,9 +435,6 @@ func TestTaintTolerationFilter(t *testing.T) {
 			p, err := New(ctx, nil, nil, feature.Features{
 				EnableTaintTolerationComparisonOperators: test.enableTaintTolerationComparisonOps,
 			})
-			if err != nil {
-				t.Fatalf("creating plugin: %v", err)
-			}
 			if err != nil {
 				t.Fatalf("creating plugin: %v", err)
 			}

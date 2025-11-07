@@ -18,10 +18,10 @@ package corev1
 
 import (
 	"encoding/json"
-	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
+	"k8s.io/klog/v2"
 )
 
 // PodPriority returns priority of the given pod.
@@ -61,32 +61,13 @@ func GetAvoidPodsFromNodeAnnotations(annotations map[string]string) (v1.AvoidPod
 }
 
 // TolerationsTolerateTaint checks if taint is tolerated by any of the tolerations.
-func TolerationsTolerateTaint(logger klog.Logger, tolerations []v1.Toleration, taint *v1.Taint) bool {
+func TolerationsTolerateTaint(logger klog.Logger, tolerations []v1.Toleration, taint *v1.Taint, enableComparisonOperators bool) bool {
 	for i := range tolerations {
-		if tolerations[i].ToleratesTaint(logger, taint) {
+		if tolerations[i].ToleratesTaint(logger, taint, enableComparisonOperators) {
 			return true
 		}
 	}
 	return false
-}
-
-// FilterTolerationsWithComparisonOperators returns a filtered list of tolerations,
-// optionally excluding tolerations with comparison operators (Lt, Gt) when the feature flag is disabled.
-func FilterTolerationsWithComparisonOperators(tolerations []v1.Toleration, enableComparisonOperators bool) ([]v1.Toleration, bool) {
-	if enableComparisonOperators {
-		return tolerations, false
-	}
-
-	filtered := []v1.Toleration{}
-	hasFiltered := false
-	for _, toleration := range tolerations {
-		if toleration.Operator == v1.TolerationOpLt || toleration.Operator == v1.TolerationOpGt {
-			hasFiltered = true
-			continue
-		}
-		filtered = append(filtered, toleration)
-	}
-	return filtered, hasFiltered
 }
 
 type taintsFilterFunc func(*v1.Taint) bool
@@ -95,10 +76,10 @@ type taintsFilterFunc func(*v1.Taint) bool
 // all the filtered taints, and returns the first taint without a toleration
 // Returns true if there is an untolerated taint
 // Returns false if all taints are tolerated
-func FindMatchingUntoleratedTaint(logger klog.Logger, taints []v1.Taint, tolerations []v1.Toleration, inclusionFilter taintsFilterFunc) (v1.Taint, bool) {
+func FindMatchingUntoleratedTaint(logger klog.Logger, taints []v1.Taint, tolerations []v1.Toleration, inclusionFilter taintsFilterFunc, enableComparisonOperators bool) (v1.Taint, bool) {
 	filteredTaints := getFilteredTaints(taints, inclusionFilter)
 	for _, taint := range filteredTaints {
-		if !TolerationsTolerateTaint(logger, tolerations, &taint) {
+		if !TolerationsTolerateTaint(logger, tolerations, &taint, enableComparisonOperators) {
 			return taint, true
 		}
 	}

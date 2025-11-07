@@ -429,7 +429,8 @@ func toleratesTaintsWithNoScheduleNoExecuteEffects(logger klog.Logger, taints []
 
 	toleratesTaint := func(taint v1.Taint) bool {
 		for _, toleration := range tolerations {
-			if toleration.ToleratesTaint(logger, &taint) {
+			//	TaintTolerationComparisonOperators feature gate will be false for e2e since the feature is in Alpha.
+			if toleration.ToleratesTaint(logger, &taint, false) {
 				return true
 			}
 		}

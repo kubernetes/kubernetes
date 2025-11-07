@@ -26,7 +26,9 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/validation"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // IsExtendedResourceName returns true if:
@@ -295,11 +297,12 @@ func GetMatchingTolerations(logger klog.Logger, taints []v1.Taint, tolerations [
 	if len(tolerations) == 0 && len(taints) > 0 {
 		return false, []v1.Toleration{}
 	}
+	enableComparisonOperators := utilfeature.DefaultFeatureGate.Enabled(features.TaintTolerationComparisonOperators)
 	result := []v1.Toleration{}
 	for i := range taints {
 		tolerated := false
 		for j := range tolerations {
-			if tolerations[j].ToleratesTaint(logger, &taints[i]) {
+			if tolerations[j].ToleratesTaint(logger, &taints[i], enableComparisonOperators) {
 				result = append(result, tolerations[j])
 				tolerated = true
 				break
