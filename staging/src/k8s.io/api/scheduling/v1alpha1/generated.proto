@@ -131,18 +131,23 @@ message TypedLocalObjectReference {
   // It must be a DNS subdomain.
   //
   // +optional
+  // +k8s:optional
+  // +k8s:format=k8s-long-name
   optional string apiGroup = 1;
 
   // Kind is the type of resource being referenced.
   // It must be a path segment name.
   //
   // +required
+  // +k8s:required
   optional string kind = 2;
 
   // Name is the name of resource being referenced.
   // It must be a path segment name.
   //
   // +required
+  // +k8s:required
+  // +k8s:format=k8s-short-name
   optional string name = 3;
 }
 

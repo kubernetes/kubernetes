@@ -144,6 +144,70 @@ func Validate_PodGroupPolicy(ctx context.Context, op operation.Operation, fldPat
 	return errs
 }
 
+// Validate_TypedLocalObjectReference validates an instance of TypedLocalObjectReference according
+// to declarative validation rules in the API schema.
+func Validate_TypedLocalObjectReference(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *schedulingv1alpha1.TypedLocalObjectReference) (errs field.ErrorList) {
+	// field schedulingv1alpha1.TypedLocalObjectReference.APIGroup
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			errs = append(errs, validate.LongName(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("apiGroup"), &obj.APIGroup, safe.Field(oldObj, func(oldObj *schedulingv1alpha1.TypedLocalObjectReference) *string { return &oldObj.APIGroup }), oldObj != nil)...)
+
+	// field schedulingv1alpha1.TypedLocalObjectReference.Kind
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("kind"), &obj.Kind, safe.Field(oldObj, func(oldObj *schedulingv1alpha1.TypedLocalObjectReference) *string { return &oldObj.Kind }), oldObj != nil)...)
+
+	// field schedulingv1alpha1.TypedLocalObjectReference.Name
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			errs = append(errs, validate.ShortName(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("name"), &obj.Name, safe.Field(oldObj, func(oldObj *schedulingv1alpha1.TypedLocalObjectReference) *string { return &oldObj.Name }), oldObj != nil)...)
+
+	return errs
+}
+
 // Validate_Workload validates an instance of Workload according
 // to declarative validation rules in the API schema.
 func Validate_Workload(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *schedulingv1alpha1.Workload) (errs field.ErrorList) {
@@ -189,7 +253,19 @@ func Validate_WorkloadList(ctx context.Context, op operation.Operation, fldPath 
 // Validate_WorkloadSpec validates an instance of WorkloadSpec according
 // to declarative validation rules in the API schema.
 func Validate_WorkloadSpec(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *schedulingv1alpha1.WorkloadSpec) (errs field.ErrorList) {
-	// field schedulingv1alpha1.WorkloadSpec.ControllerRef has no validation
+	// field schedulingv1alpha1.WorkloadSpec.ControllerRef
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *schedulingv1alpha1.TypedLocalObjectReference, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_TypedLocalObjectReference(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("controllerRef"), obj.ControllerRef, safe.Field(oldObj, func(oldObj *schedulingv1alpha1.WorkloadSpec) *schedulingv1alpha1.TypedLocalObjectReference {
+			return oldObj.ControllerRef
+		}), oldObj != nil)...)
 
 	// field schedulingv1alpha1.WorkloadSpec.PodGroups
 	errs = append(errs,

@@ -128,6 +128,60 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				field.Invalid(field.NewPath("spec", "podGroups").Index(0).Child("policy", "gang", "minCount"), int64(-1), "").WithOrigin("minimum"),
 			},
 		},
+		"valid with controllerRef": {
+			input: mkValidWorkload(func(obj *scheduling.Workload) {
+				obj.Spec.ControllerRef = &scheduling.TypedLocalObjectReference{
+					APIGroup: "apps",
+					Kind:     "Deployment",
+					Name:     "my-deployment",
+				}
+			}),
+		},
+		"controllerRef with empty APIGroup": {
+			input: mkValidWorkload(func(obj *scheduling.Workload) {
+				obj.Spec.ControllerRef = &scheduling.TypedLocalObjectReference{
+					APIGroup: "",
+					Kind:     "Pod",
+					Name:     "my-pod",
+				}
+			}),
+		},
+		"controllerRef invalid APIGroup": {
+			input: mkValidWorkload(func(obj *scheduling.Workload) {
+				obj.Spec.ControllerRef = &scheduling.TypedLocalObjectReference{
+					APIGroup: "invalid_api_group",
+					Kind:     "Deployment",
+					Name:     "my-deployment",
+				}
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "controllerRef", "apiGroup"), "invalid_api_group", ""),
+			},
+		},
+		"controllerRef missing kind": {
+			input: mkValidWorkload(func(obj *scheduling.Workload) {
+				obj.Spec.ControllerRef = &scheduling.TypedLocalObjectReference{
+					APIGroup: "apps",
+					Kind:     "",
+					Name:     "my-deployment",
+				}
+			}),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "controllerRef", "kind"), ""),
+			},
+		},
+		"controllerRef missing name": {
+			input: mkValidWorkload(func(obj *scheduling.Workload) {
+				obj.Spec.ControllerRef = &scheduling.TypedLocalObjectReference{
+					APIGroup: "apps",
+					Kind:     "Deployment",
+					Name:     "",
+				}
+			}),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "controllerRef", "name"), ""),
+			},
+		},
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {

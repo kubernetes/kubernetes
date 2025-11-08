@@ -95,21 +95,21 @@ func validateControllerRef(ref *scheduling.TypedLocalObjectReference, fldPath *f
 	var allErrs = field.ErrorList{}
 	if ref.APIGroup != "" {
 		for _, msg := range validation.IsDNS1123Subdomain(ref.APIGroup) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("apiGroup"), ref.APIGroup, msg))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("apiGroup"), ref.APIGroup, msg).MarkCoveredByDeclarative())
 		}
 	}
 	if ref.Kind == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("kind"), ""))
+		allErrs = append(allErrs, field.Required(fldPath.Child("kind"), "").MarkCoveredByDeclarative())
 	} else {
 		for _, msg := range pathvalidation.IsValidPathSegmentName(ref.Kind) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("kind"), ref.Kind, msg))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("kind"), ref.Kind, msg).MarkCoveredByDeclarative())
 		}
 	}
 	if ref.Name == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "").MarkCoveredByDeclarative())
 	} else {
 		for _, msg := range pathvalidation.IsValidPathSegmentName(ref.Name) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), ref.Name, msg))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), ref.Name, msg).MarkCoveredByDeclarative())
 		}
 	}
 	return allErrs

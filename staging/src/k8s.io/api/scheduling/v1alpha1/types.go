@@ -139,16 +139,21 @@ type TypedLocalObjectReference struct {
 	// It must be a DNS subdomain.
 	//
 	// +optional
+	// +k8s:optional
+	// +k8s:format=k8s-long-name
 	APIGroup string `json:"apiGroup,omitempty" protobuf:"bytes,1,opt,name=apiGroup"`
 	// Kind is the type of resource being referenced.
 	// It must be a path segment name.
 	//
 	// +required
+	// +k8s:required
 	Kind string `json:"kind" protobuf:"bytes,2,opt,name=kind"`
 	// Name is the name of resource being referenced.
 	// It must be a path segment name.
 	//
 	// +required
+	// +k8s:required
+	// +k8s:format=k8s-short-name
 	Name string `json:"name" protobuf:"bytes,3,opt,name=name"`
 }
 
