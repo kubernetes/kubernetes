@@ -61,6 +61,7 @@ const (
 	claim1  = "claim-1"
 	slice1  = "slice-1"
 	slice2  = "slice-2"
+	device0 = "device-0"
 	device1 = "device-1"
 	device2 = "device-2"
 	device3 = "device-3"
@@ -334,6 +335,16 @@ func allocationResultWithConfig(selector *v1.NodeSelector, driver string, source
 	}
 }
 
+func allocationResultWithConfigs(selector *v1.NodeSelector, results []resourceapi.DeviceRequestAllocationResult, configs []resourceapi.DeviceAllocationConfiguration) resourceapi.AllocationResult {
+	return resourceapi.AllocationResult{
+		Devices: resourceapi.DeviceAllocationResult{
+			Results: results,
+			Config:  configs,
+		},
+		NodeSelector: selector,
+	}
+}
+
 // Helpers
 
 // convert a list of objects to a slice
@@ -344,6 +355,15 @@ func objects[T any](objs ...T) []T {
 // generate a ResourceSlice object with the given parameters and one device "device-1"
 func sliceWithOneDevice(name string, nodeSelection any, pool, driver string) *resourceapi.ResourceSlice {
 	return slice(name, nodeSelection, pool, driver, device(device1, nil, nil))
+}
+
+// generate a ResourceSclie object with the given parameters and the specified number of devices.
+func sliceWithMultipleDevices(name string, nodeSelection any, pool, driver string, count int) *resourceapi.ResourceSlice {
+	var devices []resourceapi.Device
+	for i := 0; i < count; i++ {
+		devices = append(devices, device(fmt.Sprintf("device-%d", i), nil, nil))
+	}
+	return slice(name, nodeSelection, pool, driver, devices...)
 }
 
 func TestAllocator(t *testing.T) {
@@ -1204,12 +1224,53 @@ func TestAllocator(t *testing.T) {
 			node:             node(node1, region1),
 
 			expectResults: []any{
-				allocationResultWithConfig(
+				allocationResultWithConfigs(
 					localNodeSelector(node1),
-					driverA,
-					resourceapi.AllocationConfigSourceClass,
-					"classAttribute",
-					deviceAllocationResult(req0, driverA, pool1, device1, false),
+					objects(
+						deviceAllocationResult(req0, driverA, pool1, device1, false),
+					),
+					[]resourceapi.DeviceAllocationConfiguration{
+						{
+							Source:              resourceapi.AllocationConfigSourceClass,
+							Requests:            []string{req0},
+							DeviceConfiguration: deviceConfiguration(driverA, "classAttribute"),
+						},
+					},
+				),
+			},
+		},
+		"with-class-device-config-with-multiple-request-and-configs": {
+			claimsToAllocate: objects(claimWithRequests(claim0, []resourceapi.DeviceConstraint{}, request(req0, classA, 1), request(req1, classA, 1), request(req2, classB, 1))),
+			classes: objects(
+				classWithConfig(classA, driverA, "classAttribute-A"),
+				classWithConfig(classB, driverB, "classAttribute-B"),
+			),
+			slices: objects(
+				sliceWithMultipleDevices(slice1, node1, pool1, driverA, 2),
+				sliceWithOneDevice(slice2, node1, pool1, driverB),
+			),
+			node: node(node1, region1),
+
+			expectResults: []any{
+				allocationResultWithConfigs(
+					localNodeSelector(node1),
+					objects(
+						deviceAllocationResult(req0, driverA, pool1, device0, false),
+						deviceAllocationResult(req1, driverA, pool1, device1, false),
+						deviceAllocationResult(req2, driverB, pool1, device1, false),
+					),
+					[]resourceapi.DeviceAllocationConfiguration{
+						{
+							Source:              resourceapi.AllocationConfigSourceClass,
+							Requests:            []string{req0, req1},
+							DeviceConfiguration: deviceConfiguration(driverA, "classAttribute-A"),
+						},
+						{
+							Source:              resourceapi.AllocationConfigSourceClass,
+							Requests:            []string{req2},
+							DeviceConfiguration: deviceConfiguration(driverB, "classAttribute-B"),
+						},
+					},
 				),
 			},
 		},
