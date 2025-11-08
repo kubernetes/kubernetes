@@ -117,9 +117,11 @@ func (b *OpportunisticBatch) StoreScheduleResults(ctx context.Context, signature
 		succeeded:  true,
 	}
 	logger.V(4).Info("OpportunisticBatch set cycle state",
-		"profile", b.handle.ProfileName(), "cycleCount", cycleCount, "chosenNode", chosenNode)
+		"profile", b.handle.ProfileName(), "cycleCount", cycleCount, "hintedNode", hintedNode, "chosenNode", chosenNode)
 
 	if hintedNode == chosenNode {
+		logger.V(4).Info("OpportunisticBatch skipping set state because hint was provided",
+			"profile", b.handle.ProfileName(), "cycleCount", cycleCount, "chosenNode", chosenNode)
 		metrics.BatchAttemptStats.WithLabelValues(b.handle.ProfileName(), metrics.BatchAttemptHintUsed).Inc()
 		b.batchedPods++
 		return
@@ -158,11 +160,9 @@ func (b *OpportunisticBatch) StoreScheduleResults(ctx context.Context, signature
 // logUnusableState our batch state because we can't keep it up to date.
 // Record the reason for our invalidation in the stats.
 func (b *OpportunisticBatch) logUnusableState(logger klog.Logger, cycleCount int64, reason string) {
-	if b.state != nil {
-		metrics.BatchCacheFlushed.WithLabelValues(b.handle.ProfileName(), reason).Inc()
-		logger.V(4).Info("OpportunisticBatch found unusable state",
-			"profile", b.handle.ProfileName(), "cycleCount", cycleCount, "reason", reason)
-	}
+	metrics.BatchCacheFlushed.WithLabelValues(b.handle.ProfileName(), reason).Inc()
+	logger.V(4).Info("OpportunisticBatch found unusable state",
+		"profile", b.handle.ProfileName(), "cycleCount", cycleCount, "reason", reason)
 }
 
 // Update the batch state based on a the arrival of a new pod and the chosen node from the last pod.

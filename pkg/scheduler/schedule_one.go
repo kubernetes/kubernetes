@@ -446,8 +446,12 @@ func (sched *Scheduler) schedulePod(ctx context.Context, fwk framework.Framework
 
 	// When only one node after predicate, just use it.
 	if len(feasibleNodes) == 1 {
+		node := feasibleNodes[0].Node().Name
+		if utilfeature.DefaultFeatureGate.Enabled(features.OpportunisticBatching) {
+			fwk.StoreScheduleResults(ctx, signature, nodeHint, node, nil, sched.CurrentCycle())
+		}
 		return ScheduleResult{
-			SuggestedHost:  feasibleNodes[0].Node().Name,
+			SuggestedHost:  node,
 			EvaluatedNodes: 1 + diagnosis.NodeToStatus.Len(),
 			FeasibleNodes:  1,
 		}, nil

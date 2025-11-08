@@ -834,6 +834,7 @@ func (f *frameworkImpl) SignPod(ctx context.Context, pod *v1.Pod) string {
 			if status.Code() == fwk.Error {
 				logger.V(4).Info("SignPod failed for plugin", "plugin", plugin.Name(), "error", status.AsError())
 			}
+			logger.V(5).Info("SignPod can't sign pod due to plugin", "plugin", plugin.Name(), "status", status)
 			return fwk.Unsignable
 		}
 

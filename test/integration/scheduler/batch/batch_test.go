@@ -56,49 +56,49 @@ func TestBatchScenarios(t *testing.T) {
 			Name: "one pod one node",
 			Pods: []PodDef{
 				{
-					Name:         "batchp1",
-					ExpectedNode: "batchn1",
+					Name:         "1ppn-batchp1",
+					ExpectedNode: "1ppn-batchn1",
 				},
 			},
 			Nodes: []NodeDef{
 				{
-					Name:    "batchn1",
+					Name:    "1ppn-batchn1",
 					MaxPods: 1,
 				},
 			},
 		},
 		{
-			Name: "exact match",
+			Name: "distinct pods on distinct nodes",
 			Pods: []PodDef{
 				{
-					Name:         "batchp1",
+					Name:         "dpdn-batchp1",
 					NodeSelector: map[string]string{"forpod": "1"},
-					ExpectedNode: "batchn1",
+					ExpectedNode: "dpdn-batchn1",
 				},
 				{
-					Name:         "batchp2",
+					Name:         "dpdn-batchp2",
 					NodeSelector: map[string]string{"forpod": "2"},
-					ExpectedNode: "batchn2",
+					ExpectedNode: "dpdn-batchn2",
 				},
 				{
-					Name:         "batchp3",
+					Name:         "dpdn-batchp3",
 					NodeSelector: map[string]string{"forpod": "3"},
-					ExpectedNode: "batchn3",
+					ExpectedNode: "dpdn-batchn3",
 				},
 			},
 			Nodes: []NodeDef{
 				{
-					Name:    "batchn3",
+					Name:    "dpdn-batchn3",
 					MaxPods: 10,
 					Labels:  map[string]string{"forpod": "3"},
 				},
 				{
-					Name:    "batchn2",
+					Name:    "dpdn-batchn2",
 					MaxPods: 10,
 					Labels:  map[string]string{"forpod": "2"},
 				},
 				{
-					Name:    "batchn1",
+					Name:    "dpdn-batchn1",
 					MaxPods: 10,
 					Labels:  map[string]string{"forpod": "1"},
 				},
@@ -106,125 +106,125 @@ func TestBatchScenarios(t *testing.T) {
 		},
 
 		{
-			Name: "anyone anywhere",
+			Name: "three pod batch",
 			Pods: []PodDef{
 				{
-					Name:         "batchp1",
-					ExpectedNode: "batchn1",
-					Affinity:     []string{"batchn1", "batchn2", "batchn3"},
+					Name:         "tpb-batchp1",
+					ExpectedNode: "tpb-batchn1",
+					Affinity:     []string{"tpb-batchn1", "tpb-batchn2", "tpb-batchn3"},
 				},
 				{
-					Name:         "batchp2",
-					ExpectedNode: "batchn2",
-					Affinity:     []string{"batchn1", "batchn2", "batchn3"},
-					//ExpectBatched: true,
+					Name:          "tpb-batchp2",
+					ExpectedNode:  "tpb-batchn2",
+					Affinity:      []string{"tpb-batchn1", "tpb-batchn2", "tpb-batchn3"},
+					ExpectBatched: true,
 				},
 				{
-					Name:         "batchp3",
-					ExpectedNode: "batchn3",
-					Affinity:     []string{"batchn1", "batchn2", "batchn3"},
-					//ExpectBatched: true,
+					Name:          "tpb-batchp3",
+					ExpectedNode:  "tpb-batchn3",
+					Affinity:      []string{"tpb-batchn1", "tpb-batchn2", "tpb-batchn3"},
+					ExpectBatched: true,
 				},
 			},
 			Nodes: []NodeDef{
 				{
-					Name:    "batchn3",
+					Name:    "tpb-batchn3",
 					MaxPods: 1,
 				},
 				{
-					Name:    "batchn2",
+					Name:    "tpb-batchn2",
 					MaxPods: 1,
 				},
 				{
-					Name:    "batchn1",
+					Name:    "tpb-batchn1",
 					MaxPods: 1,
 				},
 			},
 		},
 		{
-			Name: "half of one 1 pod per node",
+			Name: "two consecutive batches",
 			Pods: []PodDef{
 				{
-					Name:         "batchp1",
-					ExpectedNode: "batchn1",
-					Affinity:     []string{"batchn1", "batchn2"},
+					Name:         "tcb-batchp1",
+					ExpectedNode: "tcb-batchn1",
+					Affinity:     []string{"tcb-batchn1", "tcb-batchn2"},
 				},
 				{
-					Name:         "batchp2",
-					ExpectedNode: "batchn2",
-					Affinity:     []string{"batchn1", "batchn2"},
-					//ExpectBatched: true,
+					Name:          "tcb-batchp2",
+					ExpectedNode:  "tcb-batchn2",
+					Affinity:      []string{"tcb-batchn1", "tcb-batchn2"},
+					ExpectBatched: true,
 				},
 				{
-					Name:         "batchp3",
-					ExpectedNode: "batchn4",
-					Affinity:     []string{"batchn4", "batchn3"},
+					Name:         "tcb-batchp3",
+					ExpectedNode: "tcb-batchn4",
+					Affinity:     []string{"tcb-batchn4", "tcb-batchn3"},
 				},
 				{
-					Name:         "batchp4",
-					ExpectedNode: "batchn3",
-					Affinity:     []string{"batchn4", "batchn3"},
-					//ExpectBatched: true,
+					Name:          "tcb-batchp4",
+					ExpectedNode:  "tcb-batchn3",
+					Affinity:      []string{"tcb-batchn4", "tcb-batchn3"},
+					ExpectBatched: true,
 				},
 			},
 			Nodes: []NodeDef{
 				{
-					Name:    "batchn4",
+					Name:    "tcb-batchn4",
 					MaxPods: 1,
 				},
 				{
-					Name:    "batchn3",
+					Name:    "tcb-batchn3",
 					MaxPods: 1,
 				},
 				{
-					Name:    "batchn2",
+					Name:    "tcb-batchn2",
 					MaxPods: 1,
 				},
 				{
-					Name:    "batchn1",
+					Name:    "tcb-batchn1",
 					MaxPods: 1,
 				},
 			},
 		},
 		{
-			Name: "half of one multi pod",
+			Name: "multiple pods per node means no batching",
 			Pods: []PodDef{
 				{
-					Name:         "batchp1",
-					ExpectedNode: "batchn1",
-					Affinity:     []string{"batchn1", "batchn2"},
+					Name:         "mppn-batchp1",
+					ExpectedNode: "mppn-batchn1",
+					Affinity:     []string{"mppn-batchn1", "mppn-batchn2"},
 				},
 				{
-					Name:         "batchp2",
-					ExpectedNode: "batchn1",
-					Affinity:     []string{"batchn1", "batchn2"},
+					Name:         "mppn-batchp2",
+					ExpectedNode: "mppn-batchn1",
+					Affinity:     []string{"mppn-batchn1", "mppn-batchn2"},
 				},
 				{
-					Name:         "batchp3",
-					ExpectedNode: "batchn4",
-					Affinity:     []string{"batchn4", "batchn3"},
+					Name:         "mppn-batchp3",
+					ExpectedNode: "mppn-batchn4",
+					Affinity:     []string{"mppn-batchn4", "mppn-batchn3"},
 				},
 				{
-					Name:         "batchp4",
-					ExpectedNode: "batchn4",
-					Affinity:     []string{"batchn4", "batchn3"},
+					Name:         "mppn-batchp4",
+					ExpectedNode: "mppn-batchn4",
+					Affinity:     []string{"mppn-batchn4", "mppn-batchn3"},
 				},
 			},
 			Nodes: []NodeDef{
 				{
-					Name:    "batchn4",
+					Name:    "mppn-batchn4",
 					MaxPods: 2,
 				},
 				{
-					Name:    "batchn3",
+					Name:    "mppn-batchn3",
 					MaxPods: 2,
 				},
 				{
-					Name:    "batchn2",
+					Name:    "mppn-batchn2",
 					MaxPods: 2,
 				},
 				{
-					Name:    "batchn1",
+					Name:    "mppn-batchn1",
 					MaxPods: 2,
 				},
 			},
@@ -337,6 +337,7 @@ func newDefaultComponentConfig() (*config.KubeSchedulerConfiguration, error) {
 		if cfg.Name == names.PodTopologySpread {
 			tps := cfg.Args.(*config.PodTopologySpreadArgs)
 			tps.DefaultConstraints = []v1.TopologySpreadConstraint{}
+			tps.DefaultingType = config.ListDefaulting
 		}
 	}
 

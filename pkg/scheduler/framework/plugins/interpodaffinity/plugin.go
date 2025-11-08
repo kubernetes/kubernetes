@@ -65,19 +65,17 @@ func (pl *InterPodAffinity) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.Sig
 		return nil, fwk.NewStatus(fwk.Unschedulable)
 	}
 
-	ret := []fwk.SignFragment{
-		{Key: fwk.InterPodAffinitySignerName, Value: nil},
-	}
-
 	// If this option is set then we only consider affinity between pods that have affinity configured,
 	// so we can ignore the pods labels if it doesn't have rules set.
 	// Otherwise we need to include the pod's labels to ensure we catch affinity between the pod
 	// and other pods which may have affinity rules set.
-	if !pl.args.IgnorePreferredTermsOfExistingPods {
-		ret = append(ret, fwk.SignFragment{Key: fwk.LabelsSignerName, Value: pod.Labels})
+	if pl.args.IgnorePreferredTermsOfExistingPods {
+		return nil, fwk.NewStatus(fwk.Success)
 	}
 
-	return ret, fwk.NewStatus(fwk.Success)
+	return []fwk.SignFragment{
+		{Key: fwk.LabelsSignerName, Value: pod.Labels},
+	}, fwk.NewStatus(fwk.Success)
 }
 
 // EventsToRegister returns the possible events that may make a failed Pod
