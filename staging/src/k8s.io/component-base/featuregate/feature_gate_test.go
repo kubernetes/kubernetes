@@ -2583,7 +2583,7 @@ func TestFrozenMode_BasicLifecycle(t *testing.T) {
 	ver := version.MustParseGeneric("1.20")
 
 	// Create frozen mode gate
-	fg := NewFeatureGateWithFreeze()
+	fg := NewFeatureGateWithFreezeForTest()
 
 	// Add a feature before freeze (should succeed)
 	if err := fg.Add(map[Feature]FeatureSpec{
@@ -2684,7 +2684,7 @@ func TestFeatureGateSnapshotRestore(t *testing.T) {
 }
 
 func TestFeatureGateSnapshotRestoreFrozen(t *testing.T) {
-	fg := NewFeatureGateWithFreeze()
+	fg := NewFeatureGateWithFreezeForTest()
 	fg.AddVersioned(map[Feature]VersionedSpecs{
 		"FrozenFeature": {{Default: false, PreRelease: Alpha, Version: version.MustParse("1.0")}},
 	})

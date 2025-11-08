@@ -269,11 +269,11 @@ type featureGate struct {
 	queriedFeatures         atomic.Value
 	emulationVersion        atomic.Pointer[version.Version]
 	minCompatibilityVersion atomic.Pointer[version.Version]
-	// freezeOnRead indicates whether this feature gate should automatically
-	// transition into "frozen mode" after the first read (via Enabled).
-	frozen atomic.Bool
 	// frozen is atomically set to true when the first read (Enabled call) occurs
 	// if freezeOnRead is true. Once frozen, the gate becomes immutable.
+	frozen atomic.Bool
+	// freezeOnRead indicates whether this feature gate should automatically
+	// transition into "frozen mode" after the first read (via Enabled).
 	freezeOnRead bool
 }
 
@@ -341,9 +341,7 @@ func (f *featureGate) Restore(state FeatureGateState) error {
 
 	f.closed = state.Closed
 
-	if !f.frozen.Load() {
-		f.frozen.Store(state.Frozen)
-	}
+	f.frozen.Store(state.Frozen)
 
 	return nil
 }
@@ -420,7 +418,7 @@ func NewFeatureGate() *featureGate {
 // after the first call to Enabled(). Once frozen, all mutation methods will
 // reject further writes. This enforces a strict "configuration phase"
 // (before the first read) followed by a "runtime phase" (after first read).
-func NewFeatureGateWithFreeze() *featureGate {
+func NewFeatureGateWithFreezeForTest() *featureGate {
 	fg := NewFeatureGate()
 	fg.freezeOnRead = true
 	return fg
