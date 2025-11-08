@@ -17,8 +17,6 @@ limitations under the License.
 package scheduling
 
 import (
-	"fmt"
-
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 )
 
@@ -28,7 +26,7 @@ func GetWarningsForWorkload(workload *scheduling.Workload) []string {
 	if workload != nil && len(workload.Spec.PodGroups) > 0 {
 		for _, podGroup := range workload.Spec.PodGroups {
 			if podGroup.Policy.Gang != nil && podGroup.Policy.Gang.MinCount <= 0 {
-				warnings = append(warnings, fmt.Sprintf("podGroup.policy.gang.minCount: must be greater than 0"))
+				warnings = append(warnings, "podGroup.policy.gang.minCount: must be greater than 0")
 			}
 		}
 	}

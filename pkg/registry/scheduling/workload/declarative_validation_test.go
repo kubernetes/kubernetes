@@ -190,6 +190,98 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 	}
 }
 
+func TestDeclarativeValidateUpdate(t *testing.T) {
+	apiVersions := []string{"v1alpha1"} // Workload is currently only in v1alpha1
+	for _, apiVersion := range apiVersions {
+		t.Run(apiVersion, func(t *testing.T) {
+			testDeclarativeValidateUpdate(t, apiVersion)
+		})
+	}
+}
+
+func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
+	testCases := map[string]struct {
+		oldObj       scheduling.Workload
+		updateObj    scheduling.Workload
+		expectedErrs field.ErrorList
+	}{
+		"valid update": {
+			oldObj:    mkValidWorkload(func(obj *scheduling.Workload) { obj.ResourceVersion = "1" }),
+			updateObj: mkValidWorkload(func(obj *scheduling.Workload) { obj.ResourceVersion = "1" }),
+		},
+		"valid update with unchanged controllerRef": {
+			oldObj: mkValidWorkload(func(obj *scheduling.Workload) {
+				obj.ResourceVersion = "1"
+				obj.Spec.ControllerRef = &scheduling.TypedLocalObjectReference{
+					APIGroup: "apps",
+					Kind:     "Deployment",
+					Name:     "my-deployment",
+				}
+			}),
+			updateObj: mkValidWorkload(func(obj *scheduling.Workload) {
+				obj.ResourceVersion = "1"
+				obj.Spec.ControllerRef = &scheduling.TypedLocalObjectReference{
+					APIGroup: "apps",
+					Kind:     "Deployment",
+					Name:     "my-deployment",
+				}
+			}),
+		},
+		"invalid update podGroups": {
+			oldObj: mkValidWorkload(func(obj *scheduling.Workload) { obj.ResourceVersion = "1" }),
+			updateObj: mkValidWorkload(func(obj *scheduling.Workload) {
+				obj.ResourceVersion = "1"
+				obj.Spec.PodGroups = append(obj.Spec.PodGroups, scheduling.PodGroup{
+					Name: "worker1",
+					Policy: scheduling.PodGroupPolicy{
+						Gang: &scheduling.GangSchedulingPolicy{
+							MinCount: 1,
+						},
+					},
+				})
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "podGroups"), nil, "field is immutable"),
+			},
+		},
+		"invalid update controllerRef": {
+			oldObj: mkValidWorkload(func(obj *scheduling.Workload) {
+				obj.ResourceVersion = "1"
+				obj.Spec.ControllerRef = &scheduling.TypedLocalObjectReference{
+					APIGroup: "apps",
+					Kind:     "Deployment",
+					Name:     "my-deployment",
+				}
+			}),
+			updateObj: mkValidWorkload(func(obj *scheduling.Workload) {
+				obj.ResourceVersion = "1"
+				obj.Spec.ControllerRef = &scheduling.TypedLocalObjectReference{
+					APIGroup: "apps",
+					Kind:     "Deployment",
+					Name:     "different-deployment",
+				}
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "controllerRef"), nil, "field is immutable"),
+			},
+		},
+	}
+	for k, tc := range testCases {
+		t.Run(k, func(t *testing.T) {
+			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+				APIPrefix:         "apis",
+				APIGroup:          "scheduling.k8s.io",
+				APIVersion:        apiVersion,
+				Resource:          "workloads",
+				Name:              "valid-workload",
+				IsResourceRequest: true,
+				Verb:              "update",
+			})
+			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.updateObj, &tc.oldObj, Strategy.ValidateUpdate, tc.expectedErrs)
+		})
+	}
+}
+
 func mkValidWorkload(tweaks ...func(obj *scheduling.Workload)) scheduling.Workload {
 	obj := scheduling.Workload{
 		ObjectMeta: metav1.ObjectMeta{
