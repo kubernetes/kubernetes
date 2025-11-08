@@ -118,10 +118,10 @@ func validateControllerRef(ref *scheduling.TypedLocalObjectReference, fldPath *f
 func validatePodGroup(podGroup *scheduling.PodGroup, fldPath *field.Path, existingPodGroups sets.Set[string]) field.ErrorList {
 	var allErrs field.ErrorList
 	for _, detail := range apivalidation.ValidatePodGroupName(podGroup.Name, false) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), podGroup.Name, detail))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), podGroup.Name, detail).MarkCoveredByDeclarative())
 	}
 	if existingPodGroups.Has(podGroup.Name) {
-		allErrs = append(allErrs, field.Duplicate(fldPath.Child("name"), podGroup.Name))
+		allErrs = append(allErrs, field.Duplicate(fldPath.Child("name"), podGroup.Name).MarkCoveredByDeclarative())
 	} else {
 		existingPodGroups.Insert(podGroup.Name)
 	}

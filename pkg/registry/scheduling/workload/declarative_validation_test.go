@@ -81,6 +81,37 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				field.TooMany(field.NewPath("spec", "podGroups"), scheduling.WorkloadMaxPodGroups+1, scheduling.WorkloadMaxPodGroups).WithOrigin("maxItems"),
 			},
 		},
+		"empty podGroup name": {
+			input: mkValidWorkload(func(obj *scheduling.Workload) {
+				obj.Spec.PodGroups[0].Name = ""
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "podGroups").Index(0).Child("name"), "", ""),
+			},
+		},
+		"invalid podGroup name": {
+			input: mkValidWorkload(func(obj *scheduling.Workload) {
+				obj.Spec.PodGroups[0].Name = "Invalid_Name"
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "podGroups").Index(0).Child("name"), "Invalid_Name", ""),
+			},
+		},
+		"duplicate podGroup names": {
+			input: mkValidWorkload(func(obj *scheduling.Workload) {
+				obj.Spec.PodGroups = append(obj.Spec.PodGroups, scheduling.PodGroup{
+					Name: "main",
+					Policy: scheduling.PodGroupPolicy{
+						Gang: &scheduling.GangSchedulingPolicy{
+							MinCount: 1,
+						},
+					},
+				})
+			}),
+			expectedErrs: field.ErrorList{
+				field.Duplicate(field.NewPath("spec", "podGroups").Index(1).Child("name"), "main"),
+			},
+		},
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {

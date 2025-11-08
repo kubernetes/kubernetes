@@ -58,6 +58,33 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 	return nil
 }
 
+// Validate_PodGroup validates an instance of PodGroup according
+// to declarative validation rules in the API schema.
+func Validate_PodGroup(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *schedulingv1alpha1.PodGroup) (errs field.ErrorList) {
+	// field schedulingv1alpha1.PodGroup.Name
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			errs = append(errs, validate.ShortName(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("name"), &obj.Name, safe.Field(oldObj, func(oldObj *schedulingv1alpha1.PodGroup) *string { return &oldObj.Name }), oldObj != nil)...)
+
+	// field schedulingv1alpha1.PodGroup.Policy has no validation
+	return errs
+}
+
 // Validate_Workload validates an instance of Workload according
 // to declarative validation rules in the API schema.
 func Validate_Workload(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *schedulingv1alpha1.Workload) (errs field.ErrorList) {
@@ -125,6 +152,8 @@ func Validate_WorkloadSpec(ctx context.Context, op operation.Operation, fldPath 
 			if earlyReturn {
 				return // do not proceed
 			}
+			// iterate the list and call the type's validation function
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_PodGroup)...)
 			return
 		}(fldPath.Child("podGroups"), obj.PodGroups, safe.Field(oldObj, func(oldObj *schedulingv1alpha1.WorkloadSpec) []schedulingv1alpha1.PodGroup { return oldObj.PodGroups }), oldObj != nil)...)
 
