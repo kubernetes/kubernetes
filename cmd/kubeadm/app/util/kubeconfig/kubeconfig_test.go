@@ -353,17 +353,49 @@ func TestGetClusterFromKubeConfig(t *testing.T) {
 		config              *clientcmdapi.Config
 		expectedClusterName string
 		expectedCluster     *clientcmdapi.Cluster
+		expectedError       bool
 	}{
 		{
-			name: "cluster is empty",
+			name: "an existing cluster with an empty name is returned directly",
 			config: &clientcmdapi.Config{
-				CurrentContext: "kubernetes",
+				Clusters: map[string]*clientcmdapi.Cluster{
+					"": {Server: "http://foo:8080"},
+				},
+			},
+			expectedClusterName: "",
+			expectedCluster: &clientcmdapi.Cluster{
+				Server: "http://foo:8080",
+			},
+		},
+		{
+			name: "the current context is invalid",
+			config: &clientcmdapi.Config{
+				CurrentContext: "foo",
+				Contexts: map[string]*clientcmdapi.Context{
+					"bar": {AuthInfo: "bar", Cluster: "bar"},
+				},
 			},
 			expectedClusterName: "",
 			expectedCluster:     nil,
+			expectedError:       true,
 		},
 		{
-			name: "cluster and currentContext are not empty",
+			name: "no matching cluster for the current context",
+			config: &clientcmdapi.Config{
+				CurrentContext: "foo",
+				Contexts: map[string]*clientcmdapi.Context{
+					"foo": {AuthInfo: "bar", Cluster: "bar"},
+				},
+				Clusters: map[string]*clientcmdapi.Cluster{
+					"baz": {Server: "https://bar:16443"},
+				},
+			},
+			expectedClusterName: "",
+			expectedCluster:     nil,
+			expectedError:       true,
+		},
+		{
+			name: "valid current context and cluster",
 			config: &clientcmdapi.Config{
 				CurrentContext: "foo",
 				Contexts: map[string]*clientcmdapi.Context{
@@ -380,30 +412,19 @@ func TestGetClusterFromKubeConfig(t *testing.T) {
 				Server: "http://foo:8080",
 			},
 		},
-		{
-			name: "cluster is not empty and currentContext is not in contexts",
-			config: &clientcmdapi.Config{
-				CurrentContext: "foo",
-				Contexts: map[string]*clientcmdapi.Context{
-					"bar": {AuthInfo: "bar", Cluster: "bar"},
-				},
-				Clusters: map[string]*clientcmdapi.Cluster{
-					"foo": {Server: "http://foo:8080"},
-					"bar": {Server: "https://bar:16443"},
-				},
-			},
-			expectedClusterName: "",
-			expectedCluster:     nil,
-		},
 	}
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
-			clusterName, cluster := GetClusterFromKubeConfig(rt.config)
+			clusterName, cluster, err := GetClusterFromKubeConfig(rt.config)
 			if clusterName != rt.expectedClusterName {
 				t.Errorf("got cluster name = %s, expected %s", clusterName, rt.expectedClusterName)
 			}
 			if !reflect.DeepEqual(cluster, rt.expectedCluster) {
 				t.Errorf("got cluster = %+v, expected %+v", cluster, rt.expectedCluster)
+			}
+			if (err != nil) != rt.expectedError {
+				t.Errorf("expected error: %v, got: %v, error: %v",
+					rt.expectedError, err != nil, err)
 			}
 		})
 	}
