@@ -1231,10 +1231,9 @@ func newConstSigFactory(config *constSigPluginConfig) frameworkruntime.PluginFac
 
 func TestSignatures(t *testing.T) {
 	table := []struct {
-		name                 string
-		plugins              []*constSigPluginConfig
-		expectedSignature    string
-		expectUnscheduleable bool
+		name              string
+		plugins           []*constSigPluginConfig
+		expectedSignature string
 	}{
 		{
 			name:              "no plugins",
@@ -1345,7 +1344,7 @@ func TestSignatures(t *testing.T) {
 					pluginType: "filter",
 				},
 			},
-			expectUnscheduleable: true,
+			expectedSignature: fwk.Unsignable,
 		},
 		{
 			name: "error plugin",
@@ -1356,7 +1355,7 @@ func TestSignatures(t *testing.T) {
 					pluginType: "filter",
 				},
 			},
-			expectUnscheduleable: true,
+			expectedSignature: fwk.Unsignable,
 		},
 	}
 	for _, item := range table {
@@ -1392,12 +1391,7 @@ func TestSignatures(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			signature, status := schedFramework.SignPod(ctx, podWithID("foo", ""))
-			if !status.IsSuccess() {
-				if !item.expectUnscheduleable || status.Code() != fwk.Unschedulable {
-					t.Fatalf("Unexpected status %v on %s", status, item.name)
-				}
-			}
+			signature := schedFramework.SignPod(ctx, podWithID("foo", ""))
 			if signature != item.expectedSignature {
 				t.Fatal(fmt.Errorf("Test %s got signature %s, expected %s", item.name, signature, item.expectedSignature))
 			}
