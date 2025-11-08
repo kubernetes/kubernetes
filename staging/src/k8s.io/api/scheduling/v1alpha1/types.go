@@ -124,6 +124,7 @@ type WorkloadSpec struct {
 	// The maximum number of pod groups is 8. This field is immutable.
 	//
 	// +required
+	// +k8s:required
 	// +listType=map
 	// +listMapKey=name
 	PodGroups []PodGroup `json:"podGroups" protobuf:"bytes,2,rep,name=podGroups"`

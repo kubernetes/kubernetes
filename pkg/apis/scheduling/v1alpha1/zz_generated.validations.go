@@ -22,7 +22,16 @@ limitations under the License.
 package v1alpha1
 
 import (
+	context "context"
+	fmt "fmt"
+
+	schedulingv1alpha1 "k8s.io/api/scheduling/v1alpha1"
+	equality "k8s.io/apimachinery/pkg/api/equality"
+	operation "k8s.io/apimachinery/pkg/api/operation"
+	safe "k8s.io/apimachinery/pkg/api/safe"
+	validate "k8s.io/apimachinery/pkg/api/validate"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	field "k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 func init() { localSchemeBuilder.Register(RegisterValidations) }
@@ -30,5 +39,90 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *runtime.Scheme) error {
+	// type Workload
+	scheme.AddValidationFunc((*schedulingv1alpha1.Workload)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_Workload(ctx, op, nil /* fldPath */, obj.(*schedulingv1alpha1.Workload), safe.Cast[*schedulingv1alpha1.Workload](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
+	// type WorkloadList
+	scheme.AddValidationFunc((*schedulingv1alpha1.WorkloadList)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_WorkloadList(ctx, op, nil /* fldPath */, obj.(*schedulingv1alpha1.WorkloadList), safe.Cast[*schedulingv1alpha1.WorkloadList](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
 	return nil
+}
+
+// Validate_Workload validates an instance of Workload according
+// to declarative validation rules in the API schema.
+func Validate_Workload(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *schedulingv1alpha1.Workload) (errs field.ErrorList) {
+	// field schedulingv1alpha1.Workload.TypeMeta has no validation
+	// field schedulingv1alpha1.Workload.ObjectMeta has no validation
+
+	// field schedulingv1alpha1.Workload.Spec
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *schedulingv1alpha1.WorkloadSpec, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_WorkloadSpec(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("spec"), &obj.Spec, safe.Field(oldObj, func(oldObj *schedulingv1alpha1.Workload) *schedulingv1alpha1.WorkloadSpec { return &oldObj.Spec }), oldObj != nil)...)
+
+	return errs
+}
+
+// Validate_WorkloadList validates an instance of WorkloadList according
+// to declarative validation rules in the API schema.
+func Validate_WorkloadList(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *schedulingv1alpha1.WorkloadList) (errs field.ErrorList) {
+	// field schedulingv1alpha1.WorkloadList.TypeMeta has no validation
+	// field schedulingv1alpha1.WorkloadList.ListMeta has no validation
+
+	// field schedulingv1alpha1.WorkloadList.Items
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []schedulingv1alpha1.Workload, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// iterate the list and call the type's validation function
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_Workload)...)
+			return
+		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *schedulingv1alpha1.WorkloadList) []schedulingv1alpha1.Workload { return oldObj.Items }), oldObj != nil)...)
+
+	return errs
+}
+
+// Validate_WorkloadSpec validates an instance of WorkloadSpec according
+// to declarative validation rules in the API schema.
+func Validate_WorkloadSpec(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *schedulingv1alpha1.WorkloadSpec) (errs field.ErrorList) {
+	// field schedulingv1alpha1.WorkloadSpec.ControllerRef has no validation
+
+	// field schedulingv1alpha1.WorkloadSpec.PodGroups
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []schedulingv1alpha1.PodGroup, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("podGroups"), obj.PodGroups, safe.Field(oldObj, func(oldObj *schedulingv1alpha1.WorkloadSpec) []schedulingv1alpha1.PodGroup { return oldObj.PodGroups }), oldObj != nil)...)
+
+	return errs
 }

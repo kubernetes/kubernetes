@@ -80,7 +80,7 @@ func validateWorkloadSpec(spec *scheduling.WorkloadSpec, fldPath *field.Path) fi
 	existingPodGroups := sets.New[string]()
 	podGroupsPath := fldPath.Child("podGroups")
 	if len(spec.PodGroups) == 0 {
-		allErrs = append(allErrs, field.Required(podGroupsPath, "must have at least one item"))
+		allErrs = append(allErrs, field.Required(podGroupsPath, "must have at least one item").MarkCoveredByDeclarative())
 	} else if len(spec.PodGroups) > scheduling.WorkloadMaxPodGroups {
 		allErrs = append(allErrs, field.TooMany(fldPath.Child("podGroups"), len(spec.PodGroups), scheduling.WorkloadMaxPodGroups))
 	} else {

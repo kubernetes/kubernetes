@@ -183,6 +183,7 @@ message WorkloadSpec {
   // The maximum number of pod groups is 8. This field is immutable.
   //
   // +required
+  // +k8s:required
   // +listType=map
   // +listMapKey=name
   repeated PodGroup podGroups = 2;
