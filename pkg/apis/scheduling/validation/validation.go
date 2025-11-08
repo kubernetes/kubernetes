@@ -161,7 +161,7 @@ func validatBasicSchedulingPolicy(policy *scheduling.BasicSchedulingPolicy, fldP
 }
 
 func validateGangSchedulingPolicy(policy *scheduling.GangSchedulingPolicy, fldPath *field.Path) field.ErrorList {
-	allErrs := apivalidation.ValidatePositiveField(int64(policy.MinCount), fldPath.Child("minCount"))
+	allErrs := apivalidation.ValidatePositiveField(int64(policy.MinCount), fldPath.Child("minCount")).WithOrigin("minimum").MarkCoveredByDeclarative()
 	return allErrs
 }
 

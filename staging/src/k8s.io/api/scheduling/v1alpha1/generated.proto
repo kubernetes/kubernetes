@@ -41,6 +41,8 @@ message GangSchedulingPolicy {
   // It must be a positive integer.
   //
   // +required
+  // +k8s:required
+  // +k8s:minimum=1
   optional int32 minCount = 1;
 }
 

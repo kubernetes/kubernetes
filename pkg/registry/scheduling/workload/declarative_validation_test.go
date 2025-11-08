@@ -112,6 +112,22 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				field.Duplicate(field.NewPath("spec", "podGroups").Index(1).Child("name"), "main"),
 			},
 		},
+		"gang minCount zero": {
+			input: mkValidWorkload(func(obj *scheduling.Workload) {
+				obj.Spec.PodGroups[0].Policy.Gang.MinCount = 0
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "podGroups").Index(0).Child("policy", "gang", "minCount"), int64(0), "").WithOrigin("minimum"),
+			},
+		},
+		"gang minCount negative": {
+			input: mkValidWorkload(func(obj *scheduling.Workload) {
+				obj.Spec.PodGroups[0].Policy.Gang.MinCount = -1
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "podGroups").Index(0).Child("policy", "gang", "minCount"), int64(-1), "").WithOrigin("minimum"),
+			},
+		},
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {

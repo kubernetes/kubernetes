@@ -58,6 +58,32 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 	return nil
 }
 
+// Validate_GangSchedulingPolicy validates an instance of GangSchedulingPolicy according
+// to declarative validation rules in the API schema.
+func Validate_GangSchedulingPolicy(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *schedulingv1alpha1.GangSchedulingPolicy) (errs field.ErrorList) {
+	// field schedulingv1alpha1.GangSchedulingPolicy.MinCount
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *int32, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			errs = append(errs, validate.Minimum(ctx, op, fldPath, obj, oldObj, 1)...)
+			return
+		}(fldPath.Child("minCount"), &obj.MinCount, safe.Field(oldObj, func(oldObj *schedulingv1alpha1.GangSchedulingPolicy) *int32 { return &oldObj.MinCount }), oldObj != nil)...)
+
+	return errs
+}
+
 // Validate_PodGroup validates an instance of PodGroup according
 // to declarative validation rules in the API schema.
 func Validate_PodGroup(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *schedulingv1alpha1.PodGroup) (errs field.ErrorList) {
@@ -81,7 +107,40 @@ func Validate_PodGroup(ctx context.Context, op operation.Operation, fldPath *fie
 			return
 		}(fldPath.Child("name"), &obj.Name, safe.Field(oldObj, func(oldObj *schedulingv1alpha1.PodGroup) *string { return &oldObj.Name }), oldObj != nil)...)
 
-	// field schedulingv1alpha1.PodGroup.Policy has no validation
+	// field schedulingv1alpha1.PodGroup.Policy
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *schedulingv1alpha1.PodGroupPolicy, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_PodGroupPolicy(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("policy"), &obj.Policy, safe.Field(oldObj, func(oldObj *schedulingv1alpha1.PodGroup) *schedulingv1alpha1.PodGroupPolicy { return &oldObj.Policy }), oldObj != nil)...)
+
+	return errs
+}
+
+// Validate_PodGroupPolicy validates an instance of PodGroupPolicy according
+// to declarative validation rules in the API schema.
+func Validate_PodGroupPolicy(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *schedulingv1alpha1.PodGroupPolicy) (errs field.ErrorList) {
+	// field schedulingv1alpha1.PodGroupPolicy.Basic has no validation
+
+	// field schedulingv1alpha1.PodGroupPolicy.Gang
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *schedulingv1alpha1.GangSchedulingPolicy, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_GangSchedulingPolicy(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("gang"), obj.Gang, safe.Field(oldObj, func(oldObj *schedulingv1alpha1.PodGroupPolicy) *schedulingv1alpha1.GangSchedulingPolicy {
+			return oldObj.Gang
+		}), oldObj != nil)...)
+
 	return errs
 }
 
