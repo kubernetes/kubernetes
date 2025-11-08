@@ -21,13 +21,17 @@ import (
 	"sort"
 	"sync"
 
+	"k8s.io/klog/v2"
+	"k8s.io/utils/lru"
+
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/controller/history"
 	"k8s.io/kubernetes/pkg/features"
 )
@@ -61,13 +65,15 @@ func NewDefaultStatefulSetControl(
 	podControl *StatefulPodControl,
 	statusUpdater StatefulSetStatusUpdaterInterface,
 	controllerHistory history.Interface) StatefulSetControlInterface {
-	return &defaultStatefulSetControl{podControl, statusUpdater, controllerHistory}
+	return &defaultStatefulSetControl{podControl, statusUpdater, controllerHistory, lru.New(maxRevisionEqualityCacheEntries)}
 }
 
 type defaultStatefulSetControl struct {
 	podControl        *StatefulPodControl
 	statusUpdater     StatefulSetStatusUpdaterInterface
 	controllerHistory history.Interface
+
+	revisionEqualityCache *lru.Cache
 }
 
 // UpdateStatefulSet executes the core logic loop for a stateful set, applying the predictable and
@@ -207,6 +213,49 @@ func (ssc *defaultStatefulSetControl) truncateHistory(
 	return nil
 }
 
+// maxRevisionEqualityCacheEntries is the size of the memory cache for equal set/controllerrevisions.
+// Allowing up to 10,000 entries takes ~1MB. Each entry consumes up to ~111 bytes:
+// - 40 bytes for the cache key (revisionEqualityKey{})
+// - 16 for the cache value (interface{} --> struct{}{})
+// - 36 bytes for the setUID string
+// - 19 bytes for the revisionResourceVersion string
+const maxRevisionEqualityCacheEntries = 10_000
+
+// revisionEqualityKey is the cache key for remembering a particular revision RV
+// is equal to the revision that results from a particular set UID at a particular set generation.
+type revisionEqualityKey struct {
+	setUID                  types.UID
+	setGeneration           int64
+	revisionResourceVersion string
+}
+
+// setMatchesLatestExistingRevision returns true if the set/proposedRevision already matches what would be produced from restoring latestExistingRevision.
+func setMatchesLatestExistingRevision(set *apps.StatefulSet, proposedRevision *apps.ControllerRevision, latestExistingRevision *apps.ControllerRevision, memory *lru.Cache) bool {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetSemanticRevisionComparison) {
+		return false
+	}
+	equalityCacheKey := revisionEqualityKey{setUID: set.UID, setGeneration: set.Generation, revisionResourceVersion: latestExistingRevision.ResourceVersion}
+	if _, ok := memory.Get(equalityCacheKey); ok {
+		return true
+	}
+	// see if reverting to the latest existing revision would produce the same thing as proposedRevision
+	latestSet, err := ApplyRevision(set, latestExistingRevision)
+	if err != nil {
+		return false
+	}
+	legacyscheme.Scheme.Default(latestSet)
+	reconstructedLatestRevision, err := newRevision(latestSet, -1, nil)
+	if err != nil {
+		return false
+	}
+	// if they match, cache this combination of set(uid,generation)+revision(resourceVersion) to minimize expensive comparisons in steady state
+	if history.EqualRevision(proposedRevision, reconstructedLatestRevision) {
+		memory.Add(equalityCacheKey, struct{}{})
+		return true
+	}
+	return false
+}
+
 // getStatefulSetRevisions returns the current and update ControllerRevisions for set. It also
 // returns a collision count that records the number of name collisions set saw when creating
 // new ControllerRevisions. This count is incremented on every name collision and is used in
@@ -250,6 +299,9 @@ func (ssc *defaultStatefulSetControl) getStatefulSetRevisions(
 		if err != nil {
 			return nil, nil, collisionCount, err
 		}
+	} else if revisionCount > 0 && setMatchesLatestExistingRevision(set, updateRevision, revisions[revisionCount-1], ssc.revisionEqualityCache) {
+		// the update revision has not changed
+		updateRevision = revisions[revisionCount-1]
 	} else {
 		//if there is no equivalent revision we create a new one
 		updateRevision, err = ssc.controllerHistory.CreateControllerRevision(set, updateRevision, &collisionCount)
