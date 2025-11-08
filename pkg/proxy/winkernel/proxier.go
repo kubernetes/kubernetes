@@ -406,7 +406,7 @@ func (proxier *Proxier) updateTerminatedEndpoints(eps []proxy.Endpoint, isOldEnd
 func (proxier *Proxier) endpointsMapChange(oldEndpointsMap, newEndpointsMap proxy.EndpointsMap) {
 	// This will optimize remote endpoint and loadbalancer deletion based on the annotation
 	var svcPortMap = make(map[proxy.ServicePortName]bool)
-	clear(proxier.terminatedEndpoints)
+
 	var logLevel klog.Level = 5
 	for svcPortName, eps := range oldEndpointsMap {
 		logFormattedEndpoints("endpointsMapChange oldEndpointsMap", logLevel, svcPortName, eps)
@@ -1229,6 +1229,9 @@ func (proxier *Proxier) syncProxyRules() {
 		return
 	}
 
+	// Clear terminated endpoints map
+	clear(proxier.terminatedEndpoints)
+
 	// We assume that if this was called, we really want to sync them,
 	// even if nothing changed in the meantime. In other words, callers are
 	// responsible for detecting no-op changes and not calling this function.
@@ -1778,10 +1781,11 @@ func (proxier *Proxier) syncProxyRules() {
 		klog.V(5).InfoS("Terminated endpoints ready for deletion", "epIP", epIP)
 		if epToDelete := queriedEndpoints[epIP]; epToDelete != nil && epToDelete.hnsID != "" && !epToDelete.IsLocal() {
 			if refCount := proxier.endPointsRefCount.getRefCount(epToDelete.hnsID); refCount == nil || *refCount == 0 {
-				klog.V(3).InfoS("Deleting unreferenced remote endpoint", "hnsID", epToDelete.hnsID, "IP", epToDelete.ip)
 				err := proxier.hns.deleteEndpoint(epToDelete.hnsID)
 				if err != nil {
 					klog.ErrorS(err, "Deleting unreferenced remote endpoint failed", "hnsID", epToDelete.hnsID)
+				} else {
+					klog.V(3).InfoS("Deleting unreferenced remote endpoint succeeded", "hnsID", epToDelete.hnsID, "IP", epToDelete.ip)
 				}
 			}
 		}
