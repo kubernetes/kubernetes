@@ -30,8 +30,7 @@ import (
 type PodSignatureFunc func(h fwk.Handle, ctx context.Context, p *v1.Pod) string
 
 func signUsingFramework(h fwk.Handle, ctx context.Context, p *v1.Pod) string {
-	sig, _ := h.SignPod(ctx, p)
-	return sig
+	return h.SignPod(ctx, p)
 }
 
 // OpportunisticBatching caches results from filtering and scoring when possible to optimize

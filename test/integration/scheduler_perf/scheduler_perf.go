@@ -154,8 +154,6 @@ var (
 				},
 			},
 			"scheduler_pod_scheduling_duration_seconds": nil,
-			"batch_use_total":    nil,
-			"batch_events_total": nil,
 			"scheduler_plugin_execution_duration_seconds": {
 				{
 					Label:  pluginLabelName,

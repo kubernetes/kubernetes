@@ -430,9 +430,11 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 		}
 	}
 
-	err := f.computeBatchablePlugins()
-	if err != nil {
-		return nil, err
+	if utilfeature.DefaultFeatureGate.Enabled(features.OpportunisticBatching) {
+		err := f.computeBatchablePlugins()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if options.captureProfile != nil {
@@ -803,10 +805,10 @@ func (f *frameworkImpl) computeBatchablePlugins() error {
 
 // SignPod returns a signature for a given pod. Any two pods with the same signature should get
 // the same feasibility and scoring for the same set of nodes in the same state. If one or more plugins
-// is unable to construct a signature for the pod, the result will have "Signable" set to false, which means
+// is unable to construct a signature for the pod, the result will be equal to fwk.Unsignable, which means
 // there is no way to compare this pod against others, and will turn off a number of optimizations
 // for this pod.
-func (f *frameworkImpl) SignPod(ctx context.Context, pod *v1.Pod) (string, *fwk.Status) {
+func (f *frameworkImpl) SignPod(ctx context.Context, pod *v1.Pod) string {
 	logger := klog.FromContext(ctx)
 
 	startTime := time.Now()
@@ -816,7 +818,7 @@ func (f *frameworkImpl) SignPod(ctx context.Context, pod *v1.Pod) (string, *fwk.
 	}()
 
 	if !f.enableSignatures {
-		return fwk.Unsignable, nil
+		return fwk.Unsignable
 	}
 
 	sig := map[string]any{
@@ -832,7 +834,7 @@ func (f *frameworkImpl) SignPod(ctx context.Context, pod *v1.Pod) (string, *fwk.
 			if status.Code() == fwk.Error {
 				logger.V(4).Info("SignPod failed for plugin", "plugin", plugin.Name(), "error", status.AsError())
 			}
-			return fwk.Unsignable, fwk.NewStatus(fwk.Success)
+			return fwk.Unsignable
 		}
 
 		for _, elem := range fragments {
@@ -842,10 +844,11 @@ func (f *frameworkImpl) SignPod(ctx context.Context, pod *v1.Pod) (string, *fwk.
 
 	sigBytes, err := json.Marshal(sig)
 	if err != nil {
-		return "", fwk.AsStatus(fmt.Errorf("error marshalling signature object %w", err))
+		logger.V(4).Info("SignPod failed to marshal signature object", "error", err)
+		return fwk.Unsignable
 	}
 
-	return string(sigBytes), nil
+	return string(sigBytes)
 }
 
 // RunPreFilterPlugins runs the set of configured PreFilter plugins. It returns
