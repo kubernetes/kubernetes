@@ -17,6 +17,7 @@ limitations under the License.
 package workload
 
 import (
+	"fmt"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -62,6 +63,24 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				field.Required(field.NewPath("spec", "podGroups"), "must have at least one item"),
 			},
 		},
+		"too many podGroups": {
+			input: mkValidWorkload(func(obj *scheduling.Workload) {
+				obj.Spec.PodGroups = make([]scheduling.PodGroup, scheduling.WorkloadMaxPodGroups+1)
+				for i := range obj.Spec.PodGroups {
+					obj.Spec.PodGroups[i] = scheduling.PodGroup{
+						Name: fmt.Sprintf("group-%d", i),
+						Policy: scheduling.PodGroupPolicy{
+							Gang: &scheduling.GangSchedulingPolicy{
+								MinCount: 1,
+							},
+						},
+					}
+				}
+			}),
+			expectedErrs: field.ErrorList{
+				field.TooMany(field.NewPath("spec", "podGroups"), scheduling.WorkloadMaxPodGroups+1, scheduling.WorkloadMaxPodGroups).WithOrigin("maxItems"),
+			},
+		},
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
@@ -94,4 +113,3 @@ func mkValidWorkload(tweaks ...func(obj *scheduling.Workload)) scheduling.Worklo
 	}
 	return obj
 }
-
