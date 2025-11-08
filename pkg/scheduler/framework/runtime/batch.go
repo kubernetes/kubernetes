@@ -71,24 +71,18 @@ func (b *OpportunisticBatch) GetNodeHint(ctx context.Context, pod *v1.Pod, state
 	logger := klog.FromContext(ctx)
 	var hint string
 
-<<<<<<< HEAD
-	signature := b.signatureFunc(pod)
-
-	nodeInfos := b.handle.SnapshotSharedLister().NodeInfos()
-=======
 	startTime := time.Now()
 	defer func() {
 		hinted := "hint"
 		if hint == "" {
 			hinted = "no_hint"
 		}
-		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.GetNodeHint, hinted, b.profileName).Observe(metrics.SinceInSeconds(startTime))
+		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.GetNodeHint, hinted, b.handle.ProfileName()).Observe(metrics.SinceInSeconds(startTime))
 	}()
 
 	signature := b.signatureFunc(b.handle, ctx, pod)
-	logger.V(3).Info("OpportunisticBatch getting hint",
-		"profile", b.profileName, "pod", pod.GetUID(), "signature", signature, "cycleCount", cycleCount)
->>>>>>> 7ae3fc42906 (Integrate batching with signatures.)
+
+	nodeInfos := b.handle.SnapshotSharedLister().NodeInfos()
 
 	// If we don't have state that we can use, then return an empty hint.
 	if !b.batchStateCompatible(ctx, logger, pod, signature, cycleCount, state, nodeInfos) {
@@ -100,12 +94,7 @@ func (b *OpportunisticBatch) GetNodeHint(ctx context.Context, pod *v1.Pod, state
 
 	// Otherwise, pop the head of the list in our state and return it as
 	// a hint. Also record it in our data to compare on storage.
-<<<<<<< HEAD
-	hint := b.state.sortedNodes.Pop()
-=======
-	metrics.BatchUsageStats.WithLabelValues(metrics.BatchResultHint).Inc()
 	hint = b.state.sortedNodes.Pop()
->>>>>>> 7ae3fc42906 (Integrate batching with signatures.)
 	logger.V(3).Info("OpportunisticBatch provided node hint",
 		"profile", b.handle.ProfileName(), "pod", klog.KObj(pod), "cycleCount", cycleCount, "hint", hint,
 		"remainingNodes", b.state.sortedNodes.Len())
@@ -119,7 +108,7 @@ func (b *OpportunisticBatch) StoreScheduleResults(ctx context.Context, signature
 
 	startTime := time.Now()
 	defer func() {
-		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.StoreScheduleResults, "", b.profileName).Observe(metrics.SinceInSeconds(startTime))
+		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.StoreScheduleResults, "", b.handle.ProfileName()).Observe(metrics.SinceInSeconds(startTime))
 	}()
 
 	// Set our cycle information for next time.
