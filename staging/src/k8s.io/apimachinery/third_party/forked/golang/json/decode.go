@@ -621,6 +621,7 @@ func (d *decodeState) object(v reflect.Value) error {
 	}
 
 	var fields []field
+	var unknownFieldsIndex []int
 
 	// Check type of target:
 	//   struct or
@@ -646,7 +647,10 @@ func (d *decodeState) object(v reflect.Value) error {
 		}
 	case reflect.Struct:
 		fields = cachedTypeFields(t)
-		// ok
+		unknownFieldsIndex = findUnknownFieldsIndex(t)
+		if len(unknownFieldsIndex) > 0 {
+			d.resetUnknownFields(v, unknownFieldsIndex)
+		}
 	default:
 		d.saveError(&UnmarshalTypeError{Value: "object", Type: t, Offset: int64(d.off)})
 		d.skip()
@@ -682,6 +686,8 @@ func (d *decodeState) object(v reflect.Value) error {
 		// Figure out field corresponding to key.
 		var subv reflect.Value
 		destring := false // whether the value is wrapped in a string to be decoded first
+		captureUnknown := false
+		var unknownKey string
 
 		if v.Kind() == reflect.Map {
 			elemType := t.Elem()
@@ -731,6 +737,9 @@ func (d *decodeState) object(v reflect.Value) error {
 				d.errorContext.FieldStack = append(d.errorContext.FieldStack, f.name)
 			} else if d.disallowUnknownFields {
 				d.saveError(fmt.Errorf("json: unknown field %q", key))
+			} else if len(unknownFieldsIndex) > 0 {
+				captureUnknown = true
+				unknownKey = string(key)
 			}
 		}
 
@@ -755,6 +764,10 @@ func (d *decodeState) object(v reflect.Value) error {
 				}
 			default:
 				d.saveError(fmt.Errorf("json: invalid use of ,string struct tag, trying to unmarshal unquoted value into %v", subv.Type()))
+			}
+		} else if captureUnknown {
+			if err := d.captureUnknownStructField(v, unknownFieldsIndex, unknownKey); err != nil {
+				return err
 			}
 		} else {
 			if err := d.value(subv); err != nil {
@@ -840,6 +853,79 @@ func lookupStructField(fields []field, key []byte) *field {
 		}
 	}
 	return nil
+}
+
+func findUnknownFieldsIndex(t reflect.Type) []int {
+	sf, ok := t.FieldByName("UnknownFields")
+	if !ok {
+		return nil
+	}
+	if !sf.IsExported() {
+		return nil
+	}
+	if sf.Type.Kind() != reflect.Map {
+		return nil
+	}
+	if sf.Type.Key().Kind() != reflect.String {
+		return nil
+	}
+	elem := sf.Type.Elem()
+	if elem.Kind() != reflect.Interface || elem.NumMethod() != 0 {
+		return nil
+	}
+	return sf.Index
+}
+
+func (d *decodeState) resetUnknownFields(v reflect.Value, index []int) {
+	if len(index) == 0 {
+		return
+	}
+	if field, ok := d.unknownFieldsValue(v, index, false); ok {
+		field.SetZero()
+	}
+}
+
+func (d *decodeState) captureUnknownStructField(v reflect.Value, index []int, key string) error {
+	val := d.valueInterface()
+	field, ok := d.unknownFieldsValue(v, index, true)
+	if !ok {
+		return nil
+	}
+	if field.IsNil() {
+		field.Set(reflect.MakeMap(field.Type()))
+	}
+	field.SetMapIndex(reflect.ValueOf(key), reflect.ValueOf(val))
+	return nil
+}
+
+func (d *decodeState) unknownFieldsValue(v reflect.Value, index []int, allocate bool) (reflect.Value, bool) {
+	field := v
+	for _, ind := range index {
+		if field.Kind() == reflect.Pointer {
+			if field.IsNil() {
+				if !allocate {
+					return reflect.Value{}, false
+				}
+				if !field.CanSet() {
+					d.saveError(fmt.Errorf("json: cannot set embedded pointer to unexported struct: %v", field.Type().Elem()))
+					return reflect.Value{}, false
+				}
+				field.Set(reflect.New(field.Type().Elem()))
+			}
+			field = field.Elem()
+		}
+		if field.Kind() != reflect.Struct {
+			return reflect.Value{}, false
+		}
+		field = field.Field(ind)
+	}
+	if field.Kind() != reflect.Map {
+		return reflect.Value{}, false
+	}
+	if !field.CanSet() {
+		return reflect.Value{}, false
+	}
+	return field, true
 }
 
 // convertNumber converts the number literal s to a float64 or a Number
