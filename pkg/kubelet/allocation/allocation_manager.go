@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/status"
@@ -187,6 +188,7 @@ func NewInMemoryManager(nodeConfig cm.NodeConfig,
 	getActivePods func() []*v1.Pod,
 	getPodByUID func(types.UID) (*v1.Pod, bool),
 	sourcesReady config.SourcesReady,
+	recorder record.EventRecorder,
 ) Manager {
 	return &manager{
 		allocated: state.NewStateMemory(nil),
@@ -201,6 +203,7 @@ func NewInMemoryManager(nodeConfig cm.NodeConfig,
 		triggerPodSync: triggerPodSync,
 		getActivePods:  getActivePods,
 		getPodByUID:    getPodByUID,
+		recorder:       recorder,
 	}
 }
 
@@ -563,6 +566,7 @@ func (m *manager) handlePodResourcesResize(pod *v1.Pod) (bool, error) {
 		if err := m.SetAllocatedResources(pod); err != nil {
 			return false, err
 		}
+		allocatedPod = pod
 		m.statusManager.ClearPodResizePendingCondition(pod.UID)
 
 		// Clear any errors that may have been surfaced from a previous resize and update the
@@ -570,11 +574,21 @@ func (m *manager) handlePodResourcesResize(pod *v1.Pod) (bool, error) {
 		m.statusManager.ClearPodResizeInProgressCondition(pod.UID)
 		m.statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", pod.Generation)
 
+		msg := events.PodResizeStartedMsg(allocatedPod, pod.Generation)
+		m.recorder.Eventf(pod, v1.EventTypeNormal, events.ResizeStarted, msg)
+
 		return true, nil
 	}
 
 	if reason != "" {
-		m.statusManager.SetPodResizePendingCondition(pod.UID, reason, message, pod.Generation)
+		if m.statusManager.SetPodResizePendingCondition(pod.UID, reason, message, pod.Generation) {
+			eventType := events.ResizeDeferred
+			if reason == v1.PodReasonInfeasible {
+				eventType = events.ResizeInfeasible
+			}
+			msg := events.PodResizePendingMsg(pod, reason, message, pod.Generation)
+			m.recorder.Eventf(pod, v1.EventTypeWarning, eventType, msg)
+		}
 	}
 
 	return false, nil

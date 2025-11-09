@@ -435,6 +435,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 	opts.AllowRelaxedEnvironmentVariableValidation = useRelaxedEnvironmentVariableValidation(podSpec, oldPodSpec)
 	opts.AllowRelaxedDNSSearchValidation = useRelaxedDNSSearchValidation(oldPodSpec)
 	opts.AllowEnvFilesValidation = useAllowEnvFilesValidation(oldPodSpec)
+	opts.AllowUserNamespacesHostNetworkSupport = useAllowUserNamespacesHostNetworkSupport(oldPodSpec)
 
 	opts.AllowOnlyRecursiveSELinuxChangePolicy = useOnlyRecursiveSELinuxChangePolicy(oldPodSpec)
 
@@ -533,6 +534,23 @@ func hasDotOrUnderscore(searches []string) bool {
 		}
 	}
 	return false
+}
+
+func useAllowUserNamespacesHostNetworkSupport(oldPodSpec *api.PodSpec) bool {
+	// Return true early if feature gate is enabled
+	if utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesHostNetworkSupport) {
+		return true
+	}
+
+	if oldPodSpec == nil || oldPodSpec.SecurityContext == nil || oldPodSpec.SecurityContext.HostUsers == nil {
+		return false
+	}
+
+	// If a pod with user namespaces and hostNetwork already exists in the cluster,
+	// this allows it to continue using the UserNamespacesHostNetworkSupport
+	// validation logic even after the feature gate is disabled.
+	userNamespaces := !*oldPodSpec.SecurityContext.HostUsers
+	return oldPodSpec.SecurityContext.HostNetwork && userNamespaces
 }
 
 func useAllowEnvFilesValidation(oldPodSpec *api.PodSpec) bool {
@@ -731,6 +749,7 @@ func dropDisabledFields(
 	dropDisabledDynamicResourceAllocationFields(podSpec, oldPodSpec)
 	dropDisabledClusterTrustBundleProjection(podSpec, oldPodSpec)
 	dropDisabledPodCertificateProjection(podSpec, oldPodSpec)
+	dropDisabledWorkloadRef(podSpec, oldPodSpec)
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && !inPlacePodVerticalScalingInUse(oldPodSpec) {
 		// Drop ResizePolicy fields. Don't drop updates to Resources field as template.spec.resources
@@ -1767,4 +1786,20 @@ func containerRestartRulesInUse(oldPodSpec *api.PodSpec) bool {
 		}
 	}
 	return false
+}
+
+// dropDisabledWorkloadRef removes pod workload reference from its spec
+// unless it is already used by the old pod spec.
+func dropDisabledWorkloadRef(podSpec, oldPodSpec *api.PodSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) && !workloadRefInUse(oldPodSpec) {
+		podSpec.WorkloadRef = nil
+	}
+}
+
+func workloadRefInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+
+	return podSpec.WorkloadRef != nil
 }

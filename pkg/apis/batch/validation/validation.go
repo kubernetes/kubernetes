@@ -23,9 +23,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/robfig/cron/v3"
-
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	apimachineryapivalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/labels"
@@ -36,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/kubernetes/pkg/util/parsers"
 	"k8s.io/utils/ptr"
 )
 
@@ -150,7 +150,7 @@ func validateGeneratedSelector(obj *batch.Job, validateBatchLabels bool) field.E
 // ValidateJob validates a Job and returns an ErrorList with any errors.
 func ValidateJob(job *batch.Job, opts JobValidationOptions) field.ErrorList {
 	// Jobs and rcs have the same name validation
-	allErrs := apivalidation.ValidateObjectMeta(&job.ObjectMeta, true, apivalidation.ValidateReplicationControllerName, field.NewPath("metadata"))
+	allErrs := apivalidation.ValidateObjectMeta(&job.ObjectMeta, true, apimachineryapivalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
 	allErrs = append(allErrs, validateGeneratedSelector(job, opts.RequirePrefixedLabels)...)
 	allErrs = append(allErrs, ValidateJobSpec(&job.Spec, field.NewPath("spec"), opts.PodValidationOptions)...)
 	if job.Spec.CompletionMode != nil && *job.Spec.CompletionMode == batch.IndexedCompletion && job.Spec.Completions != nil && *job.Spec.Completions > 0 {
@@ -660,7 +660,49 @@ func validatePodTemplateUpdate(spec, oldSpec batch.JobSpec, fldPath *field.Path,
 		oldTemplate.Labels = template.Labels                             // +k8s:verify-mutation:reason=clone
 		oldTemplate.Spec.SchedulingGates = template.Spec.SchedulingGates // +k8s:verify-mutation:reason=clone
 	}
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(template, oldTemplate, fldPath.Child("template"))...)
+	suspended := oldSpec.Suspend != nil && *oldSpec.Suspend
+	if !suspended {
+		// if the job isn't suspended, then we cannot allow any mutation of the template
+		allErrs = append(allErrs, apivalidation.ValidateImmutableField(template, oldTemplate, fldPath.Child("template"))...)
+	} else {
+		if !opts.AllowMutablePodResources {
+			allErrs = append(allErrs, apivalidation.ValidateImmutableField(template, oldTemplate, fldPath.Child("template"))...)
+		} else {
+			// Only allow container resource updates when AllowMutablePodResources is true
+			allErrs = append(allErrs, validatePodResourceUpdatesOnly(template.Spec, oldTemplate.Spec, fldPath.Child("template.spec"))...)
+		}
+	}
+	return allErrs
+}
+
+// validatePodResourceUpdatesOnly will validate that only container resources are updated.
+func validatePodResourceUpdatesOnly(newPod api.PodSpec, oldPod api.PodSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	// Create a deep copy of the old pod spec to modify
+	oldPodCopy := oldPod.DeepCopy()
+	// Update container resources in the copy to match the new pod spec
+	if len(newPod.Containers) == len(oldPodCopy.Containers) {
+		for i := range newPod.Containers {
+			if oldPodCopy.Containers[i].Name == newPod.Containers[i].Name {
+				oldPodCopy.Containers[i].Resources = newPod.Containers[i].Resources // +k8s:verify-mutation:reason=clone
+			}
+		}
+	}
+
+	// Update init container resources in the copy to match the new pod spec
+	if len(newPod.InitContainers) == len(oldPodCopy.InitContainers) {
+		for i := range newPod.InitContainers {
+			if oldPodCopy.InitContainers[i].Name == newPod.InitContainers[i].Name {
+				oldPodCopy.InitContainers[i].Resources = newPod.InitContainers[i].Resources // +k8s:verify-mutation:reason=clone
+			}
+		}
+	}
+
+	// Validate that the modified copy is identical to the new pod spec
+	// This ensures only container resources were changed
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(newPod, *oldPodCopy, fldPath)...)
+
 	return allErrs
 }
 
@@ -714,7 +756,7 @@ func ValidateJobStatusUpdate(job, oldJob *batch.Job, opts JobStatusValidationOpt
 // ValidateCronJobCreate validates a CronJob on creation and returns an ErrorList with any errors.
 func ValidateCronJobCreate(cronJob *batch.CronJob, opts apivalidation.PodValidationOptions) field.ErrorList {
 	// CronJobs and rcs have the same name validation
-	allErrs := apivalidation.ValidateObjectMeta(&cronJob.ObjectMeta, true, apivalidation.ValidateReplicationControllerName, field.NewPath("metadata"))
+	allErrs := apivalidation.ValidateObjectMeta(&cronJob.ObjectMeta, true, apimachineryapivalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
 	allErrs = append(allErrs, validateCronJobSpec(&cronJob.Spec, nil, field.NewPath("spec"), opts)...)
 	if len(cronJob.ObjectMeta.Name) > apimachineryvalidation.DNS1035LabelMaxLength-11 {
 		// The cronjob controller appends a 11-character suffix to the cronjob (`-$TIMESTAMP`) when
@@ -790,7 +832,8 @@ func validateConcurrencyPolicy(concurrencyPolicy *batch.ConcurrencyPolicy, fldPa
 
 func validateScheduleFormat(schedule string, allowTZInSchedule bool, timeZone *string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if _, err := cron.ParseStandard(schedule); err != nil {
+
+	if _, err := parsers.ParseCronScheduleWithPanicRecovery(schedule); err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath, schedule, err.Error()))
 	}
 	switch {
@@ -913,6 +956,15 @@ func IsConditionTrue(list []batch.JobCondition, cType batch.JobConditionType) bo
 	return false
 }
 
+func IsConditionFalse(list []batch.JobCondition, cType batch.JobConditionType) bool {
+	for _, c := range list {
+		if c.Type == cType && c.Status == api.ConditionFalse {
+			return true
+		}
+	}
+	return false
+}
+
 func validateFailedIndexesNotOverlapCompleted(completedIndexesStr string, failedIndexesStr string, completions int32) error {
 	if len(completedIndexesStr) == 0 || len(failedIndexesStr) == 0 {
 		return nil
@@ -1013,6 +1065,8 @@ type JobValidationOptions struct {
 	AllowMutableSchedulingDirectives bool
 	// Require Job to have the label on batch.kubernetes.io/job-name and batch.kubernetes.io/controller-uid
 	RequirePrefixedLabels bool
+	// Allow mutable pod resources
+	AllowMutablePodResources bool
 }
 
 type JobStatusValidationOptions struct {

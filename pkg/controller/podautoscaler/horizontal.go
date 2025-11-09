@@ -199,20 +199,26 @@ func NewHorizontalController(
 // Run begins watching and syncing.
 func (a *HorizontalController) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
-	defer a.queue.ShutDown()
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting HPA controller")
-	defer logger.Info("Shutting down HPA controller")
+
+	var wg sync.WaitGroup
+	defer func() {
+		logger.Info("Shutting down HPA controller")
+		a.queue.ShutDown()
+		wg.Wait()
+	}()
 
 	if !cache.WaitForNamedCacheSyncWithContext(ctx, a.hpaListerSynced, a.podListerSynced) {
 		return
 	}
 
 	for i := 0; i < workers; i++ {
-		go wait.UntilWithContext(ctx, a.worker, time.Second)
+		wg.Go(func() {
+			wait.UntilWithContext(ctx, a.worker, time.Second)
+		})
 	}
-
 	<-ctx.Done()
 }
 
@@ -952,6 +958,9 @@ func (a *HorizontalController) reconcileAutoscaler(ctx context.Context, hpaShare
 	}
 
 	a.setStatus(hpa, currentReplicas, desiredReplicas, metricStatuses, rescale)
+
+	// Monitor the desired replicas
+	a.monitor.ObserveDesiredReplicas(hpa.Namespace, hpa.Name, desiredReplicas)
 
 	err = a.updateStatusIfNeeded(ctx, hpaStatusOriginal, hpa)
 	if err != nil {

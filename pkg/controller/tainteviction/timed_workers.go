@@ -19,6 +19,7 @@ package tainteviction
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"k8s.io/apimachinery/pkg/types"
@@ -54,35 +55,54 @@ type TimedWorker struct {
 	CreatedAt time.Time
 	FireAt    time.Time
 	Timer     clock.Timer
+	cancelled atomic.Bool
 }
 
 // createWorker creates a TimedWorker that will execute `f` not earlier than `fireAt`.
 // Returns nil if the work was started immediately and doesn't need a timer.
-func createWorker(ctx context.Context, args *WorkArgs, createdAt time.Time, fireAt time.Time, f func(ctx context.Context, fireAt time.Time, args *WorkArgs) error, clock clock.WithDelayedExecution) *TimedWorker {
+func createWorker(ctx context.Context, wg *sync.WaitGroup, args *WorkArgs, createdAt time.Time, fireAt time.Time, f func(ctx context.Context, fireAt time.Time, args *WorkArgs) error, clock clock.WithDelayedExecution) *TimedWorker {
 	delay := fireAt.Sub(createdAt)
 	logger := klog.FromContext(ctx)
-	fWithErrorLogging := func() {
-		err := f(ctx, fireAt, args)
-		if err != nil {
-			logger.Error(err, "TaintEvictionController: timed worker failed")
-		}
-	}
-	if delay <= 0 {
-		go fWithErrorLogging()
-		return nil
-	}
-	timer := clock.AfterFunc(delay, fWithErrorLogging)
-	return &TimedWorker{
+
+	worker := TimedWorker{
 		WorkItem:  args,
 		CreatedAt: createdAt,
 		FireAt:    fireAt,
-		Timer:     timer,
 	}
+
+	// This dance with the cancelled flag is here so that we can be sure that once TimedWorker.Cancel returns,
+	// we either never get to any processing, or the thread is already registered with the WaitGroup.
+	// Otherwise, the following sequence can happen:
+	//   1. TimedWorker.Timer fires and gets to go wrapper().
+	//   2. TimedWorker.Cancel is called to stop the timer, but a goroutine is already running.
+	//      It's started, but wg.Go hasn't been called yet to register the goroutine.
+	//   3. We call wg.Wait, which unblocks, because the inner wg.Go hasn't been called yet.
+	//      This causes wg.Wait to unblock after TimedWorker.Cancel is called and still start a goroutine.
+	// So in our case we can still get to starting an unregistered goroutine, but it will exit immediately.
+	wrapper := func() {
+		wg.Go(func() {
+			if worker.cancelled.Load() {
+				return
+			}
+			if err := f(ctx, fireAt, args); err != nil {
+				logger.Error(err, "TaintEvictionController: timed worker failed")
+			}
+		})
+	}
+	if delay <= 0 {
+		wrapper()
+		return nil
+	}
+	worker.Timer = clock.AfterFunc(delay, wrapper)
+	return &worker
 }
 
 // Cancel cancels the execution of function by the `TimedWorker`
 func (w *TimedWorker) Cancel() {
 	if w != nil {
+		// Mark the worker as cancelled.
+		// This ensures the worker is either already running or unstarted on return from Cancel.
+		w.cancelled.Store(true)
 		w.Timer.Stop()
 	}
 }
@@ -93,6 +113,7 @@ type TimedWorkerQueue struct {
 	// map of workers keyed by string returned by 'KeyFromWorkArgs' from the given worker.
 	// Entries may be nil if the work didn't need a timer and is already running.
 	workers  map[string]*TimedWorker
+	workerWG sync.WaitGroup
 	workFunc func(ctx context.Context, fireAt time.Time, args *WorkArgs) error
 	clock    clock.WithDelayedExecution
 }
@@ -134,7 +155,7 @@ func (q *TimedWorkerQueue) AddWork(ctx context.Context, args *WorkArgs, createdA
 		return
 	}
 	logger.V(4).Info("Adding TimedWorkerQueue item and to be fired at firedTime", "item", key, "createTime", createdAt, "firedTime", fireAt)
-	worker := createWorker(ctx, args, createdAt, fireAt, q.getWrappedWorkerFunc(key), q.clock)
+	worker := createWorker(ctx, &q.workerWG, args, createdAt, fireAt, q.getWrappedWorkerFunc(key), q.clock)
 	q.workers[key] = worker
 }
 
@@ -159,7 +180,7 @@ func (q *TimedWorkerQueue) UpdateWork(ctx context.Context, args *WorkArgs, creat
 		worker.Cancel()
 	}
 	logger.V(4).Info("Adding TimedWorkerQueue item and to be fired at firedTime", "item", key, "createTime", createdAt, "firedTime", fireAt)
-	worker := createWorker(ctx, args, createdAt, fireAt, q.getWrappedWorkerFunc(key), q.clock)
+	worker := createWorker(ctx, &q.workerWG, args, createdAt, fireAt, q.getWrappedWorkerFunc(key), q.clock)
 	q.workers[key] = worker
 }
 
@@ -188,4 +209,16 @@ func (q *TimedWorkerQueue) GetWorkerUnsafe(key string) *TimedWorker {
 	q.Lock()
 	defer q.Unlock()
 	return q.workers[key]
+}
+
+// CancelAndWait cancels all workers and waits for all running threads to terminate before returning.
+func (q *TimedWorkerQueue) CancelAndWait() {
+	// Wait must be called after Unlock, otherwise this hangs.
+	defer q.workerWG.Wait()
+	q.Lock()
+	defer q.Unlock()
+	for _, worker := range q.workers {
+		worker.Cancel()
+	}
+	q.workers = make(map[string]*TimedWorker)
 }

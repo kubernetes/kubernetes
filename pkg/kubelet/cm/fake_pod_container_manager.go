@@ -20,8 +20,9 @@ import (
 	"reflect"
 	"sync"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog/v2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -52,7 +53,7 @@ func (m *FakePodContainerManager) Exists(_ *v1.Pod) bool {
 	return true
 }
 
-func (m *FakePodContainerManager) EnsureExists(_ *v1.Pod) error {
+func (m *FakePodContainerManager) EnsureExists(_ klog.Logger, _ *v1.Pod) error {
 	m.Lock()
 	defer m.Unlock()
 	m.CalledFunctions = append(m.CalledFunctions, "EnsureExists")
@@ -66,7 +67,7 @@ func (m *FakePodContainerManager) GetPodContainerName(_ *v1.Pod) (CgroupName, st
 	return nil, ""
 }
 
-func (m *FakePodContainerManager) Destroy(name CgroupName) error {
+func (m *FakePodContainerManager) Destroy(_ klog.Logger, name CgroupName) error {
 	m.Lock()
 	defer m.Unlock()
 	m.CalledFunctions = append(m.CalledFunctions, "Destroy")
@@ -79,7 +80,7 @@ func (m *FakePodContainerManager) Destroy(name CgroupName) error {
 	return nil
 }
 
-func (m *FakePodContainerManager) ReduceCPULimits(_ CgroupName) error {
+func (m *FakePodContainerManager) ReduceCPULimits(_ klog.Logger, _ CgroupName) error {
 	m.Lock()
 	defer m.Unlock()
 	m.CalledFunctions = append(m.CalledFunctions, "ReduceCPULimits")
@@ -119,7 +120,7 @@ func (cm *FakePodContainerManager) GetPodCgroupConfig(_ *v1.Pod, _ v1.ResourceNa
 	return nil, nil
 }
 
-func (cm *FakePodContainerManager) SetPodCgroupConfig(pod *v1.Pod, resourceConfig *ResourceConfig) error {
+func (cm *FakePodContainerManager) SetPodCgroupConfig(_ klog.Logger, pod *v1.Pod, resourceConfig *ResourceConfig) error {
 	cm.Lock()
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "SetPodCgroupConfig")

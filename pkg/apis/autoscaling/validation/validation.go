@@ -50,7 +50,7 @@ func ValidateScale(scale *autoscaling.Scale) field.ErrorList {
 
 // ValidateHorizontalPodAutoscalerName can be used to check whether the given autoscaler name is valid.
 // Prefix indicates this name will be used as part of generation, in which case trailing dashes are allowed.
-var ValidateHorizontalPodAutoscalerName = apivalidation.ValidateReplicationControllerName
+var ValidateHorizontalPodAutoscalerName = apimachineryvalidation.NameIsDNSSubdomain
 
 func validateHorizontalPodAutoscalerSpec(autoscaler autoscaling.HorizontalPodAutoscalerSpec, fldPath *field.Path, opts HorizontalPodAutoscalerSpecValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}

@@ -19,13 +19,17 @@ package node
 import (
 	"context"
 	"fmt"
+	"os"
 	"path"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eregistry "k8s.io/kubernetes/test/e2e/framework/registry"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -36,7 +40,7 @@ import (
 
 var _ = SIGDescribe("Container Runtime", func() {
 	f := framework.NewDefaultFramework("container-runtime")
-	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged // custom registry pods need HostPorts
 
 	ginkgo.Describe("blackbox test", func() {
 		ginkgo.Context("when starting a container that exits", func() {
@@ -254,28 +258,47 @@ while true; do sleep 1; done
 			})
 		})
 
-		ginkgo.Context("when running a container with a new image", func() {
+		framework.Context("when running a container with a new image", framework.WithSerial(), func() {
+			var registryAddress string
+			ginkgo.BeforeEach(func(ctx context.Context) {
+				var err error
+
+				registryAddress, _, err = e2eregistry.SetupRegistry(ctx, f, true)
+				framework.ExpectNoError(err)
+				// we need to wait for the registry to be removed and so we need to delete the whole NS ourselves
+				ginkgo.DeferCleanup(func(ctx context.Context) {
+					f.DeleteNamespace(ctx, f.Namespace.Name)
+				})
+			})
 
 			// Images used for ConformanceContainer are not added into NodePrePullImageList, because this test is
 			// testing image pulling, these images don't need to be prepulled. The ImagePullPolicy
 			// is v1.PullAlways, so it won't be blocked by framework image pre-pull list check.
-			imagePullTest := func(ctx context.Context, image string, expectedPhase v1.PodPhase, expectedPullStatus bool, windowsImage bool) {
-				command := []string{"/bin/sh", "-c", "while true; do sleep 1; done"}
-				if windowsImage {
-					// -t: Ping the specified host until stopped.
-					command = []string{"ping", "-t", "localhost"}
-				}
+			imagePullTest := func(ctx context.Context, image string, hasSecret bool, expectedPhase v1.PodPhase, expectedPullStatus bool) {
 				container := ConformanceContainer{
 					PodClient: e2epod.NewPodClient(f),
 					Container: v1.Container{
 						Name:            "image-pull-test",
 						Image:           image,
-						Command:         command,
 						ImagePullPolicy: v1.PullAlways,
 					},
 					RestartPolicy: v1.RestartPolicyNever,
 				}
-
+				if hasSecret {
+					secret := e2eregistry.User1DockerSecret(registryAddress)
+					secret.Name = "image-pull-secret-" + string(uuid.NewUUID())
+					// we might be told to use a different docker config JSON.
+					if framework.TestContext.DockerConfigFile != "" {
+						contents, err := os.ReadFile(framework.TestContext.DockerConfigFile)
+						framework.ExpectNoError(err)
+						secret.Data[v1.DockerConfigJsonKey] = contents
+					}
+					ginkgo.By("create image pull secret")
+					_, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(ctx, secret, metav1.CreateOptions{})
+					framework.ExpectNoError(err)
+					ginkgo.DeferCleanup(framework.IgnoreNotFound(f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Delete), secret.Name, metav1.DeleteOptions{})
+					container.ImagePullSecrets = []string{secret.Name}
+				}
 				// checkContainerStatus checks whether the container status matches expectation.
 				checkContainerStatus := func(ctx context.Context) error {
 					status, err := container.GetStatus(ctx)
@@ -293,6 +316,7 @@ while true; do sleep 1; done
 					}
 					if expectedPullStatus {
 						if status.State.Waiting == nil {
+							gomega.Expect(status.State.Running).To(gomega.BeNil())
 							return fmt.Errorf("expected container state: Waiting, got: %q",
 								GetContainerState(status.State))
 						}
@@ -340,24 +364,23 @@ while true; do sleep 1; done
 
 			f.It("should not be able to pull image from invalid registry", f.WithNodeConformance(), func(ctx context.Context) {
 				image := imageutils.GetE2EImage(imageutils.InvalidRegistryImage)
-				imagePullTest(ctx, image, v1.PodPending, true, false)
+				imagePullTest(ctx, image, false, v1.PodPending, true)
 			})
 
 			f.It("should be able to pull image", f.WithNodeConformance(), func(ctx context.Context) {
-				// NOTE(claudiub): The agnhost image is supposed to work on both Linux and Windows.
 				image := imageutils.GetE2EImage(imageutils.Agnhost)
-				imagePullTest(ctx, image, v1.PodRunning, false, false)
+				imagePullTest(ctx, image, false, v1.PodRunning, false)
 			})
 
-			// TODO: https://github.com/kubernetes/kubernetes/issues/130271
-			// Switch this to use a locally hosted private image and not depend on this host
 			f.It("should not be able to pull from private registry without secret", f.WithNodeConformance(), func(ctx context.Context) {
-				image := imageutils.GetE2EImage(imageutils.AuthenticatedAlpine)
-				imagePullTest(ctx, image, v1.PodPending, true, false)
+				image := registryAddress + "/pause:testing"
+				imagePullTest(ctx, image, false, v1.PodPending, true)
 			})
 
-			// TODO: https://github.com/kubernetes/kubernetes/issues/130271
-			// Add a sustainable test for pulling with a private registry secret
+			f.It("should be able to pull from private registry with secret", f.WithNodeConformance(), func(ctx context.Context) {
+				image := registryAddress + "/pause:testing"
+				imagePullTest(ctx, image, true, v1.PodRunning, false)
+			})
 		})
 	})
 })

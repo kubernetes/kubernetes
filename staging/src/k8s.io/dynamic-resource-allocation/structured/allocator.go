@@ -31,7 +31,22 @@ import (
 	"k8s.io/dynamic-resource-allocation/structured/internal/experimental"
 	"k8s.io/dynamic-resource-allocation/structured/internal/incubating"
 	"k8s.io/dynamic-resource-allocation/structured/internal/stable"
+	"k8s.io/dynamic-resource-allocation/structured/schedulerapi"
 )
+
+// ErrFailedAllocationOnNode is the base error for errors returned by Allocate
+// which, in contrast to other errors, only affect the one node and not
+// the entire scheduling attempt.
+//
+// The scheduler is expected to check for this with
+//
+//	errors.Is(err, structured.ErrFailedAllocation)
+//
+// and then use the error string as explanation for
+// the unscheduable status.
+//
+// It has no text of its own and can be used with fmt.Errorf("%wsome other error", ErrFailedAllocationOnNode).
+var ErrFailedAllocationOnNode = internal.ErrFailedAllocationOnNode
 
 // To keep the code in different packages simple, type aliases are used everywhere.
 // Functions are wrappers instead of variables to enable compiler optimization.
@@ -40,30 +55,32 @@ import (
 
 type DeviceClassLister = internal.DeviceClassLister
 type Features = internal.Features
-type DeviceID = internal.DeviceID
+
+// Type aliases to schedulerapi package for types that are part of the
+// scheduler and autoscaler contract. This ensures that changes to these
+// types require autoscaler approval.
+type DeviceID = schedulerapi.DeviceID
+type AllocatedState = schedulerapi.AllocatedState
+type SharedDeviceID = schedulerapi.SharedDeviceID
+type DeviceConsumedCapacity = schedulerapi.DeviceConsumedCapacity
+type ConsumedCapacityCollection = schedulerapi.ConsumedCapacityCollection
+type ConsumedCapacity = schedulerapi.ConsumedCapacity
 
 func MakeDeviceID(driver, pool, device string) DeviceID {
-	return internal.MakeDeviceID(driver, pool, device)
+	return schedulerapi.MakeDeviceID(driver, pool, device)
 }
 
-// types_experimental
-type AllocatedState = internal.AllocatedState
-type SharedDeviceID = internal.SharedDeviceID
-type DeviceConsumedCapacity = internal.DeviceConsumedCapacity
-type ConsumedCapacityCollection = internal.ConsumedCapacityCollection
-type ConsumedCapacity = internal.ConsumedCapacity
-
 func MakeSharedDeviceID(deviceID DeviceID, shareID *types.UID) SharedDeviceID {
-	return internal.MakeSharedDeviceID(deviceID, shareID)
+	return schedulerapi.MakeSharedDeviceID(deviceID, shareID)
 }
 
 func NewConsumedCapacityCollection() ConsumedCapacityCollection {
-	return internal.NewConsumedCapacityCollection()
+	return schedulerapi.NewConsumedCapacityCollection()
 }
 
 func NewDeviceConsumedCapacity(deviceID DeviceID,
 	consumedCapacity map[resourceapi.QualifiedName]resource.Quantity) DeviceConsumedCapacity {
-	return internal.NewDeviceConsumedCapacity(deviceID, consumedCapacity)
+	return schedulerapi.NewDeviceConsumedCapacity(deviceID, consumedCapacity)
 }
 
 // Allocator calculates how to allocate a set of unallocated claims which use
@@ -179,6 +196,11 @@ var availableAllocators = []struct {
 		slices []*resourceapi.ResourceSlice,
 		celCache *cel.Cache,
 	) (Allocator, error)
+	nodeMatches func(node *v1.Node,
+		nodeNameToMatch string,
+		allNodesMatch bool,
+		nodeSelector *v1.NodeSelector,
+	) (bool, error)
 }{
 	// Most stable first.
 	{
@@ -193,6 +215,7 @@ var availableAllocators = []struct {
 		) (Allocator, error) {
 			return stable.NewAllocator(ctx, features, allocatedState.AllocatedDevices, classLister, slices, celCache)
 		},
+		nodeMatches: stable.NodeMatches,
 	},
 	{
 		name:              "incubating",
@@ -206,6 +229,7 @@ var availableAllocators = []struct {
 		) (Allocator, error) {
 			return incubating.NewAllocator(ctx, features, allocatedState.AllocatedDevices, classLister, slices, celCache)
 		},
+		nodeMatches: incubating.NodeMatches,
 	},
 	{
 		name:              "experimental",
@@ -219,5 +243,49 @@ var availableAllocators = []struct {
 		) (Allocator, error) {
 			return experimental.NewAllocator(ctx, features, allocateState, classLister, slices, celCache)
 		},
+		nodeMatches: experimental.NodeMatches,
 	},
+}
+
+// NodeMatches determines whether a given Kubernetes node matches the specified criteria.
+// It calls one of the available implementations(stable, incubating, experimental) based
+// on the provided DRA features.
+func NodeMatches(features Features, node *v1.Node, nodeNameToMatch string, allNodesMatch bool, nodeSelector *v1.NodeSelector) (bool, error) {
+	for _, allocator := range availableAllocators {
+		if allocator.supportedFeatures.Set().IsSuperset(features.Set()) {
+			return allocator.nodeMatches(node, nodeNameToMatch, allNodesMatch, nodeSelector)
+		}
+	}
+
+	return false, fmt.Errorf("internal error: no NodeMatches implementation available for feature set %v", features)
+}
+
+// IsDeviceAllocated checks if a device is allocated, considering both fully allocated devices
+// and partially consumed devices when consumable capacity is enabled.
+func IsDeviceAllocated(deviceID DeviceID, allocatedState *AllocatedState) bool {
+	// Check if device is fully allocated (traditional case)
+	if allocatedState.AllocatedDevices.Has(deviceID) {
+		return true
+	}
+
+	// Check if device is partially consumed via shared allocations (consumable capacity case).
+	// We need to check if any shared device ID corresponds to our device.
+	for sharedDeviceID := range allocatedState.AllocatedSharedDeviceIDs {
+		// Extract the base device ID from the shared device ID by recreating it
+		baseDeviceID := MakeDeviceID(
+			sharedDeviceID.Driver.String(),
+			sharedDeviceID.Pool.String(),
+			sharedDeviceID.Device.String(),
+		)
+		if baseDeviceID == deviceID {
+			return true
+		}
+	}
+
+	// Check if device has consumed capacity tracked (consumable capacity case)
+	if _, hasConsumedCapacity := allocatedState.AggregatedCapacity[deviceID]; hasConsumedCapacity {
+		return true
+	}
+
+	return false
 }

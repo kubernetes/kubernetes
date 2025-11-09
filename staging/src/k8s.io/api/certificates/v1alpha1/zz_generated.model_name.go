@@ -35,23 +35,3 @@ func (in ClusterTrustBundleList) OpenAPIModelName() string {
 func (in ClusterTrustBundleSpec) OpenAPIModelName() string {
 	return "io.k8s.api.certificates.v1alpha1.ClusterTrustBundleSpec"
 }
-
-// OpenAPIModelName returns the OpenAPI model name for this type.
-func (in PodCertificateRequest) OpenAPIModelName() string {
-	return "io.k8s.api.certificates.v1alpha1.PodCertificateRequest"
-}
-
-// OpenAPIModelName returns the OpenAPI model name for this type.
-func (in PodCertificateRequestList) OpenAPIModelName() string {
-	return "io.k8s.api.certificates.v1alpha1.PodCertificateRequestList"
-}
-
-// OpenAPIModelName returns the OpenAPI model name for this type.
-func (in PodCertificateRequestSpec) OpenAPIModelName() string {
-	return "io.k8s.api.certificates.v1alpha1.PodCertificateRequestSpec"
-}
-
-// OpenAPIModelName returns the OpenAPI model name for this type.
-func (in PodCertificateRequestStatus) OpenAPIModelName() string {
-	return "io.k8s.api.certificates.v1alpha1.PodCertificateRequestStatus"
-}

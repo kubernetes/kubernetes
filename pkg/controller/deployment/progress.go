@@ -152,7 +152,7 @@ func (dc *DeploymentController) getReplicaFailures(allRSs []*apps.ReplicaSet, ne
 }
 
 // used for unit testing
-var nowFn = func() time.Time { return time.Now() }
+var nowFn = time.Now
 
 // requeueStuckDeployment checks whether the provided deployment needs to be synced for a progress
 // check. It returns the time after the deployment will be requeued for the progress check, 0 if it

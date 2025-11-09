@@ -52,9 +52,9 @@ func Test(t *testing.T) {
 			{Key: "immutable", Data: "changed"},
 		},
 	}
-	st.Value(newStruct).OldValue(oldStruct).ExpectInvalid(
-		field.Forbidden(field.NewPath("typedefItems").Index(0), "field is immutable"),
-	)
+	st.Value(newStruct).OldValue(oldStruct).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
+		field.Invalid(field.NewPath("typedefItems").Index(0), nil, "immutable").WithOrigin("immutable"),
+	})
 
 	// Test nested typedef (typedef of typedef).
 	st.Value(&Struct{

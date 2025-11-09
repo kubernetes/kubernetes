@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"os"
+	"testing"
 	"time"
 
 	"github.com/spf13/pflag"
@@ -29,9 +29,10 @@ import (
 	utilcompatibility "k8s.io/apiserver/pkg/util/compatibility"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
-	restclient "k8s.io/client-go/rest"
 	"k8s.io/component-base/compatibility"
 	"k8s.io/component-base/configz"
+	"k8s.io/component-base/featuregate"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-scheduler/app"
@@ -51,11 +52,10 @@ type TearDownFunc func()
 
 // TestServer return values supplied by kube-test-ApiServer
 type TestServer struct {
-	LoopbackClientConfig *restclient.Config // Rest client config using the magic token
-	Options              *options.Options
-	Config               *kubeschedulerconfig.Config
-	TearDownFn           TearDownFunc // TearDown function
-	TmpDir               string       // Temp Dir used, by the apiserver
+	Options    *options.Options
+	Config     *kubeschedulerconfig.Config
+	TearDownFn TearDownFunc // TearDown function
+	TmpDir     string       // Temp Dir used, by the apiserver
 }
 
 // StartTestServer starts a kube-scheduler. A rest client config and a tear-down func,
@@ -65,7 +65,7 @@ type TestServer struct {
 //
 //	files that because Golang testing's call to os.Exit will not give a stop channel go routine
 //	enough time to remove temporary files.
-func StartTestServer(ctx context.Context, customFlags []string) (result TestServer, err error) {
+func StartTestServer(t *testing.T, ctx context.Context, customFlags []string) (result TestServer, err error) {
 	logger := klog.FromContext(ctx)
 	ctx, cancel := context.WithCancel(ctx)
 
@@ -81,9 +81,6 @@ func StartTestServer(ctx context.Context, customFlags []string) (result TestServ
 				logger.Error(err, "Failed to shutdown test server clearly")
 			}
 		}
-		if len(result.TmpDir) != 0 {
-			os.RemoveAll(result.TmpDir)
-		}
 		configz.Delete("componentconfig")
 	}
 	defer func() {
@@ -92,10 +89,7 @@ func StartTestServer(ctx context.Context, customFlags []string) (result TestServ
 		}
 	}()
 
-	result.TmpDir, err = os.MkdirTemp("", "kube-scheduler")
-	if err != nil {
-		return result, fmt.Errorf("failed to create temp dir: %v", err)
-	}
+	result.TmpDir = t.TempDir()
 
 	fs := pflag.NewFlagSet("test", pflag.PanicOnError)
 
@@ -104,6 +98,7 @@ func StartTestServer(ctx context.Context, customFlags []string) (result TestServ
 	featureGate := utilfeature.DefaultMutableFeatureGate.DeepCopy()
 	effectiveVersion := utilcompatibility.DefaultKubeEffectiveVersionForTest()
 	effectiveVersion.SetEmulationVersion(featureGate.EmulationVersion())
+	effectiveVersion.SetMinCompatibilityVersion(featureGate.MinCompatibilityVersion())
 	componentGlobalsRegistry := compatibility.NewComponentGlobalsRegistry()
 	if err := componentGlobalsRegistry.Register(compatibility.DefaultKubeComponent, effectiveVersion, featureGate); err != nil {
 		return result, err
@@ -120,17 +115,17 @@ func StartTestServer(ctx context.Context, customFlags []string) (result TestServ
 	}
 	// If the local ComponentGlobalsRegistry is changed by the flags,
 	// we need to copy the new feature values back to the DefaultFeatureGate because most feature checks still use the DefaultFeatureGate.
-	if !featureGate.EmulationVersion().EqualTo(utilfeature.DefaultMutableFeatureGate.EmulationVersion()) {
-		if err := utilfeature.DefaultMutableFeatureGate.SetEmulationVersion(effectiveVersion.EmulationVersion()); err != nil {
-			return result, err
-		}
+	if !featureGate.EmulationVersion().EqualTo(utilfeature.DefaultMutableFeatureGate.EmulationVersion()) || !featureGate.MinCompatibilityVersion().EqualTo(utilfeature.DefaultMutableFeatureGate.MinCompatibilityVersion()) {
+		featuregatetesting.SetFeatureGateVersionsDuringTest(t, utilfeature.DefaultMutableFeatureGate, effectiveVersion.EmulationVersion(), effectiveVersion.MinCompatibilityVersion())
 	}
+	featureOverrides := map[featuregate.Feature]bool{}
 	for f := range utilfeature.DefaultMutableFeatureGate.GetAll() {
 		if featureGate.Enabled(f) != utilfeature.DefaultFeatureGate.Enabled(f) {
-			if err := utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=%v", f, featureGate.Enabled(f))); err != nil {
-				return result, err
-			}
+			featureOverrides[f] = featureGate.Enabled(f)
 		}
+	}
+	if len(featureOverrides) > 0 {
+		featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featureOverrides)
 	}
 
 	if opts.SecureServing.BindPort != 0 {
@@ -142,6 +137,9 @@ func StartTestServer(ctx context.Context, customFlags []string) (result TestServ
 
 		logger.Info("kube-scheduler will listen securely", "port", opts.SecureServing.BindPort)
 	}
+
+	// Always exempt /healthz from authorization because we use it to verify startup below.
+	opts.Authorization.AlwaysAllowPaths = append(opts.Authorization.AlwaysAllowPaths, "/healthz")
 
 	cc, sched, err := app.Setup(ctx, opts)
 	if err != nil {
@@ -157,10 +155,22 @@ func StartTestServer(ctx context.Context, customFlags []string) (result TestServ
 	}(ctx)
 
 	logger.Info("Waiting for /healthz to be ok...")
-	client, err := kubernetes.NewForConfig(cc.LoopbackClientConfig)
+
+	// Cannot use cc.Kubeconfig since it is overwritten to point to kube-apiserver,
+	// build our own client instead.
+	serverCert, _ := cc.SecureServing.Cert.CurrentCertKeyContent()
+	clientConfig, err := cc.SecureServing.NewClientConfig(serverCert)
 	if err != nil {
-		return result, fmt.Errorf("failed to create a client: %v", err)
+		return result, fmt.Errorf("getting secure serving rest config %w", err)
 	}
+
+	// The server cert only includes IPv4 localhost, not IPv6.
+	clientConfig.TLSClientConfig.ServerName = "127.0.0.1"
+	client, err := kubernetes.NewForConfig(clientConfig)
+	if err != nil {
+		return result, fmt.Errorf("creating client: %w", err)
+	}
+
 	err = wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 30*time.Second, false, func(ctx context.Context) (bool, error) {
 		select {
 		case err := <-errCh:
@@ -168,12 +178,12 @@ func StartTestServer(ctx context.Context, customFlags []string) (result TestServ
 		default:
 		}
 
-		result := client.CoreV1().RESTClient().Get().AbsPath("/healthz").Do(ctx)
 		status := 0
-		result.StatusCode(&status)
+		client.CoreV1().RESTClient().Get().AbsPath("/healthz").Do(ctx).StatusCode(&status)
 		if status == 200 {
 			return true, nil
 		}
+
 		return false, nil
 	})
 	if err != nil {
@@ -181,7 +191,6 @@ func StartTestServer(ctx context.Context, customFlags []string) (result TestServ
 	}
 
 	// from here the caller must call tearDown
-	result.LoopbackClientConfig = cc.LoopbackClientConfig
 	result.Options = opts
 	result.Config = cc.Config
 	result.TearDownFn = tearDown
@@ -190,13 +199,12 @@ func StartTestServer(ctx context.Context, customFlags []string) (result TestServ
 }
 
 // StartTestServerOrDie calls StartTestServer panic if it does not succeed.
-func StartTestServerOrDie(ctx context.Context, flags []string) *TestServer {
-	result, err := StartTestServer(ctx, flags)
-	if err == nil {
-		return &result
+func StartTestServerOrDie(t *testing.T, ctx context.Context, flags []string) *TestServer {
+	result, err := StartTestServer(t, ctx, flags)
+	if err != nil {
+		t.Fatalf("failed to launch server: %v", err)
 	}
-
-	panic(fmt.Errorf("failed to launch server: %v", err))
+	return &result
 }
 
 func createListenerOnFreePort() (net.Listener, int, error) {

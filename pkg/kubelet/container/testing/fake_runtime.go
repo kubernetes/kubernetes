@@ -46,26 +46,27 @@ type FakePod struct {
 // FakeRuntime is a fake container runtime for testing.
 type FakeRuntime struct {
 	sync.Mutex
-	CalledFunctions   []string
-	PodList           []*FakePod
-	AllPodList        []*FakePod
-	ImageList         []kubecontainer.Image
-	ImageFsStats      []*runtimeapi.FilesystemUsage
-	ContainerFsStats  []*runtimeapi.FilesystemUsage
-	APIPodStatus      v1.PodStatus
-	PodStatus         kubecontainer.PodStatus
-	StartedPods       []string
-	KilledPods        []string
-	StartedContainers []string
-	KilledContainers  []string
-	RuntimeStatus     *kubecontainer.RuntimeStatus
-	VersionInfo       string
-	APIVersionInfo    string
-	RuntimeType       string
-	SyncResults       *kubecontainer.PodSyncResult
-	Err               error
-	InspectErr        error
-	StatusErr         error
+	CalledFunctions     []string
+	PodList             []*FakePod
+	AllPodList          []*FakePod
+	ImageList           []kubecontainer.Image
+	ImageFsStats        []*runtimeapi.FilesystemUsage
+	ContainerFsStats    []*runtimeapi.FilesystemUsage
+	APIPodStatus        v1.PodStatus
+	PodStatus           kubecontainer.PodStatus
+	StartedPods         []string
+	KilledPods          []string
+	StartedContainers   []string
+	KilledContainers    []string
+	RuntimeStatus       *kubecontainer.RuntimeStatus
+	VersionInfo         string
+	APIVersionInfo      string
+	RuntimeType         string
+	PodResizeInProgress bool
+	SyncResults         *kubecontainer.PodSyncResult
+	Err                 error
+	InspectErr          error
+	StatusErr           error
 	// If BlockImagePulls is true, then all PullImage() calls will be blocked until
 	// UnblockImagePulls() is called. This is used to simulate image pull latency
 	// from container runtime.
@@ -570,5 +571,5 @@ func (f *FakeRuntime) GetContainerSwapBehavior(pod *v1.Pod, container *v1.Contai
 }
 
 func (f *FakeRuntime) IsPodResizeInProgress(allocatedPod *v1.Pod, podStatus *kubecontainer.PodStatus) bool {
-	return false
+	return f.PodResizeInProgress
 }

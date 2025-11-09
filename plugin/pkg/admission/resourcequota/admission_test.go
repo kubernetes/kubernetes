@@ -110,7 +110,7 @@ func createHandlerWithConfig(kubeClient kubernetes.Interface, informerFactory in
 	if config == nil {
 		config = &resourcequotaapi.Configuration{}
 	}
-	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
+	quotaConfiguration := install.NewQuotaConfigurationForAdmission(nil)
 
 	handler, err := resourcequota.NewResourceQuota(config, 5)
 	if err != nil {

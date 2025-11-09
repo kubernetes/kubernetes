@@ -41,15 +41,15 @@ func Test(t *testing.T) {
 		},
 	}
 
-	st.Value(new).OldValue(old).ExpectInvalid(
-		field.Forbidden(field.NewPath("listField").Index(0), "field is immutable"),
-		field.Forbidden(field.NewPath("listField").Index(1).Child("stringField"), "field is immutable"),
-	)
+	st.Value(new).OldValue(old).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
+		field.Invalid(field.NewPath("listField").Index(0), nil, "immutable").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("listField").Index(1).Child("stringField"), nil, "immutable").WithOrigin("immutable"),
+	})
 
-	st.Value(new).OldValue(&Struct{ListField: []Item{}}).ExpectInvalid(
-		field.Forbidden(field.NewPath("listField").Index(0), "field is immutable"),
-		field.Forbidden(field.NewPath("listField").Index(1).Child("stringField"), "field is immutable"),
-	)
+	st.Value(new).OldValue(&Struct{ListField: []Item{}}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
+		field.Invalid(field.NewPath("listField").Index(0), nil, "immutable").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("listField").Index(1).Child("stringField"), nil, "immutable").WithOrigin("immutable"),
+	})
 
 	// Test that "c" can change independently
 	st.Value(&Struct{

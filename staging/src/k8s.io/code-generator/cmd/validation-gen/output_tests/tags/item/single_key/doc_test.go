@@ -18,6 +18,8 @@ package singlekey
 
 import (
 	"testing"
+
+	"k8s.io/utils/ptr"
 )
 
 func Test(t *testing.T) {
@@ -29,7 +31,10 @@ func Test(t *testing.T) {
 			{Key: "target", Data: "d2"},
 		},
 	}).ExpectValidateFalseByPath(map[string][]string{
-		`items[1]`: {"item Items[key=target]"},
+		`items[1]`: {
+			"item Items[key=target] 1",
+			"item Items[key=target] 2",
+		},
 	})
 
 	st.Value(&Struct{
@@ -58,7 +63,10 @@ func Test(t *testing.T) {
 			{IntField: 42, Data: "d2"},
 		},
 	}).ExpectValidateFalseByPath(map[string][]string{
-		`intKeyItems[1]`: {"item IntKeyItems[intField=42]"},
+		`intKeyItems[1]`: {
+			"item IntKeyItems[intField=42] 1",
+			"item IntKeyItems[intField=42] 2",
+		},
 	})
 
 	st.Value(&Struct{
@@ -67,7 +75,10 @@ func Test(t *testing.T) {
 			{BoolField: true, Data: "d2"},
 		},
 	}).ExpectValidateFalseByPath(map[string][]string{
-		`boolKeyItems[1]`: {"item BoolKeyItems[boolField=true]"},
+		`boolKeyItems[1]`: {
+			"item BoolKeyItems[boolField=true] 1",
+			"item BoolKeyItems[boolField=true] 2",
+		},
 	})
 
 	// Test typedef slice.
@@ -77,7 +88,10 @@ func Test(t *testing.T) {
 			{ID: "typedef-target", Description: "d2"},
 		},
 	}).ExpectValidateFalseByPath(map[string][]string{
-		`typedefItems[1]`: {"item TypedefItems[id=typedef-target]"},
+		`typedefItems[1]`: {
+			"item TypedefItems[id=typedef-target] 1",
+			"item TypedefItems[id=typedef-target] 2",
+		},
 	})
 
 	st.Value(&Struct{
@@ -129,5 +143,25 @@ func Test(t *testing.T) {
 
 	st.Value(&Struct{
 		AtomicUniqueMapItems: nil,
+	}).ExpectValid()
+
+	st.Value(&Struct{
+		PtrKeyItems: []PtrKeyItem{
+			{Key: ptr.To("a"), Data: "d1"},
+			{Key: ptr.To("target-ptr"), Data: "d2"},
+			{Key: nil, Data: "d3"},
+		},
+	}).ExpectValidateFalseByPath(map[string][]string{
+		`ptrKeyItems[1]`: {
+			"item PtrKeyItems[key=target-ptr]",
+		},
+	})
+
+	st.Value(&Struct{
+		PtrKeyItems: []PtrKeyItem{
+			{Key: ptr.To("a"), Data: "d1"},
+			{Key: ptr.To("b"), Data: "d2"},
+			{Key: nil, Data: "d3"},
+		},
 	}).ExpectValid()
 }

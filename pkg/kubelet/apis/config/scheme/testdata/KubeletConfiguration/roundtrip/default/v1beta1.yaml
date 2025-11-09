@@ -25,7 +25,8 @@ cpuCFSQuota: true
 cpuCFSQuotaPeriod: 100ms
 cpuManagerPolicy: none
 cpuManagerReconcilePeriod: 10s
-crashLoopBackOff: {}
+crashLoopBackOff:
+  maxContainerRestartPeriod: 5m0s
 enableControllerAttachDetach: true
 enableDebugFlagsHandler: true
 enableDebuggingHandlers: true
@@ -38,7 +39,7 @@ enforceNodeAllocatable:
 eventBurst: 10
 eventRecordQPS: 5
 evictionPressureTransitionPeriod: 5m0s
-failCgroupV1: false
+failCgroupV1: true
 failSwapOn: true
 fileCheckFrequency: 20s
 hairpinMode: promiscuous-bridge

@@ -78,7 +78,7 @@ var _ = SIGDescribe("Terminate Pods", func() {
 				}
 			}
 			return false
-		}, 20*time.Second, 1*time.Second).Should(gomega.BeTrueBecause("expected container to be ready"))
+		}, 20*time.Second, 1*time.Second).Should(gomega.BeTrueBecause("expected container to be not ready"))
 
 		err := client.Delete(context.Background(), pod.Name, metav1.DeleteOptions{})
 

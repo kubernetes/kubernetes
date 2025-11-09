@@ -149,7 +149,7 @@ const (
 //
 // The tolerance is applied to the metric values and prevents scaling too
 // eagerly for small metric variations. (Note that setting a tolerance requires
-// enabling the alpha HPAConfigurableTolerance feature gate.)
+// the beta HPAConfigurableTolerance feature gate to be enabled.)
 type HPAScalingRules struct {
 	// StabilizationWindowSeconds is the number of seconds for which past recommendations should be
 	// considered while scaling up or scaling down.
@@ -178,8 +178,8 @@ type HPAScalingRules struct {
 	// and scale-down and scale-up tolerances of 5% and 1% respectively, scaling will be
 	// triggered when the actual consumption falls below 95Mi or exceeds 101Mi.
 	//
-	// This is an alpha field and requires enabling the HPAConfigurableTolerance
-	// feature gate.
+	// This is an beta field and requires the HPAConfigurableTolerance feature
+	// gate to be enabled.
 	//
 	// +featureGate=HPAConfigurableTolerance
 	// +optional

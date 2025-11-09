@@ -28,10 +28,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/component-base/featuregate"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 func TestVisitContainers(t *testing.T) {
@@ -1015,45 +1011,14 @@ func TestCalculatePodStatusObservedGeneration(t *testing.T) {
 	tests := []struct {
 		name     string
 		pod      *v1.Pod
-		features map[featuregate.Feature]bool
 		expected int64
 	}{
-		{
-			name: "pod with no observedGeneration/PodObservedGenerationTracking=false",
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Generation: 5,
-				},
-			},
-			features: map[featuregate.Feature]bool{
-				features.PodObservedGenerationTracking: false,
-			},
-			expected: 0,
-		},
 		{
 			name: "pod with no observedGeneration/PodObservedGenerationTracking=true",
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Generation: 5,
 				},
-			},
-			features: map[featuregate.Feature]bool{
-				features.PodObservedGenerationTracking: true,
-			},
-			expected: 5,
-		},
-		{
-			name: "pod with observedGeneration/PodObservedGenerationTracking=false",
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Generation: 5,
-				},
-				Status: v1.PodStatus{
-					ObservedGeneration: 5,
-				},
-			},
-			features: map[featuregate.Feature]bool{
-				features.PodObservedGenerationTracking: false,
 			},
 			expected: 5,
 		},
@@ -1067,18 +1032,12 @@ func TestCalculatePodStatusObservedGeneration(t *testing.T) {
 					ObservedGeneration: 5,
 				},
 			},
-			features: map[featuregate.Feature]bool{
-				features.PodObservedGenerationTracking: true,
-			},
 			expected: 5,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			for f, v := range tc.features {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, f, v)
-			}
 			assert.Equal(t, tc.expected, CalculatePodStatusObservedGeneration(tc.pod))
 		})
 	}
@@ -1088,26 +1047,8 @@ func TestCalculatePodConditionObservedGeneration(t *testing.T) {
 	tests := []struct {
 		name     string
 		pod      *v1.Pod
-		features map[featuregate.Feature]bool
 		expected int64
 	}{
-		{
-			name: "pod with no observedGeneration/PodObservedGenerationTracking=false",
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Generation: 5,
-				},
-				Status: v1.PodStatus{
-					Conditions: []v1.PodCondition{{
-						Type: v1.PodReady,
-					}},
-				},
-			},
-			features: map[featuregate.Feature]bool{
-				features.PodObservedGenerationTracking: false,
-			},
-			expected: 0,
-		},
 		{
 			name: "pod with no observedGeneration/PodObservedGenerationTracking=true",
 			pod: &v1.Pod{
@@ -1119,27 +1060,6 @@ func TestCalculatePodConditionObservedGeneration(t *testing.T) {
 						Type: v1.PodReady,
 					}},
 				},
-			},
-			features: map[featuregate.Feature]bool{
-				features.PodObservedGenerationTracking: true,
-			},
-			expected: 5,
-		},
-		{
-			name: "pod with observedGeneration/PodObservedGenerationTracking=false",
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Generation: 5,
-				},
-				Status: v1.PodStatus{
-					Conditions: []v1.PodCondition{{
-						Type:               v1.PodReady,
-						ObservedGeneration: 5,
-					}},
-				},
-			},
-			features: map[featuregate.Feature]bool{
-				features.PodObservedGenerationTracking: false,
 			},
 			expected: 5,
 		},
@@ -1156,18 +1076,12 @@ func TestCalculatePodConditionObservedGeneration(t *testing.T) {
 					}},
 				},
 			},
-			features: map[featuregate.Feature]bool{
-				features.PodObservedGenerationTracking: true,
-			},
 			expected: 5,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			for f, v := range tc.features {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, f, v)
-			}
 			assert.Equal(t, tc.expected, CalculatePodConditionObservedGeneration(&tc.pod.Status, tc.pod.Generation, v1.PodReady))
 		})
 	}

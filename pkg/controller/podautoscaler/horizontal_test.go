@@ -146,6 +146,7 @@ type testCase struct {
 	expectedReportedReconciliationErrorLabel      monitor.ErrorLabel
 	expectedReportedMetricComputationActionLabels map[autoscalingv2.MetricSourceType]monitor.ActionLabel
 	expectedReportedMetricComputationErrorLabels  map[autoscalingv2.MetricSourceType]monitor.ErrorLabel
+	checkDesiredReplicaMetric                     bool
 
 	// Target resource information.
 	resource *fakeResource
@@ -727,6 +728,14 @@ func (tc *testCase) verifyRecordedMetric(ctx context.Context, t *testing.T, m *m
 		}
 		assert.Equal(t, l, m.metricComputationErrorLabels[metricType][0], "the metric computation error should be recorded in monitor expectedly")
 	}
+
+	// TODO: Retrieve the namespace and HPA names from the test case (tc) to replace hardcoded values below (and check).
+	if tc.checkDesiredReplicaMetric {
+		currentValue := m.GetDesiredReplicasValue("test-namespace", "test-hpa")
+		assert.Equal(t, tc.expectedDesiredReplicas, currentValue,
+			"the desired replicas should be recorded in monitor expectedly")
+	}
+
 }
 
 func (tc *testCase) setupController(t *testing.T) (*HorizontalController, informers.SharedInformerFactory) {
@@ -816,9 +825,14 @@ func coolCPUCreationTime() metav1.Time {
 
 func (tc *testCase) runTestWithController(t *testing.T, hpaController *HorizontalController, informerFactory informers.SharedInformerFactory) {
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	informerFactory.Start(ctx.Done())
-	go hpaController.Run(ctx, 5)
+
+	var wg sync.WaitGroup
+	wg.Go(func() {
+		hpaController.Run(ctx, 5)
+	})
+	defer wg.Wait()
+	defer cancel()
 
 	tc.Lock()
 	shouldWait := tc.verifyEvents
@@ -862,12 +876,14 @@ type mockMonitor struct {
 	metricComputationActionLabels map[autoscalingv2.MetricSourceType][]monitor.ActionLabel
 	metricComputationErrorLabels  map[autoscalingv2.MetricSourceType][]monitor.ErrorLabel
 	metricObjectsCount            int
+	desiredReplicasValues         map[string]int32 // key is "namespace/name"
 }
 
 func newMockMonitor() *mockMonitor {
 	return &mockMonitor{
 		metricComputationActionLabels: make(map[autoscalingv2.MetricSourceType][]monitor.ActionLabel),
 		metricComputationErrorLabels:  make(map[autoscalingv2.MetricSourceType][]monitor.ErrorLabel),
+		desiredReplicasValues:         make(map[string]int32),
 	}
 }
 
@@ -918,6 +934,21 @@ func (m *mockMonitor) GetObjectsCount() int {
 	return m.metricObjectsCount
 }
 
+func (m *mockMonitor) ObserveDesiredReplicas(namespace, hpaName string, desiredReplicas int32) {
+	fmt.Printf("putting %s/%s with %v", namespace, hpaName, desiredReplicas)
+	m.Lock()
+	defer m.Unlock()
+	key := fmt.Sprintf("%s/%s", namespace, hpaName)
+	m.desiredReplicasValues[key] = desiredReplicas
+}
+
+func (m *mockMonitor) GetDesiredReplicasValue(namespace, hpaName string) int32 {
+	m.RLock()
+	defer m.RUnlock()
+	key := fmt.Sprintf("%s/%s", namespace, hpaName)
+	return m.desiredReplicasValues[key]
+}
+
 func TestScaleUp(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
@@ -938,6 +969,7 @@ func TestScaleUp(t *testing.T) {
 		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
 			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
 		},
+		checkDesiredReplicaMetric: true,
 	}
 	tc.runTest(t)
 }
@@ -5393,13 +5425,6 @@ func TestMultipleHPAs(t *testing.T) {
 		return handled, obj, err
 	})
 
-	testClient.AddReactor("delete", "horizontalpodautoscalers", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-		deleteAction := action.(core.DeleteAction)
-		hpaName := deleteAction.GetName()
-		processed <- hpaName
-		return true, nil, nil
-	})
-
 	informerFactory := informers.NewSharedInformerFactory(testClient, controller.NoResyncPeriodFunc())
 
 	tCtx := ktesting.Init(t)
@@ -5440,25 +5465,8 @@ func TestMultipleHPAs(t *testing.T) {
 	assert.Len(t, processedHPA, hpaCount, "Expected to process all HPAs")
 	assert.Equal(t, hpaCount, hpaController.monitor.(*mockMonitor).GetObjectsCount(), "Expected objects count to match number of HPAs")
 
-	// Test HPA deletion
-	hpaName := "dummy-hpa-0"
-
-	// Delete the HPA through the API
-	err := testClient.AutoscalingV2().HorizontalPodAutoscalers(testNamespace).Delete(tCtx, hpaName, metav1.DeleteOptions{})
-	if err != nil {
-		t.Fatalf("Failed to delete HPA: %v", err)
-	}
-
 	// Simulate the watch event for deletion
 	hpaWatcher.Delete(&hpaList[0])
-
-	// Wait for deletion to be processed
-	select {
-	case deletedHPAName := <-processed:
-		assert.Equal(t, hpaName, deletedHPAName, "Expected the deleted HPA name to match")
-	case <-time.After(5 * time.Second):
-		t.Fatalf("Timeout waiting for HPA deletion to be processed")
-	}
 
 	// Give the controller time to process the deletion and update the monitor
 	assert.Eventually(t, func() bool {

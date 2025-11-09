@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/scheduler"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
 	"k8s.io/utils/ptr"
 )
@@ -86,7 +87,7 @@ const (
 	OutOfPods             = "OutOfpods"
 )
 
-type getNodeAnyWayFuncType func() (*v1.Node, error)
+type getNodeAnyWayFuncType func(ctx context.Context, useCache bool) (*v1.Node, error)
 
 type pluginResourceUpdateFuncType func(*schedulerframework.NodeInfo, *PodAdmitAttributes) error
 
@@ -119,7 +120,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	// contextual logging
 	ctx := context.TODO()
 	logger := klog.FromContext(ctx)
-	node, err := w.getNodeAnyWayFunc()
+	node, err := w.getNodeAnyWayFunc(ctx, true)
 	if err != nil {
 		logger.Error(err, "Cannot get Node info")
 		return PodAdmitResult{
@@ -182,7 +183,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	// the Resource Class API in the future.
 	podWithoutMissingExtendedResources := removeMissingExtendedResources(admitPod, nodeInfo)
 
-	reasons := generalFilter(podWithoutMissingExtendedResources, nodeInfo)
+	reasons := w.generalFilter(ctx, podWithoutMissingExtendedResources, nodeInfo)
 	fit := len(reasons) == 0
 	if !fit {
 		reasons, err = w.admissionFailureHandler.HandleAdmissionFailure(ctx, admitPod, reasons)
@@ -245,6 +246,30 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	return PodAdmitResult{
 		Admit: true,
 	}
+}
+
+// generalFilter checks a group of filterings that the kubelet cares about.
+func (w *predicateAdmitHandler) generalFilter(ctx context.Context, pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) []PredicateFailureReason {
+	reasons := generalFilter(pod, nodeInfo)
+	for _, r := range reasons {
+		if r.GetReason() != nodeaffinity.ErrReasonPod {
+			return reasons
+		}
+	}
+	if len(reasons) > 0 {
+		// If the only reason for failure is the node affinity labels, fetch the node synchronously
+		// and try again.
+		logger := klog.FromContext(ctx)
+		node, err := w.getNodeAnyWayFunc(ctx, false)
+		if err != nil {
+			logger.Error(err, "Failed to synchronously fetch node info")
+			return reasons
+		}
+		nodeInfo.SetNode(node)
+		reasons = generalFilter(pod, nodeInfo)
+	}
+
+	return reasons
 }
 
 // rejectPodAdmissionBasedOnOSSelector rejects pod if it's nodeSelector doesn't match

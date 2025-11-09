@@ -48,6 +48,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
+	kubeadmruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
 )
 
 // FetchInitConfigurationFromCluster fetches configuration from a ConfigMap in the cluster
@@ -115,7 +116,7 @@ func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Inte
 	if getNodeRegistration {
 		// gets the nodeRegistration for the current from the node object
 		kubeconfigFile := filepath.Join(kubeconfigDir, constants.KubeletKubeConfigFileName)
-		if err := GetNodeRegistration(kubeconfigFile, client, &initcfg.NodeRegistration, &initcfg.ClusterConfiguration); err != nil {
+		if err := GetNodeRegistration(kubeconfigFile, client, &initcfg.NodeRegistration); err != nil {
 			return nil, errors.Wrap(err, "failed to get node registration")
 		}
 	}
@@ -162,7 +163,7 @@ func GetNodeName(kubeconfigFile string) (string, error) {
 }
 
 // GetNodeRegistration returns the nodeRegistration for the current node
-func GetNodeRegistration(kubeconfigFile string, client clientset.Interface, nodeRegistration *kubeadmapi.NodeRegistrationOptions, clusterCfg *kubeadmapi.ClusterConfiguration) error {
+func GetNodeRegistration(kubeconfigFile string, client clientset.Interface, nodeRegistration *kubeadmapi.NodeRegistrationOptions) error {
 	// gets the name of the current node
 	nodeName, err := GetNodeName(kubeconfigFile)
 	if err != nil {
@@ -180,13 +181,21 @@ func GetNodeRegistration(kubeconfigFile string, client clientset.Interface, node
 		configFilePath := filepath.Join(constants.KubeletRunDirectory, constants.KubeletInstanceConfigurationFileName)
 		_, err := os.Stat(configFilePath)
 		if os.IsNotExist(err) {
-			return errors.Errorf("node %s doesn't have %s annotation, or kubelet instance config %s", nodeName, constants.AnnotationKubeadmCRISocket, configFilePath)
+			klog.Warningf("node %q lacks annotation %q and kubelet config file %q; attempting auto-detection", nodeName, constants.AnnotationKubeadmCRISocket, configFilePath)
+			criSocket, err = kubeadmruntime.DetectCRISocket()
+			if err != nil {
+				klog.Warningf("auto-detection of CRI socket failed for node %q: %v; falling back to default %q", nodeName, err, constants.DefaultCRISocket)
+				criSocket = constants.DefaultCRISocket
+			}
+		} else if err != nil {
+			return err
+		} else {
+			kubeletConfig, err := readKubeletConfig(constants.KubeletRunDirectory, constants.KubeletInstanceConfigurationFileName)
+			if err != nil {
+				return errors.Wrapf(err, "could not read kubelet instance configuration on node %q", nodeName)
+			}
+			criSocket = kubeletConfig.ContainerRuntimeEndpoint
 		}
-		kubeletConfig, err := readKubeletConfig(constants.KubeletRunDirectory, constants.KubeletInstanceConfigurationFileName)
-		if err != nil {
-			return errors.Wrapf(err, "could not read kubelet instance configuration on node %q", nodeName)
-		}
-		criSocket = kubeletConfig.ContainerRuntimeEndpoint
 	}
 
 	// returns the nodeRegistration attributes

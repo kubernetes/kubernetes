@@ -27,6 +27,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -47,6 +48,9 @@ import (
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
+
+	flagzv1alpha1 "k8s.io/apiserver/pkg/server/flagz/api/v1alpha1"
+	v1alpha1 "k8s.io/apiserver/pkg/server/statusz/api/v1alpha1"
 )
 
 const (
@@ -132,7 +136,7 @@ func TestLivezAndReadyz(t *testing.T) {
 
 func TestFlagz(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ComponentFlagz, true)
-	testServerFlags := append(framework.DefaultTestServerFlags(), "--emulated-version=1.32")
+	testServerFlags := append(framework.DefaultTestServerFlags(), "--v=2")
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, testServerFlags, framework.SharedEtcd())
 	defer server.TearDownFn()
 
@@ -141,33 +145,107 @@ func TestFlagz(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	res := client.CoreV1().RESTClient().Get().RequestURI("/flagz").Do(context.TODO())
-	var status int
-	res.StatusCode(&status)
-	if status != http.StatusOK {
-		t.Fatalf("flagz/ should be healthy, got %v", status)
+	wantBodyStr := "kube-apiserver flagz\nWarning: This endpoint is not meant to be machine parseable"
+	wantBodyJSON := &flagzv1alpha1.Flagz{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Flagz",
+			APIVersion: "config.k8s.io/v1alpha1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "kube-apiserver",
+		},
 	}
 
-	expectedHeader := `
-kube-apiserver flags
-Warning: This endpoint is not meant to be machine parseable, has no formatting compatibility guarantees and is for debugging purposes only.`
-
-	raw, err := res.Raw()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.HasPrefix(raw, []byte(expectedHeader)) {
-		t.Fatalf("Header mismatch!\nExpected:\n%s\n\nGot:\n%s", expectedHeader, string(raw))
-	}
-	found := false
-	for _, line := range strings.Split(string(raw), "\n") {
-		if strings.Contains(line, "emulated-version") && strings.Contains(line, "1.32") {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Fatalf("Expected flag --emulated-version=[1.32] to be reflected in /flagz output, got:\n%s", string(raw))
+	for _, tc := range []struct {
+		name         string
+		acceptHeader string
+		wantStatus   int
+		wantBodySub  string               // for text/plain
+		wantJSON     *flagzv1alpha1.Flagz // for application/json
+	}{
+		{
+			name:         "text plain response",
+			acceptHeader: "text/plain",
+			wantStatus:   http.StatusOK,
+			wantBodySub:  wantBodyStr,
+		},
+		{
+			name:         "structured json response",
+			acceptHeader: "application/json;v=v1alpha1;g=config.k8s.io;as=Flagz",
+			wantStatus:   http.StatusOK,
+			wantJSON:     wantBodyJSON,
+		},
+		{
+			name:         "no accept header (defaults to text)",
+			acceptHeader: "",
+			wantStatus:   http.StatusOK,
+			wantBodySub:  wantBodyStr,
+		},
+		{
+			name:         "invalid accept header",
+			acceptHeader: "application/xml",
+			wantStatus:   http.StatusNotAcceptable,
+		},
+		{
+			name:         "application/json without params",
+			acceptHeader: "application/json",
+			wantStatus:   http.StatusNotAcceptable,
+		},
+		{
+			name:         "application/json with missing as",
+			acceptHeader: "application/json;v=v1alpha1;g=config.k8s.io",
+			wantStatus:   http.StatusNotAcceptable,
+		},
+		{
+			name:         "wildcard accept header",
+			acceptHeader: "*/*",
+			wantStatus:   http.StatusOK,
+			wantBodySub:  wantBodyStr,
+		},
+		{
+			name:         "bad json header fall back wildcard",
+			acceptHeader: "application/json;v=foo;g=config.k8s.io;as=Flagz,*/*",
+			wantStatus:   http.StatusOK,
+			wantBodySub:  wantBodyStr,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req := client.CoreV1().RESTClient().Get().RequestURI("/flagz")
+			req.SetHeader("Accept", tc.acceptHeader)
+			res := req.Do(context.TODO())
+			var status int
+			res.StatusCode(&status)
+			if status != tc.wantStatus {
+				t.Fatalf("want status %d, got %d", tc.wantStatus, status)
+			}
+			raw, err := res.Raw()
+			if err != nil && tc.wantStatus == http.StatusOK {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if tc.wantStatus == http.StatusOK {
+				if tc.wantBodySub != "" {
+					if !bytes.Contains(raw, []byte(tc.wantBodySub)) {
+						t.Errorf("body missing expected substring: %q\nGot:\n%s", tc.wantBodySub, string(raw))
+					}
+				}
+				if tc.wantJSON != nil {
+					var got flagzv1alpha1.Flagz
+					if err := json.Unmarshal(raw, &got); err != nil {
+						t.Fatalf("error unmarshalling JSON: %v", err)
+					}
+					// Only check static fields, since others are dynamic
+					if got.TypeMeta != tc.wantJSON.TypeMeta {
+						t.Errorf("TypeMeta mismatch: want %+v, got %+v", tc.wantJSON.TypeMeta, got.TypeMeta)
+					}
+					if got.ObjectMeta.Name != tc.wantJSON.ObjectMeta.Name {
+						t.Errorf("ObjectMeta.Name mismatch: want %q, got %q", tc.wantJSON.ObjectMeta.Name, got.ObjectMeta.Name)
+					}
+					if got.Flags["v"] != "2" {
+						t.Errorf("v mismatch: want %q, got %q", "2", got.Flags["v"])
+					}
+				}
+			}
+		})
 	}
 }
 
@@ -181,23 +259,111 @@ func TestStatusz(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	res := client.CoreV1().RESTClient().Get().RequestURI("/statusz").Do(context.TODO())
-	var status int
-	res.StatusCode(&status)
-	if status != http.StatusOK {
-		t.Fatalf("statusz/ should be healthy, got %v", status)
+	wantBodyStr := "statusz\nWarning: This endpoint is not meant to be machine parseable"
+	wantBodyJSON := &v1alpha1.Statusz{
+		// StartTime, UptimeSeconds, GoVersion, BinaryVersion,
+		// EmulationVersion, Paths are dynamic, so we only check
+		// static fields
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Statusz",
+			APIVersion: "config.k8s.io/v1alpha1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "apiserver",
+		},
+		Paths: []string{"/healthz", "/livez", "/metrics", "/readyz", "/statusz", "/version"},
 	}
 
-	expectedHeader := `
-apiserver statusz
-Warning: This endpoint is not meant to be machine parseable, has no formatting compatibility guarantees and is for debugging purposes only.`
-
-	raw, err := res.Raw()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Contains(raw, []byte(expectedHeader)) {
-		t.Fatalf("Header mismatch!\nExpected:\n%s\n\nGot:\n%s", expectedHeader, string(raw))
+	for _, tc := range []struct {
+		name         string
+		acceptHeader string
+		wantStatus   int
+		wantBodySub  string            // for text/plain responses
+		wantJSON     *v1alpha1.Statusz // for structured response
+	}{
+		{
+			name:         "text plain response",
+			acceptHeader: "text/plain",
+			wantStatus:   http.StatusOK,
+			wantBodySub:  wantBodyStr,
+		},
+		{
+			name:         "structured json response",
+			acceptHeader: "application/json;v=v1alpha1;g=config.k8s.io;as=Statusz",
+			wantStatus:   http.StatusOK,
+			wantJSON:     wantBodyJSON,
+		},
+		{
+			name:         "no accept header (defaults to text)",
+			acceptHeader: "",
+			wantStatus:   http.StatusOK,
+			wantBodySub:  wantBodyStr,
+		},
+		{
+			name:         "invalid accept header",
+			acceptHeader: "application/xml",
+			wantStatus:   http.StatusNotAcceptable,
+		},
+		{
+			name:         "application/json without params",
+			acceptHeader: "application/json",
+			wantStatus:   http.StatusNotAcceptable,
+		},
+		{
+			name:         "application/json with missing as",
+			acceptHeader: "application/json;v=v1alpha1;g=config.k8s.io",
+			wantStatus:   http.StatusNotAcceptable,
+		},
+		{
+			name:         "wildcard accept header",
+			acceptHeader: "*/*",
+			wantStatus:   http.StatusOK,
+			wantBodySub:  wantBodyStr,
+		},
+		{
+			name:         "bad json header fall back wildcard",
+			acceptHeader: "application/json;v=foo;g=config.k8s.io;as=Statusz,*/*",
+			wantStatus:   http.StatusOK,
+			wantBodySub:  wantBodyStr,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req := client.CoreV1().RESTClient().Get().RequestURI("/statusz")
+			req.SetHeader("Accept", tc.acceptHeader)
+			res := req.Do(context.TODO())
+			var status int
+			res.StatusCode(&status)
+			if status != tc.wantStatus {
+				t.Fatalf("want status %d, got %d", tc.wantStatus, status)
+			}
+			raw, err := res.Raw()
+			if err != nil && tc.wantStatus == http.StatusOK {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if tc.wantStatus == http.StatusOK {
+				if tc.wantBodySub != "" {
+					if !bytes.Contains(raw, []byte(tc.wantBodySub)) {
+						t.Errorf("body missing expected substring: %q\nGot:\n%s", tc.wantBodySub, string(raw))
+					}
+				}
+				if tc.wantJSON != nil {
+					var got v1alpha1.Statusz
+					if err := json.Unmarshal(raw, &got); err != nil {
+						t.Fatalf("error unmarshalling JSON: %v", err)
+					}
+					// Only check static fields, since others are dynamic
+					if got.TypeMeta != tc.wantJSON.TypeMeta {
+						t.Errorf("TypeMeta mismatch: want %+v, got %+v", tc.wantJSON.TypeMeta, got.TypeMeta)
+					}
+					if got.ObjectMeta.Name != tc.wantJSON.ObjectMeta.Name {
+						t.Errorf("ObjectMeta.Name mismatch: want %q, got %q", tc.wantJSON.ObjectMeta.Name, got.ObjectMeta.Name)
+					}
+					if diff := cmp.Diff(tc.wantJSON.Paths, got.Paths); diff != "" {
+						t.Errorf("Paths mismatch (-want,+got):\n%s", diff)
+					}
+				}
+			}
+		})
 	}
 }
 

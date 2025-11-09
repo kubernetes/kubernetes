@@ -136,7 +136,7 @@ const (
 	// Metric for tracking garbage collected images
 	ImageGarbageCollectedTotalKey = "image_garbage_collected_total"
 
-	// Metric for tracking aligment of compute resources
+	// Metric for tracking alignment of compute resources
 	ContainerAlignedComputeResourcesNameKey          = "container_aligned_compute_resources_count"
 	ContainerAlignedComputeResourcesFailureNameKey   = "container_aligned_compute_resources_failure_count"
 	ContainerAlignedComputeResourcesScopeLabelKey    = "scope"
@@ -176,6 +176,9 @@ const (
 	PodInfeasibleResizesKey          = "pod_infeasible_resizes_total"
 	PodInProgressResizesKey          = "pod_in_progress_resizes"
 	PodDeferredAcceptedResizesKey    = "pod_deferred_accepted_resizes_total"
+
+	// Metric key for podcertificate states.
+	PodCertificateStatesKey = "podcertificate_states"
 )
 
 type imageSizeBucket struct {
@@ -924,7 +927,7 @@ var (
 		},
 	)
 
-	// TopologyManagerAdmissionDuration is a Histogram that tracks the duration (in seconds) to serve a pod admission request.
+	// TopologyManagerAdmissionDuration is a Histogram that tracks the duration (in milliseconds) to serve a pod admission request.
 	TopologyManagerAdmissionDuration = metrics.NewHistogram(
 		&metrics.HistogramOpts{
 			Subsystem:      KubeletSubsystem,
@@ -944,7 +947,7 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
-	// OrphanPodCleanedVolumes is number of times that removeOrphanedPodVolumeDirs failed.
+	// OrphanPodCleanedVolumesErrors is the number of times that removeOrphanedPodVolumeDirs failed.
 	OrphanPodCleanedVolumesErrors = metrics.NewGauge(
 		&metrics.GaugeOpts{
 			Subsystem:      KubeletSubsystem,
@@ -1095,7 +1098,7 @@ var (
 		[]string{"reason"},
 	)
 
-	// ImageVolumeRequestedTotal trakcs the number of requested image volumes.
+	// ImageVolumeRequestedTotal tracks the number of requested image volumes.
 	ImageVolumeRequestedTotal = metrics.NewCounter(
 		&metrics.CounterOpts{
 			Subsystem:      KubeletSubsystem,

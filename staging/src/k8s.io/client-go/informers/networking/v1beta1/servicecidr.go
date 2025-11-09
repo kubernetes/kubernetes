@@ -56,7 +56,7 @@ func NewServiceCIDRInformer(client kubernetes.Interface, resyncPeriod time.Durat
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredServiceCIDRInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
+		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
@@ -81,7 +81,7 @@ func NewFilteredServiceCIDRInformer(client kubernetes.Interface, resyncPeriod ti
 				}
 				return client.NetworkingV1beta1().ServiceCIDRs().Watch(ctx, options)
 			},
-		},
+		}, client),
 		&apinetworkingv1beta1.ServiceCIDR{},
 		resyncPeriod,
 		indexers,

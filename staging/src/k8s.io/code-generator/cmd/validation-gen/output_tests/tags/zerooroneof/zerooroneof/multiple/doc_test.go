@@ -37,21 +37,20 @@ func Test(t *testing.T) {
 	st.Value(&Struct{U2M2: &M2{}}).ExpectValid()
 
 	// Multiple members in one union
-	st.Value(&Struct{U1M1: &M1{}, U1M2: &M2{}}).ExpectInvalid(
-		field.Invalid(nil, "{u1m1, u1m2}", "must specify at most one of: `u1m1`, `u1m2`"),
-	)
+	st.Value(&Struct{U1M1: &M1{}, U1M2: &M2{}}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
+		field.Invalid(nil, nil, "must specify at most one of").WithOrigin("zeroOrOneOf"),
+	})
 
-	st.Value(&Struct{U2M1: &M1{}, U2M2: &M2{}}).ExpectInvalid(
-		field.Invalid(nil, "{u2m1, u2m2}", "must specify at most one of: `u2m1`, `u2m2`"),
-	)
+	st.Value(&Struct{U2M1: &M1{}, U2M2: &M2{}}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
+		field.Invalid(nil, nil, "must specify at most one of").WithOrigin("zeroOrOneOf"),
+	})
 
 	st.Value(&Struct{
 		U1M1: &M1{}, U1M2: &M2{},
 		U2M1: &M1{}, U2M2: &M2{},
-	}).ExpectInvalid(
-		field.Invalid(nil, "{u1m1, u1m2}", "must specify at most one of: `u1m1`, `u1m2`"),
-		field.Invalid(nil, "{u2m1, u2m2}", "must specify at most one of: `u2m1`, `u2m2`"),
-	)
+	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
+		field.Invalid(nil, nil, "must specify at most one of").WithOrigin("zeroOrOneOf"),
+	})
 
 	// Test validation ratcheting
 	st.Value(&Struct{}).OldValue(&Struct{}).ExpectValid()

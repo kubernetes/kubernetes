@@ -27,6 +27,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog/v2"
 
 	"k8s.io/component-helpers/resource"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
@@ -331,9 +332,9 @@ func NodeAllocatableRoot(cgroupRoot string, cgroupsPerQOS bool, cgroupDriver str
 }
 
 // GetKubeletContainer returns the cgroup the kubelet will use
-func GetKubeletContainer(kubeletCgroups string) (string, error) {
+func GetKubeletContainer(logger klog.Logger, kubeletCgroups string) (string, error) {
 	if kubeletCgroups == "" {
-		cont, err := getContainer(os.Getpid())
+		cont, err := getContainer(logger, os.Getpid())
 		if err != nil {
 			return "", err
 		}

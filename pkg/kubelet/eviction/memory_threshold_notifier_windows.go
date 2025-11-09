@@ -20,6 +20,7 @@ limitations under the License.
 package eviction
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -38,8 +39,8 @@ type windowsMemoryThresholdNotifier struct {
 
 var _ ThresholdNotifier = &windowsMemoryThresholdNotifier{}
 
-func NewMemoryThresholdNotifier(threshold evictionapi.Threshold, cgroupRoot string, factory NotifierFactory, handler func(string)) (ThresholdNotifier, error) {
-	klog.InfoS("Eviction manager: creating new WindowsMemoryThresholdNotifier")
+func NewMemoryThresholdNotifier(logger klog.Logger, threshold evictionapi.Threshold, cgroupRoot string, factory NotifierFactory, handler func(string)) (ThresholdNotifier, error) {
+	logger.Info("Eviction manager: creating new WindowsMemoryThresholdNotifier")
 	return &windowsMemoryThresholdNotifier{
 		threshold: threshold,
 		events:    make(chan struct{}),
@@ -47,12 +48,13 @@ func NewMemoryThresholdNotifier(threshold evictionapi.Threshold, cgroupRoot stri
 	}, nil
 }
 
-func (m *windowsMemoryThresholdNotifier) Start() {
-	klog.InfoS("Eviction manager: starting windowsMemoryThresholdNotifier", "notifier", m.Description())
+func (m *windowsMemoryThresholdNotifier) Start(ctx context.Context) {
+	logger := klog.FromContext(ctx)
+	logger.Info("Eviction manager: starting windowsMemoryThresholdNotifier", "notifier", m.Description())
 	go func() {
 		for true {
 			time.Sleep(notifierRefreshInterval)
-			m.checkMemoryUsage()
+			m.checkMemoryUsage(logger)
 		}
 	}()
 
@@ -61,11 +63,11 @@ func (m *windowsMemoryThresholdNotifier) Start() {
 	}
 }
 
-func (m *windowsMemoryThresholdNotifier) checkMemoryUsage() {
+func (m *windowsMemoryThresholdNotifier) checkMemoryUsage(logger klog.Logger) {
 	// Get global commit limit
 	perfInfo, err := winstats.GetPerformanceInfo()
 	if err != nil {
-		klog.ErrorS(err, "Eviction manager: error getting global memory status for node")
+		logger.Error(err, "Eviction manager: error getting global memory status for node")
 	}
 
 	commmiLimitBytes := perfInfo.CommitLimitPages * perfInfo.PageSize
@@ -80,7 +82,7 @@ func (m *windowsMemoryThresholdNotifier) checkMemoryUsage() {
 	}
 }
 
-func (m *windowsMemoryThresholdNotifier) UpdateThreshold(summary *statsapi.Summary) error {
+func (m *windowsMemoryThresholdNotifier) UpdateThreshold(ctx context.Context, summary *statsapi.Summary) error {
 	// Windows doesn't use cgroup notifiers to trigger eviction, so this function is a no-op.
 	// Instead the go-routine set up in Start() will poll the system for memory usage and
 	// trigger eviction when the threshold is crossed.

@@ -10,10 +10,10 @@ import (
 )
 
 type BeEquivalentToMatcher struct {
-	Expected interface{}
+	Expected any
 }
 
-func (matcher *BeEquivalentToMatcher) Match(actual interface{}) (success bool, err error) {
+func (matcher *BeEquivalentToMatcher) Match(actual any) (success bool, err error) {
 	if actual == nil && matcher.Expected == nil {
 		return false, fmt.Errorf("Both actual and expected must not be nil.")
 	}
@@ -27,10 +27,10 @@ func (matcher *BeEquivalentToMatcher) Match(actual interface{}) (success bool, e
 	return reflect.DeepEqual(convertedActual, matcher.Expected), nil
 }
 
-func (matcher *BeEquivalentToMatcher) FailureMessage(actual interface{}) (message string) {
+func (matcher *BeEquivalentToMatcher) FailureMessage(actual any) (message string) {
 	return format.Message(actual, "to be equivalent to", matcher.Expected)
 }
 
-func (matcher *BeEquivalentToMatcher) NegatedFailureMessage(actual interface{}) (message string) {
+func (matcher *BeEquivalentToMatcher) NegatedFailureMessage(actual any) (message string) {
 	return format.Message(actual, "not to be equivalent to", matcher.Expected)
 }

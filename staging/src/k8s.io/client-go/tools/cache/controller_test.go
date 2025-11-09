@@ -18,6 +18,7 @@ package cache
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"sync"
@@ -25,6 +26,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -363,7 +365,7 @@ func TestUpdate(t *testing.T) {
 	// everything we've added has been deleted.
 	watchCh := make(chan struct{})
 	_, controller := NewInformer(
-		&ListWatch{
+		toListWatcherWithUnSupportedWatchListSemantics(&ListWatch{
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				watch, err := source.Watch(options)
 				close(watchCh)
@@ -372,7 +374,7 @@ func TestUpdate(t *testing.T) {
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				return source.List(options)
 			},
-		},
+		}),
 		&v1.Pod{},
 		0,
 		ResourceEventHandlerFuncs{
@@ -732,4 +734,162 @@ func TestDeletionHandlingObjectToName(t *testing.T) {
 	if expected != actual {
 		t.Errorf("Expected %#v, got %#v", expected, actual)
 	}
+}
+
+type listWatchWithUnSupportedWatchListSemanticsWrapper struct {
+	*ListWatch
+}
+
+func (lw listWatchWithUnSupportedWatchListSemanticsWrapper) IsWatchListSemanticsUnSupported() bool {
+	return true
+}
+
+func toListWatcherWithUnSupportedWatchListSemantics(lw *ListWatch) ListerWatcher {
+	return listWatchWithUnSupportedWatchListSemanticsWrapper{
+		lw,
+	}
+}
+
+func TestProcessDeltasInBatch(t *testing.T) {
+	cm1 := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "testname1",
+			Namespace: "testnamespace",
+		},
+	}
+	cm2 := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "testname2",
+			Namespace: "testnamespace",
+		},
+	}
+	cm3 := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "testname3",
+			Namespace: "testnamespace",
+		},
+	}
+	testDelta1 := Delta{
+		Type:   Added,
+		Object: cm1,
+	}
+	testDelta2 := Delta{
+		Type:   Added,
+		Object: cm2,
+	}
+	testDelta3 := Delta{
+		Type:   Added,
+		Object: cm3,
+	}
+	testCases := []struct {
+		name                            string
+		deltaList                       []Delta
+		succeedingObjects               []runtime.Object
+		failingObjects                  []runtime.Object
+		expectedListenerReceivedObjects []interface{}
+		expectedSuccessCount            int
+		assertErr                       func(error) bool
+	}{
+		{
+			name:                            "all transaction succeeding should works",
+			deltaList:                       []Delta{testDelta1},
+			expectedSuccessCount:            1,
+			expectedListenerReceivedObjects: []interface{}{cm1},
+		},
+		{
+			name:                 "all transaction failing should not trigger listener",
+			deltaList:            []Delta{testDelta1},
+			failingObjects:       []runtime.Object{cm1},
+			expectedSuccessCount: 0,
+			assertErr: func(err error) bool {
+				return assert.Contains(t, err.Error(), "failed to execute (1/1) transactions")
+			},
+			expectedListenerReceivedObjects: make([]interface{}, 0),
+		},
+		{
+			name:                 "partial transaction failing should only trigger successful events to listener #1",
+			deltaList:            []Delta{testDelta1, testDelta2},
+			failingObjects:       []runtime.Object{cm2},
+			expectedSuccessCount: 1,
+			assertErr: func(err error) bool {
+				return assert.Contains(t, err.Error(), "failed to execute (1/2) transactions")
+			},
+			expectedListenerReceivedObjects: []interface{}{cm1},
+		},
+		{
+			name:                 "partial transaction failing should only trigger successful events to listener #2",
+			deltaList:            []Delta{testDelta1, testDelta2, testDelta3},
+			failingObjects:       []runtime.Object{cm2},
+			expectedSuccessCount: 2,
+			assertErr: func(err error) bool {
+				return assert.Contains(t, err.Error(), "failed to execute (1/3) transactions")
+			},
+			expectedListenerReceivedObjects: []interface{}{cm1, cm3},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockStore := &mockTxnStore{
+				Store:       NewStore(MetaNamespaceKeyFunc),
+				failingObjs: tc.failingObjects,
+			}
+			actualListenerReceivedObjects := make([]interface{}, 0)
+			dummyListener := ResourceEventHandlerFuncs{
+				AddFunc: func(obj interface{}) {
+					actualListenerReceivedObjects = append(actualListenerReceivedObjects, obj)
+				},
+				UpdateFunc: func(oldObj, newObj interface{}) {
+					actualListenerReceivedObjects = append(actualListenerReceivedObjects, newObj)
+				},
+				DeleteFunc: func(obj interface{}) {
+					actualListenerReceivedObjects = append(actualListenerReceivedObjects, obj)
+				},
+			}
+			err := processDeltasInBatch(
+				dummyListener,
+				mockStore,
+				tc.deltaList,
+				true)
+			if tc.assertErr != nil {
+				assert.True(t, tc.assertErr(err))
+			}
+			assert.Equal(t, tc.expectedSuccessCount, mockStore.succeedCount)
+			assert.Equal(t, tc.expectedListenerReceivedObjects, actualListenerReceivedObjects)
+		})
+	}
+}
+
+var _ TransactionStore = &mockTxnStore{}
+
+type mockTxnStore struct {
+	failingObjs  []runtime.Object
+	succeedCount int
+	Store
+}
+
+func (m *mockTxnStore) Transaction(txns ...Transaction) *TransactionError {
+	successfuls := make([]int, 0)
+	fails := make([]int, 0)
+	errs := make([]error, 0)
+	for i := range txns {
+		txn := txns[i]
+		for _, fail := range m.failingObjs {
+			if apiequality.Semantic.DeepEqual(fail, txn.Object) {
+				fails = append(fails, i)
+				errs = append(errs, errors.New("test error"))
+			} else {
+				successfuls = append(successfuls, i)
+			}
+		}
+	}
+	if len(fails) > 0 {
+		m.succeedCount = len(successfuls)
+		return &TransactionError{
+			TotalTransactions: len(txns),
+			SuccessfulIndices: successfuls,
+			Errors:            errs,
+		}
+	}
+	m.succeedCount = len(txns)
+	return nil
 }

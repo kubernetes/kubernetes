@@ -24,6 +24,7 @@ import (
 	_ "crypto/sha512"
 
 	dockerref "github.com/distribution/reference"
+	"github.com/robfig/cron/v3"
 )
 
 // ParseImageName parses a docker image string into three parts: repo, tag and digest.
@@ -51,4 +52,18 @@ func ParseImageName(image string) (string, string, string, error) {
 		tag = "latest"
 	}
 	return repoToPull, tag, digest, nil
+}
+
+// ParseCronScheduleWithPanicRecovery safely parses a cron schedule, recovering from panics
+// that can occur in cron.ParseStandard for malformed schedules like "TZ=0".
+func ParseCronScheduleWithPanicRecovery(schedule string) (sched cron.Schedule, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			sched = nil
+			err = fmt.Errorf("invalid schedule format: %v", r)
+		}
+	}()
+
+	sched, err = cron.ParseStandard(schedule)
+	return
 }

@@ -252,7 +252,7 @@ func (c *csiAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.No
 }
 
 func (c *csiAttacher) GetDeviceMountPath(spec *volume.Spec) (string, error) {
-	klog.V(4).Info(log("attacher.GetDeviceMountPath(%v)", spec))
+	klog.V(4).Info(log("attacher.GetDeviceMountPath for volume(%s)", spec.Name()))
 	deviceMountPath, err := makeDeviceMountPath(c.plugin, spec)
 	if err != nil {
 		return "", errors.New(log("attacher.GetDeviceMountPath failed to make device mount path: %v", err))
@@ -356,7 +356,7 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 		return nil
 	}
 
-	//TODO (vladimirvivien) implement better AccessModes mapping between k8s and CSI
+	// TODO (vladimirvivien) implement better AccessModes mapping between k8s and CSI
 	accessMode := v1.ReadWriteOnce
 	if spec.PersistentVolume.Spec.AccessModes != nil {
 		accessMode = spec.PersistentVolume.Spec.AccessModes[0]

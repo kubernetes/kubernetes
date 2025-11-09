@@ -103,26 +103,11 @@ def file_passes(filename, refs, regexs):
     # trim our file to the same number of lines as the reference file
     data = data[: len(ref)]
 
-    pattern = regexs["year"]
-    for line in data:
-        if pattern.search(line):
-            if generated:
-                print(
-                    f"File {filename} has the YEAR field, but it should not be in generated file",
-                    file=verbose_out,
-                )
-            else:
-                print(
-                    "File {filename} has the YEAR field, but missing the year of date",
-                    file=verbose_out,
-                )
-            return False
-
     if not generated:
-        # Replace all occurrences of the regex "2014|2015|2016|2017|2018" with "YEAR"
+        # Remove all occurrences of the year (regex "Copyright (2014|2015|2016|2017|2018) ")
         pattern = regexs["date"]
         for i, line in enumerate(data):
-            data[i], found = pattern.subn("YEAR", line)
+            data[i], found = pattern.subn("Copyright ", line)
             if found != 0:
                 break
 
@@ -203,18 +188,18 @@ def get_files(extensions):
 
 
 def get_dates():
-    years = datetime.datetime.now().year
-    return "(%s)" % "|".join(str(year) for year in range(2014, years + 1))
+    # After 2025, we no longer allow new files to include the year in the copyright header.
+    final_year = 2025
+    return " (%s) " % "|".join(str(year) for year in range(2014, final_year + 1))
 
 
 def get_regexs():
     regexs = {}
     # Search for "YEAR" which exists in the boilerplate, but shouldn't in the real thing
     regexs["year"] = re.compile("YEAR")
-    # get_dates return 2014, 2015, 2016, 2017, or 2018 until the current year
-    # as a regex like: "(2014|2015|2016|2017|2018)";
-    # company holder names can be anything
-    regexs["date"] = re.compile(get_dates())
+    # get_dates return 2014, 2015, 2016, 2017, ..., 2025
+    # as a regex like: "(2014|2015|2016|2017|2018|...|2025)";
+    regexs["date"] = re.compile("Copyright" + get_dates())
     # strip the following build constraints/tags:
     # //go:build
     # // +build \n\n

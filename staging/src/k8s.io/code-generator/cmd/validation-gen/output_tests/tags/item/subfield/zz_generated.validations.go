@@ -56,39 +56,43 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 
 	// field Struct.Items
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []Item) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj []Item, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
 			// call field-attached validations
-			errs = append(errs, validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *Item) bool { return item.Key == "target" }, validate.DirectEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Item) field.ErrorList {
-				return validate.Subfield(ctx, op, fldPath, obj, oldObj, "stringField", func(o *Item) *string { return &o.StringField }, validate.DirectEqualPtr, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
-					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item Items[key=target].stringField")
-				})
-			})...)
 			// lists with map semantics require unique keys
 			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a Item, b Item) bool { return a.Key == b.Key })...)
+			func() { // cohort {"key": "target"}
+				errs = append(errs, validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *Item) bool { return item.Key == "target" }, validate.DirectEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Item) field.ErrorList {
+					return validate.Subfield(ctx, op, fldPath, obj, oldObj, "stringField", func(o *Item) *string { return &o.StringField }, validate.DirectEqualPtr, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
+						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item Items[key=target].stringField")
+					})
+				})...)
+			}()
 			return
-		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *Struct) []Item { return oldObj.Items }))...)
+		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *Struct) []Item { return oldObj.Items }), oldObj != nil)...)
 
 	// field Struct.RatchetItems
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []RatchetItem) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj []RatchetItem, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
 			// call field-attached validations
-			errs = append(errs, validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *RatchetItem) bool { return item.Key == "ratchet" }, validate.DirectEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *RatchetItem) field.ErrorList {
-				return validate.Subfield(ctx, op, fldPath, obj, oldObj, "status", func(o *RatchetItem) *string { return &o.Status }, validate.DirectEqualPtr, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
-					return validate.NEQ(ctx, op, fldPath, obj, oldObj, "forbidden")
-				})
-			})...)
 			// lists with map semantics require unique keys
 			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a RatchetItem, b RatchetItem) bool { return a.Key == b.Key })...)
+			func() { // cohort {"key": "ratchet"}
+				errs = append(errs, validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *RatchetItem) bool { return item.Key == "ratchet" }, validate.DirectEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *RatchetItem) field.ErrorList {
+					return validate.Subfield(ctx, op, fldPath, obj, oldObj, "status", func(o *RatchetItem) *string { return &o.Status }, validate.DirectEqualPtr, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
+						return validate.NEQ(ctx, op, fldPath, obj, oldObj, "forbidden")
+					})
+				})...)
+			}()
 			return
-		}(fldPath.Child("ratchetItems"), obj.RatchetItems, safe.Field(oldObj, func(oldObj *Struct) []RatchetItem { return oldObj.RatchetItems }))...)
+		}(fldPath.Child("ratchetItems"), obj.RatchetItems, safe.Field(oldObj, func(oldObj *Struct) []RatchetItem { return oldObj.RatchetItems }), oldObj != nil)...)
 
 	return errs
 }

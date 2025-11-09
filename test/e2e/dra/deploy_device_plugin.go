@@ -19,6 +19,7 @@ package dra
 import (
 	"context"
 
+	"github.com/onsi/ginkgo/v2"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -32,6 +33,7 @@ import (
 // extended resource name (returned as result) and deploying it twice for the same nodes from different
 // tests would conflict.
 func deployDevicePlugin(ctx context.Context, f *framework.Framework, nodeNames []string) v1.ResourceName {
+	ginkgo.By("Deploy Device Plugin")
 	err := utils.CreateFromManifests(ctx, f, f.Namespace, func(item interface{}) error {
 		switch item := item.(type) {
 		case *appsv1.DaemonSet:

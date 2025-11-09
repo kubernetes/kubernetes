@@ -1193,7 +1193,7 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 				}
 				sw.Do("// field $.inType|raw$.$.fieldName$\n", targs)
 				sw.Do("errs = append(errs,\n", targs)
-				sw.Do("  func(fldPath *$.field.Path|raw$, obj, oldObj $.fieldTypePfx$$.fieldType|raw$) (errs $.field.ErrorList|raw$) {\n", targs)
+				sw.Do("  func(fldPath *$.field.Path|raw$, obj, oldObj $.fieldTypePfx$$.fieldType|raw$, oldValueCorrelated bool) (errs $.field.ErrorList|raw$) {\n", targs)
 				if err := sw.Merge(buf, bufsw); err != nil {
 					panic(fmt.Sprintf("failed to merge buffer: %v", err))
 				}
@@ -1207,10 +1207,28 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 					sw.Do("$.safe.Value|raw$(fldPath, func() *$.field.Path|raw$ { return fldPath.Child(\"$.fieldType|raw$\") }), ", targs)
 				}
 				sw.Do("    $.fieldExprPfx$obj.$.fieldName$, ", targs)
+				// safe.Field returns a nil if the old object does not have a correlatable
+				// value, such as a map.
+				// This is ambiguous with the case where the field exists and is nil.
+				// This ambiguity is a problem for ratcheting, which needs to distinguish
+				// these cases. For example, if a required field is removed from a map,
+				// safe.Field will return nil for the old value, and the new value is also
+				// nil (because it doesn't exist). Ratcheting would normally allow this,
+				// but it's a validation failure because a required field is missing.
+				//
+				// To solve this, we pass an extra boolean parameter to the validation
+				// function, indicating whether the old value was correlated. If the old
+				// value was uncorrelated, it means the field was not present in the old
+				// object, and we should not apply ratcheting logic. `oldObj != nil`
+				// provides this bit of information.
+				//
+				// This bit is not currently propagated down to deeper levels of
+				// validation, but since the code generator only ever looks one level
+				// down, this is sufficient for now.
 				sw.Do("    $.safe.Field|raw$(oldObj, ", targs)
 				sw.Do("        func(oldObj *$.inType|raw$) $.fieldTypePfx$$.fieldType|raw$ {", targs)
 				sw.Do("            return $.fieldExprPfx$oldObj.$.fieldName$", targs)
-				sw.Do("        }),", targs)
+				sw.Do("        }), oldObj != nil", targs)
 				sw.Do("    )...)\n", targs)
 				sw.Do("\n", nil)
 			} else {
@@ -1257,10 +1275,10 @@ func emitRatchetingCheck(c *generator.Context, t *types.Type, sw *generator.Snip
 		// - obj != nil : handle optional fields which are updated to nil
 		// - oldObj != nil : handle optional fields which are updated from nil
 		// - *obj == *oldObj : compare values
-		sw.Do("if op.Type == $.operation.Update|raw$ && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {\n", targs)
+		sw.Do("if oldValueCorrelated && op.Type == $.operation.Update|raw$ && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {\n", targs)
 	} else {
 		targs["equality"] = mkSymbolArgs(c, equalityPkgSymbols)
-		sw.Do("if op.Type == $.operation.Update|raw$ && $.equality.Semantic|raw$.DeepEqual(obj, oldObj) {\n", targs)
+		sw.Do("if oldValueCorrelated && op.Type == $.operation.Update|raw$ && $.equality.Semantic|raw$.DeepEqual(obj, oldObj) {\n", targs)
 	}
 	sw.Do("   return nil\n", nil)
 	sw.Do("}\n", nil)
@@ -1280,12 +1298,159 @@ func emitRatchetingCheck(c *generator.Context, t *types.Type, sw *generator.Snip
 // variables named "obj" and "oldObj", and the field path to this value is
 // named "fldPath".
 func emitCallsToValidators(c *generator.Context, validations []validators.FunctionGen, sw *generator.SnippetWriter) {
-	// Helper func
-	sort := func(in []validators.FunctionGen) []validators.FunctionGen {
-		sooner := make([]validators.FunctionGen, 0, len(in))
-		later := make([]validators.FunctionGen, 0, len(in))
+	// Group and sort the inputs.
+	cohorts := sortIntoCohorts(validations)
 
-		for _, fg := range in {
+	for _, validations := range cohorts {
+		cohortName := validations[0].Cohort
+		if cohortName != "" {
+			sw.Do("func() { // cohort $.$\n", cohortName)
+		}
+
+		hasShortCircuits := false
+		lastShortCircuitIdx := -1
+		for i, v := range validations {
+			if v.Flags.IsSet(validators.ShortCircuit) {
+				hasShortCircuits = true
+				lastShortCircuitIdx = i
+			}
+		}
+
+		if hasShortCircuits {
+			sw.Do("earlyReturn := false\n", nil)
+		}
+
+		for i, v := range validations {
+			isShortCircuit := v.Flags.IsSet(validators.ShortCircuit)
+			isNonError := v.Flags.IsSet(validators.NonError)
+
+			targs := generator.Args{
+				"funcName": c.Universe.Type(v.Function),
+				"field":    mkSymbolArgs(c, fieldPkgSymbols),
+			}
+
+			emitCall := func() {
+				sw.Do("$.funcName|raw$", targs)
+				if typeArgs := v.TypeArgs; len(typeArgs) > 0 {
+					sw.Do("[", nil)
+					for i, typeArg := range typeArgs {
+						sw.Do("$.|raw$", c.Universe.Type(typeArg))
+						if i < len(typeArgs)-1 {
+							sw.Do(",", nil)
+						}
+					}
+					sw.Do("]", nil)
+				}
+				sw.Do("(ctx, op, fldPath, obj, oldObj", targs)
+				for _, arg := range v.Args {
+					sw.Do(", ", nil)
+					toGolangSourceDataLiteral(sw, c, arg)
+				}
+				sw.Do(")", targs)
+			}
+
+			// If validation is conditional, wrap the validation function with a conditions check.
+			if !v.Conditions.Empty() {
+				emitBaseFunction := emitCall
+				emitCall = func() {
+					sw.Do("func() $.field.ErrorList|raw$ {\n", targs)
+					sw.Do("  if ", nil)
+					firstCondition := true
+					if len(v.Conditions.OptionEnabled) > 0 {
+						sw.Do("op.HasOption($.$)", strconv.Quote(v.Conditions.OptionEnabled))
+						firstCondition = false
+					}
+					if len(v.Conditions.OptionDisabled) > 0 {
+						if !firstCondition {
+							sw.Do(" && ", nil)
+						}
+						sw.Do("!op.HasOption($.$)", strconv.Quote(v.Conditions.OptionDisabled))
+					}
+					sw.Do(" {\n", nil)
+					sw.Do("    return ", nil)
+					emitBaseFunction()
+					sw.Do("\n", nil)
+					sw.Do("  } else {\n", nil)
+					sw.Do("    return nil // skip validation\n", nil)
+					sw.Do("  }\n", nil)
+					sw.Do("}()", nil)
+				}
+			}
+
+			for _, comment := range v.Comments {
+				sw.Do("// $.$\n", comment)
+			}
+			if isShortCircuit {
+				sw.Do("if e := ", nil)
+				emitCall()
+				sw.Do("; len(e) != 0 {\n", nil)
+				if !isNonError {
+					sw.Do("  errs = append(errs, e...)\n", nil)
+				}
+				sw.Do("  earlyReturn = true\n", nil)
+				sw.Do("}\n", nil)
+
+				// Check for early return ONLY after the LAST short-circuit
+				if hasShortCircuits && i == lastShortCircuitIdx {
+					sw.Do("if earlyReturn {\n", nil)
+					sw.Do("  return // do not proceed\n", nil)
+					sw.Do("}\n", nil)
+				}
+			} else {
+				if isNonError {
+					emitCall()
+				} else {
+					sw.Do("errs = append(errs, ", nil)
+					emitCall()
+					sw.Do("...)\n", nil)
+				}
+			}
+		}
+		if cohortName != "" {
+			sw.Do("}()\n", nil)
+		}
+	}
+}
+
+// sortIntoCohorts groups the inputs into a list of cohorts. Within each
+// cohort, function calls are sorted such that short-circuiting function
+// calls are handled before others. The first cohort is always the
+// default cohort (named "") if it exists. Other cohorts are returned in
+// the order they were defined in the input.
+func sortIntoCohorts(in []validators.FunctionGen) [][]validators.FunctionGen {
+	defaultCohort := make([]validators.FunctionGen, 0, len(in))
+	namedCohorts := map[string][]validators.FunctionGen{}
+	idx := make([]string, 0, len(in))
+	for _, fg := range in {
+		key := fg.Cohort
+		if key == "" {
+			defaultCohort = append(defaultCohort, fg)
+		} else {
+			if !slices.Contains(idx, key) {
+				idx = append(idx, key)
+			}
+			namedCohorts[key] = append(namedCohorts[key], fg)
+		}
+	}
+	if len(defaultCohort) > 0 {
+		idx = append([]string{""}, idx...)
+	}
+	// NOTE: we do not sort cohorts by name, because we want to preserve
+	// their definition order.
+
+	result := make([][]validators.FunctionGen, 0, len(in))
+	for _, key := range idx {
+		var cohort []validators.FunctionGen
+		if key == "" {
+			cohort = defaultCohort
+		} else {
+			cohort = namedCohorts[key]
+		}
+
+		sooner := make([]validators.FunctionGen, 0, len(cohort))
+		later := make([]validators.FunctionGen, 0, len(cohort))
+
+		for _, fg := range cohort {
 			isShortCircuit := (fg.Flags.IsSet(validators.ShortCircuit))
 
 			if isShortCircuit {
@@ -1294,92 +1459,11 @@ func emitCallsToValidators(c *generator.Context, validations []validators.Functi
 				later = append(later, fg)
 			}
 		}
-		result := sooner
-		result = append(result, later...)
-		return result
+		sorted := sooner
+		sorted = append(sorted, later...)
+		result = append(result, sorted)
 	}
-
-	validations = sort(validations)
-
-	for _, v := range validations {
-		isShortCircuit := v.Flags.IsSet(validators.ShortCircuit)
-		isNonError := v.Flags.IsSet(validators.NonError)
-
-		targs := generator.Args{
-			"funcName": c.Universe.Type(v.Function),
-			"field":    mkSymbolArgs(c, fieldPkgSymbols),
-		}
-
-		emitCall := func() {
-			sw.Do("$.funcName|raw$", targs)
-			if typeArgs := v.TypeArgs; len(typeArgs) > 0 {
-				sw.Do("[", nil)
-				for i, typeArg := range typeArgs {
-					sw.Do("$.|raw$", c.Universe.Type(typeArg))
-					if i < len(typeArgs)-1 {
-						sw.Do(",", nil)
-					}
-				}
-				sw.Do("]", nil)
-			}
-			sw.Do("(ctx, op, fldPath, obj, oldObj", targs)
-			for _, arg := range v.Args {
-				sw.Do(", ", nil)
-				toGolangSourceDataLiteral(sw, emitterContext{Context: c}, arg)
-			}
-			sw.Do(")", targs)
-		}
-
-		// If validation is conditional, wrap the validation function with a conditions check.
-		if !v.Conditions.Empty() {
-			emitBaseFunction := emitCall
-			emitCall = func() {
-				sw.Do("func() $.field.ErrorList|raw$ {\n", targs)
-				sw.Do("  if ", nil)
-				firstCondition := true
-				if len(v.Conditions.OptionEnabled) > 0 {
-					sw.Do("op.HasOption($.$)", strconv.Quote(v.Conditions.OptionEnabled))
-					firstCondition = false
-				}
-				if len(v.Conditions.OptionDisabled) > 0 {
-					if !firstCondition {
-						sw.Do(" && ", nil)
-					}
-					sw.Do("!op.HasOption($.$)", strconv.Quote(v.Conditions.OptionDisabled))
-				}
-				sw.Do(" {\n", nil)
-				sw.Do("    return ", nil)
-				emitBaseFunction()
-				sw.Do("\n", nil)
-				sw.Do("  } else {\n", nil)
-				sw.Do("    return nil // skip validation\n", nil)
-				sw.Do("  }\n", nil)
-				sw.Do("}()", nil)
-			}
-		}
-
-		for _, comment := range v.Comments {
-			sw.Do("// $.$\n", comment)
-		}
-		if isShortCircuit {
-			sw.Do("if e := ", nil)
-			emitCall()
-			sw.Do("; len(e) != 0 {\n", nil)
-			if !isNonError {
-				sw.Do("errs = append(errs, e...)\n", nil)
-			}
-			sw.Do("    return // do not proceed\n", nil)
-			sw.Do("}\n", nil)
-		} else {
-			if isNonError {
-				emitCall()
-			} else {
-				sw.Do("errs = append(errs, ", nil)
-				emitCall()
-				sw.Do("...)\n", nil)
-			}
-		}
-	}
+	return result
 }
 
 func emitComments(comments []string, sw *generator.SnippetWriter) {
@@ -1406,7 +1490,7 @@ func (g *genValidations) emitValidationVariables(c *generator.Context, t *types.
 			}
 
 			sw.Do("var $.varName|private$ = ", targs)
-			toGolangSourceDataLiteral(sw, emitterContext{Context: c}, variable.Initializer)
+			toGolangSourceDataLiteral(sw, c, variable.Initializer)
 			sw.Do("\n", nil)
 		}
 	}
@@ -1420,13 +1504,7 @@ func (g *genValidations) emitValidationVariables(c *generator.Context, t *types.
 	}
 }
 
-type emitterContext struct {
-	*generator.Context
-	// True if the literal to be emitted is a slice or array element.
-	isElement bool
-}
-
-func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c emitterContext, value any) {
+func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c *generator.Context, value any) {
 	// For safety, be strict in what values we output to visited source, and ensure strings
 	// are quoted.
 
@@ -1470,9 +1548,9 @@ func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c emitterContext, va
 			// a "standard signature" validation function to wrap it.
 			targs := generator.Args{
 				"funcName":   c.Universe.Type(v.Function.Function),
-				"field":      mkSymbolArgs(c.Context, fieldPkgSymbols),
-				"operation":  mkSymbolArgs(c.Context, operationPkgSymbols),
-				"context":    mkSymbolArgs(c.Context, contextPkgSymbols),
+				"field":      mkSymbolArgs(c, fieldPkgSymbols),
+				"operation":  mkSymbolArgs(c, operationPkgSymbols),
+				"context":    mkSymbolArgs(c, contextPkgSymbols),
 				"objType":    v.ObjType,
 				"objTypePfx": "*",
 			}
@@ -1531,18 +1609,16 @@ func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c emitterContext, va
 		targs := generator.Args{
 			"type": c.Universe.Type(v.Type),
 		}
-		if !c.isElement { // To conform to gofmt, omit type names for array/slice elements.
-			sw.Do("$.type|raw$", targs)
-			if len(v.TypeArgs) > 0 {
-				sw.Do("[", nil)
-				for i, typeArg := range v.TypeArgs {
-					if i > 0 {
-						sw.Do(", ", nil)
-					}
-					sw.Do("$.|raw$", typeArg)
+		sw.Do("$.type|raw$", targs)
+		if len(v.TypeArgs) > 0 {
+			sw.Do("[", nil)
+			for i, typeArg := range v.TypeArgs {
+				if i > 0 {
+					sw.Do(", ", nil)
 				}
-				sw.Do("]", nil)
+				sw.Do("$.|raw$", typeArg)
 			}
+			sw.Do("]", nil)
 		}
 		sw.Do("{\n", nil)
 		for _, f := range v.Fields {
@@ -1570,7 +1646,7 @@ func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c emitterContext, va
 		}
 		sw.Do("{\n", nil)
 		for _, e := range v.Elements {
-			toGolangSourceDataLiteral(sw, emitterContext{Context: c.Context, isElement: true}, e)
+			toGolangSourceDataLiteral(sw, c, e)
 			sw.Do(",\n", nil)
 		}
 		sw.Do("}", nil)
@@ -1606,7 +1682,7 @@ func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c emitterContext, va
 	}
 }
 
-func emitFunctionCall(sw *generator.SnippetWriter, c emitterContext, v validators.FunctionGen, leadingArgs ...string) {
+func emitFunctionCall(sw *generator.SnippetWriter, c *generator.Context, v validators.FunctionGen, leadingArgs ...string) {
 	targs := generator.Args{
 		"funcName": c.Universe.Type(v.Function),
 	}

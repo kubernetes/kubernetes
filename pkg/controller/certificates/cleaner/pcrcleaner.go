@@ -21,15 +21,15 @@ import (
 	"fmt"
 	"time"
 
-	certsv1alpha1 "k8s.io/api/certificates/v1alpha1"
+	certsv1beta1 "k8s.io/api/certificates/v1beta1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	certinformersv1alpha1 "k8s.io/client-go/informers/certificates/v1alpha1"
+	certinformersv1beta1 "k8s.io/client-go/informers/certificates/v1beta1"
 	"k8s.io/client-go/kubernetes"
-	certlistersv1alpha1 "k8s.io/client-go/listers/certificates/v1alpha1"
+	certlistersv1beta1 "k8s.io/client-go/listers/certificates/v1beta1"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 	"k8s.io/utils/ptr"
@@ -39,7 +39,7 @@ import (
 // minutes.
 type PCRCleanerController struct {
 	client          kubernetes.Interface
-	pcrLister       certlistersv1alpha1.PodCertificateRequestLister
+	pcrLister       certlistersv1beta1.PodCertificateRequestLister
 	clock           clock.PassiveClock
 	threshold       time.Duration
 	pollingInterval time.Duration
@@ -48,7 +48,7 @@ type PCRCleanerController struct {
 // NewPCRCleanerController creates a PCRCleanerController.
 func NewPCRCleanerController(
 	client kubernetes.Interface,
-	pcrLister certinformersv1alpha1.PodCertificateRequestInformer,
+	pcrLister certinformersv1beta1.PodCertificateRequestInformer,
 	clock clock.PassiveClock,
 	threshold time.Duration,
 	pollingInterval time.Duration,
@@ -69,9 +69,7 @@ func (c *PCRCleanerController) Run(ctx context.Context, workers int) {
 	logger.Info("Starting PodCertificateRequest cleaner controller")
 	defer logger.Info("Shutting down PodCertificateRequest cleaner controller")
 
-	go wait.UntilWithContext(ctx, c.worker, c.pollingInterval)
-
-	<-ctx.Done()
+	wait.UntilWithContext(ctx, c.worker, c.pollingInterval)
 }
 
 func (c *PCRCleanerController) worker(ctx context.Context) {
@@ -87,7 +85,7 @@ func (c *PCRCleanerController) worker(ctx context.Context) {
 	}
 }
 
-func (c PCRCleanerController) handle(ctx context.Context, pcr *certsv1alpha1.PodCertificateRequest) error {
+func (c PCRCleanerController) handle(ctx context.Context, pcr *certsv1beta1.PodCertificateRequest) error {
 	if c.clock.Now().Before(pcr.ObjectMeta.CreationTimestamp.Time.Add(c.threshold)) {
 		return nil
 	}
@@ -98,7 +96,7 @@ func (c PCRCleanerController) handle(ctx context.Context, pcr *certsv1alpha1.Pod
 		},
 	}
 
-	err := c.client.CertificatesV1alpha1().PodCertificateRequests(pcr.ObjectMeta.Namespace).Delete(ctx, pcr.ObjectMeta.Name, opts)
+	err := c.client.CertificatesV1beta1().PodCertificateRequests(pcr.ObjectMeta.Namespace).Delete(ctx, pcr.ObjectMeta.Name, opts)
 	if k8serrors.IsNotFound(err) {
 		// This is OK, we don't care if someone else already deleted it.
 		return nil

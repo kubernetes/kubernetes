@@ -57,7 +57,7 @@ func NewJobInformer(client kubernetes.Interface, namespace string, resyncPeriod 
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredJobInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
+		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
@@ -82,7 +82,7 @@ func NewFilteredJobInformer(client kubernetes.Interface, namespace string, resyn
 				}
 				return client.BatchV1().Jobs(namespace).Watch(ctx, options)
 			},
-		},
+		}, client),
 		&apibatchv1.Job{},
 		resyncPeriod,
 		indexers,

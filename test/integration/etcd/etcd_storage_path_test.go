@@ -88,8 +88,10 @@ func TestEtcdStoragePath(t *testing.T) {
 
 func testEtcdStoragePathWithVersion(t *testing.T, v string) {
 	if v == componentbaseversion.DefaultKubeBinaryVersion {
-		featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, "AllAlpha", true)
-		featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, "AllBeta", true)
+		featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+			"AllAlpha": true,
+			"AllBeta":  true,
+		})
 	} else {
 		// Only test for beta and GA APIs with emulated version.
 		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, version.MustParse(v))

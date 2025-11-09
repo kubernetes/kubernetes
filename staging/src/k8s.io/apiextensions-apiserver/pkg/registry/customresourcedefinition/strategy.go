@@ -334,6 +334,9 @@ func dropDisabledFields(newCRD *apiextensions.CustomResourceDefinition, oldCRD *
 	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceFieldSelectors) && (oldCRD == nil || (oldCRD != nil && !specHasSelectableFields(&oldCRD.Spec))) {
 		dropSelectableFields(&newCRD.Spec)
 	}
+	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CRDObservedGenerationTracking) && (oldCRD == nil || !observedGenerationTrackingInUse(&oldCRD.Status)) {
+		dropObservedGeneration(&newCRD.Status)
+	}
 }
 
 // dropOptionalOldSelfField drops field optionalOldSelf from CRD schema
@@ -382,6 +385,25 @@ func dropSelectableFields(spec *apiextensions.CustomResourceDefinitionSpec) {
 	for i := range spec.Versions {
 		spec.Versions[i].SelectableFields = nil
 	}
+}
+
+func dropObservedGeneration(status *apiextensions.CustomResourceDefinitionStatus) {
+	status.ObservedGeneration = 0
+	for i := range status.Conditions {
+		status.Conditions[i].ObservedGeneration = 0
+	}
+}
+
+func observedGenerationTrackingInUse(status *apiextensions.CustomResourceDefinitionStatus) bool {
+	if status.ObservedGeneration != 0 {
+		return true
+	}
+	for i := range status.Conditions {
+		if status.Conditions[i].ObservedGeneration != 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func specHasSelectableFields(spec *apiextensions.CustomResourceDefinitionSpec) bool {

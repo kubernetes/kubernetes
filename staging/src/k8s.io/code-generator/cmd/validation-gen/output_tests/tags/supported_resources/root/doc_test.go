@@ -30,11 +30,11 @@ func TestRegisterValidations(t *testing.T) {
 
 	st.Value(t1).ExpectValid()
 
-	st.Value(t1).Subresources([]string{"scale"}).ExpectInvalid(
-		field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", t1, "/scale")),
-	)
+	st.Value(t1).Subresources([]string{"scale"}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
+		field.InternalError(nil, fmt.Errorf("")),
+	})
 
-	st.Value(t1).Subresources([]string{"x", "y"}).ExpectInvalid(
-		field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", t1, "/x/y")),
-	)
+	st.Value(t1).Subresources([]string{"x", "y"}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
+		field.InternalError(nil, fmt.Errorf("")),
+	})
 }

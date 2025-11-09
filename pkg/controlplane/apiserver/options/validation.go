@@ -23,7 +23,7 @@ import (
 	"strings"
 
 	apiextensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
-	genericfeatures "k8s.io/apiserver/pkg/features"
+	apiserverfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
 	"k8s.io/kubernetes/pkg/features"
@@ -71,23 +71,9 @@ func validateAPIPriorityAndFairness(options *Options) []error {
 	return nil
 }
 
-func validateNodeSelectorAuthorizationFeature() []error {
-	if utilfeature.DefaultFeatureGate.Enabled(features.AuthorizeNodeWithSelectors) && !utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AuthorizeWithSelectors) {
-		return []error{fmt.Errorf("AuthorizeNodeWithSelectors feature requires AuthorizeWithSelectors feature to be enabled")}
-	}
-	return nil
-}
-
-func validatePodCertificateRequestFeature() []error {
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodCertificateRequest) && !utilfeature.DefaultFeatureGate.Enabled(features.AuthorizeNodeWithSelectors) {
-		return []error{fmt.Errorf("PodCertificateRequest feature requires AuthorizeNodeWithSelectors feature to be enabled")}
-	}
-	return nil
-}
-
 func validateUnknownVersionInteroperabilityProxyFlags(options *Options) []error {
 	err := []error{}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.UnknownVersionInteroperabilityProxy) {
+	if !utilfeature.DefaultFeatureGate.Enabled(apiserverfeatures.UnknownVersionInteroperabilityProxy) {
 		if options.PeerCAFile != "" {
 			err = append(err, fmt.Errorf("--peer-ca-file requires UnknownVersionInteroperabilityProxy feature to be turned on"))
 		}
@@ -151,8 +137,6 @@ func (s *Options) Validate() []error {
 	errs = append(errs, validateTokenRequest(s)...)
 	errs = append(errs, s.Metrics.Validate()...)
 	errs = append(errs, validateUnknownVersionInteroperabilityProxyFlags(s)...)
-	errs = append(errs, validateNodeSelectorAuthorizationFeature()...)
-	errs = append(errs, validatePodCertificateRequestFeature()...)
 	errs = append(errs, validateServiceAccountTokenSigningConfig(s)...)
 	errs = append(errs, validateCoordinatedLeadershipFlags(s)...)
 

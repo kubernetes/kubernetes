@@ -124,6 +124,7 @@ func (stv subfieldTagValidator) GetValidations(context Context, tag codetags.Tag
 
 		for _, vfn := range validations.Functions {
 			f := Function(subfieldTagName, vfn.Flags, validateSubfield, subname, getFn, equivArg, WrapperFunction{vfn, submemb.Type})
+			f.Cohort = subname
 			result.AddFunction(f)
 		}
 	}
@@ -132,9 +133,10 @@ func (stv subfieldTagValidator) GetValidations(context Context, tag codetags.Tag
 
 func (stv subfieldTagValidator) Docs() TagDoc {
 	doc := TagDoc{
-		Tag:         stv.TagName(),
-		Scopes:      stv.ValidScopes().UnsortedList(),
-		Description: "Declares a validation for a subfield of a struct.",
+		Tag:            stv.TagName(),
+		StabilityLevel: Beta,
+		Scopes:         stv.ValidScopes().UnsortedList(),
+		Description:    "Declares a validation for a subfield of a struct.",
 		Args: []TagArgDoc{{
 			Description: "<field-json-name>",
 			Type:        codetags.ArgTypeString,

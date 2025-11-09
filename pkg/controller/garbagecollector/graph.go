@@ -206,10 +206,17 @@ func ownerReferenceMatchesCoordinates(a, b metav1.OwnerReference) bool {
 }
 
 // String renders node as a string using fmt. Acquires a read lock to ensure the
-// reflective dump of dependents doesn't race with any concurrent writes.
+// reflective dump of fields doesn't race with any concurrent writes.
 func (n *node) String() string {
+	n.beingDeletedLock.RLock()
+	defer n.beingDeletedLock.RUnlock()
+
+	n.virtualLock.RLock()
+	defer n.virtualLock.RUnlock()
+
 	n.dependentsLock.RLock()
 	defer n.dependentsLock.RUnlock()
+
 	return fmt.Sprintf("%#v", n)
 }
 

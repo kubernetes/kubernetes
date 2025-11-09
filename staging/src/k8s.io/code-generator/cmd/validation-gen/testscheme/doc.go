@@ -34,7 +34,9 @@ limitations under the License.
 // by generated test fixtures.
 //
 // For example, to test by hand. The testschema provides utilities to create a value and assert
-// that the expected errors are returned when the value is validated:
+// that the expected errors are returned when the value is validated.
+// Note that if `OldValue()` or `OldValueFuzzed()` is called on the `ValidationTester`, subsequent
+// validation calls will implicitly use update validation.
 //
 //	 func Test(t *testing.T) {
 //		  st := localSchemeBuilder.Test(t)

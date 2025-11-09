@@ -18,7 +18,6 @@ package policy
 
 import (
 	"strings"
-	"sync/atomic"
 
 	corev1 "k8s.io/api/core/v1"
 )
@@ -37,20 +36,8 @@ func pluralize(singular, plural string, count int) string {
 	return plural
 }
 
-var relaxPolicyForUserNamespacePods = &atomic.Bool{}
-
-// RelaxPolicyForUserNamespacePods allows opting into relaxing runAsUser /
-// runAsNonRoot restricted policies for user namespace pods, before the
-// usernamespace feature has reached GA and propagated to the oldest supported
-// nodes.
-// This should only be opted into in clusters where the administrator ensures
-// all nodes in the cluster enable the user namespace feature.
-func RelaxPolicyForUserNamespacePods(relax bool) {
-	relaxPolicyForUserNamespacePods.Store(relax)
-}
-
 // relaxPolicyForUserNamespacePod returns true if a policy should be relaxed
 // because of enabled user namespaces in the provided pod spec.
 func relaxPolicyForUserNamespacePod(podSpec *corev1.PodSpec) bool {
-	return relaxPolicyForUserNamespacePods.Load() && podSpec != nil && podSpec.HostUsers != nil && !*podSpec.HostUsers
+	return podSpec != nil && podSpec.HostUsers != nil && !*podSpec.HostUsers
 }

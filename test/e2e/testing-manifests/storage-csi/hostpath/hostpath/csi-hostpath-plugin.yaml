@@ -1,4 +1,4 @@
-# All of the individual sidecar RBAC roles get bound
+  # All of the individual sidecar RBAC roles get bound
 # to this account.
 kind: ServiceAccount
 apiVersion: v1
@@ -96,6 +96,24 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
   name: external-snapshotter-runner
+subjects:
+- kind: ServiceAccount
+  name: csi-hostpathplugin-sa
+  namespace: default
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/instance: hostpath.csi.k8s.io
+    app.kubernetes.io/part-of: csi-driver-host-path
+    app.kubernetes.io/name: csi-hostpathplugin
+    app.kubernetes.io/component: snapshot-metadata-cluster-role
+  name: csi-hostpathplugin-snapshot-metadata-cluster-role
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: external-snapshot-metadata-runner
 subjects:
 - kind: ServiceAccount
   name: csi-hostpathplugin-sa
@@ -219,12 +237,13 @@ spec:
       serviceAccountName: csi-hostpathplugin-sa
       containers:
         - name: hostpath
-          image: registry.k8s.io/sig-storage/hostpathplugin:v1.16.1
+          image: registry.k8s.io/sig-storage/hostpathplugin:v1.17.0
           args:
             - "--drivername=hostpath.csi.k8s.io"
             - "--v=5"
             - "--endpoint=$(CSI_ENDPOINT)"
             - "--nodeid=$(KUBE_NODE_NAME)"
+            # end hostpath args
           env:
             - name: CSI_ENDPOINT
               value: unix:///csi/csi.sock
@@ -262,7 +281,7 @@ spec:
               name: dev-dir
 
         - name: csi-external-health-monitor-controller
-          image: registry.k8s.io/sig-storage/csi-external-health-monitor-controller:v0.12.1
+          image: registry.k8s.io/sig-storage/csi-external-health-monitor-controller:v0.16.0
           args:
             - "--v=5"
             - "--csi-address=$(ADDRESS)"
@@ -276,7 +295,7 @@ spec:
               mountPath: /csi
 
         - name: node-driver-registrar
-          image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.13.0
+          image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.15.0
           args:
             - --v=5
             - --csi-address=/csi/csi.sock
@@ -304,13 +323,13 @@ spec:
           volumeMounts:
           - mountPath: /csi
             name: socket-dir
-          image: registry.k8s.io/sig-storage/livenessprobe:v2.15.0
+          image: registry.k8s.io/sig-storage/livenessprobe:v2.17.0
           args:
           - --csi-address=/csi/csi.sock
           - --health-port=9898
 
         - name: csi-attacher
-          image: registry.k8s.io/sig-storage/csi-attacher:v4.8.0
+          image: registry.k8s.io/sig-storage/csi-attacher:v4.10.0
           args:
             - --v=5
             - --csi-address=/csi/csi.sock
@@ -324,7 +343,7 @@ spec:
             name: socket-dir
 
         - name: csi-provisioner
-          image: registry.k8s.io/sig-storage/csi-provisioner:v5.1.0
+          image: registry.k8s.io/sig-storage/csi-provisioner:v6.0.0
           args:
             - -v=5
             - --csi-address=/csi/csi.sock
@@ -340,7 +359,7 @@ spec:
               name: socket-dir
 
         - name: csi-resizer
-          image: registry.k8s.io/sig-storage/csi-resizer:v1.13.1
+          image: registry.k8s.io/sig-storage/csi-resizer:v2.0.0
           args:
             - -v=5
             - -csi-address=/csi/csi.sock
@@ -354,7 +373,7 @@ spec:
               name: socket-dir
 
         - name: csi-snapshotter
-          image: registry.k8s.io/sig-storage/csi-snapshotter:v8.3.0
+          image: registry.k8s.io/sig-storage/csi-snapshotter:v8.4.0
           args:
             - -v=5
             - --csi-address=/csi/csi.sock
@@ -366,6 +385,8 @@ spec:
           volumeMounts:
             - mountPath: /csi
               name: socket-dir
+
+        # end csi containers
 
       volumes:
         - hostPath:
@@ -394,3 +415,4 @@ spec:
             path: /dev
             type: Directory
           name: dev-dir
+        # end csi volumes

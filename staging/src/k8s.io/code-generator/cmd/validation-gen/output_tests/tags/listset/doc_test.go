@@ -56,21 +56,21 @@ func Test(t *testing.T) {
 			{StringPtrField: ptrS1},
 			{StringPtrField: ptrS2},
 		},
-	}).ExpectInvalid(
-		field.Duplicate(field.NewPath("sliceStringField").Index(3), "ccc"),
-		field.Duplicate(field.NewPath("sliceStringField").Index(4), "bbb"),
-		field.Duplicate(field.NewPath("sliceStringField").Index(5), "aaa"),
-		field.Duplicate(field.NewPath("sliceIntField").Index(3), 3),
-		field.Duplicate(field.NewPath("sliceIntField").Index(4), 2),
-		field.Duplicate(field.NewPath("sliceIntField").Index(5), 1),
-		field.Duplicate(field.NewPath("sliceComparableField").Index(3), ComparableStruct{"ccc"}),
-		field.Duplicate(field.NewPath("sliceComparableField").Index(4), ComparableStruct{"bbb"}),
-		field.Duplicate(field.NewPath("sliceComparableField").Index(5), ComparableStruct{"aaa"}),
-		field.Duplicate(field.NewPath("sliceNonComparableField").Index(3), NonComparableStruct{[]string{"ccc", "333"}}),
-		field.Duplicate(field.NewPath("sliceNonComparableField").Index(4), NonComparableStruct{[]string{"bbb", "222"}}),
-		field.Duplicate(field.NewPath("sliceNonComparableField").Index(5), NonComparableStruct{[]string{"aaa", "111"}}),
-		field.Duplicate(field.NewPath("sliceFalselyComparableField").Index(1), FalselyComparableStruct{StringPtrField: ptrS2}),
-	)
+	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
+		field.Duplicate(field.NewPath("sliceStringField").Index(3), nil),
+		field.Duplicate(field.NewPath("sliceStringField").Index(4), nil),
+		field.Duplicate(field.NewPath("sliceStringField").Index(5), nil),
+		field.Duplicate(field.NewPath("sliceIntField").Index(3), nil),
+		field.Duplicate(field.NewPath("sliceIntField").Index(4), nil),
+		field.Duplicate(field.NewPath("sliceIntField").Index(5), nil),
+		field.Duplicate(field.NewPath("sliceComparableField").Index(3), nil),
+		field.Duplicate(field.NewPath("sliceComparableField").Index(4), nil),
+		field.Duplicate(field.NewPath("sliceComparableField").Index(5), nil),
+		field.Duplicate(field.NewPath("sliceNonComparableField").Index(3), nil),
+		field.Duplicate(field.NewPath("sliceNonComparableField").Index(4), nil),
+		field.Duplicate(field.NewPath("sliceNonComparableField").Index(5), nil),
+		field.Duplicate(field.NewPath("sliceFalselyComparableField").Index(1), nil),
+	})
 }
 
 func TestSetCorrelation(t *testing.T) {

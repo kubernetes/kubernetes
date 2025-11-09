@@ -256,9 +256,10 @@
   file: test/e2e/apimachinery/aggregated_discovery.go
 - testname: aggregator-supports-the-sample-apiserver
   codename: '[sig-api-machinery] Aggregator Should be able to support the 1.17 Sample
-    API Server using the current Aggregator [Conformance]'
+    API Server using the current Aggregator [LinuxOnly] [Conformance]'
   description: Ensure that the sample-apiserver code from 1.17 and compiled against
-    1.17 will work on the current Aggregator/API-Server.
+    1.17 will work on the current Aggregator/API-Server. This test is marked LinuxOnly
+    because etcd does not provide or support images for Windows.
   release: v1.17, v1.21, v1.27
   file: test/e2e/apimachinery/aggregator.go
 - testname: Custom Resource Definition Conversion Webhook, convert mixed version list
@@ -1643,6 +1644,19 @@
     The event is deleted and MUST NOT show up when listing all events.
   release: v1.25
   file: test/e2e/instrumentation/core_events.go
+- testname: kubernetes.default Endpoints and EndpointSlices
+  codename: '[sig-network] API Server should have Endpoints and EndpointSlices pointing
+    to API Server [Conformance]'
+  description: The "kubernetes.default" service MUST have Endpoints and EndpointSlices
+    pointing to each API server instance.
+  release: v1.21
+  file: test/e2e/network/apiserver.go
+- testname: Kubernetes Service
+  codename: '[sig-network] API Server should provide secure master service [Conformance]'
+  description: By default when a kubernetes cluster is running there MUST be a 'kubernetes'
+    service running in the cluster.
+  release: v1.9
+  file: test/e2e/network/apiserver.go
 - testname: DNS, cluster
   codename: '[sig-network] DNS should provide /etc/hosts entries for the cluster [Conformance]'
   description: When a Pod is created, the pod MUST be able to resolve cluster dns
@@ -1703,36 +1717,19 @@
     DNS configuration MUST be configured in the Pod.
   release: v1.17
   file: test/e2e/network/dns.go
-- testname: EndpointSlice API
+- testname: EndpointSlice, creation/deletion
   codename: '[sig-network] EndpointSlice should create Endpoints and EndpointSlices
     for Pods matching a Service [Conformance]'
-  description: The discovery.k8s.io API group MUST exist in the /apis discovery document.
-    The discovery.k8s.io/v1 API group/version MUST exist in the /apis/discovery.k8s.io
-    discovery document. The endpointslices resource MUST exist in the /apis/discovery.k8s.io/v1
-    discovery document. The endpointslice controller must create EndpointSlices for
-    Pods mataching a Service.
-  release: v1.21
-  file: test/e2e/network/endpointslice.go
-- testname: EndpointSlice API
-  codename: '[sig-network] EndpointSlice should create and delete Endpoints and EndpointSlices
-    for a Service with a selector specified [Conformance]'
-  description: The discovery.k8s.io API group MUST exist in the /apis discovery document.
-    The discovery.k8s.io/v1 API group/version MUST exist in the /apis/discovery.k8s.io
-    discovery document. The endpointslices resource MUST exist in the /apis/discovery.k8s.io/v1
-    discovery document. The endpointslice controller should create and delete EndpointSlices
+  description: The endpointslice controller must create and delete EndpointSlices
     for Pods matching a Service.
-  release: v1.21
+  release: v1.21, v1.35
   file: test/e2e/network/endpointslice.go
-- testname: EndpointSlice API
-  codename: '[sig-network] EndpointSlice should have Endpoints and EndpointSlices
-    pointing to API Server [Conformance]'
-  description: The discovery.k8s.io API group MUST exist in the /apis discovery document.
-    The discovery.k8s.io/v1 API group/version MUST exist in the /apis/discovery.k8s.io
-    discovery document. The endpointslices resource MUST exist in the /apis/discovery.k8s.io/v1
-    discovery document. The cluster MUST have a service named "kubernetes" on the
-    default namespace referencing the API servers. The "kubernetes.default" service
-    MUST have Endpoints and EndpointSlices pointing to each API server instance.
-  release: v1.21
+- testname: EndpointSlice, "empty" Service
+  codename: '[sig-network] EndpointSlice should create and delete EndpointSlices for
+    a Service with a selector that matches no pods [Conformance]'
+  description: The EndpointSlice controller should create and delete empty EndpointSlices
+    for a Service that matches no pods.
+  release: v1.21, v1.35
   file: test/e2e/network/endpointslice.go
 - testname: EndpointSlice, multiple IPs, multiple ports
   codename: '[sig-network] EndpointSlice should support a Service with multiple endpoint
@@ -1770,6 +1767,29 @@
     update, and delete actions.
   release: v1.21
   file: test/e2e/network/endpointslicemirroring.go
+- testname: Endpoint resource lifecycle
+  codename: '[sig-network] Endpoints should test the lifecycle of an Endpoint [Conformance]'
+  description: Create an endpoint, the endpoint MUST exist. The endpoint is updated
+    with a new label, a check after the update MUST find the changes. The endpoint
+    is then patched with a new IPv4 address and port, a check after the patch MUST
+    the changes. The endpoint is deleted by its label, a watch listens for the deleted
+    watch event.
+  release: v1.19
+  file: test/e2e/network/endpoints.go
+- testname: Endpoints, creation/deletion
+  codename: '[sig-network] EndpointsController should create Endpoints for Pods matching
+    a Service [Conformance]'
+  description: The Endpoints controller must create an Endpoints for Pods matching
+    a Service.
+  release: v1.21, v1.35
+  file: test/e2e/network/endpoints.go
+- testname: Endpoints, "empty" Service
+  codename: '[sig-network] EndpointsController should create and delete Endpoints
+    for a Service with a selector that matches no pods [Conformance]'
+  description: The Endpoints controller should create and delete an empty Endpoints
+    for a Service that matches no pods.
+  release: v1.21, v1.35
+  file: test/e2e/network/endpoints.go
 - testname: Scheduling, HostPort matching and HostIP and Protocol not-matching
   codename: '[sig-network] HostPort validates that there is no conflict between pods
     with same hostPort but different hostIP and protocol [LinuxOnly] [Conformance]'
@@ -2042,12 +2062,6 @@
     Windows does not support session affinity.'
   release: v1.19
   file: test/e2e/network/service.go
-- testname: Kubernetes Service
-  codename: '[sig-network] Services should provide secure master service [Conformance]'
-  description: By default when a kubernetes cluster is running there MUST be a 'kubernetes'
-    service running in the cluster.
-  release: v1.9
-  file: test/e2e/network/service.go
 - testname: Service, endpoints
   codename: '[sig-network] Services should serve a basic endpoint from pods [Conformance]'
   description: Create a service with a endpoint without any Pods, the service MUST
@@ -2078,15 +2092,6 @@
     and the service MUST list only the endpoint to the second Pod. Delete the second
     Pod and the service must now have empty set of endpoints.
   release: v1.9
-  file: test/e2e/network/service.go
-- testname: Endpoint resource lifecycle
-  codename: '[sig-network] Services should test the lifecycle of an Endpoint [Conformance]'
-  description: Create an endpoint, the endpoint MUST exist. The endpoint is updated
-    with a new label, a check after the update MUST find the changes. The endpoint
-    is then patched with a new IPv4 address and port, a check after the patch MUST
-    the changes. The endpoint is deleted by it's label, a watch listens for the deleted
-    watch event.
-  release: v1.19
   file: test/e2e/network/service.go
 - testname: ConfigMap, from environment field with various prefixes
   codename: '[sig-node] ConfigMap should be consumable as environment variable names
@@ -2431,6 +2436,63 @@
     its new label found. Deleting the Node MUST succeed and its deletion MUST be confirmed.
   release: v1.32
   file: test/e2e/node/node_lifecycle.go
+- testname: In-place Pod Resize, burtable pod with multiple containers and various
+    operations
+  codename: '[sig-node] Pod InPlace Resize Container burstable pods - extended 6 containers
+    - various operations performed (including adding limits and requests) [MinimumKubeletVersion:1.34]
+    [Conformance]'
+  description: Issuing a Pod Resize request via the Pod Resize subresource patch endpoint
+    to modify CPU and memory requests and limits on a 6-container pod with various
+    operations MUST result in the Pod resources being updated as expected.
+  release: v1.35
+  file: test/e2e/common/node/pod_resize.go
+- testname: In-place Pod Resize, burstable pod resized with equivalents
+  codename: '[sig-node] Pod InPlace Resize Container burstable pods - extended resize
+    with equivalents [MinimumKubeletVersion:1.34] [Conformance]'
+  description: Issuing an in-place Pod Resize request via the Pod Resize subresource
+    patch endpoint to modify CPU requests and limits using equivalent values (e.g.
+    2m -> 1m) MUST result in the updated Pod resources displayed correctly in the
+    status.
+  release: v1.35
+  file: test/e2e/common/node/pod_resize.go
+- testname: In-place Pod Resize, guaranteed pods with multiple containers, net increase
+  codename: '[sig-node] Pod InPlace Resize Container guaranteed pods with multiple
+    containers 3 containers - increase cpu & mem on c1, c2, decrease cpu & mem on
+    c3 - net increase [MinimumKubeletVersion:1.34] [Conformance]'
+  description: Issuing an in-place Pod Resize request via the Pod Resize subresource
+    patch endpoint to modify CPU and memory requests and limits for a guaranteed pod
+    with 3 containers with a net increase MUST result in the Pod resources being updated
+    as expected.
+  release: v1.35
+  file: test/e2e/common/node/pod_resize.go
+- testname: In-place Pod Resize, guaranteed pods with multiple containers, net decrease
+  codename: '[sig-node] Pod InPlace Resize Container guaranteed pods with multiple
+    containers 3 containers - increase cpu & mem on c1, decrease cpu & mem on c2,
+    c3 - net decrease [MinimumKubeletVersion:1.34] [Conformance]'
+  description: Issuing an in-place Pod Resize request via the Pod Resize subresource
+    patch endpoint to modify CPU and memory requests and limits for a pod with 3 containers
+    with a net decrease MUST result in the Pod resources being updated as expected.
+  release: v1.35
+  file: test/e2e/common/node/pod_resize.go
+- testname: In-place Pod Resize, guaranteed pods with multiple containers, various
+    operations
+  codename: '[sig-node] Pod InPlace Resize Container guaranteed pods with multiple
+    containers 3 containers - increase: CPU (c1,c3), memory (c2, c3) ; decrease: CPU
+    (c2) [MinimumKubeletVersion:1.34] [Conformance]'
+  description: Issuing an in-place Pod Resize request via the Pod Resize subresource
+    patch endpoint to modify CPU and memory requests and limits for a pod with 3 containers
+    with various operations MUST result in the Pod resources being updated as expected.
+  release: v1.35
+  file: test/e2e/common/node/pod_resize.go
+- testname: In-place Pod Resize, read and replace endpoints
+  codename: '[sig-node] Pod InPlace Resize Container resize pod via the replace endpoint
+    [MinimumKubeletVersion:1.34] [Conformance]'
+  description: Issuing a Pod Resize request via the Pod Resize subresource replace
+    endpoint MUST result in the Pod resources being updated as expected. The Pod object
+    fetched from the Pod Resize subresource MUST be equivalent to the Pod object fetched
+    from the main Pod endpoint after the resize is completed.
+  release: v1.35
+  file: test/e2e/common/node/pod_resize.go
 - testname: PodTemplate, delete a collection
   codename: '[sig-node] PodTemplates should delete a collection of pod templates [Conformance]'
   description: A set of Pod Templates is created with a label selector which MUST
@@ -2453,6 +2515,28 @@
     The PodTemplate must be deleted.
   release: v1.19
   file: test/e2e/common/node/podtemplates.go
+- testname: Pods Generation, graceful delete
+  codename: '[sig-node] Pods Extended (pod generation) Pod Generation custom-set generation
+    on new pods and graceful delete [Conformance]'
+  description: Create a Pod, ensure that triggering a graceful delete causes the generation
+    to be updated.
+  release: v1.35
+  file: test/e2e/node/pods.go
+- testname: Pods Generation, 500 updates
+  codename: '[sig-node] Pods Extended (pod generation) Pod Generation issue 500 podspec
+    updates and verify generation and observedGeneration eventually converge [MinimumKubeletVersion:1.34]
+    [Conformance]'
+  description: Create a Pod, issue 499 podSpec updates and verify generation and observedGeneration
+    eventually converge to 500.
+  release: v1.35
+  file: test/e2e/node/pods.go
+- testname: Pods Generation, updates
+  codename: '[sig-node] Pods Extended (pod generation) Pod Generation pod generation
+    should start at 1 and increment per update [MinimumKubeletVersion:1.34] [Conformance]'
+  description: Create a Pod, and perform a few updates, ensuring that the pod's metadata.generation
+    and status.observedGeneration are updated as expected.
+  release: v1.35
+  file: test/e2e/node/pods.go
 - testname: Pods, QOS
   codename: '[sig-node] Pods Extended Pods Set QOS Class should be set on Pods with
     matching resource requests and limits for memory and cpu [Conformance]'
@@ -2774,7 +2858,7 @@
   file: test/e2e/common/node/security_context.go
 - testname: Sysctls, reject invalid sysctls
   codename: '[sig-node] Sysctls [LinuxOnly] [NodeConformance] should reject invalid
-    sysctls [MinimumKubeletVersion:1.21] [Conformance]'
+    sysctls [Conformance]'
   description: 'Pod is created with one valid and two invalid sysctls. Pod should
     not apply invalid sysctls. [LinuxOnly]: This test is marked as LinuxOnly since
     Windows does not support sysctls'
@@ -2782,7 +2866,7 @@
   file: test/e2e/common/node/sysctl.go
 - testname: Sysctl, test sysctls
   codename: '[sig-node] Sysctls [LinuxOnly] [NodeConformance] should support sysctls
-    [MinimumKubeletVersion:1.21] [Environment:NotInUserNS] [Conformance]'
+    [Environment:NotInUserNS] [Conformance]'
   description: 'Pod is created with kernel.shm_rmid_forced sysctl. Kernel.shm_rmid_forced
     must be set to 1 [LinuxOnly]: This test is marked as LinuxOnly since Windows does
     not support sysctls [Environment:NotInUserNS]: The test fails in UserNS (as expected):
@@ -2848,6 +2932,31 @@
     lifecycle of a container.
   release: v1.19
   file: test/e2e/common/node/expansion.go
+- testname: CRUD operations for deviceclasses
+  codename: '[sig-node] [DRA] CRUD Tests resource.k8s.io/v1 DeviceClass [Conformance]'
+  description: kube-apiserver must support create/update/list/patch/delete operations
+    for resource.k8s.io/v1 DeviceClass.
+  release: v1.35
+  file: test/e2e/dra/dra.go
+- testname: CRUD operations for resourceclaims
+  codename: '[sig-node] [DRA] CRUD Tests resource.k8s.io/v1 ResourceClaim [Conformance]'
+  description: kube-apiserver must support create/update/list/patch/delete operations
+    for resource.k8s.io/v1 ResourceClaim.
+  release: v1.35
+  file: test/e2e/dra/dra.go
+- testname: CRUD operations for resourceclaimtemplates
+  codename: '[sig-node] [DRA] CRUD Tests resource.k8s.io/v1 ResourceClaimTemplate
+    [Conformance]'
+  description: kube-apiserver must support create/update/list/patch/delete operations
+    for resource.k8s.io/v1 ResourceClaimTemplate.
+  release: v1.35
+  file: test/e2e/dra/dra.go
+- testname: CRUD operations for resoureslices
+  codename: '[sig-node] [DRA] CRUD Tests resource.k8s.io/v1 ResourceSlice [Conformance]'
+  description: kube-apiserver must support create/update/list/patch/delete operations
+    for resource.k8s.io/v1 ResourceSlice.
+  release: v1.35
+  file: test/e2e/dra/dra.go
 - testname: LimitRange, resources
   codename: '[sig-scheduling] LimitRange should create a LimitRange with defaults
     and ensure pod has those defaults applied. [Conformance]'

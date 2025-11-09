@@ -762,6 +762,7 @@ message Container {
   optional ResourceRequirements resources = 8;
 
   // Resources resize policy for the container.
+  // This field cannot be set on ephemeral containers.
   // +featureGate=InPlacePodVerticalScaling
   // +optional
   // +listType=atomic
@@ -2982,6 +2983,12 @@ message NodeStatus {
   // +featureGate=SupplementalGroupsPolicy
   // +optional
   optional NodeFeatures features = 13;
+
+  // DeclaredFeatures represents the features related to feature gates that are declared by the node.
+  // +featureGate=NodeDeclaredFeatures
+  // +optional
+  // +listType=atomic
+  repeated string declaredFeatures = 14;
 }
 
 // NodeSwapStatus represents swap memory information.
@@ -3597,6 +3604,7 @@ message PersistentVolumeSpec {
 
   // nodeAffinity defines constraints that limit what nodes this volume can be accessed from.
   // This field influences the scheduling of pods that use this volume.
+  // This field is mutable if MutablePVNodeAffinity feature gate is enabled.
   // +optional
   optional VolumeNodeAffinity nodeAffinity = 9;
 
@@ -3886,6 +3894,21 @@ message PodCertificateProjection {
   //
   // +optional
   optional string certificateChainPath = 6;
+
+  // userAnnotations allow pod authors to pass additional information to
+  // the signer implementation.  Kubernetes does not restrict or validate this
+  // metadata in any way.
+  //
+  // These values are copied verbatim into the `spec.unverifiedUserAnnotations` field of
+  // the PodCertificateRequest objects that Kubelet creates.
+  //
+  // Entries are subject to the same validation as object metadata annotations,
+  // with the addition that all keys must be domain-prefixed. No restrictions
+  // are placed on values, except an overall size limitation on the entire field.
+  //
+  // Signers should document the keys and values they support. Signers should
+  // deny requests that contain keys they do not recognize.
+  map<string, string> userAnnotations = 7;
 }
 
 // PodCondition contains details for the current condition of this pod.
@@ -4711,6 +4734,18 @@ message PodSpec {
   // +featureGate=HostnameOverride
   // +optional
   optional string hostnameOverride = 41;
+
+  // WorkloadRef provides a reference to the Workload object that this Pod belongs to.
+  // This field is used by the scheduler to identify the PodGroup and apply the
+  // correct group scheduling policies. The Workload object referenced
+  // by this field may not exist at the time the Pod is created.
+  // This field is immutable, but a Workload object with the same name
+  // may be recreated with different policies. Doing this during pod scheduling
+  // may result in the placement not conforming to the expected policies.
+  //
+  // +featureGate=GenericWorkload
+  // +optional
+  optional WorkloadReference workloadRef = 42;
 }
 
 // PodStatus represents information about the status of a pod. Status may trail the actual
@@ -5251,6 +5286,8 @@ message ReplicationController {
   // be the same as the Pod(s) that the replication controller manages.
   // Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
+  // +k8s:subfield(name)=+k8s:optional
+  // +k8s:subfield(name)=+k8s:format=k8s-long-name
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec defines the specification of the desired behavior of the replication controller.
@@ -7195,5 +7232,35 @@ message WindowsSecurityContextOptions {
   // In addition, if HostProcess is true then HostNetwork must also be set to true.
   // +optional
   optional bool hostProcess = 4;
+}
+
+// WorkloadReference identifies the Workload object and PodGroup membership
+// that a Pod belongs to. The scheduler uses this information to apply
+// workload-aware scheduling semantics.
+message WorkloadReference {
+  // Name defines the name of the Workload object this Pod belongs to.
+  // Workload must be in the same namespace as the Pod.
+  // If it doesn't match any existing Workload, the Pod will remain unschedulable
+  // until a Workload object is created and observed by the kube-scheduler.
+  // It must be a DNS subdomain.
+  //
+  // +required
+  optional string name = 1;
+
+  // PodGroup is the name of the PodGroup within the Workload that this Pod
+  // belongs to. If it doesn't match any existing PodGroup within the Workload,
+  // the Pod will remain unschedulable until the Workload object is recreated
+  // and observed by the kube-scheduler. It must be a DNS label.
+  //
+  // +required
+  optional string podGroup = 2;
+
+  // PodGroupReplicaKey specifies the replica key of the PodGroup to which this
+  // Pod belongs. It is used to distinguish pods belonging to different replicas
+  // of the same pod group. The pod group policy is applied separately to each replica.
+  // When set, it must be a DNS label.
+  //
+  // +optional
+  optional string podGroupReplicaKey = 3;
 }
 

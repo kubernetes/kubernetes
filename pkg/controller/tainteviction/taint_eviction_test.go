@@ -21,6 +21,7 @@ import (
 	"fmt"
 	goruntime "runtime"
 	"sort"
+	"sync"
 	"testing"
 	"time"
 
@@ -192,31 +193,40 @@ func TestCreatePod(t *testing.T) {
 
 	for _, item := range testCases {
 		t.Run(item.description, func(t *testing.T) {
+			var wg sync.WaitGroup
+			defer wg.Wait()
 			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
 			fakeClientset := fake.NewSimpleClientset(&corev1.PodList{Items: []corev1.Pod{*item.pod}})
 			controller, podIndexer, _ := setupNewController(ctx, fakeClientset)
 			controller.recorder = testutil.NewFakeRecorder()
-			go controller.Run(ctx)
 			controller.taintedNodes = item.taintedNodes
+
+			wg.Go(func() {
+				controller.Run(ctx)
+			})
 
 			podIndexer.Add(item.pod)
 			controller.PodUpdated(nil, item.pod)
 
 			verifyPodActions(t, item.description, fakeClientset, item.expectPatch, item.expectDelete)
-
-			cancel()
 		})
 	}
 }
 
 func TestDeletePod(t *testing.T) {
+	var wg sync.WaitGroup
+	defer wg.Wait()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	fakeClientset := fake.NewSimpleClientset()
 	controller, _, _ := setupNewController(ctx, fakeClientset)
 	controller.recorder = testutil.NewFakeRecorder()
-	go controller.Run(ctx)
+	wg.Go(func() {
+		controller.Run(ctx)
+	})
 	controller.taintedNodes = map[string][]corev1.Taint{
 		"node1": {createNoExecuteTaint(1)},
 	}
@@ -286,12 +296,20 @@ func TestUpdatePod(t *testing.T) {
 				// TODO: remove skip once the flaking test has been fixed.
 				t.Skip("Skip flaking test on Windows.")
 			}
+
+			var wg sync.WaitGroup
+			defer wg.Wait()
 			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
 			fakeClientset := fake.NewSimpleClientset(&corev1.PodList{Items: []corev1.Pod{*item.prevPod}})
 			controller, podIndexer, _ := setupNewController(context.TODO(), fakeClientset)
 			controller.recorder = testutil.NewFakeRecorder()
 			controller.taintedNodes = item.taintedNodes
-			go controller.Run(ctx)
+
+			wg.Go(func() {
+				controller.Run(ctx)
+			})
 
 			podIndexer.Add(item.prevPod)
 			controller.PodUpdated(nil, item.prevPod)
@@ -311,7 +329,6 @@ func TestUpdatePod(t *testing.T) {
 			controller.PodUpdated(item.prevPod, item.newPod)
 
 			verifyPodActions(t, item.description, fakeClientset, item.expectPatch, item.expectDelete)
-			cancel()
 		})
 	}
 }
@@ -354,29 +371,47 @@ func TestCreateNode(t *testing.T) {
 	}
 
 	for _, item := range testCases {
-		ctx, cancel := context.WithCancel(context.Background())
-		fakeClientset := fake.NewSimpleClientset(&corev1.PodList{Items: item.pods})
-		controller, _, nodeIndexer := setupNewController(ctx, fakeClientset)
-		nodeIndexer.Add(item.node)
-		controller.recorder = testutil.NewFakeRecorder()
-		go controller.Run(ctx)
-		controller.NodeUpdated(nil, item.node)
+		t.Run(item.description, func(t *testing.T) {
+			var wg sync.WaitGroup
+			defer wg.Wait()
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 
-		verifyPodActions(t, item.description, fakeClientset, item.expectPatch, item.expectDelete)
+			fakeClientset := fake.NewClientset(&corev1.PodList{Items: item.pods})
+			controller, _, nodeIndexer := setupNewController(ctx, fakeClientset)
+			if err := nodeIndexer.Add(item.node); err != nil {
+				t.Fatalf("Failed to add node %q: %v", item.node.GetName(), err)
+			}
+			controller.recorder = testutil.NewFakeRecorder()
 
-		cancel()
+			wg.Go(func() {
+				controller.Run(ctx)
+			})
+
+			controller.NodeUpdated(nil, item.node)
+
+			verifyPodActions(t, item.description, fakeClientset, item.expectPatch, item.expectDelete)
+		})
 	}
 }
 
 func TestDeleteNode(t *testing.T) {
+	var wg sync.WaitGroup
+	defer wg.Wait()
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	fakeClientset := fake.NewSimpleClientset()
 	controller, _, _ := setupNewController(ctx, fakeClientset)
 	controller.recorder = testutil.NewFakeRecorder()
 	controller.taintedNodes = map[string][]corev1.Taint{
 		"node1": {createNoExecuteTaint(1)},
 	}
-	go controller.Run(ctx)
+
+	wg.Go(func() {
+		controller.Run(ctx)
+	})
+
 	controller.NodeUpdated(testutil.NewNode("node1"), nil)
 
 	// await until controller.taintedNodes is empty
@@ -389,7 +424,6 @@ func TestDeleteNode(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to await for processing node deleted: %q", err)
 	}
-	cancel()
 }
 
 func TestUpdateNode(t *testing.T) {
@@ -475,6 +509,8 @@ func TestUpdateNode(t *testing.T) {
 
 	for _, item := range testCases {
 		t.Run(item.description, func(t *testing.T) {
+			var wg sync.WaitGroup
+			defer wg.Wait()
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
@@ -482,7 +518,11 @@ func TestUpdateNode(t *testing.T) {
 			controller, _, nodeIndexer := setupNewController(ctx, fakeClientset)
 			nodeIndexer.Add(item.newNode)
 			controller.recorder = testutil.NewFakeRecorder()
-			go controller.Run(ctx)
+
+			wg.Go(func() {
+				controller.Run(ctx)
+			})
+
 			controller.NodeUpdated(item.oldNode, item.newNode)
 
 			if item.additionalSleep > 0 {
@@ -514,11 +554,18 @@ func TestUpdateNodeWithMultipleTaints(t *testing.T) {
 	singleTaintedNode := testutil.NewNode("node1")
 	singleTaintedNode.Spec.Taints = []corev1.Taint{taint1}
 
-	ctx, cancel := context.WithCancel(context.TODO())
+	var wg sync.WaitGroup
+	defer wg.Wait()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	fakeClientset := fake.NewSimpleClientset(pod)
 	controller, _, nodeIndexer := setupNewController(ctx, fakeClientset)
 	controller.recorder = testutil.NewFakeRecorder()
-	go controller.Run(ctx)
+
+	wg.Go(func() {
+		controller.Run(ctx)
+	})
 
 	// no taint
 	nodeIndexer.Add(untaintedNode)
@@ -558,7 +605,6 @@ func TestUpdateNodeWithMultipleTaints(t *testing.T) {
 			t.Error("Unexpected deletion")
 		}
 	}
-	cancel()
 }
 
 func TestUpdateNodeWithMultiplePods(t *testing.T) {
@@ -601,6 +647,9 @@ func TestUpdateNodeWithMultiplePods(t *testing.T) {
 	for _, item := range testCases {
 		t.Run(item.description, func(t *testing.T) {
 			t.Logf("Starting testcase %q", item.description)
+
+			var wg sync.WaitGroup
+			defer wg.Wait()
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
@@ -609,7 +658,11 @@ func TestUpdateNodeWithMultiplePods(t *testing.T) {
 			controller, _, nodeIndexer := setupNewController(ctx, fakeClientset)
 			nodeIndexer.Add(item.newNode)
 			controller.recorder = testutil.NewFakeRecorder()
-			go controller.Run(ctx)
+
+			wg.Go(func() {
+				controller.Run(ctx)
+			})
+
 			controller.NodeUpdated(item.oldNode, item.newNode)
 
 			startedAt := time.Now()
@@ -809,6 +862,8 @@ func TestEventualConsistency(t *testing.T) {
 
 	for _, item := range testCases {
 		t.Run(item.description, func(t *testing.T) {
+			var wg sync.WaitGroup
+			defer wg.Wait()
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
@@ -816,7 +871,10 @@ func TestEventualConsistency(t *testing.T) {
 			controller, podIndexer, nodeIndexer := setupNewController(ctx, fakeClientset)
 			nodeIndexer.Add(item.newNode)
 			controller.recorder = testutil.NewFakeRecorder()
-			go controller.Run(ctx)
+
+			wg.Go(func() {
+				controller.Run(ctx)
+			})
 
 			if item.prevPod != nil {
 				podIndexer.Add(item.prevPod)

@@ -117,6 +117,12 @@ func (v *volumeExpandTestSuite) DefineTests(driver storageframework.TestDriver, 
 	f := framework.NewFrameworkWithCustomTimeouts("volume-expand", storageframework.GetDriverTimeouts(driver))
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
+	driverSizeRange := driver.GetDriverInfo().SupportedSizeRange
+	expandSize := resource.MustParse("1Gi")
+	if driverSizeRange.Step != "" {
+		expandSize = resource.MustParse(driverSizeRange.Step)
+	}
+
 	init := func(ctx context.Context) {
 		l = local{}
 
@@ -182,7 +188,7 @@ func (v *volumeExpandTestSuite) DefineTests(driver storageframework.TestDriver, 
 			ginkgo.By("Expanding non-expandable pvc")
 			currentPvcSize := l.resource.Pvc.Spec.Resources.Requests[v1.ResourceStorage]
 			newSize := currentPvcSize.DeepCopy()
-			newSize.Add(resource.MustParse("1Gi"))
+			newSize.Add(expandSize)
 			framework.Logf("currentPvcSize %v, newSize %v", currentPvcSize, newSize)
 			_, err = ExpandPVCSizeToError(ctx, l.resource.Pvc, newSize, f.ClientSet)
 			gomega.Expect(err).To(gomega.MatchError(apierrors.IsForbidden, "While updating non-expandable PVC"))
@@ -217,7 +223,7 @@ func (v *volumeExpandTestSuite) DefineTests(driver storageframework.TestDriver, 
 			ginkgo.By("Expanding current pvc")
 			currentPvcSize := l.resource.Pvc.Spec.Resources.Requests[v1.ResourceStorage]
 			newSize := currentPvcSize.DeepCopy()
-			newSize.Add(resource.MustParse("1Gi"))
+			newSize.Add(expandSize)
 			framework.Logf("currentPvcSize %v, newSize %v", currentPvcSize, newSize)
 			newPVC, err := ExpandPVCSize(ctx, l.resource.Pvc, newSize, f.ClientSet)
 			framework.ExpectNoError(err, "While updating pvc for more size")
@@ -289,7 +295,7 @@ func (v *volumeExpandTestSuite) DefineTests(driver storageframework.TestDriver, 
 			ginkgo.By("Expanding current pvc")
 			currentPvcSize := l.resource.Pvc.Spec.Resources.Requests[v1.ResourceStorage]
 			newSize := currentPvcSize.DeepCopy()
-			newSize.Add(resource.MustParse("1Gi"))
+			newSize.Add(expandSize)
 			framework.Logf("currentPvcSize %v, newSize %v", currentPvcSize, newSize)
 			newPVC, err := ExpandPVCSize(ctx, l.resource.Pvc, newSize, f.ClientSet)
 			framework.ExpectNoError(err, "While updating pvc for more size")
@@ -341,7 +347,7 @@ func (v *volumeExpandTestSuite) DefineTests(driver storageframework.TestDriver, 
 			ginkgo.By("Expanding current pvc")
 			currentPvcSize := l.resource.Pvc.Spec.Resources.Requests[v1.ResourceStorage]
 			newSize := currentPvcSize.DeepCopy()
-			newSize.Add(resource.MustParse("1Gi"))
+			newSize.Add(expandSize)
 			framework.Logf("currentPvcSize %v, newSize %v", currentPvcSize, newSize)
 			newPVC, err := ExpandPVCSize(ctx, l.resource.Pvc, newSize, f.ClientSet)
 			framework.ExpectNoError(err, "While updating pvc for more size")

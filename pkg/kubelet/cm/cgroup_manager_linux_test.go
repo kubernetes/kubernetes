@@ -170,49 +170,6 @@ func TestParseSystemdToCgroupName(t *testing.T) {
 	}
 }
 
-func TestCpuSharesToCPUWeight(t *testing.T) {
-	testCases := []struct {
-		cpuShares         uint64
-		expectedCpuWeight uint64
-	}{
-		{
-			cpuShares:         2,
-			expectedCpuWeight: 1,
-		},
-		{
-			cpuShares:         3,
-			expectedCpuWeight: 1,
-		},
-		{
-			cpuShares:         4,
-			expectedCpuWeight: 1,
-		},
-		{
-			cpuShares:         28,
-			expectedCpuWeight: 1,
-		},
-		{
-			cpuShares:         29,
-			expectedCpuWeight: 2,
-		},
-		{
-			cpuShares:         245,
-			expectedCpuWeight: 10,
-		},
-		{
-			cpuShares:         262144,
-			expectedCpuWeight: 10000,
-		},
-	}
-
-	for _, testCase := range testCases {
-		if actual := cpuSharesToCPUWeight(testCase.cpuShares); actual != testCase.expectedCpuWeight {
-			t.Errorf("cpuShares: %v, expectedCpuWeight: %v, actualCpuWeight: %v",
-				testCase.cpuShares, testCase.expectedCpuWeight, actual)
-		}
-	}
-}
-
 func TestCpuWeightToCPUShares(t *testing.T) {
 	testCases := []struct {
 		cpuWeight         uint64

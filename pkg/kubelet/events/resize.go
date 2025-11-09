@@ -26,38 +26,68 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 )
 
-// PodResizeCompletedMsg gernerates the pod resize completed event message.
-func PodResizeCompletedMsg(allocatedPod *v1.Pod) string {
-	type containerAllocation struct {
-		Name      string                  `json:"name"`
-		Resources v1.ResourceRequirements `json:"resources,omitempty"`
-	}
-	type podResourceSummary struct {
-		//TODO: resources v1.ResourceRequirements, add pod-level resources here once resizing pod-level resources is supported
-		InitContainers []containerAllocation `json:"initContainers,omitempty"`
-		Containers     []containerAllocation `json:"containers,omitempty"`
-	}
+type containerAllocation struct {
+	Name      string                  `json:"name"`
+	Resources v1.ResourceRequirements `json:"resources,omitempty"`
+}
 
-	podResizeSource := &podResourceSummary{}
+type podResourceSummary struct {
+	// TODO: resources v1.ResourceRequirements, add pod-level resources here once resizing pod-level resources is supported
+	InitContainers []containerAllocation `json:"initContainers,omitempty"`
+	Containers     []containerAllocation `json:"containers,omitempty"`
+	Generation     int64                 `json:"generation"`
+	Error          string                `json:"error,omitempty"`
+}
 
-	for container, containerType := range podutil.ContainerIter(&allocatedPod.Spec, podutil.InitContainers|podutil.Containers) {
+// PodResizeCompletedMsg generates the pod resize completed event message.
+func PodResizeCompletedMsg(allocatedPod *v1.Pod, generation int64) string {
+	return podResizeMessage(allocatedPod, generation, "", "Pod resize completed")
+}
+
+// PodResizeStartedMsg generates the pod resize in progress event message.
+func PodResizeStartedMsg(allocatedPod *v1.Pod, generation int64) string {
+	return podResizeMessage(allocatedPod, generation, "", "Pod resize started")
+}
+
+// PodResizeErrorMsg generates the pod resize in progress error event message.
+func PodResizeErrorMsg(allocatedPod *v1.Pod, generation int64, errorMsg string) string {
+	return podResizeMessage(allocatedPod, generation, errorMsg, "Pod resize error")
+}
+
+// PodResizePendingMsg generates the pod resize pending event message.
+func PodResizePendingMsg(pod *v1.Pod, reason, message string, generation int64) string {
+	return podResizeMessage(pod, generation, message, fmt.Sprintf("Pod resize %s", reason))
+}
+
+func podResizeMessage(pod *v1.Pod, generation int64, errorMsg, messagePrefix string) string {
+	resources, err := makeResourceSummaryFromSpec(pod, generation, errorMsg)
+	if err != nil {
+		return messagePrefix
+	}
+	return fmt.Sprintf("%s: %s", messagePrefix, resources)
+
+}
+
+// Returns the desired resources from the podspec.
+func makeResourceSummaryFromSpec(pod *v1.Pod, generation int64, errorMessage string) (string, error) {
+	specResources := &podResourceSummary{Generation: generation, Error: errorMessage}
+	for container, containerType := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
 		allocation := containerAllocation{
 			Name:      container.Name,
 			Resources: container.Resources,
 		}
 		switch containerType {
 		case podutil.InitContainers:
-			podResizeSource.InitContainers = append(podResizeSource.InitContainers, allocation)
+			specResources.InitContainers = append(specResources.InitContainers, allocation)
 		case podutil.Containers:
-			podResizeSource.Containers = append(podResizeSource.Containers, allocation)
+			specResources.Containers = append(specResources.Containers, allocation)
 		}
 	}
 
-	podResizeMsgDetailsJSON, err := json.Marshal(podResizeSource)
+	message, err := json.Marshal(specResources)
 	if err != nil {
-		klog.ErrorS(err, "Failed to serialize resource summary", "pod", format.Pod(allocatedPod))
-		return "Pod resize completed"
+		klog.ErrorS(err, "Failed to serialize resource summary", "pod", format.Pod(pod))
+		return "", err
 	}
-	podResizeCompletedMsg := fmt.Sprintf("Pod resize completed: %s", string(podResizeMsgDetailsJSON))
-	return podResizeCompletedMsg
+	return string(message), nil
 }

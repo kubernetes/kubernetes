@@ -37,6 +37,7 @@ import (
 // to semver.org documentation for information on accepted patterns.
 // An optional "normalize" argument can be passed to enable normalization. Normalization removes any "v" prefix, adds a
 // 0 minor and patch numbers to versions with only major or major.minor components specified, and removes any leading 0s.
+//
 //	semver(<string>) <Semver>
 //	semver(<string>, <bool>) <Semver>
 //
@@ -65,7 +66,7 @@ import (
 //
 //	isSemver('1.0.0') // returns true
 //	isSemver('hello') // returns false
-//  isSemver('v1.0')  // returns false (leading "v" is not allowed unless normalization is enabled)
+//	isSemver('v1.0')  // returns false (leading "v" is not allowed unless normalization is enabled)
 //	isSemver('v1.0', true) // Applies normalization to remove leading "v". returns true
 //	semver('1.0', true) // Applies normalization to add the missing patch version. Returns true
 //	semver('01.01.01', true) // Applies normalization to remove leading zeros. Returns true
@@ -88,7 +89,6 @@ import (
 //
 //   - compareTo: Compares receiver to operand and returns 0 if they are equal, 1 if the receiver is greater, or -1 if the receiver is less than the operand
 //
-//
 //     <Semver>.isLessThan(<semver>) <bool>
 //     <Semver>.isGreaterThan(<semver>) <bool>
 //     <Semver>.compareTo(<semver>) <int>
@@ -98,7 +98,6 @@ import (
 // semver("1.2.3").compareTo(semver("1.2.3")) // returns 0
 // semver("1.2.3").compareTo(semver("2.0.0")) // returns -1
 // semver("1.2.3").compareTo(semver("0.1.2")) // returns 1
-
 func SemverLib(options ...SemverOption) cel.EnvOption {
 	semverLib := &semverLibType{}
 	for _, o := range options {

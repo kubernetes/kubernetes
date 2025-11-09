@@ -247,10 +247,26 @@ type ListSelectorTerm struct {
 	Value any
 }
 
+// StabilityLevel indicates the stability of a validation tag.
+type StabilityLevel string
+
+const (
+	// Alpha indicates that a tag's semantics may change in the future.
+	Alpha StabilityLevel = "Alpha"
+	// Beta indicates that a tag's semantics will remain unchanged for the
+	// foreseeable future. This is used for soaking tags before qualifying to stable.
+	Beta StabilityLevel = "Beta"
+	// Stable indicates that a tag's semantics will remain unchanged for the
+	// foreseeable future.
+	Stable StabilityLevel = "Stable"
+)
+
 // TagDoc describes a comment-tag and its usage.
 type TagDoc struct {
 	// Tag is the tag name, without the leading '+'.
 	Tag string
+	// StabilityLevel is the stability level of the tag.
+	StabilityLevel StabilityLevel
 	// Args lists any arguments this tag might take.
 	Args []TagArgDoc
 	// Usage is how the tag is used, including arguments.
@@ -399,7 +415,9 @@ const (
 	DefaultFlags FunctionFlags = 0
 
 	// ShortCircuit indicates that further validations should be skipped if
-	// this validator fails. Most validators are not fatal.
+	// this validator fails. If there are multiple validators with this flag
+	// set, they will ALL run, and if any of them fail, any non-short-circuit
+	// validators will be skipped.  Most validators are not fatal.
 	ShortCircuit FunctionFlags = 1 << iota
 
 	// NonError indicates that a failure of this validator should not be
@@ -444,6 +462,10 @@ func Function(tagName string, flags FunctionFlags, function types.Name, extraArg
 type FunctionGen struct {
 	// TagName is the tag which triggered this function.
 	TagName string
+
+	// Cohort indicates a set of related functions which are processed
+	// together.
+	Cohort string
 
 	// Flags holds the options for this validator function.
 	Flags FunctionFlags

@@ -22,6 +22,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -110,7 +111,14 @@ func lookupServiceName(name string) (EgressType, error) {
 
 func tunnelHTTPConnect(proxyConn net.Conn, proxyAddress, addr string) (net.Conn, error) {
 	fmt.Fprintf(proxyConn, "CONNECT %s HTTP/1.1\r\nHost: %s\r\n\r\n", addr, "127.0.0.1")
-	br := bufio.NewReader(proxyConn)
+
+	// As described in https://go.dev/issue/74633 a misbehaving proxy server
+	// can cause memory exhaustion in the client. The fix in https://go.dev/cl/698915
+	// only covers http.Transport users. Apply the same limit here.
+	//
+	// Limit the size of the response headers the proxy server can send us.
+	br := bufio.NewReader(io.LimitReader(proxyConn, http.DefaultMaxHeaderBytes))
+
 	res, err := http.ReadResponse(br, nil)
 	if err != nil {
 		proxyConn.Close()

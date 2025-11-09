@@ -106,7 +106,7 @@ func TestCallQueueAdd(t *testing.T) {
 	uid2 := types.UID("uid2")
 
 	t.Run("First call is added without collision", func(t *testing.T) {
-		resetMetrics()
+		registerAndResetMetrics(t)
 
 		cq := newCallQueue(mockRelevances)
 		call := &queuedAPICall{
@@ -124,7 +124,7 @@ func TestCallQueueAdd(t *testing.T) {
 	})
 
 	t.Run("No-op call is skipped", func(t *testing.T) {
-		resetMetrics()
+		registerAndResetMetrics(t)
 
 		cq := newCallQueue(mockRelevances)
 		onFinishCh := make(chan error, 1)
@@ -149,7 +149,7 @@ func TestCallQueueAdd(t *testing.T) {
 	})
 
 	t.Run("Two calls for different objects don't collide", func(t *testing.T) {
-		resetMetrics()
+		registerAndResetMetrics(t)
 
 		cq := newCallQueue(mockRelevances)
 		call1 := &queuedAPICall{
@@ -176,7 +176,7 @@ func TestCallQueueAdd(t *testing.T) {
 	})
 
 	t.Run("New call overwrites less relevant call", func(t *testing.T) {
-		resetMetrics()
+		registerAndResetMetrics(t)
 
 		cq := newCallQueue(mockRelevances)
 		onFinishCh := make(chan error, 1)
@@ -206,7 +206,7 @@ func TestCallQueueAdd(t *testing.T) {
 	})
 
 	t.Run("New call is skipped if less relevant", func(t *testing.T) {
-		resetMetrics()
+		registerAndResetMetrics(t)
 
 		cq := newCallQueue(mockRelevances)
 		onFinishCh := make(chan error, 1)
@@ -237,7 +237,7 @@ func TestCallQueueAdd(t *testing.T) {
 	})
 
 	t.Run("New call merges with old call and skips if no-op", func(t *testing.T) {
-		resetMetrics()
+		registerAndResetMetrics(t)
 
 		cq := newCallQueue(mockRelevances)
 		onFinishCh1 := make(chan error, 1)
@@ -308,7 +308,7 @@ func TestCallQueuePop(t *testing.T) {
 	uid2 := types.UID("uid2")
 
 	t.Run("Calls are popped from the queue in FIFO order", func(t *testing.T) {
-		resetMetrics()
+		registerAndResetMetrics(t)
 
 		cq := newCallQueue(mockRelevances)
 		call1 := &queuedAPICall{
@@ -395,7 +395,7 @@ func TestCallQueueFinalize(t *testing.T) {
 	uid := types.UID("uid")
 
 	t.Run("Call details are cleared if there is no waiting call", func(t *testing.T) {
-		resetMetrics()
+		registerAndResetMetrics(t)
 
 		cq := newCallQueue(mockRelevances)
 		call := &queuedAPICall{
@@ -420,7 +420,7 @@ func TestCallQueueFinalize(t *testing.T) {
 	})
 
 	t.Run("UID is re-queued if a new call arrived while one was in-flight", func(t *testing.T) {
-		resetMetrics()
+		registerAndResetMetrics(t)
 
 		cq := newCallQueue(mockRelevances)
 		call1 := &queuedAPICall{
@@ -462,7 +462,7 @@ func TestCallQueueSyncObject(t *testing.T) {
 	uid2 := types.UID("uid2")
 
 	t.Run("Object is synced with pending call details", func(t *testing.T) {
-		resetMetrics()
+		registerAndResetMetrics(t)
 
 		cq := newCallQueue(mockRelevances)
 		obj := &metav1.ObjectMeta{
@@ -497,7 +497,7 @@ func TestCallQueueSyncObject(t *testing.T) {
 	})
 
 	t.Run("Pending call is canceled if sync results in no-op", func(t *testing.T) {
-		resetMetrics()
+		registerAndResetMetrics(t)
 
 		cq := newCallQueue(mockRelevances)
 		obj := &metav1.ObjectMeta{UID: uid1}

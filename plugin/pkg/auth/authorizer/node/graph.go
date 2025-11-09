@@ -21,7 +21,7 @@ import (
 	"sync"
 	"time"
 
-	certsv1alpha1 "k8s.io/api/certificates/v1alpha1"
+	certsv1beta1 "k8s.io/api/certificates/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/component-helpers/storage/ephemeral"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
@@ -479,7 +479,7 @@ func (g *Graph) DeletePod(name, namespace string) {
 // authorization, and it's a shorter graph traversal.  The noderestriction
 // admission plugin ensures that all PCRs created have a valid node,
 // serviceaccount, and pod combination that actually exists in the cluster.
-func (g *Graph) AddPodCertificateRequest(pcr *certsv1alpha1.PodCertificateRequest) {
+func (g *Graph) AddPodCertificateRequest(pcr *certsv1beta1.PodCertificateRequest) {
 	start := time.Now()
 	defer func() {
 		graphActionsDuration.WithLabelValues("AddPodCertificateRequest").Observe(time.Since(start).Seconds())
@@ -494,7 +494,7 @@ func (g *Graph) AddPodCertificateRequest(pcr *certsv1alpha1.PodCertificateReques
 }
 
 // DeletePodCertificateRequest removes it from the graph.
-func (g *Graph) DeletePodCertificateRequest(pcr *certsv1alpha1.PodCertificateRequest) {
+func (g *Graph) DeletePodCertificateRequest(pcr *certsv1beta1.PodCertificateRequest) {
 	start := time.Now()
 	defer func() {
 		graphActionsDuration.WithLabelValues("DeletePodCertificateRequest").Observe(time.Since(start).Seconds())

@@ -203,7 +203,7 @@ func TestValidateClaimTemplate(t *testing.T) {
 			}(),
 		},
 		"prioritized-list-bad-class-name-on-subrequest": {
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("deviceClassName"), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')")},
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("deviceClassName"), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')").MarkCoveredByDeclarative()},
 			template: func() *resource.ResourceClaimTemplate {
 				template := testClaimTemplate(goodName, goodNS, validClaimSpecWithFirstAvailable)
 				template.Spec.Spec.Devices.Requests[0].FirstAvailable[0].DeviceClassName = badName

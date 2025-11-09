@@ -26,6 +26,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -277,6 +278,73 @@ func TestNodeSchedulingPropertiesChange(t *testing.T) {
 	}
 }
 
+func TestExtractNodeFeaturesChange(t *testing.T) {
+	testCases := []struct {
+		name    string
+		oldNode *v1.Node
+		newNode *v1.Node
+		want    fwk.ActionType
+	}{
+		{
+			name:    "no features changed",
+			oldNode: &v1.Node{Status: v1.NodeStatus{DeclaredFeatures: []string{"featA", "featB"}}},
+			newNode: &v1.Node{Status: v1.NodeStatus{DeclaredFeatures: []string{"featA", "featB"}}},
+			want:    fwk.None,
+		},
+		{
+			name:    "features added",
+			oldNode: &v1.Node{Status: v1.NodeStatus{DeclaredFeatures: []string{"featA"}}},
+			newNode: &v1.Node{Status: v1.NodeStatus{DeclaredFeatures: []string{"featA", "featB"}}},
+			want:    fwk.UpdateNodeDeclaredFeature,
+		},
+		{
+			name:    "features removed",
+			oldNode: &v1.Node{Status: v1.NodeStatus{DeclaredFeatures: []string{"featA", "featB"}}},
+			newNode: &v1.Node{Status: v1.NodeStatus{DeclaredFeatures: []string{"featA"}}},
+			want:    fwk.UpdateNodeDeclaredFeature,
+		},
+		{
+			name:    "features different",
+			oldNode: &v1.Node{Status: v1.NodeStatus{DeclaredFeatures: []string{"featA"}}},
+			newNode: &v1.Node{Status: v1.NodeStatus{DeclaredFeatures: []string{"featC"}}},
+			want:    fwk.UpdateNodeDeclaredFeature,
+		},
+		{
+			name:    "old features nil, new has features",
+			oldNode: &v1.Node{Status: v1.NodeStatus{DeclaredFeatures: nil}},
+			newNode: &v1.Node{Status: v1.NodeStatus{DeclaredFeatures: []string{"featA"}}},
+			want:    fwk.UpdateNodeDeclaredFeature,
+		},
+		{
+			name:    "old features empty, new has features",
+			oldNode: &v1.Node{Status: v1.NodeStatus{DeclaredFeatures: []string{}}},
+			newNode: &v1.Node{Status: v1.NodeStatus{DeclaredFeatures: []string{"featA"}}},
+			want:    fwk.UpdateNodeDeclaredFeature,
+		},
+		{
+			name:    "old has features, new is nil",
+			oldNode: &v1.Node{Status: v1.NodeStatus{DeclaredFeatures: []string{"featA"}}},
+			newNode: &v1.Node{Status: v1.NodeStatus{DeclaredFeatures: nil}},
+			want:    fwk.UpdateNodeDeclaredFeature,
+		},
+		{
+			name:    "both nil",
+			oldNode: &v1.Node{Status: v1.NodeStatus{DeclaredFeatures: nil}},
+			newNode: &v1.Node{Status: v1.NodeStatus{DeclaredFeatures: nil}},
+			want:    fwk.None,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := extractNodeFeaturesChange(tc.newNode, tc.oldNode)
+			if got != tc.want {
+				t.Errorf("extractNodeFeaturesChange() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
 func Test_podSchedulingPropertiesChange(t *testing.T) {
 	podWithBigRequest := &v1.Pod{
 		Spec: v1.PodSpec{
@@ -466,6 +534,9 @@ func Test_podSchedulingPropertiesChange(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.draDisabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicResourceAllocation, !tt.draDisabled)
 			got := PodSchedulingPropertiesChange(tt.newPod, tt.oldPod)
 			if diff := cmp.Diff(tt.want, got, cmpopts.EquateComparable(fwk.ClusterEvent{})); diff != "" {

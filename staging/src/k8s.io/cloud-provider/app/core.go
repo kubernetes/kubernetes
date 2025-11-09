@@ -128,13 +128,16 @@ func startRouteController(ctx context.Context, initContext ControllerInitContext
 		return nil, false, fmt.Errorf("length of clusterCIDRs is:%v more than max allowed of 2", len(clusterCIDRs))
 	}
 
-	routeController := routecontroller.New(
+	routeController, err := routecontroller.New(
 		routes,
 		completedConfig.ClientBuilder.ClientOrDie(initContext.ClientName),
 		completedConfig.SharedInformers.Core().V1().Nodes(),
 		completedConfig.ComponentConfig.KubeCloudShared.ClusterName,
 		clusterCIDRs,
 	)
+	if err != nil {
+		return nil, false, err
+	}
 	go routeController.Run(ctx, completedConfig.ComponentConfig.KubeCloudShared.RouteReconciliationPeriod.Duration, controlexContext.ControllerManagerMetrics)
 
 	return nil, true, nil

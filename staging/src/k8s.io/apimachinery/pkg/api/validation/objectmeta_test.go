@@ -35,33 +35,124 @@ const (
 
 // Ensure custom name functions are allowed
 func TestValidateObjectMetaCustomName(t *testing.T) {
-	errs := ValidateObjectMeta(
-		&metav1.ObjectMeta{Name: "test", GenerateName: "foo"},
-		false,
-		func(s string, prefix bool) []string {
-			if s == "test" {
-				return nil
-			}
-			return []string{"name-gen"}
-		},
-		field.NewPath("field"))
-	if len(errs) != 1 {
-		t.Fatalf("unexpected errors: %v", errs)
+	testCases := []struct {
+		name   string
+		input  metav1.ObjectMeta
+		nErrs  int
+		errStr string
+	}{{
+		name:  "valid name, empty generateName",
+		input: metav1.ObjectMeta{Name: "test", GenerateName: ""},
+	}, {
+		name:  "valid name and generateName",
+		input: metav1.ObjectMeta{Name: "test", GenerateName: "test"},
+	}, {
+		name:   "invalid name, empty generateName",
+		input:  metav1.ObjectMeta{Name: "invalid", GenerateName: ""},
+		nErrs:  1,
+		errStr: "wrong value",
+	}, {
+		name:   "invalid name, valid generateName",
+		input:  metav1.ObjectMeta{Name: "invalid", GenerateName: "test"},
+		nErrs:  1,
+		errStr: "wrong value",
+	}, {
+		name:   "invalid name, invalid generateName",
+		input:  metav1.ObjectMeta{Name: "invalid", GenerateName: "invalid"},
+		nErrs:  2,
+		errStr: "wrong value",
+	}}
+
+	fn := func(s string, prefix bool) []string {
+		// Note: this is called on both name and generateName
+		if s == "test" {
+			return nil
+		}
+		return []string{"wrong value"}
 	}
-	if !strings.Contains(errs[0].Error(), "name-gen") {
-		t.Errorf("unexpected error message: %v", errs)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := ValidateObjectMeta(&tc.input, false, fn, field.NewPath("field"))
+
+			if len(errs) == 0 {
+				if len(tc.errStr) != 0 {
+					t.Fatalf("expected 1 error, got none")
+				}
+			} else {
+				if len(tc.errStr) == 0 {
+					t.Fatalf("expected no errors, got: %v", errs)
+				}
+				if len(errs) != tc.nErrs {
+					t.Fatalf("expected %d errors, got %d: %q", tc.nErrs, len(errs), errs)
+				}
+				if !strings.Contains(errs[0].Error(), "wrong value") {
+					t.Errorf("unexpected error message: %v", errs[0].Error())
+				}
+			}
+		})
+	}
+}
+
+// Ensure custom name functions work
+func TestValidateObjectMetaWithOptsName(t *testing.T) {
+	testCases := []struct {
+		name   string
+		input  metav1.ObjectMeta
+		errStr string
+	}{{
+		name:  "valid name, empty generateName",
+		input: metav1.ObjectMeta{Name: "test", GenerateName: ""},
+	}, {
+		name:  "valid name and generateName",
+		input: metav1.ObjectMeta{Name: "test", GenerateName: "test"},
+	}, {
+		name:   "invalid name, empty generateName",
+		input:  metav1.ObjectMeta{Name: "invalid", GenerateName: ""},
+		errStr: "wrong value",
+	}, {
+		name:   "invalid name, valid generateName",
+		input:  metav1.ObjectMeta{Name: "invalid", GenerateName: "test"},
+		errStr: "wrong value",
+	}, {
+		name:   "invalid name, invalid generateName",
+		input:  metav1.ObjectMeta{Name: "invalid", GenerateName: "invalid"},
+		errStr: "wrong value",
+	}}
+
+	fn := func(fldPath *field.Path, s string) field.ErrorList {
+		if s == "test" {
+			return nil
+		}
+		return field.ErrorList{field.Invalid(fldPath, s, "wrong value")}
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := ValidateObjectMetaWithOpts(&tc.input, false, fn, field.NewPath("field"))
+
+			if len(errs) == 0 {
+				if len(tc.errStr) != 0 {
+					t.Fatalf("expected 1 error, got none")
+				}
+			} else {
+				if len(tc.errStr) == 0 {
+					t.Fatalf("expected no errors, got: %v", errs)
+				}
+				if len(errs) != 1 {
+					t.Fatalf("expected 1 error, got %d: %q", len(errs), errs)
+				}
+				if !strings.Contains(errs[0].Error(), "wrong value") {
+					t.Errorf("unexpected error message: %v", errs[0].Error())
+				}
+			}
+		})
 	}
 }
 
 // Ensure namespace names follow dns label format
 func TestValidateObjectMetaNamespaces(t *testing.T) {
-	errs := ValidateObjectMeta(
+	errs := validateObjectMetaAccessorWithOptsCommon(
 		&metav1.ObjectMeta{Name: "test", Namespace: "foo.bar"},
-		true,
-		func(s string, prefix bool) []string {
-			return nil
-		},
-		field.NewPath("field"))
+		true, field.NewPath("field"), nil)
 	if len(errs) != 1 {
 		t.Fatalf("unexpected errors: %v", errs)
 	}
@@ -74,13 +165,9 @@ func TestValidateObjectMetaNamespaces(t *testing.T) {
 	for i := range b {
 		b[i] = letters[rand.Intn(len(letters))]
 	}
-	errs = ValidateObjectMeta(
+	errs = validateObjectMetaAccessorWithOptsCommon(
 		&metav1.ObjectMeta{Name: "test", Namespace: string(b)},
-		true,
-		func(s string, prefix bool) []string {
-			return nil
-		},
-		field.NewPath("field"))
+		true, field.NewPath("field"), nil)
 	if len(errs) != 2 {
 		t.Fatalf("unexpected errors: %v", errs)
 	}
@@ -195,13 +282,9 @@ func TestValidateObjectMetaOwnerReferences(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		errs := ValidateObjectMeta(
+		errs := validateObjectMetaAccessorWithOptsCommon(
 			&metav1.ObjectMeta{Name: "test", Namespace: "test", OwnerReferences: tc.ownerReferences},
-			true,
-			func(s string, prefix bool) []string {
-				return nil
-			},
-			field.NewPath("field"))
+			true, field.NewPath("field"), nil)
 		if len(errs) != 0 && !tc.expectError {
 			t.Errorf("unexpected error: %v in test case %v", errs, tc.description)
 		}
@@ -288,7 +371,7 @@ func TestValidateFinalizersPreventConflictingFinalizers(t *testing.T) {
 		},
 	}
 	for name, tc := range testcases {
-		errs := ValidateObjectMeta(&tc.ObjectMeta, false, NameIsDNSSubdomain, field.NewPath("field"))
+		errs := validateObjectMetaAccessorWithOptsCommon(&tc.ObjectMeta, false, field.NewPath("field"), nil)
 		if len(errs) == 0 {
 			if len(tc.ExpectedErr) != 0 {
 				t.Errorf("case: %q, expected error to contain %q", name, tc.ExpectedErr)
@@ -425,8 +508,8 @@ func TestObjectMetaGenerationUpdate(t *testing.T) {
 	}
 }
 
-// Ensure trailing slash is allowed in generate name
-func TestValidateObjectMetaTrimsTrailingSlash(t *testing.T) {
+// Ensure trailing dash is allowed in generate name
+func TestValidateObjectMetaTrimsTrailingDash(t *testing.T) {
 	errs := ValidateObjectMeta(
 		&metav1.ObjectMeta{Name: "test", GenerateName: "foo-"},
 		false,

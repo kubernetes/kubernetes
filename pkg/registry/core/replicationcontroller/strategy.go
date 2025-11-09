@@ -158,10 +158,7 @@ func (rcStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) f
 	newRc := obj.(*api.ReplicationController)
 
 	opts := pod.GetValidationOptionsFromPodTemplate(newRc.Spec.Template, oldRc.Spec.Template)
-	// This should be fixed to avoid the redundant calls, but carefully.
-	validationErrorList := corevalidation.ValidateReplicationController(newRc, opts)
-	updateErrorList := corevalidation.ValidateReplicationControllerUpdate(newRc, oldRc, opts)
-	errs := append(validationErrorList, updateErrorList...)
+	errs := corevalidation.ValidateReplicationControllerUpdate(newRc, oldRc, opts)
 
 	for key, value := range helper.NonConvertibleFields(oldRc.Annotations) {
 		parts := strings.Split(key, "/")

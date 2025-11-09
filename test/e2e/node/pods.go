@@ -41,7 +41,6 @@ import (
 	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/events"
-	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -420,7 +419,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 	})
 })
 
-var _ = SIGDescribe("Pods Extended (pod generation)", feature.PodObservedGenerationTracking, framework.WithFeatureGate(features.PodObservedGenerationTracking), func() {
+var _ = SIGDescribe("Pods Extended (pod generation)", func() {
 	f := framework.NewDefaultFramework("pods")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
@@ -430,7 +429,12 @@ var _ = SIGDescribe("Pods Extended (pod generation)", feature.PodObservedGenerat
 			podClient = e2epod.NewPodClient(f)
 		})
 
-		ginkgo.It("pod generation should start at 1 and increment per update", func(ctx context.Context) {
+		/*
+			Release: v1.35
+			Testname: Pods Generation, updates
+			Description: Create a Pod, and perform a few updates, ensuring that the pod's metadata.generation and status.observedGeneration are updated as expected.
+		*/
+		framework.ConformanceIt("pod generation should start at 1 and increment per update [MinimumKubeletVersion:1.34]", func(ctx context.Context) {
 			ginkgo.By("creating the pod")
 			podName := "pod-generation-" + string(uuid.NewUUID())
 			pod := e2epod.NewAgnhostPod(f.Namespace.Name, podName, nil, nil, nil)
@@ -530,7 +534,12 @@ var _ = SIGDescribe("Pods Extended (pod generation)", feature.PodObservedGenerat
 			}
 		})
 
-		ginkgo.It("custom-set generation on new pods and graceful delete", func(ctx context.Context) {
+		/*
+			Release: v1.35
+			Testname: Pods Generation, graceful delete
+			Description: Create a Pod, ensure that triggering a graceful delete causes the generation to be updated.
+		*/
+		framework.ConformanceIt("custom-set generation on new pods and graceful delete", func(ctx context.Context) {
 			ginkgo.By("creating the pod")
 			name := "pod-generation-" + string(uuid.NewUUID())
 			value := strconv.Itoa(time.Now().Nanosecond())
@@ -566,7 +575,12 @@ var _ = SIGDescribe("Pods Extended (pod generation)", feature.PodObservedGenerat
 			gomega.Expect(pod.Generation).To(gomega.BeEquivalentTo(2))
 		})
 
-		ginkgo.It("issue 500 podspec updates and verify generation and observedGeneration eventually converge", func(ctx context.Context) {
+		/*
+			Release: v1.35
+			Testname: Pods Generation, 500 updates
+			Description: Create a Pod, issue 499 podSpec updates and verify generation and observedGeneration eventually converge to 500.
+		*/
+		framework.ConformanceIt("issue 500 podspec updates and verify generation and observedGeneration eventually converge [MinimumKubeletVersion:1.34]", func(ctx context.Context) {
 			ginkgo.By("creating the pod")
 			name := "pod-generation-" + string(uuid.NewUUID())
 			value := strconv.Itoa(time.Now().Nanosecond())

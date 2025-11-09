@@ -57,31 +57,31 @@ func testDeclarativeValidateForDeclarative(t *testing.T, apiVersion string) {
 		input        api.CertificateSigningRequest
 		expectedErrs field.ErrorList
 	}{
-		"no conditions - valid": {
+		"status.conditions: none = valid": {
 			input: makeValidCSR(),
 		},
-		"approved condition - valid": {
+		"status.conditions: Approved = valid": {
 			input: makeValidCSR(withApprovedCondition()),
 		},
-		"denied condition - valid": {
+		"status.conditions: Denied = valid": {
 			input: makeValidCSR(withDeniedCondition()),
 		},
-		"failed condition - valid": {
+		"status.conditions: Failed = valid": {
 			input: makeValidCSR(withFailedCondition()),
 		},
-		"approved+failed conditions - valid": {
+		"status.conditions: Approved+Failed = valid": {
 			input: makeValidCSR(withApprovedCondition(), withFailedCondition()),
 		},
-		"denied+failed conditions - valid": {
+		"status.conditions: Denied+Failed = valid": {
 			input: makeValidCSR(withDeniedCondition(), withFailedCondition()),
 		},
-		"approved+denied conditions - invalid": {
+		"status.conditions: Approved+Denied = invalid": {
 			input: makeValidCSR(withApprovedCondition(), withDeniedCondition()),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("status", "conditions"), nil, "").WithOrigin("zeroOrOneOf"),
 			},
 		},
-		"denied+approved conditions - invalid": {
+		"status.conditions: Denied+Approved = invalid": {
 			input: makeValidCSR(withDeniedCondition(), withApprovedCondition()),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("status", "conditions"), nil, "").WithOrigin("zeroOrOneOf"),

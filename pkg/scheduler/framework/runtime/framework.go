@@ -37,7 +37,7 @@ import (
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
-	"k8s.io/kubernetes/pkg/scheduler/backend/api_dispatcher"
+	apidispatcher "k8s.io/kubernetes/pkg/scheduler/backend/api_dispatcher"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -95,7 +95,10 @@ type frameworkImpl struct {
 	eventRecorder    events.EventRecorder
 	informerFactory  informers.SharedInformerFactory
 	sharedDRAManager fwk.SharedDRAManager
+	workloadManager  fwk.WorkloadManager
 	logger           klog.Logger
+
+	sharedCSIManager fwk.CSIManager
 
 	metricsRecorder          MetricsRecorder
 	profileName              string
@@ -150,6 +153,7 @@ type frameworkOptions struct {
 	eventRecorder          events.EventRecorder
 	informerFactory        informers.SharedInformerFactory
 	sharedDRAManager       fwk.SharedDRAManager
+	sharedCSIManager       fwk.CSIManager
 	snapshotSharedLister   fwk.SharedLister
 	metricsRecorder        MetricsRecorder
 	podNominator           fwk.PodNominator
@@ -159,6 +163,7 @@ type frameworkOptions struct {
 	parallelizer           parallelize.Parallelizer
 	waitingPods            *waitingPodsMap
 	apiDispatcher          *apidispatcher.APIDispatcher
+	workloadManager        fwk.WorkloadManager
 	logger                 *klog.Logger
 }
 
@@ -210,6 +215,13 @@ func WithSharedDRAManager(sharedDRAManager fwk.SharedDRAManager) Option {
 	}
 }
 
+// WithSharedCSIManager sets SharedCSIManager for the framework.
+func WithSharedCSIManager(sharedCSIManager fwk.CSIManager) Option {
+	return func(o *frameworkOptions) {
+		o.sharedCSIManager = sharedCSIManager
+	}
+}
+
 // WithSnapshotSharedLister sets the SharedLister of the snapshot.
 func WithSnapshotSharedLister(snapshotSharedLister fwk.SharedLister) Option {
 	return func(o *frameworkOptions) {
@@ -248,6 +260,13 @@ func WithParallelism(parallelism int) Option {
 func WithAPIDispatcher(apiDispatcher *apidispatcher.APIDispatcher) Option {
 	return func(o *frameworkOptions) {
 		o.apiDispatcher = apiDispatcher
+	}
+}
+
+// WithWorkloadManager sets Workload manager for the scheduling frameworkImpl.
+func WithWorkloadManager(workloadManager fwk.WorkloadManager) Option {
+	return func(o *frameworkOptions) {
+		o.workloadManager = workloadManager
 	}
 }
 
@@ -306,6 +325,7 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 	f := &frameworkImpl{
 		registry:             r,
 		snapshotSharedLister: options.snapshotSharedLister,
+		sharedCSIManager:     options.sharedCSIManager,
 		scorePluginWeight:    make(map[string]int),
 		waitingPods:          options.waitingPods,
 		clientSet:            options.clientSet,
@@ -318,6 +338,7 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 		PodNominator:         options.podNominator,
 		PodActivator:         options.podActivator,
 		apiDispatcher:        options.apiDispatcher,
+		workloadManager:      options.workloadManager,
 		parallelizer:         options.parallelizer,
 		logger:               logger,
 	}
@@ -1736,6 +1757,16 @@ func (f *frameworkImpl) SharedInformerFactory() informers.SharedInformerFactory 
 // SharedDRAManager returns the SharedDRAManager of the framework.
 func (f *frameworkImpl) SharedDRAManager() fwk.SharedDRAManager {
 	return f.sharedDRAManager
+}
+
+// SharedCSIManager returns the SharedCSIManager of the framework.
+func (f *frameworkImpl) SharedCSIManager() fwk.CSIManager {
+	return f.sharedCSIManager
+}
+
+// WorkloadManager returns the WorkloadManager of the framework.
+func (f *frameworkImpl) WorkloadManager() fwk.WorkloadManager {
+	return f.workloadManager
 }
 
 func (f *frameworkImpl) pluginsNeeded(plugins *config.Plugins) sets.Set[string] {
