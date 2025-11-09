@@ -141,6 +141,7 @@ func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig) error {
 		return err
 	}
 	if err := o.Admission.ApplyTo(&config.Config, config.SharedInformerFactory, kubeClient, dynamicClient, o.FeatureGate,
+		config.EffectiveVersion,
 		initializers...); err != nil {
 		return err
 	}

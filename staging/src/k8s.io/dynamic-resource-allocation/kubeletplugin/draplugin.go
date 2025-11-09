@@ -205,7 +205,8 @@ type Device struct {
 type Option func(o *options) error
 
 // DriverName defines the driver name for the dynamic resource allocation driver.
-// Must be set.
+// Must be set. Must be a DNS subdomain and should end with a DNS domain
+// owned by the vendor of the driver. It should use only lower case characters.
 func DriverName(driverName string) Option {
 	return func(o *options) error {
 		o.driverName = driverName

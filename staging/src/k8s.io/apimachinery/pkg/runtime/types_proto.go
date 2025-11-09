@@ -21,11 +21,21 @@ import (
 	"io"
 )
 
+// ProtobufReverseMarshaller can precompute size, and marshals to the start of the provided data buffer.
 type ProtobufMarshaller interface {
+	// Size returns the number of bytes a call to MarshalTo would consume.
+	Size() int
+	// MarshalTo marshals to the start of the data buffer, which must be at least as big as Size(),
+	// and returns the number of bytes written, which must be identical to the return value of Size().
 	MarshalTo(data []byte) (int, error)
 }
 
+// ProtobufReverseMarshaller can precompute size, and marshals to the end of the provided data buffer.
 type ProtobufReverseMarshaller interface {
+	// Size returns the number of bytes a call to MarshalToSizedBuffer would consume.
+	Size() int
+	// MarshalToSizedBuffer marshals to the end of the data buffer, which must be at least as big as Size(),
+	// and returns the number of bytes written, which must be identical to the return value of Size().
 	MarshalToSizedBuffer(data []byte) (int, error)
 }
 

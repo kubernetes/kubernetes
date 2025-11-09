@@ -21,6 +21,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -107,6 +108,8 @@ type KubeControllerManagerOptions struct {
 
 	Master                      string
 	ShowHiddenMetricsForVersion string
+
+	ControllerShutdownTimeout time.Duration
 
 	// ComponentGlobalsRegistry is the registry where the effective versions and feature gates for all components are stored.
 	ComponentGlobalsRegistry basecompatibility.ComponentGlobalsRegistry
@@ -238,6 +241,8 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 	s.GarbageCollectorController.GCIgnoredResources = gcIgnoredResources
 	s.Generic.LeaderElection.ResourceName = "kube-controller-manager"
 	s.Generic.LeaderElection.ResourceNamespace = "kube-system"
+
+	s.ControllerShutdownTimeout = 10 * time.Second
 	return &s, nil
 }
 
@@ -297,6 +302,9 @@ func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledBy
 	fs := fss.FlagSet("misc")
 	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig).")
 	fs.StringVar(&s.Generic.ClientConnection.Kubeconfig, "kubeconfig", s.Generic.ClientConnection.Kubeconfig, "Path to kubeconfig file with authorization and master location information (the master location can be overridden by the master flag).")
+
+	fss.FlagSet("generic").DurationVar(&s.ControllerShutdownTimeout, "controller-shutdown-timeout",
+		s.ControllerShutdownTimeout, "Time to wait for the controllers to shut down before terminating the executable")
 
 	if !utilfeature.DefaultFeatureGate.Enabled(featuregate.Feature(clientgofeaturegate.WatchListClient)) {
 		ver := version.MustParse("1.34")
@@ -413,6 +421,7 @@ func (s *KubeControllerManagerOptions) ApplyTo(c *kubecontrollerconfig.Config, a
 			return err
 		}
 	}
+	c.ControllerShutdownTimeout = s.ControllerShutdownTimeout
 	return nil
 }
 
@@ -502,11 +511,12 @@ func (s KubeControllerManagerOptions) Config(ctx context.Context, allControllers
 	eventRecorder := eventBroadcaster.NewRecorder(clientgokubescheme.Scheme, v1.EventSource{Component: KubeControllerManagerUserAgent})
 
 	c := &kubecontrollerconfig.Config{
-		Client:                   client,
-		Kubeconfig:               kubeconfig,
-		EventBroadcaster:         eventBroadcaster,
-		EventRecorder:            eventRecorder,
-		ComponentGlobalsRegistry: s.ComponentGlobalsRegistry,
+		Client:                    client,
+		Kubeconfig:                kubeconfig,
+		EventBroadcaster:          eventBroadcaster,
+		EventRecorder:             eventRecorder,
+		ControllerShutdownTimeout: s.ControllerShutdownTimeout,
+		ComponentGlobalsRegistry:  s.ComponentGlobalsRegistry,
 	}
 	if err := s.ApplyTo(c, allControllers, disabledByDefaultControllers, controllerAliases); err != nil {
 		return nil, err

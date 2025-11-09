@@ -114,11 +114,8 @@ func (o *OpenAPIV3ClientAlwaysPanic) Paths() (map[string]openapiclient.GroupVers
 func noopOpenAPIV3Patch(t *testing.T, f func(t *testing.T)) {
 	f(t)
 }
-func disableOpenAPIV3Patch(t *testing.T, f func(t *testing.T)) {
-	cmdtesting.WithAlphaEnvsDisabled([]cmdutil.FeatureGate{cmdutil.OpenAPIV3Patch}, t, f)
-}
 
-var applyFeatureToggles = []func(*testing.T, func(t *testing.T)){noopOpenAPIV3Patch, disableOpenAPIV3Patch}
+var applyFeatureToggles = []func(*testing.T, func(t *testing.T)){noopOpenAPIV3Patch}
 
 type testOpenAPISchema struct {
 	OpenAPISchemaFn     func() (openapi.Resources, error)
@@ -740,60 +737,6 @@ func TestApplyObjectWithoutAnnotation(t *testing.T) {
 	if buf.String() != expectRC {
 		t.Fatalf("unexpected output: %s\nexpected: %s", buf.String(), expectRC)
 	}
-}
-
-func TestOpenAPIV3PatchFeatureFlag(t *testing.T) {
-	// OpenAPIV3 smp apply is on by default.
-	// Test that users can disable it to use OpenAPI V2 smp
-	// An OpenAPI V3 root that always panics is used to ensure
-	// the v3 code path is never exercised when the feature is disabled
-	cmdtesting.InitTestErrorHandler(t)
-	nameRC, currentRC := readAndAnnotateReplicationController(t, filenameRC)
-	pathRC := "/namespaces/test/replicationcontrollers/" + nameRC
-
-	t.Run("test apply when a local object is specified - openapi v2 smp", func(t *testing.T) {
-		disableOpenAPIV3Patch(t, func(t *testing.T) {
-			tf := cmdtesting.NewTestFactory().WithNamespace("test")
-			defer tf.Cleanup()
-
-			tf.UnstructuredClient = &fake.RESTClient{
-				NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
-				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-					switch p, m := req.URL.Path, req.Method; {
-					case p == pathRC && m == "GET":
-						bodyRC := io.NopCloser(bytes.NewReader(currentRC))
-						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, nil
-					case p == pathRC && m == "PATCH":
-						validatePatchApplication(t, req, types.StrategicMergePatchType)
-						bodyRC := io.NopCloser(bytes.NewReader(currentRC))
-						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, nil
-					default:
-						t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
-						return nil, nil
-					}
-				}),
-			}
-			tf.OpenAPISchemaFunc = FakeOpenAPISchema.OpenAPISchemaFn
-			tf.OpenAPIV3ClientFunc = AlwaysPanicSchema.OpenAPIV3ClientFunc
-			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
-
-			ioStreams, _, buf, errBuf := genericiooptions.NewTestIOStreams()
-			cmd := NewCmdApply("kubectl", tf, ioStreams)
-			cmd.Flags().Set("filename", filenameRC)
-			cmd.Flags().Set("output", "name")
-			cmd.Run(cmd, []string{})
-
-			// uses the name from the file, not the response
-			expectRC := "replicationcontroller/" + nameRC + "\n"
-			if buf.String() != expectRC {
-				t.Fatalf("unexpected output: %s\nexpected: %s", buf.String(), expectRC)
-			}
-			if errBuf.String() != "" {
-				t.Fatalf("unexpected error output: %s", errBuf.String())
-			}
-		})
-	})
-
 }
 
 func TestOpenAPIV3DoesNotLoadV2(t *testing.T) {

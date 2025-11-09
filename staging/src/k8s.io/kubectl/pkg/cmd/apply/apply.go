@@ -284,13 +284,11 @@ func (flags *ApplyFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, baseNa
 	}
 
 	var openAPIV3Root openapi3.Root
-	if !cmdutil.OpenAPIV3Patch.IsDisabled() {
-		openAPIV3Client, err := f.OpenAPIV3Client()
-		if err == nil {
-			openAPIV3Root = openapi3.NewRoot(openAPIV3Client)
-		} else {
-			klog.V(4).Infof("warning: OpenAPI V3 Patch is enabled but is unable to be loaded. Will fall back to OpenAPI V2")
-		}
+	openAPIV3Client, err := f.OpenAPIV3Client()
+	if err == nil {
+		openAPIV3Root = openapi3.NewRoot(openAPIV3Client)
+	} else {
+		klog.V(4).Infof("warning: OpenAPI V3 Patch is enabled but is unable to be loaded. Will fall back to OpenAPI V2")
 	}
 
 	validationDirective, err := cmdutil.GetValidationDirective(cmd)

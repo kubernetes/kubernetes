@@ -56,7 +56,7 @@ type NamingConditionController struct {
 	crdMutationCache cache.MutationCache
 
 	// To allow injection for testing.
-	syncFn func(key string) error
+	syncFn func(ctx context.Context, key string) error
 
 	queue workqueue.TypedRateLimitingInterface[string]
 }
@@ -239,7 +239,7 @@ func equalToAcceptedOrFresh(requestedName, acceptedName string, usedNames sets.S
 	return fmt.Errorf("%q is already in use", requestedName)
 }
 
-func (c *NamingConditionController) sync(key string) error {
+func (c *NamingConditionController) sync(ctx context.Context, key string) error {
 	inCustomResourceDefinition, err := c.crdLister.Get(key)
 	if apierrors.IsNotFound(err) {
 		// CRD was deleted and has freed its names.
@@ -271,7 +271,7 @@ func (c *NamingConditionController) sync(key string) error {
 	apiextensionshelpers.SetCRDCondition(crd, namingCondition)
 	apiextensionshelpers.SetCRDCondition(crd, establishedCondition)
 
-	updatedObj, err := c.crdClient.CustomResourceDefinitions().UpdateStatus(context.TODO(), crd, metav1.UpdateOptions{})
+	updatedObj, err := c.crdClient.CustomResourceDefinitions().UpdateStatus(ctx, crd, metav1.UpdateOptions{})
 	if apierrors.IsNotFound(err) || apierrors.IsConflict(err) {
 		// deleted or changed in the meantime, we'll get called again
 		return nil
@@ -292,37 +292,43 @@ func (c *NamingConditionController) sync(key string) error {
 	return nil
 }
 
+//logcheck:context // RunWithContext should be used instead of Run in code which supports contextual logging.
 func (c *NamingConditionController) Run(stopCh <-chan struct{}) {
+	c.RunWithContext(wait.ContextForChannel(stopCh))
+}
+
+// RunWithContext is a context-aware version of Run.
+func (c *NamingConditionController) RunWithContext(ctx context.Context) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
 	klog.Info("Starting NamingConditionController")
 	defer klog.Info("Shutting down NamingConditionController")
 
-	if !cache.WaitForCacheSync(stopCh, c.crdSynced) {
+	if !cache.WaitForCacheSync(ctx.Done(), c.crdSynced) {
 		return
 	}
 
 	// only start one worker thread since its a slow moving API and the naming conflict resolution bits aren't thread-safe
-	go wait.Until(c.runWorker, time.Second, stopCh)
+	go wait.UntilWithContext(ctx, c.runWorker, time.Second)
 
-	<-stopCh
+	<-ctx.Done()
 }
 
-func (c *NamingConditionController) runWorker() {
-	for c.processNextWorkItem() {
+func (c *NamingConditionController) runWorker(ctx context.Context) {
+	for c.processNextWorkItem(ctx) {
 	}
 }
 
 // processNextWorkItem deals with one key off the queue.  It returns false when it's time to quit.
-func (c *NamingConditionController) processNextWorkItem() bool {
+func (c *NamingConditionController) processNextWorkItem(ctx context.Context) bool {
 	key, quit := c.queue.Get()
 	if quit {
 		return false
 	}
 	defer c.queue.Done(key)
 
-	err := c.syncFn(key)
+	err := c.syncFn(ctx, key)
 	if err == nil {
 		c.queue.Forget(key)
 		return true

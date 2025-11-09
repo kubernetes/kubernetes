@@ -70,7 +70,8 @@ func (k *KernelValidator) Validate(spec SysSpec) ([]error, []error) {
 		warns = append(warns, warn)
 	}
 	// only validate kernel config when necessary (currently no kernel config for windows)
-	if len(spec.KernelSpec.Required) > 0 || len(spec.KernelSpec.Forbidden) > 0 || len(spec.KernelSpec.Optional) > 0 {
+	if len(spec.KernelSpec.Required) > 0 || len(spec.KernelSpec.Forbidden) > 0 || len(spec.KernelSpec.Optional) > 0 ||
+		len(spec.KernelSpec.RequiredCgroupsV1) > 0 || len(spec.KernelSpec.RequiredCgroupsV2) > 0 {
 		if err = k.validateKernelConfig(spec.KernelSpec); err != nil {
 			errs = append(errs, err)
 		}
@@ -158,6 +159,20 @@ func (k *KernelValidator) validateCachedKernelConfig(allConfig map[string]kConfi
 	for _, config := range kSpec.Required {
 		validateOpt(config, required)
 	}
+	_, isCgroupsV2, err := getUnifiedMountpoint(mountsFilePath)
+	if err != nil {
+		return fmt.Errorf("failed to get unified mountpoint: %w", err)
+	}
+	if isCgroupsV2 {
+		for _, config := range kSpec.RequiredCgroupsV2 {
+			validateOpt(config, required)
+		}
+	} else {
+		for _, config := range kSpec.RequiredCgroupsV1 {
+			validateOpt(config, required)
+		}
+	}
+
 	for _, config := range kSpec.Optional {
 		validateOpt(config, optional)
 	}

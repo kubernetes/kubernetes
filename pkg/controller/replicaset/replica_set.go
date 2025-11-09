@@ -243,7 +243,7 @@ func (rsc *ReplicaSetController) Run(ctx context.Context, workers int) {
 	logger.Info("Starting controller", "name", controllerName)
 	defer logger.Info("Shutting down controller", "name", controllerName)
 
-	if !cache.WaitForNamedCacheSync(rsc.Kind, ctx.Done(), rsc.podListerSynced, rsc.rsListerSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, rsc.podListerSynced, rsc.rsListerSynced) {
 		return
 	}
 

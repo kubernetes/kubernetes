@@ -2126,6 +2126,12 @@
     ConfigMap must be deleted by Collection.
   release: v1.19
   file: test/e2e/common/node/configmap.go
+- testname: ConfigMap Update
+  codename: '[sig-node] ConfigMap should update ConfigMap successfully [NodeConformance]
+    [Conformance]'
+  description: Ensure that a ConfigMap object can be created and then updated successfully.
+  release: v1.32
+  file: test/e2e/common/node/configmap.go
 - testname: Pod Lifecycle, post start exec hook
   codename: '[sig-node] Container Lifecycle Hook when create a pod with lifecycle
     hook should execute poststart exec hook properly [NodeConformance] [Conformance]'

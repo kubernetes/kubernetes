@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/api/operation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -29,11 +30,9 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/apis/certificates/validation"
-	"k8s.io/kubernetes/pkg/features"
 	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
@@ -116,24 +115,7 @@ func (csrStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 func (csrStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	csr := obj.(*certificates.CertificateSigningRequest)
 	allErrs := validation.ValidateCertificateSigningRequestCreate(csr)
-
-	// If DeclarativeValidation feature gate is enabled, also run declarative validation
-	if utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidation) {
-		// Determine if takeover is enabled
-		takeover := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationTakeover)
-
-		// Run declarative validation with panic recovery
-		declarativeErrs := rest.ValidateDeclaratively(ctx, legacyscheme.Scheme, csr, rest.WithTakeover(takeover))
-
-		// Compare imperative and declarative errors and log + emit metric if there's a mismatch
-		rest.CompareDeclarativeErrorsAndEmitMismatches(ctx, allErrs, declarativeErrs, takeover)
-
-		// Only apply declarative errors if takeover is enabled
-		if takeover {
-			allErrs = append(allErrs.RemoveCoveredByDeclarative(), declarativeErrs...)
-		}
-	}
-	return allErrs
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, csr, nil, allErrs, operation.Create)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -147,24 +129,7 @@ func (csrStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) 
 	oldCSR := old.(*certificates.CertificateSigningRequest)
 	newCSR := obj.(*certificates.CertificateSigningRequest)
 	errs := validation.ValidateCertificateSigningRequestUpdate(newCSR, oldCSR)
-	// If DeclarativeValidation feature gate is enabled, also run declarative validation
-	if utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidation) {
-		// Determine if takeover is enabled
-		takeover := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationTakeover)
-
-		// Run declarative update validation with panic recovery
-		declarativeErrs := rest.ValidateUpdateDeclaratively(ctx, legacyscheme.Scheme, newCSR, oldCSR, rest.WithTakeover(takeover))
-
-		// Compare imperative and declarative errors and emit metric if there's a mismatch
-		rest.CompareDeclarativeErrorsAndEmitMismatches(ctx, errs, declarativeErrs, takeover)
-
-		// Only apply declarative errors if takeover is enabled
-		if takeover {
-			errs = append(errs.RemoveCoveredByDeclarative(), declarativeErrs...)
-		}
-	}
-
-	return errs
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newCSR, oldCSR, errs, operation.Update)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -280,22 +245,7 @@ func (csrStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Ob
 	newCSR := obj.(*certificates.CertificateSigningRequest)
 	oldCSR := old.(*certificates.CertificateSigningRequest)
 	errs := validation.ValidateCertificateSigningRequestStatusUpdate(newCSR, oldCSR)
-	if utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidation) {
-		// Determine if takeover is enabled
-		takeover := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationTakeover)
-
-		// Run declarative update validation with panic recovery
-		declarativeErrs := rest.ValidateUpdateDeclaratively(ctx, legacyscheme.Scheme, newCSR, oldCSR, rest.WithTakeover(takeover))
-
-		// Compare imperative and declarative errors and emit metric if there's a mismatch
-		rest.CompareDeclarativeErrorsAndEmitMismatches(ctx, errs, declarativeErrs, takeover)
-
-		// Only apply declarative errors if takeover is enabled
-		if takeover {
-			errs = append(errs.RemoveCoveredByDeclarative(), declarativeErrs...)
-		}
-	}
-	return errs
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newCSR, oldCSR, errs, operation.Update)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -350,22 +300,7 @@ func (csrApprovalStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.
 	newCSR := obj.(*certificates.CertificateSigningRequest)
 	oldCSR := old.(*certificates.CertificateSigningRequest)
 	errs := validation.ValidateCertificateSigningRequestApprovalUpdate(newCSR, oldCSR)
-	if utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidation) {
-		// Determine if takeover is enabled
-		takeover := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationTakeover)
-
-		// Run declarative update validation with panic recovery
-		declarativeErrs := rest.ValidateUpdateDeclaratively(ctx, legacyscheme.Scheme, newCSR, oldCSR, rest.WithTakeover(takeover))
-
-		// Compare imperative and declarative errors and emit metric if there's a mismatch
-		rest.CompareDeclarativeErrorsAndEmitMismatches(ctx, errs, declarativeErrs, takeover)
-
-		// Only apply declarative errors if takeover is enabled
-		if takeover {
-			errs = append(errs.RemoveCoveredByDeclarative(), declarativeErrs...)
-		}
-	}
-	return errs
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newCSR, oldCSR, errs, operation.Update)
 }
 
 // WarningsOnUpdate returns warnings for the given update.

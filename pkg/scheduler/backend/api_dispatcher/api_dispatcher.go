@@ -32,17 +32,15 @@ import (
 type APIDispatcher struct {
 	cancel func()
 
-	client            clientset.Interface
-	callQueue         *callQueue
-	goroutinesLimiter *goroutinesLimiter
+	client    clientset.Interface
+	callQueue *callQueue
 }
 
 // New returns a new APIDispatcher object.
 func New(client clientset.Interface, parallelization int, apiCallRelevances fwk.APICallRelevances) *APIDispatcher {
 	d := APIDispatcher{
-		client:            client,
-		callQueue:         newCallQueue(apiCallRelevances),
-		goroutinesLimiter: newGoroutinesLimiter(parallelization),
+		client:    client,
+		callQueue: newCallQueue(apiCallRelevances),
 	}
 
 	return &d
@@ -80,28 +78,17 @@ func (ad *APIDispatcher) Run(logger klog.Logger) {
 			default:
 			}
 
-			// Acquire a goroutine before popping a call. This ordering prevents a popped
-			// call from waiting (being in in-flight) for a long time.
-			acquired := ad.goroutinesLimiter.acquire()
-			if !acquired {
-				// goroutinesLimiter is closed.
-				return
-			}
 			apiCall, err := ad.callQueue.pop()
 			if err != nil {
 				utilruntime.HandleErrorWithLogger(logger, err, "popping API call from call controller failed")
-				ad.goroutinesLimiter.release()
 				continue
 			}
 			if apiCall == nil {
 				// callController is closed.
-				ad.goroutinesLimiter.release()
 				return
 			}
 
 			go func() {
-				defer ad.goroutinesLimiter.release()
-
 				startTime := time.Now()
 
 				err := apiCall.Execute(ctx, ad.client)
@@ -124,7 +111,6 @@ func (ad *APIDispatcher) Run(logger klog.Logger) {
 // Close shuts down the APIDispatcher.
 func (ad *APIDispatcher) Close() {
 	ad.callQueue.close()
-	ad.goroutinesLimiter.close()
 	if ad.cancel != nil {
 		ad.cancel()
 	}

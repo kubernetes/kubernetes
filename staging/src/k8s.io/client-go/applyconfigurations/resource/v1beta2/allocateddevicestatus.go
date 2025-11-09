@@ -37,7 +37,7 @@ type AllocatedDeviceStatusApplyConfiguration struct {
 	// needed on a node.
 	//
 	// Must be a DNS subdomain and should end with a DNS domain owned by the
-	// vendor of the driver.
+	// vendor of the driver. It should use only lower case characters.
 	Driver *string `json:"driver,omitempty"`
 	// This name together with the driver name and the device name field
 	// identify which device was allocated (`<driver name>/<pool name>/<device name>`).

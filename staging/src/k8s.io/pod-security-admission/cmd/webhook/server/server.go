@@ -281,7 +281,7 @@ func Setup(c *Config) (*Server, error) {
 	namespaceInformer := s.informerFactory.Core().V1().Namespaces()
 	namespaceLister := namespaceInformer.Lister()
 
-	evaluator, err := policy.NewEvaluator(policy.DefaultChecks())
+	evaluator, err := policy.NewEvaluator(policy.DefaultChecks(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("could not create PodSecurityRegistry: %w", err)
 	}

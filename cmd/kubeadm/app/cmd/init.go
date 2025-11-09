@@ -19,9 +19,11 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
@@ -351,11 +353,11 @@ func newInitData(cmd *cobra.Command, args []string, initOptions *initOptions, ou
 		return nil, err
 	}
 
-	// if dry running creates a temporary folder for saving kubeadm generated files
+	// If dry running creates a temporary directory for saving kubeadm generated files.
 	dryRunDir := ""
 	if initOptions.dryRun || cfg.DryRun {
 		if dryRunDir, err = kubeadmconstants.GetDryRunDir(kubeadmconstants.EnvVarInitDryRunDir, "kubeadm-init-dryrun", klog.Warningf); err != nil {
-			return nil, errors.Wrap(err, "couldn't create a temporary directory")
+			return nil, errors.Wrap(err, "could not create a temporary directory on dryrun")
 		}
 	}
 
@@ -475,7 +477,7 @@ func (d *initData) KubeConfig() (*clientcmdapi.Config, error) {
 	return d.kubeconfig, nil
 }
 
-// KubeConfigDir returns the path of the Kubernetes configuration folder or the temporary folder path in case of DryRun.
+// KubeConfigDir returns the Kubernetes configuration directory or the temporary directory if DryRun is true.
 func (d *initData) KubeConfigDir() string {
 	if d.dryRun {
 		return d.dryRunDir
@@ -491,7 +493,7 @@ func (d *initData) KubeConfigPath() string {
 	return d.kubeconfigPath
 }
 
-// ManifestDir returns the path where manifest should be stored or the temporary folder path in case of DryRun.
+// ManifestDir returns the path where manifest should be stored or the temporary directory if DryRun is true.
 func (d *initData) ManifestDir() string {
 	if d.dryRun {
 		return d.dryRunDir
@@ -499,7 +501,7 @@ func (d *initData) ManifestDir() string {
 	return kubeadmconstants.GetStaticPodDirectory()
 }
 
-// KubeletDir returns path of the kubelet configuration folder or the temporary folder in case of DryRun.
+// KubeletDir returns the kubelet configuration directory or the temporary directory if DryRun is true.
 func (d *initData) KubeletDir() string {
 	if d.dryRun {
 		return d.dryRunDir
@@ -569,24 +571,26 @@ func (d *initData) Client() (clientset.Interface, error) {
 	return d.client, nil
 }
 
-// ClientWithoutBootstrap returns a dry-run client or a regular client from admin.conf.
-// Unlike Client(), it does not call EnsureAdminClusterRoleBinding() or sets d.client.
-// This means the client only has anonymous permissions and does not persist in initData.
-func (d *initData) ClientWithoutBootstrap() (clientset.Interface, error) {
-	var (
-		client clientset.Interface
-		err    error
-	)
-	if d.dryRun {
-		client, err = getDryRunClient(d)
-		if err != nil {
-			return nil, err
-		}
-	} else { // Use a real client
-		client, err = kubeconfigutil.ClientSetFromFile(d.KubeConfigPath())
-		if err != nil {
-			return nil, err
-		}
+// WaitControlPlaneClient returns a basic client used for the purpose of waiting
+// for control plane components to report 'ok' on their respective health check endpoints.
+// It uses the admin.conf as the base, but modifies it to point at the local API server instead
+// of the control plane endpoint.
+func (d *initData) WaitControlPlaneClient() (clientset.Interface, error) {
+	config, err := clientcmd.LoadFromFile(d.KubeConfigPath())
+	if err != nil {
+		return nil, err
+	}
+	for _, v := range config.Clusters {
+		v.Server = fmt.Sprintf("https://%s",
+			net.JoinHostPort(
+				d.Cfg().LocalAPIEndpoint.AdvertiseAddress,
+				strconv.Itoa(int(d.Cfg().LocalAPIEndpoint.BindPort)),
+			),
+		)
+	}
+	client, err := kubeconfigutil.ToClientSet(config)
+	if err != nil {
+		return nil, err
 	}
 	return client, nil
 }

@@ -21,7 +21,7 @@
 
 usage () {
   cat <<EOF >&2
-Usage: $0 [-r <revision>|-a] [-s] [-c none|<config>] [-- <golangci-lint run flags>] [packages]"
+Usage: $0 [-r <revision>|-a] [-c none|<config>] [-- <golangci-lint run flags>] [packages]"
    -r <revision>: only report issues in code added since that revision
    -a: automatically select the common base of origin/master and HEAD
        as revision
@@ -54,7 +54,7 @@ golangci_config="${KUBE_ROOT}/hack/golangci.yaml"
 base=
 hints=
 githubactions=
-while getopts "ar:sng:c:" o; do
+while getopts "ar:ng:c:" o; do
   case "${o}" in
     a)
       base="$(git merge-base origin/master HEAD)"

@@ -26,9 +26,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -84,6 +86,7 @@ var _ = SIGDescribe("PodTemplates", func() {
 		podTemplateRead, err := f.ClientSet.CoreV1().PodTemplates(testNamespaceName).Get(ctx, podTemplateName, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to get created PodTemplate")
 		gomega.Expect(podTemplateRead.ObjectMeta.Name).To(gomega.Equal(podTemplateName))
+		gomega.Expect(podTemplateRead).To(apimachineryutils.HaveValidResourceVersion())
 
 		// patch template
 		podTemplatePatch, err := json.Marshal(map[string]interface{}{
@@ -94,8 +97,9 @@ var _ = SIGDescribe("PodTemplates", func() {
 			},
 		})
 		framework.ExpectNoError(err, "failed to marshal patch data")
-		_, err = f.ClientSet.CoreV1().PodTemplates(testNamespaceName).Patch(ctx, podTemplateName, types.StrategicMergePatchType, []byte(podTemplatePatch), metav1.PatchOptions{})
+		patchedPodTemplate, err := f.ClientSet.CoreV1().PodTemplates(testNamespaceName).Patch(ctx, podTemplateName, types.StrategicMergePatchType, []byte(podTemplatePatch), metav1.PatchOptions{})
 		framework.ExpectNoError(err, "failed to patch PodTemplate")
+		gomega.Expect(resourceversion.CompareResourceVersion(podTemplateRead.ResourceVersion, patchedPodTemplate.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 
 		// get template (ensure label is there)
 		podTemplateRead, err = f.ClientSet.CoreV1().PodTemplates(testNamespaceName).Get(ctx, podTemplateName, metav1.GetOptions{})

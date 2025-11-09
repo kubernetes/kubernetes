@@ -81,7 +81,7 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 	logger.Info("Starting PV protection controller")
 	defer logger.Info("Shutting down PV protection controller")
 
-	if !cache.WaitForNamedCacheSync("PV protection", ctx.Done(), c.pvListerSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, c.pvListerSynced) {
 		return
 	}
 

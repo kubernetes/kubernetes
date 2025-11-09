@@ -1123,16 +1123,6 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.22"
-- name: PodIndexLabel
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: "1.28"
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: "1.32"
 - name: PodLevelResources
   versionedSpecs:
   - default: false
@@ -1242,12 +1232,6 @@
   - default: true
     lockToDefault: false
     preRelease: Beta
-    version: "1.34"
-- name: ProbeHostPodSecurityStandards
-  versionedSpecs:
-  - default: true
-    lockToDefault: true
-    preRelease: GA
     version: "1.34"
 - name: ProcMountType
   versionedSpecs:

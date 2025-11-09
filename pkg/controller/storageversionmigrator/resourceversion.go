@@ -128,7 +128,7 @@ func (rv *ResourceVersionController) Run(ctx context.Context) {
 	logger.Info("Starting", "controller", ResourceVersionControllerName)
 	defer logger.Info("Shutting down", "controller", ResourceVersionControllerName)
 
-	if !cache.WaitForNamedCacheSync(ResourceVersionControllerName, ctx.Done(), rv.svmSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, rv.svmSynced) {
 		return
 	}
 

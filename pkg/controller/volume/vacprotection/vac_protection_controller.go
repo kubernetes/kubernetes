@@ -206,7 +206,7 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 	logger.Info("Starting VAC protection controller")
 	defer logger.Info("Shutting down VAC protection controller")
 
-	if !cache.WaitForNamedCacheSync("VAC protection", ctx.Done(), c.pvSynced, c.pvcSynced, c.vacSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, c.pvSynced, c.pvcSynced, c.vacSynced) {
 		return
 	}
 

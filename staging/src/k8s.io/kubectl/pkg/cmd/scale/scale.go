@@ -230,7 +230,7 @@ func (o *ScaleOptions) RunScale() error {
 
 	if len(infos) == 0 {
 		if infoErr != nil {
-			return fmt.Errorf("no objects passed to scale %w", infoErr)
+			return infoErr
 		}
 		return fmt.Errorf("no objects passed to scale")
 	}

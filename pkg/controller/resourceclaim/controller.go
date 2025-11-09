@@ -223,7 +223,15 @@ func (ec *Controller) enqueuePod(logger klog.Logger, obj interface{}, deleted bo
 		return
 	}
 
-	if len(pod.Spec.ResourceClaims) == 0 {
+	// Check if pod has any resource claims to process.
+	// Extended resource claims are stored in pod.Status.ExtendedResourceClaimStatus,
+	// not in pod.Spec.ResourceClaims, so we need to check both locations.
+	hasResourceClaims := len(pod.Spec.ResourceClaims) > 0
+	// For cleanup of extended resource claims, we must consider claims present
+	// in pod status regardless of the current feature gate state. The claim may
+	// have been created when the feature was enabled and still needs cleanup.
+	hasExtendedResourceClaims := pod.Status.ExtendedResourceClaimStatus != nil
+	if !hasResourceClaims && !hasExtendedResourceClaims {
 		// Nothing to do for it at all.
 		return
 	}
@@ -256,6 +264,18 @@ func (ec *Controller) enqueuePod(logger klog.Logger, obj interface{}, deleted bo
 				// Nothing to do, claim wasn't generated.
 				logger.V(6).Info("Nothing to do for skipped claim during pod change", "pod", klog.KObj(pod), "podClaim", podClaim.Name, "reason", reason)
 			}
+		}
+
+		// Process extended resource claims for completed/deleted pods.
+		// Extended resource claims are created by the scheduler and stored in
+		// pod.Status.ExtendedResourceClaimStatus, not in pod.Spec.ResourceClaims.
+		// Without this, extended resource claims would never be cleaned up when
+		// pods complete, causing device resources to remain allocated indefinitely.
+		if hasExtendedResourceClaims {
+			claimName := pod.Status.ExtendedResourceClaimStatus.ResourceClaimName
+			key := claimKeyPrefix + pod.Namespace + "/" + claimName
+			logger.V(6).Info("Process extended resource claim", "pod", klog.KObj(pod), "claim", klog.KRef(pod.Namespace, claimName), "key", key, "reason", reason)
+			ec.queue.Add(key)
 		}
 	}
 
@@ -403,7 +423,7 @@ func (ec *Controller) Run(ctx context.Context, workers int) {
 	ec.recorder = eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "resource_claim"})
 	defer eventBroadcaster.Shutdown()
 
-	if !cache.WaitForNamedCacheSync("resource_claim", ctx.Done(), ec.podSynced, ec.claimsSynced, ec.templatesSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, ec.podSynced, ec.claimsSynced, ec.templatesSynced) {
 		return
 	}
 

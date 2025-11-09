@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
@@ -40,6 +41,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
 	jobutil "k8s.io/kubernetes/pkg/controller/job/util"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ejob "k8s.io/kubernetes/test/e2e/framework/job"
 	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
@@ -380,6 +382,7 @@ var _ = SIGDescribe("CronJob", func() {
 		ginkgo.By("creating")
 		createdCronJob, err := cjClient.Create(ctx, cjTemplate, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
+		gomega.Expect(createdCronJob).To(apimachineryutils.HaveValidResourceVersion())
 
 		ginkgo.By("getting")
 		gottenCronJob, err := cjClient.Get(ctx, createdCronJob.Name, metav1.GetOptions{})
@@ -413,6 +416,7 @@ var _ = SIGDescribe("CronJob", func() {
 			[]byte(`{"metadata":{"annotations":{"patched":"true"}}}`), metav1.PatchOptions{})
 		framework.ExpectNoError(err)
 		gomega.Expect(patchedCronJob.Annotations).To(gomega.HaveKeyWithValue("patched", "true"), "patched object should have the applied annotation")
+		gomega.Expect(resourceversion.CompareResourceVersion(createdCronJob.ResourceVersion, patchedCronJob.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 
 		ginkgo.By("updating")
 		var cjToUpdate, updatedCronJob *batchv1.CronJob

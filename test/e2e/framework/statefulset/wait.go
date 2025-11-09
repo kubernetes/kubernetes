@@ -19,6 +19,7 @@ package statefulset
 import (
 	"context"
 	"fmt"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -63,9 +64,9 @@ func WaitForRunning(ctx context.Context, c clientset.Interface, numPodsRunning, 
 	}
 }
 
-// WaitForState periodically polls for the ss and its pods until the until function returns either true or an error
-func WaitForState(ctx context.Context, c clientset.Interface, ss *appsv1.StatefulSet, until func(*appsv1.StatefulSet, *v1.PodList) (bool, error)) {
-	pollErr := wait.PollUntilContextTimeout(ctx, StatefulSetPoll, StatefulSetTimeout, true,
+// WaitForState periodically polls for the ss and its pods until the until function returns either true or an error.
+func WaitForState(ctx context.Context, c clientset.Interface, ss *appsv1.StatefulSet, pollInterval time.Duration, until func(*appsv1.StatefulSet, *v1.PodList) (bool, error)) {
+	pollErr := wait.PollUntilContextTimeout(ctx, pollInterval, StatefulSetTimeout, true,
 		func(ctx context.Context) (bool, error) {
 			ssGet, err := c.AppsV1().StatefulSets(ss.Namespace).Get(ctx, ss.Name, metav1.GetOptions{})
 			if err != nil {
@@ -91,7 +92,7 @@ func WaitForRunningAndReady(ctx context.Context, c clientset.Interface, numState
 // WaitForPodReady waits for the Pod named podName in set to exist and have a Ready condition.
 func WaitForPodReady(ctx context.Context, c clientset.Interface, set *appsv1.StatefulSet, podName string) (*appsv1.StatefulSet, *v1.PodList) {
 	var pods *v1.PodList
-	WaitForState(ctx, c, set, func(set2 *appsv1.StatefulSet, pods2 *v1.PodList) (bool, error) {
+	WaitForState(ctx, c, set, StatefulSetPoll, func(set2 *appsv1.StatefulSet, pods2 *v1.PodList) (bool, error) {
 		set = set2
 		pods = pods2
 		for i := range pods.Items {

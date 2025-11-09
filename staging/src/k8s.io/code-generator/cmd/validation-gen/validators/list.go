@@ -27,9 +27,10 @@ import (
 )
 
 const (
-	listTypeTagName   = "k8s:listType"
-	ListMapKeyTagName = "k8s:listMapKey"
-	uniqueTagName     = "k8s:unique"
+	listTypeTagName     = "k8s:listType"
+	ListMapKeyTagName   = "k8s:listMapKey"
+	uniqueTagName       = "k8s:unique"
+	customUniqueTagName = "k8s:customUnique"
 )
 
 // globalListMeta is shared between list-related validators.
@@ -40,6 +41,7 @@ func init() {
 	RegisterTagValidator(listTypeTagValidator{byPath: globalListMeta})
 	RegisterTagValidator(listMapKeyTagValidator{byPath: globalListMeta})
 	RegisterTagValidator(uniqueTagValidator{byPath: globalListMeta})
+	RegisterTagValidator(customUniqueTagValidator{byPath: globalListMeta})
 
 	// Finish work on the accumulated list metadata.
 	RegisterFieldValidator(listValidator{byPath: globalListMeta})
@@ -70,6 +72,10 @@ type listMetadata struct {
 	semantic  listSemantic
 	keyFields []string // For semantic == map.
 	keyNames  []string // For semantic == map.
+
+	// customUnique indicates that k8s:customUnique is set on this list.
+	// It disables generation of uniqueness validation for this list.
+	customUnique bool
 }
 
 // makeListMapMatchFunc generates a function that compares two list-map
@@ -137,16 +143,18 @@ func (lttv listTypeTagValidator) GetValidations(context Context, tag codetags.Ta
 		}
 	case "set":
 		lm.ownership = ownershipShared
-		// If uniqueTagValidator has run, lm.semantic will be non-empty and non-atomic.
+		// If uniqueTagValidator has run for `unique=set` or `unique=map`,
+		// lm.semantic will be non-empty and non-atomic.
 		if lm.semantic != "" && lm.semantic != semanticAtomic {
-			return Validations{}, fmt.Errorf("unique tag can only be used with listType=atomic")
+			return Validations{}, fmt.Errorf("unique tag is redundant for listType=%q", tag.Value)
 		}
 		lm.semantic = semanticSet
 	case "map":
 		lm.ownership = ownershipShared
-		// If uniqueTagValidator has run, lm.semantic will be non-empty and non-atomic.
+		// If uniqueTagValidator has run for `unique=set` or `unique=map`,
+		// lm.semantic will be non-empty and non-atomic.
 		if lm.semantic != "" && lm.semantic != semanticAtomic {
-			return Validations{}, fmt.Errorf("unique tag can only be used with listType=atomic")
+			return Validations{}, fmt.Errorf("unique tag is redundant for listType=%q", tag.Value)
 		}
 		if util.NativeType(t.Elem).Kind != types.Struct {
 			return Validations{}, fmt.Errorf("only lists of structs can be list-maps")
@@ -267,7 +275,7 @@ func (utv uniqueTagValidator) GetValidations(context Context, tag codetags.Tag) 
 
 	// If listType has already run and set a non-atomic ownership, this is an error.
 	if lm.ownership != "" && lm.ownership != ownershipSingle {
-		return Validations{}, fmt.Errorf("unique tag can only be used with listType=atomic")
+		return Validations{}, fmt.Errorf("unique tag may not be used with listType=set or listType=map")
 	}
 
 	if lm.semantic != "" && lm.semantic != semanticAtomic {
@@ -302,6 +310,50 @@ func (utv uniqueTagValidator) Docs() TagDoc {
 		}},
 		PayloadsType:     codetags.ValueTypeString,
 		PayloadsRequired: true,
+	}
+	return doc
+}
+
+type customUniqueTagValidator struct {
+	byPath map[string]*listMetadata
+}
+
+func (customUniqueTagValidator) Init(Config) {}
+
+func (customUniqueTagValidator) TagName() string {
+	return customUniqueTagName
+}
+
+func (customUniqueTagValidator) ValidScopes() sets.Set[Scope] {
+	return listTagsValidScopes
+}
+
+func (cutv customUniqueTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
+	// NOTE: pointers to lists are not supported, so we should never see a pointer here.
+	t := util.NativeType(context.Type)
+	if t.Kind != types.Slice && t.Kind != types.Array {
+		return Validations{}, fmt.Errorf("can only be used on list types (%s)", t.Kind)
+	}
+
+	lm := cutv.byPath[context.Path.String()]
+	if lm == nil {
+		lm = &listMetadata{}
+		cutv.byPath[context.Path.String()] = lm
+	}
+
+	lm.customUnique = true
+
+	// This tag doesn't generate any validations.  It just accumulates
+	// information for other tags to use.
+	return Validations{}, nil
+}
+
+func (cutv customUniqueTagValidator) Docs() TagDoc {
+	doc := TagDoc{
+		Tag:         cutv.TagName(),
+		Scopes:      cutv.ValidScopes().UnsortedList(),
+		Description: "Indicates that uniqueness validation for this list is implemented via custom, handwritten validation. This disables generation of uniqueness validation for this list.",
+		Payloads:    nil,
 	}
 	return doc
 }
@@ -360,8 +412,13 @@ func (lv listValidator) GetValidations(context Context) (Validations, error) {
 	if err := lv.check(lm); err != nil {
 		return Validations{}, err
 	}
-
 	result := Validations{}
+	if lm.customUnique {
+		// Uniqueness validation is disabled in generated validation for this list.
+		// It would defer to handwritten validation to check the uniqueness.
+		result.AddComment("Uniqueness validation is implemented via custom, handwritten validation")
+		return result, nil
+	}
 
 	// Generate uniqueness checks for lists with higher-order semantics.
 	if lm.semantic == semanticSet {
@@ -379,11 +436,7 @@ func (lv listValidator) GetValidations(context Context) (Validations, error) {
 			WithComment(comment)
 		result.AddFunction(f)
 	}
-	// TODO: Replace with the following once we have a way to either opt-out from
-	// uniqueness validation of list-maps or settle the decision on how to handle
-	// the ratcheting cases of it.
-	// if lm.semantic == semanticMap {
-	if lm.semantic == semanticMap && lm.ownership == ownershipSingle {
+	if lm.semantic == semanticMap {
 		// TODO: There are some fields which are declared as maps which do not
 		// enforce uniqueness in manual validation. Those either need to not be
 		// maps or we need to allow types to opt-out from this validation.  SSA

@@ -1075,7 +1075,8 @@ var (
 		[]string{"driver_name", "method_name", "grpc_status_code"},
 	)
 
-	DRAResourceClaimsInUseDesc = metrics.NewDesc(DRASubsystem+"_resource_claims_in_use",
+	DRAResourceClaimsInUseDesc = metrics.NewDesc(
+		metrics.BuildFQName("", DRASubsystem, "resource_claims_in_use"),
 		"The number of ResourceClaims that are currently in use on the node, by driver name (driver_name label value) and across all drivers (special value <any> for driver_name). Note that the sum of all by-driver counts is not the total number of in-use ResourceClaims because the same ResourceClaim might use devices from different drivers. Instead, use the count for the <any> driver_name.",
 		[]string{"driver_name"},
 		nil,

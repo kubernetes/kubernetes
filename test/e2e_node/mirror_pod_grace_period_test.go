@@ -36,6 +36,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
+	"k8s.io/utils/ptr"
 )
 
 var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
@@ -344,6 +345,7 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 
 func createStaticPodWithGracePeriod(dir, name, namespace string) error {
 	podSpec := v1.PodSpec{
+		TerminationGracePeriodSeconds: ptr.To(int64(20)),
 		Containers: []v1.Container{{
 			Name:    "m-test",
 			Image:   imageutils.GetE2EImage(imageutils.BusyBox),

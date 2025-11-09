@@ -721,7 +721,7 @@ func TestOrphanedPodsWithPVCDeletePolicy(t *testing.T) {
 		}
 
 		for i := range pods {
-			if _, err := om.setPodReady(set, i); err != nil {
+			if _, err := om.setPodReadyCondition(set, i, true); err != nil {
 				t.Errorf("%d: %v", i, err)
 			}
 			if _, err := om.setPodRunning(set, i); err != nil {
@@ -980,7 +980,7 @@ func scaleUpStatefulSetControllerBounded(logger klog.Logger, set *apps.StatefulS
 		fakeWorker(ssc)
 		pod = getPodAtOrdinal(pods, ord)
 		prev = *pod
-		if pods, err = om.setPodReady(set, ord); err != nil {
+		if pods, err = om.setPodReadyCondition(set, ord, true); err != nil {
 			return err
 		}
 		pod = getPodAtOrdinal(pods, ord)

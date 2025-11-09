@@ -45,3 +45,5 @@ func (t *testData) SessionIsInteractive() bool              { return false }
 func (t *testData) AllowExperimentalUpgrades() bool         { return false }
 func (t *testData) AllowRCUpgrades() bool                   { return false }
 func (t *testData) ForceUpgrade() bool                      { return false }
+func (t *testData) KubeConfigDir() string                   { return "" }
+func (t *testData) KubeletDir() string                      { return "" }

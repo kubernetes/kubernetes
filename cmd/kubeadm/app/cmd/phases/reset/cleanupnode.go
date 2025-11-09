@@ -29,11 +29,9 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/initsystem"
 	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/users"
 )
 
 // NewCleanupNodePhase creates a kubeadm workflow phase that cleanup the node
@@ -118,17 +116,6 @@ func runCleanupNode(c workflow.RunData) error {
 		dirsToClean = append(dirsToClean, tempDir)
 	}
 	resetConfigDir(kubeadmconstants.KubernetesDir, dirsToClean, r.DryRun())
-
-	if r.Cfg() != nil && features.Enabled(r.Cfg().FeatureGates, features.RootlessControlPlane) {
-		if !r.DryRun() {
-			klog.V(1).Infoln("[reset] Removing users and groups created for rootless control-plane")
-			if err := users.RemoveUsersAndGroups(); err != nil {
-				klog.Warningf("[reset] Failed to remove users and groups: %v\n", err)
-			}
-		} else {
-			fmt.Println("[dryrun] Would remove users and groups created for rootless control-plane")
-		}
-	}
 
 	return nil
 }

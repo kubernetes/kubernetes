@@ -20,7 +20,62 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/pod-security-admission/api"
+	"k8s.io/utils/ptr"
 )
+
+func TestHostProbesAndHostLifecycleEmulation(t *testing.T) {
+	testcases := []struct {
+		name            string
+		emulateVersion  *api.Version
+		hostCheckActive bool
+	}{
+		{
+			name:            "no emulation",
+			emulateVersion:  nil,
+			hostCheckActive: true,
+		},
+		{
+			name:            "emulate 1.34",
+			emulateVersion:  ptr.To(api.MajorMinorVersion(1, 34)),
+			hostCheckActive: true,
+		},
+		{
+			name:            "emulate 1.33",
+			emulateVersion:  ptr.To(api.MajorMinorVersion(1, 33)),
+			hostCheckActive: false,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			e, err := NewEvaluator(DefaultChecks(), tc.emulateVersion)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// pod that uses a probe with an explicit host
+			podMetadata := &metav1.ObjectMeta{}
+			podSpec := &corev1.PodSpec{Containers: []corev1.Container{{StartupProbe: &corev1.Probe{ProbeHandler: corev1.ProbeHandler{HTTPGet: &corev1.HTTPGetAction{Host: "localhost"}}}}}}
+
+			// evaluating "version=latest" and "version=1.34" should only allow if the host check is not active
+			expectAllowed := tc.hostCheckActive == false
+			if result := AggregateCheckResults(e.EvaluatePod(api.LevelVersion{Level: api.LevelBaseline, Version: api.LatestVersion()}, podMetadata, podSpec)); result.Allowed != expectAllowed {
+				t.Fatalf("evaluating with 'latest' expected allowed=%v, got %v: %v", expectAllowed, result.Allowed, result.ForbiddenReasons)
+			}
+			if result := AggregateCheckResults(e.EvaluatePod(api.LevelVersion{Level: api.LevelBaseline, Version: api.MajorMinorVersion(1, 34)}, podMetadata, podSpec)); result.Allowed != expectAllowed {
+				t.Fatalf("evaluating with '1.34' expected allowed=%v, got %v: %v", expectAllowed, result.Allowed, result.ForbiddenReasons)
+			}
+
+			// evaluating "version=1.33" should always allow
+			if result := AggregateCheckResults(e.EvaluatePod(api.LevelVersion{Level: api.LevelBaseline, Version: api.MajorMinorVersion(1, 33)}, podMetadata, podSpec)); !result.Allowed {
+				t.Fatalf("evaluating with '1.33' expected allowed=true, got %v: %v", result.Allowed, result.ForbiddenReasons)
+			}
+		})
+	}
+
+}
 
 func TestHostProbesAndHostLifecycle(t *testing.T) {
 	tests := []struct {

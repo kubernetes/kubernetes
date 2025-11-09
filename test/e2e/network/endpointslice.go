@@ -29,11 +29,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/network/common"
@@ -437,6 +439,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		queriedEPS, err := epsClient.Get(ctx, createdEPS.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		gomega.Expect(queriedEPS.UID).To(gomega.Equal(createdEPS.UID))
+		gomega.Expect(queriedEPS).To(apimachineryutils.HaveValidResourceVersion())
 
 		ginkgo.By("listing")
 		epsList, err := epsClient.List(ctx, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
@@ -464,6 +467,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		patchedEPS, err := epsClient.Patch(ctx, createdEPS.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"patched":"true"}}}`), metav1.PatchOptions{})
 		framework.ExpectNoError(err)
 		gomega.Expect(patchedEPS.Annotations).To(gomega.HaveKeyWithValue("patched", "true"), "patched object should have the applied annotation")
+		gomega.Expect(resourceversion.CompareResourceVersion(createdEPS.ResourceVersion, patchedEPS.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 
 		ginkgo.By("updating")
 		var epsToUpdate, updatedEPS *discoveryv1.EndpointSlice

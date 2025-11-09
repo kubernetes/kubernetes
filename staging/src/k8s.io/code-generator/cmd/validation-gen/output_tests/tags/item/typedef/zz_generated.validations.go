@@ -55,6 +55,8 @@ func Validate_ConflictingItemList(ctx context.Context, op operation.Operation, f
 	errs = append(errs, validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *DualItem) bool { return item.ID == "target" }, validate.DirectEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *DualItem) field.ErrorList {
 		return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item ConflictingItems[id=target] from typedef")
 	})...)
+	// lists with map semantics require unique keys
+	errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a DualItem, b DualItem) bool { return a.ID == b.ID })...)
 
 	return errs
 }
@@ -65,6 +67,8 @@ func Validate_DualItemList(ctx context.Context, op operation.Operation, fldPath 
 	errs = append(errs, validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *DualItem) bool { return item.ID == "typedef-target" }, validate.DirectEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *DualItem) field.ErrorList {
 		return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item DualItems[id=typedef-target] from typedef")
 	})...)
+	// lists with map semantics require unique keys
+	errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a DualItem, b DualItem) bool { return a.ID == b.ID })...)
 
 	return errs
 }
@@ -76,6 +80,8 @@ func Validate_ItemList(ctx context.Context, op operation.Operation, fldPath *fie
 	errs = append(errs, validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *Item) bool { return item.Key == "validated" }, validate.DirectEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Item) field.ErrorList {
 		return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item ItemList[key=validated]")
 	})...)
+	// lists with map semantics require unique keys
+	errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a Item, b Item) bool { return a.Key == b.Key })...)
 
 	return errs
 }
@@ -86,6 +92,8 @@ func Validate_ItemListAlias(ctx context.Context, op operation.Operation, fldPath
 	errs = append(errs, validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *Item) bool { return item.Key == "aliased" }, validate.DirectEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Item) field.ErrorList {
 		return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item ItemListAlias[key=aliased]")
 	})...)
+	// lists with map semantics require unique keys
+	errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a Item, b Item) bool { return a.Key == b.Key })...)
 
 	return errs
 }

@@ -18,6 +18,7 @@ package apps
 
 import (
 	"context"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -45,7 +46,7 @@ func waitForPartitionedRollingUpdate(ctx context.Context, c clientset.Interface,
 			set.Namespace,
 			set.Name)
 	}
-	e2estatefulset.WaitForState(ctx, c, set, func(set2 *appsv1.StatefulSet, pods2 *v1.PodList) (bool, error) {
+	e2estatefulset.WaitForState(ctx, c, set, e2estatefulset.StatefulSetPoll, func(set2 *appsv1.StatefulSet, pods2 *v1.PodList) (bool, error) {
 		set = set2
 		pods = pods2
 		partition := int(*set.Spec.UpdateStrategy.RollingUpdate.Partition)
@@ -87,7 +88,7 @@ func waitForPartitionedRollingUpdate(ctx context.Context, c clientset.Interface,
 // waitForStatus waits for the StatefulSetStatus's ObservedGeneration to be greater than or equal to set's Generation.
 // The returned StatefulSet contains such a StatefulSetStatus
 func waitForStatus(ctx context.Context, c clientset.Interface, set *appsv1.StatefulSet) *appsv1.StatefulSet {
-	e2estatefulset.WaitForState(ctx, c, set, func(set2 *appsv1.StatefulSet, pods *v1.PodList) (bool, error) {
+	e2estatefulset.WaitForState(ctx, c, set, e2estatefulset.StatefulSetPoll, func(set2 *appsv1.StatefulSet, pods *v1.PodList) (bool, error) {
 		if set2.Status.ObservedGeneration >= set.Generation {
 			set = set2
 			return true, nil
@@ -99,7 +100,7 @@ func waitForStatus(ctx context.Context, c clientset.Interface, set *appsv1.State
 
 // waitForPodNames waits for the StatefulSet's pods to match expected names.
 func waitForPodNames(ctx context.Context, c clientset.Interface, set *appsv1.StatefulSet, expectedPodNames []string) {
-	e2estatefulset.WaitForState(ctx, c, set,
+	e2estatefulset.WaitForState(ctx, c, set, e2estatefulset.StatefulSetPoll,
 		func(intSet *appsv1.StatefulSet, pods *v1.PodList) (bool, error) {
 			if err := expectPodNames(pods, expectedPodNames); err != nil {
 				framework.Logf("Currently %v", err)
@@ -112,7 +113,7 @@ func waitForPodNames(ctx context.Context, c clientset.Interface, set *appsv1.Sta
 // waitForStatus waits for the StatefulSetStatus's CurrentReplicas to be equal to expectedReplicas
 // The returned StatefulSet contains such a StatefulSetStatus
 func waitForStatusCurrentReplicas(ctx context.Context, c clientset.Interface, set *appsv1.StatefulSet, expectedReplicas int32) *appsv1.StatefulSet {
-	e2estatefulset.WaitForState(ctx, c, set, func(set2 *appsv1.StatefulSet, pods *v1.PodList) (bool, error) {
+	e2estatefulset.WaitForState(ctx, c, set, e2estatefulset.StatefulSetPoll, func(set2 *appsv1.StatefulSet, pods *v1.PodList) (bool, error) {
 		if set2.Status.ObservedGeneration >= set.Generation && set2.Status.CurrentReplicas == expectedReplicas {
 			set = set2
 			return true, nil
@@ -125,7 +126,7 @@ func waitForStatusCurrentReplicas(ctx context.Context, c clientset.Interface, se
 // waitForPodNotReady waits for the Pod named podName in set to exist and to not have a Ready condition.
 func waitForPodNotReady(ctx context.Context, c clientset.Interface, set *appsv1.StatefulSet, podName string) (*appsv1.StatefulSet, *v1.PodList) {
 	var pods *v1.PodList
-	e2estatefulset.WaitForState(ctx, c, set, func(set2 *appsv1.StatefulSet, pods2 *v1.PodList) (bool, error) {
+	e2estatefulset.WaitForState(ctx, c, set, e2estatefulset.StatefulSetPoll, func(set2 *appsv1.StatefulSet, pods2 *v1.PodList) (bool, error) {
 		set = set2
 		pods = pods2
 		for i := range pods.Items {
@@ -148,7 +149,7 @@ func waitForRollingUpdate(ctx context.Context, c clientset.Interface, set *appsv
 			set.Name,
 			set.Spec.UpdateStrategy.Type)
 	}
-	e2estatefulset.WaitForState(ctx, c, set, func(set2 *appsv1.StatefulSet, pods2 *v1.PodList) (bool, error) {
+	e2estatefulset.WaitForState(ctx, c, set, e2estatefulset.StatefulSetPoll, func(set2 *appsv1.StatefulSet, pods2 *v1.PodList) (bool, error) {
 		set = set2
 		pods = pods2
 		if len(pods.Items) < int(*set.Spec.Replicas) {
@@ -160,6 +161,62 @@ func waitForRollingUpdate(ctx context.Context, c clientset.Interface, set *appsv
 				set.Name,
 			)
 			e2estatefulset.SortStatefulPods(pods)
+			for i := range pods.Items {
+				if pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel] != set.Status.UpdateRevision {
+					framework.Logf("Waiting for Pod %s/%s to have revision %s update revision %s",
+						pods.Items[i].Namespace,
+						pods.Items[i].Name,
+						set.Status.UpdateRevision,
+						pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel])
+				}
+			}
+			return false, nil
+		}
+		return true, nil
+	})
+	return set, pods
+}
+
+// waitForMaxUnavailableRollingUpdate waits for all Pods in set to exist and have the correct revision and for the
+// RollingUpdate to complete while enforcing maxUnavailable constraints. set must have a RollingUpdateStatefulSetStrategyType
+// with MaxUnavailable configured.
+func waitForMaxUnavailableRollingUpdate(ctx context.Context, c clientset.Interface, set *appsv1.StatefulSet, maxUnavailable int) (*appsv1.StatefulSet, *v1.PodList) {
+	var pods *v1.PodList
+	if set.Spec.UpdateStrategy.Type != appsv1.RollingUpdateStatefulSetStrategyType {
+		framework.Failf("StatefulSet %s/%s attempt to wait for maxUnavailable rolling update with updateStrategy %s",
+			set.Namespace,
+			set.Name,
+			set.Spec.UpdateStrategy.Type)
+	}
+	e2estatefulset.WaitForState(ctx, c, set, 1*time.Second, func(set2 *appsv1.StatefulSet, pods2 *v1.PodList) (bool, error) {
+		set = set2
+		pods = pods2
+		if len(pods.Items) < int(*set.Spec.Replicas) {
+			return false, nil
+		}
+
+		// Count unavailable pods
+		unavailablePods := 0
+		e2estatefulset.SortStatefulPods(pods)
+		for i := range pods.Items {
+			if !podutil.IsPodReady(&pods.Items[i]) {
+				unavailablePods++
+			}
+		}
+
+		// Validate maxUnavailable constraint is never violated
+		if unavailablePods > maxUnavailable {
+			framework.Failf("StatefulSet %s/%s rolling update violated maxUnavailable constraint: %d unavailable pods > %d maxUnavailable",
+				set.Namespace, set.Name, unavailablePods, maxUnavailable)
+		}
+
+		if set.Status.UpdateRevision != set.Status.CurrentRevision {
+			framework.Logf("Waiting for StatefulSet %s/%s to complete update, %d unavailable (max %d)",
+				set.Namespace,
+				set.Name,
+				unavailablePods,
+				maxUnavailable,
+			)
 			for i := range pods.Items {
 				if pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel] != set.Status.UpdateRevision {
 					framework.Logf("Waiting for Pod %s/%s to have revision %s update revision %s",

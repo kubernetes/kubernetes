@@ -35,6 +35,11 @@ func MaxLenError(length int) string {
 	return fmt.Sprintf("must be no more than %d bytes", length)
 }
 
+// EmptyError returns a string explanation of an "empty string" validation.
+func EmptyError() string {
+	return "must be non-empty"
+}
+
 // RegexError returns a string explanation of a regex validation failure.
 func RegexError(msg string, re string, examples ...string) string {
 	if len(examples) == 0 {

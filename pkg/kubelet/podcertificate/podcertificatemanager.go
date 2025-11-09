@@ -317,14 +317,7 @@ func (m *IssuingManager) handleProjection(ctx context.Context, key projectionKey
 		// If we can't find the pod anymore, it's been deleted.  Clear all our
 		// internal state associated with the pod and return a nil error so it
 		// is forgotten from the queue.
-
-		m.lock.Lock()
-		defer m.lock.Unlock()
-		for k := range m.credStore {
-			if k.Namespace == key.Namespace && k.PodName == key.PodName && k.PodUID == key.PodUID {
-				delete(m.credStore, k)
-			}
-		}
+		m.cleanupCredStoreForPod(key.Namespace, key.PodName, key.PodUID)
 
 		return nil
 	}
@@ -608,12 +601,25 @@ func (m *IssuingManager) TrackPod(ctx context.Context, pod *corev1.Pod) {
 	m.queueAllProjectionsForPod(pod.ObjectMeta.UID)
 }
 
-// ForgetPod queues the pod's podCertificate projected volume sources for processing.
+// cleanupCredStoreForPod removes all credStore entries for the specified pod.
+func (m *IssuingManager) cleanupCredStoreForPod(namespace, podName, podUID string) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	for k := range m.credStore {
+		if k.Namespace == namespace && k.PodName == podName && k.PodUID == podUID {
+			delete(m.credStore, k)
+		}
+	}
+}
+
+// ForgetPod cleans up all pod certificate credentials for the specified pod.
 //
 // The pod worker will notice that the pod no longer exists and clear any
 // pending and live credentials associated with it.
 func (m *IssuingManager) ForgetPod(ctx context.Context, pod *corev1.Pod) {
-	m.queueAllProjectionsForPod(pod.ObjectMeta.UID)
+	// Immediately clean up credStore entries for this pod to prevent race conditions
+	m.cleanupCredStoreForPod(pod.Namespace, pod.Name, string(pod.UID))
 }
 
 // createPodCertificateRequest creates a PodCertificateRequest.

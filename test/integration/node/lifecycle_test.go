@@ -467,7 +467,7 @@ func TestTaintBasedEvictions(t *testing.T) {
 // newHandlerForTest returns a handler configured for testing.
 func newHandlerForTest() (*defaulttolerationseconds.Plugin, error) {
 	handler := defaulttolerationseconds.NewDefaultTolerationSeconds()
-	pluginInitializer := initializer.New(nil, nil, nil, nil, nil, nil, nil)
+	pluginInitializer := initializer.New(nil, nil, nil, nil, nil, nil, nil, nil)
 	pluginInitializer.Initialize(handler)
 	return handler, admission.ValidateInitialization(handler)
 }

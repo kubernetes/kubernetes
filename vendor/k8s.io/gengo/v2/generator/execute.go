@@ -141,7 +141,7 @@ func gofmtWrapper(src []byte) ([]byte, error) {
 
 	if _, err := exec.LookPath(gofmt); err != nil {
 		klog.Errorf("WARNING: skipping output simplification: %v", err)
-		return nil, nil
+		return src, nil
 	}
 
 	cmd := exec.Command(gofmt, "-s")

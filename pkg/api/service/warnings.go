@@ -48,7 +48,7 @@ func GetWarningsForService(service, oldService *api.Service) []string {
 		if len(service.Spec.ExternalIPs) > 0 {
 			warnings = append(warnings, "spec.externalIPs is ignored for headless services")
 		}
-		if service.Spec.SessionAffinity != "" {
+		if service.Spec.SessionAffinity != api.ServiceAffinityNone {
 			warnings = append(warnings, "spec.SessionAffinity is ignored for headless services")
 		}
 	}

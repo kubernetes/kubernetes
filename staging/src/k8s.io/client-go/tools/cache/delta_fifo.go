@@ -554,7 +554,7 @@ func (f *DeltaFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 func (f *DeltaFIFO) Replace(list []interface{}, _ string) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
-	keys := make(sets.String, len(list))
+	keys := make(sets.Set[string], len(list))
 
 	// keep backwards compat for old clients
 	action := Sync

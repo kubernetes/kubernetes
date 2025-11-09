@@ -29,6 +29,7 @@ import (
 	"os"
 	"path"
 	"regexp"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -42,7 +43,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -130,7 +131,7 @@ type FeatureGateFlag interface {
 
 func init() {
 	f := featuregate.NewFeatureGate()
-	runtime.Must(logsapi.AddFeatureGates(f))
+	utilruntime.Must(logsapi.AddFeatureGates(f))
 	LoggingFeatureGate = f
 
 	LoggingConfig = logsapi.NewLoggingConfiguration()
@@ -1115,8 +1116,11 @@ func setupTestCase(t testing.TB, tc *testCase, featureGates map[featuregate.Feat
 	if qhEnabled, exists := featureGates[features.SchedulerQueueingHints]; exists && !qhEnabled {
 		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
 	}
-	for feature, flag := range featureGates {
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, flag)
+
+	// Iterate by sorted feature name, to make it deterministic and put AllAlpha/Beta first to enable
+	// overriding that choice.
+	for _, name := range slices.Sorted(maps.Keys(featureGates)) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, name, featureGates[name])
 	}
 
 	// 30 minutes should be plenty enough even for the 5000-node tests.
@@ -1457,6 +1461,10 @@ func checkEmptyInFlightEvents() error {
 func startCollectingMetrics(tCtx ktesting.TContext, collectorWG *sync.WaitGroup, podInformer coreinformers.PodInformer, mcc *metricsCollectorConfig, throughputErrorMargin float64, opIndex int, name string, namespaces []string, labelSelector map[string]string) (ktesting.TContext, []testDataCollector, error) {
 	collectorCtx := ktesting.WithCancel(tCtx)
 	workloadName := tCtx.Name()
+
+	// Clean up memory usage from the initial setup phase.
+	runtime.GC()
+
 	// The first part is the same for each workload, therefore we can strip it.
 	workloadName = workloadName[strings.Index(name, "/")+1:]
 	collectors := getTestDataCollectors(podInformer, fmt.Sprintf("%s/%s", workloadName, name), namespaces, labelSelector, mcc, throughputErrorMargin)

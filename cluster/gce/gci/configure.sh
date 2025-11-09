@@ -27,9 +27,9 @@ set -o pipefail
 DEFAULT_CNI_VERSION='v1.8.0'
 # CNI HASH for amd64 sha512
 DEFAULT_CNI_HASH='a2696f937b3433eee4a0de44a0994190166b108f2b29adf9f7005fa4fbfff56e78cbe8a2fe2607d99d4bcc0d4a8183e0c27fa748c2f8fb08ae40b62f198fd45b'
-DEFAULT_NPD_VERSION='v0.8.21'
-DEFAULT_NPD_HASH_AMD64='2805ee1da97e06a4b209c198f21763e8687c499687f1b712e4e8e767a75aee4385c9d7fc54f0b190610ea693293a09eded6661ecf15af7af3e787475540fae71'
-DEFAULT_NPD_HASH_ARM64='e2291bbb06d4e831267c2b2a316a668bdff36a502e89826a355cd7f3beeba804e62a2b59a8ec666f4e83042032a379aba9592bcbddf0d57c5a81b3bc1913517c'
+DEFAULT_NPD_VERSION='v1.34.0'
+DEFAULT_NPD_HASH_AMD64='3c55ff6ffadd77dbc3df3774d13164587103ca87c8b6914f5c71c87d8f498b78621e0c96538bb3c69f8f1b4194a6da553aa56b1b52001a7d9a67776ac24e80bd'
+DEFAULT_NPD_HASH_ARM64='ca1d34e64b80f6b2bdf86cfde95154122d6e14c707a748ea6fc414a55f391b1bb572a96b6b2c285996af0232917fa87e14e037125aa03a62247383af3e48c095'
 DEFAULT_CRICTL_VERSION='v1.34.0'
 DEFAULT_CRICTL_AMD64_SHA512='6b5669fe6c0dbcb8d0e0910529a4559e22154ef7f524fa15f3e13dfced6bea2c90a531d99786ac8b24fb4cc9ead1ef294387b52a230ba6fdf83278ab9dbd6133'
 DEFAULT_CRICTL_ARM64_SHA512='b2daa7f6b559cd32da6d3bcb82b356561c0bc2ffcf7dc5084547fbae6cb8570a96cf01c9bfaa6d868cf92d1c1fbbced2a32bf7e0328f62c420c180a86314278d'
@@ -223,6 +223,36 @@ function download-or-bust {
       fi
     done
   done
+}
+
+# Robust download with retry and exponential backoff
+function download-robust {
+  local description="$1" dest_dir="$2" url="$3"
+  
+  local max_attempts=5 attempt=1 delay=5
+  local file="${url##*/}"
+  local temp_file="${dest_dir}/.${file}.tmp"
+  
+  while [[ ${attempt} -le ${max_attempts} ]]; do
+    rm -f "${temp_file}"
+    
+    if curl --fail --location --silent --show-error --connect-timeout 20 --max-time 900 \
+       --retry 3 --retry-delay 2 -o "${temp_file}" "${url}"; then
+      mv "${temp_file}" "${dest_dir}/${file}"
+      echo "== Downloaded ${description} from ${url}"
+      return 0
+    fi
+    rm -f "${temp_file}"
+    
+    if [[ ${attempt} -lt ${max_attempts} ]]; then
+      sleep "${delay}"
+      delay=$((delay * 2))
+    fi
+    ((attempt++))
+  done
+  
+  echo "ERROR: Failed to download ${description} after ${max_attempts} attempts from ${url}"
+  return 1
 }
 
 function is-preloaded {
@@ -521,22 +551,26 @@ function install-containerd-ubuntu {
   # Override to latest versions of containerd and runc
   systemctl stop containerd
   if [[ -n "${UBUNTU_INSTALL_CONTAINERD_VERSION:-}" ]]; then
-    # containerd versions have slightly different url(s), so try both
-    # shellcheck disable=SC2086
-    ( curl ${CURL_FLAGS} \
-        --location \
-        "https://github.com/containerd/containerd/releases/download/${UBUNTU_INSTALL_CONTAINERD_VERSION}/containerd-${UBUNTU_INSTALL_CONTAINERD_VERSION:1}-${HOST_PLATFORM}-${HOST_ARCH}.tar.gz" \
-      || curl ${CURL_FLAGS} \
-        --location \
-        "https://github.com/containerd/containerd/releases/download/${UBUNTU_INSTALL_CONTAINERD_VERSION}/containerd-${UBUNTU_INSTALL_CONTAINERD_VERSION:1}.${HOST_PLATFORM}-${HOST_ARCH}.tar.gz" ) \
-    | tar --overwrite -xzv -C /usr/
+    local temp_dir
+    temp_dir=$(mktemp -d)
+    
+    # Download containerd
+    if download-robust "containerd ${UBUNTU_INSTALL_CONTAINERD_VERSION}" "${temp_dir}" \
+       "https://github.com/containerd/containerd/releases/download/${UBUNTU_INSTALL_CONTAINERD_VERSION}/containerd-${UBUNTU_INSTALL_CONTAINERD_VERSION:1}-${HOST_PLATFORM}-${HOST_ARCH}.tar.gz"; then
+      tar --overwrite -xzv -C /usr/ -f "${temp_dir}"/containerd-*.tar.gz
+    fi
+    rm -rf "${temp_dir}"
   fi
   if [[ -n "${UBUNTU_INSTALL_RUNC_VERSION:-}" ]]; then
-    # shellcheck disable=SC2086
-    curl ${CURL_FLAGS} \
-      --location \
-      "https://github.com/opencontainers/runc/releases/download/${UBUNTU_INSTALL_RUNC_VERSION}/runc.${HOST_ARCH}" --output /usr/sbin/runc \
-    && chmod 755 /usr/sbin/runc
+    local temp_dir
+    temp_dir=$(mktemp -d)
+    
+    # Download and install runc
+    if download-robust "runc ${UBUNTU_INSTALL_RUNC_VERSION}" "${temp_dir}" \
+       "https://github.com/opencontainers/runc/releases/download/${UBUNTU_INSTALL_RUNC_VERSION}/runc.${HOST_ARCH}"; then
+      cp "${temp_dir}/runc.${HOST_ARCH}" /usr/sbin/runc && chmod 755 /usr/sbin/runc
+    fi
+    rm -rf "${temp_dir}"
   fi
   sudo systemctl start containerd
 }
@@ -555,27 +589,30 @@ function install-containerd-cos {
   mount --bind /home/containerd /home/containerd
   mount -o remount,exec /home/containerd
   if [[ -n "${COS_INSTALL_CONTAINERD_VERSION:-}" ]]; then
-    # containerd versions have slightly different url(s), so try both
-    # shellcheck disable=SC2086
-    ( curl ${CURL_FLAGS} \
-        --location \
-        "https://github.com/containerd/containerd/releases/download/${COS_INSTALL_CONTAINERD_VERSION}/containerd-${COS_INSTALL_CONTAINERD_VERSION:1}-${HOST_PLATFORM}-${HOST_ARCH}.tar.gz" \
-      || curl ${CURL_FLAGS} \
-        --location \
-        "https://github.com/containerd/containerd/releases/download/${COS_INSTALL_CONTAINERD_VERSION}/containerd-${COS_INSTALL_CONTAINERD_VERSION:1}.${HOST_PLATFORM}-${HOST_ARCH}.tar.gz" ) \
-    | tar --overwrite -xzv -C /home/containerd/
-    cp /usr/lib/systemd/system/containerd.service /etc/systemd/system/containerd.service
-    # fix the path of the new containerd binary
-    sed -i 's|ExecStart=.*|ExecStart=/home/containerd/bin/containerd|' /etc/systemd/system/containerd.service
+    local temp_dir
+    temp_dir=$(mktemp -d)
+    
+    # Download containerd
+    if download-robust "containerd ${COS_INSTALL_CONTAINERD_VERSION}" "${temp_dir}" \
+       "https://github.com/containerd/containerd/releases/download/${COS_INSTALL_CONTAINERD_VERSION}/containerd-${COS_INSTALL_CONTAINERD_VERSION:1}-${HOST_PLATFORM}-${HOST_ARCH}.tar.gz"; then
+      tar --overwrite -xzv -C /home/containerd/ -f "${temp_dir}"/containerd-*.tar.gz
+      cp /usr/lib/systemd/system/containerd.service /etc/systemd/system/containerd.service
+      sed -i 's|ExecStart=.*|ExecStart=/home/containerd/bin/containerd|' /etc/systemd/system/containerd.service
+    fi
+    rm -rf "${temp_dir}"
   fi
   if [[ -n "${COS_INSTALL_RUNC_VERSION:-}" ]]; then
-    # shellcheck disable=SC2086
-    curl ${CURL_FLAGS} \
-      --location \
-      "https://github.com/opencontainers/runc/releases/download/${COS_INSTALL_RUNC_VERSION}/runc.${HOST_ARCH}" --output /home/containerd/bin/runc \
-    && chmod 755 /home/containerd/bin/runc
-    # ensure runc gets picked up from the correct location
-    sed -i "/\[Service\]/a Environment=PATH=/home/containerd/bin:$PATH" /etc/systemd/system/containerd.service
+    local temp_dir
+    temp_dir=$(mktemp -d)
+    mkdir -p /home/containerd/bin
+    
+    # Download and install runc
+    if download-robust "runc ${COS_INSTALL_RUNC_VERSION}" "${temp_dir}" \
+       "https://github.com/opencontainers/runc/releases/download/${COS_INSTALL_RUNC_VERSION}/runc.${HOST_ARCH}"; then
+      cp "${temp_dir}/runc.${HOST_ARCH}" /home/containerd/bin/runc && chmod 755 /home/containerd/bin/runc
+      sed -i "/\[Service\]/a Environment=PATH=/home/containerd/bin:\$PATH" /etc/systemd/system/containerd.service
+    fi
+    rm -rf "${temp_dir}"
   fi
   systemctl daemon-reload
   sudo systemctl start containerd

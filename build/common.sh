@@ -97,17 +97,39 @@ readonly KUBE_RSYNC_PORT="${KUBE_RSYNC_PORT:-}"
 readonly KUBE_CONTAINER_RSYNC_PORT=8730
 
 # These are the default versions (image tags) for their respective base images.
-readonly __default_distroless_iptables_version=v0.7.8
-readonly __default_go_runner_version=v2.4.0-go1.24.6-bookworm.0
+readonly __default_distroless_iptables_version=v0.8.2
+readonly __default_go_runner_version=v2.4.0-go1.25.1-bookworm.0
 readonly __default_setcap_version=bookworm-v1.0.4
 
-# These are the base images for the Docker-wrapped binaries.
+# The default image for all binaries which are dynamically linked.
+# Includes everything that is required by kube-proxy, which uses it
+# by default. Other commands only use this when dynamically linking
+# them gets requested.
+readonly __default_dynamic_base_image="$KUBE_BASE_IMAGE_REGISTRY/distroless-iptables:$__default_distroless_iptables_version"
+
+# KUBE_GORUNNER_IMAGE is the default image for commands which are built statically.
+# It can be overridden to change the image for all such commands.
+# When the per-command env variable is set, that env variable is
+# used without considering KUBE_GORUNNER_IMAGE.
 readonly KUBE_GORUNNER_IMAGE="${KUBE_GORUNNER_IMAGE:-$KUBE_BASE_IMAGE_REGISTRY/go-runner:$__default_go_runner_version}"
-readonly KUBE_APISERVER_BASE_IMAGE="${KUBE_APISERVER_BASE_IMAGE:-$KUBE_GORUNNER_IMAGE}"
-readonly KUBE_CONTROLLER_MANAGER_BASE_IMAGE="${KUBE_CONTROLLER_MANAGER_BASE_IMAGE:-$KUBE_GORUNNER_IMAGE}"
-readonly KUBE_SCHEDULER_BASE_IMAGE="${KUBE_SCHEDULER_BASE_IMAGE:-$KUBE_GORUNNER_IMAGE}"
-readonly KUBE_PROXY_BASE_IMAGE="${KUBE_PROXY_BASE_IMAGE:-$KUBE_BASE_IMAGE_REGISTRY/distroless-iptables:$__default_distroless_iptables_version}"
-readonly KUBECTL_BASE_IMAGE="${KUBECTL_BASE_IMAGE:-$KUBE_GORUNNER_IMAGE}"
+
+# __default_base_image takes the canonical build target for a Kubernetes command (e.g. k8s.io/kubernetes/cmd/kube-scheduler)
+# and prints the right default base image for it, depending on whether that command gets built dynamically or statically.
+__default_base_image() {
+  if kube::golang::is_statically_linked "$1"; then
+    echo "$KUBE_GORUNNER_IMAGE"
+  else
+    echo "$__default_dynamic_base_image"
+  fi
+}
+
+# These are the base images for the Docker-wrapped binaries.
+# These can be overridden on a case-by-case basis.
+readonly KUBE_APISERVER_BASE_IMAGE="${KUBE_APISERVER_BASE_IMAGE:-$(__default_base_image k8s.io/kubernetes/cmd/kube-apiserver)}"
+readonly KUBE_CONTROLLER_MANAGER_BASE_IMAGE="${KUBE_CONTROLLER_MANAGER_BASE_IMAGE:-$(__default_base_image k8s.io/kubernetes/cmd/kube-controller-manager)}"
+readonly KUBE_SCHEDULER_BASE_IMAGE="${KUBE_SCHEDULER_BASE_IMAGE:-$(__default_base_image k8s.io/kubernetes/cmd/kube-scheduler)}"
+readonly KUBE_PROXY_BASE_IMAGE="${KUBE_PROXY_BASE_IMAGE:-$__default_dynamic_base_image}"
+readonly KUBECTL_BASE_IMAGE="${KUBECTL_BASE_IMAGE:-$(__default_base_image k8s.io/kubernetes/cmd/kubectl)}"
 
 # This is the image used in a multi-stage build to apply capabilities to Docker-wrapped binaries.
 readonly KUBE_BUILD_SETCAP_IMAGE="${KUBE_BUILD_SETCAP_IMAGE:-$KUBE_BASE_IMAGE_REGISTRY/setcap:$__default_setcap_version}"

@@ -1022,9 +1022,8 @@ func (gb *GraphBuilder) GetMonitor(ctx context.Context, resource schema.GroupVer
 		Controller: monitor.controller,
 	}
 
-	if !cache.WaitForNamedCacheSync(
-		gb.Name(),
-		ctx.Done(),
+	if !cache.WaitForNamedCacheSyncWithContext(
+		ctx,
 		func() bool {
 			return monitor.controller.HasSynced()
 		},

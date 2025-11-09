@@ -17,27 +17,27 @@ limitations under the License.
 package validation
 
 import (
-	"fmt"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/registry/rest"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
-	"k8s.io/kubernetes/pkg/features"
 )
 
-func TestValidateScaleForDeclarative(t *testing.T) {
+// TestScaleDeclarativeValidation verifies that the validation rules that are applied uniformly to the Scale API.
+func TestScaleDeclarativeValidation(t *testing.T) {
+	apiGroup := "autoscaling"
+	apiVersion := "v1"
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-		APIGroup:    "autoscaling",
-		APIVersion:  "v1",
+		APIGroup:    apiGroup,
+		APIVersion:  apiVersion,
 		Subresource: "scale",
 	})
+
 	testCases := map[string]struct {
 		input        autoscaling.Scale
 		expectedErrs field.ErrorList
@@ -58,35 +58,13 @@ func TestValidateScaleForDeclarative(t *testing.T) {
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
-			var declarativeTakeoverErrs field.ErrorList
-			var imperativeErrs field.ErrorList
-			for _, gateVal := range []bool{true, false} {
-				t.Run(fmt.Sprintf("gates=%v", gateVal), func(t *testing.T) {
-					// We only need to test both gate enabled and disabled together, because
-					// 1) the DeclarativeValidationTakeover won't take effect if DeclarativeValidation is disabled.
-					// 2) the validation output, when only DeclarativeValidation is enabled, is the same as when both gates are disabled.
-					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeclarativeValidation, gateVal)
-					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeclarativeValidationTakeover, gateVal)
-
-					errs := rest.ValidateDeclaratively(ctx, legacyscheme.Scheme, &tc.input)
-					if gateVal {
-						declarativeTakeoverErrs = errs
-					} else {
-						imperativeErrs = errs
-					}
-					// The errOutputMatcher is used to verify the output matches the expected errors in test cases.
-					errOutputMatcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin()
-					if len(tc.expectedErrs) > 0 {
-						errOutputMatcher.Test(t, tc.expectedErrs, errs)
-					} else if len(errs) != 0 {
-						t.Errorf("expected no errors, but got: %v", errs)
-					}
-				})
-			}
-			// The equivalenceMatcher is used to verify the output errors from handwritten imperative validation
-			// are equivalent to the output errors when DeclarativeValidationTakeover is enabled.
-			equivalenceMatcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin()
-			equivalenceMatcher.Test(t, imperativeErrs, declarativeTakeoverErrs)
+			// The Scale API has no handwritten validation to compare against. So we simply test that all the versions
+			// of the Scale subresource are correct for our test cases.
+			// All resources that have a scale subresource are expected to test Scale validation against any handwritten
+			// validation code defined on that resource.
+			tester := field.ErrorMatcher{}.ByType().ByField().ByOrigin()
+			obj, _ := legacyscheme.Scheme.ConvertToVersion(&tc.input, schema.GroupVersion{Group: apiGroup, Version: apiVersion})
+			tester.Test(t, tc.expectedErrs, legacyscheme.Scheme.Validate(ctx, nil, obj, "scale"))
 
 			apitesting.VerifyVersionedValidationEquivalence(t, &tc.input, nil, "scale")
 		})

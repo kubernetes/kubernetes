@@ -114,7 +114,7 @@ func (c *ServiceAccountsController) Run(ctx context.Context, workers int) {
 	klog.FromContext(ctx).Info("Starting service account controller")
 	defer klog.FromContext(ctx).Info("Shutting down service account controller")
 
-	if !cache.WaitForNamedCacheSync("service account", ctx.Done(), c.saListerSynced, c.nsListerSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, c.saListerSynced, c.nsListerSynced) {
 		return
 	}
 

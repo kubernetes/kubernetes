@@ -1050,42 +1050,42 @@ gopkg.in/natefinch/lumberjack.v2
 ## explicit
 gopkg.in/yaml.v3
 # k8s.io/api v0.0.0 => ./staging/src/k8s.io/api
-## explicit; go 1.24.0
+## explicit; go 1.25.0
 # k8s.io/apiextensions-apiserver v0.0.0 => ./staging/src/k8s.io/apiextensions-apiserver
-## explicit; go 1.24.0
+## explicit; go 1.25.0
 # k8s.io/apimachinery v0.0.0 => ./staging/src/k8s.io/apimachinery
-## explicit; go 1.24.0
+## explicit; go 1.25.0
 # k8s.io/apiserver v0.0.0 => ./staging/src/k8s.io/apiserver
-## explicit; go 1.24.0
+## explicit; go 1.25.0
 # k8s.io/cli-runtime v0.0.0 => ./staging/src/k8s.io/cli-runtime
-## explicit; go 1.24.0
+## explicit; go 1.25.0
 # k8s.io/client-go v0.0.0 => ./staging/src/k8s.io/client-go
-## explicit; go 1.24.0
+## explicit; go 1.25.0
 # k8s.io/cloud-provider v0.0.0 => ./staging/src/k8s.io/cloud-provider
-## explicit; go 1.24.0
+## explicit; go 1.25.0
 # k8s.io/cluster-bootstrap v0.0.0 => ./staging/src/k8s.io/cluster-bootstrap
-## explicit; go 1.24.0
+## explicit; go 1.25.0
 # k8s.io/code-generator v0.0.0 => ./staging/src/k8s.io/code-generator
-## explicit; go 1.24.0
+## explicit; go 1.25.0
 # k8s.io/component-base v0.0.0 => ./staging/src/k8s.io/component-base
-## explicit; go 1.24.0
+## explicit; go 1.25.0
 # k8s.io/component-helpers v0.0.0 => ./staging/src/k8s.io/component-helpers
-## explicit; go 1.24.0
+## explicit; go 1.25.0
 # k8s.io/controller-manager v0.0.0 => ./staging/src/k8s.io/controller-manager
-## explicit; go 1.24.0
+## explicit; go 1.25.0
 # k8s.io/cri-api v0.0.0 => ./staging/src/k8s.io/cri-api
-## explicit; go 1.24.0
+## explicit; go 1.25.0
 # k8s.io/cri-client v0.0.0 => ./staging/src/k8s.io/cri-client
-## explicit; go 1.24.0
+## explicit; go 1.25.0
 # k8s.io/csi-translation-lib v0.0.0 => ./staging/src/k8s.io/csi-translation-lib
-## explicit; go 1.24.0
+## explicit; go 1.25.0
 # k8s.io/dynamic-resource-allocation v0.0.0 => ./staging/src/k8s.io/dynamic-resource-allocation
-## explicit; go 1.24.0
+## explicit; go 1.25.0
 # k8s.io/endpointslice v0.0.0 => ./staging/src/k8s.io/endpointslice
-## explicit; go 1.24.0
+## explicit; go 1.25.0
 # k8s.io/externaljwt v0.0.0 => ./staging/src/k8s.io/externaljwt
-## explicit; go 1.24.0
-# k8s.io/gengo/v2 v2.0.0-20250903151518-081d64401ab4
+## explicit; go 1.25.0
+# k8s.io/gengo/v2 v2.0.0-20250922181213-ec3ebc5fd46b
 ## explicit; go 1.23
 k8s.io/gengo/v2
 k8s.io/gengo/v2/codetags
@@ -1109,11 +1109,11 @@ k8s.io/klog/v2/ktesting/init
 k8s.io/klog/v2/test
 k8s.io/klog/v2/textlogger
 # k8s.io/kms v0.0.0 => ./staging/src/k8s.io/kms
-## explicit; go 1.24.0
+## explicit; go 1.25.0
 # k8s.io/kube-aggregator v0.0.0 => ./staging/src/k8s.io/kube-aggregator
-## explicit; go 1.24.0
+## explicit; go 1.25.0
 # k8s.io/kube-controller-manager v0.0.0 => ./staging/src/k8s.io/kube-controller-manager
-## explicit; go 1.24.0
+## explicit; go 1.25.0
 # k8s.io/kube-openapi v0.0.0-20250910181357-589584f1c912
 ## explicit; go 1.23.0
 k8s.io/kube-openapi/cmd/openapi-gen
@@ -1147,22 +1147,22 @@ k8s.io/kube-openapi/pkg/validation/strfmt
 k8s.io/kube-openapi/pkg/validation/strfmt/bson
 k8s.io/kube-openapi/pkg/validation/validate
 # k8s.io/kube-proxy v0.0.0 => ./staging/src/k8s.io/kube-proxy
-## explicit; go 1.24.0
+## explicit; go 1.25.0
 # k8s.io/kube-scheduler v0.0.0 => ./staging/src/k8s.io/kube-scheduler
-## explicit; go 1.24.0
+## explicit; go 1.25.0
 # k8s.io/kubectl v0.0.0 => ./staging/src/k8s.io/kubectl
-## explicit; go 1.24.0
+## explicit; go 1.25.0
 # k8s.io/kubelet v0.0.0 => ./staging/src/k8s.io/kubelet
-## explicit; go 1.24.0
+## explicit; go 1.25.0
 # k8s.io/metrics v0.0.0 => ./staging/src/k8s.io/metrics
-## explicit; go 1.24.0
+## explicit; go 1.25.0
 # k8s.io/mount-utils v0.0.0 => ./staging/src/k8s.io/mount-utils
-## explicit; go 1.24.0
+## explicit; go 1.25.0
 # k8s.io/pod-security-admission v0.0.0 => ./staging/src/k8s.io/pod-security-admission
-## explicit; go 1.24.0
+## explicit; go 1.25.0
 # k8s.io/sample-apiserver v0.0.0 => ./staging/src/k8s.io/sample-apiserver
-## explicit; go 1.24.0
-# k8s.io/system-validators v1.10.1
+## explicit; go 1.25.0
+# k8s.io/system-validators v1.11.1
 ## explicit; go 1.16
 k8s.io/system-validators/validators
 # k8s.io/utils v0.0.0-20250604170112-4c0f3b243397
@@ -1191,7 +1191,7 @@ sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client/metrics
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/common/metrics
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/proto/client
-# sigs.k8s.io/json v0.0.0-20241014173422-cfa47c3a1cc8
+# sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730
 ## explicit; go 1.23
 sigs.k8s.io/json
 sigs.k8s.io/json/internal/golang/encoding/json

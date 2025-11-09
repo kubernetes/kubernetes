@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
@@ -43,6 +44,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/features"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ejob "k8s.io/kubernetes/test/e2e/framework/job"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -1182,11 +1184,13 @@ done`}
 		job.Spec.Suspend = ptr.To(true)
 		job, err = e2ejob.CreateJob(ctx, f.ClientSet, ns, job)
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", ns)
+		gomega.Expect(job).To(apimachineryutils.HaveValidResourceVersion())
 
 		ginkgo.By("Patching the Job")
 		payload := "{\"metadata\":{\"labels\":{\"" + jobName + "\":\"patched\"}}}"
 		patchedJob, err := f.ClientSet.BatchV1().Jobs(ns).Patch(ctx, jobName, types.StrategicMergePatchType, []byte(payload), metav1.PatchOptions{})
 		framework.ExpectNoError(err, "failed to patch Job %s in namespace %s", jobName, ns)
+		gomega.Expect(resourceversion.CompareResourceVersion(job.ResourceVersion, patchedJob.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 
 		ginkgo.By("Watching for Job to be patched")
 		c := watchEventConfig{

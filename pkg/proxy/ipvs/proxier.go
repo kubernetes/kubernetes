@@ -706,7 +706,7 @@ func CleanupLeftovers(ctx context.Context) (encounteredError bool) {
 		return false
 	}
 
-	ipts, _ := utiliptables.NewDualStack()
+	ipts := utiliptables.NewBestEffort()
 	ipsetInterface := utilipset.New()
 	ipvsInterface := utilipvs.New()
 

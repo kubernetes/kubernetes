@@ -22,7 +22,6 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
-kube::golang::setup_gomaxprocs
 kube::util::require-jq
 
 # start the cache mutation detector by default so that cache mutators will be found

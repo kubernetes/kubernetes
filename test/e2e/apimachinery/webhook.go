@@ -35,11 +35,13 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2eendpointslice "k8s.io/kubernetes/test/e2e/framework/endpointslice"
@@ -412,6 +414,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 			},
 		})
 		framework.ExpectNoError(err, "Creating validating webhook configuration")
+		gomega.Expect(hook).To(apimachineryutils.HaveValidResourceVersion())
 		defer func() {
 			err := client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Delete(ctx, hook.Name, metav1.DeleteOptions{})
 			framework.ExpectNoError(err, "Deleting validating webhook configuration")
@@ -460,10 +463,12 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		framework.ExpectNoError(err, "Waiting for configMap in namespace %s to be allowed creation since webhook was updated to not validate create", f.Namespace.Name)
 
 		ginkgo.By("Patching a validating webhook configuration's rules to include the create operation")
+		oldRV := hook.ResourceVersion
 		hook, err = admissionClient.ValidatingWebhookConfigurations().Patch(ctx, f.UniqueName,
 			types.JSONPatchType,
 			[]byte(`[{"op": "replace", "path": "/webhooks/0/rules/0/operations", "value": ["CREATE"]}]`), metav1.PatchOptions{})
 		framework.ExpectNoError(err, "Patching validating webhook configuration")
+		gomega.Expect(resourceversion.CompareResourceVersion(oldRV, hook.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 
 		ginkgo.By("Creating a configMap that does not comply to the validation webhook rules")
 		err = wait.PollImmediate(100*time.Millisecond, 30*time.Second, func() (bool, error) {
@@ -504,6 +509,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 			},
 		})
 		framework.ExpectNoError(err, "Creating mutating webhook configuration")
+		gomega.Expect(hook).To(apimachineryutils.HaveValidResourceVersion())
 		defer func() {
 			err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Delete(ctx, hook.Name, metav1.DeleteOptions{})
 			framework.ExpectNoError(err, "Deleting mutating webhook configuration")
@@ -535,10 +541,12 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		framework.ExpectNoError(err, "Waiting for configMap in namespace %s this is not mutated", f.Namespace.Name)
 
 		ginkgo.By("Patching a mutating webhook configuration's rules to include the create operation")
+		oldRV := hook.ResourceVersion
 		hook, err = admissionClient.MutatingWebhookConfigurations().Patch(ctx, f.UniqueName,
 			types.JSONPatchType,
 			[]byte(`[{"op": "replace", "path": "/webhooks/0/rules/0/operations", "value": ["CREATE"]}]`), metav1.PatchOptions{})
 		framework.ExpectNoError(err, "Patching mutating webhook configuration")
+		gomega.Expect(resourceversion.CompareResourceVersion(oldRV, hook.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 
 		ginkgo.By("Creating a configMap that should be mutated")
 		err = wait.PollImmediate(100*time.Millisecond, 30*time.Second, func() (bool, error) {

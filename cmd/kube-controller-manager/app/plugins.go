@@ -106,7 +106,7 @@ func probeControllerVolumePlugins(logger klog.Logger, config persistentvolumecon
 	}
 	if err := AttemptToLoadRecycler(config.PersistentVolumeRecyclerConfiguration.PodTemplateFilePathHostPath, &hostPathConfig); err != nil {
 		logger.Error(err, "Could not create hostpath recycler pod from file", "path", config.PersistentVolumeRecyclerConfiguration.PodTemplateFilePathHostPath)
-		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+		return nil, err
 	}
 	allPlugins = append(allPlugins, hostpath.ProbeVolumePlugins(hostPathConfig)...)
 
@@ -117,7 +117,7 @@ func probeControllerVolumePlugins(logger klog.Logger, config persistentvolumecon
 	}
 	if err := AttemptToLoadRecycler(config.PersistentVolumeRecyclerConfiguration.PodTemplateFilePathNFS, &nfsConfig); err != nil {
 		logger.Error(err, "Could not create NFS recycler pod from file", "path", config.PersistentVolumeRecyclerConfiguration.PodTemplateFilePathNFS)
-		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+		return nil, err
 	}
 	allPlugins = append(allPlugins, nfs.ProbeVolumePlugins(nfsConfig)...)
 	allPlugins = append(allPlugins, fc.ProbeVolumePlugins()...)

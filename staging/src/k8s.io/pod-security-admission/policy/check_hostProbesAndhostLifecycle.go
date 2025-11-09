@@ -18,7 +18,6 @@ package policy
 
 import (
 	"fmt"
-	"sync/atomic"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -74,21 +73,7 @@ func CheckHostProbesAndHostLifecycle() Check {
 	}
 }
 
-// TODO(liggitt): rework this to make emulation version influence "latest" across all checks, instead of piece-mill feature gate checking.
-var skipProbeHostEnforcement = &atomic.Bool{}
-
-// SkipProbeHostEnforcement allows opting out of probe host enforcement in baseline policies.
-// This should only be done in clusters emulating minor versions prior to introduction of this check.
-func SkipProbeHostEnforcement() {
-	skipProbeHostEnforcement.Store(true)
-}
-
 func hostProbesAndHostLifecycleV1Dot34(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
-	// cluster is emulating a minor prior to this check existing
-	if skipProbeHostEnforcement.Load() {
-		return CheckResult{Allowed: true}
-	}
-
 	badContainers := sets.New[string]()
 	forbidden := sets.New[string]()
 	visitContainers(podSpec, func(container *corev1.Container) {

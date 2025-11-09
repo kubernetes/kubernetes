@@ -88,7 +88,7 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 		}
 	}()
 
-	if !cache.WaitForNamedCacheSync(controllerName, ctx.Done(), c.leaseRegistration.HasSynced, c.leaseCandidateRegistration.HasSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, c.leaseRegistration.HasSynced, c.leaseCandidateRegistration.HasSynced) {
 		return
 	}
 

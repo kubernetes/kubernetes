@@ -59,6 +59,9 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 	if err := localFeatureGate.SetFromMap(kc.FeatureGates); err != nil {
 		return err
 	}
+	if errs := localFeatureGate.Validate(); len(errs) > 0 {
+		allErrors = append(allErrors, errs...)
+	}
 
 	if kc.NodeLeaseDurationSeconds <= 0 {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: nodeLeaseDurationSeconds must be greater than 0"))

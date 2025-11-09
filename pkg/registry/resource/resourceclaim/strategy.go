@@ -20,6 +20,9 @@ import (
 	"context"
 	"errors"
 
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
+
+	"k8s.io/apimachinery/pkg/api/operation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -28,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -39,7 +43,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	resourceutils "k8s.io/kubernetes/pkg/registry/resource"
 	"k8s.io/utils/ptr"
-	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 // resourceclaimStrategy implements behavior for ResourceClaim objects
@@ -96,7 +99,8 @@ func (s *resourceclaimStrategy) Validate(ctx context.Context, obj runtime.Object
 	claim := obj.(*resource.ResourceClaim)
 
 	allErrs := resourceutils.AuthorizedForAdmin(ctx, claim.Spec.Devices.Requests, claim.Namespace, s.nsClient)
-	return append(allErrs, validation.ValidateResourceClaim(claim)...)
+	allErrs = append(allErrs, validation.ValidateResourceClaim(claim)...)
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, claim, nil, allErrs, operation.Create)
 }
 
 func (*resourceclaimStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
@@ -123,7 +127,8 @@ func (s *resourceclaimStrategy) ValidateUpdate(ctx context.Context, obj, old run
 	oldClaim := old.(*resource.ResourceClaim)
 	// AuthorizedForAdmin isn't needed here because the spec is immutable.
 	errorList := validation.ValidateResourceClaim(newClaim)
-	return append(errorList, validation.ValidateResourceClaimUpdate(newClaim, oldClaim)...)
+	errorList = append(errorList, validation.ValidateResourceClaimUpdate(newClaim, oldClaim)...)
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newClaim, oldClaim, errorList, operation.Update)
 }
 
 func (*resourceclaimStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
@@ -184,8 +189,9 @@ func (r *resourceclaimStatusStrategy) ValidateUpdate(ctx context.Context, obj, o
 	if oldClaim.Status.Allocation != nil {
 		oldAllocationResult = oldClaim.Status.Allocation.Devices.Results
 	}
-	allErrs := resourceutils.AuthorizedForAdminStatus(ctx, newAllocationResult, oldAllocationResult, newClaim.Namespace, r.nsClient)
-	return append(allErrs, validation.ValidateResourceClaimStatusUpdate(newClaim, oldClaim)...)
+	errs := resourceutils.AuthorizedForAdminStatus(ctx, newAllocationResult, oldAllocationResult, newClaim.Namespace, r.nsClient)
+	errs = append(errs, validation.ValidateResourceClaimStatusUpdate(newClaim, oldClaim)...)
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newClaim, oldClaim, errs, operation.Update)
 }
 
 // WarningsOnUpdate returns warnings for the given update.

@@ -24,33 +24,29 @@ import (
 )
 
 func TestUniqueness(t *testing.T) {
-	// TODO: enable this once we have a way to either opt-out from this validation
-	// or settle the decision on how to handle the ratcheting cases.
-	/*
-		st := localSchemeBuilder.Test(t)
+	st := localSchemeBuilder.Test(t)
 
-		st.Value(&Struct{
-			ListField: []OtherStruct{
-				{"key1", "one"},
-				{"key2", "two"},
-				{"key2", "two"},
-			},
-			ListTypedefField: []OtherTypedefStruct{
-				{"key1", "one"},
-				{"key2", "two"},
-				{"key2", "two"},
-			},
-			TypedefField: ListType{
-				{"key1", "one"},
-				{"key2", "two"},
-				{"key2", "two"},
-			},
-		}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
-			field.Duplicate(field.NewPath("listField").Index(2), nil),
-			field.Duplicate(field.NewPath("listTypedefField").Index(2), nil),
-			field.Duplicate(field.NewPath("typedefField").Index(2), nil),
-		})
-	*/
+	st.Value(&Struct{
+		ListField: []OtherStruct{
+			{"key1", "one"},
+			{"key2", "two"},
+			{"key2", "two"},
+		},
+		ListTypedefField: []OtherTypedefStruct{
+			{"key1", "one"},
+			{"key2", "two"},
+			{"key2", "two"},
+		},
+		TypedefField: ListType{
+			{"key1", "one"},
+			{"key2", "two"},
+			{"key2", "two"},
+		},
+	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+		field.Duplicate(field.NewPath("listField").Index(2), nil),
+		field.Duplicate(field.NewPath("listTypedefField").Index(2), nil),
+		field.Duplicate(field.NewPath("typedefField").Index(2), nil),
+	})
 }
 
 func TestUpdateCorrelation(t *testing.T) {

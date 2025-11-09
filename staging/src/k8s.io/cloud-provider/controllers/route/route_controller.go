@@ -104,7 +104,7 @@ func (rc *RouteController) Run(ctx context.Context, syncPeriod time.Duration, co
 	controllerManagerMetrics.ControllerStarted("route")
 	defer controllerManagerMetrics.ControllerStopped("route")
 
-	if !cache.WaitForNamedCacheSync("route", ctx.Done(), rc.nodeListerSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, rc.nodeListerSynced) {
 		return
 	}
 

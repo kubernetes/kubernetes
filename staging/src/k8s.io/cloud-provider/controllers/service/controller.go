@@ -237,7 +237,7 @@ func (c *Controller) Run(ctx context.Context, workers int, controllerManagerMetr
 	controllerManagerMetrics.ControllerStarted("service")
 	defer controllerManagerMetrics.ControllerStopped("service")
 
-	if !cache.WaitForNamedCacheSync("service", ctx.Done(), c.serviceListerSynced, c.nodeListerSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, c.serviceListerSynced, c.nodeListerSynced) {
 		return
 	}
 

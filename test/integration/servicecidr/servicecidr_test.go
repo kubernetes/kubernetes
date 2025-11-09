@@ -20,10 +20,13 @@ import (
 	"context"
 	"fmt"
 	"net/netip"
+	"reflect"
+	"sort"
 	"strings"
 	"testing"
 	"time"
 
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -31,9 +34,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/servicecidrs"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/utils/ptr"
 )
 
 func TestServiceAllocNewServiceCIDR(t *testing.T) {
@@ -347,4 +352,174 @@ func cidrContainsIP(cidr, ip string) bool {
 	prefix := netip.MustParsePrefix(cidr)
 	address := netip.MustParseAddr(ip)
 	return prefix.Contains(address)
+}
+
+// TestValidationAdmissionPolicyServiceCIDR tests that a ValidatingAdmissionPolicy
+// can be used to prevent updates to the default ServiceCIDR from users other than the
+// apiserver, and that the apiserver can update it on startup.
+func TestValidationAdmissionPolicyServiceCIDR(t *testing.T) {
+	// This test restarts the apiserver, so it cannot run in parallel.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	etcdOptions := framework.SharedEtcd()
+	// 1. Start an apiserver as a single stack.
+	apiServerOptions := kubeapiservertesting.NewDefaultTestServerOptions()
+	s := kubeapiservertesting.StartTestServerOrDie(t,
+		apiServerOptions,
+		[]string{
+			"--runtime-config=networking.k8s.io/v1=true",
+			"--service-cluster-ip-range=192.168.0.0/24",
+			"--advertise-address=10.1.1.1",
+			"--disable-admission-plugins=ServiceAccount",
+			"--enable-admission-plugins=ValidatingAdmissionPolicy",
+		},
+		etcdOptions)
+
+	clientset, err := kubernetes.NewForConfig(s.ClientConfig)
+	if err != nil {
+		s.TearDownFn()
+		t.Fatalf("Failed to create clientset: %v", err)
+	}
+
+	// fake user
+	newCfg := *s.ClientConfig
+	newCfg.Impersonate = rest.ImpersonationConfig{
+		UserName: "fake-admin",
+		Groups:   []string{"system:authenticated"},
+	}
+	kc, err := kubernetes.NewForConfig(&newCfg)
+	if err != nil {
+		t.Fatalf("Unexpected error creating kubernetes client impersonating %q", newCfg.Impersonate.UserName)
+	}
+
+	// 2. Install a validationadmissionpolicy that only allows the user apiserver to update the default servicecidr to dual stack
+	policy := &admissionregistrationv1.ValidatingAdmissionPolicy{
+		ObjectMeta: metav1.ObjectMeta{Name: "deny-non-apiserver-servicecidr-updates"},
+		Spec: admissionregistrationv1.ValidatingAdmissionPolicySpec{
+			FailurePolicy: ptr.To(admissionregistrationv1.Fail),
+			MatchConstraints: &admissionregistrationv1.MatchResources{
+				ResourceRules: []admissionregistrationv1.NamedRuleWithOperations{
+					{
+						RuleWithOperations: admissionregistrationv1.RuleWithOperations{
+							Operations: []admissionregistrationv1.OperationType{"CREATE", "UPDATE"},
+							Rule:       admissionregistrationv1.Rule{APIGroups: []string{"networking.k8s.io"}, APIVersions: []string{"v1"}, Resources: []string{"servicecidrs"}},
+						},
+					},
+				},
+			},
+			Validations: []admissionregistrationv1.Validation{{
+				// only allow to CREATE or UPDATE the default kubernetes ServiceCIDR to the apiserver
+				Expression: "request.userInfo.username == 'system:apiserver' && 'system:masters' in request.userInfo.groups",
+				Message:    "only apiserver can update and create servicecidrs",
+			}, {
+				Expression: "object.metadata.name == 'kubernetes'",
+				Message:    "only allow changes on the default servicecidr",
+			}},
+		},
+	}
+	policy, err = clientset.AdmissionregistrationV1().ValidatingAdmissionPolicies().Create(ctx, policy, metav1.CreateOptions{})
+	if err != nil {
+		s.TearDownFn()
+		t.Fatalf("Failed to create policy: %v", err)
+	}
+	binding := &admissionregistrationv1.ValidatingAdmissionPolicyBinding{
+		ObjectMeta: metav1.ObjectMeta{Name: "deny-non-apiserver-servicecidr-updates-binding"},
+		Spec: admissionregistrationv1.ValidatingAdmissionPolicyBindingSpec{
+			PolicyName: policy.Name,
+			ValidationActions: []admissionregistrationv1.ValidationAction{
+				admissionregistrationv1.Deny,
+			},
+			MatchResources: &admissionregistrationv1.MatchResources{
+				NamespaceSelector: &metav1.LabelSelector{}, // Match cluster-scoped resources
+			},
+		},
+	}
+	_, err = clientset.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Create(ctx, binding, metav1.CreateOptions{})
+	if err != nil {
+		s.TearDownFn()
+		t.Fatalf("Failed to create binding: %v", err)
+	}
+
+	// Wait for policy and binding to become active.
+	time.Sleep(2 * time.Second)
+
+	// 3. Try to update the defaultservicecidr to dual stack from the test and check that fails
+	defaultCIDR, err := clientset.NetworkingV1().ServiceCIDRs().Get(ctx, "kubernetes", metav1.GetOptions{})
+	if err != nil {
+		s.TearDownFn()
+		t.Fatalf("Failed to get default ServiceCIDR: %v", err)
+	}
+
+	defaultCIDR.Spec.CIDRs = append(defaultCIDR.Spec.CIDRs, "2001:db8::/112")
+	_, err = kc.NetworkingV1().ServiceCIDRs().Update(ctx, defaultCIDR, metav1.UpdateOptions{})
+	if err == nil {
+		s.TearDownFn()
+		t.Fatal("Expected an error updating default ServiceCIDR but got none")
+	}
+	if !strings.Contains(err.Error(), "only apiserver can update and create servicecidrs") {
+		s.TearDownFn()
+		t.Fatalf("Expected error to contain 'only apiserver can update and create servicecidrs', but got: %v", err)
+	}
+
+	// 4. add a new ServiceCIDR
+	_, err = clientset.NetworkingV1().ServiceCIDRs().Create(ctx, makeServiceCIDR("cidrnew", "192.168.0.0/28", ""), metav1.CreateOptions{})
+	if err == nil {
+		s.TearDownFn()
+		t.Fatal("Expected an error creating a new ServiceCIDR but got none")
+	}
+	if !strings.Contains(err.Error(), "only allow changes on the default servicecidr") {
+		s.TearDownFn()
+		t.Fatalf("Expected error to contain 'only allow changes on the default servicecidr', but got: %v", err)
+	}
+
+	// 5. Stop current apiserver and start a new one with dual stack cidrs in the flags
+	s.TearDownFn()
+	apiServerOptionsDual := kubeapiservertesting.NewDefaultTestServerOptions()
+	sDual := kubeapiservertesting.StartTestServerOrDie(t,
+		apiServerOptionsDual,
+		[]string{
+			"--runtime-config=networking.k8s.io/v1=true",
+			"--service-cluster-ip-range=192.168.0.0/24,2001:db8::/112",
+			"--advertise-address=10.1.1.1",
+			"--disable-admission-plugins=ServiceAccount",
+			"--enable-admission-plugins=ValidatingAdmissionPolicy",
+		},
+		etcdOptions)
+	defer sDual.TearDownFn()
+
+	clientsetDual, err := kubernetes.NewForConfig(sDual.ClientConfig)
+	if err != nil {
+		t.Fatalf("Failed to create clientset for dual-stack server: %v", err)
+	}
+
+	// 6. Validate that the default service cidr has been updated
+	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 30*time.Second, true, func(ctx context.Context) (bool, error) {
+		cidr, err := clientsetDual.NetworkingV1().ServiceCIDRs().Get(ctx, "kubernetes", metav1.GetOptions{})
+		if err != nil {
+			// The API server may not be fully ready, so retry on error.
+			t.Logf("failed to get service cidr, retrying: %v", err)
+			return false, nil
+		}
+		if len(cidr.Spec.CIDRs) == 2 {
+			return true, nil
+		}
+		t.Logf("service cidr not updated yet, have: %v", cidr.Spec.CIDRs)
+		return false, nil
+	})
+	if err != nil {
+		t.Fatalf("Failed to wait for default ServiceCIDR to be updated to dual-stack: %v", err)
+	}
+
+	updatedDefaultCIDR, err := clientsetDual.NetworkingV1().ServiceCIDRs().Get(ctx, "kubernetes", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to get updated default ServiceCIDR: %v", err)
+	}
+
+	expectedCIDRs := []string{"192.168.0.0/24", "2001:db8::/112"}
+	sort.Strings(updatedDefaultCIDR.Spec.CIDRs)
+	sort.Strings(expectedCIDRs)
+	if !reflect.DeepEqual(updatedDefaultCIDR.Spec.CIDRs, expectedCIDRs) {
+		t.Errorf("Expected ServiceCIDR to be %v, but got %v", expectedCIDRs, updatedDefaultCIDR.Spec.CIDRs)
+	}
 }

@@ -21,14 +21,16 @@ import (
 	"sort"
 	"sync"
 
+	"k8s.io/klog/v2"
+
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/history"
+	"k8s.io/kubernetes/pkg/controller/statefulset/metrics"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -706,7 +708,7 @@ func updateStatefulSetAfterInvariantEstablished(
 
 	logger := klog.FromContext(ctx)
 	replicaCount := int(*set.Spec.Replicas)
-
+	podManagementPolicy := string(set.Spec.PodManagementPolicy)
 	// we compute the minimum ordinal of the target sequence for a destructive update based on the strategy.
 	updateMin := 0
 	maxUnavailable := 1
@@ -728,17 +730,23 @@ func updateStatefulSetAfterInvariantEstablished(
 	// (MaxUnavailable - Unavailable) Pods, in order with respect to their ordinal for termination. Delete
 	// those pods and count the successful deletions. Update the status with the correct number of deletions.
 	unavailablePods := 0
+
 	for target := len(replicas) - 1; target >= 0; target-- {
 		if isUnavailable(replicas[target], set.Spec.MinReadySeconds) {
 			unavailablePods++
 		}
 	}
+	metrics.UnavailableReplicas.WithLabelValues(set.Namespace, set.Name, podManagementPolicy).Set(float64(unavailablePods))
 
 	if unavailablePods >= maxUnavailable {
-		logger.V(2).Info("StatefulSet found unavailablePods, more than or equal to allowed maxUnavailable",
-			"statefulSet", klog.KObj(set),
-			"unavailablePods", unavailablePods,
-			"maxUnavailable", maxUnavailable)
+		// log only when a true violation occurs.
+		if unavailablePods > maxUnavailable {
+			logger.V(4).Info("StatefulSet found unavailablePods, more than the allowed maxUnavailable",
+				"statefulSet", klog.KObj(set),
+				"unavailablePods", unavailablePods,
+				"maxUnavailable", maxUnavailable)
+		}
+
 		return &status, nil
 	}
 
@@ -749,9 +757,9 @@ func updateStatefulSetAfterInvariantEstablished(
 	deletedPods := 0
 	for target := len(replicas) - 1; target >= updateMin && deletedPods < podsToDelete; target-- {
 
-		// delete the Pod if it is healthy and the revision doesnt match the target
+		// delete the Pod if it is healthy and the revision does not match the target
 		if getPodRevision(replicas[target]) != updateRevision.Name && !isTerminating(replicas[target]) {
-			// delete the Pod if it is healthy and the revision doesnt match the target
+			// delete the Pod if it is healthy and the revision does not match the target
 			logger.V(2).Info("StatefulSet terminating Pod for update",
 				"statefulSet", klog.KObj(set),
 				"pod", klog.KObj(replicas[target]))
@@ -777,6 +785,21 @@ func (ssc *defaultStatefulSetControl) updateStatefulSetStatus(
 	// complete any in progress rolling update if necessary
 	completeRollingUpdate(set, status)
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.MaxUnavailableStatefulSet) {
+		// Update metrics - this ensures metrics are always updated regardless of update strategy
+		podManagementPolicy := string(set.Spec.PodManagementPolicy)
+		replicaCount := int(*set.Spec.Replicas)
+
+		var err error
+		maxUnavailable := 1
+		if set.Spec.UpdateStrategy.RollingUpdate != nil {
+			maxUnavailable, err = getStatefulSetMaxUnavailable(set.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable, replicaCount)
+			if err != nil {
+				return err
+			}
+		}
+		metrics.MaxUnavailable.WithLabelValues(set.Namespace, set.Name, podManagementPolicy).Set(float64(maxUnavailable))
+	}
 	// if the status is not inconsistent do not perform an update
 	if !inconsistentStatus(set, status) {
 		return nil

@@ -467,12 +467,7 @@ func addCompletionIndexEnvVariable(container *v1.Container) {
 			return
 		}
 	}
-	var fieldPath string
-	if feature.DefaultFeatureGate.Enabled(features.PodIndexLabel) {
-		fieldPath = fmt.Sprintf("metadata.labels['%s']", batch.JobCompletionIndexAnnotation)
-	} else {
-		fieldPath = fmt.Sprintf("metadata.annotations['%s']", batch.JobCompletionIndexAnnotation)
-	}
+	fieldPath := fmt.Sprintf("metadata.labels['%s']", batch.JobCompletionIndexAnnotation)
 	container.Env = append(container.Env, v1.EnvVar{
 		Name: completionIndexEnvName,
 		ValueFrom: &v1.EnvVarSource{

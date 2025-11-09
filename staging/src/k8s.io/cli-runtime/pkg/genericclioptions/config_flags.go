@@ -170,12 +170,15 @@ func (f *ConfigFlags) toRawKubeConfigLoader() clientcmd.ClientConfig {
 	// bind auth info flag values to overrides
 	if f.CertFile != nil {
 		overrides.AuthInfo.ClientCertificate = *f.CertFile
+		overrides.AuthInfo.ClientCertificateData = nil
 	}
 	if f.KeyFile != nil {
 		overrides.AuthInfo.ClientKey = *f.KeyFile
+		overrides.AuthInfo.ClientKeyData = nil
 	}
 	if f.BearerToken != nil {
 		overrides.AuthInfo.Token = *f.BearerToken
+		overrides.AuthInfo.TokenFile = ""
 	}
 	if f.Impersonate != nil {
 		overrides.AuthInfo.Impersonate = *f.Impersonate

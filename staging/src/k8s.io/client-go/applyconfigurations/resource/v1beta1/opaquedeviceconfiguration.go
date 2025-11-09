@@ -35,7 +35,7 @@ type OpaqueDeviceConfigurationApplyConfiguration struct {
 	// to decide whether it needs to validate them.
 	//
 	// Must be a DNS subdomain and should end with a DNS domain owned by the
-	// vendor of the driver.
+	// vendor of the driver. It should use only lower case characters.
 	Driver *string `json:"driver,omitempty"`
 	// Parameters can contain arbitrary data. It is the responsibility of
 	// the driver developer to handle validation and versioning. Typically this

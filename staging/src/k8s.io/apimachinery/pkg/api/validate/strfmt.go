@@ -18,6 +18,8 @@ package validate
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/api/validate/content"
@@ -70,6 +72,63 @@ func LongName[T ~string](_ context.Context, op operation.Operation, fldPath *fie
 	return allErrs
 }
 
+// LabelKey verifies that the specified value is a valid label key.
+// A label key is composed of an optional prefix and a name, separated by a '/'.
+// The name part is required and must:
+//   - be 63 characters or less
+//   - begin and end with an alphanumeric character ([a-z0-9A-Z])
+//   - contain only alphanumeric characters, dashes (-), underscores (_), or dots (.)
+//
+// The prefix is optional and must:
+//   - be a DNS subdomain
+//   - be no more than 253 characters
+func LabelKey[T ~string](_ context.Context, op operation.Operation, fldPath *field.Path, value, _ *T) field.ErrorList {
+	if value == nil {
+		return nil
+	}
+	var allErrs field.ErrorList
+	for _, msg := range content.IsLabelKey((string)(*value)) {
+		allErrs = append(allErrs, field.Invalid(fldPath, *value, msg).WithOrigin("format=k8s-label-key"))
+	}
+	return allErrs
+}
+
+// LongNameCaseless verifies that the specified value is a valid "long name"
+// (sometimes known as a "DNS subdomain"), but is case-insensitive.
+//   - must not be empty
+//   - must be less than 254 characters long
+//   - each element must start and end with alphanumeric characters
+//   - each element must contain only alphanumeric characters or dashes
+//
+// Deprecated: Case-insensitive names are not recommended as they can lead to ambiguity
+// (e.g., 'Foo', 'FOO', and 'foo' would be allowed names for foo). Use LongName for strict, lowercase validation.
+func LongNameCaseless[T ~string](_ context.Context, op operation.Operation, fldPath *field.Path, value, _ *T) field.ErrorList {
+	if value == nil {
+		return nil
+	}
+	var allErrs field.ErrorList
+	for _, msg := range content.IsDNS1123SubdomainCaseless((string)(*value)) {
+		allErrs = append(allErrs, field.Invalid(fldPath, *value, msg).WithOrigin("format=k8s-long-name-caseless"))
+	}
+	return allErrs
+}
+
+// LabelValue verifies that the specified value is a valid label value.
+//   - can be empty
+//   - must be no more than 63 characters
+//   - must start and end with alphanumeric characters
+//   - must contain only alphanumeric characters, dashes, underscores, or dots
+func LabelValue[T ~string](_ context.Context, op operation.Operation, fldPath *field.Path, value, _ *T) field.ErrorList {
+	if value == nil {
+		return nil
+	}
+	var allErrs field.ErrorList
+	for _, msg := range content.IsLabelValue((string)(*value)) {
+		allErrs = append(allErrs, field.Invalid(fldPath, *value, msg).WithOrigin("format=k8s-label-value"))
+	}
+	return allErrs
+}
+
 // UUID verifies that the specified value is a valid UUID (RFC 4122).
 //   - must be 36 characters long
 //   - must be in the normalized form `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`
@@ -97,4 +156,27 @@ func UUID[T ~string](_ context.Context, op operation.Operation, fldPath *field.P
 		}
 	}
 	return nil
+}
+
+// ResourcePoolName verifies that the specified value is one or more valid "long name"
+// parts separated by a '/' and no longer than 253 characters.
+func ResourcePoolName[T ~string](ctx context.Context, op operation.Operation, fldPath *field.Path, value, _ *T) field.ErrorList {
+	if value == nil {
+		return nil
+	}
+	val := (string)(*value)
+	var allErrs field.ErrorList
+	if len(val) > 253 {
+		allErrs = append(allErrs, field.TooLong(fldPath, val, 253))
+	}
+	parts := strings.Split(val, "/")
+	for i, part := range parts {
+		if len(part) == 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath, val, fmt.Sprintf("segment %d: must not be empty", i)))
+			continue
+		}
+		// Note that we are overwriting the origin from the underlying LongName validation.
+		allErrs = append(allErrs, LongName(ctx, op, fldPath, &part, nil).PrefixDetail(fmt.Sprintf("segment %d: ", i))...)
+	}
+	return allErrs.WithOrigin("format=k8s-resource-pool-name")
 }

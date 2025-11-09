@@ -20,8 +20,10 @@ import (
 	"context"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -50,7 +52,9 @@ func (deviceClassStrategy) PrepareForCreate(ctx context.Context, obj runtime.Obj
 
 func (deviceClassStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	deviceClass := obj.(*resource.DeviceClass)
-	return validation.ValidateDeviceClass(deviceClass)
+	errorList := validation.ValidateDeviceClass(deviceClass)
+
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, deviceClass, nil, errorList, operation.Create)
 }
 
 func (deviceClassStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
@@ -77,8 +81,13 @@ func (deviceClassStrategy) PrepareForUpdate(ctx context.Context, obj, old runtim
 }
 
 func (deviceClassStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	errorList := validation.ValidateDeviceClass(obj.(*resource.DeviceClass))
-	return append(errorList, validation.ValidateDeviceClassUpdate(obj.(*resource.DeviceClass), old.(*resource.DeviceClass))...)
+	newClass := obj.(*resource.DeviceClass)
+	oldClass := old.(*resource.DeviceClass)
+
+	errorList := validation.ValidateDeviceClass(newClass)
+	errorList = append(errorList, validation.ValidateDeviceClassUpdate(newClass, oldClass)...)
+
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newClass, oldClass, errorList, operation.Update)
 }
 
 func (deviceClassStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {

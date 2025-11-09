@@ -151,6 +151,7 @@ message AdmissionResponse {
   // Limit warnings to 120 characters if possible.
   // Warnings over 256 characters and large numbers of warnings may be truncated.
   // +optional
+  // +listType=atomic
   repeated string warnings = 7;
 }
 

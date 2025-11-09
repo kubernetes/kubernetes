@@ -29,12 +29,10 @@ import (
 type probeFn func() []volume.VolumePlugin
 
 func appendPluginBasedOnFeatureFlags(logger klog.Logger, plugins []volume.VolumePlugin, inTreePluginName string, featureGate featuregate.FeatureGate, pluginInfo pluginInfo) ([]volume.VolumePlugin, error) {
-
 	_, err := csimigration.CheckMigrationFeatureFlags(featureGate, pluginInfo.pluginMigrationFeature, pluginInfo.pluginUnregisterFeature)
 	if err != nil {
 		logger.Error(err, "Unexpected CSI Migration Feature Flags combination detected. CSI Migration may not take effect")
-		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
-		// TODO: fail and return here once alpha only tests can set the feature flags for a plugin correctly
+		return nil, err
 	}
 
 	// Skip appending the in-tree plugin to the list of plugins to be probed/initialized

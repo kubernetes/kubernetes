@@ -29,12 +29,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	api "k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
 )
 
@@ -93,35 +90,7 @@ func testDeclarativeValidateForDeclarative(t *testing.T, apiVersion string) {
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
-			var declarativeTakeoverErrs field.ErrorList
-			var imperativeErrs field.ErrorList
-			for _, gateVal := range []bool{true, false} {
-				// We only need to test both gate enabled and disabled together, because
-				// 1) the DeclarativeValidationTakeover won't take effect if DeclarativeValidation is disabled.
-				// 2) the validation output, when only DeclarativeValidation is enabled, is the same as when both gates are disabled.
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeclarativeValidation, gateVal)
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeclarativeValidationTakeover, gateVal)
-
-				errs := Strategy.Validate(ctx, &tc.input)
-				if gateVal {
-					declarativeTakeoverErrs = errs
-				} else {
-					imperativeErrs = errs
-				}
-				// The errOutputMatcher is used to verify the output matches the expected errors in test cases.
-				errOutputMatcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin()
-				if len(tc.expectedErrs) > 0 {
-					errOutputMatcher.Test(t, tc.expectedErrs, errs)
-				} else if len(errs) != 0 {
-					t.Errorf("expected no errors, but got: %v", errs)
-				}
-			}
-			// The equivalenceMatcher is used to verify the output errors from hand-written imperative validation
-			// are equivalent to the output errors when DeclarativeValidationTakeover is enabled.
-			equivalenceMatcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin()
-			equivalenceMatcher.Test(t, imperativeErrs, declarativeTakeoverErrs)
-
-			apitesting.VerifyVersionedValidationEquivalence(t, &tc.input, nil)
+			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, Strategy.Validate, tc.expectedErrs)
 		})
 	}
 }
@@ -208,6 +177,11 @@ func testValidateUpdateForDeclarative(t *testing.T, apiVersion string) {
 			),
 			subresources: []string{"/approval"}, // Can only modify Approved and Denied conditions on /approval subresource
 		},
+		"ratcheting: allow existing duplicate types - valid": {
+			old:          makeValidCSR(withApprovedCondition(), withApprovedCondition(), withDeniedCondition(), withDeniedCondition()),
+			update:       makeValidCSR(withDeniedCondition(), withDeniedCondition(), withApprovedCondition(), withApprovedCondition()),
+			subresources: []string{"/status"},
+		},
 	}
 
 	for k, tc := range testCases {
@@ -226,49 +200,7 @@ func testValidateUpdateForDeclarative(t *testing.T, apiVersion string) {
 
 				tc.old.ResourceVersion = "1"
 				tc.update.ResourceVersion = "1"
-				var declarativeTakeoverErrs field.ErrorList
-				var imperativeErrs field.ErrorList
-				for _, gateVal := range []bool{true, false} {
-					// We only need to test both gate enabled and disabled together, because
-					// 1) the DeclarativeValidationTakeover won't take effect if DeclarativeValidation is disabled.
-					// 2) the validation output, when only DeclarativeValidation is enabled, is the same as when both gates are disabled.
-					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeclarativeValidation, gateVal)
-					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeclarativeValidationTakeover, gateVal)
-					errs := strategy.ValidateUpdate(ctx, &tc.update, &tc.old)
-					if gateVal {
-						declarativeTakeoverErrs = errs
-					} else {
-						imperativeErrs = errs
-					}
-					// The errOutputMatcher is used to verify the output matches the expected errors in test cases.
-					errOutputMatcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin()
-
-					if len(tc.expectedErrs) > 0 {
-						errOutputMatcher.Test(t, tc.expectedErrs, errs)
-					} else if len(errs) != 0 {
-						t.Errorf("expected no errors, but got: %v", errs)
-					}
-				}
-				// The equivalenceMatcher is used to verify the output errors from hand-written imperative validation
-				// are equivalent to the output errors when DeclarativeValidationTakeover is enabled.
-				equivalenceMatcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin()
-				// TODO: remove this once ErrorMatcher has been extended to handle this form of deduplication.
-				dedupedImperativeErrs := field.ErrorList{}
-				for _, err := range imperativeErrs {
-					found := false
-					for _, existingErr := range dedupedImperativeErrs {
-						if equivalenceMatcher.Matches(existingErr, err) {
-							found = true
-							break
-						}
-					}
-					if !found {
-						dedupedImperativeErrs = append(dedupedImperativeErrs, err)
-					}
-				}
-				equivalenceMatcher.Test(t, dedupedImperativeErrs, declarativeTakeoverErrs)
-
-				apitesting.VerifyVersionedValidationEquivalence(t, &tc.update, &tc.old)
+				apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, strategy.ValidateUpdate, tc.expectedErrs)
 			})
 		}
 	}

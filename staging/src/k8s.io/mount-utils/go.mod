@@ -2,9 +2,9 @@
 
 module k8s.io/mount-utils
 
-go 1.24.0
+go 1.25.0
 
-godebug default=go1.24
+godebug default=go1.25
 
 require (
 	github.com/moby/sys/mountinfo v0.7.2

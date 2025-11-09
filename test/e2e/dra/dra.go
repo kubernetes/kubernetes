@@ -1924,6 +1924,48 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		drautils.TestContainerEnv(ctx, f, pod, pod.Spec.Containers[0].Name, false, containerEnv...)
 	}
 
+	runExtendedClaimCleanup := func(ctx context.Context, b *drautils.Builder, shellScript string, waitFn func(context.Context, *v1.Pod) error, cleanupMessage string) {
+		pod := b.Pod()
+		res := v1.ResourceList{}
+		res[v1.ResourceName(b.ExtendedResourceName(0))] = resource.MustParse("1")
+		pod.Spec.Containers[0].Resources.Requests = res
+		pod.Spec.Containers[0].Resources.Limits = res
+
+		pod.Spec.Containers[0].Command = []string{"/bin/sh"}
+		pod.Spec.Containers[0].Args = []string{"-c", shellScript}
+		pod.Spec.RestartPolicy = v1.RestartPolicyNever
+
+		ginkgo.By("Creating the pod with extended resource")
+		b.Create(ctx, pod)
+		err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
+		framework.ExpectNoError(err, "start pod")
+
+		ginkgo.By("Verifying extended resource claim exists")
+		var extendedResourceClaim *resourceapi.ResourceClaim
+		gomega.Eventually(ctx, func(ctx context.Context) bool {
+			updatedPod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+			if err != nil {
+				return false
+			}
+			if updatedPod.Status.ExtendedResourceClaimStatus == nil {
+				return false
+			}
+			claimName := updatedPod.Status.ExtendedResourceClaimStatus.ResourceClaimName
+			extendedResourceClaim, err = b.ClientV1().ResourceClaims(pod.Namespace).Get(ctx, claimName, metav1.GetOptions{})
+			return err == nil && extendedResourceClaim != nil
+		}).WithTimeout(time.Minute).Should(gomega.BeTrueBecause("extended resource claim should be created"))
+
+		ginkgo.By("Waiting for the pod to reach terminal state")
+		err = waitFn(ctx, pod)
+		framework.ExpectNoError(err, "waiting for pod to reach terminal state")
+
+		ginkgo.By("Verifying extended resource claim is cleaned up")
+		gomega.Eventually(ctx, func(ctx context.Context) bool {
+			_, err := b.ClientV1().ResourceClaims(pod.Namespace).Get(ctx, extendedResourceClaim.Name, metav1.GetOptions{})
+			return apierrors.IsNotFound(err)
+		}).WithTimeout(time.Minute).Should(gomega.BeTrueBecause("extended resource claim should be automatically deleted when pod %s", cleanupMessage))
+	}
+
 	framework.Context(f.WithFeatureGate(features.DRAExtendedResource), func() {
 		nodes := drautils.NewNodes(f, 1, 1)
 		driver := drautils.NewDriver(f, nodes, drautils.NetworkResources(10, false))
@@ -2045,6 +2087,28 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 				"container_2_request_2", "true",
 			}
 			drautils.TestContainerEnv(ctx, f, pod, pod.Spec.Containers[2].Name, false, containerEnv...)
+		})
+
+		ginkgo.It("must cleanup extended resource claims when pods complete", func(ctx context.Context) {
+			runExtendedClaimCleanup(ctx, b,
+				"echo 'Pod started with extended resource'; sleep 2; echo 'Pod completed successfully'",
+				func(ctx context.Context, p *v1.Pod) error {
+					return e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, p.Name, p.Namespace)
+				},
+				"completes",
+			)
+		})
+
+		ginkgo.It("must cleanup extended resource claims when pods fail", func(ctx context.Context) {
+			runExtendedClaimCleanup(ctx, b,
+				"echo 'Pod started with extended resource'; sleep 2; echo 'Pod failing now'; exit 1",
+				func(ctx context.Context, p *v1.Pod) error {
+					return e2epod.WaitForPodCondition(ctx, f.ClientSet, p.Namespace, p.Name, "pod failed", framework.PodStartTimeout, func(pod *v1.Pod) (bool, error) {
+						return pod.Status.Phase == v1.PodFailed, nil
+					})
+				},
+				"fails",
+			)
 		})
 	})
 

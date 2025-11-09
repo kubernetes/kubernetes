@@ -21,10 +21,12 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
+
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apiresource "k8s.io/apimachinery/pkg/api/resource"
@@ -65,11 +67,11 @@ func validatePoolName(name string, fldPath *field.Path) field.ErrorList {
 		allErrs = append(allErrs, field.Required(fldPath, ""))
 	} else {
 		if len(name) > resource.PoolNameMaxLength {
-			allErrs = append(allErrs, field.TooLong(fldPath, "" /*unused*/, resource.PoolNameMaxLength))
+			allErrs = append(allErrs, field.TooLong(fldPath, "" /*unused*/, resource.PoolNameMaxLength).WithOrigin("format=k8s-resource-pool-name"))
 		}
 		parts := strings.Split(name, "/")
 		for _, part := range parts {
-			allErrs = append(allErrs, corevalidation.ValidateDNS1123Subdomain(part, fldPath)...)
+			allErrs = append(allErrs, corevalidation.ValidateDNS1123Subdomain(part, fldPath).WithOrigin("format=k8s-resource-pool-name")...)
 		}
 	}
 	return allErrs
@@ -95,11 +97,10 @@ func ValidateResourceClaim(resourceClaim *resource.ResourceClaim) field.ErrorLis
 // ValidateResourceClaimUpdate tests if an update to ResourceClaim is valid.
 func ValidateResourceClaimUpdate(resourceClaim, oldClaim *resource.ResourceClaim) field.ErrorList {
 	allErrs := corevalidation.ValidateObjectMetaUpdate(&resourceClaim.ObjectMeta, &oldClaim.ObjectMeta, field.NewPath("metadata"))
+	// The spec is immutable. On update, we only check for immutability.
+	// Re-validating other fields is skipped because the user cannot change them;
+	// the only actionable error is for the immutability violation.
 	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(resourceClaim.Spec, oldClaim.Spec, field.NewPath("spec"))...)
-	// Because the spec is immutable, all CEL expressions in it must have been stored.
-	// If the user tries an update, this is not true and checking is less strict, but
-	// as there are errors, it doesn't matter.
-	allErrs = append(allErrs, validateResourceClaimSpec(&resourceClaim.Spec, field.NewPath("spec"), true)...)
 	return allErrs
 }
 
@@ -580,11 +581,10 @@ func validateResourceClaimTemplateSpec(spec *resource.ResourceClaimTemplateSpec,
 // ValidateResourceClaimTemplateUpdate tests if an update to template is valid.
 func ValidateResourceClaimTemplateUpdate(template, oldTemplate *resource.ResourceClaimTemplate) field.ErrorList {
 	allErrs := corevalidation.ValidateObjectMetaUpdate(&template.ObjectMeta, &oldTemplate.ObjectMeta, field.NewPath("metadata"))
+	// The spec is immutable. On update, we only check for immutability.
+	// Re-validating other fields is skipped because the user cannot change them;
+	// the only actionable error is for the immutability violation.
 	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(template.Spec, oldTemplate.Spec, field.NewPath("spec"))...)
-	// Because the spec is immutable, all CEL expressions in it must have been stored.
-	// If the user tries an update, this is not true and checking is less strict, but
-	// as there are errors, it doesn't matter.
-	allErrs = append(allErrs, validateResourceClaimTemplateSpec(&template.Spec, field.NewPath("spec"), true)...)
 	return allErrs
 }
 
@@ -1097,28 +1097,49 @@ func validateCIdentifier(id string, fldPath *field.Path) field.ErrorList {
 	return allErrs
 }
 
+// validationOption is an option for validation.
+type validationOption int
+
+const (
+	// The validation of each item is covered by declarative validation.
+	itemsCovered validationOption = iota
+	// The list size check is covered by declarative validation.
+	sizeCovered
+	// The uniqueness check is covered by declarative validation.
+	uniquenessCovered
+)
+
 // validateSlice ensures that a slice does not exceed a certain maximum size
 // and that all entries are valid.
 // A negative maxSize disables the length check.
-func validateSlice[T any](slice []T, maxSize int, validateItem func(T, *field.Path) field.ErrorList, fldPath *field.Path) field.ErrorList {
+func validateSlice[T any](slice []T, maxSize int, validateItem func(T, *field.Path) field.ErrorList, fldPath *field.Path, opts ...validationOption) field.ErrorList {
 	var allErrs field.ErrorList
 	for i, item := range slice {
 		idxPath := fldPath.Index(i)
-		allErrs = append(allErrs, validateItem(item, idxPath)...)
+		errs := validateItem(item, idxPath)
+		if slices.Contains(opts, itemsCovered) {
+			errs = errs.MarkCoveredByDeclarative()
+		}
+		allErrs = append(allErrs, errs...)
 	}
 	if maxSize >= 0 && len(slice) > maxSize {
 		// Dumping the entire field into the error message is likely to be too long,
 		// in particular when it is already beyond the maximum size. Instead this
 		// just shows the number of entries.
-		allErrs = append(allErrs, field.TooMany(fldPath, len(slice), maxSize))
+		err := field.TooMany(fldPath, len(slice), maxSize)
+		if slices.Contains(opts, sizeCovered) {
+			err = err.MarkCoveredByDeclarative()
+		}
+		allErrs = append(allErrs, err)
 	}
 	return allErrs
 }
 
 // validateSet ensures that a slice contains no duplicates, does not
 // exceed a certain maximum size and that all entries are valid.
-func validateSet[T any, K comparable](slice []T, maxSize int, validateItem func(item T, fldPath *field.Path) field.ErrorList, itemKey func(T) (K, string), fldPath *field.Path) field.ErrorList {
-	allErrs := validateSlice(slice, maxSize, validateItem, fldPath)
+func validateSet[T any, K comparable](slice []T, maxSize int, validateItem func(item T, fldPath *field.Path) field.ErrorList, itemKey func(T) (K, string), fldPath *field.Path, opts ...validationOption) field.ErrorList {
+	allErrs := validateSlice(slice, maxSize, validateItem, fldPath, opts...)
+
 	allItems := sets.New[K]()
 	for i, item := range slice {
 		idxPath := fldPath.Index(i)
@@ -1128,7 +1149,11 @@ func validateSet[T any, K comparable](slice []T, maxSize int, validateItem func(
 			childPath = childPath.Child(fieldName)
 		}
 		if allItems.Has(key) {
-			allErrs = append(allErrs, field.Duplicate(childPath, key))
+			err := field.Duplicate(childPath, key)
+			if slices.Contains(opts, uniquenessCovered) {
+				err = err.MarkCoveredByDeclarative()
+			}
+			allErrs = append(allErrs, err)
 		} else {
 			allItems.Insert(key)
 		}
@@ -1183,7 +1208,7 @@ func truncateIfTooLong(str string, maxLen int) string {
 func validateDeviceStatus(device resource.AllocatedDeviceStatus, fldPath *field.Path, allocatedDevices sets.Set[structured.SharedDeviceID]) field.ErrorList {
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, validateDriverName(device.Driver, fldPath.Child("driver"))...)
-	allErrs = append(allErrs, validatePoolName(device.Pool, fldPath.Child("pool"))...)
+	allErrs = append(allErrs, validatePoolName(device.Pool, fldPath.Child("pool")).MarkCoveredByDeclarative()...)
 	allErrs = append(allErrs, validateDeviceName(device.Device, fldPath.Child("device"))...)
 	if device.ShareID != nil {
 		allErrs = append(allErrs, validateUID(*device.ShareID, fldPath.Child("shareID"))...)

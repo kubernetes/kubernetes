@@ -49,6 +49,17 @@ type Struct struct {
 	// +k8s:unique=map
 	// +k8s:listMapKey=key
 	AtomicListUniqueMap []Item `json:"atomicListUniqueMap"`
+
+	// customUnique with listType=set
+	// +k8s:listType=set
+	// +k8s:customUnique
+	CustomUniqueListWithTypeSet []string `json:"customUniqueListWithTypeSet"`
+
+	// customUnique with listType=map
+	// +k8s:listType=map
+	// +k8s:listMapKey=key
+	// +k8s:customUnique
+	CustomUniqueListWithTypeMap []Item `json:"customUniqueListWithTypeMap"`
 }
 
 type Item struct {

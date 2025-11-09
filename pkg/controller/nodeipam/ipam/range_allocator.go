@@ -183,7 +183,7 @@ func (r *rangeAllocator) Run(ctx context.Context) {
 	logger.Info("Starting range CIDR allocator")
 	defer logger.Info("Shutting down range CIDR allocator")
 
-	if !cache.WaitForNamedCacheSync("cidrallocator", ctx.Done(), r.nodesSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, r.nodesSynced) {
 		return
 	}
 

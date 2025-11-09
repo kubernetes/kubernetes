@@ -23,11 +23,12 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/operation"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	validationmetrics "k8s.io/apiserver/pkg/validation"
 	"k8s.io/klog/v2"
 )
@@ -41,13 +42,6 @@ type ValidationConfig func(*validationConfigOption)
 func WithOptions(options []string) ValidationConfig {
 	return func(config *validationConfigOption) {
 		config.options = options
-	}
-}
-
-// WithTakeover sets the takeover flag for validation.
-func WithTakeover(takeover bool) ValidationConfig {
-	return func(config *validationConfigOption) {
-		config.takeover = takeover
 	}
 }
 
@@ -79,30 +73,10 @@ type validationConfigOption struct {
 	options              []string
 	takeover             bool
 	subresourceGVKMapper GroupVersionKindProvider
+	validationIdentifier string
 }
 
-// ValidateDeclaratively validates obj against declarative validation tags
-// defined in its Go type. It uses the API version extracted from ctx and the
-// provided scheme for validation.
-//
-// The ctx MUST contain requestInfo, which determines the target API for
-// validation. The obj is converted to the API version using the provided scheme
-// before validation occurs. The scheme MUST have the declarative validation
-// registered for the requested resource/subresource.
-//
-// Returns a field.ErrorList containing any validation errors. An internal error
-// is included if requestInfo is missing from the context or if version
-// conversion fails.
-func ValidateDeclaratively(ctx context.Context, scheme *runtime.Scheme, obj runtime.Object, configOpts ...ValidationConfig) field.ErrorList {
-	cfg := &validationConfigOption{opType: operation.Create}
-	for _, o := range configOpts {
-		o(cfg)
-	}
-
-	return panicSafeValidateFunc(validateDeclaratively, cfg.takeover)(ctx, scheme, obj, nil, cfg)
-}
-
-// ValidateUpdateDeclaratively validates obj and oldObj against declarative
+// validateDeclaratively validates obj and oldObj against declarative
 // validation tags defined in its Go type. It uses the API version extracted from
 // ctx and the provided scheme for validation.
 //
@@ -114,14 +88,6 @@ func ValidateDeclaratively(ctx context.Context, scheme *runtime.Scheme, obj runt
 // Returns a field.ErrorList containing any validation errors. An internal error
 // is included if requestInfo is missing from the context or if version
 // conversion fails.
-func ValidateUpdateDeclaratively(ctx context.Context, scheme *runtime.Scheme, obj, oldObj runtime.Object, configOpts ...ValidationConfig) field.ErrorList {
-	cfg := &validationConfigOption{opType: operation.Update}
-	for _, o := range configOpts {
-		o(cfg)
-	}
-	return panicSafeValidateFunc(validateDeclaratively, cfg.takeover)(ctx, scheme, obj, oldObj, cfg)
-}
-
 func validateDeclaratively(ctx context.Context, scheme *runtime.Scheme, obj, oldObj runtime.Object, o *validationConfigOption) field.ErrorList {
 	// Find versionedGroupVersion, which identifies the API version to use for declarative validation.
 	versionedGroupVersion, subresources, err := requestInfo(ctx, o.subresourceGVKMapper)
@@ -178,9 +144,9 @@ func parseSubresourcePath(subresourcePath string) ([]string, error) {
 	return parts, nil
 }
 
-// CompareDeclarativeErrorsAndEmitMismatches checks for mismatches between imperative and declarative validation
+// compareDeclarativeErrorsAndEmitMismatches checks for mismatches between imperative and declarative validation
 // and logs + emits metrics when inconsistencies are found
-func CompareDeclarativeErrorsAndEmitMismatches(ctx context.Context, imperativeErrs, declarativeErrs field.ErrorList, takeover bool) {
+func compareDeclarativeErrorsAndEmitMismatches(ctx context.Context, imperativeErrs, declarativeErrs field.ErrorList, takeover bool, validationIdentifier string) {
 	logger := klog.FromContext(ctx)
 	mismatchDetails := gatherDeclarativeValidationMismatches(imperativeErrs, declarativeErrs, takeover)
 	for _, detail := range mismatchDetails {
@@ -188,7 +154,7 @@ func CompareDeclarativeErrorsAndEmitMismatches(ctx context.Context, imperativeEr
 		logger.Error(nil, detail)
 
 		// Increment the metric for the mismatch
-		validationmetrics.Metrics.IncDeclarativeValidationMismatchMetric()
+		validationmetrics.Metrics.IncDeclarativeValidationMismatchMetric(validationIdentifier)
 	}
 }
 
@@ -288,12 +254,12 @@ func gatherDeclarativeValidationMismatches(imperativeErrs, declarativeErrs field
 
 // createDeclarativeValidationPanicHandler returns a function with panic recovery logic
 // that will increment the panic metric and either log or append errors based on the takeover parameter.
-func createDeclarativeValidationPanicHandler(ctx context.Context, errs *field.ErrorList, takeover bool) func() {
+func createDeclarativeValidationPanicHandler(ctx context.Context, errs *field.ErrorList, takeover bool, validationIdentifier string) func() {
 	logger := klog.FromContext(ctx)
 	return func() {
 		if r := recover(); r != nil {
 			// Increment the panic metric counter
-			validationmetrics.Metrics.IncDeclarativeValidationPanicMetric()
+			validationmetrics.Metrics.IncDeclarativeValidationPanicMetric(validationIdentifier)
 
 			const errorFmt = "panic during declarative validation: %v"
 			if takeover {
@@ -313,13 +279,87 @@ func createDeclarativeValidationPanicHandler(ctx context.Context, errs *field.Er
 // if takeover=false, and adding a validation error if takeover=true.
 func panicSafeValidateFunc(
 	validateUpdateFunc func(ctx context.Context, scheme *runtime.Scheme, obj, oldObj runtime.Object, o *validationConfigOption) field.ErrorList,
-	takeover bool,
+	takeover bool, validationIdentifier string,
 ) func(ctx context.Context, scheme *runtime.Scheme, obj, oldObj runtime.Object, o *validationConfigOption) field.ErrorList {
 	return func(ctx context.Context, scheme *runtime.Scheme, obj, oldObj runtime.Object, o *validationConfigOption) (errs field.ErrorList) {
-		defer createDeclarativeValidationPanicHandler(ctx, &errs, takeover)()
+		defer createDeclarativeValidationPanicHandler(ctx, &errs, takeover, validationIdentifier)()
 
 		return validateUpdateFunc(ctx, scheme, obj, oldObj, o)
 	}
+}
+
+func metricIdentifier(ctx context.Context, obj runtime.Object, opType operation.Type) (string, error) {
+	var identifier string
+	var err error
+
+	identifier = "unknown_resource"
+	// Use kind for identifier.
+	if obj != nil {
+		gvk := obj.GetObjectKind().GroupVersionKind()
+		if gvk.Kind != "" {
+			identifier = strings.ToLower(gvk.Kind)
+		}
+	}
+
+	// Use requestInfo for subresource.
+	requestInfo, found := genericapirequest.RequestInfoFrom(ctx)
+	if !found {
+		err = fmt.Errorf("could not find requestInfo in context")
+	} else if len(requestInfo.Subresource) > 0 {
+		// subresource can be a path, so replace '/' with '_'
+		identifier += "_" + strings.ReplaceAll(requestInfo.Subresource, "/", "_")
+	}
+
+	switch opType {
+	case operation.Create:
+		identifier += "_create"
+	case operation.Update:
+		identifier += "_update"
+	default:
+		if err == nil {
+			err = fmt.Errorf("unknown operation type: %v", opType)
+		}
+		identifier += "_unknown_op"
+	}
+	return identifier, err
+}
+
+// ValidateDeclarativelyWithMigrationChecks is a helper function that encapsulates the logic for running declarative validation.
+// It checks if the DeclarativeValidation feature gate is enabled, generates a validation identifier,
+// runs declarative validation, compares the results with imperative validation, and merges the errors if takeover is enabled.
+func ValidateDeclarativelyWithMigrationChecks(ctx context.Context, scheme *runtime.Scheme, obj, oldObj runtime.Object, errs field.ErrorList, opType operation.Type, configOpts ...ValidationConfig) field.ErrorList {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidation) {
+		return errs
+	}
+
+	takeover := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationTakeover)
+
+	validationIdentifier, err := metricIdentifier(ctx, obj, opType)
+	if err != nil {
+		// Log the error, but continue with the best-effort identifier.
+		klog.FromContext(ctx).Error(err, "failed to generate complete validation identifier for declarative validation")
+	}
+
+	// Directly create the config and call the core validation logic.
+	cfg := &validationConfigOption{
+		opType:               opType,
+		takeover:             takeover,
+		validationIdentifier: validationIdentifier,
+	}
+	for _, opt := range configOpts {
+		opt(cfg)
+	}
+
+	// Call the panic-safe wrapper with the real validation function.
+	declarativeErrs := panicSafeValidateFunc(validateDeclaratively, cfg.takeover, cfg.validationIdentifier)(ctx, scheme, obj, oldObj, cfg)
+
+	compareDeclarativeErrorsAndEmitMismatches(ctx, errs, declarativeErrs, takeover, validationIdentifier)
+
+	if takeover {
+		errs = append(errs.RemoveCoveredByDeclarative(), declarativeErrs...)
+	}
+
+	return errs
 }
 
 // RecordDuplicateValidationErrors increments a metric and log the error when duplicate validation errors are found.

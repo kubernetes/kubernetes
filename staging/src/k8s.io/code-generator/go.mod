@@ -2,9 +2,9 @@
 
 module k8s.io/code-generator
 
-go 1.24.0
+go 1.25.0
 
-godebug default=go1.24
+godebug default=go1.25
 
 require (
 	github.com/gogo/protobuf v1.3.2
@@ -14,7 +14,7 @@ require (
 	go.yaml.in/yaml/v2 v2.4.2
 	golang.org/x/text v0.28.0
 	k8s.io/apimachinery v0.0.0
-	k8s.io/gengo/v2 v2.0.0-20250903151518-081d64401ab4
+	k8s.io/gengo/v2 v2.0.0-20250922181213-ec3ebc5fd46b
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/kube-openapi v0.0.0-20250910181357-589584f1c912
 	k8s.io/utils v0.0.0-20250604170112-4c0f3b243397
@@ -45,7 +45,7 @@ require (
 	google.golang.org/protobuf v1.36.8 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	sigs.k8s.io/json v0.0.0-20241014173422-cfa47c3a1cc8 // indirect
+	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.0 // indirect
 )
 

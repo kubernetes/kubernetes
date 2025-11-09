@@ -18,6 +18,7 @@ package storage
 
 import (
 	"fmt"
+	"strings"
 	"sync/atomic"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -37,6 +38,9 @@ func SimpleUpdate(fn SimpleUpdateFunc) UpdateFunc {
 }
 
 func NamespaceKeyFunc(prefix string, obj runtime.Object) (string, error) {
+	if !strings.HasSuffix(prefix, "/") {
+		return "", fmt.Errorf("prefix should have '/' suffix")
+	}
 	meta, err := meta.Accessor(obj)
 	if err != nil {
 		return "", err
@@ -45,10 +49,13 @@ func NamespaceKeyFunc(prefix string, obj runtime.Object) (string, error) {
 	if msgs := path.IsValidPathSegmentName(name); len(msgs) != 0 {
 		return "", fmt.Errorf("invalid name: %v", msgs)
 	}
-	return prefix + "/" + meta.GetNamespace() + "/" + name, nil
+	return prefix + meta.GetNamespace() + "/" + name, nil
 }
 
 func NoNamespaceKeyFunc(prefix string, obj runtime.Object) (string, error) {
+	if !strings.HasSuffix(prefix, "/") {
+		return "", fmt.Errorf("prefix should have '/' suffix")
+	}
 	meta, err := meta.Accessor(obj)
 	if err != nil {
 		return "", err
@@ -57,7 +64,7 @@ func NoNamespaceKeyFunc(prefix string, obj runtime.Object) (string, error) {
 	if msgs := path.IsValidPathSegmentName(name); len(msgs) != 0 {
 		return "", fmt.Errorf("invalid name: %v", msgs)
 	}
-	return prefix + "/" + name, nil
+	return prefix + name, nil
 }
 
 // HighWaterMark is a thread-safe object for tracking the maximum value seen

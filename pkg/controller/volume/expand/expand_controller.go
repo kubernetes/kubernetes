@@ -327,7 +327,7 @@ func (expc *expandController) Run(ctx context.Context) {
 	logger.Info("Starting expand controller")
 	defer logger.Info("Shutting down expand controller")
 
-	if !cache.WaitForNamedCacheSync("expand", ctx.Done(), expc.pvcsSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, expc.pvcsSynced) {
 		return
 	}
 

@@ -142,7 +142,7 @@ func TestWriteKubeletConfigFiles(t *testing.T) {
 		},
 	}
 	for _, tc := range testCases {
-		err := WriteKubeletConfigFiles(tc.cfg, tempDir, tc.patchesDir, true, os.Stdout)
+		err := WriteKubeletConfigFiles(tc.cfg, tempDir, tempDir, tc.patchesDir, true, os.Stdout)
 		if (err != nil) != tc.expectedError {
 			t.Fatalf("expected error: %v, got: %v, error: %v", tc.expectedError, err != nil, err)
 		}

@@ -40,6 +40,7 @@ import (
 	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edebug "k8s.io/kubernetes/test/e2e/framework/debug"
+	e2eendpointslice "k8s.io/kubernetes/test/e2e/framework/endpointslice"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
 	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
@@ -62,8 +63,6 @@ const (
 	targetPort                      = 8080
 	sidecarTargetPort               = 8081
 	timeoutRC                       = 120 * time.Second
-	startServiceTimeout             = time.Minute
-	startServiceInterval            = 5 * time.Second
 	invalidKind                     = "ERROR: invalid workload kind for resource consumer"
 	customMetricName                = "QPS"
 	serviceInitializationTimeout    = 2 * time.Minute
@@ -613,8 +612,8 @@ func runServiceAndSidecarForResourceConsumer(ctx context.Context, c clientset.In
 
 	framework.ExpectNoError(e2erc.RunRC(ctx, controllerRcConfig))
 	// Wait for endpoints to propagate for the controller service.
-	framework.ExpectNoError(framework.WaitForServiceEndpointsNum(
-		ctx, c, ns, controllerName, 1, startServiceInterval, startServiceTimeout))
+	framework.ExpectNoError(e2eendpointslice.WaitForEndpointCount(
+		ctx, c, ns, controllerName, 1))
 }
 
 func runServiceAndWorkloadForResourceConsumer(ctx context.Context, c clientset.Interface, resourceClient dynamic.ResourceInterface, apiExtensionClient crdclientset.Interface, ns, name string, kind schema.GroupVersionKind, replicas int, cpuLimitMillis, memLimitMb int64, podAnnotations, serviceAnnotations map[string]string, additionalContainers []v1.Container, podResources *v1.ResourceRequirements) {
@@ -699,8 +698,8 @@ func runServiceAndWorkloadForResourceConsumer(ctx context.Context, c clientset.I
 
 	framework.ExpectNoError(e2erc.RunRC(ctx, controllerRcConfig))
 	// Wait for endpoints to propagate for the controller service.
-	framework.ExpectNoError(framework.WaitForServiceEndpointsNum(
-		ctx, c, ns, controllerName, 1, startServiceInterval, startServiceTimeout))
+	framework.ExpectNoError(e2eendpointslice.WaitForEndpointCount(
+		ctx, c, ns, controllerName, 1))
 }
 
 func CreateHorizontalPodAutoscaler(ctx context.Context, rc *ResourceConsumer, targetRef autoscalingv2.CrossVersionObjectReference, namespace string, metrics []autoscalingv2.MetricSpec, resourceType v1.ResourceName, metricTargetType autoscalingv2.MetricTargetType, metricTargetValue, minReplicas, maxReplicas int32) *autoscalingv2.HorizontalPodAutoscaler {

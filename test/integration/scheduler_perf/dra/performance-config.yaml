@@ -27,8 +27,6 @@
 - name: PublishResourceSlices
   featureGates:
     DynamicResourceAllocation: true
-    DRAPrioritizedList: false
-    DRAAdminAccess: false
   workloadTemplate:
   - opcode: createNodes
     countParam: $nodesWithoutDRA
@@ -315,7 +313,6 @@
 - name: SchedulingWithResourceClaim
   featureGates:
     DynamicResourceAllocation: true
-    # SchedulerQueueingHints: true
   workloadTemplate:
   - opcode: createNodes
     countParam: $nodesWithoutDRA
