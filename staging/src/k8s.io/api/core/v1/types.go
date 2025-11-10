@@ -3421,6 +3421,10 @@ const (
 	ResourceHealthStatusUnknown   ResourceHealthStatus = "Unknown"
 )
 
+// ResourceHealthMessageMaxLength is the maximum length for ResourceHealth.Message field.
+// Messages longer than this will be truncated with "..." appended.
+const ResourceHealthMessageMaxLength = 1024
+
 // ResourceID is calculated based on the source of this resource health information.
 // For DevicePlugin:
 //
@@ -3448,6 +3452,12 @@ type ResourceHealth struct {
 	//
 	// In future we may want to introduce the PermanentlyUnhealthy Status.
 	Health ResourceHealthStatus `json:"health,omitempty" protobuf:"bytes,2,name=health"`
+	// Message provides human-readable context for Health (e.g. "ECC error count exceeded threshold").
+	// This field is populated by the kubelet when ResourceHealthStatusMessage is enabled.
+	// +featureGate=ResourceHealthStatusMessage
+	// +optional
+	// +k8s:maxLength=1024
+	Message *string `json:"message,omitempty" protobuf:"bytes,6,opt,name=message"`
 }
 
 // ContainerUser represents user identity information
