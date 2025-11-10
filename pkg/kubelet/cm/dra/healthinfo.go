@@ -121,8 +121,13 @@ func (cache *healthInfoCache) saveToCheckpointInternal() error {
 }
 
 // getHealthInfo returns the current health info, adjusting for timeouts.
-func (cache *healthInfoCache) getHealthInfo(driverName, poolName, deviceName string) state.DeviceHealthStatus {
-	res := state.DeviceHealthStatusUnknown
+func (cache *healthInfoCache) getHealthInfo(driverName, poolName, deviceName string) state.DeviceHealth {
+	res := state.DeviceHealth{
+		PoolName:   poolName,
+		DeviceName: deviceName,
+		Health:     state.DeviceHealthStatusUnknown,
+		Message:    "",
+	}
 
 	_ = cache.withRLock(func() error {
 		now := time.Now()
@@ -137,9 +142,11 @@ func (cache *healthInfoCache) getHealthInfo(driverName, poolName, deviceName str
 
 				// Check if device health has timed out
 				if now.Sub(device.LastUpdated) > timeout {
-					res = state.DeviceHealthStatusUnknown
+					// Keep default Unknown status, clear message for stale device
+					res.Health = state.DeviceHealthStatusUnknown
+					res.Message = ""
 				} else {
-					res = device.Health
+					res = device
 				}
 			}
 		}
@@ -173,7 +180,8 @@ func (cache *healthInfoCache) updateHealthInfo(driverName string, devices []stat
 
 			existingDevice, ok := currentDriver.Devices[key]
 
-			if !ok || existingDevice.Health != reportedDevice.Health || existingDevice.HealthCheckTimeout != reportedDevice.HealthCheckTimeout {
+			// Consider health status, message, and timeout changes as updates
+			if !ok || existingDevice.Health != reportedDevice.Health || existingDevice.Message != reportedDevice.Message || existingDevice.HealthCheckTimeout != reportedDevice.HealthCheckTimeout {
 				changedDevices = append(changedDevices, reportedDevice)
 			}
 
@@ -194,6 +202,7 @@ func (cache *healthInfoCache) updateHealthInfo(driverName string, devices []stat
 				// Mark as unknown if the device health has timed out
 				if existingDevice.Health != state.DeviceHealthStatusUnknown && now.Sub(existingDevice.LastUpdated) > timeout {
 					existingDevice.Health = state.DeviceHealthStatusUnknown
+					existingDevice.Message = ""
 					existingDevice.LastUpdated = now
 					currentDriver.Devices[key] = existingDevice
 

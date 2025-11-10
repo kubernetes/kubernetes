@@ -9501,6 +9501,10 @@ func validateContainerStatusAllocatedResourcesStatus(containerStatuses []core.Co
 					allErrors = append(allErrors, field.NotSupported(fldPath.Index(i).Child("allocatedResourcesStatus").Index(j).Child("resources").Index(k).Child("health"), r.Health, sets.List(supportedResourceHealthValues)))
 				}
 
+				if len(r.Message) > v1.ResourceHealthMessageMaxLength {
+					allErrors = append(allErrors, field.TooLong(fldPath.Index(i).Child("allocatedResourcesStatus").Index(j).Child("resources").Index(k).Child("message"), r.Message, v1.ResourceHealthMessageMaxLength))
+				}
+
 				if uniqueResources.Has(r.ResourceID) {
 					allErrors = append(allErrors, field.Duplicate(fldPath.Index(i).Child("allocatedResourcesStatus").Index(j).Child("resources").Index(k).Child("resourceID"), r.ResourceID))
 				} else {

@@ -1247,6 +1247,7 @@ status:
     - name: nameValue
       resources:
       - health: healthValue
+        message: messageValue
         resourceID: resourceIDValue
     containerID: containerIDValue
     image: imageValue
@@ -1310,6 +1311,7 @@ status:
     - name: nameValue
       resources:
       - health: healthValue
+        message: messageValue
         resourceID: resourceIDValue
     containerID: containerIDValue
     image: imageValue
@@ -1382,6 +1384,7 @@ status:
     - name: nameValue
       resources:
       - health: healthValue
+        message: messageValue
         resourceID: resourceIDValue
     containerID: containerIDValue
     image: imageValue
