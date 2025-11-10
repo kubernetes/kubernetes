@@ -41,6 +41,7 @@ const (
 	SchedulerNameSignerName    = "v1.Pod.Spec.SchedulerName"
 	TolerationsSignerName      = "v1.Pod.Spec.Tolerations"
 	VolumesSignerName          = "v1.Pod.Spec.Volumes.NonSyntheticSources()"
+	FeaturesSignerName         = "v1.Pod.Spec.RequiredFeatures()"
 )
 
 // Common signers. These are either generic or shared across plugins.

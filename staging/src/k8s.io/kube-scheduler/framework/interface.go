@@ -652,6 +652,8 @@ type SignFragment struct {
 	Value any
 }
 
+// If a plugin cannot sign a pod because it has dependencies on other pods, etc, it can always return
+// unsignable. This will effectively disable any signature-based optimizations for the pod.
 const Unsignable = ""
 
 // SignPlugin is an interface that should be implemented by plugins that either filter or score

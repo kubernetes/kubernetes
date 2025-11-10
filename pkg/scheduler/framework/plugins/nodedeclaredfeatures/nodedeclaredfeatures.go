@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"sort"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
@@ -62,6 +63,7 @@ type NodeDeclaredFeatures struct {
 var _ fwk.PreFilterPlugin = &NodeDeclaredFeatures{}
 var _ fwk.FilterPlugin = &NodeDeclaredFeatures{}
 var _ fwk.EnqueueExtensions = &NodeDeclaredFeatures{}
+var _ fwk.SignPlugin = &NodeDeclaredFeatures{}
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *NodeDeclaredFeatures) Name() string {
@@ -125,6 +127,21 @@ func (pl *NodeDeclaredFeatures) Filter(ctx context.Context, cycleState fwk.Cycle
 		return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, fmt.Sprintf("node declared features check failed - unsatisfied requirements: %s", strings.Join(result.UnsatisfiedRequirements, ", ")))
 	}
 	return nil
+}
+
+func (pl *NodeDeclaredFeatures) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
+	podInfo := &ndf.PodInfo{Spec: &pod.Spec}
+	fs, err := pl.ndfFramework.InferForPodScheduling(podInfo, pl.version)
+	if err != nil {
+		return nil, fwk.AsStatus(err)
+	}
+	featuresList := fs.UnsortedList()
+	sort.Slice(featuresList, func(i, j int) bool {
+		return featuresList[i] < featuresList[j]
+	})
+	return []fwk.SignFragment{
+		{Key: fwk.FeaturesSignerName, Value: featuresList},
+	}, nil
 }
 
 // EventsToRegister returns events that may make a pod schedulable. It is required for the EnqueueExtensions interface.
