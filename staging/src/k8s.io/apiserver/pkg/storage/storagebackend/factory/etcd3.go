@@ -315,6 +315,17 @@ var newETCD3Client = func(c storagebackend.TransportConfig) (*kubernetes.Client,
 		// which seems to be what we want as the metrics will be collected on each attempt (retry)
 		grpc.WithChainUnaryInterceptor(grpcprom.UnaryClientInterceptor),
 		grpc.WithChainStreamInterceptor(grpcprom.StreamClientInterceptor),
+		// Use round-robin load balancing with health checking across all etcd endpoints.
+		// The DNS resolver will resolve the service name to individual etcd member IPs,
+		// and round-robin will distribute requests across them. gRPC health checking
+		// will proactively detect soft failures (slow responses, high error rates) in
+		// addition to hard failures detected by TCP keepalives.
+		grpc.WithDefaultServiceConfig(`{
+  "loadBalancingConfig": [{"round_robin": {}}],
+  "healthCheckConfig": {
+    "serviceName": ""
+  }
+}`),
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerTracing) {
 		tracingOpts := []otelgrpc.Option{
