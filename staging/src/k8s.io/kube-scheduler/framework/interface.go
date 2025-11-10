@@ -648,7 +648,8 @@ type SignFragment struct {
 	//	"v1.Pod.Volumes.EphemeralVolumes()"
 	Key string
 
-	// The value of a SignFragment must be a json-marshallable object.
+	// The value of a SignFragment must be a json-marshallable object. Remember that we need to compare these across pods, so
+	// plugins should ensure that lists where order doesn't matter are sorted, for example.
 	Value any
 }
 
