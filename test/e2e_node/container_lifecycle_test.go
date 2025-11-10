@@ -5150,10 +5150,14 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 				err = e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, 120*time.Second)
 				framework.ExpectNoError(err)
 
-				buffer := int64(2)
+				// Pod should delete in ~grace + PLEG cache latency (~2-3s).
+				// 3s buffer accounts for CI variability while maintaining test intent:
+				// pods terminated during init should delete quickly without waiting on sidecars.
+				// See: https://github.com/kubernetes/kubernetes/issues/135008
+				const podDeletionBufferSeconds = 3
 				deleteTime := time.Since(start).Seconds()
 				// should delete quickly and not try to start/wait on any sidecars since they never started
-				gomega.Expect(deleteTime).To(gomega.BeNumerically("<", grace+buffer), fmt.Sprintf("should delete in < %d seconds, took %f", grace+buffer, deleteTime))
+				gomega.Expect(deleteTime).To(gomega.BeNumerically("<", grace+podDeletionBufferSeconds), fmt.Sprintf("should delete in < %d seconds, took %f", grace+podDeletionBufferSeconds, deleteTime))
 			})
 		})
 
