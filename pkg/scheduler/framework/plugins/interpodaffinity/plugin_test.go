@@ -259,3 +259,82 @@ func Test_isSchedulableAfterNodeChange(t *testing.T) {
 		})
 	}
 }
+
+func TestPodAffinitySignature(t *testing.T) {
+	tests := []struct {
+		name              string
+		pod               *v1.Pod
+		expectedSignature []fwk.SignFragment
+		scheduleable      bool
+		config            config.InterPodAffinityArgs
+	}{
+		{
+			name: "no affinity, default settings",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"foo": "bar"},
+				},
+				Spec: v1.PodSpec{},
+			},
+			expectedSignature: []fwk.SignFragment{
+				{
+					Key:   fwk.LabelsSignerName,
+					Value: map[string]string{"foo": "bar"},
+				},
+			},
+			scheduleable: true,
+		},
+		{
+			name: "no affinity, ignore setting set",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"foo": "bar"},
+				},
+				Spec: v1.PodSpec{},
+			},
+			scheduleable: true,
+			config: config.InterPodAffinityArgs{
+				IgnorePreferredTermsOfExistingPods: true,
+			},
+		},
+		{
+			name: "affinity set",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"foo": "bar"},
+				},
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						PodAffinity: &v1.PodAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+								{},
+							},
+						},
+					},
+				},
+			},
+			scheduleable: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			snapshot := cache.NewSnapshot(nil, nil)
+			pl := plugintesting.SetupPluginWithInformers(ctx, t, schedruntime.FactoryAdapter(feature.Features{}, New), &test.config, snapshot, namespaces)
+			p := pl.(*InterPodAffinity)
+			signature, status := p.SignPod(ctx, test.pod)
+
+			if !status.IsSuccess() && test.scheduleable {
+				t.Fatalf("Expected success, got %v", status)
+			}
+
+			if diff := cmp.Diff(test.expectedSignature, signature); diff != "" {
+				t.Fatalf("Diff %s", diff)
+			}
+		})
+	}
+}
