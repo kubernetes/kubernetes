@@ -80,7 +80,7 @@ func (pl *NodeAffinity) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFra
 	return []fwk.SignFragment{
 		{Key: fwk.NodeAffinitySignerName, Value: fwk.NodeAffinitySigner(pod)},
 		{Key: fwk.NodeSelectorSignerName, Value: pod.Spec.NodeSelector},
-	}, fwk.NewStatus(fwk.Success)
+	}, nil
 }
 
 type preFilterState struct {

@@ -664,5 +664,5 @@ func getVolumeUniqueName(driverName, volumeHandle string) string {
 func (pl *CSILimits) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
 	return []fwk.SignFragment{
 		{Key: fwk.VolumesSignerName, Value: fwk.VolumesSigner(pod)},
-	}, fwk.NewStatus(fwk.Success)
+	}, nil
 }

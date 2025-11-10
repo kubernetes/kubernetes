@@ -70,12 +70,12 @@ func (pl *InterPodAffinity) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.Sig
 	// Otherwise we need to include the pod's labels to ensure we catch affinity between the pod
 	// and other pods which may have affinity rules set.
 	if pl.args.IgnorePreferredTermsOfExistingPods {
-		return nil, fwk.NewStatus(fwk.Success)
+		return nil, nil
 	}
 
 	return []fwk.SignFragment{
 		{Key: fwk.LabelsSignerName, Value: pod.Labels},
-	}, fwk.NewStatus(fwk.Success)
+	}, nil
 }
 
 // EventsToRegister returns the possible events that may make a failed Pod

@@ -189,7 +189,7 @@ func resourcesSigner(pod *v1.Pod) any {
 func (pl *Fit) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
 	return []fwk.SignFragment{
 		{Key: fwk.ResourcesSignerName, Value: resourcesSigner(pod)},
-	}, fwk.NewStatus(fwk.Success)
+	}, nil
 }
 
 // NewFit initializes a new plugin and returns it.

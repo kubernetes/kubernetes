@@ -72,7 +72,7 @@ func (pl *NodeName) Name() string {
 func (pl *NodeName) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
 	return []fwk.SignFragment{
 		{Key: fwk.NodeNameSignerName, Value: pod.Spec.NodeName},
-	}, fwk.NewStatus(fwk.Success)
+	}, nil
 }
 
 // Filter invoked at the filter extension point.

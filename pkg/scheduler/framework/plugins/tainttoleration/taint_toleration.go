@@ -61,7 +61,7 @@ func (pl *TaintToleration) Name() string {
 func (pl *TaintToleration) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
 	return []fwk.SignFragment{
 		{Key: fwk.TolerationsSignerName, Value: fwk.TolerationsSigner(pod)},
-	}, fwk.NewStatus(fwk.Success)
+	}, nil
 }
 
 // EventsToRegister returns the possible events that may make a Pod

@@ -67,7 +67,7 @@ func (pl *ImageLocality) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFr
 	sort.Slice(names, func(i, j int) bool {
 		return names[i] < names[j]
 	})
-	return []fwk.SignFragment{{Key: fwk.ImageNamesSignerName, Value: names}}, fwk.NewStatus(fwk.Success)
+	return []fwk.SignFragment{{Key: fwk.ImageNamesSignerName, Value: names}}, nil
 }
 
 // Score invoked at the score extension point.

@@ -68,7 +68,7 @@ func (pl *NodePorts) Name() string {
 func (pl *NodePorts) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
 	return []fwk.SignFragment{
 		{Key: fwk.HostPortsSignerName, Value: fwk.HostPortsSigner(pod)},
-	}, fwk.NewStatus(fwk.Success)
+	}, nil
 }
 
 // PreFilter invoked at the prefilter extension point.

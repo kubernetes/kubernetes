@@ -121,7 +121,7 @@ func (ba *BalancedAllocation) Name() string {
 func (pl *BalancedAllocation) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
 	return []fwk.SignFragment{
 		{Key: fwk.ResourcesSignerName, Value: resourcesSigner(pod)},
-	}, fwk.NewStatus(fwk.Success)
+	}, nil
 }
 
 // Score invoked at the score extension point.

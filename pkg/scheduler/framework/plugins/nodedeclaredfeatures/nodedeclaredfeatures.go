@@ -100,7 +100,7 @@ func (pl *NodeDeclaredFeatures) PreFilter(ctx context.Context, cycleState fwk.Cy
 		return nil, fwk.NewStatus(fwk.Skip)
 	}
 	cycleState.Write(preFilterStateKey, &preFilterState{reqs: reqs})
-	return nil, fwk.NewStatus(fwk.Success)
+	return nil, nil
 }
 
 // PreFilterExtensions returns pre-filter extensions, pod add and remove.

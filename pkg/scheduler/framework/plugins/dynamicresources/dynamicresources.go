@@ -203,7 +203,7 @@ func (pl *DynamicResources) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.Sig
 	if len(pod.Spec.ResourceClaims) > 0 {
 		return nil, fwk.NewStatus(fwk.Unschedulable)
 	}
-	return nil, fwk.NewStatus(fwk.Success)
+	return nil, nil
 }
 
 // EventsToRegister returns the possible events that may make a Pod

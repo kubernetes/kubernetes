@@ -133,7 +133,7 @@ func (pl *NodeUnschedulable) Name() string {
 func (pl *NodeUnschedulable) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
 	return []fwk.SignFragment{
 		{Key: fwk.TolerationsSignerName, Value: fwk.TolerationsSigner(pod)},
-	}, fwk.NewStatus(fwk.Success)
+	}, nil
 }
 
 // Filter invoked at the filter extension point.
