@@ -5477,6 +5477,12 @@ message ResourceHealth {
   //
   // In future we may want to introduce the PermanentlyUnhealthy Status.
   optional string health = 2;
+
+  // Message provides human-readable context for Health (e.g. "ECC error count exceeded threshold").
+  // This field is populated by the kubelet when ResourceHealthStatusMessage is enabled if the DRA plugin returns a message, and is null otherwise.
+  // +featureGate=ResourceHealthStatusMessage
+  // +optional
+  optional string message = 6;
 }
 
 // ResourceQuota sets aggregate quota restrictions enforced per namespace

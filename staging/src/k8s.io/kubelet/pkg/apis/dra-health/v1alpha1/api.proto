@@ -61,6 +61,11 @@ message DeviceHealth {
   // If not specified, zero, or negative, Kubelet will use a default timeout.
   // Negative values will be logged and treated as if not specified.
   int64 health_check_timeout_seconds = 4;
+
+  // An optional message providing additional details about the device's health.
+  // Maximum length is 1024 characters. Messages longer than 1024 characters
+  // will be truncated to 1021 characters with "..." appended.
+  string message = 5;
 }
 
 // NodeWatchResourcesResponse contains a list of devices and their current health.

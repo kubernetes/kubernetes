@@ -1056,7 +1056,7 @@ func dropDisabledPodStatusFields(podStatus, oldPodStatus *api.PodStatus, podSpec
 		}
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ResourceHealthStatus) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ResourceHealthStatus) && !resourceHealthStatusInUse(oldPodStatus) {
 		setAllocatedResourcesStatusToNil := func(csl []api.ContainerStatus) {
 			for i := range csl {
 				csl[i].AllocatedResourcesStatus = nil
@@ -1065,6 +1065,21 @@ func dropDisabledPodStatusFields(podStatus, oldPodStatus *api.PodStatus, podSpec
 		setAllocatedResourcesStatusToNil(podStatus.ContainerStatuses)
 		setAllocatedResourcesStatusToNil(podStatus.InitContainerStatuses)
 		setAllocatedResourcesStatusToNil(podStatus.EphemeralContainerStatuses)
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ResourceHealthStatusMessage) && !resourceHealthStatusMessageInUse(oldPodStatus) {
+		dropMessageField := func(csl []api.ContainerStatus) {
+			for i := range csl {
+				for j := range csl[i].AllocatedResourcesStatus {
+					for k := range csl[i].AllocatedResourcesStatus[j].Resources {
+						csl[i].AllocatedResourcesStatus[j].Resources[k].Message = nil
+					}
+				}
+			}
+		}
+		dropMessageField(podStatus.ContainerStatuses)
+		dropMessageField(podStatus.InitContainerStatuses)
+		dropMessageField(podStatus.EphemeralContainerStatuses)
 	}
 
 	// drop ContainerStatus.User field to empty (disable SupplementalGroupsPolicy)
@@ -1108,6 +1123,64 @@ func draExendedResourceInUse(podStatus *api.PodStatus) bool {
 	if podStatus != nil && podStatus.ExtendedResourceClaimStatus != nil {
 		return true
 	}
+	return false
+}
+
+func resourceHealthStatusInUse(podStatus *api.PodStatus) bool {
+	if podStatus == nil {
+		return false
+	}
+
+	checkContainerStatuses := func(csl []api.ContainerStatus) bool {
+		for _, cs := range csl {
+			if len(cs.AllocatedResourcesStatus) > 0 {
+				return true
+			}
+		}
+		return false
+	}
+
+	if checkContainerStatuses(podStatus.ContainerStatuses) {
+		return true
+	}
+	if checkContainerStatuses(podStatus.InitContainerStatuses) {
+		return true
+	}
+	if checkContainerStatuses(podStatus.EphemeralContainerStatuses) {
+		return true
+	}
+
+	return false
+}
+
+func resourceHealthStatusMessageInUse(podStatus *api.PodStatus) bool {
+	if podStatus == nil {
+		return false
+	}
+
+	checkContainerStatuses := func(csl []api.ContainerStatus) bool {
+		for _, cs := range csl {
+			for _, rs := range cs.AllocatedResourcesStatus {
+				for _, rh := range rs.Resources {
+					if rh.Message != nil {
+						return true
+					}
+				}
+			}
+		}
+		return false
+	}
+
+	if checkContainerStatuses(podStatus.ContainerStatuses) {
+		return true
+	}
+	if checkContainerStatuses(podStatus.InitContainerStatuses) {
+		return true
+	}
+	if checkContainerStatuses(podStatus.EphemeralContainerStatuses) {
+		return true
+	}
+
 	return false
 }
 

@@ -1487,6 +1487,16 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.31"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.36"
+- name: ResourceHealthStatusMessage
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.36"
 - name: RestartAllContainersOnContainerExits
   versionedSpecs:
   - default: false

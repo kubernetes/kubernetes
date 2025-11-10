@@ -7838,6 +7838,7 @@ func Convert_core_ResourceFieldSelector_To_v1_ResourceFieldSelector(in *core.Res
 func autoConvert_v1_ResourceHealth_To_core_ResourceHealth(in *corev1.ResourceHealth, out *core.ResourceHealth, s conversion.Scope) error {
 	out.ResourceID = core.ResourceID(in.ResourceID)
 	out.Health = core.ResourceHealthStatus(in.Health)
+	out.Message = (*string)(unsafe.Pointer(in.Message))
 	return nil
 }
 
@@ -7849,6 +7850,7 @@ func Convert_v1_ResourceHealth_To_core_ResourceHealth(in *corev1.ResourceHealth,
 func autoConvert_core_ResourceHealth_To_v1_ResourceHealth(in *core.ResourceHealth, out *corev1.ResourceHealth, s conversion.Scope) error {
 	out.ResourceID = corev1.ResourceID(in.ResourceID)
 	out.Health = corev1.ResourceHealthStatus(in.Health)
+	out.Message = (*string)(unsafe.Pointer(in.Message))
 	return nil
 }
 
