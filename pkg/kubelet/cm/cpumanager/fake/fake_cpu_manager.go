@@ -105,7 +105,7 @@ func (m *manager) GetAllCPUs() cpuset.CPUSet {
 }
 
 // NewFakeManager creates empty/fake cpu manager
-func NewFakeManager(logger logr.Logger) cpumanager.Manager {
+func NewFakeManager(logger logr.Logger) *manager {
 	logger = klog.LoggerWithName(logger, "cpu.fake")
 	return &manager{
 		logger: logger,
