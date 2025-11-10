@@ -17,6 +17,7 @@ limitations under the License.
 package framework
 
 import (
+	"encoding/json"
 	"sort"
 
 	v1 "k8s.io/api/core/v1"
@@ -35,12 +36,10 @@ const (
 	NodeNameSignerName         = "v1.Pod.Spec.NodeName"
 	NodeAffinitySignerName     = "v1.Pod.Spec.Affinity.NodeAffinity"
 	NodeSelectorSignerName     = "v1.Pod.Spec.Affinity.NodeSelector"
-	InterPodAffinitySignerName = "v1.Pod.Spec.Affinity.InterPodAffinity"
 	HostPortsSignerName        = "v1.Pod.Spec.HostPorts()"
-	ResourcesSignerName        = "v1.Pod.Spec.ContainerResourcesAndOverheads()"
+	ResourcesSignerName        = "v1.Pod.Spec.ContainerRequestsAndOverheads()"
 	SchedulerNameSignerName    = "v1.Pod.Spec.SchedulerName"
 	TolerationsSignerName      = "v1.Pod.Spec.Tolerations"
-	PodToplogySpreadSignerName = "v1.Pod.Spec.PodTopologySpread"
 	VolumesSignerName          = "v1.Pod.Spec.Volumes.NonSyntheticSources()"
 )
 
@@ -85,11 +84,18 @@ func TolerationsSigner(pod *v1.Pod) any {
 // impact scheduling but are very specific to individual pods. If we
 // don't exclude them no pods will have matching signatures.
 func VolumesSigner(pod *v1.Pod) any {
-	ret := []v1.VolumeSource{}
+	ret := []string{}
 	for _, vol := range pod.Spec.Volumes {
 		if vol.VolumeSource.ConfigMap == nil && vol.VolumeSource.Secret == nil {
-			ret = append(ret, vol.VolumeSource)
+			volStr, err := json.Marshal(vol.VolumeSource)
+			if err != nil {
+				return nil
+			}
+			ret = append(ret, string(volStr))
 		}
 	}
+	sort.Slice(ret, func(i, j int) bool {
+		return ret[i] < ret[j]
+	})
 	return ret
 }

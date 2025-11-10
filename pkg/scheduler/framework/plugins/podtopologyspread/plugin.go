@@ -90,9 +90,23 @@ func (pl *PodTopologySpread) Name() string {
 // sign pods that have topology spread constraints, either explicit or
 // defaulted.
 func (pl *PodTopologySpread) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
-	if len(pl.defaultConstraints) > 0 || len(pod.Spec.TopologySpreadConstraints) > 0 {
+	if len(pod.Spec.TopologySpreadConstraints) > 0 {
 		return nil, fwk.NewStatus(fwk.Unschedulable)
 	}
+
+	if len(pl.defaultConstraints) == 0 {
+		return nil, nil
+	}
+
+	constraints, err := pl.buildDefaultConstraints(pod, v1.ScheduleAnyway)
+	if err != nil {
+		return nil, fwk.AsStatus(err)
+	}
+
+	if len(constraints) > 0 {
+		return nil, fwk.NewStatus(fwk.Unschedulable)
+	}
+
 	return nil, nil
 }
 

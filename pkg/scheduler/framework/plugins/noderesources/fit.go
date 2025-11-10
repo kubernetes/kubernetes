@@ -19,6 +19,7 @@ package noderesources
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
@@ -170,10 +171,15 @@ func (f *Fit) Name() string {
 }
 
 func getResources(containers []v1.Container) any {
-	ret := []any{}
+	ret := []v1.ResourceList{}
 	for _, c := range containers {
-		ret = append(ret, c.Resources)
+		ret = append(ret, c.Resources.Requests)
 	}
+	sort.Slice(ret, func(i, j int) bool {
+		val1 := ret[i][v1.ResourceCPU]
+		val2 := ret[j][v1.ResourceCPU]
+		return val1.Cmp(val2) <= 0
+	})
 	return ret
 }
 

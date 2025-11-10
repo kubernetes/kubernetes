@@ -1,3 +1,19 @@
+/*
+Copyright 2025 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package batch
 
 import (
@@ -9,7 +25,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
 	restclient "k8s.io/client-go/rest"
 	kubeschedulerconfigv1 "k8s.io/kube-scheduler/config/v1"
@@ -23,235 +38,233 @@ import (
 	"k8s.io/kubernetes/test/integration/util"
 
 	"k8s.io/kubernetes/pkg/scheduler"
+	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testutil "k8s.io/kubernetes/test/integration/util"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
-type Scenario struct {
-	Name  string
-	Pods  []PodDef
-	Nodes []NodeDef
+type podDef struct {
+	name          string
+	nodeSelector  map[string]string
+	nodeAffinity  []string
+	expectedNode  string
+	expectBatched bool
 }
 
-type PodDef struct {
-	Name          string
-	NodeSelector  map[string]string
-	Affinity      []string
-	ExpectedNode  string
-	ExpectBatched bool
+type nodeDef struct {
+	name    string
+	labels  map[string]string
+	maxPods int
 }
 
-type NodeDef struct {
-	Name    string
-	Labels  map[string]string
-	MaxPods int
+type scenario struct {
+	name  string
+	pods  []podDef
+	nodes []nodeDef
 }
-
-var defaultResources = v1.ResourceList{}
 
 func TestBatchScenarios(t *testing.T) {
-	table := []*Scenario{
+	table := []*scenario{
 		{
-			Name: "one pod one node",
-			Pods: []PodDef{
+			name: "one pod one node",
+			pods: []podDef{
 				{
-					Name:         "1ppn-batchp1",
-					ExpectedNode: "1ppn-batchn1",
+					name:         "1ppn-batchp1",
+					expectedNode: "1ppn-batchn1",
 				},
 			},
-			Nodes: []NodeDef{
+			nodes: []nodeDef{
 				{
-					Name:    "1ppn-batchn1",
-					MaxPods: 1,
+					name:    "1ppn-batchn1",
+					maxPods: 1,
 				},
 			},
 		},
 		{
-			Name: "distinct pods on distinct nodes",
-			Pods: []PodDef{
+			name: "distinct pods on distinct nodes",
+			pods: []podDef{
 				{
-					Name:         "dpdn-batchp1",
-					NodeSelector: map[string]string{"forpod": "1"},
-					ExpectedNode: "dpdn-batchn1",
+					name:         "dpdn-batchp1",
+					nodeSelector: map[string]string{"forpod": "1"},
+					expectedNode: "dpdn-batchn1",
 				},
 				{
-					Name:         "dpdn-batchp2",
-					NodeSelector: map[string]string{"forpod": "2"},
-					ExpectedNode: "dpdn-batchn2",
+					name:         "dpdn-batchp2",
+					nodeSelector: map[string]string{"forpod": "2"},
+					expectedNode: "dpdn-batchn2",
 				},
 				{
-					Name:         "dpdn-batchp3",
-					NodeSelector: map[string]string{"forpod": "3"},
-					ExpectedNode: "dpdn-batchn3",
+					name:         "dpdn-batchp3",
+					nodeSelector: map[string]string{"forpod": "3"},
+					expectedNode: "dpdn-batchn3",
 				},
 			},
-			Nodes: []NodeDef{
+			nodes: []nodeDef{
 				{
-					Name:    "dpdn-batchn3",
-					MaxPods: 10,
-					Labels:  map[string]string{"forpod": "3"},
+					name:    "dpdn-batchn3",
+					maxPods: 10,
+					labels:  map[string]string{"forpod": "3"},
 				},
 				{
-					Name:    "dpdn-batchn2",
-					MaxPods: 10,
-					Labels:  map[string]string{"forpod": "2"},
+					name:    "dpdn-batchn2",
+					maxPods: 10,
+					labels:  map[string]string{"forpod": "2"},
 				},
 				{
-					Name:    "dpdn-batchn1",
-					MaxPods: 10,
-					Labels:  map[string]string{"forpod": "1"},
+					name:    "dpdn-batchn1",
+					maxPods: 10,
+					labels:  map[string]string{"forpod": "1"},
 				},
 			},
 		},
 
 		{
-			Name: "three pod batch",
-			Pods: []PodDef{
+			name: "three pod batch",
+			pods: []podDef{
 				{
-					Name:         "tpb-batchp1",
-					ExpectedNode: "tpb-batchn1",
-					Affinity:     []string{"tpb-batchn1", "tpb-batchn2", "tpb-batchn3"},
+					name:         "tpb-batchp1",
+					expectedNode: "tpb-batchn1",
+					nodeAffinity: []string{"tpb-batchn1", "tpb-batchn2", "tpb-batchn3"},
 				},
 				{
-					Name:          "tpb-batchp2",
-					ExpectedNode:  "tpb-batchn2",
-					Affinity:      []string{"tpb-batchn1", "tpb-batchn2", "tpb-batchn3"},
-					ExpectBatched: true,
+					name:          "tpb-batchp2",
+					expectedNode:  "tpb-batchn2",
+					nodeAffinity:  []string{"tpb-batchn1", "tpb-batchn2", "tpb-batchn3"},
+					expectBatched: true,
 				},
 				{
-					Name:          "tpb-batchp3",
-					ExpectedNode:  "tpb-batchn3",
-					Affinity:      []string{"tpb-batchn1", "tpb-batchn2", "tpb-batchn3"},
-					ExpectBatched: true,
-				},
-			},
-			Nodes: []NodeDef{
-				{
-					Name:    "tpb-batchn3",
-					MaxPods: 1,
-				},
-				{
-					Name:    "tpb-batchn2",
-					MaxPods: 1,
-				},
-				{
-					Name:    "tpb-batchn1",
-					MaxPods: 1,
+					name:          "tpb-batchp3",
+					expectedNode:  "tpb-batchn3",
+					nodeAffinity:  []string{"tpb-batchn1", "tpb-batchn2", "tpb-batchn3"},
+					expectBatched: true,
 				},
 			},
-		},
-		{
-			Name: "two consecutive batches",
-			Pods: []PodDef{
+			nodes: []nodeDef{
 				{
-					Name:         "tcb-batchp1",
-					ExpectedNode: "tcb-batchn1",
-					Affinity:     []string{"tcb-batchn1", "tcb-batchn2"},
+					name:    "tpb-batchn3",
+					maxPods: 1,
 				},
 				{
-					Name:          "tcb-batchp2",
-					ExpectedNode:  "tcb-batchn2",
-					Affinity:      []string{"tcb-batchn1", "tcb-batchn2"},
-					ExpectBatched: true,
+					name:    "tpb-batchn2",
+					maxPods: 1,
 				},
 				{
-					Name:         "tcb-batchp3",
-					ExpectedNode: "tcb-batchn4",
-					Affinity:     []string{"tcb-batchn4", "tcb-batchn3"},
-				},
-				{
-					Name:          "tcb-batchp4",
-					ExpectedNode:  "tcb-batchn3",
-					Affinity:      []string{"tcb-batchn4", "tcb-batchn3"},
-					ExpectBatched: true,
-				},
-			},
-			Nodes: []NodeDef{
-				{
-					Name:    "tcb-batchn4",
-					MaxPods: 1,
-				},
-				{
-					Name:    "tcb-batchn3",
-					MaxPods: 1,
-				},
-				{
-					Name:    "tcb-batchn2",
-					MaxPods: 1,
-				},
-				{
-					Name:    "tcb-batchn1",
-					MaxPods: 1,
+					name:    "tpb-batchn1",
+					maxPods: 1,
 				},
 			},
 		},
 		{
-			Name: "multiple pods per node means no batching",
-			Pods: []PodDef{
+			name: "two consecutive batches",
+			pods: []podDef{
 				{
-					Name:         "mppn-batchp1",
-					ExpectedNode: "mppn-batchn1",
-					Affinity:     []string{"mppn-batchn1", "mppn-batchn2"},
+					name:         "tcb-batchp1",
+					expectedNode: "tcb-batchn1",
+					nodeAffinity: []string{"tcb-batchn1", "tcb-batchn2"},
 				},
 				{
-					Name:         "mppn-batchp2",
-					ExpectedNode: "mppn-batchn1",
-					Affinity:     []string{"mppn-batchn1", "mppn-batchn2"},
+					name:          "tcb-batchp2",
+					expectedNode:  "tcb-batchn2",
+					nodeAffinity:  []string{"tcb-batchn1", "tcb-batchn2"},
+					expectBatched: true,
 				},
 				{
-					Name:         "mppn-batchp3",
-					ExpectedNode: "mppn-batchn4",
-					Affinity:     []string{"mppn-batchn4", "mppn-batchn3"},
+					name:         "tcb-batchp3",
+					expectedNode: "tcb-batchn4",
+					nodeAffinity: []string{"tcb-batchn4", "tcb-batchn3"},
 				},
 				{
-					Name:         "mppn-batchp4",
-					ExpectedNode: "mppn-batchn4",
-					Affinity:     []string{"mppn-batchn4", "mppn-batchn3"},
+					name:          "tcb-batchp4",
+					expectedNode:  "tcb-batchn3",
+					nodeAffinity:  []string{"tcb-batchn4", "tcb-batchn3"},
+					expectBatched: true,
 				},
 			},
-			Nodes: []NodeDef{
+			nodes: []nodeDef{
 				{
-					Name:    "mppn-batchn4",
-					MaxPods: 2,
+					name:    "tcb-batchn4",
+					maxPods: 1,
 				},
 				{
-					Name:    "mppn-batchn3",
-					MaxPods: 2,
+					name:    "tcb-batchn3",
+					maxPods: 1,
 				},
 				{
-					Name:    "mppn-batchn2",
-					MaxPods: 2,
+					name:    "tcb-batchn2",
+					maxPods: 1,
 				},
 				{
-					Name:    "mppn-batchn1",
-					MaxPods: 2,
+					name:    "tcb-batchn1",
+					maxPods: 1,
+				},
+			},
+		},
+		{
+			name: "multiple pods per node means no batching",
+			pods: []podDef{
+				{
+					name:         "mppn-batchp1",
+					expectedNode: "mppn-batchn1",
+					nodeAffinity: []string{"mppn-batchn1", "mppn-batchn2"},
+				},
+				{
+					name:         "mppn-batchp2",
+					expectedNode: "mppn-batchn1",
+					nodeAffinity: []string{"mppn-batchn1", "mppn-batchn2"},
+				},
+				{
+					name:         "mppn-batchp3",
+					expectedNode: "mppn-batchn4",
+					nodeAffinity: []string{"mppn-batchn4", "mppn-batchn3"},
+				},
+				{
+					name:         "mppn-batchp4",
+					expectedNode: "mppn-batchn4",
+					nodeAffinity: []string{"mppn-batchn4", "mppn-batchn3"},
+				},
+			},
+			nodes: []nodeDef{
+				{
+					name:    "mppn-batchn4",
+					maxPods: 2,
+				},
+				{
+					name:    "mppn-batchn3",
+					maxPods: 2,
+				},
+				{
+					name:    "mppn-batchn2",
+					maxPods: 2,
+				},
+				{
+					name:    "mppn-batchn1",
+					maxPods: 2,
 				},
 			},
 		},
 	}
 
 	for _, tt := range table {
-		t.Run(tt.Name, func(t *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
 			finalPods, batched := runScenario(t, tt, true)
 			for i, p := range finalPods {
-				if p.Spec.NodeName != tt.Pods[i].ExpectedNode {
-					t.Fatalf("Invalid node '%s' for pod '%s'. Expected '%s'", p.Spec.NodeName, p.Name, tt.Pods[i].ExpectedNode)
+				if p.Spec.NodeName != tt.pods[i].expectedNode {
+					t.Fatalf("Invalid node '%s' for pod '%s'. Expected '%s'", p.Spec.NodeName, p.Name, tt.pods[i].expectedNode)
 				}
-				if batched[i] != tt.Pods[i].ExpectBatched {
-					t.Fatalf("Expected pod %s batched %t, actually %t", p.Name, tt.Pods[i].ExpectBatched, batched[i])
+				if batched[i] != tt.pods[i].expectBatched {
+					t.Fatalf("Expected pod %s batched %t, actually %t", p.Name, tt.pods[i].expectBatched, batched[i])
 				}
 			}
 		})
 	}
 }
 
-func newPod(d *PodDef) *v1.Pod {
+func newPod(d *podDef) *v1.Pod {
 	aff := &v1.NodeAffinity{}
-	if len(d.Affinity) > 0 {
-		for i, node := range d.Affinity {
+	if len(d.nodeAffinity) > 0 {
+		for i, node := range d.nodeAffinity {
 			a := v1.PreferredSchedulingTerm{
-				Weight: int32(len(d.Affinity) - i),
+				Weight: int32(len(d.nodeAffinity) - i),
 				Preference: v1.NodeSelectorTerm{
 					MatchFields: []v1.NodeSelectorRequirement{
 						{
@@ -266,61 +279,35 @@ func newPod(d *PodDef) *v1.Pod {
 		}
 	}
 
-	return &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      d.Name,
-			UID:       types.UID(d.Name),
-			Namespace: "default",
-		},
-		Spec: v1.PodSpec{
-			NodeSelector: d.NodeSelector,
-			Affinity: &v1.Affinity{
-				NodeAffinity: aff,
-			},
-			Containers: []v1.Container{
-				{
-					Name:  "c",
-					Image: imageutils.GetPauseImageName(),
-					Ports: []v1.ContainerPort{
-						{ContainerPort: 1000},
-					},
-					Resources: v1.ResourceRequirements{
-						Requests: v1.ResourceList{
-							v1.ResourceCPU:    *(resource.NewQuantity(10, resource.DecimalSI)),
-							v1.ResourceMemory: *(resource.NewQuantity(4*1024*1024, resource.DecimalSI)),
-						},
-						Limits: v1.ResourceList{
-							v1.ResourceCPU:    *(resource.NewQuantity(10, resource.DecimalSI)),
-							v1.ResourceMemory: *(resource.NewQuantity(4*1024*1024, resource.DecimalSI)),
-						},
-					},
-				},
+	return testutil.InitPausePod(&testutil.PausePodConfig{
+		Name:      d.name,
+		Affinity:  &v1.Affinity{NodeAffinity: aff},
+		Namespace: "default",
+		Resources: &v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				v1.ResourceCPU:    *(resource.NewQuantity(10, resource.DecimalSI)),
+				v1.ResourceMemory: *(resource.NewQuantity(4*1024*1024, resource.DecimalSI)),
 			},
 		},
+		NodeSelector: d.nodeSelector,
+	})
+}
+
+func resources(maxPods int) v1.ResourceList {
+	return v1.ResourceList{
+		v1.ResourceCPU:    *(resource.NewQuantity(100, resource.DecimalSI)),
+		v1.ResourceMemory: *(resource.NewQuantity(4*1024*1024*1024, resource.DecimalSI)),
+		v1.ResourcePods:   *resource.NewQuantity(int64(maxPods), resource.DecimalSI),
 	}
 }
 
-func newNode(d *NodeDef) *v1.Node {
-	return &v1.Node{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      d.Name,
-			UID:       types.UID(d.Name),
-			Namespace: "default",
-			Labels:    d.Labels,
-		},
-		Status: v1.NodeStatus{
-			Capacity: v1.ResourceList{
-				v1.ResourceCPU:    *(resource.NewQuantity(100, resource.DecimalSI)),
-				v1.ResourceMemory: *(resource.NewQuantity(4*1024*1024*1024, resource.DecimalSI)),
-				v1.ResourcePods:   *resource.NewQuantity(int64(d.MaxPods), resource.DecimalSI),
-			},
-			Allocatable: v1.ResourceList{
-				v1.ResourceCPU:    *(resource.NewQuantity(100, resource.DecimalSI)),
-				v1.ResourceMemory: *(resource.NewQuantity(4*1024*1024*1024, resource.DecimalSI)),
-				v1.ResourcePods:   *resource.NewQuantity(int64(d.MaxPods), resource.DecimalSI),
-			},
-		},
-	}
+func newNode(d *nodeDef) *v1.Node {
+	n := st.MakeNode()
+	n.Name(d.name)
+	n.Labels = d.labels
+	n.Status.Capacity = resources(d.maxPods)
+	n.Status.Allocatable = resources(d.maxPods)
+	return n.Obj()
 }
 
 func newDefaultComponentConfig() (*config.KubeSchedulerConfiguration, error) {
@@ -349,7 +336,7 @@ type batchGetter interface {
 	TotalBatchedPods() int64
 }
 
-func runScenario(t *testing.T, tt *Scenario, batch bool) ([]*v1.Pod, []bool) {
+func runScenario(t *testing.T, tt *scenario, batch bool) ([]*v1.Pod, []bool) {
 	_, tCtx := ktesting.NewTestContext(t)
 
 	cfg, err := newDefaultComponentConfig()
@@ -369,7 +356,7 @@ func runScenario(t *testing.T, tt *Scenario, batch bool) ([]*v1.Pod, []bool) {
 	cs := testCtx.Client()
 
 	// Add nodes.
-	for _, n := range tt.Nodes {
+	for _, n := range tt.nodes {
 		_, err := testutil.CreateNode(cs, newNode(&n))
 		if err != nil {
 			t.Fatal("Failed adding node", "node", n, err)
@@ -378,7 +365,7 @@ func runScenario(t *testing.T, tt *Scenario, batch bool) ([]*v1.Pod, []bool) {
 
 	finalPods := []*v1.Pod{}
 	batched := []bool{}
-	for _, pd := range tt.Pods {
+	for _, pd := range tt.pods {
 		prevBatched := getter.TotalBatchedPods()
 
 		p := newPod(&pd)

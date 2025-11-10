@@ -356,7 +356,6 @@ func TestSchedulerWithExtenders(t *testing.T) {
 				percentageOfNodesToScore: schedulerapi.DefaultPercentageOfNodesToScore,
 				Extenders:                extenders,
 				logger:                   logger,
-				CurrentCycle:             func() int64 { return 1 },
 			}
 			sched.applyDefaultHandlers()
 

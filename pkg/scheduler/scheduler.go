@@ -84,10 +84,6 @@ type Scheduler struct {
 	// stale while they sit in a channel.
 	NextPod func(logger klog.Logger) (*framework.QueuedPodInfo, error)
 
-	// CurrentCycle gets a number associated with the current cycle. Each new pod increments the
-	// counter by 1.
-	CurrentCycle func() int64
-
 	// FailureHandler is called upon a scheduling failure.
 	FailureHandler FailureHandlerFn
 
@@ -454,7 +450,6 @@ func New(ctx context.Context,
 		WorkloadManager:                        workloadManager,
 	}
 	sched.NextPod = podQueue.Pop
-	sched.CurrentCycle = podQueue.SchedulingCycle
 	sched.applyDefaultHandlers()
 
 	if err = addAllEventHandlers(sched, informerFactory, dynInformerFactory, resourceClaimCache, resourceSliceTracker, draManager, unionedGVKs(queueingHintsPerProfile)); err != nil {
@@ -672,4 +667,8 @@ func newPodInformer(cs clientset.Interface, resyncPeriod time.Duration) cache.Sh
 	}
 	informer.SetTransform(trim)
 	return informer
+}
+
+func (sched *Scheduler) CurrentCycle() int64 {
+	return sched.SchedulingQueue.SchedulingCycle()
 }

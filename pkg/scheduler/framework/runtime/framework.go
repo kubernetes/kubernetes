@@ -832,7 +832,7 @@ func (f *frameworkImpl) SignPod(ctx context.Context, pod *v1.Pod) string {
 
 		if !status.IsSuccess() {
 			if status.Code() == fwk.Error {
-				logger.V(4).Info("SignPod failed for plugin", "plugin", plugin.Name(), "error", status.AsError())
+				logger.V(4).Error(status.AsError(), "SignPod failed for plugin", "plugin", plugin.Name(), "error", status.AsError())
 			}
 			logger.V(5).Info("SignPod can't sign pod due to plugin", "plugin", plugin.Name(), "status", status)
 			return fwk.Unsignable
@@ -845,7 +845,7 @@ func (f *frameworkImpl) SignPod(ctx context.Context, pod *v1.Pod) string {
 
 	sigBytes, err := json.Marshal(sig)
 	if err != nil {
-		logger.V(4).Info("SignPod failed to marshal signature object", "error", err)
+		logger.V(4).Error(err, "SignPod failed to marshal signature object")
 		return fwk.Unsignable
 	}
 
