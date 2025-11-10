@@ -130,51 +130,38 @@ func ShouldAllContainersRestart(pod *v1.Pod, podStatus *PodStatus, apiPodStatus 
 		}
 	}
 
-	for _, c := range pod.Spec.InitContainers {
-		if podStatus != nil {
-			status := podStatus.FindContainerStatusByName(c.Name)
-			if status == nil || status.State != ContainerStateExited {
-				continue
-			}
-			exitCode := int32(status.ExitCode)
-			rule, ok := podutil.FindMatchingContainerRestartRule(c, exitCode)
-			if ok && rule.Action == v1.ContainerRestartRuleActionRestartAllContainers {
-				return true
-			}
+	nameToAPIStatus := make(map[string]*v1.ContainerStatus)
+	if apiPodStatus != nil {
+		for i := range apiPodStatus.InitContainerStatuses {
+			nameToAPIStatus[apiPodStatus.InitContainerStatuses[i].Name] = &apiPodStatus.InitContainerStatuses[i]
 		}
-
-		if apiPodStatus != nil {
-			apiStatus, ok := podutil.GetContainerStatus(apiPodStatus.InitContainerStatuses, c.Name)
-			if !ok || apiStatus.State.Terminated == nil {
-				continue
-			}
-			exitCode := apiStatus.State.Terminated.ExitCode
-			rule, ok := podutil.FindMatchingContainerRestartRule(c, exitCode)
-			if ok && rule.Action == v1.ContainerRestartRuleActionRestartAllContainers {
-				return true
-			}
+		for i := range apiPodStatus.ContainerStatuses {
+			nameToAPIStatus[apiPodStatus.ContainerStatuses[i].Name] = &apiPodStatus.ContainerStatuses[i]
 		}
 	}
-	for _, c := range pod.Spec.Containers {
+
+	for c := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
+		if c == nil {
+			continue
+		}
 		if podStatus != nil {
 			status := podStatus.FindContainerStatusByName(c.Name)
 			if status == nil || status.State != ContainerStateExited {
 				continue
 			}
 			exitCode := int32(status.ExitCode)
-			rule, ok := podutil.FindMatchingContainerRestartRule(c, exitCode)
+			rule, ok := podutil.FindMatchingContainerRestartRule(*c, exitCode)
 			if ok && rule.Action == v1.ContainerRestartRuleActionRestartAllContainers {
 				return true
 			}
 		}
-
 		if apiPodStatus != nil {
-			apiStatus, ok := podutil.GetContainerStatus(apiPodStatus.ContainerStatuses, c.Name)
+			apiStatus, ok := nameToAPIStatus[c.Name]
 			if !ok || apiStatus.State.Terminated == nil {
 				continue
 			}
 			exitCode := apiStatus.State.Terminated.ExitCode
-			rule, ok := podutil.FindMatchingContainerRestartRule(c, exitCode)
+			rule, ok := podutil.FindMatchingContainerRestartRule(*c, exitCode)
 			if ok && rule.Action == v1.ContainerRestartRuleActionRestartAllContainers {
 				return true
 			}
@@ -187,12 +174,7 @@ func ShouldAllContainersRestart(pod *v1.Pod, podStatus *PodStatus, apiPodStatus 
 // AllContainersRestartCleanedUp returns true if all containers are removed
 // from the runtime and podStatus.
 func AllContainersRestartCleanedUp(pod *v1.Pod, podStatus *PodStatus) bool {
-	for _, initC := range pod.Spec.InitContainers {
-		if podStatus.FindContainerStatusByName(initC.Name) != nil {
-			return false
-		}
-	}
-	for _, c := range pod.Spec.Containers {
+	for c := range podutil.ContainerIter(&pod.Spec, podutil.Containers|podutil.InitContainers) {
 		if podStatus.FindContainerStatusByName(c.Name) != nil {
 			return false
 		}

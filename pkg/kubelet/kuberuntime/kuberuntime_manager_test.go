@@ -1421,9 +1421,9 @@ func TestComputePodActionsForRestartAllContainers(t *testing.T) {
 			},
 			restartAllContainers: true,
 			containersToRemove: []containerToRemoveInfo{
-				{name: "foo3", kill: true},
-				{name: "foo2", kill: true},
-				{name: "foo1", kill: true},
+				{container: &v1.Container{Name: "foo1"}, containerID: kubecontainer.ContainerID{ID: "id1"}, kill: true},
+				{container: &v1.Container{Name: "foo2"}, containerID: kubecontainer.ContainerID{ID: "id2"}, kill: true},
+				{container: &v1.Container{Name: "foo3"}, containerID: kubecontainer.ContainerID{ID: "id3"}, kill: true},
 			},
 		},
 		"pod marked for RestartAllContainers with init containers": {
@@ -1438,9 +1438,9 @@ func TestComputePodActionsForRestartAllContainers(t *testing.T) {
 			},
 			restartAllContainers: true,
 			containersToRemove: []containerToRemoveInfo{
-				{name: "init3"},
-				{name: "init2"},
-				{name: "init1"},
+				{container: &v1.Container{Name: "init1"}, containerID: kubecontainer.ContainerID{ID: "initid1"}},
+				{container: &v1.Container{Name: "init2"}, containerID: kubecontainer.ContainerID{ID: "initid2"}},
+				{container: &v1.Container{Name: "init3"}, containerID: kubecontainer.ContainerID{ID: "initid3"}},
 			},
 		},
 		"pod marked for RestartAllContainers with restartable init containers": {
@@ -1455,15 +1455,15 @@ func TestComputePodActionsForRestartAllContainers(t *testing.T) {
 			},
 			restartAllContainers: true,
 			containersToRemove: []containerToRemoveInfo{
-				{name: "restartable-init-3", kill: true},
-				{name: "restartable-init-2", kill: true},
-				{name: "restartable-init-1", kill: true},
+				{container: &v1.Container{Name: "restartable-init-1"}, containerID: kubecontainer.ContainerID{ID: "initid1"}, kill: true},
+				{container: &v1.Container{Name: "restartable-init-2"}, containerID: kubecontainer.ContainerID{ID: "initid2"}, kill: true},
+				{container: &v1.Container{Name: "restartable-init-3"}, containerID: kubecontainer.ContainerID{ID: "initid3"}, kill: true},
 			},
 		},
-		"init container exit triggers RestartAllContainres": {
+		"init container exit triggers RestartAllContainers": {
 			// The init3 container exited and triggers RestartAllContainers,
-			// the init2 container is a running sidecar. First, the init2
-			// should be killed and removed; second, the init1 containers should
+			// the init2 container is a running sidecar. First, the init1
+			// should be removed; second, the init2 containers should killed and
 			// be removed; lastly, init3 container should be removed.
 			podFunc: func() *v1.Pod {
 				pod, _ := makeBasePodAndStatusWithInitContainers()
@@ -1489,14 +1489,14 @@ func TestComputePodActionsForRestartAllContainers(t *testing.T) {
 			},
 			restartAllContainers: true,
 			containersToRemove: []containerToRemoveInfo{
-				{name: "init2", kill: true},
-				{name: "init1"},
-				{name: "init3"},
+				{container: &v1.Container{Name: "init1"}, containerID: kubecontainer.ContainerID{ID: "initid1"}},
+				{container: &v1.Container{Name: "init2"}, containerID: kubecontainer.ContainerID{ID: "initid2"}, kill: true},
+				{container: &v1.Container{Name: "init3"}, containerID: kubecontainer.ContainerID{ID: "initid3"}},
 			},
 		},
 		"sidecar container exit triggers RestartAllContainres": {
 			// Restartable-init-3 fails and triggers RestartAllContainers.
-			// The running foo1 should be killed and removed first; then init-2 and init-1
+			// The running foo1 should be killed and removed first; then init-1 and init-2
 			// should be killed and removed; lastly init-3 should be removed.
 			podFunc: func() *v1.Pod {
 				pod, _ := makeBasePodAndStatusWithRestartableInitContainers()
@@ -1523,10 +1523,10 @@ func TestComputePodActionsForRestartAllContainers(t *testing.T) {
 			},
 			restartAllContainers: true,
 			containersToRemove: []containerToRemoveInfo{
-				{name: "foo1", kill: true},
-				{name: "restartable-init-2", kill: true},
-				{name: "restartable-init-1", kill: true},
-				{name: "restartable-init-3"},
+				{container: &v1.Container{Name: "foo1"}, containerID: kubecontainer.ContainerID{ID: "id1"}, kill: true},
+				{container: &v1.Container{Name: "restartable-init-1"}, containerID: kubecontainer.ContainerID{ID: "initid1"}, kill: true},
+				{container: &v1.Container{Name: "restartable-init-2"}, containerID: kubecontainer.ContainerID{ID: "initid2"}, kill: true},
+				{container: &v1.Container{Name: "restartable-init-3"}, containerID: kubecontainer.ContainerID{ID: "initid3"}},
 			},
 		},
 		"regular container exit triggers RestartAllContainers": {
@@ -1561,12 +1561,72 @@ func TestComputePodActionsForRestartAllContainers(t *testing.T) {
 			},
 			restartAllContainers: true,
 			containersToRemove: []containerToRemoveInfo{
-				{name: "foo2", kill: true},
-				{name: "foo1", kill: true},
-				{name: "restartable-init-3", kill: true},
-				{name: "restartable-init-2", kill: true},
-				{name: "restartable-init-1", kill: true},
-				{name: "foo3"},
+				{container: &v1.Container{Name: "foo1"}, containerID: kubecontainer.ContainerID{ID: "id1"}, kill: true},
+				{container: &v1.Container{Name: "foo2"}, containerID: kubecontainer.ContainerID{ID: "id2"}, kill: true},
+				{container: &v1.Container{Name: "restartable-init-1"}, containerID: kubecontainer.ContainerID{ID: "initid1"}, kill: true},
+				{container: &v1.Container{Name: "restartable-init-2"}, containerID: kubecontainer.ContainerID{ID: "initid2"}, kill: true},
+				{container: &v1.Container{Name: "restartable-init-3"}, containerID: kubecontainer.ContainerID{ID: "initid3"}, kill: true},
+				{container: &v1.Container{Name: "foo3"}, containerID: kubecontainer.ContainerID{ID: "id3"}},
+			},
+		},
+		"removes past terminated statuses": {
+			// foo3 terminated and triggers restart all containers. All containers have started once at t0, and
+			// restarted once at t1. All container statuses should be removed; foo3 should be removed last
+			// because it triggered restart all containers.
+			podFunc: func() *v1.Pod {
+				pod, _ := makeBasePodAndStatus()
+				pod.Spec.RestartPolicy = v1.RestartPolicyAlways
+				source := pod.Spec.Containers[2]
+				source.RestartPolicy = &restartPolicyAlways
+				source.RestartPolicyRules = restartAllContainersRules
+				pod.Spec.Containers[2] = source
+				pod.Status.Conditions = allContainersRestartingTrue
+				return pod
+			},
+			podStatusFunc: func() *kubecontainer.PodStatus {
+				_, status := makeBasePodAndStatus()
+				t1 := time.Now()
+				t0 := t1.Add(-time.Minute)
+				status.ContainerStatuses[0].CreatedAt = t1
+				status.ContainerStatuses[1].CreatedAt = t1
+				status.ContainerStatuses[2] = &kubecontainer.Status{
+					Name:      "foo3",
+					State:     kubecontainer.ContainerStateExited,
+					ExitCode:  1,
+					ID:        kubecontainer.ContainerID{ID: "id3"},
+					CreatedAt: t1,
+				}
+				status.ContainerStatuses = append(status.ContainerStatuses, &kubecontainer.Status{
+					Name:      "foo1",
+					State:     kubecontainer.ContainerStateExited,
+					ExitCode:  99,
+					ID:        kubecontainer.ContainerID{ID: "id1-past"},
+					CreatedAt: t0,
+				})
+				status.ContainerStatuses = append(status.ContainerStatuses, &kubecontainer.Status{
+					Name:      "foo2",
+					State:     kubecontainer.ContainerStateExited,
+					ExitCode:  99,
+					ID:        kubecontainer.ContainerID{ID: "id2-past"},
+					CreatedAt: t0,
+				})
+				status.ContainerStatuses = append(status.ContainerStatuses, &kubecontainer.Status{
+					Name:      "foo3",
+					State:     kubecontainer.ContainerStateExited,
+					ExitCode:  99,
+					ID:        kubecontainer.ContainerID{ID: "id3-past"},
+					CreatedAt: t0,
+				})
+				return status
+			},
+			restartAllContainers: true,
+			containersToRemove: []containerToRemoveInfo{
+				{container: &v1.Container{Name: "foo1"}, containerID: kubecontainer.ContainerID{ID: "id1"}, kill: true},
+				{container: &v1.Container{Name: "foo1"}, containerID: kubecontainer.ContainerID{ID: "id1-past"}},
+				{container: &v1.Container{Name: "foo2"}, containerID: kubecontainer.ContainerID{ID: "id2"}, kill: true},
+				{container: &v1.Container{Name: "foo2"}, containerID: kubecontainer.ContainerID{ID: "id2-past"}},
+				{container: &v1.Container{Name: "foo3"}, containerID: kubecontainer.ContainerID{ID: "id3-past"}},
+				{container: &v1.Container{Name: "foo3"}, containerID: kubecontainer.ContainerID{ID: "id3"}},
 			},
 		},
 		"all containers removed, start init container": {
@@ -1615,10 +1675,6 @@ func TestComputePodActionsForRestartAllContainers(t *testing.T) {
 			expected.InitContainersToStart = test.initContainersToStart
 		}
 
-		containerStatusByName := make(map[string]*kubecontainer.Status)
-		for _, c := range status.ContainerStatuses {
-			containerStatusByName[c.Name] = c
-		}
 		containerSpecByName := make(map[string]*v1.Container)
 		for idx, c := range pod.Spec.Containers {
 			containerSpecByName[c.Name] = &pod.Spec.Containers[idx]
@@ -1627,9 +1683,9 @@ func TestComputePodActionsForRestartAllContainers(t *testing.T) {
 			containerSpecByName[c.Name] = &pod.Spec.InitContainers[idx]
 		}
 		for _, info := range test.containersToRemove {
-			info.container = containerSpecByName[info.name]
-			info.containerID = containerStatusByName[info.name].ID
-			expected.ContainersToRemove = append(expected.ContainersToRemove, info)
+			cName := info.container.Name
+			info.container = containerSpecByName[cName]
+			expected.ContainersToReset = append(expected.ContainersToReset, info)
 		}
 
 		verifyActions(t, expected, &actions, desc)

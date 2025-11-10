@@ -2092,13 +2092,20 @@ func waitingStateWithNonZeroTermination(cName string) v1.ContainerStatus {
 		},
 	}
 }
-func waitingStateWithPodRestart(cName string) v1.ContainerStatus {
+func waitingStateWithRestartingAllContainers(cName string) v1.ContainerStatus {
 	return v1.ContainerStatus{
 		Name: cName,
 		State: v1.ContainerState{
 			Waiting: &v1.ContainerStateWaiting{
-				Reason:  kubecontainer.ContainerReasonStatusUnknown,
+				Reason:  RestartingAllContainers,
 				Message: "The container is removed because RestartAllContainers in place",
+			},
+		},
+		LastTerminationState: v1.ContainerState{
+			Terminated: &v1.ContainerStateTerminated{
+				Reason:   RestartingAllContainers,
+				Message:  "The container is removed because RestartAllContainers in place",
+				ExitCode: 137,
 			},
 		},
 	}
@@ -3569,7 +3576,7 @@ func TestPodPhaseWithRestartAllContainers(t *testing.T) {
 		statuses      []v1.ContainerStatus
 		expectedPhase v1.PodPhase
 	}{
-		// Triggere RestartAllContainers
+		// Trigger RestartAllContainers
 		{
 			name: "regular container triggers RestartAllContainers",
 			spec: &v1.PodSpec{
@@ -3589,6 +3596,7 @@ func TestPodPhaseWithRestartAllContainers(t *testing.T) {
 			},
 			statuses: []v1.ContainerStatus{
 				failedStateWithExitCode("container", 42),
+				waitingState("regular"),
 			},
 			expectedPhase: v1.PodPending,
 		},
@@ -3627,9 +3635,9 @@ func TestPodPhaseWithRestartAllContainers(t *testing.T) {
 				RestartPolicy: v1.RestartPolicyNever,
 			},
 			statuses: []v1.ContainerStatus{
-				waitingStateWithPodRestart("container"),
+				waitingStateWithRestartingAllContainers("container"),
 			},
-			expectedPhase: v1.PodPending,
+			expectedPhase: v1.PodRunning,
 		},
 		{
 			name: "init container triggers RestartAllContainers, cleaned up",
@@ -3638,7 +3646,8 @@ func TestPodPhaseWithRestartAllContainers(t *testing.T) {
 				RestartPolicy:  v1.RestartPolicyNever,
 			},
 			statuses: []v1.ContainerStatus{
-				waitingStateWithPodRestart("container"),
+				waitingStateWithRestartingAllContainers("container"),
+				waitingState("regular"),
 			},
 			expectedPhase: v1.PodPending,
 		},
@@ -3650,7 +3659,7 @@ func TestPodPhaseWithRestartAllContainers(t *testing.T) {
 				RestartPolicy:  v1.RestartPolicyNever,
 			},
 			statuses: []v1.ContainerStatus{
-				waitingStateWithPodRestart("container"),
+				waitingStateWithRestartingAllContainers("container"),
 				waitingState("regular"),
 			},
 			expectedPhase: v1.PodPending,
@@ -3663,8 +3672,8 @@ func TestPodPhaseWithRestartAllContainers(t *testing.T) {
 				RestartPolicy:  v1.RestartPolicyNever,
 			},
 			statuses: []v1.ContainerStatus{
-				waitingStateWithPodRestart("container"),
-				waitingStateWithPodRestart("container"),
+				waitingStateWithRestartingAllContainers("container"),
+				waitingStateWithRestartingAllContainers("container"),
 				waitingState("regular"),
 			},
 			expectedPhase: v1.PodPending,
@@ -3679,9 +3688,9 @@ func TestPodPhaseWithRestartAllContainers(t *testing.T) {
 			},
 			statuses: []v1.ContainerStatus{
 				succeededState("init"),
-				waitingStateWithPodRestart("container"),
+				waitingStateWithRestartingAllContainers("container"),
 			},
-			expectedPhase: v1.PodPending,
+			expectedPhase: v1.PodRunning,
 		},
 		{
 			name: "regular container triggered RestartAllContainers; init container failed",
@@ -3692,7 +3701,7 @@ func TestPodPhaseWithRestartAllContainers(t *testing.T) {
 			},
 			statuses: []v1.ContainerStatus{
 				failedState("init"),
-				waitingStateWithPodRestart("container"),
+				waitingStateWithRestartingAllContainers("container"),
 			},
 			expectedPhase: v1.PodFailed,
 		},
@@ -3730,10 +3739,10 @@ func TestPodPhaseWithRestartAllContainers(t *testing.T) {
 				RestartPolicy:  v1.RestartPolicyNever,
 			},
 			statuses: []v1.ContainerStatus{
-				waitingStateWithPodRestart("container"),
-				waitingStateWithPodRestart("regular"),
+				waitingStateWithRestartingAllContainers("container"),
+				waitingStateWithRestartingAllContainers("regular"),
 			},
-			expectedPhase: v1.PodPending,
+			expectedPhase: v1.PodRunning,
 		},
 		{
 			name: "sidecar container triggered RestartAllContainers kills regular container; sidecar running",
@@ -3744,9 +3753,9 @@ func TestPodPhaseWithRestartAllContainers(t *testing.T) {
 			},
 			statuses: []v1.ContainerStatus{
 				runningState("container"),
-				waitingStateWithPodRestart("regular"),
+				waitingStateWithRestartingAllContainers("regular"),
 			},
-			expectedPhase: v1.PodPending,
+			expectedPhase: v1.PodRunning,
 		},
 		{
 			name: "sidecar container triggered RestartAllContainers; kills init container; sidecar running",
@@ -3757,7 +3766,7 @@ func TestPodPhaseWithRestartAllContainers(t *testing.T) {
 			},
 			statuses: []v1.ContainerStatus{
 				runningState("container"),
-				waitingStateWithPodRestart("container"),
+				waitingStateWithRestartingAllContainers("container"),
 				waitingState("regular"),
 			},
 			expectedPhase: v1.PodPending,
@@ -3943,7 +3952,7 @@ func TestConvertToAPIContainerStatuses(t *testing.T) {
 			podRestarting: true,
 			expected: []v1.ContainerStatus{
 				failedStateWithExitCode("containerA", 137),
-				withRestartCount(waitingStateWithPodRestart("containerB"), 1),
+				withRestartCount(waitingStateWithRestartingAllContainers("containerB"), 1),
 			},
 		},
 		{
@@ -3959,8 +3968,8 @@ func TestConvertToAPIContainerStatuses(t *testing.T) {
 			containers:    desiredState.Containers,
 			podRestarting: true,
 			expected: []v1.ContainerStatus{
-				withRestartCount(waitingStateWithPodRestart("containerA"), 1),
-				withRestartCount(waitingStateWithPodRestart("containerB"), 1),
+				withRestartCount(waitingStateWithRestartingAllContainers("containerA"), 1),
+				withRestartCount(waitingStateWithRestartingAllContainers("containerB"), 1),
 			},
 		},
 		{
@@ -3976,8 +3985,8 @@ func TestConvertToAPIContainerStatuses(t *testing.T) {
 			containers:    desiredState.Containers,
 			podRestarting: true,
 			expected: []v1.ContainerStatus{
-				withRestartCount(waitingStateWithPodRestart("containerA"), 1),
-				withRestartCount(waitingStateWithPodRestart("containerB"), 1),
+				withRestartCount(waitingStateWithRestartingAllContainers("containerA"), 1),
+				withRestartCount(waitingStateWithRestartingAllContainers("containerB"), 1),
 			},
 		},
 		{
@@ -3999,7 +4008,7 @@ func TestConvertToAPIContainerStatuses(t *testing.T) {
 			podRestarting: true,
 			expected: []v1.ContainerStatus{
 				withRestartCount(runningState("containerA"), 1),
-				withRestartCount(waitingStateWithPodRestart("containerB"), 1),
+				withRestartCount(waitingStateWithRestartingAllContainers("containerB"), 1),
 			},
 		},
 		{
@@ -4022,7 +4031,7 @@ func TestConvertToAPIContainerStatuses(t *testing.T) {
 			podRestarting: true,
 			expected: []v1.ContainerStatus{
 				withRestartCount(succeededState("containerA"), 1),
-				withRestartCount(waitingStateWithPodRestart("containerB"), 1),
+				withRestartCount(waitingStateWithRestartingAllContainers("containerB"), 1),
 			},
 		},
 		{
@@ -4045,7 +4054,7 @@ func TestConvertToAPIContainerStatuses(t *testing.T) {
 			podRestarting: true,
 			expected: []v1.ContainerStatus{
 				withRestartCount(failedStateWithExitCode("containerA", 1), 1),
-				withRestartCount(waitingStateWithPodRestart("containerB"), 1),
+				withRestartCount(waitingStateWithRestartingAllContainers("containerB"), 1),
 			},
 		},
 	}
