@@ -1857,6 +1857,12 @@
     lockToDefault: true
     preRelease: GA
     version: "1.35"
+- name: TaintTolerationComparisonOperators
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.35"
 - name: TokenRequestServiceAccountUIDValidation
   versionedSpecs:
   - default: true

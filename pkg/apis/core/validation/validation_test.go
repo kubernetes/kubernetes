@@ -12246,6 +12246,18 @@ func TestValidatePod(t *testing.T) {
 				podtest.SetTolerations(core.Toleration{Key: "node.kubernetes.io/not-ready", Operator: "Exists", Effect: "NoSchedule", TolerationSeconds: &[]int64{20}[0]}),
 			),
 		},
+		"numeric operator Lt requires feature gate (gate disabled)": {
+			expectedError: "Unsupported value: \"Lt\"",
+			spec: *podtest.MakePod("123",
+				podtest.SetTolerations(core.Toleration{Key: "node.kubernetes.io/sla", Operator: "Lt", Value: "950", Effect: "NoSchedule"}),
+			),
+		},
+		"numeric operator Gt requires feature gate (gate disabled)": {
+			expectedError: "Unsupported value: \"Gt\"",
+			spec: *podtest.MakePod("123",
+				podtest.SetTolerations(core.Toleration{Key: "node.kubernetes.io/sla", Operator: "Gt", Value: "950", Effect: "NoSchedule"}),
+			),
+		},
 		"must be a valid pod seccomp profile": {
 			expectedError: "must be a valid seccomp profile",
 			spec: *podtest.MakePod("123",
@@ -29549,6 +29561,188 @@ func TestValidateContainerStateTransition(t *testing.T) {
 			}
 			if !tc.expectErr && len(errs) > 0 {
 				t.Errorf("Unexpected error(s): %v", errs)
+			}
+		})
+	}
+}
+
+func TestNumericTolerationsWithFeatureGate(t *testing.T) {
+	testCases := []struct {
+		name          string
+		toleration    core.Toleration
+		featureGateOn bool
+		errorMsg      string
+	}{
+		{
+			name: "Gt operator with valid numeric value and feature gate enabled",
+			toleration: core.Toleration{
+				Key:      "node.kubernetes.io/sla",
+				Operator: core.TolerationOpGt,
+				Value:    "950",
+				Effect:   core.TaintEffectNoSchedule,
+			},
+			featureGateOn: true,
+		},
+		{
+			name: "Lt operator with valid numeric value and feature gate enabled",
+			toleration: core.Toleration{
+				Key:      "node.kubernetes.io/sla",
+				Operator: core.TolerationOpLt,
+				Value:    "800",
+				Effect:   core.TaintEffectNoSchedule,
+			},
+			featureGateOn: true,
+		},
+		{
+			name: "Gt operator with negative numeric value and feature gate enabled",
+			toleration: core.Toleration{
+				Key:      "test-key",
+				Operator: core.TolerationOpGt,
+				Value:    "-100",
+				Effect:   core.TaintEffectNoSchedule,
+			},
+			featureGateOn: true,
+		},
+		{
+			name: "Gt operator with non-numeric value and feature gate enabled",
+			toleration: core.Toleration{
+				Key:      "node.kubernetes.io/sla",
+				Operator: core.TolerationOpGt,
+				Value:    "high",
+				Effect:   core.TaintEffectNoSchedule,
+			},
+			featureGateOn: true,
+			errorMsg:      fmt.Sprintf("tolerations[0].value: Invalid value: %q: must be a valid decimal integer in canonical form", "high"),
+		},
+		{
+			name: "Gt operator with leading zeros and feature gate enabled (invalid - strict validation)",
+			toleration: core.Toleration{
+				Key:      "node.kubernetes.io/sla",
+				Operator: core.TolerationOpGt,
+				Value:    "0950",
+				Effect:   core.TaintEffectNoSchedule,
+			},
+			featureGateOn: true,
+			errorMsg:      fmt.Sprintf("tolerations[0].value: Invalid value: %q: must be a valid decimal integer in canonical form", "0950"),
+		},
+		{
+			name: "Gt operator with value '0' and feature gate enabled (valid)",
+			toleration: core.Toleration{
+				Key:      "test-key",
+				Operator: core.TolerationOpGt,
+				Value:    "0",
+				Effect:   core.TaintEffectNoSchedule,
+			},
+			featureGateOn: true,
+		},
+		{
+			name: "Gt operator with decimal value and feature gate enabled",
+			toleration: core.Toleration{
+				Key:      "node.kubernetes.io/sla",
+				Operator: core.TolerationOpGt,
+				Value:    "95.5",
+				Effect:   core.TaintEffectNoSchedule,
+			},
+			featureGateOn: true,
+			errorMsg:      fmt.Sprintf("tolerations[0].value: Invalid value: %q: must be a valid decimal integer in canonical form", "95.5"),
+		},
+		{
+			name: "Gt operator with just minus sign and feature gate enabled",
+			toleration: core.Toleration{
+				Key:      "test-key",
+				Operator: core.TolerationOpGt,
+				Value:    "-",
+				Effect:   core.TaintEffectNoSchedule,
+			},
+			featureGateOn: true,
+			errorMsg:      fmt.Sprintf("tolerations[0].value: Invalid value: %q: must be a valid decimal integer in canonical form", "-"),
+		},
+		{
+			name: "Gt operator with plus sign and feature gate enabled (invalid - strict validation)",
+			toleration: core.Toleration{
+				Key:      "test-key",
+				Operator: core.TolerationOpGt,
+				Value:    "+100",
+				Effect:   core.TaintEffectNoSchedule,
+			},
+			featureGateOn: true,
+			errorMsg:      fmt.Sprintf("tolerations[0].value: Invalid value: %q: must be a valid decimal integer in canonical form", "+100"),
+		},
+		{
+			name: "Gt operator with space in value and feature gate enabled",
+			toleration: core.Toleration{
+				Key:      "test-key",
+				Operator: core.TolerationOpGt,
+				Value:    "95 0",
+				Effect:   core.TaintEffectNoSchedule,
+			},
+			featureGateOn: true,
+			errorMsg:      fmt.Sprintf("tolerations[0].value: Invalid value: %q: must be a valid decimal integer in canonical form", "95 0"),
+		},
+		{
+			name: "Gt operator with empty value and feature gate enabled",
+			toleration: core.Toleration{
+				Key:      "test-key",
+				Operator: core.TolerationOpGt,
+				Value:    "",
+				Effect:   core.TaintEffectNoSchedule,
+			},
+			featureGateOn: true,
+			errorMsg:      fmt.Sprintf("tolerations[0].value: Invalid value: %q: must be non-empty", ""),
+		},
+		{
+			name: "Lt operator with feature gate disabled",
+			toleration: core.Toleration{
+				Key:      "node.kubernetes.io/sla",
+				Operator: core.TolerationOpLt,
+				Value:    "950",
+				Effect:   core.TaintEffectNoSchedule,
+			},
+			featureGateOn: false,
+			errorMsg:      "Unsupported value",
+		},
+		{
+			name: "Gt operator with max int64 value and feature gate enabled",
+			toleration: core.Toleration{
+				Key:      "test-key",
+				Operator: core.TolerationOpGt,
+				Value:    "9223372036854775807",
+				Effect:   core.TaintEffectNoSchedule,
+			},
+			featureGateOn: true,
+		},
+		{
+			name: "Gt operator with overflow value and feature gate enabled",
+			toleration: core.Toleration{
+				Key:      "test-key",
+				Operator: core.TolerationOpGt,
+				Value:    "9223372036854775808", // max int64 + 1
+				Effect:   core.TaintEffectNoSchedule,
+			},
+			featureGateOn: true,
+			errorMsg:      fmt.Sprintf("tolerations[0].value: Invalid value: %q: strconv.ParseInt: parsing %q: value out of range", "9223372036854775808", "9223372036854775808"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TaintTolerationComparisonOperators, tc.featureGateOn)
+
+			opts := PodValidationOptions{
+				AllowTaintTolerationComparisonOperators: tc.featureGateOn,
+			}
+			errs := ValidateTolerations([]core.Toleration{tc.toleration}, field.NewPath("tolerations"), opts)
+
+			if tc.errorMsg != "" {
+				if len(errs) == 0 {
+					t.Errorf("Expected error but got none")
+				} else if !strings.Contains(errs.ToAggregate().Error(), tc.errorMsg) {
+					t.Errorf("Expected error message to contain %q, got %q", tc.errorMsg, errs.ToAggregate().Error())
+				}
+			} else {
+				if len(errs) > 0 {
+					t.Errorf("Unexpected error(s): %v", errs)
+				}
 			}
 		})
 	}

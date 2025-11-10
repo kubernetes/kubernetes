@@ -48,6 +48,7 @@ type Features struct {
 	EnableStorageCapacityScoring                 bool
 	EnableNodeDeclaredFeatures                   bool
 	EnableGangScheduling                         bool
+	EnableTaintTolerationComparisonOperators     bool
 }
 
 // NewSchedulerFeaturesFromGates copies the current state of the feature gates into the struct.
@@ -76,5 +77,6 @@ func NewSchedulerFeaturesFromGates(featureGate featuregate.FeatureGate) Features
 		EnableStorageCapacityScoring:                 featureGate.Enabled(features.StorageCapacityScoring),
 		EnableNodeDeclaredFeatures:                   featureGate.Enabled(features.NodeDeclaredFeatures),
 		EnableGangScheduling:                         featureGate.Enabled(features.GangScheduling),
+		EnableTaintTolerationComparisonOperators:     featureGate.Enabled(features.TaintTolerationComparisonOperators),
 	}
 }

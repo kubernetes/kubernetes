@@ -6219,6 +6219,204 @@ func TestHasUserNamespacesWithVolumeDevices(t *testing.T) {
 	}
 }
 
+func TestTaintTolerationComparisonOperatorsInUse(t *testing.T) {
+	tests := []struct {
+		name     string
+		podSpec  *api.PodSpec
+		expected bool
+	}{
+		{
+			name:     "nil pod spec",
+			podSpec:  nil,
+			expected: false,
+		},
+		{
+			name: "no tolerations",
+			podSpec: &api.PodSpec{
+				Containers: []api.Container{{Name: "test"}},
+			},
+			expected: false,
+		},
+		{
+			name: "only Equal operator",
+			podSpec: &api.PodSpec{
+				Tolerations: []api.Toleration{
+					{Key: "key1", Operator: api.TolerationOpEqual, Value: "value1"},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "only Exists operator",
+			podSpec: &api.PodSpec{
+				Tolerations: []api.Toleration{
+					{Key: "key1", Operator: api.TolerationOpExists},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "Lt operator present",
+			podSpec: &api.PodSpec{
+				Tolerations: []api.Toleration{
+					{Key: "key1", Operator: api.TolerationOpLt, Value: "100"},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "Gt operator present",
+			podSpec: &api.PodSpec{
+				Tolerations: []api.Toleration{
+					{Key: "key1", Operator: api.TolerationOpGt, Value: "50"},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "mixed operators with Lt",
+			podSpec: &api.PodSpec{
+				Tolerations: []api.Toleration{
+					{Key: "key1", Operator: api.TolerationOpEqual, Value: "value1"},
+					{Key: "key2", Operator: api.TolerationOpLt, Value: "100"},
+					{Key: "key3", Operator: api.TolerationOpExists},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "mixed operators with Gt",
+			podSpec: &api.PodSpec{
+				Tolerations: []api.Toleration{
+					{Key: "key1", Operator: api.TolerationOpExists},
+					{Key: "key2", Operator: api.TolerationOpGt, Value: "200"},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "both Lt and Gt operators",
+			podSpec: &api.PodSpec{
+				Tolerations: []api.Toleration{
+					{Key: "key1", Operator: api.TolerationOpLt, Value: "100"},
+					{Key: "key2", Operator: api.TolerationOpGt, Value: "50"},
+				},
+			},
+			expected: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			actual := taintTolerationComparisonOperatorsInUse(test.podSpec)
+			if test.expected != actual {
+				t.Errorf("expected %v, got %v", test.expected, actual)
+			}
+		})
+	}
+}
+
+func TestAllowTaintTolerationComparisonOperators(t *testing.T) {
+	tests := []struct {
+		name           string
+		featureEnabled bool
+		oldPodSpec     *api.PodSpec
+		expected       bool
+	}{
+		{
+			name:           "feature gate enabled, nil old pod spec",
+			featureEnabled: true,
+			oldPodSpec:     nil,
+			expected:       true,
+		},
+		{
+			name:           "feature gate enabled, old pod spec without comparison operators",
+			featureEnabled: true,
+			oldPodSpec: &api.PodSpec{
+				Tolerations: []api.Toleration{
+					{Key: "key1", Operator: api.TolerationOpEqual, Value: "value1"},
+				},
+			},
+			expected: true,
+		},
+		{
+			name:           "feature gate enabled, old pod spec with Lt operator",
+			featureEnabled: true,
+			oldPodSpec: &api.PodSpec{
+				Tolerations: []api.Toleration{
+					{Key: "key1", Operator: api.TolerationOpLt, Value: "100"},
+				},
+			},
+			expected: true,
+		},
+		{
+			name:           "feature gate disabled, nil old pod spec",
+			featureEnabled: false,
+			oldPodSpec:     nil,
+			expected:       false,
+		},
+		{
+			name:           "feature gate disabled, old pod spec without comparison operators",
+			featureEnabled: false,
+			oldPodSpec: &api.PodSpec{
+				Tolerations: []api.Toleration{
+					{Key: "key1", Operator: api.TolerationOpEqual, Value: "value1"},
+					{Key: "key2", Operator: api.TolerationOpExists},
+				},
+			},
+			expected: false,
+		},
+		{
+			name:           "feature gate disabled, old pod spec with Lt operator",
+			featureEnabled: false,
+			oldPodSpec: &api.PodSpec{
+				Tolerations: []api.Toleration{
+					{Key: "key1", Operator: api.TolerationOpLt, Value: "100"},
+				},
+			},
+			expected: true,
+		},
+		{
+			name:           "feature gate disabled, old pod spec with Gt operator",
+			featureEnabled: false,
+			oldPodSpec: &api.PodSpec{
+				Tolerations: []api.Toleration{
+					{Key: "key1", Operator: api.TolerationOpGt, Value: "50"},
+				},
+			},
+			expected: true,
+		},
+		{
+			name:           "feature gate disabled, old pod spec with mixed operators including Lt",
+			featureEnabled: false,
+			oldPodSpec: &api.PodSpec{
+				Tolerations: []api.Toleration{
+					{Key: "key1", Operator: api.TolerationOpEqual, Value: "value1"},
+					{Key: "key2", Operator: api.TolerationOpLt, Value: "100"},
+					{Key: "key3", Operator: api.TolerationOpExists},
+				},
+			},
+			expected: true,
+		},
+		{
+			name:           "feature gate disabled, empty old pod spec",
+			featureEnabled: false,
+			oldPodSpec:     &api.PodSpec{},
+			expected:       false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TaintTolerationComparisonOperators, test.featureEnabled)
+			actual := allowTaintTolerationComparisonOperators(test.oldPodSpec)
+			if test.expected != actual {
+				t.Errorf("expected %v, got %v", test.expected, actual)
+			}
+		})
+	}
+}
+
 func TestDisabledWorkload(t *testing.T) {
 	podWithWorkload := &api.Pod{
 		Spec: api.PodSpec{

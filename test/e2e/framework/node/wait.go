@@ -19,6 +19,7 @@ package node
 import (
 	"context"
 	"fmt"
+	"k8s.io/klog/v2"
 	"regexp"
 	"time"
 
@@ -48,6 +49,7 @@ func WaitForReadyNodes(ctx context.Context, c clientset.Interface, size int, tim
 
 // WaitForTotalHealthy checks whether all registered nodes are ready and all required Pods are running on them.
 func WaitForTotalHealthy(ctx context.Context, c clientset.Interface, timeout time.Duration) error {
+	logger := klog.FromContext(ctx)
 	framework.Logf("Waiting up to %v for all nodes to be ready", timeout)
 
 	var notReady []v1.Node
@@ -79,7 +81,7 @@ func WaitForTotalHealthy(ctx context.Context, c clientset.Interface, timeout tim
 		}
 		missingPodsPerNode = make(map[string][]string)
 		for _, node := range nodes.Items {
-			if isNodeSchedulableWithoutTaints(&node) {
+			if isNodeSchedulableWithoutTaints(logger, &node) {
 				for _, requiredPod := range requiredPerNodePods {
 					foundRequired := false
 					for _, presentPod := range systemPodsPerNode[node.Name] {
@@ -145,6 +147,7 @@ func WaitForNodeToBeReady(ctx context.Context, c clientset.Interface, name strin
 }
 
 func WaitForNodeSchedulable(ctx context.Context, c clientset.Interface, name string, timeout time.Duration, wantSchedulable bool) bool {
+	logger := klog.FromContext(ctx)
 	framework.Logf("Waiting up to %v for node %s to be schedulable: %t", timeout, name, wantSchedulable)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
 		node, err := c.CoreV1().Nodes().Get(ctx, name, metav1.GetOptions{})
@@ -153,7 +156,7 @@ func WaitForNodeSchedulable(ctx context.Context, c clientset.Interface, name str
 			continue
 		}
 
-		if IsNodeSchedulable(node) == wantSchedulable {
+		if IsNodeSchedulable(logger, node) == wantSchedulable {
 			return true
 		}
 	}
@@ -235,6 +238,7 @@ func checkWaitListSchedulableNodes(ctx context.Context, c clientset.Interface) (
 
 // CheckReadyForTests returns a function which will return 'true' once the number of ready nodes is above the allowedNotReadyNodes threshold (i.e. to be used as a global gate for starting the tests).
 func CheckReadyForTests(ctx context.Context, c clientset.Interface, nonblockingTaints string, allowedNotReadyNodes, largeClusterThreshold int) func(ctx context.Context) (bool, error) {
+	logger := klog.FromContext(ctx)
 	attempt := 0
 	return func(ctx context.Context) (bool, error) {
 		if allowedNotReadyNodes == -1 {
@@ -257,7 +261,7 @@ func CheckReadyForTests(ctx context.Context, c clientset.Interface, nonblockingT
 			return false, terminalListNodesErr
 		}
 		for _, node := range allNodes.Items {
-			if !readyForTests(&node, nonblockingTaints) {
+			if !readyForTests(logger, &node, nonblockingTaints) {
 				nodesNotReadyYet = append(nodesNotReadyYet, node)
 			}
 		}
@@ -297,15 +301,15 @@ func CheckReadyForTests(ctx context.Context, c clientset.Interface, nonblockingT
 // to enter a testable state. By default this means it is schedulable, NodeReady, and untainted.
 // Nodes with taints nonblocking taints are permitted to have that taint and
 // also have their node.Spec.Unschedulable field ignored for the purposes of this function.
-func readyForTests(node *v1.Node, nonblockingTaints string) bool {
+func readyForTests(logger klog.Logger, node *v1.Node, nonblockingTaints string) bool {
 	if hasNonblockingTaint(node, nonblockingTaints) {
 		// If the node has one of the nonblockingTaints taints; just check that it is ready
 		// and don't require node.Spec.Unschedulable to be set either way.
-		if !IsNodeReady(node) || !isNodeUntaintedWithNonblocking(node, nonblockingTaints) {
+		if !IsNodeReady(logger, node) || !isNodeUntaintedWithNonblocking(logger, node, nonblockingTaints) {
 			return false
 		}
 	} else {
-		if !IsNodeSchedulable(node) || !isNodeUntainted(node) {
+		if !IsNodeSchedulable(logger, node) || !isNodeUntainted(logger, node) {
 			return false
 		}
 	}
