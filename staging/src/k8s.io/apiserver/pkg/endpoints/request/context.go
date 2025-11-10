@@ -34,14 +34,22 @@ const (
 	userKey
 )
 
+// Deprecated: callers should pass a context obtained from their caller
 // NewContext instantiates a base context object for request flows.
 func NewContext() context.Context {
 	return context.TODO()
 }
 
+// Deprecated: use DefaultContext instead.
 // NewDefaultContext instantiates a base context object for request flows in the default namespace
 func NewDefaultContext() context.Context {
 	return WithNamespace(NewContext(), metav1.NamespaceDefault)
+}
+
+// DefaultContext returns a context that includes the default namespace,
+// derived from the provided parent context.
+func DefaultContext(parent context.Context) context.Context {
+    return WithNamespace(parent, metav1.NamespaceDefault)
 }
 
 // WithValue returns a copy of parent in which the value associated with key is val.
