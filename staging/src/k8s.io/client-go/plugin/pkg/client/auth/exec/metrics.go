@@ -49,6 +49,13 @@ const (
 	// used in some failure modes (e.g., plugin not found, client internal error) so that someone
 	// can more easily monitor all unsuccessful invocations.
 	failureExitCode = 1
+
+	// pluginAllowed represents an exec plugin invocation that was allowed by
+	// the plugin policy and/or the allowlist
+	pluginAllowed = "allowed"
+	// pluginAllowed represents an exec plugin invocation that was denied by
+	// the plugin policy and/or the allowlist
+	pluginDenied = "denied"
 )
 
 type certificateExpirationTracker struct {
@@ -108,4 +115,13 @@ func incrementCallsMetric(err error) {
 		klog.V(2).InfoS("unexpected exec plugin return error type", "type", reflect.TypeOf(err).String(), "err", err)
 		metrics.ExecPluginCalls.Increment(failureExitCode, clientInternalError)
 	}
+}
+
+func incrementPolicyMetric(err error) {
+	if err != nil {
+		metrics.ExecPluginPolicyCalls.Increment(pluginDenied)
+		return
+	}
+
+	metrics.ExecPluginPolicyCalls.Increment(pluginAllowed)
 }
