@@ -77,8 +77,12 @@ func (pl *NodeAffinity) Name() string {
 
 // Node affinity filtering and scoring depend on NodeAffinity and NodeSelectors.
 func (pl *NodeAffinity) SignPod(ctx context.Context, pod *v1.Pod, state fwk.CycleState) ([]fwk.SignFragment, *fwk.Status) {
+	aff, err := fwk.NodeAffinitySigner(pod)
+	if err != nil {
+		return nil, fwk.AsStatus(err)
+	}
 	return []fwk.SignFragment{
-		{Key: fwk.NodeAffinitySignerName, Value: fwk.NodeAffinitySigner(pod)},
+		{Key: fwk.NodeAffinitySignerName, Value: aff},
 		{Key: fwk.NodeSelectorSignerName, Value: pod.Spec.NodeSelector},
 	}, nil
 }

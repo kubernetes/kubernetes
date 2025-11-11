@@ -65,11 +65,67 @@ func HostPortsSigner(pod *v1.Pod) any {
 	return ports
 }
 
-func NodeAffinitySigner(pod *v1.Pod) any {
-	if pod.Spec.Affinity != nil {
-		return pod.Spec.Affinity.NodeAffinity
+func NodeSelectorRequirementSigner(reqs v1.NodeSelectorRequirement) v1.NodeSelectorRequirement {
+	newValues := make([]string, len(reqs.Values))
+	copy(newValues, reqs.Values)
+	sort.Slice(newValues, func(i, j int) bool {
+		return newValues[i] < newValues[j]
+	})
+	return v1.NodeSelectorRequirement{
+		Key:      reqs.Key,
+		Operator: reqs.Operator,
+		Values:   newValues,
 	}
-	return nil
+}
+
+func NodeSelectorRequirementsSigner(reqs []v1.NodeSelectorRequirement) []v1.NodeSelectorRequirement {
+	newReqs := make([]v1.NodeSelectorRequirement, len(reqs))
+	copy(newReqs, reqs)
+	sort.Slice(newReqs, func(i, j int) bool {
+		return newReqs[i].Key < newReqs[j].Key || (newReqs[i].Key == newReqs[j].Key && newReqs[i].Operator < newReqs[j].Operator)
+	})
+	return newReqs
+}
+
+func PreferredSchedulingTermSigner(terms []v1.PreferredSchedulingTerm) ([]string, error) {
+	newTerms := make([]string, len(terms))
+	for i, t := range terms {
+		termStr, err := json.Marshal(v1.PreferredSchedulingTerm{
+			Weight: t.Weight,
+			Preference: v1.NodeSelectorTerm{
+				MatchExpressions: NodeSelectorRequirementsSigner(t.Preference.MatchExpressions),
+				MatchFields:      NodeSelectorRequirementsSigner(t.Preference.MatchFields),
+			},
+		})
+		if err != nil {
+			return nil, err
+		}
+		newTerms[i] = string(termStr)
+	}
+	sort.Slice(newTerms, func(i, j int) bool {
+		return newTerms[i] < newTerms[j]
+	})
+	return newTerms, nil
+}
+
+func NodeAffinitySigner(pod *v1.Pod) (any, error) {
+	if pod.Spec.Affinity != nil {
+		if pod.Spec.Affinity.NodeAffinity != nil {
+			n := pod.Spec.Affinity.NodeAffinity
+			pref, err := PreferredSchedulingTermSigner(n.PreferredDuringSchedulingIgnoredDuringExecution)
+			if err != nil {
+				return nil, err
+			}
+			return struct {
+				Required  *v1.NodeSelector
+				Preferred []string
+			}{
+				Required:  n.RequiredDuringSchedulingIgnoredDuringExecution,
+				Preferred: pref,
+			}, nil
+		}
+	}
+	return nil, nil
 }
 
 func TolerationsSigner(pod *v1.Pod) any {

@@ -1218,7 +1218,7 @@ func (pl *constantSigPlugin) ScoreExtensions() fwk.ScoreExtensions {
 	return nil
 }
 
-func (pl *constantSigPlugin) SignPod(_ context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
+func (pl *constantSigPlugin) SignPod(_ context.Context, pod *v1.Pod, state fwk.CycleState) ([]fwk.SignFragment, *fwk.Status) {
 	return pl.config.signature, pl.config.status
 }
 

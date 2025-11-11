@@ -670,5 +670,8 @@ func newPodInformer(cs clientset.Interface, resyncPeriod time.Duration) cache.Sh
 }
 
 func (sched *Scheduler) CurrentCycle() int64 {
-	return sched.SchedulingQueue.SchedulingCycle()
+	if sched.SchedulingQueue != nil {
+		return sched.SchedulingQueue.SchedulingCycle()
+	}
+	return 0
 }
