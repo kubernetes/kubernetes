@@ -71,6 +71,9 @@ type Manager interface {
 	// GetContainerResourceAllocation returns the AllocatedResources value for the container
 	GetContainerResourceAllocation(podUID types.UID, containerName string) (v1.ResourceRequirements, bool)
 
+	// GetPodLevelResourceAllocation returns the AllocatedResources value for the container
+	GetPodLevelResourceAllocation(podUID types.UID) (*v1.ResourceRequirements, bool)
+
 	// UpdatePodFromAllocation overwrites the pod spec with the allocation.
 	// This function does a deep copy only if updates are needed.
 	// Returns the updated (or original) pod, and whether there was an allocation stored.
@@ -417,6 +420,12 @@ func (m *manager) HasPendingResizes() bool {
 // If checkpoint manager has not been initialized, it returns nil, false
 func (m *manager) GetContainerResourceAllocation(podUID types.UID, containerName string) (v1.ResourceRequirements, bool) {
 	return m.allocated.GetContainerResources(podUID, containerName)
+}
+
+// GetPodLevelResourceAllocation returns the last checkpointed AllocatedResources values
+// If checkpoint manager has not been initialized, it returns nil, false
+func (m *manager) GetPodLevelResourceAllocation(podUID types.UID) (*v1.ResourceRequirements, bool) {
+	return m.allocated.GetPodLevelResources(podUID)
 }
 
 // UpdatePodFromAllocation overwrites the pod spec with the allocation.
