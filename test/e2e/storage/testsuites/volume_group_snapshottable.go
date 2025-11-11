@@ -147,6 +147,10 @@ func (s *VolumeGroupSnapshottableTestSuite) DefineTests(driver storageframework.
 								"app": statefulSetName,
 							},
 						},
+						PersistentVolumeClaimRetentionPolicy: &appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+							WhenDeleted: appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
+							WhenScaled:  appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
+						},
 						Template: v1.PodTemplateSpec{
 							ObjectMeta: metav1.ObjectMeta{
 								Labels: map[string]string{
@@ -229,8 +233,7 @@ func (s *VolumeGroupSnapshottableTestSuite) DefineTests(driver storageframework.
 			cleanup := func(ctx context.Context) {
 				if groupTest.statefulSet != nil {
 					framework.Logf("Deleting StatefulSet %s", groupTest.statefulSet.Name)
-					err := cs.AppsV1().StatefulSets(f.Namespace.Name).Delete(ctx, groupTest.statefulSet.Name, metav1.DeleteOptions{})
-					framework.ExpectNoError(err, "failed to delete StatefulSet %s", groupTest.statefulSet.Name)
+					e2estatefulset.DeleteAllStatefulSets(ctx, cs, groupTest.statefulSet.Namespace)
 				}
 				for _, volumeResource := range groupTest.volumeResources {
 					if volumeResource != nil {
@@ -250,6 +253,18 @@ func (s *VolumeGroupSnapshottableTestSuite) DefineTests(driver storageframework.
 
 				snapshot := storageframework.CreateVolumeGroupSnapshotResource(ctx, snapshottableDriver, groupTest.config, pattern, labelValue, f.Namespace.Name, f.Timeouts, map[string]string{"deletionPolicy": pattern.SnapshotDeletionPolicy.String()})
 				groupTest.snapshots = append(groupTest.snapshots, snapshot)
+				ginkgo.DeferCleanup(func(ctx context.Context) {
+					for _, volumeGroupSnapshotResource := range groupTest.snapshots {
+						vgsName := volumeGroupSnapshotResource.VGS.Object["metadata"].(map[string]interface{})["name"].(string)
+						framework.Logf("Deleting volumeGroupSnapshotResource %s", vgsName)
+						err := volumeGroupSnapshotResource.CleanupResource(ctx, f.Timeouts)
+						if err != nil {
+							framework.Logf("Warning: failed to delete volumeGroupSnapshotResource %s: %v", vgsName, err)
+						} else {
+							framework.Logf("Deleted volumeGroupSnapshotResource %s", vgsName)
+						}
+					}
+				})
 
 				ginkgo.By("verifying the snapshots in the group are ready to use")
 				status := snapshot.VGS.Object["status"]
