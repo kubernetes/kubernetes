@@ -326,7 +326,7 @@ func TestPodAffinitySignature(t *testing.T) {
 			snapshot := cache.NewSnapshot(nil, nil)
 			pl := plugintesting.SetupPluginWithInformers(ctx, t, schedruntime.FactoryAdapter(feature.Features{}, New), &test.config, snapshot, namespaces)
 			p := pl.(*InterPodAffinity)
-			signature, status := p.SignPod(ctx, test.pod)
+			signature, status := p.SignPod(ctx, test.pod, nil)
 
 			if !status.IsSuccess() && test.scheduleable {
 				t.Fatalf("Expected success, got %v", status)

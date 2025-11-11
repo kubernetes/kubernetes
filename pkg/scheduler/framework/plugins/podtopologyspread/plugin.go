@@ -89,21 +89,20 @@ func (pl *PodTopologySpread) Name() string {
 // Pod topology spread is not localized to a pod and node, so we cannot
 // sign pods that have topology spread constraints, either explicit or
 // defaulted.
-func (pl *PodTopologySpread) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
-	if len(pod.Spec.TopologySpreadConstraints) > 0 {
-		return nil, fwk.NewStatus(fwk.Unschedulable)
-	}
+func (pl *PodTopologySpread) SignPod(ctx context.Context, pod *v1.Pod, state fwk.CycleState) ([]fwk.SignFragment, *fwk.Status) {
+	sstate, err := state.Read(preFilterStateKey)
 
-	if len(pl.defaultConstraints) == 0 {
+	// Not found means we had no constraints.
+	if err == fwk.ErrNotFound {
 		return nil, nil
 	}
 
-	constraints, err := pl.buildDefaultConstraints(pod, v1.ScheduleAnyway)
 	if err != nil {
 		return nil, fwk.AsStatus(err)
 	}
 
-	if len(constraints) > 0 {
+	spreadState := sstate.(*preFilterState)
+	if len(spreadState.Constraints) > 0 {
 		return nil, fwk.NewStatus(fwk.Unschedulable)
 	}
 

@@ -129,7 +129,7 @@ func (pl *NodeDeclaredFeatures) Filter(ctx context.Context, cycleState fwk.Cycle
 	return nil
 }
 
-func (pl *NodeDeclaredFeatures) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
+func (pl *NodeDeclaredFeatures) SignPod(ctx context.Context, pod *v1.Pod, state fwk.CycleState) ([]fwk.SignFragment, *fwk.Status) {
 	podInfo := &ndf.PodInfo{Spec: &pod.Spec}
 	fs, err := pl.ndfFramework.InferForPodScheduling(podInfo, pl.version)
 	if err != nil {

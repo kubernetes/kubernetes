@@ -183,18 +183,14 @@ func getResources(containers []v1.Container) any {
 	return ret
 }
 
-func resourcesSigner(pod *v1.Pod) any {
-	return map[string]any{
-		"containers":     getResources(pod.Spec.Containers),
-		"initContainers": getResources(pod.Spec.InitContainers),
-		"overhead":       pod.Spec.Overhead,
-	}
-}
-
 // Filtering and scoring based on the container resources and overheads.
-func (pl *Fit) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
+func (pl *Fit) SignPod(ctx context.Context, pod *v1.Pod, state fwk.CycleState) ([]fwk.SignFragment, *fwk.Status) {
+	opts := ResourceRequestsOptions{
+		EnablePodLevelResources:   pl.enablePodLevelResources,
+		EnableDRAExtendedResource: pl.enableDRAExtendedResource,
+	}
 	return []fwk.SignFragment{
-		{Key: fwk.ResourcesSignerName, Value: resourcesSigner(pod)},
+		{Key: fwk.ResourcesSignerName, Value: computePodResourceRequest(pod, opts)},
 	}, nil
 }
 

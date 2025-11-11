@@ -462,7 +462,7 @@ func TestImageSignature(t *testing.T) {
 			if err != nil {
 				t.Fatalf("creating plugin: %v", err)
 			}
-			signature, _ := p.(*ImageLocality).SignPod(ctx, test.pod)
+			signature, _ := p.(*ImageLocality).SignPod(ctx, test.pod, nil)
 
 			if diff := cmp.Diff(test.expectedSignature, signature); diff != "" {
 				t.Fatalf("Diff %s", diff)

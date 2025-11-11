@@ -69,7 +69,7 @@ func (pl *NodeName) Name() string {
 }
 
 // NodeName scoring and feasibility are dependent on the NodeName field.
-func (pl *NodeName) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
+func (pl *NodeName) SignPod(ctx context.Context, pod *v1.Pod, state fwk.CycleState) ([]fwk.SignFragment, *fwk.Status) {
 	return []fwk.SignFragment{
 		{Key: fwk.NodeNameSignerName, Value: pod.Spec.NodeName},
 	}, nil

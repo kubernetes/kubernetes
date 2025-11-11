@@ -661,7 +661,7 @@ func getVolumeUniqueName(driverName, volumeHandle string) string {
 }
 
 // Feasibility and scoring based on the non-synthetic volume sources.
-func (pl *CSILimits) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
+func (pl *CSILimits) SignPod(ctx context.Context, pod *v1.Pod, state fwk.CycleState) ([]fwk.SignFragment, *fwk.Status) {
 	return []fwk.SignFragment{
 		{Key: fwk.VolumesSignerName, Value: fwk.VolumesSigner(pod)},
 	}, nil

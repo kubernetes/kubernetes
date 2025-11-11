@@ -808,7 +808,7 @@ func (f *frameworkImpl) computeBatchablePlugins() error {
 // is unable to construct a signature for the pod, the result will be equal to fwk.Unsignable, which means
 // there is no way to compare this pod against others, and will turn off a number of optimizations
 // for this pod.
-func (f *frameworkImpl) SignPod(ctx context.Context, pod *v1.Pod) string {
+func (f *frameworkImpl) SignPod(ctx context.Context, pod *v1.Pod, state fwk.CycleState) string {
 	logger := klog.FromContext(ctx)
 
 	startTime := time.Now()
@@ -827,7 +827,7 @@ func (f *frameworkImpl) SignPod(ctx context.Context, pod *v1.Pod) string {
 
 	for _, plugin := range f.batchablePlugins {
 		startTime := time.Now()
-		fragments, status := plugin.SignPod(ctx, pod)
+		fragments, status := plugin.SignPod(ctx, pod, state)
 		f.metricsRecorder.ObservePluginDurationAsync(metrics.Sign, plugin.Name(), status.Code().String(), metrics.SinceInSeconds(startTime))
 
 		if !status.IsSuccess() {

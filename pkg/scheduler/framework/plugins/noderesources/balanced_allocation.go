@@ -118,9 +118,13 @@ func (ba *BalancedAllocation) Name() string {
 }
 
 // Filtering and scoring based on the container resources and overheads.
-func (pl *BalancedAllocation) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
+func (pl *BalancedAllocation) SignPod(ctx context.Context, pod *v1.Pod, state fwk.CycleState) ([]fwk.SignFragment, *fwk.Status) {
+	opts := ResourceRequestsOptions{
+		EnablePodLevelResources:   pl.enablePodLevelResources,
+		EnableDRAExtendedResource: pl.enableDRAExtendedResource,
+	}
 	return []fwk.SignFragment{
-		{Key: fwk.ResourcesSignerName, Value: resourcesSigner(pod)},
+		{Key: fwk.ResourcesSignerName, Value: computePodResourceRequest(pod, opts)},
 	}, nil
 }
 

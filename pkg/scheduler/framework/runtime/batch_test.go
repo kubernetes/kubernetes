@@ -179,8 +179,8 @@ func newTestNodes(n []string) *testSortedScoredNodes {
 	return &testSortedScoredNodes{Nodes: n}
 }
 
-func newTestSigFunc(sig *string) PodSignatureFunc {
-	return func(h fwk.Handle, ctx context.Context, p *v1.Pod) string {
+func newTestSigFunc(sig *string) SignatureFunc {
+	return func(h fwk.Handle, ctx context.Context, p *v1.Pod, state fwk.CycleState) string {
 		return *sig
 	}
 }

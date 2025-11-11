@@ -27,18 +27,12 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 )
 
-type PodSignatureFunc func(h fwk.Handle, ctx context.Context, p *v1.Pod) string
-
-func signUsingFramework(h fwk.Handle, ctx context.Context, p *v1.Pod) string {
-	return h.SignPod(ctx, p)
-}
-
 // OpportunisticBatching caches results from filtering and scoring when possible to optimize
 // scheduling of common pods.
 type OpportunisticBatch struct {
 	state         *batchState
 	lastCycle     schedulingCycle
-	signatureFunc PodSignatureFunc
+	signatureFunc SignatureFunc
 	handle        fwk.Handle
 
 	// Used primarily for tests, count the total pods we
@@ -62,6 +56,12 @@ const (
 	maxBatchAge = 500 * time.Millisecond
 )
 
+type SignatureFunc func(h fwk.Handle, ctx context.Context, p *v1.Pod, state fwk.CycleState) string
+
+func signUsingFramework(h fwk.Handle, ctx context.Context, p *v1.Pod, state fwk.CycleState) string {
+	return h.SignPod(ctx, p, state)
+}
+
 // Provide a hint for the pod based on filtering an scoring results of previous cycles. Caching works only for consecutive pods
 // with the same signature that are scheduled in 1-pod-per-node manner (otherwise previous scores could not be reused).
 // It's assured by checking the top rated node is no longer feasible (meaning the previous pod was successfully scheduled and the
@@ -79,7 +79,7 @@ func (b *OpportunisticBatch) GetNodeHint(ctx context.Context, pod *v1.Pod, state
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.GetNodeHint, hinted, b.handle.ProfileName()).Observe(metrics.SinceInSeconds(startTime))
 	}()
 
-	signature := b.signatureFunc(b.handle, ctx, pod)
+	signature := b.signatureFunc(b.handle, ctx, pod, state)
 
 	nodeInfos := b.handle.SnapshotSharedLister().NodeInfos()
 
@@ -228,7 +228,7 @@ func (b *OpportunisticBatch) stateEmpty() bool {
 	return b.state == nil || b.state.sortedNodes == nil || b.state.sortedNodes.Len() == 0
 }
 
-func newOpportunisticBatch(h fwk.Handle, signatureFunc PodSignatureFunc) *OpportunisticBatch {
+func newOpportunisticBatch(h fwk.Handle, signatureFunc SignatureFunc) *OpportunisticBatch {
 	return &OpportunisticBatch{
 		signatureFunc: signatureFunc,
 		handle:        h,

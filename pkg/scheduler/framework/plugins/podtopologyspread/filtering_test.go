@@ -3457,3 +3457,78 @@ func mustNewPodInfo(t *testing.T, pod *v1.Pod) *framework.PodInfo {
 	}
 	return podInfo
 }
+
+func TestPodTopoSignatures(t *testing.T) {
+	tests := []struct {
+		name              string
+		pod               *v1.Pod
+		expectedSignature []fwk.SignFragment
+		scheduleable      bool
+		config            config.PodTopologySpreadArgs
+	}{
+		{
+			name: "pod w constraints",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					TopologySpreadConstraints: []v1.TopologySpreadConstraint{
+						{
+							TopologyKey: "test",
+						},
+					},
+				},
+			},
+			config: config.PodTopologySpreadArgs{
+				DefaultingType: "System",
+			},
+			scheduleable: false,
+		},
+		{
+			name: "pod no constraints but default",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{},
+			},
+			config: config.PodTopologySpreadArgs{
+				DefaultingType: "System",
+			},
+			scheduleable: false,
+		},
+		{
+			name: "pod no constraints no default",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{},
+			},
+			config: config.PodTopologySpreadArgs{
+				DefaultingType:     "List",
+				DefaultConstraints: []v1.TopologySpreadConstraint{},
+			},
+			scheduleable: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			snapshot := cache.NewSnapshot(nil, nil)
+			state := framework.NewCycleState()
+			pl := plugintesting.SetupPluginWithInformers(ctx, t, frameworkruntime.FactoryAdapter(feature.Features{}, New), &test.config, snapshot, nil)
+			p := pl.(*PodTopologySpread)
+			_, status := p.PreFilter(ctx, state, test.pod, []fwk.NodeInfo{})
+			if status.Code() == fwk.Error {
+				t.Fatalf("Expected success, got error")
+			}
+
+			signature, status := p.SignPod(ctx, test.pod, state)
+
+			if !status.IsSuccess() && test.scheduleable {
+				t.Fatalf("Expected success, got %v", status)
+			}
+
+			if diff := cmp.Diff(test.expectedSignature, signature); diff != "" {
+				t.Fatalf("Diff %s", diff)
+			}
+		})
+	}
+}

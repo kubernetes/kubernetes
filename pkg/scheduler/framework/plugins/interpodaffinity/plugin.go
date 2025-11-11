@@ -60,7 +60,7 @@ func (pl *InterPodAffinity) Name() string {
 // Inter pod affinity make feasibility and scoring dependent on the placement of other
 // pods in addition the current pod and node, so we cannot sign pods with these
 // constraints.
-func (pl *InterPodAffinity) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
+func (pl *InterPodAffinity) SignPod(ctx context.Context, pod *v1.Pod, state fwk.CycleState) ([]fwk.SignFragment, *fwk.Status) {
 	if pod.Spec.Affinity != nil && (pod.Spec.Affinity.PodAffinity != nil || pod.Spec.Affinity.PodAntiAffinity != nil) {
 		return nil, fwk.NewStatus(fwk.Unschedulable)
 	}
