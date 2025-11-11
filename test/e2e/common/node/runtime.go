@@ -260,11 +260,13 @@ while true; do sleep 1; done
 
 		framework.Context("when running a container with a new image", framework.WithSerial(), func() {
 			var registryAddress string
+			var registryNodeNames []string
 			ginkgo.BeforeEach(func(ctx context.Context) {
 				var err error
 
-				registryAddress, _, err = e2eregistry.SetupRegistry(ctx, f, true)
+				registryAddress, registryNodeNames, err = e2eregistry.SetupRegistry(ctx, f, true)
 				framework.ExpectNoError(err)
+				gomega.Expect(registryNodeNames).ToNot(gomega.BeEmpty())
 				// we need to wait for the registry to be removed and so we need to delete the whole NS ourselves
 				ginkgo.DeferCleanup(func(ctx context.Context) {
 					f.DeleteNamespace(ctx, f.Namespace.Name)
@@ -282,6 +284,9 @@ while true; do sleep 1; done
 						Image:           image,
 						ImagePullPolicy: v1.PullAlways,
 					},
+					// make sure the container is scheduled to the registry node when
+					// it is running node e2e tests or e2e tests.
+					NodeName:      registryNodeNames[0],
 					RestartPolicy: v1.RestartPolicyNever,
 				}
 				if hasSecret {
