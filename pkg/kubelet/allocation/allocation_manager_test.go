@@ -299,12 +299,16 @@ func TestRetryPendingResizes(t *testing.T) {
 	cpu2m := resource.MustParse("2m")
 	cpu500m := resource.MustParse("500m")
 	cpu1000m := resource.MustParse("1")
+	cpu1200m := resource.MustParse("1200m")
 	cpu1500m := resource.MustParse("1500m")
+	cpu2000m := resource.MustParse("2")
 	cpu2500m := resource.MustParse("2500m")
 	cpu5000m := resource.MustParse("5000m")
 	mem500M := resource.MustParse("500Mi")
 	mem1000M := resource.MustParse("1Gi")
+	mem1200M := resource.MustParse("1200Mi")
 	mem1500M := resource.MustParse("1500Mi")
+	mem2000M := resource.MustParse("2Gi")
 	mem2500M := resource.MustParse("2500Mi")
 	mem4500M := resource.MustParse("4500Mi")
 
@@ -373,19 +377,23 @@ func TestRetryPendingResizes(t *testing.T) {
 	)
 
 	tests := []struct {
-		name                   string
-		originalRequests       v1.ResourceList
-		newRequests            v1.ResourceList
-		originalLimits         v1.ResourceList
-		newLimits              v1.ResourceList
-		originalInProgress     bool // Whether to prepopulate an in-progress condition.
-		originalPending        bool // Whether to prepopulate a pending condition.
-		newResourcesAllocated  bool // Whether the new requests have already been allocated (but not actuated)
-		expectedAllocatedReqs  v1.ResourceList
-		expectedAllocatedLims  v1.ResourceList
-		expectedResize         []*v1.PodCondition
-		expectPodSyncTriggered string
-		annotations            map[string]string
+		name                         string
+		originalRequests             v1.ResourceList
+		newRequests                  v1.ResourceList
+		originalLimits               v1.ResourceList
+		newLimits                    v1.ResourceList
+		originalPodRequests          v1.ResourceList
+		newPodRequests               v1.ResourceList
+		originalInProgress           bool // Whether to prepopulate an in-progress condition.
+		originalPending              bool // Whether to prepopulate a pending condition.
+		newResourcesAllocated        bool // Whether the new requests have already been allocated (but not actuated)
+		expectedAllocatedReqs        v1.ResourceList
+		expectedAllocatedLims        v1.ResourceList
+		expectedAllocatedPodReqs     v1.ResourceList
+		expectedResize               []*v1.PodCondition
+		expectPodSyncTriggered       string
+		annotations                  map[string]string
+		inPlacePodLevelResizeEnabled bool
 	}{
 		{
 			name:                  "Request CPU and memory decrease - expect InProgress",
@@ -640,11 +648,90 @@ func TestRetryPendingResizes(t *testing.T) {
 			},
 			expectPodSyncTriggered: "true",
 		},
+		{
+			name:                         "pod-level: Request CPU and memory increase - expect InProgress",
+			inPlacePodLevelResizeEnabled: true,
+			originalPodRequests:          v1.ResourceList{v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem1500M},
+			newPodRequests:               v1.ResourceList{v1.ResourceCPU: cpu2000m, v1.ResourceMemory: mem2000M},
+			originalRequests:             v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+			newRequests:                  v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+			expectedAllocatedReqs:        v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+			expectedAllocatedPodReqs:     v1.ResourceList{v1.ResourceCPU: cpu2000m, v1.ResourceMemory: mem2000M},
+			expectedResize: []*v1.PodCondition{
+				{
+					Type:   v1.PodResizeInProgress,
+					Status: "True",
+				},
+			},
+			expectPodSyncTriggered: "true",
+		},
+		{
+			name:                         "pod-level: Request CPU and memory decrease - expect InProgress",
+			inPlacePodLevelResizeEnabled: true,
+			originalPodRequests:          v1.ResourceList{v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem1500M},
+			newPodRequests:               v1.ResourceList{v1.ResourceCPU: cpu1200m, v1.ResourceMemory: mem1200M}, // still > container reqs
+			originalRequests:             v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+			newRequests:                  v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+			expectedAllocatedReqs:        v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+			expectedAllocatedPodReqs:     v1.ResourceList{v1.ResourceCPU: cpu1200m, v1.ResourceMemory: mem1200M},
+			expectedResize: []*v1.PodCondition{
+				{
+					Type:    v1.PodResizeInProgress,
+					Status:  "True",
+					Message: "",
+				},
+			},
+			expectPodSyncTriggered: "true",
+		},
+		{
+			name:                         "pod-level: Request CPU increase beyond current capacity - expect Deferred",
+			inPlacePodLevelResizeEnabled: true,
+			originalPodRequests:          v1.ResourceList{v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem1500M},
+			newPodRequests:               v1.ResourceList{v1.ResourceCPU: cpu2500m, v1.ResourceMemory: mem1500M},
+			originalRequests:             v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+			newRequests:                  v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+			expectedAllocatedReqs:        v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+			expectedAllocatedPodReqs:     v1.ResourceList{v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem1500M},
+			expectedResize: []*v1.PodCondition{
+				{
+					Type:    v1.PodResizePending,
+					Status:  "True",
+					Reason:  "Deferred",
+					Message: "Node didn't have enough resource: cpu",
+				},
+			},
+			expectPodSyncTriggered: "true",
+		},
+		{
+			name:                         "pod-level: Request memory increase beyond node capacity - expect Infeasible",
+			inPlacePodLevelResizeEnabled: true,
+			originalPodRequests:          v1.ResourceList{v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem1500M},
+			newPodRequests:               v1.ResourceList{v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem4500M},
+			originalRequests:             v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+			newRequests:                  v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+			expectedAllocatedReqs:        v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+			expectedAllocatedPodReqs:     v1.ResourceList{v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem1500M},
+			expectedResize: []*v1.PodCondition{
+				{
+					Type:    v1.PodResizePending,
+					Status:  "True",
+					Reason:  "Infeasible",
+					Message: "Node didn't have enough capacity: memory, requested: 4718592000, capacity: 4294967296",
+				},
+			},
+			expectPodSyncTriggered: "true",
+		},
 	}
 
 	for _, tt := range tests {
 		for _, isSidecarContainer := range []bool{false, true} {
+			if tt.inPlacePodLevelResizeEnabled && isSidecarContainer {
+				continue // pod level resources makes the distinction between container types irrelevant
+			}
 			t.Run(fmt.Sprintf("%s/sidecar=%t", tt.name, isSidecarContainer), func(t *testing.T) {
+				if tt.inPlacePodLevelResizeEnabled {
+					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, true)
+				}
 				var originalPod *v1.Pod
 				var originalCtr *v1.Container
 				if isSidecarContainer {
@@ -657,6 +744,9 @@ func TestRetryPendingResizes(t *testing.T) {
 				originalPod.Annotations = tt.annotations
 				originalCtr.Resources.Requests = tt.originalRequests
 				originalCtr.Resources.Limits = tt.originalLimits
+				if tt.originalPodRequests != nil {
+					originalPod.Spec.Resources = &v1.ResourceRequirements{Requests: tt.originalPodRequests.DeepCopy()}
+				}
 
 				newPod := originalPod.DeepCopy()
 				if isSidecarContainer {
@@ -665,6 +755,12 @@ func TestRetryPendingResizes(t *testing.T) {
 				} else {
 					newPod.Spec.Containers[0].Resources.Requests = tt.newRequests
 					newPod.Spec.Containers[0].Resources.Limits = tt.newLimits
+				}
+				if tt.newPodRequests != nil {
+					if newPod.Spec.Resources == nil {
+						newPod.Spec.Resources = &v1.ResourceRequirements{}
+					}
+					newPod.Spec.Resources.Requests = tt.newPodRequests.DeepCopy()
 				}
 
 				podStatus := &kubecontainer.PodStatus{
@@ -718,6 +814,25 @@ func TestRetryPendingResizes(t *testing.T) {
 				assert.Equal(t, tt.expectedAllocatedReqs, updatedPodCtr.Resources.Requests, "updated pod spec requests")
 				assert.Equal(t, tt.expectedAllocatedLims, updatedPodCtr.Resources.Limits, "updated pod spec limits")
 
+				if tt.inPlacePodLevelResizeEnabled {
+					if tt.expectedAllocatedPodReqs != nil {
+						require.NotNil(t, updatedPod.Spec.Resources)
+						assert.Equal(t, tt.expectedAllocatedPodReqs, updatedPod.Spec.Resources.Requests, "updated pod spec pod requests")
+					} else {
+						if updatedPod.Spec.Resources != nil {
+							assert.Empty(t, updatedPod.Spec.Resources.Requests, "updated pod spec pod requests should be empty")
+						}
+					}
+
+					alloc, found := allocationManager.(*manager).allocated.GetPodResourceInfo(newPod.UID)
+					if tt.expectedAllocatedPodReqs != nil {
+						require.True(t, found, "pod allocation")
+						assert.Equal(t, tt.expectedAllocatedPodReqs, alloc.PodLevelResources.Requests, "stored pod request allocation")
+					} else {
+						require.False(t, found, "pod allocation should not be found")
+					}
+				}
+
 				alloc, found := allocationManager.GetContainerResourceAllocation(newPod.UID, updatedPodCtr.Name)
 				require.True(t, found, "container allocation")
 				assert.Equal(t, tt.expectedAllocatedReqs, alloc.Requests, "stored container request allocation")
@@ -748,7 +863,7 @@ func TestRetryPendingResizes(t *testing.T) {
 	expectedMetrics := `
 		# HELP kubelet_pod_infeasible_resizes_total [ALPHA] Number of infeasible resizes for pods.
 	    # TYPE kubelet_pod_infeasible_resizes_total counter
-	    kubelet_pod_infeasible_resizes_total{reason_detail="insufficient_node_allocatable"} 4
+	    kubelet_pod_infeasible_resizes_total{reason_detail="insufficient_node_allocatable"} 5
 	    kubelet_pod_infeasible_resizes_total{reason_detail="static_pod"} 2
 	`
 	assert.NoError(t, testutil.GatherAndCompare(
@@ -1627,38 +1742,42 @@ func TestIsResizeIncreasingRequests(t *testing.T) {
 	cpu500m := resource.MustParse("500m")
 	cpu1000m := resource.MustParse("1")
 	cpu1500m := resource.MustParse("1500m")
+	cpu2500m := resource.MustParse("2500m")
 	mem500M := resource.MustParse("500Mi")
 	mem1000M := resource.MustParse("1Gi")
 	mem1500M := resource.MustParse("1500Mi")
+	mem2500M := resource.MustParse("2500Mi")
 
 	tests := []struct {
-		name        string
-		newRequests map[int]v1.ResourceList
-		expected    bool
+		name                         string
+		newPodRequests               v1.ResourceList
+		newContRequests              map[int]v1.ResourceList
+		expected                     bool
+		inPlacePodLevelResizeEnabled bool
 	}{
 		{
-			name:        "increase requests, one container",
-			newRequests: map[int]v1.ResourceList{0: {v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem1500M}},
-			expected:    true,
+			name:            "increase requests, one container",
+			newContRequests: map[int]v1.ResourceList{0: {v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem1500M}},
+			expected:        true,
 		},
 		{
-			name:        "decrease requests, one container",
-			newRequests: map[int]v1.ResourceList{0: {v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M}},
-			expected:    false,
+			name:            "decrease requests, one container",
+			newContRequests: map[int]v1.ResourceList{0: {v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M}},
+			expected:        false,
 		},
 		{
-			name:        "increase cpu, decrease memory, one container",
-			newRequests: map[int]v1.ResourceList{0: {v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem500M}},
-			expected:    true,
+			name:            "increase cpu, decrease memory, one container",
+			newContRequests: map[int]v1.ResourceList{0: {v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem500M}},
+			expected:        true,
 		},
 		{
-			name:        "increase memory, decrease cpu, one container",
-			newRequests: map[int]v1.ResourceList{0: {v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem1500M}},
-			expected:    true,
+			name:            "increase memory, decrease cpu, one container",
+			newContRequests: map[int]v1.ResourceList{0: {v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem1500M}},
+			expected:        true,
 		},
 		{
 			name: "increase one container, decrease another container, net neutral",
-			newRequests: map[int]v1.ResourceList{
+			newContRequests: map[int]v1.ResourceList{
 				0: {v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem1500M},
 				1: {v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
 			},
@@ -1666,36 +1785,91 @@ func TestIsResizeIncreasingRequests(t *testing.T) {
 		},
 		{
 			name: "decrease requests, two containers",
-			newRequests: map[int]v1.ResourceList{
+			newContRequests: map[int]v1.ResourceList{
 				0: {v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
 				1: {v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
 			},
 			expected: false,
 		},
 		{
-			name:        "remove requests, set as empty struct",
-			newRequests: map[int]v1.ResourceList{0: {}},
-			expected:    false,
+			name:            "remove requests, set as empty struct",
+			newContRequests: map[int]v1.ResourceList{0: {}},
+			expected:        false,
 		},
 		{
-			name:        "remove requests, set as nil",
-			newRequests: map[int]v1.ResourceList{0: nil},
-			expected:    false,
+			name:            "remove requests, set as nil",
+			newContRequests: map[int]v1.ResourceList{0: nil},
+			expected:        false,
 		},
 		{
-			name:        "add requests, set as empty struct",
-			newRequests: map[int]v1.ResourceList{2: {v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M}},
-			expected:    true,
+			name:            "add requests, set as empty struct",
+			newContRequests: map[int]v1.ResourceList{2: {v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M}},
+			expected:        true,
 		},
 		{
-			name:        "add requests, set as nil",
-			newRequests: map[int]v1.ResourceList{3: {v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M}},
-			expected:    true,
+			name:            "add requests, set as nil",
+			newContRequests: map[int]v1.ResourceList{3: {v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M}},
+			expected:        true,
+		},
+		{
+			name:                         "pod-level: increase cpu",
+			newPodRequests:               v1.ResourceList{v1.ResourceCPU: resource.MustParse("3000m"), v1.ResourceMemory: resource.MustParse("2500Mi")},
+			expected:                     true,
+			inPlacePodLevelResizeEnabled: true,
+		},
+		{
+			name:                         "pod-level: decrease memory",
+			newPodRequests:               v1.ResourceList{v1.ResourceCPU: resource.MustParse("2500m"), v1.ResourceMemory: resource.MustParse("2000Mi")},
+			expected:                     false,
+			inPlacePodLevelResizeEnabled: true,
+		},
+		{
+			name:                         "pod-level: increase cpu, decrease memory",
+			newPodRequests:               v1.ResourceList{v1.ResourceCPU: resource.MustParse("3000m"), v1.ResourceMemory: resource.MustParse("2000Mi")},
+			expected:                     true,
+			inPlacePodLevelResizeEnabled: true,
+		},
+		{
+			name:                         "container-level: increase cpu",
+			newContRequests:              map[int]v1.ResourceList{0: {v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem1000M}},
+			expected:                     false,
+			inPlacePodLevelResizeEnabled: true,
+		},
+		{
+			name:                         "container-level: decrease cpu",
+			newContRequests:              map[int]v1.ResourceList{0: {v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem1000M}},
+			expected:                     false,
+			inPlacePodLevelResizeEnabled: true,
+		},
+		{
+			name:                         "pod & container: increase container cpu, increase pod cpu, net increase",
+			newPodRequests:               v1.ResourceList{v1.ResourceCPU: resource.MustParse("2600m"), v1.ResourceMemory: resource.MustParse("2500Mi")}, // +100m
+			newContRequests:              map[int]v1.ResourceList{0: {v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem1000M}},                           // +500m
+			expected:                     true,
+			inPlacePodLevelResizeEnabled: true,
+		},
+		{
+			name:                         "pod & container: decrease container cpu, decrease pod cpu, net decrease",
+			newPodRequests:               v1.ResourceList{v1.ResourceCPU: resource.MustParse("2000m"), v1.ResourceMemory: resource.MustParse("2500Mi")}, // -500m
+			newContRequests:              map[int]v1.ResourceList{0: {v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem1000M}},                            // -500m
+			expected:                     false,
+			inPlacePodLevelResizeEnabled: true,
+		},
+		{
+			name:                         "pod & container: increase container cpu, same pod cpu, net neutral",
+			newPodRequests:               v1.ResourceList{v1.ResourceCPU: resource.MustParse("2500m"), v1.ResourceMemory: resource.MustParse("2500Mi")}, // 0
+			newContRequests:              map[int]v1.ResourceList{0: {v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem1000M}},                           // +500m
+			expected:                     false,
+			inPlacePodLevelResizeEnabled: true,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			if tc.inPlacePodLevelResizeEnabled == true {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, true)
+			}
+
 			testPod := &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					UID:       "1111",
@@ -1735,10 +1909,19 @@ func TestIsResizeIncreasingRequests(t *testing.T) {
 					},
 				},
 			}
+			if tc.inPlacePodLevelResizeEnabled == true {
+				testPod.Spec.Resources = &v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceCPU: cpu2500m, v1.ResourceMemory: mem2500M},
+				}
+			}
+
 			allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, []*v1.Pod{testPod}, nil)
 			require.NoError(t, allocationManager.SetAllocatedResources(testPod))
 
-			for k, v := range tc.newRequests {
+			if tc.newPodRequests != nil {
+				testPod.Spec.Resources.Requests = tc.newPodRequests
+			}
+			for k, v := range tc.newContRequests {
 				testPod.Spec.Containers[k].Resources.Requests = v
 			}
 			require.Equal(t, tc.expected, allocationManager.(*manager).isResizeIncreasingRequests(testPod))
@@ -1773,43 +1956,43 @@ func TestSortPendingResizes(t *testing.T) {
 		}
 	}
 
-	testPods := []*v1.Pod{createTestPod(0), createTestPod(1), createTestPod(2), createTestPod(3), createTestPod(4), createTestPod(5)}
+	testPods := []*v1.Pod{createTestPod(0), createTestPod(1), createTestPod(2), createTestPod(3), createTestPod(4), createTestPod(5), createTestPod(6)}
 	allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, testPods, nil)
 	for _, testPod := range testPods {
 		require.NoError(t, allocationManager.SetAllocatedResources(testPod))
 	}
 
-	// testPods[0] has the highest priority, as it doesn't increase resource requests.
-	// testPods[1] has the highest PriorityClass.
-	// testPods[2] is the only pod with QoS class "guaranteed" (all others are burstable).
-	// testPods[3] has been in a "deferred" state for longer than testPods[4].
-	// testPods[5] has no resize conditions yet, indicating it is a newer request than the other deferred resizes.
+	// testPods[0] has the highest priority, as it doesn't increase resource requests (pod-level).
+	// testPods[1] has the next highest priority, as it doesn't increase resource requests (container-level).
+	// testPods[2] has the highest PriorityClass.
+	// testPods[3] is the only pod with QoS class "guaranteed" (all others are burstable).
+	// testPods[4] has been in a "deferred" state for longer than testPods[5].
+	// testPods[6] has no resize conditions yet, indicating it is a newer request than the other deferred resizes.
 
-	testPods[0].Spec.Containers[0].Resources.Requests = v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M}
-	for i := 1; i < len(testPods); i++ {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, true)
+
+	testPods[0].Spec.Resources = &v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M}}
+	testPods[1].Spec.Containers[0].Resources.Requests = v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M}
+	for i := 2; i < len(testPods); i++ {
 		testPods[i].Spec.Containers[0].Resources.Requests = v1.ResourceList{v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem1500M}
 	}
 
-	testPods[1].Spec.Priority = ptr.To(int32(100))
-	testPods[2].Status.QOSClass = v1.PodQOSGuaranteed
-	allocationManager.(*manager).statusManager.SetPodResizePendingCondition(testPods[3].UID, v1.PodReasonDeferred, "some-message", 1)
-	time.Sleep(5 * time.Millisecond)
+	testPods[2].Spec.Priority = ptr.To(int32(100))
+	testPods[3].Status.QOSClass = v1.PodQOSGuaranteed
 	allocationManager.(*manager).statusManager.SetPodResizePendingCondition(testPods[4].UID, v1.PodReasonDeferred, "some-message", 1)
+	time.Sleep(5 * time.Millisecond)
+	allocationManager.(*manager).statusManager.SetPodResizePendingCondition(testPods[5].UID, v1.PodReasonDeferred, "some-message", 1)
 
 	allocationManager.(*manager).getPodByUID = func(uid types.UID) (*v1.Pod, bool) {
-		pods := map[types.UID]*v1.Pod{
-			testPods[0].UID: testPods[0],
-			testPods[1].UID: testPods[1],
-			testPods[2].UID: testPods[2],
-			testPods[3].UID: testPods[3],
-			testPods[4].UID: testPods[4],
-			testPods[5].UID: testPods[5],
+		pods := make(map[types.UID]*v1.Pod)
+		for _, pod := range testPods {
+			pods[pod.UID] = pod
 		}
 		pod, found := pods[uid]
 		return pod, found
 	}
 
-	expected := []types.UID{testPods[0].UID, testPods[1].UID, testPods[2].UID, testPods[3].UID, testPods[4].UID, testPods[5].UID}
+	expected := []types.UID{testPods[0].UID, testPods[1].UID, testPods[2].UID, testPods[3].UID, testPods[4].UID, testPods[5].UID, testPods[6].UID}
 
 	// Push all the pods to the queue.
 	for i := range testPods {
@@ -1819,7 +2002,7 @@ func TestSortPendingResizes(t *testing.T) {
 
 	// Clear the queue and push the pods in reverse order to spice things up.
 	allocationManager.(*manager).podsWithPendingResizes = nil
-	for i := 5; i >= 0; i-- {
+	for i := len(testPods) - 1; i >= 0; i-- {
 		allocationManager.PushPendingResize(testPods[i].UID)
 	}
 	require.Equal(t, expected, allocationManager.(*manager).podsWithPendingResizes)
