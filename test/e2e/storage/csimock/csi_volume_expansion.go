@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/drivers"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	matchers "k8s.io/kubernetes/test/e2e/framework/matchers"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
@@ -613,11 +614,13 @@ func validateQuotaUsage(ctx context.Context, m *mockDriverSetup, currentQuota, e
 		usedCount = quota.Status.Used[pvcCountQuotaKey]
 		usedSize = quota.Status.Used[pvcSizeQuotaKey]
 		return usedCount.Cmp(expectedCount) == 0 && usedSize.Cmp(expectedUsedSize) == 0
-	}, csiResizeWaitPeriod, resizePollInterval).Should(gomega.BeTrue(),
-		fmt.Sprintf("resource quota usage did not converge; currentlyUsed: %s/%s, expected: %s/%s",
-			usedCount.String(), usedSize.String(), expectedCount.String(), expectedUsedSize.String()))
+	}, csiResizeWaitPeriod, resizePollInterval).Should(
+        matchers.BeTrueBecause(
+            "resource quota usage did not converge; currentlyUsed: %s/%s, expected: %s/%s",
+            usedCount.String(), usedSize.String(), expectedCount.String(), expectedUsedSize.String(),
+        ),
+	)
 }
-
 func validateRecoveryBehaviour(ctx context.Context, pvc *v1.PersistentVolumeClaim, m *mockDriverSetup, test recoveryTest) {
 	var err error
 	ginkgo.By("Waiting for resizer to set allocated resource")
