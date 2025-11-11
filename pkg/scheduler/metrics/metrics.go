@@ -63,8 +63,6 @@ var ExtensionPoints = []string{
 	Unreserve,
 	Permit,
 	Sign,
-	GetNodeHint,
-	StoreScheduleResults,
 }
 
 const (
@@ -84,8 +82,6 @@ const (
 	Unreserve                   = "Unreserve"
 	Permit                      = "Permit"
 	Sign                        = "Sign"
-	GetNodeHint                 = "GetNodeHint"
-	StoreScheduleResults        = "StoreScheduleResults"
 )
 
 const (
@@ -119,17 +115,19 @@ const (
 
 // All the histogram based metrics have 1ms as size for the smallest bucket.
 var (
-	scheduleAttempts           *metrics.CounterVec
-	EventHandlingLatency       *metrics.HistogramVec
-	schedulingLatency          *metrics.HistogramVec
-	SchedulingAlgorithmLatency *metrics.Histogram
-	PreemptionVictims          *metrics.Histogram
-	PreemptionAttempts         *metrics.Counter
-	pendingPods                *metrics.GaugeVec
-	InFlightEvents             *metrics.GaugeVec
-	Goroutines                 *metrics.GaugeVec
-	BatchAttemptStats          *metrics.CounterVec
-	BatchCacheFlushed          *metrics.CounterVec
+	scheduleAttempts             *metrics.CounterVec
+	EventHandlingLatency         *metrics.HistogramVec
+	schedulingLatency            *metrics.HistogramVec
+	SchedulingAlgorithmLatency   *metrics.Histogram
+	PreemptionVictims            *metrics.Histogram
+	PreemptionAttempts           *metrics.Counter
+	pendingPods                  *metrics.GaugeVec
+	InFlightEvents               *metrics.GaugeVec
+	Goroutines                   *metrics.GaugeVec
+	BatchAttemptStats            *metrics.CounterVec
+	BatchCacheFlushed            *metrics.CounterVec
+	GetNodeHintDuration          *metrics.HistogramVec
+	StoreScheduleResultsDuration *metrics.HistogramVec
 
 	PodSchedulingSLIDuration        *metrics.HistogramVec
 	PodSchedulingAttempts           *metrics.Histogram
@@ -433,6 +431,28 @@ func InitMetrics() {
 		},
 		[]string{"status"})
 
+	GetNodeHintDuration = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem: SchedulerSubsystem,
+			Name:      "get_node_hint_duration_seconds",
+			Help:      "Latency for getting a node hint.",
+			// Start with 0.01ms with the last bucket being [~200ms, Inf)
+			Buckets:        metrics.ExponentialBuckets(0.00001, 2, 12),
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"hinted", "profile"})
+
+	StoreScheduleResultsDuration = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem: SchedulerSubsystem,
+			Name:      "store_schedule_results_duration_seconds",
+			Help:      "Latency for getting a no.",
+			// Start with 0.01ms with the last bucket being [~200ms, Inf)
+			Buckets:        metrics.ExponentialBuckets(0.00001, 2, 12),
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"profile"})
+
 	metricsList = []metrics.Registerable{
 		scheduleAttempts,
 		schedulingLatency,
@@ -453,6 +473,8 @@ func InitMetrics() {
 		PluginEvaluationTotal,
 		BatchAttemptStats,
 		BatchCacheFlushed,
+		GetNodeHintDuration,
+		StoreScheduleResultsDuration,
 	}
 }
 

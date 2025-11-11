@@ -76,7 +76,7 @@ func (b *OpportunisticBatch) GetNodeHint(ctx context.Context, pod *v1.Pod, state
 		if hint == "" {
 			hinted = "no_hint"
 		}
-		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.GetNodeHint, hinted, b.handle.ProfileName()).Observe(metrics.SinceInSeconds(startTime))
+		metrics.GetNodeHintDuration.WithLabelValues(hinted, b.handle.ProfileName()).Observe(metrics.SinceInSeconds(startTime))
 	}()
 
 	signature := b.signatureFunc(b.handle, ctx, pod, state)
@@ -107,7 +107,7 @@ func (b *OpportunisticBatch) StoreScheduleResults(ctx context.Context, signature
 
 	startTime := time.Now()
 	defer func() {
-		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.StoreScheduleResults, "", b.handle.ProfileName()).Observe(metrics.SinceInSeconds(startTime))
+		metrics.StoreScheduleResultsDuration.WithLabelValues(b.handle.ProfileName()).Observe(metrics.SinceInSeconds(startTime))
 	}()
 
 	// Set our cycle information for next time.
