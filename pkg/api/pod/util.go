@@ -428,6 +428,8 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		OldPodViolatesLegacyMatchLabelKeysValidation:        false,
 		AllowContainerRestartPolicyRules:                    utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules),
 		AllowUserNamespacesWithVolumeDevices:                false,
+		// This also allows restart rules on sidecar containers.
+		AllowRestartAllContainers: utilfeature.DefaultFeatureGate.Enabled(features.RestartAllContainersOnContainerExits),
 	}
 
 	// If old spec uses relaxed validation or enabled the RelaxedEnvironmentVariableValidation feature gate,
@@ -476,6 +478,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		opts.AllowSidecarResizePolicy = opts.AllowSidecarResizePolicy || hasRestartableInitContainerResizePolicy(oldPodSpec)
 
 		opts.AllowContainerRestartPolicyRules = opts.AllowContainerRestartPolicyRules || containerRestartRulesInUse(oldPodSpec)
+		opts.AllowRestartAllContainers = opts.AllowRestartAllContainers || restartAllContainersActionInUse(oldPodSpec)
 
 		// If old spec has userns and volume devices (doesn't work), we still allow
 		// modifications to it.
@@ -1825,4 +1828,29 @@ func workloadRefInUse(podSpec *api.PodSpec) bool {
 	}
 
 	return podSpec.WorkloadRef != nil
+}
+
+func restartAllContainersActionInUse(oldPodSpec *api.PodSpec) bool {
+	if oldPodSpec == nil {
+		return false
+	}
+	for _, c := range oldPodSpec.Containers {
+		for _, rule := range c.RestartPolicyRules {
+			if rule.Action == api.ContainerRestartRuleActionRestartAllContainers {
+				return true
+			}
+		}
+	}
+	for _, c := range oldPodSpec.InitContainers {
+		for _, rule := range c.RestartPolicyRules {
+			if rule.Action == api.ContainerRestartRuleActionRestartAllContainers {
+				return true
+			}
+		}
+		// This feature also allows sidecar containers to have rules.
+		if c.RestartPolicy != nil && *c.RestartPolicy == api.ContainerRestartPolicyAlways && len(c.RestartPolicyRules) > 0 {
+			return true
+		}
+	}
+	return false
 }

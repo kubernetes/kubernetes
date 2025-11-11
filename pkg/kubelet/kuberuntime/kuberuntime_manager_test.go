@@ -661,7 +661,7 @@ func TestSyncPod(t *testing.T) {
 	}
 
 	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
-	result := m.SyncPod(tCtx, pod, &kubecontainer.PodStatus{}, []v1.Secret{}, backOff)
+	result := m.SyncPod(tCtx, pod, &kubecontainer.PodStatus{}, []v1.Secret{}, backOff, false)
 	assert.NoError(t, result.Error())
 	assert.Len(t, fakeRuntime.Containers, 2)
 	assert.Len(t, fakeImage.Images, 2)
@@ -722,7 +722,7 @@ func TestSyncPodWithConvertedPodSysctls(t *testing.T) {
 	}
 
 	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
-	result := m.SyncPod(tCtx, pod, &kubecontainer.PodStatus{}, []v1.Secret{}, backOff)
+	result := m.SyncPod(tCtx, pod, &kubecontainer.PodStatus{}, []v1.Secret{}, backOff, false)
 	assert.NoError(t, result.Error())
 	assert.Equal(t, exceptSysctls, pod.Spec.SecurityContext.Sysctls)
 	for _, sandbox := range fakeRuntime.Sandboxes {
@@ -812,7 +812,7 @@ func TestSyncPodWithInitContainers(t *testing.T) {
 	// 1. should only create the init container.
 	podStatus, err := m.GetPodStatus(tCtx, pod.UID, pod.Name, pod.Namespace)
 	assert.NoError(t, err)
-	result := m.SyncPod(tCtx, pod, podStatus, []v1.Secret{}, backOff)
+	result := m.SyncPod(tCtx, pod, podStatus, []v1.Secret{}, backOff, false)
 	assert.NoError(t, result.Error())
 	expected := []*cRecord{
 		{name: initContainers[0].Name, attempt: 0, state: runtimeapi.ContainerState_CONTAINER_RUNNING},
@@ -822,7 +822,7 @@ func TestSyncPodWithInitContainers(t *testing.T) {
 	// 2. should not create app container because init container is still running.
 	podStatus, err = m.GetPodStatus(tCtx, pod.UID, pod.Name, pod.Namespace)
 	assert.NoError(t, err)
-	result = m.SyncPod(tCtx, pod, podStatus, []v1.Secret{}, backOff)
+	result = m.SyncPod(tCtx, pod, podStatus, []v1.Secret{}, backOff, false)
 	assert.NoError(t, result.Error())
 	verifyContainerStatuses(t, fakeRuntime, expected, "init container still running; do nothing")
 
@@ -838,7 +838,7 @@ func TestSyncPodWithInitContainers(t *testing.T) {
 	// Sync again.
 	podStatus, err = m.GetPodStatus(tCtx, pod.UID, pod.Name, pod.Namespace)
 	assert.NoError(t, err)
-	result = m.SyncPod(tCtx, pod, podStatus, []v1.Secret{}, backOff)
+	result = m.SyncPod(tCtx, pod, podStatus, []v1.Secret{}, backOff, false)
 	assert.NoError(t, result.Error())
 	expected = []*cRecord{
 		{name: initContainers[0].Name, attempt: 0, state: runtimeapi.ContainerState_CONTAINER_EXITED},
@@ -854,7 +854,7 @@ func TestSyncPodWithInitContainers(t *testing.T) {
 	// Sync again.
 	podStatus, err = m.GetPodStatus(tCtx, pod.UID, pod.Name, pod.Namespace)
 	assert.NoError(t, err)
-	result = m.SyncPod(tCtx, pod, podStatus, []v1.Secret{}, backOff)
+	result = m.SyncPod(tCtx, pod, podStatus, []v1.Secret{}, backOff, false)
 	assert.NoError(t, result.Error())
 	expected = []*cRecord{
 		// The first init container instance is purged and no longer visible.
@@ -865,6 +865,121 @@ func TestSyncPodWithInitContainers(t *testing.T) {
 		{name: containers[1].Name, attempt: 0, state: runtimeapi.ContainerState_CONTAINER_EXITED},
 	}
 	verifyContainerStatuses(t, fakeRuntime, expected, "kill all app containers, purge the existing init container, and restart a new one")
+}
+
+func TestSyncPodWithRestartAllContainers(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.ContainerRestartRules:                true,
+		features.NodeDeclaredFeatures:                 true,
+		features.RestartAllContainersOnContainerExits: true,
+	})
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	restartPolicyAlways := v1.ContainerRestartPolicyAlways
+	initContainers := []v1.Container{
+		{
+			Name:            "init1",
+			Image:           "init",
+			ImagePullPolicy: v1.PullIfNotPresent,
+		},
+	}
+	containers := []v1.Container{
+		{
+			Name:            "foo1",
+			Image:           "busybox",
+			ImagePullPolicy: v1.PullIfNotPresent,
+		},
+		{
+			Name:            "foo2",
+			Image:           "alpine",
+			ImagePullPolicy: v1.PullIfNotPresent,
+			RestartPolicy:   &restartPolicyAlways,
+			RestartPolicyRules: []v1.ContainerRestartRule{
+				{
+					Action: v1.ContainerRestartRuleActionRestartAllContainers,
+					ExitCodes: &v1.ContainerRestartRuleOnExitCodes{
+						Operator: v1.ContainerRestartRuleOnExitCodesOpIn,
+						Values:   []int32{42},
+					},
+				},
+			},
+		},
+	}
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "new",
+		},
+		Spec: v1.PodSpec{
+			Containers:     containers,
+			InitContainers: initContainers,
+		},
+	}
+
+	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+
+	// 1. Run the pod first. First SyncPod should execute the init container.
+	podStatus, err := m.GetPodStatus(tCtx, pod.UID, pod.Name, pod.Namespace)
+	require.NoError(t, err)
+	result := m.SyncPod(tCtx, pod, podStatus, []v1.Secret{}, backOff, false)
+	require.NoError(t, result.Error())
+	expected := []*cRecord{
+		{name: initContainers[0].Name, attempt: 0, state: runtimeapi.ContainerState_CONTAINER_RUNNING},
+	}
+	verifyContainerStatuses(t, fakeRuntime, expected, "start only the init container")
+
+	// 2. should run all app containers because init container finished.
+	// Stop init container instance 0.
+	sandboxIDs, err := m.getSandboxIDByPodUID(tCtx, pod.UID, nil)
+	require.NoError(t, err)
+	sandboxID := sandboxIDs[0]
+	initID0, err := fakeRuntime.GetContainerID(sandboxID, initContainers[0].Name, 0)
+	require.NoError(t, err)
+	err = fakeRuntime.StopContainer(tCtx, initID0, 0)
+	require.NoError(t, err)
+	// Sync again.
+	podStatus, err = m.GetPodStatus(tCtx, pod.UID, pod.Name, pod.Namespace)
+	require.NoError(t, err)
+	result = m.SyncPod(tCtx, pod, podStatus, []v1.Secret{}, backOff, false)
+	require.NoError(t, result.Error())
+	expected = []*cRecord{
+		{name: initContainers[0].Name, attempt: 0, state: runtimeapi.ContainerState_CONTAINER_EXITED},
+		{name: containers[0].Name, attempt: 0, state: runtimeapi.ContainerState_CONTAINER_RUNNING},
+		{name: containers[1].Name, attempt: 0, state: runtimeapi.ContainerState_CONTAINER_RUNNING},
+	}
+	verifyContainerStatuses(t, fakeRuntime, expected, "init container completed; all app containers should be running")
+
+	// 3. Exits the container foo2 with code 42, the pod should be marked for RestartAllContainers, and
+	// should remove all containers.
+	sandboxIDs, err = m.getSandboxIDByPodUID(tCtx, pod.UID, nil)
+	require.NoError(t, err)
+	sandboxID = sandboxIDs[0]
+	foo2ID, err := fakeRuntime.GetContainerID(sandboxID, containers[1].Name, 0)
+	require.NoError(t, err)
+	failedFoo2 := fakeRuntime.Containers[foo2ID]
+	failedFoo2.State = runtimeapi.ContainerState_CONTAINER_EXITED
+	failedFoo2.ExitCode = 42
+	fakeRuntime.Containers[foo2ID] = failedFoo2
+
+	podStatus, err = m.GetPodStatus(tCtx, pod.UID, pod.Name, pod.Namespace)
+	require.NoError(t, err)
+	result = m.SyncPod(tCtx, pod, podStatus, []v1.Secret{}, backOff, true)
+	require.NoError(t, result.Error())
+	expected = []*cRecord{}
+	verifyContainerStatuses(t, fakeRuntime, expected, "kill all containers")
+
+	// 4. Unmark the pod. Now it should start the init container first.
+	podStatus, err = m.GetPodStatus(tCtx, pod.UID, pod.Name, pod.Namespace)
+	require.NoError(t, err)
+	result = m.SyncPod(tCtx, pod, podStatus, []v1.Secret{}, backOff, false)
+	require.NoError(t, result.Error())
+	expected = []*cRecord{
+		{name: initContainers[0].Name, attempt: 0, state: runtimeapi.ContainerState_CONTAINER_RUNNING},
+	}
+	verifyContainerStatuses(t, fakeRuntime, expected, "start only the init container")
 }
 
 // A helper function to get a basic pod and its status assuming all sandbox and
@@ -1231,12 +1346,351 @@ func TestComputePodActions(t *testing.T) {
 			test.mutateStatusFn(status)
 		}
 		tCtx := ktesting.Init(t)
-		actions := m.computePodActions(tCtx, pod, status)
+		actions := m.computePodActions(tCtx, pod, status, false)
 		verifyActions(t, &test.actions, &actions, desc)
 		if test.resetStatusFn != nil {
 			test.resetStatusFn(status)
 		}
 	}
+}
+
+func TestComputePodActionsForRestartAllContainers(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.ContainerRestartRules:                true,
+		features.NodeDeclaredFeatures:                 true,
+		features.RestartAllContainersOnContainerExits: true,
+	})
+	TestComputePodActions(t)
+	TestComputePodActionsWithInitContainers(t)
+
+	tCtx := ktesting.Init(t)
+	_, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	allContainersRestartingTrue := []v1.PodCondition{
+		{
+			Type:   v1.AllContainersRestarting,
+			Status: v1.ConditionTrue,
+		},
+	}
+	allContainersRestartingFalse := []v1.PodCondition{
+		{
+			Type:   v1.AllContainersRestarting,
+			Status: v1.ConditionFalse,
+		},
+	}
+
+	restartPolicyAlways := v1.ContainerRestartPolicyAlways
+	restartPolicyNever := v1.ContainerRestartPolicyNever
+	restartAllContainersRules := []v1.ContainerRestartRule{{
+		Action: v1.ContainerRestartRuleActionRestartAllContainers,
+		ExitCodes: &v1.ContainerRestartRuleOnExitCodes{
+			Operator: v1.ContainerRestartRuleOnExitCodesOpIn,
+			Values:   []int32{1},
+		},
+	}}
+
+	for desc, test := range map[string]struct {
+		podFunc               func() *v1.Pod
+		podStatusFunc         func() *kubecontainer.PodStatus
+		restartAllContainers  bool
+		containersToRemove    []containerToRemoveInfo
+		containersToStart     []int
+		initContainersToStart []int
+	}{
+		"pod not marked for RestartAllContainers": {
+			podFunc: func() *v1.Pod {
+				pod, _ := makeBasePodAndStatus()
+				pod.Status.Conditions = allContainersRestartingFalse
+				return pod
+			},
+			podStatusFunc: func() *kubecontainer.PodStatus {
+				_, status := makeBasePodAndStatus()
+				return status
+			},
+		},
+		"pod marked for RestartAllContainers": {
+			podFunc: func() *v1.Pod {
+				pod, _ := makeBasePodAndStatus()
+				pod.Status.Conditions = allContainersRestartingTrue
+				return pod
+			},
+			podStatusFunc: func() *kubecontainer.PodStatus {
+				_, status := makeBasePodAndStatus()
+				return status
+			},
+			restartAllContainers: true,
+			containersToRemove: []containerToRemoveInfo{
+				{container: &v1.Container{Name: "foo1"}, containerID: kubecontainer.ContainerID{ID: "id1"}, kill: true},
+				{container: &v1.Container{Name: "foo2"}, containerID: kubecontainer.ContainerID{ID: "id2"}, kill: true},
+				{container: &v1.Container{Name: "foo3"}, containerID: kubecontainer.ContainerID{ID: "id3"}, kill: true},
+			},
+		},
+		"pod marked for RestartAllContainers with init containers": {
+			podFunc: func() *v1.Pod {
+				pod, _ := makeBasePodAndStatusWithInitContainers()
+				pod.Status.Conditions = allContainersRestartingTrue
+				return pod
+			},
+			podStatusFunc: func() *kubecontainer.PodStatus {
+				_, status := makeBasePodAndStatusWithInitContainers()
+				return status
+			},
+			restartAllContainers: true,
+			containersToRemove: []containerToRemoveInfo{
+				{container: &v1.Container{Name: "init1"}, containerID: kubecontainer.ContainerID{ID: "initid1"}},
+				{container: &v1.Container{Name: "init2"}, containerID: kubecontainer.ContainerID{ID: "initid2"}},
+				{container: &v1.Container{Name: "init3"}, containerID: kubecontainer.ContainerID{ID: "initid3"}},
+			},
+		},
+		"pod marked for RestartAllContainers with restartable init containers": {
+			podFunc: func() *v1.Pod {
+				pod, _ := makeBasePodAndStatusWithRestartableInitContainers()
+				pod.Status.Conditions = allContainersRestartingTrue
+				return pod
+			},
+			podStatusFunc: func() *kubecontainer.PodStatus {
+				_, status := makeBasePodAndStatusWithRestartableInitContainers()
+				return status
+			},
+			restartAllContainers: true,
+			containersToRemove: []containerToRemoveInfo{
+				{container: &v1.Container{Name: "restartable-init-1"}, containerID: kubecontainer.ContainerID{ID: "initid1"}, kill: true},
+				{container: &v1.Container{Name: "restartable-init-2"}, containerID: kubecontainer.ContainerID{ID: "initid2"}, kill: true},
+				{container: &v1.Container{Name: "restartable-init-3"}, containerID: kubecontainer.ContainerID{ID: "initid3"}, kill: true},
+			},
+		},
+		"init container exit triggers RestartAllContainers": {
+			// The init3 container exited and triggers RestartAllContainers,
+			// the init2 container is a running sidecar. First, the init1
+			// should be removed; second, the init2 containers should killed and
+			// be removed; lastly, init3 container should be removed.
+			podFunc: func() *v1.Pod {
+				pod, _ := makeBasePodAndStatusWithInitContainers()
+				sidecar := pod.Spec.InitContainers[1]
+				sidecar.RestartPolicy = &restartPolicyAlways
+				pod.Spec.InitContainers[1] = sidecar
+				source := pod.Spec.InitContainers[2]
+				source.RestartPolicy = &restartPolicyNever
+				source.RestartPolicyRules = restartAllContainersRules
+				pod.Spec.InitContainers[2] = source
+				pod.Status.Conditions = allContainersRestartingTrue
+				return pod
+			},
+			podStatusFunc: func() *kubecontainer.PodStatus {
+				_, status := makeBasePodAndStatusWithInitContainers()
+				sidecarStatus := status.ContainerStatuses[1]
+				sidecarStatus.State = kubecontainer.ContainerStateRunning
+				status.ContainerStatuses[1] = sidecarStatus
+				sourceStatus := status.ContainerStatuses[2]
+				sourceStatus.ExitCode = 1
+				status.ContainerStatuses[2] = sourceStatus
+				return status
+			},
+			restartAllContainers: true,
+			containersToRemove: []containerToRemoveInfo{
+				{container: &v1.Container{Name: "init1"}, containerID: kubecontainer.ContainerID{ID: "initid1"}},
+				{container: &v1.Container{Name: "init2"}, containerID: kubecontainer.ContainerID{ID: "initid2"}, kill: true},
+				{container: &v1.Container{Name: "init3"}, containerID: kubecontainer.ContainerID{ID: "initid3"}},
+			},
+		},
+		"sidecar container exit triggers RestartAllContainres": {
+			// Restartable-init-3 fails and triggers RestartAllContainers.
+			// The running foo1 should be killed and removed first; then init-1 and init-2
+			// should be killed and removed; lastly init-3 should be removed.
+			podFunc: func() *v1.Pod {
+				pod, _ := makeBasePodAndStatusWithRestartableInitContainers()
+				source := pod.Spec.InitContainers[2]
+				source.RestartPolicy = &restartPolicyAlways
+				source.RestartPolicyRules = restartAllContainersRules
+				pod.Spec.InitContainers[2] = source
+				pod.Status.Conditions = allContainersRestartingTrue
+				return pod
+			},
+			podStatusFunc: func() *kubecontainer.PodStatus {
+				pod, status := makeBasePodAndStatusWithRestartableInitContainers()
+				sourceStatus := status.ContainerStatuses[2]
+				sourceStatus.ExitCode = 1
+				sourceStatus.State = kubecontainer.ContainerStateExited
+				status.ContainerStatuses[2] = sourceStatus
+				status.ContainerStatuses = append(status.ContainerStatuses, &kubecontainer.Status{
+					Name:  "foo1",
+					State: kubecontainer.ContainerStateRunning,
+					ID:    kubecontainer.ContainerID{ID: "id1"},
+					Hash:  kubecontainer.HashContainer(&pod.Spec.Containers[0]),
+				})
+				return status
+			},
+			restartAllContainers: true,
+			containersToRemove: []containerToRemoveInfo{
+				{container: &v1.Container{Name: "foo1"}, containerID: kubecontainer.ContainerID{ID: "id1"}, kill: true},
+				{container: &v1.Container{Name: "restartable-init-1"}, containerID: kubecontainer.ContainerID{ID: "initid1"}, kill: true},
+				{container: &v1.Container{Name: "restartable-init-2"}, containerID: kubecontainer.ContainerID{ID: "initid2"}, kill: true},
+				{container: &v1.Container{Name: "restartable-init-3"}, containerID: kubecontainer.ContainerID{ID: "initid3"}},
+			},
+		},
+		"regular container exit triggers RestartAllContainers": {
+			podFunc: func() *v1.Pod {
+				pod, _ := makeBasePodAndStatusWithRestartableInitContainers()
+				source := pod.Spec.Containers[2]
+				source.RestartPolicy = &restartPolicyNever
+				source.RestartPolicyRules = restartAllContainersRules
+				pod.Spec.Containers[2] = source
+				pod.Status.Conditions = allContainersRestartingTrue
+				return pod
+			},
+			podStatusFunc: func() *kubecontainer.PodStatus {
+				_, status := makeBasePodAndStatusWithRestartableInitContainers()
+				status.ContainerStatuses = append(status.ContainerStatuses, &kubecontainer.Status{
+					Name:  "foo1",
+					State: kubecontainer.ContainerStateRunning,
+					ID:    kubecontainer.ContainerID{ID: "id1"},
+				})
+				status.ContainerStatuses = append(status.ContainerStatuses, &kubecontainer.Status{
+					Name:  "foo2",
+					State: kubecontainer.ContainerStateRunning,
+					ID:    kubecontainer.ContainerID{ID: "id2"},
+				})
+				status.ContainerStatuses = append(status.ContainerStatuses, &kubecontainer.Status{
+					Name:     "foo3",
+					State:    kubecontainer.ContainerStateExited,
+					ExitCode: 1,
+					ID:       kubecontainer.ContainerID{ID: "id3"},
+				})
+				return status
+			},
+			restartAllContainers: true,
+			containersToRemove: []containerToRemoveInfo{
+				{container: &v1.Container{Name: "foo1"}, containerID: kubecontainer.ContainerID{ID: "id1"}, kill: true},
+				{container: &v1.Container{Name: "foo2"}, containerID: kubecontainer.ContainerID{ID: "id2"}, kill: true},
+				{container: &v1.Container{Name: "restartable-init-1"}, containerID: kubecontainer.ContainerID{ID: "initid1"}, kill: true},
+				{container: &v1.Container{Name: "restartable-init-2"}, containerID: kubecontainer.ContainerID{ID: "initid2"}, kill: true},
+				{container: &v1.Container{Name: "restartable-init-3"}, containerID: kubecontainer.ContainerID{ID: "initid3"}, kill: true},
+				{container: &v1.Container{Name: "foo3"}, containerID: kubecontainer.ContainerID{ID: "id3"}},
+			},
+		},
+		"removes past terminated statuses": {
+			// foo3 terminated and triggers restart all containers. All containers have started once at t0, and
+			// restarted once at t1. All container statuses should be removed; foo3 should be removed last
+			// because it triggered restart all containers.
+			podFunc: func() *v1.Pod {
+				pod, _ := makeBasePodAndStatus()
+				pod.Spec.RestartPolicy = v1.RestartPolicyAlways
+				source := pod.Spec.Containers[2]
+				source.RestartPolicy = &restartPolicyAlways
+				source.RestartPolicyRules = restartAllContainersRules
+				pod.Spec.Containers[2] = source
+				pod.Status.Conditions = allContainersRestartingTrue
+				return pod
+			},
+			podStatusFunc: func() *kubecontainer.PodStatus {
+				_, status := makeBasePodAndStatus()
+				t1 := time.Now()
+				t0 := t1.Add(-time.Minute)
+				status.ContainerStatuses[0].CreatedAt = t1
+				status.ContainerStatuses[1].CreatedAt = t1
+				status.ContainerStatuses[2] = &kubecontainer.Status{
+					Name:      "foo3",
+					State:     kubecontainer.ContainerStateExited,
+					ExitCode:  1,
+					ID:        kubecontainer.ContainerID{ID: "id3"},
+					CreatedAt: t1,
+				}
+				status.ContainerStatuses = append(status.ContainerStatuses, &kubecontainer.Status{
+					Name:      "foo1",
+					State:     kubecontainer.ContainerStateExited,
+					ExitCode:  99,
+					ID:        kubecontainer.ContainerID{ID: "id1-past"},
+					CreatedAt: t0,
+				})
+				status.ContainerStatuses = append(status.ContainerStatuses, &kubecontainer.Status{
+					Name:      "foo2",
+					State:     kubecontainer.ContainerStateExited,
+					ExitCode:  99,
+					ID:        kubecontainer.ContainerID{ID: "id2-past"},
+					CreatedAt: t0,
+				})
+				status.ContainerStatuses = append(status.ContainerStatuses, &kubecontainer.Status{
+					Name:      "foo3",
+					State:     kubecontainer.ContainerStateExited,
+					ExitCode:  99,
+					ID:        kubecontainer.ContainerID{ID: "id3-past"},
+					CreatedAt: t0,
+				})
+				return status
+			},
+			restartAllContainers: true,
+			containersToRemove: []containerToRemoveInfo{
+				{container: &v1.Container{Name: "foo1"}, containerID: kubecontainer.ContainerID{ID: "id1"}, kill: true},
+				{container: &v1.Container{Name: "foo1"}, containerID: kubecontainer.ContainerID{ID: "id1-past"}},
+				{container: &v1.Container{Name: "foo2"}, containerID: kubecontainer.ContainerID{ID: "id2"}, kill: true},
+				{container: &v1.Container{Name: "foo2"}, containerID: kubecontainer.ContainerID{ID: "id2-past"}},
+				{container: &v1.Container{Name: "foo3"}, containerID: kubecontainer.ContainerID{ID: "id3-past"}},
+				{container: &v1.Container{Name: "foo3"}, containerID: kubecontainer.ContainerID{ID: "id3"}},
+			},
+		},
+		"all containers removed, start init container": {
+			podFunc: func() *v1.Pod {
+				pod, _ := makeBasePodAndStatusWithInitContainers()
+				return pod
+			},
+			podStatusFunc: func() *kubecontainer.PodStatus {
+				_, status := makeBasePodAndStatus()
+				// Remove all containers from PodStatus to simulate cleanup
+				status.ContainerStatuses = []*kubecontainer.Status{}
+				return status
+			},
+			initContainersToStart: []int{0},
+		},
+		"all containers removed, start regular container": {
+			podFunc: func() *v1.Pod {
+				pod, _ := makeBasePodAndStatus()
+				return pod
+			},
+			podStatusFunc: func() *kubecontainer.PodStatus {
+				_, status := makeBasePodAndStatus()
+				// Remove all containers from PodStatus to simulate cleanup
+				status.ContainerStatuses = []*kubecontainer.Status{}
+				return status
+			},
+			containersToStart: []int{0, 1, 2},
+		},
+	} {
+		pod := test.podFunc()
+		status := test.podStatusFunc()
+		tCtx := ktesting.Init(t)
+		actions := m.computePodActions(tCtx, pod, status, test.restartAllContainers)
+
+		expected := &podActions{
+			CreateSandbox:     false,
+			KillPod:           false,
+			SandboxID:         status.SandboxStatuses[0].Id,
+			ContainersToKill:  map[kubecontainer.ContainerID]containerToKillInfo{},
+			ContainersToStart: []int{},
+		}
+		if test.containersToStart != nil {
+			expected.ContainersToStart = test.containersToStart
+		}
+		if test.initContainersToStart != nil {
+			expected.InitContainersToStart = test.initContainersToStart
+		}
+
+		containerSpecByName := make(map[string]*v1.Container)
+		for idx, c := range pod.Spec.Containers {
+			containerSpecByName[c.Name] = &pod.Spec.Containers[idx]
+		}
+		for idx, c := range pod.Spec.InitContainers {
+			containerSpecByName[c.Name] = &pod.Spec.InitContainers[idx]
+		}
+		for _, info := range test.containersToRemove {
+			cName := info.container.Name
+			info.container = containerSpecByName[cName]
+			expected.ContainersToReset = append(expected.ContainersToReset, info)
+		}
+
+		verifyActions(t, expected, &actions, desc)
+	}
+
 }
 
 func getKillMap(pod *v1.Pod, status *kubecontainer.PodStatus, cIndexes []int) map[kubecontainer.ContainerID]containerToKillInfo {
@@ -1503,7 +1957,7 @@ func TestComputePodActionsWithInitContainers(t *testing.T) {
 				test.mutateStatusFn(status)
 			}
 			tCtx := ktesting.Init(t)
-			actions := m.computePodActions(tCtx, pod, status)
+			actions := m.computePodActions(tCtx, pod, status, false)
 			verifyActions(t, &test.actions, &actions, desc)
 		})
 	}
@@ -1910,7 +2364,7 @@ func TestComputePodActionsWithRestartableInitContainers(t *testing.T) {
 			test.mutateStatusFn(pod, status)
 		}
 		tCtx := ktesting.Init(t)
-		actions := m.computePodActions(tCtx, pod, status)
+		actions := m.computePodActions(tCtx, pod, status, false)
 		verifyActions(t, &test.actions, &actions, desc)
 		if test.resetStatusFn != nil {
 			test.resetStatusFn(status)
@@ -2105,7 +2559,7 @@ func TestComputePodActionsWithInitAndEphemeralContainers(t *testing.T) {
 				test.mutateStatusFn(status)
 			}
 			tCtx := ktesting.Init(t)
-			actions := m.computePodActions(tCtx, pod, status)
+			actions := m.computePodActions(tCtx, pod, status, false)
 			verifyActions(t, &test.actions, &actions, desc)
 		})
 	}
@@ -2246,7 +2700,7 @@ func TestComputePodActionsWithContainerRestartRules(t *testing.T) {
 			test.mutateStatusFn(status)
 		}
 		ctx := context.Background()
-		actions := m.computePodActions(ctx, pod, status)
+		actions := m.computePodActions(ctx, pod, status, false)
 		verifyActions(t, &test.actions, &actions, desc)
 		if test.resetStatusFn != nil {
 			test.resetStatusFn(status)
@@ -2286,7 +2740,7 @@ func TestSyncPodWithSandboxAndDeletedPod(t *testing.T) {
 	// the fakePodProvider so they are 'deleted'.
 	podStatus, err := m.GetPodStatus(tCtx, pod.UID, pod.Name, pod.Namespace)
 	assert.NoError(t, err)
-	result := m.SyncPod(tCtx, pod, podStatus, []v1.Secret{}, backOff)
+	result := m.SyncPod(tCtx, pod, podStatus, []v1.Secret{}, backOff, false)
 	// This will return an error if the pod has _not_ been deleted.
 	assert.NoError(t, result.Error())
 }
@@ -2770,7 +3224,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 
 			tCtx := ktesting.Init(t)
 			expectedActions := test.getExpectedPodActionsFn(pod, status)
-			actions := m.computePodActions(tCtx, pod, status)
+			actions := m.computePodActions(tCtx, pod, status, false)
 			verifyActions(t, expectedActions, &actions, desc)
 		})
 	}

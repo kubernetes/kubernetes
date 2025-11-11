@@ -16003,6 +16003,16 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 		),
 		err:  `status.ephemeralContainerStatuses[0].user.linux: Forbidden: cannot be set for a windows pod`,
 		test: "containerUser cannot be set for windows pod in ephemeralContainerStatuses",
+	}, {
+		new: *podtest.MakePod("foo",
+			podtest.SetStatus(core.PodStatus{
+				Conditions: []core.PodCondition{{
+					Type:   core.AllContainersRestarting,
+					Status: core.ConditionTrue,
+				}},
+			}),
+		),
+		old: *podtest.MakePod("foo"),
 	},
 	}
 
@@ -29207,9 +29217,10 @@ func TestValidateContainerRestartPolicy(t *testing.T) {
 	podRestartPolicyAlways := core.RestartPolicyAlways
 
 	successCases := []struct {
-		Name               string
-		RestartPolicy      *core.ContainerRestartPolicy
-		RestartPolicyRules []core.ContainerRestartRule
+		Name                      string
+		RestartPolicy             *core.ContainerRestartPolicy
+		RestartPolicyRules        []core.ContainerRestartRule
+		AllowRestartAllContainers bool
 	}{
 		{
 			Name: "no-restart-policy-and-rules",
@@ -29233,6 +29244,17 @@ func TestValidateContainerRestartPolicy(t *testing.T) {
 					Values:   []int32{42},
 				},
 			}},
+		}, {
+			Name:          "restart-all-containers",
+			RestartPolicy: &containerRestartPolicyNever,
+			RestartPolicyRules: []core.ContainerRestartRule{{
+				Action: "RestartAllContainers",
+				ExitCodes: &core.ContainerRestartRuleOnExitCodes{
+					Operator: "In",
+					Values:   []int32{42},
+				},
+			}},
+			AllowRestartAllContainers: true,
 		},
 	}
 
@@ -29248,6 +29270,7 @@ func TestValidateContainerRestartPolicy(t *testing.T) {
 			}}
 			opts := PodValidationOptions{
 				AllowContainerRestartPolicyRules: true,
+				AllowRestartAllContainers:        tc.AllowRestartAllContainers,
 			}
 			errs := validateContainers(containers, podOS, volumeDevices, nil, defaultGracePeriod, field.NewPath("containers"), opts, &podRestartPolicyAlways, noUserNamespace)
 			if len(errs) > 0 {
@@ -29396,27 +29419,70 @@ func TestValidateContainerRestartPolicy(t *testing.T) {
 		})
 	}
 
-	// test cases sidecar containers
+	containerRestartPolicyAlways := core.ContainerRestartPolicyAlways
+	// test cases init containers
 	cases := []struct {
 		title              string
+		restartPolicy      *core.ContainerRestartPolicy
 		restartPolicyRules []core.ContainerRestartRule
+		opts               PodValidationOptions
 		expectedErrors     field.ErrorList
 	}{
 		{
 			"sidecar containers without restart policy rules",
+			&containerRestartPolicyAlways,
 			nil,
+			PodValidationOptions{
+				AllowContainerRestartPolicyRules: true,
+			},
 			nil,
 		},
 		{
-			"restart policy rules are not supported with restart policy Always",
+			"restart policy rules are supported with restart policy Always with option",
+			&containerRestartPolicyAlways,
 			[]core.ContainerRestartRule{{
-				Action: core.ContainerRestartRuleActionRestart,
+				Action: core.ContainerRestartRuleActionRestartAllContainers,
 				ExitCodes: &core.ContainerRestartRuleOnExitCodes{
 					Operator: core.ContainerRestartRuleOnExitCodesOpIn,
 					Values:   []int32{1},
 				},
 			}},
+			PodValidationOptions{
+				AllowContainerRestartPolicyRules: true,
+				AllowRestartAllContainers:        true,
+			},
+			nil,
+		},
+		{
+			"restart policy rules are not supported with restart policy Always without option",
+			&containerRestartPolicyAlways,
+			[]core.ContainerRestartRule{{
+				Action: core.ContainerRestartRuleActionRestartAllContainers,
+				ExitCodes: &core.ContainerRestartRuleOnExitCodes{
+					Operator: core.ContainerRestartRuleOnExitCodesOpIn,
+					Values:   []int32{1},
+				},
+			}},
+			PodValidationOptions{
+				AllowContainerRestartPolicyRules: true,
+			},
 			field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "initContainers[0].restartPolicyRules", BadValue: ""}},
+		},
+		{
+			"restart policy rules are not supported if no restart policy is set",
+			nil,
+			[]core.ContainerRestartRule{{
+				Action: core.ContainerRestartRuleActionRestartAllContainers,
+				ExitCodes: &core.ContainerRestartRuleOnExitCodes{
+					Operator: core.ContainerRestartRuleOnExitCodesOpIn,
+					Values:   []int32{1},
+				},
+			}},
+			PodValidationOptions{
+				AllowContainerRestartPolicyRules: true,
+				AllowRestartAllContainers:        true,
+			},
+			field.ErrorList{{Type: field.ErrorTypeRequired, Field: "initContainers[0].restartPolicy", BadValue: ""}},
 		},
 	}
 
@@ -29427,13 +29493,10 @@ func TestValidateContainerRestartPolicy(t *testing.T) {
 				Image:                    "image",
 				ImagePullPolicy:          "IfNotPresent",
 				TerminationMessagePolicy: "File",
-				RestartPolicy:            &containerRestartPolicyAlways,
+				RestartPolicy:            tc.restartPolicy,
 				RestartPolicyRules:       tc.restartPolicyRules,
 			}}
-			opts := PodValidationOptions{
-				AllowContainerRestartPolicyRules: true,
-			}
-			errs := validateInitContainers(containers, podOS, nil, volumeDevices, nil, defaultGracePeriod, field.NewPath("initContainers"), opts, &podRestartPolicyAlways, noUserNamespace)
+			errs := validateInitContainers(containers, podOS, nil, volumeDevices, nil, defaultGracePeriod, field.NewPath("initContainers"), tc.opts, &podRestartPolicyAlways, noUserNamespace)
 			if tc.expectedErrors == nil {
 				if len(errs) > 0 {
 					t.Errorf("unexpected errors: %v", prettyErrorList(errs))
@@ -29548,13 +29611,258 @@ func TestValidateContainerStateTransition(t *testing.T) {
 			newStatuses: []core.ContainerStatus{{Name: "c1", State: runningState}},
 			expectErr:   true,
 		},
+		{
+			name: "restart allowed if the container have RestartAllContainers actions",
+			podSpec: core.PodSpec{
+				RestartPolicy: core.RestartPolicyNever,
+				Containers: []core.Container{
+					{
+						Name:          "c1",
+						Image:         "image",
+						RestartPolicy: &containerRestartPolicyNever,
+						RestartPolicyRules: []core.ContainerRestartRule{
+							{
+								Action: core.ContainerRestartRuleActionRestartAllContainers,
+								ExitCodes: &core.ContainerRestartRuleOnExitCodes{
+									Operator: core.ContainerRestartRuleOnExitCodesOpIn,
+									Values:   []int32{42},
+								},
+							},
+						},
+					},
+				},
+			},
+			oldStatuses: []core.ContainerStatus{{Name: "c1", State: terminatedState(1)}},
+			newStatuses: []core.ContainerStatus{{Name: "c1", State: runningState}},
+		},
+		{
+			name: "restart allowed if other container have RestartAllContainers actions",
+			podSpec: core.PodSpec{
+				RestartPolicy: core.RestartPolicyNever,
+				Containers: []core.Container{
+					container1RestartNever,
+					{
+						Name:          "c2",
+						Image:         "image",
+						RestartPolicy: &containerRestartPolicyNever,
+						RestartPolicyRules: []core.ContainerRestartRule{
+							{
+								Action: core.ContainerRestartRuleActionRestartAllContainers,
+								ExitCodes: &core.ContainerRestartRuleOnExitCodes{
+									Operator: core.ContainerRestartRuleOnExitCodesOpIn,
+									Values:   []int32{42},
+								},
+							},
+						},
+					},
+				},
+			},
+			oldStatuses: []core.ContainerStatus{{Name: "c1", State: terminatedState(1)}},
+			newStatuses: []core.ContainerStatus{{Name: "c1", State: runningState}},
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerRestartRules, true)
+			opts := PodValidationOptions{
+				AllowContainerRestartPolicyRules: true,
+				AllowRestartAllContainers:        true,
+			}
+			errs := ValidateContainerStateTransition(tc.newStatuses, tc.oldStatuses, field.NewPath("field"), tc.podSpec, opts)
 
-			errs := ValidateContainerStateTransition(tc.newStatuses, tc.oldStatuses, field.NewPath("field"), tc.podSpec)
+			if tc.expectErr && len(errs) == 0 {
+				t.Errorf("Unexpected success")
+			}
+			if !tc.expectErr && len(errs) > 0 {
+				t.Errorf("Unexpected error(s): %v", errs)
+			}
+		})
+	}
+}
+
+func TestValidateInitContainerStateTransition(t *testing.T) {
+	var (
+		containerRestartPolicyAlways = core.ContainerRestartPolicyAlways
+		containerRestartPolicyNever  = core.ContainerRestartPolicyNever
+	)
+	runningState := core.ContainerState{Running: &core.ContainerStateRunning{}}
+	terminatedState := func(exitCode int32) core.ContainerState {
+		return core.ContainerState{Terminated: &core.ContainerStateTerminated{ExitCode: exitCode}}
+	}
+
+	container1 := core.Container{Name: "c1", Image: "image"}
+	container1RestartNever := core.Container{Name: "c1", Image: "image", RestartPolicy: &containerRestartPolicyNever}
+	container1RestartAlways := core.Container{Name: "c1", Image: "image", RestartPolicy: &containerRestartPolicyAlways}
+	container1RestartRuleIn42 := core.Container{
+		Name:          "c1",
+		Image:         "image",
+		RestartPolicy: &containerRestartPolicyNever,
+		RestartPolicyRules: []core.ContainerRestartRule{
+			{
+				Action: core.ContainerRestartRuleActionRestart,
+				ExitCodes: &core.ContainerRestartRuleOnExitCodes{
+					Operator: "In",
+					Values:   []int32{42},
+				},
+			},
+		},
+	}
+
+	testCases := []struct {
+		name        string
+		podSpec     core.PodSpec
+		oldStatuses []core.ContainerStatus
+		newStatuses []core.ContainerStatus
+		expectErr   bool
+	}{
+		{
+			name: "feature enabled, not terminated",
+			podSpec: core.PodSpec{
+				RestartPolicy:  core.RestartPolicyNever,
+				InitContainers: []core.Container{container1RestartNever},
+			},
+			oldStatuses: []core.ContainerStatus{{Name: "c1", State: runningState}},
+			newStatuses: []core.ContainerStatus{{Name: "c1", State: runningState}},
+			expectErr:   false,
+		},
+		{
+			name: "feature enabled, restart allowed by pod policy 'Always'",
+			podSpec: core.PodSpec{
+				RestartPolicy:  core.RestartPolicyAlways,
+				InitContainers: []core.Container{container1},
+			},
+			oldStatuses: []core.ContainerStatus{{Name: "c1", State: terminatedState(0)}},
+			newStatuses: []core.ContainerStatus{{Name: "c1", State: runningState}},
+			expectErr:   false,
+		},
+		{
+			name: "feature enabled, restart allowed by pod policy 'OnFailure' with exit 1",
+			podSpec: core.PodSpec{
+				RestartPolicy:  core.RestartPolicyOnFailure,
+				InitContainers: []core.Container{container1},
+			},
+			oldStatuses: []core.ContainerStatus{{Name: "c1", State: terminatedState(1)}},
+			newStatuses: []core.ContainerStatus{{Name: "c1", State: runningState}},
+			expectErr:   false,
+		},
+		{
+			name: "feature enabled, restart not allowed by pod policy 'OnFailure' with exit 0",
+			podSpec: core.PodSpec{
+				RestartPolicy:  core.RestartPolicyOnFailure,
+				InitContainers: []core.Container{container1},
+			},
+			oldStatuses: []core.ContainerStatus{{Name: "c1", State: terminatedState(0)}},
+			newStatuses: []core.ContainerStatus{{Name: "c1", State: runningState}},
+			expectErr:   true,
+		},
+		{
+			name: "feature enabled, restart not allowed by pod policy 'Never', with transition",
+			podSpec: core.PodSpec{
+				RestartPolicy:  core.RestartPolicyNever,
+				InitContainers: []core.Container{container1},
+			},
+			oldStatuses: []core.ContainerStatus{{Name: "c1", State: terminatedState(0)}},
+			newStatuses: []core.ContainerStatus{{Name: "c1", State: runningState}},
+			expectErr:   true,
+		},
+		{
+			name: "feature enabled, restart allowed by container policy 'Always'",
+			podSpec: core.PodSpec{
+				RestartPolicy:  core.RestartPolicyNever,
+				InitContainers: []core.Container{container1RestartAlways},
+			},
+			oldStatuses: []core.ContainerStatus{{Name: "c1", State: terminatedState(0)}},
+			newStatuses: []core.ContainerStatus{{Name: "c1", State: runningState}},
+			expectErr:   false,
+		},
+		{
+			name: "feature enabled, restart not allowed by container policy 'Never'",
+			podSpec: core.PodSpec{
+				RestartPolicy:  core.RestartPolicyAlways,
+				InitContainers: []core.Container{container1RestartNever},
+			},
+			oldStatuses: []core.ContainerStatus{{Name: "c1", State: terminatedState(0)}},
+			newStatuses: []core.ContainerStatus{{Name: "c1", State: runningState}},
+			expectErr:   true,
+		},
+		{
+			name: "feature enabled, restart allowed by container rule",
+			podSpec: core.PodSpec{
+				RestartPolicy:  core.RestartPolicyNever,
+				InitContainers: []core.Container{container1RestartRuleIn42},
+			},
+			oldStatuses: []core.ContainerStatus{{Name: "c1", State: terminatedState(42)}},
+			newStatuses: []core.ContainerStatus{{Name: "c1", State: runningState}},
+			expectErr:   false,
+		},
+		{
+			name: "feature enabled, restart not allowed by container rule mismatch",
+			podSpec: core.PodSpec{
+				RestartPolicy:  core.RestartPolicyNever,
+				InitContainers: []core.Container{container1RestartRuleIn42},
+			},
+			oldStatuses: []core.ContainerStatus{{Name: "c1", State: terminatedState(1)}},
+			newStatuses: []core.ContainerStatus{{Name: "c1", State: runningState}},
+			expectErr:   true,
+		},
+		{
+			name: "restart allowed if the container have RestartAllContainers actions",
+			podSpec: core.PodSpec{
+				RestartPolicy: core.RestartPolicyNever,
+				InitContainers: []core.Container{
+					{
+						Name:          "c1",
+						Image:         "image",
+						RestartPolicy: &containerRestartPolicyNever,
+						RestartPolicyRules: []core.ContainerRestartRule{
+							{
+								Action: core.ContainerRestartRuleActionRestartAllContainers,
+								ExitCodes: &core.ContainerRestartRuleOnExitCodes{
+									Operator: core.ContainerRestartRuleOnExitCodesOpIn,
+									Values:   []int32{42},
+								},
+							},
+						},
+					},
+				},
+			},
+			oldStatuses: []core.ContainerStatus{{Name: "c1", State: terminatedState(1)}},
+			newStatuses: []core.ContainerStatus{{Name: "c1", State: runningState}},
+		},
+		{
+			name: "restart allowed if other container have RestartAllContainers actions",
+			podSpec: core.PodSpec{
+				RestartPolicy: core.RestartPolicyNever,
+				InitContainers: []core.Container{
+					container1RestartNever,
+					{
+						Name:          "c2",
+						Image:         "image",
+						RestartPolicy: &containerRestartPolicyNever,
+						RestartPolicyRules: []core.ContainerRestartRule{
+							{
+								Action: core.ContainerRestartRuleActionRestartAllContainers,
+								ExitCodes: &core.ContainerRestartRuleOnExitCodes{
+									Operator: core.ContainerRestartRuleOnExitCodesOpIn,
+									Values:   []int32{42},
+								},
+							},
+						},
+					},
+				},
+			},
+			oldStatuses: []core.ContainerStatus{{Name: "c1", State: terminatedState(1)}},
+			newStatuses: []core.ContainerStatus{{Name: "c1", State: runningState}},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			opts := PodValidationOptions{
+				AllowContainerRestartPolicyRules: true,
+				AllowRestartAllContainers:        true,
+			}
+			errs := ValidateInitContainerStateTransition(tc.newStatuses, tc.oldStatuses, field.NewPath("field"), tc.podSpec, opts)
 
 			if tc.expectErr && len(errs) == 0 {
 				t.Errorf("Unexpected success")

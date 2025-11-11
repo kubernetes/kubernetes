@@ -3530,6 +3530,8 @@ const (
 	// If both PodResizePending and PodResizeInProgress are set, it means that a new resize was
 	// requested in the middle of a previous pod resize that is still in progress.
 	PodResizeInProgress PodConditionType = "PodResizeInProgress"
+	// AllContainersRestarting indicates that all containers of the pod is being restarted.
+	AllContainersRestarting PodConditionType = "AllContainersRestarting"
 )
 
 // These are reasons for a pod's transition to a condition.
@@ -3666,7 +3668,8 @@ type ContainerRestartRuleAction string
 
 // The only valid action is Restart.
 const (
-	ContainerRestartRuleActionRestart ContainerRestartRuleAction = "Restart"
+	ContainerRestartRuleActionRestart              ContainerRestartRuleAction = "Restart"
+	ContainerRestartRuleActionRestartAllContainers ContainerRestartRuleAction = "RestartAllContainers"
 )
 
 // ContainerRestartRuleOnExitCodes describes the condition

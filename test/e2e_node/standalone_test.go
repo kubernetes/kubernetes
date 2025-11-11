@@ -336,6 +336,110 @@ var _ = SIGDescribe(feature.StandaloneMode, func() {
 	})
 })
 
+var _ = SIGDescribe("Pod Extended (RestartAllContainers)",
+	feature.StandaloneMode,
+	framework.WithFeatureGate(features.ContainerRestartRules),
+	framework.WithFeatureGate(features.RestartAllContainersOnContainerExits),
+	func() {
+		f := framework.NewDefaultFramework("static-pod")
+		f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
+		ginkgo.It("should restart all containers on regular container exit", func(ctx context.Context) {
+			ns := f.Namespace.Name
+			staticPodName := "static-pod-" + string(uuid.NewUUID())
+			podPath := kubeletCfg.StaticPodPath
+			var (
+				containerRestartPolicyAlways = v1.ContainerRestartPolicyAlways
+				containerRestartPolicyNever  = v1.ContainerRestartPolicyNever
+			)
+			restartAllContainersRules := []v1.ContainerRestartRule{
+				{
+					Action: v1.ContainerRestartRuleActionRestartAllContainers,
+					ExitCodes: &v1.ContainerRestartRuleOnExitCodes{
+						Operator: v1.ContainerRestartRuleOnExitCodesOpIn,
+						Values:   []int32{42},
+					},
+				},
+			}
+			pod := &v1.Pod{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Pod",
+					APIVersion: "v1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      staticPodName,
+					Namespace: ns,
+				},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyNever,
+					InitContainers: []v1.Container{
+						{
+							Name:    "init",
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+							Command: []string{"/bin/sh", "-c", "exit 0"},
+						},
+						{
+							Name:          "sidecar",
+							Image:         imageutils.GetE2EImage(imageutils.BusyBox),
+							Command:       []string{"/bin/sh", "-c", "sleep 10000"},
+							RestartPolicy: &containerRestartPolicyAlways,
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name:               "source-container",
+							Image:              imageutils.GetE2EImage(imageutils.BusyBox),
+							Command:            []string{"/bin/sh", "-c", "sleep 60; exit 42"},
+							RestartPolicy:      &containerRestartPolicyNever,
+							RestartPolicyRules: restartAllContainersRules,
+						},
+						{
+							Name:    "regular",
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+							Command: []string{"/bin/sh", "-c", "sleep 10000"},
+						},
+					},
+				},
+			}
+
+			err := scheduleStaticPod(podPath, staticPodName, ns, pod)
+			framework.ExpectNoError(err)
+
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				pod, err := getPodFromStandaloneKubelet(ctx, ns, staticPodName)
+				if err != nil {
+					return fmt.Errorf("error getting pod(%v/%v) from standalone kubelet: %w", ns, staticPodName, err)
+				}
+
+				isReady, err := testutils.PodRunningReady(pod)
+				if err != nil {
+					return fmt.Errorf("error checking if pod (%v/%v) is running ready: %w", ns, staticPodName, err)
+				}
+				if !isReady {
+					return fmt.Errorf("pod (%v/%v) is not running", ns, staticPodName)
+				}
+				return nil
+			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.Succeed())
+
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				pod, err := getPodFromStandaloneKubelet(ctx, ns, staticPodName)
+				if err != nil {
+					return fmt.Errorf("error getting pod(%v/%v) from standalone kubelet: %w", ns, staticPodName, err)
+				}
+				for _, c := range pod.Status.InitContainerStatuses {
+					if c.RestartCount == 0 {
+						return fmt.Errorf("init container %v has not restarted", c.Name)
+					}
+				}
+				for _, c := range pod.Status.ContainerStatuses {
+					if c.RestartCount == 0 {
+						return fmt.Errorf("container %v has not restarted", c.Name)
+					}
+				}
+				return nil
+			}, 10*time.Minute, f.Timeouts.Poll).Should(gomega.Succeed())
+		})
+	})
+
 func createBasicStaticPodSpec(name, namespace string) *v1.Pod {
 	podSpec := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{

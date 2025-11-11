@@ -3154,6 +3154,8 @@ const (
 	// If both PodResizePending and PodResizeInProgress are set, it means that a new resize was
 	// requested in the middle of a previous pod resize that is still in progress.
 	PodResizeInProgress PodConditionType = "PodResizeInProgress"
+	// AllContainersRestarting indicates that all containers of the pod is being restarted.
+	AllContainersRestarting PodConditionType = "AllContainersRestarting"
 )
 
 // PodCondition represents pod's condition
@@ -3241,9 +3243,15 @@ type ContainerRestartRule struct {
 // container exits.
 type ContainerRestartRuleAction string
 
-// The only valid action is Restart.
+// These are valid restart rule actions.
 const (
+	// The container will be restarted if the rule matches. Only valid on normal init container and
+	// regular containers. Not valid on sidecar containers and ephemeral containers.
 	ContainerRestartRuleActionRestart ContainerRestartRuleAction = "Restart"
+	// All containers (except ephemeral containers) inside the pod will be terminated and restarted.
+	// Valid on normal init container, sidecar containers, and regular containers. Not valid on
+	// ephemeral containers.
+	ContainerRestartRuleActionRestartAllContainers ContainerRestartRuleAction = "RestartAllContainers"
 )
 
 // ContainerRestartRuleOnExitCodes describes the condition
