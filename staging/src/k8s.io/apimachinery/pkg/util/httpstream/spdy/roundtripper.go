@@ -365,6 +365,11 @@ func (s *SpdyRoundTripper) NewConnection(resp *http.Response) (httpstream.Connec
 	upgradeHeader := strings.ToLower(resp.Header.Get(httpstream.HeaderUpgrade))
 	if (resp.StatusCode != http.StatusSwitchingProtocols) || !strings.Contains(connectionHeader, strings.ToLower(httpstream.HeaderUpgrade)) || !strings.Contains(upgradeHeader, strings.ToLower(HeaderSpdy31)) {
 		defer resp.Body.Close()
+		// Close the underlying network connection to prevent fd leak when
+		// the upgrade is not successful (e.g. container not found).
+		if s.conn != nil {
+			defer s.conn.Close()
+		}
 		responseError := ""
 		responseErrorBytes, err := io.ReadAll(resp.Body)
 		if err != nil {
