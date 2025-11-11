@@ -1,5 +1,5 @@
 /*
-Copyright 2024 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"strconv"
 	"time"
 
 	"github.com/onsi/gomega"
@@ -28,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/common/node/framework/cgroups"
 	"k8s.io/kubernetes/test/e2e/common/node/framework/podresize"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -92,7 +94,7 @@ func doGuaranteedPodLevelResizeTests(f *framework.Framework) {
 				desiredPodResources = makePodResources(offsetCPU(15, desiredPodCPU), offsetCPU(15, desiredPodCPU), offsetMemory(15, desiredPodMem), offsetMemory(15, desiredPodMem))
 			}
 
-			doPatchAndRollback(ctx, f, originalContainers, expectedContainers, originalPodResources, desiredPodResources, true, true)
+			doPatchAndRollbackPLR(ctx, f, originalContainers, expectedContainers, originalPodResources, desiredPodResources, true, true)
 		},
 			// All tests will perform the requested resize, and once completed, will roll back the change.
 			// This results in the coverage of both increase and decrease of
@@ -103,9 +105,9 @@ func doGuaranteedPodLevelResizeTests(f *framework.Framework) {
 			ginkgo.Entry("cpu & mem in the same direction", increasedCPU, increasedMem, "", ""),
 			ginkgo.Entry("cpu & mem in opposite directions", increasedCPU, reducedMem, "", ""),
 			ginkgo.Entry("pod-level cpu", originalCPU, originalMem, increasedCPU, originalMem),
+			ginkgo.Entry("pod-level mem", originalCPU, originalMem, originalCPU, offsetMemory(10, increasedMem)),
 			ginkgo.Entry("only pod-level cpu", "", "", increasedCPU, originalMem),
 			ginkgo.Entry("only pod-level mem", "", "", originalCPU, increasedMem),
-			ginkgo.Entry("pod-level mem", originalCPU, originalMem, originalCPU, offsetMemory(10, increasedMem)),
 			ginkgo.Entry("pod-level cpu & mem in the same direction", originalCPU, originalMem, increasedCPU, increasedMem),
 			ginkgo.Entry("pod-level cpu & mem in opposite directions", originalCPU, originalMem, increasedCPU, reducedMem),
 		)
@@ -148,7 +150,7 @@ func doGuaranteedPodLevelResizeTests(f *framework.Framework) {
 				},
 			}
 
-			doPatchAndRollback(ctx, f, originalContainers, expectedContainers, nil, nil, true, true)
+			doPatchAndRollbackPLR(ctx, f, originalContainers, expectedContainers, nil, nil, true, true)
 		})
 
 		/*
@@ -178,7 +180,7 @@ func doGuaranteedPodLevelResizeTests(f *framework.Framework) {
 				},
 			}
 
-			doPatchAndRollback(ctx, f, originalContainers, expectedContainers, nil, nil, true, true)
+			doPatchAndRollbackPLR(ctx, f, originalContainers, expectedContainers, nil, nil, true, true)
 		})
 
 		/*
@@ -208,7 +210,7 @@ func doGuaranteedPodLevelResizeTests(f *framework.Framework) {
 				},
 			}
 
-			doPatchAndRollback(ctx, f, originalContainers, expectedContainers, nil, nil, true, true)
+			doPatchAndRollbackPLR(ctx, f, originalContainers, expectedContainers, nil, nil, true, true)
 		})
 	})
 }
@@ -236,7 +238,7 @@ func doBurstablePodLevelResizeTests(f *framework.Framework) {
 				originalPodResources = makePodResources(offsetCPU(30, originalCPU), offsetCPU(30, originalCPULimit), offsetMemory(30, originalMem), offsetMemory(30, originalMemLimit))
 				desiredPodResources = makePodResources(offsetCPU(30, desiredPodLevelResources.cpuReq), offsetCPU(30, desiredPodLevelResources.cpuLim), offsetMemory(30, desiredPodLevelResources.memReq), offsetMemory(30, desiredPodLevelResources.memLim))
 			}
-			doPatchAndRollback(ctx, f, originalContainers, expectedContainers, originalPodResources, desiredPodResources, true, true)
+			doPatchAndRollbackPLR(ctx, f, originalContainers, expectedContainers, originalPodResources, desiredPodResources, true, true)
 		},
 			// All tests will perform the requested resize, and once completed, will roll back the change.
 			// This results in the coverage of both increase and decrease of resources.
@@ -328,7 +330,7 @@ func doBurstablePodLevelResizeTests(f *framework.Framework) {
 					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, MemReq: increasedMem},
 				},
 			}
-			doPatchAndRollback(ctx, f, originalContainers, expectedContainers, nil, nil, false, true)
+			doPatchAndRollbackPLR(ctx, f, originalContainers, expectedContainers, nil, nil, false, true)
 		})
 
 		/*
@@ -349,7 +351,7 @@ func doBurstablePodLevelResizeTests(f *framework.Framework) {
 					Resources: &cgroups.ContainerResources{CPUReq: "1m", CPULim: "5m"},
 				},
 			}
-			doPatchAndRollback(ctx, f, originalContainers, expectedContainers, nil, nil, true, true)
+			doPatchAndRollbackPLR(ctx, f, originalContainers, expectedContainers, nil, nil, true, true)
 		})
 	})
 
@@ -358,7 +360,7 @@ func doBurstablePodLevelResizeTests(f *framework.Framework) {
 		originalPodResources := makePodResources(originalPodLevelResources.cpuReq, originalPodLevelResources.cpuLim, originalPodLevelResources.memReq, originalPodLevelResources.memLim)
 		desiredPodResources := makePodResources(expectedPodLevelResources.cpuReq, expectedPodLevelResources.cpuLim, expectedPodLevelResources.memReq, expectedPodLevelResources.memLim)
 
-		doPatchAndRollback(ctx, f, originalContainers, expectedContainers, originalPodResources, desiredPodResources, doRollback, true)
+		doPatchAndRollbackPLR(ctx, f, originalContainers, expectedContainers, originalPodResources, desiredPodResources, doRollback, true)
 	},
 		ginkgo.Entry("pod-level resize with equivalents",
 			[]podresize.ResizableContainerInfo{
@@ -429,7 +431,7 @@ func doBurstablePodLevelResizeTests(f *framework.Framework) {
 	)
 }
 
-var _ = SIGDescribe("PLR Pod InPlace Resize", func() {
+var _ = SIGDescribe("PLR Pod InPlace Resize", framework.WithFeatureGate(features.InPlacePodLevelResourcesVerticalScaling), func() {
 	f := framework.NewDefaultFramework("pod-level-resources-resize-tests")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	ginkgo.BeforeEach(func(ctx context.Context) {
@@ -489,11 +491,10 @@ func VerifyPodLevelStatus(gotPod *v1.Pod) error {
 		if err := framework.Gomega().Expect(gotPod.Status.Resources).To(gomega.BeComparableTo(wantStatusResources)); err != nil {
 			errs = append(errs, fmt.Errorf("pod.status.resources mismatch: %w", err))
 		}
-	} else {
-		// TODO(ndixita) - add tests when to compare Pod.Status.Resources with pod
-		// cgroup config values. Converting cgroup values -> Pod.Status.Resources ->
-		// cgroup values is resulting in indeterministic rounded off values
 	}
+	// TODO(ndixita) - add tests when to compare Pod.Status.Resources with pod
+	// cgroup config values. Converting cgroup values -> Pod.Status.Resources ->
+	// cgroup values is resulting in indeterministic rounded off values
 
 	var wantAllocatedResources v1.ResourceList
 	aggrReq, aggrLim := podresize.AggregateContainerResources(gotPod.Spec)
@@ -536,13 +537,12 @@ func doPodLevelResourcesMemoryLimitDecreaseTest(f *framework.Framework) {
 		}}
 
 		ginkgo.By("creating and verifying pod")
-		testPod := createAndVerifyPod(ctx, f, podClient, containers, originalPLR, true)
+		testPod := createAndVerifyPodPLR(ctx, f, podClient, containers, originalPLR, true)
 
 		// 1. Decrease the limit a little bit - should succeed
 		ginkgo.By("Patching pod with a slightly lowered memory limit")
 		viableLoweredLimit := []podresize.ResizableContainerInfo{{
-			Name:      "c1",
-			Resources: &cgroups.ContainerResources{MemReq: reducedMem, MemLim: reducedMem},
+			Name: "c1",
 		}}
 		viableLoweredLimitPLR := &v1.ResourceRequirements{
 			Requests: v1.ResourceList{
@@ -640,4 +640,71 @@ func doPodLevelResourcesMemoryLimitDecreaseTest(f *framework.Framework) {
 		ginkgo.By("deleting pod")
 		podClient.DeleteSync(ctx, testPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 	})
+}
+
+func doPatchAndRollbackPLR(ctx context.Context, f *framework.Framework, originalContainers, expectedContainers []podresize.ResizableContainerInfo, originalPodResources, expectedPodResources *v1.ResourceRequirements, doRollback bool, mountPodCgroup bool) {
+	ginkgo.By("creating and verifying pod")
+	podClient := e2epod.NewPodClient(f)
+	newPod := createAndVerifyPodPLR(ctx, f, podClient, originalContainers, originalPodResources, mountPodCgroup)
+
+	if expectedPodResources != nil {
+		framework.ExpectNoError(VerifyPodLevelStatus(newPod))
+	}
+	ginkgo.By(fmt.Sprintf("patching and verifying pod for resize %s: %v", newPod.Name, newPod.UID))
+	patchAndVerifyPLR(ctx, f, podClient, newPod, originalContainers, expectedContainers, originalPodResources, expectedPodResources, "resize")
+	if doRollback {
+		// Resize has been actuated, test the reverse operation.
+		rollbackContainers := createRollbackContainers(originalContainers, expectedContainers)
+		ginkgo.By("patching and verifying pod for rollback")
+		patchAndVerify(ctx, f, podClient, newPod, expectedContainers, rollbackContainers, expectedPodResources, originalPodResources, "rollback")
+	}
+
+	ginkgo.By("deleting pod")
+	podClient.DeleteSync(ctx, newPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
+}
+
+func patchAndVerifyPLR(ctx context.Context, f *framework.Framework, podClient *e2epod.PodClient, newPod *v1.Pod, originalContainers, expectedContainers []podresize.ResizableContainerInfo, originalPodResources, expectedPodResources *v1.ResourceRequirements, opStr string) {
+	patch := podresize.MakeResizePatch(originalContainers, expectedContainers, originalPodResources, expectedPodResources)
+	patchedPod, pErr := f.ClientSet.CoreV1().Pods(newPod.Namespace).Patch(ctx, newPod.Name,
+		types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "resize")
+	framework.ExpectNoError(pErr, fmt.Sprintf("failed to patch pod for %s", opStr))
+
+	expected := podresize.UpdateExpectedContainerRestarts(ctx, patchedPod, expectedContainers)
+
+	podresize.VerifyPodResources(patchedPod, expected, expectedPodResources)
+	resizedPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, newPod, expected)
+	podresize.ExpectPodResized(ctx, f, resizedPod, expected)
+	// Uncomment pod-level status verification after patch in 1.36 release.
+	// convesion of cgroup values -> Pod.Status.Resources -> cgroup values is
+	// resulting in values off by a small number.
+	// framework.ExpectNoError(VerifyPodLevelStatus(resizedPod))
+	if expectedPodResources != nil {
+		framework.ExpectNoError(podresize.VerifyPodCgroupValues(ctx, f, resizedPod))
+	}
+}
+
+func createAndVerifyPodPLR(ctx context.Context, f *framework.Framework, podClient *e2epod.PodClient, originalContainers []podresize.ResizableContainerInfo, podResources *v1.ResourceRequirements, mountPodCgroup bool) *v1.Pod {
+	tStamp := strconv.Itoa(time.Now().Nanosecond())
+	testPod := podresize.MakePodWithResizableContainers(f.Namespace.Name, "", tStamp, originalContainers, podResources)
+	testPod.GenerateName = "resize-test-"
+	testPod = e2epod.MustMixinRestrictedPodSecurity(testPod)
+
+	// TODO: mount pod cgroup path for all pod resize related tests and remove
+	// dependency on mountPodCgroup
+	if mountPodCgroup {
+		// mount pod cgroup in first container that can be used for pod cgroup values verification
+		cgroups.ConfigureHostPathForPodCgroup(testPod)
+	}
+
+	newPod := podClient.CreateSync(ctx, testPod)
+	podresize.VerifyPodResources(newPod, originalContainers, podResources)
+
+	podresize.VerifyPodResizePolicy(newPod, originalContainers)
+	framework.ExpectNoError(podresize.VerifyPodStatusResources(newPod, originalContainers))
+
+	framework.ExpectNoError(podresize.VerifyPodContainersCgroupValues(ctx, f, newPod, originalContainers))
+	if podResources != nil {
+		framework.ExpectNoError(podresize.VerifyPodCgroupValues(ctx, f, newPod))
+	}
+	return newPod
 }

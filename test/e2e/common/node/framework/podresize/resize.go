@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -394,12 +395,37 @@ func ExpectPodResized(ctx context.Context, f *framework.Framework, resizedPod *v
 	// Verify Pod Containers Cgroup Values
 	var errs []error
 
+	onlyPLRSet := func(pod *v1.Pod) bool {
+		if pod.Spec.Resources == nil {
+			return false
+		}
+
+		for _, container := range pod.Spec.Containers {
+			if container.Resources.Requests != nil && container.Resources.Limits != nil {
+				return false
+			}
+		}
+		return true
+	}
+
+	if onlyPLRSet(resizedPod) {
+		// Wait for containers to start. Pods using only
+		// pod-level resources and undergoing container
+		// restarts experience a startup delay before
+		// cgroup metrics are available.
+		ginkgo.By("Waiting for cgroup reading")
+		const cgroupReadDelay = time.Second * 60
+		time.Sleep(cgroupReadDelay)
+	}
+
 	if cgroupErrs := VerifyPodContainersCgroupValues(ctx, f, resizedPod, expectedContainers); cgroupErrs != nil {
 		errs = append(errs, fmt.Errorf("container cgroup values don't match expected: %w", formatErrors(cgroupErrs)))
 	}
+
 	if resourceErrs := VerifyPodStatusResources(resizedPod, expectedContainers); resourceErrs != nil {
 		errs = append(errs, fmt.Errorf("container status resources don't match expected: %w", formatErrors(resourceErrs)))
 	}
+
 	if restartErrs := verifyPodRestarts(f, resizedPod, expectedContainers); restartErrs != nil {
 		errs = append(errs, fmt.Errorf("container restart counts don't match expected: %w", formatErrors(restartErrs)))
 	}

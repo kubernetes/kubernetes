@@ -830,7 +830,6 @@ func doPatchAndRollback(ctx context.Context, f *framework.Framework, originalCon
 	podClient := e2epod.NewPodClient(f)
 	newPod := createAndVerifyPod(ctx, f, podClient, originalContainers, originalPodResources, mountPodCgroup)
 
-	framework.ExpectNoError(VerifyPodLevelStatus(newPod))
 	ginkgo.By("patching and verifying pod for resize")
 	patchAndVerify(ctx, f, podClient, newPod, originalContainers, expectedContainers, originalPodResources, expectedPodResources, "resize")
 	if doRollback {
@@ -855,33 +854,7 @@ func patchAndVerify(ctx context.Context, f *framework.Framework, podClient *e2ep
 	podresize.VerifyPodResources(patchedPod, expected, expectedPodResources)
 	resizedPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, newPod, expected)
 
-	onlyPLRSet := func(pod *v1.Pod) bool {
-		if pod.Spec.Resources == nil {
-			return false
-		}
-
-		for _, container := range pod.Spec.Containers {
-			if container.Resources.Requests != nil || container.Resources.Limits != nil {
-				return false
-			}
-		}
-		return true
-	}
-
-	// pods with only pod-level resources have some
-	// latencies in container startup time. So wait for a minute before verifying
-	// cgroup values
-	if onlyPLRSet(resizedPod) {
-		ginkgo.By("Waiting for cgroup verification")
-		const cgroupDelay = 60 * time.Second
-		time.Sleep(cgroupDelay)
-	}
-
 	podresize.ExpectPodResized(ctx, f, resizedPod, expected)
-	// Uncomment pod-level status verification after patch in 1.36 release.
-	// convesion of cgroup values -> Pod.Status.Resources -> cgroup values is
-	// resulting in values off by a small number.
-	// framework.ExpectNoError(VerifyPodLevelStatus(resizedPod))
 	if expectedPodResources != nil {
 		framework.ExpectNoError(podresize.VerifyPodCgroupValues(ctx, f, resizedPod))
 	}
