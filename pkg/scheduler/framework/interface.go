@@ -178,7 +178,7 @@ type Framework interface {
 	// are unable to create a signature, the pod may be "unsignable" which disables results caching
 	// and gang scheduling optimizations.
 	// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-scheduling/5598-opportunistic-batching
-	SignPod(ctx context.Context, pod *v1.Pod, state fwk.CycleState) string
+	SignPod(ctx context.Context, pod *v1.Pod, state fwk.CycleState) fwk.PodSignature
 
 	// RunPreFilterPlugins runs the set of configured PreFilter plugins. It returns
 	// *fwk.Status and its code is set to non-success if any of the plugins returns
@@ -201,10 +201,10 @@ type Framework interface {
 	// from the previous scheduling cycle can be reused for this cycle.
 	// If the batching code cannot provide a hint, the function returns "".
 	// See git.k8s.io/enhancements/keps/sig-scheduling/5598-opportunistic-batching
-	GetNodeHint(ctx context.Context, pod *v1.Pod, state fwk.CycleState, cycleCount int64) (hint string, signature string)
+	GetNodeHint(ctx context.Context, pod *v1.Pod, state fwk.CycleState, cycleCount int64) (hint string, signature fwk.PodSignature)
 
 	// StoreScheduleResults stores the results after we have sorted and filtered nodes.
-	StoreScheduleResults(ctx context.Context, signature string, hintedNode, chosenNode string, otherNodes SortedScoredNodes, cycleCount int64)
+	StoreScheduleResults(ctx context.Context, signature fwk.PodSignature, hintedNode, chosenNode string, otherNodes SortedScoredNodes, cycleCount int64)
 
 	// RunPreBindPlugins runs the set of configured PreBind plugins. It returns
 	// *fwk.Status and its code is set to non-success if any of the plugins returns

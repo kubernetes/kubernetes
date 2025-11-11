@@ -17,6 +17,7 @@ limitations under the License.
 package scheduler
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -1232,11 +1233,11 @@ func TestSignatures(t *testing.T) {
 	table := []struct {
 		name              string
 		plugins           []*constSigPluginConfig
-		expectedSignature string
+		expectedSignature []byte
 	}{
 		{
 			name:              "no plugins",
-			expectedSignature: `{"v1.Pod.Spec.SchedulerName":"test-scheduler"}`,
+			expectedSignature: []byte(`{"v1.Pod.Spec.SchedulerName":"test-scheduler"}`),
 		},
 		{
 			name: "single filter",
@@ -1248,7 +1249,7 @@ func TestSignatures(t *testing.T) {
 					pluginType: "filter",
 				},
 			},
-			expectedSignature: `{"test":16,"v1.Pod.Spec.SchedulerName":"test-scheduler"}`,
+			expectedSignature: []byte(`{"test":16,"v1.Pod.Spec.SchedulerName":"test-scheduler"}`),
 		},
 		{
 			name: "single prefilter",
@@ -1260,7 +1261,7 @@ func TestSignatures(t *testing.T) {
 					pluginType: "prefilter",
 				},
 			},
-			expectedSignature: `{"test":16,"v1.Pod.Spec.SchedulerName":"test-scheduler"}`,
+			expectedSignature: []byte(`{"test":16,"v1.Pod.Spec.SchedulerName":"test-scheduler"}`),
 		},
 		{
 			name: "single score",
@@ -1272,7 +1273,7 @@ func TestSignatures(t *testing.T) {
 					pluginType: "score",
 				},
 			},
-			expectedSignature: `{"test":16,"v1.Pod.Spec.SchedulerName":"test-scheduler"}`,
+			expectedSignature: []byte(`{"test":16,"v1.Pod.Spec.SchedulerName":"test-scheduler"}`),
 		},
 		{
 			name: "single prescore",
@@ -1284,7 +1285,7 @@ func TestSignatures(t *testing.T) {
 					pluginType: "prescore",
 				},
 			},
-			expectedSignature: `{"test":16,"v1.Pod.Spec.SchedulerName":"test-scheduler"}`,
+			expectedSignature: []byte(`{"test":16,"v1.Pod.Spec.SchedulerName":"test-scheduler"}`),
 		},
 		{
 			name: "two plugins",
@@ -1302,7 +1303,7 @@ func TestSignatures(t *testing.T) {
 					pluginType: "score",
 				},
 			},
-			expectedSignature: `{"test":16,"test2":17,"v1.Pod.Spec.SchedulerName":"test-scheduler"}`,
+			expectedSignature: []byte(`{"test":16,"test2":17,"v1.Pod.Spec.SchedulerName":"test-scheduler"}`),
 		},
 		{
 			name: "plugin with multiple fragments",
@@ -1314,7 +1315,7 @@ func TestSignatures(t *testing.T) {
 					pluginType: "filter",
 				},
 			},
-			expectedSignature: `{"test":16,"test2":17,"v1.Pod.Spec.SchedulerName":"test-scheduler"}`,
+			expectedSignature: []byte(`{"test":16,"test2":17,"v1.Pod.Spec.SchedulerName":"test-scheduler"}`),
 		},
 		{
 			name: "overlapping fragments",
@@ -1332,7 +1333,7 @@ func TestSignatures(t *testing.T) {
 					pluginType: "score",
 				},
 			},
-			expectedSignature: `{"test":16,"v1.Pod.Spec.SchedulerName":"test-scheduler"}`,
+			expectedSignature: []byte(`{"test":16,"v1.Pod.Spec.SchedulerName":"test-scheduler"}`),
 		},
 		{
 			name: "unsignable plugin",
@@ -1343,7 +1344,7 @@ func TestSignatures(t *testing.T) {
 					pluginType: "filter",
 				},
 			},
-			expectedSignature: fwk.Unsignable,
+			expectedSignature: nil,
 		},
 		{
 			name: "error plugin",
@@ -1354,7 +1355,7 @@ func TestSignatures(t *testing.T) {
 					pluginType: "filter",
 				},
 			},
-			expectedSignature: fwk.Unsignable,
+			expectedSignature: nil,
 		},
 	}
 	for _, item := range table {
@@ -1391,7 +1392,7 @@ func TestSignatures(t *testing.T) {
 				t.Fatal(err)
 			}
 			signature := schedFramework.SignPod(ctx, podWithID("foo", ""), nil)
-			if signature != item.expectedSignature {
+			if !bytes.Equal(signature, item.expectedSignature) {
 				t.Fatal(fmt.Errorf("Test %s got signature %s, expected %s", item.name, signature, item.expectedSignature))
 			}
 		})

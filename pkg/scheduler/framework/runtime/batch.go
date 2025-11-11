@@ -17,6 +17,7 @@ limitations under the License.
 package runtime
 
 import (
+	"bytes"
 	"context"
 	"time"
 
@@ -41,7 +42,7 @@ type OpportunisticBatch struct {
 }
 
 type batchState struct {
-	signature    string
+	signature    fwk.PodSignature
 	sortedNodes  framework.SortedScoredNodes
 	creationTime time.Time
 }
@@ -56,9 +57,9 @@ const (
 	maxBatchAge = 500 * time.Millisecond
 )
 
-type SignatureFunc func(h fwk.Handle, ctx context.Context, p *v1.Pod, state fwk.CycleState) string
+type SignatureFunc func(h fwk.Handle, ctx context.Context, p *v1.Pod, state fwk.CycleState) fwk.PodSignature
 
-func signUsingFramework(h fwk.Handle, ctx context.Context, p *v1.Pod, state fwk.CycleState) string {
+func signUsingFramework(h fwk.Handle, ctx context.Context, p *v1.Pod, state fwk.CycleState) fwk.PodSignature {
 	return h.SignPod(ctx, p, state)
 }
 
@@ -66,7 +67,7 @@ func signUsingFramework(h fwk.Handle, ctx context.Context, p *v1.Pod, state fwk.
 // with the same signature that are scheduled in 1-pod-per-node manner (otherwise previous scores could not be reused).
 // It's assured by checking the top rated node is no longer feasible (meaning the previous pod was successfully scheduled and the
 // current one does not fit).
-func (b *OpportunisticBatch) GetNodeHint(ctx context.Context, pod *v1.Pod, state fwk.CycleState, cycleCount int64) (string, string) {
+func (b *OpportunisticBatch) GetNodeHint(ctx context.Context, pod *v1.Pod, state fwk.CycleState, cycleCount int64) (string, fwk.PodSignature) {
 	logger := klog.FromContext(ctx)
 	var hint string
 
@@ -102,7 +103,7 @@ func (b *OpportunisticBatch) GetNodeHint(ctx context.Context, pod *v1.Pod, state
 }
 
 // Store results from scheduling for use as a batch later.
-func (b *OpportunisticBatch) StoreScheduleResults(ctx context.Context, signature, hintedNode, chosenNode string, otherNodes framework.SortedScoredNodes, cycleCount int64) {
+func (b *OpportunisticBatch) StoreScheduleResults(ctx context.Context, signature fwk.PodSignature, hintedNode, chosenNode string, otherNodes framework.SortedScoredNodes, cycleCount int64) {
 	logger := klog.FromContext(ctx)
 
 	startTime := time.Now()
@@ -138,7 +139,7 @@ func (b *OpportunisticBatch) StoreScheduleResults(ctx context.Context, signature
 	// If this pod is batchable, set our results as state.
 	// We will check this against the next pod when we give the
 	// next hint.
-	if signature != "" && otherNodes != nil && otherNodes.Len() > 0 {
+	if signature != nil && otherNodes != nil && otherNodes.Len() > 0 {
 		b.state = &batchState{
 			signature:    signature,
 			sortedNodes:  otherNodes,
@@ -166,7 +167,7 @@ func (b *OpportunisticBatch) logUnusableState(logger klog.Logger, cycleCount int
 }
 
 // Update the batch state based on a the arrival of a new pod and the chosen node from the last pod.
-func (b *OpportunisticBatch) batchStateCompatible(ctx context.Context, logger klog.Logger, pod *v1.Pod, signature string, cycleCount int64, state fwk.CycleState, nodeInfos fwk.NodeInfoLister) bool {
+func (b *OpportunisticBatch) batchStateCompatible(ctx context.Context, logger klog.Logger, pod *v1.Pod, signature fwk.PodSignature, cycleCount int64, state fwk.CycleState, nodeInfos fwk.NodeInfoLister) bool {
 	// Just return if we don't have any state to use.
 	if b.stateEmpty() {
 		return false
@@ -185,7 +186,7 @@ func (b *OpportunisticBatch) batchStateCompatible(ctx context.Context, logger kl
 	}
 
 	// If the new pod is incompatible with the current state, throw the state away.
-	if signature == "" || signature != b.state.signature {
+	if signature == nil || bytes.Compare(signature, b.state.signature) != 0 {
 		b.logUnusableState(logger, cycleCount, metrics.BatchFlushPodIncompatible)
 		return false
 	}

@@ -17,6 +17,7 @@ limitations under the License.
 package runtime
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"log"
@@ -179,8 +180,8 @@ func newTestNodes(n []string) *testSortedScoredNodes {
 	return &testSortedScoredNodes{Nodes: n}
 }
 
-func newTestSigFunc(sig *string) SignatureFunc {
-	return func(h fwk.Handle, ctx context.Context, p *v1.Pod, state fwk.CycleState) string {
+func newTestSigFunc(sig *fwk.PodSignature) SignatureFunc {
+	return func(h fwk.Handle, ctx context.Context, p *v1.Pod, state fwk.CycleState) fwk.PodSignature {
 		return *sig
 	}
 }
@@ -302,7 +303,7 @@ func TestBatchBasic(t *testing.T) {
 			secondChosenNode:              "n1",
 			expectedHint:                  "n1",
 			expectedState: &batchState{
-				signature:   "sig",
+				signature:   []byte("sig"),
 				sortedNodes: newTestNodes([]string{"n2"}),
 			},
 		},
@@ -325,7 +326,7 @@ func TestBatchBasic(t *testing.T) {
 				},
 			}
 
-			signature := tt.firstSig
+			signature := fwk.PodSignature(tt.firstSig)
 			batch := newOpportunisticBatch(testFwk, newTestSigFunc(&signature))
 			state := framework.NewCycleState()
 
@@ -335,7 +336,7 @@ func TestBatchBasic(t *testing.T) {
 				t.Fatalf("Got unexpected hint %s", hint)
 			}
 			if tt.firstPodScheduledSuccessfully {
-				batch.StoreScheduleResults(ctx, tt.firstSig, hint, tt.firstChosenNode, tt.firstOtherNodes, 1)
+				batch.StoreScheduleResults(ctx, []byte(tt.firstSig), hint, tt.firstChosenNode, tt.firstOtherNodes, 1)
 			}
 
 			var cycleCount int64 = 2
@@ -358,14 +359,14 @@ func TestBatchBasic(t *testing.T) {
 			}})
 			lister.nodes = nodeInfoLister{lastChosenNode}
 
-			signature = tt.secondSig
+			signature = fwk.PodSignature(tt.secondSig)
 			hint, _ = batch.GetNodeHint(ctx, pod2, state, cycleCount)
 
 			if hint != tt.expectedHint {
 				t.Fatalf("Got hint '%s' expected '%s' for test '%s'", hint, tt.expectedHint, tt.name)
 			}
 
-			batch.StoreScheduleResults(ctx, tt.secondSig, hint, tt.secondChosenNode, tt.secondOtherNodes, cycleCount)
+			batch.StoreScheduleResults(ctx, []byte(tt.secondSig), hint, tt.secondChosenNode, tt.secondOtherNodes, cycleCount)
 
 			batchEmpty := batch.state == nil || batch.state.sortedNodes == nil || batch.state.sortedNodes.Len() == 0
 			expectedEmpty := tt.expectedState == nil
@@ -374,7 +375,7 @@ func TestBatchBasic(t *testing.T) {
 				t.Fatalf("Expected empty %t, got empty %t for %s", expectedEmpty, batchEmpty, tt.name)
 			}
 			if !expectedEmpty {
-				if batch.state.signature != tt.expectedState.signature {
+				if bytes.Compare(batch.state.signature, []byte(tt.expectedState.signature)) != 0 {
 					t.Fatalf("Got state signature '%s' expected '%s' for test '%s'", batch.state.signature, tt.expectedState.signature, tt.name)
 				}
 				nodesDiff := cmp.Diff(tt.expectedState.sortedNodes, batch.state.sortedNodes)

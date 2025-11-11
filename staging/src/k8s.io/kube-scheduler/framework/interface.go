@@ -653,9 +653,7 @@ type SignFragment struct {
 	Value any
 }
 
-// If a plugin cannot sign a pod because it has dependencies on other pods, etc, it can always return
-// unsignable. This will effectively disable any signature-based optimizations for the pod.
-const Unsignable = ""
+type PodSignature []byte
 
 // SignPlugin is an interface that should be implemented by plugins that either filter or score
 // pods to enable batching and gang scheduling optimizations.
@@ -760,7 +758,7 @@ type Handle interface {
 	WorkloadManager() WorkloadManager
 
 	// Sign a pod.
-	SignPod(ctx context.Context, pod *v1.Pod, state CycleState) string
+	SignPod(ctx context.Context, pod *v1.Pod, state CycleState) PodSignature
 }
 
 // Parallelizer helps run scheduling operations in parallel chunks where possible, to improve performance and CPU utilization.

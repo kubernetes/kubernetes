@@ -808,7 +808,7 @@ func (f *frameworkImpl) computeBatchablePlugins() error {
 // is unable to construct a signature for the pod, the result will be equal to fwk.Unsignable, which means
 // there is no way to compare this pod against others, and will turn off a number of optimizations
 // for this pod.
-func (f *frameworkImpl) SignPod(ctx context.Context, pod *v1.Pod, state fwk.CycleState) string {
+func (f *frameworkImpl) SignPod(ctx context.Context, pod *v1.Pod, state fwk.CycleState) fwk.PodSignature {
 	logger := klog.FromContext(ctx)
 
 	startTime := time.Now()
@@ -818,7 +818,7 @@ func (f *frameworkImpl) SignPod(ctx context.Context, pod *v1.Pod, state fwk.Cycl
 	}()
 
 	if !f.enableSignatures {
-		return fwk.Unsignable
+		return nil
 	}
 
 	sig := map[string]any{
@@ -835,7 +835,7 @@ func (f *frameworkImpl) SignPod(ctx context.Context, pod *v1.Pod, state fwk.Cycl
 				logger.V(4).Error(status.AsError(), "SignPod failed for plugin", "plugin", plugin.Name(), "error", status.AsError())
 			}
 			logger.V(5).Info("SignPod can't sign pod due to plugin", "plugin", plugin.Name(), "status", status)
-			return fwk.Unsignable
+			return nil
 		}
 
 		for _, elem := range fragments {
@@ -846,10 +846,10 @@ func (f *frameworkImpl) SignPod(ctx context.Context, pod *v1.Pod, state fwk.Cycl
 	sigBytes, err := json.Marshal(sig)
 	if err != nil {
 		logger.V(4).Error(err, "SignPod failed to marshal signature object")
-		return fwk.Unsignable
+		return nil
 	}
 
-	return string(sigBytes)
+	return sigBytes
 }
 
 // RunPreFilterPlugins runs the set of configured PreFilter plugins. It returns
@@ -1398,11 +1398,11 @@ func (f *frameworkImpl) runScoreExtension(ctx context.Context, pl fwk.ScorePlugi
 	return status
 }
 
-func (f *frameworkImpl) GetNodeHint(ctx context.Context, pod *v1.Pod, state fwk.CycleState, cycleCount int64) (hint string, signature string) {
+func (f *frameworkImpl) GetNodeHint(ctx context.Context, pod *v1.Pod, state fwk.CycleState, cycleCount int64) (hint string, signature fwk.PodSignature) {
 	return f.batch.GetNodeHint(ctx, pod, state, cycleCount)
 }
 
-func (f *frameworkImpl) StoreScheduleResults(ctx context.Context, signature string, hintedNode, chosenNode string, otherNodes framework.SortedScoredNodes, cycleCount int64) {
+func (f *frameworkImpl) StoreScheduleResults(ctx context.Context, signature fwk.PodSignature, hintedNode, chosenNode string, otherNodes framework.SortedScoredNodes, cycleCount int64) {
 	f.batch.StoreScheduleResults(ctx, signature, hintedNode, chosenNode, otherNodes, cycleCount)
 }
 
