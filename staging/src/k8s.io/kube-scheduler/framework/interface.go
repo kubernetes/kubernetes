@@ -629,6 +629,8 @@ type BindPlugin interface {
 	Bind(ctx context.Context, state CycleState, p *v1.Pod, nodeName string) *Status
 }
 
+// A portion of a pod signature. The sign fragments from all plugins are combined
+// together to create a unified signature.
 type SignFragment struct {
 	// Pod signature fragments are identified by a key, i.e., fragments with the same key
 	// should contain the same value for the same pod. Plugin authors can return the same SignFragment
@@ -653,6 +655,7 @@ type SignFragment struct {
 	Value any
 }
 
+// The signature for a given pod after all of the results from plugins are consolidated.
 type PodSignature []byte
 
 // SignPlugin is an interface that should be implemented by plugins that either filter or score
