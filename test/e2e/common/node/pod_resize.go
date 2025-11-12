@@ -350,6 +350,69 @@ func doBurstablePodResizeTests(f *framework.Framework) {
 			}
 			doPatchAndRollback(ctx, f, originalContainers, expectedContainers, true)
 		})
+
+		/*
+			Release: v1.35
+			Testname: In-place Pod Resize, burstable pod removing limits and requests
+			Description: Issuing a Pod Resize request via the Pod Resize subresource patch endpoint to removing CPU and memory requests and limits on a 5-container pod with various patterns MUST result in the Pod resources being removed as expected.
+		*/
+		framework.ConformanceIt("remove limits and requests [MinimumKubeletVersion:1.35]", func(ctx context.Context) {
+			originalContainers := []podresize.ResizableContainerInfo{
+				{
+					// c1 starts with CPU and memory requests; remove CPU limits
+					Name:      "c1",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
+				},
+				{
+					// c2 starts with CPU and memory requests; remove memory limits
+					Name:      "c2",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
+				},
+				{
+					// c3 starts with CPU and memory requests; remove CPU requests
+					Name:      "c3",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, MemReq: originalMem, MemLim: originalMemLimit},
+				},
+				{
+					// c4 starts with CPU and memory requests; remove memory limits
+					Name:      "c4",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem},
+				},
+				{
+					// c5 starts with CPU and memory requests; remove CPU&memory limits
+					Name:      "c5",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
+				},
+			}
+			expectedContainers := []podresize.ResizableContainerInfo{
+				{
+					// c1 starts with CPU and memory requests; remove CPU limits
+					Name:      "c1",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, MemReq: originalMem, MemLim: originalMemLimit},
+				},
+				{
+					// c2 starts with CPU and memory requests; remove memory limits
+					Name:      "c2",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem},
+				},
+				{
+					// c3 starts with CPU and memory requests; remove CPU requests
+					Name:      "c3",
+					Resources: &cgroups.ContainerResources{MemReq: originalMem, MemLim: originalMemLimit},
+				},
+				{
+					// c4 starts with CPU and memory requests; remove memory limits
+					Name:      "c4",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit},
+				},
+				{
+					// c5 starts with CPU and memory requests; remove CPU&memory limits
+					Name:      "c5",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, MemReq: originalMem},
+				},
+			}
+			doPatchAndRollback(ctx, f, originalContainers, expectedContainers, false)
+		})
 	})
 }
 
@@ -417,70 +480,6 @@ func doPodResizePatchErrorTests(f *framework.Framework) {
 				},
 			},
 			"Pod QOS Class may not change as a result of resizing",
-			true,
-		),
-		ginkgo.Entry("Guaranteed pod - remove cpu & memory limits",
-			[]podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
-				},
-			},
-			[]podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, MemReq: originalMem},
-				},
-			},
-			"resource limits cannot be removed",
-			true,
-		),
-		ginkgo.Entry("Burstable pod - remove cpu & memory limits + increase requests",
-			[]podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: increasedCPULimit, MemReq: originalMem, MemLim: increasedMemLimit},
-				},
-			},
-			[]podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: increasedCPU, MemReq: increasedMem},
-				},
-			},
-			"resource limits cannot be removed",
-			true,
-		),
-		ginkgo.Entry("Burstable pod - remove memory requests",
-			[]podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{MemReq: originalMem},
-				},
-			},
-			[]podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{},
-				},
-			},
-			"resource requests cannot be removed",
-			true,
-		),
-		ginkgo.Entry("Burstable pod - remove cpu requests",
-			[]podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU},
-				},
-			},
-			[]podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{},
-				},
-			},
-			"resource requests cannot be removed",
 			true,
 		),
 		ginkgo.Entry("Burstable pod - reorder containers",
