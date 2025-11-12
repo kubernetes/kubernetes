@@ -199,9 +199,9 @@ func (pl *DynamicResources) Name() string {
 // Because it isn't simple to determine if DRA claims are single host or more complex,
 // we exclude any pod with a DRA claim from signatures. We should improve this.
 // See https://github.com/kubernetes/kubernetes/issues/134986
-func (pl *DynamicResources) SignPod(ctx context.Context, pod *v1.Pod, state fwk.CycleState) ([]fwk.SignFragment, *fwk.Status) {
+func (pl *DynamicResources) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
 	if len(pod.Spec.ResourceClaims) > 0 {
-		return nil, fwk.NewStatus(fwk.Unschedulable)
+		return nil, fwk.NewStatus(fwk.Unschedulable, "pods with dra resource claims are not signable")
 	}
 	return nil, nil
 }

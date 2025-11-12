@@ -1219,7 +1219,7 @@ func (pl *constantSigPlugin) ScoreExtensions() fwk.ScoreExtensions {
 	return nil
 }
 
-func (pl *constantSigPlugin) SignPod(_ context.Context, pod *v1.Pod, state fwk.CycleState) ([]fwk.SignFragment, *fwk.Status) {
+func (pl *constantSigPlugin) SignPod(_ context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
 	return pl.config.signature, pl.config.status
 }
 
@@ -1391,7 +1391,7 @@ func TestSignatures(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			signature := schedFramework.SignPod(ctx, podWithID("foo", ""), nil)
+			signature := schedFramework.SignPod(ctx, podWithID("foo", ""))
 			if !bytes.Equal(signature, item.expectedSignature) {
 				t.Fatal(fmt.Errorf("Test %s got signature %s, expected %s", item.name, signature, item.expectedSignature))
 			}

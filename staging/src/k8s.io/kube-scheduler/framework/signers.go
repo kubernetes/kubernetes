@@ -87,15 +87,19 @@ func NodeSelectorRequirementsSigner(reqs []v1.NodeSelectorRequirement) []v1.Node
 	return newReqs
 }
 
+func NodeSelectorTermSigner(t *v1.NodeSelectorTerm) v1.NodeSelectorTerm {
+	return v1.NodeSelectorTerm{
+		MatchExpressions: NodeSelectorRequirementsSigner(t.MatchExpressions),
+		MatchFields:      NodeSelectorRequirementsSigner(t.MatchFields),
+	}
+}
+
 func PreferredSchedulingTermSigner(terms []v1.PreferredSchedulingTerm) ([]string, error) {
 	newTerms := make([]string, len(terms))
 	for i, t := range terms {
 		termStr, err := json.Marshal(v1.PreferredSchedulingTerm{
-			Weight: t.Weight,
-			Preference: v1.NodeSelectorTerm{
-				MatchExpressions: NodeSelectorRequirementsSigner(t.Preference.MatchExpressions),
-				MatchFields:      NodeSelectorRequirementsSigner(t.Preference.MatchFields),
-			},
+			Weight:     t.Weight,
+			Preference: NodeSelectorTermSigner(&t.Preference),
 		})
 		if err != nil {
 			return nil, err
@@ -108,6 +112,28 @@ func PreferredSchedulingTermSigner(terms []v1.PreferredSchedulingTerm) ([]string
 	return newTerms, nil
 }
 
+func NodeSelectorTermsSigner(terms []v1.NodeSelectorTerm) ([]string, error) {
+	req := make([]string, len(terms))
+	for i, t := range terms {
+		tStr, err := json.Marshal(NodeSelectorTermSigner(&t))
+		if err != nil {
+			return nil, err
+		}
+		req[i] = string(tStr)
+	}
+
+	sort.Slice(req, func(i, j int) bool {
+		return req[i] < req[j]
+	})
+
+	return req, nil
+}
+
+type nodeAffinitySignerResult struct {
+	Required  []string
+	Preferred []string
+}
+
 func NodeAffinitySigner(pod *v1.Pod) (any, error) {
 	if pod.Spec.Affinity != nil {
 		if pod.Spec.Affinity.NodeAffinity != nil {
@@ -116,11 +142,14 @@ func NodeAffinitySigner(pod *v1.Pod) (any, error) {
 			if err != nil {
 				return nil, err
 			}
-			return struct {
-				Required  *v1.NodeSelector
-				Preferred []string
-			}{
-				Required:  n.RequiredDuringSchedulingIgnoredDuringExecution,
+
+			req, err := NodeSelectorTermsSigner(n.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms)
+			if err != nil {
+				return nil, err
+			}
+
+			return nodeAffinitySignerResult{
+				Required:  req,
 				Preferred: pref,
 			}, nil
 		}

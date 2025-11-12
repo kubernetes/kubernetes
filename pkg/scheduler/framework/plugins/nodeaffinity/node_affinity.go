@@ -76,7 +76,7 @@ func (pl *NodeAffinity) Name() string {
 }
 
 // Node affinity filtering and scoring depend on NodeAffinity and NodeSelectors.
-func (pl *NodeAffinity) SignPod(ctx context.Context, pod *v1.Pod, state fwk.CycleState) ([]fwk.SignFragment, *fwk.Status) {
+func (pl *NodeAffinity) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
 	aff, err := fwk.NodeAffinitySigner(pod)
 	if err != nil {
 		return nil, fwk.AsStatus(err)

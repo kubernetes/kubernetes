@@ -104,7 +104,7 @@ func (pl *VolumeZone) Name() string {
 }
 
 // Feasibility and scoring based on the non-synthetic volume sources.
-func (pl *VolumeZone) SignPod(ctx context.Context, pod *v1.Pod, state fwk.CycleState) ([]fwk.SignFragment, *fwk.Status) {
+func (pl *VolumeZone) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
 	return []fwk.SignFragment{
 		{Key: fwk.VolumesSignerName, Value: fwk.VolumesSigner(pod)},
 	}, nil

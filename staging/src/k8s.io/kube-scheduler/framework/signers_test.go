@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 )
 
@@ -79,53 +80,6 @@ func TestHostPortsSigner(t *testing.T) {
 			got := HostPortsSigner(tt.pod)
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("HostPortsSigner() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestNodeAffinitySigner(t *testing.T) {
-	affinity := &v1.NodeAffinity{
-		RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
-			NodeSelectorTerms: []v1.NodeSelectorTerm{
-				{MatchExpressions: []v1.NodeSelectorRequirement{
-					{Key: "foo", Operator: v1.NodeSelectorOpExists},
-				}},
-			},
-		},
-	}
-
-	tests := []struct {
-		name string
-		pod  *v1.Pod
-		want any
-	}{
-		{
-			name: "nil affinity",
-			pod:  &v1.Pod{Spec: v1.PodSpec{Affinity: nil}},
-			want: nil,
-		},
-		{
-			name: "non-nil affinity, nil node affinity",
-			pod: &v1.Pod{Spec: v1.PodSpec{Affinity: &v1.Affinity{
-				PodAffinity: &v1.PodAffinity{},
-			}}},
-			want: nil,
-		},
-		{
-			name: "non-nil node affinity",
-			pod: &v1.Pod{Spec: v1.PodSpec{Affinity: &v1.Affinity{
-				NodeAffinity: affinity,
-			}}},
-			want: affinity,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := NodeAffinitySigner(tt.pod)
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("NodeAffinitySigner() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -239,6 +193,115 @@ func TestVolumesSigner(t *testing.T) {
 			got := VolumesSigner(tt.pod)
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("VolumesSigner() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestNodeAffinitySigner(t *testing.T) {
+	table := []struct {
+		name        string
+		input       *v1.Pod
+		expected    any
+		expectedErr error
+	}{
+		{
+			name:        "nil affinity",
+			input:       &v1.Pod{},
+			expected:    nil,
+			expectedErr: nil,
+		},
+		{
+			name: "empty affinity",
+			input: &v1.Pod{
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{},
+						},
+					},
+				},
+			},
+			expected:    nodeAffinitySignerResult{Required: []string{}, Preferred: []string{}},
+			expectedErr: nil,
+		},
+		{
+			name: "affinity unsorted",
+			input: &v1.Pod{
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{Key: "kk3", Operator: v1.NodeSelectorOpIn, Values: []string{"kv3", "v4"}},
+											{Key: "kk2", Operator: v1.NodeSelectorOpIn, Values: []string{"kv1", "v2"}},
+										},
+										MatchFields: []v1.NodeSelectorRequirement{
+											{Key: "kk1", Operator: v1.NodeSelectorOpIn, Values: []string{"kv3", "v4"}},
+										},
+									},
+									{
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{Key: "k2", Operator: v1.NodeSelectorOpIn, Values: []string{"v1", "v2"}},
+										},
+										MatchFields: []v1.NodeSelectorRequirement{
+											{Key: "k1", Operator: v1.NodeSelectorOpIn, Values: []string{"v3", "v4"}},
+										},
+									},
+								},
+							},
+							PreferredDuringSchedulingIgnoredDuringExecution: []v1.PreferredSchedulingTerm{
+								{
+									Weight: 3,
+									Preference: v1.NodeSelectorTerm{
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{Key: "ppk2", Operator: v1.NodeSelectorOpIn, Values: []string{"ppv1", "v2"}},
+										},
+										MatchFields: []v1.NodeSelectorRequirement{
+											{Key: "ppk1", Operator: v1.NodeSelectorOpIn, Values: []string{"ppv3", "v4"}},
+										},
+									},
+								},
+								{
+									Weight: 1,
+									Preference: v1.NodeSelectorTerm{
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{Key: "pk2", Operator: v1.NodeSelectorOpIn, Values: []string{"pv1", "v2"}},
+										},
+										MatchFields: []v1.NodeSelectorRequirement{
+											{Key: "pk1", Operator: v1.NodeSelectorOpIn, Values: []string{"pv3", "v4"}},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: nodeAffinitySignerResult{
+				Required: []string{
+					`{"matchExpressions":[{"key":"k2","operator":"In","values":["v1","v2"]}],"matchFields":[{"key":"k1","operator":"In","values":["v3","v4"]}]}`,
+					`{"matchExpressions":[{"key":"kk2","operator":"In","values":["kv1","v2"]},{"key":"kk3","operator":"In","values":["kv3","v4"]}],"matchFields":[{"key":"kk1","operator":"In","values":["kv3","v4"]}]}`,
+				},
+				Preferred: []string{
+					`{"weight":1,"preference":{"matchExpressions":[{"key":"pk2","operator":"In","values":["pv1","v2"]}],"matchFields":[{"key":"pk1","operator":"In","values":["pv3","v4"]}]}}`,
+					`{"weight":3,"preference":{"matchExpressions":[{"key":"ppk2","operator":"In","values":["ppv1","v2"]}],"matchFields":[{"key":"ppk1","operator":"In","values":["ppv3","v4"]}]}}`,
+				},
+			},
+			expectedErr: nil,
+		},
+	}
+
+	for _, tt := range table {
+		t.Run(tt.name, func(t *testing.T) {
+			res, err := NodeAffinitySigner(tt.input)
+			if err != tt.expectedErr {
+				t.Fatalf("unexpected error %v, expected %v", err, tt.expectedErr)
+			}
+			if diff := cmp.Diff(res, tt.expected); diff != "" {
+				t.Fatalf("unexpected result %s", diff)
 			}
 		})
 	}

@@ -3520,7 +3520,7 @@ func TestPodTopoSignatures(t *testing.T) {
 				t.Fatalf("Expected success, got error")
 			}
 
-			signature, status := p.SignPod(ctx, test.pod, state)
+			signature, status := p.SignPod(ctx, test.pod)
 
 			if !status.IsSuccess() && test.scheduleable {
 				t.Fatalf("Expected success, got %v", status)

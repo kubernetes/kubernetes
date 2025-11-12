@@ -65,7 +65,7 @@ func (pl *NodePorts) Name() string {
 }
 
 // NodePort feasibility and scheduling is based on the host ports for the containers.
-func (pl *NodePorts) SignPod(ctx context.Context, pod *v1.Pod, state fwk.CycleState) ([]fwk.SignFragment, *fwk.Status) {
+func (pl *NodePorts) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
 	return []fwk.SignFragment{
 		{Key: fwk.HostPortsSignerName, Value: fwk.HostPortsSigner(pod)},
 	}, nil

@@ -57,10 +57,10 @@ const (
 	maxBatchAge = 500 * time.Millisecond
 )
 
-type SignatureFunc func(h fwk.Handle, ctx context.Context, p *v1.Pod, state fwk.CycleState) fwk.PodSignature
+type SignatureFunc func(h fwk.Handle, ctx context.Context, p *v1.Pod) fwk.PodSignature
 
-func signUsingFramework(h fwk.Handle, ctx context.Context, p *v1.Pod, state fwk.CycleState) fwk.PodSignature {
-	return h.SignPod(ctx, p, state)
+func signUsingFramework(h fwk.Handle, ctx context.Context, p *v1.Pod) fwk.PodSignature {
+	return h.SignPod(ctx, p)
 }
 
 // Provide a hint for the pod based on filtering an scoring results of previous cycles. Caching works only for consecutive pods
@@ -80,7 +80,7 @@ func (b *OpportunisticBatch) GetNodeHint(ctx context.Context, pod *v1.Pod, state
 		metrics.GetNodeHintDuration.WithLabelValues(hinted, b.handle.ProfileName()).Observe(metrics.SinceInSeconds(startTime))
 	}()
 
-	signature := b.signatureFunc(b.handle, ctx, pod, state)
+	signature := b.signatureFunc(b.handle, ctx, pod)
 
 	nodeInfos := b.handle.SnapshotSharedLister().NodeInfos()
 

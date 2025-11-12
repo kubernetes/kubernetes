@@ -676,7 +676,7 @@ type SignPlugin interface {
 	//   - Error: the signer hits something _unexpected_ and cannot build sign(s). A framework runtime just
 	//     proceeds with scheduling this pod without opportunistic batching optimization like Unschedulable,
 	//     but just report errors to logs.
-	SignPod(ctx context.Context, pod *v1.Pod, cycleState CycleState) ([]SignFragment, *Status)
+	SignPod(ctx context.Context, pod *v1.Pod) ([]SignFragment, *Status)
 }
 
 // Handle provides data and some tools that plugins can use. It is
@@ -758,7 +758,7 @@ type Handle interface {
 	WorkloadManager() WorkloadManager
 
 	// Sign a pod.
-	SignPod(ctx context.Context, pod *v1.Pod, state CycleState) PodSignature
+	SignPod(ctx context.Context, pod *v1.Pod) PodSignature
 }
 
 // Parallelizer helps run scheduling operations in parallel chunks where possible, to improve performance and CPU utilization.

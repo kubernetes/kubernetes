@@ -184,7 +184,7 @@ func getResources(containers []v1.Container) any {
 }
 
 // Filtering and scoring based on the container resources and overheads.
-func (pl *Fit) SignPod(ctx context.Context, pod *v1.Pod, state fwk.CycleState) ([]fwk.SignFragment, *fwk.Status) {
+func (pl *Fit) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
 	opts := ResourceRequestsOptions{
 		EnablePodLevelResources:   pl.enablePodLevelResources,
 		EnableDRAExtendedResource: pl.enableDRAExtendedResource,

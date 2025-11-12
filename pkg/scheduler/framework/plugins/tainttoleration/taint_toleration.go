@@ -58,7 +58,7 @@ func (pl *TaintToleration) Name() string {
 }
 
 // Feasibility and scoring based on the pod's tolerations.
-func (pl *TaintToleration) SignPod(ctx context.Context, pod *v1.Pod, state fwk.CycleState) ([]fwk.SignFragment, *fwk.Status) {
+func (pl *TaintToleration) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
 	return []fwk.SignFragment{
 		{Key: fwk.TolerationsSignerName, Value: fwk.TolerationsSigner(pod)},
 	}, nil

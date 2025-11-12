@@ -53,7 +53,7 @@ func (pl *ImageLocality) Name() string {
 }
 
 // Filtering and scoring based on container image names.
-func (pl *ImageLocality) SignPod(ctx context.Context, pod *v1.Pod, state fwk.CycleState) ([]fwk.SignFragment, *fwk.Status) {
+func (pl *ImageLocality) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
 	nameSet := sets.New[string]()
 
 	containers := []v1.Container{}
