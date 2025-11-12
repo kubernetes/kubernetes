@@ -143,8 +143,13 @@ func (b *OpportunisticBatch) StoreScheduleResults(ctx context.Context, signature
 			sortedNodes:  otherNodes,
 			creationTime: time.Now(),
 		}
-		logger.V(4).Info("OpportunisticBatch set batch information",
+		if loggerV := logger.V(6); loggerV.Enabled() {
+			loggerV.Info("OpportunisticBatch set batch information",
 			"profile", b.handle.ProfileName(), "signature", b.state.signature, "nodes", otherNodes.Len(), "cycleCount", cycleCount)
+		} else {
+			logger.V(4).Info("OpportunisticBatch set batch information",
+			"profile", b.handle.ProfileName(), "nodes", otherNodes.Len(), "cycleCount", cycleCount)
+		}
 	} else {
 		reason := metrics.BatchFlushPodNotBatchable
 		if otherNodes == nil || otherNodes.Len() == 0 {
