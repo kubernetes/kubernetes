@@ -84,6 +84,9 @@ type Manager interface {
 	// and other resource controllers.
 	GetPodTopologyHints(*v1.Pod) map[string][]topologymanager.TopologyHint
 
+	// AllocatePod is called to trigger the allocation of memory to a pod.
+	AllocatePod(pod *v1.Pod, hint topologymanager.TopologyHint) error
+
 	// GetMemoryNUMANodes provides NUMA nodes that are used to allocate the container memory
 	GetMemoryNUMANodes(logger klog.Logger, pod *v1.Pod, container *v1.Container) sets.Set[int]
 
@@ -271,6 +274,21 @@ func (m *manager) Allocate(pod *v1.Pod, container *v1.Container) error {
 	// Call down into the policy to assign this container memory if required.
 	if err := m.policy.Allocate(logger, m.state, pod, container); err != nil {
 		logger.Error(err, "Allocate error", "pod", klog.KObj(pod), "containerName", container.Name)
+		return err
+	}
+	return nil
+}
+
+func (m *manager) AllocatePod(pod *v1.Pod, hint topologymanager.TopologyHint) error {
+	logger := klog.TODO() // until we move topology manager to contextual logging
+
+	m.removeStaleState(logger)
+
+	m.Lock()
+	defer m.Unlock()
+
+	// Call down into the policy to assign this container memory if required.
+	if err := m.policy.AllocatePod(logger, m.state, pod, hint); err != nil {
 		return err
 	}
 	return nil

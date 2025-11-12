@@ -45,6 +45,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
+	resourcehelper "k8s.io/component-helpers/resource"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	pluginwatcherapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
@@ -419,6 +420,21 @@ func (cm *containerManagerImpl) PodHasExclusiveCPUs(pod *v1.Pod) bool {
 }
 
 func (cm *containerManagerImpl) ContainerHasExclusiveCPUs(pod *v1.Pod, container *v1.Container) bool {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResourceManagers) && resourcehelper.IsPodLevelResourcesSet(pod) {
+		// With pod-level resource management, a container is considered to have exclusive CPUs
+		// if it is in a Guaranteed pod, requests an integer number of CPUs and specifies an
+		// equal request and limit amout for both CPU and memory.
+		// The check for an assigned cpuset is still necessary to handle cases where the
+		// pod is not managed by the static policy.
+		// This specific pod-level resources check is required to disable CPU quota for containers
+		// that have an exclusive CPU set assigned and are not part of the pod shared CPU set pool.
+		if cpumanager.ResourcesQualifyForExclusiveCPUs(container) && containerHasExclusiveCPUs(cm.cpuManager, pod, container) {
+			klog.V(4).InfoS("Container has pinned cpus", "podName", pod.Name, "containerName", container.Name)
+			return true
+		}
+		return false
+	}
+
 	return containerHasExclusiveCPUs(cm.cpuManager, pod, container)
 }
 
