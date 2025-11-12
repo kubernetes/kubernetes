@@ -347,7 +347,28 @@ func (m *manager) UpdatePodStatus(ctx context.Context, pod *v1.Pod, podStatus *v
 		} else {
 			// The check whether there is a probe which hasn't run yet.
 			w, exists := m.getWorker(pod.UID, c.Name, readiness)
-			ready = !exists // no readinessProbe -> always ready
+
+			// For containers without readiness probe, check startup probe status
+			// Don't mark ready if startup probe hasn't succeeded yet
+			if !exists {
+				// No readiness probe configured
+				if _, startupExists := m.getWorker(pod.UID, c.Name, startup); startupExists {
+					// Has startup probe - check if it has succeeded
+					if startupResult, startupOk := m.startupManager.Get(kubecontainer.ParseContainerID(c.ContainerID)); startupOk {
+						// Startup probe has run - only ready if it succeeded
+						ready = startupResult == results.Success
+					} else {
+						// Startup probe hasn't run yet - not ready
+						ready = false
+					}
+				} else {
+					// No startup probe either - always ready (original behavior)
+					ready = true
+				}
+			} else {
+				// Has readiness probe but hasn't run yet - not ready
+				ready = false
+			}
 			if exists {
 				// Trigger an immediate run of the readinessProbe to update ready state
 				select {
@@ -402,7 +423,28 @@ func (m *manager) UpdatePodStatus(ctx context.Context, pod *v1.Pod, podStatus *v
 		} else {
 			// The check whether there is a probe which hasn't run yet.
 			w, exists := m.getWorker(pod.UID, c.Name, readiness)
-			ready = !exists // no readinessProbe -> always ready
+
+			// For containers without readiness probe, check startup probe status
+			// Don't mark ready if startup probe hasn't succeeded yet
+			if !exists {
+				// No readiness probe configured
+				if _, startupExists := m.getWorker(pod.UID, c.Name, startup); startupExists {
+					// Has startup probe - check if it has succeeded
+					if startupResult, startupOk := m.startupManager.Get(kubecontainer.ParseContainerID(c.ContainerID)); startupOk {
+						// Startup probe has run - only ready if it succeeded
+						ready = startupResult == results.Success
+					} else {
+						// Startup probe hasn't run yet - not ready
+						ready = false
+					}
+				} else {
+					// No startup probe either - always ready (original behavior)
+					ready = true
+				}
+			} else {
+				// Has readiness probe but hasn't run yet - not ready
+				ready = false
+			}
 			if exists {
 				// Trigger an immediate run of the readinessProbe to update ready state
 				select {
