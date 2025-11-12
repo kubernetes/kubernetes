@@ -19,7 +19,6 @@ package noderesources
 import (
 	"context"
 	"fmt"
-	"sort"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
@@ -168,19 +167,6 @@ func getPreScoreState(cycleState fwk.CycleState) (*preScoreState, error) {
 // Name returns name of the plugin. It is used in logs, etc.
 func (f *Fit) Name() string {
 	return Name
-}
-
-func getResources(containers []v1.Container) any {
-	ret := []v1.ResourceList{}
-	for _, c := range containers {
-		ret = append(ret, c.Resources.Requests)
-	}
-	sort.Slice(ret, func(i, j int) bool {
-		val1 := ret[i][v1.ResourceCPU]
-		val2 := ret[j][v1.ResourceCPU]
-		return val1.Cmp(val2) <= 0
-	})
-	return ret
 }
 
 // Filtering and scoring based on the container resources and overheads.

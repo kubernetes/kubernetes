@@ -788,6 +788,7 @@ func (f *frameworkImpl) computeBatchablePlugins() {
 		if _, found := plugins[pl.Name()]; !found {
 			if _, implements := pl.(fwk.SignPlugin); implements {
 				f.batchablePlugins = append(f.batchablePlugins, pl.(fwk.SignPlugin))
+				plugins[pl.Name()] = pl.(fwk.SignPlugin)
 			} else {
 				unsupportedPlugins.Insert(pl.Name())
 				f.enableSignatures = false
@@ -799,15 +800,11 @@ func (f *frameworkImpl) computeBatchablePlugins() {
 		f.logger.Info("Disabling signatures for profile because plugins do not support it.",
 			"profile", f.profileName, "plugins", unsupportedPlugins.UnsortedList())
 	}
-
-	for _, plugin := range plugins {
-		f.batchablePlugins = append(f.batchablePlugins, plugin)
-	}
 }
 
 // SignPod returns a signature for a given pod. Any two pods with the same signature should get
 // the same feasibility and scoring for the same set of nodes in the same state. If one or more plugins
-// is unable to construct a signature for the pod, the result will be equal to fwk.Unsignable, which means
+// is unable to construct a signature for the pod, the result will be nil, which means
 // there is no way to compare this pod against others, and will turn off a number of optimizations
 // for this pod.
 func (f *frameworkImpl) SignPod(ctx context.Context, pod *v1.Pod, recordPluginStats bool) fwk.PodSignature {

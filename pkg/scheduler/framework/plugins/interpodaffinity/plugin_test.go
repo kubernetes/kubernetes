@@ -265,7 +265,7 @@ func TestPodAffinitySignature(t *testing.T) {
 		name              string
 		pod               *v1.Pod
 		expectedSignature []fwk.SignFragment
-		scheduleable      bool
+		schedulable       bool
 		config            config.InterPodAffinityArgs
 	}{
 		{
@@ -282,7 +282,7 @@ func TestPodAffinitySignature(t *testing.T) {
 					Value: map[string]string{"foo": "bar"},
 				},
 			},
-			scheduleable: true,
+			schedulable: true,
 		},
 		{
 			name: "no affinity, ignore setting set",
@@ -292,7 +292,7 @@ func TestPodAffinitySignature(t *testing.T) {
 				},
 				Spec: v1.PodSpec{},
 			},
-			scheduleable: true,
+			schedulable: true,
 			config: config.InterPodAffinityArgs{
 				IgnorePreferredTermsOfExistingPods: true,
 			},
@@ -313,7 +313,7 @@ func TestPodAffinitySignature(t *testing.T) {
 					},
 				},
 			},
-			scheduleable: false,
+			schedulable: false,
 		},
 	}
 
@@ -328,7 +328,7 @@ func TestPodAffinitySignature(t *testing.T) {
 			p := pl.(*InterPodAffinity)
 			signature, status := p.SignPod(ctx, test.pod)
 
-			if !status.IsSuccess() && test.scheduleable {
+			if !status.IsSuccess() && test.schedulable {
 				t.Fatalf("Expected success, got %v", status)
 			}
 
