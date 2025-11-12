@@ -2808,6 +2808,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 
 	}
 
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
 	for desc, test := range map[string]struct {
 		setupFn                 func(*v1.Pod)
 		getExpectedPodActionsFn func(*v1.Pod, *kubecontainer.PodStatus) *podActions
@@ -4484,6 +4485,7 @@ func TestIsPodResizeInProgress(t *testing.T) {
 		unstarted               bool // Whether the container is missing from the pod status
 	}
 
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
 	type testPLR struct {
 		allocated testResources
 		actuated  *testResources

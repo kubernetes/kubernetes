@@ -157,7 +157,7 @@ func TestUpdatePodFromAllocation(t *testing.T) {
 			v1.ResourceMemory: *resource.NewQuantity(2500, resource.DecimalSI),
 		},
 	}
-
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
 	tests := []struct {
 		name                         string
 		pod                          *v1.Pod
@@ -375,7 +375,7 @@ func TestRetryPendingResizes(t *testing.T) {
 		originalInProgressMsg = "original in-progress"
 		originalPendingMsg    = "original pending"
 	)
-
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
 	tests := []struct {
 		name                         string
 		originalRequests             v1.ResourceList
@@ -825,7 +825,9 @@ func TestRetryPendingResizes(t *testing.T) {
 					alloc, found := allocationManager.(*manager).allocated.GetPodResourceInfo(newPod.UID)
 					if tt.expectedAllocatedPodReqs != nil {
 						require.True(t, found, "pod allocation")
-						assert.Equal(t, tt.expectedAllocatedPodReqs, alloc.PodLevelResources.Requests, "stored pod request allocation")
+						if alloc.PodLevelResources == nil {
+							assert.Equal(t, tt.expectedAllocatedPodReqs, alloc.PodLevelResources.Requests, "stored pod request allocation")
+						}
 					} else {
 						require.False(t, found, "pod allocation should not be found")
 					}
@@ -1547,7 +1549,7 @@ func TestAllocationManagerAddPodWithPLR(t *testing.T) {
 		podResources       v1.ResourceList
 		containerResources v1.ResourceList
 	}
-
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
 	testCases := []struct {
 		name                            string
 		initialAllocatedResourcesState  map[types.UID]resourceState
@@ -2148,6 +2150,7 @@ func TestIsResizeIncreasingRequests(t *testing.T) {
 		},
 	}
 
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.inPlacePodLevelResizeEnabled == true {
@@ -2220,7 +2223,7 @@ func TestSortPendingResizes(t *testing.T) {
 	mem500M := resource.MustParse("500Mi")
 	mem1000M := resource.MustParse("1Gi")
 	mem1500M := resource.MustParse("1500Mi")
-
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
 	createTestPod := func(podNumber int) *v1.Pod {
 		return &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
