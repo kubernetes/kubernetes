@@ -135,10 +135,7 @@ func (pl *NodeDeclaredFeatures) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk
 	if err != nil {
 		return nil, fwk.AsStatus(err)
 	}
-	featuresList := fs.UnsortedList()
-	sort.Slice(featuresList, func(i, j int) bool {
-		return featuresList[i] < featuresList[j]
-	})
+	featuresList := fs.List()
 	return []fwk.SignFragment{
 		{Key: fwk.FeaturesSignerName, Value: featuresList},
 	}, nil
