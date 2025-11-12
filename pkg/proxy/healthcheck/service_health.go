@@ -159,7 +159,7 @@ type hcInstance struct {
 	endpoints int // number of local endpoints for a service
 }
 
-// listenAll opens health check port on all the addresses provided
+// listenAndServeAll opens health check port on all the addresses provided
 func (hcI *hcInstance) listenAndServeAll(hcs *server) error {
 	var err error
 	var listener net.Listener

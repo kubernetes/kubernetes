@@ -2671,7 +2671,7 @@ type ctnAttribute struct {
 	restartPolicy *v1.ContainerRestartPolicy
 }
 
-// makeCPUMangerPod returns a pod with the provided ctnAttributes.
+// makeCPUManagerPod returns a pod with the provided ctnAttributes.
 func makeCPUManagerPod(podName string, ctnAttributes []ctnAttribute) *v1.Pod {
 	var containers []v1.Container
 	for _, ctnAttr := range ctnAttributes {
@@ -2739,7 +2739,7 @@ func makeCPUManagerPod(podName string, ctnAttributes []ctnAttribute) *v1.Pod {
 	}
 }
 
-// makeCPUMangerInitContainersPod returns a pod with init containers with the
+// makeCPUManagerInitContainersPod returns a pod with init containers with the
 // provided ctnAttributes.
 func makeCPUManagerInitContainersPod(podName string, ctnAttributes []ctnAttribute) *v1.Pod {
 	var containers []v1.Container

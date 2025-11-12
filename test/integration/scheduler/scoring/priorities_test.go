@@ -926,7 +926,7 @@ func TestImageLocalityScoring(t *testing.T) {
 	}
 }
 
-// makeContainerWithImage returns a list of v1.Container objects for each given image. Duplicates of an image are ignored,
+// makeContainersWithImages returns a list of v1.Container objects for each given image. Duplicates of an image are ignored,
 // i.e., each image is used only once.
 func makeContainersWithImages(images []string) []v1.Container {
 	var containers []v1.Container

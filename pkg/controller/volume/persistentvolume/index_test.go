@@ -471,7 +471,7 @@ func TestFindingVolumeWithDifferentAccessModes(t *testing.T) {
 	}
 }
 
-// createVolumeNodeAffinity returns a VolumeNodeAffinity for given key and value.
+// createNodeAffinity returns a VolumeNodeAffinity for given key and value.
 func createNodeAffinity(key string, value string) *v1.VolumeNodeAffinity {
 	return &v1.VolumeNodeAffinity{
 		Required: &v1.NodeSelector{

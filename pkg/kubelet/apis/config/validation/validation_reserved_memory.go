@@ -24,7 +24,7 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 )
 
-// validateReservedMemory validates the reserved memory configuration and returns an error if it is invalid.
+// validateReservedMemoryConfiguration validates the reserved memory configuration and returns an error if it is invalid.
 func validateReservedMemoryConfiguration(kc *kubeletconfig.KubeletConfiguration) []error {
 	if len(kc.ReservedMemory) == 0 {
 		return nil

@@ -135,7 +135,7 @@ func (p *exampleHandler) DecreasePluginCount(pluginName string) (old int, ok boo
 	return v, ok
 }
 
-// Dial establishes the gRPC communication with the picked up plugin socket. https://godoc.org/google.golang.org/grpc#Dial
+// dial establishes the gRPC communication with the picked up plugin socket. https://godoc.org/google.golang.org/grpc#Dial
 func dial(ctx context.Context, unixSocketPath string, timeout time.Duration) (registerapi.RegistrationClient, *grpc.ClientConn, error) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()

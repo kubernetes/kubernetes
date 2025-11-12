@@ -301,7 +301,7 @@ func (m *kubeGenericRuntimeManager) getKubeletSandboxes(ctx context.Context, all
 	return resp, nil
 }
 
-// determinePodSandboxIP determines the IP addresses of the given pod sandbox.
+// determinePodSandboxIPs determines the IP addresses of the given pod sandbox.
 func (m *kubeGenericRuntimeManager) determinePodSandboxIPs(ctx context.Context, podNamespace, podName string, podSandbox *runtimeapi.PodSandboxStatus) []string {
 	logger := klog.FromContext(ctx)
 	podIPs := make([]string, 0)

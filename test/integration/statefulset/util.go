@@ -55,7 +55,7 @@ func labelMap() map[string]string {
 	return map[string]string{"foo": "bar"}
 }
 
-// newService returns a service with a fake name for StatefulSet to be created soon
+// newHeadlessService returns a service with a fake name for StatefulSet to be created soon
 func newHeadlessService(namespace string) *v1.Service {
 	return &v1.Service{
 		TypeMeta: metav1.TypeMeta{

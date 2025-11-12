@@ -78,7 +78,7 @@ var _ = SIGDescribe(feature.CloudProvider, framework.WithDisruptive(), "Nodes", 
 	})
 })
 
-// DeleteNodeOnCloudProvider deletes the specified node.
+// deleteNodeOnCloudProvider deletes the specified node.
 func deleteNodeOnCloudProvider(node *v1.Node) error {
 	return framework.TestContext.CloudConfig.Provider.DeleteNode(node)
 }

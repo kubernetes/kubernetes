@@ -42,7 +42,7 @@ type containerGC struct {
 	tracer           trace.Tracer
 }
 
-// NewContainerGC creates a new containerGC.
+// newContainerGC creates a new containerGC.
 func newContainerGC(client internalapi.RuntimeService, podStateProvider podStateProvider, manager *kubeGenericRuntimeManager, tracer trace.Tracer) *containerGC {
 	return &containerGC{
 		client:           client,

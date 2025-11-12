@@ -235,7 +235,7 @@ func SSH(ctx context.Context, cmd, host, provider string) (Result, error) {
 	return result, err
 }
 
-// runSSHCommandViaBastion returns the stdout, stderr, and exit code from running cmd on
+// runSSHCommand returns the stdout, stderr, and exit code from running cmd on
 // host as specific user, along with any SSH-level error.
 func runSSHCommand(ctx context.Context, cmd, user, host string, signer ssh.Signer) (string, string, int, error) {
 	if user == "" {

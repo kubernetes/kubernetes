@@ -159,7 +159,7 @@ func ValidateVolumeAttachmentV1(volumeAttachment *storage.VolumeAttachment) fiel
 	return allErrs
 }
 
-// ValidateVolumeAttachmentSpec tests that the specified VolumeAttachmentSpec
+// validateVolumeAttachmentSpec tests that the specified VolumeAttachmentSpec
 // has valid data.
 func validateVolumeAttachmentSpec(
 	spec *storage.VolumeAttachmentSpec, fldPath *field.Path) field.ErrorList {
@@ -179,7 +179,7 @@ func validateAttacher(attacher string, fldPath *field.Path) field.ErrorList {
 	return allErrs
 }
 
-// validateSource tests if the source is valid for VolumeAttachment.
+// validateVolumeAttachmentSource tests if the source is valid for VolumeAttachment.
 func validateVolumeAttachmentSource(source *storage.VolumeAttachmentSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	switch {
@@ -208,7 +208,7 @@ func validateNodeName(nodeName string, fldPath *field.Path) field.ErrorList {
 	return allErrs
 }
 
-// validaVolumeAttachmentStatus tests if volumeAttachmentStatus is valid.
+// validateVolumeAttachmentStatus tests if volumeAttachmentStatus is valid.
 func validateVolumeAttachmentStatus(status *storage.VolumeAttachmentStatus, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, validateAttachmentMetadata(status.AttachmentMetadata, fldPath.Child("attachmentMetadata"))...)
@@ -275,7 +275,7 @@ func validateVolumeBindingMode(mode *storage.VolumeBindingMode, fldPath *field.P
 	return allErrs
 }
 
-// validateAllowedTopology tests that AllowedTopologies specifies valid values.
+// validateAllowedTopologies tests that AllowedTopologies specifies valid values.
 func validateAllowedTopologies(topologies []api.TopologySelectorTerm, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
@@ -338,7 +338,7 @@ func ValidateCSINodeUpdate(new, old *storage.CSINode, validationOpts CSINodeVali
 	return allErrs
 }
 
-// ValidateCSINodeSpec tests that the specified CSINodeSpec has valid data.
+// validateCSINodeSpec tests that the specified CSINodeSpec has valid data.
 func validateCSINodeSpec(
 	spec *storage.CSINodeSpec, fldPath *field.Path, validationOpts CSINodeValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -443,7 +443,7 @@ func ValidateCSIDriverUpdate(new, old *storage.CSIDriver) field.ErrorList {
 	return allErrs
 }
 
-// ValidateCSIDriverSpec tests that the specified CSIDriverSpec
+// validateCSIDriverSpec tests that the specified CSIDriverSpec
 // has valid data.
 func validateCSIDriverSpec(
 	spec *storage.CSIDriverSpec, fldPath *field.Path) field.ErrorList {
@@ -573,7 +573,7 @@ func validateSELinuxMount(seLinuxMount *bool, fldPath *field.Path) field.ErrorLi
 	return allErrs
 }
 
-// validvalidateServiceAccountTokenInSecrets validates serviceAccountTokenInSecrets and its relation to tokenRequests.
+// validateServiceAccountTokenInSecrets validates serviceAccountTokenInSecrets and its relation to tokenRequests.
 func validateServiceAccountTokenInSecrets(serviceAccountTokenInSecrets *bool, tokenRequests []storage.TokenRequest, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if serviceAccountTokenInSecrets != nil && len(tokenRequests) == 0 {

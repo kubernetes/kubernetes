@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
 
-// serviceAccountTokenController is special because it must run first to set up permissions for other controllers.
+// newServiceAccountTokenControllerDescriptor is special because it must run first to set up permissions for other controllers.
 // It cannot use the "normal" client builder, so it tracks its own.
 func newServiceAccountTokenControllerDescriptor(rootClientBuilder clientbuilder.ControllerClientBuilder) *ControllerDescriptor {
 	return &ControllerDescriptor{

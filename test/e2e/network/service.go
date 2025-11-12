@@ -162,7 +162,7 @@ func affinityCheckFromTest(ctx context.Context, cs clientset.Interface, serviceI
 	return interval, timeout, getHosts
 }
 
-// CheckAffinity function tests whether the service affinity works as expected.
+// checkAffinity function tests whether the service affinity works as expected.
 // If affinity is expected, the test will return true once affinityConfirmCount
 // number of same response observed in a row. If affinity is not expected, the
 // test will keep observe until different responses observed. The function will

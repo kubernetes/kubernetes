@@ -75,7 +75,7 @@ func newClaimInfoFromClaim(claim *resourceapi.ResourceClaim) (*ClaimInfo, error)
 	return info, nil
 }
 
-// newClaimInfoFromClaim creates a new claim info from a checkpointed claim info state object.
+// newClaimInfoFromState creates a new claim info from a checkpointed claim info state object.
 func newClaimInfoFromState(state *state.ClaimInfoState) *ClaimInfo {
 	info := &ClaimInfo{
 		ClaimInfoState: *state.DeepCopy(),

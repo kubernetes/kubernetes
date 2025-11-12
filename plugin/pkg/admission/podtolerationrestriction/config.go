@@ -37,7 +37,7 @@ func init() {
 	install.Install(scheme)
 }
 
-// LoadConfiguration loads the provided configuration.
+// loadConfiguration loads the provided configuration.
 func loadConfiguration(config io.Reader) (*internalapi.Configuration, error) {
 	// if no config is provided, return a default configuration
 	if config == nil {

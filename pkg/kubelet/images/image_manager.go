@@ -144,7 +144,7 @@ func (m *imageManager) logIt(objRef *v1.ObjectReference, eventtype, event, prefi
 	}
 }
 
-// imageNotPresentOnNeverPolicy error is a utility function that emits an event about
+// imageNotPresentOnNeverPolicyError error is a utility function that emits an event about
 // an image not being present and returns the appropriate error to be passed on.
 //
 // Called in 2 scenarios:

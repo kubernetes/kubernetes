@@ -308,7 +308,7 @@ func (ex *ExamplePlugin) getUnprepareResourcesFailure() error {
 	return ex.unprepareResourcesFailure
 }
 
-// NodePrepareResource ensures that the CDI file(s) (one per request) for the claim exists. It uses
+// nodePrepareResource ensures that the CDI file(s) (one per request) for the claim exists. It uses
 // a deterministic name to simplify NodeUnprepareResource (no need to remember
 // or discover the name) and idempotency (when called again, the file simply
 // gets written again).
@@ -453,7 +453,7 @@ func (ex *ExamplePlugin) PrepareResourceClaims(ctx context.Context, claims []*re
 	return result, nil
 }
 
-// NodeUnprepareResource removes the CDI file created by
+// nodeUnprepareResource removes the CDI file created by
 // NodePrepareResource. It's idempotent, therefore it is not an error when that
 // file is already gone.
 func (ex *ExamplePlugin) nodeUnprepareResource(ctx context.Context, claimRef kubeletplugin.NamespacedObject) error {

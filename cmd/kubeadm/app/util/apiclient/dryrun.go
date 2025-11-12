@@ -165,7 +165,7 @@ func (d *DryRun) FakeClient() clientset.Interface {
 	return d.fakeClient
 }
 
-// addRectors is by default called by NewDryRun after creating the fake client.
+// addReactors is by default called by NewDryRun after creating the fake client.
 // It prepends a set of reactors before the default fake client reactor.
 func (d *DryRun) addReactors() {
 	reactors := []testing.Reactor{

@@ -1361,7 +1361,7 @@ func (m *manager) recordPendingResizeCount() {
 	}
 }
 
-// recordInProgressResize sets the in-progress resize metric.
+// recordInProgressResizeCount sets the in-progress resize metric.
 func (m *manager) recordInProgressResizeCount() {
 	inProgressResizeCount := 0
 	for _, conditions := range m.podResizeConditions {

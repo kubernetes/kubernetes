@@ -371,7 +371,7 @@ func (c *PodClient) PodIsReady(ctx context.Context, name string) bool {
 	return podutils.IsPodReady(pod)
 }
 
-// RemoveString returns a newly created []string that contains all items from slice
+// removeString returns a newly created []string that contains all items from slice
 // that are not equal to s.
 // This code is taken from k/k/pkg/util/slice/slice.go to remove
 // e2e/framework/pod -> k/k/pkg/util/slice dependency.

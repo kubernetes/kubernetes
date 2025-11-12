@@ -161,7 +161,7 @@ func (kl *Kubelet) getPodDir(podUID types.UID) string {
 	return filepath.Join(kl.getPodsDir(), string(podUID))
 }
 
-// getPodVolumesSubpathsDir returns the full path to the per-pod subpaths directory under
+// getPodVolumeSubpathsDir returns the full path to the per-pod subpaths directory under
 // which subpath volumes are created for the specified pod.  This directory may not
 // exist if the pod does not exist or subpaths are not specified.
 func (kl *Kubelet) getPodVolumeSubpathsDir(podUID types.UID) string {
@@ -216,7 +216,7 @@ func (kl *Kubelet) getPodContainerDir(podUID types.UID, ctrName string) string {
 	return filepath.Join(kl.getPodDir(podUID), kubeletconfig.DefaultKubeletContainersDirName, ctrName)
 }
 
-// getPodResourcesSocket returns the full path to the directory containing the pod resources socket
+// getPodResourcesDir returns the full path to the directory containing the pod resources socket
 func (kl *Kubelet) getPodResourcesDir() string {
 	return filepath.Join(kl.getRootDir(), kubeletconfig.DefaultKubeletPodResourcesDirName)
 }
@@ -466,7 +466,7 @@ func (kl *Kubelet) setCachedMachineInfo(info *cadvisorapiv1.MachineInfo) {
 	kl.machineInfo = info
 }
 
-// getLastStableNodeAddresses returns the last observed node addresses.
+// getLastObservedNodeAddresses returns the last observed node addresses.
 func (kl *Kubelet) getLastObservedNodeAddresses() []v1.NodeAddress {
 	node, err := kl.GetNode()
 	if err != nil || node == nil {

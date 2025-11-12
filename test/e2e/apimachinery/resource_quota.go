@@ -2237,7 +2237,7 @@ func newTestPodForQuotaWithPriority(f *framework.Framework, name string, request
 	}
 }
 
-// newTestPodForQuota returns a pod that has the specified requests and limits
+// newTestPodWithAffinityForQuota returns a pod that has the specified requests and limits
 func newTestPodWithAffinityForQuota(f *framework.Framework, name string, affinity *v1.Affinity) *v1.Pod {
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{

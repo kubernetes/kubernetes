@@ -350,7 +350,7 @@ func hostnameHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, getHostName())
 }
 
-// healthHandler response with a 200 if the UDP server is ready. It also serves
+// healthzHandler response with a 200 if the UDP server is ready. It also serves
 // as a health check of the HTTP server by virtue of being a HTTP handler.
 func healthzHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("GET /healthz")

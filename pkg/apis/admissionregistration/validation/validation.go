@@ -588,7 +588,7 @@ func validatingHasAcceptedAdmissionReviewVersions(webhooks []admissionregistrati
 	return true
 }
 
-// ignoreMatchConditions returns false if any change to match conditions
+// ignoreMutatingWebhookMatchConditions returns false if any change to match conditions
 func ignoreMutatingWebhookMatchConditions(new, old []admissionregistration.MutatingWebhook) bool {
 	if len(new) != len(old) {
 		return false
@@ -602,7 +602,7 @@ func ignoreMutatingWebhookMatchConditions(new, old []admissionregistration.Mutat
 	return true
 }
 
-// ignoreMatchConditions returns true if any new expressions are added
+// ignoreValidatingWebhookMatchConditions returns true if any new expressions are added
 func ignoreValidatingWebhookMatchConditions(new, old []admissionregistration.ValidatingWebhook) bool {
 	if len(new) != len(old) {
 		return false
@@ -682,7 +682,7 @@ func validatingHasNoSideEffects(webhooks []admissionregistration.ValidatingWebho
 	return true
 }
 
-// validatingWebhookAllowInvalidLabelValueInSelector returns true if all webhooksallow invalid label value in selector
+// validatingWebhookHasInvalidLabelValueInSelector returns true if all webhooksallow invalid label value in selector
 func validatingWebhookHasInvalidLabelValueInSelector(webhooks []admissionregistration.ValidatingWebhook) bool {
 	labelSelectorValidationOpts := metav1validation.LabelSelectorValidationOptions{
 		AllowInvalidLabelValueInSelector: false,
@@ -703,7 +703,7 @@ func validatingWebhookHasInvalidLabelValueInSelector(webhooks []admissionregistr
 	return false
 }
 
-// mutatingWebhookAllowInvalidLabelValueInSelector returns true if all webhooks allow invalid label value in selector
+// mutatingWebhookHasInvalidLabelValueInSelector returns true if all webhooks allow invalid label value in selector
 func mutatingWebhookHasInvalidLabelValueInSelector(webhooks []admissionregistration.MutatingWebhook) bool {
 	labelSelectorValidationOpts := metav1validation.LabelSelectorValidationOptions{
 		AllowInvalidLabelValueInSelector: false,

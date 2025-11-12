@@ -147,7 +147,7 @@ func (r *RestartDaemonConfig) kill(ctx context.Context) {
 	framework.ExpectNoError(err)
 }
 
-// Restart checks if the daemon is up, kills it, and waits till it comes back up
+// restart checks if the daemon is up, kills it, and waits till it comes back up
 func (r *RestartDaemonConfig) restart(ctx context.Context) {
 	r.waitUp(ctx)
 	r.kill(ctx)

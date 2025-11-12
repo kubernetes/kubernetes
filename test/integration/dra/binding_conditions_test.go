@@ -51,7 +51,7 @@ func testDeviceBindingConditions(tCtx ktesting.TContext, enabled bool) {
 	}
 }
 
-// testBindingConditionsBasicFlow tests scheduling with mixed devices: one with BindingConditions, one without.
+// testDeviceBindingConditionsBasicFlow tests scheduling with mixed devices: one with BindingConditions, one without.
 // It verifies that the scheduler prioritizes the device without BindingConditions for the first pod.
 // The second pod then uses the device with BindingConditions. The test checks that the scheduler retries
 // after an initial binding failure of the second pod, ensuring successful scheduling after rescheduling.
@@ -221,7 +221,7 @@ func testDeviceBindingConditionsBasicFlow(tCtx ktesting.TContext, enabled bool) 
 	waitForPodScheduled(tCtx, namespace, pod.Name)
 }
 
-// testBindingFailureReschedule verifies scheduling behavior when device preparation fails on a node.
+// testDeviceBindingFailureConditionsReschedule verifies scheduling behavior when device preparation fails on a node.
 // It tests that a BindingFailure is written, and the scheduler successfully reschedules the pod
 // to a different node where binding succeeds. This ensures that failure recovery via rescheduling works as expected.
 // Device preparation failure is simulated in two ways: by applying DeviceTaints or by removing the device from ResourceSlice.

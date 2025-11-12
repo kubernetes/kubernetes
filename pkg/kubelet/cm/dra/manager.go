@@ -164,7 +164,7 @@ func (m *Manager) Start(ctx context.Context, activePods ActivePodsFunc, getNode 
 	return nil
 }
 
-// initPluginManager can be used instead of Start to make the manager useable
+// initDRAPluginManager can be used instead of Start to make the manager useable
 // for calls to prepare/unprepare. It exists primarily for testing purposes.
 func (m *Manager) initDRAPluginManager(ctx context.Context, getNode GetNodeFunc, wipingDelay time.Duration) {
 	m.draPlugins = draplugin.NewDRAPluginManager(ctx, m.kubeClient, getNode, m, wipingDelay)

@@ -51,7 +51,7 @@ type uidTrackingExpectations struct {
 	store cache.Store
 }
 
-// GetUIDs is a convenience method to avoid exposing the set of expected uids.
+// getSet is a convenience method to avoid exposing the set of expected uids.
 // The returned set is not thread safe, all modifications must be made holding
 // the uidStoreLock.
 func (u *uidTrackingExpectations) getSet(controllerKey string) *uidSet {
@@ -94,7 +94,7 @@ func (u *uidTrackingExpectations) expectFinalizersRemoved(logger klog.Logger, jo
 	return nil
 }
 
-// FinalizerRemovalObserved records the given deleteKey as a deletion, for the given job.
+// finalizerRemovalObserved records the given deleteKey as a deletion, for the given job.
 func (u *uidTrackingExpectations) finalizerRemovalObserved(logger klog.Logger, jobKey string, deleteKey types.UID) {
 	uids := u.getSet(jobKey)
 	if uids != nil {
@@ -117,7 +117,7 @@ func (u *uidTrackingExpectations) deleteExpectations(logger klog.Logger, jobKey 
 	}
 }
 
-// NewUIDTrackingControllerExpectations returns a wrapper around
+// newUIDTrackingExpectations returns a wrapper around
 // ControllerExpectations that is aware of deleteKeys.
 func newUIDTrackingExpectations() *uidTrackingExpectations {
 	return &uidTrackingExpectations{store: cache.NewStore(uidSetKeyFunc)}

@@ -250,7 +250,7 @@ func (ec *ephemeralController) syncHandler(ctx context.Context, key string) erro
 	return nil
 }
 
-// handleEphemeralVolume is invoked for each volume of a pod.
+// handleVolume is invoked for each volume of a pod.
 func (ec *ephemeralController) handleVolume(ctx context.Context, pod *v1.Pod, vol v1.Volume) error {
 	logger := klog.FromContext(ctx)
 	logger.V(5).Info("Ephemeral: checking volume", "volumeName", vol.Name)

@@ -51,7 +51,7 @@ type prober struct {
 	recorder record.EventRecorder
 }
 
-// NewProber creates a Prober, it takes a command runner and
+// newProber creates a Prober, it takes a command runner and
 // several container info managers.
 func newProber(
 	runner kubecontainer.CommandRunner,

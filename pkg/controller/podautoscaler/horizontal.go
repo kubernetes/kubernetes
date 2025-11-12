@@ -1353,7 +1353,7 @@ func calculateScaleUpLimitWithScalingRules(currentReplicas int32, scaleUpEvents,
 	return result
 }
 
-// calculateScaleDownLimitWithBehavior returns the maximum number of pods that could be deleted for the given HPAScalingRules
+// calculateScaleDownLimitWithBehaviors returns the maximum number of pods that could be deleted for the given HPAScalingRules
 func calculateScaleDownLimitWithBehaviors(currentReplicas int32, scaleUpEvents, scaleDownEvents []timestampedScaleEvent, scalingRules *autoscalingv2.HPAScalingRules) int32 {
 	var result int32
 	var proposed int32

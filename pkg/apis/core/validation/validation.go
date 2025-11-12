@@ -502,7 +502,7 @@ func IsMatchedVolume(name string, volumes map[string]core.VolumeSource) bool {
 	return false
 }
 
-// isMatched checks whether the volume with the given name is used by a
+// isMatchedDevice checks whether the volume with the given name is used by a
 // container and if so, if it involves a PVC.
 func isMatchedDevice(name string, volumes map[string]core.VolumeSource) (isMatched bool, isPVC bool) {
 	if source, ok := volumes[name]; ok {
@@ -3783,7 +3783,7 @@ func validateEphemeralContainers(ephemeralContainers []core.EphemeralContainer, 
 	return allErrs
 }
 
-// ValidateFieldAcceptList checks that only allowed fields are set.
+// validateFieldAllowList checks that only allowed fields are set.
 // The value must be a struct (not a pointer to a struct!).
 func validateFieldAllowList(value interface{}, allowedFields map[string]bool, errorText string, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
@@ -5289,7 +5289,7 @@ func ValidateSeccompPodAnnotations(annotations map[string]string, fldPath *field
 	return allErrs
 }
 
-// ValidateSeccompProfileType tests that the argument is a valid SeccompProfileType.
+// validateSeccompProfileType tests that the argument is a valid SeccompProfileType.
 func validateSeccompProfileType(fldPath *field.Path, seccompProfileType core.SeccompProfileType) *field.Error {
 	switch seccompProfileType {
 	case core.SeccompProfileTypeLocalhost, core.SeccompProfileTypeRuntimeDefault, core.SeccompProfileTypeUnconfined:
@@ -6469,7 +6469,7 @@ var supportedServiceIPFamilyPolicy = sets.New(
 	core.IPFamilyPolicyPreferDualStack,
 	core.IPFamilyPolicyRequireDualStack)
 
-// ValidateService tests if required fields/annotations of a Service are valid.
+// validateService tests if required fields/annotations of a Service are valid.
 func validateService(service, oldService *core.Service) field.ErrorList {
 	metaPath := field.NewPath("metadata")
 

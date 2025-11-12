@@ -428,7 +428,7 @@ func (ssc *StatefulSetController) enqueueStatefulSet(logger klog.Logger, obj int
 	ssc.queue.Add(key)
 }
 
-// enqueueStatefulSet enqueues the given statefulset in the work queue after given time
+// enqueueSSAfter enqueues the given statefulset in the work queue after given time
 func (ssc *StatefulSetController) enqueueSSAfter(logger klog.Logger, ss *apps.StatefulSet, duration time.Duration) {
 	key, err := controller.KeyFunc(ss)
 	if err != nil {

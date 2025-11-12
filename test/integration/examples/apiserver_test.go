@@ -270,7 +270,7 @@ func TestFrontProxyConfig(t *testing.T) {
 	})
 }
 
-// TestFrontProxyConfig tests that the RequestHeader configuration is consumed
+// testFrontProxyConfig tests that the RequestHeader configuration is consumed
 // correctly by the aggregated API servers.
 func testFrontProxyConfig(t *testing.T, withUID bool) {
 	const testNamespace = "integration-test-front-proxy-config"

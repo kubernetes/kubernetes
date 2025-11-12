@@ -60,7 +60,7 @@ func main() {
 	}
 }
 
-// MountInChroot is to run mount within chroot with the passing root directory
+// mountInChroot is to run mount within chroot with the passing root directory
 func mountInChroot(rootfsPath string, args []string) error {
 	if _, err := os.Stat(rootfsPath); os.IsNotExist(err) {
 		return fmt.Errorf("path <%s> does not exist", rootfsPath)

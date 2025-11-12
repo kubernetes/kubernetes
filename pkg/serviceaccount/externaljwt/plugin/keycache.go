@@ -53,7 +53,7 @@ func newKeyCache(client externaljwtv1.ExternalJWTSignerClient) *keyCache {
 	return cache
 }
 
-// InitialFill can be used to perform an initial fetch for keys get the
+// initialFill can be used to perform an initial fetch for keys get the
 // refresh interval as recommended by external signer.
 func (p *keyCache) initialFill(ctx context.Context) error {
 	if err := p.syncKeys(ctx); err != nil {

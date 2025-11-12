@@ -349,7 +349,7 @@ func processDirFiles(dirName string, fileAction func(filePath string, fileConten
 	return utilerrors.NewAggregate(walkErrors)
 }
 
-// createKubeletCOnfigSchemeEncoderDecoder creates strict-encoding encoder and
+// createKubeletConfigSchemeEncoderDecoder creates strict-encoding encoder and
 // decoder for the internal and alpha kubelet config APIs.
 func createKubeletConfigSchemeEncoderDecoder() (runtime.Encoder, runtime.Decoder, error) {
 	codecs, info, err := getKubeletConfigSerializerInfo()

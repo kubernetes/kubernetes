@@ -332,7 +332,7 @@ func (c *Controller) isBeingUsed(ctx context.Context, vac *storagev1.VolumeAttri
 	return false
 }
 
-// pvAddedUpdated reacts to vac added/updated events
+// vacAddedUpdated reacts to vac added/updated events
 func (c *Controller) vacAddedUpdated(logger klog.Logger, obj interface{}) {
 	vac, ok := obj.(*storagev1.VolumeAttributesClass)
 	if !ok {

@@ -134,7 +134,7 @@ func (s *preScoreState) Clone() fwk.StateData {
 	return s
 }
 
-// getAllTolerationEffectPreferNoSchedule gets the list of all Tolerations with Effect PreferNoSchedule or with no effect.
+// getAllTolerationPreferNoSchedule gets the list of all Tolerations with Effect PreferNoSchedule or with no effect.
 func getAllTolerationPreferNoSchedule(tolerations []v1.Toleration) (tolerationList []v1.Toleration) {
 	for _, toleration := range tolerations {
 		// Empty effect means all effects which includes PreferNoSchedule, so we need to collect it as well.
@@ -168,7 +168,7 @@ func getPreScoreState(cycleState fwk.CycleState) (*preScoreState, error) {
 	return s, nil
 }
 
-// CountIntolerableTaintsPreferNoSchedule gives the count of intolerable taints of a pod with effect PreferNoSchedule
+// countIntolerableTaintsPreferNoSchedule gives the count of intolerable taints of a pod with effect PreferNoSchedule
 func (pl *TaintToleration) countIntolerableTaintsPreferNoSchedule(logger klog.Logger, taints []v1.Taint, tolerations []v1.Toleration) (intolerableTaints int) {
 	for _, taint := range taints {
 		// check only on taints that have effect PreferNoSchedule

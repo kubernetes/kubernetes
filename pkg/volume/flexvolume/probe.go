@@ -207,7 +207,7 @@ func (prober *flexVolumeProber) handleWatchEvent(event fsnotify.Event) error {
 	return nil
 }
 
-// getExecutableName returns the executableName of a flex plugin
+// getExecutablePathRel returns the executableName of a flex plugin
 func getExecutablePathRel(driverDirName string) string {
 	parts := strings.Split(driverDirName, "~")
 	return filepath.Join(driverDirName, parts[len(parts)-1])

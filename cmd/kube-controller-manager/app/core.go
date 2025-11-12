@@ -961,7 +961,7 @@ func newLegacyServiceAccountTokenCleanerController(ctx context.Context, controll
 	return newControllerLoop(legacySATokenCleaner.Run, controllerName), nil
 }
 
-// processCIDRs is a helper function that works on a comma separated cidrs and returns
+// validateCIDRs is a helper function that works on a comma separated cidrs and returns
 // a list of typed cidrs
 // error if failed to parse any of the cidrs or invalid length of cidrs
 func validateCIDRs(cidrsList string) ([]*net.IPNet, error) {

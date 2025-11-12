@@ -127,7 +127,7 @@ func removeSlice(slices []*discovery.EndpointSlice, sliceToRemove *discovery.End
 	return slices
 }
 
-// toSliceByAddrType returns lists of EndpointSlices grouped by address.
+// toSlicesByAddrType returns lists of EndpointSlices grouped by address.
 func toSlicesByAddrType(slices []*discovery.EndpointSlice) slicesByAddrType {
 	byAddrType := slicesByAddrType{}
 	for _, slice := range slices {

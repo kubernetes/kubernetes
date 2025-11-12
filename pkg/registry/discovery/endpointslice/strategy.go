@@ -139,7 +139,7 @@ func (endpointSliceStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 
-// dropDisabledConditionsOnCreate will drop any fields that are disabled.
+// dropDisabledFieldsOnCreate will drop any fields that are disabled.
 func dropDisabledFieldsOnCreate(endpointSlice *discovery.EndpointSlice) {
 	dropHints := !utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareHints)
 	dropNodeHints := !utilfeature.DefaultFeatureGate.Enabled(features.PreferSameTrafficDistribution)

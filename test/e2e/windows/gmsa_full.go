@@ -226,7 +226,7 @@ func isValidOutput(output string) bool {
 		!strings.Contains(output, "RPC_S_SERVER_UNAVAILABLE")
 }
 
-// findPreconfiguredGmsaNode finds node with the gmsaFullNodeLabel label on it.
+// findPreconfiguredGmsaNodes finds node with the gmsaFullNodeLabel label on it.
 func findPreconfiguredGmsaNodes(ctx context.Context, c clientset.Interface) []v1.Node {
 	nodeOpts := metav1.ListOptions{
 		LabelSelector: gmsaFullNodeLabel,

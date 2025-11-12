@@ -443,7 +443,7 @@ func (mutators *migrateMutators) addEmpty(in []any) {
 	*mutators = append(*mutators, mutator)
 }
 
-// defaultMutators returns the default list of mutators for known configuration objects.
+// defaultMigrateMutators returns the default list of mutators for known configuration objects.
 // TODO: make this function return defaultEmptyMutators() when v1beta3 is removed.
 func defaultMigrateMutators() migrateMutators {
 	var (

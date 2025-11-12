@@ -526,7 +526,7 @@ func (c *csiMountMgr) getFSGroupPolicy() (storage.FSGroupPolicy, error) {
 	return *csiDriver.Spec.FSGroupPolicy, nil
 }
 
-// supportsVolumeMode checks whether the CSI driver supports a volume in the given mode.
+// supportsVolumeLifecycleMode checks whether the CSI driver supports a volume in the given mode.
 // An error indicates that it isn't supported and explains why.
 func (c *csiMountMgr) supportsVolumeLifecycleMode() error {
 	// Retrieve CSIDriver. It's not an error if the driver isn't found

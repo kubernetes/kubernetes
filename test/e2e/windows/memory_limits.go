@@ -216,7 +216,7 @@ func getNodeMemory(ctx context.Context, f *framework.Framework, node v1.Node) no
 	return nodeMem
 }
 
-// getNodeMemory populates a nodeMemory struct with information from the first Windows node
+// getFirstNodeMemory populates a nodeMemory struct with information from the first Windows node
 // that is found in the cluster.
 func getFirstNodeMemory(ctx context.Context, f *framework.Framework) nodeMemory {
 	selector := labels.Set{"kubernetes.io/os": "windows"}.AsSelector()

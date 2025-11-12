@@ -98,7 +98,7 @@ func makeMemoryManagerContainers(ctnCmd string, ctnAttributes []memoryManagerCtn
 	return containers, hugepagesMount
 }
 
-// makeMemoryMangerPod returns a pod with the provided ctnAttributes.
+// makeMemoryManagerPod returns a pod with the provided ctnAttributes.
 func makeMemoryManagerPod(podName string, initCtnAttributes, ctnAttributes []memoryManagerCtnAttributes) *v1.Pod {
 	hugepagesMount := false
 	memsetCmd := "grep Mems_allowed_list /proc/self/status | cut -f2"

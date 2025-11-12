@@ -767,7 +767,7 @@ func cleanupStorageClass(ctx context.Context, config *localTestConfig) {
 	framework.ExpectNoError(config.client.StorageV1().StorageClasses().Delete(ctx, config.scName, metav1.DeleteOptions{}))
 }
 
-// podNode wraps RunKubectl to get node where pod is running
+// podNodeName wraps RunKubectl to get node where pod is running
 func podNodeName(ctx context.Context, config *localTestConfig, pod *v1.Pod) (string, error) {
 	runtimePod, runtimePodErr := config.client.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
 	return runtimePod.Spec.NodeName, runtimePodErr
@@ -1055,7 +1055,7 @@ func setupLocalVolumesPVCsPVs(
 	return testVols
 }
 
-// newLocalClaim creates a new persistent volume claim.
+// newLocalClaimWithName creates a new persistent volume claim.
 func newLocalClaimWithName(config *localTestConfig, name string) *v1.PersistentVolumeClaim {
 	claim := v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{

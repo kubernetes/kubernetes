@@ -141,7 +141,7 @@ func inUseError(err error) bool {
 	return st.Code() == codes.FailedPrecondition
 }
 
-// IsInfeasibleError returns true for grpc errors that are considered terminal in a way
+// isInfeasibleError returns true for grpc errors that are considered terminal in a way
 // that they indicate CSI operation as infeasible.
 // This function returns a subset of final errors. All infeasible errors are also final errors.
 func isInfeasibleError(err error) bool {

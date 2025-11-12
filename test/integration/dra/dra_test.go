@@ -353,7 +353,7 @@ func startScheduler(tCtx ktesting.TContext) {
 	startSchedulerWithConfig(tCtx, "")
 }
 
-// startScheduler starts the scheduler with the given config.
+// startSchedulerWithConfig starts the scheduler with the given config.
 // This may be used only in tests which run sequentially if the config is non-empty.
 func startSchedulerWithConfig(tCtx ktesting.TContext, config string) {
 	tCtx.Helper()

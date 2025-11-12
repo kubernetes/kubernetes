@@ -355,7 +355,7 @@ func addIndexFailureCountAnnotation(logger klog.Logger, template *v1.PodTemplate
 	}
 }
 
-// getNewIndexFailureCount returns the value of the index-failure-count
+// getNewIndexFailureCounts returns the value of the index-failure-count
 // annotation for the new pod being created
 func getNewIndexFailureCounts(logger klog.Logger, job *batch.Job, podBeingReplaced *v1.Pod) (int32, int32) {
 	if podBeingReplaced != nil {

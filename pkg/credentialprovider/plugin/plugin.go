@@ -797,7 +797,7 @@ func parseRegistry(image string) string {
 	return imageParts[0]
 }
 
-// mergedEnvVars overlays system defined env vars with credential provider env vars,
+// mergeEnvVars overlays system defined env vars with credential provider env vars,
 // it gives priority to the credential provider vars allowing user to override system
 // env vars
 func mergeEnvVars(sysEnvVars, credProviderVars []string) []string {

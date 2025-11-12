@@ -406,7 +406,7 @@ func computeEvents(logger klog.Logger, oldPod, newPod *kubecontainer.Pod, cid *k
 	return generateEvents(logger, pid, cid.ID, oldState, newState)
 }
 
-// getPodIP preserves an older cached status' pod IP if the new status has no pod IPs
+// getPodIPs preserves an older cached status' pod IP if the new status has no pod IPs
 // and its sandboxes have exited
 func (g *GenericPLEG) getPodIPs(pid types.UID, status *kubecontainer.PodStatus) []string {
 	if len(status.IPs) != 0 {

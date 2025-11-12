@@ -395,7 +395,7 @@ func (c *Controller) processNextWorkItem(ctx context.Context) bool {
 	return true
 }
 
-// syncHandler is invoked for each pod which might need to be processed.
+// sync is invoked for each pod which might need to be processed.
 // If an error is returned from this function, the pod will be requeued.
 func (c *Controller) sync(ctx context.Context, podRef cache.ObjectName) error {
 	logger := klog.FromContext(ctx)

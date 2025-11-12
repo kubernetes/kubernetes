@@ -479,7 +479,7 @@ func (f *Fit) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1.Pod, oldO
 	return fwk.Queue, nil
 }
 
-// isSchedulableAfterDeviceClassChange is invoked whenever a device class added or changed. It checks whether
+// isSchedulableAfterDeviceClassEvent is invoked whenever a device class added or changed. It checks whether
 // that change could make a previously unschedulable pod schedulable.
 func (f *Fit) isSchedulableAfterDeviceClassEvent(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
 	originalClass, modifiedClass, err := schedutil.As[*resourceapi.DeviceClass](oldObj, newObj)

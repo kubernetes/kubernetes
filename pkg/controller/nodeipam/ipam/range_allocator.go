@@ -207,7 +207,7 @@ func (r *rangeAllocator) runWorker(ctx context.Context) {
 	}
 }
 
-// processNextWorkItem will read a single work item off the queue and
+// processNextNodeWorkItem will read a single work item off the queue and
 // attempt to process it, by calling the syncHandler.
 func (r *rangeAllocator) processNextNodeWorkItem(ctx context.Context) bool {
 	obj, shutdown := r.queue.Get()

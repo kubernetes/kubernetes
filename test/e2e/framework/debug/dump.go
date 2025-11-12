@@ -168,7 +168,7 @@ func getKubeletPods(ctx context.Context, c clientset.Interface, node string) (*v
 	}
 }
 
-// logNodeEvents logs kubelet events from the given node. This includes kubelet
+// getNodeEvents logs kubelet events from the given node. This includes kubelet
 // restart and node unhealthy events. Note that listing events like this will mess
 // with latency metrics, beware of calling it during a test.
 func getNodeEvents(ctx context.Context, c clientset.Interface, nodeName string) []v1.Event {

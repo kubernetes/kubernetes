@@ -274,7 +274,7 @@ func (printer *upgradePlanTextPrinter) PrintObj(obj runtime.Object, writer io.Wr
 	return nil
 }
 
-// printUpgradePlan prints a UX-friendly overview of what versions are available to upgrade to
+// printAvailableUpgrade prints a UX-friendly overview of what versions are available to upgrade to
 func (printer *upgradePlanTextPrinter) printAvailableUpgrade(writer io.Writer, au *outputapiv1alpha3.AvailableUpgrade) error {
 	var kubeVersion string
 	var beforeKubeadmVersion, afterKubeadmVersion string

@@ -155,7 +155,7 @@ func storageMatches(set *apps.StatefulSet, pod *v1.Pod) bool {
 	return true
 }
 
-// getPersistentVolumeClaimPolicy returns the PVC policy for a StatefulSet, returning a retain policy if the set policy is nil.
+// getPersistentVolumeClaimRetentionPolicy returns the PVC policy for a StatefulSet, returning a retain policy if the set policy is nil.
 func getPersistentVolumeClaimRetentionPolicy(set *apps.StatefulSet) apps.StatefulSetPersistentVolumeClaimRetentionPolicy {
 	policy := apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
 		WhenDeleted: apps.RetainPersistentVolumeClaimRetentionPolicyType,

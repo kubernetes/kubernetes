@@ -1713,7 +1713,7 @@ func RunSidecarLivenessTest(ctx context.Context, f *framework.Framework, pod *v1
 	runLivenessTest(ctx, f, pod, expectNumRestarts, timeout, containerName)
 }
 
-// RunLivenessTest verifies the number of restarts for pod with given expected number of restarts
+// runLivenessTest verifies the number of restarts for pod with given expected number of restarts
 func runLivenessTest(ctx context.Context, f *framework.Framework, pod *v1.Pod, expectNumRestarts int, timeout time.Duration, containerName string) {
 	podClient := e2epod.NewPodClient(f)
 	ns := f.Namespace.Name

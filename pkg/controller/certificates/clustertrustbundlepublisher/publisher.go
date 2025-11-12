@@ -212,7 +212,7 @@ func NewAlphaClusterTrustBundlePublisher(
 	)
 }
 
-// NewClusterTrustBundlePublisher creates and maintains a cluster trust bundle object
+// newClusterTrustBundlePublisher creates and maintains a cluster trust bundle object
 // for a signer named `signerName`. The cluster trust bundle object contains the
 // CA from the `caProvider` in its .spec.TrustBundle.
 func newClusterTrustBundlePublisher[T clusterTrustBundle](

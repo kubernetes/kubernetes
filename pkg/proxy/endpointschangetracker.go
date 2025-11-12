@@ -234,21 +234,21 @@ func (em EndpointsMap) Update(ect *EndpointsChangeTracker) UpdateEndpointsMapRes
 	return result
 }
 
-// Merge ensures that the current EndpointsMap contains all <service, endpoints> pairs from the EndpointsMap passed in.
+// merge ensures that the current EndpointsMap contains all <service, endpoints> pairs from the EndpointsMap passed in.
 func (em EndpointsMap) merge(other EndpointsMap) {
 	for svcPortName := range other {
 		em[svcPortName] = other[svcPortName]
 	}
 }
 
-// Unmerge removes the <service, endpoints> pairs from the current EndpointsMap which are contained in the EndpointsMap passed in.
+// unmerge removes the <service, endpoints> pairs from the current EndpointsMap which are contained in the EndpointsMap passed in.
 func (em EndpointsMap) unmerge(other EndpointsMap) {
 	for svcPortName := range other {
 		delete(em, svcPortName)
 	}
 }
 
-// getLocalEndpointIPs returns endpoints IPs if given endpoint is local - local means the endpoint is running in same host as kube-proxy.
+// getLocalReadyEndpointIPs returns endpoints IPs if given endpoint is local - local means the endpoint is running in same host as kube-proxy.
 func (em EndpointsMap) getLocalReadyEndpointIPs() map[types.NamespacedName]sets.Set[string] {
 	localIPs := make(map[types.NamespacedName]sets.Set[string])
 	for svcPortName, epList := range em {

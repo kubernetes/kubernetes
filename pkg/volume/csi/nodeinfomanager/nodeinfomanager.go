@@ -178,7 +178,7 @@ func (nim *nodeInfoManager) updateNode(updateFuncs ...nodeUpdateFunc) error {
 	return nil
 }
 
-// updateNode repeatedly attempts to update the corresponding node object
+// tryUpdateNode repeatedly attempts to update the corresponding node object
 // which is modified by applying the given update functions sequentially.
 // Because updateFuncs are applied sequentially, later updateFuncs should take into account
 // the effects of previous updateFuncs to avoid potential conflicts. For example, if multiple

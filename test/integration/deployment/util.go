@@ -315,7 +315,7 @@ func (d *deploymentTester) waitForDeploymentCompleteAndMarkPodsReady() error {
 	return nil
 }
 
-// waitForDeploymentCompleteAndMarkPodsReadyAndRemoveTerminating waits for the Deployment to complete
+// waitForDeploymentCompleteAndMarkPodsReadyAndRemoveTerminated waits for the Deployment to complete
 // while marking updated Deployment pods as ready and removes terminated pods at the same time.
 func (d *deploymentTester) waitForDeploymentCompleteAndMarkPodsReadyAndRemoveTerminated(ctx context.Context) error {
 	var wg sync.WaitGroup

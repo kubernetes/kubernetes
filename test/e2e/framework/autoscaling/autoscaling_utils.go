@@ -163,7 +163,7 @@ func getSidecarContainer(name string, cpuLimit, memLimit int64) v1.Container {
 }
 
 /*
-NewResourceConsumer creates new ResourceConsumer
+newResourceConsumer creates new ResourceConsumer
 initCPUTotal argument is in millicores
 initMemoryTotal argument is in megabytes
 memLimit argument is in megabytes, memLimit is a maximum amount of memory that can be consumed by a single pod

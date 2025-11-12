@@ -75,7 +75,7 @@ func newKubeManager(framework *framework.Framework, dnsDomain string) *kubeManag
 	}
 }
 
-// initializeCluster initialized the cluster, creating namespaces pods and services as needed.
+// initializeClusterFromModel initialized the cluster, creating namespaces pods and services as needed.
 func (k *kubeManager) initializeClusterFromModel(ctx context.Context, model *Model) error {
 	var createdPods []*v1.Pod
 	for _, ns := range model.Namespaces {
@@ -338,12 +338,12 @@ func getWorkers() int {
 	return 3
 }
 
-// getPollInterval returns the value for which the Prober will wait before attempting next attempt.
+// getPollIntervalSeconds returns the value for which the Prober will wait before attempting next attempt.
 func getPollIntervalSeconds() int {
 	return defaultPollIntervalSeconds
 }
 
-// getPollTimeout returns the timeout for polling on probes, and takes windows heuristics into account, where requests can take longer sometimes.
+// getPollTimeoutSeconds returns the timeout for polling on probes, and takes windows heuristics into account, where requests can take longer sometimes.
 func getPollTimeoutSeconds() int {
 	if framework.NodeOSDistroIs("windows") {
 		return defaultPollTimeoutSeconds * 2

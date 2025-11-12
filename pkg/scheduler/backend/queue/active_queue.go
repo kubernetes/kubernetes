@@ -249,7 +249,7 @@ func (aq *activeQueue) underLock(fn func(unlockedActiveQ unlockedActiveQueuer)) 
 	fn(aq.unlockedQueue)
 }
 
-// underLock runs the fn function under the lock.RLock.
+// underRLock runs the fn function under the lock.RLock.
 // fn can run unlockedActiveQueueReader methods but should NOT run any other activeQueue method,
 // as it would end up in deadlock.
 func (aq *activeQueue) underRLock(fn func(unlockedActiveQ unlockedActiveQueueReader)) {

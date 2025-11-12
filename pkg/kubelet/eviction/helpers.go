@@ -638,7 +638,7 @@ func (ms *multiSorter) Sort(pods []*v1.Pod) {
 	sort.Sort(ms)
 }
 
-// OrderedBy returns a Sorter that sorts using the cmp functions, in order.
+// orderedBy returns a Sorter that sorts using the cmp functions, in order.
 // Call its Sort method to sort the data.
 func orderedBy(cmp ...cmpFunc) *multiSorter {
 	return &multiSorter{

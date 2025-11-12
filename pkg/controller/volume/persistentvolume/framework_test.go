@@ -356,7 +356,7 @@ func newExternalProvisionedVolume(name, capacity, boundToClaimUID, boundToClaimN
 	return &volume
 }
 
-// newVolume returns a new volume with given attributes
+// newVolumeWithFinalizers returns a new volume with given attributes
 func newVolumeWithFinalizers(name, capacity, boundToClaimUID, boundToClaimName string, phase v1.PersistentVolumePhase, reclaimPolicy v1.PersistentVolumeReclaimPolicy, class string, finalizers []string, annotations ...string) *v1.PersistentVolume {
 	retVolume := newVolume(name, capacity, boundToClaimUID, boundToClaimName, phase, reclaimPolicy, class, annotations...)
 	retVolume.SetFinalizers(finalizers)
