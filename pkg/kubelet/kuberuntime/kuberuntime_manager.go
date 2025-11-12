@@ -70,6 +70,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/sysctl"
 	"k8s.io/kubernetes/pkg/kubelet/token"
 	"k8s.io/kubernetes/pkg/kubelet/types"
+	kubeutil "k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/kubelet/util/cache"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	sc "k8s.io/kubernetes/pkg/securitycontext"
@@ -594,11 +595,21 @@ type podActions struct {
 	// runtime for RestartAllContainers. The container that triggered RestartAllContainers
 	// will be reset the last.
 	ContainersToReset []containerToRemoveInfo
+	// UpdatePodLevelResources is true if pod-level resources need to be updated
+	UpdatePodLevelResources bool
+}
+
+// podLevelResources holds the set of resources applicable to the running pod
+type podLevelResources struct {
+	memoryLimit   int64
+	memoryRequest int64
+	cpuLimit      int64
+	cpuRequest    int64
 }
 
 func (p podActions) String() string {
-	return fmt.Sprintf("KillPod: %t, CreateSandbox: %t, UpdatePodResources: %t, Attempt: %d, InitContainersToStart: %v, ContainersToStart: %v, EphemeralContainersToStart: %v,ContainersToUpdate: %v, ContainersToKill: %v, ContainersToRemove: %v",
-		p.KillPod, p.CreateSandbox, p.UpdatePodResources, p.Attempt, p.InitContainersToStart, p.ContainersToStart, p.EphemeralContainersToStart, p.ContainersToUpdate, p.ContainersToKill, p.ContainersToReset)
+	return fmt.Sprintf("KillPod: %t, CreateSandbox: %t, UpdatePodResources: %t, UpdatePodLevelResources: %t, Attempt: %d, InitContainersToStart: %v, ContainersToStart: %v, EphemeralContainersToStart: %v,ContainersToUpdate: %v, ContainersToKill: %v, ContainersToRemove: %v",
+		p.KillPod, p.CreateSandbox, p.UpdatePodResources, p.UpdatePodLevelResources, p.Attempt, p.InitContainersToStart, p.ContainersToStart, p.EphemeralContainersToStart, p.ContainersToUpdate, p.ContainersToKill, p.ContainersToReset)
 }
 
 // containerChanged will determine whether the container has changed based on the fields that will affect the running of the container.
@@ -623,8 +634,30 @@ func containerSucceeded(c *v1.Container, podStatus *kubecontainer.PodStatus) boo
 	return cStatus.State == kubecontainer.ContainerStateExited && cStatus.ExitCode == 0
 }
 
-func containerResourcesFromRequirements(requirements *v1.ResourceRequirements) containerResources {
-	return containerResources{
+func containerResourcesFromRequirements(podRequirements, containerRequirements *v1.ResourceRequirements) containerResources {
+	resources := containerResources{
+		memoryLimit:   containerRequirements.Limits.Memory().Value(),
+		memoryRequest: containerRequirements.Requests.Memory().Value(),
+		cpuLimit:      containerRequirements.Limits.Cpu().MilliValue(),
+		cpuRequest:    containerRequirements.Requests.Cpu().MilliValue(),
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
+		return resources
+	}
+
+	containerLimits := kubeutil.GetLimits(&kubeutil.ResourceOpts{PodResources: podRequirements, ContainerResources: containerRequirements})
+	resources.memoryLimit = containerLimits.Memory().Value()
+	resources.cpuLimit = containerLimits.Cpu().MilliValue()
+	return resources
+}
+
+func podResourcesFromRequirements(requirements *v1.ResourceRequirements) podLevelResources {
+	if requirements == nil {
+		return podLevelResources{}
+	}
+
+	return podLevelResources{
 		memoryLimit:   requirements.Limits.Memory().Value(),
 		memoryRequest: requirements.Requests.Memory().Value(),
 		cpuLimit:      requirements.Limits.Cpu().MilliValue(),
@@ -656,7 +689,7 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(ctx context.Context, 
 		return true
 	}
 
-	actuatedResources, found := m.actuatedState.GetContainerResources(pod.UID, container.Name)
+	actuatedContainerResources, found := m.actuatedState.GetContainerResources(pod.UID, container.Name)
 	if !found {
 		logger.Error(nil, "Missing actuated resource record", "pod", klog.KObj(pod), "container", container.Name)
 		// Proceed with the zero-value actuated resources. For restart NotRequired, this may
@@ -664,8 +697,13 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(ctx context.Context, 
 		// For RestartContainer, this may trigger a container restart.
 	}
 
-	desiredResources := containerResourcesFromRequirements(&container.Resources)
-	currentResources := containerResourcesFromRequirements(&actuatedResources)
+	var actuatedPodResources *v1.ResourceRequirements
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
+		actuatedPodResources, _ = m.actuatedState.GetPodLevelResources(pod.UID)
+	}
+
+	desiredResources := containerResourcesFromRequirements(pod.Spec.Resources, &container.Resources)
+	currentResources := containerResourcesFromRequirements(actuatedPodResources, &actuatedContainerResources)
 
 	if currentResources == desiredResources {
 		// No resize required.
@@ -781,6 +819,57 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 		return resizeResult
 	}
 
+	updateActuatedPodLevelResources := func(resourceName v1.ResourceName) error {
+		allocatedResources := pod.Spec.Resources
+		if allocatedResources == nil {
+			return nil
+		}
+
+		// allocated resources will never be nil
+		actuatedPodResources, found := m.actuatedState.GetPodLevelResources(pod.UID)
+		if !found || actuatedPodResources == nil {
+			logger.Error(nil, "Missing actuated resource record", "pod", klog.KObj(pod), "pod", pod.Name)
+			// Proceed with the zero-value actuated resources.
+			actuatedPodResources = &v1.ResourceRequirements{}
+		}
+
+		defaultResourceListIfNil := func(rl v1.ResourceList) v1.ResourceList {
+			if rl == nil {
+				return make(v1.ResourceList)
+			}
+
+			return rl
+		}
+
+		switch resourceName {
+		case v1.ResourceMemory:
+			if allocatedResources.Requests != nil {
+				actuatedPodResources.Requests = defaultResourceListIfNil(actuatedPodResources.Requests)
+				actuatedPodResources.Requests[v1.ResourceMemory] = allocatedResources.Requests[v1.ResourceMemory]
+			}
+			if allocatedResources.Limits != nil {
+				actuatedPodResources.Limits = defaultResourceListIfNil(actuatedPodResources.Limits)
+				actuatedPodResources.Limits[v1.ResourceMemory] = allocatedResources.Limits[v1.ResourceMemory]
+			}
+		case v1.ResourceCPU:
+			if allocatedResources.Requests != nil {
+				actuatedPodResources.Requests = defaultResourceListIfNil(actuatedPodResources.Requests)
+				actuatedPodResources.Requests[v1.ResourceCPU] = allocatedResources.Requests[v1.ResourceCPU]
+			}
+			if allocatedResources.Limits != nil {
+				actuatedPodResources.Limits = defaultResourceListIfNil(actuatedPodResources.Limits)
+				actuatedPodResources.Limits[v1.ResourceCPU] = allocatedResources.Limits[v1.ResourceCPU]
+			}
+
+		}
+		if err = m.actuatedState.SetPodLevelResources(pod.UID, actuatedPodResources); err != nil {
+			logger.Error(err, "SetPodLevelResources failed", "pod", pod.Name, "UID", pod.UID,
+				"pod", format.Pod(pod), "resourceName", resourceName)
+			return err
+		}
+		return nil
+	}
+
 	setPodCgroupConfig := func(logger klog.Logger, rName v1.ResourceName, setLimitValue bool) error {
 		var err error
 		resizedResources := &cm.ResourceConfig{}
@@ -809,8 +898,16 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 			logger.Error(err, "Failed to notify runtime for UpdatePodSandboxResources", "resource", rName, "pod", klog.KObj(pod))
 			// Don't propagate the error since the updatePodSandboxResources call is best-effort.
 		}
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
+			if err = updateActuatedPodLevelResources(rName); err != nil {
+				logger.Error(err, "Failed to update pod-level actuated resources", "resource", rName, "pod", klog.KObj(pod))
+
+			}
+		}
 		return nil
 	}
+
 	// Memory and CPU are updated separately because memory resizes may be ordered differently than CPU resizes.
 	// If resize results in net pod resource increase, set pod cgroup config before resizing containers.
 	// If resize results in net pod resource decrease, set pod cgroup config after resizing containers.
@@ -856,7 +953,7 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 	// partially actuated.
 	defer m.runtimeHelper.SetPodWatchCondition(pod.UID, "doPodResizeAction", func(*kubecontainer.PodStatus) bool { return true })
 
-	if len(podContainerChanges.ContainersToUpdate[v1.ResourceMemory]) > 0 || podContainerChanges.UpdatePodResources {
+	if len(podContainerChanges.ContainersToUpdate[v1.ResourceMemory]) > 0 || podContainerChanges.UpdatePodResources || podContainerChanges.UpdatePodLevelResources {
 		if podResources.Memory == nil {
 			// Default pod memory limit to the current memory limit if unset to prevent it from updating.
 			// TODO(#128675): This does not support removing limits.
@@ -867,7 +964,7 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 			return resizeResult
 		}
 	}
-	if len(podContainerChanges.ContainersToUpdate[v1.ResourceCPU]) > 0 || podContainerChanges.UpdatePodResources {
+	if len(podContainerChanges.ContainersToUpdate[v1.ResourceCPU]) > 0 || podContainerChanges.UpdatePodResources || podContainerChanges.UpdatePodLevelResources {
 		if podResources.CPUShares == nil {
 			// This shouldn't happen: ResourceConfigForPod always returns a non-nil value for CPUShares.
 			logger.Error(nil, "podResources.CPUShares is nil", "pod", pod.Name)
@@ -1229,6 +1326,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		changes.InitContainersToStart = nil
 	}
 
+	changes.UpdatePodLevelResources = m.computePodLevelResourcesResizeAction(ctx, pod)
 	return changes
 }
 
@@ -1262,6 +1360,25 @@ func (m *kubeGenericRuntimeManager) getContainersToReset(containers []v1.Contain
 		}
 	}
 	return
+}
+
+func (m *kubeGenericRuntimeManager) computePodLevelResourcesResizeAction(ctx context.Context, pod *v1.Pod) bool {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
+		return false
+	}
+	logger := klog.FromContext(ctx)
+
+	actuatedPodLevelResources, found := m.actuatedState.GetPodLevelResources(pod.UID)
+	if !found {
+		logger.Error(nil, "Missing actuated pod level resource record", "pod", klog.KObj(pod), "pod", pod.Name)
+		// Proceed with the zero-value actuated resources. For restart NotRequired, this may
+		// result in an extra call to UpdateContainerResources, but that call should be idempotent.
+		// For RestartContainer, this may trigger a container restart.
+	}
+
+	desiredPodLevelResources := podResourcesFromRequirements(pod.Spec.Resources)
+	currentPodLevelResources := podResourcesFromRequirements(actuatedPodLevelResources)
+	return currentPodLevelResources != desiredPodLevelResources
 }
 
 // SyncPod syncs the running pod into the desired pod by executing following steps:
@@ -1579,7 +1696,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 
 	// Step 7: For containers in podContainerChanges.ContainersToUpdate[CPU,Memory] list, invoke UpdateContainerResources
 	if resizable, _, _ := allocation.IsInPlacePodVerticalScalingAllowed(pod); resizable {
-		if len(podContainerChanges.ContainersToUpdate) > 0 || podContainerChanges.UpdatePodResources {
+		if len(podContainerChanges.ContainersToUpdate) > 0 || podContainerChanges.UpdatePodResources || podContainerChanges.UpdatePodLevelResources {
 			result.SyncResults = append(result.SyncResults, m.doPodResizeAction(ctx, pod, podStatus, podContainerChanges))
 		}
 	}
@@ -1963,12 +2080,38 @@ func (m *kubeGenericRuntimeManager) ListPodSandboxMetrics(ctx context.Context) (
 	return m.runtimeService.ListPodSandboxMetrics(ctx)
 }
 
-// isPodResizeInProgress checks whether the actuated resizable resources differ from the allocated resources
-// for any running containers. Specifically, the following differences are ignored:
+func (m *kubeGenericRuntimeManager) UpdateActuatedPodLevelResources(actuatedPod *v1.Pod) error {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		return nil
+	}
+
+	if actuatedPod.Spec.Resources == nil {
+		return nil
+	}
+
+	if actuatedPod.Spec.Resources.Requests == nil && actuatedPod.Spec.Resources.Limits == nil {
+		return nil
+	}
+
+	return m.actuatedState.SetPodLevelResources(actuatedPod.UID, actuatedPod.Spec.Resources)
+}
+
+// isPodResizeInProgress checks whether the actuated resizable resources differ from
+// the resources allocated for:
+// * any running containers - Specifically, the following differences are ignored:
 // - Non-resizable containers: non-restartable init containers, ephemeral containers
 // - Non-resizable resources: only CPU & memory are resizable
 // - Non-running containers: they will be sized correctly when (re)started
+// * any running pod if InPlacePodLevelResourcesVerticalScaling is enabled.
 func (m *kubeGenericRuntimeManager) IsPodResizeInProgress(allocatedPod *v1.Pod, podStatus *kubecontainer.PodStatus) bool {
+	if m.isContainerResourceResizeInProgress(allocatedPod, podStatus) {
+		return true
+	}
+
+	return m.isPodLevelResourcesResizeInProgress(allocatedPod, podStatus)
+}
+
+func (m *kubeGenericRuntimeManager) isContainerResourceResizeInProgress(allocatedPod *v1.Pod, podStatus *kubecontainer.PodStatus) bool {
 	return !podutil.VisitContainers(&allocatedPod.Spec, podutil.InitContainers|podutil.Containers,
 		func(allocatedContainer *v1.Container, containerType podutil.ContainerType) (shouldContinue bool) {
 			if !isResizableContainer(allocatedContainer, containerType) {
@@ -1983,12 +2126,50 @@ func (m *kubeGenericRuntimeManager) IsPodResizeInProgress(allocatedPod *v1.Pod, 
 
 			actuatedResources, _ := m.actuatedState.GetContainerResources(allocatedPod.UID, allocatedContainer.Name)
 			allocatedResources := allocatedContainer.Resources
+			if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
+				allocatedResources.Limits = kubeutil.GetLimits(&kubeutil.ResourceOpts{PodResources: allocatedPod.Spec.Resources, ContainerResources: &allocatedContainer.Resources})
+			}
 
 			return allocatedResources.Requests[v1.ResourceCPU].Equal(actuatedResources.Requests[v1.ResourceCPU]) &&
 				allocatedResources.Limits[v1.ResourceCPU].Equal(actuatedResources.Limits[v1.ResourceCPU]) &&
 				allocatedResources.Requests[v1.ResourceMemory].Equal(actuatedResources.Requests[v1.ResourceMemory]) &&
 				allocatedResources.Limits[v1.ResourceMemory].Equal(actuatedResources.Limits[v1.ResourceMemory])
 		})
+}
+
+func (m *kubeGenericRuntimeManager) isPodLevelResourcesResizeInProgress(allocatedPod *v1.Pod, podStatus *kubecontainer.PodStatus) bool {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
+		return false
+	}
+
+	if allocatedPod.Spec.Resources == nil {
+		return false
+	}
+
+	actuatedPodResources, _ := m.actuatedState.GetPodLevelResources(allocatedPod.UID)
+	allocatedPodResources := allocatedPod.Spec.Resources
+
+	return !cpuMemoryResourcesEqual(actuatedPodResources, allocatedPodResources)
+}
+
+func cpuMemoryResourcesEqual(actuatedPodResources, allocatedPodResources *v1.ResourceRequirements) bool {
+	if actuatedPodResources == nil && allocatedPodResources == nil {
+		return true
+	}
+
+	cmpResources := func(actuated, allocated v1.ResourceList) bool {
+		return actuated[v1.ResourceCPU].Equal(allocated[v1.ResourceCPU]) && actuated[v1.ResourceMemory].Equal(allocated[v1.ResourceMemory])
+	}
+
+	if actuatedPodResources == nil {
+		return cmpResources(nil, allocatedPodResources.Requests) && cmpResources(nil, allocatedPodResources.Limits)
+	}
+
+	if allocatedPodResources == nil {
+		return cmpResources(actuatedPodResources.Requests, nil) && cmpResources(actuatedPodResources.Limits, nil)
+
+	}
+	return cmpResources(actuatedPodResources.Requests, allocatedPodResources.Requests) && cmpResources(actuatedPodResources.Limits, allocatedPodResources.Limits)
 }
 
 func isResizableContainer(container *v1.Container, containerType podutil.ContainerType) bool {

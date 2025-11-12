@@ -26,6 +26,7 @@ import (
 // New features are added to this list to be automatically included in both
 // discovery and inference logic.
 var AllFeatures = []nodedeclaredfeatures.Feature{
-	inplacepodresize.Feature,
 	restartallcontainers.Feature,
+	inplacepodresize.GuaranteedQoSPodCPUResizeFeature,
+	inplacepodresize.PodLevelResourcesResizeFeature,
 }

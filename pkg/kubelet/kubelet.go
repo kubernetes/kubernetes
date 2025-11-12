@@ -46,6 +46,7 @@ import (
 	ndffeatures "k8s.io/component-helpers/nodedeclaredfeatures/features"
 	"k8s.io/mount-utils"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
@@ -2097,6 +2098,10 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 					kl.recorder.Eventf(pod, v1.EventTypeWarning, events.FailedToCreatePodContainer, "unable to ensure pod container exists: %v", err)
 					return false, fmt.Errorf("failed to ensure that the pod: %v cgroups exist and are correctly applied: %v", pod.UID, err)
 				}
+
+				if err = kl.containerRuntime.UpdateActuatedPodLevelResources(pod); err != nil {
+					return false, fmt.Errorf("failed to update the state of pod-level resources for the pod %v : %w", pod.UID, err)
+				}
 			}
 		}
 	}
@@ -2799,7 +2804,7 @@ func (kl *Kubelet) HandlePodUpdates(pods []*v1.Pod) {
 		}
 
 		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-			if recordContainerResizeOperations(oldPod, pod) {
+			if recordResizeOperations(oldPod, pod) {
 				_, updatedFromAllocation := kl.allocationManager.UpdatePodFromAllocation(pod)
 				if updatedFromAllocation {
 					kl.allocationManager.PushPendingResize(pod.UID)
@@ -2844,14 +2849,37 @@ func (kl *Kubelet) HandlePodUpdates(pods []*v1.Pod) {
 	}
 }
 
-// recordContainerResizeOperations records if any of the pod's containers needs to be resized, and returns
+// recordResizeOperaations records if any of the pod level resources or
+// containers need to be resized, and returns
 // true if so
-func recordContainerResizeOperations(oldPod, newPod *v1.Pod) bool {
-	hasResize := false
+func recordResizeOperations(oldPod, newPod *v1.Pod) bool {
 	if oldPod == nil {
 		// This should never happen.
 		return true
 	}
+
+	hasResize := recordContainerResizeOperations(oldPod, newPod) || recordPodLevelResourceResizeOperations(oldPod, newPod)
+	return hasResize
+
+}
+
+// recordPodLevelResourceResizeOperations records if any of the pod level resources need to be resized, and returns
+// true if so
+func recordPodLevelResourceResizeOperations(oldPod, newPod *v1.Pod) bool {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		return false
+	}
+
+	// TODO(ndixita): add metrics for pod-level resources resize.
+
+	return !apiequality.Semantic.DeepEqual(oldPod.Spec.Resources, newPod.Spec.Resources)
+}
+
+// recordContainerResizeOperations records if any of the pod's containers needs to be resized, and returns
+// true if so
+func recordContainerResizeOperations(oldPod, newPod *v1.Pod) bool {
+	hasResize := false
+
 	for oldContainer, containerType := range podutil.ContainerIter(&oldPod.Spec, podutil.InitContainers|podutil.Containers) {
 		if !allocation.IsResizableContainer(oldContainer, containerType) {
 			continue
@@ -2970,8 +2998,9 @@ func (kl *Kubelet) HandlePodReconcile(pods []*v1.Pod) {
 			// resources changing.
 			if hasPendingResizes && !retryPendingResizes && oldPod != nil {
 				opts := resourcehelper.PodResourcesOptions{
-					UseStatusResources:    true,
-					SkipPodLevelResources: !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+					UseStatusResources:                             true,
+					SkipPodLevelResources:                          !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+					InPlacePodLevelResourcesVerticalScalingEnabled: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling),
 				}
 
 				// Ignore desired resources when aggregating the resources.

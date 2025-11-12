@@ -1230,6 +1230,8 @@ spec:
     podGroup: podGroupValue
     podGroupReplicaKey: podGroupReplicaKeyValue
 status:
+  allocatedResources:
+    allocatedResourcesKey: "0"
   conditions:
   - lastProbeTime: "2003-01-01T01:01:01Z"
     lastTransitionTime: "2004-01-01T01:01:01Z"
@@ -1449,4 +1451,12 @@ status:
   resourceClaimStatuses:
   - name: nameValue
     resourceClaimName: resourceClaimNameValue
+  resources:
+    claims:
+    - name: nameValue
+      request: requestValue
+    limits:
+      limitsKey: "0"
+    requests:
+      requestsKey: "0"
   startTime: "2007-01-01T01:01:01Z"

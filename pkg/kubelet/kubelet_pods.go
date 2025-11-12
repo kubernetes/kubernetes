@@ -44,6 +44,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	resourcehelper "k8s.io/component-helpers/resource"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubelet/pkg/cri/streaming/portforward"
@@ -2123,7 +2124,122 @@ func (kl *Kubelet) convertStatusToAPIStatus(pod *v1.Pod, podStatus *kubecontaine
 		podRestarting,
 	)
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
+		apiPodStatus.Resources = kl.convertToAPIPodLevelResourcesStatus(pod, oldPodStatus)
+		opts := resourcehelper.PodResourcesOptions{
+			SkipPodLevelResources: !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+		}
+		apiPodStatus.AllocatedResources = resourcehelper.PodRequests(pod, opts)
+	}
+
 	return &apiPodStatus
+}
+
+func getEffectiveAllocatedResources(allocatedPod *v1.Pod) *v1.ResourceRequirements {
+	allocatedResources := allocatedPod.Spec.Resources
+	if allocatedResources == nil {
+		allocatedResources = &v1.ResourceRequirements{}
+	}
+	opts := resourcehelper.PodResourcesOptions{
+		SkipPodLevelResources: !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+	}
+	allocatedResources.Requests = resourcehelper.PodRequests(allocatedPod, opts)
+	allocatedResources.Limits = resourcehelper.PodLimits(allocatedPod, opts)
+	return allocatedResources
+}
+
+func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(allocatedPod *v1.Pod, oldPodStatus v1.PodStatus) *v1.ResourceRequirements {
+	if allocatedPod.Status.Phase != v1.PodRunning {
+		return getEffectiveAllocatedResources(allocatedPod)
+	}
+
+	// TODO(ndixita): Revisit the decision to output cgroup values in Pod Status.
+	// The internal rounding off logic can introduce minute variability, making the
+	// output inconsistent. We should decide if the information is useful enough to
+	//  outweigh the consistency issues,
+	pcm := kl.containerManager.NewPodContainerManager()
+	memoryConfig, err := pcm.GetPodCgroupConfig(allocatedPod, v1.ResourceMemory)
+	if err != nil {
+		klog.ErrorS(err, "failed to read memory cgroup config for the pod", "podName", allocatedPod.Name)
+	}
+	memoryLimit := cm.MemoryLimitsFromConfig(memoryConfig)
+	cpuConfig, err := pcm.GetPodCgroupConfig(allocatedPod, v1.ResourceCPU)
+	if err != nil {
+		klog.ErrorS(err, "failed to read memory cgroup limits for the pod", "podName", allocatedPod.Name)
+
+	}
+
+	cpuRequest := cm.CPURequestsFromConfig(cpuConfig)
+	cpuLimit := cm.CPULimitsFromConfig(cpuConfig)
+
+	preserveOldResourcesValue := func(rName v1.ResourceName, oldStatusResource, resource v1.ResourceList) {
+		if allocatedPod.Status.Phase == v1.PodRunning && oldPodStatus.Phase == v1.PodRunning && oldPodStatus.Resources != nil {
+			if r, exists := oldStatusResource[rName]; exists {
+				resource[rName] = r.DeepCopy()
+			}
+		}
+	}
+
+	resources := allocatedPod.Spec.Resources.DeepCopy()
+
+	if oldPodStatus.Resources == nil {
+		oldPodStatus.Resources = &v1.ResourceRequirements{}
+	}
+
+	if resources == nil {
+		resources = &v1.ResourceRequirements{}
+	}
+
+	if resources.Requests == nil {
+		resources.Requests = make(v1.ResourceList)
+	}
+
+	if resources.Limits == nil {
+		resources.Limits = make(v1.ResourceList)
+	}
+
+	if cpuRequest != nil {
+		// If both the allocated & actual resources are at
+		// or below MinShares, preserve the allocated value in the API to avoid
+		// confusion and simplify comparisons.
+		if cpuRequest.MilliValue() > cm.MinShares || resources.Requests.Cpu().MilliValue() > cm.MinShares {
+			resources.Requests[v1.ResourceCPU] = cpuRequest.DeepCopy()
+		}
+	} else {
+		preserveOldResourcesValue(v1.ResourceCPU, oldPodStatus.Resources.Requests, resources.Requests)
+	}
+
+	if _, found := resources.Requests[v1.ResourceMemory]; !found {
+		opts := resourcehelper.PodResourcesOptions{
+			SkipPodLevelResources: !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+		}
+		aggregatedResources := resourcehelper.PodRequests(allocatedPod, opts)
+		resources.Requests[v1.ResourceMemory] = aggregatedResources[v1.ResourceMemory]
+	}
+
+	// TODO: Once we begin persisting memory Request from the PodSpec to cgroups,
+	// the code needs to persist that value if it is non-nil.
+	preserveOldResourcesValue(v1.ResourceMemory, oldPodStatus.Resources.Requests, resources.Requests)
+
+	if cpuLimit != nil {
+		// If both the allocated & actual resources are at
+		// or below the minimum effective limit, preserve the
+		// allocated value in the API to avoid confusion and simplify comparisons.
+		if cpuLimit.MilliValue() > cm.MinMilliCPULimit || resources.Limits.Cpu().MilliValue() > cm.MinMilliCPULimit {
+			resources.Limits[v1.ResourceCPU] = cpuLimit.DeepCopy()
+		}
+	} else {
+		preserveOldResourcesValue(v1.ResourceCPU, oldPodStatus.Resources.Limits, resources.Limits)
+
+	}
+
+	if memoryLimit != nil {
+		resources.Limits[v1.ResourceMemory] = memoryLimit.DeepCopy()
+	} else {
+		preserveOldResourcesValue(v1.ResourceMemory, oldPodStatus.Resources.Limits, resources.Limits)
+	}
+
+	return resources
 }
 
 // convertToAPIContainerStatuses converts the given internal container

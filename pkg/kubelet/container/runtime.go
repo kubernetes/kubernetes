@@ -145,6 +145,8 @@ type Runtime interface {
 	// IsPodResizeInProgress checks whether the given pod is in the process of resizing
 	// (allocated resources != actuated resources).
 	IsPodResizeInProgress(allocatedPod *v1.Pod, podStatus *PodStatus) bool
+	// UpdateActuatedPodLevelResources updates pod-level resources in actuatedState
+	UpdateActuatedPodLevelResources(actuatedPod *v1.Pod) error
 }
 
 // StreamingRuntime is the interface implemented by runtimes that handle the serving of the

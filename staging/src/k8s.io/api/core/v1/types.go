@@ -5400,6 +5400,20 @@ type PodStatus struct {
 	// +featureGate=DRAExtendedResource
 	// +optional
 	ExtendedResourceClaimStatus *PodExtendedResourceClaimStatus `json:"extendedResourceClaimStatus,omitempty" protobuf:"bytes,18,opt,name=extendedResourceClaimStatus"`
+
+	// AllocatedResources is the total requests allocated for this pod by the node.
+	// If pod-level requests are not set, this will be the total requests aggregated
+	// across containers in the pod.
+	// +featureGate=InPlacePodLevelResourcesVerticalScaling
+	// +optional
+	AllocatedResources ResourceList `json:"allocatedResources,omitempty" protobuf:"bytes,19,rep,name=allocatedResources,casttype=ResourceList,castkey=ResourceName"`
+
+	// Resources represents the compute resource requests and limits that have been
+	// applied at the pod level if pod-level requests or limits are set in
+	// PodSpec.Resources
+	// +featureGate=InPlacePodLevelResourcesVerticalScaling
+	// +optional
+	Resources *ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,20,opt,name=resources"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

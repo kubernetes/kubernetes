@@ -71,6 +71,9 @@ type Manager interface {
 	// GetContainerResourceAllocation returns the AllocatedResources value for the container
 	GetContainerResourceAllocation(podUID types.UID, containerName string) (v1.ResourceRequirements, bool)
 
+	// GetPodLevelResourceAllocation returns the AllocatedResources value for the container
+	GetPodLevelResourceAllocation(podUID types.UID) (*v1.ResourceRequirements, bool)
+
 	// UpdatePodFromAllocation overwrites the pod spec with the allocation.
 	// This function does a deep copy only if updates are needed.
 	// Returns the updated (or original) pod, and whether there was an allocation stored.
@@ -419,6 +422,12 @@ func (m *manager) GetContainerResourceAllocation(podUID types.UID, containerName
 	return m.allocated.GetContainerResources(podUID, containerName)
 }
 
+// GetPodLevelResourceAllocation returns the last checkpointed AllocatedResources values
+// If checkpoint manager has not been initialized, it returns nil, false
+func (m *manager) GetPodLevelResourceAllocation(podUID types.UID) (*v1.ResourceRequirements, bool) {
+	return m.allocated.GetPodLevelResources(podUID)
+}
+
 // UpdatePodFromAllocation overwrites the pod spec with the allocation.
 // This function does a deep copy only if updates are needed.
 func (m *manager) UpdatePodFromAllocation(pod *v1.Pod) (*v1.Pod, bool) {
@@ -440,6 +449,15 @@ func updatePodFromAllocation(pod *v1.Pod, allocated state.PodResourceInfo) (*v1.
 	}
 
 	updated := false
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
+		pAlloc := allocated.PodLevelResources
+		if !apiequality.Semantic.DeepEqual(pod.Spec.Resources, pAlloc) {
+			// Allocation differs from pod spec, retrieve the allocation
+			pod = pod.DeepCopy()
+			pod.Spec.Resources = pAlloc
+			updated = true
+		}
+	}
 	containerAlloc := func(c v1.Container) (v1.ResourceRequirements, bool) {
 		if cAlloc, ok := allocated.ContainerResources[c.Name]; ok {
 			if !apiequality.Semantic.DeepEqual(c.Resources, cAlloc) {
@@ -477,6 +495,9 @@ func (m *manager) SetAllocatedResources(pod *v1.Pod) error {
 
 func allocationFromPod(pod *v1.Pod) state.PodResourceInfo {
 	var podAlloc state.PodResourceInfo
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) && pod.Spec.Resources != nil {
+		podAlloc.PodLevelResources = pod.Spec.Resources.DeepCopy()
+	}
 	podAlloc.ContainerResources = make(map[string]v1.ResourceRequirements)
 	for _, container := range pod.Spec.Containers {
 		alloc := *container.Resources.DeepCopy()
@@ -557,6 +578,15 @@ func (m *manager) handlePodResourcesResize(pod *v1.Pod) (bool, error) {
 		metrics.PodInfeasibleResizes.WithLabelValues("swap_limitation").Inc()
 		m.statusManager.SetPodResizePendingCondition(pod.UID, v1.PodReasonInfeasible, msg, pod.Generation)
 		return false, nil
+	}
+
+	if !apiequality.Semantic.DeepEqual(pod.Spec.Resources, allocatedPod.Spec.Resources) {
+		if resizable, msg, reason := IsInPlacePodLevelResourcesVerticalScalingAllowed(pod); !resizable {
+			// If there is a pending pod-level resources resize but the resize is not allowed, always use the allocated resources.
+			metrics.PodInfeasibleResizes.WithLabelValues(reason).Inc()
+			m.statusManager.SetPodResizePendingCondition(pod.UID, v1.PodReasonInfeasible, msg, pod.Generation)
+			return false, nil
+		}
 	}
 
 	// Desired resources != allocated resources. Can we update the allocation to the desired resources?

@@ -424,6 +424,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		AllowSidecarResizePolicy:                            utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
 		AllowMatchLabelKeysInPodTopologySpread:              utilfeature.DefaultFeatureGate.Enabled(features.MatchLabelKeysInPodTopologySpread),
 		AllowMatchLabelKeysInPodTopologySpreadSelectorMerge: utilfeature.DefaultFeatureGate.Enabled(features.MatchLabelKeysInPodTopologySpreadSelectorMerge),
+		InPlacePodLevelResourcesVerticalScalingEnabled:      utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling),
 		OldPodViolatesMatchLabelKeysValidation:              false,
 		OldPodViolatesLegacyMatchLabelKeysValidation:        false,
 		AllowContainerRestartPolicyRules:                    utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules),
@@ -1006,6 +1007,12 @@ func dropDisabledPodStatusFields(podStatus, oldPodStatus *api.PodStatus, podSpec
 		podStatus = &api.PodStatus{}
 	}
 
+	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) && !podLevelStatusResourcesInUse(oldPodStatus) {
+		// Drop Resources and AllocatedResources fields from PodStatus
+		podStatus.Resources = nil
+		podStatus.AllocatedResources = nil
+	}
+
 	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && !inPlacePodVerticalScalingInUse(oldPodSpec) {
 		// Drop Resources fields
 		dropResourcesField := func(csl []api.ContainerStatus) {
@@ -1324,6 +1331,16 @@ func podLevelResourcesInUse(podSpec *api.PodSpec) bool {
 	}
 
 	return false
+}
+
+// podLevelStatusResourcesInUse checks if AllocationResources or Resources are set
+// in PodStatus.
+func podLevelStatusResourcesInUse(podStatus *api.PodStatus) bool {
+	if podStatus == nil {
+		return false
+	}
+
+	return podStatus.Resources != nil || podStatus.AllocatedResources != nil
 }
 
 // inPlacePodVerticalScalingInUse returns true if pod spec is non-nil and ResizePolicy is set

@@ -102,7 +102,7 @@ func TestMakeResizePatch(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			patch := MakeResizePatch(tt.old, tt.new)
+			patch := MakeResizePatch(tt.old, tt.new, nil, nil)
 
 			// Ignore the "$setElementOrder" directive for patch comparison.
 			patchMap := strategicpatch.JSONMap{}
