@@ -106,6 +106,9 @@ type Manager struct {
 
 	// update channel for resource updates
 	update chan resourceupdates.Update
+
+	// Record metrics for the DRA operations.
+	recordOperation func(operation string, isError bool, duration float64)
 }
 
 // NewManager creates a new DRA manager.
@@ -132,6 +135,10 @@ func NewManager(logger klog.Logger, kubeClient clientset.Interface, stateFileDir
 	// We should consider making it configurable in the future.
 	reconcilePeriod := defaultReconcilePeriod
 
+	recordOperation := func(operation string, isError bool, duration float64) {
+		kubeletmetrics.DRAOperationsDuration.WithLabelValues(operation, strconv.FormatBool(isError)).Observe(duration)
+	}
+
 	manager := &Manager{
 		cache:           claimInfoCache,
 		kubeClient:      kubeClient,
@@ -140,6 +147,7 @@ func NewManager(logger klog.Logger, kubeClient clientset.Interface, stateFileDir
 		sourcesReady:    nil,
 		healthInfoCache: healthInfoCache,
 		update:          make(chan resourceupdates.Update, 100),
+		recordOperation: recordOperation,
 	}
 
 	return manager, nil
@@ -226,7 +234,8 @@ func (m *Manager) reconcileLoop(ctx context.Context) {
 func (m *Manager) PrepareResources(ctx context.Context, pod *v1.Pod) error {
 	startTime := time.Now()
 	err := m.prepareResources(ctx, pod)
-	kubeletmetrics.DRAOperationsDuration.WithLabelValues("PrepareResources", strconv.FormatBool(err == nil)).Observe(time.Since(startTime).Seconds())
+	isError := (err != nil)
+	m.recordOperation("PrepareResources", isError, time.Since(startTime).Seconds())
 	if err != nil {
 		return fmt.Errorf("prepare dynamic resources: %w", err)
 	}
@@ -554,7 +563,8 @@ func (m *Manager) GetResources(pod *v1.Pod, container *v1.Container) (*Container
 func (m *Manager) UnprepareResources(ctx context.Context, pod *v1.Pod) error {
 	startTime := time.Now()
 	err := m.unprepareResourcesForPod(ctx, pod)
-	kubeletmetrics.DRAOperationsDuration.WithLabelValues("UnprepareResources", strconv.FormatBool(err == nil)).Observe(time.Since(startTime).Seconds())
+	isError := (err != nil)
+	m.recordOperation("UnprepareResources", isError, time.Since(startTime).Seconds())
 	if err != nil {
 		return fmt.Errorf("unprepare dynamic resources: %w", err)
 	}
