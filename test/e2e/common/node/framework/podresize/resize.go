@@ -196,6 +196,18 @@ func VerifyPodStatusResources(gotPod *v1.Pod, wantInfo []ResizableContainerInfo)
 	return utilerrors.NewAggregate(errs)
 }
 
+func VerifyPodLevelStatusResources(gotPod *v1.Pod, wantPodResources *v1.ResourceRequirements) error {
+	var errs []error
+	if err := framework.Gomega().Expect(gotPod.Status.AllocatedResources).To(gomega.BeComparableTo(wantPodResources.Requests)); err != nil {
+		errs = append(errs, fmt.Errorf("pod[%s] status allocatedResources mismatch: %w", gotPod.Name, err))
+	}
+
+	if err := framework.Gomega().Expect(gotPod.Status.Resources).To(gomega.BeComparableTo(wantPodResources)); err != nil {
+		errs = append(errs, fmt.Errorf("pod[%s] status resources mismatch: %w", gotPod.Name, err))
+	}
+	return utilerrors.NewAggregate(errs)
+}
+
 func verifyPodContainersStatusResources(gotCtrStatuses []v1.ContainerStatus, wantCtrs []v1.Container) error {
 	ginkgo.GinkgoHelper()
 

@@ -807,7 +807,7 @@ func doPodResizeReadAndReplaceTests(f *framework.Framework) {
 //	   b) api-server in services doesn't start with --enable-admission-plugins=ResourceQuota
 //	      and is not possible to start it from TEST_ARGS
 //	Above tests in test/e2e/node/pod_resize.go
-var _ = SIGDescribe("Pod InPlace Resize", func() {
+var _ = SIGDescribe("Pod InPlace Resize Container", func() {
 	f := framework.NewDefaultFramework("pod-resize-tests")
 
 	ginkgo.BeforeEach(func(ctx context.Context) {

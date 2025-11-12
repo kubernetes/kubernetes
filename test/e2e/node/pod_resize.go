@@ -77,11 +77,11 @@ func doPodResizeResourceQuotaTests(f *framework.Framework) {
 	})
 
 	ginkgo.DescribeTable("pod-resize-resource-quota-test",
-		func(ctx context.Context, desiredContainers []podresize.ResizableContainerInfo, expectedContainers []podresize.ResizableContainerInfo, podResources *v1.ResourceRequirements, wantError string) {
+		func(ctx context.Context, desiredContainers []podresize.ResizableContainerInfo, expectedContainers []podresize.ResizableContainerInfo, wantError string) {
 			tStamp := strconv.Itoa(time.Now().Nanosecond())
-			testPod1 := podresize.MakePodWithResizableContainers(f.Namespace.Name, "testpod1", tStamp, originalContainers, podResources)
+			testPod1 := podresize.MakePodWithResizableContainers(f.Namespace.Name, "testpod1", tStamp, originalContainers, nil)
 			testPod1 = e2epod.MustMixinRestrictedPodSecurity(testPod1)
-			testPod2 := podresize.MakePodWithResizableContainers(f.Namespace.Name, "testpod2", tStamp, originalContainers, podResources)
+			testPod2 := podresize.MakePodWithResizableContainers(f.Namespace.Name, "testpod2", tStamp, originalContainers, nil)
 			testPod2 = e2epod.MustMixinRestrictedPodSecurity(testPod2)
 
 			ginkgo.By("creating pods")
@@ -140,7 +140,6 @@ func doPodResizeResourceQuotaTests(f *framework.Framework) {
 				},
 			},
 			originalContainers,
-			nil,
 			"exceeded quota: resize-resource-quota, requested: cpu=300m, used: cpu=600m, limited: cpu=800m",
 		),
 
@@ -152,7 +151,6 @@ func doPodResizeResourceQuotaTests(f *framework.Framework) {
 				},
 			},
 			originalContainers,
-			nil,
 			"exceeded quota: resize-resource-quota, requested: memory=450Mi, used: memory=600Mi, limited: memory=800Mi",
 		),
 
@@ -164,7 +162,6 @@ func doPodResizeResourceQuotaTests(f *framework.Framework) {
 				},
 			},
 			originalContainers,
-			nil,
 			"exceeded quota: resize-resource-quota, requested: cpu=300m,memory=450Mi, used: cpu=600m,memory=600Mi, limited: cpu=800m,memory=800Mi",
 		),
 
@@ -181,7 +178,6 @@ func doPodResizeResourceQuotaTests(f *framework.Framework) {
 					Resources: &cgroups.ContainerResources{CPUReq: "350m", CPULim: "350m", MemReq: "300Mi", MemLim: "300Mi"},
 				},
 			},
-			nil,
 			"",
 		),
 
@@ -198,7 +194,6 @@ func doPodResizeResourceQuotaTests(f *framework.Framework) {
 					Resources: &cgroups.ContainerResources{CPUReq: "350m", CPULim: "350m", MemReq: "350Mi", MemLim: "350Mi"},
 				},
 			},
-			nil,
 			"",
 		),
 
@@ -215,7 +210,6 @@ func doPodResizeResourceQuotaTests(f *framework.Framework) {
 					Resources: &cgroups.ContainerResources{CPUReq: "400m", CPULim: "400m", MemReq: "400Mi", MemLim: "400Mi"},
 				},
 			},
-			nil,
 			"",
 		),
 	)

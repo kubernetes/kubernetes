@@ -818,10 +818,8 @@ func TestRetryPendingResizes(t *testing.T) {
 					if tt.expectedAllocatedPodReqs != nil {
 						require.NotNil(t, updatedPod.Spec.Resources)
 						assert.Equal(t, tt.expectedAllocatedPodReqs, updatedPod.Spec.Resources.Requests, "updated pod spec pod requests")
-					} else {
-						if updatedPod.Spec.Resources != nil {
-							assert.Empty(t, updatedPod.Spec.Resources.Requests, "updated pod spec pod requests should be empty")
-						}
+					} else if updatedPod.Spec.Resources != nil {
+						assert.Empty(t, updatedPod.Spec.Resources.Requests, "updated pod spec pod requests should be empty")
 					}
 
 					alloc, found := allocationManager.(*manager).allocated.GetPodResourceInfo(newPod.UID)
@@ -1570,7 +1568,7 @@ func TestAllocationManagerAddPodWithPLR(t *testing.T) {
 			admitFunc:                      nil,
 			expectAdmit:                    true,
 			// allocated resources updated with pod1's resources
-			expectedAllocatedResourcesState: map[types.UID]resourceState{pod1UID: resourceState{podResources: cpu1Mem1G, containerResources: cpu1Mem1G}},
+			expectedAllocatedResourcesState: map[types.UID]resourceState{pod1UID: {podResources: cpu1Mem1G, containerResources: cpu1Mem1G}},
 			ipprPLRFeatureGate:              true,
 		},
 		{
@@ -1580,11 +1578,11 @@ func TestAllocationManagerAddPodWithPLR(t *testing.T) {
 			podToAdd:                        pod1SmallWithPLR,
 			admitFunc:                       nil,
 			expectAdmit:                     true,
-			expectedAllocatedResourcesState: map[types.UID]resourceState{pod1UID: resourceState{containerResources: cpu1Mem1G}},
+			expectedAllocatedResourcesState: map[types.UID]resourceState{pod1UID: {containerResources: cpu1Mem1G}},
 		},
 		{
 			name:                           "PLR IPPR Enabled - New pod not admitted due to insufficient resources",
-			initialAllocatedResourcesState: map[types.UID]resourceState{pod1UID: resourceState{containerResources: cpu1Mem1G}},
+			initialAllocatedResourcesState: map[types.UID]resourceState{pod1UID: {containerResources: cpu1Mem1G}},
 			currentActivePods:              []*v1.Pod{pod1Small},
 			podToAdd:                       pod2LargeWithPLR,
 			admitFunc: func(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
@@ -1602,12 +1600,12 @@ func TestAllocationManagerAddPodWithPLR(t *testing.T) {
 			admissionFailureReason:  "OutOfcpu",
 			admissionFailureMessage: "not enough CPUs available for pod ns2/pod2, requested: 2, available:1",
 			// allocated resources not modified
-			expectedAllocatedResourcesState: map[types.UID]resourceState{pod1UID: resourceState{containerResources: cpu1Mem1G}},
+			expectedAllocatedResourcesState: map[types.UID]resourceState{pod1UID: {containerResources: cpu1Mem1G}},
 			ipprPLRFeatureGate:              true,
 		},
 		{
 			name:                           "PLR IPPR Disabled - New pod not admitted due to insufficient resources",
-			initialAllocatedResourcesState: map[types.UID]resourceState{pod1UID: resourceState{containerResources: cpu1Mem1G}},
+			initialAllocatedResourcesState: map[types.UID]resourceState{pod1UID: {containerResources: cpu1Mem1G}},
 			currentActivePods:              []*v1.Pod{pod1Small},
 			podToAdd:                       pod2LargeWithPLR,
 			admitFunc: func(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
@@ -1625,21 +1623,21 @@ func TestAllocationManagerAddPodWithPLR(t *testing.T) {
 			admissionFailureReason:  "OutOfcpu",
 			admissionFailureMessage: "not enough CPUs available for pod ns2/pod2, requested: 2, available:1",
 			// allocated resources not modified
-			expectedAllocatedResourcesState: map[types.UID]resourceState{pod1UID: resourceState{containerResources: cpu1Mem1G}},
+			expectedAllocatedResourcesState: map[types.UID]resourceState{pod1UID: {containerResources: cpu1Mem1G}},
 		},
 		{
 			name: "PLR IPPR Enabled - no pod resize request. Resource request same as existing allocation",
 			initialAllocatedResourcesState: map[types.UID]resourceState{
-				pod1UID: resourceState{containerResources: cpu1Mem1G, podResources: cpu1Mem1G},
-				pod2UID: resourceState{containerResources: cpu1Mem1G, podResources: cpu1Mem1G},
+				pod1UID: {containerResources: cpu1Mem1G, podResources: cpu1Mem1G},
+				pod2UID: {containerResources: cpu1Mem1G, podResources: cpu1Mem1G},
 			},
 			currentActivePods: []*v1.Pod{pod1SmallWithPLR},
 			podToAdd:          pod1SmallWithPLR,
 			admitFunc:         nil,
 			expectAdmit:       true,
 			expectedAllocatedResourcesState: map[types.UID]resourceState{
-				pod1UID: resourceState{containerResources: cpu1Mem1G, podResources: cpu1Mem1G},
-				pod2UID: resourceState{containerResources: cpu1Mem1G, podResources: cpu1Mem1G},
+				pod1UID: {containerResources: cpu1Mem1G, podResources: cpu1Mem1G},
+				pod2UID: {containerResources: cpu1Mem1G, podResources: cpu1Mem1G},
 			},
 			ipprPLRFeatureGate: true,
 		},
@@ -1651,14 +1649,14 @@ func TestAllocationManagerAddPodWithPLR(t *testing.T) {
 			admitFunc:                      nil,
 			expectAdmit:                    true,
 			// pod2's resources added to allocated resources
-			expectedAllocatedResourcesState: map[types.UID]resourceState{pod1UID: resourceState{containerResources: cpu2Mem2G, podResources: cpu2Mem2G}},
+			expectedAllocatedResourcesState: map[types.UID]resourceState{pod1UID: {containerResources: cpu2Mem2G, podResources: cpu2Mem2G}},
 			ipprPLRFeatureGate:              true,
 		},
 		{
 			name: "PLR IPPR Enabled - request different from current allocation. Pod still admitted based on existing allocation, but allocated resources remains unchanges.",
 			initialAllocatedResourcesState: map[types.UID]resourceState{
-				pod1UID: resourceState{containerResources: cpu1Mem1G, podResources: cpu1Mem1G},
-				pod2UID: resourceState{containerResources: cpu1Mem1G, podResources: cpu1Mem1G},
+				pod1UID: {containerResources: cpu1Mem1G, podResources: cpu1Mem1G},
+				pod2UID: {containerResources: cpu1Mem1G, podResources: cpu1Mem1G},
 			},
 			currentActivePods: []*v1.Pod{pod1SmallWithPLR, pod2SmallWithPLR},
 			podToAdd:          pod1LargeWithPLR,
@@ -1677,14 +1675,14 @@ func TestAllocationManagerAddPodWithPLR(t *testing.T) {
 			expectAdmit: true,
 			//  allocated Resources state must not be updated.
 			expectedAllocatedResourcesState: map[types.UID]resourceState{
-				pod1UID: resourceState{containerResources: cpu1Mem1G, podResources: cpu1Mem1G},
-				pod2UID: resourceState{containerResources: cpu1Mem1G, podResources: cpu1Mem1G},
+				pod1UID: {containerResources: cpu1Mem1G, podResources: cpu1Mem1G},
+				pod2UID: {containerResources: cpu1Mem1G, podResources: cpu1Mem1G},
 			},
 			ipprPLRFeatureGate: true,
 		},
 		{
 			name:                           "PLR IPPR Disabled - request different from current allocation. Admission fails. Allocated resources not updated.",
-			initialAllocatedResourcesState: map[types.UID]resourceState{pod1UID: resourceState{containerResources: cpu1Mem1G}},
+			initialAllocatedResourcesState: map[types.UID]resourceState{pod1UID: {containerResources: cpu1Mem1G}},
 			currentActivePods:              []*v1.Pod{pod1SmallWithPLR},
 			podToAdd:                       pod1LargeWithPLR,
 			admitFunc: func(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
@@ -1704,7 +1702,7 @@ func TestAllocationManagerAddPodWithPLR(t *testing.T) {
 			admissionFailureMessage: "not enough CPUs available for pod ns1/pod1, requested: 2, available:1",
 			// allocated Resources state must not be updated.
 			expectedAllocatedResourcesState: map[types.UID]resourceState{
-				pod1UID: resourceState{containerResources: cpu1Mem1G},
+				pod1UID: {containerResources: cpu1Mem1G},
 			},
 			ipprPLRFeatureGate: false,
 		},
