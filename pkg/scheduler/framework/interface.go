@@ -153,7 +153,7 @@ func NewPodsToActivate() *PodsToActivate {
 	return &PodsToActivate{Map: make(map[string]*v1.Pod)}
 }
 
-// A list of scored nodes, returned from scheduling.
+// SortedScoredNodes is a list of scored nodes, returned from scheduling.
 type SortedScoredNodes interface {
 	Pop() string
 	Len() int
