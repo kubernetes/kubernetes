@@ -145,10 +145,10 @@ func (b *OpportunisticBatch) StoreScheduleResults(ctx context.Context, signature
 		}
 		if loggerV := logger.V(6); loggerV.Enabled() {
 			loggerV.Info("OpportunisticBatch set batch information",
-			"profile", b.handle.ProfileName(), "signature", b.state.signature, "nodes", otherNodes.Len(), "cycleCount", cycleCount)
+				"profile", b.handle.ProfileName(), "signature", b.state.signature, "nodes", otherNodes.Len(), "cycleCount", cycleCount)
 		} else {
 			logger.V(4).Info("OpportunisticBatch set batch information",
-			"profile", b.handle.ProfileName(), "nodes", otherNodes.Len(), "cycleCount", cycleCount)
+				"profile", b.handle.ProfileName(), "nodes", otherNodes.Len(), "cycleCount", cycleCount)
 		}
 	} else {
 		reason := metrics.BatchFlushPodNotBatchable
@@ -189,7 +189,7 @@ func (b *OpportunisticBatch) batchStateCompatible(ctx context.Context, logger kl
 	}
 
 	// If the new pod is incompatible with the current state, throw the state away.
-	if signature == nil || bytes.Compare(signature, b.state.signature) != 0 {
+	if signature == nil || !bytes.Equal(signature, b.state.signature) {
 		b.logUnusableState(logger, cycleCount, metrics.BatchFlushPodIncompatible)
 		return false
 	}

@@ -4610,20 +4610,6 @@ func podWithResources(id, desiredHost string, limits v1.ResourceList, requests v
 	return pod
 }
 
-func podWithAffinity(id, desiredHost, label string) *v1.Pod {
-	pod := podWithID(id, desiredHost)
-	pod.Spec.Affinity = &v1.Affinity{
-		PodAffinity: &v1.PodAffinity{
-			RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
-				{
-					TopologyKey: label,
-				},
-			},
-		},
-	}
-	return pod
-}
-
 func makeNodeList(nodeNames []string) []*v1.Node {
 	result := make([]*v1.Node, 0, len(nodeNames))
 	for _, nodeName := range nodeNames {

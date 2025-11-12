@@ -18,6 +18,7 @@ package framework
 
 import (
 	"encoding/json"
+	"errors"
 	"reflect"
 	"testing"
 
@@ -297,7 +298,7 @@ func TestNodeAffinitySigner(t *testing.T) {
 	for _, tt := range table {
 		t.Run(tt.name, func(t *testing.T) {
 			res, err := NodeAffinitySigner(tt.input)
-			if err != tt.expectedErr {
+			if !errors.Is(err, tt.expectedErr) {
 				t.Fatalf("unexpected error %v, expected %v", err, tt.expectedErr)
 			}
 			if diff := cmp.Diff(res, tt.expected); diff != "" {

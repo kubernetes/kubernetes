@@ -161,7 +161,7 @@ func NodeAffinitySigner(pod *v1.Pod) (any, error) {
 	if pod.Spec.Affinity != nil {
 		if pod.Spec.Affinity.NodeAffinity != nil {
 			n := pod.Spec.Affinity.NodeAffinity
-			var pref []string
+			pref := []string{}
 			var err error
 			if n.PreferredDuringSchedulingIgnoredDuringExecution != nil {
 				pref, err = PreferredSchedulingTermSigner(n.PreferredDuringSchedulingIgnoredDuringExecution)
@@ -170,7 +170,7 @@ func NodeAffinitySigner(pod *v1.Pod) (any, error) {
 				}
 			}
 
-			var req []string
+			req := []string{}
 			if n.RequiredDuringSchedulingIgnoredDuringExecution != nil {
 				req, err = NodeSelectorTermsSigner(n.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms)
 				if err != nil {

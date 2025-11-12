@@ -375,7 +375,7 @@ func TestBatchBasic(t *testing.T) {
 				t.Fatalf("Expected empty %t, got empty %t for %s", expectedEmpty, batchEmpty, tt.name)
 			}
 			if !expectedEmpty {
-				if bytes.Compare(batch.state.signature, []byte(tt.expectedState.signature)) != 0 {
+				if !bytes.Equal(batch.state.signature, []byte(tt.expectedState.signature)) {
 					t.Fatalf("Got state signature '%s' expected '%s' for test '%s'", batch.state.signature, tt.expectedState.signature, tt.name)
 				}
 				nodesDiff := cmp.Diff(tt.expectedState.sortedNodes, batch.state.sortedNodes)

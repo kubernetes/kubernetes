@@ -38,7 +38,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/kubernetes/test/integration/util"
 
 	"k8s.io/kubernetes/pkg/scheduler"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -247,39 +246,37 @@ func TestBatchScenarios(t *testing.T) {
 				},
 			},
 		},
-		/*
-			{
-				name: "nnn trumps hint",
-				pods: []podDef{
-					{
-						name:         "nnn-batchp1",
-						expectedNode: "nnn-batchn1",
-						nodeAffinity: []string{"nnn-batchn1", "nnn-batchn2", "nnn-batchn3"},
-					},
-					{
-						name:          "nnn-batchp2",
-						expectedNode:  "nnn-batchn3",
-						nodeAffinity:  []string{"nnn-batchn1", "nnn-batchn2", "nnn-batchn3"},
-						nnn:           "nnn-batchn3",
-						expectBatched: false,
-					},
+		{
+			name: "nnn trumps hint",
+			pods: []podDef{
+				{
+					name:         "nnn-batchp1",
+					expectedNode: "nnn-batchn1",
+					nodeAffinity: []string{"nnn-batchn1", "nnn-batchn2", "nnn-batchn3"},
 				},
-				nodes: []nodeDef{
-					{
-						name:    "nnn-batchn3",
-						maxPods: 1,
-					},
-					{
-						name:    "nnn-batchn2",
-						maxPods: 1,
-					},
-					{
-						name:    "nnn-batchn1",
-						maxPods: 1,
-					},
+				{
+					name:          "nnn-batchp2",
+					expectedNode:  "nnn-batchn3",
+					nodeAffinity:  []string{"nnn-batchn1", "nnn-batchn2", "nnn-batchn3"},
+					nnn:           "nnn-batchn3",
+					expectBatched: false,
 				},
 			},
-		*/
+			nodes: []nodeDef{
+				{
+					name:    "nnn-batchn3",
+					maxPods: 1,
+				},
+				{
+					name:    "nnn-batchn2",
+					maxPods: 1,
+				},
+				{
+					name:    "nnn-batchn1",
+					maxPods: 1,
+				},
+			},
+		},
 		{
 			name: "no batching between schedulers",
 			pods: []podDef{
@@ -566,6 +563,9 @@ func runScenario(t *testing.T, tt *scenario, batch bool) ([]*v1.Pod, []bool) {
 		}
 
 		finalPod, err := cs.CoreV1().Pods(p.Namespace).Get(testCtx, p.Name, metav1.GetOptions{})
+		if err != nil {
+			t.Fatalf("Failed to get pod %v", err)
+		}
 		finalPods = append(finalPods, finalPod)
 
 		currBatched := getter.TotalBatchedPods()
@@ -623,10 +623,10 @@ func mustSetupCluster(tCtx ktesting.TContext, config *config.KubeSchedulerConfig
 
 	// Not all config options will be effective but only those mostly related with scheduler performance will
 	// be applied to start a scheduler, most of them are defined in `scheduler.schedulerOptions`.
-	scheduler, informerFactory := util.StartScheduler(tCtx, config, outOfTreePluginRegistry)
-	util.StartFakePVController(tCtx, tCtx.Client(), informerFactory)
-	runGC := util.CreateGCController(tCtx, tCtx, *cfg, informerFactory)
-	runNS := util.CreateNamespaceController(tCtx, tCtx, *cfg, informerFactory)
+	scheduler, informerFactory := testutil.StartScheduler(tCtx, config, outOfTreePluginRegistry)
+	testutil.StartFakePVController(tCtx, tCtx.Client(), informerFactory)
+	runGC := testutil.CreateGCController(tCtx, tCtx, *cfg, informerFactory)
+	runNS := testutil.CreateNamespaceController(tCtx, tCtx, *cfg, informerFactory)
 
 	runResourceClaimController := func() {}
 
