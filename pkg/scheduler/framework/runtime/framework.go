@@ -431,10 +431,7 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.OpportunisticBatching) {
-		err := f.computeBatchablePlugins()
-		if err != nil {
-			return nil, err
-		}
+		f.computeBatchablePlugins()
 	}
 
 	if options.captureProfile != nil {
@@ -759,8 +756,15 @@ func (f *frameworkImpl) QueueSortFunc() fwk.LessFunc {
 
 // If any of our preFilter, filter, preScore or score plugins haven't
 // implemented a signature, then disable the cache.
-func (f *frameworkImpl) computeBatchablePlugins() error {
+func (f *frameworkImpl) computeBatchablePlugins() {
 	f.enableSignatures = true
+
+	if len(f.extenders) > 0 {
+		f.logger.Info("Disabling signatures for profile because it has extenders configured.",
+			"profile", f.profileName)
+
+		f.enableSignatures = false
+	}
 
 	// Get all plugins of compatible types.
 	candidatePlugins := []fwk.Plugin{}
@@ -799,8 +803,6 @@ func (f *frameworkImpl) computeBatchablePlugins() error {
 	for _, plugin := range plugins {
 		f.batchablePlugins = append(f.batchablePlugins, plugin)
 	}
-
-	return nil
 }
 
 // SignPod returns a signature for a given pod. Any two pods with the same signature should get
