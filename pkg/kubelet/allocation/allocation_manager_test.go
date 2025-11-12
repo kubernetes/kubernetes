@@ -179,8 +179,10 @@ func TestUpdatePodFromAllocation(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, nil, nil)
 			pod := test.pod.DeepCopy()
-			allocatedPod, updated := updatePodFromAllocation(pod, test.allocated)
+			allocationManager.(*manager).allocated.SetPodResourceInfo(pod.UID, test.allocated)
+			allocatedPod, updated := allocationManager.UpdatePodFromAllocation(pod)
 
 			if test.expectUpdate {
 				assert.True(t, updated, "updated")
