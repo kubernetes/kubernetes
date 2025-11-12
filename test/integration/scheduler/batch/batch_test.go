@@ -17,6 +17,7 @@ limitations under the License.
 package batch
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
@@ -25,9 +26,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/informers"
 	restclient "k8s.io/client-go/rest"
 	kubeschedulerconfigv1 "k8s.io/kube-scheduler/config/v1"
+	fwk "k8s.io/kube-scheduler/framework"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -49,6 +52,8 @@ type podDef struct {
 	nodeAffinity  []string
 	expectedNode  string
 	expectBatched bool
+	nnn           string
+	scheduler     string
 }
 
 type nodeDef struct {
@@ -242,6 +247,131 @@ func TestBatchScenarios(t *testing.T) {
 				},
 			},
 		},
+		/*
+			{
+				name: "nnn trumps hint",
+				pods: []podDef{
+					{
+						name:         "nnn-batchp1",
+						expectedNode: "nnn-batchn1",
+						nodeAffinity: []string{"nnn-batchn1", "nnn-batchn2", "nnn-batchn3"},
+					},
+					{
+						name:          "nnn-batchp2",
+						expectedNode:  "nnn-batchn3",
+						nodeAffinity:  []string{"nnn-batchn1", "nnn-batchn2", "nnn-batchn3"},
+						nnn:           "nnn-batchn3",
+						expectBatched: false,
+					},
+				},
+				nodes: []nodeDef{
+					{
+						name:    "nnn-batchn3",
+						maxPods: 1,
+					},
+					{
+						name:    "nnn-batchn2",
+						maxPods: 1,
+					},
+					{
+						name:    "nnn-batchn1",
+						maxPods: 1,
+					},
+				},
+			},
+		*/
+		{
+			name: "no batching between schedulers",
+			pods: []podDef{
+				{
+					name:         "bts--batchp1",
+					expectedNode: "bts--batchn1",
+					nodeAffinity: []string{"bts--batchn1", "bts--batchn2", "bts--batchn3"},
+				},
+				{
+					name:         "bts--batchp2",
+					expectedNode: "bts--batchn2",
+					nodeAffinity: []string{"bts--batchn1", "bts--batchn2", "bts--batchn3"},
+					scheduler:    "mysched",
+				},
+			},
+			nodes: []nodeDef{
+				{
+					name:    "bts--batchn3",
+					maxPods: 1,
+				},
+				{
+					name:    "bts--batchn2",
+					maxPods: 1,
+				},
+				{
+					name:    "bts--batchn1",
+					maxPods: 1,
+				},
+			},
+		},
+		{
+			name: "no batching missing sign",
+			pods: []podDef{
+				{
+					name:         "nsg-batchp1",
+					expectedNode: "nsg-batchn1",
+					nodeAffinity: []string{"nsg-batchn1", "nsg-batchn2", "nsg-batchn3"},
+					scheduler:    "nosign",
+				},
+				{
+					name:         "nsg-batchp2",
+					expectedNode: "nsg-batchn2",
+					nodeAffinity: []string{"nsg-batchn1", "nsg-batchn2", "nsg-batchn3"},
+					scheduler:    "nosign",
+				},
+			},
+			nodes: []nodeDef{
+				{
+					name:    "nsg-batchn3",
+					maxPods: 1,
+				},
+				{
+					name:    "nsg-batchn2",
+					maxPods: 1,
+				},
+				{
+					name:    "nsg-batchn1",
+					maxPods: 1,
+				},
+			},
+		},
+		{
+			name: "no batching empty sign",
+			pods: []podDef{
+				{
+					name:         "esg-batchp1",
+					expectedNode: "esg-batchn1",
+					nodeAffinity: []string{"esg-batchn1", "esg-batchn2", "esg-batchn3"},
+					scheduler:    "emptysign",
+				},
+				{
+					name:         "esg-batchp2",
+					expectedNode: "esg-batchn2",
+					nodeAffinity: []string{"esg-batchn1", "esg-batchn2", "esg-batchn3"},
+					scheduler:    "emptysign",
+				},
+			},
+			nodes: []nodeDef{
+				{
+					name:    "esg-batchn3",
+					maxPods: 1,
+				},
+				{
+					name:    "esg-batchn2",
+					maxPods: 1,
+				},
+				{
+					name:    "esg-batchn1",
+					maxPods: 1,
+				},
+			},
+		},
 	}
 
 	for _, tt := range table {
@@ -289,7 +419,8 @@ func newPod(d *podDef) *v1.Pod {
 				v1.ResourceMemory: *(resource.NewQuantity(4*1024*1024, resource.DecimalSI)),
 			},
 		},
-		NodeSelector: d.nodeSelector,
+		NodeSelector:  d.nodeSelector,
+		SchedulerName: d.scheduler,
 	})
 }
 
@@ -331,6 +462,43 @@ func newDefaultComponentConfig() (*config.KubeSchedulerConfiguration, error) {
 	return &cfg, nil
 }
 
+type testPluginNoSign struct{}
+
+var _ fwk.FilterPlugin = &testPluginNoSign{}
+
+func (pl *testPluginNoSign) Name() string {
+	return "nosign"
+}
+
+func (pl *testPluginNoSign) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
+	return nil
+}
+
+func newNoSignPlugin(_ context.Context, injArgs runtime.Object, f fwk.Handle) (fwk.Plugin, error) {
+	return &testPluginNoSign{}, nil
+}
+
+type testPluginEmptySign struct{}
+
+var _ fwk.FilterPlugin = &testPluginEmptySign{}
+var _ fwk.SignPlugin = &testPluginEmptySign{}
+
+func (pl *testPluginEmptySign) Name() string {
+	return "nosign"
+}
+
+func (pl *testPluginEmptySign) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
+	return nil
+}
+
+func (pl *testPluginEmptySign) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
+	return nil, fwk.NewStatus(fwk.Unschedulable)
+}
+
+func newEmptySignPlugin(_ context.Context, injArgs runtime.Object, f fwk.Handle) (fwk.Plugin, error) {
+	return &testPluginEmptySign{}, nil
+}
+
 // To access the test-only field in the framework
 type batchGetter interface {
 	TotalBatchedPods() int64
@@ -344,12 +512,29 @@ func runScenario(t *testing.T, tt *scenario, batch bool) ([]*v1.Pod, []bool) {
 		tCtx.Fatalf("Error creating default component config: %v", err)
 	}
 
+	newProfile := cfg.Profiles[0].DeepCopy()
+	newProfile.SchedulerName = "mysched"
+	cfg.Profiles = append(cfg.Profiles, *newProfile)
+
+	newProfile = cfg.Profiles[0].DeepCopy()
+	newProfile.SchedulerName = "nosign"
+	newProfile.Plugins.Filter.Enabled = append(newProfile.Plugins.Filter.Enabled, config.Plugin{Name: "nosign"})
+	cfg.Profiles = append(cfg.Profiles, *newProfile)
+
+	newProfile = cfg.Profiles[0].DeepCopy()
+	newProfile.SchedulerName = "emptysign"
+	newProfile.Plugins.Filter.Enabled = append(newProfile.Plugins.Filter.Enabled, config.Plugin{Name: "emptysign"})
+	cfg.Profiles = append(cfg.Profiles, *newProfile)
+
 	enabledFeatures := map[featuregate.Feature]bool{}
 	if batch {
 		enabledFeatures[featuregate.Feature(features.OpportunisticBatching)] = true
 	}
 
-	scheduler, _, testCtx := mustSetupCluster(tCtx, cfg, nil, nil)
+	scheduler, _, testCtx := mustSetupCluster(tCtx, cfg, nil, frameworkruntime.Registry{
+		"nosign":    newNoSignPlugin,
+		"emptysign": newEmptySignPlugin,
+	})
 
 	getter := scheduler.Profiles["default-scheduler"].(batchGetter)
 
