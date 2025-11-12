@@ -18,7 +18,6 @@ package imagelocality
 
 import (
 	"context"
-	"sort"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
@@ -63,7 +62,7 @@ func (pl *ImageLocality) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFr
 	for _, container := range containers {
 		nameSet.Insert(normalizedImageName(container.Image))
 	}
-	names := nameSet.List()
+	names := sets.List(nameSet)
 	return []fwk.SignFragment{{Key: fwk.ImageNamesSignerName, Value: names}}, nil
 }
 

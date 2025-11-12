@@ -20,11 +20,11 @@ import (
 	"context"
 	"fmt"
 	"slices"
-	"sort"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	versionutil "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/component-base/version"
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
@@ -135,7 +135,7 @@ func (pl *NodeDeclaredFeatures) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk
 	if err != nil {
 		return nil, fwk.AsStatus(err)
 	}
-	featuresList := fs.List()
+	featuresList := sets.List(fs.Set)
 	return []fwk.SignFragment{
 		{Key: fwk.FeaturesSignerName, Value: featuresList},
 	}, nil
