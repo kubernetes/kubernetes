@@ -63,10 +63,7 @@ func (pl *ImageLocality) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFr
 	for _, container := range containers {
 		nameSet.Insert(normalizedImageName(container.Image))
 	}
-	names := nameSet.UnsortedList()
-	sort.Slice(names, func(i, j int) bool {
-		return names[i] < names[j]
-	})
+	names := nameSet.List()
 	return []fwk.SignFragment{{Key: fwk.ImageNamesSignerName, Value: names}}, nil
 }
 
