@@ -761,7 +761,7 @@ type Handle interface {
 	WorkloadManager() WorkloadManager
 
 	// Sign a pod.
-	SignPod(ctx context.Context, pod *v1.Pod) PodSignature
+	SignPod(ctx context.Context, pod *v1.Pod, recordPluginStats bool) PodSignature
 }
 
 // Parallelizer helps run scheduling operations in parallel chunks where possible, to improve performance and CPU utilization.

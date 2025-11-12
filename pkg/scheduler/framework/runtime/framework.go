@@ -810,14 +810,16 @@ func (f *frameworkImpl) computeBatchablePlugins() {
 // is unable to construct a signature for the pod, the result will be equal to fwk.Unsignable, which means
 // there is no way to compare this pod against others, and will turn off a number of optimizations
 // for this pod.
-func (f *frameworkImpl) SignPod(ctx context.Context, pod *v1.Pod) fwk.PodSignature {
+func (f *frameworkImpl) SignPod(ctx context.Context, pod *v1.Pod, recordPluginStats bool) fwk.PodSignature {
 	logger := klog.FromContext(ctx)
-
-	startTime := time.Now()
 	var status *fwk.Status
-	defer func() {
-		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.Sign, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
-	}()
+
+	if recordPluginStats {
+		startTime := time.Now()
+		defer func() {
+			metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.Sign, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
+		}()
+	}
 
 	if !f.enableSignatures {
 		return nil

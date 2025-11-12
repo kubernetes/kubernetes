@@ -65,41 +65,60 @@ func HostPortsSigner(pod *v1.Pod) any {
 	return ports
 }
 
-func NodeSelectorRequirementSigner(reqs v1.NodeSelectorRequirement) v1.NodeSelectorRequirement {
-	newValues := make([]string, len(reqs.Values))
-	copy(newValues, reqs.Values)
-	sort.Slice(newValues, func(i, j int) bool {
-		return newValues[i] < newValues[j]
-	})
-	return v1.NodeSelectorRequirement{
-		Key:      reqs.Key,
-		Operator: reqs.Operator,
-		Values:   newValues,
+func NodeSelectorRequirementsSigner(reqs []v1.NodeSelectorRequirement) ([]string, error) {
+	ret := make([]string, len(reqs))
+	for i, req := range reqs {
+		t := req.DeepCopy()
+		sort.Slice(t.Values, func(i, j int) bool {
+			return t.Values[i] < t.Values[j]
+		})
+		v, err := json.Marshal(t)
+		if err != nil {
+			return nil, err
+		}
+		ret[i] = string(v)
 	}
+	sort.Slice(ret, func(i, j int) bool {
+		return ret[i] < ret[j]
+	})
+	return ret, nil
 }
 
-func NodeSelectorRequirementsSigner(reqs []v1.NodeSelectorRequirement) []v1.NodeSelectorRequirement {
-	newReqs := make([]v1.NodeSelectorRequirement, len(reqs))
-	copy(newReqs, reqs)
-	sort.Slice(newReqs, func(i, j int) bool {
-		return newReqs[i].Key < newReqs[j].Key || (newReqs[i].Key == newReqs[j].Key && newReqs[i].Operator < newReqs[j].Operator)
-	})
-	return newReqs
+type nodeSelTermSignResult struct {
+	MatchExpressions []string
+	MatchFields      []string
 }
 
-func NodeSelectorTermSigner(t *v1.NodeSelectorTerm) v1.NodeSelectorTerm {
-	return v1.NodeSelectorTerm{
-		MatchExpressions: NodeSelectorRequirementsSigner(t.MatchExpressions),
-		MatchFields:      NodeSelectorRequirementsSigner(t.MatchFields),
+func NodeSelectorTermSigner(t *v1.NodeSelectorTerm) (nodeSelTermSignResult, error) {
+	exp, err := NodeSelectorRequirementsSigner(t.MatchExpressions)
+	if err != nil {
+		return nodeSelTermSignResult{}, err
 	}
+	fld, err := NodeSelectorRequirementsSigner(t.MatchFields)
+	if err != nil {
+		return nodeSelTermSignResult{}, err
+	}
+	return nodeSelTermSignResult{
+		MatchExpressions: exp,
+		MatchFields:      fld,
+	}, nil
+}
+
+type prefSchedTermSignResult struct {
+	Weight     int32
+	Preference nodeSelTermSignResult
 }
 
 func PreferredSchedulingTermSigner(terms []v1.PreferredSchedulingTerm) ([]string, error) {
 	newTerms := make([]string, len(terms))
 	for i, t := range terms {
-		termStr, err := json.Marshal(v1.PreferredSchedulingTerm{
+		pref, err := NodeSelectorTermSigner(&t.Preference)
+		if err != nil {
+			return nil, err
+		}
+		termStr, err := json.Marshal(prefSchedTermSignResult{
 			Weight:     t.Weight,
-			Preference: NodeSelectorTermSigner(&t.Preference),
+			Preference: pref,
 		})
 		if err != nil {
 			return nil, err
@@ -115,7 +134,11 @@ func PreferredSchedulingTermSigner(terms []v1.PreferredSchedulingTerm) ([]string
 func NodeSelectorTermsSigner(terms []v1.NodeSelectorTerm) ([]string, error) {
 	req := make([]string, len(terms))
 	for i, t := range terms {
-		tStr, err := json.Marshal(NodeSelectorTermSigner(&t))
+		nst, err := NodeSelectorTermSigner(&t)
+		if err != nil {
+			return nil, err
+		}
+		tStr, err := json.Marshal(nst)
 		if err != nil {
 			return nil, err
 		}

@@ -178,7 +178,7 @@ type Framework interface {
 	// are unable to create a signature, the pod may be "unsignable" which disables results caching
 	// and gang scheduling optimizations.
 	// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-scheduling/5598-opportunistic-batching
-	SignPod(ctx context.Context, pod *v1.Pod) fwk.PodSignature
+	SignPod(ctx context.Context, pod *v1.Pod, recordPluginStats bool) fwk.PodSignature
 
 	// RunPreFilterPlugins runs the set of configured PreFilter plugins. It returns
 	// *fwk.Status and its code is set to non-success if any of the plugins returns

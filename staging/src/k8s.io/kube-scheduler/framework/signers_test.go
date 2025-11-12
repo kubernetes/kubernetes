@@ -235,7 +235,7 @@ func TestNodeAffinitySigner(t *testing.T) {
 								NodeSelectorTerms: []v1.NodeSelectorTerm{
 									{
 										MatchExpressions: []v1.NodeSelectorRequirement{
-											{Key: "kk3", Operator: v1.NodeSelectorOpIn, Values: []string{"kv3", "v4"}},
+											{Key: "kk3", Operator: v1.NodeSelectorOpIn, Values: []string{"v3", "kv4"}},
 											{Key: "kk2", Operator: v1.NodeSelectorOpIn, Values: []string{"kv1", "v2"}},
 										},
 										MatchFields: []v1.NodeSelectorRequirement{
@@ -282,12 +282,12 @@ func TestNodeAffinitySigner(t *testing.T) {
 			},
 			expected: nodeAffinitySignerResult{
 				Required: []string{
-					`{"matchExpressions":[{"key":"k2","operator":"In","values":["v1","v2"]}],"matchFields":[{"key":"k1","operator":"In","values":["v3","v4"]}]}`,
-					`{"matchExpressions":[{"key":"kk2","operator":"In","values":["kv1","v2"]},{"key":"kk3","operator":"In","values":["kv3","v4"]}],"matchFields":[{"key":"kk1","operator":"In","values":["kv3","v4"]}]}`,
+					`{"MatchExpressions":["{\"key\":\"k2\",\"operator\":\"In\",\"values\":[\"v1\",\"v2\"]}"],"MatchFields":["{\"key\":\"k1\",\"operator\":\"In\",\"values\":[\"v3\",\"v4\"]}"]}`,
+					`{"MatchExpressions":["{\"key\":\"kk2\",\"operator\":\"In\",\"values\":[\"kv1\",\"v2\"]}","{\"key\":\"kk3\",\"operator\":\"In\",\"values\":[\"kv4\",\"v3\"]}"],"MatchFields":["{\"key\":\"kk1\",\"operator\":\"In\",\"values\":[\"kv3\",\"v4\"]}"]}`,
 				},
 				Preferred: []string{
-					`{"weight":1,"preference":{"matchExpressions":[{"key":"pk2","operator":"In","values":["pv1","v2"]}],"matchFields":[{"key":"pk1","operator":"In","values":["pv3","v4"]}]}}`,
-					`{"weight":3,"preference":{"matchExpressions":[{"key":"ppk2","operator":"In","values":["ppv1","v2"]}],"matchFields":[{"key":"ppk1","operator":"In","values":["ppv3","v4"]}]}}`,
+					`{"Weight":1,"Preference":{"MatchExpressions":["{\"key\":\"pk2\",\"operator\":\"In\",\"values\":[\"pv1\",\"v2\"]}"],"MatchFields":["{\"key\":\"pk1\",\"operator\":\"In\",\"values\":[\"pv3\",\"v4\"]}"]}}`,
+					`{"Weight":3,"Preference":{"MatchExpressions":["{\"key\":\"ppk2\",\"operator\":\"In\",\"values\":[\"ppv1\",\"v2\"]}"],"MatchFields":["{\"key\":\"ppk1\",\"operator\":\"In\",\"values\":[\"ppv3\",\"v4\"]}"]}}`,
 				},
 			},
 			expectedErr: nil,
