@@ -35,11 +35,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	matchers "k8s.io/kubernetes/test/e2e/framework/matchers"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/storage/drivers"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
-	matchers "k8s.io/kubernetes/test/e2e/framework/matchers"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
@@ -615,10 +615,10 @@ func validateQuotaUsage(ctx context.Context, m *mockDriverSetup, currentQuota, e
 		usedSize = quota.Status.Used[pvcSizeQuotaKey]
 		return usedCount.Cmp(expectedCount) == 0 && usedSize.Cmp(expectedUsedSize) == 0
 	}, csiResizeWaitPeriod, resizePollInterval).Should(
-        matchers.BeTrueBecause(
-            "resource quota usage did not converge; currentlyUsed: %s/%s, expected: %s/%s",
-            usedCount.String(), usedSize.String(), expectedCount.String(), expectedUsedSize.String(),
-        ),
+		matchers.BeTrueBecause(
+			"resource quota usage did not converge; currentlyUsed: %s/%s, expected: %s/%s",
+			usedCount.String(), usedSize.String(), expectedCount.String(), expectedUsedSize.String(),
+		),
 	)
 }
 func validateRecoveryBehaviour(ctx context.Context, pvc *v1.PersistentVolumeClaim, m *mockDriverSetup, test recoveryTest) {
