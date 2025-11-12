@@ -107,9 +107,7 @@ func (b *OpportunisticBatch) StoreScheduleResults(ctx context.Context, signature
 	logger := klog.FromContext(ctx)
 
 	startTime := time.Now()
-	defer func() {
-		metrics.StoreScheduleResultsDuration.WithLabelValues(b.handle.ProfileName()).Observe(metrics.SinceInSeconds(startTime))
-	}()
+	defer metrics.StoreScheduleResultsDuration.WithLabelValues(b.handle.ProfileName()).Observe(metrics.SinceInSeconds(startTime))
 
 	// Set our cycle information for next time.
 	b.lastCycle = schedulingCycle{
