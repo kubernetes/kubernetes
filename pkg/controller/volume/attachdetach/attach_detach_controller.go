@@ -822,10 +822,6 @@ func (adc *attachDetachController) GetMounter() mount.Interface {
 	return nil
 }
 
-func (adc *attachDetachController) GetHostName() string {
-	return ""
-}
-
 func (adc *attachDetachController) GetNodeAllocatable() (v1.ResourceList, error) {
 	return v1.ResourceList{}, nil
 }

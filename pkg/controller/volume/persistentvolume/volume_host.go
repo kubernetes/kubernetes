@@ -75,10 +75,6 @@ func (ctrl *PersistentVolumeController) GetMounter() mount.Interface {
 	return nil
 }
 
-func (ctrl *PersistentVolumeController) GetHostName() string {
-	return ""
-}
-
 func (ctrl *PersistentVolumeController) GetNodeAllocatable() (v1.ResourceList, error) {
 	return v1.ResourceList{}, nil
 }
