@@ -688,7 +688,7 @@ func TestAuthFilters(t *testing.T) {
 	for _, fineGraned := range []bool{false, true} {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletFineGrainedAuthz, fineGraned)
 		for _, tc := range AuthzTestCases(fineGraned) {
-			t.Run(fmt.Sprintf("method=%v:path=%v:fineGrained=%v", tc.Method, tc.Method, fineGraned), func(t *testing.T) {
+			t.Run(fmt.Sprintf("method=%v:path=%v:fineGrained=%v", tc.Method, tc.Path, fineGraned), func(t *testing.T) {
 				var (
 					expectedUser = AuthzTestUser()
 
