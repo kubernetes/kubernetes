@@ -29,6 +29,52 @@ import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 // Package-wide variables from generator "generated".
 option go_package = "k8s.io/api/scheduling/v1alpha1";
 
+// BasicSchedulingPolicy indicates that standard Kubernetes
+// scheduling behavior should be used.
+message BasicSchedulingPolicy {
+}
+
+// GangSchedulingPolicy defines the parameters for gang scheduling.
+message GangSchedulingPolicy {
+  // MinCount is the minimum number of pods that must be schedulable or scheduled
+  // at the same time for the scheduler to admit the entire group.
+  // It must be a positive integer.
+  //
+  // +required
+  optional int32 minCount = 1;
+}
+
+// PodGroup represents a set of pods with a common scheduling policy.
+message PodGroup {
+  // Name is a unique identifier for the PodGroup within the Workload.
+  // It must be a DNS label. This field is immutable.
+  //
+  // +required
+  optional string name = 1;
+
+  // Policy defines the scheduling policy for this PodGroup.
+  //
+  // +required
+  optional PodGroupPolicy policy = 3;
+}
+
+// PodGroupPolicy defines the scheduling configuration for a PodGroup.
+message PodGroupPolicy {
+  // Basic specifies that the pods in this group should be scheduled using
+  // standard Kubernetes scheduling behavior.
+  //
+  // +optional
+  // +oneOf=PolicySelection
+  optional BasicSchedulingPolicy basic = 2;
+
+  // Gang specifies that the pods in this group should be scheduled using
+  // all-or-nothing semantics.
+  //
+  // +optional
+  // +oneOf=PolicySelection
+  optional GangSchedulingPolicy gang = 3;
+}
+
 // DEPRECATED - This group version of PriorityClass is deprecated by scheduling.k8s.io/v1/PriorityClass.
 // PriorityClass defines mapping from a priority class name to the priority
 // integer value. The value can be any valid integer.
@@ -71,5 +117,74 @@ message PriorityClassList {
 
   // items is the list of PriorityClasses
   repeated PriorityClass items = 2;
+}
+
+// TypedLocalObjectReference allows to reference typed object inside the same namespace.
+message TypedLocalObjectReference {
+  // APIGroup is the group for the resource being referenced.
+  // If APIGroup is empty, the specified Kind must be in the core API group.
+  // For any other third-party types, setting APIGroup is required.
+  // It must be a DNS subdomain.
+  //
+  // +optional
+  optional string apiGroup = 1;
+
+  // Kind is the type of resource being referenced.
+  // It must be a path segment name.
+  //
+  // +required
+  optional string kind = 2;
+
+  // Name is the name of resource being referenced.
+  // It must be a path segment name.
+  //
+  // +required
+  optional string name = 3;
+}
+
+// Workload allows for expressing scheduling constraints that should be used
+// when managing lifecycle of workloads from scheduling perspective,
+// including scheduling, preemption, eviction and other phases.
+message Workload {
+  // Standard object's metadata.
+  // Name must be a DNS subdomain.
+  //
+  // +optional
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+
+  // Spec defines the desired behavior of a Workload.
+  //
+  // +required
+  optional WorkloadSpec spec = 2;
+}
+
+// WorkloadList contains a list of Workload resources.
+message WorkloadList {
+  // Standard list metadata.
+  //
+  // +optional
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+
+  // Items is the list of Workloads.
+  repeated Workload items = 2;
+}
+
+// WorkloadSpec defines the desired state of a Workload.
+message WorkloadSpec {
+  // ControllerRef is an optional reference to the controlling object, such as a
+  // Deployment or Job. This field is intended for use by tools like CLIs
+  // to provide a link back to the original workload definition.
+  // When set, it cannot be changed.
+  //
+  // +optional
+  optional TypedLocalObjectReference controllerRef = 1;
+
+  // PodGroups is the list of pod groups that make up the Workload.
+  // The maximum number of pod groups is 8. This field is immutable.
+  //
+  // +required
+  // +listType=map
+  // +listMapKey=name
+  repeated PodGroup podGroups = 2;
 }
 

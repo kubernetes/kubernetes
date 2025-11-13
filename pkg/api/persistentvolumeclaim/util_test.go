@@ -272,8 +272,10 @@ func TestDataSourceFilter(t *testing.T) {
 		t.Run(testName, func(t *testing.T) {
 			// TODO: this will be removed in 1.36
 			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AnyVolumeDataSource, test.anyEnabled)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CrossNamespaceVolumeDataSource, test.xnsEnabled)
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.AnyVolumeDataSource:            test.anyEnabled,
+				features.CrossNamespaceVolumeDataSource: test.xnsEnabled,
+			})
 			DropDisabledFields(&test.spec, &test.oldSpec)
 			if test.spec.DataSource != test.want {
 				t.Errorf("expected condition was not met, test: %s, anyEnabled: %v, xnsEnabled: %v, spec: %+v, expected DataSource: %+v",
@@ -370,8 +372,10 @@ func TestDataSourceRef(t *testing.T) {
 		},
 	}
 
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AnyVolumeDataSource, true)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CrossNamespaceVolumeDataSource, true)
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.AnyVolumeDataSource:            true,
+		features.CrossNamespaceVolumeDataSource: true,
+	})
 
 	for testName, test := range tests {
 		t.Run(testName, func(t *testing.T) {
@@ -598,8 +602,10 @@ func TestDropDisabledFieldsFromStatus(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecoverVolumeExpansionFailure, test.enableRecoverVolumeExpansionFailure)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, test.enableVolumeAttributesClass)
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.RecoverVolumeExpansionFailure: test.enableRecoverVolumeExpansionFailure,
+				features.VolumeAttributesClass:         test.enableVolumeAttributesClass,
+			})
 
 			DropDisabledFieldsFromStatus(test.pvc, test.oldPVC)
 

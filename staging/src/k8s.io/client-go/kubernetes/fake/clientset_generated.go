@@ -134,8 +134,8 @@ import (
 	fakestoragev1alpha1 "k8s.io/client-go/kubernetes/typed/storage/v1alpha1/fake"
 	storagev1beta1 "k8s.io/client-go/kubernetes/typed/storage/v1beta1"
 	fakestoragev1beta1 "k8s.io/client-go/kubernetes/typed/storage/v1beta1/fake"
-	storagemigrationv1alpha1 "k8s.io/client-go/kubernetes/typed/storagemigration/v1alpha1"
-	fakestoragemigrationv1alpha1 "k8s.io/client-go/kubernetes/typed/storagemigration/v1alpha1/fake"
+	storagemigrationv1beta1 "k8s.io/client-go/kubernetes/typed/storagemigration/v1beta1"
+	fakestoragemigrationv1beta1 "k8s.io/client-go/kubernetes/typed/storagemigration/v1beta1/fake"
 	"k8s.io/client-go/testing"
 )
 
@@ -190,6 +190,17 @@ func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 
 func (c *Clientset) Tracker() testing.ObjectTracker {
 	return c.tracker
+}
+
+// IsWatchListSemanticsSupported informs the reflector that this client
+// doesn't support WatchList semantics.
+//
+// This is a synthetic method whose sole purpose is to satisfy the optional
+// interface check performed by the reflector.
+// Returning true signals that WatchList can NOT be used.
+// No additional logic is implemented here.
+func (c *Clientset) IsWatchListSemanticsUnSupported() bool {
+	return true
 }
 
 // NewClientset returns a clientset that will respond with the provided objects.
@@ -503,7 +514,7 @@ func (c *Clientset) StorageV1alpha1() storagev1alpha1.StorageV1alpha1Interface {
 	return &fakestoragev1alpha1.FakeStorageV1alpha1{Fake: &c.Fake}
 }
 
-// StoragemigrationV1alpha1 retrieves the StoragemigrationV1alpha1Client
-func (c *Clientset) StoragemigrationV1alpha1() storagemigrationv1alpha1.StoragemigrationV1alpha1Interface {
-	return &fakestoragemigrationv1alpha1.FakeStoragemigrationV1alpha1{Fake: &c.Fake}
+// StoragemigrationV1beta1 retrieves the StoragemigrationV1beta1Client
+func (c *Clientset) StoragemigrationV1beta1() storagemigrationv1beta1.StoragemigrationV1beta1Interface {
+	return &fakestoragemigrationv1beta1.FakeStoragemigrationV1beta1{Fake: &c.Fake}
 }

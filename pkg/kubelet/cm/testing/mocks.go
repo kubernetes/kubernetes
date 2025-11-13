@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/cri-api/pkg/apis"
+	"k8s.io/klog/v2"
 	v10 "k8s.io/kubelet/pkg/apis/podresources/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/cm/resourceupdates"
@@ -1769,16 +1770,16 @@ func (_c *MockContainerManager_UpdatePluginResources_Call) RunAndReturn(run func
 }
 
 // UpdateQOSCgroups provides a mock function for the type MockContainerManager
-func (_mock *MockContainerManager) UpdateQOSCgroups() error {
-	ret := _mock.Called()
+func (_mock *MockContainerManager) UpdateQOSCgroups(logger klog.Logger) error {
+	ret := _mock.Called(logger)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UpdateQOSCgroups")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func() error); ok {
-		r0 = returnFunc()
+	if returnFunc, ok := ret.Get(0).(func(klog.Logger) error); ok {
+		r0 = returnFunc(logger)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -1791,13 +1792,20 @@ type MockContainerManager_UpdateQOSCgroups_Call struct {
 }
 
 // UpdateQOSCgroups is a helper method to define mock.On call
-func (_e *MockContainerManager_Expecter) UpdateQOSCgroups() *MockContainerManager_UpdateQOSCgroups_Call {
-	return &MockContainerManager_UpdateQOSCgroups_Call{Call: _e.mock.On("UpdateQOSCgroups")}
+//   - logger klog.Logger
+func (_e *MockContainerManager_Expecter) UpdateQOSCgroups(logger interface{}) *MockContainerManager_UpdateQOSCgroups_Call {
+	return &MockContainerManager_UpdateQOSCgroups_Call{Call: _e.mock.On("UpdateQOSCgroups", logger)}
 }
 
-func (_c *MockContainerManager_UpdateQOSCgroups_Call) Run(run func()) *MockContainerManager_UpdateQOSCgroups_Call {
+func (_c *MockContainerManager_UpdateQOSCgroups_Call) Run(run func(logger klog.Logger)) *MockContainerManager_UpdateQOSCgroups_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run()
+		var arg0 klog.Logger
+		if args[0] != nil {
+			arg0 = args[0].(klog.Logger)
+		}
+		run(
+			arg0,
+		)
 	})
 	return _c
 }
@@ -1807,7 +1815,7 @@ func (_c *MockContainerManager_UpdateQOSCgroups_Call) Return(err error) *MockCon
 	return _c
 }
 
-func (_c *MockContainerManager_UpdateQOSCgroups_Call) RunAndReturn(run func() error) *MockContainerManager_UpdateQOSCgroups_Call {
+func (_c *MockContainerManager_UpdateQOSCgroups_Call) RunAndReturn(run func(logger klog.Logger) error) *MockContainerManager_UpdateQOSCgroups_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1886,16 +1894,16 @@ func (_m *MockPodContainerManager) EXPECT() *MockPodContainerManager_Expecter {
 }
 
 // Destroy provides a mock function for the type MockPodContainerManager
-func (_mock *MockPodContainerManager) Destroy(name cm.CgroupName) error {
-	ret := _mock.Called(name)
+func (_mock *MockPodContainerManager) Destroy(logger klog.Logger, name cm.CgroupName) error {
+	ret := _mock.Called(logger, name)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Destroy")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(cm.CgroupName) error); ok {
-		r0 = returnFunc(name)
+	if returnFunc, ok := ret.Get(0).(func(klog.Logger, cm.CgroupName) error); ok {
+		r0 = returnFunc(logger, name)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -1908,19 +1916,25 @@ type MockPodContainerManager_Destroy_Call struct {
 }
 
 // Destroy is a helper method to define mock.On call
+//   - logger klog.Logger
 //   - name cm.CgroupName
-func (_e *MockPodContainerManager_Expecter) Destroy(name interface{}) *MockPodContainerManager_Destroy_Call {
-	return &MockPodContainerManager_Destroy_Call{Call: _e.mock.On("Destroy", name)}
+func (_e *MockPodContainerManager_Expecter) Destroy(logger interface{}, name interface{}) *MockPodContainerManager_Destroy_Call {
+	return &MockPodContainerManager_Destroy_Call{Call: _e.mock.On("Destroy", logger, name)}
 }
 
-func (_c *MockPodContainerManager_Destroy_Call) Run(run func(name cm.CgroupName)) *MockPodContainerManager_Destroy_Call {
+func (_c *MockPodContainerManager_Destroy_Call) Run(run func(logger klog.Logger, name cm.CgroupName)) *MockPodContainerManager_Destroy_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 cm.CgroupName
+		var arg0 klog.Logger
 		if args[0] != nil {
-			arg0 = args[0].(cm.CgroupName)
+			arg0 = args[0].(klog.Logger)
+		}
+		var arg1 cm.CgroupName
+		if args[1] != nil {
+			arg1 = args[1].(cm.CgroupName)
 		}
 		run(
 			arg0,
+			arg1,
 		)
 	})
 	return _c
@@ -1931,22 +1945,22 @@ func (_c *MockPodContainerManager_Destroy_Call) Return(err error) *MockPodContai
 	return _c
 }
 
-func (_c *MockPodContainerManager_Destroy_Call) RunAndReturn(run func(name cm.CgroupName) error) *MockPodContainerManager_Destroy_Call {
+func (_c *MockPodContainerManager_Destroy_Call) RunAndReturn(run func(logger klog.Logger, name cm.CgroupName) error) *MockPodContainerManager_Destroy_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // EnsureExists provides a mock function for the type MockPodContainerManager
-func (_mock *MockPodContainerManager) EnsureExists(pod *v1.Pod) error {
-	ret := _mock.Called(pod)
+func (_mock *MockPodContainerManager) EnsureExists(logger klog.Logger, pod *v1.Pod) error {
+	ret := _mock.Called(logger, pod)
 
 	if len(ret) == 0 {
 		panic("no return value specified for EnsureExists")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*v1.Pod) error); ok {
-		r0 = returnFunc(pod)
+	if returnFunc, ok := ret.Get(0).(func(klog.Logger, *v1.Pod) error); ok {
+		r0 = returnFunc(logger, pod)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -1959,19 +1973,25 @@ type MockPodContainerManager_EnsureExists_Call struct {
 }
 
 // EnsureExists is a helper method to define mock.On call
+//   - logger klog.Logger
 //   - pod *v1.Pod
-func (_e *MockPodContainerManager_Expecter) EnsureExists(pod interface{}) *MockPodContainerManager_EnsureExists_Call {
-	return &MockPodContainerManager_EnsureExists_Call{Call: _e.mock.On("EnsureExists", pod)}
+func (_e *MockPodContainerManager_Expecter) EnsureExists(logger interface{}, pod interface{}) *MockPodContainerManager_EnsureExists_Call {
+	return &MockPodContainerManager_EnsureExists_Call{Call: _e.mock.On("EnsureExists", logger, pod)}
 }
 
-func (_c *MockPodContainerManager_EnsureExists_Call) Run(run func(pod *v1.Pod)) *MockPodContainerManager_EnsureExists_Call {
+func (_c *MockPodContainerManager_EnsureExists_Call) Run(run func(logger klog.Logger, pod *v1.Pod)) *MockPodContainerManager_EnsureExists_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *v1.Pod
+		var arg0 klog.Logger
 		if args[0] != nil {
-			arg0 = args[0].(*v1.Pod)
+			arg0 = args[0].(klog.Logger)
+		}
+		var arg1 *v1.Pod
+		if args[1] != nil {
+			arg1 = args[1].(*v1.Pod)
 		}
 		run(
 			arg0,
+			arg1,
 		)
 	})
 	return _c
@@ -1982,7 +2002,7 @@ func (_c *MockPodContainerManager_EnsureExists_Call) Return(err error) *MockPodC
 	return _c
 }
 
-func (_c *MockPodContainerManager_EnsureExists_Call) RunAndReturn(run func(pod *v1.Pod) error) *MockPodContainerManager_EnsureExists_Call {
+func (_c *MockPodContainerManager_EnsureExists_Call) RunAndReturn(run func(logger klog.Logger, pod *v1.Pod) error) *MockPodContainerManager_EnsureExists_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -2344,16 +2364,16 @@ func (_c *MockPodContainerManager_IsPodCgroup_Call) RunAndReturn(run func(cgroup
 }
 
 // ReduceCPULimits provides a mock function for the type MockPodContainerManager
-func (_mock *MockPodContainerManager) ReduceCPULimits(name cm.CgroupName) error {
-	ret := _mock.Called(name)
+func (_mock *MockPodContainerManager) ReduceCPULimits(logger klog.Logger, name cm.CgroupName) error {
+	ret := _mock.Called(logger, name)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ReduceCPULimits")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(cm.CgroupName) error); ok {
-		r0 = returnFunc(name)
+	if returnFunc, ok := ret.Get(0).(func(klog.Logger, cm.CgroupName) error); ok {
+		r0 = returnFunc(logger, name)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -2366,19 +2386,25 @@ type MockPodContainerManager_ReduceCPULimits_Call struct {
 }
 
 // ReduceCPULimits is a helper method to define mock.On call
+//   - logger klog.Logger
 //   - name cm.CgroupName
-func (_e *MockPodContainerManager_Expecter) ReduceCPULimits(name interface{}) *MockPodContainerManager_ReduceCPULimits_Call {
-	return &MockPodContainerManager_ReduceCPULimits_Call{Call: _e.mock.On("ReduceCPULimits", name)}
+func (_e *MockPodContainerManager_Expecter) ReduceCPULimits(logger interface{}, name interface{}) *MockPodContainerManager_ReduceCPULimits_Call {
+	return &MockPodContainerManager_ReduceCPULimits_Call{Call: _e.mock.On("ReduceCPULimits", logger, name)}
 }
 
-func (_c *MockPodContainerManager_ReduceCPULimits_Call) Run(run func(name cm.CgroupName)) *MockPodContainerManager_ReduceCPULimits_Call {
+func (_c *MockPodContainerManager_ReduceCPULimits_Call) Run(run func(logger klog.Logger, name cm.CgroupName)) *MockPodContainerManager_ReduceCPULimits_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 cm.CgroupName
+		var arg0 klog.Logger
 		if args[0] != nil {
-			arg0 = args[0].(cm.CgroupName)
+			arg0 = args[0].(klog.Logger)
+		}
+		var arg1 cm.CgroupName
+		if args[1] != nil {
+			arg1 = args[1].(cm.CgroupName)
 		}
 		run(
 			arg0,
+			arg1,
 		)
 	})
 	return _c
@@ -2389,22 +2415,22 @@ func (_c *MockPodContainerManager_ReduceCPULimits_Call) Return(err error) *MockP
 	return _c
 }
 
-func (_c *MockPodContainerManager_ReduceCPULimits_Call) RunAndReturn(run func(name cm.CgroupName) error) *MockPodContainerManager_ReduceCPULimits_Call {
+func (_c *MockPodContainerManager_ReduceCPULimits_Call) RunAndReturn(run func(logger klog.Logger, name cm.CgroupName) error) *MockPodContainerManager_ReduceCPULimits_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // SetPodCgroupConfig provides a mock function for the type MockPodContainerManager
-func (_mock *MockPodContainerManager) SetPodCgroupConfig(pod *v1.Pod, resourceConfig *cm.ResourceConfig) error {
-	ret := _mock.Called(pod, resourceConfig)
+func (_mock *MockPodContainerManager) SetPodCgroupConfig(logger klog.Logger, pod *v1.Pod, resourceConfig *cm.ResourceConfig) error {
+	ret := _mock.Called(logger, pod, resourceConfig)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SetPodCgroupConfig")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*v1.Pod, *cm.ResourceConfig) error); ok {
-		r0 = returnFunc(pod, resourceConfig)
+	if returnFunc, ok := ret.Get(0).(func(klog.Logger, *v1.Pod, *cm.ResourceConfig) error); ok {
+		r0 = returnFunc(logger, pod, resourceConfig)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -2417,25 +2443,31 @@ type MockPodContainerManager_SetPodCgroupConfig_Call struct {
 }
 
 // SetPodCgroupConfig is a helper method to define mock.On call
+//   - logger klog.Logger
 //   - pod *v1.Pod
 //   - resourceConfig *cm.ResourceConfig
-func (_e *MockPodContainerManager_Expecter) SetPodCgroupConfig(pod interface{}, resourceConfig interface{}) *MockPodContainerManager_SetPodCgroupConfig_Call {
-	return &MockPodContainerManager_SetPodCgroupConfig_Call{Call: _e.mock.On("SetPodCgroupConfig", pod, resourceConfig)}
+func (_e *MockPodContainerManager_Expecter) SetPodCgroupConfig(logger interface{}, pod interface{}, resourceConfig interface{}) *MockPodContainerManager_SetPodCgroupConfig_Call {
+	return &MockPodContainerManager_SetPodCgroupConfig_Call{Call: _e.mock.On("SetPodCgroupConfig", logger, pod, resourceConfig)}
 }
 
-func (_c *MockPodContainerManager_SetPodCgroupConfig_Call) Run(run func(pod *v1.Pod, resourceConfig *cm.ResourceConfig)) *MockPodContainerManager_SetPodCgroupConfig_Call {
+func (_c *MockPodContainerManager_SetPodCgroupConfig_Call) Run(run func(logger klog.Logger, pod *v1.Pod, resourceConfig *cm.ResourceConfig)) *MockPodContainerManager_SetPodCgroupConfig_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *v1.Pod
+		var arg0 klog.Logger
 		if args[0] != nil {
-			arg0 = args[0].(*v1.Pod)
+			arg0 = args[0].(klog.Logger)
 		}
-		var arg1 *cm.ResourceConfig
+		var arg1 *v1.Pod
 		if args[1] != nil {
-			arg1 = args[1].(*cm.ResourceConfig)
+			arg1 = args[1].(*v1.Pod)
+		}
+		var arg2 *cm.ResourceConfig
+		if args[2] != nil {
+			arg2 = args[2].(*cm.ResourceConfig)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -2446,7 +2478,7 @@ func (_c *MockPodContainerManager_SetPodCgroupConfig_Call) Return(err error) *Mo
 	return _c
 }
 
-func (_c *MockPodContainerManager_SetPodCgroupConfig_Call) RunAndReturn(run func(pod *v1.Pod, resourceConfig *cm.ResourceConfig) error) *MockPodContainerManager_SetPodCgroupConfig_Call {
+func (_c *MockPodContainerManager_SetPodCgroupConfig_Call) RunAndReturn(run func(logger klog.Logger, pod *v1.Pod, resourceConfig *cm.ResourceConfig) error) *MockPodContainerManager_SetPodCgroupConfig_Call {
 	_c.Call.Return(run)
 	return _c
 }

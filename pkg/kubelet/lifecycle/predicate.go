@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/scheduler"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
 	"k8s.io/utils/ptr"
 )
@@ -86,7 +87,7 @@ const (
 	OutOfPods             = "OutOfpods"
 )
 
-type getNodeAnyWayFuncType func() (*v1.Node, error)
+type getNodeAnyWayFuncType func(ctx context.Context, useCache bool) (*v1.Node, error)
 
 type pluginResourceUpdateFuncType func(*schedulerframework.NodeInfo, *PodAdmitAttributes) error
 
@@ -119,7 +120,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	// contextual logging
 	ctx := context.TODO()
 	logger := klog.FromContext(ctx)
-	node, err := w.getNodeAnyWayFunc()
+	node, err := w.getNodeAnyWayFunc(ctx, true)
 	if err != nil {
 		logger.Error(err, "Cannot get Node info")
 		return PodAdmitResult{
@@ -182,7 +183,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	// the Resource Class API in the future.
 	podWithoutMissingExtendedResources := removeMissingExtendedResources(admitPod, nodeInfo)
 
-	reasons := generalFilter(podWithoutMissingExtendedResources, nodeInfo)
+	reasons := w.generalFilter(ctx, podWithoutMissingExtendedResources, nodeInfo)
 	fit := len(reasons) == 0
 	if !fit {
 		reasons, err = w.admissionFailureHandler.HandleAdmissionFailure(ctx, admitPod, reasons)
@@ -245,6 +246,32 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	return PodAdmitResult{
 		Admit: true,
 	}
+}
+
+// generalFilter checks a group of filterings that the kubelet cares about.
+func (w *predicateAdmitHandler) generalFilter(ctx context.Context, pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) []PredicateFailureReason {
+	logger := klog.FromContext(ctx)
+
+	reasons := generalFilter(logger, pod, nodeInfo)
+	for _, r := range reasons {
+		if r.GetReason() != nodeaffinity.ErrReasonPod {
+			return reasons
+		}
+	}
+	if len(reasons) > 0 {
+		// If the only reason for failure is the node affinity labels, fetch the node synchronously
+		// and try again.
+
+		node, err := w.getNodeAnyWayFunc(ctx, false)
+		if err != nil {
+			logger.Error(err, "Failed to synchronously fetch node info")
+			return reasons
+		}
+		nodeInfo.SetNode(node)
+		reasons = generalFilter(logger, pod, nodeInfo)
+	}
+
+	return reasons
 }
 
 // rejectPodAdmissionBasedOnOSSelector rejects pod if it's nodeSelector doesn't match
@@ -387,7 +414,7 @@ func (e *PredicateFailureError) GetReason() string {
 }
 
 // generalFilter checks a group of filterings that the kubelet cares about.
-func generalFilter(pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) []PredicateFailureReason {
+func generalFilter(logger klog.Logger, pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) []PredicateFailureReason {
 	admissionResults := scheduler.AdmissionCheck(pod, nodeInfo, true)
 	var reasons []PredicateFailureReason
 	for _, r := range admissionResults {
@@ -405,10 +432,10 @@ func generalFilter(pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) []Predica
 
 	// Check taint/toleration except for static pods
 	if !types.IsStaticPod(pod) {
-		_, isUntolerated := corev1.FindMatchingUntoleratedTaint(nodeInfo.Node().Spec.Taints, pod.Spec.Tolerations, func(t *v1.Taint) bool {
+		_, isUntolerated := corev1.FindMatchingUntoleratedTaint(logger, nodeInfo.Node().Spec.Taints, pod.Spec.Tolerations, func(t *v1.Taint) bool {
 			// Kubelet is only interested in the NoExecute taint.
 			return t.Effect == v1.TaintEffectNoExecute
-		})
+		}, utilfeature.DefaultFeatureGate.Enabled(features.TaintTolerationComparisonOperators))
 		if isUntolerated {
 			reasons = append(reasons, &PredicateFailureError{tainttoleration.Name, tainttoleration.ErrReasonNotMatch})
 		}

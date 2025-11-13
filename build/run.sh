@@ -25,19 +25,12 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "$KUBE_ROOT/build/common.sh"
 
+# This is no longer supported, warn if set to non-default value
 KUBE_RUN_COPY_OUTPUT="${KUBE_RUN_COPY_OUTPUT:-y}"
+# we previously accepted an explicit both y and Y
+if [[ ! "${KUBE_RUN_COPY_OUTPUT}" =~ ^[yY]$ ]]; then
+   kube::log::error "KUBE_RUN_COPY_OUTPUT no longer means anything as we bind-mount instead of rsyncing, so output is always persisted"
+fi
 
 kube::build::verify_prereqs
-kube::build::build_image
-
-if [[ ${KUBE_RUN_COPY_OUTPUT} =~ ^[yY]$ ]]; then
-  kube::log::status "Output from this container will be rsynced out upon completion. Set KUBE_RUN_COPY_OUTPUT=n to disable."
-else
-  kube::log::status "Output from this container will NOT be rsynced out upon completion. Set KUBE_RUN_COPY_OUTPUT=y to enable."
-fi
-
 kube::build::run_build_command "$@"
-
-if [[ ${KUBE_RUN_COPY_OUTPUT} =~ ^[yY]$ ]]; then
-  kube::build::copy_output
-fi

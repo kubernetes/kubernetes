@@ -36,6 +36,7 @@ import (
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
@@ -279,12 +280,14 @@ func (w *KubeWaiter) WaitForControlPlaneComponents(podMap map[string]*v1.Pod, ap
 							Get().AbsPath(comp.endpoint).Do(ctx).StatusCode(&statusCode)
 						if err := result.Error(); err != nil {
 							lastError = errors.WithMessagef(err, "%s check failed at %s", comp.name, url)
+							klog.V(5).Info(lastError)
 							return false, nil
 						}
 					} else {
 						resp, err := client.Get(url)
 						if err != nil {
 							lastError = errors.WithMessagef(err, "%s check failed at %s", comp.name, url)
+							klog.V(5).Info(lastError)
 							return false, nil
 						}
 						defer func() {
@@ -296,6 +299,7 @@ func (w *KubeWaiter) WaitForControlPlaneComponents(podMap map[string]*v1.Pod, ap
 					if statusCode != http.StatusOK {
 						lastError = errors.Errorf("%s check failed at %s with status: %d",
 							comp.name, url, statusCode)
+						klog.V(5).Info(lastError)
 						return false, nil
 					}
 

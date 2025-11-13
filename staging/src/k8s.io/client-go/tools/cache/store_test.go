@@ -21,6 +21,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -184,5 +185,64 @@ func TestKeyError(t *testing.T) {
 	nestedKeyErr := KeyError{obj, keyErr}
 	if !errors.Is(keyErr, err) || !errors.Is(nestedKeyErr, err) {
 		t.Errorf("not match target error: %v", err)
+	}
+}
+
+func TestCacheTransactionShouldIndexErrors(t *testing.T) {
+	successObj1 := 1
+	successObj2 := 2
+	failObj1 := 3
+	failObj2 := 4
+	testTxnType := TransactionTypeAdd
+	testCases := []struct {
+		name        string
+		objs        []interface{}
+		assertError func(*TransactionError) bool
+	}{
+		{
+			name: "txn all success objects should work",
+			objs: []interface{}{successObj1, successObj2},
+		},
+		{
+			name: "txn all fail objects should work",
+			objs: []interface{}{failObj1, failObj2},
+			assertError: func(err *TransactionError) bool {
+				return assert.Equal(t, []int{}, err.SuccessfulIndices)
+			},
+		},
+		{
+			name: "txn mix success and fail objects should work",
+			objs: []interface{}{successObj1, failObj1, successObj2, failObj2},
+			assertError: func(err *TransactionError) bool {
+				return assert.Equal(t, []int{0, 2}, err.SuccessfulIndices)
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			testKeyFunc := func(obj interface{}) (string, error) {
+				if obj == successObj1 || obj == successObj2 {
+					return "", nil
+				}
+				return "", errors.New("test error")
+			}
+			testStore := NewStore(testKeyFunc)
+			txnStore := testStore.(TransactionStore)
+			txns := make([]Transaction, len(tc.objs))
+			for i := range tc.objs {
+				txns[i] = Transaction{
+					Object: tc.objs[i],
+					Type:   testTxnType,
+				}
+			}
+			txnErr := txnStore.Transaction(txns...)
+			if tc.assertError != nil {
+				tc.assertError(txnErr)
+				return
+			}
+			if txnErr != nil {
+				t.Errorf("unexpected error: %v", txnErr)
+			}
+		})
 	}
 }

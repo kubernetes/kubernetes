@@ -24,7 +24,7 @@ import (
 func init() {
 	appArmorFixture_1_0 := fixtureGenerator{
 		expectErrorSubstring: "forbidden AppArmor profile",
-		generatePass: func(pod *corev1.Pod) []*corev1.Pod {
+		generatePass: func(pod *corev1.Pod, _ api.Level) []*corev1.Pod {
 			pod = ensureAnnotation(pod)
 			return []*corev1.Pod{
 				// container with runtime/default annotation

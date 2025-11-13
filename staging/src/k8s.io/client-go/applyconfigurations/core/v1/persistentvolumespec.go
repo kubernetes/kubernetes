@@ -58,6 +58,7 @@ type PersistentVolumeSpecApplyConfiguration struct {
 	VolumeMode *corev1.PersistentVolumeMode `json:"volumeMode,omitempty"`
 	// nodeAffinity defines constraints that limit what nodes this volume can be accessed from.
 	// This field influences the scheduling of pods that use this volume.
+	// This field is mutable if MutablePVNodeAffinity feature gate is enabled.
 	NodeAffinity *VolumeNodeAffinityApplyConfiguration `json:"nodeAffinity,omitempty"`
 	// Name of VolumeAttributesClass to which this persistent volume belongs. Empty value
 	// is not allowed. When this field is not set, it indicates that this volume does not belong to any

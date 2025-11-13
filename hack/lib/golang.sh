@@ -659,9 +659,15 @@ kube::golang::place_bins() {
     local platform_src="/${platform//\//_}"
     if [[ "${platform}" == "${host_platform}" ]]; then
       platform_src=""
-      rm -f "${THIS_PLATFORM_BIN}"
-      mkdir -p "$(dirname "${THIS_PLATFORM_BIN}")"
-      ln -s "${KUBE_OUTPUT_BIN}/${platform}" "${THIS_PLATFORM_BIN}"
+      # For compatibility with the old rsync behavior, only setup the symlink
+      # when we're doing a "local" build, not a "dockerized" build
+      # if KUBE_OUTPUT_SUBPATH is set then we're not writing to the default local path
+      if [[ -z "${KUBE_OUTPUT_SUBPATH+x}" ]]; then
+        V=4 kube::log::status "Creating ${THIS_PLATFORM_BIN} symlink for non-dockerized build"
+        rm -f "${THIS_PLATFORM_BIN}"
+        mkdir -p "$(dirname "${THIS_PLATFORM_BIN}")"
+        ln -s "../${_KUBE_OUTPUT_SUBPATH:?}/${_KUBE_OUTPUT_BIN_SUBPATH:?}/${platform}" "${THIS_PLATFORM_BIN}"
+      fi
     fi
 
     V=3 kube::log::status "Placing binaries for ${platform} in ${KUBE_OUTPUT_BIN}/${platform}"
@@ -669,7 +675,7 @@ kube::golang::place_bins() {
     if [[ -d "${full_binpath_src}" ]]; then
       mkdir -p "${KUBE_OUTPUT_BIN}/${platform}"
       find "${full_binpath_src}" -maxdepth 1 -type f -exec \
-        rsync -pc {} "${KUBE_OUTPUT_BIN}/${platform}" \;
+        cp -p {} "${KUBE_OUTPUT_BIN}/${platform}" \;
     fi
   done
 }
@@ -815,7 +821,7 @@ kube::golang::build_binaries_for_platform() {
   for binary in "${binaries[@]}"; do
     if [[ "${binary}" =~ ".test"$ ]]; then
       tests+=("${binary}")
-      kube::log::info "    ${binary} (test)"
+      kube::log::info "    ${binary} (test${KUBE_RACE:+, race detection})"
     elif kube::golang::is_statically_linked "${binary}"; then
       statics+=("${binary}")
       kube::log::info "    ${binary} (static)"
@@ -848,7 +854,7 @@ kube::golang::build_binaries_for_platform() {
       -tags="${gotags:-}"
     )
     if [[ -n "${KUBE_RACE:-}" ]]; then
-        build_args+=("${KUBE_RACE}")
+      build_args+=("${KUBE_RACE}")
     fi
     kube::golang::build_some_binaries "${nonstatics[@]}"
   fi
@@ -859,13 +865,18 @@ kube::golang::build_binaries_for_platform() {
     testpkg=$(dirname "${test}")
 
     mkdir -p "$(dirname "${outfile}")"
-    go test -c \
-      ${goflags:+"${goflags[@]}"} \
-      -gcflags="${gogcflags}" \
-      -ldflags="${goldflags}" \
-      -tags="${gotags:-}" \
-      -o "${outfile}" \
-      "${testpkg}"
+    build_args=(
+      -c
+      ${goflags:+"${goflags[@]}"}
+      -gcflags="${gogcflags}"
+      -ldflags="${goldflags}"
+      -tags="${gotags:-}"
+      -o "${outfile}"
+    )
+    if [[ -n "${KUBE_RACE:-}" ]]; then
+      build_args+=("${KUBE_RACE}")
+    fi
+    go test "${build_args[@]}" "${testpkg}"
   done
 }
 

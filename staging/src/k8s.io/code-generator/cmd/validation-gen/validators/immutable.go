@@ -18,7 +18,6 @@ package validators
 
 import (
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/code-generator/cmd/validation-gen/util"
 	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/types"
 )
@@ -46,31 +45,22 @@ func (immutableTagValidator) ValidScopes() sets.Set[Scope] {
 }
 
 var (
-	immutableCompareValidator = types.Name{Package: libValidationPkg, Name: "ImmutableByCompare"}
-	immutableReflectValidator = types.Name{Package: libValidationPkg, Name: "ImmutableByReflect"}
+	immutableValidator = types.Name{Package: libValidationPkg, Name: "Immutable"}
 )
 
 func (immutableTagValidator) GetValidations(context Context, _ codetags.Tag) (Validations, error) {
 	var result Validations
 
-	if util.IsDirectComparable(util.NonPointer(util.NativeType(context.Type))) {
-		// This is a minor optimization to just compare primitive values when
-		// possible. Slices and maps are not comparable, and structs might hold
-		// pointer fields, which are directly comparable but not what we need.
-		//
-		// Note: This compares the pointee, not the pointer itself.
-		result.AddFunction(Function(immutableTagName, DefaultFlags, immutableCompareValidator))
-	} else {
-		result.AddFunction(Function(immutableTagName, DefaultFlags, immutableReflectValidator))
-	}
-
+	// Use ShortCircuit flag so immutable runs in the same group as +k8s:optional.
+	result.AddFunction(Function(immutableTagName, ShortCircuit, immutableValidator))
 	return result, nil
 }
 
 func (itv immutableTagValidator) Docs() TagDoc {
 	return TagDoc{
-		Tag:         itv.TagName(),
-		Scopes:      itv.ValidScopes().UnsortedList(),
-		Description: "Indicates that a field may not be updated.",
+		Tag:            itv.TagName(),
+		StabilityLevel: Alpha,
+		Scopes:         itv.ValidScopes().UnsortedList(),
+		Description:    "Indicates that a field may not be updated.",
 	}
 }

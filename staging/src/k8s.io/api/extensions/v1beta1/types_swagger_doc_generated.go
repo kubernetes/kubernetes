@@ -174,7 +174,7 @@ var map_DeploymentStatus = map[string]string{
 	"readyReplicas":       "Total number of non-terminating pods targeted by this Deployment with a Ready Condition.",
 	"availableReplicas":   "Total number of available non-terminating pods (ready for at least minReadySeconds) targeted by this deployment.",
 	"unavailableReplicas": "Total number of unavailable pods targeted by this deployment. This is the total number of pods that are still required for the deployment to have 100% available capacity. They may either be pods that are running but not yet available or pods that still have not been created.",
-	"terminatingReplicas": "Total number of terminating pods targeted by this deployment. Terminating pods have a non-null .metadata.deletionTimestamp and have not yet reached the Failed or Succeeded .status.phase.\n\nThis is an alpha field. Enable DeploymentReplicaSetTerminatingReplicas to be able to use this field.",
+	"terminatingReplicas": "Total number of terminating pods targeted by this deployment. Terminating pods have a non-null .metadata.deletionTimestamp and have not yet reached the Failed or Succeeded .status.phase.\n\nThis is a beta field and requires enabling DeploymentReplicaSetTerminatingReplicas feature (enabled by default).",
 	"conditions":          "Represents the latest available observations of a deployment's current state.",
 	"collisionCount":      "Count of hash collisions for the Deployment. The Deployment controller uses this field as a collision avoidance mechanism when it needs to create the name for the newest ReplicaSet.",
 }
@@ -461,7 +461,7 @@ var map_ReplicaSetStatus = map[string]string{
 	"fullyLabeledReplicas": "The number of non-terminating pods that have labels matching the labels of the pod template of the replicaset.",
 	"readyReplicas":        "The number of non-terminating pods targeted by this ReplicaSet with a Ready Condition.",
 	"availableReplicas":    "The number of available non-terminating pods (ready for at least minReadySeconds) for this replica set.",
-	"terminatingReplicas":  "The number of terminating pods for this replica set. Terminating pods have a non-null .metadata.deletionTimestamp and have not yet reached the Failed or Succeeded .status.phase.\n\nThis is an alpha field. Enable DeploymentReplicaSetTerminatingReplicas to be able to use this field.",
+	"terminatingReplicas":  "The number of terminating pods for this replica set. Terminating pods have a non-null .metadata.deletionTimestamp and have not yet reached the Failed or Succeeded .status.phase.\n\nThis is a beta field and requires enabling DeploymentReplicaSetTerminatingReplicas feature (enabled by default).",
 	"observedGeneration":   "ObservedGeneration reflects the generation of the most recently observed ReplicaSet.",
 	"conditions":           "Represents the latest available observations of a replica set's current state.",
 }

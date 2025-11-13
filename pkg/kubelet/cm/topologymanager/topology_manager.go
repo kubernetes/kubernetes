@@ -17,6 +17,7 @@ limitations under the License.
 package topologymanager
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -59,7 +60,7 @@ type Manager interface {
 	lifecycle.PodAdmitHandler
 	// AddHintProvider adds a hint provider to manager to indicate the hint provider
 	// wants to be consulted with when making topology hints
-	AddHintProvider(HintProvider)
+	AddHintProvider(logger klog.Logger, h HintProvider)
 	// AddContainer adds pod to Manager for tracking
 	AddContainer(pod *v1.Pod, container *v1.Container, containerID string)
 	// RemoveContainer removes pod from Manager tracking
@@ -133,18 +134,22 @@ var _ Manager = &manager{}
 
 // NewManager creates a new TopologyManager based on provided policy and scope
 func NewManager(topology []cadvisorapi.Node, topologyPolicyName string, topologyScopeName string, topologyPolicyOptions map[string]string) (Manager, error) {
+	// Use klog.TODO() because we currently do not have a proper logger to pass in.
+	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
+	logger := klog.TODO()
+
 	// When policy is none, the scope is not relevant, so we can short circuit here.
 	if topologyPolicyName == PolicyNone {
-		klog.InfoS("Creating topology manager with none policy")
+		logger.Info("Creating topology manager with none policy")
 		return &manager{scope: NewNoneScope()}, nil
 	}
 
-	opts, err := NewPolicyOptions(topologyPolicyOptions)
+	opts, err := NewPolicyOptions(logger, topologyPolicyOptions)
 	if err != nil {
 		return nil, err
 	}
 
-	klog.InfoS("Creating topology manager with policy per scope", "topologyPolicyName", topologyPolicyName, "topologyScopeName", topologyScopeName, "topologyPolicyOptions", opts)
+	logger.Info("Creating topology manager with policy per scope", "topologyPolicyName", topologyPolicyName, "topologyScopeName", topologyScopeName, "topologyPolicyOptions", opts)
 
 	numaInfo, err := NewNUMAInfo(topology, opts)
 	if err != nil {
@@ -209,7 +214,7 @@ func (m *manager) GetPolicy() Policy {
 	return m.scope.GetPolicy()
 }
 
-func (m *manager) AddHintProvider(h HintProvider) {
+func (m *manager) AddHintProvider(_ klog.Logger, h HintProvider) {
 	m.scope.AddHintProvider(h)
 }
 
@@ -222,13 +227,17 @@ func (m *manager) RemoveContainer(containerID string) error {
 }
 
 func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
-	klog.V(4).InfoS("Topology manager admission check", "pod", klog.KObj(attrs.Pod))
+	// TODO: create context here as changing interface https://github.com/kubernetes/kubernetes/blob/09aaf7226056a7964adcb176d789de5507313d00/pkg/kubelet/lifecycle/interfaces.go#L43
+	// requires changes in too many other components
+	ctx := context.TODO()
+	logger := klog.FromContext(ctx)
+	logger.V(4).Info("Topology manager admission check", "pod", klog.KObj(attrs.Pod))
 	metrics.TopologyManagerAdmissionRequestsTotal.Inc()
 
 	startTime := time.Now()
-	podAdmitResult := m.scope.Admit(attrs.Pod)
+	podAdmitResult := m.scope.Admit(ctx, attrs.Pod)
 	metrics.TopologyManagerAdmissionDuration.Observe(float64(time.Since(startTime).Milliseconds()))
 
-	klog.V(4).InfoS("Pod Admit Result", "Message", podAdmitResult.Message, "pod", klog.KObj(attrs.Pod))
+	logger.V(4).Info("Pod Admit Result", "Message", podAdmitResult.Message, "pod", klog.KObj(attrs.Pod))
 	return podAdmitResult
 }

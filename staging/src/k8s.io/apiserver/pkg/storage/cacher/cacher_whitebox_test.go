@@ -31,12 +31,12 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/metadata"
-	"k8s.io/apimachinery/pkg/apis/meta/internalversion"
-	"k8s.io/apimachinery/pkg/apis/meta/internalversion/validation"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apis/meta/internalversion"
+	"k8s.io/apimachinery/pkg/apis/meta/internalversion/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -55,6 +55,8 @@ import (
 	etcdfeature "k8s.io/apiserver/pkg/storage/feature"
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	clientfeatures "k8s.io/client-go/features"
+	clientfeaturestesting "k8s.io/client-go/features/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	k8smetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/testutil"
@@ -139,6 +141,10 @@ func (d *dummyStorage) getRequestWatchProgressCounter() int {
 
 func (d *dummyStorage) CompactRevision() int64 {
 	return 0
+}
+
+func (d *dummyStorage) IsWatchListSemanticsUnSupported() bool {
+	return true
 }
 
 type dummyWatch struct {
@@ -780,8 +786,10 @@ func TestGetListNonRecursiveCacheBypass(t *testing.T) {
 
 func TestGetListNonRecursiveCacheWithConsistentListFromCache(t *testing.T) {
 	// Set feature gates once at the beginning since we only care about ConsistentListFromCache=true and ListFromCacheSnapshot=false
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, false)
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.ConsistentListFromCache: true,
+		features.ListFromCacheSnapshot:   false,
+	})
 	forceRequestWatchProgressSupport(t)
 
 	tests := []struct {
@@ -2411,8 +2419,10 @@ func TestCacheIntervalInvalidationStopsWatch(t *testing.T) {
 }
 
 func TestWaitUntilWatchCacheFreshAndForceAllEvents(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.WatchList:               true,
+		features.ConsistentListFromCache: true,
+	})
 	forceRequestWatchProgressSupport(t)
 
 	scenarios := []struct {
@@ -3551,5 +3561,25 @@ func TestRetryAfterForUnreadyCache(t *testing.T) {
 	}
 	if statusError.Status().Details.RetryAfterSeconds != 2 {
 		t.Fatalf("Unexpected retry after: %v", statusError.Status().Details.RetryAfterSeconds)
+	}
+}
+
+func TestWatchListSemanticsSimple(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)
+	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.WatchListClient, true)
+
+	// The dummyStore doesn’t support WatchList semantics,
+	// so we don’t need to prepare a response.
+	backingStorage := &dummyStorage{}
+	clock := testingclock.NewFakeClock(time.Now())
+	cacher, _, err := newTestCacherWithoutSyncing(backingStorage, clock)
+	if err != nil {
+		t.Fatalf("couldn't create cacher: %v", err)
+	}
+	defer cacher.Stop()
+	ctx, cancel := context.WithTimeout(context.TODO(), 5*time.Second)
+	defer cancel()
+	if err = cacher.ready.wait(ctx); err != nil {
+		t.Fatalf("error waiting for the cache to be ready, err: %v", err)
 	}
 }

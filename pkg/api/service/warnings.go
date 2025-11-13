@@ -72,6 +72,10 @@ func GetWarningsForService(service, oldService *api.Service) []string {
 		warnings = append(warnings, fmt.Sprintf("spec.externalName is ignored when spec.type is not %q", api.ServiceTypeExternalName))
 	}
 
+	if service.Spec.TrafficDistribution != nil && *service.Spec.TrafficDistribution == api.ServiceTrafficDistributionPreferClose {
+		warnings = append(warnings, fmt.Sprintf("spec.trafficDistribution: %q is deprecated; use %q", api.ServiceTrafficDistributionPreferClose, api.ServiceTrafficDistributionPreferSameZone))
+	}
+
 	return warnings
 }
 

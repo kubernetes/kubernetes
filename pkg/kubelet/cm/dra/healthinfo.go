@@ -28,9 +28,9 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
 )
 
-// TODO(#133118): Make health timeout configurable.
 const (
-	healthTimeout = 30 * time.Second
+	// DefaultHealthTimeout is the default timeout for device health checks when not specified by the plugin
+	DefaultHealthTimeout = 30 * time.Second
 )
 
 // healthInfoCache is a cache of known device health.
@@ -129,7 +129,14 @@ func (cache *healthInfoCache) getHealthInfo(driverName, poolName, deviceName str
 		if driver, ok := (*cache.HealthInfo)[driverName]; ok {
 			key := poolName + "/" + deviceName
 			if device, ok := driver.Devices[key]; ok {
-				if now.Sub(device.LastUpdated) > healthTimeout {
+				// Use device-specific timeout if set, otherwise use default
+				timeout := device.HealthCheckTimeout
+				if timeout == 0 {
+					timeout = DefaultHealthTimeout
+				}
+
+				// Check if device health has timed out
+				if now.Sub(device.LastUpdated) > timeout {
 					res = state.DeviceHealthStatusUnknown
 				} else {
 					res = device.Health
@@ -166,7 +173,7 @@ func (cache *healthInfoCache) updateHealthInfo(driverName string, devices []stat
 
 			existingDevice, ok := currentDriver.Devices[key]
 
-			if !ok || existingDevice.Health != reportedDevice.Health {
+			if !ok || existingDevice.Health != reportedDevice.Health || existingDevice.HealthCheckTimeout != reportedDevice.HealthCheckTimeout {
 				changedDevices = append(changedDevices, reportedDevice)
 			}
 
@@ -178,7 +185,14 @@ func (cache *healthInfoCache) updateHealthInfo(driverName string, devices []stat
 		// them. Mark them as "Unknown" if their status has timed out.
 		for key, existingDevice := range currentDriver.Devices {
 			if _, wasReported := reportedKeys[key]; !wasReported {
-				if existingDevice.Health != state.DeviceHealthStatusUnknown && now.Sub(existingDevice.LastUpdated) > healthTimeout {
+				// Use device-specific timeout if set, otherwise use default
+				timeout := existingDevice.HealthCheckTimeout
+				if timeout == 0 {
+					timeout = DefaultHealthTimeout
+				}
+
+				// Mark as unknown if the device health has timed out
+				if existingDevice.Health != state.DeviceHealthStatusUnknown && now.Sub(existingDevice.LastUpdated) > timeout {
 					existingDevice.Health = state.DeviceHealthStatusUnknown
 					existingDevice.LastUpdated = now
 					currentDriver.Devices[key] = existingDevice

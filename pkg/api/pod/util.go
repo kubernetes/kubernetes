@@ -424,10 +424,13 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		AllowSidecarResizePolicy:                            utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
 		AllowMatchLabelKeysInPodTopologySpread:              utilfeature.DefaultFeatureGate.Enabled(features.MatchLabelKeysInPodTopologySpread),
 		AllowMatchLabelKeysInPodTopologySpreadSelectorMerge: utilfeature.DefaultFeatureGate.Enabled(features.MatchLabelKeysInPodTopologySpreadSelectorMerge),
+		InPlacePodLevelResourcesVerticalScalingEnabled:      utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling),
 		OldPodViolatesMatchLabelKeysValidation:              false,
 		OldPodViolatesLegacyMatchLabelKeysValidation:        false,
 		AllowContainerRestartPolicyRules:                    utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules),
 		AllowUserNamespacesWithVolumeDevices:                false,
+		// This also allows restart rules on sidecar containers.
+		AllowRestartAllContainers: utilfeature.DefaultFeatureGate.Enabled(features.RestartAllContainersOnContainerExits),
 	}
 
 	// If old spec uses relaxed validation or enabled the RelaxedEnvironmentVariableValidation feature gate,
@@ -435,8 +438,10 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 	opts.AllowRelaxedEnvironmentVariableValidation = useRelaxedEnvironmentVariableValidation(podSpec, oldPodSpec)
 	opts.AllowRelaxedDNSSearchValidation = useRelaxedDNSSearchValidation(oldPodSpec)
 	opts.AllowEnvFilesValidation = useAllowEnvFilesValidation(oldPodSpec)
+	opts.AllowUserNamespacesHostNetworkSupport = useAllowUserNamespacesHostNetworkSupport(oldPodSpec)
 
 	opts.AllowOnlyRecursiveSELinuxChangePolicy = useOnlyRecursiveSELinuxChangePolicy(oldPodSpec)
+	opts.AllowTaintTolerationComparisonOperators = allowTaintTolerationComparisonOperators(oldPodSpec)
 
 	if oldPodSpec != nil {
 		// if old spec used non-integer multiple of huge page unit size, we must allow it
@@ -474,6 +479,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		opts.AllowSidecarResizePolicy = opts.AllowSidecarResizePolicy || hasRestartableInitContainerResizePolicy(oldPodSpec)
 
 		opts.AllowContainerRestartPolicyRules = opts.AllowContainerRestartPolicyRules || containerRestartRulesInUse(oldPodSpec)
+		opts.AllowRestartAllContainers = opts.AllowRestartAllContainers || restartAllContainersActionInUse(oldPodSpec)
 
 		// If old spec has userns and volume devices (doesn't work), we still allow
 		// modifications to it.
@@ -533,6 +539,23 @@ func hasDotOrUnderscore(searches []string) bool {
 		}
 	}
 	return false
+}
+
+func useAllowUserNamespacesHostNetworkSupport(oldPodSpec *api.PodSpec) bool {
+	// Return true early if feature gate is enabled
+	if utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesHostNetworkSupport) {
+		return true
+	}
+
+	if oldPodSpec == nil || oldPodSpec.SecurityContext == nil || oldPodSpec.SecurityContext.HostUsers == nil {
+		return false
+	}
+
+	// If a pod with user namespaces and hostNetwork already exists in the cluster,
+	// this allows it to continue using the UserNamespacesHostNetworkSupport
+	// validation logic even after the feature gate is disabled.
+	userNamespaces := !*oldPodSpec.SecurityContext.HostUsers
+	return oldPodSpec.SecurityContext.HostNetwork && userNamespaces
 }
 
 func useAllowEnvFilesValidation(oldPodSpec *api.PodSpec) bool {
@@ -731,6 +754,7 @@ func dropDisabledFields(
 	dropDisabledDynamicResourceAllocationFields(podSpec, oldPodSpec)
 	dropDisabledClusterTrustBundleProjection(podSpec, oldPodSpec)
 	dropDisabledPodCertificateProjection(podSpec, oldPodSpec)
+	dropDisabledWorkloadRef(podSpec, oldPodSpec)
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && !inPlacePodVerticalScalingInUse(oldPodSpec) {
 		// Drop ResizePolicy fields. Don't drop updates to Resources field as template.spec.resources
@@ -981,6 +1005,12 @@ func dropDisabledPodStatusFields(podStatus, oldPodStatus *api.PodStatus, podSpec
 	// the new status is always be non-nil
 	if podStatus == nil {
 		podStatus = &api.PodStatus{}
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) && !podLevelStatusResourcesInUse(oldPodStatus) {
+		// Drop Resources and AllocatedResources fields from PodStatus
+		podStatus.Resources = nil
+		podStatus.AllocatedResources = nil
 	}
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && !inPlacePodVerticalScalingInUse(oldPodSpec) {
@@ -1303,6 +1333,16 @@ func podLevelResourcesInUse(podSpec *api.PodSpec) bool {
 	return false
 }
 
+// podLevelStatusResourcesInUse checks if AllocationResources or Resources are set
+// in PodStatus.
+func podLevelStatusResourcesInUse(podStatus *api.PodStatus) bool {
+	if podStatus == nil {
+		return false
+	}
+
+	return podStatus.Resources != nil || podStatus.AllocatedResources != nil
+}
+
 // inPlacePodVerticalScalingInUse returns true if pod spec is non-nil and ResizePolicy is set
 func inPlacePodVerticalScalingInUse(podSpec *api.PodSpec) bool {
 	if podSpec == nil {
@@ -1599,6 +1639,28 @@ func useOnlyRecursiveSELinuxChangePolicy(oldPodSpec *api.PodSpec) bool {
 	return true
 }
 
+func taintTolerationComparisonOperatorsInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	for _, toleration := range podSpec.Tolerations {
+		if toleration.Operator == api.TolerationOpLt || toleration.Operator == api.TolerationOpGt {
+			return true
+		}
+	}
+	return false
+}
+
+func allowTaintTolerationComparisonOperators(oldPodSpec *api.PodSpec) bool {
+	// allow the operators if the feature gate is enabled or the old pod spec uses
+	// comparison operators
+	if utilfeature.DefaultFeatureGate.Enabled(features.TaintTolerationComparisonOperators) ||
+		taintTolerationComparisonOperatorsInUse(oldPodSpec) {
+		return true
+	}
+	return false
+}
+
 func hasUserNamespacesWithVolumeDevices(podSpec *api.PodSpec) bool {
 	if podSpec.SecurityContext == nil || podSpec.SecurityContext.HostUsers == nil || *podSpec.SecurityContext.HostUsers {
 		return false
@@ -1763,6 +1825,47 @@ func containerRestartRulesInUse(oldPodSpec *api.PodSpec) bool {
 	}
 	for _, c := range oldPodSpec.Containers {
 		if c.RestartPolicy != nil {
+			return true
+		}
+	}
+	return false
+}
+
+// dropDisabledWorkloadRef removes pod workload reference from its spec
+// unless it is already used by the old pod spec.
+func dropDisabledWorkloadRef(podSpec, oldPodSpec *api.PodSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) && !workloadRefInUse(oldPodSpec) {
+		podSpec.WorkloadRef = nil
+	}
+}
+
+func workloadRefInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+
+	return podSpec.WorkloadRef != nil
+}
+
+func restartAllContainersActionInUse(oldPodSpec *api.PodSpec) bool {
+	if oldPodSpec == nil {
+		return false
+	}
+	for _, c := range oldPodSpec.Containers {
+		for _, rule := range c.RestartPolicyRules {
+			if rule.Action == api.ContainerRestartRuleActionRestartAllContainers {
+				return true
+			}
+		}
+	}
+	for _, c := range oldPodSpec.InitContainers {
+		for _, rule := range c.RestartPolicyRules {
+			if rule.Action == api.ContainerRestartRuleActionRestartAllContainers {
+				return true
+			}
+		}
+		// This feature also allows sidecar containers to have rules.
+		if c.RestartPolicy != nil && *c.RestartPolicy == api.ContainerRestartPolicyAlways && len(c.RestartPolicyRules) > 0 {
 			return true
 		}
 	}

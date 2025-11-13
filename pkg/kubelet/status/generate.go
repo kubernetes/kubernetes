@@ -21,7 +21,9 @@ import (
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	runtimeutil "k8s.io/kubernetes/pkg/kubelet/kuberuntime/util"
 )
@@ -39,6 +41,8 @@ const (
 	ContainersNotInitialized = "ContainersNotInitialized"
 	// ReadinessGatesNotReady says that one or more pod readiness gates are not ready.
 	ReadinessGatesNotReady = "ReadinessGatesNotReady"
+	// RestartAllContainersStarted says that a container exited and triggered RestartAllContainer action.
+	RestartAllContainersStarted = "RestartAllContainersStarted"
 )
 
 // GenerateContainersReadyCondition returns the status of "ContainersReady" condition.
@@ -233,6 +237,20 @@ func GeneratePodInitializedCondition(pod *v1.Pod, oldPodStatus *v1.PodStatus, co
 	}
 	unreadyMessage := strings.Join(unreadyMessages, ", ")
 	if unreadyMessage != "" {
+		// During pod in-place restart, init container status can change from completed to waiting.
+		// However, it is assumed that once a pod is initialized, it cannot be uninitialized. If
+		// the pod is already initialized, the condition is kept.
+		if utilfeature.DefaultFeatureGate.Enabled(features.RestartAllContainersOnContainerExits) {
+			for _, cond := range oldPodStatus.Conditions {
+				if cond.Type == v1.PodInitialized && cond.Status == v1.ConditionTrue {
+					return v1.PodCondition{
+						Type:               v1.PodInitialized,
+						ObservedGeneration: podutil.CalculatePodConditionObservedGeneration(oldPodStatus, pod.Generation, v1.PodInitialized),
+						Status:             v1.ConditionTrue,
+					}
+				}
+			}
+		}
 		return v1.PodCondition{
 			Type:               v1.PodInitialized,
 			ObservedGeneration: podutil.CalculatePodConditionObservedGeneration(oldPodStatus, pod.Generation, v1.PodInitialized),
@@ -299,4 +317,40 @@ func generatePodReadyConditionForTerminalPhase(pod *v1.Pod, oldPodStatus *v1.Pod
 	}
 
 	return condition
+}
+
+func GenerateAllContainersRestartingCondition(pod *v1.Pod, podStatus *kubecontainer.PodStatus, oldPodStatus *v1.PodStatus, podPhase v1.PodPhase) v1.PodCondition {
+	if podPhase == v1.PodSucceeded {
+		return v1.PodCondition{
+			Type:   v1.AllContainersRestarting,
+			Status: v1.ConditionFalse,
+			Reason: PodCompleted,
+		}
+	}
+	if podPhase == v1.PodFailed {
+		return v1.PodCondition{
+			Type:   v1.AllContainersRestarting,
+			Status: v1.ConditionFalse,
+			Reason: PodFailed,
+		}
+	}
+
+	if !kubecontainer.ShouldAllContainersRestart(pod, podStatus, oldPodStatus) {
+		return v1.PodCondition{
+			Type:   v1.AllContainersRestarting,
+			Status: v1.ConditionFalse,
+		}
+	}
+	if kubecontainer.AllContainersRestartCleanedUp(pod, podStatus) {
+		return v1.PodCondition{
+			Type:   v1.AllContainersRestarting,
+			Status: v1.ConditionFalse,
+		}
+	}
+	return v1.PodCondition{
+		Type:    v1.AllContainersRestarting,
+		Status:  v1.ConditionTrue,
+		Reason:  RestartAllContainersStarted,
+		Message: "container exited with restart policy rule",
+	}
 }

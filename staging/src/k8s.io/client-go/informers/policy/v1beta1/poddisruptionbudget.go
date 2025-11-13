@@ -57,7 +57,7 @@ func NewPodDisruptionBudgetInformer(client kubernetes.Interface, namespace strin
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredPodDisruptionBudgetInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
+		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
@@ -82,7 +82,7 @@ func NewFilteredPodDisruptionBudgetInformer(client kubernetes.Interface, namespa
 				}
 				return client.PolicyV1beta1().PodDisruptionBudgets(namespace).Watch(ctx, options)
 			},
-		},
+		}, client),
 		&apipolicyv1beta1.PodDisruptionBudget{},
 		resyncPeriod,
 		indexers,

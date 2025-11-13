@@ -18,9 +18,9 @@ limitations under the License.
 
 package cgroups
 
-import v1 "k8s.io/api/core/v1"
+import "k8s.io/apimachinery/pkg/api/resource"
 
-func getExpectedCPUShares(rr *v1.ResourceRequirements, podOnCgroupv2 bool) []string {
+func getExpectedCPUShares(cpuRequest, cpuLimit *resource.Quantity, podOnCgroupv2 bool) []string {
 	// cgroup is only supported in linux.
 	return []string{}
 }

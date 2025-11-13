@@ -37,6 +37,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/dynamic-resource-allocation/internal/workqueue"
@@ -69,6 +70,7 @@ func TestControllerSyncPool(t *testing.T) {
 		resourceSlice3 = "resource-slice-3"
 		generateName   = ownerName + "-" + driverName + "-"
 		generatedName1 = generateName + "0"
+		generatedName2 = generateName + "1"
 		attrs          = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
 			"new-attribute": {StringValue: ptr.To("value")},
 		}
@@ -107,7 +109,7 @@ func TestControllerSyncPool(t *testing.T) {
 		inputDriverResources   *DriverResources
 		expectedResourceSlices []resourceapi.ResourceSlice
 		expectedStats          Stats
-		expectedError          string
+		expectedErrors         []string
 	}{
 		"create-slice": {
 			nodeUID:        nodeUID,
@@ -316,7 +318,7 @@ func TestControllerSyncPool(t *testing.T) {
 					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).
 					Obj(),
 			},
-			expectedError: `update ResourceSlice: pool "pool", slice #0: some fields were dropped by the apiserver, probably because these features are disabled: DRADeviceTaints`,
+			expectedErrors: []string{`update ResourceSlice: pool "pool", slice #0: some fields were dropped by the apiserver, probably because these features are disabled: DRADeviceTaints`},
 		},
 		"drop-consumable-capacity-field": {
 			features: features{disableConsumableCapacity: true},
@@ -354,7 +356,7 @@ func TestControllerSyncPool(t *testing.T) {
 					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).
 					Obj(),
 			},
-			expectedError: `update ResourceSlice: pool "pool", slice #0: some fields were dropped by the apiserver, probably because these features are disabled: DRAConsumableCapacity`,
+			expectedErrors: []string{`update ResourceSlice: pool "pool", slice #0: some fields were dropped by the apiserver, probably because these features are disabled: DRAConsumableCapacity`},
 		},
 		"remove-pool": {
 			nodeUID:   nodeUID,
@@ -858,38 +860,43 @@ func TestControllerSyncPool(t *testing.T) {
 					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).Obj(),
 			},
 		},
-		"create-partitionable-device": {
+		"create-partitionable-devices": {
 			nodeUID: nodeUID,
 			inputDriverResources: &DriverResources{
 				Pools: map[string]Pool{
 					poolName: {
 						Generation: 1,
-						Slices: []Slice{{
-							PerDeviceNodeSelection: ptr.To(true),
-							SharedCounters: []resourceapi.CounterSet{{
-								Name: "gpu-0",
-								Counters: map[string]resourceapi.Counter{
-									"mem": {Value: resource.MustParse("1")},
-								},
-							}},
-							Devices: []resourceapi.Device{
-								newDevice(
-									deviceName,
-									nodeNameField(ownerName),
-									[]resourceapi.DeviceCounterConsumption{{
-										CounterSet: "gpu-0",
-										Counters: map[string]resourceapi.Counter{
-											"mem": {Value: resource.MustParse("1")},
-										},
-									}},
-								),
+						Slices: []Slice{
+							{
+								PerDeviceNodeSelection: ptr.To(true),
+								SharedCounters: []resourceapi.CounterSet{{
+									Name: "gpu-0",
+									Counters: map[string]resourceapi.Counter{
+										"mem": {Value: resource.MustParse("1")},
+									},
+								}},
 							},
-						}},
+							{
+								PerDeviceNodeSelection: ptr.To(true),
+								Devices: []resourceapi.Device{
+									newDevice(
+										deviceName,
+										nodeNameField(ownerName),
+										[]resourceapi.DeviceCounterConsumption{{
+											CounterSet: "gpu-0",
+											Counters: map[string]resourceapi.Counter{
+												"mem": {Value: resource.MustParse("1")},
+											},
+										}},
+									),
+								},
+							},
+						},
 					},
 				},
 			},
 			expectedStats: Stats{
-				NumCreates: 1,
+				NumCreates: 2,
 			},
 			expectedResourceSlices: []resourceapi.ResourceSlice{
 				*MakeResourceSlice().Name(generatedName1).GenerateName(generateName).
@@ -901,6 +908,12 @@ func TestControllerSyncPool(t *testing.T) {
 							"mem": {Value: resource.MustParse("1")},
 						},
 					}}).
+					Driver(driverName).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 2}).
+					Obj(),
+				*MakeResourceSlice().Name(generatedName2).GenerateName(generateName).
+					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
+					PerDeviceNodeSelection(true).
 					Driver(driverName).
 					Devices([]resourceapi.Device{
 						newDevice(
@@ -914,53 +927,66 @@ func TestControllerSyncPool(t *testing.T) {
 							},
 						),
 					}).
-					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 2}).
 					Obj(),
 			},
 		},
-		"drop-partitionable-device": {
+		"drop-partitionable-devices": {
 			features: features{disablePartitionableDevices: true},
 			nodeUID:  nodeUID,
 			inputDriverResources: &DriverResources{
 				Pools: map[string]Pool{
 					poolName: {
 						Generation: 1,
-						Slices: []Slice{{
-							PerDeviceNodeSelection: ptr.To(true),
-							SharedCounters: []resourceapi.CounterSet{{
-								Name: "gpu-0",
-								Counters: map[string]resourceapi.Counter{
-									"mem": {Value: resource.MustParse("1")},
-								},
-							}},
-							Devices: []resourceapi.Device{
-								newDevice(
-									deviceName,
-									nodeNameField(ownerName),
-									resourceapi.DeviceCounterConsumption{
-										CounterSet: "gpu-0",
-										Counters: map[string]resourceapi.Counter{
-											"mem": {Value: resource.MustParse("1")},
-										},
+						Slices: []Slice{
+							{
+								PerDeviceNodeSelection: ptr.To(true),
+								SharedCounters: []resourceapi.CounterSet{{
+									Name: "gpu-0",
+									Counters: map[string]resourceapi.Counter{
+										"mem": {Value: resource.MustParse("1")},
 									},
-								),
+								}},
 							},
-						}},
+							{
+								PerDeviceNodeSelection: ptr.To(true),
+								Devices: []resourceapi.Device{
+									newDevice(
+										deviceName,
+										nodeNameField(ownerName),
+										resourceapi.DeviceCounterConsumption{
+											CounterSet: "gpu-0",
+											Counters: map[string]resourceapi.Counter{
+												"mem": {Value: resource.MustParse("1")},
+											},
+										},
+									),
+								},
+							},
+						},
 					},
 				},
 			},
 			expectedStats: Stats{
-				NumCreates: 1,
+				NumCreates: 2,
 			},
 			expectedResourceSlices: []resourceapi.ResourceSlice{
 				*MakeResourceSlice().Name(generatedName1).GenerateName(generateName).
 					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
 					Driver(driverName).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 2}).
+					Obj(),
+				*MakeResourceSlice().Name(generatedName2).GenerateName(generateName).
+					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
+					Driver(driverName).
 					Devices([]resourceapi.Device{newDevice(deviceName)}).
-					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 2}).
 					Obj(),
 			},
-			expectedError: `create ResourceSlice: pool "pool", slice #0: some fields were dropped by the apiserver, probably because these features are disabled: DRAPartitionableDevices`,
+			expectedErrors: []string{
+				`create ResourceSlice: pool "pool", slice #0: some fields were dropped by the apiserver, probably because these features are disabled: DRAPartitionableDevices`,
+				`create ResourceSlice: pool "pool", slice #1: some fields were dropped by the apiserver, probably because these features are disabled: DRAPartitionableDevices`,
+			},
 		},
 		"create-device-with-binding-condition": {
 			nodeUID: nodeUID,
@@ -1028,7 +1054,140 @@ func TestControllerSyncPool(t *testing.T) {
 					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).
 					Obj(),
 			},
-			expectedError: `create ResourceSlice: pool "pool", slice #0: some fields were dropped by the apiserver, probably because these features are disabled: DRADeviceBindingConditions`,
+			expectedErrors: []string{`create ResourceSlice: pool "pool", slice #0: some fields were dropped by the apiserver, probably because these features are disabled: DRADeviceBindingConditions`},
+		},
+		"detect-resource-pools-with-duplicate-counter-sets": {
+			nodeUID: nodeUID,
+			inputDriverResources: &DriverResources{
+				Pools: map[string]Pool{
+					poolName: {
+						Generation: 1,
+						Slices: []Slice{
+							{
+								SharedCounters: []resourceapi.CounterSet{
+									{
+										Name: "counterset",
+									},
+								},
+							},
+							{
+								SharedCounters: []resourceapi.CounterSet{
+									{
+										Name: "counterset",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedStats: Stats{
+				NumCreates: 0,
+			},
+			expectedErrors: []string{`pool validation failed: found duplicate counter set "counterset" in pool "pool"`},
+		},
+		"detect-duplicate-devices": {
+			nodeUID: nodeUID,
+			inputDriverResources: &DriverResources{
+				Pools: map[string]Pool{
+					poolName: {
+						Generation: 1,
+						Slices: []Slice{
+							{
+								Devices: []resourceapi.Device{
+									{
+										Name: deviceName,
+									},
+								},
+							},
+							{
+								Devices: []resourceapi.Device{
+									{
+										Name: deviceName,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedStats: Stats{
+				NumCreates: 0,
+			},
+			expectedErrors: []string{`pool validation failed: found duplicate device "device" in pool "pool"`},
+		},
+		"detect-device-referencing-unknown-counter-set": {
+			nodeUID: nodeUID,
+			inputDriverResources: &DriverResources{
+				Pools: map[string]Pool{
+					poolName: {
+						Generation: 1,
+						Slices: []Slice{
+							{
+								Devices: []resourceapi.Device{
+									{
+										Name: deviceName,
+										ConsumesCounters: []resourceapi.DeviceCounterConsumption{
+											{
+												CounterSet: "counterset",
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedStats: Stats{
+				NumCreates: 0,
+			},
+			expectedErrors: []string{`pool validation failed: counter set "counterset" referenced by device "device" not found`},
+		},
+		"detect-device-referencing-unknown-counter-in-counter-set": {
+			nodeUID: nodeUID,
+			inputDriverResources: &DriverResources{
+				Pools: map[string]Pool{
+					poolName: {
+						Generation: 1,
+						Slices: []Slice{
+							{
+								SharedCounters: []resourceapi.CounterSet{
+									{
+										Name: "counterset",
+										Counters: map[string]resourceapi.Counter{
+											"memory": {
+												Value: resource.MustParse("8Gi"),
+											},
+										},
+									},
+								},
+							},
+							{
+								Devices: []resourceapi.Device{
+									{
+										Name: "device",
+										ConsumesCounters: []resourceapi.DeviceCounterConsumption{
+											{
+												CounterSet: "counterset",
+												Counters: map[string]resourceapi.Counter{
+													"cpu": {
+														Value: resource.MustParse("4"),
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedStats: Stats{
+				NumCreates: 0,
+			},
+			expectedErrors: []string{`pool validation failed: counter "cpu" referenced by device "device" not found in counter set "counterset"`},
 		},
 	}
 	for name, test := range testCases {
@@ -1115,32 +1274,62 @@ func TestControllerSyncPool(t *testing.T) {
 				assert.Equal(t, test.expectedStats, ctrl.GetStats(), "statistics after re-sync")
 			}
 
+			// Dedup the list of errors since we synced the pool twice.
+			var dedupedControllerErrors []error
+			errorMsgs := sets.New[string]()
+			for _, err := range controllerErrors {
+				errorMsg := err.Error()
+				if errorMsgs.Has(errorMsg) {
+					continue
+				}
+				errorMsgs.Insert(errorMsg)
+				dedupedControllerErrors = append(dedupedControllerErrors, err)
+			}
+
 			ctrl.Stop()
 			switch {
-			case test.expectedError != "" && len(controllerErrors) == 0:
-				t.Errorf("expected error, got none: %s", test.expectedError)
-			case test.expectedError == "" && len(controllerErrors) > 0:
-				t.Errorf("expected no error, got:\n  %s", strings.Join(formatErrors(controllerErrors), "\n  "))
-			case test.expectedError != "" && len(controllerErrors) != 1:
-				t.Errorf("expected one error %q, got:\n  %s", test.expectedError, strings.Join(formatErrors(controllerErrors), "\n  "))
-			case test.expectedError != "":
-				assert.Equal(t, test.expectedError, controllerErrors[0].Error())
+			case len(test.expectedErrors) != 0 && len(dedupedControllerErrors) == 0:
+				t.Errorf("expected errors, got none: %s", joinErrors(test.expectedErrors))
+			case len(test.expectedErrors) == 0 && len(dedupedControllerErrors) > 0:
+				t.Errorf("expected no error, got:\n  %s", joinErrors(formatErrors(controllerErrors)))
+			case len(test.expectedErrors) != len(dedupedControllerErrors):
+				t.Errorf("expected %d errors, got %d:\n  %s", len(test.expectedErrors), len(dedupedControllerErrors), joinErrors(formatErrors(dedupedControllerErrors)))
+			default:
+				expectedErrorsSet := sets.New(test.expectedErrors...)
+				actualErrorsSet := sets.New(errsToStrings(dedupedControllerErrors)...)
+				if !expectedErrorsSet.Equal(actualErrorsSet) {
+					t.Errorf("expected errors:\n  %s\ngot:\n  %s", joinErrors(test.expectedErrors), joinErrors(formatErrors(dedupedControllerErrors)))
+				}
 			}
 		})
+	}
+}
+
+func joinErrors(errors []string) string {
+	return strings.Join(errors, "\n  ")
+}
+
+func errsToStrings(errs []error) []string {
+	var strings []string
+	for _, err := range errs {
+		strings = append(strings, err.Error())
+	}
+	return strings
+}
+
+func formatError(err error) string {
+	var droppedFields *DroppedFieldsError
+	if errors.As(err, &droppedFields) {
+		return fmt.Sprintf("%v\n%s", err, cmp.Diff(droppedFields.DesiredSlice.Spec, droppedFields.ActualSlice.Spec))
+	} else {
+		return err.Error()
 	}
 }
 
 func formatErrors(errs []error) []string {
 	var errMsgs []string
 	for _, err := range errs {
-		var droppedFields *DroppedFieldsError
-		var errMsg string
-		if errors.As(err, &droppedFields) {
-			errMsg = fmt.Sprintf("%v\n%s", err, cmp.Diff(droppedFields.DesiredSlice.Spec, droppedFields.ActualSlice.Spec))
-		} else {
-			errMsg = err.Error()
-		}
-		errMsgs = append(errMsgs, errMsg)
+		errMsgs = append(errMsgs, formatError(err))
 	}
 	return errMsgs
 }
@@ -1259,8 +1448,7 @@ func MakeResourceSlice() *ResourceSliceWrapper {
 		resourceapi.ResourceSlice{
 			ObjectMeta: metav1.ObjectMeta{},
 			Spec: resourceapi.ResourceSliceSpec{
-				Pool:    resourceapi.ResourcePool{},
-				Devices: []resourceapi.Device{},
+				Pool: resourceapi.ResourcePool{},
 			},
 		},
 	}

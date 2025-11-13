@@ -20,11 +20,13 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -103,8 +105,7 @@ func NewTokensController(logger klog.Logger, serviceAccounts informers.ServiceAc
 		options.ServiceAccountResync,
 	)
 
-	secretCache := secrets.Informer().GetIndexer()
-	e.updatedSecrets = cache.NewIntegerResourceVersionMutationCache(logger, secretCache, secretCache, 60*time.Second, true)
+	e.secrets = secrets.Lister()
 	e.secretSynced = secrets.Informer().HasSynced
 	secrets.Informer().AddEventHandlerWithOptions(
 		cache.FilteringResourceEventHandler{
@@ -113,7 +114,7 @@ func NewTokensController(logger klog.Logger, serviceAccounts informers.ServiceAc
 				case *v1.Secret:
 					return t.Type == v1.SecretTypeServiceAccountToken
 				default:
-					utilruntime.HandleError(fmt.Errorf("object passed to %T that is not expected: %T", e, obj))
+					utilruntime.HandleErrorWithLogger(logger, nil, "Unexpected object type passed to tokens controller", "type", fmt.Sprintf("%T", obj))
 					return false
 				}
 			},
@@ -140,10 +141,7 @@ type TokensController struct {
 	rootCA []byte
 
 	serviceAccounts listersv1.ServiceAccountLister
-	// updatedSecrets is a wrapper around the shared cache which allows us to record
-	// and return our local mutations (since we're very likely to act on an updated
-	// secret before the watch reports it).
-	updatedSecrets cache.MutationCache
+	secrets         listersv1.SecretLister
 
 	// Since we join two objects, we'll watch both of them with controllers.
 	serviceAccountSynced cache.InformerSynced
@@ -166,23 +164,31 @@ type TokensController struct {
 
 // Run runs controller blocks until stopCh is closed
 func (e *TokensController) Run(ctx context.Context, workers int) {
-	// Shut down queues
-	defer utilruntime.HandleCrash()
-	defer e.syncServiceAccountQueue.ShutDown()
-	defer e.syncSecretQueue.ShutDown()
+	defer utilruntime.HandleCrashWithContext(ctx)
+	logger := klog.FromContext(ctx)
+
+	var wg sync.WaitGroup
+	defer func() {
+		logger.V(1).Info("Shutting down")
+		e.syncServiceAccountQueue.ShutDown()
+		e.syncSecretQueue.ShutDown()
+		wg.Wait()
+	}()
 
 	if !cache.WaitForNamedCacheSyncWithContext(ctx, e.serviceAccountSynced, e.secretSynced) {
 		return
 	}
 
-	logger := klog.FromContext(ctx)
 	logger.V(5).Info("Starting workers")
 	for i := 0; i < workers; i++ {
-		go wait.UntilWithContext(ctx, e.syncServiceAccount, 0)
-		go wait.UntilWithContext(ctx, e.syncSecret, 0)
+		wg.Go(func() {
+			wait.UntilWithContext(ctx, e.syncServiceAccount, 0)
+		})
+		wg.Go(func() {
+			wait.UntilWithContext(ctx, e.syncSecret, 0)
+		})
 	}
 	<-ctx.Done()
-	logger.V(1).Info("Shutting down")
 }
 
 func (e *TokensController) queueServiceAccountSync(obj interface{}) {
@@ -281,7 +287,7 @@ func (e *TokensController) syncSecret(ctx context.Context) {
 		return
 	}
 
-	secret, err := e.getSecret(secretInfo.namespace, secretInfo.name, secretInfo.uid, false)
+	secret, err := e.getSecret(secretInfo.namespace, secretInfo.name, secretInfo.uid)
 	switch {
 	case err != nil:
 		logger.Error(err, "Getting secret")
@@ -510,54 +516,34 @@ func (e *TokensController) getServiceAccount(ns string, name string, uid types.U
 	return nil, nil
 }
 
-func (e *TokensController) getSecret(ns string, name string, uid types.UID, fetchOnCacheMiss bool) (*v1.Secret, error) {
+func (e *TokensController) getSecret(ns string, name string, uid types.UID) (*v1.Secret, error) {
 	// Look up in cache
-	obj, exists, err := e.updatedSecrets.GetByKey(makeCacheKey(ns, name))
+	secret, err := e.secrets.Secrets(ns).Get(name)
 	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, nil
+		}
 		return nil, err
 	}
-	if exists {
-		secret, ok := obj.(*v1.Secret)
-		if !ok {
-			return nil, fmt.Errorf("expected *v1.Secret, got %#v", secret)
-		}
-		// Ensure UID matches if given
-		if len(uid) == 0 || uid == secret.UID {
-			return secret, nil
-		}
-	}
 
-	if !fetchOnCacheMiss {
-		return nil, nil
-	}
-
-	// Live lookup
-	secret, err := e.client.CoreV1().Secrets(ns).Get(context.TODO(), name, metav1.GetOptions{})
-	if apierrors.IsNotFound(err) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
 	// Ensure UID matches if given
 	if len(uid) == 0 || uid == secret.UID {
 		return secret, nil
 	}
+
 	return nil, nil
 }
 
-// listTokenSecrets returns a list of all of the ServiceAccountToken secrets that
+// listTokenSecrets returns a list of all the ServiceAccountToken secrets that
 // reference the given service account's name and uid
 func (e *TokensController) listTokenSecrets(serviceAccount *v1.ServiceAccount) ([]*v1.Secret, error) {
-	namespaceSecrets, err := e.updatedSecrets.ByIndex("namespace", serviceAccount.Namespace)
+	namespaceSecrets, err := e.secrets.Secrets(serviceAccount.Namespace).List(labels.Everything())
 	if err != nil {
 		return nil, err
 	}
 
 	items := []*v1.Secret{}
-	for _, obj := range namespaceSecrets {
-		secret := obj.(*v1.Secret)
-
+	for _, secret := range namespaceSecrets {
 		if apiserverserviceaccount.IsServiceAccountToken(secret, serviceAccount) {
 			items = append(items, secret)
 		}
@@ -626,9 +612,4 @@ func parseSecretQueueKey(key interface{}) (secretQueueKey, error) {
 		return secretQueueKey{}, fmt.Errorf("invalid secret key: %#v", key)
 	}
 	return queueKey, nil
-}
-
-// produce the same key format as cache.MetaNamespaceKeyFunc
-func makeCacheKey(namespace, name string) string {
-	return namespace + "/" + name
 }

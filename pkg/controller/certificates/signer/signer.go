@@ -22,6 +22,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"sync"
 	"time"
 
 	capi "k8s.io/api/certificates/v1"
@@ -111,9 +112,14 @@ func NewCSRSigningController(
 
 // Run the main goroutine responsible for watching and syncing jobs.
 func (c *CSRSigningController) Run(ctx context.Context, workers int) {
-	go c.dynamicCertReloader.Run(ctx, workers)
-
-	c.certificateController.Run(ctx, workers)
+	var wg sync.WaitGroup
+	wg.Go(func() {
+		c.dynamicCertReloader.Run(ctx, workers)
+	})
+	wg.Go(func() {
+		c.certificateController.Run(ctx, workers)
+	})
+	wg.Wait()
 }
 
 type isRequestForSignerFunc func(req *x509.CertificateRequest, usages []capi.KeyUsage, signerName string) (bool, error)

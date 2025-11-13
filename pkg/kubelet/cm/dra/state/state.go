@@ -51,11 +51,12 @@ type DriverState struct {
 }
 
 // Device is how a DRA driver described an allocated device in a claim
-// to kubelet. RequestName and CDI device IDs are optional.
+// to kubelet. RequestName, ShareID, and CDI device IDs are optional.
 // +k8s:deepcopy-gen=true
 type Device struct {
 	PoolName     string
 	DeviceName   string
+	ShareID      *types.UID
 	RequestNames []string
 	CDIDeviceIDs []string
 }
@@ -95,4 +96,9 @@ type DeviceHealth struct {
 
 	// LastUpdated keeps track of the last health status update of this device.
 	LastUpdated time.Time
+
+	// HealthCheckTimeout is the timeout for the health check of the device.
+	// Zero value means use the default timeout (DefaultHealthTimeout).
+	// This ensures backward compatibility with existing data.
+	HealthCheckTimeout time.Duration
 }

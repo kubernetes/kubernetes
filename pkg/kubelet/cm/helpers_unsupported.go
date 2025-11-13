@@ -21,7 +21,9 @@ package cm
 
 import (
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -71,6 +73,18 @@ func NodeAllocatableRoot(cgroupRoot string, cgroupsPerQOS bool, cgroupDriver str
 }
 
 // GetKubeletContainer returns the cgroup the kubelet will use
-func GetKubeletContainer(kubeletCgroups string) (string, error) {
+func GetKubeletContainer(logger klog.Logger, kubeletCgroups string) (string, error) {
 	return "", nil
+}
+
+func CPURequestsFromConfig(podConfig *ResourceConfig) *resource.Quantity {
+	return nil
+}
+
+func CPULimitsFromConfig(podConfig *ResourceConfig) *resource.Quantity {
+	return nil
+}
+
+func MemoryLimitsFromConfig(podConfig *ResourceConfig) *resource.Quantity {
+	return nil
 }

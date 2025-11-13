@@ -26,13 +26,16 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/blang/semver/v4"
 )
 
 var _ Validator = &CgroupsValidator{}
 
 // CgroupsValidator validates cgroup configuration.
 type CgroupsValidator struct {
-	Reporter Reporter
+	Reporter       Reporter
+	KubeletVersion string
 }
 
 // Name is part of the system.Validator interface.
@@ -114,7 +117,22 @@ func (c *CgroupsValidator) Validate(spec SysSpec) (warns, errs []error) {
 		requiredCgroupSpec = spec.CgroupsV2
 		optionalCgroupSpec = spec.CgroupsV2Optional
 	} else {
-		warns = append(warns, errors.New("cgroups v1 support is in maintenance mode, please migrate to cgroups v2"))
+		v1DisabledInKubelet, err := c.isCgroupsV1DisabledInKubelet()
+		if err != nil {
+			return nil, []error{err}
+		}
+
+		v1Error := errors.New("cgroups v1 support is deprecated and will be removed in a future release. " +
+			"Please migrate to cgroups v2. To explicitly enable cgroups v1 support for kubelet v1.35 or newer, " +
+			"you must set the kubelet configuration option 'FailCgroupV1' to 'false'. You must also explicitly " +
+			"skip this validation. For more information, see https://git.k8s.io/enhancements/keps/sig-node/5573-remove-cgroup-v1")
+
+		if v1DisabledInKubelet {
+			errs = append(errs, v1Error)
+		} else {
+			warns = append(warns, v1Error)
+		}
+
 		subsystems, err = c.getCgroupV1Subsystems()
 		if err != nil {
 			return nil, []error{fmt.Errorf("failed to get cgroups v1 subsystems: %w", err)}
@@ -228,4 +246,25 @@ func checkCgroupV2Freeze(unifiedMountpoint string) (isCgroupfs bool, warn error)
 	}
 	isCgroupfs = true
 	return
+}
+
+// isCgroupsV1DisabledInKubelet checks the KubeletVersion and determines if that version
+// disabled cgroups v1 support by default:
+// - If the version is newer than 1.35 pre-release, return true.
+// - If the version is not defined or older than pre-release 1.35, return false.
+func (c *CgroupsValidator) isCgroupsV1DisabledInKubelet() (bool, error) {
+	if c.KubeletVersion == "" {
+		return false, nil
+	}
+
+	kv, err := semver.Parse(c.KubeletVersion)
+	if err != nil {
+		return false, fmt.Errorf("malformed KubeletVersion in CgroupsValidator: %w", err)
+	}
+
+	if kv.Compare(semver.MustParse("1.35.0-0")) > -1 {
+		return true, nil
+	}
+
+	return false, nil
 }

@@ -26,10 +26,8 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/spf13/cobra"
 
-	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/kubectl/pkg/cmd/plugin"
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
 func TestNormalizationFuncGlobalExistence(t *testing.T) {
@@ -359,47 +357,4 @@ func (h *testPluginHandler) Execute(executablePath string, cmdArgs, env []string
 	h.withArgs = cmdArgs
 	h.withEnv = env
 	return nil
-}
-
-func TestKubectlCommandHeadersHooks(t *testing.T) {
-	tests := map[string]struct {
-		envVar    string
-		addsHooks bool
-	}{
-		"empty environment variable; hooks added": {
-			envVar:    "",
-			addsHooks: true,
-		},
-		"random env var value; hooks added": {
-			envVar:    "foo",
-			addsHooks: true,
-		},
-		"true env var value; hooks added": {
-			envVar:    "true",
-			addsHooks: true,
-		},
-		"false env var value; hooks NOT added": {
-			envVar:    "false",
-			addsHooks: false,
-		},
-	}
-
-	for name, testCase := range tests {
-		t.Run(name, func(t *testing.T) {
-			cmds := &cobra.Command{}
-			kubeConfigFlags := genericclioptions.NewConfigFlags(true).WithDeprecatedPasswordFlag()
-			if kubeConfigFlags.WrapConfigFn != nil {
-				t.Fatal("expected initial nil WrapConfigFn")
-			}
-			t.Setenv(string(cmdutil.CmdHeaders), testCase.envVar)
-			addCmdHeaderHooks(cmds, kubeConfigFlags)
-			// Valdidate whether the hooks were added.
-			if testCase.addsHooks && kubeConfigFlags.WrapConfigFn == nil {
-				t.Error("after adding kubectl command header, expecting non-nil WrapConfigFn")
-			}
-			if !testCase.addsHooks && kubeConfigFlags.WrapConfigFn != nil {
-				t.Error("env var feature gate should have blocked setting WrapConfigFn")
-			}
-		})
-	}
 }

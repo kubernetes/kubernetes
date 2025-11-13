@@ -183,9 +183,14 @@ type fixtureGenerator struct {
 	// Pass cases are not allowed to be feature-gated (pass cases must only depend on data existing in GA fields).
 	failRequiresFeatures []featuregate.Feature
 
-	// generatePass transforms a minimum valid pod into one or more valid pods.
+	// failRequiresError indicates the fixtures in the failure cases cannot be created with warnings, but result in API errors.
+	// This happens when the combination of fields required to fail the PSA check also fails validation.
+	// When failRequiresError=true, the controller test scenarios expect failure cases to be rejected rather than accepted with warnings.
+	failRequiresError bool
+
+	// generatePass transforms a minimum valid pod into one or more valid pods that pass the given policy level.
 	// pods do not need to populate metadata.name.
-	generatePass func(*corev1.Pod) []*corev1.Pod
+	generatePass func(*corev1.Pod, api.Level) []*corev1.Pod
 	// generateFail transforms a minimum valid pod into one or more invalid pods.
 	// pods do not need to populate metadata.name.
 	generateFail func(*corev1.Pod) []*corev1.Pod
@@ -200,6 +205,11 @@ type fixtureData struct {
 	// If empty, failure test cases are always run.
 	// Pass cases are not allowed to be feature-gated (pass cases must only depend on data existing in GA fields).
 	failRequiresFeatures []featuregate.Feature
+
+	// failRequiresError indicates the fixtures in the failure cases cannot be created with warnings, but result in API errors.
+	// This happens when the combination of fields required to fail the PSA check also fails validation.
+	// When failRequiresError=true, the controller test scenarios expect failure cases to be rejected rather than accepted with warnings.
+	failRequiresError bool
 
 	pass []*corev1.Pod
 	fail []*corev1.Pod
@@ -248,8 +258,9 @@ func getFixtures(key fixtureKey) (fixtureData, error) {
 			data := fixtureData{
 				expectErrorSubstring: generator.expectErrorSubstring,
 				failRequiresFeatures: generator.failRequiresFeatures,
+				failRequiresError:    generator.failRequiresError,
 
-				pass: generator.generatePass(validPodForLevel.DeepCopy()),
+				pass: generator.generatePass(validPodForLevel.DeepCopy(), key.level),
 				fail: generator.generateFail(validPodForLevel.DeepCopy()),
 			}
 			if len(data.expectErrorSubstring) == 0 {

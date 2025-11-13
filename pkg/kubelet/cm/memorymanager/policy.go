@@ -17,9 +17,8 @@ limitations under the License.
 package memorymanager
 
 import (
-	"context"
-
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 )
@@ -30,19 +29,19 @@ type policyType string
 // Policy implements logic for pod container to a memory assignment.
 type Policy interface {
 	Name() string
-	Start(ctx context.Context, s state.State) error
+	Start(logger klog.Logger, s state.State) error
 	// Allocate call is idempotent
-	Allocate(ctx context.Context, s state.State, pod *v1.Pod, container *v1.Container) error
+	Allocate(logger klog.Logger, s state.State, pod *v1.Pod, container *v1.Container) error
 	// RemoveContainer call is idempotent
-	RemoveContainer(ctx context.Context, s state.State, podUID string, containerName string)
+	RemoveContainer(logger klog.Logger, s state.State, podUID string, containerName string)
 	// GetTopologyHints implements the topologymanager.HintProvider Interface
 	// and is consulted to achieve NUMA aware resource alignment among this
 	// and other resource controllers.
-	GetTopologyHints(ctx context.Context, s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint
+	GetTopologyHints(logger klog.Logger, s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint
 	// GetPodTopologyHints implements the topologymanager.HintProvider Interface
 	// and is consulted to achieve NUMA aware resource alignment among this
 	// and other resource controllers.
-	GetPodTopologyHints(ctx context.Context, s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint
+	GetPodTopologyHints(logger klog.Logger, s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint
 	// GetAllocatableMemory returns the amount of allocatable memory for each NUMA node
-	GetAllocatableMemory(ctx context.Context, s state.State) []state.Block
+	GetAllocatableMemory(s state.State) []state.Block
 }

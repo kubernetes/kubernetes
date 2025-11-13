@@ -19,16 +19,20 @@ limitations under the License.
 
 package eviction
 
-import "k8s.io/klog/v2"
+import (
+	"context"
+
+	"k8s.io/klog/v2"
+)
 
 // NewCgroupNotifier creates a cgroup notifier that does nothing because cgroups do not exist on non-linux systems.
-func NewCgroupNotifier(path, attribute string, threshold int64) (CgroupNotifier, error) {
-	klog.V(5).InfoS("cgroup notifications not supported")
+func NewCgroupNotifier(logger klog.Logger, path, attribute string, threshold int64) (CgroupNotifier, error) {
+	logger.V(5).Info("cgroup notifications not supported")
 	return &unsupportedThresholdNotifier{}, nil
 }
 
 type unsupportedThresholdNotifier struct{}
 
-func (*unsupportedThresholdNotifier) Start(_ chan<- struct{}) {}
+func (*unsupportedThresholdNotifier) Start(context.Context, chan<- struct{}) {}
 
 func (*unsupportedThresholdNotifier) Stop() {}

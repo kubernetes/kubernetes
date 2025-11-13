@@ -153,6 +153,12 @@ func NewPodsToActivate() *PodsToActivate {
 	return &PodsToActivate{Map: make(map[string]*v1.Pod)}
 }
 
+// SortedScoredNodes is a list of scored nodes, returned from scheduling.
+type SortedScoredNodes interface {
+	Pop() string
+	Len() int
+}
+
 // Framework manages the set of plugins in use by the scheduling framework.
 // Configured plugins are called at specified points in a scheduling context.
 type Framework interface {
@@ -166,6 +172,13 @@ type Framework interface {
 
 	// QueueSortFunc returns the function to sort pods in scheduling queue
 	QueueSortFunc() fwk.LessFunc
+
+	// Create a scheduling signature for a given pod, if possible. Two pods with the same signature
+	// should get the same feasibility and scores for any given set of nodes even after one of them gets assigned. If some plugins
+	// are unable to create a signature, the pod may be "unsignable" which disables results caching
+	// and gang scheduling optimizations.
+	// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-scheduling/5598-opportunistic-batching
+	SignPod(ctx context.Context, pod *v1.Pod, recordPluginStats bool) fwk.PodSignature
 
 	// RunPreFilterPlugins runs the set of configured PreFilter plugins. It returns
 	// *fwk.Status and its code is set to non-success if any of the plugins returns
@@ -183,6 +196,15 @@ type Framework interface {
 	// to execute first and return Unschedulable status, or ones that try to change the
 	// cluster state to make the pod potentially schedulable in a future scheduling cycle.
 	RunPostFilterPlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, filteredNodeStatusMap fwk.NodeToStatusReader) (*fwk.PostFilterResult, *fwk.Status)
+
+	// Get a "node hint" for a given pod. A node hint is the name of a node provided by the batching code when information
+	// from the previous scheduling cycle can be reused for this cycle.
+	// If the batching code cannot provide a hint, the function returns "".
+	// See git.k8s.io/enhancements/keps/sig-scheduling/5598-opportunistic-batching
+	GetNodeHint(ctx context.Context, pod *v1.Pod, state fwk.CycleState, cycleCount int64) (hint string, signature fwk.PodSignature)
+
+	// StoreScheduleResults stores the results after we have sorted and filtered nodes.
+	StoreScheduleResults(ctx context.Context, signature fwk.PodSignature, hintedNode, chosenNode string, otherNodes SortedScoredNodes, cycleCount int64)
 
 	// RunPreBindPlugins runs the set of configured PreBind plugins. It returns
 	// *fwk.Status and its code is set to non-success if any of the plugins returns
@@ -240,9 +262,6 @@ type Framework interface {
 
 	// ListPlugins returns a map of extension point name to list of configured Plugins.
 	ListPlugins() *config.Plugins
-
-	// ProfileName returns the profile name associated to a profile.
-	ProfileName() string
 
 	// PercentageOfNodesToScore returns percentageOfNodesToScore associated to a profile.
 	PercentageOfNodesToScore() *int32

@@ -35,6 +35,10 @@ func SetDefaults_DeviceRequest(obj *resourceapi.DeviceRequest) {
 	if obj.DeviceClassName == "" {
 		return
 	}
+	// Declarative defaulting (+default) is not used for AllocationMode here because
+	// v1beta1 uses a bespoke union structure. Applying an unconditional default
+	// would make valid "FirstAvailable" requests (where this field must be empty) invalid.
+	// Therefore, we rely on this manual defaulting logic.
 	if obj.AllocationMode == "" {
 		obj.AllocationMode = resourceapi.DeviceAllocationModeExactCount
 	}

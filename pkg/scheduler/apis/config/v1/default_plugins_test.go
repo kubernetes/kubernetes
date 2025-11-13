@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -88,7 +89,7 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: names.VolumeZone},
 						{Name: names.PodTopologySpread, Weight: ptr.To[int32](2)},
 						{Name: names.InterPodAffinity, Weight: ptr.To[int32](2)},
-						{Name: names.DynamicResources},
+						{Name: names.DynamicResources, Weight: ptr.To[int32](2)},
 						{Name: names.DefaultPreemption},
 						{Name: names.NodeResourcesBalancedAllocation, Weight: ptr.To[int32](1)},
 						{Name: names.ImageLocality, Weight: ptr.To[int32](1)},
@@ -97,13 +98,110 @@ func TestApplyFeatureGates(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "Feature gate NodeDeclaredFeatures enabled",
+			features: map[featuregate.Feature]bool{
+				features.NodeDeclaredFeatures: true,
+			},
+			wantConfig: &v1.Plugins{
+				MultiPoint: v1.PluginSet{
+					Enabled: []v1.Plugin{
+						{Name: names.SchedulingGates},
+						{Name: names.PrioritySort},
+						{Name: names.NodeUnschedulable},
+						{Name: names.NodeName},
+						{Name: names.TaintToleration, Weight: ptr.To[int32](3)},
+						{Name: names.NodeAffinity, Weight: ptr.To[int32](2)},
+						{Name: names.NodePorts},
+						{Name: names.NodeResourcesFit, Weight: ptr.To[int32](1)},
+						{Name: names.VolumeRestrictions},
+						{Name: names.NodeVolumeLimits},
+						{Name: names.VolumeBinding},
+						{Name: names.VolumeZone},
+						{Name: names.PodTopologySpread, Weight: ptr.To[int32](2)},
+						{Name: names.InterPodAffinity, Weight: ptr.To[int32](2)},
+						{Name: names.DynamicResources, Weight: ptr.To[int32](2)},
+						{Name: names.DefaultPreemption},
+						{Name: names.NodeResourcesBalancedAllocation, Weight: ptr.To[int32](1)},
+						{Name: names.ImageLocality, Weight: ptr.To[int32](1)},
+						{Name: names.DefaultBinder},
+						{Name: names.NodeDeclaredFeatures},
+					},
+				},
+			},
+		},
+		{
+			name: "Feature gate NodeDeclaredFeatures disabled",
+			features: map[featuregate.Feature]bool{
+				features.NodeDeclaredFeatures: false,
+			},
+			wantConfig: &v1.Plugins{
+				MultiPoint: v1.PluginSet{
+					Enabled: []v1.Plugin{
+						{Name: names.SchedulingGates},
+						{Name: names.PrioritySort},
+						{Name: names.NodeUnschedulable},
+						{Name: names.NodeName},
+						{Name: names.TaintToleration, Weight: ptr.To[int32](3)},
+						{Name: names.NodeAffinity, Weight: ptr.To[int32](2)},
+						{Name: names.NodePorts},
+						{Name: names.NodeResourcesFit, Weight: ptr.To[int32](1)},
+						{Name: names.VolumeRestrictions},
+						{Name: names.NodeVolumeLimits},
+						{Name: names.VolumeBinding},
+						{Name: names.VolumeZone},
+						{Name: names.PodTopologySpread, Weight: ptr.To[int32](2)},
+						{Name: names.InterPodAffinity, Weight: ptr.To[int32](2)},
+						{Name: names.DynamicResources, Weight: ptr.To[int32](2)},
+						{Name: names.DefaultPreemption},
+						{Name: names.NodeResourcesBalancedAllocation, Weight: ptr.To[int32](1)},
+						{Name: names.ImageLocality, Weight: ptr.To[int32](1)},
+						{Name: names.DefaultBinder},
+					},
+				},
+			},
+		},
+		{
+			name: "Feature gate GangScheduling enabled",
+			features: map[featuregate.Feature]bool{
+				features.GangScheduling:  true,
+				features.GenericWorkload: true,
+			},
+			wantConfig: &v1.Plugins{
+				MultiPoint: v1.PluginSet{
+					Enabled: []v1.Plugin{
+						{Name: names.SchedulingGates},
+						{Name: names.PrioritySort},
+						{Name: names.NodeUnschedulable},
+						{Name: names.NodeName},
+						{Name: names.TaintToleration, Weight: ptr.To[int32](3)},
+						{Name: names.NodeAffinity, Weight: ptr.To[int32](2)},
+						{Name: names.NodePorts},
+						{Name: names.NodeResourcesFit, Weight: ptr.To[int32](1)},
+						{Name: names.VolumeRestrictions},
+						{Name: names.NodeVolumeLimits},
+						{Name: names.VolumeBinding},
+						{Name: names.VolumeZone},
+						{Name: names.PodTopologySpread, Weight: ptr.To[int32](2)},
+						{Name: names.InterPodAffinity, Weight: ptr.To[int32](2)},
+						{Name: names.DynamicResources, Weight: ptr.To[int32](2)},
+						{Name: names.DefaultPreemption},
+						{Name: names.NodeResourcesBalancedAllocation, Weight: ptr.To[int32](1)},
+						{Name: names.ImageLocality, Weight: ptr.To[int32](1)},
+						{Name: names.DefaultBinder},
+						{Name: names.GangScheduling},
+					},
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			for k, v := range test.features {
-				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, k, v)
+			if draEnabled, draExists := test.features[features.DynamicResourceAllocation]; draExists && !draEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, version.MustParse("1.34"))
 			}
+			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, test.features)
 
 			gotConfig := getDefaultPlugins()
 			if diff := cmp.Diff(test.wantConfig, gotConfig); diff != "" {

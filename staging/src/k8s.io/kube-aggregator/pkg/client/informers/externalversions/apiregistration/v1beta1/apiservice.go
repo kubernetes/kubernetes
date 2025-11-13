@@ -56,7 +56,7 @@ func NewAPIServiceInformer(client clientset.Interface, resyncPeriod time.Duratio
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredAPIServiceInformer(client clientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
+		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
@@ -81,7 +81,7 @@ func NewFilteredAPIServiceInformer(client clientset.Interface, resyncPeriod time
 				}
 				return client.ApiregistrationV1beta1().APIServices().Watch(ctx, options)
 			},
-		},
+		}, client),
 		&apisapiregistrationv1beta1.APIService{},
 		resyncPeriod,
 		indexers,

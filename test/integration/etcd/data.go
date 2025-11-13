@@ -229,7 +229,7 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 			ExpectedEtcdPath:  "/registry/podcertificaterequests/" + namespace + "/req-1",
 			ExpectedGVK:       gvkP("certificates.k8s.io", "v1alpha1", "PodCertificateRequest"),
 			IntroducedVersion: "1.34",
-			RemovedVersion:    "1.37",
+			RemovedVersion:    "1.35",
 		},
 		// --
 
@@ -238,6 +238,13 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 			Stub:              `{"metadata": {"name": "example.com:signer:abc"}, "spec": {"signerName":"example.com/signer", "trustBundle": "-----BEGIN CERTIFICATE-----\nMIIBBDCBt6ADAgECAgEAMAUGAytlcDAQMQ4wDAYDVQQDEwVyb290MTAiGA8wMDAx\nMDEwMTAwMDAwMFoYDzAwMDEwMTAxMDAwMDAwWjAQMQ4wDAYDVQQDEwVyb290MTAq\nMAUGAytlcAMhAF2MoFeGa97gK2NGT1h6p1/a1GlMXAXbcjI/OShyIobPozIwMDAP\nBgNVHRMBAf8EBTADAQH/MB0GA1UdDgQWBBTWDdK2CNQiHqRjPaAWYPPtIykQgjAF\nBgMrZXADQQCtom9WGl7m2SAa4tXM9Soo/mbInBsRhn187BMoqTAHInHchKup5/3y\nl1tYJSZZsEXnXrCvw2qLCBNif6+2YYgE\n-----END CERTIFICATE-----\n"}}`,
 			ExpectedEtcdPath:  "/registry/clustertrustbundles/example.com:signer:abc",
 			IntroducedVersion: "1.33",
+			RemovedVersion:    "1.39",
+		},
+		gvr("certificates.k8s.io", "v1beta1", "podcertificaterequests"): {
+			Stub:              `{"metadata": {"name": "req-1"}, "spec": {"signerName":"example.com/signer", "podName":"pod-1", "podUID":"pod-uid-1", "serviceAccountName":"sa-1", "serviceAccountUID":"sa-uid-1", "nodeName":"node-1", "nodeUID":"node-uid-1", "maxExpirationSeconds":86400, "pkixPublicKey":"MCowBQYDK2VwAyEA5g+rk9q/hjojtc2nwHJ660RdX5w1f4AK0/kP391QyLY=", "proofOfPossession":"SuGHX7SMyPHuN5cD5wjKLXGNbhdlCYUnTH65JkTx17iWlLynQ/g9GiTYObftSHNzqRh0ofdgAGqK6a379O7RBw=="}, "userConfig": {"test/foo":"bar"}}`,
+			ExpectedEtcdPath:  "/registry/podcertificaterequests/" + namespace + "/req-1",
+			ExpectedGVK:       gvkP("certificates.k8s.io", "v1beta1", "PodCertificateRequest"),
+			IntroducedVersion: "1.35",
 			RemovedVersion:    "1.39",
 		},
 		// --
@@ -344,12 +351,12 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 		},
 		// --
 
-		// k8s.io/kubernetes/pkg/apis/storagemigration/v1alpha1
-		gvr("storagemigration.k8s.io", "v1alpha1", "storageversionmigrations"): {
-			Stub:              `{"metadata": {"name": "test-migration"}, "spec":{"resource": {"group": "test-group", "resource": "test-resource", "version": "test-version"}}}`,
+		// k8s.io/kubernetes/pkg/apis/storagemigration/v1beta1
+		gvr("storagemigration.k8s.io", "v1beta1", "storageversionmigrations"): {
+			Stub:              `{"metadata": {"name": "test-migration"}, "spec":{"resource": {"group": "test-group", "resource": "test-resource"}}}`,
 			ExpectedEtcdPath:  "/registry/storageversionmigrations/test-migration",
-			IntroducedVersion: "1.30",
-			RemovedVersion:    "1.36",
+			IntroducedVersion: "1.35",
+			RemovedVersion:    "1.41",
 		},
 		// --
 
@@ -374,16 +381,6 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 			Stub:              `{"metadata": {"name": "va3"}, "spec": {"attacher": "gce", "nodeName": "localhost", "source": {"persistentVolumeName": "pv3"}}}`,
 			ExpectedEtcdPath:  "/registry/volumeattachments/va3",
 			IntroducedVersion: "1.13",
-		},
-		// --
-
-		// k8s.io/kubernetes/pkg/apis/storage/v1alpha1
-		gvr("storage.k8s.io", "v1alpha1", "volumeattributesclasses"): {
-			Stub:              `{"metadata": {"name": "vac1"}, "driverName": "example.com/driver", "parameters": {"foo": "bar"}}`,
-			ExpectedEtcdPath:  "/registry/volumeattributesclasses/vac1",
-			ExpectedGVK:       gvkP("storage.k8s.io", "v1beta1", "VolumeAttributesClass"),
-			IntroducedVersion: "1.29",
-			RemovedVersion:    "1.35",
 		},
 		// --
 
@@ -515,6 +512,15 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 			Stub:              `{"metadata":{"name":"pc3"},"Value":1000}`,
 			ExpectedEtcdPath:  "/registry/priorityclasses/pc3",
 			IntroducedVersion: "1.14",
+		},
+		// --
+
+		// k8s.io/kubernetes/pkg/apis/scheduling/v1alpha1
+		gvr("scheduling.k8s.io", "v1alpha1", "workloads"): {
+			Stub:              `{"metadata": {"name": "w1"}, "spec": {"podGroups": [{"name": "group1", "policy": {"basic": {}}}]}}`,
+			ExpectedEtcdPath:  "/registry/workloads/" + namespace + "/w1",
+			IntroducedVersion: "1.35",
+			RemovedVersion:    "1.41",
 		},
 		// --
 

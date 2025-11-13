@@ -69,7 +69,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
-	storagemigrationv1alpha1 "k8s.io/api/storagemigration/v1alpha1"
+	storagemigrationv1beta1 "k8s.io/api/storagemigration/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -126,7 +126,7 @@ import (
 	applyconfigurationsstoragev1 "k8s.io/client-go/applyconfigurations/storage/v1"
 	applyconfigurationsstoragev1alpha1 "k8s.io/client-go/applyconfigurations/storage/v1alpha1"
 	applyconfigurationsstoragev1beta1 "k8s.io/client-go/applyconfigurations/storage/v1beta1"
-	applyconfigurationsstoragemigrationv1alpha1 "k8s.io/client-go/applyconfigurations/storagemigration/v1alpha1"
+	applyconfigurationsstoragemigrationv1beta1 "k8s.io/client-go/applyconfigurations/storagemigration/v1beta1"
 )
 
 // ForKind returns an apply configuration type for the given GroupVersionKind, or nil if no
@@ -630,12 +630,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscertificatesv1alpha1.ClusterTrustBundleApplyConfiguration{}
 	case certificatesv1alpha1.SchemeGroupVersion.WithKind("ClusterTrustBundleSpec"):
 		return &applyconfigurationscertificatesv1alpha1.ClusterTrustBundleSpecApplyConfiguration{}
-	case certificatesv1alpha1.SchemeGroupVersion.WithKind("PodCertificateRequest"):
-		return &applyconfigurationscertificatesv1alpha1.PodCertificateRequestApplyConfiguration{}
-	case certificatesv1alpha1.SchemeGroupVersion.WithKind("PodCertificateRequestSpec"):
-		return &applyconfigurationscertificatesv1alpha1.PodCertificateRequestSpecApplyConfiguration{}
-	case certificatesv1alpha1.SchemeGroupVersion.WithKind("PodCertificateRequestStatus"):
-		return &applyconfigurationscertificatesv1alpha1.PodCertificateRequestStatusApplyConfiguration{}
 
 		// Group=certificates.k8s.io, Version=v1beta1
 	case certificatesv1beta1.SchemeGroupVersion.WithKind("CertificateSigningRequest"):
@@ -650,6 +644,12 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscertificatesv1beta1.ClusterTrustBundleApplyConfiguration{}
 	case certificatesv1beta1.SchemeGroupVersion.WithKind("ClusterTrustBundleSpec"):
 		return &applyconfigurationscertificatesv1beta1.ClusterTrustBundleSpecApplyConfiguration{}
+	case certificatesv1beta1.SchemeGroupVersion.WithKind("PodCertificateRequest"):
+		return &applyconfigurationscertificatesv1beta1.PodCertificateRequestApplyConfiguration{}
+	case certificatesv1beta1.SchemeGroupVersion.WithKind("PodCertificateRequestSpec"):
+		return &applyconfigurationscertificatesv1beta1.PodCertificateRequestSpecApplyConfiguration{}
+	case certificatesv1beta1.SchemeGroupVersion.WithKind("PodCertificateRequestStatus"):
+		return &applyconfigurationscertificatesv1beta1.PodCertificateRequestStatusApplyConfiguration{}
 
 		// Group=coordination.k8s.io, Version=v1
 	case coordinationv1.SchemeGroupVersion.WithKind("Lease"):
@@ -1084,6 +1084,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.WeightedPodAffinityTermApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("WindowsSecurityContextOptions"):
 		return &applyconfigurationscorev1.WindowsSecurityContextOptionsApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("WorkloadReference"):
+		return &applyconfigurationscorev1.WorkloadReferenceApplyConfiguration{}
 
 		// Group=discovery.k8s.io, Version=v1
 	case discoveryv1.SchemeGroupVersion.WithKind("Endpoint"):
@@ -1406,6 +1408,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsmetav1.ConditionApplyConfiguration{}
 	case metav1.SchemeGroupVersion.WithKind("DeleteOptions"):
 		return &applyconfigurationsmetav1.DeleteOptionsApplyConfiguration{}
+	case metav1.SchemeGroupVersion.WithKind("GroupResource"):
+		return &applyconfigurationsmetav1.GroupResourceApplyConfiguration{}
 	case metav1.SchemeGroupVersion.WithKind("LabelSelector"):
 		return &applyconfigurationsmetav1.LabelSelectorApplyConfiguration{}
 	case metav1.SchemeGroupVersion.WithKind("LabelSelectorRequirement"):
@@ -1708,16 +1712,14 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1.ResourceSliceSpecApplyConfiguration{}
 
 		// Group=resource.k8s.io, Version=v1alpha3
-	case v1alpha3.SchemeGroupVersion.WithKind("CELDeviceSelector"):
-		return &resourcev1alpha3.CELDeviceSelectorApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("DeviceSelector"):
-		return &resourcev1alpha3.DeviceSelectorApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("DeviceTaint"):
 		return &resourcev1alpha3.DeviceTaintApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("DeviceTaintRule"):
 		return &resourcev1alpha3.DeviceTaintRuleApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("DeviceTaintRuleSpec"):
 		return &resourcev1alpha3.DeviceTaintRuleSpecApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("DeviceTaintRuleStatus"):
+		return &resourcev1alpha3.DeviceTaintRuleStatusApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("DeviceTaintSelector"):
 		return &resourcev1alpha3.DeviceTaintSelectorApplyConfiguration{}
 
@@ -1886,8 +1888,20 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsschedulingv1.PriorityClassApplyConfiguration{}
 
 		// Group=scheduling.k8s.io, Version=v1alpha1
+	case schedulingv1alpha1.SchemeGroupVersion.WithKind("GangSchedulingPolicy"):
+		return &applyconfigurationsschedulingv1alpha1.GangSchedulingPolicyApplyConfiguration{}
+	case schedulingv1alpha1.SchemeGroupVersion.WithKind("PodGroup"):
+		return &applyconfigurationsschedulingv1alpha1.PodGroupApplyConfiguration{}
+	case schedulingv1alpha1.SchemeGroupVersion.WithKind("PodGroupPolicy"):
+		return &applyconfigurationsschedulingv1alpha1.PodGroupPolicyApplyConfiguration{}
 	case schedulingv1alpha1.SchemeGroupVersion.WithKind("PriorityClass"):
 		return &applyconfigurationsschedulingv1alpha1.PriorityClassApplyConfiguration{}
+	case schedulingv1alpha1.SchemeGroupVersion.WithKind("TypedLocalObjectReference"):
+		return &applyconfigurationsschedulingv1alpha1.TypedLocalObjectReferenceApplyConfiguration{}
+	case schedulingv1alpha1.SchemeGroupVersion.WithKind("Workload"):
+		return &applyconfigurationsschedulingv1alpha1.WorkloadApplyConfiguration{}
+	case schedulingv1alpha1.SchemeGroupVersion.WithKind("WorkloadSpec"):
+		return &applyconfigurationsschedulingv1alpha1.WorkloadSpecApplyConfiguration{}
 
 		// Group=scheduling.k8s.io, Version=v1beta1
 	case schedulingv1beta1.SchemeGroupVersion.WithKind("PriorityClass"):
@@ -1973,17 +1987,13 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 	case storagev1beta1.SchemeGroupVersion.WithKind("VolumeNodeResources"):
 		return &applyconfigurationsstoragev1beta1.VolumeNodeResourcesApplyConfiguration{}
 
-		// Group=storagemigration.k8s.io, Version=v1alpha1
-	case storagemigrationv1alpha1.SchemeGroupVersion.WithKind("GroupVersionResource"):
-		return &applyconfigurationsstoragemigrationv1alpha1.GroupVersionResourceApplyConfiguration{}
-	case storagemigrationv1alpha1.SchemeGroupVersion.WithKind("MigrationCondition"):
-		return &applyconfigurationsstoragemigrationv1alpha1.MigrationConditionApplyConfiguration{}
-	case storagemigrationv1alpha1.SchemeGroupVersion.WithKind("StorageVersionMigration"):
-		return &applyconfigurationsstoragemigrationv1alpha1.StorageVersionMigrationApplyConfiguration{}
-	case storagemigrationv1alpha1.SchemeGroupVersion.WithKind("StorageVersionMigrationSpec"):
-		return &applyconfigurationsstoragemigrationv1alpha1.StorageVersionMigrationSpecApplyConfiguration{}
-	case storagemigrationv1alpha1.SchemeGroupVersion.WithKind("StorageVersionMigrationStatus"):
-		return &applyconfigurationsstoragemigrationv1alpha1.StorageVersionMigrationStatusApplyConfiguration{}
+		// Group=storagemigration.k8s.io, Version=v1beta1
+	case storagemigrationv1beta1.SchemeGroupVersion.WithKind("StorageVersionMigration"):
+		return &applyconfigurationsstoragemigrationv1beta1.StorageVersionMigrationApplyConfiguration{}
+	case storagemigrationv1beta1.SchemeGroupVersion.WithKind("StorageVersionMigrationSpec"):
+		return &applyconfigurationsstoragemigrationv1beta1.StorageVersionMigrationSpecApplyConfiguration{}
+	case storagemigrationv1beta1.SchemeGroupVersion.WithKind("StorageVersionMigrationStatus"):
+		return &applyconfigurationsstoragemigrationv1beta1.StorageVersionMigrationStatusApplyConfiguration{}
 
 	}
 	return nil

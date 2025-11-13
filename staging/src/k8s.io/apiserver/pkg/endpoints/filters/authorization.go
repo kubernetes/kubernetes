@@ -94,7 +94,7 @@ func withAuthorization(handler http.Handler, a authorizer.Authorizer, s runtime.
 		audit.AddAuditAnnotations(ctx,
 			decisionAnnotationKey, decisionForbid,
 			reasonAnnotationKey, reason)
-		responsewriters.Forbidden(ctx, attributes, w, req, reason, s)
+		responsewriters.Forbidden(attributes, w, req, reason, s)
 	})
 }
 

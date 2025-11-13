@@ -49,7 +49,7 @@ import (
 
 const (
 	// Warning message for the users still using cgroup v1
-	CgroupV1MaintenanceModeWarning = "cgroup v1 support is in maintenance mode, please migrate to cgroup v2"
+	CgroupV1DeprecatedWarning = "cgroup v1 detected. cgroup v1 support is deprecated and will be removed in a future release. Please migrate to cgroup v2. More information at https://git.k8s.io/enhancements/keps/sig-node/5573-remove-cgroup-v1"
 
 	// Warning message for the users using cgroup v2 on kernel doesn't support root `cpu.stat`.
 	// `cpu.stat` was added to root cgroup in kernel 5.8.
@@ -102,7 +102,7 @@ type ContainerManager interface {
 
 	// UpdateQOSCgroups performs housekeeping updates to ensure that the top
 	// level QoS containers have their desired state in a thread-safe way
-	UpdateQOSCgroups() error
+	UpdateQOSCgroups(logger klog.Logger) error
 
 	// GetResources returns RunContainerOptions with devices, mounts, and env fields populated for
 	// extended resources required by container.

@@ -766,7 +766,7 @@ func DeploymentProgressing(deployment *apps.Deployment, newStatus *apps.Deployme
 }
 
 // used for unit testing
-var nowFn = func() time.Time { return time.Now() }
+var nowFn = time.Now
 
 // DeploymentTimedOut considers a deployment to have timed out once its condition that reports progress
 // is older than progressDeadlineSeconds or a Progressing condition with a TimedOutReason reason already

@@ -528,6 +528,7 @@ function install-containerd-ubuntu {
     socat \
     curl \
     gnupg2 \
+    nfs-common \
     software-properties-common \
     lsb-release
 
@@ -610,7 +611,7 @@ function install-containerd-cos {
     if download-robust "runc ${COS_INSTALL_RUNC_VERSION}" "${temp_dir}" \
        "https://github.com/opencontainers/runc/releases/download/${COS_INSTALL_RUNC_VERSION}/runc.${HOST_ARCH}"; then
       cp "${temp_dir}/runc.${HOST_ARCH}" /home/containerd/bin/runc && chmod 755 /home/containerd/bin/runc
-      sed -i "/\[Service\]/a Environment=PATH=/home/containerd/bin:\$PATH" /etc/systemd/system/containerd.service
+      sed -i "/\[Service\]/a Environment=PATH=/home/containerd/bin:$PATH" /etc/systemd/system/containerd.service
     fi
     rm -rf "${temp_dir}"
   fi
@@ -660,7 +661,7 @@ EOF
 
 function ensure-containerd-runtime {
   # Install containerd/runc if requested
-  if [[ -n "${UBUNTU_INSTALL_CONTAINERD_VERSION:-}" || -n "${UBUNTU_INSTALL_RUNC_VERSION:-}" ]]; then
+  if [[ ( -n "${UBUNTU_INSTALL_CONTAINERD_VERSION:-}" || -n "${UBUNTU_INSTALL_RUNC_VERSION:-}" ) && "$(lsb_release -si)" == "Ubuntu" ]]; then
     log-wrap "InstallContainerdUbuntu" install-containerd-ubuntu
   fi
   if [[ -n "${COS_INSTALL_CONTAINERD_VERSION:-}" || -n "${COS_INSTALL_RUNC_VERSION:-}" ]]; then

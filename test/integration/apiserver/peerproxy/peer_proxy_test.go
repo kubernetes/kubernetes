@@ -38,7 +38,6 @@ import (
 	"k8s.io/klog/v2"
 	kastesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	controlplaneapiserver "k8s.io/kubernetes/pkg/controlplane/apiserver"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 
 	"k8s.io/kubernetes/test/integration/framework"
 	testutil "k8s.io/kubernetes/test/utils"
@@ -56,8 +55,10 @@ func TestPeerProxiedRequest(t *testing.T) {
 	transport.DialerStopCh = ctx.Done()
 
 	// enable feature flags
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIServerIdentity, true)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.UnknownVersionInteroperabilityProxy, true)
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.APIServerIdentity:                   true,
+		features.UnknownVersionInteroperabilityProxy: true,
+	})
 
 	// create sharedetcd
 	etcd := framework.SharedEtcd()
@@ -117,8 +118,10 @@ func TestPeerProxiedRequestToThirdServerAfterFirstDies(t *testing.T) {
 	transport.DialerStopCh = ctx.Done()
 
 	// enable feature flags
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIServerIdentity, true)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.UnknownVersionInteroperabilityProxy, true)
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.APIServerIdentity:                   true,
+		features.UnknownVersionInteroperabilityProxy: true,
+	})
 
 	// create sharedetcd
 	etcd := framework.SharedEtcd()

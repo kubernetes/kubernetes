@@ -27,6 +27,7 @@ import (
 	"github.com/opencontainers/cgroups/fscommon"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2"
 	cmutil "k8s.io/kubernetes/pkg/kubelet/cm/util"
 )
 
@@ -45,9 +46,9 @@ type cgroupV2impl struct {
 	cgroupCommon
 }
 
-func NewCgroupV2Manager(cs *CgroupSubsystems, cgroupDriver string) CgroupManager {
+func NewCgroupV2Manager(logger klog.Logger, cs *CgroupSubsystems, cgroupDriver string) CgroupManager {
 	return &cgroupV2impl{
-		cgroupCommon: newCgroupCommon(cs, cgroupDriver),
+		cgroupCommon: newCgroupCommon(logger, cs, cgroupDriver),
 	}
 }
 

@@ -71,7 +71,7 @@ func (m *podContainerManagerImpl) Exists(pod *v1.Pod) bool {
 // EnsureExists takes a pod as argument and makes sure that
 // pod cgroup exists if qos cgroup hierarchy flag is enabled.
 // If the pod level container doesn't already exist it is created.
-func (m *podContainerManagerImpl) EnsureExists(pod *v1.Pod) error {
+func (m *podContainerManagerImpl) EnsureExists(logger klog.Logger, pod *v1.Pod) error {
 	// check if container already exist
 	alreadyExists := m.Exists(pod)
 	if !alreadyExists {
@@ -97,9 +97,10 @@ func (m *podContainerManagerImpl) EnsureExists(pod *v1.Pod) error {
 		if enforceMemoryQoS {
 			klog.V(4).InfoS("MemoryQoS config for pod", "pod", klog.KObj(pod), "unified", containerConfig.ResourceParameters.Unified)
 		}
-		if err := m.cgroupManager.Create(containerConfig); err != nil {
+		if err := m.cgroupManager.Create(logger, containerConfig); err != nil {
 			return fmt.Errorf("failed to create container for %v : %v", podContainerName, err)
 		}
+
 	}
 	return nil
 }
@@ -141,9 +142,9 @@ func (m *podContainerManagerImpl) GetPodCgroupConfig(pod *v1.Pod, resource v1.Re
 	return m.cgroupManager.GetCgroupConfig(podCgroupName, resource)
 }
 
-func (m *podContainerManagerImpl) SetPodCgroupConfig(pod *v1.Pod, resourceConfig *ResourceConfig) error {
+func (m *podContainerManagerImpl) SetPodCgroupConfig(logger klog.Logger, pod *v1.Pod, resourceConfig *ResourceConfig) error {
 	podCgroupName, _ := m.GetPodContainerName(pod)
-	return m.cgroupManager.SetCgroupConfig(podCgroupName, resourceConfig)
+	return m.cgroupManager.SetCgroupConfig(logger, podCgroupName, resourceConfig)
 }
 
 // Kill one process ID
@@ -164,8 +165,8 @@ func (m *podContainerManagerImpl) killOnePid(pid int) error {
 
 // Scan through the whole cgroup directory and kill all processes either
 // attached to the pod cgroup or to a container cgroup under the pod cgroup
-func (m *podContainerManagerImpl) tryKillingCgroupProcesses(podCgroup CgroupName) error {
-	pidsToKill := m.cgroupManager.Pids(podCgroup)
+func (m *podContainerManagerImpl) tryKillingCgroupProcesses(logger klog.Logger, podCgroup CgroupName) error {
+	pidsToKill := m.cgroupManager.Pids(logger, podCgroup)
 	// No pids charged to the terminated pod cgroup return
 	if len(pidsToKill) == 0 {
 		return nil
@@ -201,10 +202,10 @@ func (m *podContainerManagerImpl) tryKillingCgroupProcesses(podCgroup CgroupName
 }
 
 // Destroy destroys the pod container cgroup paths
-func (m *podContainerManagerImpl) Destroy(podCgroup CgroupName) error {
+func (m *podContainerManagerImpl) Destroy(logger klog.Logger, podCgroup CgroupName) error {
 	// Try killing all the processes attached to the pod cgroup
-	if err := m.tryKillingCgroupProcesses(podCgroup); err != nil {
-		klog.InfoS("Failed to kill all the processes attached to cgroup", "cgroupName", podCgroup, "err", err)
+	if err := m.tryKillingCgroupProcesses(logger, podCgroup); err != nil {
+		logger.Info("Failed to kill all the processes attached to cgroup", "cgroupName", podCgroup, "err", err)
 		return fmt.Errorf("failed to kill all the processes attached to the %v cgroups : %v", podCgroup, err)
 	}
 
@@ -213,16 +214,16 @@ func (m *podContainerManagerImpl) Destroy(podCgroup CgroupName) error {
 		Name:               podCgroup,
 		ResourceParameters: &ResourceConfig{},
 	}
-	if err := m.cgroupManager.Destroy(containerConfig); err != nil {
-		klog.InfoS("Failed to delete cgroup paths", "cgroupName", podCgroup, "err", err)
+	if err := m.cgroupManager.Destroy(logger, containerConfig); err != nil {
+		logger.Info("Failed to delete cgroup paths", "cgroupName", podCgroup, "err", err)
 		return fmt.Errorf("failed to delete cgroup paths for %v : %v", podCgroup, err)
 	}
 	return nil
 }
 
 // ReduceCPULimits reduces the CPU CFS values to the minimum amount of shares.
-func (m *podContainerManagerImpl) ReduceCPULimits(podCgroup CgroupName) error {
-	return m.cgroupManager.ReduceCPULimits(podCgroup)
+func (m *podContainerManagerImpl) ReduceCPULimits(logger klog.Logger, podCgroup CgroupName) error {
+	return m.cgroupManager.ReduceCPULimits(logger, podCgroup)
 }
 
 // IsPodCgroup returns true if the literal cgroupfs name corresponds to a pod
@@ -320,7 +321,7 @@ func (m *podContainerManagerNoop) Exists(_ *v1.Pod) bool {
 	return true
 }
 
-func (m *podContainerManagerNoop) EnsureExists(_ *v1.Pod) error {
+func (m *podContainerManagerNoop) EnsureExists(_ klog.Logger, _ *v1.Pod) error {
 	return nil
 }
 
@@ -333,11 +334,11 @@ func (m *podContainerManagerNoop) GetPodContainerNameForDriver(_ *v1.Pod) string
 }
 
 // Destroy destroys the pod container cgroup paths
-func (m *podContainerManagerNoop) Destroy(_ CgroupName) error {
+func (m *podContainerManagerNoop) Destroy(_ klog.Logger, _ CgroupName) error {
 	return nil
 }
 
-func (m *podContainerManagerNoop) ReduceCPULimits(_ CgroupName) error {
+func (m *podContainerManagerNoop) ReduceCPULimits(_ klog.Logger, _ CgroupName) error {
 	return nil
 }
 
@@ -357,6 +358,6 @@ func (m *podContainerManagerNoop) GetPodCgroupConfig(_ *v1.Pod, _ v1.ResourceNam
 	return nil, nil
 }
 
-func (m *podContainerManagerNoop) SetPodCgroupConfig(_ *v1.Pod, _ *ResourceConfig) error {
+func (m *podContainerManagerNoop) SetPodCgroupConfig(_ klog.Logger, _ *v1.Pod, _ *ResourceConfig) error {
 	return nil
 }

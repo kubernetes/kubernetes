@@ -117,6 +117,31 @@ func IsDomainPrefixedPath(fldPath *field.Path, dpPath string) field.ErrorList {
 	return allErrs
 }
 
+// IsDomainPrefixedKey checks if the given key string is a domain-prefixed key
+// (e.g. acme.io/foo). All characters before the first "/" must be a valid
+// subdomain as defined by RFC 1123. All characters trailing the first "/" must
+// be non-empty and match the regex ^([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]$.
+func IsDomainPrefixedKey(fldPath *field.Path, key string) field.ErrorList {
+	var allErrs field.ErrorList
+	if len(key) == 0 {
+		return append(allErrs, field.Required(fldPath, ""))
+	}
+	for _, errMessages := range content.IsLabelKey(key) {
+		allErrs = append(allErrs, field.Invalid(fldPath, key, errMessages))
+	}
+
+	if len(allErrs) > 0 {
+		return allErrs
+	}
+
+	segments := strings.Split(key, "/")
+	if len(segments) != 2 {
+		return append(allErrs, field.Invalid(fldPath, key, "must be a domain-prefixed key (such as \"acme.io/foo\")"))
+	}
+
+	return allErrs
+}
+
 // LabelValueMaxLength is a label's max length
 // Deprecated: Use k8s.io/apimachinery/pkg/api/validate/content.LabelValueMaxLength instead.
 const LabelValueMaxLength int = content.LabelValueMaxLength
@@ -237,19 +262,10 @@ func IsWildcardDNS1123Subdomain(value string) []string {
 	return errs
 }
 
-const cIdentifierFmt string = "[A-Za-z_][A-Za-z0-9_]*"
-const identifierErrMsg string = "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_'"
-
-var cIdentifierRegexp = regexp.MustCompile("^" + cIdentifierFmt + "$")
-
 // IsCIdentifier tests for a string that conforms the definition of an identifier
 // in C. This checks the format, but not the length.
-func IsCIdentifier(value string) []string {
-	if !cIdentifierRegexp.MatchString(value) {
-		return []string{RegexError(identifierErrMsg, cIdentifierFmt, "my_name", "MY_NAME", "MyName")}
-	}
-	return nil
-}
+// Deprecated: Use k8s.io/apimachinery/pkg/api/validate/content.IsCIdentifier instead.
+var IsCIdentifier = content.IsCIdentifier
 
 // IsValidPortNum tests that the argument is a valid, non-zero port number.
 func IsValidPortNum(port int) []string {

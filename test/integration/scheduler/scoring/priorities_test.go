@@ -67,6 +67,9 @@ var (
 	ignorePolicy = v1.NodeInclusionPolicyIgnore
 	honorPolicy  = v1.NodeInclusionPolicyHonor
 	taints       = []v1.Taint{{Key: v1.TaintNodeUnschedulable, Value: "", Effect: v1.TaintEffectPreferNoSchedule}}
+
+	priorityLowTaint  = v1.Taint{Key: "node.example.com/priority-class", Value: "800", Effect: v1.TaintEffectNoSchedule}
+	priorityHighTaint = v1.Taint{Key: "node.example.com/priority-class", Value: "999", Effect: v1.TaintEffectPreferNoSchedule}
 )
 
 const (
@@ -834,9 +837,29 @@ func TestTaintTolerationScoring(t *testing.T) {
 			},
 			expectedNodesName: sets.New("node-2"),
 		},
+		{
+			name: "pod with Gt toleration prefers nodes with matching numeric taints",
+			podTolerations: []v1.Toleration{
+				{
+					Key:      "node.example.com/priority-class",
+					Operator: v1.TolerationOpGt,
+					Value:    "900",
+					Effect:   v1.TaintEffectPreferNoSchedule,
+				},
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-gt-low").
+					Taints([]v1.Taint{priorityLowTaint}).Obj(),
+				st.MakeNode().Name("node-gt-high").
+					Taints([]v1.Taint{priorityHighTaint}).Obj(),
+			},
+			expectedNodesName: sets.New("node-gt-high"),
+		},
 	}
 	for i, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Enable the TaintTolerationComparisonOperators feature gate for Gt/Lt tests
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TaintTolerationComparisonOperators, true)
 			testCtx := initTestSchedulerForScoringTests(t, tainttoleration.Name, tainttoleration.Name)
 
 			for _, n := range tt.nodes {

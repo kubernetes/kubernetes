@@ -57,7 +57,7 @@ func NewFooInformer(client versioned.Interface, namespace string, resyncPeriod t
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredFooInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
+		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
@@ -82,7 +82,7 @@ func NewFilteredFooInformer(client versioned.Interface, namespace string, resync
 				}
 				return client.SamplecontrollerV1alpha1().Foos(namespace).Watch(ctx, options)
 			},
-		},
+		}, client),
 		&apissamplecontrollerv1alpha1.Foo{},
 		resyncPeriod,
 		indexers,
