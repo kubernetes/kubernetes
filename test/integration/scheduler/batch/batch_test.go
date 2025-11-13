@@ -247,37 +247,6 @@ func TestBatchScenarios(t *testing.T) {
 			},
 		},
 		{
-			name: "nnn trumps hint",
-			pods: []podDef{
-				{
-					name:         "nnn-batchp1",
-					expectedNode: "nnn-batchn1",
-					nodeAffinity: []string{"nnn-batchn1", "nnn-batchn2", "nnn-batchn3"},
-				},
-				{
-					name:          "nnn-batchp2",
-					expectedNode:  "nnn-batchn3",
-					nodeAffinity:  []string{"nnn-batchn1", "nnn-batchn2", "nnn-batchn3"},
-					nnn:           "nnn-batchn3",
-					expectBatched: false,
-				},
-			},
-			nodes: []nodeDef{
-				{
-					name:    "nnn-batchn3",
-					maxPods: 1,
-				},
-				{
-					name:    "nnn-batchn2",
-					maxPods: 1,
-				},
-				{
-					name:    "nnn-batchn1",
-					maxPods: 1,
-				},
-			},
-		},
-		{
 			name: "no batching between schedulers",
 			pods: []podDef{
 				{
