@@ -735,8 +735,14 @@ function kube::util::ensure-gnu-date {
   elif command -v gdate &>/dev/null; then
     DATE="gdate"
   else
-    kube::log::error "Failed to find GNU date as date or gdate. If you are on Mac: brew install coreutils." >&2
-    return 1
+    # date from uutils-coreutils doesn't report that it's uutils in the --help output, so check --version instead
+    date_version="$(LANG=C date --version 2>&1 || true)"
+    if echo "${date_version}" | grep -q "uutils"; then
+      DATE="date"
+    else
+      kube::log::error "Failed to find GNU date as date or gdate. If you are on Mac: brew install coreutils." >&2
+      return 1
+    fi
   fi
   kube::util::sourced_variable "${DATE}"
 }
