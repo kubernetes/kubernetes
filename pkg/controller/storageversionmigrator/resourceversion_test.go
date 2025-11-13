@@ -207,9 +207,19 @@ func TestRVSync(t *testing.T) {
 		expectKubeActions  []kubetesting.Action
 	}{
 		{
+			name: "Migration not active",
+			key:  "inactive-svm",
+			svm:  newSVMWithConditions("inactive-svm", "", []metav1.Condition{}),
+		},
+		{
 			name: "Successful RV acquisition",
 			key:  "test-svm",
-			svm:  newSVM("test-svm", ""),
+			svm: newSVMWithConditions("test-svm", "", []metav1.Condition{
+				{
+					Type:   string(svmv1beta1.MigrationRunning),
+					Status: metav1.ConditionTrue,
+				},
+			}),
 			discoveryResources: &metav1.APIResourceList{
 				GroupVersion: "apps/v1",
 				APIResources: []metav1.APIResource{
@@ -225,7 +235,12 @@ func TestRVSync(t *testing.T) {
 				kubetesting.NewUpdateAction(
 					svmv1beta1.SchemeGroupVersion.WithResource("storageversionmigrations"),
 					"",
-					newSVM("test-svm", "12345"),
+					newSVMWithConditions("test-svm", "12345", []metav1.Condition{
+						{
+							Type:   string(svmv1beta1.MigrationRunning),
+							Status: metav1.ConditionTrue,
+						},
+					}),
 				),
 			},
 		},
@@ -233,6 +248,11 @@ func TestRVSync(t *testing.T) {
 			name: "SVM not found",
 			key:  "non-existent-svm",
 			svm:  nil,
+		},
+		{
+			name: "SVM has no CRD condition",
+			key:  "succeeded-svm",
+			svm:  newSVM("succeeded-svm", ""),
 		},
 		{
 			name: "SVM already succeeded",
@@ -257,12 +277,22 @@ func TestRVSync(t *testing.T) {
 		{
 			name: "RV already set",
 			key:  "rv-set-svm",
-			svm:  newSVM("rv-set-svm", "123"),
+			svm: newSVMWithConditions("rv-set-svm", "123", []metav1.Condition{
+				{
+					Type:   string(svmv1beta1.MigrationRunning),
+					Status: metav1.ConditionTrue,
+				},
+			}),
 		},
 		{
 			name: "Resource not migratable",
 			key:  "not-migratable-svm",
-			svm:  newSVM("not-migratable-svm", ""),
+			svm: newSVMWithConditions("not-migratable-svm", "", []metav1.Condition{
+				{
+					Type:   string(svmv1beta1.MigrationRunning),
+					Status: metav1.ConditionTrue,
+				},
+			}),
 			discoveryResources: &metav1.APIResourceList{
 				GroupVersion: "apps/v1",
 				APIResources: []metav1.APIResource{
@@ -275,6 +305,10 @@ func TestRVSync(t *testing.T) {
 					"",
 					newSVMWithConditions("not-migratable-svm", "", []metav1.Condition{
 						{
+							Type:   string(svmv1beta1.MigrationRunning),
+							Status: metav1.ConditionTrue,
+						},
+						{
 							Type:   string(svmv1beta1.MigrationFailed),
 							Status: metav1.ConditionTrue,
 						},
@@ -285,7 +319,12 @@ func TestRVSync(t *testing.T) {
 		{
 			name: "Metadata list error",
 			key:  "metadata-error-svm",
-			svm:  newSVM("metadata-error-svm", ""),
+			svm: newSVMWithConditions("metadata-error-svm", "", []metav1.Condition{
+				{
+					Type:   string(svmv1beta1.MigrationRunning),
+					Status: metav1.ConditionTrue,
+				},
+			}),
 			discoveryResources: &metav1.APIResourceList{
 				GroupVersion: "apps/v1",
 				APIResources: []metav1.APIResource{
@@ -299,7 +338,12 @@ func TestRVSync(t *testing.T) {
 		{
 			name: "Invalid RV returned",
 			key:  "invalid-rv-svm",
-			svm:  newSVM("invalid-rv-svm", ""),
+			svm: newSVMWithConditions("invalid-rv-svm", "", []metav1.Condition{
+				{
+					Type:   string(svmv1beta1.MigrationRunning),
+					Status: metav1.ConditionTrue,
+				},
+			}),
 			discoveryResources: &metav1.APIResourceList{
 				GroupVersion: "apps/v1",
 				APIResources: []metav1.APIResource{
@@ -316,6 +360,10 @@ func TestRVSync(t *testing.T) {
 					svmv1beta1.SchemeGroupVersion.WithResource("storageversionmigrations"),
 					"",
 					newSVMWithConditions("invalid-rv-svm", "", []metav1.Condition{
+						{
+							Type:   string(svmv1beta1.MigrationRunning),
+							Status: metav1.ConditionTrue,
+						},
 						{
 							Type:   string(svmv1beta1.MigrationFailed),
 							Status: metav1.ConditionTrue,
