@@ -35,7 +35,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume/csimigration"
 	"k8s.io/kubernetes/pkg/volume/fc"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
@@ -291,7 +290,7 @@ func setup(nodeName string, t *testing.T) (*volume.VolumePluginMgr, csimigration
 	*fsVolumeMode = v1.PersistentVolumeFilesystem
 
 	csiTranslator := csitrans.New()
-	intreeToCSITranslator := csimigration.NewPluginManager(csiTranslator, utilfeature.DefaultFeatureGate)
+	intreeToCSITranslator := csimigration.NewPluginManager(csiTranslator)
 	kubeClient := fake.NewSimpleClientset()
 
 	factory := informers.NewSharedInformerFactory(kubeClient, time.Minute)
