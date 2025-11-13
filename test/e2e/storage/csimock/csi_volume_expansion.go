@@ -604,36 +604,29 @@ func validateQuotaUsage(ctx context.Context, m *mockDriverSetup, currentQuota, e
 	expectedCount := expectedQuota.Status.Used[pvcCountQuotaKey]
 	expectedUsedSize := expectedQuota.Status.Used[pvcSizeQuotaKey]
 
-	// remove this if you added it
-// import "k8s.io/kubernetes/test/e2e/framework/matchers"
+	gomega.Eventually(func() error {
+		q, err := uncachedClient.ResourceQuotas(currentQuota.Namespace).Get(ctx, currentQuota.Name, metav1.GetOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to get resource quota %s/%s: %w", currentQuota.Namespace, currentQuota.Name, err)
+		}
+		if q.Status.Used == nil {
+			return fmt.Errorf("resource quota %s/%s has nil Status.Used", currentQuota.Namespace, currentQuota.Name)
+		}
 
-gomega.Eventually(func() error {
-    q, err := uncachedClient.ResourceQuotas(currentQuota.Namespace).Get(ctx, currentQuota.Name, metav1.GetOptions{})
-    if err != nil {
-        return fmt.Errorf("failed to get resource quota %s/%s: %v", currentQuota.Namespace, currentQuota.Name, err)
-    }
-    if q.Status.Used == nil {
-        return fmt.Errorf("resource quota %s/%s has nil Status.Used", currentQuota.Namespace, currentQuota.Name)
-    }
+		quota = q
+		usedCount = quota.Status.Used[pvcCountQuotaKey]
+		usedSize = quota.Status.Used[pvcSizeQuotaKey]
 
-    quota = q
-    usedCount = quota.Status.Used[pvcCountQuotaKey]
-    usedSize = quota.Status.Used[pvcSizeQuotaKey]
-
-    if usedCount.Cmp(expectedCount) != 0 || usedSize.Cmp(expectedUsedSize) != 0 {
-        return fmt.Errorf(
-            "resource quota usage did not converge; currentlyUsed: %s/%s, expected: %s/%s",
-            usedCount.String(), usedSize.String(), expectedCount.String(), expectedUsedSize.String(),
-        )
-    }
-    return nil
-}, csiResizeWaitPeriod, resizePollInterval).Should(gomega.Succeed())(
-		matchers.BeTrueBecause(
-			"resource quota usage did not converge; currentlyUsed: %s/%s, expected: %s/%s",
-			usedCount.String(), usedSize.String(), expectedCount.String(), expectedUsedSize.String(),
-		),
-	)
+		if usedCount.Cmp(expectedCount) != 0 || usedSize.Cmp(expectedUsedSize) != 0 {
+			return fmt.Errorf(
+				"resource quota usage did not converge; currentlyUsed: %s/%s, expected: %s/%s",
+				usedCount.String(), usedSize.String(), expectedCount.String(), expectedUsedSize.String(),
+			)
+		}
+		return nil
+	}, csiResizeWaitPeriod, resizePollInterval).Should(gomega.Succeed())
 }
+
 func validateRecoveryBehaviour(ctx context.Context, pvc *v1.PersistentVolumeClaim, m *mockDriverSetup, test recoveryTest) {
 	var err error
 	ginkgo.By("Waiting for resizer to set allocated resource")
