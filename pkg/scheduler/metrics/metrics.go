@@ -301,7 +301,7 @@ func InitMetrics() {
 		&metrics.CounterOpts{
 			Subsystem:      SchedulerSubsystem,
 			Name:           "pod_scheduled_after_flush_total",
-			Help:           "Number of pods that were successfully scheduled after being flushed from unschedulablePods due to timeout. This metric helps detect potential queue hint bugs or event handling issues.",
+			Help:           "Number of pods that were successfully scheduled after being flushed from unschedulablePods due to timeout. This metric helps detect potential queueing hint misconfigurations or event handling issues.",
 			StabilityLevel: metrics.ALPHA,
 		})
 
