@@ -26,6 +26,7 @@ import (
 
 	"go.uber.org/goleak"
 
+	extensionfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -154,6 +155,7 @@ func TestStorageVersionMigrationWithCRD(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 		features.StorageVersionMigrator:                                  true,
 		featuregate.Feature(clientgofeaturegate.InformerResourceVersion): true,
+		extensionfeatures.CRDObservedGenerationTracking:                  true,
 	})
 	// decode errors are expected when using conversation webhooks
 	etcd3watcher.TestOnlySetFatalOnDecodeError(false)
@@ -262,7 +264,7 @@ func TestStorageVersionMigrationWithCRD(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create SVM resource: %v", err)
 	}
-	if ok := svmTest.isCRDMigrated(ctx, t, svm.Name, "triggercr"); !ok {
+	if ok := svmTest.isCRDMigrated(ctx, t, svm.Name, crd.Name, "triggercr"); !ok {
 		t.Fatalf("CRD not migrated")
 	}
 
@@ -303,6 +305,7 @@ func TestStorageVersionMigrationDuringChaos(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 		features.StorageVersionMigrator:                                  true,
 		featuregate.Feature(clientgofeaturegate.InformerResourceVersion): true,
+		extensionfeatures.CRDObservedGenerationTracking:                  true,
 	})
 
 	ctx := ktesting.Init(t)
@@ -344,7 +347,7 @@ func TestStorageVersionMigrationDuringChaos(t *testing.T) {
 				return
 			}
 			triggerCRName := "chaos-trigger-" + strconv.Itoa(i)
-			if ok := svmTest.isCRDMigrated(ctx, t, svm.Name, triggerCRName); !ok {
+			if ok := svmTest.isCRDMigrated(ctx, t, svm.Name, crd.Name, triggerCRName); !ok {
 				t.Errorf("CRD not migrated")
 				return
 			}
