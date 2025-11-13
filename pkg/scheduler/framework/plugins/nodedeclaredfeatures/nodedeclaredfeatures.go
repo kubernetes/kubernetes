@@ -24,6 +24,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	versionutil "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/component-base/version"
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
@@ -62,6 +63,7 @@ type NodeDeclaredFeatures struct {
 var _ fwk.PreFilterPlugin = &NodeDeclaredFeatures{}
 var _ fwk.FilterPlugin = &NodeDeclaredFeatures{}
 var _ fwk.EnqueueExtensions = &NodeDeclaredFeatures{}
+var _ fwk.SignPlugin = &NodeDeclaredFeatures{}
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *NodeDeclaredFeatures) Name() string {
@@ -100,7 +102,7 @@ func (pl *NodeDeclaredFeatures) PreFilter(ctx context.Context, cycleState fwk.Cy
 		return nil, fwk.NewStatus(fwk.Skip)
 	}
 	cycleState.Write(preFilterStateKey, &preFilterState{reqs: reqs})
-	return nil, fwk.NewStatus(fwk.Success)
+	return nil, nil
 }
 
 // PreFilterExtensions returns pre-filter extensions, pod add and remove.
@@ -125,6 +127,18 @@ func (pl *NodeDeclaredFeatures) Filter(ctx context.Context, cycleState fwk.Cycle
 		return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, fmt.Sprintf("node declared features check failed - unsatisfied requirements: %s", strings.Join(result.UnsatisfiedRequirements, ", ")))
 	}
 	return nil
+}
+
+func (pl *NodeDeclaredFeatures) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
+	podInfo := &ndf.PodInfo{Spec: &pod.Spec}
+	fs, err := pl.ndfFramework.InferForPodScheduling(podInfo, pl.version)
+	if err != nil {
+		return nil, fwk.AsStatus(err)
+	}
+	featuresList := sets.List(fs.Set)
+	return []fwk.SignFragment{
+		{Key: fwk.FeaturesSignerName, Value: featuresList},
+	}, nil
 }
 
 // EventsToRegister returns events that may make a pod schedulable. It is required for the EnqueueExtensions interface.
