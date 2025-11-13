@@ -189,6 +189,11 @@ func (rv *ResourceVersionController) sync(ctx context.Context, key string) error
 	}
 	// working with copy to avoid race condition between this and migration controller
 	toBeProcessedSVM := svm.DeepCopy()
+	crdCond := meta.FindStatusCondition(toBeProcessedSVM.Status.Conditions, string(svmv1beta1.AssociatedCRD))
+	if crdCond == nil {
+		logger.V(4).Info("The CRD condition has not yet been set. We will attempt to migrate once the custom resource condition is available.")
+		return nil
+	}
 	gr := toBeProcessedSVM.Spec.Resource
 
 	if meta.IsStatusConditionTrue(toBeProcessedSVM.Status.Conditions, string(svmv1beta1.MigrationSucceeded)) ||

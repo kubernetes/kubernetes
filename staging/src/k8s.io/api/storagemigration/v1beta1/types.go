@@ -58,6 +58,8 @@ const (
 	MigrationSucceeded MigrationConditionType = "Succeeded"
 	// Indicates that the migration has failed.
 	MigrationFailed MigrationConditionType = "Failed"
+	// Indicates whether there is a CRD associated with the migration.
+	AssociatedCRD MigrationConditionType = "AssociatedCRD"
 )
 
 // Status of the storage version migration.
