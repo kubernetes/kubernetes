@@ -37,14 +37,12 @@ type PluginNameMapper interface {
 // PluginManager keeps track of migrated state of in-tree plugins
 type PluginManager struct {
 	PluginNameMapper
-	featureGate featuregate.FeatureGate
 }
 
 // NewPluginManager returns a new PluginManager instance
-func NewPluginManager(m PluginNameMapper, featureGate featuregate.FeatureGate) PluginManager {
+func NewPluginManager(m PluginNameMapper) PluginManager {
 	return PluginManager{
 		PluginNameMapper: m,
-		featureGate:      featureGate,
 	}
 }
 
