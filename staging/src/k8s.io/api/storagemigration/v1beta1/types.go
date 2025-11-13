@@ -58,6 +58,8 @@ const (
 	MigrationSucceeded MigrationConditionType = "Succeeded"
 	// Indicates that the migration has failed.
 	MigrationFailed MigrationConditionType = "Failed"
+	// MigrationActive indicates that the migration is currently active.
+	MigrationActive MigrationConditionType = "MigrationActive"
 )
 
 // Status of the storage version migration.
