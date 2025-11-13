@@ -17,14 +17,13 @@ limitations under the License.
 package nodevolumelimits
 
 import (
-	storagev1 "k8s.io/api/storage/v1"
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
 )
 
 // isCSIMigrationOn returns a boolean value indicating whether
 // the CSI migration has been enabled for a particular storage plugin.
-func isCSIMigrationOn(csiNode *storagev1.CSINode, pluginName string) bool {
-	if csiNode == nil || len(pluginName) == 0 {
+func isCSIMigrationOn(pluginName string) bool {
+	if len(pluginName) == 0 {
 		return false
 	}
 
