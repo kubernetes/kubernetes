@@ -46,13 +46,14 @@ import (
 )
 
 type podDef struct {
-	name          string
-	nodeSelector  map[string]string
-	nodeAffinity  []string
-	expectedNode  string
-	expectBatched bool
-	nnn           string
-	scheduler     string
+	name                string
+	nodeSelector        map[string]string
+	nodeAffinity        []string
+	expectedNode        string
+	expectBatched       bool
+	scheduler           string
+	expectUnschedulable bool
+	priority            int32
 }
 
 type nodeDef struct {
@@ -338,6 +339,26 @@ func TestBatchScenarios(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "unschedulable pod",
+			pods: []podDef{
+				{
+					name:         "usp-batchp1",
+					expectedNode: "usp-batchn1",
+				},
+				{
+					name:                "usp-batchp2",
+					expectBatched:       false,
+					expectUnschedulable: true,
+				},
+			},
+			nodes: []nodeDef{
+				{
+					name:    "usp-batchn1",
+					maxPods: 1,
+				},
+			},
+		},
 	}
 
 	for _, tt := range table {
@@ -375,7 +396,7 @@ func newPod(d *podDef) *v1.Pod {
 		}
 	}
 
-	return testutil.InitPausePod(&testutil.PausePodConfig{
+	ret := testutil.InitPausePod(&testutil.PausePodConfig{
 		Name:      d.name,
 		Affinity:  &v1.Affinity{NodeAffinity: aff},
 		Namespace: "default",
@@ -388,6 +409,12 @@ func newPod(d *podDef) *v1.Pod {
 		NodeSelector:  d.nodeSelector,
 		SchedulerName: d.scheduler,
 	})
+
+	if d.priority != 0 {
+		ret.Spec.Priority = &d.priority
+	}
+
+	return ret
 }
 
 func resources(maxPods int) v1.ResourceList {
@@ -526,9 +553,17 @@ func runScenario(t *testing.T, tt *scenario, batch bool) ([]*v1.Pod, []bool) {
 				p.Namespace, p.Name, err)
 		}
 
-		if err := testutil.WaitForPodToSchedule(testCtx, cs, createdPod); err != nil {
-			t.Errorf("Failed to schedule pod %s/%s on the node, err: %v",
-				p.Namespace, p.Name, err)
+		if err := testutil.WaitForPodToScheduleWithTimeout(testCtx, cs, createdPod, 5*time.Second); err != nil {
+			if !pd.expectUnschedulable {
+				t.Errorf("Failed to schedule pod %s/%s on the node, err: %v",
+					p.Namespace, p.Name, err)
+			} else {
+				break
+			}
+		}
+
+		if pd.expectUnschedulable {
+			t.Fatalf("Expected pod to be unschedulable but it was scheduled")
 		}
 
 		finalPod, err := cs.CoreV1().Pods(p.Namespace).Get(testCtx, p.Name, metav1.GetOptions{})
