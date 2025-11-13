@@ -429,7 +429,7 @@ func (c *Controller) syncPod(ctx context.Context, pod *v1.Pod) error {
 
 	// Pre-compute volumes
 	for i := range pod.Spec.Volumes {
-		spec, err := util.CreateVolumeSpec(logger, pod.Spec.Volumes[i], pod, c.vpm, c.pvcLister, c.pvLister, c.cmpm, c.csiTranslator)
+		spec, err := util.CreateVolumeSpec(logger, pod.Spec.Volumes[i], pod, c.pvcLister, c.pvLister, c.cmpm, c.csiTranslator)
 		if err != nil {
 			// This can happen frequently when PVC or PV do not exist yet.
 			// Report it, but continue further.
