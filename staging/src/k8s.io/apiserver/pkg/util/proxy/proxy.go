@@ -17,8 +17,10 @@ limitations under the License.
 package proxy
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"math/rand"
 	"net"
 	"net/http"
@@ -36,6 +38,7 @@ import (
 	"k8s.io/apiserver/pkg/audit"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	listersv1 "k8s.io/client-go/listers/core/v1"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -176,6 +179,22 @@ func NewRequestForProxy(location *url.URL, req *http.Request) (*http.Request, co
 	newReq.Header = utilnet.CloneHeader(req.Header)
 	newReq.URL = location
 	newReq.Host = location.Host
+
+	// Preserve or create GetBody for HTTP/2 GOAWAY retry support
+	if req.GetBody != nil {
+		newReq.GetBody = req.GetBody
+	} else if req.Body != nil && req.Body != http.NoBody {
+		// Unknown body type - buffer it (similar to http.NewRequestWithContext)
+		buf, err := io.ReadAll(req.Body)
+		if err != nil {
+			klog.Errorf("Failed to buffer request body: %v", err)
+		} else {
+			newReq.Body = io.NopCloser(bytes.NewReader(buf))
+			newReq.GetBody = func() (io.ReadCloser, error) {
+				return io.NopCloser(bytes.NewReader(buf)), nil
+			}
+		}
+	}
 
 	// If the original request has an audit ID, let's make sure we propagate this
 	// to the aggregated server.
