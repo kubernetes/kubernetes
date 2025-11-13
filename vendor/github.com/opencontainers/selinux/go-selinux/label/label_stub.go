@@ -10,12 +10,6 @@ func InitLabels([]string) (string, string, error) {
 	return "", "", nil
 }
 
-// Deprecated: The GenLabels function is only to be used during the transition
-// to the official API. Use InitLabels(strings.Fields(options)) instead.
-func GenLabels(string) (string, string, error) {
-	return "", "", nil
-}
-
 func SetFileLabel(string, string) error {
 	return nil
 }

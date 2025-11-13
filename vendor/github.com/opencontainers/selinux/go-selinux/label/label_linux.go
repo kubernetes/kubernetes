@@ -18,7 +18,7 @@ var validOptions = map[string]bool{
 	"level":    true,
 }
 
-var ErrIncompatibleLabel = errors.New("Bad SELinux option z and Z can not be used together")
+var ErrIncompatibleLabel = errors.New("bad SELinux option: z and Z can not be used together")
 
 // InitLabels returns the process label and file labels to be used within
 // the container.  A list of options can be passed into this function to alter
@@ -52,11 +52,11 @@ func InitLabels(options []string) (plabel string, mlabel string, retErr error) {
 				return "", selinux.PrivContainerMountLabel(), nil
 			}
 			if i := strings.Index(opt, ":"); i == -1 {
-				return "", "", fmt.Errorf("Bad label option %q, valid options 'disable' or \n'user, role, level, type, filetype' followed by ':' and a value", opt)
+				return "", "", fmt.Errorf("bad label option %q, valid options 'disable' or \n'user, role, level, type, filetype' followed by ':' and a value", opt)
 			}
 			con := strings.SplitN(opt, ":", 2)
 			if !validOptions[con[0]] {
-				return "", "", fmt.Errorf("Bad label option %q, valid options 'disable, user, role, level, type, filetype'", con[0])
+				return "", "", fmt.Errorf("bad label option %q, valid options 'disable, user, role, level, type, filetype'", con[0])
 			}
 			if con[0] == "filetype" {
 				mcon["type"] = con[1]
@@ -77,12 +77,6 @@ func InitLabels(options []string) (plabel string, mlabel string, retErr error) {
 		mountLabel = mcon.Get()
 	}
 	return processLabel, mountLabel, nil
-}
-
-// Deprecated: The GenLabels function is only to be used during the transition
-// to the official API. Use InitLabels(strings.Fields(options)) instead.
-func GenLabels(options string) (string, string, error) {
-	return InitLabels(strings.Fields(options))
 }
 
 // SetFileLabel modifies the "path" label to the specified file label
@@ -122,11 +116,6 @@ func Relabel(path string, fileLabel string, shared bool) error {
 	}
 	return selinux.Chcon(path, fileLabel, true)
 }
-
-// DisableSecOpt returns a security opt that can disable labeling
-// support for future container processes
-// Deprecated: use selinux.DisableSecOpt
-var DisableSecOpt = selinux.DisableSecOpt
 
 // Validate checks that the label does not include unexpected options
 func Validate(label string) error {
