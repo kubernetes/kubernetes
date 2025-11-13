@@ -26,6 +26,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	svmv1beta1 "k8s.io/api/storagemigration/v1beta1"
+	apiextensionsfake "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -93,6 +94,7 @@ func newMockMonitor(lastSyncRV string, items []runtime.Object) *mockMonitor {
 func newTestSVMController(
 	kubeClient kubernetes.Interface,
 	svmInformer svminformers.StorageVersionMigrationInformer,
+	crdClient *apiextensionsfake.Clientset,
 	graphBuilder *mockGraphBuilder,
 ) *SVMController {
 	dynamicClient := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme())
@@ -105,6 +107,7 @@ func newTestSVMController(
 		dynamicClient:          dynamicClient,
 		svmListers:             svmInformer.Lister(),
 		svmSynced:              func() bool { return true },
+		crdClient:              crdClient.ApiextensionsV1().CustomResourceDefinitions(),
 		restMapper:             mapper,
 		dependencyGraphBuilder: graphBuilder,
 	}
@@ -457,12 +460,14 @@ func TestSync(t *testing.T) {
 			kubeInformerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
 			svmInformer := kubeInformerFactory.Storagemigration().V1beta1().StorageVersionMigrations()
 
+			crdClient := apiextensionsfake.NewClientset()
+
 			if tc.svm != nil {
 				err := svmInformer.Informer().GetStore().Add(tc.svm)
 				require.NoError(t, err)
 			}
 
-			controller := newTestSVMController(kubeClient, svmInformer, tc.graphBuilder)
+			controller := newTestSVMController(kubeClient, svmInformer, crdClient, tc.graphBuilder)
 
 			dynamicClient := controller.dynamicClient.(*dynamicfake.FakeDynamicClient)
 			dynamicClient.PrependReactor("patch", "*", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {

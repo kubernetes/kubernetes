@@ -39,6 +39,9 @@ import (
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
 
 	svmv1beta1 "k8s.io/api/storagemigration/v1beta1"
+	"k8s.io/apiextensions-apiserver/pkg/apihelpers"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -63,6 +66,7 @@ type SVMController struct {
 	dynamicClient          dynamic.Interface
 	svmListers             svmlisters.StorageVersionMigrationLister
 	svmSynced              cache.InformerSynced
+	crdClient              apiextensionsclient.CustomResourceDefinitionInterface
 	queue                  workqueue.TypedRateLimitingInterface[string]
 	rateLimiter            workqueue.TypedRateLimiter[string]
 	restMapper             meta.RESTMapper
@@ -74,6 +78,7 @@ func NewSVMController(
 	kubeClient kubernetes.Interface,
 	dynamicClient *dynamic.DynamicClient,
 	svmInformer svminformers.StorageVersionMigrationInformer,
+	crdClient apiextensionsclient.CustomResourceDefinitionInterface,
 	controllerName string,
 	mapper meta.ResettableRESTMapper,
 	dependencyGraphBuilder *garbagecollector.GraphBuilder,
@@ -87,6 +92,7 @@ func NewSVMController(
 		controllerName:         controllerName,
 		svmListers:             svmInformer.Lister(),
 		svmSynced:              svmInformer.Informer().HasSynced,
+		crdClient:              crdClient,
 		restMapper:             mapper,
 		dependencyGraphBuilder: dependencyGraphBuilder,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
@@ -301,6 +307,17 @@ func (svmc *SVMController) runMigration(ctx context.Context, logger klog.Logger,
 	if err != nil {
 		return svmc.failMigration(ctx, toBeProcessedSVM, err), true
 	}
+	// Get CRD for the GVK if it exists
+	crd, err := svmc.crdForGroupVersionResource(ctx, gvr)
+	if err != nil {
+		return err, false
+	}
+	if crd != nil {
+		if err := svmc.beginCRDMigration(ctx, crd); err != nil {
+			return err, false
+		}
+	}
+
 	for _, obj := range resourceMonitor.Store.List() {
 		accessor, err := meta.Accessor(obj)
 		if err != nil {
@@ -364,6 +381,13 @@ func (svmc *SVMController) runMigration(ctx context.Context, logger klog.Logger,
 		}
 		logger.V(4).Info("Successfully migrated the resource", "namespace", accessor.GetNamespace(), "name", accessor.GetName(), "gvr", gvr.String())
 	}
+	// Finish migrating CRD if it exists
+	if crd != nil {
+		if err := svmc.finishCRDMigration(ctx, crd); err != nil {
+			return err, false
+		}
+	}
+
 	return nil, false
 }
 
@@ -389,6 +413,78 @@ func (svmc *SVMController) failMigration(ctx context.Context, toBeProcessedSVM *
 			metav1.UpdateOptions{},
 		)
 	return errStatus
+}
+
+func (svmc *SVMController) beginCRDMigration(ctx context.Context, crd *apiextensionsv1.CustomResourceDefinition) error {
+	cond := apihelpers.FindCRDCondition(crd, apiextensionsv1.Migrating)
+	if cond != nil && cond.Status == apiextensionsv1.ConditionTrue {
+		return nil
+	}
+	// Set a migration running condition prior to running the migration.
+	cond = &apiextensionsv1.CustomResourceDefinitionCondition{
+		Type:               apiextensionsv1.Migrating,
+		Status:             apiextensionsv1.ConditionTrue,
+		Reason:             "StorageMigration",
+		Message:            "Storage migration is currently in progress",
+		ObservedGeneration: crd.Generation,
+	}
+	apihelpers.SetCRDCondition(crd, *cond)
+	_, err := svmc.crdClient.UpdateStatus(ctx, crd, metav1.UpdateOptions{})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (svmc *SVMController) finishCRDMigration(ctx context.Context, crd *apiextensionsv1.CustomResourceDefinition) error {
+	crd, err := svmc.crdClient.Get(ctx, crd.Name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	cond := apihelpers.FindCRDCondition(crd, apiextensionsv1.Migrating)
+	// Condition either unset or not in progress
+	if cond != nil && cond.Status != apiextensionsv1.ConditionTrue {
+		// This is an error but we should fail gracefully
+		return nil
+	}
+	oldGen := cond.ObservedGeneration
+	// Set a migration running condition prior to running the migration.
+	cond = &apiextensionsv1.CustomResourceDefinitionCondition{
+		Type:               apiextensionsv1.Migrating,
+		Status:             apiextensionsv1.ConditionFalse,
+		Reason:             "StorageMigration",
+		Message:            "Storage migration is complete",
+		ObservedGeneration: crd.Generation,
+	}
+	// Wipe out all stored versions that we have migrated off of if nothing else
+	// has transpired during the migration.
+	if oldGen == crd.Generation {
+		var storedVersion string
+		for _, version := range crd.Spec.Versions {
+			if version.Storage {
+				storedVersion = version.Name
+			}
+		}
+		crd.Status.StoredVersions = []string{storedVersion}
+	}
+	apihelpers.SetCRDCondition(crd, *cond)
+	_, err = svmc.crdClient.UpdateStatus(ctx, crd, metav1.UpdateOptions{})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (svmc *SVMController) crdForGroupVersionResource(ctx context.Context, gvr schema.GroupVersionResource) (*apiextensionsv1.CustomResourceDefinition, error) {
+	crdName := fmt.Sprintf("%s.%s", gvr.Resource, gvr.Group)
+	crd, err := svmc.crdClient.Get(ctx, crdName, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return crd, nil
 }
 
 type typeMetaUIDRV struct {
