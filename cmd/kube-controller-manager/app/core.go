@@ -69,7 +69,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/vacprotection"
 	"k8s.io/kubernetes/pkg/features"
 	quotainstall "k8s.io/kubernetes/pkg/quota/v1/install"
-	"k8s.io/kubernetes/pkg/volume/csimigration"
 	"k8s.io/utils/clock"
 	netutils "k8s.io/utils/net"
 )
@@ -423,7 +422,6 @@ func newPersistentVolumeExpanderController(ctx context.Context, controllerContex
 		controllerContext.InformerFactory.Core().V1().PersistentVolumeClaims(),
 		plugins,
 		csiTranslator,
-		csimigration.NewPluginManager(csiTranslator),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init volume expand controller: %w", err)

@@ -81,12 +81,12 @@ func createInTreeVolumeSpec(logger klog.Logger, podVolume *v1.Volume, pod *v1.Po
 	return volumeSpec, claimName, nil
 }
 
-func CreateVolumeSpec(logger klog.Logger, podVolume v1.Volume, pod *v1.Pod, pvcLister corelisters.PersistentVolumeClaimLister, pvLister corelisters.PersistentVolumeLister, csiMigratedPluginManager csimigration.PluginManager, csiTranslator csimigration.InTreeToCSITranslator) (*volume.Spec, error) {
+func CreateVolumeSpec(logger klog.Logger, podVolume v1.Volume, pod *v1.Pod, pvcLister corelisters.PersistentVolumeClaimLister, pvLister corelisters.PersistentVolumeLister, csiTranslator csimigration.InTreeToCSITranslator) (*volume.Spec, error) {
 	volumeSpec, claimName, err := createInTreeVolumeSpec(logger, &podVolume, pod, pvcLister, pvLister)
 	if err != nil {
 		return nil, err
 	}
-	volumeSpec, err = translateInTreeSpecToCSIIfNeeded(logger, volumeSpec, csiMigratedPluginManager, csiTranslator, pod.Namespace)
+	volumeSpec, err = translateInTreeSpecToCSIIfNeeded(logger, volumeSpec, csiTranslator, pod.Namespace)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"error performing CSI migration checks and translation for PVC %q/%q: %w",
@@ -167,7 +167,7 @@ func DetermineVolumeAction(pod *v1.Pod, desiredStateOfWorld cache.DesiredStateOf
 
 // ProcessPodVolumes processes the volumes in the given pod and adds them to the
 // desired state of the world if addVolumes is true, otherwise it removes them.
-func ProcessPodVolumes(logger klog.Logger, pod *v1.Pod, addVolumes bool, desiredStateOfWorld cache.DesiredStateOfWorld, volumePluginMgr *volume.VolumePluginMgr, pvcLister corelisters.PersistentVolumeClaimLister, pvLister corelisters.PersistentVolumeLister, csiMigratedPluginManager csimigration.PluginManager, csiTranslator csimigration.InTreeToCSITranslator) {
+func ProcessPodVolumes(logger klog.Logger, pod *v1.Pod, addVolumes bool, desiredStateOfWorld cache.DesiredStateOfWorld, volumePluginMgr *volume.VolumePluginMgr, pvcLister corelisters.PersistentVolumeClaimLister, pvLister corelisters.PersistentVolumeLister, csiTranslator csimigration.InTreeToCSITranslator) {
 	if pod == nil {
 		return
 	}
@@ -190,7 +190,7 @@ func ProcessPodVolumes(logger klog.Logger, pod *v1.Pod, addVolumes bool, desired
 
 	// Process volume spec for each volume defined in pod
 	for _, podVolume := range pod.Spec.Volumes {
-		volumeSpec, err := CreateVolumeSpec(logger, podVolume, pod, pvcLister, pvLister, csiMigratedPluginManager, csiTranslator)
+		volumeSpec, err := CreateVolumeSpec(logger, podVolume, pod, pvcLister, pvLister, csiTranslator)
 		if err != nil {
 			logger.V(10).Info("Error processing volume for pod", "pod", klog.KObj(pod), "volumeName", podVolume.Name, "err", err)
 			continue
@@ -226,12 +226,8 @@ func ProcessPodVolumes(logger klog.Logger, pod *v1.Pod, addVolumes bool, desired
 	}
 }
 
-func translateInTreeSpecToCSIIfNeeded(logger klog.Logger, spec *volume.Spec, csiMigratedPluginManager csimigration.PluginManager, csiTranslator csimigration.InTreeToCSITranslator, podNamespace string) (*volume.Spec, error) {
-	migratable, err := csiMigratedPluginManager.IsMigratable(spec)
-	if err != nil {
-		return nil, err
-	}
-	if !migratable {
+func translateInTreeSpecToCSIIfNeeded(logger klog.Logger, spec *volume.Spec, csiTranslator csimigration.InTreeToCSITranslator, podNamespace string) (*volume.Spec, error) {
+	if !csiTranslator.IsMigratable(spec.PersistentVolume, spec.Volume) {
 		// Jump out of translation fast so we don't check the node if the spec itself is not migratable
 		return spec, nil
 	}

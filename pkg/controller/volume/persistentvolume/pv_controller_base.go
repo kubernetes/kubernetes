@@ -92,6 +92,7 @@ func NewController(ctx context.Context, p ControllerParameters) (*PersistentVolu
 		volumeQueue:                   workqueue.NewTypedWithConfig(workqueue.TypedQueueConfig[string]{Name: "volumes"}),
 		resyncPeriod:                  p.SyncPeriod,
 		operationTimestamps:           metrics.NewOperationStartTimeCache(),
+		csiTranslator:                 csitrans.New(),
 	}
 
 	// Prober is nil because PV is not aware of Flexvolume.
@@ -132,10 +133,6 @@ func NewController(ctx context.Context, p ControllerParameters) (*PersistentVolu
 	if err := common.AddPodPVCIndexerIfNotPresent(controller.podIndexer); err != nil {
 		return nil, fmt.Errorf("could not initialize attach detach controller: %w", err)
 	}
-
-	csiTranslator := csitrans.New()
-	controller.translator = csiTranslator
-	controller.csiMigratedPluginManager = csimigration.NewPluginManager(csiTranslator)
 
 	return controller, nil
 }
@@ -343,7 +340,7 @@ func (ctrl *PersistentVolumeController) updateClaimMigrationAnnotations(ctx cont
 	// copy of the volume and sometimes return a ref to the original
 	claimClone := claim.DeepCopy()
 	logger := klog.FromContext(ctx)
-	modified := updateMigrationAnnotations(logger, ctrl.csiMigratedPluginManager, ctrl.translator, claimClone.Annotations, true)
+	modified := updateMigrationAnnotations(logger, ctrl.csiTranslator, claimClone.Annotations, true)
 	if !modified {
 		return claimClone, nil
 	}
@@ -362,8 +359,8 @@ func (ctrl *PersistentVolumeController) updateVolumeMigrationAnnotationsAndFinal
 	volume *v1.PersistentVolume) (*v1.PersistentVolume, error) {
 	volumeClone := volume.DeepCopy()
 	logger := klog.FromContext(ctx)
-	annModified := updateMigrationAnnotations(logger, ctrl.csiMigratedPluginManager, ctrl.translator, volumeClone.Annotations, false)
-	modifiedFinalizers, finalizersModified := modifyDeletionFinalizers(logger, ctrl.csiMigratedPluginManager, volumeClone)
+	annModified := updateMigrationAnnotations(logger, ctrl.csiTranslator, volumeClone.Annotations, false)
+	modifiedFinalizers, finalizersModified := modifyDeletionFinalizers(logger, ctrl.csiTranslator, volumeClone)
 	if !annModified && !finalizersModified {
 		return volumeClone, nil
 	}
@@ -387,7 +384,7 @@ func (ctrl *PersistentVolumeController) updateVolumeMigrationAnnotationsAndFinal
 // `Recycle`, removing the finalizer is necessary to reflect the recalimPolicy updates on the PV.
 // The method also removes any external PV Deletion Protection finalizers added on the PV, this represents CSI migration
 // rollback/disable scenarios.
-func modifyDeletionFinalizers(logger klog.Logger, cmpm CSIMigratedPluginManager, volume *v1.PersistentVolume) ([]string, bool) {
+func modifyDeletionFinalizers(logger klog.Logger, csiTranslator csimigration.InTreeToCSITranslator, volume *v1.PersistentVolume) ([]string, bool) {
 	modified := false
 	var outFinalizers []string
 	if !utilfeature.DefaultFeatureGate.Enabled(features.HonorPVReclaimPolicy) {
@@ -402,7 +399,7 @@ func modifyDeletionFinalizers(logger klog.Logger, cmpm CSIMigratedPluginManager,
 		outFinalizers = append(outFinalizers, volume.Finalizers...)
 	}
 	provisioner := volume.Annotations[storagehelpers.AnnDynamicallyProvisioned]
-	if cmpm.IsMigrationEnabledForPlugin(provisioner) {
+	if csiTranslator.IsMigratableIntreePluginByName(provisioner) {
 		// Remove in-tree delete finalizer on the PV as migration is enabled.
 		if slice.ContainsString(outFinalizers, storagehelpers.PVDeletionInTreeProtectionFinalizer, nil) {
 			outFinalizers = slice.RemoveString(outFinalizers, storagehelpers.PVDeletionInTreeProtectionFinalizer, nil)
@@ -442,7 +439,7 @@ func modifyDeletionFinalizers(logger klog.Logger, cmpm CSIMigratedPluginManager,
 // driver name for that provisioner is "on" based on feature flags, it will also
 // remove the annotation is migration is "off" for that provisioner in rollback
 // scenarios. Returns true if the annotations map was modified and false otherwise.
-func updateMigrationAnnotations(logger klog.Logger, cmpm CSIMigratedPluginManager, translator CSINameTranslator, ann map[string]string, claim bool) bool {
+func updateMigrationAnnotations(logger klog.Logger, csiTranslator csimigration.InTreeToCSITranslator, ann map[string]string, claim bool) bool {
 	var csiDriverName string
 	var err error
 
@@ -472,8 +469,8 @@ func updateMigrationAnnotations(logger klog.Logger, cmpm CSIMigratedPluginManage
 	}
 
 	migratedToDriver := ann[storagehelpers.AnnMigratedTo]
-	if cmpm.IsMigrationEnabledForPlugin(provisioner) {
-		csiDriverName, err = translator.GetCSINameFromInTreeName(provisioner)
+	if csiTranslator.IsMigratableIntreePluginByName(provisioner) {
+		csiDriverName, err = csiTranslator.GetCSINameFromInTreeName(provisioner)
 		if err != nil {
 			logger.Error(err, "Could not update volume migration annotations. Migration enabled for plugin but could not find corresponding driver name", "plugin", provisioner)
 			return false
@@ -648,7 +645,7 @@ func (ctrl *PersistentVolumeController) setClaimProvisioner(ctx context.Context,
 	logger := klog.FromContext(ctx)
 	metav1.SetMetaDataAnnotation(&claimClone.ObjectMeta, storagehelpers.AnnBetaStorageProvisioner, provisionerName)
 	metav1.SetMetaDataAnnotation(&claimClone.ObjectMeta, storagehelpers.AnnStorageProvisioner, provisionerName)
-	updateMigrationAnnotations(logger, ctrl.csiMigratedPluginManager, ctrl.translator, claimClone.Annotations, true)
+	updateMigrationAnnotations(logger, ctrl.csiTranslator, claimClone.Annotations, true)
 	newClaim, err := ctrl.kubeClient.CoreV1().PersistentVolumeClaims(claim.Namespace).Update(ctx, claimClone, metav1.UpdateOptions{})
 	if err != nil {
 		return newClaim, err

@@ -31,7 +31,6 @@ import (
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/klog/v2/ktesting"
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
-	"k8s.io/kubernetes/pkg/volume/csimigration"
 	"k8s.io/kubernetes/pkg/volume/fc"
 
 	"k8s.io/client-go/kubernetes/fake"
@@ -232,8 +231,8 @@ func Test_CreateVolumeSpec(t *testing.T) {
 	} {
 		t.Run(test.desc, func(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
-			_, intreeToCSITranslator, csiTranslator, pvLister, pvcLister := setup(testNodeName, t)
-			actualSpec, err := CreateVolumeSpec(logger, test.pod.Spec.Volumes[0], test.pod, pvcLister, pvLister, intreeToCSITranslator, csiTranslator)
+			_, csiTranslator, pvLister, pvcLister := setup(testNodeName, t)
+			actualSpec, err := CreateVolumeSpec(logger, test.pod.Spec.Volumes[0], test.pod, pvcLister, pvLister, csiTranslator)
 
 			if actualSpec == nil && (test.wantPersistentVolume != nil || test.wantVolume != nil) {
 				t.Errorf("got volume spec is nil")
@@ -271,7 +270,7 @@ func Test_CreateVolumeSpec(t *testing.T) {
 	}
 }
 
-func setup(nodeName string, t *testing.T) (*volume.VolumePluginMgr, csimigration.PluginManager, csitrans.CSITranslator, tf.PersistentVolumeLister, tf.PersistentVolumeClaimLister) {
+func setup(nodeName string, t *testing.T) (*volume.VolumePluginMgr, csitrans.CSITranslator, tf.PersistentVolumeLister, tf.PersistentVolumeClaimLister) {
 	tmpDir, err := utiltesting.MkTmpdir("csi-test")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
@@ -281,7 +280,6 @@ func setup(nodeName string, t *testing.T) (*volume.VolumePluginMgr, csimigration
 	*fsVolumeMode = v1.PersistentVolumeFilesystem
 
 	csiTranslator := csitrans.New()
-	intreeToCSITranslator := csimigration.NewPluginManager(csiTranslator)
 	kubeClient := fake.NewSimpleClientset()
 
 	factory := informers.NewSharedInformerFactory(kubeClient, time.Minute)
@@ -345,5 +343,5 @@ func setup(nodeName string, t *testing.T) (*volume.VolumePluginMgr, csimigration
 		},
 	}
 
-	return plugMgr, intreeToCSITranslator, csiTranslator, pvLister, pvcLister
+	return plugMgr, csiTranslator, pvLister, pvcLister
 }

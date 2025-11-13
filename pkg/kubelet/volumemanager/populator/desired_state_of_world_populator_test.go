@@ -39,7 +39,6 @@ import (
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/csimigration"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
@@ -1613,9 +1612,8 @@ func createDswpWithVolumeWithCustomPluginMgr(pv *v1.PersistentVolume, pvc *v1.Pe
 		actualStateOfWorld:  fakeASW,
 		pods: processedPods{
 			processedPods: make(map[types.UniquePodName]bool)},
-		csiMigratedPluginManager: csimigration.NewPluginManager(csiTranslator),
-		intreeToCSITranslator:    csiTranslator,
-		volumePluginMgr:          fakeVolumePluginMgr,
+		intreeToCSITranslator: csiTranslator,
+		volumePluginMgr:       fakeVolumePluginMgr,
 	}
 	return dswp, fakePodManager, fakesDSW, fakeRuntime, fakeStateProvider
 }

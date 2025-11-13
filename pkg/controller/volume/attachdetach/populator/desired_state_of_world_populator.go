@@ -63,32 +63,29 @@ func NewDesiredStateOfWorldPopulator(
 	volumePluginMgr *volume.VolumePluginMgr,
 	pvcLister corelisters.PersistentVolumeClaimLister,
 	pvLister corelisters.PersistentVolumeLister,
-	csiMigratedPluginManager csimigration.PluginManager,
 	intreeToCSITranslator csimigration.InTreeToCSITranslator) DesiredStateOfWorldPopulator {
 	return &desiredStateOfWorldPopulator{
-		loopSleepDuration:        loopSleepDuration,
-		listPodsRetryDuration:    listPodsRetryDuration,
-		podLister:                podLister,
-		desiredStateOfWorld:      desiredStateOfWorld,
-		volumePluginMgr:          volumePluginMgr,
-		pvcLister:                pvcLister,
-		pvLister:                 pvLister,
-		csiMigratedPluginManager: csiMigratedPluginManager,
-		intreeToCSITranslator:    intreeToCSITranslator,
+		loopSleepDuration:     loopSleepDuration,
+		listPodsRetryDuration: listPodsRetryDuration,
+		podLister:             podLister,
+		desiredStateOfWorld:   desiredStateOfWorld,
+		volumePluginMgr:       volumePluginMgr,
+		pvcLister:             pvcLister,
+		pvLister:              pvLister,
+		intreeToCSITranslator: intreeToCSITranslator,
 	}
 }
 
 type desiredStateOfWorldPopulator struct {
-	loopSleepDuration        time.Duration
-	podLister                corelisters.PodLister
-	desiredStateOfWorld      cache.DesiredStateOfWorld
-	volumePluginMgr          *volume.VolumePluginMgr
-	pvcLister                corelisters.PersistentVolumeClaimLister
-	pvLister                 corelisters.PersistentVolumeLister
-	listPodsRetryDuration    time.Duration
-	timeOfLastListPods       time.Time
-	csiMigratedPluginManager csimigration.PluginManager
-	intreeToCSITranslator    csimigration.InTreeToCSITranslator
+	loopSleepDuration     time.Duration
+	podLister             corelisters.PodLister
+	desiredStateOfWorld   cache.DesiredStateOfWorld
+	volumePluginMgr       *volume.VolumePluginMgr
+	pvcLister             corelisters.PersistentVolumeClaimLister
+	pvLister              corelisters.PersistentVolumeLister
+	listPodsRetryDuration time.Duration
+	timeOfLastListPods    time.Time
+	intreeToCSITranslator csimigration.InTreeToCSITranslator
 }
 
 func (dswp *desiredStateOfWorldPopulator) Run(ctx context.Context) {
@@ -190,7 +187,7 @@ func (dswp *desiredStateOfWorldPopulator) findAndAddActivePods(logger klog.Logge
 			continue
 		}
 		util.ProcessPodVolumes(logger, pod, true,
-			dswp.desiredStateOfWorld, dswp.volumePluginMgr, dswp.pvcLister, dswp.pvLister, dswp.csiMigratedPluginManager, dswp.intreeToCSITranslator)
+			dswp.desiredStateOfWorld, dswp.volumePluginMgr, dswp.pvcLister, dswp.pvLister, dswp.intreeToCSITranslator)
 
 	}
 

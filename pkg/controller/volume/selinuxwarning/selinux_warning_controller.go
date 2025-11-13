@@ -73,7 +73,6 @@ type Controller struct {
 	csiDriversSynced cache.InformerSynced
 
 	vpm               *volume.VolumePluginMgr
-	cmpm              csimigration.PluginManager
 	csiTranslator     csimigration.InTreeToCSITranslator
 	seLinuxTranslator *translator.ControllerSELinuxTranslator
 	eventBroadcaster  record.EventBroadcaster
@@ -129,7 +128,6 @@ func NewController(
 	}
 	csiTranslator := csitrans.New()
 	c.csiTranslator = csiTranslator
-	c.cmpm = csimigration.NewPluginManager(csiTranslator)
 
 	// Index pods by its PVC keys. Then we don't need to iterate all pods every time to find
 	// pods which reference given PVC.
@@ -429,7 +427,7 @@ func (c *Controller) syncPod(ctx context.Context, pod *v1.Pod) error {
 
 	// Pre-compute volumes
 	for i := range pod.Spec.Volumes {
-		spec, err := util.CreateVolumeSpec(logger, pod.Spec.Volumes[i], pod, c.pvcLister, c.pvLister, c.cmpm, c.csiTranslator)
+		spec, err := util.CreateVolumeSpec(logger, pod.Spec.Volumes[i], pod, c.pvcLister, c.pvLister, c.csiTranslator)
 		if err != nil {
 			// This can happen frequently when PVC or PV do not exist yet.
 			// Report it, but continue further.

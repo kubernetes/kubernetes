@@ -183,8 +183,15 @@ func (CSITranslator) GetInTreeNameFromCSIName(pluginName string) (string, error)
 	return "", fmt.Errorf("could not find In-Tree driver name for CSI plugin %s", pluginName)
 }
 
+func (t CSITranslator) IsMigratable(pv *v1.PersistentVolume, vol *v1.Volume) bool {
+	return t.IsPVMigratable(pv) || t.IsInlineMigratable(vol)
+}
+
 // IsPVMigratable tests whether there is migration logic for the given Persistent Volume
-func (CSITranslator) IsPVMigratable(pv *v1.PersistentVolume) bool {
+func (t CSITranslator) IsPVMigratable(pv *v1.PersistentVolume) bool {
+	if pv == nil {
+		return false
+	}
 	for _, curPlugin := range inTreePlugins {
 		if curPlugin.CanSupport(pv) {
 			return true
@@ -195,6 +202,9 @@ func (CSITranslator) IsPVMigratable(pv *v1.PersistentVolume) bool {
 
 // IsInlineMigratable tests whether there is Migration logic for the given Inline Volume
 func (CSITranslator) IsInlineMigratable(vol *v1.Volume) bool {
+	if vol == nil {
+		return false
+	}
 	for _, curPlugin := range inTreePlugins {
 		if curPlugin.CanSupportInline(vol) {
 			return true

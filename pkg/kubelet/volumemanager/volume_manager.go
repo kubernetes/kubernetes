@@ -208,10 +208,8 @@ func NewVolumeManager(
 	}
 
 	intreeToCSITranslator := csitrans.New()
-	csiMigratedPluginManager := csimigration.NewPluginManager(intreeToCSITranslator)
 
 	vm.intreeToCSITranslator = intreeToCSITranslator
-	vm.csiMigratedPluginManager = csiMigratedPluginManager
 	vm.desiredStateOfWorldPopulator = populator.NewDesiredStateOfWorldPopulator(
 		kubeClient,
 		desiredStateOfWorldPopulatorLoopSleepPeriod,
@@ -219,7 +217,6 @@ func NewVolumeManager(
 		podStateProvider,
 		vm.desiredStateOfWorld,
 		vm.actualStateOfWorld,
-		csiMigratedPluginManager,
 		intreeToCSITranslator,
 		volumePluginMgr)
 	vm.reconciler = reconciler.NewReconciler(
@@ -276,9 +273,6 @@ type volumeManager struct {
 	// desiredStateOfWorldPopulator runs an asynchronous periodic loop to
 	// populate the desiredStateOfWorld using the kubelet PodManager.
 	desiredStateOfWorldPopulator populator.DesiredStateOfWorldPopulator
-
-	// csiMigratedPluginManager keeps track of CSI migration status of plugins
-	csiMigratedPluginManager csimigration.PluginManager
 
 	// intreeToCSITranslator translates in-tree volume specs to CSI
 	intreeToCSITranslator csimigration.InTreeToCSITranslator

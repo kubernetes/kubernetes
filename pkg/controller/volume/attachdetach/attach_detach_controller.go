@@ -180,7 +180,6 @@ func NewAttachDetachController(
 
 	csiTranslator := csitrans.New()
 	adc.intreeToCSITranslator = csiTranslator
-	adc.csiMigratedPluginManager = csimigration.NewPluginManager(csiTranslator)
 
 	adc.desiredStateOfWorldPopulator = populator.NewDesiredStateOfWorldPopulator(
 		timerConfig.DesiredStateOfWorldPopulatorLoopSleepPeriod,
@@ -190,7 +189,6 @@ func NewAttachDetachController(
 		&adc.volumePluginMgr,
 		pvcInformer.Lister(),
 		pvInformer.Lister(),
-		adc.csiMigratedPluginManager,
 		adc.intreeToCSITranslator)
 
 	podInformer.Informer().AddEventHandler(kcache.ResourceEventHandlerFuncs{
@@ -315,9 +313,6 @@ type attachDetachController struct {
 	// pvcQueue is used to queue pvc objects
 	pvcQueue workqueue.TypedRateLimitingInterface[string]
 
-	// csiMigratedPluginManager detects in-tree plugins that have been migrated to CSI
-	csiMigratedPluginManager csimigration.PluginManager
-
 	// intreeToCSITranslator translates from in-tree volume specs to CSI
 	intreeToCSITranslator csimigration.InTreeToCSITranslator
 }
@@ -362,7 +357,6 @@ func (adc *attachDetachController) Run(ctx context.Context) {
 		adc.actualStateOfWorld,
 		adc.desiredStateOfWorld,
 		&adc.volumePluginMgr,
-		adc.csiMigratedPluginManager,
 		adc.intreeToCSITranslator,
 	)
 
@@ -448,7 +442,7 @@ func (adc *attachDetachController) populateDesiredStateOfWorld(logger klog.Logge
 			// The volume specs present in the ActualStateOfWorld are nil, let's replace those
 			// with the correct ones found on pods. The present in the ASW with no corresponding
 			// pod will be detached and the spec is irrelevant.
-			volumeSpec, err := util.CreateVolumeSpec(logger, podVolume, podToAdd, adc.pvcLister, adc.pvLister, adc.csiMigratedPluginManager, adc.intreeToCSITranslator)
+			volumeSpec, err := util.CreateVolumeSpec(logger, podVolume, podToAdd, adc.pvcLister, adc.pvLister, adc.intreeToCSITranslator)
 			if err != nil {
 				logger.Error(
 					err,
@@ -512,7 +506,7 @@ func (adc *attachDetachController) podAdd(logger klog.Logger, obj interface{}) {
 		true /* default volume action */)
 
 	util.ProcessPodVolumes(logger, pod, volumeActionFlag, /* addVolumes */
-		adc.desiredStateOfWorld, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister, adc.csiMigratedPluginManager, adc.intreeToCSITranslator)
+		adc.desiredStateOfWorld, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister, adc.intreeToCSITranslator)
 }
 
 // GetDesiredStateOfWorld returns desired state of world associated with controller
@@ -536,7 +530,7 @@ func (adc *attachDetachController) podUpdate(logger klog.Logger, oldObj, newObj 
 		true /* default volume action */)
 
 	util.ProcessPodVolumes(logger, pod, volumeActionFlag, /* addVolumes */
-		adc.desiredStateOfWorld, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister, adc.csiMigratedPluginManager, adc.intreeToCSITranslator)
+		adc.desiredStateOfWorld, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister, adc.intreeToCSITranslator)
 }
 
 func (adc *attachDetachController) podDelete(logger klog.Logger, obj interface{}) {
@@ -546,7 +540,7 @@ func (adc *attachDetachController) podDelete(logger klog.Logger, obj interface{}
 	}
 
 	util.ProcessPodVolumes(logger, pod, false, /* addVolumes */
-		adc.desiredStateOfWorld, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister, adc.csiMigratedPluginManager, adc.intreeToCSITranslator)
+		adc.desiredStateOfWorld, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister, adc.intreeToCSITranslator)
 }
 
 func (adc *attachDetachController) nodeAdd(logger klog.Logger, obj interface{}) {
@@ -668,7 +662,7 @@ func (adc *attachDetachController) syncPVCByKey(logger klog.Logger, key string) 
 			true /* default volume action */)
 
 		util.ProcessPodVolumes(logger, pod, volumeActionFlag, /* addVolumes */
-			adc.desiredStateOfWorld, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister, adc.csiMigratedPluginManager, adc.intreeToCSITranslator)
+			adc.desiredStateOfWorld, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister, adc.intreeToCSITranslator)
 	}
 	return nil
 }
@@ -717,8 +711,8 @@ func (adc *attachDetachController) processVolumeAttachments(logger klog.Logger) 
 		// Consult csiMigratedPluginManager first before querying the plugins registered during runtime in volumePluginMgr.
 		// In-tree plugins that provisioned PVs will not be registered anymore after migration to CSI, once the respective
 		// feature gate is enabled.
-		if inTreePluginName, err := adc.csiMigratedPluginManager.GetInTreePluginNameFromSpec(pv, nil); err == nil {
-			if adc.csiMigratedPluginManager.IsMigrationEnabledForPlugin(inTreePluginName) {
+		if inTreePluginName, err := adc.intreeToCSITranslator.GetInTreePluginNameFromSpec(pv, nil); err == nil {
+			if adc.intreeToCSITranslator.IsMigratableIntreePluginByName(inTreePluginName) {
 				// PV is migrated and should be handled by the CSI plugin instead of the in-tree one
 				plugin, _ = adc.volumePluginMgr.FindAttachablePluginByName(csi.CSIPluginName)
 				// podNamespace is not needed here for Azurefile as the volumeName generated will be the same with or without podNamespace

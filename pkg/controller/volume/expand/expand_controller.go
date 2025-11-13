@@ -42,6 +42,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/kubernetes/pkg/controller/volume/events"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
@@ -61,11 +62,6 @@ const (
 // ExpandController expands the pvs
 type ExpandController interface {
 	Run(ctx context.Context)
-}
-
-// CSINameTranslator can get the CSI Driver name based on the in-tree plugin name
-type CSINameTranslator interface {
-	GetCSINameFromInTreeName(pluginName string) (string, error)
 }
 
 // Deprecated: This controller is deprecated and for now exists for the sole purpose of adding
@@ -91,9 +87,7 @@ type expandController struct {
 
 	queue workqueue.TypedRateLimitingInterface[string]
 
-	translator CSINameTranslator
-
-	csiMigratedPluginManager csimigration.PluginManager
+	csiTranslator csimigration.InTreeToCSITranslator
 }
 
 // NewExpandController expands the pvs
@@ -102,8 +96,7 @@ func NewExpandController(
 	kubeClient clientset.Interface,
 	pvcInformer coreinformers.PersistentVolumeClaimInformer,
 	plugins []volume.VolumePlugin,
-	translator CSINameTranslator,
-	csiMigratedPluginManager csimigration.PluginManager) (ExpandController, error) {
+	csiTranslator csitrans.CSITranslator) (ExpandController, error) {
 
 	expc := &expandController{
 		kubeClient: kubeClient,
@@ -113,8 +106,7 @@ func NewExpandController(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{Name: "volume_expand"},
 		),
-		translator:               translator,
-		csiMigratedPluginManager: csiMigratedPluginManager,
+		csiTranslator: csiTranslator,
 	}
 
 	if err := expc.volumePluginMgr.InitPlugins(plugins, nil, expc); err != nil {
@@ -237,14 +229,9 @@ func (expc *expandController) syncHandler(ctx context.Context, key string) error
 	}
 
 	volumeSpec := volume.NewSpecFromPersistentVolume(pv, false)
-	migratable, err := expc.csiMigratedPluginManager.IsMigratable(volumeSpec)
-	if err != nil {
-		logger.V(4).Info("Failed to check CSI migration status for PVC with error", "pvcKey", key, "err", err)
-		return nil
-	}
 	// handle CSI migration scenarios before invoking FindExpandablePluginBySpec for in-tree
-	if migratable {
-		inTreePluginName, err := expc.csiMigratedPluginManager.GetInTreePluginNameFromSpec(volumeSpec.PersistentVolume, volumeSpec.Volume)
+	if expc.csiTranslator.IsMigratable(volumeSpec.PersistentVolume, volumeSpec.Volume) {
+		inTreePluginName, err := expc.csiTranslator.GetInTreePluginNameFromSpec(volumeSpec.PersistentVolume, volumeSpec.Volume)
 		if err != nil {
 			logger.V(4).Info("Error getting in-tree plugin name from persistent volume", "volumeName", volumeSpec.PersistentVolume.Name, "err", err)
 			return err
@@ -252,7 +239,7 @@ func (expc *expandController) syncHandler(ctx context.Context, key string) error
 
 		msg := fmt.Sprintf("CSI migration enabled for %s; waiting for external resizer to expand the pvc", inTreePluginName)
 		expc.recorder.Event(pvc, v1.EventTypeNormal, events.ExternalExpanding, msg)
-		csiResizerName, err := expc.translator.GetCSINameFromInTreeName(inTreePluginName)
+		csiResizerName, err := expc.csiTranslator.GetCSINameFromInTreeName(inTreePluginName)
 		if err != nil {
 			errorMsg := fmt.Sprintf("error getting CSI driver name for pvc %s, with error %v", key, err)
 			expc.recorder.Event(pvc, v1.EventTypeWarning, events.ExternalExpanding, errorMsg)

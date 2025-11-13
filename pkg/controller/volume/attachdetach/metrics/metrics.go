@@ -74,7 +74,6 @@ func Register(pvcLister corelisters.PersistentVolumeClaimLister,
 	asw cache.ActualStateOfWorld,
 	dsw cache.DesiredStateOfWorld,
 	pluginMgr *volume.VolumePluginMgr,
-	csiMigratedPluginManager csimigration.PluginManager,
 	intreeToCSITranslator csimigration.InTreeToCSITranslator) {
 	registerMetrics.Do(func() {
 		legacyregistry.CustomMustRegister(newAttachDetachStateCollector(pvcLister,
@@ -83,7 +82,6 @@ func Register(pvcLister corelisters.PersistentVolumeClaimLister,
 			asw,
 			dsw,
 			pluginMgr,
-			csiMigratedPluginManager,
 			intreeToCSITranslator))
 		legacyregistry.MustRegister(ForceDetachMetricCounter)
 	})
@@ -92,14 +90,13 @@ func Register(pvcLister corelisters.PersistentVolumeClaimLister,
 type attachDetachStateCollector struct {
 	metrics.BaseStableCollector
 
-	pvcLister                corelisters.PersistentVolumeClaimLister
-	podLister                corelisters.PodLister
-	pvLister                 corelisters.PersistentVolumeLister
-	asw                      cache.ActualStateOfWorld
-	dsw                      cache.DesiredStateOfWorld
-	volumePluginMgr          *volume.VolumePluginMgr
-	csiMigratedPluginManager csimigration.PluginManager
-	intreeToCSITranslator    csimigration.InTreeToCSITranslator
+	pvcLister             corelisters.PersistentVolumeClaimLister
+	podLister             corelisters.PodLister
+	pvLister              corelisters.PersistentVolumeLister
+	asw                   cache.ActualStateOfWorld
+	dsw                   cache.DesiredStateOfWorld
+	volumePluginMgr       *volume.VolumePluginMgr
+	intreeToCSITranslator csimigration.InTreeToCSITranslator
 }
 
 // volumeCount is a map of maps used as a counter, e.g.:
@@ -126,9 +123,8 @@ func newAttachDetachStateCollector(
 	asw cache.ActualStateOfWorld,
 	dsw cache.DesiredStateOfWorld,
 	pluginMgr *volume.VolumePluginMgr,
-	csiMigratedPluginManager csimigration.PluginManager,
 	intreeToCSITranslator csimigration.InTreeToCSITranslator) *attachDetachStateCollector {
-	return &attachDetachStateCollector{pvcLister: pvcLister, podLister: podLister, pvLister: pvLister, asw: asw, dsw: dsw, volumePluginMgr: pluginMgr, csiMigratedPluginManager: csiMigratedPluginManager, intreeToCSITranslator: intreeToCSITranslator}
+	return &attachDetachStateCollector{pvcLister: pvcLister, podLister: podLister, pvLister: pvLister, asw: asw, dsw: dsw, volumePluginMgr: pluginMgr, intreeToCSITranslator: intreeToCSITranslator}
 }
 
 // Check if our collector implements necessary collector interface
@@ -180,7 +176,7 @@ func (collector *attachDetachStateCollector) getVolumeInUseCount(logger klog.Log
 			continue
 		}
 		for _, podVolume := range pod.Spec.Volumes {
-			volumeSpec, err := util.CreateVolumeSpec(logger, podVolume, pod, collector.pvcLister, collector.pvLister, collector.csiMigratedPluginManager, collector.intreeToCSITranslator)
+			volumeSpec, err := util.CreateVolumeSpec(logger, podVolume, pod, collector.pvcLister, collector.pvLister, collector.intreeToCSITranslator)
 			if err != nil {
 				continue
 			}
