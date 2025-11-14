@@ -2743,6 +2743,115 @@ func TestHandlePodAdditionsInvokesPodAdmitHandlers(t *testing.T) {
 	checkPodStatus(t, kl, podToAdmit, v1.PodPending)
 }
 
+// TestHandlePodAdditionsRemovesRejectedPodsFromPodManager verifies that pods rejected
+// during admission are removed from the podManager to prevent them from being
+// included in resource accounting for subsequent pod admissions.
+//
+// This test reproduces the scenario from https://github.com/kubernetes/kubernetes/issues/135296:
+//   - Node has 100m CPU allocatable
+//   - Pod 1 requests 1000m CPU (way over capacity), gets rejected
+//   - Pod 2 requests 50m CPU (fits in capacity), should be admitted
+func TestHandlePodAdditionsRemovesRejectedPodsFromPodManager(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kl := testKubelet.kubelet
+	kl.nodeLister = testNodeLister{nodes: []*v1.Node{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: string(kl.nodeName)},
+			Status: v1.NodeStatus{
+				Allocatable: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("100m"),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+					v1.ResourcePods:   *resource.NewQuantity(110, resource.DecimalSI),
+				},
+			},
+		},
+	}}
+
+	// Pod 1: Requests way more CPU than the node has - will be rejected.
+	podOverCapacity := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "over-capacity",
+			Name:      "pod-over-capacity",
+			Namespace: "foo",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "container",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("1000m"),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// Pod 2: Requests a small amount of CPU that fits - should be admitted.
+	podFits := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "fits",
+			Name:      "pod-fits",
+			Namespace: "foo",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "container",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("50m"),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// Process both pods. Pod 1 should be rejected, Pod 2 should be admitted.
+	kl.HandlePodAdditions([]*v1.Pod{podOverCapacity, podFits})
+
+	// Verify that the rejected pod (over capacity) is not in the podManager.
+	// Without the fix, https://github.com/kubernetes/kubernetes/pull/135298
+	// the rejected pod remains in podManager.GetPods(), which is used by GetActivePods()
+	// for resource accounting. Although filterOutInactivePods() filters out pods with
+	// Failed status, there's a race window where the status update may not be visible
+	// to other goroutines, causing the rejected pod's resources to be counted (as seen
+	// in the issue https://github.com/kubernetes/kubernetes/issues/135296
+	_, found := kl.podManager.GetPodByUID(podOverCapacity.UID)
+	if found {
+		t.Errorf("Rejected pod %s should have been removed from podManager", podOverCapacity.Name)
+	}
+
+	// Verify that the admitted pod is still in the podManager.
+	_, found = kl.podManager.GetPodByUID(podFits.UID)
+	if !found {
+		t.Errorf("Admitted pod %s should still be in podManager", podFits.Name)
+	}
+
+	// Calculate the total CPU requested by pods in podManager (before filtering).
+	allPodsInManager := kl.podManager.GetPods()
+	nodeInfo := schedulerframework.NewNodeInfo(allPodsInManager...)
+	usedMilliCPU := nodeInfo.Requested.MilliCPU
+
+	// Only the admitted pod (50m) should be in podManager.
+	// Without the fix, the rejected pod (1000m) would also be included, totaling 1050m.
+	expectedMilliCPU := int64(50)
+	if usedMilliCPU != expectedMilliCPU {
+		t.Errorf("Resource accounting from podManager.GetPods() is incorrect: "+
+			"used CPU = %dm, expected %dm. The rejected pod's resources are being counted.",
+			usedMilliCPU, expectedMilliCPU)
+	}
+
+	// Verify the rejected pod's status shows it failed.
+	checkPodStatus(t, kl, podOverCapacity, v1.PodFailed)
+
+	// Verify the admitted pod is pending (not rejected).
+	checkPodStatus(t, kl, podFits, v1.PodPending)
+}
+
 func TestPodResourceAllocationReset(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	testKubelet := newTestKubelet(t, false)
