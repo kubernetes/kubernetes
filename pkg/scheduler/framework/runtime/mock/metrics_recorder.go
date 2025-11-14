@@ -29,7 +29,7 @@ import (
 // if they need to assert on those metrics.
 // Get queueing hint and in-flight event records are intentionally absent.
 type MetricsRecorder struct {
-	mu sync.Mutex
+	mu sync.RWMutex
 
 	// Counters for method calls
 	pluginDurationCalls int
