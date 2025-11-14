@@ -62,7 +62,7 @@ type MetricsRecorder interface {
 	ObserveQueueingHintDurationAsync(pluginName, event, hint string, value float64)
 
 	// ObserveInFlightEventsAsync observes the scheduler_in_flight_events metric.
-	// The metric will be flushed asynchronously.
+	// The metric will be flushed asynchronously. Setting forceFlush to true forces immediate flushing and should be used rarely.
 	ObserveInFlightEventsAsync(eventLabel string, valueToAdd float64, forceFlush bool)
 }
 
