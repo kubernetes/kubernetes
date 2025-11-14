@@ -733,7 +733,7 @@ func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string)
 	}
 
 	// List all pods indexed to RS UID and Orphan pods
-	allRSPods, err := controller.FilterPodsByOwner(rsc.podIndexer, &rs.ObjectMeta, rsc.Kind, true)
+	allRSPods, err := controller.FilterPodsByOwner(ctx, rsc.podIndexer, &rs.ObjectMeta, rsc.Kind, true)
 	if err != nil {
 		return err
 	}

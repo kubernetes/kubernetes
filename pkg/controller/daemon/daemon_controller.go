@@ -709,7 +709,7 @@ func (dsc *DaemonSetsController) getDaemonPods(ctx context.Context, ds *apps.Dae
 		return nil, err
 	}
 	// List all pods indexed to DS UID and Orphan pods
-	pods, err := controller.FilterPodsByOwner(dsc.podIndexer, &ds.ObjectMeta, "DaemonSet", true)
+	pods, err := controller.FilterPodsByOwner(ctx, dsc.podIndexer, &ds.ObjectMeta, "DaemonSet", true)
 	if err != nil {
 		return nil, err
 	}

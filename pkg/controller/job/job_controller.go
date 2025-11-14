@@ -776,7 +776,7 @@ func (jm *Controller) getPodsForJob(ctx context.Context, j *batch.Job) ([]*v1.Po
 	}
 
 	// list all pods managed by this Job using the pod indexer
-	pods, err := controller.FilterPodsByOwner(jm.podIndexer, &j.ObjectMeta, "Job", true)
+	pods, err := controller.FilterPodsByOwner(ctx, jm.podIndexer, &j.ObjectMeta, "Job", true)
 	if err != nil {
 		return nil, err
 	}
