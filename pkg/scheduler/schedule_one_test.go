@@ -603,9 +603,6 @@ func TestSchedulerGuaranteeNonNilNodeInSchedulingCycle(t *testing.T) {
 	var deleteNodeIndex int
 	deleteNodesOneRound := func(ctx context.Context) {
 		for i := 0; i < deleteNodeNumberPerRound; i++ {
-			if ctx.Err() != nil {
-				return
-			}
 			if deleteNodeIndex >= initialNodeNumber {
 				// all initial nodes are already deleted
 				return
@@ -623,9 +620,6 @@ func TestSchedulerGuaranteeNonNilNodeInSchedulingCycle(t *testing.T) {
 			return
 		}
 		for i := 0; i < createPodNumberPerRound; i++ {
-			if ctx.Err() != nil {
-				return
-			}
 			podName := fmt.Sprintf("pod%d", createPodIndex)
 			// Note: the node(specifiedNodeName) may already be deleted, which leads pod scheduled failed.
 			specifiedNodeName := fmt.Sprintf("node%d", random.Intn(initialNodeNumber))
