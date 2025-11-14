@@ -44,8 +44,8 @@ var (
 // "ctx" is the context that would close the background goroutine.
 func New(ctx context.Context, ttl time.Duration, apiDispatcher fwk.APIDispatcher) Cache {
 	logger := klog.FromContext(ctx)
-	cache := newCache(ctx, ttl, cleanAssumedPeriod, apiDispatcher)
-	cache.run(ctx, logger)
+	cache := newCache(logger, ttl, cleanAssumedPeriod, apiDispatcher)
+	go cache.run(ctx, logger)
 	return cache
 }
 
@@ -91,8 +91,7 @@ type podState struct {
 	bindingFinished bool
 }
 
-func newCache(ctx context.Context, ttl, period time.Duration, apiDispatcher fwk.APIDispatcher) *cacheImpl {
-	logger := klog.FromContext(ctx)
+func newCache(logger klog.Logger, ttl, period time.Duration, apiDispatcher fwk.APIDispatcher) *cacheImpl {
 	return &cacheImpl{
 		ttl:    ttl,
 		period: period,
