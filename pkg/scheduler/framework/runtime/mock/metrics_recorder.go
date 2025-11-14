@@ -103,5 +103,5 @@ func (f *MetricsRecorder) Reset() {
 	defer f.mu.Unlock()
 
 	f.pluginDurationCalls = 0
-	f.pluginDurationRecords = []PluginDurationRecord{}
+	f.pluginDurationRecords = nil
 }
