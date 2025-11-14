@@ -797,20 +797,44 @@ func (ev *Evaluator) EarlyNominate(ctx context.Context, state fwk.CycleState, po
 		return nil, fwk.AsStatus(err)
 	}
 
-	// 1) Find all pods that are currently preempting.
-	preemptingPods := make(map[string][]*v1.Pod)
-	preemptedPods := make(map[string][]*v1.Pod)
-	allPods, err := ev.PodLister.List(labels.Everything())
-	if err != nil {
-		logger.Error(err, "Could not list all pods when early nominating")
-		return nil, fwk.AsStatus(err)
+	// 1) Find all pods that are currently preempting using the in-memory set.
+	ev.mu.RLock()
+	preemptingUIDs := ev.preempting.Clone()
+	ev.mu.RUnlock()
+
+	if preemptingUIDs.Len() == 0 {
+		return nil, fwk.NewStatus(fwk.Unschedulable, "No preempting pods for early nomination")
 	}
-	for _, p := range allPods {
-		if ev.IsPodRunningPreemption(p.UID) {
-			preemptingPods[p.Spec.NodeName] = append(preemptingPods[p.Spec.NodeName], p)
+
+	preemptingPods := make(map[string][]*v1.Pod)
+	for uid := range preemptingUIDs {
+		allPods, err := ev.PodLister.List(labels.Everything())
+		if err != nil {
+			logger.Error(err, "Could not list all pods when early nominating")
+			return nil, fwk.AsStatus(err)
 		}
-		if p.DeletionTimestamp != nil && p.Status.Reason == v1.PodReasonPreemptionByScheduler {
-			preemptedPods[p.Spec.NodeName] = append(preemptedPods[p.Spec.NodeName], p)
+		for _, p := range allPods {
+			if p.UID == uid {
+				preemptingPods[p.Spec.NodeName] = append(preemptingPods[p.Spec.NodeName], p)
+				break
+			}
+		}
+	}
+
+	preemptedPods := make(map[string][]*v1.Pod)
+
+	for nodeName := range preemptingPods {
+		preemptedPods[nodeName] = []*v1.Pod{}
+		nodeInfo, err := ev.Handler.SnapshotSharedLister().NodeInfos().Get(nodeName)
+		if err != nil {
+			logger.Error(err, "Could not get NodeInfo for node with preempting pods", "node", klog.KRef("", nodeName))
+			return nil, fwk.AsStatus(err)
+		}
+		for _, pi := range nodeInfo.GetPods() {
+			p := pi.GetPod()
+			if p.DeletionTimestamp != nil && p.Status.Reason == v1.PodReasonPreemptionByScheduler {
+				preemptedPods[nodeName] = append(preemptedPods[nodeName], p)
+			}
 		}
 	}
 
