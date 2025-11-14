@@ -240,7 +240,7 @@ func (sched *Scheduler) addPodToSchedulingQueue(pod *v1.Pod) {
 func (sched *Scheduler) syncPodWithDispatcher(pod *v1.Pod) *v1.Pod {
 	enrichedObj, err := sched.APIDispatcher.SyncObject(pod)
 	if err != nil {
-		utilruntime.HandleErrorWithLogger(sched.logger, err, "failed to sync pod with API dispatcher", "namespace", pod.Namespace, "name", pod.Name)
+		utilruntime.HandleErrorWithLogger(sched.logger, err, "failed to sync pod with API dispatcher", "pod", klog.KObj(pod))
 		return pod
 	}
 	enrichedPod, ok := enrichedObj.(*v1.Pod)
