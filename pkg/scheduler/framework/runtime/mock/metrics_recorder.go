@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,22 +14,27 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package runtime
+package mock
 
 import (
+	"slices"
 	"sync"
 )
 
-// MockMetricsRecorder is a fake implementation of MetricsRecorder for testing.
+// MetricsRecorder is a fake implementation of MetricsRecorder for testing.
 // It uses counters and stores call records for verification in tests.
-type MockMetricsRecorder struct {
+// Queueing hint and in-flight event metrics are intentionally not
+// recorded in this runtime mock. The methods exist as no-ops to satisfy
+// the interface; backend-specific tests should provide their own mocks
+// if they need to assert on those metrics.
+// Get queueing hint and in-flight event records are intentionally absent.
+type MetricsRecorder struct {
 	mu sync.Mutex
 
 	// Counters for method calls
 	pluginDurationCalls int
-	flushMetricsCalls   int
 
-	// Records of calls for verification
+	// pluginDurationRecords is used to store the records of calls and is used for verification
 	pluginDurationRecords []PluginDurationRecord
 }
 
@@ -41,20 +46,13 @@ type PluginDurationRecord struct {
 	Value          float64
 }
 
-// Queueing hint and in-flight event metrics are intentionally not
-// recorded in this runtime mock. The methods exist as no-ops to satisfy
-// the interface; backend-specific tests should provide their own mocks
-// if they need to assert on those metrics.
-
-// NewMockMetricsRecorder creates a new MockMetricsRecorder
-func NewMockMetricsRecorder() *MockMetricsRecorder {
-	return &MockMetricsRecorder{
-		pluginDurationRecords: []PluginDurationRecord{},
-	}
+// NewMetricsRecorder creates a new MockMetricsRecorder
+func NewMetricsRecorder() *MetricsRecorder {
+	return &MetricsRecorder{}
 }
 
 // ObservePluginDurationAsync records the plugin duration observation
-func (f *MockMetricsRecorder) ObservePluginDurationAsync(extensionPoint, pluginName, status string, value float64) {
+func (f *MetricsRecorder) ObservePluginDurationAsync(extensionPoint, pluginName, status string, value float64) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
@@ -68,50 +66,42 @@ func (f *MockMetricsRecorder) ObservePluginDurationAsync(extensionPoint, pluginN
 }
 
 // ObserveQueueingHintDurationAsync is a no-op in the runtime mock.
-func (f *MockMetricsRecorder) ObserveQueueingHintDurationAsync(pluginName, event, hint string, value float64) {
+func (f *MetricsRecorder) ObserveQueueingHintDurationAsync(pluginName, event, hint string, value float64) {
 }
 
 // ObserveInFlightEventsAsync is a no-op in the runtime mock.
-func (f *MockMetricsRecorder) ObserveInFlightEventsAsync(eventLabel string, valueToAdd float64, forceFlush bool) {
+func (f *MetricsRecorder) ObserveInFlightEventsAsync(eventLabel string, valueToAdd float64, forceFlush bool) {
 }
 
-// FlushMetrics records the flush operation is a no-op in the runtime mock.
-func (f *MockMetricsRecorder) FlushMetrics() {
+// FlushMetrics is a no-op in the runtime mock.
+func (f *MetricsRecorder) FlushMetrics() {
 }
 
 // PluginDurationCallCount returns the number of ObservePluginDurationAsync calls
-func (f *MockMetricsRecorder) PluginDurationCallCount() int {
+func (f *MetricsRecorder) PluginDurationCallCount() int {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return f.pluginDurationCalls
+	return len(f.pluginDurationRecords)
 }
 
-// FlushMetricsCallCount returns the number of FlushMetrics calls
-func (f *MockMetricsRecorder) FlushMetricsCallCount() int {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	return f.flushMetricsCalls
+// FlushMetricsCallCount is a no-op in the runtime mock.
+func (f *MetricsRecorder) FlushMetricsCallCount() int {
+	return 0
 }
 
 // GetPluginDurationRecords returns a copy of the plugin duration records
-func (f *MockMetricsRecorder) GetPluginDurationRecords() []PluginDurationRecord {
+func (f *MetricsRecorder) GetPluginDurationRecords() []PluginDurationRecord {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	records := make([]PluginDurationRecord, len(f.pluginDurationRecords))
-	copy(records, f.pluginDurationRecords)
-	return records
+	return slices.Clone(f.pluginDurationRecords)
 }
 
-// Get queueing hint and in-flight event records are intentionally absent.
-
 // Reset clears all counters and records
-func (f *MockMetricsRecorder) Reset() {
+func (f *MetricsRecorder) Reset() {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
 	f.pluginDurationCalls = 0
-	f.flushMetricsCalls = 0
-
 	f.pluginDurationRecords = []PluginDurationRecord{}
 }
