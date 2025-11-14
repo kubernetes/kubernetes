@@ -57,7 +57,7 @@ type MetricsRecorder interface {
 	// The metric will be flushed asynchronously.
 	ObservePluginDurationAsync(extensionPoint, pluginName, status string, value float64)
 
-	// ObserveQueueingHintDurationAsync observes the queueing_hint_execution_duration_seconds metric.
+	// ObserveQueueingHintDurationAsync observes the scheduler_queueing_hint_execution_duration_seconds metric.
 	// The metric will be flushed asynchronously.
 	ObserveQueueingHintDurationAsync(pluginName, event, hint string, value float64)
 
