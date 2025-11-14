@@ -46,10 +46,10 @@ var _ = SIGDescribe("DefaultProcMount [LinuxOnly]", framework.WithNodeConformanc
 })
 
 var _ = SIGDescribe("ProcMount [LinuxOnly]", feature.ProcMountType, feature.UserNamespacesSupport, func() {
-	f := framework.NewDefaultFramework("proc-mount-baseline-test")
-	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
+	f := framework.NewDefaultFramework("proc-mount-restricted-test")
+	f.NamespacePodSecurityLevel = admissionapi.LevelRestricted
 
-	f.It("will fail to unmask proc mounts if not privileged", func(ctx context.Context) {
+	f.It("will fail to unmask proc mounts at restricted level", func(ctx context.Context) {
 		if !supportsUserNS(ctx, f) {
 			e2eskipper.Skipf("runtime does not support user namespaces")
 		}
