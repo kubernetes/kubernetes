@@ -342,6 +342,7 @@ func (sched *Scheduler) bindingCycle(
 	}
 	// Count pods scheduled after being flushed from unschedulablePods
 	if assumedPodInfo.WasFlushedFromUnschedulable {
+		logger.Info("Pod scheduled after flush from unschedulablePods", "pod", klog.KObj(assumedPodInfo.Pod), "unschedulablePlugins", assumedPodInfo.UnschedulablePlugins)
 		metrics.PodScheduledAfterFlush.Inc()
 	}
 	// Run "postbind" plugins.
