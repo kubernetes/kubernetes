@@ -17,17 +17,15 @@ limitations under the License.
 package metrics
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"sync"
 	"sync/atomic"
 
-	"github.com/blang/semver/v4"
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/component-base/version"
 	"k8s.io/klog/v2"
 
@@ -40,11 +38,6 @@ var (
 	disabledMetrics     = map[string]struct{}{}
 	showHiddenOnce      sync.Once
 	showHidden          atomic.Bool
-
-	metricNameExpr           = `[a-zA-Z_:][a-zA-Z0-9_:]*`
-	labelExpr                = `[a-zA-Z_][a-zA-Z0-9_]*`
-	metricNameRegex          = regexp.MustCompile(`^` + metricNameExpr + `$`)
-	allowListMappingKeyRegex = regexp.MustCompile(metricNameExpr + `,` + labelExpr)
 )
 
 var (
@@ -75,7 +68,8 @@ var (
 
 // Options has all parameters needed for exposing metrics from components
 type Options struct {
-	v1.MetricsConfiguration `json:",inline"`
+	// Configuration serialization is omitted here since the parent is never expected to be embedded.
+	v1.MetricsConfiguration `json:"-"`
 }
 
 // NewOptions returns default metrics options
@@ -226,8 +220,8 @@ func SetLabelAllowListFromManifest(manifest string) {
 	SetLabelAllowList(allowListMapping)
 }
 
-// ApplyMetricsConfiguration applies a MetricsConfiguration into global configuration of metrics.
-func ApplyMetricsConfiguration(c *v1.MetricsConfiguration) {
+// Apply applies a MetricsConfiguration into global configuration of metrics.
+func Apply(c *v1.MetricsConfiguration) {
 	if c == nil {
 		return
 	}
@@ -249,103 +243,19 @@ func (o *Options) Apply() {
 		return
 	}
 
-	ApplyMetricsConfiguration(&o.MetricsConfiguration)
-}
-
-func validateShowHiddenMetricsVersion(currentVersion semver.Version, targetVersionStr string) error {
-	if targetVersionStr == "" {
-		return nil
-	}
-
-	validVersionStr := fmt.Sprintf("%d.%d", currentVersion.Major, currentVersion.Minor-1)
-	if targetVersionStr != validVersionStr {
-		return fmt.Errorf("--show-hidden-metrics-for-version must be omitted or have the value '%v'. Only the previous minor version is allowed", validVersionStr)
-	}
-
-	return nil
+	Apply(&o.MetricsConfiguration)
 }
 
 // ValidateShowHiddenMetricsVersion checks invalid version for which show hidden metrics.
 // TODO: This is kept here for backward compatibility in Kubelet (as metrics configuration fields were exposed on an individual basis earlier).
 // TODO: Revisit this after Kubelet supports the new metrics configuration API.
 func ValidateShowHiddenMetricsVersion(v string) []error {
-	err := validateShowHiddenMetricsVersion(parseVersion(version.Get()), v)
+	err := v1.ValidateShowHiddenMetricsVersionForKubeletBackwardCompatOnly(parseVersion(version.Get()), v)
 	if err != nil {
 		return []error{err}
 	}
 
 	return nil
-}
-
-func validateDisabledMetrics(names []string) error {
-	for _, name := range names {
-		if !metricNameRegex.MatchString(name) {
-			return fmt.Errorf("--disabled-metrics must be fully qualified metric names matching %q, got %q", metricNameRegex.String(), name)
-		}
-	}
-	return nil
-}
-
-func validateAllowListMapping(allowListMapping map[string]string) error {
-	for k := range allowListMapping {
-		if allowListMappingKeyRegex.FindString(k) != k {
-			return fmt.Errorf("--allow-metric-labels must have a list of kv pair with format `metricName,labelName=labelValue, labelValue,...`")
-		}
-	}
-
-	return nil
-}
-
-// validateAllowListMappingManifest validates the allow list mapping manifest file.
-// This function is used to validate the manifest file provided via the flag --allow-metric-labels-manifest, or the configuration file.
-// In the former case, the path resolution is relative to the current working directory.
-// In the latter case, the path resolution is relative to the configuration file's location, and components are required to pass in the resolved absolute path.
-// NOTE: If its the latter case, components are expected to pass in the *absolute* path to the manifest file.
-func validateAllowListMappingManifest(allowListMappingManifestPath string) error {
-	if allowListMappingManifestPath == "" {
-		return nil
-	}
-	data, err := os.ReadFile(filepath.Clean(allowListMappingManifestPath))
-	if err != nil {
-		return fmt.Errorf("failed to read allow list manifest: %w", err)
-	}
-	allowListMapping := make(map[string]string)
-	err = yaml.Unmarshal(data, &allowListMapping)
-	if err != nil {
-		return fmt.Errorf("failed to parse allow list manifest: %w", err)
-	}
-	if err = validateAllowListMapping(allowListMapping); err != nil {
-		return fmt.Errorf("invalid allow list mapping in manifest: %w", err)
-	}
-
-	return nil
-}
-
-// ValidateMetricsConfiguration validates a MetricsConfiguration.
-func ValidateMetricsConfiguration(c *v1.MetricsConfiguration) []error {
-	if c == nil {
-		return nil
-	}
-
-	var errs []error
-	err := validateShowHiddenMetricsVersion(parseVersion(version.Get()), c.ShowHiddenMetricsForVersion)
-	if err != nil {
-		errs = append(errs, err)
-	}
-	if err = validateDisabledMetrics(c.DisabledMetrics); err != nil {
-		errs = append(errs, err)
-	}
-	if err = validateAllowListMapping(c.AllowListMapping); err != nil {
-		errs = append(errs, err)
-	}
-	if err = validateAllowListMappingManifest(c.AllowListMappingManifest); err != nil {
-		errs = append(errs, err)
-	}
-
-	if len(errs) == 0 {
-		return nil
-	}
-	return errs
 }
 
 // Validate validates metrics flags options.
@@ -354,5 +264,5 @@ func (o *Options) Validate() []error {
 		return nil
 	}
 
-	return ValidateMetricsConfiguration(&o.MetricsConfiguration)
+	return v1.Validate(&o.MetricsConfiguration, parseVersion(version.Get()), field.NewPath("metrics")).ToAggregate().Errors()
 }

@@ -33,7 +33,6 @@ type MetricsConfiguration struct {
 	AllowListMapping map[string]string `json:"allowListMapping,omitempty"`
 	// The path to the manifest file that contains the allow-list mapping. Provided for convenience over AllowListMapping.
 	// The file contents must represent a map of string keys and values, i.e.,
-	// allowListMapping:
 	//  "metric1,label1": "value11,value12"
 	//  "metric2,label2": ""
 	AllowListMappingManifest string `json:"allowListMappingManifest,omitempty"`
