@@ -45,7 +45,7 @@ var (
 func New(ctx context.Context, ttl time.Duration, apiDispatcher fwk.APIDispatcher) Cache {
 	logger := klog.FromContext(ctx)
 	cache := newCache(ctx, ttl, cleanAssumedPeriod, apiDispatcher)
-	cache.run(logger)
+	cache.run(ctx, logger)
 	return cache
 }
 
@@ -59,7 +59,6 @@ type nodeInfoListItem struct {
 }
 
 type cacheImpl struct {
-	stop   <-chan struct{}
 	ttl    time.Duration
 	period time.Duration
 
@@ -97,7 +96,6 @@ func newCache(ctx context.Context, ttl, period time.Duration, apiDispatcher fwk.
 	return &cacheImpl{
 		ttl:    ttl,
 		period: period,
-		stop:   ctx.Done(),
 
 		nodes:         make(map[string]*nodeInfoListItem),
 		nodeTree:      newNodeTree(logger, nil),
@@ -729,9 +727,9 @@ func (cache *cacheImpl) removeNodeImageStates(node *v1.Node) {
 	}
 }
 
-func (cache *cacheImpl) run(logger klog.Logger) {
+func (cache *cacheImpl) run(ctx context.Context, logger klog.Logger) {
 	go wait.UntilWithContext(
-		wait.ContextForChannel(cache.stop),
+		ctx,
 		func(ctx context.Context) {
 			cache.cleanupAssumedPods(logger, time.Now())
 		},
