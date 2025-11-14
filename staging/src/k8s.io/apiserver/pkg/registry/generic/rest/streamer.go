@@ -108,7 +108,15 @@ func (s *LocationStreamer) InputStream(ctx context.Context, apiVersion, acceptHe
 	if len(contentType) == 0 {
 		contentType = resp.Header.Get("Content-Type")
 		if len(contentType) > 0 {
-			contentType = strings.TrimSpace(strings.SplitN(contentType, ";", 2)[0])
+			// Preserve the full Content-Type including charset if present
+			contentType = strings.TrimSpace(contentType)
+			// If it's text/plain without charset, add charset=utf-8
+			if contentType == "text/plain" {
+				contentType = "text/plain; charset=utf-8"
+			}
+		} else {
+			// Default to text/plain with UTF-8 if no Content-Type was provided
+			contentType = "text/plain; charset=utf-8"
 		}
 	}
 	flush = s.Flush

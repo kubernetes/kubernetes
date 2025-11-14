@@ -129,3 +129,18 @@ func TestPodLogValidates(t *testing.T) {
 		})
 	}
 }
+
+func TestProducesMIMETypes(t *testing.T) {
+	logRest := &LogREST{}
+	mimeTypes := logRest.ProducesMIMETypes("GET")
+
+	if len(mimeTypes) != 1 {
+		t.Fatalf("Expected 1 MIME type, got %d", len(mimeTypes))
+	}
+
+	// Should declare text/plain without charset since actual charset is determined at runtime
+	expectedContentType := "text/plain"
+	if mimeTypes[0] != expectedContentType {
+		t.Errorf("Expected Content-Type %q, got %q", expectedContentType, mimeTypes[0])
+	}
+}

@@ -168,3 +168,88 @@ func TestInputStreamRedirects(t *testing.T) {
 	_, _, _, err = streamer.InputStream(context.Background(), "", "")
 	assert.Error(t, err, "Redirect should trigger an error")
 }
+
+func TestInputStreamContentTypeCharset(t *testing.T) {
+	tests := []struct {
+		name               string
+		serverContentType  string // What the backend server sends
+		expectedResultType string // What we expect after processing
+	}{
+		{
+			name:               "text/plain without charset should add utf-8",
+			serverContentType:  "text/plain",
+			expectedResultType: "text/plain; charset=utf-8",
+		},
+		{
+			name:               "text/plain with utf-8 should preserve it",
+			serverContentType:  "text/plain; charset=utf-8",
+			expectedResultType: "text/plain; charset=utf-8",
+		},
+		{
+			name:               "text/plain with latin-1 should preserve it",
+			serverContentType:  "text/plain; charset=latin-1",
+			expectedResultType: "text/plain; charset=latin-1",
+		},
+		{
+			name:               "text/plain with iso-8859-1 should preserve it",
+			serverContentType:  "text/plain; charset=iso-8859-1",
+			expectedResultType: "text/plain; charset=iso-8859-1",
+		},
+		{
+			name:               "text/plain with extra spaces should preserve charset",
+			serverContentType:  "text/plain;  charset=utf-16",
+			expectedResultType: "text/plain;  charset=utf-16",
+		},
+		{
+			name:               "application/json should not be modified",
+			serverContentType:  "application/json",
+			expectedResultType: "application/json",
+		},
+		{
+			name:               "application/octet-stream should not be modified",
+			serverContentType:  "application/octet-stream",
+			expectedResultType: "application/octet-stream",
+		},
+		{
+			name:               "empty content-type should default to text/plain with utf-8",
+			serverContentType:  "",
+			expectedResultType: "text/plain; charset=utf-8",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			location, _ := url.Parse("http://www.example.com")
+			streamer := &LocationStreamer{
+				Location:  location,
+				Transport: fakeTransport(tt.serverContentType, "test content"),
+			}
+			_, _, contentType, err := streamer.InputStream(context.Background(), "", "")
+			if err != nil {
+				t.Errorf("Unexpected error when getting stream: %v", err)
+				return
+			}
+			if contentType != tt.expectedResultType {
+				t.Errorf("Content type mismatch.\nGot:      %q\nExpected: %q", contentType, tt.expectedResultType)
+			}
+		})
+	}
+}
+
+func TestInputStreamContentTypePreset(t *testing.T) {
+	// Test that if ContentType is preset in LocationStreamer, it's used unconditionally
+	location, _ := url.Parse("http://www.example.com")
+	streamer := &LocationStreamer{
+		Location:    location,
+		Transport:   fakeTransport("text/plain", "test content"),
+		ContentType: "application/custom; charset=special", // Preset value
+	}
+	_, _, contentType, err := streamer.InputStream(context.Background(), "", "")
+	if err != nil {
+		t.Errorf("Unexpected error when getting stream: %v", err)
+		return
+	}
+	if contentType != "application/custom; charset=special" {
+		t.Errorf("Expected preset ContentType to be used. Got: %s", contentType)
+	}
+}

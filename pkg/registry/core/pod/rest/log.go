@@ -65,7 +65,10 @@ func (r *LogREST) Destroy() {
 func (r *LogREST) ProducesMIMETypes(verb string) []string {
 	// Since the default list does not include "plain/text", we need to
 	// explicitly override ProducesMIMETypes, so that it gets added to
-	// the "produces" section for pods/{name}/log
+	// the "produces" section for pods/{name}/log.
+	// Note: We declare "text/plain" without charset because the actual charset
+	// is determined at runtime based on the kubelet response (commonly utf-8,
+	// but could be other charsets if explicitly specified by the source).
 	return []string{
 		"text/plain",
 	}
@@ -106,7 +109,7 @@ func (r *LogREST) Get(ctx context.Context, name string, opts runtime.Object) (ru
 	return &genericrest.LocationStreamer{
 		Location:                              location,
 		Transport:                             transport,
-		ContentType:                           "text/plain",
+		ContentType:                           "",
 		Flush:                                 logOpts.Follow,
 		ResponseChecker:                       genericrest.NewGenericHttpResponseChecker(api.Resource("pods/log"), name),
 		RedirectChecker:                       genericrest.PreventRedirects,
