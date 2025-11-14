@@ -53,7 +53,7 @@ const (
 // This interface abstracts the metrics recording functionality, allowing
 // for dependency injection and easier testing with mocks.
 type MetricsRecorder interface {
-	// ObservePluginDurationAsync observes the plugin_execution_duration_seconds metric.
+	// ObservePluginDurationAsync observes the scheduler_plugin_execution_duration_seconds metric.
 	// The metric will be flushed asynchronously.
 	ObservePluginDurationAsync(extensionPoint, pluginName, status string, value float64)
 
