@@ -74,7 +74,7 @@ func TestHandleFlagz(t *testing.T) {
 			),
 		},
 		{
-			name:          "valid request for v1alpha1",
+			name:          "valid request for application/json",
 			acceptHeader:  "application/json;v=v1alpha1;g=config.k8s.io;as=Flagz",
 			componentName: "test-server",
 			registry: &registry{
@@ -117,6 +117,17 @@ func TestHandleFlagz(t *testing.T) {
 				},
 			},
 			wantWarning: true,
+		},
+		{
+			name:          "valid request for application/yaml",
+			acceptHeader:  "application/yaml;v=v1alpha1;g=config.k8s.io;as=Flagz",
+			componentName: "test-server",
+			registry: &registry{
+				reader:                fakeReader,
+				deprecatedVersionsMap: map[string]bool{},
+			},
+			wantStatusCode: http.StatusOK,
+			wantBody:       "apiVersion: config.k8s.io/v1alpha1",
 		},
 		{
 			name:          "no accept header falls back to text/plain",
