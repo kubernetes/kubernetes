@@ -45,7 +45,7 @@ var (
 func New(ctx context.Context, ttl time.Duration, apiDispatcher fwk.APIDispatcher) Cache {
 	logger := klog.FromContext(ctx)
 	cache := newCache(logger, ttl, cleanAssumedPeriod, apiDispatcher)
-	go cache.run(ctx, logger)
+	cache.run(ctx, logger)
 	return cache
 }
 
