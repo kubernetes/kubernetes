@@ -601,8 +601,11 @@ func TestSchedulerGuaranteeNonNilNodeInSchedulingCycle(t *testing.T) {
 	go sched.Run(ctx)
 
 	var deleteNodeIndex int
-	deleteNodesOneRound := func() {
+	deleteNodesOneRound := func(ctx context.Context) {
 		for i := 0; i < deleteNodeNumberPerRound; i++ {
+			if ctx.Err() != nil {
+				return
+			}
 			if deleteNodeIndex >= initialNodeNumber {
 				// all initial nodes are already deleted
 				return
@@ -615,11 +618,14 @@ func TestSchedulerGuaranteeNonNilNodeInSchedulingCycle(t *testing.T) {
 		}
 	}
 	var createPodIndex int
-	createPodsOneRound := func() {
+	createPodsOneRound := func(ctx context.Context) {
 		if createPodIndex > waitSchedulingPodNumber {
 			return
 		}
 		for i := 0; i < createPodNumberPerRound; i++ {
+			if ctx.Err() != nil {
+				return
+			}
 			podName := fmt.Sprintf("pod%d", createPodIndex)
 			// Note: the node(specifiedNodeName) may already be deleted, which leads pod scheduled failed.
 			specifiedNodeName := fmt.Sprintf("node%d", random.Intn(initialNodeNumber))
@@ -636,8 +642,8 @@ func TestSchedulerGuaranteeNonNilNodeInSchedulingCycle(t *testing.T) {
 	// 1) One is responsible for deleting several nodes in each round;
 	// 2) Another is creating several pods in each round to trigger scheduling;
 	// Those two goroutines will stop until ctx.Done() is called, which means all waiting pods are scheduled at least once.
-	go wait.UntilWithContext(ctx, func(context.Context) { deleteNodesOneRound() }, 10*time.Millisecond)
-	go wait.UntilWithContext(ctx, func(context.Context) { createPodsOneRound() }, 9*time.Millisecond)
+	go wait.UntilWithContext(ctx, deleteNodesOneRound, 10*time.Millisecond)
+	go wait.UntilWithContext(ctx, createPodsOneRound, 9*time.Millisecond)
 	// Capture the events to wait all pods to be scheduled at least once.
 	allWaitSchedulingPods := sets.New[string]()
 	for i := 0; i < waitSchedulingPodNumber; i++ {
