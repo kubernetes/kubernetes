@@ -237,7 +237,7 @@ func (s *VolumeGroupSnapshottableTestSuite) DefineTests(driver storageframework.
 					e2estatefulset.DeleteAllStatefulSets(ctx, cs, groupTest.statefulSet.Namespace)
 				}
 
-				var cleanUpVGSErrs []error
+				var cleanupVGSErrs []error
 				for _, vgsr := range groupTest.snapshots {
 					if vgsr == nil || vgsr.VGS == nil {
 						framework.Logf("Skipping cleanup: VolumeGroupSnapshotResource or VGS is nil")
@@ -250,13 +250,13 @@ func (s *VolumeGroupSnapshottableTestSuite) DefineTests(driver storageframework.
 					framework.Logf("deleting VolumeGroupSnapshotResource %s/%s", vgsNamespace, vgsName)
 					err := vgsr.CleanupResource(ctx, f.Timeouts)
 					if err != nil {
-						cleanUpVGSErrs = append(cleanUpVGSErrs, err)
+						cleanupVGSErrs = append(cleanupVGSErrs, err)
 						framework.Logf("Warning: failed to delete VolumeGroupSnapshotResource %s/%s: %v", vgsNamespace, vgsName, err)
 					} else {
 						framework.Logf("deleted VolumeGroupSnapshotResource %s/%s", vgsNamespace, vgsName)
 					}
 				}
-				framework.ExpectNoError(utilerrors.NewAggregate(cleanUpVGSErrs), "failed to delete VGS resources")
+				framework.ExpectNoError(utilerrors.NewAggregate(cleanupVGSErrs), "failed to delete VGS resources")
 
 				var cleanupVolumeErrs []error
 				for _, volumeResource := range groupTest.volumeResources {
