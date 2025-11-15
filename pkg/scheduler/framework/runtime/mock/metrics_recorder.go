@@ -83,8 +83,8 @@ func (f *MetricsRecorder) GetPluginDurationRecords() []PluginDurationRecord {
 
 // Reset clears all counters and records
 func (f *MetricsRecorder) Reset() {
-	f.mu.RLock()
-	defer f.mu.RUnlock()
+	f.mu.Lock()
+	defer f.mu.Unlock()
 
 	f.pluginDurationRecords = nil
 }
