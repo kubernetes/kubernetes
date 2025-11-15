@@ -193,14 +193,12 @@ func (r *RequestInfoFactory) NewRequestInfo(req *http.Request) (*RequestInfo, er
 	// URL forms: /namespaces/{namespace}/{kind}/*, where parts are adjusted to be relative to kind
 	if currentParts[0] == "namespaces" {
 		if len(currentParts) > 1 {
-			// requestInfo.Namespace = currentParts[1]
 			potentialNamespace := currentParts[1]
 
 			// Check if the namespace is cluster-scoped
 			if len(currentParts) == 2 {
 				// Request like: /namespaces/{namespace} is a request for the namespace resource itself
 				requestInfo.Namespace = ""
-				// requestInfo.Resource = "namespaces"
 				requestInfo.Name = potentialNamespace
 			} else {
 				requestInfo.Namespace = potentialNamespace

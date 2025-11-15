@@ -45,8 +45,6 @@ func TestGetAPIRequestInfo(t *testing.T) {
 
 		// resource paths
 		{MethodGet, "/api/v1/namespaces", "list", "api", "", "v1", "", "namespaces", "", "", []string{"namespaces"}},
-		{MethodGet, "/api/v1/namespaces/other", "get", "api", "", "v1", "other", "namespaces", "", "other", []string{"namespaces", "other"}},
-
 		{MethodGet, "/api/v1/namespaces/other/pods", "list", "api", "", "v1", "other", "pods", "", "", []string{"pods"}},
 		{MethodGet, "/api/v1/namespaces/other/pods/foo", "get", "api", "", "v1", "other", "pods", "", "foo", []string{"pods", "foo"}},
 		{MethodHead, "/api/v1/namespaces/other/pods/foo", "get", "api", "", "v1", "other", "pods", "", "foo", []string{"pods", "foo"}},
@@ -54,6 +52,13 @@ func TestGetAPIRequestInfo(t *testing.T) {
 		{MethodHead, "/api/v1/pods", "list", "api", "", "v1", namespaceAll, "pods", "", "", []string{"pods"}},
 		{MethodGet, "/api/v1/namespaces/other/pods/foo", "get", "api", "", "v1", "other", "pods", "", "foo", []string{"pods", "foo"}},
 		{MethodGet, "/api/v1/namespaces/other/pods", "list", "api", "", "v1", "other", "pods", "", "", []string{"pods"}},
+
+		// namespace resource itself (cluster-scoped, not namespaced)
+		{MethodGet, "/api/v1/namespaces/other", "get", "api", "", "v1", "", "namespaces", "", "other", []string{"namespaces", "other"}},
+		{MethodHead, "/api/v1/namespaces/other", "get", "api", "", "v1", "", "namespaces", "", "other", []string{"namespaces", "other"}},
+		{MethodPut, "/api/v1/namespaces/other", "update", "api", "", "v1", "", "namespaces", "", "other", []string{"namespaces", "other"}},
+		{MethodPatch, "/api/v1/namespaces/other", "patch", "api", "", "v1", "", "namespaces", "", "other", []string{"namespaces", "other"}},
+		{MethodDelete, "/api/v1/namespaces/other", "delete", "api", "", "v1", "", "namespaces", "", "other", []string{"namespaces", "other"}},
 
 		// special verbs
 		{MethodGet, "/api/v1/proxy/namespaces/other/pods/foo", "proxy", "api", "", "v1", "other", "pods", "", "foo", []string{"pods", "foo"}},
