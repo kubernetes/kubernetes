@@ -128,6 +128,25 @@ func Validate_VolumeAttachmentSpec(ctx context.Context, op operation.Operation, 
 		}(fldPath.Child("attacher"), &obj.Attacher, safe.Field(oldObj, func(oldObj *storagev1alpha1.VolumeAttachmentSpec) *string { return &oldObj.Attacher }))...)
 
 	// field storagev1alpha1.VolumeAttachmentSpec.Source has no validation
-	// field storagev1alpha1.VolumeAttachmentSpec.NodeName has no validation
+
+	// field storagev1alpha1.VolumeAttachmentSpec.NodeName
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("nodeName"), &obj.NodeName, safe.Field(oldObj, func(oldObj *storagev1alpha1.VolumeAttachmentSpec) *string { return &oldObj.NodeName }))...)
+
 	return errs
 }

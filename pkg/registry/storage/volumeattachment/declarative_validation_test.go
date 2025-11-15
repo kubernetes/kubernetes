@@ -27,8 +27,7 @@ import (
 )
 
 func TestDeclarativeValidate(t *testing.T) {
-	// VolumeAttachment existed as v1beta1 and v1
-	apiVersions := []string{"v1beta1", "v1"}
+	apiVersions := []string{"v1beta1", "v1alpha1", "v1"}
 	for _, apiVersion := range apiVersions {
 		t.Run(apiVersion, func(t *testing.T) {
 			testDeclarativeValidate(t, apiVersion)
@@ -37,8 +36,7 @@ func TestDeclarativeValidate(t *testing.T) {
 }
 
 func TestDeclarativeValidateUpdate(t *testing.T) {
-	// VolumeAttachment existed as v1beta1 and v1
-	apiVersions := []string{"v1beta1", "v1"}
+	apiVersions := []string{"v1beta1", "v1alpha1", "v1"}
 	for _, apiVersion := range apiVersions {
 		t.Run(apiVersion, func(t *testing.T) {
 			testDeclarativeValidateUpdate(t, apiVersion)
