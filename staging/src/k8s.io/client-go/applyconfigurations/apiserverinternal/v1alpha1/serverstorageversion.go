@@ -24,15 +24,16 @@ package v1alpha1
 // An API server instance reports the version it can decode and the version it
 // encodes objects to when persisting objects in the backend.
 type ServerStorageVersionApplyConfiguration struct {
-	// The ID of the reporting API server.
+	// apiServerID is the ID of the reporting API server.
 	APIServerID *string `json:"apiServerID,omitempty"`
-	// The API server encodes the object to this version when persisting it in
-	// the backend (e.g., etcd).
+	// encodingVersion is the version the API server encodes the object to when
+	// persisting it in the backend (e.g., etcd).
 	EncodingVersion *string `json:"encodingVersion,omitempty"`
+	// decodableVersions are the encoding versions the API server can handle to decode.
 	// The API server can decode objects encoded in these versions.
 	// The encodingVersion must be included in the decodableVersions.
 	DecodableVersions []string `json:"decodableVersions,omitempty"`
-	// The API server can serve these versions.
+	// servedVersions lists all versions the API server can serve.
 	// DecodableVersions must include all ServedVersions.
 	ServedVersions []string `json:"servedVersions,omitempty"`
 }

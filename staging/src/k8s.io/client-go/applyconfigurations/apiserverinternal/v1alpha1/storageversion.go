@@ -33,12 +33,14 @@ import (
 // Storage version of a specific resource.
 type StorageVersionApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// metadata is the standard object metadata.
 	// The name is <group>.<resource>.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	// Spec is an empty spec. It is here to comply with Kubernetes API style.
+	// spec is an empty spec. It is here to comply with Kubernetes API style.
 	Spec *apiserverinternalv1alpha1.StorageVersionSpec `json:"spec,omitempty"`
-	// API server instances report the version they can decode and the version they
-	// encode objects to when persisting objects in the backend.
+	// status hold the StorageVersionStatus, reporting the version an API server
+	// instance can decode and the version it encodes objects to when persisting
+	// objects in the backend.
 	Status *StorageVersionStatusApplyConfiguration `json:"status,omitempty"`
 }
 
