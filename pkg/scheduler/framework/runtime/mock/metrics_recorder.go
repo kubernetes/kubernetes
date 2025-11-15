@@ -31,9 +31,6 @@ import (
 type MetricsRecorder struct {
 	mu sync.RWMutex
 
-	// Counters for method calls
-	pluginDurationCalls int
-
 	// pluginDurationRecords is used to store the records of calls and is used for verification
 	pluginDurationRecords []PluginDurationRecord
 }
@@ -56,7 +53,6 @@ func (f *MetricsRecorder) ObservePluginDurationAsync(extensionPoint, pluginName,
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	f.pluginDurationCalls++
 	f.pluginDurationRecords = append(f.pluginDurationRecords, PluginDurationRecord{
 		ExtensionPoint: extensionPoint,
 		PluginName:     pluginName,
@@ -77,31 +73,18 @@ func (f *MetricsRecorder) ObserveInFlightEventsAsync(eventLabel string, valueToA
 func (f *MetricsRecorder) FlushMetrics() {
 }
 
-// PluginDurationCallCount returns the number of ObservePluginDurationAsync calls
-func (f *MetricsRecorder) PluginDurationCallCount() int {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	return len(f.pluginDurationRecords)
-}
-
-// FlushMetricsCallCount is a no-op in the runtime mock.
-func (f *MetricsRecorder) FlushMetricsCallCount() int {
-	return 0
-}
-
 // GetPluginDurationRecords returns a copy of the plugin duration records
 func (f *MetricsRecorder) GetPluginDurationRecords() []PluginDurationRecord {
-	f.mu.Lock()
-	defer f.mu.Unlock()
+	f.mu.RLock()
+	defer f.mu.RUnlock()
 
 	return slices.Clone(f.pluginDurationRecords)
 }
 
 // Reset clears all counters and records
 func (f *MetricsRecorder) Reset() {
-	f.mu.Lock()
-	defer f.mu.Unlock()
+	f.mu.RLock()
+	defer f.mu.RUnlock()
 
-	f.pluginDurationCalls = 0
 	f.pluginDurationRecords = nil
 }
