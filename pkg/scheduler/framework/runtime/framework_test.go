@@ -4690,24 +4690,20 @@ func TestRecordingMetricsWithMocks(t *testing.T) {
 				name   string
 				action func(ctx context.Context, f framework.Framework)
 				inject injectedResult
+
+				// Plugin configuration
+				plugins *config.Plugins
+
 				// Expected metrics fields
 				expectedPluginDurationCallCount int
 				expectedPluginDurationRecords   []mock.PluginDurationRecord
-
-				// Plugin configuration fields
-				prefilterPlugins *config.PluginSet
-				prescorePlugins  *config.PluginSet
-				scorePlugins     *config.PluginSet
-				reservePlugins   *config.PluginSet
-				permitPlugins    *config.PluginSet
-				prebindPlugins   *config.PluginSet
-				bindPlugins      *config.PluginSet
-				postbindPlugins  *config.PluginSet
 			}{
 				{
-					name:                            "PreFilter - Success",
-					action:                          func(ctx context.Context, f framework.Framework) { f.RunPreFilterPlugins(ctx, state, pod) },
-					prefilterPlugins:                &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 1}}},
+					name:   "PreFilter - Success",
+					action: func(ctx context.Context, f framework.Framework) { f.RunPreFilterPlugins(ctx, state, pod) },
+					plugins: &config.Plugins{
+						PreFilter: config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 1}}},
+					},
 					expectedPluginDurationCallCount: 1,
 					expectedPluginDurationRecords: []mock.PluginDurationRecord{
 						{
@@ -4722,7 +4718,9 @@ func TestRecordingMetricsWithMocks(t *testing.T) {
 					action: func(ctx context.Context, f framework.Framework) {
 						f.RunScorePlugins(ctx, state, pod, BuildNodeInfos(nodes))
 					},
-					scorePlugins:                    &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 1}}},
+					plugins: &config.Plugins{
+						Score: config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 1}}},
+					},
 					expectedPluginDurationCallCount: 2, // Score runs once per node (2 nodes)
 					expectedPluginDurationRecords: []mock.PluginDurationRecord{
 						{
@@ -4738,9 +4736,11 @@ func TestRecordingMetricsWithMocks(t *testing.T) {
 					},
 				},
 				{
-					name:                            "Bind - Success",
-					action:                          func(ctx context.Context, f framework.Framework) { f.RunBindPlugins(ctx, state, pod, "") },
-					bindPlugins:                     &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+					name:   "Bind - Success",
+					action: func(ctx context.Context, f framework.Framework) { f.RunBindPlugins(ctx, state, pod, "") },
+					plugins: &config.Plugins{
+						Bind: config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+					},
 					expectedPluginDurationCallCount: 1,
 					expectedPluginDurationRecords: []mock.PluginDurationRecord{
 						{
@@ -4751,10 +4751,12 @@ func TestRecordingMetricsWithMocks(t *testing.T) {
 					},
 				},
 				{
-					name:                            "PreFilter - Error",
-					action:                          func(ctx context.Context, f framework.Framework) { f.RunPreFilterPlugins(ctx, state, pod) },
-					inject:                          injectedResult{PreFilterStatus: int(fwk.Error)},
-					prefilterPlugins:                &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 1}}},
+					name:   "PreFilter - Error",
+					action: func(ctx context.Context, f framework.Framework) { f.RunPreFilterPlugins(ctx, state, pod) },
+					inject: injectedResult{PreFilterStatus: int(fwk.Error)},
+					plugins: &config.Plugins{
+						PreFilter: config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 1}}},
+					},
 					expectedPluginDurationCallCount: 1,
 					expectedPluginDurationRecords: []mock.PluginDurationRecord{
 						{
@@ -4765,10 +4767,12 @@ func TestRecordingMetricsWithMocks(t *testing.T) {
 					},
 				},
 				{
-					name:                            "Bind - Error",
-					action:                          func(ctx context.Context, f framework.Framework) { f.RunBindPlugins(ctx, state, pod, "") },
-					inject:                          injectedResult{BindStatus: int(fwk.Error)},
-					bindPlugins:                     &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+					name:   "Bind - Error",
+					action: func(ctx context.Context, f framework.Framework) { f.RunBindPlugins(ctx, state, pod, "") },
+					inject: injectedResult{BindStatus: int(fwk.Error)},
+					plugins: &config.Plugins{
+						Bind: config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+					},
 					expectedPluginDurationCallCount: 1,
 					expectedPluginDurationRecords: []mock.PluginDurationRecord{
 						{
@@ -4779,9 +4783,11 @@ func TestRecordingMetricsWithMocks(t *testing.T) {
 					},
 				},
 				{
-					name:                            "PreScore - Success",
-					action:                          func(ctx context.Context, f framework.Framework) { f.RunPreScorePlugins(ctx, state, pod, nil) },
-					prescorePlugins:                 &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 1}}},
+					name:   "PreScore - Success",
+					action: func(ctx context.Context, f framework.Framework) { f.RunPreScorePlugins(ctx, state, pod, nil) },
+					plugins: &config.Plugins{
+						PreScore: config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 1}}},
+					},
 					expectedPluginDurationCallCount: 1,
 					expectedPluginDurationRecords: []mock.PluginDurationRecord{
 						{
@@ -4792,10 +4798,12 @@ func TestRecordingMetricsWithMocks(t *testing.T) {
 					},
 				},
 				{
-					name:                            "PreScore - Error",
-					action:                          func(ctx context.Context, f framework.Framework) { f.RunPreScorePlugins(ctx, state, pod, nil) },
-					inject:                          injectedResult{PreScoreStatus: int(fwk.Error)},
-					prescorePlugins:                 &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 1}}},
+					name:   "PreScore - Error",
+					action: func(ctx context.Context, f framework.Framework) { f.RunPreScorePlugins(ctx, state, pod, nil) },
+					inject: injectedResult{PreScoreStatus: int(fwk.Error)},
+					plugins: &config.Plugins{
+						PreScore: config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 1}}},
+					},
 					expectedPluginDurationCallCount: 1,
 					expectedPluginDurationRecords: []mock.PluginDurationRecord{
 						{
@@ -4810,8 +4818,10 @@ func TestRecordingMetricsWithMocks(t *testing.T) {
 					action: func(ctx context.Context, f framework.Framework) {
 						f.RunScorePlugins(ctx, state, pod, BuildNodeInfos(nodes))
 					},
-					inject:                          injectedResult{ScoreStatus: int(fwk.Error)},
-					scorePlugins:                    &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 1}}},
+					inject: injectedResult{ScoreStatus: int(fwk.Error)},
+					plugins: &config.Plugins{
+						Score: config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 1}}},
+					},
 					expectedPluginDurationCallCount: 2, // Score still runs for all nodes even on error
 					expectedPluginDurationRecords: []mock.PluginDurationRecord{
 						{
@@ -4827,9 +4837,11 @@ func TestRecordingMetricsWithMocks(t *testing.T) {
 					},
 				},
 				{
-					name:                            "Reserve - Success",
-					action:                          func(ctx context.Context, f framework.Framework) { f.RunReservePluginsReserve(ctx, state, pod, "") },
-					reservePlugins:                  &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+					name:   "Reserve - Success",
+					action: func(ctx context.Context, f framework.Framework) { f.RunReservePluginsReserve(ctx, state, pod, "") },
+					plugins: &config.Plugins{
+						Reserve: config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+					},
 					expectedPluginDurationCallCount: 1,
 					expectedPluginDurationRecords: []mock.PluginDurationRecord{
 						{
@@ -4840,10 +4852,12 @@ func TestRecordingMetricsWithMocks(t *testing.T) {
 					},
 				},
 				{
-					name:                            "Reserve - Error",
-					action:                          func(ctx context.Context, f framework.Framework) { f.RunReservePluginsReserve(ctx, state, pod, "") },
-					inject:                          injectedResult{ReserveStatus: int(fwk.Error)},
-					reservePlugins:                  &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+					name:   "Reserve - Error",
+					action: func(ctx context.Context, f framework.Framework) { f.RunReservePluginsReserve(ctx, state, pod, "") },
+					inject: injectedResult{ReserveStatus: int(fwk.Error)},
+					plugins: &config.Plugins{
+						Reserve: config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+					},
 					expectedPluginDurationCallCount: 1,
 					expectedPluginDurationRecords: []mock.PluginDurationRecord{
 						{
@@ -4854,9 +4868,11 @@ func TestRecordingMetricsWithMocks(t *testing.T) {
 					},
 				},
 				{
-					name:                            "Unreserve - Success",
-					action:                          func(ctx context.Context, f framework.Framework) { f.RunReservePluginsUnreserve(ctx, state, pod, "") },
-					reservePlugins:                  &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+					name:   "Unreserve - Success",
+					action: func(ctx context.Context, f framework.Framework) { f.RunReservePluginsUnreserve(ctx, state, pod, "") },
+					plugins: &config.Plugins{
+						Reserve: config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+					},
 					expectedPluginDurationCallCount: 1,
 					expectedPluginDurationRecords: []mock.PluginDurationRecord{
 						{
@@ -4867,9 +4883,11 @@ func TestRecordingMetricsWithMocks(t *testing.T) {
 					},
 				},
 				{
-					name:                            "PreBind - Success",
-					action:                          func(ctx context.Context, f framework.Framework) { f.RunPreBindPlugins(ctx, state, pod, "") },
-					prebindPlugins:                  &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+					name:   "PreBind - Success",
+					action: func(ctx context.Context, f framework.Framework) { f.RunPreBindPlugins(ctx, state, pod, "") },
+					plugins: &config.Plugins{
+						PreBind: config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+					},
 					expectedPluginDurationCallCount: 1,
 					expectedPluginDurationRecords: []mock.PluginDurationRecord{
 						{
@@ -4880,10 +4898,12 @@ func TestRecordingMetricsWithMocks(t *testing.T) {
 					},
 				},
 				{
-					name:                            "PreBind - Error",
-					action:                          func(ctx context.Context, f framework.Framework) { f.RunPreBindPlugins(ctx, state, pod, "") },
-					inject:                          injectedResult{PreBindStatus: int(fwk.Error)},
-					prebindPlugins:                  &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+					name:   "PreBind - Error",
+					action: func(ctx context.Context, f framework.Framework) { f.RunPreBindPlugins(ctx, state, pod, "") },
+					inject: injectedResult{PreBindStatus: int(fwk.Error)},
+					plugins: &config.Plugins{
+						PreBind: config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+					},
 					expectedPluginDurationCallCount: 1,
 					expectedPluginDurationRecords: []mock.PluginDurationRecord{
 						{
@@ -4894,9 +4914,11 @@ func TestRecordingMetricsWithMocks(t *testing.T) {
 					},
 				},
 				{
-					name:                            "PostBind - Success",
-					action:                          func(ctx context.Context, f framework.Framework) { f.RunPostBindPlugins(ctx, state, pod, "") },
-					postbindPlugins:                 &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+					name:   "PostBind - Success",
+					action: func(ctx context.Context, f framework.Framework) { f.RunPostBindPlugins(ctx, state, pod, "") },
+					plugins: &config.Plugins{
+						PostBind: config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+					},
 					expectedPluginDurationCallCount: 1,
 					expectedPluginDurationRecords: []mock.PluginDurationRecord{
 						{
@@ -4907,9 +4929,11 @@ func TestRecordingMetricsWithMocks(t *testing.T) {
 					},
 				},
 				{
-					name:                            "Permit - Success",
-					action:                          func(ctx context.Context, f framework.Framework) { f.RunPermitPlugins(ctx, state, pod, "") },
-					permitPlugins:                   &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+					name:   "Permit - Success",
+					action: func(ctx context.Context, f framework.Framework) { f.RunPermitPlugins(ctx, state, pod, "") },
+					plugins: &config.Plugins{
+						Permit: config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+					},
 					expectedPluginDurationCallCount: 1,
 					expectedPluginDurationRecords: []mock.PluginDurationRecord{
 						{
@@ -4920,10 +4944,12 @@ func TestRecordingMetricsWithMocks(t *testing.T) {
 					},
 				},
 				{
-					name:                            "Permit - Error",
-					action:                          func(ctx context.Context, f framework.Framework) { f.RunPermitPlugins(ctx, state, pod, "") },
-					inject:                          injectedResult{PermitStatus: int(fwk.Error)},
-					permitPlugins:                   &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+					name:   "Permit - Error",
+					action: func(ctx context.Context, f framework.Framework) { f.RunPermitPlugins(ctx, state, pod, "") },
+					inject: injectedResult{PermitStatus: int(fwk.Error)},
+					plugins: &config.Plugins{
+						Permit: config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+					},
 					expectedPluginDurationCallCount: 1,
 					expectedPluginDurationRecords: []mock.PluginDurationRecord{
 						{
@@ -4934,10 +4960,12 @@ func TestRecordingMetricsWithMocks(t *testing.T) {
 					},
 				},
 				{
-					name:                            "Permit - Wait",
-					action:                          func(ctx context.Context, f framework.Framework) { f.RunPermitPlugins(ctx, state, pod, "") },
-					inject:                          injectedResult{PermitStatus: int(fwk.Wait)},
-					permitPlugins:                   &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+					name:   "Permit - Wait",
+					action: func(ctx context.Context, f framework.Framework) { f.RunPermitPlugins(ctx, state, pod, "") },
+					inject: injectedResult{PermitStatus: int(fwk.Wait)},
+					plugins: &config.Plugins{
+						Permit: config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+					},
 					expectedPluginDurationCallCount: 1,
 					expectedPluginDurationRecords: []mock.PluginDurationRecord{
 						{
@@ -4964,30 +4992,10 @@ func TestRecordingMetricsWithMocks(t *testing.T) {
 						t.Fatalf("Failed to register plugin %s: %v", testPlugin, err)
 					}
 
-					// Helper function to dereference plugin set or return empty set
-					pluginSetOrEmpty := func(ps *config.PluginSet) config.PluginSet {
-						if ps != nil {
-							return *ps
-						}
-						return config.PluginSet{}
-					}
-
-					// Build plugins configuration using individual plugin sets
-					plugins := &config.Plugins{
-						PreFilter: pluginSetOrEmpty(tt.prefilterPlugins),
-						PreScore:  pluginSetOrEmpty(tt.prescorePlugins),
-						Score:     pluginSetOrEmpty(tt.scorePlugins),
-						Reserve:   pluginSetOrEmpty(tt.reservePlugins),
-						Permit:    pluginSetOrEmpty(tt.permitPlugins),
-						PreBind:   pluginSetOrEmpty(tt.prebindPlugins),
-						Bind:      pluginSetOrEmpty(tt.bindPlugins),
-						PostBind:  pluginSetOrEmpty(tt.postbindPlugins),
-					}
-
 					profile := config.KubeSchedulerProfile{
 						PercentageOfNodesToScore: ptr.To[int32](testPercentageOfNodesToScore),
 						SchedulerName:            testProfileName,
-						Plugins:                  plugins,
+						Plugins:                  tt.plugins,
 					}
 
 					// Create framework with mock recorder
