@@ -30346,3 +30346,80 @@ func TestValidateWorkloadReference(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateHostAliases(t *testing.T) {
+	testCases := []struct {
+		name        string
+		hostAliases []core.HostAlias
+		expectErr   bool
+	}{
+		{
+			name: "valid hostnames without trailing dot",
+			hostAliases: []core.HostAlias{
+				{IP: "10.0.0.1", Hostnames: []string{"example.com", "foo.bar.com"}},
+			},
+			expectErr: false,
+		},
+		{
+			name: "valid hostname with trailing dot (FQDN)",
+			hostAliases: []core.HostAlias{
+				{IP: "10.0.0.1", Hostnames: []string{"example.com."}},
+			},
+			expectErr: false,
+		},
+		{
+			name: "valid multiple hostnames with and without trailing dot",
+			hostAliases: []core.HostAlias{
+				{IP: "10.0.0.1", Hostnames: []string{"example.com", "example.com.", "foo.bar.com."}},
+			},
+			expectErr: false,
+		},
+		{
+			name: "valid single label hostname with trailing dot",
+			hostAliases: []core.HostAlias{
+				{IP: "10.0.0.1", Hostnames: []string{"localhost."}},
+			},
+			expectErr: false,
+		},
+		{
+			name: "invalid IP address",
+			hostAliases: []core.HostAlias{
+				{IP: "invalid-ip", Hostnames: []string{"example.com"}},
+			},
+			expectErr: true,
+		},
+		{
+			name: "invalid hostname with double trailing dot",
+			hostAliases: []core.HostAlias{
+				{IP: "10.0.0.1", Hostnames: []string{"example.com.."}},
+			},
+			expectErr: true,
+		},
+		{
+			name: "invalid hostname starting with dot",
+			hostAliases: []core.HostAlias{
+				{IP: "10.0.0.1", Hostnames: []string{".example.com"}},
+			},
+			expectErr: true,
+		},
+		{
+			name: "invalid hostname with only dot",
+			hostAliases: []core.HostAlias{
+				{IP: "10.0.0.1", Hostnames: []string{"."}},
+			},
+			expectErr: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := ValidateHostAliases(tc.hostAliases, field.NewPath("hostAliases"))
+			if tc.expectErr && len(errs) == 0 {
+				t.Errorf("expected validation errors but got none")
+			}
+			if !tc.expectErr && len(errs) > 0 {
+				t.Errorf("unexpected validation errors: %v", errs)
+			}
+		})
+	}
+}
