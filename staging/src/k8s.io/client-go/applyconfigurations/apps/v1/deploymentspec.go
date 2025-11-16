@@ -28,33 +28,34 @@ import (
 //
 // DeploymentSpec is the specification of the desired behavior of the Deployment.
 type DeploymentSpecApplyConfiguration struct {
-	// Number of desired pods. This is a pointer to distinguish between explicit
-	// zero and not specified. Defaults to 1.
+	// replicas is the number of desired pods. This is a pointer to distinguish
+	// between explicit zero and not specified. Defaults to 1.
 	Replicas *int32 `json:"replicas,omitempty"`
-	// Label selector for pods. Existing ReplicaSets whose pods are
+	// selector is a label query for pods. Existing ReplicaSets whose pods are
 	// selected by this will be the ones affected by this deployment.
 	// It must match the pod template's labels.
 	Selector *metav1.LabelSelectorApplyConfiguration `json:"selector,omitempty"`
-	// Template describes the pods that will be created.
+	// template describes the pods that will be created.
 	// The only allowed template.spec.restartPolicy value is "Always".
 	Template *corev1.PodTemplateSpecApplyConfiguration `json:"template,omitempty"`
-	// The deployment strategy to use to replace existing pods with new ones.
+	// strategy to use to replace existing Deployment pods with new ones.
 	Strategy *DeploymentStrategyApplyConfiguration `json:"strategy,omitempty"`
-	// Minimum number of seconds for which a newly created pod should be ready
-	// without any of its container crashing, for it to be considered available.
-	// Defaults to 0 (pod will be considered available as soon as it is ready)
+	// minReadySeconds is the minimum number of seconds for which a newly created pod should
+	// be ready without any of its container crashing, for it to be considered available.
+	// Defaults to 0 (pod will be considered available as soon as it is ready).
 	MinReadySeconds *int32 `json:"minReadySeconds,omitempty"`
-	// The number of old ReplicaSets to retain to allow rollback.
+	// revisionHistoryLimit is the maximum number of old ReplicaSets to retain to allow rollback.
 	// This is a pointer to distinguish between explicit zero and not specified.
 	// Defaults to 10.
 	RevisionHistoryLimit *int32 `json:"revisionHistoryLimit,omitempty"`
-	// Indicates that the deployment is paused.
+	// paused indicates that the deployment is paused.
 	Paused *bool `json:"paused,omitempty"`
-	// The maximum time in seconds for a deployment to make progress before it
-	// is considered to be failed. The deployment controller will continue to
-	// process failed deployments and a condition with a ProgressDeadlineExceeded
-	// reason will be surfaced in the deployment status. Note that progress will
-	// not be estimated during the time a deployment is paused. Defaults to 600s.
+	// progressDeadlineSeconds is the maximum time in seconds for a deployment to
+	// make progress before it is considered to be failed. The deployment controller
+	// will continue to process failed deployments and a condition with a
+	// ProgressDeadlineExceeded reason will be surfaced in the deployment status.
+	// Note that progress will not be estimated during the time a deployment is paused.
+	// Defaults to 600s.
 	ProgressDeadlineSeconds *int32 `json:"progressDeadlineSeconds,omitempty"`
 }
 

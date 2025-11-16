@@ -42,15 +42,15 @@ option go_package = "k8s.io/api/apps/v1beta2";
 // it may be subject to name and representation changes in future releases, and clients should not
 // depend on its stability. It is primarily for internal use by controllers.
 message ControllerRevision {
-  // Standard object's metadata.
+  // metadata is the standard object metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // Data is the serialized representation of the state.
+  // data is the serialized representation of the state.
   optional .k8s.io.apimachinery.pkg.runtime.RawExtension data = 2;
 
-  // Revision indicates the revision of the state represented by Data.
+  // revision indicates the revision of the state represented by Data.
   optional int64 revision = 3;
 }
 
@@ -68,18 +68,17 @@ message ControllerRevisionList {
 // more information.
 // DaemonSet represents the configuration of a daemon set.
 message DaemonSet {
-  // Standard object's metadata.
+  // metadata is the standard object metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // The desired behavior of this daemon set.
+  // spec defines the desired behavior of this daemon set.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
   // +optional
   optional DaemonSetSpec spec = 2;
 
-  // The current status of this daemon set. This data may be
-  // out of date by some window of time.
+  // status reports the current status of this daemon set. This data may be out of date by some window of time.
   // Populated by the system.
   // Read-only.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
@@ -89,21 +88,21 @@ message DaemonSet {
 
 // DaemonSetCondition describes the state of a DaemonSet at a certain point.
 message DaemonSetCondition {
-  // Type of DaemonSet condition.
+  // type of DaemonSet condition.
   optional string type = 1;
 
-  // Status of the condition, one of True, False, Unknown.
+  // status of the condition, one of True, False, Unknown.
   optional string status = 2;
 
-  // Last time the condition transitioned from one status to another.
+  // lastTransitionTime is the last time the condition transitioned from one status to another.
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 3;
 
-  // The reason for the condition's last transition.
+  // reason for the condition's last transition.
   // +optional
   optional string reason = 4;
 
-  // A human readable message indicating details about the transition.
+  // message is a human readable string indicating details about the transition.
   // +optional
   optional string message = 5;
 }
@@ -121,13 +120,13 @@ message DaemonSetList {
 
 // DaemonSetSpec is the specification of a daemon set.
 message DaemonSetSpec {
-  // A label query over pods that are managed by the daemon set.
+  // selector is the label query to identify pods that are managed by the daemon set.
   // Must match in order to be controlled.
   // It must match the pod template's labels.
   // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 1;
 
-  // An object that describes the pod that will be created.
+  // template describes the pod that will be created.
   // The DaemonSet will create exactly one copy of this pod on every node
   // that matches the template's node selector (or on every node if no node
   // selector is specified).
@@ -135,18 +134,17 @@ message DaemonSetSpec {
   // More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template
   optional .k8s.io.api.core.v1.PodTemplateSpec template = 2;
 
-  // An update strategy to replace existing DaemonSet pods with new pods.
+  // updateStrategy to replace existing DaemonSet pods with new pods.
   // +optional
   optional DaemonSetUpdateStrategy updateStrategy = 3;
 
-  // The minimum number of seconds for which a newly created DaemonSet pod should
-  // be ready without any of its container crashing, for it to be considered
-  // available. Defaults to 0 (pod will be considered available as soon as it
-  // is ready).
+  // minReadySeconds is the minimum number of seconds for which a newly created DaemonSet
+  // pod should be ready without any of its container crashing, for it to be considered
+  // available. Defaults to 0 (pod will be considered available as soon as it is ready).
   // +optional
   optional int32 minReadySeconds = 4;
 
-  // The number of old history to retain to allow rollback.
+  // revisionHistoryLimit is the maximum number of old revisions to retain to allow rollback.
   // This is a pointer to distinguish between explicit zero and not specified.
   // Defaults to 10.
   // +optional
@@ -155,52 +153,53 @@ message DaemonSetSpec {
 
 // DaemonSetStatus represents the current status of a daemon set.
 message DaemonSetStatus {
-  // The number of nodes that are running at least 1
-  // daemon pod and are supposed to run the daemon pod.
+  // currentNumberScheduled is the number of nodes that are running
+  // at least 1 daemon pod and are supposed to run the daemon pod.
   // More info: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/
   optional int32 currentNumberScheduled = 1;
 
-  // The number of nodes that are running the daemon pod, but are
-  // not supposed to run the daemon pod.
+  // numberMisscheduled is the number of nodes that are running
+  // the daemon pod, but are not supposed to run the daemon pod.
   // More info: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/
   optional int32 numberMisscheduled = 2;
 
-  // The total number of nodes that should be running the daemon
-  // pod (including nodes correctly running the daemon pod).
+  // desiredNumberScheduled is the total number of nodes that should be running
+  // the daemon pod (including nodes correctly running the daemon pod).
   // More info: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/
   optional int32 desiredNumberScheduled = 3;
 
-  // Total number of nodes that should be running the daemon pod and have one
+  // numberReady is the total number of nodes that should be running the daemon pod and have one
   // or more of the daemon pod running with a Ready Condition by passing the readinessProbe.
   optional int32 numberReady = 4;
 
-  // The most recent generation observed by the daemon set controller.
+  // observedGeneration is the most recent generation observed by the daemon set controller.
   // +optional
   optional int64 observedGeneration = 5;
 
-  // The total number of nodes that are running updated daemon pod
+  // updatedNumberScheduled is the total number of nodes that are running updated daemon pod.
   // +optional
   optional int32 updatedNumberScheduled = 6;
 
-  // The number of nodes that should be running the
-  // daemon pod and have one or more of the daemon pod running and
-  // available (ready for at least spec.minReadySeconds)
+  // numberAvailable is the number of nodes that should be running
+  // the daemon pod and have one or more of the daemon pod running
+  // and available (ready for at least spec.minReadySeconds).
   // +optional
   optional int32 numberAvailable = 7;
 
-  // The number of nodes that should be running the
+  // numberUnavailable is the number of nodes that should be running the
   // daemon pod and have none of the daemon pod running and available
-  // (ready for at least spec.minReadySeconds)
+  // (ready for at least spec.minReadySeconds).
   // +optional
   optional int32 numberUnavailable = 8;
 
-  // Count of hash collisions for the DaemonSet. The DaemonSet controller
-  // uses this field as a collision avoidance mechanism when it needs to
-  // create the name for the newest ControllerRevision.
+  // collisionCount is the number of hash collisions for the DaemonSet.
+  // The DaemonSet controller uses this field as a collision avoidance
+  // mechanism when it needs to create the name for the newest
+  // ControllerRevision.
   // +optional
   optional int32 collisionCount = 9;
 
-  // Represents the latest available observations of a DaemonSet's current state.
+  // conditions lists the latest available observations of a DaemonSet's current state.
   // +optional
   // +patchMergeKey=type
   // +patchStrategy=merge
@@ -211,11 +210,11 @@ message DaemonSetStatus {
 
 // DaemonSetUpdateStrategy is a struct used to control the update strategy for a DaemonSet.
 message DaemonSetUpdateStrategy {
-  // Type of daemon set update. Can be "RollingUpdate" or "OnDelete". Default is RollingUpdate.
+  // type of daemon set update. Can be "RollingUpdate" or "OnDelete". Default is RollingUpdate.
   // +optional
   optional string type = 1;
 
-  // Rolling update config params. Present only if type = "RollingUpdate".
+  // rollingUpdate config params. Present only if type = "RollingUpdate".
   // ---
   // TODO: Update this to follow our convention for oneOf, whatever we decide it
   // to be. Same as Deployment `strategy.rollingUpdate`.
@@ -228,155 +227,158 @@ message DaemonSetUpdateStrategy {
 // more information.
 // Deployment enables declarative updates for Pods and ReplicaSets.
 message Deployment {
-  // Standard object metadata.
+  // metadata is the standard object metadata.
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // Specification of the desired behavior of the Deployment.
+  // spec defines the desired behavior of the Deployment.
   // +optional
   optional DeploymentSpec spec = 2;
 
-  // Most recently observed status of the Deployment.
+  // status is the most recently observed status of the Deployment.
   // +optional
   optional DeploymentStatus status = 3;
 }
 
 // DeploymentCondition describes the state of a deployment at a certain point.
 message DeploymentCondition {
-  // Type of deployment condition.
+  // type of deployment condition.
   optional string type = 1;
 
-  // Status of the condition, one of True, False, Unknown.
+  // status of the condition, one of True, False, Unknown.
   optional string status = 2;
 
-  // The last time this condition was updated.
+  // lastUpdateTime is the last time this condition was updated.
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastUpdateTime = 6;
 
-  // Last time the condition transitioned from one status to another.
+  // lastTransitionTime is the last time the condition transitioned from one status to another.
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 7;
 
-  // The reason for the condition's last transition.
+  // reason for the condition's last transition.
   optional string reason = 4;
 
-  // A human readable message indicating details about the transition.
+  // message is a human readable string indicating details about the transition.
   optional string message = 5;
 }
 
 // DeploymentList is a list of Deployments.
 message DeploymentList {
-  // Standard list metadata.
+  // metadata is the standard list metadata.
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
-  // Items is the list of Deployments.
+  // items is the list of Deployments.
   repeated Deployment items = 2;
 }
 
 // DeploymentSpec is the specification of the desired behavior of the Deployment.
 message DeploymentSpec {
-  // Number of desired pods. This is a pointer to distinguish between explicit
-  // zero and not specified. Defaults to 1.
+  // replicas is the number of desired pods. This is a pointer to distinguish
+  // between explicit zero and not specified. Defaults to 1.
   // +optional
   optional int32 replicas = 1;
 
-  // Label selector for pods. Existing ReplicaSets whose pods are
+  // selector is a label query for pods. Existing ReplicaSets whose pods are
   // selected by this will be the ones affected by this deployment.
   // It must match the pod template's labels.
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 2;
 
-  // Template describes the pods that will be created.
+  // template describes the pods that will be created.
   // The only allowed template.spec.restartPolicy value is "Always".
   optional .k8s.io.api.core.v1.PodTemplateSpec template = 3;
 
-  // The deployment strategy to use to replace existing pods with new ones.
+  // strategy to use to replace existing Deployment pods with new ones.
   // +optional
   // +patchStrategy=retainKeys
   optional DeploymentStrategy strategy = 4;
 
-  // Minimum number of seconds for which a newly created pod should be ready
-  // without any of its container crashing, for it to be considered available.
-  // Defaults to 0 (pod will be considered available as soon as it is ready)
+  // minReadySeconds is the minimum number of seconds for which a newly created pod should
+  // be ready without any of its container crashing, for it to be considered available.
+  // Defaults to 0 (pod will be considered available as soon as it is ready).
   // +optional
   optional int32 minReadySeconds = 5;
 
-  // The number of old ReplicaSets to retain to allow rollback.
+  // revisionHistoryLimit is the maximum number of old ReplicaSets to retain to allow rollback.
   // This is a pointer to distinguish between explicit zero and not specified.
   // Defaults to 10.
   // +optional
   optional int32 revisionHistoryLimit = 6;
 
-  // Indicates that the deployment is paused.
+  // paused indicates that the deployment is paused.
   // +optional
   optional bool paused = 7;
 
-  // The maximum time in seconds for a deployment to make progress before it
-  // is considered to be failed. The deployment controller will continue to
-  // process failed deployments and a condition with a ProgressDeadlineExceeded
-  // reason will be surfaced in the deployment status. Note that progress will
-  // not be estimated during the time a deployment is paused. Defaults to 600s.
+  // progressDeadlineSeconds is the maximum time in seconds for a deployment to
+  // make progress before it is considered to be failed. The deployment controller
+  // will continue to process failed deployments and a condition with a
+  // ProgressDeadlineExceeded reason will be surfaced in the deployment status.
+  // Note that progress will not be estimated during the time a deployment is paused.
+  // Defaults to 600s.
   optional int32 progressDeadlineSeconds = 9;
 }
 
 // DeploymentStatus is the most recently observed status of the Deployment.
 message DeploymentStatus {
-  // The generation observed by the deployment controller.
+  // observedGeneration is the most recent generation observed by the deployment controller.
   // +optional
   optional int64 observedGeneration = 1;
 
-  // Total number of non-terminating pods targeted by this deployment (their labels match the selector).
+  // replicas is the total number of non-terminating pods targeted
+  // by this deployment (their labels match the selector).
   // +optional
   optional int32 replicas = 2;
 
-  // Total number of non-terminating pods targeted by this deployment that have the desired template spec.
+  // updatedReplicas is total number of non-terminating pods targeted
+  // by this deployment that have the desired template spec.
   // +optional
   optional int32 updatedReplicas = 3;
 
-  // Total number of non-terminating pods targeted by this Deployment with a Ready Condition.
+  // readyReplicas is the total number of non-terminating pods targeted by this Deployment with a Ready Condition.
   // +optional
   optional int32 readyReplicas = 7;
 
-  // Total number of available non-terminating pods (ready for at least minReadySeconds) targeted by this deployment.
+  // availableReplicas is the total number of available non-terminating pods
+  // (ready for at least minReadySeconds) targeted by this deployment.
   // +optional
   optional int32 availableReplicas = 4;
 
-  // Total number of unavailable pods targeted by this deployment. This is the total number of
-  // pods that are still required for the deployment to have 100% available capacity. They may
-  // either be pods that are running but not yet available or pods that still have not been created.
+  // unavailableReplicas is the total number of unavailable pods targeted by this deployment.
+  // This is the total number of pods that are still required for the deployment to have 100%
+  // available capacity. They may either be pods that are running but not yet available or
+  // pods that still have not been created.
   // +optional
   optional int32 unavailableReplicas = 5;
 
-  // Total number of terminating pods targeted by this deployment. Terminating pods have a non-null
-  // .metadata.deletionTimestamp and have not yet reached the Failed or Succeeded .status.phase.
+  // terminatingReplicas is the number of terminating pods targeted by this deployment.
+  // Terminating pods have a non-null .metadata.deletionTimestamp and have not yet
+  // reached the Failed or Succeeded .status.phase.
   //
   // This is a beta field and requires enabling DeploymentReplicaSetTerminatingReplicas feature (enabled by default).
   // +optional
   optional int32 terminatingReplicas = 9;
 
-  // Represents the latest available observations of a deployment's current state.
+  // conditions lists the latest available observations of a deployment's current state.
   // +patchMergeKey=type
   // +patchStrategy=merge
   // +listType=map
   // +listMapKey=type
   repeated DeploymentCondition conditions = 6;
 
-  // Count of hash collisions for the Deployment. The Deployment controller uses this
-  // field as a collision avoidance mechanism when it needs to create the name for the
-  // newest ReplicaSet.
+  // collisionCount is the number of hash collisions for the Deployment. The Deployment controller uses this
+  // field as a collision avoidance mechanism when it needs to create the name for the newest ReplicaSet.
   // +optional
   optional int32 collisionCount = 8;
 }
 
 // DeploymentStrategy describes how to replace existing pods with new ones.
 message DeploymentStrategy {
-  // Type of deployment. Can be "Recreate" or "RollingUpdate". Default is RollingUpdate.
+  // type of deployment. Can be "Recreate" or "RollingUpdate". Default is RollingUpdate.
   // +optional
   optional string type = 1;
 
-  // Rolling update config params. Present only if DeploymentStrategyType =
-  // RollingUpdate.
+  // rollingUpdate config params. Present only if type = RollingUpdate.
   // ---
-  // TODO: Update this to follow our convention for oneOf, whatever we decide it
-  // to be.
+  // TODO: Update this to follow our convention for oneOf, whatever we decide it to be.
   // +optional
   optional RollingUpdateDeployment rollingUpdate = 2;
 }
@@ -385,18 +387,19 @@ message DeploymentStrategy {
 // more information.
 // ReplicaSet ensures that a specified number of pod replicas are running at any given time.
 message ReplicaSet {
+  // metadata is the standard object metadata.
   // If the Labels of a ReplicaSet are empty, they are defaulted to
   // be the same as the Pod(s) that the ReplicaSet manages.
-  // Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+  // Standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // Spec defines the specification of the desired behavior of the ReplicaSet.
+  // spec defines the desired behavior of the ReplicaSet.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
   // +optional
   optional ReplicaSetSpec spec = 2;
 
-  // Status is the most recently observed status of the ReplicaSet.
+  // status is the most recently observed status of the ReplicaSet.
   // This data may be out of date by some window of time.
   // Populated by the system.
   // Read-only.
@@ -407,21 +410,21 @@ message ReplicaSet {
 
 // ReplicaSetCondition describes the state of a replica set at a certain point.
 message ReplicaSetCondition {
-  // Type of replica set condition.
+  // type of replica set condition.
   optional string type = 1;
 
-  // Status of the condition, one of True, False, Unknown.
+  // status of the condition, one of True, False, Unknown.
   optional string status = 2;
 
-  // The last time the condition transitioned from one status to another.
+  // lastTransitionTime is the last time the condition transitioned from one status to another.
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 3;
 
-  // The reason for the condition's last transition.
+  // reason for the condition's last transition.
   // +optional
   optional string reason = 4;
 
-  // A human readable message indicating details about the transition.
+  // message is a human readable string indicating details about the transition.
   // +optional
   optional string message = 5;
 }
@@ -440,26 +443,27 @@ message ReplicaSetList {
 
 // ReplicaSetSpec is the specification of a ReplicaSet.
 message ReplicaSetSpec {
-  // Replicas is the number of desired pods.
+  // replicas is the number of desired pods.
   // This is a pointer to distinguish between explicit zero and unspecified.
   // Defaults to 1.
   // More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicaset
   // +optional
   optional int32 replicas = 1;
 
-  // Minimum number of seconds for which a newly created pod should be ready
-  // without any of its container crashing, for it to be considered available.
+  // minReadySeconds is the minimum number of seconds for which a newly created
+  // pod should be ready without any of its container crashing, for it to be
+  // considered available.
   // Defaults to 0 (pod will be considered available as soon as it is ready)
   // +optional
   optional int32 minReadySeconds = 4;
 
-  // Selector is a label query over pods that should match the replica count.
+  // selector is a label query over pods that should match the replica count.
   // Label keys and values that must match in order to be controlled by this replica set.
   // It must match the pod template's labels.
   // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 2;
 
-  // Template is the object that describes the pod that will be created if
+  // template is the object that describes the pod that will be created if
   // insufficient replicas are detected.
   // More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicaset/#pod-template
   // +optional
@@ -468,34 +472,36 @@ message ReplicaSetSpec {
 
 // ReplicaSetStatus represents the current status of a ReplicaSet.
 message ReplicaSetStatus {
-  // Replicas is the most recently observed number of non-terminating pods.
+  // replicas is the most recently observed number of non-terminating pods.
   // More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicaset
   optional int32 replicas = 1;
 
-  // The number of non-terminating pods that have labels matching the labels of the pod template of the replicaset.
+  // fullyLabeledReplicas is the number of non-terminating pods that have labels matching the labels of the pod
+  // template of the replicaset.
   // +optional
   optional int32 fullyLabeledReplicas = 2;
 
-  // The number of non-terminating pods targeted by this ReplicaSet with a Ready Condition.
+  // readyReplicas is the number of non-terminating pods targeted by this ReplicaSet with a Ready Condition.
   // +optional
   optional int32 readyReplicas = 4;
 
-  // The number of available non-terminating pods (ready for at least minReadySeconds) for this replica set.
+  // availableReplicas is the number of available non-terminating pods (ready for at least minReadySeconds) for this
+  // replica set.
   // +optional
   optional int32 availableReplicas = 5;
 
-  // The number of terminating pods for this replica set. Terminating pods have a non-null .metadata.deletionTimestamp
-  // and have not yet reached the Failed or Succeeded .status.phase.
+  // terminatingReplicas is the number of terminating pods for this replica set. Terminating pods have a non-null
+  // .metadata.deletionTimestamp and have not yet reached the Failed or Succeeded .status.phase.
   //
   // This is a beta field and requires enabling DeploymentReplicaSetTerminatingReplicas feature (enabled by default).
   // +optional
   optional int32 terminatingReplicas = 7;
 
-  // ObservedGeneration reflects the generation of the most recently observed ReplicaSet.
+  // observedGeneration reflects the generation of the most recently observed ReplicaSet.
   // +optional
   optional int64 observedGeneration = 3;
 
-  // Represents the latest available observations of a replica set's current state.
+  // conditions lists the latest available observations of a replica set's current state.
   // +optional
   // +patchMergeKey=type
   // +patchStrategy=merge
@@ -506,9 +512,9 @@ message ReplicaSetStatus {
 
 // Spec to control the desired behavior of daemon set rolling update.
 message RollingUpdateDaemonSet {
-  // The maximum number of DaemonSet pods that can be unavailable during the
-  // update. Value can be an absolute number (ex: 5) or a percentage of total
-  // number of DaemonSet pods at the start of the update (ex: 10%). Absolute
+  // maxUnavailable is the maximum number of DaemonSet pods that can be unavailable
+  // during the update. Value can be an absolute number (ex: 5) or a percentage of
+  // total number of DaemonSet pods at the start of the update (ex: 10%). Absolute
   // number is calculated from percentage by rounding up.
   // This cannot be 0 if MaxSurge is 0
   // Default value is 1.
@@ -523,10 +529,10 @@ message RollingUpdateDaemonSet {
   // +optional
   optional .k8s.io.apimachinery.pkg.util.intstr.IntOrString maxUnavailable = 1;
 
-  // The maximum number of nodes with an existing available DaemonSet pod that
-  // can have an updated DaemonSet pod during during an update.
+  // maxSurge is the maximum number of nodes with an existing available DaemonSet pod that
+  // can have an updated DaemonSet pod during an update.
   // Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
-  // This can not be 0 if MaxUnavailable is 0.
+  // This cannot be 0 if MaxUnavailable is 0.
   // Absolute number is calculated from percentage by rounding up to a minimum of 1.
   // Default value is 0.
   // Example: when this is set to 30%, at most 30% of the total number of nodes
@@ -547,7 +553,7 @@ message RollingUpdateDaemonSet {
 
 // Spec to control the desired behavior of rolling update.
 message RollingUpdateDeployment {
-  // The maximum number of pods that can be unavailable during the update.
+  // maxUnavailable is the maximum number of pods that can be unavailable during the update.
   // Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
   // Absolute number is calculated from percentage by rounding down.
   // This can not be 0 if MaxSurge is 0.
@@ -560,8 +566,7 @@ message RollingUpdateDeployment {
   // +optional
   optional .k8s.io.apimachinery.pkg.util.intstr.IntOrString maxUnavailable = 1;
 
-  // The maximum number of pods that can be scheduled above the desired number of
-  // pods.
+  // maxSurge is the maximum number of pods that can be scheduled above the desired number of pods.
   // Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
   // This can not be 0 if MaxUnavailable is 0.
   // Absolute number is calculated from percentage by rounding up.
@@ -577,14 +582,14 @@ message RollingUpdateDeployment {
 
 // RollingUpdateStatefulSetStrategy is used to communicate parameter for RollingUpdateStatefulSetStrategyType.
 message RollingUpdateStatefulSetStrategy {
-  // Partition indicates the ordinal at which the StatefulSet should be partitioned
+  // partition indicates the ordinal at which the StatefulSet should be partitioned
   // for updates. During a rolling update, all pods from ordinal Replicas-1 to
   // Partition are updated. All pods from ordinal Partition-1 to 0 remain untouched.
   // This is helpful in being able to do a canary based deployment. The default value is 0.
   // +optional
   optional int32 partition = 1;
 
-  // The maximum number of pods that can be unavailable during the update.
+  // maxUnavailable is the maximum number of pods that can be unavailable during the update.
   // Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
   // Absolute number is calculated from percentage by rounding up. This can not be 0.
   // Defaults to 1. This field is beta-level and is enabled by default. The field applies to all pods in the range 0 to
@@ -599,22 +604,26 @@ message RollingUpdateStatefulSetStrategy {
 
 // Scale represents a scaling request for a resource.
 message Scale {
-  // Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
+  // metadata is the standard object metadata.
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // defines the behavior of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status.
+  // spec defines the behavior of the scale.
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status.
   // +optional
   optional ScaleSpec spec = 2;
 
-  // current status of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status. Read-only.
+  // status of the scale.
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status.
+  // Read-only.
   // +optional
   optional ScaleStatus status = 3;
 }
 
 // ScaleSpec describes the attributes of a scale subresource
 message ScaleSpec {
-  // desired number of instances for the scaled object.
+  // replicas defines the desired number of instances for the scaled object.
   // +optional
   // +k8s:optional
   // +default=0
@@ -624,7 +633,7 @@ message ScaleSpec {
 
 // ScaleStatus represents the current status of a scale subresource.
 message ScaleStatus {
-  // actual number of observed instances of the scaled object.
+  // replicas is the actual number of observed instances of the scaled object.
   optional int32 replicas = 1;
 
   // selector is a label query over pods that should match the replicas count. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
@@ -632,10 +641,10 @@ message ScaleStatus {
   // +mapType=atomic
   map<string, string> selector = 2;
 
-  // label selector for pods that should match the replicas count. This is a serializated
-  // version of both map-based and more expressive set-based selectors. This is done to
-  // avoid introspection in the clients. The string will be in the same format as the
-  // query-param syntax. If the target type only supports map-based selectors, both this
+  // targetSelector is the label selector for pods that should match the replicas count.
+  // This is a serialized version of both map-based and more expressive set-based selectors.
+  // This is done to avoid introspection in the clients. The string will be in the same format
+  // as the query-param syntax. If the target type only supports map-based selectors, both this
   // field and map-based selector field are populated.
   // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
   // +optional
@@ -652,14 +661,15 @@ message ScaleStatus {
 // The StatefulSet guarantees that a given network identity will always
 // map to the same storage identity.
 message StatefulSet {
+  // metadata is the standard object metadata.
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // Spec defines the desired identities of pods in this set.
+  // spec defines the desired identities of pods in this set.
   // +optional
   optional StatefulSetSpec spec = 2;
 
-  // Status is the current status of Pods in this StatefulSet. This data
+  // status is the current status of Pods in this StatefulSet. This data
   // may be out of date by some window of time.
   // +optional
   optional StatefulSetStatus status = 3;
@@ -667,21 +677,21 @@ message StatefulSet {
 
 // StatefulSetCondition describes the state of a statefulset at a certain point.
 message StatefulSetCondition {
-  // Type of statefulset condition.
+  // type of statefulset condition.
   optional string type = 1;
 
-  // Status of the condition, one of True, False, Unknown.
+  // status of the condition, one of True, False, Unknown.
   optional string status = 2;
 
-  // Last time the condition transitioned from one status to another.
+  // lastTransitionTime is the last time the condition transitioned from one status to another.
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 3;
 
-  // The reason for the condition's last transition.
+  // reason for the condition's last transition.
   // +optional
   optional string reason = 4;
 
-  // A human readable message indicating details about the transition.
+  // message is a human readable string indicating details about the transition.
   // +optional
   optional string message = 5;
 }
@@ -712,13 +722,13 @@ message StatefulSetOrdinals {
 // StatefulSetPersistentVolumeClaimRetentionPolicy describes the policy used for PVCs
 // created from the StatefulSet VolumeClaimTemplates.
 message StatefulSetPersistentVolumeClaimRetentionPolicy {
-  // WhenDeleted specifies what happens to PVCs created from StatefulSet
+  // whenDeleted specifies what happens to PVCs created from StatefulSet
   // VolumeClaimTemplates when the StatefulSet is deleted. The default policy
   // of `Retain` causes PVCs to not be affected by StatefulSet deletion. The
   // `Delete` policy causes those PVCs to be deleted.
   optional string whenDeleted = 1;
 
-  // WhenScaled specifies what happens to PVCs created from StatefulSet
+  // whenScaled specifies what happens to PVCs created from StatefulSet
   // VolumeClaimTemplates when the StatefulSet is scaled down. The default
   // policy of `Retain` causes PVCs to not be affected by a scaledown. The
   // `Delete` policy causes the associated PVCs for any excess pods above
@@ -791,9 +801,9 @@ message StatefulSetSpec {
   // StatefulSetSpec version. The default value is 10.
   optional int32 revisionHistoryLimit = 8;
 
-  // Minimum number of seconds for which a newly created pod should be ready
-  // without any of its container crashing for it to be considered available.
-  // Defaults to 0 (pod will be considered available as soon as it is ready)
+  // minReadySeconds is the minimum number of seconds for which a newly created pod should
+  // be ready without any of its container crashing for it to be considered available.
+  // Defaults to 0 (pod will be considered available as soon as it is ready).
   // +optional
   optional int32 minReadySeconds = 9;
 
@@ -834,11 +844,11 @@ message StatefulSetStatus {
   // indicated by updateRevision.
   optional int32 updatedReplicas = 5;
 
-  // currentRevision, if not empty, indicates the version of the StatefulSet used to generate Pods in the
+  // currentRevision – if not empty – indicates the version of the StatefulSet used to generate Pods in the
   // sequence [0,currentReplicas).
   optional string currentRevision = 6;
 
-  // updateRevision, if not empty, indicates the version of the StatefulSet used to generate Pods in the sequence
+  // updateRevision – if not empty – indicates the version of the StatefulSet used to generate Pods in the sequence
   // [replicas-updatedReplicas,replicas)
   optional string updateRevision = 7;
 
@@ -848,7 +858,7 @@ message StatefulSetStatus {
   // +optional
   optional int32 collisionCount = 9;
 
-  // Represents the latest available observations of a statefulset's current state.
+  // conditions lists the latest available observations of a StatefulSet's current state.
   // +optional
   // +patchMergeKey=type
   // +patchStrategy=merge
@@ -856,7 +866,8 @@ message StatefulSetStatus {
   // +listMapKey=type
   repeated StatefulSetCondition conditions = 10;
 
-  // Total number of available pods (ready for at least minReadySeconds) targeted by this StatefulSet.
+  // availableReplicas is the number of available non-terminating pods (ready for at
+  // least minReadySeconds) targeted by this StatefulSet.
   // +optional
   optional int32 availableReplicas = 11;
 }
@@ -865,12 +876,12 @@ message StatefulSetStatus {
 // controller will use to perform updates. It includes any additional parameters
 // necessary to perform the update for the indicated strategy.
 message StatefulSetUpdateStrategy {
-  // Type indicates the type of the StatefulSetUpdateStrategy.
+  // type indicates the type of the StatefulSetUpdateStrategy.
   // Default is RollingUpdate.
   // +optional
   optional string type = 1;
 
-  // RollingUpdate is used to communicate parameters when Type is RollingUpdateStatefulSetStrategyType.
+  // rollingUpdate is used to communicate parameters when Type is RollingUpdateStatefulSetStrategyType.
   // +optional
   optional RollingUpdateStatefulSetStrategy rollingUpdate = 2;
 }

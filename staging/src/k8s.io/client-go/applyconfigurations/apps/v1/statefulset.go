@@ -39,12 +39,12 @@ import (
 // map to the same storage identity.
 type StatefulSetApplyConfiguration struct {
 	metav1.TypeMetaApplyConfiguration `json:",inline"`
-	// Standard object's metadata.
+	// metadata is the standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	// Spec defines the desired identities of pods in this set.
+	// spec defines the desired identities of pods in this set.
 	Spec *StatefulSetSpecApplyConfiguration `json:"spec,omitempty"`
-	// Status is the current status of Pods in this StatefulSet. This data
+	// status is the current status of Pods in this StatefulSet. This data
 	// may be out of date by some window of time.
 	Status *StatefulSetStatusApplyConfiguration `json:"status,omitempty"`
 }

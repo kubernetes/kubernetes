@@ -31,11 +31,15 @@ import (
 // Scale represents a scaling request for a resource.
 type ScaleApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration `json:",inline"`
-	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
+	// metadata is the standard object metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	// defines the behavior of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status.
+	// spec defines the behavior of the scale.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status.
 	Spec *appsv1beta2.ScaleSpec `json:"spec,omitempty"`
-	// current status of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status. Read-only.
+	// status of the scale.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status.
+	// Read-only.
 	Status *appsv1beta2.ScaleStatus `json:"status,omitempty"`
 }
 
