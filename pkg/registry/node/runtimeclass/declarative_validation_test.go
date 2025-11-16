@@ -51,7 +51,7 @@ func buildInvalidHandlerErr() field.ErrorList {
 }
 
 func TestRuntimeClass_DeclarativeValidate_Handler(t *testing.T) {
-	apiVersions := []string{"v1", "v1beta1"}
+	apiVersions := []string{"v1", "v1alpha1", "v1beta1"}
 
 	for _, apiVersion := range apiVersions {
 		t.Run(apiVersion, func(t *testing.T) {
@@ -91,7 +91,7 @@ func TestRuntimeClass_DeclarativeValidate_Handler(t *testing.T) {
 }
 
 func TestRuntimeClass_DeclarativeValidate_ImmutableHandler(t *testing.T) {
-	apiVersions := []string{"v1", "v1beta1"}
+	apiVersions := []string{"v1", "v1alpha1", "v1beta1"}
 
 	for _, apiVersion := range apiVersions {
 		t.Run(apiVersion, func(t *testing.T) {
