@@ -129,6 +129,24 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 			oldPod:       st.MakePod().Node("fake-node").Label("service", "securityscan").Obj(),
 			expectedHint: fwk.Queue,
 		},
+		{
+			name:         "delete a pod with anti-affinity that matches pending pod",
+			pod:          st.MakePod().Name("p").Label("service", "securityscan").Obj(),
+			oldPod:       st.MakePod().Node("fake-node").PodAntiAffinityIn("service", "region", []string{"securityscan", "value2"}, st.PodAntiAffinityWithRequiredReq).Obj(),
+			expectedHint: fwk.Queue,
+		},
+		{
+			name:         "delete a pod with anti-affinity that doesn't match pending pod",
+			pod:          st.MakePod().Name("p").Label("service", "foo").Obj(),
+			oldPod:       st.MakePod().Node("fake-node").PodAntiAffinityIn("service", "region", []string{"securityscan", "value2"}, st.PodAntiAffinityWithRequiredReq).Obj(),
+			expectedHint: fwk.QueueSkip,
+		},
+		{
+			name:         "delete a pod which doesn't match pending pod's anti-affinity and has anti-affinity that doesn't match pending pod",
+			pod:          st.MakePod().Name("p").PodAntiAffinityIn("service", "region", []string{"securityscan", "value2"}, st.PodAntiAffinityWithRequiredReq).Label("service", "foo").Obj(),
+			oldPod:       st.MakePod().Node("fake-node").PodAntiAffinityIn("service", "region", []string{"securityscan", "value2"}, st.PodAntiAffinityWithRequiredReq).Label("service", "foo").Obj(),
+			expectedHint: fwk.QueueSkip,
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

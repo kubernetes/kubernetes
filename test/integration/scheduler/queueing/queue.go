@@ -683,6 +683,54 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		EnableSchedulingQueueHint: sets.New(true),
 	},
 	{
+		Name:          "Pod rejected by the InterPodAffinity plugin is requeued when deleting the existing pod that matches the target podAntiAffinity",
+		EnablePlugins: []string{names.InterPodAffinity},
+		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+		InitialPods: []*v1.Pod{
+			st.MakePod().Name("pod1").Label("anti1", "anti1").Container("image").Node("fake-node").Obj(),
+			st.MakePod().Name("pod2").Label("anti2", "anti2").Container("image").Node("fake-node").Obj(),
+		},
+		Pods: []*v1.Pod{
+			// - Pod3 and pod4 will be rejected by the PodAffinity plugin.
+			st.MakePod().Name("pod3").Label("anti1", "anti1").PodAntiAffinityExists("anti1", "node", st.PodAntiAffinityWithRequiredReq).Container("image").Obj(),
+			st.MakePod().Name("pod4").Label("anti2", "anti2").PodAntiAffinityExists("anti2", "node", st.PodAntiAffinityWithRequiredReq).Container("image").Obj(),
+		},
+
+		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+			// Delete pod1 which will make pod3 schedulable because pod3's antiAffinity won't match pod1 anymore.
+			if err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Delete(testCtx.Ctx, "pod1", metav1.DeleteOptions{GracePeriodSeconds: new(int64)}); err != nil {
+				return nil, fmt.Errorf("failed to delete pod1: %w", err)
+			}
+			return map[fwk.ClusterEvent]uint64{{Resource: assignedPod, ActionType: fwk.Delete}: 1}, nil
+		},
+		WantRequeuedPods:          sets.New("pod3"),
+		EnableSchedulingQueueHint: sets.New(true),
+	},
+	{
+		Name:          "Pod rejected by the InterPodAffinity plugin is requeued when deleting the existing pod with podAntiAffinity that matches the target pod",
+		EnablePlugins: []string{names.InterPodAffinity},
+		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+		InitialPods: []*v1.Pod{
+			st.MakePod().Name("pod1").PodAntiAffinityExists("anti1", "node", st.PodAntiAffinityWithRequiredReq).Container("image").Node("fake-node").Obj(),
+			st.MakePod().Name("pod2").PodAntiAffinityExists("anti2", "node", st.PodAntiAffinityWithRequiredReq).Container("image").Node("fake-node").Obj(),
+		},
+		Pods: []*v1.Pod{
+			// - Pod3 and pod4 will be rejected by the PodAffinity plugin.
+			st.MakePod().Name("pod3").Label("anti1", "anti1").Container("image").Obj(),
+			st.MakePod().Name("pod4").Label("anti2", "anti2").Container("image").Obj(),
+		},
+
+		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+			// Delete pod1 which will make pod3 schedulable because pod1's antiAffinity won't match pod3 anymore.
+			if err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Delete(testCtx.Ctx, "pod1", metav1.DeleteOptions{GracePeriodSeconds: new(int64)}); err != nil {
+				return nil, fmt.Errorf("failed to delete pod1: %w", err)
+			}
+			return map[fwk.ClusterEvent]uint64{{Resource: assignedPod, ActionType: fwk.Delete}: 1}, nil
+		},
+		WantRequeuedPods:          sets.New("pod3"),
+		EnableSchedulingQueueHint: sets.New(true),
+	},
+	{
 		Name:          "Pod rejected by the PodAffinity plugin is requeued when updating the existed pod's label to make it match the pod's podAffinity",
 		EnablePlugins: []string{names.InterPodAffinity},
 		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
