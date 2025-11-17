@@ -976,6 +976,51 @@ func TestGetPodTopologyHints(t *testing.T) {
 	}
 }
 
+func TestCandidateNUMANodes(t *testing.T) {
+	resource := "testdevice"
+	deviceOnNode := func(id string, node int) *pluginapi.Device {
+		return &pluginapi.Device{
+			ID:       id,
+			Topology: &pluginapi.TopologyInfo{Nodes: []*pluginapi.NUMANode{{ID: int64(node)}}},
+		}
+	}
+
+	t.Run("filters to nodes with usable devices", func(t *testing.T) {
+		m := ManagerImpl{
+			allDevices: NewResourceDeviceInstances(),
+		}
+		m.allDevices[resource] = DeviceInstances{
+			"a": deviceOnNode("a", 3),
+			"b": deviceOnNode("b", 5),
+		}
+
+		available := sets.New[string]("a")
+		reusable := sets.New[string]()
+
+		nodes := m.candidateNUMANodes(resource, available, reusable)
+		expected := []int{3}
+		if !reflect.DeepEqual(nodes, expected) {
+			t.Fatalf("expected nodes %v, got %v", expected, nodes)
+		}
+	})
+
+	t.Run("falls back to nodes with topology info when no devices selected", func(t *testing.T) {
+		m := ManagerImpl{
+			allDevices: NewResourceDeviceInstances(),
+		}
+		m.allDevices[resource] = DeviceInstances{
+			"a": deviceOnNode("a", 3),
+			"b": deviceOnNode("b", 1),
+		}
+
+		nodes := m.candidateNUMANodes(resource, nil, nil)
+		expected := []int{1, 3}
+		if !reflect.DeepEqual(nodes, expected) {
+			t.Fatalf("expected nodes %v, got %v", expected, nodes)
+		}
+	})
+}
+
 type topologyHintTestCase struct {
 	description      string
 	pod              *v1.Pod
