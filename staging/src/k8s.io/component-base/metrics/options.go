@@ -263,6 +263,13 @@ func (o *Options) Validate() []error {
 	if o == nil {
 		return nil
 	}
+	currentVersion := parseVersion(version.Get())
+	fldPath := field.NewPath("metrics")
+	fldErrs := v1.Validate(&o.MetricsConfiguration, currentVersion, fldPath)
 
-	return v1.Validate(&o.MetricsConfiguration, parseVersion(version.Get()), field.NewPath("metrics")).ToAggregate().Errors()
+	if len(fldErrs) == 0 {
+		return nil
+	}
+
+	return fldErrs.ToAggregate().Errors()
 }
