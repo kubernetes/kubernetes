@@ -28,7 +28,6 @@ import (
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -948,7 +947,7 @@ func (s *NodeAllocatableStrategy) createCSINode(ctx context.Context, nodeName st
 	if apierrors.IsAlreadyExists(err) {
 		// Something created CSINode instance after we checked it did not exist.
 		// Make the caller to re-try PrepareDependentObjects by returning Conflict error
-		err = apierrors.NewConflict(storagev1beta1.Resource("csinodes"), nodeName, err)
+		err = apierrors.NewConflict(storagev1.Resource("csinodes"), nodeName, err)
 	}
 	return err
 }

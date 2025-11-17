@@ -41,16 +41,9 @@ KUBE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 # If it is specified, we'll use it in KUBE_OUTPUT.
 _KUBE_OUTPUT_SUBPATH="${KUBE_OUTPUT_SUBPATH:-_output/local}"
 export KUBE_OUTPUT="${KUBE_ROOT}/${_KUBE_OUTPUT_SUBPATH}"
-export KUBE_OUTPUT_BIN="${KUBE_OUTPUT}/bin"
+readonly _KUBE_OUTPUT_BIN_SUBPATH="bin"
+export KUBE_OUTPUT_BIN="${KUBE_OUTPUT}/${_KUBE_OUTPUT_BIN_SUBPATH}"
 export THIS_PLATFORM_BIN="${KUBE_ROOT}/_output/bin"
-
-# This controls rsync compression. Set to a value > 0 to enable rsync
-# compression for build container
-KUBE_RSYNC_COMPRESS="${KUBE_RSYNC_COMPRESS:-0}"
-
-# Set no_proxy for localhost if behind a proxy, otherwise,
-# the connections to localhost in scripts will time out
-export no_proxy="127.0.0.1,localhost${no_proxy:+,${no_proxy}}"
 
 source "${KUBE_ROOT}/hack/lib/util.sh"
 source "${KUBE_ROOT}/hack/lib/logging.sh"
@@ -119,7 +112,7 @@ storage.k8s.io/v1beta1 \
 storage.k8s.io/v1 \
 storage.k8s.io/v1alpha1 \
 flowcontrol.apiserver.k8s.io/v1 \
-storagemigration.k8s.io/v1alpha1 \
+storagemigration.k8s.io/v1beta1 \
 flowcontrol.apiserver.k8s.io/v1beta1 \
 flowcontrol.apiserver.k8s.io/v1beta2 \
 flowcontrol.apiserver.k8s.io/v1beta3 \

@@ -2930,9 +2930,18 @@ func TestAllowRelaxedServiceNameValidation(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			// Test feature with gate disabled
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RelaxedServiceNameValidation, false)
 			got := allowRelaxedServiceNameValidation(tc.ingress)
 			if got != tc.expect {
 				t.Errorf("allowRelaxedServiceNameValidation() = %v, want %v", got, tc.expect)
+			}
+
+			// Test feature with gate enabled - it should always return true
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RelaxedServiceNameValidation, true)
+			got = allowRelaxedServiceNameValidation(tc.ingress)
+			if got != true {
+				t.Errorf("allowRelaxedServiceNameValidation() = %v, want %v", got, true)
 			}
 		})
 	}

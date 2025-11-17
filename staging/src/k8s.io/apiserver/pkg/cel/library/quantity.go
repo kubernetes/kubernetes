@@ -70,7 +70,7 @@ import (
 //
 //   - asInteger: returns a representation of the current value as an int64 if
 //     possible or results in an error if conversion would result in overflow
-//	   or loss of precision.
+//     or loss of precision.
 //
 //   - asApproximateFloat: returns a float64 representation of the quantity which may
 //     lose precision. If the value of the quantity is outside the range of a float64
@@ -119,7 +119,6 @@ import (
 //
 //   - compareTo: Compares receiver to operand and returns 0 if they are equal, 1 if the receiver is greater, or -1 if the receiver is less than the operand
 //
-//
 //     <Quantity>.isLessThan(<quantity>) <bool>
 //     <Quantity>.isGreaterThan(<quantity>) <bool>
 //     <Quantity>.compareTo(<quantity>) <int>
@@ -133,7 +132,6 @@ import (
 // quantity("50Mi").isGreaterThan(quantity("100Mi")) // returns false
 // quantity("50M").isLessThan(quantity("100M")) // returns true
 // quantity("100M").isLessThan(quantity("50M")) // returns false
-
 func Quantity() cel.EnvOption {
 	return cel.Lib(quantityLib)
 }

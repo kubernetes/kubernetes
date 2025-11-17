@@ -44,10 +44,8 @@ type BasicDeviceApplyConfiguration struct {
 	//
 	// There can only be a single entry per counterSet.
 	//
-	// The total number of device counter consumption entries
-	// must be <= 32. In addition, the total number in the
-	// entire ResourceSlice must be <= 1024 (for example,
-	// 64 devices with 16 counters each).
+	// The maximum number of device counter consumptions per
+	// device is 2.
 	ConsumesCounters []DeviceCounterConsumptionApplyConfiguration `json:"consumesCounters,omitempty"`
 	// NodeName identifies the node where the device is available.
 	//
@@ -68,7 +66,9 @@ type BasicDeviceApplyConfiguration struct {
 	AllNodes *bool `json:"allNodes,omitempty"`
 	// If specified, these are the driver-defined taints.
 	//
-	// The maximum number of taints is 4.
+	// The maximum number of taints is 16. If taints are set for
+	// any device in a ResourceSlice, then the maximum number of
+	// allowed devices per ResourceSlice is 64 instead of 128.
 	//
 	// This is an alpha field and requires enabling the DRADeviceTaints
 	// feature gate.

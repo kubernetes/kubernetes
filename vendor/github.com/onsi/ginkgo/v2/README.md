@@ -1,6 +1,6 @@
 ![Ginkgo](https://onsi.github.io/ginkgo/images/ginkgo.png)
 
-[![test](https://github.com/onsi/ginkgo/workflows/test/badge.svg?branch=master)](https://github.com/onsi/ginkgo/actions?query=workflow%3Atest+branch%3Amaster) | [Ginkgo Docs](https://onsi.github.io/ginkgo/)
+[![test](https://github.com/onsi/ginkgo/actions/workflows/test.yml/badge.svg?branch=master)](https://github.com/onsi/ginkgo/actions?query=workflow%3Atest+branch%3Amaster) | [Ginkgo Docs](https://onsi.github.io/ginkgo/)
 
 ---
 
@@ -113,3 +113,13 @@ Ginkgo is MIT-Licensed
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md)
+
+## Sponsors
+
+Sponsors commit to a [sponsorship](https://github.com/sponsors/onsi) for a year.  If you're an organization that makes use of Ginkgo please consider becoming a sponsor!
+
+<p style="font-size:21px; color:black;">Browser testing via 
+    <a href="https://www.lambdatest.com/" target="_blank">
+        <img src="https://www.lambdatest.com/blue-logo.png" style="vertical-align: middle;" width="250" height="45" />
+    </a>
+</p>

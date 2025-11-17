@@ -152,14 +152,14 @@ var _ CgroupManager = &cgroupV1impl{}
 var _ CgroupManager = &cgroupV2impl{}
 
 // NewCgroupManager is a factory method that returns a CgroupManager
-func NewCgroupManager(cs *CgroupSubsystems, cgroupDriver string) CgroupManager {
+func NewCgroupManager(logger klog.Logger, cs *CgroupSubsystems, cgroupDriver string) CgroupManager {
 	if libcontainercgroups.IsCgroup2UnifiedMode() {
-		return NewCgroupV2Manager(cs, cgroupDriver)
+		return NewCgroupV2Manager(logger, cs, cgroupDriver)
 	}
-	return NewCgroupV1Manager(cs, cgroupDriver)
+	return NewCgroupV1Manager(logger, cs, cgroupDriver)
 }
 
-func newCgroupCommon(cs *CgroupSubsystems, cgroupDriver string) cgroupCommon {
+func newCgroupCommon(logger klog.Logger, cs *CgroupSubsystems, cgroupDriver string) cgroupCommon {
 	return cgroupCommon{
 		subsystems: cs,
 		useSystemd: cgroupDriver == "systemd",
@@ -194,12 +194,12 @@ func (m *cgroupCommon) buildCgroupPaths(name CgroupName) map[string]string {
 }
 
 // libctCgroupConfig converts CgroupConfig to libcontainer's Cgroup config.
-func (m *cgroupCommon) libctCgroupConfig(in *CgroupConfig, needResources bool) *libcontainercgroups.Cgroup {
+func (m *cgroupCommon) libctCgroupConfig(logger klog.Logger, in *CgroupConfig, needResources bool) *libcontainercgroups.Cgroup {
 	config := &libcontainercgroups.Cgroup{
 		Systemd: m.useSystemd,
 	}
 	if needResources {
-		config.Resources = m.toResources(in.ResourceParameters)
+		config.Resources = m.toResources(logger, in.ResourceParameters)
 	} else {
 		config.Resources = &libcontainercgroups.Resources{}
 	}
@@ -233,13 +233,14 @@ func (m *cgroupCommon) libctCgroupConfig(in *CgroupConfig, needResources bool) *
 }
 
 // Destroy destroys the specified cgroup
-func (m *cgroupCommon) Destroy(cgroupConfig *CgroupConfig) error {
+func (m *cgroupCommon) Destroy(logger klog.Logger, cgroupConfig *CgroupConfig) error {
+
 	start := time.Now()
 	defer func() {
 		metrics.CgroupManagerDuration.WithLabelValues("destroy").Observe(metrics.SinceInSeconds(start))
 	}()
 
-	libcontainerCgroupConfig := m.libctCgroupConfig(cgroupConfig, false)
+	libcontainerCgroupConfig := m.libctCgroupConfig(logger, cgroupConfig, false)
 	manager, err := libcontainercgroupmanager.New(libcontainerCgroupConfig)
 	if err != nil {
 		return err
@@ -253,13 +254,13 @@ func (m *cgroupCommon) Destroy(cgroupConfig *CgroupConfig) error {
 	return nil
 }
 
-func (m *cgroupCommon) SetCgroupConfig(name CgroupName, resourceConfig *ResourceConfig) error {
+func (m *cgroupCommon) SetCgroupConfig(logger klog.Logger, name CgroupName, resourceConfig *ResourceConfig) error {
 	containerConfig := &CgroupConfig{
 		Name:               name,
 		ResourceParameters: resourceConfig,
 	}
 
-	return m.Update(containerConfig)
+	return m.Update(logger, containerConfig)
 }
 
 // getCPUWeight converts from the range [2, 262144] to [1, 10000]
@@ -278,7 +279,7 @@ var (
 	availableRootControllers     sets.Set[string]
 )
 
-func (m *cgroupCommon) toResources(resourceConfig *ResourceConfig) *libcontainercgroups.Resources {
+func (m *cgroupCommon) toResources(logger klog.Logger, resourceConfig *ResourceConfig) *libcontainercgroups.Resources {
 	resources := &libcontainercgroups.Resources{
 		SkipDevices:     true,
 		SkipFreezeOnSet: true,
@@ -309,7 +310,7 @@ func (m *cgroupCommon) toResources(resourceConfig *ResourceConfig) *libcontainer
 		resources.CpusetCpus = resourceConfig.CPUSet.String()
 	}
 
-	m.maybeSetHugetlb(resourceConfig, resources)
+	m.maybeSetHugetlb(logger, resourceConfig, resources)
 
 	// Ideally unified is used for all the resources when running on cgroup v2.
 	// It doesn't make difference for the memory.max limit, but for e.g. the cpu controller
@@ -323,15 +324,15 @@ func (m *cgroupCommon) toResources(resourceConfig *ResourceConfig) *libcontainer
 	return resources
 }
 
-func (m *cgroupCommon) maybeSetHugetlb(resourceConfig *ResourceConfig, resources *libcontainercgroups.Resources) {
+func (m *cgroupCommon) maybeSetHugetlb(logger klog.Logger, resourceConfig *ResourceConfig, resources *libcontainercgroups.Resources) {
 	// Check if hugetlb is supported.
 	if libcontainercgroups.IsCgroup2UnifiedMode() {
 		if !getSupportedUnifiedControllers().Has("hugetlb") {
-			klog.V(6).InfoS("Optional subsystem not supported: hugetlb")
+			logger.V(6).Info("Optional subsystem not supported: hugetlb")
 			return
 		}
 	} else if _, ok := m.subsystems.MountPoints["hugetlb"]; !ok {
-		klog.V(6).InfoS("Optional subsystem not supported: hugetlb")
+		logger.V(6).Info("Optional subsystem not supported: hugetlb")
 		return
 	}
 
@@ -340,7 +341,7 @@ func (m *cgroupCommon) maybeSetHugetlb(resourceConfig *ResourceConfig, resources
 	for pageSize, limit := range resourceConfig.HugePageLimit {
 		sizeString, err := v1helper.HugePageUnitSizeFromByteSize(pageSize)
 		if err != nil {
-			klog.InfoS("Invalid pageSize", "err", err)
+			logger.Info("Invalid pageSize", "err", err)
 			continue
 		}
 		resources.HugetlbLimit = append(resources.HugetlbLimit, &libcontainercgroups.HugepageLimit{
@@ -362,13 +363,13 @@ func (m *cgroupCommon) maybeSetHugetlb(resourceConfig *ResourceConfig, resources
 }
 
 // Update updates the cgroup with the specified Cgroup Configuration
-func (m *cgroupCommon) Update(cgroupConfig *CgroupConfig) error {
+func (m *cgroupCommon) Update(logger klog.Logger, cgroupConfig *CgroupConfig) error {
 	start := time.Now()
 	defer func() {
 		metrics.CgroupManagerDuration.WithLabelValues("update").Observe(metrics.SinceInSeconds(start))
 	}()
 
-	libcontainerCgroupConfig := m.libctCgroupConfig(cgroupConfig, true)
+	libcontainerCgroupConfig := m.libctCgroupConfig(logger, cgroupConfig, true)
 	manager, err := libcontainercgroupmanager.New(libcontainerCgroupConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create cgroup manager: %v", err)
@@ -377,13 +378,13 @@ func (m *cgroupCommon) Update(cgroupConfig *CgroupConfig) error {
 }
 
 // Create creates the specified cgroup
-func (m *cgroupCommon) Create(cgroupConfig *CgroupConfig) error {
+func (m *cgroupCommon) Create(logger klog.Logger, cgroupConfig *CgroupConfig) error {
 	start := time.Now()
 	defer func() {
 		metrics.CgroupManagerDuration.WithLabelValues("create").Observe(metrics.SinceInSeconds(start))
 	}()
 
-	libcontainerCgroupConfig := m.libctCgroupConfig(cgroupConfig, true)
+	libcontainerCgroupConfig := m.libctCgroupConfig(logger, cgroupConfig, true)
 	manager, err := libcontainercgroupmanager.New(libcontainerCgroupConfig)
 	if err != nil {
 		return err
@@ -409,7 +410,7 @@ func (m *cgroupCommon) Create(cgroupConfig *CgroupConfig) error {
 }
 
 // Scans through all subsystems to find pids associated with specified cgroup.
-func (m *cgroupCommon) Pids(name CgroupName) []int {
+func (m *cgroupCommon) Pids(logger klog.Logger, name CgroupName) []int {
 	// we need the driver specific name
 	cgroupFsName := m.Name(name)
 
@@ -434,7 +435,7 @@ func (m *cgroupCommon) Pids(name CgroupName) []int {
 		// WalkFunc which is called for each file and directory in the pod cgroup dir
 		visitor := func(path string, info os.FileInfo, err error) error {
 			if err != nil {
-				klog.V(4).InfoS("Cgroup manager encountered error scanning cgroup path", "path", path, "err", err)
+				logger.V(4).Info("Cgroup manager encountered error scanning cgroup path", "path", path, "err", err)
 				return filepath.SkipDir
 			}
 			if !info.IsDir() {
@@ -442,7 +443,7 @@ func (m *cgroupCommon) Pids(name CgroupName) []int {
 			}
 			pids, err = getCgroupProcs(path)
 			if err != nil {
-				klog.V(4).InfoS("Cgroup manager encountered error getting procs for cgroup path", "path", path, "err", err)
+				logger.V(4).Info("Cgroup manager encountered error getting procs for cgroup path", "path", path, "err", err)
 				return filepath.SkipDir
 			}
 			pidsToKill.Insert(pids...)
@@ -452,14 +453,14 @@ func (m *cgroupCommon) Pids(name CgroupName) []int {
 		// container cgroups haven't been GCed yet. Get attached processes to
 		// all such unwanted containers under the pod cgroup
 		if err = filepath.Walk(dir, visitor); err != nil {
-			klog.V(4).InfoS("Cgroup manager encountered error scanning pids for directory", "path", dir, "err", err)
+			logger.V(4).Info("Cgroup manager encountered error scanning pids for directory", "path", dir, "err", err)
 		}
 	}
 	return sets.List(pidsToKill)
 }
 
 // ReduceCPULimits reduces the cgroup's cpu shares to the lowest possible value
-func (m *cgroupCommon) ReduceCPULimits(cgroupName CgroupName) error {
+func (m *cgroupCommon) ReduceCPULimits(logger klog.Logger, cgroupName CgroupName) error {
 	// Set lowest possible CpuShares value for the cgroup
 	minimumCPUShares := uint64(MinShares)
 	resources := &ResourceConfig{
@@ -469,7 +470,7 @@ func (m *cgroupCommon) ReduceCPULimits(cgroupName CgroupName) error {
 		Name:               cgroupName,
 		ResourceParameters: resources,
 	}
-	return m.Update(containerConfig)
+	return m.Update(logger, containerConfig)
 }
 
 func readCgroupMemoryConfig(cgroupPath string, memLimitFile string) (*ResourceConfig, error) {

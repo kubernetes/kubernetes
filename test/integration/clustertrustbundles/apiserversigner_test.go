@@ -78,7 +78,7 @@ func TestClusterTrustBundlesPublisherController(t *testing.T) {
 
 	kubeConfigFile := createKubeConfigFileForRestConfig(t, server.ClientConfig)
 
-	kcm := kubecontrollermanagertesting.StartTestServerOrDie(ctx, []string{
+	kcm := kubecontrollermanagertesting.StartTestServerOrDie(t, ctx, []string{
 		"--kubeconfig=" + kubeConfigFile,
 		"--controllers=kube-apiserver-serving-clustertrustbundle-publisher-controller", // these are the only controllers needed for this test
 		"--use-service-account-credentials=true",                                       // exercise RBAC of kube-apiserver-serving-clustertrustbundle-publisher controller

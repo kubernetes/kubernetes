@@ -63,39 +63,39 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 
 	// field Struct.LabelKeyField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call field-attached validations
 			errs = append(errs, validate.LabelKey(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("labelKeyField"), &obj.LabelKeyField, safe.Field(oldObj, func(oldObj *Struct) *string { return &oldObj.LabelKeyField }))...)
+		}(fldPath.Child("labelKeyField"), &obj.LabelKeyField, safe.Field(oldObj, func(oldObj *Struct) *string { return &oldObj.LabelKeyField }), oldObj != nil)...)
 
 	// field Struct.LabelKeyPtrField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call field-attached validations
 			errs = append(errs, validate.LabelKey(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("labelKeyPtrField"), obj.LabelKeyPtrField, safe.Field(oldObj, func(oldObj *Struct) *string { return oldObj.LabelKeyPtrField }))...)
+		}(fldPath.Child("labelKeyPtrField"), obj.LabelKeyPtrField, safe.Field(oldObj, func(oldObj *Struct) *string { return oldObj.LabelKeyPtrField }), oldObj != nil)...)
 
 	// field Struct.LabelKeyTypedefField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *LabelKeyStringType) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *LabelKeyStringType, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_LabelKeyStringType(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("labelKeyTypedefField"), &obj.LabelKeyTypedefField, safe.Field(oldObj, func(oldObj *Struct) *LabelKeyStringType { return &oldObj.LabelKeyTypedefField }))...)
+		}(fldPath.Child("labelKeyTypedefField"), &obj.LabelKeyTypedefField, safe.Field(oldObj, func(oldObj *Struct) *LabelKeyStringType { return &oldObj.LabelKeyTypedefField }), oldObj != nil)...)
 
 	return errs
 }

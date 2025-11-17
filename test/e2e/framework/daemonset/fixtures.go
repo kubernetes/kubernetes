@@ -19,6 +19,7 @@ package daemonset
 import (
 	"context"
 	"fmt"
+	"k8s.io/klog/v2"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -81,11 +82,12 @@ func CheckPresentOnNodes(ctx context.Context, c clientset.Interface, ds *appsv1.
 }
 
 func SchedulableNodes(ctx context.Context, c clientset.Interface, ds *appsv1.DaemonSet) []string {
+	logger := klog.FromContext(ctx)
 	nodeList, err := c.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	framework.ExpectNoError(err)
 	nodeNames := make([]string, 0)
 	for _, node := range nodeList.Items {
-		shouldRun, _ := daemon.NodeShouldRunDaemonPod(&node, ds)
+		shouldRun, _ := daemon.NodeShouldRunDaemonPod(logger, &node, ds)
 		if !shouldRun {
 			framework.Logf("DaemonSet pods can't tolerate node %s with taints %+v, skip checking this node", node.Name, node.Spec.Taints)
 			continue

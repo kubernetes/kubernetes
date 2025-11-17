@@ -28,6 +28,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 )
 
 func activeTestPods() []*v1.Pod {
@@ -106,7 +108,7 @@ func activeTestPods() []*v1.Pod {
 	}
 }
 
-func createTestQOSContainerManager() (*qosContainerManagerImpl, error) {
+func createTestQOSContainerManager(logger klog.Logger) (*qosContainerManagerImpl, error) {
 	subsystems, err := GetCgroupSubsystems()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get mounted cgroup subsystems: %v", err)
@@ -117,7 +119,7 @@ func createTestQOSContainerManager() (*qosContainerManagerImpl, error) {
 
 	qosContainerManager := &qosContainerManagerImpl{
 		subsystems:    subsystems,
-		cgroupManager: NewCgroupManager(subsystems, "cgroupfs"),
+		cgroupManager: NewCgroupManager(logger, subsystems, "cgroupfs"),
 		cgroupRoot:    cgroupRoot,
 		qosReserved:   nil,
 	}
@@ -128,7 +130,8 @@ func createTestQOSContainerManager() (*qosContainerManagerImpl, error) {
 }
 
 func TestQoSContainerCgroup(t *testing.T) {
-	m, err := createTestQOSContainerManager()
+	logger, _ := ktesting.NewTestContext(t)
+	m, err := createTestQOSContainerManager(logger)
 	assert.NoError(t, err)
 
 	qosConfigs := map[v1.PodQOSClass]*CgroupConfig{

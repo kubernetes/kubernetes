@@ -126,12 +126,7 @@ linters:
 
       - linters:
           - gocritic
-        text: "append result not assigned to the same slice|put a space between `//` and comment text|sloppyLen|elseif|should rewrite switch statement to if statement|regexpMust|wrapperFunc: use strings.ReplaceAll|singleCaseSwitch|deprecatedComment|exitAfterDefer|captLocal|unlambda|underef|unslice|valSwap|typeSwitchVar"
-
-      # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507008918
-      - linters:
-          - gocritic
-        text: "assignOp:"
+        text: "wrapperFunc: use strings.ReplaceAll|should rewrite switch statement to if statement"
 
       # Kube-API-Linter should only be run on the API definitions
       - linters:
@@ -159,6 +154,25 @@ linters:
         path: "staging/src/k8s.io/api/resource/"
       - text: "Conditions field in AllocatedDeviceStatus has incorrect tags, should be: `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,5,rep,name=conditions\"`"
         path: "staging/src/k8s.io/api/resource/"
+      
+      # Commentstart - Ignore commentstart issues for existing API group
+      # TODO: For each existing API group, we aim to remove it over time.
+      - text: "godoc for field .* should start with '.* ...'"
+        path: "staging/src/k8s.io/api/(admissionregistration|apidiscovery|apiserverinternal|apps|authentication|authorization|autoscaling|batch|certificates|coordination|core|discovery|events|extensions|flowcontrol|imagepolicy|networking|node|policy|rbac|resource|scheduling|storage|storagemigration)"
+      - text: "field .* is missing godoc comment"
+        path: "staging/src/k8s.io/api/autoscaling/"
+      
+      # Pre-existing issues from the conflictmarkers linter
+      # The Error field in some older API types is marked as both optional and required.
+      # This is incorrect, but cannot be changed without breaking changes.
+      - text: "field PortStatus.Error has conflicting markers: optional_vs_required: {\\[optional\\], \\[kubebuilder:validation:Required\\]}. fields cannot be both optional and required"
+        path: "staging/src/k8s.io/api/core/v1/types.go"
+      - text: "field IngressPortStatus.Error has conflicting markers: optional_vs_required: {\\[optional\\], \\[kubebuilder:validation:Required\\]}. fields cannot be both optional and required"
+        path: "staging/src/k8s.io/api/extensions/v1beta1/types.go"
+      - text: "field IngressPortStatus.Error has conflicting markers: optional_vs_required: {\\[optional\\], \\[kubebuilder:validation:Required\\]}. fields cannot be both optional and required"
+        path: "staging/src/k8s.io/api/networking/v1/types.go"
+      - text: "field IngressPortStatus.Error has conflicting markers: optional_vs_required: {\\[optional\\], \\[kubebuilder:validation:Required\\]}. fields cannot be both optional and required"
+        path: "staging/src/k8s.io/api/networking/v1beta1/types.go"
 
   default: none
   enable: # please keep this alphabetized
@@ -250,8 +264,11 @@ linters:
             contextual k8s.io/kubernetes/pkg/securitycontext/.*
             contextual k8s.io/kubernetes/test/e2e/dra/.*
             contextual k8s.io/kubernetes/pkg/kubelet/certificate/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/.*
             contextual k8s.io/kubernetes/pkg/kubelet/cm/dra/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/.*
             contextual k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/.*
             contextual k8s.io/kubernetes/pkg/kubelet/lifecycle/.*
             contextual k8s.io/kubernetes/pkg/kubelet/pleg/.*
             contextual k8s.io/kubernetes/pkg/kubelet/clustertrustbundle/.*
@@ -272,6 +289,7 @@ linters:
             contextual k8s.io/kubernetes/pkg/kubelet/volumemanager/.*
             contextual k8s.io/kubernetes/pkg/kubelet/util/.*
             contextual k8s.io/kubernetes/pkg/kubelet/logs/.*
+            contextual k8s.io/kubernetes/test/images/sample-device-plugin/.*
             
             # As long as contextual logging is alpha or beta, all WithName, WithValues,
             # NewContext calls have to go through klog. Once it is GA, we can lift
@@ -302,9 +320,9 @@ linters:
             disable:
               - '*'
             enable:
-              # - "commentstart" # Ensure comments start with the serialized version of the field name.
+              - "commentstart" # Ensure comments start with the serialized version of the field name.
               - "conditions" # Ensure conditions have the correct json tags and markers.
-              # - "conflictingmarkers" - Detect mutually exclusive markers on the same field.
+              - "conflictingmarkers" # Detect mutually exclusive markers on the same field.
               # - "integers" # Ensure only int32 and int64 are used for integers.
               # - "jsontags" # Ensure every field has a json tag.
               # - "maxlength" # Ensure all strings and arrays have maximum lengths/maximum items. ONLY for CRDs until declarative markers exist in core types.
@@ -318,18 +336,24 @@ linters:
               # - "requiredfields" # Required fields should only be pointers when required based on the validity of the zero value, they should always have `omitempty`.
               - "ssatags" # Ensure lists have a listType tag.
               # - "uniquemarkers" # Ensure markers are not duplicated across field and type definitions.
+              - "duplicatemarkers" #Prevent identical markers from being present on types and fields
           lintersConfig:
             conditions:
               isFirstField: Ignore
               usePatchStrategy: SuggestFix
               useProtobuf: SuggestFix
-            # conflictingMarkers:
-            #   conflicts:
-            #   - name: "default_vs_required"
-            #     sets:
-            #     - ["default", "kubebuilder:default"]
-            #     - ["required", "kubebuilder:validation:Required", "k8s:required"]
-            #     description: "A field with a default value cannot be required"
+            conflictingmarkers:
+              conflicts:
+              - name: "optional_vs_required"
+                sets:
+                - ["k8s:optional", "optional", "kubebuilder:validation:Optional"]
+                - ["k8s:required", "required", "kubebuilder:validation:Required"]
+                description: "fields cannot be both optional and required"
+              - name: "required_vs_default"
+                sets:
+                - ["k8s:required", "required", "kubebuilder:validation:Required"]
+                - ["default"]
+                description: "fields with default values are always optional"
             # jsonTags:
             #   jsonTagRegex: "^[a-z][a-z0-9]*(?:[A-Z][a-z0-9]*)*$" # The default regex is appropriate for our use case.
             # nomaps:
@@ -378,6 +402,9 @@ linters:
     forbidigo:
       analyze-types: true
       forbid:
+        - pattern: md5\.*
+          # https://github.com/kubernetes/kubernetes/issues/129652
+          msg: md5 is oudated, insecure, prefer a secure hash (such as sha256) or a non-cryptographic hash
         - pattern: ^managedfields\.ExtractInto$
           pkg: ^k8s\.io/apimachinery/pkg/util/managedfields$
           msg: should not be used because managedFields was removed
@@ -388,10 +415,24 @@ linters:
           pkg: ^k8s\.io/component-base/featuregate$         
           msg: should not use Add, use AddVersioned instead
     gocritic:
-      enabled-checks:
-        - equalFold
+      enabled-checks: # These are in addition to the default checks - see https://golangci-lint.run/docs/linters/configuration/#gocritic
         - boolExprSimplify
+        - equalFold
+      disabled-checks: # This disables checks that are enabled by default (this can be combined with enabled-checks, contrary to the docs)
+        - appendAssign
+        - assignOp # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507008918
+        - captLocal
+        - commentFormatting
         - deprecatedComment
+        - elseif
+        # The following have few (single-digit) occurrences left in k/k and wouldn't be too onerous to enable
+        - exitAfterDefer
+        - regexpMust
+        - sloppyLen
+        - typeSwitchVar
+        - underef
+        - unslice
+        - valSwap
     revive:
       # Only these rules are enabled.
       rules:

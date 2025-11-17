@@ -132,7 +132,7 @@ func (ac *AuditContext) ProcessEventStage(ctx context.Context, stage auditintern
 	return processed
 }
 
-func (ac *AuditContext) LogImpersonatedUser(user user.Info) {
+func (ac *AuditContext) LogImpersonatedUser(user user.Info, constraint string) {
 	ac.visitEvent(func(ev *auditinternal.Event) {
 		if ev == nil || ev.Level.Less(auditinternal.LevelMetadata) {
 			return
@@ -145,6 +145,12 @@ func (ac *AuditContext) LogImpersonatedUser(user user.Info) {
 		ev.ImpersonatedUser.Extra = map[string]authnv1.ExtraValue{}
 		for k, v := range user.GetExtra() {
 			ev.ImpersonatedUser.Extra[k] = authnv1.ExtraValue(v)
+		}
+		if len(constraint) > 0 {
+			if ev.AuthenticationMetadata == nil {
+				ev.AuthenticationMetadata = &auditinternal.AuthenticationMetadata{}
+			}
+			ev.AuthenticationMetadata.ImpersonationConstraint = constraint
 		}
 	})
 }

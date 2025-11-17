@@ -69,6 +69,7 @@ type PodTopologySpread struct {
 	enableNodeInclusionPolicyInPodTopologySpread bool
 	enableMatchLabelKeysInPodTopologySpread      bool
 	enableSchedulingQueueHint                    bool
+	enableTaintTolerationComparisonOperators     bool
 }
 
 var _ fwk.PreFilterPlugin = &PodTopologySpread{}
@@ -76,6 +77,7 @@ var _ fwk.FilterPlugin = &PodTopologySpread{}
 var _ fwk.PreScorePlugin = &PodTopologySpread{}
 var _ fwk.ScorePlugin = &PodTopologySpread{}
 var _ fwk.EnqueueExtensions = &PodTopologySpread{}
+var _ fwk.SignPlugin = &PodTopologySpread{}
 
 // Name is the name of the plugin used in the plugin registry and configurations.
 const Name = names.PodTopologySpread
@@ -83,6 +85,21 @@ const Name = names.PodTopologySpread
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *PodTopologySpread) Name() string {
 	return Name
+}
+
+// Pod topology spread is not localized to a pod and node, so we cannot
+// sign pods that have topology spread constraints, either explicit or
+// defaulted.
+func (pl *PodTopologySpread) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
+	if len(pod.Spec.TopologySpreadConstraints) > 0 {
+		return nil, fwk.NewStatus(fwk.Unschedulable, "pods with topology constraints are not signable")
+	}
+
+	if len(pl.defaultConstraints) > 0 {
+		return nil, fwk.NewStatus(fwk.Unschedulable, "pods with default topology constraints are not signable")
+	}
+
+	return nil, nil
 }
 
 // New initializes a new plugin and returns it.
@@ -104,6 +121,7 @@ func New(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.Fea
 		enableNodeInclusionPolicyInPodTopologySpread: fts.EnableNodeInclusionPolicyInPodTopologySpread,
 		enableMatchLabelKeysInPodTopologySpread:      fts.EnableMatchLabelKeysInPodTopologySpread,
 		enableSchedulingQueueHint:                    fts.EnableSchedulingQueueHint,
+		enableTaintTolerationComparisonOperators:     fts.EnableTaintTolerationComparisonOperators,
 	}
 	if args.DefaultingType == config.SystemDefaulting {
 		pl.defaultConstraints = systemDefaultConstraints

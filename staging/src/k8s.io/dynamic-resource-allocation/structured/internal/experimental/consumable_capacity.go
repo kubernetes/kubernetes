@@ -18,51 +18,43 @@ package experimental
 
 import (
 	"errors"
-	"fmt"
 
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/utils/ptr"
 )
 
 // CmpRequestOverCapacity checks whether the new capacity request can be added within the given capacity,
 // and checks whether the requested value is against the capacity requestPolicy.
 func CmpRequestOverCapacity(currentConsumedCapacity ConsumedCapacity, deviceRequestCapacity *resourceapi.CapacityRequirements,
-	allowMultipleAllocations *bool, capacity map[draapi.QualifiedName]draapi.DeviceCapacity, allocatingCapacity ConsumedCapacity) (bool, error) {
+	allowMultipleAllocations *bool, capacity map[resourceapi.QualifiedName]resourceapi.DeviceCapacity, allocatingCapacity ConsumedCapacity) (bool, error) {
 	if requestsContainNonExistCapacity(deviceRequestCapacity, capacity) {
 		return false, errors.New("some requested capacity has not been defined")
 	}
 	clone := currentConsumedCapacity.Clone()
 	for name, cap := range capacity {
-		convertedName := resourceapi.QualifiedName(name)
-		var convertedCapacity resourceapi.DeviceCapacity
-		err := draapi.Convert_api_DeviceCapacity_To_v1_DeviceCapacity(&cap, &convertedCapacity, nil)
-		if err != nil {
-			return false, fmt.Errorf("failed to convert DeviceCapacity %w", err)
-		}
 		var requestedValPtr *resource.Quantity
 		if deviceRequestCapacity != nil && deviceRequestCapacity.Requests != nil {
-			if requestedVal, requestedFound := deviceRequestCapacity.Requests[convertedName]; requestedFound {
+			if requestedVal, requestedFound := deviceRequestCapacity.Requests[name]; requestedFound {
 				requestedValPtr = &requestedVal
 			}
 		}
-		consumedCapacity := calculateConsumedCapacity(requestedValPtr, convertedCapacity)
-		if violatesPolicy(consumedCapacity, convertedCapacity.RequestPolicy) {
+		consumedCapacity := calculateConsumedCapacity(requestedValPtr, cap)
+		if violatesPolicy(consumedCapacity, cap.RequestPolicy) {
 			return false, nil
 		}
 		// If the current clone already contains an entry for this capacity, add the consumedCapacity to it.
 		// Otherwise, initialize it with calculated consumedCapacity.
-		if _, allocatedFound := clone[convertedName]; allocatedFound {
-			clone[convertedName].Add(consumedCapacity)
+		if _, allocatedFound := clone[name]; allocatedFound {
+			clone[name].Add(consumedCapacity)
 		} else {
-			clone[convertedName] = ptr.To(consumedCapacity)
+			clone[name] = ptr.To(consumedCapacity)
 		}
 		// If allocatingCapacity contains an entry for this capacity, add its value to clone as well.
-		if allocatingVal, allocatingFound := allocatingCapacity[convertedName]; allocatingFound {
-			clone[convertedName].Add(*allocatingVal)
+		if allocatingVal, allocatingFound := allocatingCapacity[name]; allocatingFound {
+			clone[name].Add(*allocatingVal)
 		}
-		if clone[convertedName].Cmp(cap.Value) > 0 {
+		if clone[name].Cmp(cap.Value) > 0 {
 			return false, nil
 		}
 	}
@@ -71,13 +63,12 @@ func CmpRequestOverCapacity(currentConsumedCapacity ConsumedCapacity, deviceRequ
 
 // requestsNonExistCapacity returns true if requests contain non-exist capacity.
 func requestsContainNonExistCapacity(deviceRequestCapacity *resourceapi.CapacityRequirements,
-	capacity map[draapi.QualifiedName]draapi.DeviceCapacity) bool {
+	capacity map[resourceapi.QualifiedName]resourceapi.DeviceCapacity) bool {
 	if deviceRequestCapacity == nil || deviceRequestCapacity.Requests == nil {
 		return false
 	}
 	for name := range deviceRequestCapacity.Requests {
-		convertedName := draapi.QualifiedName(name)
-		if _, found := capacity[convertedName]; !found {
+		if _, found := capacity[name]; !found {
 			return true
 		}
 	}

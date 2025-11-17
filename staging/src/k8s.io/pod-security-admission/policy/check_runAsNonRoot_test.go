@@ -25,12 +25,11 @@ import (
 
 func TestRunAsNonRoot(t *testing.T) {
 	tests := []struct {
-		name           string
-		pod            *corev1.Pod
-		expectReason   string
-		expectDetail   string
-		expectAllowed  bool
-		relaxForUserNS bool
+		name          string
+		pod           *corev1.Pod
+		expectReason  string
+		expectDetail  string
+		expectAllowed bool
 	}{
 		{
 			name: "no explicit runAsNonRoot",
@@ -83,37 +82,17 @@ func TestRunAsNonRoot(t *testing.T) {
 			expectDetail: `pod or containers "a", "b" must set securityContext.runAsNonRoot=true`,
 		},
 		{
-			name: "UserNamespacesPodSecurityStandards enabled without HostUsers",
+			name: "host users false allowed",
 			pod: &corev1.Pod{Spec: corev1.PodSpec{
 				HostUsers: ptr.To(false),
 			}},
-			expectAllowed:  true,
-			relaxForUserNS: true,
-		},
-		{
-			name: "UserNamespacesPodSecurityStandards enabled with HostUsers",
-			pod: &corev1.Pod{Spec: corev1.PodSpec{
-				Containers: []corev1.Container{
-					{Name: "a"},
-				},
-				HostUsers: ptr.To(true),
-			}},
-			expectReason:   `runAsNonRoot != true`,
-			expectDetail:   `pod or container "a" must set securityContext.runAsNonRoot=true`,
-			expectAllowed:  false,
-			relaxForUserNS: true,
+			expectAllowed: true,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.relaxForUserNS {
-				RelaxPolicyForUserNamespacePods(true)
-				t.Cleanup(func() {
-					RelaxPolicyForUserNamespacePods(false)
-				})
-			}
-			result := runAsNonRoot_1_0(&tc.pod.ObjectMeta, &tc.pod.Spec)
+			result := runAsNonRoot1_35(&tc.pod.ObjectMeta, &tc.pod.Spec)
 			if result.Allowed != tc.expectAllowed {
 				t.Fatalf("expected Allowed to be %v was %v", tc.expectAllowed, result.Allowed)
 			}

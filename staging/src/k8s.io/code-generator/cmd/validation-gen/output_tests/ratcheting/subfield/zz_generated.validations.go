@@ -64,9 +64,9 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 
 	// field Struct.SubStructField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *SubStruct) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *SubStruct, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
 			// call field-attached validations
@@ -81,7 +81,7 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 				})...)
 			}()
 			return
-		}(fldPath.Child("subStructField"), &obj.SubStructField, safe.Field(oldObj, func(oldObj *Struct) *SubStruct { return &oldObj.SubStructField }))...)
+		}(fldPath.Child("subStructField"), &obj.SubStructField, safe.Field(oldObj, func(oldObj *Struct) *SubStruct { return &oldObj.SubStructField }), oldObj != nil)...)
 
 	return errs
 }

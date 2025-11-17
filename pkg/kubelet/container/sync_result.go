@@ -19,9 +19,57 @@ package container
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 )
+
+// BackoffError should be used whenever an error needs to specify a particular backoff duration
+// to the Kubelet.
+type BackoffError struct {
+	error
+	backoffTime time.Time
+}
+
+func NewBackoffError(err error, backoffTime time.Time) *BackoffError {
+	return &BackoffError{
+		error:       err,
+		backoffTime: backoffTime,
+	}
+}
+
+// BackoffTime returns the expected expiration time of the backoff.
+func (e *BackoffError) BackoffTime() time.Time {
+	return e.backoffTime
+}
+
+// MinBackoffExpiration recursively searches through err for BackoffErrors and returns
+// the minimum of all found backoff times.
+func MinBackoffExpiration(err error) (time.Time, bool) {
+	var ae utilerrors.Aggregate
+	var be *BackoffError
+	switch {
+	case errors.As(err, &be):
+		return be.BackoffTime(), true
+	case errors.As(err, &ae):
+		var min time.Time
+		found := false
+		for _, e := range ae.Errors() {
+			if backoff, ok := MinBackoffExpiration(e); ok {
+				if !found || backoff.Before(min) {
+					min = backoff
+					found = true
+				}
+			}
+		}
+		return min, found
+	default:
+		if e := errors.Unwrap(err); e != nil {
+			return MinBackoffExpiration(e)
+		}
+		return time.Time{}, false
+	}
+}
 
 // TODO(random-liu): We need to better organize runtime errors for introspection.
 
@@ -47,6 +95,8 @@ var (
 	ErrKillPodSandbox = errors.New("KillPodSandboxError")
 	// ErrResizePodInPlace returned when runtime failed to resize a pod.
 	ErrResizePodInPlace = errors.New("ResizePodInPlaceError")
+	// ErrRemoveContainer returned when runtime failed to remove a container.
+	ErrRemoveContainer = errors.New("RemoveContainerError")
 )
 
 // SyncAction indicates different kind of actions in SyncPod() and KillPod(). Now there are only actions
@@ -72,6 +122,8 @@ const (
 	KillPodSandbox SyncAction = "KillPodSandbox"
 	// ResizePodInPlace action is included whenever any containers in the pod are resized without restart
 	ResizePodInPlace SyncAction = "ResizePodInPlace"
+	// RemoveContainer action
+	RemoveContainer SyncAction = "RemoveContainer"
 )
 
 // SyncResult is the result of sync action.
@@ -126,11 +178,11 @@ func (p *PodSyncResult) Fail(err error) {
 func (p *PodSyncResult) Error() error {
 	errlist := []error{}
 	if p.SyncError != nil {
-		errlist = append(errlist, fmt.Errorf("failed to SyncPod: %v", p.SyncError))
+		errlist = append(errlist, fmt.Errorf("failed to SyncPod: %w", p.SyncError))
 	}
 	for _, result := range p.SyncResults {
 		if result.Error != nil {
-			errlist = append(errlist, fmt.Errorf("failed to %q for %q with %v: %q", result.Action, result.Target,
+			errlist = append(errlist, fmt.Errorf("failed to %q for %q with %w: %q", result.Action, result.Target,
 				result.Error, result.Message))
 		}
 	}

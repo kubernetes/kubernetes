@@ -74,9 +74,11 @@ func directRecordReadFunc(expectHit bool) benchmarkedCheckFunc {
 func mustAttemptPullReadFunc(expectHit bool) benchmarkedCheckFunc {
 	return func(b *testing.B, pullManager PullManager, imgRef string) {
 		tCtx := ktesting.Init(b)
-		mustPull := pullManager.MustAttemptImagePull(tCtx, "test.repo/org/"+imgRef, imgRef, nil, nil)
-		if mustPull != !expectHit {
-			b.Fatalf("MustAttemptImagePull() expected %t, got %t", !expectHit, mustPull)
+		mustPull, err := pullManager.MustAttemptImagePull(tCtx, "test.repo/org/"+imgRef, imgRef, func() ([]kubeletconfig.ImagePullSecret, *kubeletconfig.ImagePullServiceAccount, error) {
+			return nil, nil, nil
+		})
+		if mustPull != !expectHit || err != nil {
+			b.Fatalf("no error expected (got %v); MustAttemptImagePull() expected %t, got %t", err, !expectHit, mustPull)
 		}
 	}
 }
@@ -303,8 +305,16 @@ func setupInMemRecordsAccessor(t testing.TB, cacheSize int, authoritative bool) 
 
 	fsAccessor := setupFSRecordsAccessor(t)
 	memcacheAccessor := NewCachedPullRecordsAccessor(fsAccessor, int32(cacheSize), int32(cacheSize), int32(runtime.NumCPU()))
-	memcacheAccessor.intents.authoritative.Store(authoritative)
-	memcacheAccessor.pulledRecords.authoritative.Store(authoritative)
+	gotMeteredAccessor, ok := memcacheAccessor.(*meteringRecordsAccessor)
+	if !ok {
+		t.Fatalf("the tested accessor must be a metered records accessor, got %T", memcacheAccessor)
+	}
+	inMemAccessor, ok := gotMeteredAccessor.sizeExposedPullRecordsAccessor.(*cachedPullRecordsAccessor)
+	if !ok {
+		t.Fatalf("the metered accessor's delegate is not an inMemAccesor: %T", gotMeteredAccessor.sizeExposedPullRecordsAccessor)
+	}
+	inMemAccessor.intents.authoritative.Store(authoritative)
+	inMemAccessor.pulledRecords.authoritative.Store(authoritative)
 
 	return memcacheAccessor
 }

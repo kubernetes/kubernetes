@@ -24,6 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
 	resourceapi "k8s.io/api/resource/v1"
+	schedulingapi "k8s.io/api/scheduling/v1alpha1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -417,6 +418,12 @@ func (p *PodWrapper) ZeroTerminationGracePeriod() *PodWrapper {
 	return p
 }
 
+// TerminationGracePeriodSeconds sets the TerminationGracePeriodSeconds of the inner pod.
+func (p *PodWrapper) TerminationGracePeriodSeconds(s int64) *PodWrapper {
+	p.Spec.TerminationGracePeriodSeconds = &s
+	return p
+}
+
 // Node sets `s` as the nodeName of the inner pod.
 func (p *PodWrapper) Node(s string) *PodWrapper {
 	p.Spec.NodeName = s
@@ -559,6 +566,12 @@ func (p *PodWrapper) SchedulingGates(gates []string) *PodWrapper {
 	for _, gate := range gates {
 		p.Spec.SchedulingGates = append(p.Spec.SchedulingGates, v1.PodSchedulingGate{Name: gate})
 	}
+	return p
+}
+
+// ResourceVersion sets the inner pod's ResurceVersion.
+func (p *PodWrapper) ResourceVersion(version string) *PodWrapper {
+	p.ObjectMeta.ResourceVersion = version
 	return p
 }
 
@@ -781,6 +794,22 @@ func (p *PodWrapper) Res(resMap map[v1.ResourceName]string) *PodWrapper {
 	return p
 }
 
+// Resources sets requests and limits at pod-level.
+func (p *PodWrapper) PodLevelResourceRequests(reqMap map[v1.ResourceName]string) *PodWrapper {
+	if len(reqMap) == 0 {
+		return p
+	}
+
+	res := v1.ResourceList{}
+	for k, v := range reqMap {
+		res[k] = resource.MustParse(v)
+	}
+	p.Spec.Resources = &v1.ResourceRequirements{
+		Requests: res,
+	}
+	return p
+}
+
 // Req adds a new container to the inner pod with given resource map of requests.
 func (p *PodWrapper) Req(reqMap map[v1.ResourceName]string) *PodWrapper {
 	if len(reqMap) == 0 {
@@ -834,6 +863,12 @@ func (p *PodWrapper) PreemptionPolicy(policy v1.PreemptionPolicy) *PodWrapper {
 // Overhead sets the give ResourceList to the inner pod
 func (p *PodWrapper) Overhead(rl v1.ResourceList) *PodWrapper {
 	p.Spec.Overhead = rl
+	return p
+}
+
+// WorkloadRef sets workloadRef of the inner pod.
+func (p *PodWrapper) WorkloadRef(workloadRef *v1.WorkloadReference) *PodWrapper {
+	p.Spec.WorkloadRef = workloadRef
 	return p
 }
 
@@ -915,6 +950,12 @@ func (n *NodeWrapper) Taints(taints []v1.Taint) *NodeWrapper {
 // Unschedulable applies the unschedulable field.
 func (n *NodeWrapper) Unschedulable(unschedulable bool) *NodeWrapper {
 	n.Spec.Unschedulable = unschedulable
+	return n
+}
+
+// DeclaredFeatures applies the declared features in node status.
+func (n *NodeWrapper) DeclaredFeatures(declaredFeatures []string) *NodeWrapper {
+	n.Status.DeclaredFeatures = declaredFeatures
 	return n
 }
 
@@ -1190,7 +1231,7 @@ func (wrapper *ResourceClaimWrapper) RequestWithNameCount(name, deviceClassName 
 
 // RequestWithPrioritizedList adds one device request with one subrequest
 // per provided deviceClassName.
-func (wrapper *ResourceClaimWrapper) RequestWithPrioritizedList(deviceClassNames ...string) *ResourceClaimWrapper {
+func (wrapper *ResourceClaimWrapper) RequestWithPrioritizedListFromDeviceClasses(deviceClassNames ...string) *ResourceClaimWrapper {
 	var prioritizedList []resourceapi.DeviceSubRequest
 	for i, deviceClassName := range deviceClassNames {
 		prioritizedList = append(prioritizedList, resourceapi.DeviceSubRequest{
@@ -1208,6 +1249,45 @@ func (wrapper *ResourceClaimWrapper) RequestWithPrioritizedList(deviceClassNames
 		},
 	)
 	return wrapper
+}
+
+func (wrapper *ResourceClaimWrapper) RequestWithPrioritizedList(subRequests ...resourceapi.DeviceSubRequest) *ResourceClaimWrapper {
+	return wrapper.NamedRequestWithPrioritizedList(fmt.Sprintf("req-%d", len(wrapper.Spec.Devices.Requests)+1), subRequests...)
+}
+
+func (wrapper *ResourceClaimWrapper) NamedRequestWithPrioritizedList(name string, subRequests ...resourceapi.DeviceSubRequest) *ResourceClaimWrapper {
+	wrapper.Spec.Devices.Requests = append(wrapper.Spec.Devices.Requests,
+		resourceapi.DeviceRequest{
+			Name:           name,
+			FirstAvailable: subRequests,
+		},
+	)
+	return wrapper
+}
+
+func SubRequest(name, deviceClassName string, count int64) resourceapi.DeviceSubRequest {
+	return resourceapi.DeviceSubRequest{
+		Name:            name,
+		AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
+		Count:           count,
+		DeviceClassName: deviceClassName,
+	}
+}
+
+func SubRequestWithSelector(name, deviceClassName, selector string) resourceapi.DeviceSubRequest {
+	return resourceapi.DeviceSubRequest{
+		Name:            name,
+		AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
+		Count:           1,
+		DeviceClassName: deviceClassName,
+		Selectors: []resourceapi.DeviceSelector{
+			{
+				CEL: &resourceapi.CELDeviceSelector{
+					Expression: selector,
+				},
+			},
+		},
+	}
 }
 
 // Allocation sets the allocation of the inner object.
@@ -1468,4 +1548,69 @@ func (c *VolumeAttachmentWrapper) Source(source storagev1.VolumeAttachmentSource
 func (c *VolumeAttachmentWrapper) Attached(attached bool) *VolumeAttachmentWrapper {
 	c.Status.Attached = attached
 	return c
+}
+
+// WorkloadWrapper wraps a Workload inside.
+type WorkloadWrapper struct{ schedulingapi.Workload }
+
+// MakeWorkload creates a Workload wrapper.
+func MakeWorkload() *WorkloadWrapper {
+	return &WorkloadWrapper{}
+}
+
+// Obj returns the inner Workload.
+func (wrapper *WorkloadWrapper) Obj() *schedulingapi.Workload {
+	return &wrapper.Workload
+}
+
+// Name sets `name` as the name of the inner Workload.
+func (wrapper *WorkloadWrapper) Name(name string) *WorkloadWrapper {
+	wrapper.SetName(name)
+	return wrapper
+}
+
+// Namespace sets `namespace` as the namespace of the inner Workload.
+func (wrapper *WorkloadWrapper) Namespace(namespace string) *WorkloadWrapper {
+	wrapper.SetNamespace(namespace)
+	return wrapper
+}
+
+// PodGroup injects the pod group into the inner Workload.
+func (wrapper *WorkloadWrapper) PodGroup(pg *schedulingapi.PodGroup) *WorkloadWrapper {
+	wrapper.Spec.PodGroups = append(wrapper.Spec.PodGroups, *pg)
+	return wrapper
+}
+
+// PodGroupWrapper wraps a PodGroup inside.
+type PodGroupWrapper struct{ schedulingapi.PodGroup }
+
+// MakePodGroup creates a PodGroup wrapper.
+func MakePodGroup() *PodGroupWrapper {
+	return &PodGroupWrapper{}
+}
+
+// Obj returns the inner PodGroup.
+func (wrapper *PodGroupWrapper) Obj() *schedulingapi.PodGroup {
+	return &wrapper.PodGroup
+}
+
+// Name sets `name` as the name of the inner PodGroup.
+func (wrapper *PodGroupWrapper) Name(name string) *PodGroupWrapper {
+	wrapper.PodGroup.Name = name
+	return wrapper
+}
+
+// MinCount sets the MinCount for the Gang scheduling policy.
+func (wrapper *PodGroupWrapper) MinCount(count int32) *PodGroupWrapper {
+	if wrapper.Policy.Gang == nil {
+		wrapper.Policy.Gang = &schedulingapi.GangSchedulingPolicy{}
+	}
+	wrapper.Policy.Gang.MinCount = count
+	return wrapper
+}
+
+// BasicPolicy sets the PodGroup policy to Basic.
+func (wrapper *PodGroupWrapper) BasicPolicy() *PodGroupWrapper {
+	wrapper.Policy.Basic = &schedulingapi.BasicSchedulingPolicy{}
+	return wrapper
 }

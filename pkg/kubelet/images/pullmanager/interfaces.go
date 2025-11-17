@@ -23,6 +23,9 @@ import (
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 )
 
+// GetPodCredentials lazily looks up and returns a set of pull credentials.
+type GetPodCredentials func() ([]kubeletconfiginternal.ImagePullSecret, *kubeletconfiginternal.ImagePullServiceAccount, error)
+
 // ImagePullManager keeps the state of images that were pulled and which are
 // currently still being pulled.
 // It should keep an internal state of images currently being pulled by the kubelet
@@ -59,11 +62,16 @@ type ImagePullManager interface {
 	// set of credentials or if the image can be accessed by any of the node's pods
 	// or if the image can be accessed by the specified service account.
 	//
-	// Returns true if the policy demands verification and no record of the pull
+	// `getPodCredentials` is invoked to retrieve the set of credentials after
+	// MustAttemptImagePull evaluates the parts of the policy that do not depend on them.
+	//
+	// Returns true and an error if `getPodCredentials` returns an error.
+	//
+	// Returns true and nil if the policy demands verification and no record of the pull
 	// was found in the cache.
 	//
 	// `image` is the content of the pod's container `image` field.
-	MustAttemptImagePull(ctx context.Context, image, imageRef string, credentials []kubeletconfiginternal.ImagePullSecret, serviceAccount *kubeletconfiginternal.ImagePullServiceAccount) bool
+	MustAttemptImagePull(ctx context.Context, image, imageRef string, getPodCredentials GetPodCredentials) (bool, error)
 	// PruneUnknownRecords deletes all of the cache ImagePulledRecords for each of the images
 	// whose imageRef does not appear in the `imageList` iff such an record was last updated
 	// _before_ the `until` timestamp.

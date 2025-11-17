@@ -77,7 +77,7 @@ import (
 	storagev1 "k8s.io/client-go/kubernetes/typed/storage/v1"
 	storagev1alpha1 "k8s.io/client-go/kubernetes/typed/storage/v1alpha1"
 	storagev1beta1 "k8s.io/client-go/kubernetes/typed/storage/v1beta1"
-	storagemigrationv1alpha1 "k8s.io/client-go/kubernetes/typed/storagemigration/v1alpha1"
+	storagemigrationv1beta1 "k8s.io/client-go/kubernetes/typed/storagemigration/v1beta1"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
 )
@@ -138,7 +138,7 @@ type Interface interface {
 	StorageV1beta1() storagev1beta1.StorageV1beta1Interface
 	StorageV1() storagev1.StorageV1Interface
 	StorageV1alpha1() storagev1alpha1.StorageV1alpha1Interface
-	StoragemigrationV1alpha1() storagemigrationv1alpha1.StoragemigrationV1alpha1Interface
+	StoragemigrationV1beta1() storagemigrationv1beta1.StoragemigrationV1beta1Interface
 }
 
 // Clientset contains the clients for groups.
@@ -198,7 +198,7 @@ type Clientset struct {
 	storageV1beta1                *storagev1beta1.StorageV1beta1Client
 	storageV1                     *storagev1.StorageV1Client
 	storageV1alpha1               *storagev1alpha1.StorageV1alpha1Client
-	storagemigrationV1alpha1      *storagemigrationv1alpha1.StoragemigrationV1alpha1Client
+	storagemigrationV1beta1       *storagemigrationv1beta1.StoragemigrationV1beta1Client
 }
 
 // AdmissionregistrationV1 retrieves the AdmissionregistrationV1Client
@@ -471,9 +471,9 @@ func (c *Clientset) StorageV1alpha1() storagev1alpha1.StorageV1alpha1Interface {
 	return c.storageV1alpha1
 }
 
-// StoragemigrationV1alpha1 retrieves the StoragemigrationV1alpha1Client
-func (c *Clientset) StoragemigrationV1alpha1() storagemigrationv1alpha1.StoragemigrationV1alpha1Interface {
-	return c.storagemigrationV1alpha1
+// StoragemigrationV1beta1 retrieves the StoragemigrationV1beta1Client
+func (c *Clientset) StoragemigrationV1beta1() storagemigrationv1beta1.StoragemigrationV1beta1Interface {
+	return c.storagemigrationV1beta1
 }
 
 // Discovery retrieves the DiscoveryClient
@@ -736,7 +736,7 @@ func NewForConfigAndClient(c *rest.Config, httpClient *http.Client) (*Clientset,
 	if err != nil {
 		return nil, err
 	}
-	cs.storagemigrationV1alpha1, err = storagemigrationv1alpha1.NewForConfigAndClient(&configShallowCopy, httpClient)
+	cs.storagemigrationV1beta1, err = storagemigrationv1beta1.NewForConfigAndClient(&configShallowCopy, httpClient)
 	if err != nil {
 		return nil, err
 	}
@@ -815,7 +815,7 @@ func New(c rest.Interface) *Clientset {
 	cs.storageV1beta1 = storagev1beta1.New(c)
 	cs.storageV1 = storagev1.New(c)
 	cs.storageV1alpha1 = storagev1alpha1.New(c)
-	cs.storagemigrationV1alpha1 = storagemigrationv1alpha1.New(c)
+	cs.storagemigrationV1beta1 = storagemigrationv1beta1.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs

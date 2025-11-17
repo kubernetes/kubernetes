@@ -20,6 +20,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -32,9 +34,9 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -45,20 +47,30 @@ import (
 	cgotesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/events"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	compbasemetrics "k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/testutil"
+	"k8s.io/dynamic-resource-allocation/deviceclass/extendedresourcecache"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/dynamic-resource-allocation/structured"
 	kubeschedulerconfigv1 "k8s.io/kube-scheduler/config/v1"
 	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	configv1 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
+	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
+
+func init() {
+	metrics.InitMetrics()
+}
 
 var (
 	podKind = v1.SchemeGroupVersion.WithKind("Pod")
@@ -78,6 +90,7 @@ var (
 	namespace                    = "default"
 	attrName                     = resourceapi.QualifiedName("healthy") // device attribute only available on non-default node
 	extendedResourceName         = "example.com/gpu"
+	extendedResourceName2        = "example.com/gpu2"
 	implicitExtendedResourceName = "deviceclass.resource.kubernetes.io/my-resource-class"
 
 	deviceClass = &resourceapi.DeviceClass{
@@ -93,7 +106,14 @@ var (
 			ExtendedResourceName: &extendedResourceName,
 		},
 	}
-
+	deviceClassWithExtendResourceName2 = &resourceapi.DeviceClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: className + "2",
+		},
+		Spec: resourceapi.DeviceClassSpec{
+			ExtendedResourceName: &extendedResourceName2,
+		},
+	}
 	podWithClaimName = st.MakePod().Name(podName).Namespace(namespace).
 				UID(podUID).
 				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimName: &claimName}).
@@ -128,6 +148,13 @@ var (
 			v1.ResourceName(extendedResourceName): "1",
 		}).
 		Obj()
+	podWithExtendedResourceName2 = st.MakePod().Name(podName).Namespace(namespace).
+					UID(podUID).
+					Req(map[v1.ResourceName]string{
+			v1.ResourceName(extendedResourceName):  "1",
+			v1.ResourceName(extendedResourceName2): "1",
+		}).
+		Obj()
 	podWithImplicitExtendedResourceName = st.MakePod().Name(podName).Namespace(namespace).
 						UID(podUID).
 						Req(map[v1.ResourceName]string{
@@ -158,8 +185,9 @@ var (
 	workerNode3      = &st.MakeNode().Name(node3Name).Label("kubernetes.io/hostname", node3Name).Node
 	workerNode3Slice = st.MakeResourceSlice(node3Name, driver).Device("instance-1", map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{attrName: {BoolValue: ptr.To(true)}}).Obj()
 
-	workerNodeWithExtendedResource = &st.MakeNode().Name(nodeName).Label("kubernetes.io/hostname", nodeName).Capacity(map[v1.ResourceName]string{v1.ResourceName(extendedResourceName): "1"}).Node
-	brokenSelector                 = resourceapi.DeviceSelector{
+	workerNodeWithExtendedResource                = &st.MakeNode().Name(nodeName).Label("kubernetes.io/hostname", nodeName).Capacity(map[v1.ResourceName]string{v1.ResourceName(extendedResourceName): "1"}).Node
+	workerNodeWithExtendedResourceZeroAllocatable = &st.MakeNode().Name(nodeName).Label("kubernetes.io/hostname", nodeName).Capacity(map[v1.ResourceName]string{v1.ResourceName(extendedResourceName): "0"}).Node
+	brokenSelector                                = resourceapi.DeviceSelector{
 		CEL: &resourceapi.CELDeviceSelector{
 			// Not set for workerNode.
 			Expression: fmt.Sprintf(`device.attributes["%s"].%s`, driver, attrName),
@@ -188,8 +216,39 @@ var (
 	claimWithPrioritzedList = st.MakeResourceClaim().
 				Name(claimName).
 				Namespace(namespace).
-				RequestWithPrioritizedList(className).
-				Obj()
+				RequestWithPrioritizedList(
+			st.SubRequest("subreq-1", className, 1),
+		).
+		Obj()
+	claimWithPrioritizedListAndSelector = st.MakeResourceClaim().
+						Name(claimName).
+						Namespace(namespace).
+						RequestWithPrioritizedList(
+			st.SubRequestWithSelector("subreq-1", className, fmt.Sprintf(`device.attributes["%s"].%s`, driver, attrName)),
+			st.SubRequest("subreq-2", className, 1),
+		).
+		Obj()
+	claimWithMultiplePrioritizedListRequests = st.MakeResourceClaim().
+							Name(claimName).
+							Namespace(namespace).
+							RequestWithPrioritizedList(
+			st.SubRequest("subreq-1", className, 2),
+			st.SubRequest("subreq-2", className, 1),
+		).
+		RequestWithPrioritizedList(
+			st.SubRequest("subreq-1", className, 2),
+			st.SubRequest("subreq-2", className, 1),
+		).Obj()
+	claim2WithPrioritizedListAndMultipleSubrequests = st.MakeResourceClaim().
+							Name(claimName2).
+							Namespace(namespace).
+							RequestWithPrioritizedList(
+			st.SubRequest("subreq-1", className, 4),
+			st.SubRequest("subreq-2", className, 3),
+			st.SubRequest("subreq-3", className, 2),
+			st.SubRequest("subreq-4", className, 1),
+		).Obj()
+
 	pendingClaim = st.FromResourceClaim(claim).
 			OwnerReference(podName, podUID, podKind).
 			Obj()
@@ -199,6 +258,15 @@ var (
 	pendingClaimWithPrioritizedList = st.FromResourceClaim(claimWithPrioritzedList).
 					OwnerReference(podName, podUID, podKind).
 					Obj()
+	pendingClaimWithPrioritizedListAndSelector = st.FromResourceClaim(claimWithPrioritizedListAndSelector).
+							OwnerReference(podName, podUID, podKind).
+							Obj()
+	pendingClaim2WithPrioritizedListAndMultipleSubrequests = st.FromResourceClaim(claim2WithPrioritizedListAndMultipleSubrequests).
+								OwnerReference(podName, podUID, podKind).
+								Obj()
+	pendingClaimWithMultiplePrioritizedListRequests = st.FromResourceClaim(claimWithMultiplePrioritizedListRequests).
+							OwnerReference(podName, podUID, podKind).
+							Obj()
 	allocationResult = &resourceapi.AllocationResult{
 		Devices: resourceapi.DeviceAllocationResult{
 			Results: []resourceapi.DeviceRequestAllocationResult{{
@@ -232,6 +300,19 @@ var (
 				Pool:    nodeName,
 				Device:  "instance-1",
 				Request: "container-0-request-0",
+			}},
+		},
+		NodeSelector: func() *v1.NodeSelector {
+			return st.MakeNodeSelector().In("metadata.name", []string{nodeName}, st.NodeSelectorTypeMatchFields).Obj()
+		}(),
+	}
+	extendedResourceAllocationResult2 = &resourceapi.AllocationResult{
+		Devices: resourceapi.DeviceAllocationResult{
+			Results: []resourceapi.DeviceRequestAllocationResult{{
+				Driver:  driver,
+				Pool:    nodeName,
+				Device:  "instance-1",
+				Request: "container-0-request-1",
 			}},
 		},
 		NodeSelector: func() *v1.NodeSelector {
@@ -319,6 +400,79 @@ var (
 			return st.MakeNodeSelector().In("metadata.name", []string{nodeName}, st.NodeSelectorTypeMatchFields).Obj()
 		}(),
 	}
+	allocationResultWithPrioritizedListAndSelector = &resourceapi.AllocationResult{
+		Devices: resourceapi.DeviceAllocationResult{
+			Results: []resourceapi.DeviceRequestAllocationResult{{
+				Driver:  driver,
+				Pool:    nodeName,
+				Device:  "instance-1",
+				Request: "req-1/subreq-1",
+			}},
+		},
+		NodeSelector: func() *v1.NodeSelector {
+			return st.MakeNodeSelector().In("metadata.name", []string{nodeName}, st.NodeSelectorTypeMatchFields).Obj()
+		}(),
+	}
+	allocationResultWithPrioritizedListAndMultipleSubrequests = &resourceapi.AllocationResult{
+		Devices: resourceapi.DeviceAllocationResult{
+			Results: []resourceapi.DeviceRequestAllocationResult{
+				{
+					Driver:  driver,
+					Pool:    nodeName,
+					Device:  "instance-1",
+					Request: "req-1/subreq-2",
+				},
+				{
+					Driver:  driver,
+					Pool:    nodeName,
+					Device:  "instance-2",
+					Request: "req-1/subreq-2",
+				},
+				{
+					Driver:  driver,
+					Pool:    nodeName,
+					Device:  "instance-3",
+					Request: "req-1/subreq-2",
+				},
+			},
+		},
+		NodeSelector: func() *v1.NodeSelector {
+			return st.MakeNodeSelector().In("metadata.name", []string{nodeName}, st.NodeSelectorTypeMatchFields).Obj()
+		}(),
+	}
+	allocationResultWithMultiplePrioritizedListRequests = &resourceapi.AllocationResult{
+		Devices: resourceapi.DeviceAllocationResult{
+			Results: []resourceapi.DeviceRequestAllocationResult{
+				{
+					Driver:  driver,
+					Pool:    nodeName,
+					Device:  "instance-1",
+					Request: "req-1/subreq-1",
+				},
+				{
+					Driver:  driver,
+					Pool:    nodeName,
+					Device:  "instance-2",
+					Request: "req-1/subreq-1",
+				},
+				{
+					Driver:  driver,
+					Pool:    nodeName,
+					Device:  "instance-1",
+					Request: "req-2/subreq-1",
+				},
+				{
+					Driver:  driver,
+					Pool:    nodeName,
+					Device:  "instance-2",
+					Request: "req-2/subreq-1",
+				},
+			},
+		},
+		NodeSelector: func() *v1.NodeSelector {
+			return st.MakeNodeSelector().In("metadata.name", []string{nodeName}, st.NodeSelectorTypeMatchFields).Obj()
+		}(),
+	}
 	inUseClaim = st.FromResourceClaim(pendingClaim).
 			Allocation(allocationResult).
 			ReservedForPod(podName, types.UID(podUID)).
@@ -327,6 +481,18 @@ var (
 					Allocation(allocationResultWithPrioritizedList).
 					ReservedForPod(podName, types.UID(podUID)).
 					Obj()
+	inUseClaimWithPrioritizedListAndSelector = st.FromResourceClaim(pendingClaimWithPrioritizedListAndSelector).
+							Allocation(allocationResultWithPrioritizedListAndSelector).
+							ReservedForPod(podName, types.UID(podUID)).
+							Obj()
+	inUseClaim2WithPrioritizedListAndMultipleSubrequests = st.FromResourceClaim(pendingClaim2WithPrioritizedListAndMultipleSubrequests).
+								Allocation(allocationResultWithPrioritizedListAndMultipleSubrequests).
+								ReservedForPod(podName, types.UID(podUID)).
+								Obj()
+	inUseClaimWithMultiplePrioritizedListRequests = st.FromResourceClaim(pendingClaimWithMultiplePrioritizedListRequests).
+							Allocation(allocationResultWithMultiplePrioritizedListRequests).
+							ReservedForPod(podName, types.UID(podUID)).
+							Obj()
 	allocatedClaim = st.FromResourceClaim(pendingClaim).
 			Allocation(allocationResult).
 			Obj()
@@ -336,7 +502,15 @@ var (
 	allocatedClaimWithPrioritizedList = st.FromResourceClaim(pendingClaimWithPrioritizedList).
 						Allocation(allocationResultWithPrioritizedList).
 						Obj()
-
+	allocatedClaimWithPrioritizedListAndSelector = st.FromResourceClaim(pendingClaimWithPrioritizedListAndSelector).
+							Allocation(allocationResultWithPrioritizedListAndSelector).
+							Obj()
+	allocatedClaim2WithPrioritizedListAndMultipleSubrequests = st.FromResourceClaim(pendingClaim2WithPrioritizedListAndMultipleSubrequests).
+									Allocation(allocationResultWithPrioritizedListAndMultipleSubrequests).
+									Obj()
+	allocatedClaimWithMultiplePrioritizedListRequests = st.FromResourceClaim(pendingClaimWithMultiplePrioritizedListRequests).
+								Allocation(allocationResultWithMultiplePrioritizedListRequests).
+								Obj()
 	allocatedClaimWithWrongTopology = st.FromResourceClaim(allocatedClaim).
 					Allocation(&resourceapi.AllocationResult{NodeSelector: st.MakeNodeSelector().In("no-such-label", []string{"no-such-value"}, st.NodeSelectorTypeMatchExpressions).Obj()}).
 					Obj()
@@ -358,15 +532,30 @@ var (
 				Annotations(map[string]string{"resource.kubernetes.io/extended-resource-claim": "true"}).
 				OwnerRef(
 			metav1.OwnerReference{
-				APIVersion:         "v1",
-				Kind:               "Pod",
-				Name:               podName,
-				UID:                types.UID(podUID),
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				APIVersion: "v1",
+				Kind:       "Pod",
+				Name:       podName,
+				UID:        types.UID(podUID),
+				Controller: ptr.To(true),
 			}).
 		RequestWithName("container-0-request-0", className).
 		Allocation(extendedResourceAllocationResult).
+		Obj()
+	extendedResourceClaim2 = st.MakeResourceClaim().
+				Name("my-pod-extended-resources-0").
+				GenerateName("my-pod-extended-resources-").
+				Namespace(namespace).
+				Annotations(map[string]string{"resource.kubernetes.io/extended-resource-claim": "true"}).
+				OwnerRef(
+			metav1.OwnerReference{
+				APIVersion: "v1",
+				Kind:       "Pod",
+				Name:       podName,
+				UID:        types.UID(podUID),
+				Controller: ptr.To(true),
+			}).
+		RequestWithName("container-0-request-1", className+"2").
+		Allocation(extendedResourceAllocationResult2).
 		Obj()
 	extendedResourceClaimNoName = st.MakeResourceClaim().
 					Name(specialClaimInMemName).
@@ -375,15 +564,30 @@ var (
 					Annotations(map[string]string{"resource.kubernetes.io/extended-resource-claim": "true"}).
 					OwnerRef(
 			metav1.OwnerReference{
-				APIVersion:         "v1",
-				Kind:               "Pod",
-				Name:               podName,
-				UID:                types.UID(podUID),
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				APIVersion: "v1",
+				Kind:       "Pod",
+				Name:       podName,
+				UID:        types.UID(podUID),
+				Controller: ptr.To(true),
 			}).
 		RequestWithName("container-0-request-0", className).
 		Allocation(extendedResourceAllocationResult).
+		Obj()
+	extendedResourceClaimNoName2 = st.MakeResourceClaim().
+					Name(specialClaimInMemName).
+					GenerateName("my-pod-extended-resources-").
+					Namespace(namespace).
+					Annotations(map[string]string{"resource.kubernetes.io/extended-resource-claim": "true"}).
+					OwnerRef(
+			metav1.OwnerReference{
+				APIVersion: "v1",
+				Kind:       "Pod",
+				Name:       podName,
+				UID:        types.UID(podUID),
+				Controller: ptr.To(true),
+			}).
+		RequestWithName("container-0-request-1", className+"2").
+		Allocation(extendedResourceAllocationResult2).
 		Obj()
 	implicitExtendedResourceClaim = st.MakeResourceClaim().
 					Name("my-pod-extended-resources-0").
@@ -392,12 +596,11 @@ var (
 					Annotations(map[string]string{"resource.kubernetes.io/extended-resource-claim": "true"}).
 					OwnerRef(
 			metav1.OwnerReference{
-				APIVersion:         "v1",
-				Kind:               "Pod",
-				Name:               podName,
-				UID:                types.UID(podUID),
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				APIVersion: "v1",
+				Kind:       "Pod",
+				Name:       podName,
+				UID:        types.UID(podUID),
+				Controller: ptr.To(true),
 			}).
 		RequestWithName("container-0-request-0", className).
 		RequestWithNameCount("container-0-request-1", className, 2).
@@ -410,12 +613,11 @@ var (
 						Annotations(map[string]string{"resource.kubernetes.io/extended-resource-claim": "true"}).
 						OwnerRef(
 			metav1.OwnerReference{
-				APIVersion:         "v1",
-				Kind:               "Pod",
-				Name:               podName,
-				UID:                types.UID(podUID),
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				APIVersion: "v1",
+				Kind:       "Pod",
+				Name:       podName,
+				UID:        types.UID(podUID),
+				Controller: ptr.To(true),
 			}).
 		RequestWithName("container-0-request-0", className).
 		RequestWithNameCount("container-0-request-1", className, 2).
@@ -428,12 +630,11 @@ var (
 							Annotations(map[string]string{"resource.kubernetes.io/extended-resource-claim": "true"}).
 							OwnerRef(
 			metav1.OwnerReference{
-				APIVersion:         "v1",
-				Kind:               "Pod",
-				Name:               podName,
-				UID:                types.UID(podUID),
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				APIVersion: "v1",
+				Kind:       "Pod",
+				Name:       podName,
+				UID:        types.UID(podUID),
+				Controller: ptr.To(true),
 			}).
 		RequestWithName("container-0-request-0", className).
 		RequestWithNameCount("container-1-request-0", className, 2).
@@ -446,12 +647,11 @@ var (
 								Annotations(map[string]string{"resource.kubernetes.io/extended-resource-claim": "true"}).
 								OwnerRef(
 			metav1.OwnerReference{
-				APIVersion:         "v1",
-				Kind:               "Pod",
-				Name:               podName,
-				UID:                types.UID(podUID),
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				APIVersion: "v1",
+				Kind:       "Pod",
+				Name:       podName,
+				UID:        types.UID(podUID),
+				Controller: ptr.To(true),
 			}).
 		RequestWithName("container-0-request-0", className).
 		RequestWithNameCount("container-1-request-0", className, 2).
@@ -464,12 +664,11 @@ var (
 					Annotations(map[string]string{"resource.kubernetes.io/extended-resource-claim": "true"}).
 					OwnerRef(
 			metav1.OwnerReference{
-				APIVersion:         "v1",
-				Kind:               "Pod",
-				Name:               podName,
-				UID:                types.UID(podUID),
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
+				APIVersion: "v1",
+				Kind:       "Pod",
+				Name:       podName,
+				UID:        types.UID(podUID),
+				Controller: ptr.To(true),
 			}).
 		RequestWithName("container-0-request-0", className).
 		Allocation(extendedResourceAllocationResultNode2).
@@ -689,9 +888,9 @@ type result struct {
 	// nil if none.
 	assumedClaim *resourceapi.ResourceClaim
 
-	// inFlightClaim is the one claim which is expected to be tracked as
+	// inFlightClaims is a list of claims which are expected to be tracked as
 	// in flight, nil if none.
-	inFlightClaim *resourceapi.ResourceClaim
+	inFlightClaims []metav1.Object
 }
 
 // change contains functions for modifying objects of a certain type. These
@@ -709,19 +908,32 @@ func (p perNodeResult) forNode(nodeName string) result {
 	return p[nodeName]
 }
 
+type perNodeScoreResult map[string]int64
+
+func (p perNodeScoreResult) forNode(nodeName string) int64 {
+	if p == nil {
+		return 0
+	}
+	return p[nodeName]
+}
+
 type want struct {
-	preenqueue       result
-	preFilterResult  *fwk.PreFilterResult
-	prefilter        result
-	filter           perNodeResult
-	prescore         result
-	reserve          result
-	unreserve        result
-	prebindPreFlight *fwk.Status
-	prebind          result
-	postbind         result
-	postFilterResult *fwk.PostFilterResult
-	postfilter       result
+	preenqueue           result
+	preFilterResult      *fwk.PreFilterResult
+	prefilter            result
+	filter               perNodeResult
+	prescore             result
+	scoreResult          perNodeScoreResult
+	score                perNodeResult
+	normalizeScoreResult fwk.NodeScoreList
+	normalizeScore       result
+	reserve              result
+	unreserve            result
+	prebindPreFlight     *fwk.Status
+	prebind              result
+	postbind             result
+	postFilterResult     *fwk.PostFilterResult
+	postfilter           result
 
 	// unreserveAfterBindFailure, if set, triggers a call to Unreserve
 	// after PreBind, as if the actual Bind had failed.
@@ -780,6 +992,8 @@ func TestPlugin(t *testing.T) {
 		disableDRASchedulerFilterTimeout bool
 		skipOnWindows                    string
 		failPatch                        bool
+		reactors                         []cgotesting.Reactor
+		metrics                          func(*testing.T, compbasemetrics.Gatherer)
 	}{
 		"empty": {
 			pod: st.MakePod().Name("foo").Namespace("default").Obj(),
@@ -899,7 +1113,7 @@ func TestPlugin(t *testing.T) {
 			objs:    []apiruntime.Object{workerNodeSlice},
 			want: want{
 				reserve: result{
-					inFlightClaim: allocatedClaim,
+					inFlightClaims: []metav1.Object{allocatedClaim},
 				},
 				prebind: result{
 					assumedClaim: reserve(allocatedClaim, podWithClaimName),
@@ -932,7 +1146,7 @@ func TestPlugin(t *testing.T) {
 			objs:    []apiruntime.Object{workerNodeSlice},
 			want: want{
 				reserve: result{
-					inFlightClaim: allocatedClaim,
+					inFlightClaims: []metav1.Object{allocatedClaim},
 				},
 				prebind: result{
 					assumedClaim: reserve(allocatedClaim, podWithClaimName),
@@ -972,7 +1186,7 @@ func TestPlugin(t *testing.T) {
 			},
 			want: want{
 				reserve: result{
-					inFlightClaim: allocatedClaim,
+					inFlightClaims: []metav1.Object{allocatedClaim},
 				},
 				prebind: result{
 					assumedClaim: reserve(allocatedClaim, podWithClaimName),
@@ -1009,7 +1223,7 @@ func TestPlugin(t *testing.T) {
 			},
 			want: want{
 				reserve: result{
-					inFlightClaim: allocatedClaim,
+					inFlightClaims: []metav1.Object{allocatedClaim},
 				},
 				prebind: result{
 					assumedClaim: reserve(allocatedClaim, podWithClaimName),
@@ -1035,7 +1249,7 @@ func TestPlugin(t *testing.T) {
 			objs:    []apiruntime.Object{workerNodeSlice},
 			want: want{
 				reserve: result{
-					inFlightClaim: allocatedClaim,
+					inFlightClaims: []metav1.Object{allocatedClaim},
 				},
 				unreserveBeforePreBind: &result{},
 			},
@@ -1069,7 +1283,7 @@ func TestPlugin(t *testing.T) {
 			objs:                  []apiruntime.Object{taintDevices(workerNodeSlice)},
 			want: want{
 				reserve: result{
-					inFlightClaim: allocatedClaim,
+					inFlightClaims: []metav1.Object{allocatedClaim},
 				},
 				prebind: result{
 					assumedClaim: reserve(allocatedClaim, podWithClaimName),
@@ -1117,7 +1331,7 @@ func TestPlugin(t *testing.T) {
 			objs:    []apiruntime.Object{workerNodeSlice},
 			want: want{
 				reserve: result{
-					inFlightClaim: adminAccess(allocatedClaim),
+					inFlightClaims: []metav1.Object{adminAccess(allocatedClaim)},
 				},
 				prebind: result{
 					assumedClaim: reserve(adminAccess(allocatedClaim), podWithClaimName),
@@ -1165,7 +1379,7 @@ func TestPlugin(t *testing.T) {
 			objs:    []apiruntime.Object{workerNodeSlice},
 			want: want{
 				reserve: result{
-					inFlightClaim: allocatedClaim,
+					inFlightClaims: []metav1.Object{allocatedClaim},
 				},
 				prebind: result{
 					assumedClaim: reserve(allocatedClaim, podWithClaimName),
@@ -1397,7 +1611,7 @@ func TestPlugin(t *testing.T) {
 			objs:                     []apiruntime.Object{workerNodeSlice},
 			want: want{
 				reserve: result{
-					inFlightClaim: allocatedClaimWithPrioritizedList,
+					inFlightClaims: []metav1.Object{allocatedClaimWithPrioritizedList},
 				},
 				prebind: result{
 					assumedClaim: reserve(allocatedClaimWithPrioritizedList, podWithClaimName),
@@ -1414,7 +1628,7 @@ func TestPlugin(t *testing.T) {
 				},
 			},
 		},
-		"extended-resource-name-wth-node-resource": {
+		"extended-resource-name-with-node-resource": {
 			enableDRAExtendedResource:          true,
 			enableDRADeviceBindingConditions:   true,
 			enableDRAResourceClaimDeviceStatus: true,
@@ -1422,6 +1636,63 @@ func TestPlugin(t *testing.T) {
 			pod:                                podWithExtendedResourceName,
 			classes:                            []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
 			want:                               want{},
+			metrics: func(t *testing.T, g compbasemetrics.Gatherer) {
+				_, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
+				require.ErrorContains(t, err, "not found")
+			},
+		},
+		"extended-resource-one-device-plugin-one-dra": {
+			enableDRAExtendedResource:          true,
+			enableDRADeviceBindingConditions:   true,
+			enableDRAResourceClaimDeviceStatus: true,
+			nodes:                              []*v1.Node{workerNodeWithExtendedResource},
+			pod:                                podWithExtendedResourceName2,
+			classes:                            []*resourceapi.DeviceClass{deviceClassWithExtendResourceName, deviceClassWithExtendResourceName2},
+			objs:                               []apiruntime.Object{workerNodeSlice, podWithExtendedResourceName2},
+			want: want{
+				reserve: result{
+					inFlightClaims: []metav1.Object{extendedResourceClaimNoName2},
+				},
+				prebind: result{
+					assumedClaim: reserve(extendedResourceClaim2, podWithExtendedResourceName2),
+					added:        []metav1.Object{reserve(extendedResourceClaim2, podWithExtendedResourceName2)},
+				},
+				postbind: result{
+					assumedClaim: reserve(extendedResourceClaim2, podWithExtendedResourceName2),
+				},
+			},
+		},
+		"extended-resource-name-with-zero-allocatable": {
+			enableDRAExtendedResource: true,
+			nodes:                     []*v1.Node{workerNodeWithExtendedResourceZeroAllocatable},
+			pod:                       podWithExtendedResourceName,
+			classes:                   []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
+			objs:                      []apiruntime.Object{workerNodeSlice, podWithExtendedResourceName},
+			want: want{
+				reserve: result{
+					inFlightClaims: []metav1.Object{extendedResourceClaimNoName},
+				},
+				prebind: result{
+					assumedClaim: reserve(extendedResourceClaim, podWithExtendedResourceName),
+					added:        []metav1.Object{reserve(extendedResourceClaim, podWithExtendedResourceName)},
+				},
+				postbind: result{
+					assumedClaim: reserve(extendedResourceClaim, podWithExtendedResourceName),
+				},
+			},
+		},
+		"non-DRA-extended-resource-name-with-zero-allocatable": {
+			enableDRAExtendedResource: true,
+			nodes:                     []*v1.Node{workerNodeWithExtendedResourceZeroAllocatable},
+			pod:                       podWithExtendedResourceName,
+			classes:                   []*resourceapi.DeviceClass{deviceClass},
+			objs:                      []apiruntime.Object{workerNodeSlice, podWithExtendedResourceName},
+			want: want{
+				prefilter: result{
+					status: fwk.NewStatus(fwk.Skip),
+				},
+				prebindPreFlight: fwk.NewStatus(fwk.Skip),
+			},
 		},
 		"extended-resource-name-no-resource": {
 			enableDRAExtendedResource: true,
@@ -1437,6 +1708,10 @@ func TestPlugin(t *testing.T) {
 					status: fwk.NewStatus(fwk.Unschedulable, `still not schedulable`),
 				},
 			},
+			metrics: func(t *testing.T, g compbasemetrics.Gatherer) {
+				_, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
+				require.ErrorContains(t, err, "not found")
+			},
 		},
 		"extended-resource-name-with-resources": {
 			enableDRAExtendedResource: true,
@@ -1445,7 +1720,7 @@ func TestPlugin(t *testing.T) {
 			objs:                      []apiruntime.Object{workerNodeSlice, podWithExtendedResourceName},
 			want: want{
 				reserve: result{
-					inFlightClaim: extendedResourceClaimNoName,
+					inFlightClaims: []metav1.Object{extendedResourceClaimNoName},
 				},
 				prebind: result{
 					assumedClaim: reserve(extendedResourceClaim, podWithExtendedResourceName),
@@ -1455,6 +1730,11 @@ func TestPlugin(t *testing.T) {
 					assumedClaim: reserve(extendedResourceClaim, podWithExtendedResourceName),
 				},
 			},
+			metrics: func(t *testing.T, g compbasemetrics.Gatherer) {
+				metric, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
+				require.NoError(t, err)
+				require.Equal(t, 1, int(metric["success"]))
+			},
 		},
 		"implicit-extended-resource-name-with-resources": {
 			enableDRAExtendedResource: true,
@@ -1463,7 +1743,7 @@ func TestPlugin(t *testing.T) {
 			objs:                      []apiruntime.Object{largeWorkerNodeSlice, podWithImplicitExtendedResourceName},
 			want: want{
 				reserve: result{
-					inFlightClaim: implicitExtendedResourceClaimNoName,
+					inFlightClaims: []metav1.Object{implicitExtendedResourceClaimNoName},
 				},
 				prebind: result{
 					assumedClaim: reserve(implicitExtendedResourceClaim, podWithImplicitExtendedResourceName),
@@ -1473,6 +1753,11 @@ func TestPlugin(t *testing.T) {
 					assumedClaim: reserve(implicitExtendedResourceClaim, podWithImplicitExtendedResourceName),
 				},
 			},
+			metrics: func(t *testing.T, g compbasemetrics.Gatherer) {
+				metric, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
+				require.NoError(t, err)
+				require.Equal(t, 1, int(metric["success"]))
+			},
 		},
 		"implicit-extended-resource-name-two-containers-with-resources": {
 			enableDRAExtendedResource: true,
@@ -1481,7 +1766,7 @@ func TestPlugin(t *testing.T) {
 			objs:                      []apiruntime.Object{largeWorkerNodeSlice, podWithImplicitExtendedResourceNameTwoContainers},
 			want: want{
 				reserve: result{
-					inFlightClaim: implicitExtendedResourceClaimNoNameTwoContainers,
+					inFlightClaims: []metav1.Object{implicitExtendedResourceClaimNoNameTwoContainers},
 				},
 				prebind: result{
 					assumedClaim: reserve(implicitExtendedResourceClaimTwoContainers, podWithImplicitExtendedResourceNameTwoContainers),
@@ -1490,6 +1775,11 @@ func TestPlugin(t *testing.T) {
 				postbind: result{
 					assumedClaim: reserve(implicitExtendedResourceClaimTwoContainers, podWithImplicitExtendedResourceNameTwoContainers),
 				},
+			},
+			metrics: func(t *testing.T, g compbasemetrics.Gatherer) {
+				metric, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
+				require.NoError(t, err)
+				require.Equal(t, 1, int(metric["success"]))
 			},
 		},
 		"extended-resource-name-with-resources-fail-patch": {
@@ -1500,7 +1790,7 @@ func TestPlugin(t *testing.T) {
 			objs:                      []apiruntime.Object{workerNodeSlice, podWithExtendedResourceName},
 			want: want{
 				reserve: result{
-					inFlightClaim: extendedResourceClaimNoName,
+					inFlightClaims: []metav1.Object{extendedResourceClaimNoName},
 				},
 				prebind: result{
 					assumedClaim: reserve(extendedResourceClaim, podWithExtendedResourceName),
@@ -1510,6 +1800,11 @@ func TestPlugin(t *testing.T) {
 				postbind: result{
 					assumedClaim: reserve(extendedResourceClaim, podWithExtendedResourceName),
 				},
+			},
+			metrics: func(t *testing.T, g compbasemetrics.Gatherer) {
+				metric, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
+				require.NoError(t, err)
+				require.Equal(t, 1, int(metric["success"]))
 			},
 		},
 		"extended-resource-name-with-resources-has-claim": {
@@ -1529,6 +1824,10 @@ func TestPlugin(t *testing.T) {
 					removed: []metav1.Object{extendedResourceClaim},
 				},
 			},
+			metrics: func(t *testing.T, g compbasemetrics.Gatherer) {
+				_, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
+				require.ErrorContains(t, err, "not found")
+			},
 		},
 		"extended-resource-name-with-resources-delete-claim": {
 			enableDRAExtendedResource: true,
@@ -1547,6 +1846,10 @@ func TestPlugin(t *testing.T) {
 					removed: []metav1.Object{extendedResourceClaimNode2},
 				},
 			},
+			metrics: func(t *testing.T, g compbasemetrics.Gatherer) {
+				_, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
+				require.ErrorContains(t, err, "not found")
+			},
 		},
 		"extended-resource-name-bind-failure": {
 			enableDRAExtendedResource: true,
@@ -1555,7 +1858,7 @@ func TestPlugin(t *testing.T) {
 			objs:                      []apiruntime.Object{workerNodeSlice, podWithExtendedResourceName},
 			want: want{
 				reserve: result{
-					inFlightClaim: extendedResourceClaimNoName,
+					inFlightClaims: []metav1.Object{extendedResourceClaimNoName},
 				},
 				prebind: result{
 					assumedClaim: reserve(extendedResourceClaim, podWithExtendedResourceName),
@@ -1565,6 +1868,11 @@ func TestPlugin(t *testing.T) {
 					removed: []metav1.Object{reserve(extendedResourceClaim, podWithExtendedResourceName)},
 				},
 			},
+			metrics: func(t *testing.T, g compbasemetrics.Gatherer) {
+				metric, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
+				require.NoError(t, err)
+				require.Equal(t, 1, int(metric["success"]))
+			},
 		},
 		"extended-resource-name-skip-bind": {
 			enableDRAExtendedResource: true,
@@ -1573,9 +1881,45 @@ func TestPlugin(t *testing.T) {
 			objs:                      []apiruntime.Object{workerNodeSlice, podWithExtendedResourceName},
 			want: want{
 				reserve: result{
-					inFlightClaim: extendedResourceClaimNoName,
+					inFlightClaims: []metav1.Object{extendedResourceClaimNoName},
 				},
 				unreserveBeforePreBind: &result{},
+			},
+			metrics: func(t *testing.T, g compbasemetrics.Gatherer) {
+				metric, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
+				require.NoError(t, err)
+				require.Equal(t, 1, int(metric["success"]))
+			},
+		},
+		"extended-resource-name-claim-creation-failure": {
+			enableDRAExtendedResource: true,
+			pod:                       podWithExtendedResourceName,
+			classes:                   []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
+			objs:                      []apiruntime.Object{workerNodeSlice, podWithExtendedResourceName},
+			want: want{
+				reserve: result{
+					inFlightClaims: []metav1.Object{extendedResourceClaimNoName},
+				},
+				prebind: result{
+					status: fwk.NewStatus(fwk.Unschedulable, `claim creation errors`),
+				},
+				unreserveAfterBindFailure: &result{
+					removed: []metav1.Object{reserve(extendedResourceClaim, podWithExtendedResourceName)},
+				},
+			},
+			reactors: []cgotesting.Reactor{
+				&cgotesting.SimpleReactor{
+					Verb:     "create",
+					Resource: "resourceclaims",
+					Reaction: func(action cgotesting.Action) (handled bool, ret apiruntime.Object, err error) {
+						return true, nil, apierrors.NewBadRequest("claim creation errors")
+					},
+				},
+			},
+			metrics: func(t *testing.T, g compbasemetrics.Gatherer) {
+				metric, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
+				require.NoError(t, err)
+				require.Equal(t, 1, int(metric["failure"]))
 			},
 		},
 		"canceled": {
@@ -1634,7 +1978,7 @@ func TestPlugin(t *testing.T) {
 			objs:                             []apiruntime.Object{workerNodeSlice},
 			want: want{
 				reserve: result{
-					inFlightClaim: allocatedClaim,
+					inFlightClaims: []metav1.Object{allocatedClaim},
 				},
 				prebind: result{
 					assumedClaim: reserve(allocatedClaim, podWithClaimName),
@@ -1664,7 +2008,7 @@ func TestPlugin(t *testing.T) {
 			objs:    []apiruntime.Object{workerNodeSlice},
 			want: want{
 				reserve: result{
-					inFlightClaim: allocatedClaim,
+					inFlightClaims: []metav1.Object{allocatedClaim},
 				},
 				prebind: result{
 					assumedClaim: reserve(allocatedClaim, podWithClaimName),
@@ -1768,7 +2112,10 @@ func TestPlugin(t *testing.T) {
 		"prebind-fail-with-binding-timeout": {
 			enableDRADeviceBindingConditions:   true,
 			enableDRAResourceClaimDeviceStatus: true,
-			pod:                                podWithClaimName,
+			args: &config.DynamicResourcesArgs{
+				BindingTimeout: &metav1.Duration{Duration: 600 * time.Second},
+			},
+			pod: podWithClaimName,
 			claims: func() []*resourceapi.ResourceClaim {
 				claim := allocatedClaim.DeepCopy()
 				claim.Status.Allocation = allocationResultWithBindingConditions.DeepCopy()
@@ -1928,21 +2275,181 @@ func TestPlugin(t *testing.T) {
 				},
 			},
 		},
+		"single-claim-prioritized-list-scoring": {
+			enableDRAPrioritizedList: true,
+			pod:                      podWithClaimName,
+			claims:                   []*resourceapi.ResourceClaim{pendingClaimWithPrioritizedListAndSelector},
+			classes:                  []*resourceapi.DeviceClass{deviceClass},
+			nodes:                    []*v1.Node{workerNode, workerNode2},
+			objs: []apiruntime.Object{
+				st.MakeResourceSlice(nodeName, driver).Device("instance-1", map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{attrName: {BoolValue: ptr.To(true)}}).Obj(),
+				st.MakeResourceSlice(node2Name, driver).Device("instance-1", map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{attrName: {BoolValue: ptr.To(false)}}).Obj(),
+			},
+			want: want{
+				scoreResult: perNodeScoreResult{
+					nodeName:  8,
+					node2Name: 7,
+				},
+				normalizeScoreResult: fwk.NodeScoreList{
+					{
+						Name:  nodeName,
+						Score: 100,
+					},
+					{
+						Name:  node2Name,
+						Score: 87,
+					},
+				},
+				reserve: result{
+					inFlightClaims: []metav1.Object{allocatedClaimWithPrioritizedListAndSelector},
+				},
+				prebind: result{
+					assumedClaim: reserve(allocatedClaimWithPrioritizedListAndSelector, podWithClaimName),
+					changes: change{
+						claim: func(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							if claim.Name == claimName {
+								claim = claim.DeepCopy()
+								claim.Finalizers = allocatedClaimWithPrioritizedListAndSelector.Finalizers
+								claim.Status = inUseClaimWithPrioritizedListAndSelector.Status
+							}
+							return claim
+						},
+					},
+				},
+			},
+		},
+		"multiple-claims-prioritized-list-scoring": {
+			enableDRAPrioritizedList: true,
+			pod:                      podWithTwoClaimNames,
+			claims:                   []*resourceapi.ResourceClaim{pendingClaimWithPrioritizedList, pendingClaim2WithPrioritizedListAndMultipleSubrequests},
+			classes:                  []*resourceapi.DeviceClass{deviceClass},
+			nodes:                    []*v1.Node{workerNode, workerNode2, workerNode3},
+			objs: []apiruntime.Object{
+				st.MakeResourceSlice(nodeName, driver).
+					Device("instance-1").
+					Device("instance-2").
+					Device("instance-3").
+					Device("instance-4").Obj(),
+				st.MakeResourceSlice(node2Name, driver).
+					Device("instance-1").
+					Device("instance-2").Obj(),
+				st.MakeResourceSlice(node3Name, driver).
+					Device("instance-1").Obj(),
+			},
+			want: want{
+				filter: perNodeResult{
+					workerNode3.Name: {
+						status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `cannot allocate all claims`),
+					},
+				},
+				scoreResult: perNodeScoreResult{
+					workerNode.Name:  15,
+					workerNode2.Name: 13,
+				},
+				normalizeScoreResult: fwk.NodeScoreList{
+					{
+						Name:  workerNode.Name,
+						Score: 100,
+					},
+					{
+						Name:  workerNode2.Name,
+						Score: 86,
+					},
+				},
+				reserve: result{
+					inFlightClaims: []metav1.Object{allocatedClaimWithPrioritizedList, allocatedClaim2WithPrioritizedListAndMultipleSubrequests},
+				},
+				prebind: result{
+					assumedClaim: reserve(allocatedClaimWithPrioritizedList, podWithTwoClaimNames),
+					changes: change{
+						claim: func(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							if claim.Name == claimName {
+								claim = claim.DeepCopy()
+								claim.Finalizers = inUseClaimWithPrioritizedList.Finalizers
+								claim.Status = inUseClaimWithPrioritizedList.Status
+							}
+							if claim.Name == claimName2 {
+								claim = claim.DeepCopy()
+								claim.Finalizers = inUseClaim2WithPrioritizedListAndMultipleSubrequests.Finalizers
+								claim.Status = inUseClaim2WithPrioritizedListAndMultipleSubrequests.Status
+							}
+							return claim
+						},
+					},
+				},
+			},
+		},
+		"multiple-requests-prioritized-list-scoring": {
+			enableDRAPrioritizedList: true,
+			pod:                      podWithClaimName,
+			claims:                   []*resourceapi.ResourceClaim{pendingClaimWithMultiplePrioritizedListRequests},
+			classes:                  []*resourceapi.DeviceClass{deviceClass},
+			nodes:                    []*v1.Node{workerNode, workerNode2, workerNode3},
+			objs: []apiruntime.Object{
+				st.MakeResourceSlice(nodeName, driver).
+					Device("instance-1").
+					Device("instance-2").
+					Device("instance-3").
+					Device("instance-4").Obj(),
+				st.MakeResourceSlice(node2Name, driver).
+					Device("instance-1").
+					Device("instance-2").
+					Device("instance-3").Obj(),
+				st.MakeResourceSlice(node3Name, driver).
+					Device("instance-1").
+					Device("instance-2").Obj(),
+			},
+			want: want{
+				scoreResult: perNodeScoreResult{
+					workerNode.Name:  16,
+					workerNode2.Name: 15,
+					workerNode3.Name: 14,
+				},
+				normalizeScoreResult: fwk.NodeScoreList{
+					{
+						Name:  workerNode.Name,
+						Score: 100,
+					},
+					{
+						Name:  workerNode2.Name,
+						Score: 93,
+					},
+					{
+						Name:  workerNode3.Name,
+						Score: 87,
+					},
+				},
+				reserve: result{
+					inFlightClaims: []metav1.Object{allocatedClaimWithMultiplePrioritizedListRequests},
+				},
+				prebind: result{
+					assumedClaim: reserve(allocatedClaimWithMultiplePrioritizedListRequests, podWithClaimName),
+					changes: change{
+						claim: func(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							if claim.Name == claimName {
+								claim = claim.DeepCopy()
+								claim.Finalizers = inUseClaimWithMultiplePrioritizedListRequests.Finalizers
+								claim.Status = inUseClaimWithMultiplePrioritizedListRequests.Status
+							}
+							return claim
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for name, tc := range testcases {
 		if len(tc.skipOnWindows) > 0 && goruntime.GOOS == "windows" {
 			t.Skipf("Skipping '%s' test case on Windows, reason: %s", name, tc.skipOnWindows)
 		}
-		// We can run in parallel because logging is per-test.
 		tc := tc
 		t.Run(name, func(t *testing.T) {
-			t.Parallel()
 			nodes := tc.nodes
 			if nodes == nil {
 				nodes = []*v1.Node{workerNode}
 			}
-			features := feature.Features{
+			feats := feature.Features{
 				EnableDRAAdminAccess:               tc.enableDRAAdminAccess,
 				EnableDRADeviceBindingConditions:   tc.enableDRADeviceBindingConditions,
 				EnableDRAResourceClaimDeviceStatus: tc.enableDRAResourceClaimDeviceStatus,
@@ -1952,8 +2459,14 @@ func TestPlugin(t *testing.T) {
 				EnableDRAPrioritizedList:           tc.enableDRAPrioritizedList,
 				EnableDRAExtendedResource:          tc.enableDRAExtendedResource,
 			}
-			testCtx := setup(t, tc.args, nodes, tc.claims, tc.classes, tc.objs, features, tc.failPatch)
+
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, tc.enableDRAExtendedResource)
+			testCtx := setup(t, tc.args, nodes, tc.claims, tc.classes, tc.objs, feats, tc.failPatch, tc.reactors)
 			initialObjects := testCtx.listAll(t)
+			var registry compbasemetrics.KubeRegistry
+			if tc.metrics != nil {
+				registry = setupMetrics(feats)
+			}
 
 			status := testCtx.p.PreEnqueue(testCtx.ctx, tc.pod)
 			t.Run("PreEnqueue", func(t *testing.T) {
@@ -2002,18 +2515,47 @@ func TestPlugin(t *testing.T) {
 				}
 			}
 
+			var scores fwk.NodeScoreList
 			if !unschedulable && len(potentialNodes) > 1 {
 				initialObjects = testCtx.listAll(t)
 				initialObjects = testCtx.updateAPIServer(t, initialObjects, tc.prepare.prescore)
+
+				for _, potentialNode := range potentialNodes {
+					initialObjects = testCtx.listAll(t)
+					score, status := testCtx.p.Score(testCtx.ctx, testCtx.state, tc.pod, potentialNode)
+					nodeName := potentialNode.Node().Name
+					t.Run(fmt.Sprintf("score/%s", nodeName), func(t *testing.T) {
+						assert.Equal(t, tc.want.scoreResult.forNode(nodeName), score)
+						testCtx.verify(t, tc.want.score.forNode(nodeName), initialObjects, nil, status)
+					})
+					scores = append(scores, fwk.NodeScore{Name: nodeName, Score: score})
+				}
+
+				initialObjects = testCtx.listAll(t)
+				status := testCtx.p.NormalizeScore(testCtx.ctx, testCtx.state, tc.pod, scores)
+				t.Run("normalizeScore", func(t *testing.T) {
+					assert.Equal(t, tc.want.normalizeScoreResult, scores)
+					testCtx.verify(t, tc.want.normalizeScore, initialObjects, nil, status)
+				})
 			}
 
-			var selectedNode fwk.NodeInfo
+			var selectedNodeName string
 			if !unschedulable && len(potentialNodes) > 0 {
-				selectedNode = potentialNodes[0]
+				if len(scores) > 0 {
+					nodeScore := scores[0]
+					for _, score := range scores {
+						if score.Score > nodeScore.Score {
+							nodeScore = score
+						}
+					}
+					selectedNodeName = nodeScore.Name
+				} else {
+					selectedNodeName = potentialNodes[0].Node().Name
+				}
 
 				initialObjects = testCtx.listAll(t)
 				initialObjects = testCtx.updateAPIServer(t, initialObjects, tc.prepare.reserve)
-				status := testCtx.p.Reserve(testCtx.ctx, testCtx.state, tc.pod, selectedNode.Node().Name)
+				status := testCtx.p.Reserve(testCtx.ctx, testCtx.state, tc.pod, selectedNodeName)
 				t.Run("reserve", func(t *testing.T) {
 					testCtx.verify(t, tc.want.reserve, initialObjects, nil, status)
 				})
@@ -2022,18 +2564,18 @@ func TestPlugin(t *testing.T) {
 				}
 			}
 
-			if selectedNode != nil {
+			if selectedNodeName != "" {
 				if unschedulable {
 					initialObjects = testCtx.listAll(t)
 					initialObjects = testCtx.updateAPIServer(t, initialObjects, tc.prepare.unreserve)
-					testCtx.p.Unreserve(testCtx.ctx, testCtx.state, tc.pod, selectedNode.Node().Name)
+					testCtx.p.Unreserve(testCtx.ctx, testCtx.state, tc.pod, selectedNodeName)
 					t.Run("unreserve", func(t *testing.T) {
 						testCtx.verify(t, tc.want.unreserve, initialObjects, nil, status)
 					})
 				} else {
 					if tc.want.unreserveBeforePreBind != nil {
 						initialObjects = testCtx.listAll(t)
-						testCtx.p.Unreserve(testCtx.ctx, testCtx.state, tc.pod, selectedNode.Node().Name)
+						testCtx.p.Unreserve(testCtx.ctx, testCtx.state, tc.pod, selectedNodeName)
 						t.Run("unreserveBeforePreBind", func(t *testing.T) {
 							testCtx.verify(t, *tc.want.unreserveBeforePreBind, initialObjects, nil, status)
 						})
@@ -2042,17 +2584,17 @@ func TestPlugin(t *testing.T) {
 
 					initialObjects = testCtx.listAll(t)
 					initialObjects = testCtx.updateAPIServer(t, initialObjects, tc.prepare.prebind)
-					preBindPreFlightStatus := testCtx.p.PreBindPreFlight(testCtx.ctx, testCtx.state, tc.pod, selectedNode.Node().Name)
+					preBindPreFlightStatus := testCtx.p.PreBindPreFlight(testCtx.ctx, testCtx.state, tc.pod, selectedNodeName)
 					t.Run("prebindPreFlight", func(t *testing.T) {
 						assert.Equal(t, tc.want.prebindPreFlight, preBindPreFlightStatus)
 					})
-					preBindStatus := testCtx.p.PreBind(testCtx.ctx, testCtx.state, tc.pod, selectedNode.Node().Name)
+					preBindStatus := testCtx.p.PreBind(testCtx.ctx, testCtx.state, tc.pod, selectedNodeName)
 					t.Run("prebind", func(t *testing.T) {
 						testCtx.verify(t, tc.want.prebind, initialObjects, nil, preBindStatus)
 					})
 					if tc.want.unreserveAfterBindFailure != nil {
 						initialObjects = testCtx.listAll(t)
-						testCtx.p.Unreserve(testCtx.ctx, testCtx.state, tc.pod, selectedNode.Node().Name)
+						testCtx.p.Unreserve(testCtx.ctx, testCtx.state, tc.pod, selectedNodeName)
 						t.Run("unreserverAfterBindFailure", func(t *testing.T) {
 							testCtx.verify(t, *tc.want.unreserveAfterBindFailure, initialObjects, nil, status)
 						})
@@ -2070,8 +2612,22 @@ func TestPlugin(t *testing.T) {
 					testCtx.verify(t, tc.want.postfilter, initialObjects, nil, status)
 				})
 			}
+			if tc.metrics != nil {
+				tc.metrics(t, registry)
+			}
 		})
 	}
+}
+
+func setupMetrics(features feature.Features) compbasemetrics.KubeRegistry {
+	// Since feature gate is not set globally, we can't use metrics.Register().
+	// We use a new registry instead of using global registry.
+	testRegistry := compbasemetrics.NewKubeRegistry()
+	if features.EnableDRAExtendedResource {
+		testRegistry.MustRegister(metrics.ResourceClaimCreatesTotal)
+		metrics.ResourceClaimCreatesTotal.Reset()
+	}
+	return testRegistry
 }
 
 type testContext struct {
@@ -2168,12 +2724,8 @@ func (tc *testContext) verify(t *testing.T, expected result, initialObjects []me
 		}
 	}
 
-	var expectInFlightClaims []metav1.Object
-	if expected.inFlightClaim != nil {
-		expectInFlightClaims = append(expectInFlightClaims, expected.inFlightClaim)
-	}
 	actualInFlightClaims := tc.listInFlightClaims()
-	if diff := cmp.Diff(expectInFlightClaims, actualInFlightClaims, ignoreFieldsInResourceClaims...); diff != "" {
+	if diff := cmp.Diff(expected.inFlightClaims, actualInFlightClaims, ignoreFieldsInResourceClaims...); diff != "" {
 		t.Errorf("In-flight claims are different (- expected, + actual):\n%s", diff)
 	}
 }
@@ -2268,7 +2820,7 @@ func update(t *testing.T, objects []metav1.Object, updates change) []metav1.Obje
 	return updated
 }
 
-func setup(t *testing.T, args *config.DynamicResourcesArgs, nodes []*v1.Node, claims []*resourceapi.ResourceClaim, classes []*resourceapi.DeviceClass, objs []apiruntime.Object, features feature.Features, failPatch bool) (result *testContext) {
+func setup(t *testing.T, args *config.DynamicResourcesArgs, nodes []*v1.Node, claims []*resourceapi.ResourceClaim, classes []*resourceapi.DeviceClass, objs []apiruntime.Object, features feature.Features, failPatch bool, apiReactors []cgotesting.Reactor) (result *testContext) {
 	t.Helper()
 
 	tc := &testContext{}
@@ -2278,14 +2830,16 @@ func setup(t *testing.T, args *config.DynamicResourcesArgs, nodes []*v1.Node, cl
 	tc.client = fake.NewSimpleClientset(objs...)
 	reactor := createReactor(tc.client.Tracker(), failPatch)
 	tc.client.PrependReactor("*", "*", reactor)
+	// Prepends reactors to the client.
+	tc.client.ReactionChain = append(apiReactors, tc.client.ReactionChain...)
 
 	tc.informerFactory = informers.NewSharedInformerFactory(tc.client, 0)
 	resourceSliceTrackerOpts := resourceslicetracker.Options{
-		EnableDeviceTaints: true,
-		SliceInformer:      tc.informerFactory.Resource().V1().ResourceSlices(),
-		TaintInformer:      tc.informerFactory.Resource().V1alpha3().DeviceTaintRules(),
-		ClassInformer:      tc.informerFactory.Resource().V1().DeviceClasses(),
-		KubeClient:         tc.client,
+		EnableDeviceTaintRules: true,
+		SliceInformer:          tc.informerFactory.Resource().V1().ResourceSlices(),
+		TaintInformer:          tc.informerFactory.Resource().V1alpha3().DeviceTaintRules(),
+		ClassInformer:          tc.informerFactory.Resource().V1().DeviceClasses(),
+		KubeClient:             tc.client,
 	}
 	resourceSliceTracker, err := resourceslicetracker.StartTracker(tCtx, resourceSliceTrackerOpts)
 	require.NoError(t, err, "couldn't start resource slice tracker")
@@ -2304,6 +2858,13 @@ func setup(t *testing.T, args *config.DynamicResourcesArgs, nodes []*v1.Node, cl
 	registeredHandler := claimsCache.AddEventHandler(cache.ResourceEventHandlerFuncs{})
 
 	tc.draManager = NewDRAManager(tCtx, claimsCache, resourceSliceTracker, tc.informerFactory)
+	if features.EnableDRAExtendedResource {
+		cache := tc.draManager.DeviceClassResolver().(*extendedresourcecache.ExtendedResourceCache)
+		if _, err := tc.informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandler(cache); err != nil {
+			tCtx.Logger().Error(err, "failed to add device class informer event handler")
+		}
+	}
+
 	opts := []runtime.Option{
 		runtime.WithClientSet(tc.client),
 		runtime.WithInformerFactory(tc.informerFactory),
@@ -2348,7 +2909,7 @@ func setup(t *testing.T, args *config.DynamicResourcesArgs, nodes []*v1.Node, cl
 	// is synced, we need to wait until HasSynced of the handler returns
 	// true, this ensures that the assume cache is in sync with the informer's
 	// store which has been informed by at least one full LIST of the underlying storage.
-	cache.WaitForCacheSync(tc.ctx.Done(), registeredHandler.HasSynced)
+	cache.WaitForCacheSync(tc.ctx.Done(), registeredHandler.HasSynced, resourceSliceTracker.HasSynced)
 
 	for _, node := range nodes {
 		nodeInfo := framework.NewNodeInfo()
@@ -2526,7 +3087,7 @@ func Test_isSchedulableAfterClaimChange(t *testing.T) {
 				EnableDRASchedulerFilterTimeout: true,
 				EnableDynamicResourceAllocation: true,
 			}
-			testCtx := setup(t, nil, nil, tc.claims, nil, nil, features, false)
+			testCtx := setup(t, nil, nil, tc.claims, nil, nil, features, false, nil)
 			oldObj := tc.oldObj
 			newObj := tc.newObj
 			if claim, ok := tc.newObj.(*resourceapi.ResourceClaim); ok {
@@ -2650,7 +3211,7 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 				EnableDRASchedulerFilterTimeout: true,
 				EnableDynamicResourceAllocation: true,
 			}
-			testCtx := setup(t, nil, nil, tc.claims, nil, tc.objs, features, false)
+			testCtx := setup(t, nil, nil, tc.claims, nil, tc.objs, features, false, nil)
 			gotHint, err := testCtx.p.isSchedulableAfterPodChange(logger, tc.pod, nil, tc.obj)
 			if tc.wantErr {
 				if err == nil {
@@ -2669,277 +3230,13 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 	}
 }
 
-func Test_createDeviceRequests(t *testing.T) {
-	pod1 := st.MakePod().Name(podName).Namespace(namespace).
-		UID(podUID).
-		Res(map[v1.ResourceName]string{
-			v1.ResourceName(extendedResourceName):       "1",
-			v1.ResourceName(extendedResourceName + "1"): "2",
-		}).
-		Obj()
-	pod2 := st.MakePod().Name(podName).Namespace(namespace).
-		UID(podUID).
-		Res(map[v1.ResourceName]string{
-			v1.ResourceName(extendedResourceName): "1",
-		}).
-		Res(map[v1.ResourceName]string{
-			v1.ResourceName(extendedResourceName + "1"): "2",
-		}).
-		Obj()
-
-	podInit := st.MakePod().Name(podName).Namespace(namespace).
-		UID(podUID).
-		Res(map[v1.ResourceName]string{
-			v1.ResourceName(extendedResourceName): "1",
-		}).
-		InitReq(map[v1.ResourceName]string{
-			v1.ResourceName(extendedResourceName + "init"): "2",
-		}).
-		Obj()
-
-	res := map[v1.ResourceName]int64{
-		v1.ResourceName(extendedResourceName): 1,
-	}
-	res2 := map[v1.ResourceName]int64{
-		v1.ResourceName(extendedResourceName):       1,
-		v1.ResourceName(extendedResourceName + "1"): 2,
-	}
-	resInit := map[v1.ResourceName]int64{
-		v1.ResourceName(extendedResourceName):          1,
-		v1.ResourceName(extendedResourceName + "init"): 2,
-	}
-	devMap := map[v1.ResourceName]string{
-		v1.ResourceName(extendedResourceName): "class",
-	}
-	devMap2 := map[v1.ResourceName]string{
-		v1.ResourceName(extendedResourceName):       "class",
-		v1.ResourceName(extendedResourceName + "1"): "class1",
-	}
-	devMapInit := map[v1.ResourceName]string{
-		v1.ResourceName(extendedResourceName):          "class",
-		v1.ResourceName(extendedResourceName + "init"): "classInit",
-	}
-	devReq := resourceapi.DeviceRequest{
-		Name: "container-0-request-0",
-		Exactly: &resourceapi.ExactDeviceRequest{
-			DeviceClassName: "class",
-			AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
-			Count:           1,
-		},
-	}
-	devReq2 := resourceapi.DeviceRequest{
-		Name: "container-0-request-1",
-		Exactly: &resourceapi.ExactDeviceRequest{
-			DeviceClassName: "class1",
-			AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
-			Count:           2,
-		},
-	}
-	devReq3 := resourceapi.DeviceRequest{
-		Name: "container-1-request-0",
-		Exactly: &resourceapi.ExactDeviceRequest{
-			DeviceClassName: "class1",
-			AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
-			Count:           2,
-		},
-	}
-	devReqInit := resourceapi.DeviceRequest{
-		Name: "container-1-request-0",
-		Exactly: &resourceapi.ExactDeviceRequest{
-			DeviceClassName: "class",
-			AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
-			Count:           1,
-		},
-	}
-	devReq2Init := resourceapi.DeviceRequest{
-		Name: "container-0-request-0",
-		Exactly: &resourceapi.ExactDeviceRequest{
-			DeviceClassName: "classInit",
-			AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
-			Count:           2,
-		},
-	}
-
-	testcases := map[string]struct {
-		pod                *v1.Pod
-		extendedResources  map[v1.ResourceName]int64
-		deviceClassMapping map[v1.ResourceName]string
-		wantDeviceRequests []resourceapi.DeviceRequest
-	}{
-		"nil": {
-			pod:                pod1,
-			wantDeviceRequests: nil,
-		},
-		"one resource match": {
-			pod:                pod1,
-			extendedResources:  res,
-			deviceClassMapping: devMap,
-			wantDeviceRequests: []resourceapi.DeviceRequest{devReq},
-		},
-		"one resource match, one resource not match": {
-			pod:                pod1,
-			extendedResources:  res2,
-			deviceClassMapping: devMap,
-			wantDeviceRequests: []resourceapi.DeviceRequest{devReq},
-		},
-		"two resources match": {
-			pod:                pod1,
-			extendedResources:  res2,
-			deviceClassMapping: devMap2,
-			wantDeviceRequests: []resourceapi.DeviceRequest{devReq, devReq2},
-		},
-		"two containers match": {
-			pod:                pod2,
-			extendedResources:  res2,
-			deviceClassMapping: devMap2,
-			wantDeviceRequests: []resourceapi.DeviceRequest{devReq, devReq3},
-		},
-		"one init container, one regular container": {
-			pod:                podInit,
-			extendedResources:  resInit,
-			deviceClassMapping: devMapInit,
-			wantDeviceRequests: []resourceapi.DeviceRequest{devReq2Init, devReqInit},
-		},
-	}
-
-	for name, tc := range testcases {
-		t.Run(name, func(t *testing.T) {
-			gotDeviceRequests := createDeviceRequests(tc.pod, tc.extendedResources, tc.deviceClassMapping)
-			if len(tc.wantDeviceRequests) != len(gotDeviceRequests) {
-				t.Fatalf("different length, want %#v, got %#v", tc.wantDeviceRequests, gotDeviceRequests)
-			}
-			sort.Slice(gotDeviceRequests, func(i, j int) bool { return gotDeviceRequests[i].Name < gotDeviceRequests[j].Name })
-			for i, r := range tc.wantDeviceRequests {
-				if r.Name != gotDeviceRequests[i].Name {
-					t.Fatalf("different name, want %#v, got %#v", r, gotDeviceRequests[i])
-				}
-				if r.Exactly.DeviceClassName != gotDeviceRequests[i].Exactly.DeviceClassName {
-					t.Fatalf("different deviceClassName, want %#v, got %#v", r, gotDeviceRequests[i])
-				}
-				if r.Exactly.AllocationMode != gotDeviceRequests[i].Exactly.AllocationMode {
-					t.Fatalf("different allocationMode, want %#v, got %#v", r, gotDeviceRequests[i])
-				}
-				if r.Exactly.Count != gotDeviceRequests[i].Exactly.Count {
-					t.Fatalf("different count, want %#v, got %#v", r, gotDeviceRequests[i])
-				}
-			}
-		})
-	}
+// mockDeviceClassResolver is a simple mock implementation of fwk.DeviceClassResolver for testing
+type mockDeviceClassResolver struct {
+	mapping map[v1.ResourceName]*resourceapi.DeviceClass
 }
 
-func Test_createRequestMappings(t *testing.T) {
-	pod1 := st.MakePod().Name(podName).Namespace(namespace).
-		UID(podUID).
-		Res(map[v1.ResourceName]string{
-			v1.ResourceName(extendedResourceName):       "1",
-			v1.ResourceName(extendedResourceName + "1"): "2",
-		}).
-		Obj()
-	pod2 := st.MakePod().Name(podName).Namespace(namespace).
-		UID(podUID).
-		Res(map[v1.ResourceName]string{
-			v1.ResourceName(extendedResourceName): "1",
-		}).
-		Res(map[v1.ResourceName]string{
-			v1.ResourceName(extendedResourceName + "1"): "2",
-		}).
-		Obj()
-
-	podInit := st.MakePod().Name(podName).Namespace(namespace).
-		UID(podUID).
-		Res(map[v1.ResourceName]string{
-			v1.ResourceName(extendedResourceName): "1",
-		}).
-		InitReq(map[v1.ResourceName]string{
-			v1.ResourceName(extendedResourceName + "init"): "2",
-		}).
-		Obj()
-
-	claim := st.MakeResourceClaim().
-		Name(claimName).
-		Namespace(namespace).
-		RequestWithName("container-0-request-0", className).
-		Obj()
-	claim2 := st.MakeResourceClaim().
-		Name(claimName).
-		Namespace(namespace).
-		RequestWithName("container-0-request-0", className).
-		RequestWithName("container-1-request-0", className).
-		Obj()
-
-	cer := v1.ContainerExtendedResourceRequest{
-		ContainerName: "con0",
-		ResourceName:  extendedResourceName,
-		RequestName:   "container-0-request-0",
-	}
-	cer2 := v1.ContainerExtendedResourceRequest{
-		ContainerName: "con1",
-		ResourceName:  extendedResourceName + "1",
-		RequestName:   "container-1-request-0",
-	}
-	cer3 := v1.ContainerExtendedResourceRequest{
-		ContainerName: "con0",
-		ResourceName:  extendedResourceName,
-		RequestName:   "container-1-request-0",
-	}
-	cerInit := v1.ContainerExtendedResourceRequest{
-		ContainerName: "init-con0",
-		ResourceName:  extendedResourceName + "init",
-		RequestName:   "container-0-request-0",
-	}
-
-	testcases := map[string]struct {
-		claim           *resourceapi.ResourceClaim
-		pod             *v1.Pod
-		wantReqMappings []v1.ContainerExtendedResourceRequest
-	}{
-		"one container, one request": {
-			claim:           claim,
-			pod:             pod1,
-			wantReqMappings: []v1.ContainerExtendedResourceRequest{cer},
-		},
-		"two containers, one request": {
-			claim:           claim,
-			pod:             pod2,
-			wantReqMappings: []v1.ContainerExtendedResourceRequest{cer},
-		},
-		"one init container, one regular container, one request": {
-			claim:           claim,
-			pod:             podInit,
-			wantReqMappings: []v1.ContainerExtendedResourceRequest{cerInit},
-		},
-		"two containers, two requests": {
-			claim:           claim2,
-			pod:             pod2,
-			wantReqMappings: []v1.ContainerExtendedResourceRequest{cer, cer2},
-		},
-		"two containers (one is init container), two requests": {
-			claim:           claim2,
-			pod:             podInit,
-			wantReqMappings: []v1.ContainerExtendedResourceRequest{cerInit, cer3},
-		},
-	}
-
-	for name, tc := range testcases {
-		t.Run(name, func(t *testing.T) {
-			gotReqMappings := createRequestMappings(tc.claim, tc.pod)
-			if len(tc.wantReqMappings) != len(gotReqMappings) {
-				t.Fatalf("different length, want %#v, got %#v", tc.wantReqMappings, gotReqMappings)
-			}
-			sort.Slice(gotReqMappings, func(i, j int) bool { return gotReqMappings[i].RequestName < gotReqMappings[j].RequestName })
-			for i, r := range tc.wantReqMappings {
-				if r.RequestName != gotReqMappings[i].RequestName {
-					t.Fatalf("different request name, want %#v, got %#v", r, gotReqMappings[i])
-				}
-				if r.ContainerName != gotReqMappings[i].ContainerName {
-					t.Fatalf("different container name, want %#v, got %#v", r, gotReqMappings[i])
-				}
-				if r.ResourceName != gotReqMappings[i].ResourceName {
-					t.Fatalf("different resource name, want %#v, got %#v", r, gotReqMappings[i])
-				}
-			}
-		})
-	}
+func (m *mockDeviceClassResolver) GetDeviceClass(resourceName v1.ResourceName) *resourceapi.DeviceClass {
+	return m.mapping[resourceName]
 }
 
 // TestAllocatorSelection covers the selection of a structured allocation implementation
@@ -2976,7 +3273,7 @@ func TestAllocatorSelection(t *testing.T) {
 			featureGate := utilfeature.DefaultFeatureGate.DeepCopy()
 			tCtx.ExpectNoError(featureGate.Set(tc.features), "set features")
 			fts := feature.NewSchedulerFeaturesFromGates(featureGate)
-			features := allocatorFeatures(fts)
+			features := AllocatorFeatures(fts)
 
 			// Slightly hacky: most arguments are not valid and the constructor
 			// is expected to not use them yet.
@@ -2986,6 +3283,433 @@ func TestAllocatorSelection(t *testing.T) {
 			if !strings.Contains(allocatorType, tc.expectImplementation) {
 				tCtx.Fatalf("Expected allocator implementation %q, got %s", tc.expectImplementation, allocatorType)
 			}
+		})
+	}
+}
+
+func Test_computesScore(t *testing.T) {
+	testcases := map[string]struct {
+		claims        []*resourceapi.ResourceClaim
+		allocations   nodeAllocation
+		expectedScore int64
+		expectErr     bool
+	}{
+		"more-claims-than-allocations": {
+			claims: []*resourceapi.ResourceClaim{
+				st.MakeResourceClaim().
+					NamedRequestWithPrioritizedList("req-1",
+						st.SubRequest("subreq-1", className, 1),
+					).
+					Obj(),
+				st.MakeResourceClaim().
+					NamedRequestWithPrioritizedList("req-2",
+						st.SubRequest("subreq-1", className, 1),
+					).
+					Obj(),
+			},
+			allocations: nodeAllocation{},
+			expectErr:   true,
+		},
+		"single-request-only-subrequest-allocated": {
+			claims: []*resourceapi.ResourceClaim{
+				st.MakeResourceClaim().
+					NamedRequestWithPrioritizedList("req-1",
+						st.SubRequest("subreq-1", className, 1),
+					).
+					Obj(),
+			},
+			allocations: nodeAllocation{
+				allocationResults: []resourceapi.AllocationResult{
+					{
+						Devices: resourceapi.DeviceAllocationResult{
+							Results: []resourceapi.DeviceRequestAllocationResult{
+								{
+									Request: "req-1/subreq-1",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedScore: 8,
+		},
+		"single-request-last-subrequest-allocated": {
+			claims: []*resourceapi.ResourceClaim{
+				st.MakeResourceClaim().
+					NamedRequestWithPrioritizedList("req-1",
+						st.SubRequest("subreq-1", className, 1),
+						st.SubRequest("subreq-2", className, 1),
+						st.SubRequest("subreq-3", className, 1),
+						st.SubRequest("subreq-4", className, 1),
+						st.SubRequest("subreq-5", className, 1),
+						st.SubRequest("subreq-6", className, 1),
+						st.SubRequest("subreq-7", className, 1),
+						st.SubRequest("subreq-8", className, 1),
+					).
+					Obj(),
+			},
+			allocations: nodeAllocation{
+				allocationResults: []resourceapi.AllocationResult{
+					{
+						Devices: resourceapi.DeviceAllocationResult{
+							Results: []resourceapi.DeviceRequestAllocationResult{
+								{
+									Request: "req-1/subreq-8",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedScore: 1,
+		},
+		"multiple-requests-with-middle-subrequests-allocated": {
+			claims: []*resourceapi.ResourceClaim{
+				st.MakeResourceClaim().
+					NamedRequestWithPrioritizedList("req-1",
+						st.SubRequest("subreq-1", className, 1),
+						st.SubRequest("subreq-2", className, 1),
+						st.SubRequest("subreq-3", className, 1),
+						st.SubRequest("subreq-4", className, 1),
+					).
+					NamedRequestWithPrioritizedList("req-2",
+						st.SubRequest("subreq-1", className, 1),
+						st.SubRequest("subreq-2", className, 1),
+						st.SubRequest("subreq-3", className, 1),
+						st.SubRequest("subreq-4", className, 1),
+						st.SubRequest("subreq-5", className, 1),
+					).
+					Obj(),
+			},
+			allocations: nodeAllocation{
+				allocationResults: []resourceapi.AllocationResult{
+					{
+						Devices: resourceapi.DeviceAllocationResult{
+							Results: []resourceapi.DeviceRequestAllocationResult{
+								{
+									Request: "req-1/subreq-4",
+								},
+								{
+									Request: "req-2/subreq-5",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedScore: 9,
+		},
+		"multiple-requests-with-top-subrequests-allocated": {
+			claims: []*resourceapi.ResourceClaim{
+				st.MakeResourceClaim().
+					NamedRequestWithPrioritizedList("req-1",
+						st.SubRequest("subreq-1", className, 1),
+						st.SubRequest("subreq-2", className, 1),
+						st.SubRequest("subreq-3", className, 1),
+						st.SubRequest("subreq-4", className, 1),
+						st.SubRequest("subreq-5", className, 1),
+						st.SubRequest("subreq-6", className, 1),
+						st.SubRequest("subreq-7", className, 1),
+						st.SubRequest("subreq-8", className, 1),
+					).
+					NamedRequestWithPrioritizedList("req-2",
+						st.SubRequest("subreq-1", className, 1),
+					).
+					Obj(),
+			},
+			allocations: nodeAllocation{
+				allocationResults: []resourceapi.AllocationResult{
+					{
+						Devices: resourceapi.DeviceAllocationResult{
+							Results: []resourceapi.DeviceRequestAllocationResult{
+								{
+									Request: "req-1/subreq-8",
+								},
+								{
+									Request: "req-2/subreq-1",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedScore: 9,
+		},
+		"multiple-claims-with-last-subrequests-allocated": {
+			claims: []*resourceapi.ResourceClaim{
+				st.MakeResourceClaim().
+					NamedRequestWithPrioritizedList("req-1",
+						st.SubRequest("subreq-1", className, 1),
+						st.SubRequest("subreq-2", className, 1),
+						st.SubRequest("subreq-3", className, 1),
+						st.SubRequest("subreq-4", className, 1),
+						st.SubRequest("subreq-5", className, 1),
+						st.SubRequest("subreq-6", className, 1),
+						st.SubRequest("subreq-7", className, 1),
+						st.SubRequest("subreq-8", className, 1),
+					).
+					Obj(),
+				st.MakeResourceClaim().
+					NamedRequestWithPrioritizedList("req-2",
+						st.SubRequest("subreq-1", className, 1),
+						st.SubRequest("subreq-2", className, 1),
+						st.SubRequest("subreq-3", className, 1),
+						st.SubRequest("subreq-4", className, 1),
+						st.SubRequest("subreq-5", className, 1),
+						st.SubRequest("subreq-6", className, 1),
+						st.SubRequest("subreq-7", className, 1),
+						st.SubRequest("subreq-8", className, 1),
+					).
+					Obj(),
+			},
+			allocations: nodeAllocation{
+				allocationResults: []resourceapi.AllocationResult{
+					{
+						Devices: resourceapi.DeviceAllocationResult{
+							Results: []resourceapi.DeviceRequestAllocationResult{
+								{
+									Request: "req-1/subreq-8",
+								},
+							},
+						},
+					},
+					{
+						Devices: resourceapi.DeviceAllocationResult{
+							Results: []resourceapi.DeviceRequestAllocationResult{
+								{
+									Request: "req-2/subreq-8",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedScore: 2,
+		},
+		"multiple-claims-with-top-subrequests-allocated": {
+			claims: []*resourceapi.ResourceClaim{
+				st.MakeResourceClaim().
+					NamedRequestWithPrioritizedList("req-1",
+						st.SubRequest("subreq-1", className, 1),
+					).
+					Obj(),
+				st.MakeResourceClaim().
+					NamedRequestWithPrioritizedList("req-2",
+						st.SubRequest("subreq-1", className, 1),
+					).
+					Obj(),
+			},
+			allocations: nodeAllocation{
+				allocationResults: []resourceapi.AllocationResult{
+					{
+						Devices: resourceapi.DeviceAllocationResult{
+							Results: []resourceapi.DeviceRequestAllocationResult{
+								{
+									Request: "req-1/subreq-1",
+								},
+							},
+						},
+					},
+					{
+						Devices: resourceapi.DeviceAllocationResult{
+							Results: []resourceapi.DeviceRequestAllocationResult{
+								{
+									Request: "req-2/subreq-1",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedScore: 16,
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			iterator := slices.All(tc.claims)
+			score, err := computeScore(iterator, tc.allocations)
+			if err != nil {
+				if !tc.expectErr {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				return
+			}
+			if tc.expectErr {
+				t.Fatal("expected error, got none")
+			}
+			assert.Equal(t, tc.expectedScore, score)
+		})
+	}
+}
+
+func TestNormalizeScore(t *testing.T) {
+	testcases := map[string]struct {
+		scores         fwk.NodeScoreList
+		expectedScores fwk.NodeScoreList
+	}{
+		"empty": {
+			scores:         fwk.NodeScoreList{},
+			expectedScores: fwk.NodeScoreList{},
+		},
+		"single-score": {
+			scores: fwk.NodeScoreList{
+				{
+					Name:  "node-1",
+					Score: 42,
+				},
+			},
+			expectedScores: fwk.NodeScoreList{
+				{
+					Name:  "node-1",
+					Score: 100,
+				},
+			},
+		},
+		"all-same": {
+			scores: fwk.NodeScoreList{
+				{
+					Name:  "node-1",
+					Score: 8,
+				},
+				{
+					Name:  "node-2",
+					Score: 8,
+				},
+			},
+			expectedScores: fwk.NodeScoreList{
+				{
+					Name:  "node-1",
+					Score: 100,
+				},
+				{
+					Name:  "node-2",
+					Score: 100,
+				},
+			},
+		},
+		"all-same-very-large": {
+			scores: fwk.NodeScoreList{
+				{
+					Name:  "node-1",
+					Score: math.MaxInt32,
+				},
+				{
+					Name:  "node-2",
+					Score: math.MaxInt32,
+				},
+			},
+			expectedScores: fwk.NodeScoreList{
+				{
+					Name:  "node-1",
+					Score: 100,
+				},
+				{
+					Name:  "node-2",
+					Score: 100,
+				},
+			},
+		},
+		"max-and-min-values": {
+			scores: fwk.NodeScoreList{
+				{
+					Name:  "node-1",
+					Score: math.MaxInt32,
+				},
+				{
+					Name:  "node-2",
+					Score: 0,
+				},
+			},
+			expectedScores: fwk.NodeScoreList{
+				{
+					Name:  "node-1",
+					Score: 100,
+				},
+				{
+					Name:  "node-2",
+					Score: 0,
+				},
+			},
+		},
+		"mid-value": {
+			scores: fwk.NodeScoreList{
+				{
+					Name:  "node-1",
+					Score: 99,
+				},
+				{
+					Name:  "node-2",
+					Score: 98,
+				},
+				{
+					Name:  "node-3",
+					Score: 97,
+				},
+			},
+			expectedScores: fwk.NodeScoreList{
+				{
+					Name:  "node-1",
+					Score: 100,
+				},
+				{
+					Name:  "node-2",
+					Score: 98,
+				},
+				{
+					Name:  "node-3",
+					Score: 97,
+				},
+			},
+		},
+		"large-spread-lost-precision": {
+			scores: fwk.NodeScoreList{
+				{
+					Name:  "node-1",
+					Score: math.MaxInt32,
+				},
+				{
+					Name:  "node-2",
+					Score: math.MaxInt32 - 1,
+				},
+				{
+					Name:  "node-3",
+					Score: 1,
+				},
+				{
+					Name:  "node-4",
+					Score: 0,
+				},
+			},
+			expectedScores: fwk.NodeScoreList{
+				{
+					Name:  "node-1",
+					Score: 100,
+				},
+				{
+					Name:  "node-2",
+					Score: 99,
+				},
+				{
+					Name:  "node-3",
+					Score: 0,
+				},
+				{
+					Name:  "node-4",
+					Score: 0,
+				},
+			},
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			pl := &DynamicResources{
+				enabled: true,
+			}
+			scores := tc.scores
+			_ = pl.NormalizeScore(context.Background(), nil, nil, scores)
+			assert.Equal(t, tc.expectedScores, scores)
 		})
 	}
 }

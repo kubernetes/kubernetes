@@ -17,6 +17,8 @@ limitations under the License.
 package framework
 
 import (
+	"slices"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -100,6 +102,7 @@ type podChangeExtractor func(newPod *v1.Pod, oldPod *v1.Pod) fwk.ActionType
 func extractPodScaleDown(newPod, oldPod *v1.Pod) fwk.ActionType {
 	opt := resource.PodResourcesOptions{
 		UseStatusResources: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
+		InPlacePodLevelResourcesVerticalScalingEnabled: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling),
 	}
 	newPodRequests := resource.PodRequests(newPod, opt)
 	oldPodRequests := resource.PodRequests(oldPod, opt)
@@ -168,6 +171,10 @@ func NodeSchedulingPropertiesChange(newNode *v1.Node, oldNode *v1.Node) (events 
 		extractNodeAnnotationsChange,
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.NodeDeclaredFeatures) {
+		nodeChangeExtracters = append(nodeChangeExtracters, extractNodeFeaturesChange)
+	}
+
 	for _, fn := range nodeChangeExtracters {
 		if event := fn(newNode, oldNode); event != fwk.None {
 			events = append(events, fwk.ClusterEvent{Resource: fwk.Node, ActionType: event})
@@ -228,6 +235,14 @@ func extractNodeSpecUnschedulableChange(newNode *v1.Node, oldNode *v1.Node) fwk.
 func extractNodeAnnotationsChange(newNode *v1.Node, oldNode *v1.Node) fwk.ActionType {
 	if !equality.Semantic.DeepEqual(oldNode.GetAnnotations(), newNode.GetAnnotations()) {
 		return fwk.UpdateNodeAnnotation
+	}
+	return fwk.None
+}
+
+func extractNodeFeaturesChange(newNode *v1.Node, oldNode *v1.Node) fwk.ActionType {
+	// DeclaredFeatures is maintained in a sorted order, so slice comparison is safe.
+	if !slices.Equal(oldNode.Status.DeclaredFeatures, newNode.Status.DeclaredFeatures) {
+		return fwk.UpdateNodeDeclaredFeature
 	}
 	return fwk.None
 }

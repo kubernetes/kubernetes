@@ -180,7 +180,7 @@ func TestLegacyRestStorageStrategies(t *testing.T) {
 			ClusterIPRange: apiserverCfg.Extra.ServiceIPRange,
 			NodePortRange:  apiserverCfg.Extra.ServiceNodePortRange,
 		},
-	})
+	}, nil)
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}

@@ -17,10 +17,10 @@ limitations under the License.
 package util
 
 import (
-	"crypto/md5"
 	"encoding/hex"
 	"fmt"
 	"hash"
+	"hash/fnv"
 	"reflect"
 	"sort"
 
@@ -47,22 +47,103 @@ var semanticIgnoreResourceVersion = conversion.EqualitiesOrDie(
 	},
 )
 
-// GetPodServiceMemberships returns a set of Service keys for Services that have
-// a selector matching the given pod.
-func GetPodServiceMemberships(serviceLister v1listers.ServiceLister, pod *v1.Pod) (sets.String, error) {
-	set := sets.String{}
-	services, err := serviceLister.Services(pod.Namespace).List(labels.Everything())
-	if err != nil {
-		return set, err
+// PodProjectionKey encapsulates all pod information required to find services that may need their endpoints to be updated.
+type PodProjectionKey struct {
+	Namespace  string
+	Labels     labels.Set // this is set to the pod's current labels
+	OldLabels  labels.Set // this is set if the pod's labels changed (in an Update event)
+	PodChanged bool       // set to true if the pod's fields changed in a way that may affect its endpoints membership
+}
+
+func GetPodUpdateProjectionKey(oldObj, newObj interface{}) *PodProjectionKey {
+	newPod := getPodFromObject(newObj)
+	oldPod := getPodFromObject(oldObj)
+	if newPod == nil && oldPod == nil {
+		utilruntime.HandleError(fmt.Errorf("unexpected pod event with both old/new values as nil, ignoring"))
+		return nil
+	}
+	if oldPod == nil {
+		return &PodProjectionKey{
+			Namespace: newPod.Namespace,
+			Labels:    labels.Set(newPod.Labels),
+		}
+	}
+	if newPod == nil {
+		return &PodProjectionKey{
+			Namespace: oldPod.Namespace,
+			Labels:    labels.Set(oldPod.Labels),
+		}
 	}
 
+	// If we reached here, both old/new pod objects are non-nil, so it's an update event.
+	// Safe to ignore pod informer resync events as service informer already handles resync for all services.
+	if newPod.ResourceVersion == oldPod.ResourceVersion {
+		return nil
+	}
+
+	podChanged, labelsChanged := podEndpointsChanged(oldPod, newPod)
+
+	// If both the pod and labels are unchanged, no update is needed.
+	if !podChanged && !labelsChanged {
+		return nil
+	}
+
+	// If only the pod has changed, projection key can be created with just the new pod.
+	if !labelsChanged {
+		return &PodProjectionKey{
+			Namespace: newPod.Namespace,
+			Labels:    labels.Set(newPod.Labels),
+		}
+	}
+
+	// The pod labels have changed, so the projection key needs to include both its old/new labels.
+	// Additionally, PodChanged field indicates if union/diff of matching services should be reconciled.
+	return &PodProjectionKey{
+		Namespace:  newPod.Namespace,
+		Labels:     labels.Set(newPod.Labels),
+		OldLabels:  labels.Set(oldPod.Labels),
+		PodChanged: podChanged,
+	}
+}
+
+func GetServicesToUpdate(serviceLister v1listers.ServiceLister, key *PodProjectionKey) (sets.String, error) {
+	if key == nil {
+		return nil, nil
+	}
+
+	services, err := getServicesForPod(serviceLister, key.Namespace, key.Labels)
+	if err != nil {
+		return nil, err
+	}
+
+	// If the pod's labels changed in an update event, we'll need to consider all the affected services.
+	if key.OldLabels != nil {
+		oldServices, err := getServicesForPod(serviceLister, key.Namespace, key.OldLabels)
+		if err != nil {
+			return nil, err
+		}
+
+		services = determineNeededServiceUpdates(oldServices, services, key.PodChanged)
+	}
+
+	return services, nil
+}
+
+// getServicesForPod returns a set of services matching the given pod's namespace and labels (via service selector).
+func getServicesForPod(serviceLister v1listers.ServiceLister, namespace string, podLabels labels.Set) (sets.String, error) {
+	services, err := serviceLister.Services(namespace).List(labels.Everything())
+	if err != nil {
+		return nil, err
+	}
+
+	set := sets.String{}
 	for _, service := range services {
 		if service.Spec.Selector == nil {
-			// if the service has a nil selector this means selectors match nothing, not everything.
+			// If the service has a nil selector this means selectors match nothing, not everything.
 			continue
 		}
 
-		if labels.ValidatedSetSelector(service.Spec.Selector).Matches(labels.Set(pod.Labels)) {
+		if labels.ValidatedSetSelector(service.Spec.Selector).Matches(podLabels) {
 			key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(service)
 			if err != nil {
 				return nil, err
@@ -84,7 +165,7 @@ func NewPortMapKey(endpointPorts []discovery.EndpointPort) PortMapKey {
 
 // deepHashObjectToString creates a unique hash string from a go object.
 func deepHashObjectToString(objectToWrite interface{}) string {
-	hasher := md5.New()
+	hasher := fnv.New128a()
 	deepHashObject(hasher, objectToWrite)
 	return hex.EncodeToString(hasher.Sum(nil)[0:])
 }
@@ -158,47 +239,11 @@ func podEndpointsChanged(oldPod, newPod *v1.Pod) (bool, bool) {
 	return false, labelsChanged
 }
 
-// GetServicesToUpdateOnPodChange returns a set of Service keys for Services
-// that have potentially been affected by a change to this pod.
-func GetServicesToUpdateOnPodChange(serviceLister v1listers.ServiceLister, old, cur interface{}) sets.String {
-	newPod := cur.(*v1.Pod)
-	oldPod := old.(*v1.Pod)
-	if newPod.ResourceVersion == oldPod.ResourceVersion {
-		// Periodic resync will send update events for all known pods.
-		// Two different versions of the same pod will always have different RVs
-		return sets.String{}
+func getPodFromObject(obj interface{}) *v1.Pod {
+	if obj == nil {
+		return nil
 	}
-
-	podChanged, labelsChanged := podEndpointsChanged(oldPod, newPod)
-
-	// If both the pod and labels are unchanged, no update is needed
-	if !podChanged && !labelsChanged {
-		return sets.String{}
-	}
-
-	services, err := GetPodServiceMemberships(serviceLister, newPod)
-	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("unable to get pod %s/%s's service memberships: %v", newPod.Namespace, newPod.Name, err))
-		return sets.String{}
-	}
-
-	if labelsChanged {
-		oldServices, err := GetPodServiceMemberships(serviceLister, oldPod)
-		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("unable to get pod %s/%s's service memberships: %v", oldPod.Namespace, oldPod.Name, err))
-		}
-		services = determineNeededServiceUpdates(oldServices, services, podChanged)
-	}
-
-	return services
-}
-
-// GetPodFromDeleteAction returns a pointer to a pod if one can be derived from
-// obj (could be a *v1.Pod, or a DeletionFinalStateUnknown marker item).
-func GetPodFromDeleteAction(obj interface{}) *v1.Pod {
 	if pod, ok := obj.(*v1.Pod); ok {
-		// Enqueue all the services that the pod used to be a member of.
-		// This is the same thing we do when we add a pod.
 		return pod
 	}
 	// If we reached here it means the pod was deleted but its final state is unrecorded.

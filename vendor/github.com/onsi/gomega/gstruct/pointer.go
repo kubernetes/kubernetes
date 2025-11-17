@@ -10,10 +10,11 @@ import (
 	"github.com/onsi/gomega/types"
 )
 
-//PointTo applies the given matcher to the value pointed to by actual. It fails if the pointer is
-//nil.
-//  actual := 5
-//  Expect(&actual).To(PointTo(Equal(5)))
+// PointTo applies the given matcher to the value pointed to by actual. It fails if the pointer is
+// nil.
+//
+//	actual := 5
+//	Expect(&actual).To(PointTo(Equal(5)))
 func PointTo(matcher types.GomegaMatcher) types.GomegaMatcher {
 	return &PointerMatcher{
 		Matcher: matcher,
@@ -27,7 +28,7 @@ type PointerMatcher struct {
 	failure string
 }
 
-func (m *PointerMatcher) Match(actual interface{}) (bool, error) {
+func (m *PointerMatcher) Match(actual any) (bool, error) {
 	val := reflect.ValueOf(actual)
 
 	// return error if actual type is not a pointer
@@ -49,10 +50,10 @@ func (m *PointerMatcher) Match(actual interface{}) (bool, error) {
 	return match, err
 }
 
-func (m *PointerMatcher) FailureMessage(_ interface{}) (message string) {
+func (m *PointerMatcher) FailureMessage(_ any) (message string) {
 	return m.failure
 }
 
-func (m *PointerMatcher) NegatedFailureMessage(actual interface{}) (message string) {
+func (m *PointerMatcher) NegatedFailureMessage(actual any) (message string) {
 	return m.Matcher.NegatedFailureMessage(actual)
 }

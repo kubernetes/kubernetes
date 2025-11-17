@@ -17,6 +17,7 @@ limitations under the License.
 package upgrade
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -26,12 +27,14 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/diff"
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/kubernetes/fake"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
@@ -146,6 +149,104 @@ func TestWriteKubeletConfigFiles(t *testing.T) {
 		if (err != nil) != tc.expectedError {
 			t.Fatalf("expected error: %v, got: %v, error: %v", tc.expectedError, err != nil, err)
 		}
+	}
+}
+
+func TestRemoveKubeletArgsFromFile(t *testing.T) {
+	testCases := []struct {
+		name            string
+		kubeletFlags    []kubeadmapi.Arg
+		unwantedFlags   []string
+		wantErr         bool
+		wantFileContent string
+	}{
+		{
+			name: "remove an existing flag",
+			kubeletFlags: []kubeadmapi.Arg{
+				{Name: "node-ip", Value: "172.18.0.2"},
+				{Name: "node-labels", Value: ""},
+				{Name: "pod-infra-container-image", Value: "registry.k8s.io/pause:ver"},
+				{Name: "provider-id", Value: "kind://docker/kind/kind-control-plane"},
+			},
+			unwantedFlags: []string{
+				"pod-infra-container-image",
+			},
+			wantErr: false,
+			wantFileContent: `KUBELET_KUBEADM_ARGS="--node-ip=172.18.0.2 --node-labels= --provider-id=kind://docker/kind/kind-control-plane"
+`,
+		},
+		{
+			name: "remove multiple existing flags",
+			kubeletFlags: []kubeadmapi.Arg{
+				{Name: "node-ip", Value: "172.18.0.2"},
+				{Name: "node-labels", Value: ""},
+				{Name: "pod-infra-container-image", Value: "registry.k8s.io/pause:ver"},
+				{Name: "provider-id", Value: "kind://docker/kind/kind-control-plane"},
+			},
+			unwantedFlags: []string{
+				"pod-infra-container-image",
+				"node-labels",
+			},
+			wantErr: false,
+			wantFileContent: `KUBELET_KUBEADM_ARGS="--node-ip=172.18.0.2 --provider-id=kind://docker/kind/kind-control-plane"
+`,
+		},
+		{
+			name: "remove non-existing flags",
+			kubeletFlags: []kubeadmapi.Arg{
+				{Name: "node-ip", Value: "172.18.0.2"},
+				{Name: "node-labels", Value: ""},
+				{Name: "pod-infra-container-image", Value: "registry.k8s.io/pause:ver"},
+				{Name: "provider-id", Value: "kind://docker/kind/kind-control-plane"},
+			},
+			unwantedFlags: []string{
+				"foo",
+			},
+			wantErr: false,
+			wantFileContent: `KUBELET_KUBEADM_ARGS="--node-ip=172.18.0.2 --node-labels= --pod-infra-container-image=registry.k8s.io/pause:ver --provider-id=kind://docker/kind/kind-control-plane"
+`,
+		},
+		{
+			name: "remove multiple flags mixed with non-existing and existing flags",
+			kubeletFlags: []kubeadmapi.Arg{
+				{Name: "node-ip", Value: "172.18.0.2"},
+				{Name: "node-labels", Value: ""},
+				{Name: "pod-infra-container-image", Value: "registry.k8s.io/pause:ver"},
+				{Name: "provider-id", Value: "kind://docker/kind/kind-control-plane"},
+			},
+			unwantedFlags: []string{
+				"pod-infra-container-image",
+				"foo",
+			},
+			wantErr: false,
+			wantFileContent: `KUBELET_KUBEADM_ARGS="--node-ip=172.18.0.2 --node-labels= --provider-id=kind://docker/kind/kind-control-plane"
+`,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tempDir := t.TempDir()
+
+			err := kubeletphase.WriteKubeletArgsToFile(tc.kubeletFlags, nil, tempDir)
+			if err != nil {
+				t.Fatalf("Failed to write kubeadm-flags.env file: %v", err)
+			}
+
+			err = RemoveKubeletArgsFromFile(tempDir, tempDir, tc.unwantedFlags, false, io.Discard)
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("expected error: %v, got: %v, error: %v", tc.wantErr, err != nil, err)
+			}
+
+			kubeletEnvFilePath := filepath.Join(tempDir, constants.KubeletEnvFileName)
+			fileContent, err := os.ReadFile(kubeletEnvFilePath)
+			if err != nil {
+				t.Fatalf("Failed to read kubelet.env file: %v", err)
+			}
+			if gotOut := string(fileContent); gotOut != tc.wantFileContent {
+				t.Fatalf("Actual modified content of RemoveKubeletArgsFromFile() does not match expected.\nActual:  %v\nExpected: %v\n, Diff: %v", gotOut, tc.wantFileContent, diff.Diff(gotOut, tc.wantFileContent))
+			}
+		})
 	}
 }
 

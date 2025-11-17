@@ -3,7 +3,10 @@
 # We are aiming to consolidate on: registry.k8s.io/e2e-test-images/agnhost
 # The sources for which are in test/images/agnhost.
 # If agnhost is missing functionality for your tests, please reach out to SIG Testing.
-gcr.io/authenticated-image-pulling/alpine
+#
+# TODO: remove gcr.io/k8s-authenticated-test/agnhost and set up a cluster-local
+#       private registry via test/e2e/framework/registry.SetupRegistry() to test
+#       private image pulls
 gcr.io/k8s-authenticated-test/agnhost
 invalid.registry.k8s.io/invalid/alpine
 registry.k8s.io/build-image/distroless-iptables

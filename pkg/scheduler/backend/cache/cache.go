@@ -419,12 +419,15 @@ func (cache *cacheImpl) ForgetPod(logger klog.Logger, pod *v1.Pod) error {
 	defer cache.mu.Unlock()
 
 	currState, ok := cache.podStates[key]
-	if ok && currState.pod.Spec.NodeName != pod.Spec.NodeName {
+	if !ok {
+		// Pod does not exist in the cache anymore.
+		return nil
+	}
+	if currState.pod.Spec.NodeName != pod.Spec.NodeName {
 		return fmt.Errorf("pod %v(%v) was assumed on %v but assigned to %v", key, klog.KObj(pod), pod.Spec.NodeName, currState.pod.Spec.NodeName)
 	}
-
 	// Only assumed pod can be forgotten.
-	if ok && cache.assumedPods.Has(key) {
+	if cache.assumedPods.Has(key) {
 		return cache.removePod(logger, pod)
 	}
 	return fmt.Errorf("pod %v(%v) wasn't assumed so cannot be forgotten", key, klog.KObj(pod))

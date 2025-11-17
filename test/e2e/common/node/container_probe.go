@@ -36,7 +36,6 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/events"
-	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eevents "k8s.io/kubernetes/test/e2e/framework/events"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -228,7 +227,7 @@ var _ = SIGDescribe("Probing container", func() {
 		Testname: Pod liveness probe, container exec timeout, restart
 		Description: A Pod is created with liveness probe with a Exec action on the Pod. If the liveness probe call does not return within the timeout specified, liveness probe MUST restart the Pod.
 	*/
-	f.It("should be restarted with an exec liveness probe with timeout [MinimumKubeletVersion:1.20]", f.WithNodeConformance(), func(ctx context.Context) {
+	f.It("should be restarted with an exec liveness probe with timeout", f.WithNodeConformance(), func(ctx context.Context) {
 		cmd := []string{"/bin/sh", "-c", "sleep 600"}
 		livenessProbe := &v1.Probe{
 			ProbeHandler:        execHandler([]string{"/bin/sh", "-c", "sleep 10"}),
@@ -245,7 +244,7 @@ var _ = SIGDescribe("Probing container", func() {
 		Testname: Pod readiness probe, container exec timeout, not ready
 		Description: A Pod is created with readiness probe with a Exec action on the Pod. If the readiness probe call does not return within the timeout specified, readiness probe MUST not be Ready.
 	*/
-	f.It("should not be ready with an exec readiness probe timeout [MinimumKubeletVersion:1.20]", f.WithNodeConformance(), func(ctx context.Context) {
+	f.It("should not be ready with an exec readiness probe timeout", f.WithNodeConformance(), func(ctx context.Context) {
 		cmd := []string{"/bin/sh", "-c", "sleep 600"}
 		readinessProbe := &v1.Probe{
 			ProbeHandler:        execHandler([]string{"/bin/sh", "-c", "sleep 10"}),
@@ -260,7 +259,7 @@ var _ = SIGDescribe("Probing container", func() {
 	/*
 		Release: v1.21
 		Testname: Pod liveness probe, container exec timeout, restart
-		Description: A Pod is created with liveness probe with a Exec action on the Pod. If the liveness probe call does not return within the timeout specified, liveness probe MUST restart the Pod. When ExecProbeTimeout feature gate is disabled and cluster is using dockershim, the timeout is ignored BUT a failing liveness probe MUST restart the Pod.
+		Description: A Pod is created with liveness probe with a Exec action on the Pod. If the liveness probe call does not return within the timeout specified, liveness probe MUST restart the Pod.
 	*/
 	ginkgo.It("should be restarted with a failing exec liveness probe that took longer than the timeout", func(ctx context.Context) {
 		cmd := []string{"/bin/sh", "-c", "sleep 600"}
@@ -730,7 +729,7 @@ done
 	})
 })
 
-var _ = SIGDescribe(feature.SidecarContainers, framework.WithFeatureGate(features.SidecarContainers), "Probing restartable init container", func() {
+var _ = SIGDescribe(framework.WithNodeConformance(), framework.WithFeatureGate(features.SidecarContainers), "Probing restartable init container", func() {
 	f := framework.NewDefaultFramework("container-probe")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	var podClient *e2epod.PodClient
@@ -932,7 +931,7 @@ var _ = SIGDescribe(feature.SidecarContainers, framework.WithFeatureGate(feature
 		Pod. If the liveness probe call does not return within the timeout
 		specified, liveness probe MUST restart the Pod.
 	*/
-	ginkgo.It("should be restarted with an exec liveness probe with timeout [MinimumKubeletVersion:1.20]", func(ctx context.Context) {
+	ginkgo.It("should be restarted with an exec liveness probe with timeout", func(ctx context.Context) {
 		cmd := []string{"/bin/sh", "-c", "sleep 600"}
 		livenessProbe := &v1.Probe{
 			ProbeHandler:        execHandler([]string{"/bin/sh", "-c", "sleep 10"}),
@@ -951,7 +950,7 @@ var _ = SIGDescribe(feature.SidecarContainers, framework.WithFeatureGate(feature
 		the Pod. If the readiness probe call does not return within the timeout
 		specified, readiness probe MUST not be Ready.
 	*/
-	ginkgo.It("should not be ready with an exec readiness probe timeout [MinimumKubeletVersion:1.20]", func(ctx context.Context) {
+	ginkgo.It("should not be ready with an exec readiness probe timeout", func(ctx context.Context) {
 		cmd := []string{"/bin/sh", "-c", "sleep 600"}
 		readinessProbe := &v1.Probe{
 			ProbeHandler:        execHandler([]string{"/bin/sh", "-c", "sleep 10"}),
@@ -968,9 +967,7 @@ var _ = SIGDescribe(feature.SidecarContainers, framework.WithFeatureGate(feature
 		Testname: Pod restartalbe init container liveness probe, container exec timeout, restart
 		Description: A Pod is created with liveness probe with a Exec action on the
 		Pod. If the liveness probe call does not return within the timeout
-		specified, liveness probe MUST restart the Pod. When ExecProbeTimeout
-		feature gate is disabled and cluster is using dockershim, the timeout is
-		ignored BUT a failing liveness probe MUST restart the Pod.
+		specified, liveness probe MUST restart the Pod.
 	*/
 	ginkgo.It("should be restarted with a failing exec liveness probe that took longer than the timeout", func(ctx context.Context) {
 		cmd := []string{"/bin/sh", "-c", "sleep 600"}

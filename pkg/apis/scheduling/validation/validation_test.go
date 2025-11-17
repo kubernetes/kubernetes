@@ -17,6 +17,8 @@ limitations under the License.
 package validation
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -179,4 +181,231 @@ func TestValidatePriorityClassUpdate(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestValidateWorkload(t *testing.T) {
+	successCases := map[string]*scheduling.Workload{
+		"basic and gang policies": mkWorkload(),
+		"no controllerRef": mkWorkload(func(w *scheduling.Workload) {
+			w.Spec.ControllerRef = nil
+		}),
+		"no controllerRef apiGroup": mkWorkload(func(w *scheduling.Workload) {
+			w.Spec.ControllerRef.APIGroup = ""
+		}),
+	}
+	for name, workload := range successCases {
+		errs := ValidateWorkload(workload)
+		if len(errs) != 0 {
+			t.Errorf("Expected success for %q: %v", name, errs)
+		}
+	}
+
+	failureCases := map[string]*scheduling.Workload{
+		"no name": mkWorkload(func(w *scheduling.Workload) {
+			w.Name = ""
+		}),
+		"invalid name": mkWorkload(func(w *scheduling.Workload) {
+			w.Name = ".workload"
+		}),
+		"too long name": mkWorkload(func(w *scheduling.Workload) {
+			w.Name = strings.Repeat("w", 254)
+		}),
+		"no namespace": mkWorkload(func(w *scheduling.Workload) {
+			w.Namespace = ""
+		}),
+		"invalid namespace": mkWorkload(func(w *scheduling.Workload) {
+			w.Namespace = ".ns"
+		}),
+		"too long namespace": mkWorkload(func(w *scheduling.Workload) {
+			w.Namespace = strings.Repeat("n", 64)
+		}),
+		"invalid controllerRef apiGroup": mkWorkload(func(w *scheduling.Workload) {
+			w.Spec.ControllerRef.APIGroup = ".group"
+		}),
+		"too long controllerRef apiGroup": mkWorkload(func(w *scheduling.Workload) {
+			w.Spec.ControllerRef.APIGroup = strings.Repeat("g", 254)
+		}),
+		"no controllerRef kind": mkWorkload(func(w *scheduling.Workload) {
+			w.Spec.ControllerRef.Kind = ""
+		}),
+		"invalid controllerRef kind": mkWorkload(func(w *scheduling.Workload) {
+			w.Spec.ControllerRef.Kind = "/foo"
+		}),
+		"no controllerRef name": mkWorkload(func(w *scheduling.Workload) {
+			w.Spec.ControllerRef.Name = ""
+		}),
+		"invalid controllerRef name": mkWorkload(func(w *scheduling.Workload) {
+			w.Spec.ControllerRef.Name = "/baz"
+		}),
+		"no pod groups": mkWorkload(func(w *scheduling.Workload) {
+			w.Spec.PodGroups = nil
+		}),
+		"too many pod groups": mkWorkload(func(w *scheduling.Workload) {
+			w.Spec.PodGroups = nil
+			for i := 0; i < scheduling.WorkloadMaxPodGroups+1; i++ {
+				w.Spec.PodGroups = append(w.Spec.PodGroups, scheduling.PodGroup{
+					Name: fmt.Sprintf("group-%v", i),
+					Policy: scheduling.PodGroupPolicy{
+						Basic: &scheduling.BasicSchedulingPolicy{},
+					},
+				})
+			}
+		}),
+		"no pod group name": mkWorkload(func(w *scheduling.Workload) {
+			w.Spec.PodGroups[0].Name = ""
+		}),
+		"invalid pod group name": mkWorkload(func(w *scheduling.Workload) {
+			w.Spec.PodGroups[0].Name = ".group1"
+		}),
+		"too long pod group name": mkWorkload(func(w *scheduling.Workload) {
+			w.Spec.PodGroups[0].Name = strings.Repeat("g", 64)
+		}),
+		"no policy set": mkWorkload(func(w *scheduling.Workload) {
+			w.Spec.PodGroups[0].Policy = scheduling.PodGroupPolicy{}
+		}),
+		"two policies": mkWorkload(func(w *scheduling.Workload) {
+			w.Spec.PodGroups[0].Policy.Gang = &scheduling.GangSchedulingPolicy{
+				MinCount: 2,
+			}
+		}),
+		"zero min count in gang": mkWorkload(func(w *scheduling.Workload) {
+			w.Spec.PodGroups[1].Policy.Gang.MinCount = 0
+		}),
+		"negative min count in gang": mkWorkload(func(w *scheduling.Workload) {
+			w.Spec.PodGroups[1].Policy.Gang.MinCount = -1
+		}),
+		"two pod groups with the same name": mkWorkload(func(w *scheduling.Workload) {
+			w.Spec.PodGroups[1].Name = w.Spec.PodGroups[0].Name
+		}),
+	}
+	for name, workload := range failureCases {
+		errs := ValidateWorkload(workload)
+		if len(errs) == 0 {
+			t.Errorf("Expected failure for %q", name)
+		}
+	}
+}
+
+func TestValidateWorkloadUpdate(t *testing.T) {
+	successCases := map[string]struct {
+		old    *scheduling.Workload
+		update *scheduling.Workload
+	}{
+		"no change": {
+			old:    mkWorkload(),
+			update: mkWorkload(),
+		},
+		"set controller ref": {
+			old: mkWorkload(func(w *scheduling.Workload) {
+				w.Spec.ControllerRef = nil
+			}),
+			update: mkWorkload(),
+		},
+	}
+	for name, tc := range successCases {
+		tc.old.ResourceVersion = "0"
+		tc.update.ResourceVersion = "1"
+		errs := ValidateWorkloadUpdate(tc.update, tc.old)
+		if len(errs) != 0 {
+			t.Errorf("Expected success for %q: %v", name, errs)
+		}
+	}
+
+	failureCases := map[string]struct {
+		old    *scheduling.Workload
+		update *scheduling.Workload
+	}{
+		"change name": {
+			old: mkWorkload(),
+			update: mkWorkload(func(w *scheduling.Workload) {
+				w.Name += "bar"
+			}),
+		},
+		"change namespace": {
+			old: mkWorkload(),
+			update: mkWorkload(func(w *scheduling.Workload) {
+				w.Namespace += "bar"
+			}),
+		},
+		"change pod group name": {
+			old: mkWorkload(),
+			update: mkWorkload(func(w *scheduling.Workload) {
+				w.Spec.PodGroups[0].Name += "bar"
+			}),
+		},
+		"add pod group": {
+			old: mkWorkload(),
+			update: mkWorkload(func(w *scheduling.Workload) {
+				w.Spec.PodGroups = append(w.Spec.PodGroups, scheduling.PodGroup{
+					Name: "group3",
+					Policy: scheduling.PodGroupPolicy{
+						Basic: &scheduling.BasicSchedulingPolicy{},
+					},
+				})
+			}),
+		},
+		"delete pod group": {
+			old: mkWorkload(),
+			update: mkWorkload(func(w *scheduling.Workload) {
+				w.Spec.PodGroups = w.Spec.PodGroups[:1]
+			}),
+		},
+		"change gang min count": {
+			old: mkWorkload(),
+			update: mkWorkload(func(w *scheduling.Workload) {
+				w.Spec.PodGroups[1].Policy.Gang.MinCount = 5
+			}),
+		},
+		"change controllerRef": {
+			old: mkWorkload(),
+			update: mkWorkload(func(w *scheduling.Workload) {
+				w.Spec.ControllerRef.Kind += "bar"
+			}),
+		},
+		"delete controllerRef": {
+			old: mkWorkload(),
+			update: mkWorkload(func(w *scheduling.Workload) {
+				w.Spec.ControllerRef = nil
+			}),
+		},
+	}
+	for name, tc := range failureCases {
+		tc.old.ResourceVersion = "0"
+		tc.update.ResourceVersion = "1"
+		errs := ValidateWorkloadUpdate(tc.update, tc.old)
+		if len(errs) == 0 {
+			t.Errorf("Expected failure for %q", name)
+		}
+	}
+}
+
+// mkWorkload produces a Workload which passes validation with no tweaks.
+func mkWorkload(tweaks ...func(w *scheduling.Workload)) *scheduling.Workload {
+	w := &scheduling.Workload{
+		ObjectMeta: metav1.ObjectMeta{Name: "workload", Namespace: "ns"},
+		Spec: scheduling.WorkloadSpec{
+			ControllerRef: &scheduling.TypedLocalObjectReference{
+				APIGroup: "group",
+				Kind:     "foo",
+				Name:     "baz",
+			},
+			PodGroups: []scheduling.PodGroup{{
+				Name: "group1",
+				Policy: scheduling.PodGroupPolicy{
+					Basic: &scheduling.BasicSchedulingPolicy{},
+				},
+			}, {
+				Name: "group2",
+				Policy: scheduling.PodGroupPolicy{
+					Gang: &scheduling.GangSchedulingPolicy{
+						MinCount: 2,
+					},
+				},
+			}},
+		},
+	}
+	for _, tweak := range tweaks {
+		tweak(w)
+	}
+	return w
 }

@@ -133,8 +133,8 @@ func (kl *Kubelet) HandlerSupportsUserNamespaces(rtHandler string) (bool, error)
 }
 
 // GetKubeletMappings gets the additional IDs allocated for the Kubelet.
-func (kl *Kubelet) GetKubeletMappings() (uint32, uint32, error) {
-	return kl.getKubeletMappings()
+func (kl *Kubelet) GetKubeletMappings(idsPerPod uint32) (uint32, uint32, error) {
+	return kl.getKubeletMappings(idsPerPod)
 }
 
 func (kl *Kubelet) GetMaxPods() int {
@@ -299,10 +299,8 @@ func (kl *Kubelet) GetNode() (*v1.Node, error) {
 // in which case return a manufactured nodeInfo representing a node with no pods,
 // zero capacity, and the default labels.
 func (kl *Kubelet) getNodeAnyWay() (*v1.Node, error) {
-	if kl.kubeClient != nil {
-		if n, err := kl.nodeLister.Get(string(kl.nodeName)); err == nil {
-			return n, nil
-		}
+	if n, err := kl.GetNode(); err == nil {
+		return n, nil
 	}
 	return kl.initialNode(context.TODO())
 }

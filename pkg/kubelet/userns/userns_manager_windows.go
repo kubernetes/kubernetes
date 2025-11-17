@@ -28,7 +28,7 @@ import (
 
 type UsernsManager struct{}
 
-func MakeUserNsManager(klog.Logger, userNsPodsManager) (*UsernsManager, error) {
+func MakeUserNsManager(klog.Logger, userNsPodsManager, *int64) (*UsernsManager, error) {
 	return nil, nil
 }
 

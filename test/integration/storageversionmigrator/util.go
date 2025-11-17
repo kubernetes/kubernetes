@@ -38,10 +38,11 @@ import (
 	clientv3 "go.etcd.io/etcd/client/v3"
 
 	corev1 "k8s.io/api/core/v1"
-	svmv1alpha1 "k8s.io/api/storagemigration/v1alpha1"
+	svmv1beta1 "k8s.io/api/storagemigration/v1beta1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	crdintegration "k8s.io/apiextensions-apiserver/test/integration"
+	metaconditions "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/unstructuredscheme"
@@ -62,7 +63,6 @@ import (
 	utiltesting "k8s.io/client-go/util/testing"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	kubecontrollermanagertesting "k8s.io/kubernetes/cmd/kube-controller-manager/app/testing"
-	"k8s.io/kubernetes/pkg/controller/storageversionmigrator"
 	"k8s.io/kubernetes/test/images/agnhost/crd-conversion-webhook/converter"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/etcd"
@@ -275,14 +275,14 @@ func svmSetup(ctx context.Context, t *testing.T) *svmTest {
 		"--audit-log-mode", "blocking",
 		"--audit-log-path", logFile.Name(),
 		"--authorization-mode=RBAC",
-		fmt.Sprintf("--runtime-config=%s=true", svmv1alpha1.SchemeGroupVersion),
+		fmt.Sprintf("--runtime-config=%s=true", svmv1beta1.SchemeGroupVersion),
 	}
 	storageConfig := framework.SharedEtcd()
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, apiServerFlags, storageConfig)
 
 	kubeConfigFile := createKubeConfigFileForRestConfig(t, server.ClientConfig)
 
-	kcm := kubecontrollermanagertesting.StartTestServerOrDie(ctx, []string{
+	kcm := kubecontrollermanagertesting.StartTestServerOrDie(t, ctx, []string{
 		"--kubeconfig=" + kubeConfigFile,
 		"--controllers=garbagecollector,svm",     // these are the only controllers needed for this test
 		"--use-service-account-credentials=true", // exercise RBAC of SVM controller
@@ -468,35 +468,34 @@ func (svm *svmTest) updateFile(t *testing.T, configDir, filename string, newCont
 	}
 }
 
-func (svm *svmTest) createSVMResource(ctx context.Context, t *testing.T, name string, gvr svmv1alpha1.GroupVersionResource) (
-	*svmv1alpha1.StorageVersionMigration,
+func (svm *svmTest) createSVMResource(ctx context.Context, t *testing.T, name string, gr metav1.GroupResource) (
+	*svmv1beta1.StorageVersionMigration,
 	error,
 ) {
 	t.Helper()
-	svmResource := &svmv1alpha1.StorageVersionMigration{
+	svmResource := &svmv1beta1.StorageVersionMigration{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
-		Spec: svmv1alpha1.StorageVersionMigrationSpec{
-			Resource: svmv1alpha1.GroupVersionResource{
-				Group:    gvr.Group,
-				Version:  gvr.Version,
-				Resource: gvr.Resource,
+		Spec: svmv1beta1.StorageVersionMigrationSpec{
+			Resource: metav1.GroupResource{
+				Group:    gr.Group,
+				Resource: gr.Resource,
 			},
 		},
 	}
 
-	return svm.client.StoragemigrationV1alpha1().
+	return svm.client.StoragemigrationV1beta1().
 		StorageVersionMigrations().
 		Create(ctx, svmResource, metav1.CreateOptions{})
 }
 
 func (svm *svmTest) getSVM(ctx context.Context, t *testing.T, name string) (
-	*svmv1alpha1.StorageVersionMigration,
+	*svmv1beta1.StorageVersionMigration,
 	error,
 ) {
 	t.Helper()
-	return svm.client.StoragemigrationV1alpha1().
+	return svm.client.StoragemigrationV1beta1().
 		StorageVersionMigrations().
 		Get(ctx, name, metav1.GetOptions{})
 }
@@ -597,9 +596,10 @@ func (svm *svmTest) waitForResourceMigration(
 			if err != nil {
 				t.Fatalf("Failed to get SVM resource: %v", err)
 			}
+			svmConditions := svmResource.Status.Conditions
 
-			if storageversionmigrator.IsConditionTrue(svmResource, svmv1alpha1.MigrationFailed) {
-				t.Logf("%q SVM has failed migration, %#v", svmName, svmResource.Status.Conditions)
+			if metaconditions.IsStatusConditionTrue(svmConditions, string(svmv1beta1.MigrationFailed)) {
+				t.Logf("%q SVM has failed migration, %#v", svmName, svmConditions)
 				return false, fmt.Errorf("SVM has failed migration")
 			}
 
@@ -608,17 +608,17 @@ func (svm *svmTest) waitForResourceMigration(
 				return false, nil
 			}
 
-			if storageversionmigrator.IsConditionTrue(svmResource, svmv1alpha1.MigrationSucceeded) {
+			if metaconditions.IsStatusConditionTrue(svmConditions, string(svmv1beta1.MigrationSucceeded)) {
 				t.Logf("%q SVM has completed migration", svmName)
 				return true, nil
 			}
 
-			if storageversionmigrator.IsConditionTrue(svmResource, svmv1alpha1.MigrationRunning) {
-				t.Logf("%q SVM migration is running, %#v", svmName, svmResource.Status.Conditions)
+			if metaconditions.IsStatusConditionTrue(svmConditions, string(svmv1beta1.MigrationRunning)) {
+				t.Logf("%q SVM migration is running, %#v", svmName, svmConditions)
 				return false, nil
 			}
 
-			t.Logf("%q SVM has not started migration, %#v", svmName, svmResource.Status.Conditions)
+			t.Logf("%q SVM has not started migration, %#v", svmName, svmConditions)
 
 			// We utilize the LastSyncResourceVersion of the Garbage Collector (GC) to ensure that the cache is up-to-date before proceeding with the migration.
 			// However, in a quiet cluster, the GC may not be updated unless there is some activity or the watch receives a bookmark event after every 10 minutes.
@@ -1087,9 +1087,10 @@ func (svm *svmTest) isCRDMigrated(ctx context.Context, t *testing.T, crdSVMName,
 			if err != nil {
 				t.Fatalf("Failed to get SVM resource: %v", err)
 			}
+			svmConditions := svmResource.Status.Conditions
 
-			if storageversionmigrator.IsConditionTrue(svmResource, svmv1alpha1.MigrationFailed) {
-				t.Logf("%q SVM has failed migration, %#v", crdSVMName, svmResource.Status.Conditions)
+			if metaconditions.IsStatusConditionTrue(svmConditions, string(svmv1beta1.MigrationFailed)) {
+				t.Logf("%q SVM has failed migration, %#v", crdSVMName, svmConditions)
 				return false, fmt.Errorf("SVM has failed migration")
 			}
 
@@ -1098,17 +1099,17 @@ func (svm *svmTest) isCRDMigrated(ctx context.Context, t *testing.T, crdSVMName,
 				return false, nil
 			}
 
-			if storageversionmigrator.IsConditionTrue(svmResource, svmv1alpha1.MigrationSucceeded) {
+			if metaconditions.IsStatusConditionTrue(svmConditions, string(svmv1beta1.MigrationSucceeded)) {
 				t.Logf("%q SVM has completed migration", crdSVMName)
 				return true, nil
 			}
 
-			if storageversionmigrator.IsConditionTrue(svmResource, svmv1alpha1.MigrationRunning) {
-				t.Logf("%q SVM migration is running, %#v", crdSVMName, svmResource.Status.Conditions)
+			if metaconditions.IsStatusConditionTrue(svmConditions, string(svmv1beta1.MigrationRunning)) {
+				t.Logf("%q SVM migration is running, %#v", crdSVMName, svmConditions)
 				return false, nil
 			}
 
-			t.Logf("%q SVM has not started migration, %#v", crdSVMName, svmResource.Status.Conditions)
+			t.Logf("%q SVM has not started migration, %#v", crdSVMName, svmConditions)
 
 			// at this point we know that the RV has been set on the SVM resource,
 			// and we need to make sure that the GC list RV has caught up to that without waiting for a watch bookmark.

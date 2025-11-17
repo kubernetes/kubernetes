@@ -143,7 +143,7 @@ func ValidateRoleBinding(roleBinding *rbac.RoleBinding) field.ErrorList {
 	}
 
 	if len(roleBinding.RoleRef.Name) == 0 {
-		allErrs = append(allErrs, field.Required(field.NewPath("roleRef", "name"), ""))
+		allErrs = append(allErrs, field.Required(field.NewPath("roleRef", "name"), "").MarkCoveredByDeclarative())
 	} else {
 		for _, msg := range ValidateRBACName(roleBinding.RoleRef.Name, false) {
 			allErrs = append(allErrs, field.Invalid(field.NewPath("roleRef", "name"), roleBinding.RoleRef.Name, msg))
@@ -187,7 +187,7 @@ func ValidateClusterRoleBinding(roleBinding *rbac.ClusterRoleBinding) field.Erro
 	}
 
 	if len(roleBinding.RoleRef.Name) == 0 {
-		allErrs = append(allErrs, field.Required(field.NewPath("roleRef", "name"), ""))
+		allErrs = append(allErrs, field.Required(field.NewPath("roleRef", "name"), "").MarkCoveredByDeclarative())
 	} else {
 		for _, msg := range ValidateRBACName(roleBinding.RoleRef.Name, false) {
 			allErrs = append(allErrs, field.Invalid(field.NewPath("roleRef", "name"), roleBinding.RoleRef.Name, msg))
@@ -218,7 +218,7 @@ func ValidateRoleBindingSubject(subject rbac.Subject, isNamespaced bool, fldPath
 	allErrs := field.ErrorList{}
 
 	if len(subject.Name) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "").MarkCoveredByDeclarative())
 	}
 
 	switch subject.Kind {

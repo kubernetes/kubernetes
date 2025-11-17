@@ -56,15 +56,15 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 
 	// field Struct.Tasks
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj TaskList) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj TaskList, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_TaskList(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("tasks"), obj.Tasks, safe.Field(oldObj, func(oldObj *Struct) TaskList { return oldObj.Tasks }))...)
+		}(fldPath.Child("tasks"), obj.Tasks, safe.Field(oldObj, func(oldObj *Struct) TaskList { return oldObj.Tasks }), oldObj != nil)...)
 
 	return errs
 }

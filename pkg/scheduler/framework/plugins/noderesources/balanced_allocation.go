@@ -22,7 +22,9 @@ import (
 	"math"
 
 	v1 "k8s.io/api/core/v1"
+	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/dynamic-resource-allocation/structured"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
@@ -39,6 +41,7 @@ type BalancedAllocation struct {
 
 var _ fwk.PreScorePlugin = &BalancedAllocation{}
 var _ fwk.ScorePlugin = &BalancedAllocation{}
+var _ fwk.SignPlugin = &BalancedAllocation{}
 
 // BalancedAllocationName is the name of the plugin used in the plugin registry and configurations.
 const (
@@ -48,11 +51,21 @@ const (
 	balancedAllocationPreScoreStateKey = "PreScore" + BalancedAllocationName
 )
 
+// draPreScoreState holds the pre-computed data for DRA extended resources scoring.
+type draPreScoreState struct {
+	// allocatedState holds the DRA allocated state for DRA extended resources scoring.
+	allocatedState *structured.AllocatedState
+	// resourceSlices holds the list of resource slices for DRA extended resource scoring.
+	resourceSlices []*resourceapi.ResourceSlice
+}
+
 // balancedAllocationPreScoreState computed at PreScore and used at Score.
 type balancedAllocationPreScoreState struct {
 	// podRequests have the same order of the resources defined in NodeResourcesFitArgs.Resources,
 	// same for other place we store a list like that.
 	podRequests []int64
+	// DRA extended resource scoring state.
+	*draPreScoreState
 }
 
 // Clone implements the mandatory Clone interface. We don't really copy the data since
@@ -72,6 +85,15 @@ func (ba *BalancedAllocation) PreScore(ctx context.Context, cycleState fwk.Cycle
 	}
 	state := &balancedAllocationPreScoreState{
 		podRequests: podRequests,
+	}
+	if ba.enableDRAExtendedResource {
+		draPreScoreState, status := getDRAPreScoredParams(ba.draManager, ba.resources)
+		if status != nil {
+			return status
+		}
+		if draPreScoreState != nil {
+			state.draPreScoreState = draPreScoreState
+		}
 	}
 	cycleState.Write(balancedAllocationPreScoreStateKey, state)
 	return nil
@@ -95,6 +117,22 @@ func (ba *BalancedAllocation) Name() string {
 	return BalancedAllocationName
 }
 
+// Filtering and scoring based on the container resources and overheads.
+func (pl *BalancedAllocation) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
+	opts := ResourceRequestsOptions{
+		EnablePodLevelResources:   pl.enablePodLevelResources,
+		EnableDRAExtendedResource: pl.enableDRAExtendedResource,
+	}
+
+	if pl.enableDRAExtendedResource {
+		return nil, fwk.NewStatus(fwk.Unschedulable, "signature disabled when dra extended resources enabled")
+	}
+
+	return []fwk.SignFragment{
+		{Key: fwk.ResourcesSignerName, Value: computePodResourceRequest(pod, opts)},
+	}, nil
+}
+
 // Score invoked at the score extension point.
 func (ba *BalancedAllocation) Score(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) (int64, *fwk.Status) {
 	s, err := getBalancedAllocationPreScoreState(state)
@@ -103,6 +141,15 @@ func (ba *BalancedAllocation) Score(ctx context.Context, state fwk.CycleState, p
 		if ba.isBestEffortPod(s.podRequests) {
 			return 0, nil
 		}
+		if ba.enableDRAExtendedResource {
+			draPreScoreState, status := getDRAPreScoredParams(ba.draManager, ba.resources)
+			if status != nil {
+				return 0, status
+			}
+			if draPreScoreState != nil {
+				s.draPreScoreState = draPreScoreState
+			}
+		}
 	}
 
 	// ba.score favors nodes with balanced resource usage rate.
@@ -110,7 +157,7 @@ func (ba *BalancedAllocation) Score(ctx context.Context, state fwk.CycleState, p
 	// Detail: score = (1 - std) * MaxNodeScore, where std is calculated by the root square of Σ((fraction(i)-mean)^2)/len(resources)
 	// The algorithm is partly inspired by:
 	// "Wei Huang et al. An Energy Efficient Virtual Machine Placement Algorithm with Balanced Resource Utilization"
-	return ba.score(ctx, pod, nodeInfo, s.podRequests)
+	return ba.score(ctx, pod, nodeInfo, s.podRequests, s.draPreScoreState)
 }
 
 // ScoreExtensions of the Score plugin.
@@ -135,9 +182,11 @@ func NewBalancedAllocation(_ context.Context, baArgs runtime.Object, h fwk.Handl
 			Name:                            BalancedAllocationName,
 			enableInPlacePodVerticalScaling: fts.EnableInPlacePodVerticalScaling,
 			enablePodLevelResources:         fts.EnablePodLevelResources,
+			enableDRAExtendedResource:       fts.EnableDRAExtendedResource,
 			scorer:                          balancedResourceScorer,
 			useRequested:                    true,
 			resources:                       args.Resources,
+			enableInPlacePodLevelResourcesVerticalScaling: fts.EnableInPlacePodLevelResourcesVerticalScaling,
 		},
 	}, nil
 }

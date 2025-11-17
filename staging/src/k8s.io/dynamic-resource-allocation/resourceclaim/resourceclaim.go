@@ -116,6 +116,19 @@ func BaseRequestRef(requestRef string) string {
 	return segments[0]
 }
 
+// CreateSubRequestRef combines the names from a request and a subrequest into
+// a reference to the subrequest.
+func CreateSubRequestRef(requestName, subRequestName string) string {
+	return fmt.Sprintf("%s/%s", requestName, subRequestName)
+}
+
+// IsSubRequestRef checks if the provided reference is to a subrequest and returns
+// true if it is. Otherwise it returns false.
+func IsSubRequestRef(requestRef string) bool {
+	segments := strings.Split(requestRef, "/")
+	return len(segments) == 2
+}
+
 // ConfigForResult returns the configs that are applicable to device
 // allocated for the provided result.
 func ConfigForResult(deviceConfigurations []resourceapi.DeviceAllocationConfiguration, result resourceapi.DeviceRequestAllocationResult) []resourceapi.DeviceAllocationConfiguration {

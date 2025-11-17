@@ -35,14 +35,18 @@ metadata:
 spec:
   deviceSelector:
     device: deviceValue
-    deviceClassName: deviceClassNameValue
     driver: driverValue
     pool: poolValue
-    selectors:
-    - cel:
-        expression: expressionValue
   taint:
     effect: effectValue
     key: keyValue
     timeAdded: "2004-01-01T01:01:01Z"
     value: valueValue
+status:
+  conditions:
+  - lastTransitionTime: "2004-01-01T01:01:01Z"
+    message: messageValue
+    observedGeneration: 3
+    reason: reasonValue
+    status: statusValue
+    type: typeValue

@@ -180,6 +180,9 @@ const (
 	PodInfeasibleResizesKey          = "pod_infeasible_resizes_total"
 	PodInProgressResizesKey          = "pod_in_progress_resizes"
 	PodDeferredAcceptedResizesKey    = "pod_deferred_accepted_resizes_total"
+
+	// Metric key for podcertificate states.
+	PodCertificateStatesKey = "podcertificate_states"
 )
 
 type imageSizeBucket struct {
@@ -1125,7 +1128,7 @@ var (
 			Subsystem:      KubeletSubsystem,
 			Name:           ImageVolumeRequestedTotalKey,
 			Help:           "Number of requested image volumes.",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		},
 	)
 
@@ -1135,7 +1138,7 @@ var (
 			Subsystem:      KubeletSubsystem,
 			Name:           ImageVolumeMountedSucceedTotalKey,
 			Help:           "Number of successful image volume mounts.",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		},
 	)
 
@@ -1145,7 +1148,7 @@ var (
 			Subsystem:      KubeletSubsystem,
 			Name:           ImageVolumeMountedErrorsTotalKey,
 			Help:           "Number of failed image volume mounts.",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		},
 	)
 

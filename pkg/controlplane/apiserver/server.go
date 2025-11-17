@@ -32,12 +32,12 @@ import (
 	genericregistry "k8s.io/apiserver/pkg/registry/generic"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
+	"k8s.io/apiserver/pkg/server/flagz"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientgoinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	zpagesfeatures "k8s.io/component-base/zpages/features"
-	"k8s.io/component-base/zpages/flagz"
 	"k8s.io/component-helpers/apimachinery/lease"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
@@ -47,7 +47,6 @@ import (
 	"k8s.io/kubernetes/pkg/controlplane/controller/leaderelection"
 	"k8s.io/kubernetes/pkg/controlplane/controller/legacytokentracking"
 	"k8s.io/kubernetes/pkg/controlplane/controller/systemnamespaces"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/routes"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
@@ -194,7 +193,7 @@ func (c completedConfig) New(name string, delegationTarget genericapiserver.Dele
 		})
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.UnknownVersionInteroperabilityProxy) {
+	if utilfeature.DefaultFeatureGate.Enabled(apiserverfeatures.UnknownVersionInteroperabilityProxy) {
 		peeraddress := getPeerAddress(c.Extra.PeerAdvertiseAddress, c.Generic.PublicAddress, publicServicePort)
 		peerEndpointCtrl := peerreconcilers.New(
 			c.Generic.APIServerID,
@@ -213,22 +212,36 @@ func (c completedConfig) New(name string, delegationTarget genericapiserver.Dele
 				return nil
 			})
 		if c.Extra.PeerProxy != nil {
+			// Wait for handler to be ready
+			s.GenericAPIServer.AddPostStartHookOrDie("mixed-version-proxy-handler", func(context genericapiserver.PostStartHookContext) error {
+				err := c.Extra.PeerProxy.WaitForCacheSync(context.Done())
+				return err
+			})
+
 			// Run local-discovery sync loop
 			s.GenericAPIServer.AddPostStartHookOrDie("local-discovery-cache-sync", func(context genericapiserver.PostStartHookContext) error {
 				err := c.Extra.PeerProxy.RunLocalDiscoveryCacheSync(context.Done())
 				return err
 			})
 
-			// Run peer-discovery sync loop.
+			// Run peer-discovery sync loop
 			s.GenericAPIServer.AddPostStartHookOrDie("peer-discovery-cache-sync", func(context genericapiserver.PostStartHookContext) error {
 				go c.Extra.PeerProxy.RunPeerDiscoveryCacheSync(context, 1)
 				return nil
 			})
 
-			// Wait for handler to be ready.
-			s.GenericAPIServer.AddPostStartHookOrDie("mixed-version-proxy-handler", func(context genericapiserver.PostStartHookContext) error {
-				err := c.Extra.PeerProxy.WaitForCacheSync(context.Done())
-				return err
+			// RunGVDeletionWorkers processes GVs from deleted CRDs/APIServices. If a GV is no longer in use,
+			// it is marked for removal from peer-discovery (with a deletion timestamp), triggering a grace period before cleanup.
+			s.GenericAPIServer.AddPostStartHookOrDie("gv-deletion-workers", func(context genericapiserver.PostStartHookContext) error {
+				go c.Extra.PeerProxy.RunGVDeletionWorkers(context, 1)
+				return nil
+			})
+
+			// RunExcludedGVsReaper removes GVs from the peer-discovery exclusion list after their grace period expires.
+			// This ensures we don't include stale CRDs/aggregated APIs from peer discovery in the aggregated discovery.
+			s.GenericAPIServer.AddPostStartHookOrDie("excluded-groups-reaper", func(context genericapiserver.PostStartHookContext) error {
+				go c.Extra.PeerProxy.RunExcludedGVsReaper(context.Done())
+				return nil
 			})
 		}
 	}
@@ -262,26 +275,31 @@ func (c completedConfig) New(name string, delegationTarget genericapiserver.Dele
 	})
 
 	if utilfeature.DefaultFeatureGate.Enabled(apiserverfeatures.APIServerIdentity) {
-		s.GenericAPIServer.AddPostStartHookOrDie("start-kube-apiserver-identity-lease-controller", func(hookContext genericapiserver.PostStartHookContext) error {
-			leaseName := s.GenericAPIServer.APIServerID
-			holderIdentity := s.GenericAPIServer.APIServerID + "_" + string(uuid.NewUUID())
+		leaseName := s.GenericAPIServer.APIServerID
+		holderIdentity := s.GenericAPIServer.APIServerID + "_" + string(uuid.NewUUID())
+		peeraddress := getPeerAddress(c.Extra.PeerAdvertiseAddress, c.Generic.PublicAddress, publicServicePort)
 
-			peeraddress := getPeerAddress(c.Extra.PeerAdvertiseAddress, c.Generic.PublicAddress, publicServicePort)
-			// must replace ':,[]' in [ip:port] to be able to store this as a valid label value
-			controller := lease.NewController(
-				clock.RealClock{},
-				client,
-				holderIdentity,
-				int32(IdentityLeaseDurationSeconds),
-				nil,
-				IdentityLeaseRenewIntervalPeriod,
-				leaseName,
-				metav1.NamespaceSystem,
-				// TODO: receive identity label value as a parameter when post start hook is moved to generic apiserver.
-				labelAPIServerHeartbeatFunc(name, peeraddress))
-			go controller.Run(hookContext)
+		// must replace ':,[]' in [ip:port] to be able to store this as a valid label value
+		controller := lease.NewController(
+			clock.RealClock{},
+			client,
+			holderIdentity,
+			int32(IdentityLeaseDurationSeconds),
+			nil,
+			IdentityLeaseRenewIntervalPeriod,
+			leaseName,
+			metav1.NamespaceSystem,
+			// TODO: receive identity label value as a parameter when post start hook is moved to generic apiserver.
+			labelAPIServerHeartbeatFunc(name, peeraddress),
+		)
+		s.GenericAPIServer.AddPostStartHookOrDie("start-kube-apiserver-identity-lease-controller", func(hookContext genericapiserver.PostStartHookContext) error {
+			return controller.Start(hookContext.Done())
+		})
+		s.GenericAPIServer.AddPreShutdownHookOrDie("stop-kube-apiserver-identity-lease-controller", func() error {
+			controller.Stop()
 			return nil
 		})
+
 		// TODO: move this into generic apiserver and make the lease identity value configurable
 		s.GenericAPIServer.AddPostStartHookOrDie("start-kube-apiserver-identity-lease-garbage-collector", func(hookContext genericapiserver.PostStartHookContext) error {
 			go apiserverleasegc.NewAPIServerLeaseGC(
@@ -328,7 +346,7 @@ func labelAPIServerHeartbeatFunc(identity string, peeraddress string) lease.Proc
 		lease.Labels[apiv1.LabelHostname] = hostname
 
 		// Include apiserver network location <ip_port> used by peers to proxy requests between kube-apiservers
-		if utilfeature.DefaultFeatureGate.Enabled(features.UnknownVersionInteroperabilityProxy) {
+		if utilfeature.DefaultFeatureGate.Enabled(apiserverfeatures.UnknownVersionInteroperabilityProxy) {
 			if peeraddress != "" {
 				lease.Annotations[apiv1.AnnotationPeerAdvertiseAddress] = peeraddress
 			}

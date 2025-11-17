@@ -52,6 +52,11 @@ func (in DeviceTaintRuleSpec) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in DeviceTaintRuleStatus) OpenAPIModelName() string {
+	return "io.k8s.api.resource.v1alpha3.DeviceTaintRuleStatus"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in DeviceTaintSelector) OpenAPIModelName() string {
 	return "io.k8s.api.resource.v1alpha3.DeviceTaintSelector"
 }

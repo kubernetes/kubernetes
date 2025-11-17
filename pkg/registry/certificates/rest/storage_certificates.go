@@ -103,6 +103,19 @@ func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorag
 		}
 	}
 
+	if resource := "podcertificaterequests"; apiResourceConfigSource.ResourceEnabled(certificatesapiv1beta1.SchemeGroupVersion.WithResource(resource)) {
+		if utilfeature.DefaultFeatureGate.Enabled(features.PodCertificateRequest) {
+			pcrStorage, pcrStatusStorage, err := podcertificaterequeststore.NewREST(restOptionsGetter, p.Authorizer, clock.RealClock{})
+			if err != nil {
+				return nil, err
+			}
+			storage[resource] = pcrStorage
+			storage[resource+"/status"] = pcrStatusStorage
+		} else {
+			klog.Warning("PodCertificateRequest storage is disabled because the PodCertificateRequest feature gate is disabled")
+		}
+	}
+
 	return storage, nil
 }
 
@@ -118,19 +131,6 @@ func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstora
 			storage[resource] = bundleStorage
 		} else {
 			klog.Warning("ClusterTrustBundle storage is disabled because the ClusterTrustBundle feature gate is disabled")
-		}
-	}
-
-	if resource := "podcertificaterequests"; apiResourceConfigSource.ResourceEnabled(certificatesapiv1alpha1.SchemeGroupVersion.WithResource(resource)) {
-		if utilfeature.DefaultFeatureGate.Enabled(features.PodCertificateRequest) {
-			pcrStorage, pcrStatusStorage, err := podcertificaterequeststore.NewREST(restOptionsGetter, p.Authorizer, clock.RealClock{})
-			if err != nil {
-				return nil, err
-			}
-			storage[resource] = pcrStorage
-			storage[resource+"/status"] = pcrStatusStorage
-		} else {
-			klog.Warning("PodCertificateRequest storage is disabled because the PodCertificateRequest feature gate is disabled")
 		}
 	}
 

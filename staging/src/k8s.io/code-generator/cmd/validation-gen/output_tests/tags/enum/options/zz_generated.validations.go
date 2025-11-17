@@ -92,27 +92,27 @@ func Validate_ConditionalStruct(ctx context.Context, op operation.Operation, fld
 
 	// field ConditionalStruct.ConditionalEnumField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *ConditionalEnum) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *ConditionalEnum, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_ConditionalEnum(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("conditionalEnumField"), &obj.ConditionalEnumField, safe.Field(oldObj, func(oldObj *ConditionalStruct) *ConditionalEnum { return &oldObj.ConditionalEnumField }))...)
+		}(fldPath.Child("conditionalEnumField"), &obj.ConditionalEnumField, safe.Field(oldObj, func(oldObj *ConditionalStruct) *ConditionalEnum { return &oldObj.ConditionalEnumField }), oldObj != nil)...)
 
 	// field ConditionalStruct.ConditionalEnumPtrField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *ConditionalEnum) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *ConditionalEnum, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_ConditionalEnum(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("conditionalEnumPtrField"), obj.ConditionalEnumPtrField, safe.Field(oldObj, func(oldObj *ConditionalStruct) *ConditionalEnum { return oldObj.ConditionalEnumPtrField }))...)
+		}(fldPath.Child("conditionalEnumPtrField"), obj.ConditionalEnumPtrField, safe.Field(oldObj, func(oldObj *ConditionalStruct) *ConditionalEnum { return oldObj.ConditionalEnumPtrField }), oldObj != nil)...)
 
 	return errs
 }
@@ -164,102 +164,102 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 
 	// field Struct.Enum0Field
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *Enum0) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *Enum0, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_Enum0(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("enum0Field"), &obj.Enum0Field, safe.Field(oldObj, func(oldObj *Struct) *Enum0 { return &oldObj.Enum0Field }))...)
+		}(fldPath.Child("enum0Field"), &obj.Enum0Field, safe.Field(oldObj, func(oldObj *Struct) *Enum0 { return &oldObj.Enum0Field }), oldObj != nil)...)
 
 	// field Struct.Enum0PtrField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *Enum0) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *Enum0, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_Enum0(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("enum0PtrField"), obj.Enum0PtrField, safe.Field(oldObj, func(oldObj *Struct) *Enum0 { return oldObj.Enum0PtrField }))...)
+		}(fldPath.Child("enum0PtrField"), obj.Enum0PtrField, safe.Field(oldObj, func(oldObj *Struct) *Enum0 { return oldObj.Enum0PtrField }), oldObj != nil)...)
 
 	// field Struct.Enum1Field
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *Enum1) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *Enum1, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_Enum1(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("enum1Field"), &obj.Enum1Field, safe.Field(oldObj, func(oldObj *Struct) *Enum1 { return &oldObj.Enum1Field }))...)
+		}(fldPath.Child("enum1Field"), &obj.Enum1Field, safe.Field(oldObj, func(oldObj *Struct) *Enum1 { return &oldObj.Enum1Field }), oldObj != nil)...)
 
 	// field Struct.Enum1PtrField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *Enum1) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *Enum1, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_Enum1(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("enum1PtrField"), obj.Enum1PtrField, safe.Field(oldObj, func(oldObj *Struct) *Enum1 { return oldObj.Enum1PtrField }))...)
+		}(fldPath.Child("enum1PtrField"), obj.Enum1PtrField, safe.Field(oldObj, func(oldObj *Struct) *Enum1 { return oldObj.Enum1PtrField }), oldObj != nil)...)
 
 	// field Struct.Enum2Field
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *Enum2) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *Enum2, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_Enum2(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("enum2Field"), &obj.Enum2Field, safe.Field(oldObj, func(oldObj *Struct) *Enum2 { return &oldObj.Enum2Field }))...)
+		}(fldPath.Child("enum2Field"), &obj.Enum2Field, safe.Field(oldObj, func(oldObj *Struct) *Enum2 { return &oldObj.Enum2Field }), oldObj != nil)...)
 
 	// field Struct.Enum2PtrField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *Enum2) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *Enum2, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_Enum2(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("enum2PtrField"), obj.Enum2PtrField, safe.Field(oldObj, func(oldObj *Struct) *Enum2 { return oldObj.Enum2PtrField }))...)
+		}(fldPath.Child("enum2PtrField"), obj.Enum2PtrField, safe.Field(oldObj, func(oldObj *Struct) *Enum2 { return oldObj.Enum2PtrField }), oldObj != nil)...)
 
 	// field Struct.NotEnumField has no validation
 	// field Struct.NotEnumPtrField has no validation
 
 	// field Struct.EnumWithExcludeField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *EnumWithExclude) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *EnumWithExclude, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_EnumWithExclude(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("enumWithExcludeField"), &obj.EnumWithExcludeField, safe.Field(oldObj, func(oldObj *Struct) *EnumWithExclude { return &oldObj.EnumWithExcludeField }))...)
+		}(fldPath.Child("enumWithExcludeField"), &obj.EnumWithExcludeField, safe.Field(oldObj, func(oldObj *Struct) *EnumWithExclude { return &oldObj.EnumWithExcludeField }), oldObj != nil)...)
 
 	// field Struct.EnumWithExcludePtrField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *EnumWithExclude) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *EnumWithExclude, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_EnumWithExclude(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("enumWithExcludePtrField"), obj.EnumWithExcludePtrField, safe.Field(oldObj, func(oldObj *Struct) *EnumWithExclude { return oldObj.EnumWithExcludePtrField }))...)
+		}(fldPath.Child("enumWithExcludePtrField"), obj.EnumWithExcludePtrField, safe.Field(oldObj, func(oldObj *Struct) *EnumWithExclude { return oldObj.EnumWithExcludePtrField }), oldObj != nil)...)
 
 	return errs
 }

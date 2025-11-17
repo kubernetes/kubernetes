@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -271,8 +272,11 @@ func (c *PodClient) mungeSpec(pod *v1.Pod) {
 	// during the test.
 	for i := range pod.Spec.Containers {
 		c := &pod.Spec.Containers[i]
-		if c.ImagePullPolicy == v1.PullNever {
-			// If the image pull policy is PullNever, make sure it is in the pre-pull list.
+		// If the image pull policy is PullNever, make sure it is in the pre-pull list.
+		// Note that we skip images from localhost registry here, because
+		// they are usually used for testing private registry pulling,
+		// and they are not supposed to be pre-pulled.
+		if c.ImagePullPolicy == v1.PullNever && !strings.Contains(c.Image, "localhost") {
 			gomega.Expect(ImagePrePullList.Has(c.Image)).To(gomega.BeTrueBecause("Image %q is not in the pre-pull list, consider adding it to PrePulledImages in test/e2e/common/util.go or NodePrePullImageList in test/e2e_node/image_list.go", c.Image))
 		}
 		// If the image pull policy is PullAlways or PullIfNotPresent, the image doesn't need

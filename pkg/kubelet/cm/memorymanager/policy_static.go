@@ -17,11 +17,9 @@ limitations under the License.
 package memorymanager
 
 import (
-	"context"
 	"fmt"
 	"sort"
 
-	"github.com/go-logr/logr"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 
 	v1 "k8s.io/api/core/v1"
@@ -62,7 +60,7 @@ type staticPolicy struct {
 var _ Policy = &staticPolicy{}
 
 // NewPolicyStatic returns new static policy instance
-func NewPolicyStatic(ctx context.Context, machineInfo *cadvisorapi.MachineInfo, reserved systemReservedMemory, affinity topologymanager.Store) (Policy, error) {
+func NewPolicyStatic(logger klog.Logger, machineInfo *cadvisorapi.MachineInfo, reserved systemReservedMemory, affinity topologymanager.Store) (Policy, error) {
 	var totalSystemReserved uint64
 	for _, node := range reserved {
 		if _, ok := node[v1.ResourceMemory]; !ok {
@@ -88,8 +86,7 @@ func (p *staticPolicy) Name() string {
 	return string(PolicyTypeStatic)
 }
 
-func (p *staticPolicy) Start(ctx context.Context, s state.State) error {
-	logger := klog.FromContext(ctx)
+func (p *staticPolicy) Start(logger klog.Logger, s state.State) error {
 	if err := p.validateState(logger, s); err != nil {
 		logger.Error(err, "Invalid state, please drain node and remove policy state file")
 		return err
@@ -98,9 +95,8 @@ func (p *staticPolicy) Start(ctx context.Context, s state.State) error {
 }
 
 // Allocate call is idempotent
-func (p *staticPolicy) Allocate(ctx context.Context, s state.State, pod *v1.Pod, container *v1.Container) (rerr error) {
+func (p *staticPolicy) Allocate(logger klog.Logger, s state.State, pod *v1.Pod, container *v1.Container) (rerr error) {
 	// allocate the memory only for guaranteed pods
-	logger := klog.FromContext(ctx)
 	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod), "containerName", container.Name)
 	qos := v1qos.GetPodQOS(pod)
 	if qos != v1.PodQOSGuaranteed {
@@ -259,8 +255,8 @@ func (p *staticPolicy) getPodReusableMemory(pod *v1.Pod, numaAffinity bitmask.Bi
 }
 
 // RemoveContainer call is idempotent
-func (p *staticPolicy) RemoveContainer(ctx context.Context, s state.State, podUID string, containerName string) {
-	logger := klog.LoggerWithValues(klog.FromContext(ctx), "podUID", podUID, "containerName", containerName)
+func (p *staticPolicy) RemoveContainer(logger klog.Logger, s state.State, podUID string, containerName string) {
+	logger = klog.LoggerWithValues(logger, "podUID", podUID, "containerName", containerName)
 
 	blocks := s.GetMemoryBlocks(podUID, containerName)
 	if blocks == nil {
@@ -313,7 +309,7 @@ func (p *staticPolicy) RemoveContainer(ctx context.Context, s state.State, podUI
 	s.SetMachineState(machineState)
 }
 
-func regenerateHints(logger logr.Logger, pod *v1.Pod, ctn *v1.Container, ctnBlocks []state.Block, reqRsrc map[v1.ResourceName]uint64) map[string][]topologymanager.TopologyHint {
+func regenerateHints(logger klog.Logger, pod *v1.Pod, ctn *v1.Container, ctnBlocks []state.Block, reqRsrc map[v1.ResourceName]uint64) map[string][]topologymanager.TopologyHint {
 	hints := map[string][]topologymanager.TopologyHint{}
 	for resourceName := range reqRsrc {
 		hints[string(resourceName)] = []topologymanager.TopologyHint{}
@@ -405,8 +401,8 @@ func getPodRequestedResources(pod *v1.Pod) (map[v1.ResourceName]uint64, error) {
 	return reqRsrcs, nil
 }
 
-func (p *staticPolicy) GetPodTopologyHints(ctx context.Context, s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
-	logger := klog.LoggerWithValues(klog.FromContext(ctx), "pod", klog.KObj(pod))
+func (p *staticPolicy) GetPodTopologyHints(logger klog.Logger, s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
+	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod))
 
 	if v1qos.GetPodQOS(pod) != v1.PodQOSGuaranteed {
 		return nil
@@ -440,8 +436,8 @@ func (p *staticPolicy) GetPodTopologyHints(ctx context.Context, s state.State, p
 // GetTopologyHints implements the topologymanager.HintProvider Interface
 // and is consulted to achieve NUMA aware resource alignment among this
 // and other resource controllers.
-func (p *staticPolicy) GetTopologyHints(ctx context.Context, s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
-	logger := klog.LoggerWithValues(klog.FromContext(ctx), "pod", klog.KObj(pod))
+func (p *staticPolicy) GetTopologyHints(logger klog.Logger, s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
+	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod))
 
 	if v1qos.GetPodQOS(pod) != v1.PodQOSGuaranteed {
 		return nil
@@ -599,7 +595,7 @@ func areGroupsEqual(group1, group2 []int) bool {
 	return true
 }
 
-func (p *staticPolicy) validateState(logger logr.Logger, s state.State) error {
+func (p *staticPolicy) validateState(logger klog.Logger, s state.State) error {
 	machineState := s.GetMachineState()
 	memoryAssignments := s.GetMemoryAssignments()
 
@@ -672,7 +668,7 @@ func (p *staticPolicy) validateState(logger logr.Logger, s state.State) error {
 	return nil
 }
 
-func areMachineStatesEqual(logger logr.Logger, ms1, ms2 state.NUMANodeMap) bool {
+func areMachineStatesEqual(logger klog.Logger, ms1, ms2 state.NUMANodeMap) bool {
 	if len(ms1) != len(ms2) {
 		logger.Info("Node states were different", "lengthNode1", len(ms1), "lengthNode2", len(ms2))
 		return false
@@ -733,7 +729,7 @@ func areMachineStatesEqual(logger logr.Logger, ms1, ms2 state.NUMANodeMap) bool 
 	return true
 }
 
-func areMemoryStatesEqual(logger logr.Logger, memoryState1, memoryState2 *state.MemoryTable, nodeID int, resourceName v1.ResourceName) bool {
+func areMemoryStatesEqual(logger klog.Logger, memoryState1, memoryState2 *state.MemoryTable, nodeID int, resourceName v1.ResourceName) bool {
 	loggerWithValues := klog.LoggerWithValues(logger, "node", nodeID, "resource", resourceName, "memoryState1", *memoryState1, "memoryState2", *memoryState2)
 	if memoryState1.TotalMemSize != memoryState2.TotalMemSize {
 		logger.Info("Memory states for the NUMA node and resource are different", "field", "TotalMemSize", "TotalMemSize1", memoryState1.TotalMemSize, "TotalMemSize2", memoryState2.TotalMemSize)
@@ -910,7 +906,7 @@ func findBestHint(hints []topologymanager.TopologyHint) *topologymanager.Topolog
 }
 
 // GetAllocatableMemory returns the amount of allocatable memory for each NUMA node
-func (p *staticPolicy) GetAllocatableMemory(_ context.Context, s state.State) []state.Block {
+func (p *staticPolicy) GetAllocatableMemory(s state.State) []state.Block {
 	var allocatableMemory []state.Block
 	machineState := s.GetMachineState()
 	for numaNodeID, numaNodeState := range machineState {
@@ -974,7 +970,7 @@ func (p *staticPolicy) updatePodReusableMemory(pod *v1.Pod, container *v1.Contai
 	}
 }
 
-func (p *staticPolicy) updateInitContainersMemoryBlocks(logger logr.Logger, s state.State, pod *v1.Pod, container *v1.Container, containerMemoryBlocks []state.Block) {
+func (p *staticPolicy) updateInitContainersMemoryBlocks(logger klog.Logger, s state.State, pod *v1.Pod, container *v1.Container, containerMemoryBlocks []state.Block) {
 	podUID := string(pod.UID)
 
 	for _, containerBlock := range containerMemoryBlocks {
@@ -1038,7 +1034,7 @@ func isRegularInitContainer(pod *v1.Pod, container *v1.Container) bool {
 	return false
 }
 
-func isNUMAAffinitiesEqual(logger logr.Logger, numaAffinity1, numaAffinity2 []int) bool {
+func isNUMAAffinitiesEqual(logger klog.Logger, numaAffinity1, numaAffinity2 []int) bool {
 	bitMask1, err := bitmask.NewBitMask(numaAffinity1...)
 	if err != nil {
 		logger.Error(err, "failed to create bit mask", "numaAffinity1", numaAffinity1)

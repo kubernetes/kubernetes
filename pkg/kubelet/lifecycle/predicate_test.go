@@ -17,6 +17,7 @@ limitations under the License.
 package lifecycle
 
 import (
+	"context"
 	goruntime "runtime"
 	"testing"
 
@@ -30,6 +31,7 @@ import (
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
@@ -189,11 +191,12 @@ func newPodWithPort(hostPorts ...int) *v1.Pod {
 
 func TestGeneralPredicates(t *testing.T) {
 	resourceTests := []struct {
-		pod      *v1.Pod
-		nodeInfo *schedulerframework.NodeInfo
-		node     *v1.Node
-		name     string
-		reasons  []PredicateFailureReason
+		pod        *v1.Pod
+		nodeInfo   *schedulerframework.NodeInfo
+		cachedNode *v1.Node
+		syncNode   *v1.Node
+		name       string
+		reasons    []PredicateFailureReason
 	}{
 		{
 			pod: &v1.Pod{},
@@ -202,7 +205,7 @@ func TestGeneralPredicates(t *testing.T) {
 					v1.ResourceCPU:    *resource.NewMilliQuantity(9, resource.DecimalSI),
 					v1.ResourceMemory: *resource.NewQuantity(19, resource.BinarySI),
 				})),
-			node: &v1.Node{
+			cachedNode: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
 				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
 			},
@@ -218,7 +221,7 @@ func TestGeneralPredicates(t *testing.T) {
 					v1.ResourceCPU:    *resource.NewMilliQuantity(5, resource.DecimalSI),
 					v1.ResourceMemory: *resource.NewQuantity(19, resource.BinarySI),
 				})),
-			node: &v1.Node{
+			cachedNode: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
 				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
 			},
@@ -235,7 +238,7 @@ func TestGeneralPredicates(t *testing.T) {
 				},
 			},
 			nodeInfo: schedulerframework.NewNodeInfo(),
-			node: &v1.Node{
+			cachedNode: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
 				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
 			},
@@ -245,7 +248,7 @@ func TestGeneralPredicates(t *testing.T) {
 		{
 			pod:      newPodWithPort(123),
 			nodeInfo: schedulerframework.NewNodeInfo(newPodWithPort(123)),
-			node: &v1.Node{
+			cachedNode: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
 				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
 			},
@@ -262,7 +265,7 @@ func TestGeneralPredicates(t *testing.T) {
 				},
 			},
 			nodeInfo: schedulerframework.NewNodeInfo(),
-			node: &v1.Node{
+			cachedNode: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
 				Spec: v1.NodeSpec{
 					Taints: []v1.Taint{
@@ -277,7 +280,7 @@ func TestGeneralPredicates(t *testing.T) {
 		{
 			pod:      &v1.Pod{},
 			nodeInfo: schedulerframework.NewNodeInfo(),
-			node: &v1.Node{
+			cachedNode: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
 				Spec: v1.NodeSpec{
 					Taints: []v1.Taint{
@@ -291,7 +294,7 @@ func TestGeneralPredicates(t *testing.T) {
 		{
 			pod:      &v1.Pod{},
 			nodeInfo: schedulerframework.NewNodeInfo(),
-			node: &v1.Node{
+			cachedNode: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
 				Spec: v1.NodeSpec{
 					Taints: []v1.Taint{
@@ -306,7 +309,7 @@ func TestGeneralPredicates(t *testing.T) {
 		{
 			pod:      &v1.Pod{},
 			nodeInfo: schedulerframework.NewNodeInfo(),
-			node: &v1.Node{
+			cachedNode: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
 				Spec: v1.NodeSpec{
 					Taints: []v1.Taint{
@@ -326,7 +329,7 @@ func TestGeneralPredicates(t *testing.T) {
 				},
 			},
 			nodeInfo: schedulerframework.NewNodeInfo(),
-			node: &v1.Node{
+			cachedNode: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
 				Spec: v1.NodeSpec{
 					Taints: []v1.Taint{
@@ -338,11 +341,197 @@ func TestGeneralPredicates(t *testing.T) {
 			},
 			name: "static pods ignore taints",
 		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						types.ConfigSourceAnnotationKey: types.FileSource,
+					},
+				},
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{
+												Key:      "foo",
+												Operator: v1.NodeSelectorOpExists,
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			nodeInfo: schedulerframework.NewNodeInfo(),
+			cachedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
+				Spec:       v1.NodeSpec{},
+				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
+			},
+			syncNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
+				Spec:       v1.NodeSpec{},
+				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
+			},
+			name: "node affinity failure",
+			reasons: []PredicateFailureReason{
+				&PredicateFailureError{nodeaffinity.Name, nodeaffinity.ErrReasonPod},
+			},
+		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						types.ConfigSourceAnnotationKey: types.FileSource,
+					},
+				},
+				Spec: v1.PodSpec{
+					NodeName: "some-node-name",
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{
+												Key:      "foo",
+												Operator: v1.NodeSelectorOpExists,
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			nodeInfo: schedulerframework.NewNodeInfo(),
+			cachedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
+				Spec:       v1.NodeSpec{},
+				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
+			},
+			syncNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "machine1",
+					Labels: map[string]string{
+						"foo": "bar",
+					},
+				},
+				Spec:   v1.NodeSpec{},
+				Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
+			},
+			name: "node affinity failure on cached node and node name doesn't match",
+			// Ensure that both reasons are returned, because we do not fetch the node synchronously on multiple failures.
+			reasons: []PredicateFailureReason{
+				&PredicateFailureError{nodeaffinity.Name, nodeaffinity.ErrReasonPod},
+				&PredicateFailureError{nodename.Name, nodename.ErrReason},
+			},
+		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						types.ConfigSourceAnnotationKey: types.FileSource,
+					},
+				},
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{
+												Key:      "foo",
+												Operator: v1.NodeSelectorOpExists,
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			nodeInfo: schedulerframework.NewNodeInfo(),
+			cachedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
+				Spec:       v1.NodeSpec{},
+				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
+			},
+			syncNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "machine1",
+					Labels: map[string]string{
+						"foo": "bar",
+					},
+				},
+				Spec:   v1.NodeSpec{},
+				Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
+			},
+			name: "node affinity failure on cached node, but not the fresh one",
+		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						types.ConfigSourceAnnotationKey: types.FileSource,
+					},
+				},
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{
+												Key:      "foo",
+												Operator: v1.NodeSelectorOpExists,
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			nodeInfo: schedulerframework.NewNodeInfo(),
+			cachedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "machine1",
+					Labels: map[string]string{
+						"foo": "bar",
+					},
+				},
+				Spec:   v1.NodeSpec{},
+				Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
+			},
+			syncNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
+				Spec:       v1.NodeSpec{},
+				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
+			},
+			name: "node affinity failure on fresh node, but not the cached one",
+		},
 	}
 	for _, test := range resourceTests {
 		t.Run(test.name, func(t *testing.T) {
-			test.nodeInfo.SetNode(test.node)
-			reasons := generalFilter(test.pod, test.nodeInfo)
+			test.nodeInfo.SetNode(test.cachedNode)
+			w := &predicateAdmitHandler{getNodeAnyWayFunc: func(ctx context.Context, useCache bool) (*v1.Node, error) {
+				if useCache {
+					return test.cachedNode, nil
+				}
+				return test.syncNode, nil
+			}}
+			reasons := w.generalFilter(context.Background(), test.pod, test.nodeInfo)
 			if diff := cmp.Diff(test.reasons, reasons); diff != "" {
 				t.Errorf("unexpected failure reasons (-want, +got):\n%s", diff)
 			}

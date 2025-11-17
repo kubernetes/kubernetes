@@ -56,9 +56,9 @@ func Validate_StructWithMaps(ctx context.Context, op operation.Operation, fldPat
 
 	// field StructWithMaps.MapPrimitiveField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj map[string]string) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj map[string]string, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
 			// call field-attached validations
@@ -66,13 +66,13 @@ func Validate_StructWithMaps(ctx context.Context, op operation.Operation, fldPat
 				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field MapTest.MapPrimitiveField[*]")
 			})...)
 			return
-		}(fldPath.Child("mapPrimitiveField"), obj.MapPrimitiveField, safe.Field(oldObj, func(oldObj *StructWithMaps) map[string]string { return oldObj.MapPrimitiveField }))...)
+		}(fldPath.Child("mapPrimitiveField"), obj.MapPrimitiveField, safe.Field(oldObj, func(oldObj *StructWithMaps) map[string]string { return oldObj.MapPrimitiveField }), oldObj != nil)...)
 
 	// field StructWithMaps.MapTypedefField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj map[string]StringType) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj map[string]StringType, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
 			// call field-attached validations
@@ -80,13 +80,13 @@ func Validate_StructWithMaps(ctx context.Context, op operation.Operation, fldPat
 				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field MapTest.MapTypedefField[*]")
 			})...)
 			return
-		}(fldPath.Child("mapTypedefField"), obj.MapTypedefField, safe.Field(oldObj, func(oldObj *StructWithMaps) map[string]StringType { return oldObj.MapTypedefField }))...)
+		}(fldPath.Child("mapTypedefField"), obj.MapTypedefField, safe.Field(oldObj, func(oldObj *StructWithMaps) map[string]StringType { return oldObj.MapTypedefField }), oldObj != nil)...)
 
 	// field StructWithMaps.MapComparableStructField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj map[string]ComparableStruct) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj map[string]ComparableStruct, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
 			// call field-attached validations
@@ -94,13 +94,13 @@ func Validate_StructWithMaps(ctx context.Context, op operation.Operation, fldPat
 				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field MapTest.MapComparableStructField[*]")
 			})...)
 			return
-		}(fldPath.Child("mapComparableStructField"), obj.MapComparableStructField, safe.Field(oldObj, func(oldObj *StructWithMaps) map[string]ComparableStruct { return oldObj.MapComparableStructField }))...)
+		}(fldPath.Child("mapComparableStructField"), obj.MapComparableStructField, safe.Field(oldObj, func(oldObj *StructWithMaps) map[string]ComparableStruct { return oldObj.MapComparableStructField }), oldObj != nil)...)
 
 	// field StructWithMaps.MapNonComparableStructField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj map[string]NonComparableStruct) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj map[string]NonComparableStruct, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
 			// call field-attached validations
@@ -108,7 +108,7 @@ func Validate_StructWithMaps(ctx context.Context, op operation.Operation, fldPat
 				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field MapTest.MapNonComparableStructField[*]")
 			})...)
 			return
-		}(fldPath.Child("mapNonComparableStructField"), obj.MapNonComparableStructField, safe.Field(oldObj, func(oldObj *StructWithMaps) map[string]NonComparableStruct { return oldObj.MapNonComparableStructField }))...)
+		}(fldPath.Child("mapNonComparableStructField"), obj.MapNonComparableStructField, safe.Field(oldObj, func(oldObj *StructWithMaps) map[string]NonComparableStruct { return oldObj.MapNonComparableStructField }), oldObj != nil)...)
 
 	return errs
 }
