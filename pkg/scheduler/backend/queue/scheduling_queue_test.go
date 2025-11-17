@@ -3078,7 +3078,7 @@ func TestFlushUnschedulablePodsLeftoverSetsFlag(t *testing.T) {
 
 	internalPInfo := q.unschedulablePods.get(pod)
 	if internalPInfo == nil {
-		t.Fatalf("pod should be in unschedulablePods")
+		t.Fatalf("Pod should be in unschedulablePods")
 	}
 	if internalPInfo.WasFlushedFromUnschedulable {
 		t.Errorf("Expected WasFlushedFromUnschedulable to be cleared (false) after returning to queue, but got true")
