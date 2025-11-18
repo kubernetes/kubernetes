@@ -27,6 +27,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientgofeaturegate "k8s.io/client-go/features"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 )
 
@@ -395,6 +396,9 @@ func DeletionHandlingObjectToName(obj interface{}) (ObjectName, error) {
 
 // InformerOptions configure a Reflector.
 type InformerOptions struct {
+	// Logger, if not nil, is used instead of klog.Background() for logging.
+	Logger *klog.Logger
+
 	// ListerWatcher implements List and Watch functions for the source of the resource
 	// the informer will be informing about.
 	ListerWatcher ListerWatcher
@@ -776,7 +780,11 @@ func newInformer(clientState Store, options InformerOptions, keyFunc KeyFunc) Co
 	// KeyLister, that way resync operations will result in the correct set
 	// of update/delete deltas.
 
-	fifo := newQueueFIFO(clientState, options.Transform)
+	logger := klog.Background()
+	if options.Logger != nil {
+		logger = *options.Logger
+	}
+	fifo := newQueueFIFO(logger, clientState, options.Transform)
 
 	cfg := &Config{
 		Queue:            fifo,
@@ -798,9 +806,10 @@ func newInformer(clientState Store, options InformerOptions, keyFunc KeyFunc) Co
 	return New(cfg)
 }
 
-func newQueueFIFO(clientState Store, transform TransformFunc) Queue {
+func newQueueFIFO(logger klog.Logger, clientState Store, transform TransformFunc) Queue {
 	if clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.InOrderInformers) {
 		options := RealFIFOOptions{
+			Logger:      &logger,
 			KeyFunction: MetaNamespaceKeyFunc,
 			Transformer: transform,
 		}
@@ -814,6 +823,7 @@ func newQueueFIFO(clientState Store, transform TransformFunc) Queue {
 		return NewRealFIFOWithOptions(options)
 	} else {
 		return NewDeltaFIFOWithOptions(DeltaFIFOOptions{
+			Logger:                &logger,
 			KnownObjects:          clientState,
 			EmitDeltaTypeReplaced: true,
 			Transformer:           transform,
