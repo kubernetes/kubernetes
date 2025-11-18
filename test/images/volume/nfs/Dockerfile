@@ -16,8 +16,11 @@ ARG BASEIMAGE
 FROM $BASEIMAGE
 
 CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
-RUN dnf -y install procps-ng nfs-utils && dnf clean all
-RUN mkdir -p /exports
+
+RUN dnf -y install --setopt=install_weak_deps=False --setopt=tsflags=nodocs procps-ng nfs-utils \
+    && rm -rf /var/cache/dnf \
+    && mkdir -p /exports
+
 ADD run_nfs.sh /usr/local/bin/
 ADD index.html /tmp/index.html
 RUN chmod 644 /tmp/index.html
