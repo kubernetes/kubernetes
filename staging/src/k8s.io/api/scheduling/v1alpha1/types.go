@@ -118,6 +118,7 @@ type WorkloadSpec struct {
 	// When set, it cannot be changed.
 	//
 	// +optional
+	// +k8s:optional
 	ControllerRef *TypedLocalObjectReference `json:"controllerRef,omitempty" protobuf:"bytes,1,opt,name=controllerRef"`
 
 	// PodGroups is the list of pod groups that make up the Workload.
@@ -179,6 +180,7 @@ type PodGroupPolicy struct {
 	// standard Kubernetes scheduling behavior.
 	//
 	// +optional
+	// +k8s:optional
 	// +oneOf=PolicySelection
 	Basic *BasicSchedulingPolicy `json:"basic,omitempty" protobuf:"bytes,2,opt,name=basic"`
 
@@ -186,6 +188,7 @@ type PodGroupPolicy struct {
 	// all-or-nothing semantics.
 	//
 	// +optional
+	// +k8s:optional
 	// +oneOf=PolicySelection
 	Gang *GangSchedulingPolicy `json:"gang,omitempty" protobuf:"bytes,3,opt,name=gang"`
 }

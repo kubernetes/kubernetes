@@ -25,7 +25,6 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	schedulingutil "k8s.io/kubernetes/pkg/api/scheduling"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/apis/scheduling/validation"
 )
@@ -52,7 +51,7 @@ func (workloadStrategy) Validate(ctx context.Context, obj runtime.Object) field.
 }
 
 func (workloadStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
-	return schedulingutil.GetWarningsForWorkload(obj.(*scheduling.Workload))
+	return nil
 }
 
 func (workloadStrategy) Canonicalize(obj runtime.Object) {}
@@ -64,13 +63,12 @@ func (workloadStrategy) AllowCreateOnUpdate() bool {
 func (workloadStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {}
 
 func (workloadStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	allErrs := validation.ValidateWorkload(obj.(*scheduling.Workload))
-	allErrs = append(allErrs, validation.ValidateWorkloadUpdate(obj.(*scheduling.Workload), old.(*scheduling.Workload))...)
+	allErrs := validation.ValidateWorkloadUpdate(obj.(*scheduling.Workload), old.(*scheduling.Workload))
 	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, obj, old, allErrs, operation.Update)
 }
 
 func (workloadStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
-	return schedulingutil.GetWarningsForWorkload(obj.(*scheduling.Workload))
+	return nil
 }
 
 func (workloadStrategy) AllowUnconditionalUpdate() bool {

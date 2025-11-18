@@ -125,7 +125,25 @@ func Validate_PodGroup(ctx context.Context, op operation.Operation, fldPath *fie
 // Validate_PodGroupPolicy validates an instance of PodGroupPolicy according
 // to declarative validation rules in the API schema.
 func Validate_PodGroupPolicy(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *schedulingv1alpha1.PodGroupPolicy) (errs field.ErrorList) {
-	// field schedulingv1alpha1.PodGroupPolicy.Basic has no validation
+	// field schedulingv1alpha1.PodGroupPolicy.Basic
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *schedulingv1alpha1.BasicSchedulingPolicy, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("basic"), obj.Basic, safe.Field(oldObj, func(oldObj *schedulingv1alpha1.PodGroupPolicy) *schedulingv1alpha1.BasicSchedulingPolicy {
+			return oldObj.Basic
+		}), oldObj != nil)...)
 
 	// field schedulingv1alpha1.PodGroupPolicy.Gang
 	errs = append(errs,
@@ -133,6 +151,14 @@ func Validate_PodGroupPolicy(ctx context.Context, op operation.Operation, fldPat
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_GangSchedulingPolicy(ctx, op, fldPath, obj, oldObj)...)
@@ -259,6 +285,14 @@ func Validate_WorkloadSpec(ctx context.Context, op operation.Operation, fldPath 
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_TypedLocalObjectReference(ctx, op, fldPath, obj, oldObj)...)

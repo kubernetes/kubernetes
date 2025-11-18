@@ -86,7 +86,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				obj.Spec.PodGroups[0].Name = ""
 			}),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "podGroups").Index(0).Child("name"), "", ""),
+				field.Invalid(field.NewPath("spec", "podGroups").Index(0).Child("name"), "", "a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')").WithOrigin("format=k8s-short-name"),
 			},
 		},
 		"invalid podGroup name": {
@@ -94,7 +94,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				obj.Spec.PodGroups[0].Name = "Invalid_Name"
 			}),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "podGroups").Index(0).Child("name"), "Invalid_Name", ""),
+				field.Invalid(field.NewPath("spec", "podGroups").Index(0).Child("name"), "Invalid_Name", "a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')").WithOrigin("format=k8s-short-name"),
 			},
 		},
 		"duplicate podGroup names": {
@@ -155,7 +155,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				}
 			}),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "controllerRef", "apiGroup"), "invalid_api_group", ""),
+				field.Invalid(field.NewPath("spec", "controllerRef", "apiGroup"), "invalid_api_group", "").WithOrigin("format=k8s-long-name"),
 			},
 		},
 		"controllerRef missing kind": {
@@ -180,6 +180,18 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			}),
 			expectedErrs: field.ErrorList{
 				field.Required(field.NewPath("spec", "controllerRef", "name"), ""),
+			},
+		},
+		"controllerRef invalid name": {
+			input: mkValidWorkload(func(obj *scheduling.Workload) {
+				obj.Spec.ControllerRef = &scheduling.TypedLocalObjectReference{
+					APIGroup: "apps",
+					Kind:     "Deployment",
+					Name:     "/invalid-name",
+				}
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "controllerRef", "name"), "/invalid-name", "must not contain '/'").WithOrigin("format=k8s-short-name"),
 			},
 		},
 	}
@@ -226,6 +238,38 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 					Name:     "my-deployment",
 				}
 			}),
+		},
+		"invalid update empty podGroups": {
+			oldObj: mkValidWorkload(func(obj *scheduling.Workload) { obj.ResourceVersion = "1" }),
+			updateObj: mkValidWorkload(func(obj *scheduling.Workload) {
+				obj.ResourceVersion = "1"
+				obj.Spec.PodGroups = []scheduling.PodGroup{}
+			}),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "podGroups"), "must have at least one item"),
+				field.Invalid(field.NewPath("spec", "podGroups"), []scheduling.PodGroup{}, "field is immutable"),
+			},
+		},
+		"invalid update too many podGroups": {
+			oldObj: mkValidWorkload(func(obj *scheduling.Workload) { obj.ResourceVersion = "1" }),
+			updateObj: mkValidWorkload(func(obj *scheduling.Workload) {
+				obj.ResourceVersion = "1"
+				obj.Spec.PodGroups = make([]scheduling.PodGroup, scheduling.WorkloadMaxPodGroups+1)
+				for i := range obj.Spec.PodGroups {
+					obj.Spec.PodGroups[i] = scheduling.PodGroup{
+						Name: fmt.Sprintf("group-%d", i),
+						Policy: scheduling.PodGroupPolicy{
+							Gang: &scheduling.GangSchedulingPolicy{
+								MinCount: 1,
+							},
+						},
+					}
+				}
+			}),
+			expectedErrs: field.ErrorList{
+				field.TooMany(field.NewPath("spec", "podGroups"), scheduling.WorkloadMaxPodGroups+1, scheduling.WorkloadMaxPodGroups).WithOrigin("maxItems"),
+				field.Invalid(field.NewPath("spec", "podGroups"), nil, "field is immutable"),
+			},
 		},
 		"invalid update podGroups": {
 			oldObj: mkValidWorkload(func(obj *scheduling.Workload) { obj.ResourceVersion = "1" }),

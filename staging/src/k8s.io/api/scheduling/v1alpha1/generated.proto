@@ -68,6 +68,7 @@ message PodGroupPolicy {
   // standard Kubernetes scheduling behavior.
   //
   // +optional
+  // +k8s:optional
   // +oneOf=PolicySelection
   optional BasicSchedulingPolicy basic = 2;
 
@@ -75,6 +76,7 @@ message PodGroupPolicy {
   // all-or-nothing semantics.
   //
   // +optional
+  // +k8s:optional
   // +oneOf=PolicySelection
   optional GangSchedulingPolicy gang = 3;
 }
@@ -186,6 +188,7 @@ message WorkloadSpec {
   // When set, it cannot be changed.
   //
   // +optional
+  // +k8s:optional
   optional TypedLocalObjectReference controllerRef = 1;
 
   // PodGroups is the list of pod groups that make up the Workload.

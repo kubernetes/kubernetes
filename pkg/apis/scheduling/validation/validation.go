@@ -95,7 +95,7 @@ func validateControllerRef(ref *scheduling.TypedLocalObjectReference, fldPath *f
 	var allErrs = field.ErrorList{}
 	if ref.APIGroup != "" {
 		for _, msg := range validation.IsDNS1123Subdomain(ref.APIGroup) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("apiGroup"), ref.APIGroup, msg).MarkCoveredByDeclarative())
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("apiGroup"), ref.APIGroup, msg).WithOrigin("format=k8s-long-name").MarkCoveredByDeclarative())
 		}
 	}
 	if ref.Kind == "" {
@@ -109,7 +109,7 @@ func validateControllerRef(ref *scheduling.TypedLocalObjectReference, fldPath *f
 		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "").MarkCoveredByDeclarative())
 	} else {
 		for _, msg := range pathvalidation.IsValidPathSegmentName(ref.Name) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), ref.Name, msg).MarkCoveredByDeclarative())
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), ref.Name, msg).WithOrigin("format=k8s-short-name").MarkCoveredByDeclarative())
 		}
 	}
 	return allErrs
@@ -118,10 +118,10 @@ func validateControllerRef(ref *scheduling.TypedLocalObjectReference, fldPath *f
 func validatePodGroup(podGroup *scheduling.PodGroup, fldPath *field.Path, existingPodGroups sets.Set[string]) field.ErrorList {
 	var allErrs field.ErrorList
 	for _, detail := range apivalidation.ValidatePodGroupName(podGroup.Name, false) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), podGroup.Name, detail).MarkCoveredByDeclarative())
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), podGroup.Name, detail).WithOrigin("format=k8s-short-name").MarkCoveredByDeclarative())
 	}
 	if existingPodGroups.Has(podGroup.Name) {
-		allErrs = append(allErrs, field.Duplicate(fldPath.Child("name"), podGroup.Name).MarkCoveredByDeclarative())
+		allErrs = append(allErrs, field.Duplicate(fldPath.Child("name"), podGroup.Name))
 	} else {
 		existingPodGroups.Insert(podGroup.Name)
 	}
@@ -167,7 +167,7 @@ func validateGangSchedulingPolicy(policy *scheduling.GangSchedulingPolicy, fldPa
 
 // ValidateWorkloadUpdate tests if an update to Workload is valid.
 func ValidateWorkloadUpdate(workload, oldWorkload *scheduling.Workload) field.ErrorList {
-	allErrs := apivalidation.ValidateObjectMetaUpdate(&workload.ObjectMeta, &oldWorkload.ObjectMeta, field.NewPath("metadata")).MarkCoveredByDeclarative()
+	allErrs := apivalidation.ValidateObjectMetaUpdate(&workload.ObjectMeta, &oldWorkload.ObjectMeta, field.NewPath("metadata"))
 	allErrs = append(allErrs, validateWorkloadSpec(&workload.Spec, field.NewPath("spec"))...)
 	allErrs = append(allErrs, validateWorkloadSpecUpdate(&workload.Spec, &oldWorkload.Spec, field.NewPath("spec"))...)
 	return allErrs
