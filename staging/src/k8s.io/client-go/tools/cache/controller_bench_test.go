@@ -26,6 +26,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	fcache "k8s.io/client-go/tools/cache/testing"
+	"k8s.io/klog/v2/ktesting"
 )
 
 const handlerWaitTime = time.Millisecond
@@ -33,7 +34,8 @@ const handlerWaitTime = time.Millisecond
 func BenchmarkAddWithSlowHandlers(b *testing.B) {
 	for _, unlockWhileProcessing := range []bool{false, true} {
 		b.Run(fmt.Sprintf("unlockWhileProcessing=%t", unlockWhileProcessing), func(b *testing.B) {
-			ctx, cancel := context.WithCancel(context.Background())
+			logger, ctx := ktesting.NewTestContext(b)
+			ctx, cancel := context.WithCancel(ctx)
 			source := fcache.NewFakeControllerSource()
 			b.Cleanup(func() {
 				cancel()
@@ -65,12 +67,12 @@ func BenchmarkAddWithSlowHandlers(b *testing.B) {
 
 				Process: func(obj interface{}, isInInitialList bool) error {
 					if deltas, ok := obj.(Deltas); ok {
-						return processDeltas(handler, store, deltas, isInInitialList, DeletionHandlingMetaNamespaceKeyFunc)
+						return processDeltas(logger, handler, store, deltas, isInInitialList, DeletionHandlingMetaNamespaceKeyFunc)
 					}
 					return errors.New("object given as Process argument is not Deltas")
 				},
 				ProcessBatch: func(deltaList []Delta, isInInitialList bool) error {
-					return processDeltasInBatch(handler, store, deltaList, isInInitialList, DeletionHandlingMetaNamespaceKeyFunc)
+					return processDeltasInBatch(logger, handler, store, deltaList, isInInitialList, DeletionHandlingMetaNamespaceKeyFunc)
 				},
 			}
 			c := New(cfg)

@@ -508,7 +508,11 @@ func (c *AssumeCache) AddEventHandler(handler cache.ResourceEventHandler) cache.
 
 	if c.handlerRegistration == nil {
 		// No informer, so immediately synced.
-		return syncedHandlerRegistration{}
+		s := syncedHandlerRegistration{
+			synced: make(chan struct{}),
+		}
+		close(s.synced)
+		return s
 	}
 
 	return c.handlerRegistration
@@ -557,6 +561,14 @@ func (c *AssumeCache) emitEvents() {
 
 // syncedHandlerRegistration is an implementation of ResourceEventHandlerRegistration
 // which always returns true.
-type syncedHandlerRegistration struct{}
+type syncedHandlerRegistration struct {
+	synced chan struct{}
+}
 
 func (syncedHandlerRegistration) HasSynced() bool { return true }
+
+func (s syncedHandlerRegistration) HasSyncedChecker() cache.DoneChecker { return s }
+
+func (s syncedHandlerRegistration) Name() string { return "AssumeCache" }
+
+func (s syncedHandlerRegistration) Done() <-chan struct{} { return s.synced }

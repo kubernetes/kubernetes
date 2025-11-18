@@ -1134,8 +1134,13 @@ func TestAddWhileActive(t *testing.T) {
 		return
 	}
 
-	if !handle1.HasSynced() {
-		t.Error("Not synced after Run??")
+	select {
+	case <-handle1.HasSyncedChecker().Done():
+		if !handle1.HasSynced() {
+			t.Error("Not synced after channel said we are synced??")
+		}
+	case <-time.After(10 * time.Second):
+		t.Error("Not synced 10 seconds after Run??")
 	}
 
 	listener2.lock.Lock() // ensure we observe it before it has synced
