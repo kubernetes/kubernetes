@@ -23,11 +23,19 @@ import (
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2"
 	utiltrace "k8s.io/utils/trace"
 )
 
 // RealFIFOOptions is the configuration parameters for RealFIFO.
 type RealFIFOOptions struct {
+	// If set, log output will go to this logger instead of klog.Background().
+	// The name of the fifo gets added automatically.
+	Logger *klog.Logger
+
+	// Name can be used to override the default "RealFIFO" name for the new instance.
+	Name string
+
 	// KeyFunction is used to figure out what key an object should have. (It's
 	// exposed in the returned RealFIFO's keyOf() method, with additional
 	// handling around deleted objects and queue state).
@@ -78,6 +86,13 @@ var _ QueueWithBatch = &RealFIFO{}
 // 1. delivers notifications for items that have been deleted
 // 2. delivers multiple notifications per item instead of simply the most recent value
 type RealFIFO struct {
+	// logger is a per-instance logger. This gets chosen when constructing
+	// the instance, with klog.Background() as default.
+	logger klog.Logger
+
+	// name is the name of the fifo. It is included in the logger.
+	name string
+
 	lock sync.RWMutex
 	cond sync.Cond
 
@@ -623,10 +638,10 @@ func reconcileReplacement(
 		deletedObj, exists, err := knownObjects.GetByKey(knownKey)
 		if err != nil {
 			deletedObj = nil
-			utilruntime.HandleError(fmt.Errorf("error during lookup, placing DeleteFinalStateUnknown marker without object: key=%q, err=%w", knownKey, err))
+			utilruntime.HandleErrorWithLogger(klog.TODO(), err, "Error during lookup, placing DeleteFinalStateUnknown marker without object", "key", knownKey)
 		} else if !exists {
 			deletedObj = nil
-			utilruntime.HandleError(fmt.Errorf("key does not exist in known objects store, placing DeleteFinalStateUnknown marker without object: key=%q", knownKey))
+			utilruntime.HandleErrorWithLogger(klog.TODO(), nil, "Key does not exist in known objects store, placing DeleteFinalStateUnknown marker without object", "key", knownKey)
 		}
 		retErr := onDelete(DeletedFinalStateUnknown{
 			Key: knownKey,
@@ -683,10 +698,10 @@ func (f *RealFIFO) Resync() error {
 
 		knownObj, exists, err := f.knownObjects.GetByKey(knownKey)
 		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("unable to queue object for sync: key=%q, err=%w", knownKey, err))
+			utilruntime.HandleErrorWithLogger(f.logger, err, "Unable to queue object for sync", "key", knownKey)
 			continue
 		} else if !exists {
-			utilruntime.HandleError(fmt.Errorf("key does not exist in known objects store, unable to queue object for sync: key=%q", knownKey))
+			utilruntime.HandleErrorWithLogger(f.logger, nil, "Key does not exist in known objects store, unable to queue object for sync", "key", knownKey)
 			continue
 		}
 
@@ -739,6 +754,8 @@ func NewRealFIFOWithOptions(opts RealFIFOOptions) *RealFIFO {
 	}
 
 	f := &RealFIFO{
+		logger:                klog.Background(),
+		name:                  "RealFIFO",
 		items:                 make([]Delta, 0, 10),
 		keyFunc:               opts.KeyFunction,
 		knownObjects:          opts.KnownObjects,
@@ -749,7 +766,13 @@ func NewRealFIFOWithOptions(opts RealFIFOOptions) *RealFIFO {
 		identifier:            opts.Identifier,
 		metrics:               newFIFOMetrics(opts.Identifier, opts.MetricsProvider),
 	}
-
+	if opts.Logger != nil {
+		f.logger = *opts.Logger
+	}
+	if opts.Name != "" {
+		f.name = opts.Name
+	}
+	f.logger = klog.LoggerWithName(f.logger, f.name)
 	f.cond.L = &f.lock
 	return f
 }
