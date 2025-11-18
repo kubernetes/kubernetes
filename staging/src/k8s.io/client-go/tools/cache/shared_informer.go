@@ -539,7 +539,7 @@ func (s *sharedIndexInformer) RunWithContext(ctx context.Context) {
 		s.startedLock.Lock()
 		defer s.startedLock.Unlock()
 
-		fifo := newQueueFIFO(s.indexer, s.transform)
+		fifo := newQueueFIFO(logger, s.indexer, s.transform)
 
 		cfg := &Config{
 			Queue:             fifo,
