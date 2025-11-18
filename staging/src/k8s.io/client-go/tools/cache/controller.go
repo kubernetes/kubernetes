@@ -142,6 +142,11 @@ type Controller interface {
 	// HasSynced delegates to the Config's Queue
 	HasSynced() bool
 
+	// HasSyncedChecker enables waiting for syncing without polling.
+	// The returned DoneChecker can be passed to WaitFor.
+	// It delegates to the Config's Queue.
+	HasSyncedChecker() DoneChecker
+
 	// LastSyncResourceVersion delegates to the Reflector when there
 	// is one, otherwise returns the empty string
 	LastSyncResourceVersion() string
@@ -168,11 +173,13 @@ func (c *controller) RunWithContext(ctx context.Context) {
 		<-ctx.Done()
 		c.config.Queue.Close()
 	}()
+	logger := klog.FromContext(ctx)
 	r := NewReflectorWithOptions(
 		c.config.ListerWatcher,
 		c.config.ObjectType,
 		c.config.Queue,
 		ReflectorOptions{
+			Logger:          &logger,
 			ResyncPeriod:    c.config.FullResyncPeriod,
 			MinWatchTimeout: c.config.MinWatchTimeout,
 			TypeDescription: c.config.ObjectDescription,
@@ -204,6 +211,13 @@ func (c *controller) RunWithContext(ctx context.Context) {
 // Returns true once this controller has completed an initial resource listing
 func (c *controller) HasSynced() bool {
 	return c.config.Queue.HasSynced()
+}
+
+// HasSyncedChecker enables waiting for syncing without polling.
+// The returned DoneChecker can be passed to [WaitFor].
+// It delegates to the Config's Queue.
+func (c *controller) HasSyncedChecker() DoneChecker {
+	return c.config.Queue.HasSyncedChecker()
 }
 
 func (c *controller) LastSyncResourceVersion() string {
@@ -716,7 +730,7 @@ func newInformer(clientState Store, options InformerOptions) Controller {
 	if options.Logger != nil {
 		logger = *options.Logger
 	}
-	fifo := newQueueFIFO(logger, clientState, options.Transform)
+	fifo := newQueueFIFO(logger, options.ObjectType, clientState, options.Transform)
 
 	cfg := &Config{
 		Queue:            fifo,
@@ -738,17 +752,23 @@ func newInformer(clientState Store, options InformerOptions) Controller {
 	return New(cfg)
 }
 
-func newQueueFIFO(logger klog.Logger, clientState Store, transform TransformFunc) Queue {
+func newQueueFIFO(logger klog.Logger, objectType any, clientState Store, transform TransformFunc) Queue {
 	if clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.InOrderInformers) {
+		name := fmt.Sprintf("RealFIFO %T", objectType)
+		logger = klog.LoggerWithName(logger, name)
 		return NewRealFIFOWithOptions(RealFIFOOptions{
 			Logger:       &logger,
+			Name:         name,
 			KeyFunction:  MetaNamespaceKeyFunc,
 			KnownObjects: clientState,
 			Transformer:  transform,
 		})
 	} else {
+		name := fmt.Sprintf("DeltaFIFO %T", objectType)
+		logger = klog.LoggerWithName(logger, name)
 		return NewDeltaFIFOWithOptions(DeltaFIFOOptions{
 			Logger:                &logger,
+			Name:                  name,
 			KnownObjects:          clientState,
 			EmitDeltaTypeReplaced: true,
 			Transformer:           transform,

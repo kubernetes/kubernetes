@@ -126,6 +126,11 @@ type DeltaFIFO struct {
 	// A key is in `queue` if and only if it is in `items`.
 	queue []string
 
+	// synced is initially an open channel. It gets closed (once!) by hasSynced_locked
+	// as soon as the initial sync is considered complete.
+	synced       chan struct{}
+	syncedClosed bool
+
 	// populated is true if the first batch of items inserted by Replace() has been populated
 	// or Delete/Add/Update/AddIfNotPresent was called first.
 	populated bool
@@ -262,6 +267,7 @@ func NewDeltaFIFOWithOptions(opts DeltaFIFOOptions) *DeltaFIFO {
 	f := &DeltaFIFO{
 		logger:       klog.Background(),
 		name:         opts.Name,
+		synced:       make(chan struct{}),
 		items:        map[string]Deltas{},
 		queue:        []string{},
 		keyFunc:      opts.KeyFunction,
@@ -284,6 +290,7 @@ func NewDeltaFIFOWithOptions(opts DeltaFIFOOptions) *DeltaFIFO {
 var (
 	_ = Queue(&DeltaFIFO{})             // DeltaFIFO is a Queue
 	_ = TransformingStore(&DeltaFIFO{}) // DeltaFIFO implements TransformingStore to allow memory optimizations
+	_ = DoneChecker(&DeltaFIFO{})       // DeltaFIFO implements DoneChecker.
 )
 
 var (
@@ -329,8 +336,31 @@ func (f *DeltaFIFO) HasSynced() bool {
 	return f.hasSynced_locked()
 }
 
+// HasSyncedChecker is done if an Add/Update/Delete/AddIfNotPresent are called first,
+// or the first batch of items inserted by Replace() has been popped.
+func (f *DeltaFIFO) HasSyncedChecker() DoneChecker {
+	return f
+}
+
+// Name implements [DoneChecker.Name]
+func (f *DeltaFIFO) Name() string {
+	return f.name
+}
+
+// Done implements [DoneChecker.Done]
+func (f *DeltaFIFO) Done() <-chan struct{} {
+	return f.synced
+}
+
+// hasSynced_locked checks whether the initial sync is completed and returns true if it is, otherwise false.
+// It must be called whenever populated or initialPopulationCount change.
 func (f *DeltaFIFO) hasSynced_locked() bool {
-	return f.populated && f.initialPopulationCount == 0
+	synced := f.populated && f.initialPopulationCount == 0
+	if synced && !f.syncedClosed {
+		f.syncedClosed = true
+		close(f.synced)
+	}
+	return synced
 }
 
 // Add inserts an item, and puts it in the queue. The item is only enqueued
@@ -339,6 +369,7 @@ func (f *DeltaFIFO) Add(obj interface{}) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	f.populated = true
+	f.hasSynced_locked()
 	return f.queueActionLocked(Added, obj)
 }
 
@@ -347,6 +378,7 @@ func (f *DeltaFIFO) Update(obj interface{}) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	f.populated = true
+	f.hasSynced_locked()
 	return f.queueActionLocked(Updated, obj)
 }
 
@@ -363,6 +395,7 @@ func (f *DeltaFIFO) Delete(obj interface{}) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	f.populated = true
+	f.hasSynced_locked()
 	if f.knownObjects == nil {
 		if _, exists := f.items[id]; !exists {
 			// Presumably, this was deleted when a relist happened.
@@ -528,6 +561,7 @@ func (f *DeltaFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 		depth := len(f.queue)
 		if f.initialPopulationCount > 0 {
 			f.initialPopulationCount--
+			f.hasSynced_locked()
 		}
 		item, ok := f.items[id]
 		if !ok {
@@ -640,6 +674,7 @@ func (f *DeltaFIFO) Replace(list []interface{}, _ string) error {
 	if !f.populated {
 		f.populated = true
 		f.initialPopulationCount = keys.Len() + queuedDeletions
+		f.hasSynced_locked()
 	}
 
 	return nil
