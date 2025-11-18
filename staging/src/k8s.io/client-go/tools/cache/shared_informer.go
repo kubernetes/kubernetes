@@ -542,12 +542,16 @@ func (s *sharedIndexInformer) RunWithContext(ctx context.Context) {
 		var fifo Queue
 		if clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.InOrderInformers) {
 			fifo = NewRealFIFOWithOptions(RealFIFOOptions{
+				Logger:       &logger,
+				Name:         fmt.Sprintf("RealFIFO %T", s.objectType),
 				KeyFunction:  MetaNamespaceKeyFunc,
 				KnownObjects: s.indexer,
 				Transformer:  s.transform,
 			})
 		} else {
 			fifo = NewDeltaFIFOWithOptions(DeltaFIFOOptions{
+				Logger:                &logger,
+				Name:                  fmt.Sprintf("DeltaFIFO %T", s.objectType),
 				KnownObjects:          s.indexer,
 				EmitDeltaTypeReplaced: true,
 				Transformer:           s.transform,
