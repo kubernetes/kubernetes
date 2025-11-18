@@ -142,6 +142,9 @@ type Controller interface {
 	// HasSynced delegates to the Config's Queue
 	HasSynced() bool
 
+	// NamedHasSynced delegates to the Config's Queue
+	NamedHasSynced() NamedSyncer
+
 	// LastSyncResourceVersion delegates to the Reflector when there
 	// is one, otherwise returns the empty string
 	LastSyncResourceVersion() string
@@ -168,11 +171,13 @@ func (c *controller) RunWithContext(ctx context.Context) {
 		<-ctx.Done()
 		c.config.Queue.Close()
 	}()
+	logger := klog.FromContext(ctx)
 	r := NewReflectorWithOptions(
 		c.config.ListerWatcher,
 		c.config.ObjectType,
 		c.config.Queue,
 		ReflectorOptions{
+			Logger:          &logger,
 			ResyncPeriod:    c.config.FullResyncPeriod,
 			MinWatchTimeout: c.config.MinWatchTimeout,
 			TypeDescription: c.config.ObjectDescription,
@@ -204,6 +209,11 @@ func (c *controller) RunWithContext(ctx context.Context) {
 // Returns true once this controller has completed an initial resource listing
 func (c *controller) HasSynced() bool {
 	return c.config.Queue.HasSynced()
+}
+
+// NamedHasSynced implements [Controller.NamedHasSynced].
+func (c *controller) NamedHasSynced() NamedSyncer {
+	return c.config.Queue.NamedHasSynced()
 }
 
 func (c *controller) LastSyncResourceVersion() string {
