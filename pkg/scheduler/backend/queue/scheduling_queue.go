@@ -610,11 +610,11 @@ func (p *PriorityQueue) runPreEnqueuePlugin(ctx context.Context, logger klog.Log
 		// No need to change GatingPlugin; it's overwritten by the next PreEnqueue plugin if they gate this pod, or it's overwritten with an empty string if all PreEnqueue plugins pass.
 		return s
 	}
-	// Only increment metric and insert if not already present
-	if !pInfo.UnschedulablePlugins.Has(pl.Name()) {
-		pInfo.UnschedulablePlugins.Insert(pl.Name())
+	// Only increment metric and insert if not already incremented for this plugin
+	if !pInfo.UnschedulablePlugins.Has(pl.Name()) && !pInfo.PendingPlugins.Has(pl.Name()) {
 		metrics.UnschedulableReason(pl.Name(), pod.Spec.SchedulerName).Inc()
 	}
+	pInfo.UnschedulablePlugins.Insert(pl.Name())
 	pInfo.GatingPlugin = pl.Name()
 	pInfo.GatingPluginEvents = p.pluginToEventsMap[pInfo.GatingPlugin]
 	if s.Code() == fwk.Error {
