@@ -56,6 +56,12 @@ type Queue interface {
 	// Update, or Delete; otherwise the first batch is empty.
 	HasSynced() bool
 
+	// NamedHasSynced is done once the first batch of keys have all been
+	// popped.  The first batch of keys are those of the first Replace
+	// operation if that happened before any Add, AddIfNotPresent,
+	// Update, or Delete; otherwise the first batch is empty.
+	NamedHasSynced() NamedSyncer
+
 	// Close the queue
 	Close()
 }
@@ -117,6 +123,11 @@ type FIFO struct {
 	items map[string]interface{}
 	queue []string
 
+	// synced is initially an open channel. It gets closed (once!) by hasSynced_locked
+	// as soon as the initial sync is considered complete.
+	synced       chan struct{}
+	syncedClosed bool
+
 	// populated is true if the first batch of items inserted by Replace() has been populated
 	// or Delete/Add/Update was called first.
 	populated bool
@@ -134,7 +145,8 @@ type FIFO struct {
 }
 
 var (
-	_ = Queue(&FIFO{}) // FIFO is a Queue
+	_ = Queue(&FIFO{})       // FIFO is a Queue
+	_ = NamedSyncer(&FIFO{}) // ... and implements NamedSyncer.
 )
 
 // Close the queue.
@@ -153,8 +165,31 @@ func (f *FIFO) HasSynced() bool {
 	return f.hasSynced_locked()
 }
 
+// NamedHasSynced is done if an Add/Update/Delete/AddIfNotPresent are called first,
+// or the first batch of items inserted by Replace() has been popped.
+func (f *FIFO) NamedHasSynced() NamedSyncer {
+	return f
+}
+
+// Name implements [NamedSyncer.Name]
+func (f *FIFO) Name() string {
+	return "FIFO" // FIFO doesn't seem to be used outside of a few tests, so changing the NewFIFO API to pass in a name doesn't seem worth it.
+}
+
+// Done implements [NamedSyncer.Done]
+func (f *FIFO) Done() <-chan struct{} {
+	return f.synced
+}
+
+// hasSynced_locked checks whether the initial sync is completed and returns true if it is, otherwise false.
+// It must be called whenever populated or initialPopulationCount change.
 func (f *FIFO) hasSynced_locked() bool {
-	return f.populated && f.initialPopulationCount == 0
+	synced := f.populated && f.initialPopulationCount == 0
+	if synced && !f.syncedClosed {
+		f.syncedClosed = true
+		close(f.synced)
+	}
+	return synced
 }
 
 // Add inserts an item, and puts it in the queue. The item is only enqueued
@@ -167,6 +202,7 @@ func (f *FIFO) Add(obj interface{}) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	f.populated = true
+	f.hasSynced_locked()
 	if _, exists := f.items[id]; !exists {
 		f.queue = append(f.queue, id)
 	}
@@ -191,6 +227,7 @@ func (f *FIFO) Delete(obj interface{}) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	f.populated = true
+	f.hasSynced_locked()
 	delete(f.items, id)
 	return err
 }
@@ -227,6 +264,7 @@ func (f *FIFO) Pop(process PopProcessFunc) (interface{}, error) {
 		f.queue = f.queue[1:]
 		if f.initialPopulationCount > 0 {
 			f.initialPopulationCount--
+			f.hasSynced_locked()
 		}
 		item, ok := f.items[id]
 		if !ok {
@@ -259,6 +297,7 @@ func (f *FIFO) Replace(list []interface{}, resourceVersion string) error {
 	if !f.populated {
 		f.populated = true
 		f.initialPopulationCount = len(items)
+		f.hasSynced_locked()
 	}
 
 	f.items = items
@@ -297,6 +336,7 @@ func (f *FIFO) Resync() error {
 // process.
 func NewFIFO(keyFunc KeyFunc) *FIFO {
 	f := &FIFO{
+		synced:  make(chan struct{}),
 		items:   map[string]interface{}{},
 		queue:   []string{},
 		keyFunc: keyFunc,

@@ -77,6 +77,11 @@ type RealFIFO struct {
 
 	items []Delta
 
+	// synced is initially an open channel. It gets closed (once!) by hasSynced_locked
+	// as soon as the initial sync is considered complete.
+	synced       chan struct{}
+	syncedClosed bool
+
 	// populated is true if the first batch of items inserted by Replace() has been populated
 	// or Delete/Add/Update was called first.
 	populated bool
@@ -106,6 +111,7 @@ type RealFIFO struct {
 var (
 	_ = Queue(&RealFIFO{})             // RealFIFO is a Queue
 	_ = TransformingStore(&RealFIFO{}) // RealFIFO implements TransformingStore to allow memory optimizations
+	_ = NamedSyncer(&RealFIFO{})       // RealFIFO and implements NamedSyncer.
 )
 
 // Close the queue.
@@ -142,11 +148,35 @@ func (f *RealFIFO) HasSynced() bool {
 	return f.hasSynced_locked()
 }
 
+// NamedHasSynced is done if an Add/Update/Delete/AddIfNotPresent are called first,
+// or the first batch of items inserted by Replace() has been popped.
+func (f *RealFIFO) NamedHasSynced() NamedSyncer {
+	return f
+}
+
+// Name implements [NamedSyncer.Name]
+func (f *RealFIFO) Name() string {
+	return f.name
+}
+
+// Done implements [NamedSyncer.Done]
+func (f *RealFIFO) Done() <-chan struct{} {
+	return f.synced
+}
+
+// hasSynced_locked checks whether the initial sync is completed and returns true if it is, otherwise false.
+// It must be called whenever populated or initialPopulationCount change.
+//
 // ignoring lint to reduce delta to the original for review.  It's ok adjust later.
 //
 //lint:file-ignore ST1003: should not use underscores in Go names
 func (f *RealFIFO) hasSynced_locked() bool {
-	return f.populated && f.initialPopulationCount == 0
+	synced := f.populated && f.initialPopulationCount == 0
+	if synced && !f.syncedClosed {
+		f.syncedClosed = true
+		close(f.synced)
+	}
+	return synced
 }
 
 // addToItems_locked appends to the delta list.
@@ -195,6 +225,7 @@ func (f *RealFIFO) Add(obj interface{}) error {
 	defer f.lock.Unlock()
 
 	f.populated = true
+	f.hasSynced_locked()
 	retErr := f.addToItems_locked(Added, false, obj)
 
 	return retErr
@@ -206,6 +237,7 @@ func (f *RealFIFO) Update(obj interface{}) error {
 	defer f.lock.Unlock()
 
 	f.populated = true
+	f.hasSynced_locked()
 	retErr := f.addToItems_locked(Updated, false, obj)
 
 	return retErr
@@ -219,6 +251,7 @@ func (f *RealFIFO) Delete(obj interface{}) error {
 	defer f.lock.Unlock()
 
 	f.populated = true
+	f.hasSynced_locked()
 	retErr := f.addToItems_locked(Deleted, false, obj)
 
 	return retErr
@@ -258,6 +291,7 @@ func (f *RealFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 	f.items = f.items[1:]
 	if f.initialPopulationCount > 0 {
 		f.initialPopulationCount--
+		f.hasSynced_locked()
 	}
 
 	// Only log traces if the queue depth is greater than 10 and it takes more than
@@ -325,6 +359,7 @@ func (f *RealFIFO) PopBatch(process ProcessBatchFunc) error {
 	}
 	if f.initialPopulationCount > 0 {
 		f.initialPopulationCount -= len(deltas)
+		f.hasSynced_locked()
 	}
 	f.items = f.items[len(deltas):]
 
@@ -449,6 +484,7 @@ func (f *RealFIFO) Replace(newItems []interface{}, resourceVersion string) error
 	if !f.populated {
 		f.populated = true
 		f.initialPopulationCount = len(f.items)
+		f.hasSynced_locked()
 	}
 
 	return nil
@@ -532,6 +568,7 @@ func NewRealFIFOWithOptions(opts RealFIFOOptions) *RealFIFO {
 		logger:       klog.Background(),
 		name:         opts.Name,
 		items:        make([]Delta, 0, 10),
+		synced:       make(chan struct{}),
 		keyFunc:      opts.KeyFunction,
 		knownObjects: opts.KnownObjects,
 		transformer:  opts.Transformer,
