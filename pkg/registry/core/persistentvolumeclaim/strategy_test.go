@@ -22,7 +22,6 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"k8s.io/apimachinery/pkg/util/version"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -154,200 +153,137 @@ func TestPrepareForCreate(t *testing.T) {
 	xnsCoreDataSourceRef := makeDataSourceRef(coreGroup, podKind, "my-pod", &ns)
 
 	var tests = map[string]struct {
-		anyEnabled    bool
 		xnsEnabled    bool
 		dataSource    *api.TypedLocalObjectReference
 		dataSourceRef *api.TypedObjectReference
 		want          *api.TypedLocalObjectReference
 		wantRef       *api.TypedObjectReference
 	}{
-		"any disabled with empty ds": {
+		"empty ds": {
 			want: nil,
 		},
-		"any disabled with volume ds": {
+		"volume ds": {
 			dataSource: volumeDataSource,
-			want:       volumeDataSource,
-		},
-		"any disabled with snapshot ds": {
-			dataSource: snapshotDataSource,
-			want:       snapshotDataSource,
-		},
-		"any disabled with generic ds": {
-			dataSource: genericDataSource,
-			want:       nil,
-		},
-		"any disabled with invalid ds": {
-			dataSource: coreDataSource,
-			want:       nil,
-		},
-		"any disabled with volume ds ref": {
-			dataSourceRef: volumeDataSourceRef,
-		},
-		"any disabled with snapshot ds ref": {
-			dataSourceRef: snapshotDataSourceRef,
-		},
-		"any disabled with generic ds ref": {
-			dataSourceRef: genericDataSourceRef,
-		},
-		"any disabled with invalid ds ref": {
-			dataSourceRef: coreDataSourceRef,
-		},
-		"any enabled with empty ds": {
-			anyEnabled: true,
-			want:       nil,
-		},
-		"any enabled with volume ds": {
-			dataSource: volumeDataSource,
-			anyEnabled: true,
 			want:       volumeDataSource,
 			wantRef:    volumeDataSourceRef,
 		},
-		"any enabled with snapshot ds": {
+		"snapshot ds": {
 			dataSource: snapshotDataSource,
-			anyEnabled: true,
 			want:       snapshotDataSource,
 			wantRef:    snapshotDataSourceRef,
 		},
-		"any enabled with generic ds": {
+		"generic ds": {
 			dataSource: genericDataSource,
-			anyEnabled: true,
 		},
-		"any enabled with invalid ds": {
+		"invalid ds": {
 			dataSource: coreDataSource,
-			anyEnabled: true,
 		},
-		"any enabled with volume ds ref": {
+		"volume ds ref": {
 			dataSourceRef: volumeDataSourceRef,
-			anyEnabled:    true,
 			want:          volumeDataSource,
 			wantRef:       volumeDataSourceRef,
 		},
-		"any enabled with snapshot ds ref": {
+		"snapshot ds ref": {
 			dataSourceRef: snapshotDataSourceRef,
-			anyEnabled:    true,
 			want:          snapshotDataSource,
 			wantRef:       snapshotDataSourceRef,
 		},
-		"any enabled with generic ds ref": {
+		"generic ds ref": {
 			dataSourceRef: genericDataSourceRef,
-			anyEnabled:    true,
 			want:          genericDataSource,
 			wantRef:       genericDataSourceRef,
 		},
-		"any enabled with invalid ds ref": {
+		"invalid ds ref": {
 			dataSourceRef: coreDataSourceRef,
-			anyEnabled:    true,
 			want:          coreDataSource,
 			wantRef:       coreDataSourceRef,
 		},
-		"any enabled with mismatched data sources": {
+		"mismatched data sources": {
 			dataSource:    volumeDataSource,
 			dataSourceRef: snapshotDataSourceRef,
-			anyEnabled:    true,
 			want:          volumeDataSource,
 			wantRef:       snapshotDataSourceRef,
 		},
-		"both any and xns enabled with empty ds": {
-			anyEnabled: true,
+		"xns enabled with empty ds": {
 			xnsEnabled: true,
 			want:       nil,
 		},
-		"both any and xns enabled with volume ds": {
+		"xns enabled with volume ds": {
 			dataSource: volumeDataSource,
-			anyEnabled: true,
 			xnsEnabled: true,
 			want:       volumeDataSource,
 			wantRef:    volumeDataSourceRef,
 		},
-		"both any and xns enabled with snapshot ds": {
+		"xns enabled with snapshot ds": {
 			dataSource: snapshotDataSource,
-			anyEnabled: true,
 			xnsEnabled: true,
 			want:       snapshotDataSource,
 			wantRef:    snapshotDataSourceRef,
 		},
-		"both any and xns enabled with generic ds": {
+		"xns enabled with generic ds": {
 			dataSource: genericDataSource,
-			anyEnabled: true,
 			xnsEnabled: true,
 		},
-		"both any and xns enabled with invalid ds": {
+		"xns enabled with invalid ds": {
 			dataSource: coreDataSource,
-			anyEnabled: true,
 			xnsEnabled: true,
 		},
-		"both any and xns enabled with volume ds ref": {
+		"xns enabled with volume ds ref": {
 			dataSourceRef: volumeDataSourceRef,
-			anyEnabled:    true,
 			xnsEnabled:    true,
 			want:          volumeDataSource,
 			wantRef:       volumeDataSourceRef,
 		},
-		"both any and xns enabled with snapshot ds ref": {
+		"xns enabled with snapshot ds ref": {
 			dataSourceRef: snapshotDataSourceRef,
-			anyEnabled:    true,
 			xnsEnabled:    true,
 			want:          snapshotDataSource,
 			wantRef:       snapshotDataSourceRef,
 		},
-		"both any and xns enabled with generic ds ref": {
+		"xns enabled with generic ds ref": {
 			dataSourceRef: genericDataSourceRef,
-			anyEnabled:    true,
 			xnsEnabled:    true,
 			want:          genericDataSource,
 			wantRef:       genericDataSourceRef,
 		},
-		"both any and xns enabled with invalid ds ref": {
+		"xns enabled with invalid ds ref": {
 			dataSourceRef: coreDataSourceRef,
-			anyEnabled:    true,
 			xnsEnabled:    true,
 			want:          coreDataSource,
 			wantRef:       coreDataSourceRef,
 		},
-		"both any and xns enabled with mismatched data sources": {
+		"xns enabled with mismatched data sources": {
 			dataSource:    volumeDataSource,
 			dataSourceRef: snapshotDataSourceRef,
-			anyEnabled:    true,
 			xnsEnabled:    true,
 			want:          volumeDataSource,
 			wantRef:       snapshotDataSourceRef,
 		},
-		"both any and xns enabled with volume xns ds ref": {
+		"xns enabled with volume xns ds ref": {
 			dataSourceRef: xnsVolumeDataSourceRef,
-			anyEnabled:    true,
 			xnsEnabled:    true,
 			wantRef:       xnsVolumeDataSourceRef,
 		},
-		"both any and xns enabled with snapshot xns ds ref": {
+		"xns enabled with snapshot xns ds ref": {
 			dataSourceRef: xnsSnapshotDataSourceRef,
-			anyEnabled:    true,
 			xnsEnabled:    true,
 			wantRef:       xnsSnapshotDataSourceRef,
 		},
-		"both any and xns enabled with generic xns ds ref": {
+		"xns enabled with generic xns ds ref": {
 			dataSourceRef: xnsGenericDataSourceRef,
-			anyEnabled:    true,
 			xnsEnabled:    true,
 			wantRef:       xnsGenericDataSourceRef,
 		},
-		"both any and xns enabled with invalid xns ds ref": {
+		"xns enabled with invalid xns ds ref": {
 			dataSourceRef: xnsCoreDataSourceRef,
-			anyEnabled:    true,
 			xnsEnabled:    true,
 			wantRef:       xnsCoreDataSourceRef,
-		},
-		"only xns enabled with snapshot xns ds ref": {
-			dataSourceRef: xnsSnapshotDataSourceRef,
-			xnsEnabled:    true,
 		},
 	}
 
 	for testName, test := range tests {
 		t.Run(testName, func(t *testing.T) {
-			// TODO: this will be removed in 1.36
-			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.AnyVolumeDataSource:            test.anyEnabled,
 				features.CrossNamespaceVolumeDataSource: test.xnsEnabled,
 			})
 			pvc := api.PersistentVolumeClaim{
@@ -361,12 +297,12 @@ func TestPrepareForCreate(t *testing.T) {
 			Strategy.PrepareForCreate(ctx, &pvc)
 
 			if !reflect.DeepEqual(pvc.Spec.DataSource, test.want) {
-				t.Errorf("data source does not match, test: %s, anyEnabled: %v, dataSource: %v, expected: %v",
-					testName, test.anyEnabled, test.dataSource, test.want)
+				t.Errorf("data source does not match, test: %s, dataSource: %v, expected: %v",
+					testName, test.dataSource, test.want)
 			}
 			if !reflect.DeepEqual(pvc.Spec.DataSourceRef, test.wantRef) {
-				t.Errorf("data source ref does not match, test: %s, anyEnabled: %v, dataSourceRef: %v, expected: %v",
-					testName, test.anyEnabled, test.dataSourceRef, test.wantRef)
+				t.Errorf("data source ref does not match, test: %s, dataSourceRef: %v, expected: %v",
+					testName, test.dataSourceRef, test.wantRef)
 			}
 		})
 	}
