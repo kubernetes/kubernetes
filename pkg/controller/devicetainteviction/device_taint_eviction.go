@@ -100,7 +100,7 @@ type Controller struct {
 	ruleInformer  resourcealphainformers.DeviceTaintRuleInformer
 	classInformer resourceinformers.DeviceClassInformer
 	ruleLister    resourcealphalisters.DeviceTaintRuleLister
-	haveSynced    []cache.InformerSynced
+	haveSynced    []cache.DoneChecker
 	hasSynced     atomic.Int32
 	metrics       metrics.Metrics
 	workqueue     workqueue.TypedRateLimitingInterface[workItem]
@@ -733,11 +733,11 @@ func New(c clientset.Interface, podInformer coreinformers.PodInformer, claimInfo
 		evictingRules:   make(map[string]*resourcealpha.DeviceTaintRule),
 		taintRuleStats:  make(map[types.UID]taintRuleStats),
 		// Instantiate all informers now to ensure that they get started.
-		haveSynced: []cache.InformerSynced{
-			podInformer.Informer().HasSynced,
-			claimInformer.Informer().HasSynced,
-			sliceInformer.Informer().HasSynced,
-			classInformer.Informer().HasSynced,
+		haveSynced: []cache.DoneChecker{
+			podInformer.Informer().HasSyncedChecker(),
+			claimInformer.Informer().HasSyncedChecker(),
+			sliceInformer.Informer().HasSyncedChecker(),
+			classInformer.Informer().HasSyncedChecker(),
 		},
 		metrics: metrics.Global,
 	}
@@ -748,7 +748,7 @@ func New(c clientset.Interface, podInformer coreinformers.PodInformer, claimInfo
 	if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaintRules) {
 		tc.ruleInformer = ruleInformer
 		tc.ruleLister = ruleInformer.Lister()
-		tc.haveSynced = append(tc.haveSynced, ruleInformer.Informer().HasSynced)
+		tc.haveSynced = append(tc.haveSynced, ruleInformer.Informer().HasSyncedChecker())
 	}
 
 	return tc
@@ -852,7 +852,7 @@ func (tc *Controller) Run(ctx context.Context, numWorkers int) error {
 	defer func() {
 		_ = tc.claimInformer.Informer().RemoveEventHandler(claimHandler)
 	}()
-	tc.haveSynced = append(tc.haveSynced, claimHandler.HasSynced)
+	tc.haveSynced = append(tc.haveSynced, claimHandler.HasSyncedChecker())
 
 	podHandler, err := tc.podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj any) {
@@ -899,7 +899,7 @@ func (tc *Controller) Run(ctx context.Context, numWorkers int) error {
 	defer func() {
 		_ = tc.podInformer.Informer().RemoveEventHandler(podHandler)
 	}()
-	tc.haveSynced = append(tc.haveSynced, podHandler.HasSynced)
+	tc.haveSynced = append(tc.haveSynced, podHandler.HasSyncedChecker())
 
 	if tc.ruleInformer != nil {
 		ruleHandler, err := tc.ruleInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -947,7 +947,7 @@ func (tc *Controller) Run(ctx context.Context, numWorkers int) error {
 		defer func() {
 			_ = tc.ruleInformer.Informer().RemoveEventHandler(ruleHandler)
 		}()
-		tc.haveSynced = append(tc.haveSynced, ruleHandler.HasSynced)
+		tc.haveSynced = append(tc.haveSynced, ruleHandler.HasSyncedChecker())
 	}
 
 	sliceHandler, err := tc.sliceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -993,9 +993,9 @@ func (tc *Controller) Run(ctx context.Context, numWorkers int) error {
 	defer func() {
 		_ = tc.sliceInformer.Informer().RemoveEventHandler(sliceHandler)
 	}()
-	tc.haveSynced = append(tc.haveSynced, sliceHandler.HasSynced)
+	tc.haveSynced = append(tc.haveSynced, sliceHandler.HasSyncedChecker())
 
-	if !cache.WaitForNamedCacheSyncWithContext(ctx, tc.haveSynced...) {
+	if !cache.WaitFor(ctx, "cache and event handler sync", tc.haveSynced...) {
 		// If we get here, the caller canceled the context. This is not an error.
 		return nil
 	}
