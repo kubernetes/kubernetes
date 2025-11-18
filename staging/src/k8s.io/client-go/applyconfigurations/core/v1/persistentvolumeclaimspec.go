@@ -53,8 +53,8 @@ type PersistentVolumeClaimSpecApplyConfiguration struct {
 	// * An existing PVC (PersistentVolumeClaim)
 	// If the provisioner or an external controller can support the specified data source,
 	// it will create a new volume based on the contents of the specified data source.
-	// dataSource contents will be copied to dataSourceRef, and dataSourceRef contents will be copied
-	// to dataSource when dataSourceRef.namespace is not specified.
+	// dataSource contents will be copied to dataSourceRef, and dataSourceRef contents will be
+	// copied to dataSource when dataSourceRef.namespace is not specified.
 	// If the namespace is specified, then dataSourceRef will not be copied to dataSource.
 	DataSource *TypedLocalObjectReferenceApplyConfiguration `json:"dataSource,omitempty"`
 	// dataSourceRef specifies the object from which to populate the volume with data, if a non-empty
