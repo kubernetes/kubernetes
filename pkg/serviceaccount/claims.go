@@ -98,13 +98,11 @@ func Claims(sa core.ServiceAccount, pod *core.Pod, secret *core.Secret, node *co
 			Name: pod.Name,
 			UID:  string(pod.UID),
 		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountTokenPodNodeInfo) {
-			// if this is bound to a pod and the node information is available, persist that too
-			if node != nil {
-				pc.Kubernetes.Node = &ref{
-					Name: node.Name,
-					UID:  string(node.UID),
-				}
+		// if this is bound to a pod and the node information is available, persist that too
+		if node != nil {
+			pc.Kubernetes.Node = &ref{
+				Name: node.Name,
+				UID:  string(node.UID),
 			}
 		}
 	case secret != nil:
@@ -233,11 +231,9 @@ func (v *validator) Validate(ctx context.Context, _ string, public *jwt.Claims, 
 	if noderef != nil {
 		switch {
 		case podref != nil:
-			if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountTokenPodNodeInfo) {
-				// for pod-bound tokens, just extract the node claims
-				nodeName = noderef.Name
-				nodeUID = noderef.UID
-			}
+			// for pod-bound tokens, just extract the node claims
+			nodeName = noderef.Name
+			nodeUID = noderef.UID
 		case podref == nil:
 			if !utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountTokenNodeBindingValidation) {
 				klog.V(4).Infof("ServiceAccount token is bound to a Node object, but the node bound token validation feature is disabled")

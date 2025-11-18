@@ -222,12 +222,7 @@ func (p *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 	// potentially override the generic serviceaccount storage with one that supports pods
 	var serviceAccountStorage *serviceaccountstore.REST
 	if p.ServiceAccountIssuer != nil {
-		var nodeGetter rest.Getter
-		if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountTokenNodeBinding) ||
-			utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountTokenPodNodeInfo) {
-			nodeGetter = nodeStorage.Node.Store
-		}
-		serviceAccountStorage, err = serviceaccountstore.NewREST(restOptionsGetter, p.ServiceAccountIssuer, p.APIAudiences, p.ServiceAccountMaxExpiration, podStorage.Pod.Store, storage["secrets"].(rest.Getter), nodeGetter, p.ExtendExpiration, p.MaxExtendedExpiration)
+		serviceAccountStorage, err = serviceaccountstore.NewREST(restOptionsGetter, p.ServiceAccountIssuer, p.APIAudiences, p.ServiceAccountMaxExpiration, podStorage.Pod.Store, storage["secrets"].(rest.Getter), nodeStorage.Node.Store, p.ExtendExpiration, p.MaxExtendedExpiration)
 		if err != nil {
 			return genericapiserver.APIGroupInfo{}, err
 		}

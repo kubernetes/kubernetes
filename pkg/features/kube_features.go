@@ -943,13 +943,6 @@ const (
 	// Controls whether the apiserver will validate Node claims in service account tokens.
 	ServiceAccountTokenNodeBindingValidation featuregate.Feature = "ServiceAccountTokenNodeBindingValidation"
 
-	// owner: @munnerz
-	// kep: http://kep.k8s.io/4193
-	//
-	// Controls whether the apiserver embeds the node name and uid for the associated node when issuing
-	// service account tokens bound to Pod objects.
-	ServiceAccountTokenPodNodeInfo featuregate.Feature = "ServiceAccountTokenPodNodeInfo"
-
 	// owner: @gjkim42 @SergeyKanzhelev @matthyx @tzneal
 	// kep: http://kep.k8s.io/753
 	//
@@ -1791,12 +1784,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	},
 
-	ServiceAccountTokenPodNodeInfo: {
-		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	},
-
 	SidecarContainers: {
 		{Version: version.MustParse("1.28"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.29"), Default: true, PreRelease: featuregate.Beta},
@@ -2419,8 +2406,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	ServiceAccountTokenNodeBinding: {ServiceAccountTokenNodeBindingValidation},
 
 	ServiceAccountTokenNodeBindingValidation: {},
-
-	ServiceAccountTokenPodNodeInfo: {},
 
 	SidecarContainers: {},
 

@@ -221,7 +221,7 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy", func() {
 		framework.ExpectNoError(err)
 		o.Expect(selfSubjectResults.Status.UserInfo.Extra["authentication.kubernetes.io/node-name"]).To(o.BeEmpty())
 
-		noNodeAssociationMessage := "no node association found for user, this user must run in a pod on a node and ServiceAccountTokenPodNodeInfo must be enabled"
+		noNodeAssociationMessage := "no node association found for user, this user must run in a pod on a node"
 		_, err = serviceAccountClientWithoutNodeClaim.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, actualDisallowedConfigMap, metav1.CreateOptions{})
 		o.Expect(err).To(o.HaveOccurred())
 		o.Expect(err.Error()).To(o.ContainSubstring(noNodeAssociationMessage))
