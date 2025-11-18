@@ -2041,12 +2041,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	},
 
-	apiextensionsfeatures.CustomResourceFieldSelectors: {
-		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.32"), Default: true, LockToDefault: true, PreRelease: featuregate.GA},
-	},
-
 	genericfeatures.APIResponseCompression: {
 		{Version: version.MustParse("1.8"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.16"), Default: true, PreRelease: featuregate.Beta},
@@ -2575,8 +2569,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	apiextensionsfeatures.CRDObservedGenerationTracking: {},
 
 	apiextensionsfeatures.CRDValidationRatcheting: {},
-
-	apiextensionsfeatures.CustomResourceFieldSelectors: {},
 
 	genericfeatures.APIResponseCompression: {},
 

@@ -337,9 +337,6 @@ func dropDisabledFields(newCRD *apiextensions.CustomResourceDefinition, oldCRD *
 			}
 		}
 	}
-	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceFieldSelectors) && (oldCRD == nil || !specHasSelectableFields(&oldCRD.Spec)) {
-		dropSelectableFields(&newCRD.Spec)
-	}
 	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CRDObservedGenerationTracking) && (oldCRD == nil || !observedGenerationTrackingInUse(&oldCRD.Status)) {
 		dropObservedGeneration(&newCRD.Status)
 	}
@@ -386,13 +383,6 @@ func schemaHasOptionalOldSelf(s *apiextensions.JSONSchemaProps) bool {
 	})
 }
 
-func dropSelectableFields(spec *apiextensions.CustomResourceDefinitionSpec) {
-	spec.SelectableFields = nil
-	for i := range spec.Versions {
-		spec.Versions[i].SelectableFields = nil
-	}
-}
-
 func dropObservedGeneration(status *apiextensions.CustomResourceDefinitionStatus) {
 	status.ObservedGeneration = 0
 	for i := range status.Conditions {
@@ -409,18 +399,5 @@ func observedGenerationTrackingInUse(status *apiextensions.CustomResourceDefinit
 			return true
 		}
 	}
-	return false
-}
-
-func specHasSelectableFields(spec *apiextensions.CustomResourceDefinitionSpec) bool {
-	if spec.SelectableFields != nil {
-		return true
-	}
-	for _, v := range spec.Versions {
-		if v.SelectableFields != nil {
-			return true
-		}
-	}
-
 	return false
 }
