@@ -269,7 +269,8 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	MasterUpgrade = framework.WithFeature(framework.ValidFeatures.Add("MasterUpgrade"))
 
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	// owner: sig-node
+	// It is used for jobs in test-infra to only run memory manager tests.
 	MemoryManager = framework.WithFeature(framework.ValidFeatures.Add("MemoryManager"))
 
 	// Owner: sig-api-machinery
