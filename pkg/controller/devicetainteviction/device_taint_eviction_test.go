@@ -49,7 +49,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/featuregate"
 	metricstestutil "k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/devicetainteviction/metrics"
@@ -60,6 +60,17 @@ import (
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
+
+func init() {
+	// We must not use Default*Mutable*FeatureGate directly here,
+	// otherwise hack/verify-test-featuregates.sh complains.
+	if err := utilfeature.DefaultFeatureGate.(featuregate.MutableVersionedFeatureGate).SetFromMap(map[string]bool{
+		string(features.DRADeviceTaints):     true,
+		string(features.DRADeviceTaintRules): true,
+	}); err != nil {
+		panic(err)
+	}
+}
 
 // Reduce typing with some constructors.
 
@@ -87,13 +98,6 @@ func l[T any](items ...T) []T {
 
 // setup creates a controller which is ready to have its handle* methods called.
 func setup(tCtx ktesting.TContext) *testContext {
-	featuregatetesting.SetFeatureGatesDuringTest(tCtx, utilfeature.DefaultFeatureGate,
-		featuregatetesting.FeatureOverrides{
-			features.DRADeviceTaints:     true,
-			features.DRADeviceTaintRules: true,
-		},
-	)
-
 	fakeClientset := fake.NewClientset()
 	informerFactory := informers.NewSharedInformerFactory(fakeClientset, 0)
 	controller := New(fakeClientset,
@@ -762,6 +766,8 @@ func inProgress(rule *resourcealpha.DeviceTaintRule, status bool, reason, messag
 // advancing time to reach "later" work items.
 func TestController(t *testing.T) { testController(ktesting.Init(t)) }
 func testController(tCtx ktesting.TContext) {
+	tCtx.Parallel()
+
 	for name, tc := range map[string]testCase{
 		"empty": {},
 		"populate-pools": {
@@ -1860,6 +1866,7 @@ func testController(tCtx ktesting.TContext) {
 		},
 	} {
 		tCtx.Run(name, func(tCtx ktesting.TContext) {
+			tCtx.Parallel()
 			numEvents := len(tc.events)
 			if numEvents <= 1 {
 				// No permutations.
@@ -1882,9 +1889,12 @@ func testController(tCtx ktesting.TContext) {
 					tc := tc
 					tc.events = events
 					name := strings.Trim(fmt.Sprintf("%v", permutation), "[]")
-					tCtx.SyncTest(name, func(tCtx ktesting.TContext) {
-						tContext := setup(tCtx)
-						testHandlers(tContext, tc)
+					tCtx.Run(name, func(tCtx ktesting.TContext) {
+						tCtx.Parallel()
+						tCtx.SyncTest("", func(tCtx ktesting.TContext) {
+							tContext := setup(tCtx)
+							testHandlers(tContext, tc)
+						})
 					})
 					return
 				}
@@ -2043,28 +2053,32 @@ func applyEventPair(tContext *testContext, event any) {
 		store := tContext.informerFactory.Core().V1().Pods().Informer().GetStore()
 		switch {
 		case pair[0] != nil && pair[1] != nil:
-			tContext.ExpectNoError(store.Update(pair[1]))
-			tContext.ExpectNoError(tContext.client.Tracker().Update(v1.SchemeGroupVersion.WithResource("pods"), pair[1], pair[1].Namespace))
+			obj := pair[1].DeepCopy()
+			tContext.ExpectNoError(store.Update(obj))
+			tContext.ExpectNoError(tContext.client.Tracker().Update(v1.SchemeGroupVersion.WithResource("pods"), obj, pair[1].Namespace))
 		case pair[0] != nil:
 			tContext.ExpectNoError(store.Delete(pair[0]))
 			tContext.ExpectNoError(tContext.client.Tracker().Delete(v1.SchemeGroupVersion.WithResource("pods"), pair[0].Namespace, pair[0].Name))
 		default:
-			tContext.ExpectNoError(store.Add(pair[1]))
-			tContext.ExpectNoError(tContext.client.Tracker().Add(pair[1]))
+			obj := pair[1].DeepCopy()
+			tContext.ExpectNoError(store.Add(obj))
+			tContext.ExpectNoError(tContext.client.Tracker().Add(obj))
 		}
 		tContext.handlePodChange(pair[0], pair[1])
 	case [2]*resourcealpha.DeviceTaintRule:
 		store := tContext.informerFactory.Resource().V1alpha3().DeviceTaintRules().Informer().GetStore()
 		switch {
 		case pair[0] != nil && pair[1] != nil:
-			tContext.ExpectNoError(store.Update(pair[1]))
-			tContext.ExpectNoError(tContext.client.Tracker().Update(resourcealpha.SchemeGroupVersion.WithResource("devicetaintrules"), pair[1], pair[1].Namespace))
+			obj := pair[1].DeepCopy()
+			tContext.ExpectNoError(store.Update(obj))
+			tContext.ExpectNoError(tContext.client.Tracker().Update(resourcealpha.SchemeGroupVersion.WithResource("devicetaintrules"), obj, pair[1].Namespace))
 		case pair[0] != nil:
 			tContext.ExpectNoError(store.Delete(pair[0]))
 			tContext.ExpectNoError(tContext.client.Tracker().Delete(resourcealpha.SchemeGroupVersion.WithResource("devicetaintrules"), pair[0].Namespace, pair[0].Name))
 		default:
-			tContext.ExpectNoError(store.Add(pair[1]))
-			tContext.ExpectNoError(tContext.client.Tracker().Add(pair[1]))
+			obj := pair[1].DeepCopy()
+			tContext.ExpectNoError(store.Add(obj))
+			tContext.ExpectNoError(tContext.client.Tracker().Add(obj))
 		}
 		tContext.handleRuleChange(pair[0], pair[1])
 	default:
@@ -2124,12 +2138,6 @@ func newTestController(tCtx ktesting.TContext, clientSet *fake.Clientset) *Contr
 
 	informerFactory := informers.NewSharedInformerFactory(clientSet, 0)
 
-	featuregatetesting.SetFeatureGatesDuringTest(tCtx, utilfeature.DefaultFeatureGate,
-		featuregatetesting.FeatureOverrides{
-			features.DRADeviceTaints:     true,
-			features.DRADeviceTaintRules: true,
-		},
-	)
 	controller := New(tCtx.Client(),
 		informerFactory.Core().V1().Pods(),
 		informerFactory.Resource().V1().ResourceClaims(),
@@ -2138,59 +2146,60 @@ func newTestController(tCtx ktesting.TContext, clientSet *fake.Clientset) *Contr
 		informerFactory.Resource().V1().DeviceClasses(),
 		"device-taint-eviction",
 	)
-	controller.metrics = metrics.New(300 /* one large initial bucket for testing */) // TODO: inside a synctest bubble we should have deterministic delays and shouldn't need this trick. The remaining uncertainty comes from polling for informer cache sync.
+	controller.metrics = metrics.New()
 	// Always log, not matter what the -v value is.
 	logger := klog.FromContext(tCtx)
 	controller.eventLogger = &logger
 
-	informerFactory.Start(tCtx.Done())
+	informerFactory.StartWithContext(tCtx)
 	tCtx.Cleanup(informerFactory.Shutdown)
 
 	tCtx.Log("starting to wait for watches")
-	if tCtx.IsSyncTest() {
-		tCtx.Wait()
-		require.Equal(tCtx, int32(5), numWatches.Load(), "All watches should be registered.")
-	} else {
-		tCtx.Eventually(func(tCtx ktesting.TContext) int32 {
-			return numWatches.Load()
-		}).WithTimeout(5*time.Second).Should(gomega.Equal(int32(5)), "All watches should be registered.")
-	}
+	tCtx.Wait()
+	tCtx.Expect(numWatches.Load()).To(gomega.Equal(int32(5)), "All watches should be registered.")
 	tCtx.Log("done waiting for watches")
 
 	return controller
 }
 
-func testPodDeletionsMetrics(controller *Controller, total int) error {
-	// We cannot predict the sum of the latencies. Therefore we leave it at zero here
-	// and replace expected (>= 0) values when gathering.
-	expectedMetric := fmt.Sprintf(`# HELP device_taint_eviction_controller_pod_deletion_duration_seconds [ALPHA] Latency, in seconds, between the time when a device taint effect has been activated and a Pod's deletion via DeviceTaintEvictionController.
+// testPodDeletionsMetrics verifies the metrics recorded by the controller based on
+// the expected pod deletion latencies. Each entry in latencies represents one deleted pod.
+func testPodDeletionsMetrics(controller *Controller, latencies ...time.Duration) error {
+	countLE := func(le float64) int {
+		total := 0
+		for _, latency := range latencies {
+			if le == -1 || latency.Seconds() <= le {
+				total++
+			}
+		}
+		return total
+	}
+	var totalDuration time.Duration
+	for _, latency := range latencies {
+		totalDuration += latency
+	}
+
+	var expected strings.Builder
+	expected.WriteString(`# HELP device_taint_eviction_controller_pod_deletion_duration_seconds [ALPHA] Latency, in seconds, between the time when a device taint effect has been activated and a Pod's deletion via DeviceTaintEvictionController.
 # TYPE device_taint_eviction_controller_pod_deletion_duration_seconds histogram
-device_taint_eviction_controller_pod_deletion_duration_seconds_bucket{le="300"} %[1]d
-device_taint_eviction_controller_pod_deletion_duration_seconds_bucket{le="+Inf"} %[1]d
-device_taint_eviction_controller_pod_deletion_duration_seconds_sum 0
-device_taint_eviction_controller_pod_deletion_duration_seconds_count %[1]d
-# HELP device_taint_eviction_controller_pod_deletions_total [ALPHA] Total number of Pods deleted by DeviceTaintEvictionController since its start.
+`)
+	for _, le := range []float64{0.005, 0.025, 0.1, 0.5, 1, 2.5, 10, 30, 60, 120, 180, 240} {
+		expected.WriteString(fmt.Sprintf("device_taint_eviction_controller_pod_deletion_duration_seconds_bucket{le=\"%f\"} %d\n", le, countLE(le)))
+	}
+	expected.WriteString(fmt.Sprintf("device_taint_eviction_controller_pod_deletion_duration_seconds_bucket{le=\"+Inf\"} %d\n", countLE(-1)))
+	expected.WriteString(fmt.Sprintf("device_taint_eviction_controller_pod_deletion_duration_seconds_sum %f\n", totalDuration.Seconds()))
+	expected.WriteString(fmt.Sprintf("device_taint_eviction_controller_pod_deletion_duration_seconds_count %d\n", len(latencies)))
+	expected.WriteString(fmt.Sprintf(`# HELP device_taint_eviction_controller_pod_deletions_total [ALPHA] Total number of Pods deleted by DeviceTaintEvictionController since its start.
 # TYPE device_taint_eviction_controller_pod_deletions_total counter
-device_taint_eviction_controller_pod_deletions_total %[1]d
-`, total)
+device_taint_eviction_controller_pod_deletions_total %d
+`, len(latencies)))
+
 	names := []string{
 		controller.metrics.PodDeletionsTotal.FQName(),
 		controller.metrics.PodDeletionsLatency.FQName(),
 	}
-	gather := func() ([]*metricstestutil.MetricFamily, error) {
-		got, err := controller.metrics.Gather()
-		for _, mf := range got {
-			for _, m := range mf.Metric {
-				if m.Histogram == nil || m.Histogram.SampleSum == nil || *m.Histogram.SampleSum < 0 {
-					continue
-				}
-				m.Histogram.SampleSum = ptr.To(float64(0))
-			}
-		}
-		return got, err
-	}
 
-	return metricstestutil.GatherAndCompare(metricstestutil.GathererFunc(gather), strings.NewReader(expectedMetric), names...)
+	return metricstestutil.GatherAndCompare(controller.metrics, strings.NewReader(expected.String()), names...)
 }
 
 // TestEviction runs through the full flow of starting the controller and evicting one pod.
@@ -2202,6 +2211,8 @@ device_taint_eviction_controller_pod_deletions_total %[1]d
 // activity to settle down and then check the state.
 func TestEviction(t *testing.T) { testEviction(ktesting.Init(t)) }
 func testEviction(tCtx ktesting.TContext) {
+	tCtx.Parallel()
+
 	do := func(tCtx ktesting.TContext, what string, action func(tCtx ktesting.TContext) error) {
 		tCtx.Log(what)
 		err := action(tCtx)
@@ -2303,19 +2314,19 @@ func testEviction(tCtx ktesting.TContext) {
 			fakeClientset.PrependReactor("get", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 				podGets++
 				podName := action.(core.GetAction).GetName()
-				assert.Equal(tCtx, podWithClaimName.Name, podName, "name of pod to patch")
+				tCtx.Assert(podName).Should(gomega.Equal(podWithClaimName.Name), "name of pod to patch")
 				return false, nil, nil
 			})
 			fakeClientset.PrependReactor("patch", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 				podUpdates++
 				podName := action.(core.PatchAction).GetName()
-				assert.Equal(tCtx, podWithClaimName.Name, podName, "name of pod to get")
+				tCtx.Assert(podName).Should(gomega.Equal(podWithClaimName.Name), "name of pod to get")
 				return false, nil, nil
 			})
 			fakeClientset.PrependReactor("delete", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 				podDeletions++
 				podName := action.(core.DeleteAction).GetName()
-				assert.Equal(tCtx, podWithClaimName.Name, podName, "name of pod to delete")
+				tCtx.Assert(podName).Should(gomega.Equal(podWithClaimName.Name), "name of pod to delete")
 				obj, err := fakeClientset.Tracker().Get(v1.SchemeGroupVersion.WithResource("pods"), pod.Namespace, pod.Name)
 				require.NoError(tCtx, err)
 				updatedPod = obj.(*v1.Pod)
@@ -2336,27 +2347,14 @@ func testEviction(tCtx ktesting.TContext) {
 			}()
 
 			// Eventually the controller should have synced it's informers.
-			if false {
-				// This feels like it should work (controller should run until it has started up, then block durably), but it doesn't.
-				// Time progresses while the controller is blocked in cache.WaitForNamedCacheSyncWithContext, so this is
-				// probably a good place to start looking.
-				// TODO: make "wait for cache sync" block on a channel. Alternatively, use a context and let `context.Cause`
-				// report success or failure (might be too hacky).
-				tCtx.Wait()
-				if controller.hasSynced.Load() <= 0 {
-					tCtx.Fatal("controller should have synced")
-				}
-			} else {
-				tCtx.Eventually(func(tCtx ktesting.TContext) bool {
-					return controller.hasSynced.Load() > 0
-				}).WithTimeout(30 * time.Second).Should(gomega.BeTrueBecause("controller synced"))
-				if tt.afterSync != nil {
-					tt.afterSync(tCtx)
-				}
-			}
-
-			// We can wait for the controller to be idle.
 			tCtx.Wait()
+			if controller.hasSynced.Load() <= 0 {
+				tCtx.Fatal("controller should have synced")
+			}
+			if tt.afterSync != nil {
+				tt.afterSync(tCtx)
+				tCtx.Wait()
+			}
 
 			// The number of API calls is deterministic.
 			assert.Equal(tCtx, 1, podGets, "get pod once")
@@ -2384,19 +2382,16 @@ func testEviction(tCtx ktesting.TContext) {
 				tCtx.Errorf("unexpected modified pod (-want, +got):\n%s", diff)
 			}
 
+			// Timing is perfectly predictable.
+			tCtx.Expect(time.Since(start)).To(gomega.Equal(0*time.Second), "time to evict pod")
+
 			// Shortly after deletion we should also see updated metrics.
 			// This is the last thing the controller does for a pod.
-			// Because of Wait we know that all goroutines are durably blocked and won't
-			// wake up again to change the metrics => no need for a "Consistently"!
-			gomega.NewWithT(tCtx).Expect(listEvents(tCtx)).Should(matchDeletionEvent())
-			tCtx.ExpectNoError(testPodDeletionsMetrics(controller, 1), "pod eviction done")
-
-			// Depending on timing, some of the "wait for cache synced" polling sleep a bit more or less,
-			// so there is a certain delta of uncertainty about the overall duration. Without that polling
-			// we probably could assert zero runtime here.
-			tCtx.Logf("eviction duration: %s", time.Since(start))
-			delta := time.Second
-			require.WithinRange(tCtx, time.Now(), start, start.Add(delta), "time to evict pod")
+			// We know that all goroutines are durably blocked and
+			// queues are empty => no need for a "Consistently"!
+			tCtx.Assert(controller.workqueue.Len()).To(gomega.Equal(0), "work queue empty")
+			tCtx.Assert(listEvents(tCtx)).Should(matchDeletionEvent())
+			tCtx.ExpectNoError(testPodDeletionsMetrics(controller, 0*time.Second), "pod eviction done")
 		})
 	}
 }
@@ -2406,10 +2401,25 @@ func testEviction(tCtx ktesting.TContext) {
 //
 // This runs in a bubble (https://pkg.go.dev/testing/synctest), so we can wait for goroutine
 // activity to settle down and then check the state.
-func TestDeviceTaintRule(t *testing.T) { ktesting.Init(t).SyncTest("", synctestDeviceTaintRule) }
-func synctestDeviceTaintRule(tCtx ktesting.TContext) {
+func TestDeviceTaintRule(t *testing.T) { testDeviceTaintRule(ktesting.Init(t)) }
+func testDeviceTaintRule(tCtx ktesting.TContext) {
+	tCtx.Parallel()
+	tCtx.SyncTest("immediate", func(tCtx ktesting.TContext) { synctestDeviceTaintRule(tCtx, false) })
+	tCtx.SyncTest("delayed", func(tCtx ktesting.TContext) { synctestDeviceTaintRule(tCtx, true) })
+}
+func synctestDeviceTaintRule(tCtx ktesting.TContext, delayed bool) {
 	rule := ruleNone.DeepCopy()
-	fakeClientset := fake.NewClientset(podWithClaimName, inUseClaim, rule)
+	claim := inUseClaim.DeepCopy()
+	tolerationSeconds := int64(0)
+	if delayed {
+		tolerationSeconds = 30
+		claim.Status.Allocation.Devices.Results[0].Tolerations = []resourceapi.DeviceToleration{{
+			Effect:            resourceapi.DeviceTaintEffectNoExecute,
+			Value:             rule.Spec.Taint.Value,
+			TolerationSeconds: &tolerationSeconds,
+		}}
+	}
+	fakeClientset := fake.NewClientset(podWithClaimName, claim, rule)
 	tCtx = tCtx.WithClients(nil, nil, fakeClientset, nil, nil)
 	controller := newTestController(tCtx, fakeClientset)
 
@@ -2426,48 +2436,52 @@ func synctestDeviceTaintRule(tCtx ktesting.TContext) {
 	})
 
 	// Eventually the controller should have synced it's informers.
-	if false {
-		// This feels like it should work (controller should run until it has started up, then block durably), but it doesn't.
-		// Time progresses while the controller is blocked in cache.WaitForNamedCacheSyncWithContext, so this is
-		// probably a good place to start looking.
-		// TODO: make "wait for cache sync" block on a channel. Alternatively, use a context and let `context.Cause`
-		// report success or failure (might be too hacky).
-		tCtx.Wait()
-		if controller.hasSynced.Load() <= 0 {
-			tCtx.Fatal("controller should have synced")
-		}
-	} else {
-		tCtx.Eventually(func(tCtx ktesting.TContext) bool {
-			return controller.hasSynced.Load() > 0
-		}).WithTimeout(30 * time.Second).Should(gomega.BeTrueBecause("controller synced"))
+	tCtx.Wait()
+	if controller.hasSynced.Load() <= 0 {
+		tCtx.Fatal("controller should have synced")
 	}
 
-	// We can wait for the controller to be idle.
-	tCtx.Wait()
 	start := metav1.Now()
-	tCtx.Logf("TIME: start at %s", start)
+	tCtx.Logf("TIME: start")
 	check(tCtx, "initial processing: ", l(inProgress(ruleNone, false, "NoEffect", "0 published devices selected. 1 allocated device selected. 1 pod would be evicted in 1 namespace if the effect was NoExecute. This information will not be updated again. Recreate the DeviceTaintRule to trigger an update.", &start /* processed before waiting for cache sync completion */)), l(podWithClaimName))
 
 	// Move time forward to ensure that we get different time stamps.
 	time.Sleep(20 * time.Second)
+	updated := metav1.Now()
+	rule = rule.DeepCopy() // fake.NewClientset does not copy! Perhaps it should?!
 	rule.Spec.Taint.Effect = resourcealpha.DeviceTaintEffectNoExecute
+	// The real apiserver is going to bump this automatically in 1.36,
+	// but in a unit test we have to do it manually.
+	rule.Spec.Taint.TimeAdded = &updated
 	rule, err := tCtx.Client().ResourceV1alpha3().DeviceTaintRules().Update(tCtx, rule, metav1.UpdateOptions{})
 	tCtx.ExpectNoError(err, "update rule")
 
 	// Wait for eviction.
 	tCtx.Wait()
-	evicted := metav1.Now()
-	tCtx.Logf("TIME: eviction done at %s", evicted)
+	tCtx.Logf("TIME: eviction %s since start", updated.Sub(start.Time))
 	// The rule status got updated once before evicting pods, but not yet after evicting it.
-	check(tCtx, "evict: ", l(inProgress(rule, true, "PodsPendingEviction", "1 pod needs to be evicted in 1 namespace.", &evicted)), nil)
+	var expectedPods []*v1.Pod
+	if tolerationSeconds > 0 {
+		// Eviction is delayed, pod not deleted yet.
+		expectedPods = append(expectedPods, podWithClaimName)
+	}
+	check(tCtx, "evict: ", l(inProgress(rule, true, "PodsPendingEviction", "1 pod needs to be evicted in 1 namespace.", &updated)), expectedPods)
+
+	if tolerationSeconds > 0 {
+		// Need to move forward in time past the delay.
+		time.Sleep(time.Duration(tolerationSeconds) * time.Second)
+		tCtx.Wait()
+		// Now the pod is deleted. Status gets updated later.
+		check(tCtx, "evict: ", l(inProgress(rule, true, "PodsPendingEviction", "1 pod needs to be evicted in 1 namespace.", &updated)), nil)
+	}
 
 	// AddAfter does not move time forward. Do it ourselves...
 	time.Sleep(ruleStatusPeriod)
 	slept := metav1.Now()
-	tCtx.Logf("TIME: slept till %s", slept)
+	tCtx.Logf("TIME: slept %s since start", slept.Sub(start.Time))
 	tCtx.Wait()
 	done := metav1.Now()
-	tCtx.Logf("TIME: done at %s", done)
+	tCtx.Logf("TIME: done %s since start", done.Sub(start.Time))
 	check(tCtx, "done: ", l(inProgress(rule, false, "Completed", "1 pod evicted since starting the controller.", &done)), nil)
 	assertEqual(tCtx, map[types.UID]taintRuleStats{rule.UID: {numEvictedPods: 1}}, controller.taintRuleStats, "taint rule statistics should have counted the pod")
 
@@ -2476,8 +2490,13 @@ func synctestDeviceTaintRule(tCtx ktesting.TContext) {
 	tCtx.ExpectNoError(err, "delete rule")
 	tCtx.Wait()
 	deleted := metav1.Now()
-	tCtx.Logf("TIME: deleted at %s", deleted)
+	tCtx.Logf("TIME: deleted %s since start", deleted.Sub(start.Time))
 	assert.Empty(tCtx, controller.taintRuleStats, "taint rule statistics should have dropped the deleted rule")
+
+	tCtx.Assert(controller.workqueue.Len()).Should(gomega.Equal(0), "work queue empty")
+	// There are no delays inside a synctest bubble. The pod always gets deleted "immediately".
+	// TODO: simulate delays?
+	tCtx.ExpectNoError(testPodDeletionsMetrics(controller, 0))
 }
 
 func check(tCtx ktesting.TContext, prefix string, expectRules []*resourcealpha.DeviceTaintRule, expectPods []*v1.Pod) {
@@ -2504,6 +2523,7 @@ func check(tCtx ktesting.TContext, prefix string, expectRules []*resourcealpha.D
 // or removes the slice. Either way, eviction gets cancelled.
 func TestCancelEviction(t *testing.T) { testCancelEviction(ktesting.Init(t)) }
 func testCancelEviction(tCtx ktesting.TContext) {
+	tCtx.Parallel()
 	tCtx.SyncTest("pod-deleted", func(tCtx ktesting.TContext) { doCancelEviction(tCtx, true) })
 	tCtx.SyncTest("slice-deleted", func(tCtx ktesting.TContext) { doCancelEviction(tCtx, false) })
 }
@@ -2620,22 +2640,20 @@ func doCancelEviction(tCtx ktesting.TContext, deletePod bool) {
 		assert.Equal(tCtx, 0, podDeletions, "Pod should not have been deleted.")
 	}
 
-	// Naively (?) one could expect synctest.Wait to have blocked until the work item added via AddAfter
-	// got processed because before that the overall state isn't stable yet. But the workqueue package
-	// seems to implement AddAfter in a way which is not detected as "blocking on time to pass" by
-	// by synctest and therefore it returns without advancing time enough.
-	//
-	// Here we trigger that manually as a workaround (?). The factor doesn't really matter.
-	// Commenting this out causes the controller.maybeDeletePodCount check to fail.
+	// Time does not progress in synctest.Wait because it returns when all goroutines are blocked
+	// waiting for time to pass (for example, in a time.Sleep).
+	// To flush the workqueue, we have to move time forward by enough time to get past
+	// the delay of the AddAfter.
 	time.Sleep(10 * time.Duration(tolerationSeconds) * time.Second)
 	tCtx.Wait()
 
+	tCtx.Assert(controller.workqueue.Len()).Should(gomega.Equal(0), "work queue empty")
+	gomega.NewGomegaWithT(tCtx).Expect(controller.workqueue.Len()).Should(gomega.Equal(0), "work queue empty")
 	assert.Equal(tCtx, 0, podGets, "Worker should not have needed to get the pod.")
 	assert.Equal(tCtx, 0, podUpdates, "Worker should not have needed to update the pod.")
-	assert.Equal(tCtx, 0, controller.workqueue.Len(), "Work queue should be empty now.")
 	assert.Equal(tCtx, int64(1), controller.maybeDeletePodCount, "Work queue should have processed pod.")
 	gomega.NewWithT(tCtx).Expect(listEvents(tCtx)).Should(matchEvents)
-	tCtx.ExpectNoError(testPodDeletionsMetrics(controller, 0))
+	tCtx.ExpectNoError(testPodDeletionsMetrics(controller))
 }
 
 // TestParallelPodDeletion covers the scenario that a pod gets deleted right before
@@ -2643,78 +2661,83 @@ func doCancelEviction(tCtx ktesting.TContext, deletePod bool) {
 func TestParallelPodDeletion(t *testing.T) { testParallelPodDeletion(ktesting.Init(t)) }
 func testParallelPodDeletion(tCtx ktesting.TContext) {
 	tCtx.Parallel()
+	tCtx.SyncTest("", synctestParallelPodDeletion)
+}
+func synctestParallelPodDeletion(tCtx ktesting.TContext) {
+	// This scenario is the same as "evict-pod-resourceclaim" above.
+	pod := podWithClaimName.DeepCopy()
+	fakeClientset := fake.NewClientset(
+		sliceTainted,
+		slice2,
+		inUseClaim,
+		pod,
+	)
+	tCtx = tCtx.WithClients(nil, nil, fakeClientset, nil, nil)
 
-	tCtx.SyncTest("", func(tCtx ktesting.TContext) {
-		// This scenario is the same as "evict-pod-resourceclaim" above.
-		pod := podWithClaimName.DeepCopy()
-		fakeClientset := fake.NewClientset(
-			sliceTainted,
-			slice2,
-			inUseClaim,
-			pod,
-		)
-		tCtx = tCtx.WithClients(nil, nil, fakeClientset, nil, nil)
+	pod, err := fakeClientset.CoreV1().Pods(pod.Namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
+	require.NoError(tCtx, err, "get pod before eviction")
+	assert.Equal(tCtx, podWithClaimName, pod, "test pod")
 
-		pod, err := fakeClientset.CoreV1().Pods(pod.Namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
-		require.NoError(tCtx, err, "get pod before eviction")
-		assert.Equal(tCtx, podWithClaimName, pod, "test pod")
+	var mutex sync.Mutex
+	var podGets int
+	var podDeletions int
 
-		var mutex sync.Mutex
-		var podGets int
-		var podDeletions int
+	fakeClientset.PrependReactor("get", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		mutex.Lock()
+		defer mutex.Unlock()
+		podGets++
+		podName := action.(core.GetAction).GetName()
+		assert.Equal(tCtx, podWithClaimName.Name, podName, "name of patched pod")
 
-		fakeClientset.PrependReactor("get", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-			mutex.Lock()
-			defer mutex.Unlock()
-			podGets++
-			podName := action.(core.GetAction).GetName()
-			assert.Equal(tCtx, podWithClaimName.Name, podName, "name of patched pod")
-
-			// This gets called directly before eviction. Pretend that it is deleted.
-			err = fakeClientset.Tracker().Delete(v1.SchemeGroupVersion.WithResource("pods"), pod.Namespace, pod.Name)
-			assert.NoError(tCtx, err, "delete pod") //nolint:testifylint // Here recording an unknown error and continuing is okay.
-			return true, nil, apierrors.NewNotFound(v1.SchemeGroupVersion.WithResource("pods").GroupResource(), pod.Name)
-		})
-		fakeClientset.PrependReactor("delete", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-			mutex.Lock()
-			defer mutex.Unlock()
-			podDeletions++
-			podName := action.(core.DeleteAction).GetName()
-			assert.Equal(tCtx, podWithClaimName.Name, podName, "name of deleted pod")
-			return false, nil, nil
-		})
-		controller := newTestController(tCtx, fakeClientset)
-
-		var wg sync.WaitGroup
-		defer func() {
-			tCtx.Log("Waiting for goroutine termination...")
-			tCtx.Cancel("time to stop")
-			wg.Wait()
-		}()
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			assert.NoError(tCtx, controller.Run(tCtx, 10 /* workers */), "eviction controller failed")
-		}()
-
-		// Eventually the pod gets deleted, in this test by us.
-		tCtx.Eventually(func(tCtx ktesting.TContext) bool {
-			mutex.Lock()
-			defer mutex.Unlock()
-			return podGets >= 1
-		}).WithTimeout(30 * time.Second).Should(gomega.BeTrueBecause("pod eviction started"))
-
-		// We don't want any events.
-		tCtx.Wait()
-		assert.Equal(tCtx, 1, podGets, "number of pod get calls")
-		assert.Equal(tCtx, 0, podDeletions, "number of pod delete calls")
-		gomega.NewWithT(tCtx).Expect(listEvents(tCtx)).Should(gomega.BeEmpty())
-		tCtx.ExpectNoError(testPodDeletionsMetrics(controller, 0))
+		// This gets called directly before eviction. Pretend that it is deleted.
+		err = fakeClientset.Tracker().Delete(v1.SchemeGroupVersion.WithResource("pods"), pod.Namespace, pod.Name)
+		assert.NoError(tCtx, err, "delete pod") //nolint:testifylint // Here recording an unknown error and continuing is okay.
+		return true, nil, apierrors.NewNotFound(v1.SchemeGroupVersion.WithResource("pods").GroupResource(), pod.Name)
 	})
+	fakeClientset.PrependReactor("delete", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		mutex.Lock()
+		defer mutex.Unlock()
+		podDeletions++
+		podName := action.(core.DeleteAction).GetName()
+		assert.Equal(tCtx, podWithClaimName.Name, podName, "name of deleted pod")
+		return false, nil, nil
+	})
+	controller := newTestController(tCtx, fakeClientset)
+
+	var wg sync.WaitGroup
+	defer func() {
+		tCtx.Log("Waiting for goroutine termination...")
+		tCtx.Cancel("time to stop")
+		wg.Wait()
+	}()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		assert.NoError(tCtx, controller.Run(tCtx, 10 /* workers */), "eviction controller failed")
+	}()
+
+	// Eventually the pod gets deleted, in this test by us.
+	tCtx.Eventually(func(tCtx ktesting.TContext) bool {
+		mutex.Lock()
+		defer mutex.Unlock()
+		return podGets >= 1
+	}).WithTimeout(30 * time.Second).Should(gomega.BeTrueBecause("pod eviction started"))
+
+	// We don't want any events.
+	tCtx.Wait()
+	assert.Equal(tCtx, 1, podGets, "number of pod get calls")
+	assert.Equal(tCtx, 0, podDeletions, "number of pod delete calls")
+	assert.Equal(tCtx, 0, controller.workqueue.Len(), "Work queue should be empty now.")
+	gomega.NewWithT(tCtx).Expect(listEvents(tCtx)).Should(gomega.BeEmpty())
+	tCtx.ExpectNoError(testPodDeletionsMetrics(controller))
 }
 
 // TestRetry covers the scenario that an eviction attempt must be retried.
-func TestRetry(t *testing.T) { ktesting.Init(t).SyncTest("", synctestRetry) }
+func TestRetry(t *testing.T) { testRetry(ktesting.Init(t)) }
+func testRetry(tCtx ktesting.TContext) {
+	tCtx.Parallel()
+	tCtx.SyncTest("", synctestRetry)
+}
 func synctestRetry(tCtx ktesting.TContext) {
 	// This scenario is the same as "evict-pod-resourceclaim" above.
 	pod := podWithClaimName.DeepCopy()
@@ -2769,10 +2792,12 @@ func synctestRetry(tCtx ktesting.TContext) {
 		assert.NoError(tCtx, controller.Run(tCtx, 10 /* workers */), "eviction controller failed")
 	}()
 
+	expectLatencies := []time.Duration{5 * time.Millisecond /* default exponential retry */}
+
 	// Eventually the pod gets deleted and the event is recorded.
 	tCtx.Eventually(func(tCtx ktesting.TContext) error {
 		gomega.NewWithT(tCtx).Expect(listEvents(tCtx)).Should(matchDeletionEvent())
-		return testPodDeletionsMetrics(controller, 1)
+		return testPodDeletionsMetrics(controller, expectLatencies...)
 	}).WithTimeout(30*time.Second).Should(gomega.Succeed(), "pod eviction done")
 
 	// Now we can check the API calls.
@@ -2780,7 +2805,8 @@ func synctestRetry(tCtx ktesting.TContext) {
 	assert.Equal(tCtx, 2, podGets, "number of pod get calls")
 	assert.Equal(tCtx, 1, podDeletions, "number of pod delete calls")
 	gomega.NewWithT(tCtx).Expect(listEvents(tCtx)).Should(matchDeletionEvent())
-	tCtx.ExpectNoError(testPodDeletionsMetrics(controller, 1))
+	assert.Equal(tCtx, 0, controller.workqueue.Len(), "Work queue should be empty now.")
+	tCtx.ExpectNoError(testPodDeletionsMetrics(controller, expectLatencies...))
 }
 
 // BenchTaintUntaint checks the full flow of detecting a claim as
