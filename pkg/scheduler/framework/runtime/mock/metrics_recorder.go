@@ -80,11 +80,3 @@ func (f *MetricsRecorder) GetPluginDurationRecords() []PluginDurationRecord {
 
 	return slices.Clone(f.pluginDurationRecords)
 }
-
-// Reset clears all counters and records
-func (f *MetricsRecorder) Reset() {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-
-	f.pluginDurationRecords = nil
-}
