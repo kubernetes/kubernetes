@@ -89,12 +89,10 @@ func NewStrategy(typer runtime.ObjectTyper, namespaceScoped bool, kind schema.Gr
 			schemaValidator:       schemaValidator,
 			statusSchemaValidator: statusSchemaValidator,
 		},
-		structuralSchema: structuralSchema,
-		celValidator:     celValidator,
-		kind:             kind,
-	}
-	if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceFieldSelectors) {
-		strategy.selectableFieldSet = prepareSelectableFields(selectableFields)
+		structuralSchema:   structuralSchema,
+		celValidator:       celValidator,
+		kind:               kind,
+		selectableFieldSet: prepareSelectableFields(selectableFields),
 	}
 	return strategy
 }
@@ -342,7 +340,7 @@ func (a customResourceStrategy) selectableFields(obj runtime.Object, objectMeta 
 	objectMetaFields := objectMetaFieldsSet(objectMeta, a.namespaceScoped)
 	var selectableFieldsSet fields.Set
 
-	if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceFieldSelectors) && len(a.selectableFieldSet) > 0 {
+	if len(a.selectableFieldSet) > 0 {
 		us, ok := obj.(runtime.Unstructured)
 		if !ok {
 			return nil, fmt.Errorf("unexpected error casting a custom resource to unstructured")

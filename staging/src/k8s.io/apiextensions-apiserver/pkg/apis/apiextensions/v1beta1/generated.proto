@@ -283,7 +283,6 @@ message CustomResourceDefinitionSpec {
   // selectableFields specifies paths to fields that may be used as field selectors.
   // See https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors
   //
-  // +featureGate=CustomResourceFieldSelectors
   // +optional
   // +listType=atomic
   repeated SelectableField selectableFields = 11;
@@ -383,7 +382,6 @@ message CustomResourceDefinitionVersion {
   // selectableFields specifies paths to fields that may be used as field selectors.
   // See https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors
   //
-  // +featureGate=CustomResourceFieldSelectors
   // +optional
   // +listType=atomic
   repeated SelectableField selectableFields = 9;
