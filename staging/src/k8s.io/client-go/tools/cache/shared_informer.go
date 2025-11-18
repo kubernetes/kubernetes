@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 
@@ -193,6 +194,14 @@ type SharedInformer interface {
 	// For that, please call HasSynced on the handle returned by
 	// AddEventHandler.
 	HasSynced() bool
+	// HasSyncedChecker completes if the shared informer's store has been
+	// informed by at least one full LIST of the authoritative state
+	// of the informer's object collection.  This is unrelated to "resync".
+	//
+	// Note that this doesn't tell you if an individual handler is synced!!
+	// For that, please use HasSyncedChecker on the handle returned by
+	// AddEventHandler.
+	HasSyncedChecker() DoneChecker
 	// LastSyncResourceVersion is the resource version observed when last synced with the underlying
 	// store. The value returned is not synchronized with access to the underlying store and is not
 	// thread-safe.
@@ -246,6 +255,10 @@ type ResourceEventHandlerRegistration interface {
 	// HasSynced reports if both the parent has synced and all pre-sync
 	// events have been delivered.
 	HasSynced() bool
+
+	// HasSyncedChecker reports if both the parent has synced and all pre-sync
+	// events have been delivered.
+	HasSyncedChecker() DoneChecker
 }
 
 // Optional configuration options for [SharedInformer.AddEventHandlerWithOptions].
@@ -305,6 +318,7 @@ func NewSharedIndexInformerWithOptions(lw ListerWatcher, exampleObject runtime.O
 	return &sharedIndexInformer{
 		indexer:                         NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, options.Indexers),
 		processor:                       &sharedProcessor{clock: realClock},
+		synced:                          make(chan struct{}),
 		listerWatcher:                   lw,
 		objectType:                      exampleObject,
 		objectDescription:               options.ObjectDescription,
@@ -400,6 +414,101 @@ func WaitForCacheSync(stopCh <-chan struct{}, cacheSyncs ...InformerSynced) bool
 	return true
 }
 
+// WaitFor waits for a set of activities to complete, like cache syncing.
+// It returns true if it was successful, false if the context was canceled
+// before all activities are completed.
+//
+// If a non-nil "what" is provided, then progress information is logged
+// while waiting ("Waiting",  for="<what>").
+//
+// In contrast to other WaitForCacheSync alternatives, this one here doesn't
+// need polling, which makes it react immediately. When used in a synctest unit
+// test, waiting completes without moving time forward randomly, which
+// makes tests more predictable.
+func WaitFor(ctx context.Context, what string, checkers ...DoneChecker) bool {
+	logger := klog.FromContext(ctx)
+	if what != "" {
+		helper, l := logger.WithCallStackHelper()
+		logger = l
+		helper()
+		logger.Info("Waiting", "for", what)
+	}
+
+	// Check in parallel to ensure that we log "Done waiting" as soon
+	// as possible for each checker. The timing may be useful to know.
+	// We cannot log inside the goroutine, the stack unwinding wouldn't
+	// work, so instead each goroutine just notifies the parent
+	// goroutine when it's checker is done and the main goroutine then
+	// logs it.
+	var wg sync.WaitGroup
+	type result struct {
+		checker DoneChecker
+		done    bool
+	}
+	doneChecker := make(chan result)
+	for _, checker := range checkers {
+		wg.Go(func() {
+			select {
+			case <-checker.Done():
+				// Let's check this first and consider it
+				// done even when the context is already canceled.
+				doneChecker <- result{checker, true}
+			case <-ctx.Done():
+				doneChecker <- result{checker, false}
+			}
+		})
+	}
+	instances := make([]string, 0, len(checkers))
+	for totalDone := 0; totalDone < len(checkers); totalDone++ {
+		// We are guaranteed to get exactly one result from each goroutine, so this won't block forever.
+		result := <-doneChecker
+		if result.done {
+			if what != "" {
+				logger.Info("Done waiting", "for", what, "instance", result.checker.Name())
+			}
+		} else {
+			// We don't need this information unless we are a) logging or b) debugging interactively.
+			instances = append(instances, result.checker.Name())
+		}
+	}
+	wg.Wait()
+
+	if what != "" && len(instances) > 0 {
+		slices.Sort(instances)
+		logger.Info("Timed out waiting", "for", what, "cause", context.Cause(ctx), "instances", instances)
+	}
+
+	done := len(instances) == 0
+	return done
+}
+
+// DoneChecker, in contrast to [InformerSynced], supports waiting
+// for some activity to finish without polling and has a name
+// that describes itself.
+//
+// To check for completion without blocking, use [IsDone].
+type DoneChecker interface {
+	// Name returns a string describing the entity that is being waited for.
+	//
+	// Note that this name might be computed, so callers should only
+	// get the name outside of a hot code path.
+	Name() string
+
+	// Done returns a channel that will be closed on completion
+	// of the activity.
+	Done() <-chan struct{}
+}
+
+// IsDone returns true if the activity is done, false otherwise.
+func IsDone(checker DoneChecker) bool {
+	select {
+	case <-checker.Done():
+		return true
+	default:
+		return false
+	}
+}
+
 // `*sharedIndexInformer` implements SharedIndexInformer and has three
 // main components.  One is an indexed local cache, `indexer Indexer`.
 // The second main component is a Controller that pulls
@@ -416,6 +525,10 @@ func WaitForCacheSync(stopCh <-chan struct{}, cacheSyncs ...InformerSynced) bool
 type sharedIndexInformer struct {
 	indexer    Indexer
 	controller Controller
+
+	// synced gets created when creating the sharedIndexInformer.
+	// It gets closed when Run detects that the processor created
+	synced chan struct{}
 
 	processor             *sharedProcessor
 	cacheMutationDetector MutationDetector
@@ -472,6 +585,10 @@ func (v *dummyController) Run(stopCh <-chan struct{}) {
 
 func (v *dummyController) HasSynced() bool {
 	return v.informer.HasSynced()
+}
+
+func (v *dummyController) HasSyncedChecker() DoneChecker {
+	return v.informer.HasSyncedChecker()
 }
 
 func (v *dummyController) LastSyncResourceVersion() string {
@@ -543,7 +660,7 @@ func (s *sharedIndexInformer) RunWithContext(ctx context.Context) {
 		s.startedLock.Lock()
 		defer s.startedLock.Unlock()
 
-		fifo := newQueueFIFO(logger, s.indexer, s.transform)
+		logger, fifo := newQueueFIFO(logger, s.objectType, s.indexer, s.transform)
 
 		cfg := &Config{
 			Queue:             fifo,
@@ -553,8 +670,12 @@ func (s *sharedIndexInformer) RunWithContext(ctx context.Context) {
 			FullResyncPeriod:  s.resyncCheckPeriod,
 			ShouldResync:      s.processor.shouldResync,
 
-			Process:                      s.HandleDeltas,
-			ProcessBatch:                 s.HandleBatchDeltas,
+			Process: func(obj interface{}, isInInitialList bool) error {
+				return s.handleDeltas(logger, obj, isInInitialList)
+			},
+			ProcessBatch: func(deltas []Delta, isInInitialList bool) error {
+				return s.handleBatchDeltas(logger, deltas, isInInitialList)
+			},
 			WatchErrorHandlerWithContext: s.watchErrorHandler,
 		}
 
@@ -574,6 +695,15 @@ func (s *sharedIndexInformer) RunWithContext(ctx context.Context) {
 	// has a RunWithContext method that we can use here.
 	wg.StartWithChannel(processorStopCtx.Done(), s.cacheMutationDetector.Run)
 	wg.StartWithContext(processorStopCtx, s.processor.run)
+	wg.Start(func() {
+		select {
+		case <-ctx.Done():
+			// We were stopped without completing the sync.
+		case <-s.controller.HasSyncedChecker().Done():
+			// Controller has synced and thus so have we.
+			close(s.synced)
+		}
+	})
 
 	defer func() {
 		s.startedLock.Lock()
@@ -590,13 +720,31 @@ func (s *sharedIndexInformer) HasStarted() bool {
 }
 
 func (s *sharedIndexInformer) HasSynced() bool {
-	s.startedLock.Lock()
-	defer s.startedLock.Unlock()
-
-	if s.controller == nil {
+	select {
+	case <-s.synced:
+		return true
+	default:
 		return false
 	}
-	return s.controller.HasSynced()
+}
+
+func (s *sharedIndexInformer) HasSyncedChecker() DoneChecker {
+	return &sharedIndexInformerDone{
+		s: s,
+	}
+}
+
+// sharedIndexInformerDone implements [NamedCacheSync] for a [sharedIndexInformer].
+type sharedIndexInformerDone struct {
+	s *sharedIndexInformer
+}
+
+func (sd *sharedIndexInformerDone) Name() string {
+	return fmt.Sprintf("SharedIndexInformer %T", sd.s.objectType)
+}
+
+func (sd *sharedIndexInformerDone) Done() <-chan struct{} {
+	return sd.s.synced
 }
 
 func (s *sharedIndexInformer) LastSyncResourceVersion() string {
@@ -688,7 +836,7 @@ func (s *sharedIndexInformer) AddEventHandlerWithOptions(handler ResourceEventHa
 		}
 	}
 
-	listener := newProcessListener(logger, handler, resyncPeriod, determineResyncPeriod(logger, resyncPeriod, s.resyncCheckPeriod), s.clock.Now(), initialBufferSize, s.HasSynced)
+	listener := newProcessListener(logger, handler, resyncPeriod, determineResyncPeriod(logger, resyncPeriod, s.resyncCheckPeriod), s.clock.Now(), initialBufferSize, s.HasSyncedChecker())
 
 	if !s.started {
 		return s.processor.addListener(listener), nil
@@ -717,20 +865,20 @@ func (s *sharedIndexInformer) AddEventHandlerWithOptions(handler ResourceEventHa
 	return handle, nil
 }
 
-func (s *sharedIndexInformer) HandleDeltas(obj interface{}, isInInitialList bool) error {
+func (s *sharedIndexInformer) handleDeltas(logger klog.Logger, obj interface{}, isInInitialList bool) error {
 	s.blockDeltas.Lock()
 	defer s.blockDeltas.Unlock()
 
 	if deltas, ok := obj.(Deltas); ok {
-		return processDeltas(s, s.indexer, deltas, isInInitialList, s.keyFunc)
+		return processDeltas(logger, s, s.indexer, deltas, isInInitialList, s.keyFunc)
 	}
 	return errors.New("object given as Process argument is not Deltas")
 }
 
-func (s *sharedIndexInformer) HandleBatchDeltas(deltas []Delta, isInInitialList bool) error {
+func (s *sharedIndexInformer) handleBatchDeltas(logger klog.Logger, deltas []Delta, isInInitialList bool) error {
 	s.blockDeltas.Lock()
 	defer s.blockDeltas.Unlock()
-	return processDeltasInBatch(s, s.indexer, deltas, isInInitialList, s.keyFunc)
+	return processDeltasInBatch(logger, s, s.indexer, deltas, isInInitialList, s.keyFunc)
 }
 
 // Conforms to ResourceEventHandler
@@ -833,6 +981,7 @@ func (p *sharedProcessor) addListener(listener *processorListener) ResourceEvent
 	p.listeners[listener] = true
 
 	if p.listenersStarted {
+		p.wg.Start(listener.watchSynced)
 		p.wg.Start(listener.run)
 		p.wg.Start(listener.pop)
 	}
@@ -887,6 +1036,7 @@ func (p *sharedProcessor) run(ctx context.Context) {
 		p.listenersLock.RLock()
 		defer p.listenersLock.RUnlock()
 		for listener := range p.listeners {
+			p.wg.Start(listener.watchSynced)
 			p.wg.Start(listener.run)
 			p.wg.Start(listener.pop)
 		}
@@ -944,7 +1094,7 @@ func (p *sharedProcessor) resyncCheckPeriodChanged(logger klog.Logger, resyncChe
 }
 
 // processorListener relays notifications from a sharedProcessor to
-// one ResourceEventHandler --- using two goroutines, two unbuffered
+// one ResourceEventHandler --- using three goroutines, two unbuffered
 // channels, and an unbounded ring buffer.  The `add(notification)`
 // function sends the given notification to `addCh`.  One goroutine
 // runs `pop()`, which pumps notifications from `addCh` to `nextCh`
@@ -952,16 +1102,23 @@ func (p *sharedProcessor) resyncCheckPeriodChanged(logger klog.Logger, resyncChe
 // Another goroutine runs `run()`, which receives notifications from
 // `nextCh` and synchronously invokes the appropriate handler method.
 //
+// The third goroutine watches the upstream "has synced" channel
+// and notifies a SingleFileTracker instance. That instance then
+// combines the upstream state and the processListener state to
+// implement the overall "event handler has synced".
+//
 // processorListener also keeps track of the adjusted requested resync
 // period of the listener.
 type processorListener struct {
 	logger klog.Logger
 	nextCh chan interface{}
 	addCh  chan interface{}
+	done   chan struct{}
 
 	handler ResourceEventHandler
 
-	syncTracker *synctrack.SingleFileTracker
+	syncTracker       *synctrack.SingleFileTracker
+	upstreamHasSynced DoneChecker
 
 	// pendingNotifications is an unbounded ring buffer that holds all notifications not yet distributed.
 	// There is one per listener, but a failing/stalled listener will have infinite pendingNotifications
@@ -999,13 +1156,21 @@ func (p *processorListener) HasSynced() bool {
 	return p.syncTracker.HasSynced()
 }
 
-func newProcessListener(logger klog.Logger, handler ResourceEventHandler, requestedResyncPeriod, resyncPeriod time.Duration, now time.Time, bufferSize int, hasSynced func() bool) *processorListener {
+// HasNamedSync is done if the source informer has synced, and all
+// corresponding events have been delivered.
+func (p *processorListener) HasSyncedChecker() DoneChecker {
+	return p.syncTracker
+}
+
+func newProcessListener(logger klog.Logger, handler ResourceEventHandler, requestedResyncPeriod, resyncPeriod time.Duration, now time.Time, bufferSize int, hasSynced DoneChecker) *processorListener {
 	ret := &processorListener{
 		logger:                logger,
 		nextCh:                make(chan interface{}),
 		addCh:                 make(chan interface{}),
+		done:                  make(chan struct{}),
+		upstreamHasSynced:     hasSynced,
 		handler:               handler,
-		syncTracker:           &synctrack.SingleFileTracker{UpstreamHasSynced: hasSynced},
+		syncTracker:           synctrack.NewSingleFileTracker(fmt.Sprintf("%s + event handler %s", hasSynced.Name(), nameForHandler(handler))),
 		pendingNotifications:  *buffer.NewRingGrowing(bufferSize),
 		requestedResyncPeriod: requestedResyncPeriod,
 		resyncPeriod:          resyncPeriod,
@@ -1026,6 +1191,7 @@ func (p *processorListener) add(notification interface{}) {
 func (p *processorListener) pop() {
 	defer utilruntime.HandleCrashWithLogger(p.logger)
 	defer close(p.nextCh) // Tell .run() to stop
+	defer close(p.done)   // Tell .watchSynced() to stop
 
 	var nextCh chan<- interface{}
 	var notification interface{}
@@ -1086,6 +1252,16 @@ func (p *processorListener) run() {
 			}
 			sleepAfterCrash = false
 		}()
+	}
+}
+
+func (p *processorListener) watchSynced() {
+	select {
+	case <-p.upstreamHasSynced.Done():
+		// Notify tracker that the upstream has synced.
+		p.syncTracker.UpstreamHasSynced()
+	case <-p.done:
+		// Give up waiting for sync.
 	}
 }
 

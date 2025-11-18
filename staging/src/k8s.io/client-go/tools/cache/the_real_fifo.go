@@ -90,6 +90,11 @@ type RealFIFO struct {
 
 	items []Delta
 
+	// synced is initially an open channel. It gets closed (once!) by checkSynced_locked
+	// as soon as the initial sync is considered complete.
+	synced       chan struct{}
+	syncedClosed bool
+
 	// populated is true if the first batch of items inserted by Replace() has been populated
 	// or Delete/Add/Update was called first.
 	populated bool
@@ -146,6 +151,7 @@ type SyncAllInfo struct{}
 var (
 	_ = Queue(&RealFIFO{})             // RealFIFO is a Queue
 	_ = TransformingStore(&RealFIFO{}) // RealFIFO implements TransformingStore to allow memory optimizations
+	_ = DoneChecker(&RealFIFO{})       // RealFIFO and implements DoneChecker.
 )
 
 // Close the queue.
@@ -182,11 +188,37 @@ func (f *RealFIFO) HasSynced() bool {
 	return f.hasSynced_locked()
 }
 
-// ignoring lint to reduce delta to the original for review.  It's ok adjust later.
-//
-//lint:file-ignore ST1003: should not use underscores in Go names
+// HasSyncedChecker is done if an Add/Update/Delete/AddIfNotPresent are called first,
+// or the first batch of items inserted by Replace() has been popped.
+func (f *RealFIFO) HasSyncedChecker() DoneChecker {
+	return f
+}
+
+// Name implements [DoneChecker.Name]
+func (f *RealFIFO) Name() string {
+	return f.name
+}
+
+// Done implements [DoneChecker.Done]
+func (f *RealFIFO) Done() <-chan struct{} {
+	return f.synced
+}
+
+// hasSynced_locked returns the result of a prior checkSynced_locked call.
 func (f *RealFIFO) hasSynced_locked() bool {
-	return f.populated && f.initialPopulationCount == 0
+	return f.syncedClosed
+}
+
+// checkSynced_locked checks whether the initial batch of items (set via Replace) has been delivered
+// and closes the synced channel as needed. It must be called after changing f.populated and/or
+// f.initialPopulationCount while the mutex is still locked.
+func (f *RealFIFO) checkSynced_locked() {
+	synced := f.populated && f.initialPopulationCount == 0
+	if synced && !f.syncedClosed {
+		// Initial sync is complete.
+		f.syncedClosed = true
+		close(f.synced)
+	}
 }
 
 // addToItems_locked appends to the delta list.
@@ -274,6 +306,7 @@ func (f *RealFIFO) Add(obj interface{}) error {
 	defer f.lock.Unlock()
 
 	f.populated = true
+	f.checkSynced_locked()
 	retErr := f.addToItems_locked(Added, false, obj)
 
 	return retErr
@@ -285,6 +318,7 @@ func (f *RealFIFO) Update(obj interface{}) error {
 	defer f.lock.Unlock()
 
 	f.populated = true
+	f.checkSynced_locked()
 	retErr := f.addToItems_locked(Updated, false, obj)
 
 	return retErr
@@ -298,6 +332,7 @@ func (f *RealFIFO) Delete(obj interface{}) error {
 	defer f.lock.Unlock()
 
 	f.populated = true
+	f.checkSynced_locked()
 	retErr := f.addToItems_locked(Deleted, false, obj)
 
 	return retErr
@@ -345,6 +380,7 @@ func (f *RealFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 	defer func() {
 		if f.initialPopulationCount > 0 {
 			f.initialPopulationCount--
+			f.checkSynced_locked()
 		}
 	}()
 
@@ -456,7 +492,6 @@ func (f *RealFIFO) PopBatch(processBatch ProcessBatchFunc, processSingle PopProc
 		unique.Insert(id)
 		moveDeltaToProcessList(i)
 	}
-
 	f.items = f.items[len(deltas):]
 	// Decrement initialPopulationCount if needed.
 	// This is done in a defer so we only do this *after* processing is complete,
@@ -464,6 +499,7 @@ func (f *RealFIFO) PopBatch(processBatch ProcessBatchFunc, processSingle PopProc
 	defer func() {
 		if f.initialPopulationCount > 0 {
 			f.initialPopulationCount -= len(deltas)
+			f.checkSynced_locked()
 		}
 	}()
 
@@ -504,7 +540,7 @@ func (f *RealFIFO) Replace(newItems []interface{}, resourceVersion string) error
 	if f.emitAtomicEvents {
 		err = f.addReplaceToItemsLocked(newItems, resourceVersion)
 	} else {
-		err = reconcileReplacement(f.items, f.knownObjects, newItems, f.keyOf,
+		err = reconcileReplacement(f.logger, f.items, f.knownObjects, newItems, f.keyOf,
 			func(obj DeletedFinalStateUnknown) error {
 				return f.addToItems_locked(Deleted, true, obj)
 			},
@@ -519,6 +555,7 @@ func (f *RealFIFO) Replace(newItems []interface{}, resourceVersion string) error
 	if !f.populated {
 		f.populated = true
 		f.initialPopulationCount = len(f.items)
+		f.checkSynced_locked()
 	}
 
 	return nil
@@ -528,6 +565,7 @@ func (f *RealFIFO) Replace(newItems []interface{}, resourceVersion string) error
 // and based upon the state of the items in the queue and known objects will call onDelete and onReplace
 // depending upon whether the item is being deleted or replaced/added.
 func reconcileReplacement(
+	logger klog.Logger,
 	queuedItems []Delta,
 	knownObjects KeyListerGetter,
 	newItems []interface{},
@@ -603,10 +641,10 @@ func reconcileReplacement(
 		deletedObj, exists, err := knownObjects.GetByKey(knownKey)
 		if err != nil {
 			deletedObj = nil
-			utilruntime.HandleErrorWithLogger(klog.TODO(), err, "Error during lookup, placing DeleteFinalStateUnknown marker without object", "key", knownKey)
+			utilruntime.HandleErrorWithLogger(logger, err, "Error during lookup, placing DeleteFinalStateUnknown marker without object", "key", knownKey)
 		} else if !exists {
 			deletedObj = nil
-			utilruntime.HandleErrorWithLogger(klog.TODO(), nil, "Key does not exist in known objects store, placing DeleteFinalStateUnknown marker without object", "key", knownKey)
+			utilruntime.HandleErrorWithLogger(logger, nil, "Key does not exist in known objects store, placing DeleteFinalStateUnknown marker without object", "key", knownKey)
 		}
 		retErr := onDelete(DeletedFinalStateUnknown{
 			Key: knownKey,
@@ -722,6 +760,7 @@ func NewRealFIFOWithOptions(opts RealFIFOOptions) *RealFIFO {
 		logger:                klog.Background(),
 		name:                  "RealFIFO",
 		items:                 make([]Delta, 0, 10),
+		synced:                make(chan struct{}),
 		keyFunc:               opts.KeyFunction,
 		knownObjects:          opts.KnownObjects,
 		transformer:           opts.Transformer,

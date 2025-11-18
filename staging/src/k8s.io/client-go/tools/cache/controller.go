@@ -142,6 +142,11 @@ type Controller interface {
 	// HasSynced delegates to the Config's Queue
 	HasSynced() bool
 
+	// HasSyncedChecker enables waiting for syncing without polling.
+	// The returned DoneChecker can be passed to WaitFor.
+	// It delegates to the Config's Queue.
+	HasSyncedChecker() DoneChecker
+
 	// LastSyncResourceVersion delegates to the Reflector when there
 	// is one, otherwise returns the empty string
 	LastSyncResourceVersion() string
@@ -168,11 +173,13 @@ func (c *controller) RunWithContext(ctx context.Context) {
 		<-ctx.Done()
 		c.config.Queue.Close()
 	}()
+	logger := klog.FromContext(ctx)
 	r := NewReflectorWithOptions(
 		c.config.ListerWatcher,
 		c.config.ObjectType,
 		c.config.Queue,
 		ReflectorOptions{
+			Logger:          &logger,
 			ResyncPeriod:    c.config.FullResyncPeriod,
 			MinWatchTimeout: c.config.MinWatchTimeout,
 			TypeDescription: c.config.ObjectDescription,
@@ -204,6 +211,13 @@ func (c *controller) RunWithContext(ctx context.Context) {
 // Returns true once this controller has completed an initial resource listing
 func (c *controller) HasSynced() bool {
 	return c.config.Queue.HasSynced()
+}
+
+// HasSyncedChecker enables waiting for syncing without polling.
+// The returned DoneChecker can be passed to [WaitFor].
+// It delegates to the Config's Queue.
+func (c *controller) HasSyncedChecker() DoneChecker {
+	return c.config.Queue.HasSyncedChecker()
 }
 
 func (c *controller) LastSyncResourceVersion() string {
@@ -583,6 +597,7 @@ func NewTransformingIndexerInformer(
 // Multiplexes updates in the form of a list of Deltas into a Store, and informs
 // a given handler of events OnUpdate, OnAdd, OnDelete
 func processDeltas(
+	logger klog.Logger,
 	// Object which receives event notifications from the given deltas
 	handler ResourceEventHandler,
 	clientState Store,
@@ -600,7 +615,7 @@ func processDeltas(
 			if !ok {
 				return fmt.Errorf("ReplacedAll did not contain ReplacedAllInfo: %T", obj)
 			}
-			if err := processReplacedAllInfo(handler, info, clientState, isInInitialList, keyFunc); err != nil {
+			if err := processReplacedAllInfo(logger, handler, info, clientState, isInInitialList, keyFunc); err != nil {
 				return err
 			}
 		case SyncAll:
@@ -645,6 +660,7 @@ func processDeltas(
 // Returns an error if any Delta or transaction fails. For TransactionError,
 // only successful operations trigger callbacks.
 func processDeltasInBatch(
+	logger klog.Logger,
 	handler ResourceEventHandler,
 	clientState Store,
 	deltas []Delta,
@@ -658,7 +674,7 @@ func processDeltasInBatch(
 	if !txnSupported {
 		var errs []error
 		for _, delta := range deltas {
-			if err := processDeltas(handler, clientState, Deltas{delta}, isInInitialList, keyFunc); err != nil {
+			if err := processDeltas(logger, handler, clientState, Deltas{delta}, isInInitialList, keyFunc); err != nil {
 				errs = append(errs, err)
 			}
 		}
@@ -723,7 +739,7 @@ func processDeltasInBatch(
 	return nil
 }
 
-func processReplacedAllInfo(handler ResourceEventHandler, info ReplacedAllInfo, clientState Store, isInInitialList bool, keyFunc KeyFunc) error {
+func processReplacedAllInfo(logger klog.Logger, handler ResourceEventHandler, info ReplacedAllInfo, clientState Store, isInInitialList bool, keyFunc KeyFunc) error {
 	var deletions []DeletedFinalStateUnknown
 	type replacement struct {
 		oldObj interface{}
@@ -731,7 +747,7 @@ func processReplacedAllInfo(handler ResourceEventHandler, info ReplacedAllInfo, 
 	}
 	replacements := make([]replacement, 0, len(info.Objects))
 
-	err := reconcileReplacement(nil, clientState, info.Objects, keyFunc,
+	err := reconcileReplacement(logger, nil, clientState, info.Objects, keyFunc,
 		func(obj DeletedFinalStateUnknown) error {
 			deletions = append(deletions, obj)
 			return nil
@@ -784,7 +800,7 @@ func newInformer(clientState Store, options InformerOptions, keyFunc KeyFunc) Co
 	if options.Logger != nil {
 		logger = *options.Logger
 	}
-	fifo := newQueueFIFO(logger, clientState, options.Transform)
+	logger, fifo := newQueueFIFO(logger, options.ObjectType, clientState, options.Transform)
 
 	cfg := &Config{
 		Queue:            fifo,
@@ -795,21 +811,24 @@ func newInformer(clientState Store, options InformerOptions, keyFunc KeyFunc) Co
 
 		Process: func(obj interface{}, isInInitialList bool) error {
 			if deltas, ok := obj.(Deltas); ok {
-				return processDeltas(options.Handler, clientState, deltas, isInInitialList, keyFunc)
+				// This must be the logger *of the fifo*.
+				return processDeltas(logger, options.Handler, clientState, deltas, isInInitialList, keyFunc)
 			}
 			return errors.New("object given as Process argument is not Deltas")
 		},
 		ProcessBatch: func(deltaList []Delta, isInInitialList bool) error {
-			return processDeltasInBatch(options.Handler, clientState, deltaList, isInInitialList, keyFunc)
+			// Same here.
+			return processDeltasInBatch(logger, options.Handler, clientState, deltaList, isInInitialList, keyFunc)
 		},
 	}
 	return New(cfg)
 }
 
-func newQueueFIFO(logger klog.Logger, clientState Store, transform TransformFunc) Queue {
+func newQueueFIFO(logger klog.Logger, objectType any, clientState Store, transform TransformFunc) (klog.Logger, Queue) {
 	if clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.InOrderInformers) {
 		options := RealFIFOOptions{
 			Logger:      &logger,
+			Name:        fmt.Sprintf("RealFIFO %T", objectType),
 			KeyFunction: MetaNamespaceKeyFunc,
 			Transformer: transform,
 		}
@@ -820,13 +839,16 @@ func newQueueFIFO(logger klog.Logger, clientState Store, transform TransformFunc
 		} else {
 			options.KnownObjects = clientState
 		}
-		return NewRealFIFOWithOptions(options)
+		f := NewRealFIFOWithOptions(options)
+		return f.logger, f
 	} else {
-		return NewDeltaFIFOWithOptions(DeltaFIFOOptions{
+		f := NewDeltaFIFOWithOptions(DeltaFIFOOptions{
 			Logger:                &logger,
+			Name:                  fmt.Sprintf("DeltaFIFO %T", objectType),
 			KnownObjects:          clientState,
 			EmitDeltaTypeReplaced: true,
 			Transformer:           transform,
 		})
+		return f.logger, f
 	}
 }
