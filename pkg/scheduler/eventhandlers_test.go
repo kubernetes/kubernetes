@@ -711,7 +711,7 @@ func TestAdmissionCheck(t *testing.T) {
 			existingPods: []*v1.Pod{
 				st.MakePod().Name("pod1").HostPort(80).Obj(),
 			},
-			wantAdmissionResults: [][]AdmissionResult{{nodeaffinityError, AdmissionResult{Name: nodeports.Name, Reason: "node(s) port conflict for the requested pod ports (&ContainerPort{Name:,HostPort:80,ContainerPort:0,Protocol:,HostIP:,})"}}, {nodeaffinityError}},
+			wantAdmissionResults: [][]AdmissionResult{{nodeaffinityError, AdmissionResult{Name: nodeports.Name, Reason: "node(s) port conflict for the requested pod ports (/:80)"}}, {nodeaffinityError}},
 		},
 		{
 			name: "check PodOverhead and nodeAffinity, PodOverhead need fail quickly if includeAllFailures is false",
@@ -729,7 +729,7 @@ func TestAdmissionCheck(t *testing.T) {
 			existingPods: []*v1.Pod{
 				st.MakePod().Name("pod1").HostPort(80).Node("fake-node").Obj(),
 			},
-			wantAdmissionResults: [][]AdmissionResult{{nodenameError, AdmissionResult{Name: nodeports.Name, Reason: "node(s) port conflict for the requested pod ports (&ContainerPort{Name:,HostPort:80,ContainerPort:0,Protocol:,HostIP:,})"}}, {nodenameError}},
+			wantAdmissionResults: [][]AdmissionResult{{nodenameError, AdmissionResult{Name: nodeports.Name, Reason: "node(s) port conflict for the requested pod ports (/:80)"}}, {nodenameError}},
 		},
 	}
 	for _, tt := range tests {

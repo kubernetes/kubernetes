@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -183,7 +184,8 @@ func fitsPorts(wantPorts []v1.ContainerPort, portsInUse fwk.HostPortInfo) (fits 
 	// try to see whether portsInUse and wantPorts will conflict or not
 	for _, cp := range wantPorts {
 		if portsInUse.CheckConflict(cp.HostIP, string(cp.Protocol), cp.HostPort) {
-			errReason := fmt.Sprintf("node(s) port conflict for the requested pod ports (%s)", cp.String())
+			portNotFittingMessage := fmt.Sprintf("%s/%s:%s", string(cp.Protocol), cp.HostIP, strconv.Itoa(int(cp.HostPort)))
+			errReason := fmt.Sprintf("node(s) port conflict for the requested pod ports (%s)", portNotFittingMessage)
 			return false, errReason
 		}
 	}
