@@ -86,7 +86,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				obj.Spec.PodGroups[0].Name = ""
 			}),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "podGroups").Index(0).Child("name"), "", "a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')").WithOrigin("format=k8s-short-name"),
+				field.Required(field.NewPath("spec", "podGroups").Index(0).Child("name"), ""),
 			},
 		},
 		"invalid podGroup name": {
@@ -112,12 +112,14 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				field.Duplicate(field.NewPath("spec", "podGroups").Index(1).Child("name"), "main"),
 			},
 		},
+		// Declarative validation treats 0 as "missing" and returns Required error
+		// instead of checking minimum constraint and returning Invalid error.
 		"gang minCount zero": {
 			input: mkValidWorkload(func(obj *scheduling.Workload) {
 				obj.Spec.PodGroups[0].Policy.Gang.MinCount = 0
 			}),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "podGroups").Index(0).Child("policy", "gang", "minCount"), int64(0), "").WithOrigin("minimum"),
+				field.Required(field.NewPath("spec", "podGroups").Index(0).Child("policy", "gang", "minCount"), ""),
 			},
 		},
 		"gang minCount negative": {
@@ -125,7 +127,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				obj.Spec.PodGroups[0].Policy.Gang.MinCount = -1
 			}),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "podGroups").Index(0).Child("policy", "gang", "minCount"), int64(-1), "").WithOrigin("minimum"),
+				field.Invalid(field.NewPath("spec", "podGroups").Index(0).Child("policy", "gang", "minCount"), int64(-1), "must be greater than zero").WithOrigin("minimum"),
 			},
 		},
 		"valid with controllerRef": {

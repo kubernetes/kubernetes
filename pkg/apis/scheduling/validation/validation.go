@@ -117,8 +117,15 @@ func validateControllerRef(ref *scheduling.TypedLocalObjectReference, fldPath *f
 
 func validatePodGroup(podGroup *scheduling.PodGroup, fldPath *field.Path, existingPodGroups sets.Set[string]) field.ErrorList {
 	var allErrs field.ErrorList
-	for _, detail := range apivalidation.ValidatePodGroupName(podGroup.Name, false) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), podGroup.Name, detail).WithOrigin("format=k8s-short-name").MarkCoveredByDeclarative())
+	// To match the declarative validation behavior, we return Required for empty string.
+	// Declarative validation treats "" as "missing" via validate.RequiredValue()
+	// and returns early before checking the format constraint.
+	if podGroup.Name == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "").MarkCoveredByDeclarative())
+	} else {
+		for _, detail := range apivalidation.ValidatePodGroupName(podGroup.Name, false) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), podGroup.Name, detail).WithOrigin("format=k8s-short-name").MarkCoveredByDeclarative())
+		}
 	}
 	if existingPodGroups.Has(podGroup.Name) {
 		allErrs = append(allErrs, field.Duplicate(fldPath.Child("name"), podGroup.Name))
@@ -161,7 +168,17 @@ func validatBasicSchedulingPolicy(policy *scheduling.BasicSchedulingPolicy, fldP
 }
 
 func validateGangSchedulingPolicy(policy *scheduling.GangSchedulingPolicy, fldPath *field.Path) field.ErrorList {
-	allErrs := apivalidation.ValidatePositiveField(int64(policy.MinCount), fldPath.Child("minCount")).WithOrigin("minimum").MarkCoveredByDeclarative()
+	// To match the declarative validation behavior, we return Required for 0.
+	// Declarative validation treats 0 as "missing" via validate.RequiredValue()
+	// and returns early before checking the minimum constraint.
+	// For non-zero values, declarative validation returns early without any validation,
+	// so we don't mark them as covered.
+	var allErrs field.ErrorList
+	if policy.MinCount == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("minCount"), "").MarkCoveredByDeclarative())
+	} else {
+		allErrs = apivalidation.ValidatePositiveField(int64(policy.MinCount), fldPath.Child("minCount")).WithOrigin("minimum")
+	}
 	return allErrs
 }
 

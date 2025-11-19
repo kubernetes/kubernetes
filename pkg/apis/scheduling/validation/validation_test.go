@@ -289,7 +289,7 @@ func TestValidateWorkload(t *testing.T) {
 		workload     *scheduling.Workload
 		expectedErrs field.ErrorList
 	}{
-		"invalid controllerRef apiGroup - covered": {
+		"invalid controllerRef apiGroup": {
 			workload: mkWorkload(func(w *scheduling.Workload) {
 				w.Spec.ControllerRef.APIGroup = ".group"
 			}),
@@ -297,7 +297,7 @@ func TestValidateWorkload(t *testing.T) {
 				field.Invalid(field.NewPath("spec", "controllerRef", "apiGroup"), ".group", "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')").MarkCoveredByDeclarative(),
 			},
 		},
-		"no controllerRef kind - covered": {
+		"no controllerRef kind": {
 			workload: mkWorkload(func(w *scheduling.Workload) {
 				w.Spec.ControllerRef.Kind = ""
 			}),
@@ -305,7 +305,7 @@ func TestValidateWorkload(t *testing.T) {
 				field.Required(field.NewPath("spec", "controllerRef", "kind"), "").MarkCoveredByDeclarative(),
 			},
 		},
-		"invalid controllerRef kind - covered": {
+		"invalid controllerRef kind": {
 			workload: mkWorkload(func(w *scheduling.Workload) {
 				w.Spec.ControllerRef.Kind = "/foo"
 			}),
@@ -313,7 +313,7 @@ func TestValidateWorkload(t *testing.T) {
 				field.Invalid(field.NewPath("spec", "controllerRef", "kind"), "/foo", "must not contain '/'").MarkCoveredByDeclarative(),
 			},
 		},
-		"no controllerRef name - covered": {
+		"no controllerRef name": {
 			workload: mkWorkload(func(w *scheduling.Workload) {
 				w.Spec.ControllerRef.Name = ""
 			}),
@@ -321,7 +321,7 @@ func TestValidateWorkload(t *testing.T) {
 				field.Required(field.NewPath("spec", "controllerRef", "name"), "").MarkCoveredByDeclarative(),
 			},
 		},
-		"invalid controllerRef name - covered": {
+		"invalid controllerRef name": {
 			workload: mkWorkload(func(w *scheduling.Workload) {
 				w.Spec.ControllerRef.Name = "/baz"
 			}),
@@ -329,7 +329,7 @@ func TestValidateWorkload(t *testing.T) {
 				field.Invalid(field.NewPath("spec", "controllerRef", "name"), "/baz", "must not contain '/'").WithOrigin("format=k8s-short-name").MarkCoveredByDeclarative(),
 			},
 		},
-		"no pod groups - covered": {
+		"no pod groups": {
 			workload: mkWorkload(func(w *scheduling.Workload) {
 				w.Spec.PodGroups = nil
 			}),
@@ -337,7 +337,7 @@ func TestValidateWorkload(t *testing.T) {
 				field.Required(field.NewPath("spec", "podGroups"), "must have at least one item").MarkCoveredByDeclarative(),
 			},
 		},
-		"too many pod groups - covered": {
+		"too many pod groups": {
 			workload: mkWorkload(func(w *scheduling.Workload) {
 				w.Spec.PodGroups = nil
 				for i := 0; i < scheduling.WorkloadMaxPodGroups+1; i++ {
@@ -351,38 +351,6 @@ func TestValidateWorkload(t *testing.T) {
 			}),
 			expectedErrs: field.ErrorList{
 				field.TooMany(field.NewPath("spec", "podGroups"), scheduling.WorkloadMaxPodGroups+1, scheduling.WorkloadMaxPodGroups).WithOrigin("maxItems").MarkCoveredByDeclarative(),
-			},
-		},
-		"invalid pod group name - covered": {
-			workload: mkWorkload(func(w *scheduling.Workload) {
-				w.Spec.PodGroups[0].Name = "Invalid_Name"
-			}),
-			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "podGroups").Index(0).Child("name"), "Invalid_Name", "a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')").WithOrigin("format=k8s-short-name").MarkCoveredByDeclarative(),
-			},
-		},
-		"zero min count in gang - covered": {
-			workload: mkWorkload(func(w *scheduling.Workload) {
-				w.Spec.PodGroups[1].Policy.Gang.MinCount = 0
-			}),
-			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "podGroups").Index(1).Child("policy", "gang", "minCount"), int64(0), "must be greater than zero").WithOrigin("minimum").MarkCoveredByDeclarative(),
-			},
-		},
-		"duplicate pod group names - NOT covered": {
-			workload: mkWorkload(func(w *scheduling.Workload) {
-				w.Spec.PodGroups[1].Name = w.Spec.PodGroups[0].Name
-			}),
-			expectedErrs: field.ErrorList{
-				field.Duplicate(field.NewPath("spec", "podGroups").Index(1).Child("name"), "group1"),
-			},
-		},
-		"no policy set - NOT covered": {
-			workload: mkWorkload(func(w *scheduling.Workload) {
-				w.Spec.PodGroups[0].Policy = scheduling.PodGroupPolicy{}
-			}),
-			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec", "podGroups").Index(0).Child("policy"), "exactly one of `basic`, `gang` is required"),
 			},
 		},
 	}
@@ -506,61 +474,6 @@ func TestValidateWorkloadUpdate(t *testing.T) {
 		if len(errs) == 0 {
 			t.Errorf("Expected failure for %q", name)
 		}
-	}
-
-	updateDeclarativeCoverageCases := map[string]struct {
-		old          *scheduling.Workload
-		update       *scheduling.Workload
-		expectedErrs field.ErrorList
-	}{
-		"change pod groups - NOT covered (immutable)": {
-			old: mkWorkload(),
-			update: mkWorkload(func(w *scheduling.Workload) {
-				w.Spec.PodGroups[0].Name += "bar"
-			}),
-			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "podGroups"), nil, "field is immutable"),
-			},
-		},
-		"change controllerRef - NOT covered (immutable)": {
-			old: mkWorkload(),
-			update: mkWorkload(func(w *scheduling.Workload) {
-				w.Spec.ControllerRef.Kind += "bar"
-			}),
-			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "controllerRef"), nil, "field is immutable"),
-			},
-		},
-	}
-	for name, tc := range updateDeclarativeCoverageCases {
-		t.Run(name, func(t *testing.T) {
-			tc.old.ResourceVersion = "0"
-			tc.update.ResourceVersion = "1"
-			errs := ValidateWorkloadUpdate(tc.update, tc.old)
-			if len(errs) == 0 {
-				t.Errorf("Expected failure")
-				return
-			}
-			// Check that the number of errors matches
-			if len(errs) != len(tc.expectedErrs) {
-				t.Errorf("Expected %d errors, got %d: %v", len(tc.expectedErrs), len(errs), errs)
-				return
-			}
-			// Check each error has the correct CoveredByDeclarative flag
-			for i, err := range errs {
-				expectedErr := tc.expectedErrs[i]
-				if err.Type != expectedErr.Type {
-					t.Errorf("Error %d: expected type %v, got %v", i, expectedErr.Type, err.Type)
-				}
-				if err.Field != expectedErr.Field {
-					t.Errorf("Error %d: expected field %v, got %v", i, expectedErr.Field, err.Field)
-				}
-				if err.CoveredByDeclarative != expectedErr.CoveredByDeclarative {
-					t.Errorf("Error %d: expected CoveredByDeclarative=%v, got %v for error: %v",
-						i, expectedErr.CoveredByDeclarative, err.CoveredByDeclarative, err)
-				}
-			}
-		})
 	}
 }
 
