@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -37,42 +38,42 @@ func TestBackoffQueue_getBackoffTime(t *testing.T) {
 		initialBackoffDuration time.Duration
 		maxBackoffDuration     time.Duration
 		podInfo                *framework.QueuedPodInfo
-		want                   time.Time
+		want                   metav1.Time
 	}{
 		{
 			name:                   "no backoff",
 			initialBackoffDuration: 1 * time.Second,
 			maxBackoffDuration:     32 * time.Second,
-			podInfo:                &framework.QueuedPodInfo{UnschedulableCount: 0, Timestamp: time.Date(2023, 10, 1, 0, 0, 0, 0, time.UTC)},
-			want:                   time.Time{},
+			podInfo:                &framework.QueuedPodInfo{UnschedulableCount: 0, Timestamp: metav1.NewTime(time.Date(2023, 10, 1, 0, 0, 0, 0, time.UTC))},
+			want:                   metav1.Time{},
 		},
 		{
 			name:                   "backoff is returned from the cache",
 			initialBackoffDuration: 1 * time.Second,
 			maxBackoffDuration:     32 * time.Second,
-			podInfo:                &framework.QueuedPodInfo{UnschedulableCount: 1, Timestamp: time.Date(2023, 10, 1, 0, 0, 0, 0, time.UTC), BackoffExpiration: time.Date(2023, 10, 1, 0, 0, 0, 1, time.UTC)},
-			want:                   time.Date(2023, 10, 1, 0, 0, 0, 1, time.UTC),
+			podInfo:                &framework.QueuedPodInfo{UnschedulableCount: 1, Timestamp: metav1.NewTime(time.Date(2023, 10, 1, 0, 0, 0, 0, time.UTC)), BackoffExpiration: metav1.NewTime(time.Date(2023, 10, 1, 0, 0, 0, 1, time.UTC))},
+			want:                   metav1.NewTime(time.Date(2023, 10, 1, 0, 0, 0, 1, time.UTC)),
 		},
 		{
 			name:                   "backoff by UnschedulableCount",
 			initialBackoffDuration: 1 * time.Second,
 			maxBackoffDuration:     32 * time.Second,
-			podInfo:                &framework.QueuedPodInfo{UnschedulableCount: 16, Timestamp: time.Date(2023, 10, 1, 0, 0, 0, 0, time.UTC)},
-			want:                   time.Date(2023, 10, 1, 0, 0, 32, 0, time.UTC),
+			podInfo:                &framework.QueuedPodInfo{UnschedulableCount: 16, Timestamp: metav1.NewTime(time.Date(2023, 10, 1, 0, 0, 0, 0, time.UTC))},
+			want:                   metav1.NewTime(time.Date(2023, 10, 1, 0, 0, 32, 0, time.UTC)),
 		},
 		{
 			name:                   "backoff is calculated with ConsecutiveErrorsCount",
 			initialBackoffDuration: 1 * time.Second,
 			maxBackoffDuration:     32 * time.Second,
-			podInfo:                &framework.QueuedPodInfo{UnschedulableCount: 5, ConsecutiveErrorsCount: 16, Timestamp: time.Date(2023, 10, 1, 0, 0, 0, 0, time.UTC)},
-			want:                   time.Date(2023, 10, 1, 0, 0, 32, 0, time.UTC),
+			podInfo:                &framework.QueuedPodInfo{UnschedulableCount: 5, ConsecutiveErrorsCount: 16, Timestamp: metav1.NewTime(time.Date(2023, 10, 1, 0, 0, 0, 0, time.UTC))},
+			want:                   metav1.NewTime(time.Date(2023, 10, 1, 0, 0, 32, 0, time.UTC)),
 		},
 		{
 			name:                   "zero maxBackoffDuration means no backoff",
 			initialBackoffDuration: 0,
 			maxBackoffDuration:     0,
-			podInfo:                &framework.QueuedPodInfo{UnschedulableCount: 16, Timestamp: time.Date(2023, 10, 1, 0, 0, 0, 0, time.UTC)},
-			want:                   time.Time{},
+			podInfo:                &framework.QueuedPodInfo{UnschedulableCount: 16, Timestamp: metav1.NewTime(time.Date(2023, 10, 1, 0, 0, 0, 0, time.UTC))},
+			want:                   metav1.Time{},
 		},
 	}
 	for _, tt := range tests {
@@ -146,7 +147,7 @@ func TestBackoffQueue_popAllBackoffCompleted(t *testing.T) {
 			PodInfo: &framework.PodInfo{
 				Pod: st.MakePod().Name("pod0").Obj(),
 			},
-			Timestamp:            fakeClock.Now().Add(-2 * time.Second),
+			Timestamp:            metav1.NewTime(fakeClock.Now().Add(-2 * time.Second)),
 			UnschedulableCount:   1,
 			UnschedulablePlugins: sets.New("plugin"),
 		},
@@ -154,7 +155,7 @@ func TestBackoffQueue_popAllBackoffCompleted(t *testing.T) {
 			PodInfo: &framework.PodInfo{
 				Pod: st.MakePod().Name("pod1").Obj(),
 			},
-			Timestamp:            fakeClock.Now().Add(time.Second),
+			Timestamp:            metav1.NewTime(fakeClock.Now().Add(time.Second)),
 			UnschedulableCount:   1,
 			UnschedulablePlugins: sets.New("plugin"),
 		},
@@ -162,14 +163,14 @@ func TestBackoffQueue_popAllBackoffCompleted(t *testing.T) {
 			PodInfo: &framework.PodInfo{
 				Pod: st.MakePod().Name("pod2").Obj(),
 			},
-			Timestamp:              fakeClock.Now().Add(-2 * time.Second),
+			Timestamp:              metav1.NewTime(fakeClock.Now().Add(-2 * time.Second)),
 			ConsecutiveErrorsCount: 1,
 		},
 		"pod3": {
 			PodInfo: &framework.PodInfo{
 				Pod: st.MakePod().Name("pod3").Obj(),
 			},
-			Timestamp:              fakeClock.Now().Add(time.Second),
+			Timestamp:              metav1.NewTime(fakeClock.Now().Add(time.Second)),
 			ConsecutiveErrorsCount: 1,
 		},
 	}
@@ -242,7 +243,7 @@ func TestBackoffQueueOrdering(t *testing.T) {
 			PodInfo: &framework.PodInfo{
 				Pod: st.MakePod().Name("pod0").Priority(1).Obj(),
 			},
-			Timestamp:            fakeClock.Now(),
+			Timestamp:            metav1.NewTime(fakeClock.Now()),
 			Attempts:             1,
 			UnschedulableCount:   1,
 			UnschedulablePlugins: sets.New("plugin"),
@@ -251,7 +252,7 @@ func TestBackoffQueueOrdering(t *testing.T) {
 			PodInfo: &framework.PodInfo{
 				Pod: st.MakePod().Name("pod1").Priority(1).Obj(),
 			},
-			Timestamp:            fakeClock.Now().Add(-time.Second),
+			Timestamp:            metav1.NewTime(fakeClock.Now().Add(-time.Second)),
 			Attempts:             1,
 			UnschedulableCount:   1,
 			UnschedulablePlugins: sets.New("plugin"),
@@ -260,7 +261,7 @@ func TestBackoffQueueOrdering(t *testing.T) {
 			PodInfo: &framework.PodInfo{
 				Pod: st.MakePod().Name("pod2").Priority(2).Obj(),
 			},
-			Timestamp:            fakeClock.Now().Add(-2*time.Second + time.Millisecond),
+			Timestamp:            metav1.NewTime(fakeClock.Now().Add(-2*time.Second + time.Millisecond)),
 			Attempts:             1,
 			UnschedulableCount:   1,
 			UnschedulablePlugins: sets.New("plugin"),
@@ -269,7 +270,7 @@ func TestBackoffQueueOrdering(t *testing.T) {
 			PodInfo: &framework.PodInfo{
 				Pod: st.MakePod().Name("pod3").Priority(1).Obj(),
 			},
-			Timestamp:            fakeClock.Now().Add(-2 * time.Second),
+			Timestamp:            metav1.NewTime(fakeClock.Now().Add(-2 * time.Second)),
 			Attempts:             1,
 			UnschedulableCount:   1,
 			UnschedulablePlugins: sets.New("plugin"),
@@ -278,7 +279,7 @@ func TestBackoffQueueOrdering(t *testing.T) {
 			PodInfo: &framework.PodInfo{
 				Pod: st.MakePod().Name("pod4").Priority(2).Obj(),
 			},
-			Timestamp:            fakeClock.Now().Add(-2 * time.Second),
+			Timestamp:            metav1.NewTime(fakeClock.Now().Add(-2 * time.Second)),
 			Attempts:             1,
 			UnschedulableCount:   1,
 			UnschedulablePlugins: sets.New("plugin"),
@@ -287,7 +288,7 @@ func TestBackoffQueueOrdering(t *testing.T) {
 			PodInfo: &framework.PodInfo{
 				Pod: st.MakePod().Name("pod5").Priority(1).Obj(),
 			},
-			Timestamp:            fakeClock.Now().Add(-3 * time.Second),
+			Timestamp:            metav1.NewTime(fakeClock.Now().Add(-3 * time.Second)),
 			Attempts:             1,
 			UnschedulableCount:   1,
 			UnschedulablePlugins: sets.New("plugin"),
