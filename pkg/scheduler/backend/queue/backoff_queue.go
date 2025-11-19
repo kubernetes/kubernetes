@@ -21,6 +21,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -137,11 +138,11 @@ func (bq *backoffQueue) podMaxBackoffDuration() time.Duration {
 
 // alignToWindow truncates the provided time to the podBackoffQ ordering window.
 // It returns the lowest possible timestamp in the window.
-func (bq *backoffQueue) alignToWindow(t time.Time) time.Time {
+func (bq *backoffQueue) alignToWindow(t metav1.Time) metav1.Time {
 	if !bq.isPopFromBackoffQEnabled {
 		return t
 	}
-	return t.Truncate(backoffQOrderingWindowDuration)
+	return metav1.NewTime(t.Truncate(backoffQOrderingWindowDuration))
 }
 
 // waitUntilAlignedWithOrderingWindow waits until the time reaches a multiple of backoffQOrderingWindowDuration.
@@ -151,7 +152,7 @@ func (bq *backoffQueue) alignToWindow(t time.Time) time.Time {
 func (bq *backoffQueue) waitUntilAlignedWithOrderingWindow(f func(), stopCh <-chan struct{}) {
 	now := bq.clock.Now()
 	// Wait until the time reaches the multiple of backoffQOrderingWindowDuration.
-	durationToNextWindow := bq.alignToWindow(now.Add(backoffQOrderingWindowDuration)).Sub(now)
+	durationToNextWindow := bq.alignToWindow(metav1.NewTime(now.Add(backoffQOrderingWindowDuration))).Sub(now)
 	timer := bq.clock.NewTimer(durationToNextWindow)
 	select {
 	case <-stopCh:
@@ -191,8 +192,8 @@ func (bq *backoffQueue) waitUntilAlignedWithOrderingWindow(f func(), stopCh <-ch
 func (bq *backoffQueue) lessBackoffCompletedWithPriority(pInfo1, pInfo2 *framework.QueuedPodInfo) bool {
 	bo1 := bq.getBackoffTime(pInfo1)
 	bo2 := bq.getBackoffTime(pInfo2)
-	if !bo1.Equal(bo2) {
-		return bo1.Before(bo2)
+	if !bo1.Equal(&bo2) {
+		return bo1.Before(&bo2)
 	}
 	// If the backoff time is the same, sort the pod in the same manner as activeQ does.
 	return bq.activeQLessFn(pInfo1, pInfo2)
@@ -202,7 +203,7 @@ func (bq *backoffQueue) lessBackoffCompletedWithPriority(pInfo1, pInfo2 *framewo
 func (bq *backoffQueue) lessBackoffCompleted(pInfo1, pInfo2 *framework.QueuedPodInfo) bool {
 	bo1 := bq.getBackoffTime(pInfo1)
 	bo2 := bq.getBackoffTime(pInfo2)
-	return bo1.Before(bo2)
+	return bo1.Before(&bo2)
 }
 
 // isPodBackingoff returns true if a pod is still waiting for its backoff timer.
@@ -210,8 +211,9 @@ func (bq *backoffQueue) lessBackoffCompleted(pInfo1, pInfo2 *framework.QueuedPod
 // If the pod backoff time is in the actual ordering window, it should still be backing off.
 func (bq *backoffQueue) isPodBackingoff(podInfo *framework.QueuedPodInfo) bool {
 	boTime := bq.getBackoffTime(podInfo)
+	nowAligned := bq.alignToWindow(metav1.NewTime(bq.clock.Now()))
 	// Don't use After, because in case of windows equality we want to return true.
-	return !boTime.Before(bq.alignToWindow(bq.clock.Now()))
+	return !boTime.Before(&nowAligned)
 }
 
 // getBackoffTime returns the time that podInfo completes backoff.
@@ -219,10 +221,10 @@ func (bq *backoffQueue) isPodBackingoff(podInfo *framework.QueuedPodInfo) bool {
 // The cache will be cleared when this pod is poped from the scheduling queue again (i.e., at activeQ's pop),
 // because of the fact that the backoff time is calculated based on podInfo.Attempts,
 // which doesn't get changed until the pod's scheduling is retried.
-func (bq *backoffQueue) getBackoffTime(podInfo *framework.QueuedPodInfo) time.Time {
+func (bq *backoffQueue) getBackoffTime(podInfo *framework.QueuedPodInfo) metav1.Time {
 	if bq.podMaxBackoff == 0 {
 		// If podMaxBackoff is set to 0, the backoff should be disabled completely.
-		return time.Time{}
+		return metav1.Time{}
 	}
 	count := podInfo.UnschedulableCount
 	if podInfo.ConsecutiveErrorsCount > 0 {
@@ -234,12 +236,12 @@ func (bq *backoffQueue) getBackoffTime(podInfo *framework.QueuedPodInfo) time.Ti
 	if count == 0 {
 		// When the Pod hasn't experienced any scheduling attempts,
 		// they don't have to get a backoff.
-		return time.Time{}
+		return metav1.Time{}
 	}
 
 	if podInfo.BackoffExpiration.IsZero() {
 		duration := bq.calculateBackoffDuration(count)
-		podInfo.BackoffExpiration = bq.alignToWindow(podInfo.Timestamp.Add(duration))
+		podInfo.BackoffExpiration = bq.alignToWindow(metav1.NewTime(podInfo.Timestamp.Add(duration)))
 	}
 
 	return podInfo.BackoffExpiration

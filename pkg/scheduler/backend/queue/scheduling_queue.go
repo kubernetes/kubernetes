@@ -675,7 +675,7 @@ func (p *PriorityQueue) moveToActiveQ(logger klog.Logger, pInfo *framework.Queue
 		}
 		if pInfo.InitialAttemptTimestamp == nil {
 			now := p.clock.Now()
-			pInfo.InitialAttemptTimestamp = &now
+			pInfo.InitialAttemptTimestamp = &metav1.Time{Time: now}
 		}
 		p.unschedulablePods.delete(pInfo.Pod, gatedBefore)
 		p.backoffQ.delete(pInfo)
@@ -901,10 +901,10 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(logger klog.Logger, pInfo *
 		pInfo.ConsecutiveErrorsCount = 0
 	}
 	// Refresh the timestamp since the pod is re-added.
-	pInfo.Timestamp = p.clock.Now()
+	pInfo.Timestamp = metav1.NewTime(p.clock.Now())
 	// We changed ConsecutiveErrorsCount or UnschedulableCount plus Timestamp, and now the calculated backoff time should be different,
 	// removing the cached backoff time.
-	pInfo.BackoffExpiration = time.Time{}
+	pInfo.BackoffExpiration = metav1.Time{}
 	// Clear the flush flag since the pod is returning to the queue after a scheduling attempt.
 	pInfo.WasFlushedFromUnschedulable = false
 	// Pod with Workload reference should always need the cycle after got unschedulable for some reason.
@@ -962,7 +962,7 @@ func (p *PriorityQueue) flushUnschedulablePodsLeftover(logger klog.Logger) {
 	currentTime := p.clock.Now()
 	for _, pInfo := range p.unschedulablePods.podInfoMap {
 		lastScheduleTime := pInfo.Timestamp
-		if currentTime.Sub(lastScheduleTime) > p.podMaxInUnschedulablePodsDuration {
+		if currentTime.Sub(lastScheduleTime.Time) > p.podMaxInUnschedulablePodsDuration {
 			// Mark this pod as flushed so we can detect if it schedules soon after
 			pInfo.WasFlushedFromUnschedulable = true
 			podsToMove = append(podsToMove, pInfo)
@@ -1494,7 +1494,7 @@ func (p *PriorityQueue) newQueuedPodInfo(pod *v1.Pod, plugins ...string) *framew
 	podInfo, _ := framework.NewPodInfo(pod)
 	return &framework.QueuedPodInfo{
 		PodInfo:                 podInfo,
-		Timestamp:               now,
+		Timestamp:               metav1.NewTime(now),
 		InitialAttemptTimestamp: nil,
 		UnschedulablePlugins:    sets.New(plugins...),
 		NeedsPodGroupScheduling: p.isGenericWorkloadEnabled && pod.Spec.WorkloadRef != nil,

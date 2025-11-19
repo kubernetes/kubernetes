@@ -19,11 +19,9 @@ package framework
 import (
 	"errors"
 	"fmt"
-	"slices"
 	"sort"
 	"strings"
 	"sync/atomic"
-	"time"
 
 	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -33,6 +31,7 @@ import (
 	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
 	resourcehelper "k8s.io/component-helpers/resource"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -500,10 +499,11 @@ func nextGeneration() int64 {
 // QueuedPodInfo is a Pod wrapper with additional information related to
 // the pod's status in the scheduling queue, such as the timestamp when
 // it's added to the queue.
+// +k8s:deepcopy-gen=true
 type QueuedPodInfo struct {
 	*PodInfo
 	// The time pod added to the scheduling queue.
-	Timestamp time.Time
+	Timestamp metav1.Time
 	// Number of all schedule attempts before successfully scheduled.
 	// It's used to record the # attempts metric.
 	Attempts int
@@ -511,7 +511,7 @@ type QueuedPodInfo struct {
 	// If the SchedulerPopFromBackoffQ feature is enabled, the value is aligned to the backoff ordering window.
 	// Then, two Pods with the same BackoffExpiration (time bucket) are ordered by priority and eventually the timestamp,
 	// to make sure popping from the backoffQ considers priority of pods that are close to the expiration time.
-	BackoffExpiration time.Time
+	BackoffExpiration metav1.Time
 	// The total number of the scheduling attempts that this Pod gets unschedulable.
 	// Basically it equals Attempts, but when the Pod fails with the Error status (e.g., the network error),
 	// this count won't be incremented.
@@ -538,7 +538,7 @@ type QueuedPodInfo struct {
 	// back to the queue multiple times before it's successfully scheduled.
 	// It shouldn't be updated once initialized. It's used to record the e2e scheduling
 	// latency for a pod.
-	InitialAttemptTimestamp *time.Time
+	InitialAttemptTimestamp *metav1.Time
 	// UnschedulablePlugins records the plugin names that the Pod failed with Unschedulable or UnschedulableAndUnresolvable status
 	// at specific extension points: PreFilter, Filter, Reserve, or Permit (WaitOnPermit).
 	// If Pods are rejected at other extension points,
@@ -564,7 +564,7 @@ func (pqi *QueuedPodInfo) GetPodInfo() fwk.PodInfo {
 	return pqi.PodInfo
 }
 
-func (pqi *QueuedPodInfo) GetTimestamp() time.Time {
+func (pqi *QueuedPodInfo) GetTimestamp() metav1.Time {
 	return pqi.Timestamp
 }
 
@@ -572,7 +572,7 @@ func (pqi *QueuedPodInfo) GetAttempts() int {
 	return pqi.Attempts
 }
 
-func (pqi *QueuedPodInfo) GetBackoffExpiration() time.Time {
+func (pqi *QueuedPodInfo) GetBackoffExpiration() metav1.Time {
 	return pqi.BackoffExpiration
 }
 
@@ -584,7 +584,7 @@ func (pqi *QueuedPodInfo) GetConsecutiveErrorsCount() int {
 	return pqi.ConsecutiveErrorsCount
 }
 
-func (pqi *QueuedPodInfo) GetInitialAttemptTimestamp() *time.Time {
+func (pqi *QueuedPodInfo) GetInitialAttemptTimestamp() *metav1.Time {
 	return pqi.InitialAttemptTimestamp
 }
 
@@ -607,24 +607,6 @@ func (pqi *QueuedPodInfo) GetGatingPluginEvents() []fwk.ClusterEvent {
 // Gated returns true if the pod is gated by any plugin.
 func (pqi *QueuedPodInfo) Gated() bool {
 	return pqi.GatingPlugin != ""
-}
-
-// DeepCopy returns a deep copy of the QueuedPodInfo object.
-func (pqi *QueuedPodInfo) DeepCopy() *QueuedPodInfo {
-	return &QueuedPodInfo{
-		PodInfo:                 pqi.PodInfo.DeepCopy(),
-		Timestamp:               pqi.Timestamp,
-		Attempts:                pqi.Attempts,
-		UnschedulableCount:      pqi.UnschedulableCount,
-		InitialAttemptTimestamp: pqi.InitialAttemptTimestamp,
-		UnschedulablePlugins:    pqi.UnschedulablePlugins.Clone(),
-		BackoffExpiration:       pqi.BackoffExpiration,
-		GatingPlugin:            pqi.GatingPlugin,
-		GatingPluginEvents:      slices.Clone(pqi.GatingPluginEvents),
-		PendingPlugins:          pqi.PendingPlugins.Clone(),
-		ConsecutiveErrorsCount:  pqi.ConsecutiveErrorsCount,
-		NeedsPodGroupScheduling: pqi.NeedsPodGroupScheduling,
-	}
 }
 
 // ClearRejectorPlugins clears the plugin-related fields that track why a pod
@@ -676,6 +658,7 @@ func (pgi *PodGroupInfo) GetNamespace() string {
 // PodInfo is a wrapper to a Pod with additional pre-computed information to
 // accelerate processing. This information is typically immutable (e.g., pre-processed
 // inter-pod affinity selectors).
+// +k8s:deepcopy-gen=true
 type PodInfo struct {
 	Pod                        *v1.Pod
 	RequiredAffinityTerms      []fwk.AffinityTerm
@@ -711,18 +694,6 @@ func (pi *PodInfo) GetPreferredAffinityTerms() []fwk.WeightedAffinityTerm {
 
 func (pi *PodInfo) GetPreferredAntiAffinityTerms() []fwk.WeightedAffinityTerm {
 	return pi.PreferredAntiAffinityTerms
-}
-
-// DeepCopy returns a deep copy of the PodInfo object.
-func (pi *PodInfo) DeepCopy() *PodInfo {
-	return &PodInfo{
-		Pod:                        pi.Pod.DeepCopy(),
-		RequiredAffinityTerms:      pi.RequiredAffinityTerms,
-		RequiredAntiAffinityTerms:  pi.RequiredAntiAffinityTerms,
-		PreferredAffinityTerms:     pi.PreferredAffinityTerms,
-		PreferredAntiAffinityTerms: pi.PreferredAntiAffinityTerms,
-		cachedResource:             pi.cachedResource,
-	}
 }
 
 // Update creates a full new PodInfo by default. And only updates the pod when the PodInfo
@@ -924,9 +895,12 @@ func NewPodInfo(pod *v1.Pod) (*PodInfo, error) {
 	return pInfo, err
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/kube-scheduler/framework.Resource
+
 // Resource is a collection of compute resource.
 // Implementation is separate from interface fwk.Resource, because implementation of functions Add and SetMaxResource
 // depends on internal scheduler util functions.
+// +k8s:deepcopy-gen=true
 type Resource struct {
 	MilliCPU         int64
 	Memory           int64

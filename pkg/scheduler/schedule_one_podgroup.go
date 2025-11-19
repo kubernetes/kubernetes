@@ -24,6 +24,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
@@ -152,9 +153,9 @@ func (sched *Scheduler) podGroupInfoForPod(ctx context.Context, pInfo *framework
 		p1 := corev1helpers.PodPriority(pInfo1.GetPodInfo().GetPod())
 		p2 := corev1helpers.PodPriority(pInfo2.GetPodInfo().GetPod())
 		// Timestamps should be set, but dereferencing them for safety.
-		p1Timestamp := ptr.Deref(pInfo1.InitialAttemptTimestamp, time.Time{})
-		p2Timestamp := ptr.Deref(pInfo2.InitialAttemptTimestamp, time.Time{})
-		return (p1 > p2) || (p1 == p2 && p1Timestamp.Before(p2Timestamp))
+		p1Timestamp := ptr.Deref(pInfo1.InitialAttemptTimestamp, metav1.Time{})
+		p2Timestamp := ptr.Deref(pInfo2.InitialAttemptTimestamp, metav1.Time{})
+		return (p1 > p2) || (p1 == p2 && p1Timestamp.Time.Before(p2Timestamp.Time))
 	})
 
 	// Populate UnscheduledPods based on the QueuedPodInfos.
