@@ -17,7 +17,10 @@ FROM $BASEIMAGE
 
 CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
 
-RUN yum install -y targetcli && yum clean all
+RUN yum install -y targetcli && \
+    yum clean all && \
+    rm -rf /var/cache/yum
+
 ADD run_iscsi_target.sh /usr/local/bin/
 ADD block.tar.gz /
 
