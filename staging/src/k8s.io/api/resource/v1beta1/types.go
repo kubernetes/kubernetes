@@ -304,6 +304,7 @@ type Device struct {
 	//
 	// +optional
 	// +oneOf=deviceType
+	// +k8s:optional
 	Basic *BasicDevice `json:"basic,omitempty" protobuf:"bytes,2,opt,name=basic"`
 }
 
