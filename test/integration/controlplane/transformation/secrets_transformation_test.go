@@ -341,10 +341,9 @@ func TestAllowUnsafeMalformedObjectDeletionFeature(t *testing.T) {
 			}
 
 			// l) let's try the normal deletion flow with/without dry run, we expect an error
-			emptyOptions := metav1.DeleteOptions{}
-			err = test.restClient.CoreV1().Secrets(testNamespace).Delete(context.Background(), secretCorrupt, withDryRun(emptyOptions))
+			err = test.restClient.CoreV1().Secrets(testNamespace).Delete(context.Background(), secretCorrupt, withDryRun(metav1.DeleteOptions{}))
 			tc.corrupObjDeletWithoutOption.verify(t, err)
-			err = test.restClient.CoreV1().Secrets(testNamespace).Delete(context.Background(), secretCorrupt, emptyOptions)
+			err = test.restClient.CoreV1().Secrets(testNamespace).Delete(context.Background(), secretCorrupt, metav1.DeleteOptions{})
 			tc.corrupObjDeletWithoutOption.verify(t, err)
 
 			// m) make an attempt to delete the corrupt object by enabling the option,

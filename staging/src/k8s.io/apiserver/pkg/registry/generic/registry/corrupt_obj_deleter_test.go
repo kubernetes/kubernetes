@@ -331,17 +331,20 @@ func (s *corruptStorage) Delete(ctx context.Context, key string, out runtime.Obj
 
 func TestUnsafeDeleteDryRun(t *testing.T) {
 	tests := []struct {
-		name              string
-		storageError      error
-		wantDeleted       bool
-		wantError         bool
-		wantErrorContains string
+		name             string
+		storageError     error
+		wantDeleted      bool
+		errShouldContain string
 	}{
 		{
-			name:              "dry run with non-corrupt object should fail",
-			storageError:      nil, // No error means object is readable (not corrupt)
-			wantError:         true,
-			wantErrorContains: "is exclusively used to delete corrupt object(s)",
+			name:             "dry run with non-corrupt object should fail",
+			storageError:     nil, // No error means object is readable (not corrupt)
+			errShouldContain: "is exclusively used to delete corrupt object(s)",
+		},
+		{
+			name:             "dry run with non-corrupt error should fail",
+			storageError:     fmt.Errorf("some generic storage error"),
+			errShouldContain: "is exclusively used to delete corrupt object(s)",
 		},
 		{
 			name:         "dry run with corrupt object should succeed",
@@ -388,18 +391,16 @@ func TestUnsafeDeleteDryRun(t *testing.T) {
 				t.Errorf("Expected unsafe delete invoked %d time(s), got: %d", want, got)
 			}
 
-			// Verify error happens or not as expected
-			if want, got := test.wantError, err != nil; want != got {
-				t.Errorf("Expected error=%t, have error=%t", want, got)
-			}
-
-			if !test.wantError {
-				return
-			}
-
 			// Verify error expectations
-			if !strings.Contains(err.Error(), test.wantErrorContains) {
-				t.Errorf("Expected error to contain %q, got: %v", test.wantErrorContains, err)
+			switch test.errShouldContain {
+			case "":
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+			default:
+				if err == nil || !strings.Contains(err.Error(), test.errShouldContain) {
+					t.Errorf("expected error containing %q, got: %v", test.errShouldContain, err)
+				}
 			}
 		})
 	}

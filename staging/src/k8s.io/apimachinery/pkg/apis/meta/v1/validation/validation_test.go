@@ -129,7 +129,6 @@ func TestInvalidDryRun(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func TestValidateDeleteOptionsWithIgnoreStoreReadError(t *testing.T) {
@@ -211,10 +210,20 @@ func TestValidateDeleteOptionsWithIgnoreStoreReadError(t *testing.T) {
 		{
 			name: "option is true, dry-run is set (should be allowed)",
 			opts: metav1.DeleteOptions{
-				IgnoreStoreReadErrorWithClusterBreakingPotential: ptr.To[bool](true),
+				IgnoreStoreReadErrorWithClusterBreakingPotential: ptr.To(true),
 				DryRun: []string{"All"},
 			},
 			expectedErrors: field.ErrorList{},
+		},
+		{
+			name: "option is true, dry-run is set to an invalid value",
+			opts: metav1.DeleteOptions{
+				IgnoreStoreReadErrorWithClusterBreakingPotential: ptr.To(true),
+				DryRun: []string{"Invalid"},
+			},
+			expectedErrors: field.ErrorList{
+				field.NotSupported(field.NewPath("dryRun"), []string{"Invalid"}, []string{"All"}),
+			},
 		},
 	}
 
