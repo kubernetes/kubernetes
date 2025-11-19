@@ -115,6 +115,7 @@ func validateEvent(messagePrefix string, actualEvent *v1.Event, expectedEvent *v
 	// Temp clear time stamps for comparison because actual values don't matter for comparison
 	recvEvent.FirstTimestamp = expectedEvent.FirstTimestamp
 	recvEvent.LastTimestamp = expectedEvent.LastTimestamp
+	recvEvent.EventTime = expectedEvent.EventTime
 
 	recvEvent.ReportingController = expectedEvent.ReportingController
 
