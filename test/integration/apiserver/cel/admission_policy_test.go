@@ -40,6 +40,7 @@ import (
 	admissionregistrationv1beta1apis "k8s.io/kubernetes/pkg/apis/admissionregistration/v1beta1"
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils/ktesting"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -580,10 +581,11 @@ func testPolicyAdmission(t *testing.T, supportV1Beta1 bool) {
 		t.Fatal(err)
 	}
 
+	_, ctx := ktesting.NewTestContext(t)
 	// Try to patch the configmap and look for the warning message.
-	if err := wait.PollUntilContextTimeout(context.Background(), time.Millisecond*10, time.Second*5, false, func(ctx context.Context) (bool, error) {
+	if err := wait.PollUntilContextTimeout(ctx, time.Millisecond*100, time.Second*5, false, func(ctx context.Context) (bool, error) {
 		holder.reset(t)
-		_, err = client.CoreV1().ConfigMaps(testNamespace).Patch(context.TODO(), testConfigmap.Name, types.JSONPatchType, []byte("[]"), metav1.PatchOptions{})
+		_, err = client.CoreV1().ConfigMaps(testNamespace).Patch(ctx, testConfigmap.Name, types.JSONPatchType, []byte("[]"), metav1.PatchOptions{})
 		if err != nil {
 			return false, nil
 		}
@@ -594,13 +596,12 @@ func testPolicyAdmission(t *testing.T, supportV1Beta1 bool) {
 		}
 		return false, nil
 	}); err != nil {
-		t.Errorf("timed out waiting policy and biniding to establish: %v", err)
+		t.Errorf("timed out waiting policy and binding to establish: %v", err)
 	}
 
-	// Try deleting the configmap.
-	err = client.CoreV1().ConfigMaps(testNamespace).Delete(context.TODO(), testConfigmap.Name, metav1.DeleteOptions{})
+	err = client.CoreV1().ConfigMaps(testNamespace).Delete(ctx, testConfigmap.Name, metav1.DeleteOptions{})
 	if err != nil {
-		t.Errorf("Failed to delete ConfigMap with error: %+v", err)
+		t.Errorf("failed to delete ConfigMap with error: %+v", err)
 	}
 
 	start := time.Now()
