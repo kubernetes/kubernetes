@@ -319,7 +319,12 @@ func testWebhookConverter(t *testing.T, watchCache bool) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer tearDown()
+			// VERIFICATION: Force the race condition
+			defer func() {
+				tearDown() // Stop the webhook
+				t.Log("Webhook stopped. Sleeping 30s to force race condition with API Server...")
+				time.Sleep(30 * time.Second) // Force API server (still running) to hit the dead webhook
+			}()
 
 			ctc.setConversionWebhook(t, webhookClientConfig, test.reviewVersions)
 			defer ctc.removeConversionWebhook(t)
