@@ -207,6 +207,7 @@ func Validate_TypedLocalObjectReference(ctx context.Context, op operation.Operat
 			if earlyReturn {
 				return // do not proceed
 			}
+			errs = append(errs, validate.PathSegmentName(ctx, op, fldPath, obj, oldObj)...)
 			return
 		}(fldPath.Child("kind"), &obj.Kind, safe.Field(oldObj, func(oldObj *schedulingv1alpha1.TypedLocalObjectReference) *string { return &oldObj.Kind }), oldObj != nil)...)
 
@@ -226,7 +227,7 @@ func Validate_TypedLocalObjectReference(ctx context.Context, op operation.Operat
 			if earlyReturn {
 				return // do not proceed
 			}
-			errs = append(errs, validate.ShortName(ctx, op, fldPath, obj, oldObj)...)
+			errs = append(errs, validate.PathSegmentName(ctx, op, fldPath, obj, oldObj)...)
 			return
 		}(fldPath.Child("name"), &obj.Name, safe.Field(oldObj, func(oldObj *schedulingv1alpha1.TypedLocalObjectReference) *string { return &oldObj.Name }), oldObj != nil)...)
 

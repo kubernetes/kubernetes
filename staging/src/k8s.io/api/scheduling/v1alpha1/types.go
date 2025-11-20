@@ -148,13 +148,14 @@ type TypedLocalObjectReference struct {
 	//
 	// +required
 	// +k8s:required
+	// +k8s:format=k8s-path-segment
 	Kind string `json:"kind" protobuf:"bytes,2,opt,name=kind"`
 	// Name is the name of resource being referenced.
 	// It must be a path segment name.
 	//
 	// +required
 	// +k8s:required
-	// +k8s:format=k8s-short-name
+	// +k8s:format=k8s-path-segment
 	Name string `json:"name" protobuf:"bytes,3,opt,name=name"`
 }
 
