@@ -329,7 +329,7 @@ func (m *GVExclusionManager) diffGVs(old, new map[schema.GroupVersion]struct{}) 
 
 // RunReaper runs Worker 2: Reaper
 // This worker periodically removes expired GVs from recentlyDeletedGVs.
-func (m *GVExclusionManager) RunReaper(stopCh <-chan struct{}) {
+func (m *GVExclusionManager) RunReaper(ctx context.Context) {
 	klog.Infof("Starting GV Reaper with %s interval", m.reaperCheckInterval)
 	ticker := time.NewTicker(m.reaperCheckInterval)
 	defer ticker.Stop()
@@ -338,7 +338,7 @@ func (m *GVExclusionManager) RunReaper(stopCh <-chan struct{}) {
 		select {
 		case <-ticker.C:
 			m.reapExpiredGVs()
-		case <-stopCh:
+		case <-ctx.Done():
 			klog.Info("GV Reaper stopped")
 			return
 		}

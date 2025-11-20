@@ -49,7 +49,7 @@ const (
 	// available on this server.
 	localDiscoveryRefreshInterval = 30 * time.Minute
 	// defaultExclusionGracePeriod is the default duration to wait before
-	// removing a group from the exclusion set after it is deleted from
+	// removing a groupversion from the exclusion set after it is deleted from
 	// CRDs and aggregated APIs.
 	// This is to allow time for all peer API servers to also observe
 	// the deleted CRD or aggregated API before this server stops excluding it
@@ -67,12 +67,15 @@ type Interface interface {
 	HasFinishedSync() bool
 	RunLocalDiscoveryCacheSync(stopCh <-chan struct{}) error
 	RunPeerDiscoveryCacheSync(ctx context.Context, workers int)
-	RunExcludedGVsReaper(stopCh <-chan struct{})
-	RunGVDeletionWorkers(ctx context.Context, workers int)
 	GetPeerResources() map[string][]apidiscoveryv2.APIGroupDiscovery
 	RegisterCacheInvalidationCallback(cb func())
+	// GV exclusion manager informer registration
 	RegisterCRDInformerHandlers(crdInformer cache.SharedIndexInformer, extractor GVExtractor) error
 	RegisterAPIServiceInformerHandlers(apiServiceInformer cache.SharedIndexInformer, extractor GVExtractor) error
+	// GV exclusion manager worker methods
+	RunActiveGVTracker(ctx context.Context, workers int)
+	RunReaper(ctx context.Context)
+	RunPeerDiscoveryRefilter(ctx context.Context, workers int)
 }
 
 // New creates a new instance to implement unknown version proxy
@@ -102,15 +105,14 @@ func NewPeerProxyHandler(
 				Name: peerDiscoveryControllerName,
 			}),
 		apiserverIdentityInformer: leaseInformer,
-		excludedGVs:               make(map[schema.GroupVersion]*time.Time),
-		exclusionGracePeriod:      defaultExclusionGracePeriod,
-		reaperCheckInterval:       defaultExclusionReaperInterval,
-		gvDeletionQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
-			workqueue.DefaultTypedControllerRateLimiter[string](),
-			workqueue.TypedRateLimitingQueueConfig[string]{
-				Name: "gv-deletion",
-			}),
 	}
+
+	h.gvExclusionManager = NewGVExclusionManager(
+		defaultExclusionGracePeriod,
+		defaultExclusionReaperInterval,
+		&h.peerDiscoveryInfoCache,
+		&h.cacheInvalidationCallback,
+	)
 
 	if parts := strings.Split(identityLeaseLabelSelector, "="); len(parts) != 2 {
 		return nil, fmt.Errorf("invalid identityLeaseLabelSelector provided, must be of the form key=value, received: %v", identityLeaseLabelSelector)
@@ -168,4 +170,41 @@ func NewPeerProxyHandler(
 
 	h.leaseRegistration = peerDiscoveryRegistration
 	return h, nil
+}
+
+// RegisterCRDInformerHandlers registers event handlers for CRD informer.
+func (h *peerProxyHandler) RegisterCRDInformerHandlers(crdInformer cache.SharedIndexInformer, extractor GVExtractor) error {
+	if h.gvExclusionManager != nil {
+		return h.gvExclusionManager.RegisterCRDInformerHandlers(crdInformer, extractor)
+	}
+	return nil
+}
+
+// RegisterAPIServiceInformerHandlers registers event handlers for APIService informer.
+func (h *peerProxyHandler) RegisterAPIServiceInformerHandlers(apiServiceInformer cache.SharedIndexInformer, extractor GVExtractor) error {
+	if h.gvExclusionManager != nil {
+		return h.gvExclusionManager.RegisterAPIServiceInformerHandlers(apiServiceInformer, extractor)
+	}
+	return nil
+}
+
+// RunActiveGVTracker starts the worker that tracks active GVs from CRDs/APIServices.
+func (h *peerProxyHandler) RunActiveGVTracker(ctx context.Context, workers int) {
+	if h.gvExclusionManager != nil {
+		h.gvExclusionManager.RunActiveGVTracker(ctx, workers)
+	}
+}
+
+// RunReaper starts the worker that removes expired GVs from the exclusion set.
+func (h *peerProxyHandler) RunReaper(ctx context.Context) {
+	if h.gvExclusionManager != nil {
+		h.gvExclusionManager.RunReaper(ctx)
+	}
+}
+
+// RunPeerDiscoveryRefilter starts the worker that refilters peer discovery cache.
+func (h *peerProxyHandler) RunPeerDiscoveryRefilter(ctx context.Context, workers int) {
+	if h.gvExclusionManager != nil {
+		h.gvExclusionManager.RunPeerDiscoveryRefilter(ctx, workers)
+	}
 }
