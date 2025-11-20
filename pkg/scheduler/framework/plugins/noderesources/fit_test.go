@@ -1573,6 +1573,12 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 			enableInPlacePodVerticalScaling: true,
 			expectedHint:                    fwk.QueueSkip,
 		},
+		"queue-on-nominated-pod-deleted": {
+			pod:                             st.MakePod().Name("pod1").UID("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).UID("uid0").Obj(),
+			oldObj:                          st.MakePod().Name("pod2").UID("pod2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).NominatedNodeName("fake").UID("uid1").Obj(),
+			enableInPlacePodVerticalScaling: true,
+			expectedHint:                    fwk.Queue,
+		},
 		"skip-queue-on-disable-inplace-pod-vertical-scaling": {
 			pod:    st.MakePod().Name("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
 			oldObj: st.MakePod().Name("pod2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Node("fake").Obj(),
