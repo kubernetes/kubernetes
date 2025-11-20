@@ -19,6 +19,7 @@ package kubelet
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
@@ -75,7 +76,18 @@ func (s *runtimeState) setRuntimeState(err error) {
 func (s *runtimeState) setRuntimeHandlers(rtHandlers []kubecontainer.RuntimeHandler) {
 	s.Lock()
 	defer s.Unlock()
-	s.rtHandlers = rtHandlers
+	// Copy and sort to ensure deterministic ordering of runtime handlers and avoid spurious Node status updates.
+	s.rtHandlers = append([]kubecontainer.RuntimeHandler(nil), rtHandlers...)
+	sort.Slice(s.rtHandlers, func(i, j int) bool {
+		// Keep the default (empty name) handler at the end for consistent status/debug output; no functional dependency on this position.
+		if s.rtHandlers[i].Name == "" {
+			return false
+		}
+		if s.rtHandlers[j].Name == "" {
+			return true
+		}
+		return s.rtHandlers[i].Name < s.rtHandlers[j].Name
+	})
 }
 
 func (s *runtimeState) runtimeHandlers() []kubecontainer.RuntimeHandler {
