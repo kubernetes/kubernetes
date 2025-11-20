@@ -116,9 +116,9 @@ func TestWriteClientCAs(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: "extension-apiserver-authentication"},
 					Data: map[string]string{
 						"client-ca-file":                     string(someRandomCA),
-						"requestheader-username-headers":     `["alfa","bravo","charlie"]`,
-						"requestheader-group-headers":        `["delta"]`,
-						"requestheader-extra-headers-prefix": `["echo","foxtrot"]`,
+						"requestheader-username-headers":     `["X-Remote-User","alfa","bravo","charlie"]`,
+						"requestheader-group-headers":        `["X-Remote-Group","delta"]`,
+						"requestheader-extra-headers-prefix": `["X-Remote-Extra-","echo","foxtrot"]`,
 						"requestheader-client-ca-file":       string(anotherRandomCA),
 						"requestheader-allowed-names":        `["first","second"]`,
 					},
@@ -142,10 +142,10 @@ func TestWriteClientCAs(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: "extension-apiserver-authentication"},
 					Data: map[string]string{
 						"client-ca-file":                     string(someRandomCA),
-						"requestheader-username-headers":     `["alfa","bravo","charlie"]`,
-						"requestheader-uid-headers":          `["golf","hotel","india"]`,
-						"requestheader-group-headers":        `["delta"]`,
-						"requestheader-extra-headers-prefix": `["echo","foxtrot"]`,
+						"requestheader-username-headers":     `["X-Remote-User","alfa","bravo","charlie"]`,
+						"requestheader-uid-headers":          `["X-Remote-Uid","golf","hotel","india"]`,
+						"requestheader-group-headers":        `["X-Remote-Group","delta"]`,
+						"requestheader-extra-headers-prefix": `["X-Remote-Extra-","echo","foxtrot"]`,
 						"requestheader-client-ca-file":       string(anotherRandomCA),
 						"requestheader-allowed-names":        `["first","second"]`,
 					},
@@ -164,9 +164,9 @@ func TestWriteClientCAs(t *testing.T) {
 				"extension-apiserver-authentication": {
 					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: "extension-apiserver-authentication"},
 					Data: map[string]string{
-						"requestheader-username-headers":     `[]`,
-						"requestheader-group-headers":        `[]`,
-						"requestheader-extra-headers-prefix": `[]`,
+						"requestheader-username-headers":     `["X-Remote-User"]`,
+						"requestheader-group-headers":        `["X-Remote-Group"]`,
+						"requestheader-extra-headers-prefix": `["X-Remote-Extra-"]`,
 						"requestheader-client-ca-file":       string(anotherRandomCA),
 						"requestheader-allowed-names":        `["first","second"]`,
 					},
@@ -198,9 +198,9 @@ func TestWriteClientCAs(t *testing.T) {
 				"extension-apiserver-authentication": {
 					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: "extension-apiserver-authentication"},
 					Data: map[string]string{
-						"requestheader-username-headers":     `[]`,
-						"requestheader-group-headers":        `[]`,
-						"requestheader-extra-headers-prefix": `[]`,
+						"requestheader-username-headers":     `["X-Remote-User"]`,
+						"requestheader-group-headers":        `["X-Remote-Group"]`,
+						"requestheader-extra-headers-prefix": `["X-Remote-Extra-"]`,
 						"requestheader-client-ca-file":       string(anotherRandomCA),
 						"requestheader-allowed-names":        `[]`,
 					},
@@ -243,9 +243,9 @@ func TestWriteClientCAs(t *testing.T) {
 				&corev1.ConfigMap{
 					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: "extension-apiserver-authentication"},
 					Data: map[string]string{
-						"requestheader-username-headers":     `[]`,
-						"requestheader-group-headers":        `[]`,
-						"requestheader-extra-headers-prefix": `[]`,
+						"requestheader-username-headers":     `["X-Remote-User"]`,
+						"requestheader-group-headers":        `["X-Remote-Group"]`,
+						"requestheader-extra-headers-prefix": `["X-Remote-Extra-"]`,
 						"requestheader-client-ca-file":       string(someRandomCA),
 						"requestheader-allowed-names":        `[]`,
 					},
@@ -255,9 +255,9 @@ func TestWriteClientCAs(t *testing.T) {
 				"extension-apiserver-authentication": {
 					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: "extension-apiserver-authentication"},
 					Data: map[string]string{
-						"requestheader-username-headers":     `[]`,
-						"requestheader-group-headers":        `[]`,
-						"requestheader-extra-headers-prefix": `[]`,
+						"requestheader-username-headers":     `["X-Remote-User"]`,
+						"requestheader-group-headers":        `["X-Remote-Group"]`,
+						"requestheader-extra-headers-prefix": `["X-Remote-Extra-"]`,
 						"requestheader-client-ca-file":       string(someRandomCA) + string(anotherRandomCA),
 						"requestheader-allowed-names":        `[]`,
 					},
@@ -295,9 +295,9 @@ func TestWriteClientCAs(t *testing.T) {
 				&corev1.ConfigMap{
 					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: "extension-apiserver-authentication"},
 					Data: map[string]string{
-						"requestheader-username-headers":     `[]`,
-						"requestheader-group-headers":        `[]`,
-						"requestheader-extra-headers-prefix": `[]`,
+						"requestheader-username-headers":     `["X-Remote-User"]`,
+						"requestheader-group-headers":        `["X-Remote-Group"]`,
+						"requestheader-extra-headers-prefix": `["X-Remote-Extra-"]`,
 						"requestheader-client-ca-file":       string(anotherRandomCA),
 						"requestheader-allowed-names":        `[]`,
 					},
@@ -320,10 +320,10 @@ func TestWriteClientCAs(t *testing.T) {
 				&corev1.ConfigMap{
 					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: "extension-apiserver-authentication"},
 					Data: map[string]string{
-						"requestheader-username-headers":     `[]`,
-						"requestheader-uid-headers":          `["snorlax"]`,
-						"requestheader-group-headers":        `[]`,
-						"requestheader-extra-headers-prefix": `[]`,
+						"requestheader-username-headers":     `["X-Remote-User"]`,
+						"requestheader-uid-headers":          `["X-Remote-Uid","snorlax"]`,
+						"requestheader-group-headers":        `["X-Remote-Group"]`,
+						"requestheader-extra-headers-prefix": `["X-Remote-Extra-"]`,
 						"requestheader-client-ca-file":       string(anotherRandomCA),
 						"requestheader-allowed-names":        `[]`,
 					},
@@ -333,9 +333,9 @@ func TestWriteClientCAs(t *testing.T) {
 				"extension-apiserver-authentication": {
 					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: "extension-apiserver-authentication"},
 					Data: map[string]string{
-						"requestheader-username-headers":     `[]`,
-						"requestheader-group-headers":        `[]`,
-						"requestheader-extra-headers-prefix": `[]`,
+						"requestheader-username-headers":     `["X-Remote-User"]`,
+						"requestheader-group-headers":        `["X-Remote-Group"]`,
+						"requestheader-extra-headers-prefix": `["X-Remote-Extra-"]`,
 						"requestheader-client-ca-file":       string(anotherRandomCA),
 						"requestheader-allowed-names":        `[]`,
 					},
@@ -347,7 +347,7 @@ func TestWriteClientCAs(t *testing.T) {
 			name: "add uid with feature gate",
 			clusterAuthInfo: ClusterAuthenticationInfo{
 				RequestHeaderUsernameHeaders:     headerrequest.StaticStringSlice{},
-				RequestHeaderUIDHeaders:          headerrequest.StaticStringSlice{"panda"},
+				RequestHeaderUIDHeaders:          headerrequest.StaticStringSlice{},
 				RequestHeaderGroupHeaders:        headerrequest.StaticStringSlice{},
 				RequestHeaderExtraHeaderPrefixes: headerrequest.StaticStringSlice{},
 				RequestHeaderCA:                  anotherRandomCAProvider,
@@ -357,9 +357,9 @@ func TestWriteClientCAs(t *testing.T) {
 				&corev1.ConfigMap{
 					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: "extension-apiserver-authentication"},
 					Data: map[string]string{
-						"requestheader-username-headers":     `[]`,
-						"requestheader-group-headers":        `[]`,
-						"requestheader-extra-headers-prefix": `[]`,
+						"requestheader-username-headers":     `["X-Remote-User"]`,
+						"requestheader-group-headers":        `["X-Remote-Group"]`,
+						"requestheader-extra-headers-prefix": `["X-Remote-Extra-"]`,
 						"requestheader-client-ca-file":       string(anotherRandomCA),
 						"requestheader-allowed-names":        `[]`,
 					},
@@ -369,10 +369,10 @@ func TestWriteClientCAs(t *testing.T) {
 				"extension-apiserver-authentication": {
 					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: "extension-apiserver-authentication"},
 					Data: map[string]string{
-						"requestheader-username-headers":     `[]`,
-						"requestheader-uid-headers":          `["panda"]`,
-						"requestheader-group-headers":        `[]`,
-						"requestheader-extra-headers-prefix": `[]`,
+						"requestheader-username-headers":     `["X-Remote-User"]`,
+						"requestheader-uid-headers":          `["X-Remote-Uid"]`,
+						"requestheader-group-headers":        `["X-Remote-Group"]`,
+						"requestheader-extra-headers-prefix": `["X-Remote-Extra-"]`,
 						"requestheader-client-ca-file":       string(anotherRandomCA),
 						"requestheader-allowed-names":        `[]`,
 					},
@@ -395,10 +395,10 @@ func TestWriteClientCAs(t *testing.T) {
 				&corev1.ConfigMap{
 					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: "extension-apiserver-authentication"},
 					Data: map[string]string{
-						"requestheader-username-headers":     `[]`,
-						"requestheader-uid-headers":          `["snorlax"]`,
-						"requestheader-group-headers":        `[]`,
-						"requestheader-extra-headers-prefix": `[]`,
+						"requestheader-username-headers":     `["X-Remote-User"]`,
+						"requestheader-uid-headers":          `["X-Remote-Uid","snorlax"]`,
+						"requestheader-group-headers":        `["X-Remote-Group"]`,
+						"requestheader-extra-headers-prefix": `["X-Remote-Extra-"]`,
 						"requestheader-client-ca-file":       string(anotherRandomCA),
 						"requestheader-allowed-names":        `[]`,
 					},
@@ -408,10 +408,10 @@ func TestWriteClientCAs(t *testing.T) {
 				"extension-apiserver-authentication": {
 					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: "extension-apiserver-authentication"},
 					Data: map[string]string{
-						"requestheader-username-headers":     `[]`,
-						"requestheader-uid-headers":          `["snorlax","panda"]`,
-						"requestheader-group-headers":        `[]`,
-						"requestheader-extra-headers-prefix": `[]`,
+						"requestheader-username-headers":     `["X-Remote-User"]`,
+						"requestheader-uid-headers":          `["X-Remote-Uid","snorlax","panda"]`,
+						"requestheader-group-headers":        `["X-Remote-Group"]`,
+						"requestheader-extra-headers-prefix": `["X-Remote-Extra-"]`,
 						"requestheader-client-ca-file":       string(anotherRandomCA),
 						"requestheader-allowed-names":        `[]`,
 					},
@@ -433,12 +433,11 @@ func TestWriteClientCAs(t *testing.T) {
 			}
 			configmapLister := corev1listers.NewConfigMapLister(configMapIndexer)
 
-			c := &Controller{
-				configMapLister:            configmapLister,
-				configMapClient:            client.CoreV1(),
-				namespaceClient:            client.CoreV1(),
-				requiredAuthenticationData: test.clusterAuthInfo,
-			}
+			// use the init to merge the test config with the defaults
+			c := NewClusterAuthenticationTrustController(test.clusterAuthInfo, client)
+			// instead of having to go through the process of feeding the lister
+			// through a started informer, just use one we prepared ourselves
+			c.configMapLister = configmapLister
 
 			err := c.syncConfigMap()
 			if err != nil {
