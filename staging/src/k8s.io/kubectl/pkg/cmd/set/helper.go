@@ -105,7 +105,7 @@ func CalculatePatch(patch *Patch, encoder runtime.Encoder, mutateFn PatchFn) boo
 		return false
 	}
 
-	patch.Patch, patch.Err = strategicpatch.CreateTwoWayMergePatch(patch.Before, patch.After, patch.Info.Object)
+	patch.Patch, patch.Err = strategicpatch.CreateTwoWayMergePatch(patch.Before, patch.After, patch.Info.Object, strategicpatch.WithDuplicateMergeKeySupport(true))
 	return true
 }
 
