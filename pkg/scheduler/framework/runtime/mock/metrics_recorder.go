@@ -22,12 +22,10 @@ import (
 )
 
 // MetricsRecorder is a fake implementation of MetricsRecorder for testing.
-// It uses counters and stores call records for verification in tests.
+// It stores call records for verification in tests.
 // Queueing hint and in-flight event metrics are intentionally not
 // recorded in this runtime mock. The methods exist as no-ops to satisfy
-// the interface; backend-specific tests should provide their own mocks
-// if they need to assert on those metrics.
-// Get queueing hint and in-flight event records are intentionally absent.
+// the interface and can be implemented if needed.
 type MetricsRecorder struct {
 	mu sync.RWMutex
 
@@ -35,7 +33,7 @@ type MetricsRecorder struct {
 	pluginDurationRecords []PluginDurationRecord
 }
 
-// PluginDurationRecord stores the parameters of ObservePluginDurationAsync calls
+// PluginDurationRecord stores the parameters of ObservePluginDurationAsync call.
 type PluginDurationRecord struct {
 	ExtensionPoint string
 	PluginName     string
