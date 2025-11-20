@@ -375,7 +375,7 @@ var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 		highPriorityPods := make([]*v1.Pod, 0, 5*nodeListLen)
 		mediumPriorityPods := make([]*v1.Pod, 0, 10*nodeListLen)
 
-		ginkgo.By("Run high/medium priority pods that have same requirements as that of lower priority pod")
+		ginkgo.By("Run medium priority pods that have same requirements as that of lower priority pod")
 		for i := range nodeList.Items {
 			// Create medium priority pods first
 			// to confirm the scheduler finally prioritize the high priority pods, ignoring the medium priority pods.
@@ -393,19 +393,6 @@ var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 				})
 				mediumPriorityPods = append(mediumPriorityPods, p)
 			}
-
-			for j := 0; j < 5; j++ {
-				p := createPausePod(ctx, f, pausePodConfig{
-					Name:              fmt.Sprintf("pod%d-%d-%v", i, j, highPriorityClassName),
-					PriorityClassName: highPriorityClassName,
-					Resources: &v1.ResourceRequirements{
-						// Set the pod request to the low priority pod's resources
-						Requests: lowPriorityPods[0].Spec.Containers[0].Resources.Requests,
-						Limits:   lowPriorityPods[0].Spec.Containers[0].Resources.Requests,
-					},
-				})
-				highPriorityPods = append(highPriorityPods, p)
-			}
 		}
 
 		// All low priority Pods should be the target of preemption.
@@ -419,6 +406,22 @@ var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 				}
 				return preemptedPod.DeletionTimestamp != nil, nil
 			}))
+		}
+
+		ginkgo.By("Run high priority pods that have same requirements as that of lower priority pod")
+		for i := range nodeList.Items {
+			for j := 0; j < 5; j++ {
+				p := createPausePod(ctx, f, pausePodConfig{
+					Name:              fmt.Sprintf("pod%d-%d-%v", i, j, highPriorityClassName),
+					PriorityClassName: highPriorityClassName,
+					Resources: &v1.ResourceRequirements{
+						// Set the pod request to the low priority pod's resources
+						Requests: lowPriorityPods[0].Spec.Containers[0].Resources.Requests,
+						Limits:   lowPriorityPods[0].Spec.Containers[0].Resources.Requests,
+					},
+				})
+				highPriorityPods = append(highPriorityPods, p)
+			}
 		}
 
 		// All high priority Pods should be schedulable by removing the low priority Pods.
