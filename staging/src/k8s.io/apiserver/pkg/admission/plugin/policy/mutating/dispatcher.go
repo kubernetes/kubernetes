@@ -122,8 +122,12 @@ func (d *dispatcher) dispatchInvocations(
 	// if it is cluster scoped, namespaceName will be empty
 	// Otherwise, get the Namespace resource.
 	if namespaceName != "" {
-		namespace, err = d.matcher.GetNamespace(namespaceName)
+		namespace, err = d.matcher.GetNamespace(ctx, namespaceName)
 		if err != nil {
+			var statusError *k8serrors.StatusError
+			if errors.As(err, &statusError) {
+				return nil, statusError
+			}
 			return nil, k8serrors.NewNotFound(schema.GroupResource{Group: "", Resource: "namespaces"}, namespaceName)
 		}
 	}
