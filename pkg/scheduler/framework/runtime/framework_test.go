@@ -4216,11 +4216,9 @@ func TestRecordingMetrics(t *testing.T) {
 							t.Errorf("Plugin duration record mismatch (-want +got):\n%s", diff)
 						}
 					}
-				} else {
+				} else if len(records) != 0 {
 					// Verify no records were created when metrics disabled
-					if len(records) != 0 {
-						t.Errorf("expected no plugin duration records when metrics disabled, got %v", records)
-					}
+					t.Errorf("expected no plugin duration records when metrics disabled, got %v", records)
 				}
 			})
 		}
