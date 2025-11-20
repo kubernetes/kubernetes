@@ -87,7 +87,7 @@ var (
 		"ClusterRoleUpdate": &authorizer.AttributesRecord{
 			User:            tim,
 			Verb:            "update",
-			APIGroup:        "rbac.authorization.k8s.io", // Core
+			APIGroup:        "rbac.authorization.k8s.io",
 			APIVersion:      "v1beta1",
 			Resource:        "clusterroles",
 			Subresource:     "status",
