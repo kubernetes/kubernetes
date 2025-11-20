@@ -841,6 +841,15 @@ func TestPrepareResources(t *testing.T) {
 
 			manager, err := NewManager(tCtx.Logger(), fakeKubeClient, t.TempDir())
 			require.NoError(t, err, "create DRA manager")
+
+			// Test recorded operations to ensure they match behavior of call.
+			recordedOperation := ""
+			var recordedAsError *bool
+			manager.recordOperation = func(operation string, isError bool, duration float64) {
+				recordedOperation = operation
+				recordedAsError = &isError
+			}
+
 			manager.initDRAPluginManager(backgroundCtx, getFakeNode, time.Second /* very short wiping delay for testing */)
 
 			if test.claim != nil {
@@ -877,8 +886,11 @@ func TestPrepareResources(t *testing.T) {
 			err = manager.PrepareResources(backgroundCtx, test.pod)
 
 			assert.Equal(t, test.expectedPrepareCalls, draServerInfo.server.prepareResourceCalls.Load())
+			assert.Equal(t, "PrepareResources", recordedOperation)
+			assert.NotNil(t, recordedAsError)
 
 			if test.expectedErrMsg != "" {
+				assert.True(t, *recordedAsError)
 				assert.Error(t, err)
 				if err != nil {
 					assert.ErrorContains(t, err, test.expectedErrMsg)
@@ -887,6 +899,7 @@ func TestPrepareResources(t *testing.T) {
 			}
 
 			require.NoError(t, err)
+			assert.False(t, *recordedAsError)
 
 			if test.wantResourceSkipped {
 				return // resource skipped so no need to continue
@@ -1025,6 +1038,15 @@ func TestUnprepareResources(t *testing.T) {
 
 			manager, err := NewManager(tCtx.Logger(), fakeKubeClient, t.TempDir())
 			require.NoError(t, err, "create DRA manager")
+
+			// Test recorded operations to ensure they match behavior of call.
+			recordedOperation := ""
+			var recordedAsError *bool
+			manager.recordOperation = func(operation string, isError bool, duration float64) {
+				recordedOperation = operation
+				recordedAsError = &isError
+			}
+
 			manager.initDRAPluginManager(backgroundCtx, getFakeNode, time.Second /* very short wiping delay for testing */)
 
 			plg := manager.GetWatcherHandler()
@@ -1040,8 +1062,11 @@ func TestUnprepareResources(t *testing.T) {
 			err = manager.UnprepareResources(backgroundCtx, test.pod)
 
 			assert.Equal(t, test.expectedUnprepareCalls, draServerInfo.server.unprepareResourceCalls.Load())
+			assert.Equal(t, "UnprepareResources", recordedOperation)
+			assert.NotNil(t, recordedAsError)
 
 			if test.expectedErrMsg != "" {
+				assert.True(t, *recordedAsError)
 				assert.Error(t, err)
 				if err != nil {
 					assert.ErrorContains(t, err, test.expectedErrMsg)
@@ -1050,6 +1075,7 @@ func TestUnprepareResources(t *testing.T) {
 			}
 
 			require.NoError(t, err)
+			assert.False(t, *recordedAsError)
 
 			if test.wantResourceSkipped {
 				if test.claimInfo != nil && len(test.claimInfo.PodUIDs) > 1 {
