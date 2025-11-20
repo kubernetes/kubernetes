@@ -125,9 +125,11 @@ type WorkloadSpec struct {
 	// The maximum number of pod groups is 8. This field is immutable.
 	//
 	// +required
-	// +k8s:required
 	// +listType=map
 	// +listMapKey=name
+	// +k8s:required
+	// +k8s:list-type=map
+	// +k8s:list-type-key=name
 	// +k8s:maxItems=8
 	PodGroups []PodGroup `json:"podGroups" protobuf:"bytes,2,rep,name=podGroups"`
 }
@@ -211,5 +213,6 @@ type GangSchedulingPolicy struct {
 	//
 	// +required
 	// +k8s:required
+	// +k8s:minimum=0
 	MinCount int32 `json:"minCount" protobuf:"varint,1,opt,name=minCount"`
 }
