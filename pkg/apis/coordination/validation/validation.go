@@ -49,13 +49,11 @@ func ValidateLeaseUpdate(lease, oldLease *coordination.Lease) field.ErrorList {
 func ValidateLeaseSpec(spec *coordination.LeaseSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	if spec.LeaseDurationSeconds != nil && *spec.LeaseDurationSeconds <= 0 {
-		fld := fldPath.Child("leaseDurationSeconds")
-		allErrs = append(allErrs, field.Invalid(fld, spec.LeaseDurationSeconds, "must be greater than 0"))
+	if spec.LeaseDurationSeconds != nil {
+		allErrs = append(allErrs, ValidatePositiveInt32(*spec.LeaseDurationSeconds, fldPath.Child("leaseDurationSeconds")).MarkCoveredByDeclarative()...)
 	}
-	if spec.LeaseTransitions != nil && *spec.LeaseTransitions < 0 {
-		fld := fldPath.Child("leaseTransitions")
-		allErrs = append(allErrs, field.Invalid(fld, spec.LeaseTransitions, "must be greater than or equal to 0"))
+	if spec.LeaseTransitions != nil {
+		allErrs = append(allErrs, ValidateNonnegativeInt32(*spec.LeaseTransitions, fldPath.Child("leaseTransitions")).MarkCoveredByDeclarative()...)
 	}
 	if spec.Strategy != nil {
 		allErrs = append(allErrs, ValidateCoordinatedLeaseStrategy(*spec.Strategy, fldPath.Child("strategy"))...)
@@ -163,4 +161,23 @@ func ValidateCoordinatedLeaseStrategy(strategy coordination.CoordinatedLeaseStra
 		}
 	}
 	return allErrs
+}
+
+// Helper function that creates errors with Origin already set
+func ValidatePositiveInt32(value int32, fldPath *field.Path) field.ErrorList {
+	if value < 1 {
+		return field.ErrorList{
+			field.Invalid(fldPath, value, "must be greater than or equal to 1").WithOrigin("minimum"),
+		}
+	}
+	return field.ErrorList{}
+}
+
+func ValidateNonnegativeInt32(value int32, fldPath *field.Path) field.ErrorList {
+	if value < 0 {
+		return field.ErrorList{
+			field.Invalid(fldPath, value, "must be greater than or equal to 0").WithOrigin("minimum"),
+		}
+	}
+	return field.ErrorList{}
 }
