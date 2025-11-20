@@ -140,6 +140,8 @@ func (dsc *DaemonSetsController) rollingUpdate(ctx context.Context, ds *apps.Dae
 	// * A node with an unavailable old pod is a candidate for immediate new pod creation
 	// * An old available pod is deleted if a new pod is available
 	// * No more than maxSurge new pods are created for old available pods at any one time
+	// * When maxUnavailable is 0, we must wait for new pods to be ready and old pods deleted before
+	//   proceeding to the next node (one node at a time)
 	//
 	var oldPodsToDelete []string          // these pods are already updated or unavailable on sunsetted node
 	var shouldNotRunPodsToDelete []string // candidate pods to be deleted on sunsetted nodes
@@ -147,6 +149,7 @@ func (dsc *DaemonSetsController) rollingUpdate(ctx context.Context, ds *apps.Dae
 	var allowedNewNodes []string
 	var numSurge int
 	var numAvailable int
+	var nodesWithPendingUpdates int // count of nodes with both old and new pods where new pod is not ready
 
 	for nodeName, pods := range nodeToDaemonPods {
 		newPod, oldPod, ok := findUpdatedPodsOnNode(ds, pods, hash)
@@ -216,6 +219,10 @@ func (dsc *DaemonSetsController) rollingUpdate(ctx context.Context, ds *apps.Dae
 			if !podutil.IsPodAvailable(newPod, ds.Spec.MinReadySeconds, metav1.Time{Time: now}) {
 				// we're waiting to go available here
 				numSurge++
+				// Track nodes with pending updates (both old and new pods, new pod not ready)
+				// This is used to enforce maxUnavailable = 0 constraint
+				// oldPod is guaranteed to be non-nil in this default case
+				nodesWithPendingUpdates++
 				continue
 			}
 			// we're available, delete the old pod
@@ -225,8 +232,13 @@ func (dsc *DaemonSetsController) rollingUpdate(ctx context.Context, ds *apps.Dae
 	}
 
 	// use any of the candidates we can, including the allowedNewNodes
-	logger.V(5).Info("DaemonSet allowing replacements", "daemonset", klog.KObj(ds), "replacements", len(allowedNewNodes), "maxSurge", maxSurge, "numSurge", numSurge, "candidates", len(candidateNewNodes))
+	logger.V(5).Info("DaemonSet allowing replacements", "daemonset", klog.KObj(ds), "replacements", len(allowedNewNodes), "maxSurge", maxSurge, "numSurge", numSurge, "candidates", len(candidateNewNodes), "nodesWithPendingUpdates", nodesWithPendingUpdates)
 	remainingSurge := maxSurge - numSurge
+
+	if maxUnavailable == 0 && nodesWithPendingUpdates > 0 {
+		logger.V(5).Info("DaemonSet has maxUnavailable=0 and nodes with pending updates, blocking new pod creation until updates complete", "daemonset", klog.KObj(ds), "nodesWithPendingUpdates", nodesWithPendingUpdates)
+		remainingSurge = 0
+	}
 
 	// With maxSurge, the application owner expects 100% availability.
 	// When the scheduling constraint change from node A to node B, we do not want the application to stay
@@ -254,7 +266,16 @@ func (dsc *DaemonSetsController) rollingUpdate(ctx context.Context, ds *apps.Dae
 	if max := len(candidateNewNodes); remainingSurge > max {
 		remainingSurge = max
 	}
-	newNodesToCreate := append(allowedNewNodes, candidateNewNodes[:remainingSurge]...)
+
+	var newNodesToCreate []string
+	if maxUnavailable == 0 && nodesWithPendingUpdates > 0 {
+		// Don't create any new pods until pending updates complete (new pod ready + old pod deleted)
+		// This ensures we never have more than 0 unavailable pods and enforces one-node-at-a-time updates
+		logger.V(5).Info("DaemonSet has maxUnavailable=0 and nodes with pending updates, blocking all new pod creation until updates complete", "daemonset", klog.KObj(ds), "nodesWithPendingUpdates", nodesWithPendingUpdates)
+		newNodesToCreate = nil
+	} else {
+		newNodesToCreate = append(allowedNewNodes, candidateNewNodes[:remainingSurge]...)
+	}
 
 	return dsc.syncNodes(ctx, ds, oldPodsToDelete, newNodesToCreate, hash)
 }
