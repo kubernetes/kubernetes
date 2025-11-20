@@ -453,7 +453,7 @@ func (c *csiMountMgr) TearDownAt(dir string) error {
 	// to the spec.
 	//
 	// Kubelet should only be responsible for removal of json data files it
-	// creates and parent directories.
+	// creates and their parent directories.
 	//
 	// However, some CSI plugins maybe buggy and don't adhere to the standard,
 	// so we still need to remove the target_path here if it's unmounted and
