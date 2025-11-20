@@ -218,6 +218,7 @@ API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,K
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,PodGCController
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,ReplicaSetController
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,ReplicationController
+API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,ResourceClaimController
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,ResourceQuotaController
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,SAController
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,ServiceController
@@ -251,6 +252,7 @@ API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,P
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,PodGCControllerConfiguration,TerminatedPodGCThreshold
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,ReplicaSetControllerConfiguration,ConcurrentRSSyncs
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,ReplicationControllerConfiguration,ConcurrentRCSyncs
+API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,ResourceClaimControllerConfiguration,ConcurrentSyncs
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,ResourceQuotaControllerConfiguration,ConcurrentResourceQuotaSyncs
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,ResourceQuotaControllerConfiguration,ResourceQuotaSyncPeriod
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,SAControllerConfiguration,ConcurrentSATokenSyncs
