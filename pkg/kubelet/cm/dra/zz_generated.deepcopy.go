@@ -25,6 +25,7 @@ package dra
 func (in *ClaimInfo) DeepCopyInto(out *ClaimInfo) {
 	*out = *in
 	in.ClaimInfoState.DeepCopyInto(&out.ClaimInfoState)
+	in.tombstoneTime.DeepCopyInto(&out.tombstoneTime)
 	return
 }
 
