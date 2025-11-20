@@ -66,3 +66,82 @@ func TestDefaultNodeIdentifier_NodeIdentity(t *testing.T) {
 		})
 	}
 }
+
+func TestDefaultNodeAssociater_AssociatedNode(t *testing.T) {
+	tests := []struct {
+		name           string
+		user           user.Info
+		expectNodeName string
+		expectIsNode   bool
+	}{
+		{
+			name:           "nil user",
+			user:           nil,
+			expectNodeName: "",
+			expectIsNode:   false,
+		},
+		{
+			name:           "node username without group",
+			user:           &user.DefaultInfo{Name: "system:node:foo"},
+			expectNodeName: "",
+			expectIsNode:   false,
+		},
+		{
+			name:           "node group without username",
+			user:           &user.DefaultInfo{Name: "foo", Groups: []string{"system:nodes"}},
+			expectNodeName: "",
+			expectIsNode:   false,
+		},
+		{
+			name:           "node group and username",
+			user:           &user.DefaultInfo{Name: "system:node:foo", Groups: []string{"system:nodes"}},
+			expectNodeName: "foo",
+			expectIsNode:   true,
+		},
+		{
+			name: "service account with node name",
+			user: &user.DefaultInfo{
+				Name:   "system:serviceaccount:kube-system:replicaset-controller",
+				Groups: []string{"system:serviceaccounts", "system:serviceaccounts:kube-system"},
+				Extra: map[string][]string{
+					"authentication.kubernetes.io/node-name": {"foo"},
+				},
+			},
+			expectNodeName: "foo",
+			expectIsNode:   true,
+		},
+		{
+			name: "service account with empty node name",
+			user: &user.DefaultInfo{
+				Name:   "system:serviceaccount:kube-system:replicaset-controller",
+				Groups: []string{"system:serviceaccounts", "system:serviceaccounts:kube-system"},
+				Extra: map[string][]string{
+					"authentication.kubernetes.io/node-name": {""},
+				},
+			},
+			expectNodeName: "",
+			expectIsNode:   false,
+		},
+		{
+			name: "service account with no node name",
+			user: &user.DefaultInfo{
+				Name:   "system:serviceaccount:kube-system:replicaset-controller",
+				Groups: []string{"system:serviceaccounts", "system:serviceaccounts:kube-system"},
+				Extra:  map[string][]string{},
+			},
+			expectNodeName: "",
+			expectIsNode:   false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			nodeName, isNode := NewDefaultNodeAssociater().AssociatedNode(tt.user)
+			if nodeName != tt.expectNodeName {
+				t.Errorf("DefaultNodeAssociater.AssociatedNode() got = %v, want %v", nodeName, tt.expectNodeName)
+			}
+			if isNode != tt.expectIsNode {
+				t.Errorf("DefaultNodeAssociater.AssociatedNode() got = %v, want %v", isNode, tt.expectIsNode)
+			}
+		})
+	}
+}
