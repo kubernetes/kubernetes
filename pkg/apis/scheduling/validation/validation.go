@@ -128,7 +128,7 @@ func validatePodGroup(podGroup *scheduling.PodGroup, fldPath *field.Path, existi
 		}
 	}
 	if existingPodGroups.Has(podGroup.Name) {
-		allErrs = append(allErrs, field.Duplicate(fldPath.Child("name"), podGroup.Name))
+		allErrs = append(allErrs, field.Duplicate(fldPath.Child("name"), podGroup.Name).MarkCoveredByDeclarative())
 	} else {
 		existingPodGroups.Insert(podGroup.Name)
 	}
@@ -149,10 +149,10 @@ func validatePodGroupPolicy(policy *scheduling.PodGroupPolicy, fldPath *field.Pa
 
 	switch {
 	case len(setFields) == 0:
-		allErrs = append(allErrs, field.Required(fldPath, "exactly one of `basic`, `gang` is required"))
+		allErrs = append(allErrs, field.Required(fldPath, "exactly one of `basic`, `gang` is required").MarkCoveredByDeclarative())
 	case len(setFields) > 1:
 		allErrs = append(allErrs, field.Invalid(fldPath, fmt.Sprintf("{%s}", strings.Join(setFields, ", ")),
-			"exactly one of `basic`, `gang` is required, but multiple fields are set"))
+			"exactly one of `basic`, `gang` is required, but multiple fields are set").MarkCoveredByDeclarative())
 	case policy.Basic != nil:
 		allErrs = append(allErrs, validatBasicSchedulingPolicy(policy.Basic, fldPath.Child("basic"))...)
 	case policy.Gang != nil:
@@ -176,8 +176,8 @@ func validateGangSchedulingPolicy(policy *scheduling.GangSchedulingPolicy, fldPa
 	var allErrs field.ErrorList
 	if policy.MinCount == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("minCount"), "").MarkCoveredByDeclarative())
-	} else {
-		allErrs = apivalidation.ValidatePositiveField(int64(policy.MinCount), fldPath.Child("minCount")).WithOrigin("minimum")
+	} else if policy.MinCount < 0 {
+		allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(policy.MinCount), fldPath.Child("minCount")).WithOrigin("minimum").MarkCoveredByDeclarative()...)
 	}
 	return allErrs
 }
