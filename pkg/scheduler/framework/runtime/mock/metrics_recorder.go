@@ -29,7 +29,7 @@ import (
 type MetricsRecorder struct {
 	mu sync.RWMutex
 
-	// pluginDurationRecords is used to store the records of calls and is used for verification
+	// pluginDurationRecords is used to store the records of calls and is used for verification.
 	pluginDurationRecords []PluginDurationRecord
 }
 
@@ -41,12 +41,12 @@ type PluginDurationRecord struct {
 	Value          float64
 }
 
-// NewMetricsRecorder creates a new MockMetricsRecorder
+// NewMetricsRecorder creates a new MockMetricsRecorder.
 func NewMetricsRecorder() *MetricsRecorder {
 	return &MetricsRecorder{}
 }
 
-// ObservePluginDurationAsync records the plugin duration observation
+// ObservePluginDurationAsync records the plugin duration observation.
 func (f *MetricsRecorder) ObservePluginDurationAsync(extensionPoint, pluginName, status string, value float64) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -71,7 +71,7 @@ func (f *MetricsRecorder) ObserveInFlightEventsAsync(eventLabel string, valueToA
 func (f *MetricsRecorder) FlushMetrics() {
 }
 
-// GetPluginDurationRecords returns a copy of the plugin duration records
+// GetPluginDurationRecords returns a copy of the plugin duration records.
 func (f *MetricsRecorder) GetPluginDurationRecords() []PluginDurationRecord {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
