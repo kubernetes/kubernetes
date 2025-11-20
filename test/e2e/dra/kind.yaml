@@ -78,3 +78,4 @@ kubeadmConfigPatches:
 #    --config <(cat test/e2e/dra/kind.yaml; echo "  <some feature>: true")
 featureGates:
   DynamicResourceAllocation: true
+  ResourceHealthStatus: true

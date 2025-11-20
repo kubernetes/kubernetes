@@ -5468,6 +5468,12 @@ message ResourceHealth {
   //
   // In future we may want to introduce the PermanentlyUnhealthy Status.
   optional string health = 2;
+
+  // Message provides human-readable context for Health (e.g. "ECC error count exceeded threshold").
+  // This field is populated by the kubelet when ResourceHealthStatus is enabled.
+  // +optional
+  // +k8s:maxLength=1024
+  optional string message = 6;
 }
 
 // ResourceQuota sets aggregate quota restrictions enforced per namespace
