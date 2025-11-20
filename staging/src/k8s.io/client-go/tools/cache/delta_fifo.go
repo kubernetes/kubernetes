@@ -58,6 +58,12 @@ type DeltaFIFOOptions struct {
 
 	// If set, log output will go to this logger instead of klog.Background().
 	Logger *klog.Logger
+
+	Identifier *Identifier
+
+	// If set, metricsProvider will be used to create metrics for the DeltaFIFO.
+	// This allows consumers to provide their own metrics implementation.
+	MetricsProvider FIFOMetricsProvider
 }
 
 // DeltaFIFO is like FIFO, but differs in two ways.  One is that the
@@ -143,6 +149,12 @@ type DeltaFIFO struct {
 	// logger is a per-instance logger. This gets chosen when constructing
 	// the instance, with klog.Background() as default.
 	logger klog.Logger
+
+	// metrics tracks basic metric information about the DeltaFIFO.
+	// It's used to expose queue length and latency metrics.
+	metrics *fifoMetrics
+
+	identfier *Identifier
 }
 
 // TransformFunc allows for transforming an object before it will be processed.
@@ -261,6 +273,8 @@ func NewDeltaFIFOWithOptions(opts DeltaFIFOOptions) *DeltaFIFO {
 		emitDeltaTypeReplaced: opts.EmitDeltaTypeReplaced,
 		transformer:           opts.Transformer,
 		logger:                klog.Background(),
+		identfier:             opts.Identifier,
+		metrics:               newFIFOMetrics(opts.Identifier, opts.MetricsProvider),
 	}
 	if opts.Logger != nil {
 		f.logger = *opts.Logger
@@ -323,18 +337,30 @@ func (f *DeltaFIFO) hasSynced_locked() bool {
 // Add inserts an item, and puts it in the queue. The item is only enqueued
 // if it doesn't already exist in the set.
 func (f *DeltaFIFO) Add(obj interface{}) error {
+	var size int
+	defer func() {
+		f.metrics.numberOfQueuedItem.Set(float64(size))
+	}()
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	f.populated = true
-	return f.queueActionLocked(Added, obj)
+	err := f.queueActionLocked(Added, obj)
+	size = len(f.queue)
+	return err
 }
 
 // Update is just like Add, but makes an Updated Delta.
 func (f *DeltaFIFO) Update(obj interface{}) error {
+	var size int
+	defer func() {
+		f.metrics.numberOfQueuedItem.Set(float64(size))
+	}()
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	f.populated = true
-	return f.queueActionLocked(Updated, obj)
+	err := f.queueActionLocked(Updated, obj)
+	size = len(f.queue)
+	return err
 }
 
 // Delete is just like Add, but makes a Deleted Delta. If the given
@@ -343,12 +369,22 @@ func (f *DeltaFIFO) Update(obj interface{}) error {
 // method `f.knownObjects`, if not nil, provides (via GetByKey)
 // _additional_ objects that are considered to already exist.
 func (f *DeltaFIFO) Delete(obj interface{}) error {
+	var size int
+	defer func() {
+		f.metrics.numberOfQueuedItem.Set(float64(size))
+	}()
 	id, err := f.KeyOf(obj)
 	if err != nil {
 		return KeyError{obj, err}
 	}
 	f.lock.Lock()
 	defer f.lock.Unlock()
+	err = f.deleteLocked(id, obj)
+	size = len(f.queue)
+	return err
+}
+
+func (f *DeltaFIFO) deleteLocked(id string, obj interface{}) error {
 	f.populated = true
 	if f.knownObjects == nil {
 		if _, exists := f.items[id]; !exists {
@@ -496,8 +532,18 @@ func (f *DeltaFIFO) IsClosed() bool {
 // Pop returns a 'Deltas', which has a complete list of all the things
 // that happened to the object (deltas) while it was sitting in the queue.
 func (f *DeltaFIFO) Pop(process PopProcessFunc) (interface{}, error) {
+	var size int
+	defer func() {
+		f.metrics.numberOfQueuedItem.Set(float64(size))
+	}()
 	f.lock.Lock()
 	defer f.lock.Unlock()
+	delta, err := f.popLocked(process)
+	size = len(f.queue)
+	return delta, err
+}
+
+func (f *DeltaFIFO) popLocked(process PopProcessFunc) (interface{}, error) {
 	for {
 		for len(f.queue) == 0 {
 			// When the queue is empty, invocation of Pop() is blocked until new item is enqueued.
@@ -530,7 +576,8 @@ func (f *DeltaFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 		// https://github.com/kubernetes/kubernetes/issues/103789
 		if depth > 10 {
 			trace := utiltrace.New("DeltaFIFO Pop Process",
-				utiltrace.Field{Key: "ID", Value: id},
+				utiltrace.Field{Key: "Name", Value: f.identfier.Name},
+				utiltrace.Field{Key: "ItemType", Value: f.identfier.ItemType},
 				utiltrace.Field{Key: "Depth", Value: depth},
 				utiltrace.Field{Key: "Reason", Value: "slow event handlers blocking the queue"})
 			defer trace.LogIfLong(100 * time.Millisecond)
@@ -552,8 +599,18 @@ func (f *DeltaFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 // the one present in the last delta in `f.items`. If there is no delta for K
 // in `f.items`, it is the object in `f.knownObjects`
 func (f *DeltaFIFO) Replace(list []interface{}, _ string) error {
+	var size int
+	defer func() {
+		f.metrics.numberOfQueuedItem.Set(float64(size))
+	}()
 	f.lock.Lock()
 	defer f.lock.Unlock()
+	err := f.replaceLocked(list)
+	size = len(f.queue)
+	return err
+}
+
+func (f *DeltaFIFO) replaceLocked(list []interface{}) error {
 	keys := make(sets.Set[string], len(list))
 
 	// keep backwards compat for old clients
@@ -636,8 +693,17 @@ func (f *DeltaFIFO) Replace(list []interface{}, _ string) error {
 // `f.knownObjects` whose key is not already queued for processing.
 // If `f.knownObjects` is `nil` then Resync does nothing.
 func (f *DeltaFIFO) Resync() error {
+	var size int
+	defer func() {
+		f.metrics.numberOfQueuedItem.Set(float64(size))
+	}()
 	f.lock.Lock()
 	defer f.lock.Unlock()
+	err := f.resyncLocked()
+	size = len(f.queue)
+	return err
+}
+func (f *DeltaFIFO) resyncLocked() error {
 
 	if f.knownObjects == nil {
 		return nil

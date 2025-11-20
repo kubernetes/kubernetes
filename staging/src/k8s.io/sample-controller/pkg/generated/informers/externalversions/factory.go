@@ -53,6 +53,8 @@ type sharedInformerFactory struct {
 	// shuttingDown is true when Shutdown has been called. It may still be running
 	// because it needs to wait for goroutines.
 	shuttingDown bool
+	// name is used for logging and monitoring.
+	name string
 }
 
 // WithCustomResyncConfig sets a custom resync period for the specified informer types.
@@ -77,6 +79,14 @@ func WithTweakListOptions(tweakListOptions internalinterfaces.TweakListOptionsFu
 func WithNamespace(namespace string) SharedInformerOption {
 	return func(factory *sharedInformerFactory) *sharedInformerFactory {
 		factory.namespace = namespace
+		return factory
+	}
+}
+
+// WithName sets the name of the SharedInformerFactory used for logging and monitoring.
+func WithName(name string) SharedInformerOption {
+	return func(factory *sharedInformerFactory) *sharedInformerFactory {
+		factory.name = name
 		return factory
 	}
 }
@@ -194,6 +204,9 @@ func (f *sharedInformerFactory) InformerFor(obj runtime.Object, newFunc internal
 	}
 
 	informer = newFunc(f.client, resyncPeriod)
+	if f.name != "" {
+		informer.SetName(f.name)
+	}
 	informer.SetTransform(f.transform)
 	f.informers[informerType] = informer
 

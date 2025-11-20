@@ -429,6 +429,8 @@ type InformerOptions struct {
 	// for them.
 	// Optional - if unset no additional transforming is happening.
 	Transform TransformFunc
+
+	Identifier *Identifier
 }
 
 // NewInformerWithOptions returns a Store and a controller for populating the store
@@ -704,6 +706,7 @@ func processDeltasInBatch(
 //   - clientState is the store you want to populate
 //   - options contain the options to configure the controller
 func newInformer(clientState Store, options InformerOptions) Controller {
+	options.Identifier = options.Identifier.WithObjectType(options.ObjectType)
 	// This will hold incoming changes. Note how we pass clientState in as a
 	// KeyLister, that way resync operations will result in the correct set
 	// of update/delete deltas.
@@ -714,12 +717,14 @@ func newInformer(clientState Store, options InformerOptions) Controller {
 			KeyFunction:  MetaNamespaceKeyFunc,
 			KnownObjects: clientState,
 			Transformer:  options.Transform,
+			Identifier:   options.Identifier,
 		})
 	} else {
 		fifo = NewDeltaFIFOWithOptions(DeltaFIFOOptions{
 			KnownObjects:          clientState,
 			EmitDeltaTypeReplaced: true,
 			Transformer:           options.Transform,
+			Identifier:            options.Identifier,
 		})
 	}
 

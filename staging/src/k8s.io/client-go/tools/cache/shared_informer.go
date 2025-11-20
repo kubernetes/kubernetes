@@ -230,6 +230,8 @@ type SharedInformer interface {
 	// Please see the comment on TransformFunc for more details.
 	SetTransform(handler TransformFunc) error
 
+	SetName(string) error
+
 	// IsStopped reports whether the informer has already been stopped.
 	// Adding event handlers to already stopped informers is not possible.
 	// An informer already stopped will never be started again.
@@ -449,6 +451,8 @@ type sharedIndexInformer struct {
 	watchErrorHandler WatchErrorHandlerWithContext
 
 	transform TransformFunc
+
+	name string
 }
 
 // dummyController hides the fact that a SharedInformer is different from a dedicated one
@@ -522,6 +526,18 @@ func (s *sharedIndexInformer) SetTransform(handler TransformFunc) error {
 	return nil
 }
 
+func (s *sharedIndexInformer) SetName(name string) error {
+	s.startedLock.Lock()
+	defer s.startedLock.Unlock()
+
+	if s.started {
+		return fmt.Errorf("informer has already started")
+	}
+
+	s.name = name
+	return nil
+}
+
 func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 	s.RunWithContext(wait.ContextForChannel(stopCh))
 }
@@ -534,6 +550,7 @@ func (s *sharedIndexInformer) RunWithContext(ctx context.Context) {
 		logger.Info("Warning: the sharedIndexInformer has started, run more than once is not allowed")
 		return
 	}
+	identifier := NewIdentifier(s.name, s.objectType)
 
 	func() {
 		s.startedLock.Lock()
@@ -545,12 +562,14 @@ func (s *sharedIndexInformer) RunWithContext(ctx context.Context) {
 				KeyFunction:  MetaNamespaceKeyFunc,
 				KnownObjects: s.indexer,
 				Transformer:  s.transform,
+				Identifier:   identifier,
 			})
 		} else {
 			fifo = NewDeltaFIFOWithOptions(DeltaFIFOOptions{
 				KnownObjects:          s.indexer,
 				EmitDeltaTypeReplaced: true,
 				Transformer:           s.transform,
+				Identifier:            identifier,
 			})
 		}
 
