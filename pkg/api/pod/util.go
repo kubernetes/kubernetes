@@ -430,7 +430,8 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		AllowContainerRestartPolicyRules:                    utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules),
 		AllowUserNamespacesWithVolumeDevices:                false,
 		// This also allows restart rules on sidecar containers.
-		AllowRestartAllContainers: utilfeature.DefaultFeatureGate.Enabled(features.RestartAllContainersOnContainerExits),
+		AllowRestartAllContainers:  utilfeature.DefaultFeatureGate.Enabled(features.RestartAllContainersOnContainerExits),
+		AllowImageVolumeWithDigest: utilfeature.DefaultFeatureGate.Enabled(features.ImageVolumeWithDigest),
 	}
 
 	// If old spec uses relaxed validation or enabled the RelaxedEnvironmentVariableValidation feature gate,
@@ -1084,6 +1085,11 @@ func dropDisabledPodStatusFields(podStatus, oldPodStatus *api.PodStatus, podSpec
 			podStatus.Conditions[i].ObservedGeneration = 0
 		}
 	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ImageVolumeWithDigest) && !imageVolumeWithDigestInUse(oldPodStatus) {
+		dropImageVolumeWithDigest(podStatus)
+	}
+
 }
 
 // dropDisabledDynamicResourceAllocationFields removes pod claim references from
@@ -1870,4 +1876,60 @@ func restartAllContainersActionInUse(oldPodSpec *api.PodSpec) bool {
 		}
 	}
 	return false
+}
+
+func imageVolumeWithDigestInUse(oldPodStatus *api.PodStatus) bool {
+	if oldPodStatus == nil {
+		return false
+	}
+
+	for _, containerStatus := range oldPodStatus.ContainerStatuses {
+		for _, volumeMount := range containerStatus.VolumeMounts {
+			if volumeMount.VolumeStatus.Image != nil {
+				return true
+			}
+		}
+	}
+
+	for _, containerStatus := range oldPodStatus.InitContainerStatuses {
+		for _, volumeMount := range containerStatus.VolumeMounts {
+			if volumeMount.VolumeStatus.Image != nil {
+				return true
+			}
+		}
+	}
+
+	for _, containerStatus := range oldPodStatus.EphemeralContainerStatuses {
+		for _, volumeMount := range containerStatus.VolumeMounts {
+			if volumeMount.VolumeStatus.Image != nil {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func dropImageVolumeWithDigest(podStatus *api.PodStatus) {
+	if podStatus == nil {
+		return
+	}
+
+	for i := range podStatus.ContainerStatuses {
+		for j := range podStatus.ContainerStatuses[i].VolumeMounts {
+			podStatus.ContainerStatuses[i].VolumeMounts[j].VolumeStatus.Image = nil
+		}
+	}
+
+	for i := range podStatus.InitContainerStatuses {
+		for j := range podStatus.InitContainerStatuses[i].VolumeMounts {
+			podStatus.InitContainerStatuses[i].VolumeMounts[j].VolumeStatus.Image = nil
+		}
+	}
+
+	for i := range podStatus.EphemeralContainerStatuses {
+		for j := range podStatus.EphemeralContainerStatuses[i].VolumeMounts {
+			podStatus.EphemeralContainerStatuses[i].VolumeMounts[j].VolumeStatus.Image = nil
+		}
+	}
 }

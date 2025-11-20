@@ -2275,6 +2275,16 @@ message ImageVolumeSource {
   optional string pullPolicy = 2;
 }
 
+// ImageVolumeStatus represents the image-based volume status.
+message ImageVolumeStatus {
+  // ImageRef is the digest of the image used for this volume.
+  // It should have a value that's similar to the pod's status.containerStatuses[i].imageID.
+  // The ImageRef length should not exceed 256 characters.
+  // +kubebuilder:validation:MaxLength=256
+  // +required
+  optional string imageRef = 1;
+}
+
 // Maps a string key to a path within a volume.
 message KeyToPath {
   // key is the key to project.
@@ -6885,6 +6895,11 @@ message VolumeMountStatus {
   // depending on the mount result.
   // +optional
   optional string recursiveReadOnly = 4;
+
+  // volumeStatus represents volume-type-specific status about the mounted
+  // volume.
+  // +optional
+  optional VolumeStatus volumeStatus = 5;
 }
 
 // VolumeNodeAffinity defines constraints that limit what nodes this volume can be accessed from.
@@ -7190,6 +7205,15 @@ message VolumeSource {
   // +featureGate=ImageVolume
   // +optional
   optional ImageVolumeSource image = 30;
+}
+
+// VolumeStatus represents the status of a mounted volume.
+// At most one of its members must be specified.
+message VolumeStatus {
+  // image represents an OCI object (a container image or artifact) pulled and mounted on the kubelet's host machine.
+  // +featureGate=ImageVolumeWithDigest
+  // +optional
+  optional ImageVolumeStatus image = 1;
 }
 
 // Represents a vSphere volume resource.

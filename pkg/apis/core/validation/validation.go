@@ -4493,6 +4493,8 @@ type PodValidationOptions struct {
 	AllowUserNamespacesHostNetworkSupport bool
 	// Allow containers to have restart policy rule with RestartAllContainers action, applicable for init, sidecar, and regular containers.
 	AllowRestartAllContainers bool
+	// Allows container statuses to contain image volume digest
+	AllowImageVolumeWithDigest bool
 }
 
 // validatePodMetadataAndSpec tests if required fields in the pod.metadata and pod.spec are set,
@@ -6062,6 +6064,27 @@ func ValidatePodStatusUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions
 	allErrs = append(allErrs, validateContainerStatusAllocatedResourcesStatus(newPod.Status.InitContainerStatuses, fldPath.Child("initContainerStatuses"), newPod.Spec.InitContainers)...)
 	// ephemeral containers are not allowed to have resources allocated
 	allErrs = append(allErrs, validateContainerStatusNoAllocatedResourcesStatus(newPod.Status.EphemeralContainerStatuses, fldPath.Child("ephemeralContainerStatuses"))...)
+
+	if opts.AllowImageVolumeWithDigest {
+		for i, containerStatus := range newPod.Status.ContainerStatuses {
+			for j, volumeMountStatus := range containerStatus.VolumeMounts {
+				validatedField := fldPath.Child("containerStatuses").Index(i).Child("volumeMounts").Index(j).Child("volumeStatus")
+				allErrs = append(allErrs, validateVolumeStatus(volumeMountStatus.VolumeStatus, validatedField)...)
+			}
+		}
+		for i, containerStatus := range newPod.Status.InitContainerStatuses {
+			for j, volumeMountStatus := range containerStatus.VolumeMounts {
+				validatedField := fldPath.Child("initContainerStatuses").Index(i).Child("volumeMounts").Index(j).Child("volumeStatus")
+				allErrs = append(allErrs, validateVolumeStatus(volumeMountStatus.VolumeStatus, validatedField)...)
+			}
+		}
+		for i, containerStatus := range newPod.Status.EphemeralContainerStatuses {
+			for j, volumeMountStatus := range containerStatus.VolumeMounts {
+				validatedField := fldPath.Child("ephemeralContainerStatuses").Index(i).Child("volumeMounts").Index(j).Child("volumeStatus")
+				allErrs = append(allErrs, validateVolumeStatus(volumeMountStatus.VolumeStatus, validatedField)...)
+			}
+		}
+	}
 
 	return allErrs
 }
@@ -9597,4 +9620,41 @@ func validateWorkloadReference(workloadRef *core.WorkloadReference, fldPath *fie
 		}
 	}
 	return allErrs
+}
+
+func validateImageVolumeStatus(imageVolumeStatus *core.ImageVolumeStatus, fldPath *field.Path) field.ErrorList {
+	allErrors := field.ErrorList{}
+
+	if imageVolumeStatus == nil {
+		return allErrors
+	}
+
+	if imageVolumeStatus.ImageRef == "" {
+		allErrors = append(allErrors, field.Required(fldPath.Child("imageRef"), "imageRef must not be empty"))
+	}
+
+	const maxImageRefLen = 256
+	if len(imageVolumeStatus.ImageRef) > maxImageRefLen {
+		allErrors = append(allErrors, field.TooLong(fldPath.Child("imageRef"), imageVolumeStatus.ImageRef, maxImageRefLen))
+	}
+
+	return allErrors
+}
+
+// validateVolumeStatus returns an error if the given struct has more than 1 populated field.
+func validateVolumeStatus(volumeStatus core.VolumeStatus, fldPath *field.Path) field.ErrorList {
+	allErrors := field.ErrorList{}
+
+	numStatuses := 0
+
+	if volumeStatus.Image != nil {
+		numStatuses++
+		allErrors = append(allErrors, validateImageVolumeStatus(volumeStatus.Image, fldPath.Child("imageVolumeStatus"))...)
+	}
+
+	if numStatuses > 1 {
+		allErrors = append(allErrors, field.Forbidden(fldPath, "may not specify more than 1 volume type"))
+	}
+
+	return allErrors
 }
