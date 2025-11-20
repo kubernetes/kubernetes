@@ -1665,13 +1665,18 @@ func createHealthTestPodAndClaim(ctx context.Context, f *framework.Framework, dr
 	})
 
 	// Update the Pod's status to include the ResourceClaimStatuses, mimicking the scheduler.
-	podToUpdate, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, createdPod.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err)
-	podToUpdate.Status.ResourceClaimStatuses = []v1.PodResourceClaimStatus{
-		{Name: claimName, ResourceClaimName: &claimName},
-	}
-	_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).UpdateStatus(ctx, podToUpdate, metav1.UpdateOptions{})
-	framework.ExpectNoError(err, "failed to update Pod status with ResourceClaimStatuses")
+	// Use Eventually to handle potential conflicts from concurrent updates by kubelet or other controllers.
+	gomega.Eventually(func(ctx context.Context) error {
+		podToUpdate, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, createdPod.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		podToUpdate.Status.ResourceClaimStatuses = []v1.PodResourceClaimStatus{
+			{Name: claimName, ResourceClaimName: &claimName},
+		}
+		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).UpdateStatus(ctx, podToUpdate, metav1.UpdateOptions{})
+		return err
+	}).WithContext(ctx).WithTimeout(10*time.Second).WithPolling(500*time.Millisecond).Should(gomega.Succeed(), "failed to update Pod status with ResourceClaimStatuses")
 
 	ginkgo.By(fmt.Sprintf("Allocating claim %q to pod %q with its real UID", claimName, podName))
 	// Get the created claim to ensure the latest version before updating.
