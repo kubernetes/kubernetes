@@ -18,9 +18,7 @@ package nodeports
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"strconv"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -165,9 +163,9 @@ func (pl *NodePorts) Filter(ctx context.Context, cycleState fwk.CycleState, pod 
 		return fwk.AsStatus(err)
 	}
 
-	portFits, portConflictErrMessage := fitsPorts(wantPorts, nodeInfo.GetUsedPorts())
+	portFits, portConflictErr := fitsPorts(wantPorts, nodeInfo.GetUsedPorts())
 	if !portFits {
-		return fwk.NewStatus(fwk.Unschedulable, portConflictErrMessage)
+		return fwk.NewStatus(fwk.Unschedulable, portConflictErr.Error())
 	}
 
 	return nil
@@ -176,18 +174,18 @@ func (pl *NodePorts) Filter(ctx context.Context, cycleState fwk.CycleState, pod 
 // Fits checks if the pod has any ports conflicting with nodeInfo's ports.
 // It returns true if there are no conflicts (which means that pod fits the node), otherwise false with the errMessage.
 func Fits(pod *v1.Pod, nodeInfo fwk.NodeInfo) (fits bool, err error) {
-	portFits, portConflictErrMessage := fitsPorts(util.GetHostPorts(pod), nodeInfo.GetUsedPorts())
-	return portFits, errors.New(portConflictErrMessage)
+	portFits, portConflictErr := fitsPorts(util.GetHostPorts(pod), nodeInfo.GetUsedPorts())
+	return portFits, portConflictErr
 }
 
 func fitsPorts(wantPorts []v1.ContainerPort, portsInUse fwk.HostPortInfo) (bool, error) {
 	// try to see whether portsInUse and wantPorts will conflict or not
 	for _, cp := range wantPorts {
 		if portsInUse.CheckConflict(cp.HostIP, string(cp.Protocol), cp.HostPort) {
-			return false, fmt.Errorf("node(s) port conflict for the requested pod ports (%s/%s:%d)", portStr, cp.Protocol, cp.HostIP, cp.HostPort)
+			return false, fmt.Errorf("node(s) port conflict for the requested pod ports (%s/%s:%d)", cp.Protocol, cp.HostIP, cp.HostPort)
 		}
 	}
-	return true, ""
+	return true, nil
 }
 
 // New initializes a new plugin and returns it.
