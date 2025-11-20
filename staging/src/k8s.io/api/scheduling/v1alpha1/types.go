@@ -118,6 +118,7 @@ type WorkloadSpec struct {
 	// When set, it cannot be changed.
 	//
 	// +optional
+	// +k8s:optional
 	ControllerRef *TypedLocalObjectReference `json:"controllerRef,omitempty" protobuf:"bytes,1,opt,name=controllerRef"`
 
 	// PodGroups is the list of pod groups that make up the Workload.
@@ -126,6 +127,10 @@ type WorkloadSpec struct {
 	// +required
 	// +listType=map
 	// +listMapKey=name
+	// +k8s:required
+	// +k8s:list-type=map
+	// +k8s:list-type-key=name
+	// +k8s:maxItems=8
 	PodGroups []PodGroup `json:"podGroups" protobuf:"bytes,2,rep,name=podGroups"`
 }
 
@@ -137,16 +142,22 @@ type TypedLocalObjectReference struct {
 	// It must be a DNS subdomain.
 	//
 	// +optional
+	// +k8s:optional
+	// +k8s:format=k8s-long-name
 	APIGroup string `json:"apiGroup,omitempty" protobuf:"bytes,1,opt,name=apiGroup"`
 	// Kind is the type of resource being referenced.
 	// It must be a path segment name.
 	//
 	// +required
+	// +k8s:required
+	// +k8s:format=k8s-path-segment
 	Kind string `json:"kind" protobuf:"bytes,2,opt,name=kind"`
 	// Name is the name of resource being referenced.
 	// It must be a path segment name.
 	//
 	// +required
+	// +k8s:required
+	// +k8s:format=k8s-path-segment
 	Name string `json:"name" protobuf:"bytes,3,opt,name=name"`
 }
 
@@ -156,6 +167,8 @@ type PodGroup struct {
 	// It must be a DNS label. This field is immutable.
 	//
 	// +required
+	// +k8s:required
+	// +k8s:format=k8s-short-name
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 
 	// Policy defines the scheduling policy for this PodGroup.
@@ -170,6 +183,7 @@ type PodGroupPolicy struct {
 	// standard Kubernetes scheduling behavior.
 	//
 	// +optional
+	// +k8s:optional
 	// +oneOf=PolicySelection
 	Basic *BasicSchedulingPolicy `json:"basic,omitempty" protobuf:"bytes,2,opt,name=basic"`
 
@@ -177,6 +191,7 @@ type PodGroupPolicy struct {
 	// all-or-nothing semantics.
 	//
 	// +optional
+	// +k8s:optional
 	// +oneOf=PolicySelection
 	Gang *GangSchedulingPolicy `json:"gang,omitempty" protobuf:"bytes,3,opt,name=gang"`
 }
@@ -197,5 +212,7 @@ type GangSchedulingPolicy struct {
 	// It must be a positive integer.
 	//
 	// +required
+	// +k8s:required
+	// +k8s:minimum=0
 	MinCount int32 `json:"minCount" protobuf:"varint,1,opt,name=minCount"`
 }

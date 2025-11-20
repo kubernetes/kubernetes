@@ -80,9 +80,9 @@ func validateWorkloadSpec(spec *scheduling.WorkloadSpec, fldPath *field.Path) fi
 	existingPodGroups := sets.New[string]()
 	podGroupsPath := fldPath.Child("podGroups")
 	if len(spec.PodGroups) == 0 {
-		allErrs = append(allErrs, field.Required(podGroupsPath, "must have at least one item"))
+		allErrs = append(allErrs, field.Required(podGroupsPath, "must have at least one item").MarkCoveredByDeclarative())
 	} else if len(spec.PodGroups) > scheduling.WorkloadMaxPodGroups {
-		allErrs = append(allErrs, field.TooMany(fldPath.Child("podGroups"), len(spec.PodGroups), scheduling.WorkloadMaxPodGroups))
+		allErrs = append(allErrs, field.TooMany(podGroupsPath, len(spec.PodGroups), scheduling.WorkloadMaxPodGroups).WithOrigin("maxItems").MarkCoveredByDeclarative())
 	} else {
 		for i := range spec.PodGroups {
 			allErrs = append(allErrs, validatePodGroup(&spec.PodGroups[i], podGroupsPath.Index(i), existingPodGroups)...)
@@ -95,21 +95,21 @@ func validateControllerRef(ref *scheduling.TypedLocalObjectReference, fldPath *f
 	var allErrs = field.ErrorList{}
 	if ref.APIGroup != "" {
 		for _, msg := range validation.IsDNS1123Subdomain(ref.APIGroup) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("apiGroup"), ref.APIGroup, msg))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("apiGroup"), ref.APIGroup, msg).WithOrigin("format=k8s-long-name").MarkCoveredByDeclarative())
 		}
 	}
 	if ref.Kind == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("kind"), ""))
+		allErrs = append(allErrs, field.Required(fldPath.Child("kind"), "").MarkCoveredByDeclarative())
 	} else {
 		for _, msg := range pathvalidation.IsValidPathSegmentName(ref.Kind) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("kind"), ref.Kind, msg))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("kind"), ref.Kind, msg).MarkCoveredByDeclarative())
 		}
 	}
 	if ref.Name == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "").MarkCoveredByDeclarative())
 	} else {
 		for _, msg := range pathvalidation.IsValidPathSegmentName(ref.Name) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), ref.Name, msg))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), ref.Name, msg).WithOrigin("format=k8s-short-name").MarkCoveredByDeclarative())
 		}
 	}
 	return allErrs
@@ -117,11 +117,18 @@ func validateControllerRef(ref *scheduling.TypedLocalObjectReference, fldPath *f
 
 func validatePodGroup(podGroup *scheduling.PodGroup, fldPath *field.Path, existingPodGroups sets.Set[string]) field.ErrorList {
 	var allErrs field.ErrorList
-	for _, detail := range apivalidation.ValidatePodGroupName(podGroup.Name, false) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), podGroup.Name, detail))
+	// To match the declarative validation behavior, we return Required for empty string.
+	// Declarative validation treats "" as "missing" via validate.RequiredValue()
+	// and returns early before checking the format constraint.
+	if podGroup.Name == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "").MarkCoveredByDeclarative())
+	} else {
+		for _, detail := range apivalidation.ValidatePodGroupName(podGroup.Name, false) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), podGroup.Name, detail).WithOrigin("format=k8s-short-name").MarkCoveredByDeclarative())
+		}
 	}
 	if existingPodGroups.Has(podGroup.Name) {
-		allErrs = append(allErrs, field.Duplicate(fldPath.Child("name"), podGroup.Name))
+		allErrs = append(allErrs, field.Duplicate(fldPath.Child("name"), podGroup.Name).MarkCoveredByDeclarative())
 	} else {
 		existingPodGroups.Insert(podGroup.Name)
 	}
@@ -142,10 +149,10 @@ func validatePodGroupPolicy(policy *scheduling.PodGroupPolicy, fldPath *field.Pa
 
 	switch {
 	case len(setFields) == 0:
-		allErrs = append(allErrs, field.Required(fldPath, "exactly one of `basic`, `gang` is required"))
+		allErrs = append(allErrs, field.Required(fldPath, "exactly one of `basic`, `gang` is required").MarkCoveredByDeclarative())
 	case len(setFields) > 1:
 		allErrs = append(allErrs, field.Invalid(fldPath, fmt.Sprintf("{%s}", strings.Join(setFields, ", ")),
-			"exactly one of `basic`, `gang` is required, but multiple fields are set"))
+			"exactly one of `basic`, `gang` is required, but multiple fields are set").MarkCoveredByDeclarative())
 	case policy.Basic != nil:
 		allErrs = append(allErrs, validatBasicSchedulingPolicy(policy.Basic, fldPath.Child("basic"))...)
 	case policy.Gang != nil:
@@ -161,7 +168,17 @@ func validatBasicSchedulingPolicy(policy *scheduling.BasicSchedulingPolicy, fldP
 }
 
 func validateGangSchedulingPolicy(policy *scheduling.GangSchedulingPolicy, fldPath *field.Path) field.ErrorList {
-	allErrs := apivalidation.ValidatePositiveField(int64(policy.MinCount), fldPath.Child("minCount"))
+	// To match the declarative validation behavior, we return Required for 0.
+	// Declarative validation treats 0 as "missing" via validate.RequiredValue()
+	// and returns early before checking the minimum constraint.
+	// For non-zero values, declarative validation returns early without any validation,
+	// so we don't mark them as covered.
+	var allErrs field.ErrorList
+	if policy.MinCount == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("minCount"), "").MarkCoveredByDeclarative())
+	} else if policy.MinCount < 0 {
+		allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(policy.MinCount), fldPath.Child("minCount")).WithOrigin("minimum").MarkCoveredByDeclarative()...)
+	}
 	return allErrs
 }
 
@@ -176,8 +193,8 @@ func ValidateWorkloadUpdate(workload, oldWorkload *scheduling.Workload) field.Er
 func validateWorkloadSpecUpdate(spec, oldSpec *scheduling.WorkloadSpec, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if oldSpec.ControllerRef != nil {
-		allErrs = apimachineryvalidation.ValidateImmutableField(spec.ControllerRef, oldSpec.ControllerRef, field.NewPath("controllerRef"))
+		allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(spec.ControllerRef, oldSpec.ControllerRef, fldPath.Child("controllerRef"))...)
 	}
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.PodGroups, oldSpec.PodGroups, field.NewPath("podGroups"))...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.PodGroups, oldSpec.PodGroups, fldPath.Child("podGroups"))...)
 	return allErrs
 }
