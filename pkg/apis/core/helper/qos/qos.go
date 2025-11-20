@@ -19,18 +19,13 @@ limitations under the License.
 package qos
 
 import (
-	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 )
 
-var supportedQoSComputeResources = sets.NewString(string(core.ResourceCPU), string(core.ResourceMemory))
-
-func isSupportedQoSComputeResource(name core.ResourceName) bool {
-	return supportedQoSComputeResources.Has(string(name))
-}
+var supportedQoSComputeResources = sets.New(core.ResourceCPU, core.ResourceMemory)
 
 // GetPodQOS returns the QoS class of a pod persisted in the PodStatus.QOSClass field.
 // If PodStatus.QOSClass is empty, it returns value of ComputePodQOS() which evaluates pod's QoS class.
@@ -41,131 +36,79 @@ func GetPodQOS(pod *core.Pod) core.PodQOSClass {
 	return ComputePodQOS(pod)
 }
 
-// zeroQuantity represents a resource.Quantity with value "0", used as a baseline
-// for resource comparisons.
-var zeroQuantity = resource.MustParse("0")
-
-// processResourceList adds non-zero quantities for supported QoS compute resources
-// quantities from newList to list.
-func processResourceList(list, newList core.ResourceList) {
-	for name, quantity := range newList {
-		if !isSupportedQoSComputeResource(name) {
-			continue
-		}
-		if quantity.Cmp(zeroQuantity) == 1 {
-			delta := quantity.DeepCopy()
-			if _, exists := list[name]; !exists {
-				list[name] = delta
-			} else {
-				delta.Add(list[name])
-				list[name] = delta
-			}
-		}
-	}
-}
-
-// getQOSResources returns a set of resource names from the provided resource list that:
-// 1. Are supported QoS compute resources
-// 2. Have quantities greater than zero
-func getQOSResources(list core.ResourceList) sets.Set[string] {
-	qosResources := sets.New[string]()
-	for name, quantity := range list {
-		if !isSupportedQoSComputeResource(name) {
-			continue
-		}
-		if quantity.Cmp(zeroQuantity) == 1 {
-			qosResources.Insert(string(name))
-		}
-	}
-	return qosResources
-}
-
 // ComputePodQOS evaluates the list of containers to determine a pod's QoS class. This function is more
 // expensive than GetPodQOS which should be used for pods having a non-empty .Status.QOSClass.
-// A pod is besteffort if none of its containers have specified any requests or limits.
-// A pod is guaranteed only when requests and limits are specified for all the containers and they are equal.
-// A pod is burstable if limits and requests do not match across all containers.
-// When this function is updated please also update staging/src/k8s.io/kubectl/pkg/util/qos/qos.go
+// A pod is besteffort if none of its containers have specified any cpu or memory requests or limits.
+// A pod is guaranteed only when cpu & memory requests and limits are specified for all the containers and they are equal.
+// A pod is burstable if cpu & memory limits and requests do not match across all containers.
+// NOTE: This is tested in pkg/apis/core/v1/helper/qos/qos_test.go
 func ComputePodQOS(pod *core.Pod) core.PodQOSClass {
-	requests := core.ResourceList{}
-	limits := core.ResourceList{}
-	isGuaranteed := true
 	// When pod-level resources are specified, we use them to determine QoS class.
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) &&
 		pod.Spec.Resources != nil {
-		if len(pod.Spec.Resources.Requests) > 0 {
-			// process requests
-			processResourceList(requests, pod.Spec.Resources.Requests)
-		}
+		return resourceQOS(pod.Spec.Resources)
+	}
 
-		if len(pod.Spec.Resources.Limits) > 0 {
-			// process limits
-			processResourceList(limits, pod.Spec.Resources.Limits)
-			qosLimitResources := getQOSResources(pod.Spec.Resources.Limits)
-			if !qosLimitResources.HasAll(string(core.ResourceMemory), string(core.ResourceCPU)) {
-				isGuaranteed = false
+	// Iterator for Init & main Containers.
+	// Cannot use podutil.ContainerIter due to import cycle.
+	containerIter := func(yield func(*core.Container) bool) {
+		for _, c := range pod.Spec.InitContainers {
+			if !yield(&c) {
+				return
 			}
 		}
-	} else {
-		// note, ephemeral containers are not considered for QoS as they cannot define resources
-		allContainers := []core.Container{}
-		allContainers = append(allContainers, pod.Spec.Containers...)
-		allContainers = append(allContainers, pod.Spec.InitContainers...)
-		for _, container := range allContainers {
-			// process requests
-			for name, quantity := range container.Resources.Requests {
-				if !isSupportedQoSComputeResource(name) {
-					continue
-				}
-				if quantity.Cmp(zeroQuantity) == 1 {
-					delta := quantity.DeepCopy()
-					if _, exists := requests[name]; !exists {
-						requests[name] = delta
-					} else {
-						delta.Add(requests[name])
-						requests[name] = delta
-					}
-				}
-			}
-			// process limits
-			qosLimitsFound := sets.NewString()
-			for name, quantity := range container.Resources.Limits {
-				if !isSupportedQoSComputeResource(name) {
-					continue
-				}
-				if quantity.Cmp(zeroQuantity) == 1 {
-					qosLimitsFound.Insert(string(name))
-					delta := quantity.DeepCopy()
-					if _, exists := limits[name]; !exists {
-						limits[name] = delta
-					} else {
-						delta.Add(limits[name])
-						limits[name] = delta
-					}
-				}
-			}
-
-			if !qosLimitsFound.HasAll(string(core.ResourceMemory), string(core.ResourceCPU)) {
-				isGuaranteed = false
+		for _, c := range pod.Spec.Containers {
+			if !yield(&c) {
+				return
 			}
 		}
 	}
 
-	if len(requests) == 0 && len(limits) == 0 {
+	var podQOS core.PodQOSClass
+	for container := range containerIter {
+		qos := resourceQOS(&container.Resources)
+		if qos == core.PodQOSBurstable {
+			return qos // If any container is Burstable, we know the pod isn't BestEffort or Guaranteed
+		} else if podQOS == "" {
+			podQOS = qos
+		} else {
+			if podQOS != qos {
+				return core.PodQOSBurstable // If one container is BestEffort and another is Guaranteed, the pod is Burstable
+			}
+		}
+	}
+	if podQOS == "" { // This should only happen in tests
+		podQOS = core.PodQOSBestEffort
+	}
+	return podQOS
+}
+
+// resourceQOS gets the QOSClass based on a single set of resource requirements. This may need to be aggregated to determine pod QOS.
+func resourceQOS(resources *core.ResourceRequirements) core.PodQOSClass {
+	if len(resources.Requests) == 0 && len(resources.Limits) == 0 {
 		return core.PodQOSBestEffort
 	}
-	// Check if requests match limits for all resources.
-	if isGuaranteed {
-		for name, req := range requests {
-			if lim, exists := limits[name]; !exists || lim.Cmp(req) != 0 {
-				isGuaranteed = false
-				break
+
+	var qos core.PodQOSClass
+	for res := range supportedQoSComputeResources {
+		req := resources.Requests[res]
+		lim := resources.Limits[res]
+		if !req.Equal(lim) {
+			// If they're not equal we know at least one is non-zero, so we know it's neither guaranteed nor best effort.
+			return core.PodQOSBurstable
+		}
+		bestEffort := req.IsZero() && lim.IsZero()
+		if qos == "" {
+			if bestEffort {
+				qos = core.PodQOSBestEffort
+			} else {
+				qos = core.PodQOSGuaranteed
+			}
+		} else {
+			if bestEffort != (qos == core.PodQOSBestEffort) {
+				return core.PodQOSBurstable
 			}
 		}
 	}
-	if isGuaranteed &&
-		len(requests) == len(limits) {
-		return core.PodQOSGuaranteed
-	}
-	return core.PodQOSBurstable
+	return qos
 }
