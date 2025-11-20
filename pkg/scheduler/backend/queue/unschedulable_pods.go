@@ -43,6 +43,32 @@ func newUnschedulablePods(unschedulableRecorder, gatedRecorder metrics.MetricRec
 	}
 }
 
+// updateMetricsOnStateChange handles the metric accounting when a pod changes
+// between Gated and Unschedulable states.
+func (u *unschedulablePods) updateMetricsOnStateChange(gatedBefore, isGated bool) {
+	if gatedBefore == isGated {
+		return
+	}
+
+	if gatedBefore {
+		// Transition: Gated -> Ungated
+		if u.gatedRecorder != nil {
+			u.gatedRecorder.Dec()
+		}
+		if u.unschedulableRecorder != nil {
+			u.unschedulableRecorder.Inc()
+		}
+	} else {
+		// Transition: Ungated -> Gated
+		if u.unschedulableRecorder != nil {
+			u.unschedulableRecorder.Dec()
+		}
+		if u.gatedRecorder != nil {
+			u.gatedRecorder.Inc()
+		}
+	}
+}
+
 // addOrUpdate adds a pod to the unschedulable podInfoMap.
 // The event should show which event triggered the addition and is used for the metric recording.
 func (u *unschedulablePods) addOrUpdate(pInfo *framework.QueuedPodInfo, event string) {

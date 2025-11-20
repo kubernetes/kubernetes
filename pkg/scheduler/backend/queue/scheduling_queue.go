@@ -656,6 +656,7 @@ func (p *PriorityQueue) moveToActiveQ(logger klog.Logger, pInfo *framework.Queue
 				return
 			}
 			if p.unschedulablePods.get(pInfo.Pod) != nil {
+				p.unschedulablePods.updateMetricsOnStateChange(gatedBefore, true)
 				return
 			}
 			p.unschedulablePods.addOrUpdate(pInfo, event)
@@ -692,6 +693,8 @@ func (p *PriorityQueue) moveToBackoffQ(logger klog.Logger, pInfo *framework.Queu
 			if p.unschedulablePods.get(pInfo.Pod) == nil {
 				p.unschedulablePods.addOrUpdate(pInfo, event)
 				logger.V(5).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pInfo.Pod), "event", event, "queue", unschedulableQ)
+			} else {
+				p.unschedulablePods.updateMetricsOnStateChange(gatedBefore, true)
 			}
 			return false
 		}
