@@ -184,9 +184,7 @@ func fitsPorts(wantPorts []v1.ContainerPort, portsInUse fwk.HostPortInfo) (bool,
 	// try to see whether portsInUse and wantPorts will conflict or not
 	for _, cp := range wantPorts {
 		if portsInUse.CheckConflict(cp.HostIP, string(cp.Protocol), cp.HostPort) {
-			portNotFittingMessage := fmt.Sprintf("%s/%s:%s", string(cp.Protocol), cp.HostIP, strconv.Itoa(int(cp.HostPort)))
-			errReason := fmt.Sprintf("node(s) port conflict for the requested pod ports (%s)", portNotFittingMessage)
-			return false, errReason
+			return false, fmt.Errorf("node(s) port conflict for the requested pod ports (%s/%s:%d)", portStr, cp.Protocol, cp.HostIP, cp.HostPort)
 		}
 	}
 	return true, ""
