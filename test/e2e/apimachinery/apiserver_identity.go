@@ -32,7 +32,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -80,7 +79,7 @@ func restartAPIServer(ctx context.Context, node *v1.Node) error {
 }
 
 // This test requires that --feature-gates=APIServerIdentity=true be set on the apiserver
-var _ = SIGDescribe("kube-apiserver identity", feature.APIServerIdentity, func() {
+var _ = SIGDescribe("kube-apiserver identity", framework.WithNodeConformance(), func() {
 	f := framework.NewDefaultFramework("kube-apiserver-identity")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
