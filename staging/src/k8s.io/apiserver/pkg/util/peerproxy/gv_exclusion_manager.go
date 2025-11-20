@@ -228,9 +228,9 @@ func (m *GVExclusionManager) onDeleteEvent(gvs []schema.GroupVersion) {
 	m.refilterQueue.Add("refilter")
 }
 
-// RunActiveGVTracker runs Worker 1: Active GV Tracker
+// RunPeerDiscoveryActiveGVTracker runs Worker 1: Active GV Tracker
 // This worker is triggered by CRD/APIService events and rebuilds the active GV set.
-func (m *GVExclusionManager) RunActiveGVTracker(ctx context.Context, workers int) {
+func (m *GVExclusionManager) RunPeerDiscoveryActiveGVTracker(ctx context.Context, workers int) {
 	defer m.activeGVQueue.ShutDown()
 
 	klog.Infof("Starting %d Active GV Tracker worker(s)", workers)
@@ -327,9 +327,9 @@ func (m *GVExclusionManager) diffGVs(old, new map[schema.GroupVersion]struct{}) 
 	return false
 }
 
-// RunReaper runs Worker 2: Reaper
+// RunPeerDiscoveryReaper runs Worker 2: Reaper
 // This worker periodically removes expired GVs from recentlyDeletedGVs.
-func (m *GVExclusionManager) RunReaper(stopCh <-chan struct{}) {
+func (m *GVExclusionManager) RunPeerDiscoveryReaper(ctx context.Context) {
 	klog.Infof("Starting GV Reaper with %s interval", m.reaperCheckInterval)
 	ticker := time.NewTicker(m.reaperCheckInterval)
 	defer ticker.Stop()
@@ -338,7 +338,7 @@ func (m *GVExclusionManager) RunReaper(stopCh <-chan struct{}) {
 		select {
 		case <-ticker.C:
 			m.reapExpiredGVs()
-		case <-stopCh:
+		case <-ctx.Done():
 			klog.Info("GV Reaper stopped")
 			return
 		}

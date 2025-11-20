@@ -230,17 +230,25 @@ func (c completedConfig) New(name string, delegationTarget genericapiserver.Dele
 				return nil
 			})
 
-			// RunGVDeletionWorkers processes GVs from deleted CRDs/APIServices. If a GV is no longer in use,
-			// it is marked for removal from peer-discovery (with a deletion timestamp), triggering a grace period before cleanup.
-			s.GenericAPIServer.AddPostStartHookOrDie("gv-deletion-workers", func(context genericapiserver.PostStartHookContext) error {
-				go c.Extra.PeerProxy.RunGVDeletionWorkers(context, 1)
+			// RunActiveGVTracker monitors CRDs/APIServices and maintains the active GV list for exclusion from peer-discovery.
+			s.GenericAPIServer.AddPostStartHookOrDie("peer-discovery-gv-active-tracker", func(context genericapiserver.PostStartHookContext) error {
+				go c.Extra.PeerProxy.RunPeerDiscoveryActiveGVTracker(context, 1)
 				return nil
 			})
 
-			// RunExcludedGVsReaper removes GVs from the peer-discovery exclusion list after their grace period expires.
-			// This ensures we don't include stale CRDs/aggregated APIs from peer discovery in the aggregated discovery.
-			s.GenericAPIServer.AddPostStartHookOrDie("excluded-groups-reaper", func(context genericapiserver.PostStartHookContext) error {
-				go c.Extra.PeerProxy.RunExcludedGVsReaper(context.Done())
+			// RunReaper removes expired GVs from the exclusion set for peer-discovery after their grace period.
+			// This ensures we don't indefinitely exclude GVs that are no longer present.
+			s.GenericAPIServer.AddPostStartHookOrDie("peer-discovery-gv-exclusion-reaper", func(context genericapiserver.PostStartHookContext) error {
+				go c.Extra.PeerProxy.RunPeerDiscoveryReaper(context)
+				return nil
+			})
+
+			// RunPeerDiscoveryRefilter re-applies the exclusion filter to the existing peer discovery cache
+			// whenever the exclusion set changes (e.g., CRD or aggregated API added/deleted). This is different from the
+			// initial filtering that happens when peer discovery is first fetched - this worker ensures
+			// the already-cached data stays consistent with the current exclusion set.
+			s.GenericAPIServer.AddPostStartHookOrDie("peer-discovery-refilter", func(context genericapiserver.PostStartHookContext) error {
+				go c.Extra.PeerProxy.RunPeerDiscoveryRefilter(context, 1)
 				return nil
 			})
 		}

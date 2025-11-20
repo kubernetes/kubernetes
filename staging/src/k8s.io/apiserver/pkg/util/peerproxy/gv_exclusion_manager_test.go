@@ -59,13 +59,14 @@ func TestGetExclusionSet(t *testing.T) {
 				{Group: "deprecated", Version: "v1beta1"}: time.Now(),
 				{Group: "legacy", Version: "v1alpha1"}:    time.Now(),
 			},
+			// Reaper hasnt removed deleted GVs yet.
 			wantGVs: []schema.GroupVersion{
 				{Group: "deprecated", Version: "v1beta1"},
 				{Group: "legacy", Version: "v1alpha1"},
 			},
 		},
 		{
-			name: "active and deleted GVs",
+			name: "different active and deleted GVs",
 			activeGVs: map[schema.GroupVersion]struct{}{
 				{Group: "apps", Version: "v1"}:  {},
 				{Group: "batch", Version: "v1"}: {},
@@ -73,10 +74,28 @@ func TestGetExclusionSet(t *testing.T) {
 			deletedGVs: map[schema.GroupVersion]time.Time{
 				{Group: "old", Version: "v1"}: time.Now(),
 			},
+			// Include both active GVs and recently deleted GVs.
+			// Deleted GVs remain in the exclusion set until the reaper removes them after the grace period.
 			wantGVs: []schema.GroupVersion{
 				{Group: "apps", Version: "v1"},
 				{Group: "batch", Version: "v1"},
 				{Group: "old", Version: "v1"},
+			},
+		},
+		{
+			// A GV can appear in both active and deleted sets if:
+			// 1. CRD was deleted (moved from active to deleted)
+			// 2. CRD was recreated (added back to active)
+			// 3. Reaper hasn't cleaned up the deleted entry yet
+			name: "same GV in both active and deleted",
+			activeGVs: map[schema.GroupVersion]struct{}{
+				{Group: "apps", Version: "v1"}: {},
+			},
+			deletedGVs: map[schema.GroupVersion]time.Time{
+				{Group: "apps", Version: "v1"}: time.Now(),
+			},
+			wantGVs: []schema.GroupVersion{
+				{Group: "apps", Version: "v1"},
 			},
 		},
 	}
@@ -284,6 +303,9 @@ func TestFilterPeerDiscoveryCache(t *testing.T) {
 			},
 		},
 		{
+			// Recently deleted GVs are still filtered from peer discovery during the
+			// grace period (before the reaper cleans them up) to avoid routing requests
+			// to peers for GVs that were just deleted locally.
 			name: "filter deleted GVs",
 			deletedGVs: map[schema.GroupVersion]time.Time{
 				{Group: "custom", Version: "v1alpha1"}: time.Now(),
@@ -307,6 +329,8 @@ func TestFilterPeerDiscoveryCache(t *testing.T) {
 			},
 		},
 		{
+			// Both active GVs and recently deleted GVs (within grace period, not yet
+			// cleaned up by the reaper) are filtered from peer discovery.
 			name: "filter both active and deleted GVs",
 			activeGVs: map[schema.GroupVersion]struct{}{
 				{Group: "apps", Version: "v1"}: {},
