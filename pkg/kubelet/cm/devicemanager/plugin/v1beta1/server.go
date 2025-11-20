@@ -57,8 +57,8 @@ type server struct {
 	chandler   ClientHandler
 	clients    map[string]Client
 
-	// isStarted indicates whether the service has started successfully.
-	isStarted bool
+	// lastError records the last runtime error. A server is considered healthy till an actual error occurs.
+	lastError error
 }
 
 // NewServer returns an initialized device plugin registration server.
@@ -117,7 +117,7 @@ func (s *server) Start() error {
 		defer s.wg.Done()
 		s.setHealthy()
 		if err = s.grpc.Serve(ln); err != nil {
-			s.setUnhealthy()
+			s.setUnhealthy(err)
 			klog.ErrorS(err, "Error while serving device plugin registration grpc server")
 		}
 	}()
@@ -208,18 +208,19 @@ func (s *server) Name() string {
 }
 
 func (s *server) Check(_ *http.Request) error {
-	if s.isStarted {
-		return nil
-	}
-	return fmt.Errorf("device plugin registration gRPC server failed and no device plugins can register")
+	return s.lastError
 }
 
 // setHealthy sets the health status of the gRPC server.
 func (s *server) setHealthy() {
-	s.isStarted = true
+	s.lastError = nil
 }
 
 // setUnhealthy sets the health status of the gRPC server to unhealthy.
-func (s *server) setUnhealthy() {
-	s.isStarted = false
+func (s *server) setUnhealthy(err error) {
+	if err == nil {
+		s.lastError = fmt.Errorf("device registration error: device plugin registration gRPC server failed and no device plugins can register")
+		return
+	}
+	s.lastError = fmt.Errorf("device registration error: device plugin registration gRPC server failed and no device plugins can register: %w", err)
 }
