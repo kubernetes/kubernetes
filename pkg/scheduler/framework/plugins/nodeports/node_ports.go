@@ -180,7 +180,7 @@ func Fits(pod *v1.Pod, nodeInfo fwk.NodeInfo) (fits bool, err error) {
 	return portFits, errors.New(portConflictErrMessage)
 }
 
-func fitsPorts(wantPorts []v1.ContainerPort, portsInUse fwk.HostPortInfo) (fits bool, errMessage string) {
+func fitsPorts(wantPorts []v1.ContainerPort, portsInUse fwk.HostPortInfo) (bool, error) {
 	// try to see whether portsInUse and wantPorts will conflict or not
 	for _, cp := range wantPorts {
 		if portsInUse.CheckConflict(cp.HostIP, string(cp.Protocol), cp.HostPort) {
