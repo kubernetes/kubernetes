@@ -58,9 +58,11 @@ func (s *sourceFile) startWatch(logger klog.Logger) {
 		}
 
 		if err := s.doWatch(logger); err != nil {
-			logger.Error(err, "Unable to read config path", "path", s.path)
 			if _, retryable := err.(*retryableError); !retryable {
+				logger.Error(err, "Unable to read config path", "path", s.path)
 				backOff.Next(backOffID, time.Now())
+			} else {
+				logger.V(3).Info("Retryable error reading config path", "path", s.path, "error", err)
 			}
 		}
 	}, retryPeriod)
