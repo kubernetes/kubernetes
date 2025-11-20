@@ -237,6 +237,22 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 			expectedHint: fwk.Queue,
 		},
 		{
+			name: "delete nominated pod with labels that don't match topologySpreadConstraints selector",
+			pod: st.MakePod().UID("p").Name("p").Label("foo", "").
+				SpreadConstraint(1, "zone", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
+				Obj(),
+			oldPod:       st.MakePod().UID("p2").NominatedNodeName("fake-node").Label("bar", "").Obj(),
+			expectedHint: fwk.QueueSkip,
+		},
+		{
+			name: "delete nominated pod with labels that match topologySpreadConstraints selector",
+			pod: st.MakePod().UID("p").Name("p").Label("foo", "").
+				SpreadConstraint(1, "zone", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
+				Obj(),
+			oldPod:       st.MakePod().UID("p2").NominatedNodeName("fake-node").Label("foo", "").Obj(),
+			expectedHint: fwk.Queue,
+		},
+		{
 			name: "delete pod with labels that don't match topologySpreadConstraints selector",
 			pod: st.MakePod().UID("p").Name("p").Label("foo", "").
 				SpreadConstraint(1, "zone", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
