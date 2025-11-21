@@ -41,6 +41,11 @@ import (
 	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
 
+	roundrobin "google.golang.org/grpc/balancer/roundrobin" // named import (not blank)
+	_ "google.golang.org/grpc/health"                       // Register health checking service
+	"google.golang.org/grpc/resolver"
+	dnsresolver "google.golang.org/grpc/resolver/dns" // named import
+
 	"k8s.io/apimachinery/pkg/runtime"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -92,6 +97,10 @@ func init() {
 		l = zap.NewNop()
 	}
 	etcd3ClientLogger = l.Named("etcd-client")
+
+	resolver.Register(dnsresolver.NewBuilder())
+	resolver.SetDefaultScheme("dns")
+	_ = roundrobin.Name
 }
 
 // etcdClientDebugLevel translates ETCD_CLIENT_DEBUG into zap log level.
@@ -315,6 +324,17 @@ var newETCD3Client = func(c storagebackend.TransportConfig) (*kubernetes.Client,
 		// which seems to be what we want as the metrics will be collected on each attempt (retry)
 		grpc.WithChainUnaryInterceptor(grpcprom.UnaryClientInterceptor),
 		grpc.WithChainStreamInterceptor(grpcprom.StreamClientInterceptor),
+		// Use round-robin load balancing with health checking across all etcd endpoints.
+		// The DNS resolver will resolve the service name to individual etcd member IPs,
+		// and round-robin will distribute requests across them. gRPC health checking
+		// will proactively detect soft failures (slow responses, high error rates) in
+		// addition to hard failures detected by TCP keepalives.
+		grpc.WithDefaultServiceConfig(`{
+  "loadBalancingConfig": [{"round_robin": {}}],
+  "healthCheckConfig": {
+    "serviceName": ""
+  }
+}`),
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerTracing) {
 		tracingOpts := []otelgrpc.Option{
@@ -327,6 +347,68 @@ var newETCD3Client = func(c storagebackend.TransportConfig) (*kubernetes.Client,
 		dialOptions = append(dialOptions,
 			grpc.WithStatsHandler(otelgrpc.NewClientHandler(tracingOpts...)))
 	}
+	// Configure endpoints for load balancing:
+	// Two modes are supported:
+	// 1. Single endpoint (DNS service name): Use DNS resolver to discover all etcd member IPs.
+	//    The DNS resolver will resolve the service name to multiple IPs, and round-robin will
+	//    distribute requests across them. Example: "etcd.namespace.svc:2379"
+	// 2. Multiple endpoints (legacy mode): Uses the original logic - direct connections to all
+	//    specified endpoints with egress dialer support. No DNS resolution.
+	//    Example: ["10.0.1.1:2379", "10.0.1.2:2379", "10.0.1.3:2379"]
+
+	if len(c.ServerList) == 1 {
+		// Single endpoint mode: Use DNS resolver for service discovery
+		endpoint := c.ServerList[0]
+		endpoint = strings.TrimPrefix(endpoint, "https://")
+		endpoint = strings.TrimPrefix(endpoint, "http://")
+
+		klog.Infof("Using DNS resolver for single endpoint: %s", endpoint)
+
+		// Set TLS ServerName for DNS-resolved endpoint
+		if tlsConfig != nil && tlsConfig.ServerName == "" {
+			host := endpoint
+			if h, _, err := net.SplitHostPort(host); err == nil {
+				host = h
+			}
+			tlsConfig.ServerName = host
+		}
+
+		// IMPORTANT: Custom dialers bypass gRPC's resolver system. When using DNS-based
+		// resolution, we must NOT use a custom dialer because it would prevent the DNS
+		// resolver from resolving the service name to individual etcd member IPs.
+		if egressDialer != nil {
+			klog.Warningf("Egress dialer is configured but will be skipped for DNS-based load balancing to allow gRPC DNS resolver to function properly")
+		}
+
+		// Use the processed single endpoint (DNS will resolve to multiple IPs)
+		cfg := clientv3.Config{
+			DialTimeout:          dialTimeout,
+			DialKeepAliveTime:    keepaliveTime,
+			DialKeepAliveTimeout: keepaliveTimeout,
+			DialOptions:          dialOptions,
+			Endpoints:            []string{endpoint},
+			TLS:                  tlsConfig,
+			Logger:               etcd3ClientLogger,
+		}
+
+		klog.Infof("Creating etcd client with DNS-resolved endpoint: %v", []string{endpoint})
+		k, err := kubernetes.New(cfg)
+		if err != nil {
+			klog.Errorf("kubernetes.New() failed: %v", err)
+			return nil, err
+		}
+
+		klog.Infof("etcd client created successfully")
+		klog.Infof("etcd client endpoints: %v", k.Endpoints())
+		klog.Infof("Health checking: enabled (serviceName=''), TCP keepalives: time=%v timeout=%v", keepaliveTime, keepaliveTimeout)
+
+		return k, err
+	}
+
+	// Multiple endpoints mode: Use legacy/original logic (exactly like the original code)
+	klog.Infof("Using direct connection to %d endpoints (legacy mode): %v", len(c.ServerList), c.ServerList)
+
+	// Original egress dialer logic for multiple endpoints
 	if egressDialer != nil {
 		dialer := func(ctx context.Context, addr string) (net.Conn, error) {
 			if strings.Contains(addr, "//") {
@@ -342,6 +424,7 @@ var newETCD3Client = func(c storagebackend.TransportConfig) (*kubernetes.Client,
 		dialOptions = append(dialOptions, grpc.WithContextDialer(dialer))
 	}
 
+	// Use original config exactly as in the legacy code
 	cfg := clientv3.Config{
 		DialTimeout:          dialTimeout,
 		DialKeepAliveTime:    keepaliveTime,
