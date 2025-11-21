@@ -21,6 +21,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"math/rand"
 	"slices"
 	"testing"
 	"time"
@@ -30,12 +31,14 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	certlistersv1beta1 "k8s.io/client-go/listers/certificates/v1beta1"
 	corelistersv1 "k8s.io/client-go/listers/core/v1"
+	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/test/utils/hermeticpodcertificatesigner"
 	"k8s.io/kubernetes/test/utils/ktesting"
@@ -182,9 +185,22 @@ func TestFullFlow(t *testing.T) {
 	ctx, cancel := context.WithCancel(ktesting.Init(t))
 	defer cancel()
 
-	kc := fake.NewSimpleClientset()
-	informerFactory := informers.NewSharedInformerFactoryWithOptions(kc, 0)
 	clock := testclock.NewFakeClock(mustRFC3339(t, "2010-01-01T00:00:00Z"))
+	kc := fake.NewSimpleClientset()
+
+	// Assign PCR name and creationTimeStamp
+	kc.Fake.PrependReactor("create", "podcertificaterequests",
+		func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+			obj := action.(k8stesting.CreateAction).GetObject().(*certsv1beta1.PodCertificateRequest)
+			// Simulate server-side GenerateName behavior
+			if obj.Name == "" {
+				obj.Name = fmt.Sprintf("%s-pcr-%d", obj.Spec.PodName, rand.Int63n(1_000_000))
+			}
+			obj.CreationTimestamp = metav1.NewTime(clock.Now())
+
+			return false, obj, nil // allow normal processing
+		})
+	informerFactory := informers.NewSharedInformerFactoryWithOptions(kc, 0)
 
 	//
 	// Configure and boot up a fake podcertificaterequest signing controller.
@@ -198,7 +214,6 @@ func TestFullFlow(t *testing.T) {
 	}
 	pcrSigner := hermeticpodcertificatesigner.New(clock, signerName, caKeys, caCerts, kc)
 	go pcrSigner.Run(ctx)
-
 	//
 	// Configure and boot up enough Kubelet subsystems to run an IssuingManager.
 	//
@@ -225,10 +240,10 @@ func TestFullFlow(t *testing.T) {
 		types.NodeName(node1.ObjectMeta.Name),
 		clock,
 	)
-
 	informerFactory.Start(ctx.Done())
+	clock.Step(1 * time.Second)
+	time.Sleep(100 * time.Millisecond)
 	go node1PodCertificateManager.Run(ctx)
-
 	//
 	// Make a pod that uses a podcertificate volume.
 	//
@@ -256,6 +271,7 @@ func TestFullFlow(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: workloadNS.ObjectMeta.Name,
 			Name:      "workload",
+			UID:       "test-workload-uid",
 		},
 		Spec: corev1.PodSpec{
 			ServiceAccountName: workloadSA.ObjectMeta.Name,
@@ -297,7 +313,6 @@ func TestFullFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error creating workload pod: %v", err)
 	}
-
 	// Because our fake podManager is based on an informer, we need to poll
 	// until workloadPod is reflected in the informer.
 	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 30*time.Second, true, func(ctx context.Context) (bool, error) {

@@ -481,6 +481,10 @@ func (m *IssuingManager) handleProjection(ctx context.Context, key projectionKey
 			// remember creating the PCR, then we must be in case 2.  Return to
 			// credStateInitial so we create a new PCR.
 			rec.curState = &credStateInitial{}
+			// Protect against nil dereference when informer lag causes pcr to be nil.
+			if pcr == nil {
+				return fmt.Errorf("PodCertificateRequest appears to have been deleted (pcr is nil for key %s/%s)", key.Namespace, key.PodName)
+			}
 			return fmt.Errorf("PodCertificateRequest %q appears to have been deleted", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
 		} else if err != nil {
 			return fmt.Errorf("while getting PodCertificateRequest %q: %w", key.Namespace+"/"+state.pcrName, err)
