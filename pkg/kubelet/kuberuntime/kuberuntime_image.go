@@ -18,6 +18,7 @@ package kuberuntime
 
 import (
 	"context"
+	"strings"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -81,6 +82,26 @@ func (m *kubeGenericRuntimeManager) GetImageRef(ctx context.Context, image kubec
 	}
 	if resp.Image == nil {
 		return "", nil
+	}
+	// Prefer returning a digest reference over an image ID to ensure pull record lookups work correctly.
+	// Some container runtimes (e.g., CRI-O) return digest references from PullImage but store multiple
+	// digests in repo_digests. We need to find the one matching the queried image's registry/repository.
+	if len(resp.Image.RepoDigests) > 0 {
+		// Extract registry/repository from the image name (e.g., "localhost:5000/pause" from "localhost:5000/pause:tag")
+		// The format is: [registry/]repository[:tag|@digest]
+		imagePrefix := image.Image
+		// Remove tag or digest suffix
+		if idx := strings.LastIndexAny(imagePrefix, ":@"); idx != -1 {
+			imagePrefix = imagePrefix[:idx]
+		}
+		// Look for a digest matching this registry/repository
+		for _, digest := range resp.Image.RepoDigests {
+			if strings.HasPrefix(digest, imagePrefix+"@") {
+				return digest, nil
+			}
+		}
+		// If no matching digest found, fall back to the first one
+		return resp.Image.RepoDigests[0], nil
 	}
 	return resp.Image.Id, nil
 }
