@@ -633,18 +633,18 @@ func autoConvert_v1beta1_KubeletConfiguration_To_config_KubeletConfiguration(in 
 	if err := v1.Convert_Pointer_bool_To_bool(&in.CgroupsPerQOS, &out.CgroupsPerQOS, s); err != nil {
 		return err
 	}
-	out.CgroupDriver = in.CgroupDriver
-	out.CPUManagerPolicy = in.CPUManagerPolicy
+	out.CgroupDriver = string(in.CgroupDriver)
+	out.CPUManagerPolicy = string(in.CPUManagerPolicy)
 	out.SingleProcessOOMKill = (*bool)(unsafe.Pointer(in.SingleProcessOOMKill))
 	out.CPUManagerPolicyOptions = *(*map[string]string)(unsafe.Pointer(&in.CPUManagerPolicyOptions))
 	out.CPUManagerReconcilePeriod = in.CPUManagerReconcilePeriod
-	out.MemoryManagerPolicy = in.MemoryManagerPolicy
-	out.TopologyManagerPolicy = in.TopologyManagerPolicy
-	out.TopologyManagerScope = in.TopologyManagerScope
+	out.MemoryManagerPolicy = string(in.MemoryManagerPolicy)
+	out.TopologyManagerPolicy = string(in.TopologyManagerPolicy)
+	out.TopologyManagerScope = string(in.TopologyManagerScope)
 	out.TopologyManagerPolicyOptions = *(*map[string]string)(unsafe.Pointer(&in.TopologyManagerPolicyOptions))
 	out.QOSReserved = *(*map[string]string)(unsafe.Pointer(&in.QOSReserved))
 	out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
-	out.HairpinMode = in.HairpinMode
+	out.HairpinMode = string(in.HairpinMode)
 	out.MaxPods = in.MaxPods
 	out.PodCIDR = in.PodCIDR
 	if err := v1.Convert_Pointer_int64_To_int64(&in.PodPidsLimit, &out.PodPidsLimit, s); err != nil {
@@ -841,18 +841,18 @@ func autoConvert_config_KubeletConfiguration_To_v1beta1_KubeletConfiguration(in 
 	if err := v1.Convert_bool_To_Pointer_bool(&in.CgroupsPerQOS, &out.CgroupsPerQOS, s); err != nil {
 		return err
 	}
-	out.CgroupDriver = in.CgroupDriver
+	out.CgroupDriver = configv1beta1.CgroupDriver(in.CgroupDriver)
 	out.SingleProcessOOMKill = (*bool)(unsafe.Pointer(in.SingleProcessOOMKill))
-	out.CPUManagerPolicy = in.CPUManagerPolicy
+	out.CPUManagerPolicy = configv1beta1.CPUManagerPolicy(in.CPUManagerPolicy)
 	out.CPUManagerPolicyOptions = *(*map[string]string)(unsafe.Pointer(&in.CPUManagerPolicyOptions))
 	out.CPUManagerReconcilePeriod = in.CPUManagerReconcilePeriod
-	out.MemoryManagerPolicy = in.MemoryManagerPolicy
-	out.TopologyManagerPolicy = in.TopologyManagerPolicy
-	out.TopologyManagerScope = in.TopologyManagerScope
+	out.MemoryManagerPolicy = configv1beta1.MemoryManagerPolicy(in.MemoryManagerPolicy)
+	out.TopologyManagerPolicy = configv1beta1.TopologyManagerPolicy(in.TopologyManagerPolicy)
+	out.TopologyManagerScope = configv1beta1.TopologyManagerScope(in.TopologyManagerScope)
 	out.TopologyManagerPolicyOptions = *(*map[string]string)(unsafe.Pointer(&in.TopologyManagerPolicyOptions))
 	out.QOSReserved = *(*map[string]string)(unsafe.Pointer(&in.QOSReserved))
 	out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
-	out.HairpinMode = in.HairpinMode
+	out.HairpinMode = configv1beta1.HairpinMode(in.HairpinMode)
 	out.MaxPods = in.MaxPods
 	out.PodCIDR = in.PodCIDR
 	if err := v1.Convert_int64_To_Pointer_int64(&in.PodPidsLimit, &out.PodPidsLimit, s); err != nil {
@@ -928,7 +928,7 @@ func autoConvert_config_KubeletConfiguration_To_v1beta1_KubeletConfiguration(in 
 	out.KubeReserved = *(*map[string]string)(unsafe.Pointer(&in.KubeReserved))
 	out.SystemReservedCgroup = in.SystemReservedCgroup
 	out.KubeReservedCgroup = in.KubeReservedCgroup
-	out.EnforceNodeAllocatable = *(*[]string)(unsafe.Pointer(&in.EnforceNodeAllocatable))
+	out.EnforceNodeAllocatable = *(*[]configv1beta1.EnforceNodeAllocatable)(unsafe.Pointer(&in.EnforceNodeAllocatable))
 	out.ReservedSystemCPUs = in.ReservedSystemCPUs
 	out.ShowHiddenMetricsForVersion = in.ShowHiddenMetricsForVersion
 	out.Logging = in.Logging
