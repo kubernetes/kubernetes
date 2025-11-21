@@ -36,6 +36,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
@@ -1542,6 +1543,112 @@ func (pl *preEnqueuePlugin) PreEnqueue(ctx context.Context, p *v1.Pod) *fwk.Stat
 		}
 	}
 	return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "pod name not in allowlists")
+}
+
+func TestSchedulingQueueMetrics_UngatedToGated_Transitions(t *testing.T) {
+	tests := []struct {
+		name           string
+		featureEnabled bool
+		forceBackoff   bool // If true, sets timestamps to FUTURE to force moveToBackoffQ
+	}{
+		{
+			name:           "Feature Disabled, always moves to ActiveQ",
+			featureEnabled: false,
+			forceBackoff:   false,
+		},
+		{
+			name:           "Feature Enabled, Backoff expired, moves to ActiveQ",
+			featureEnabled: true,
+			forceBackoff:   false, // Feature is ON, but pod is ready, so it hits Active path
+		},
+		{
+			name:           "Feature Enabled, Backoff active, moves to BackoffQ",
+			featureEnabled: true,
+			forceBackoff:   true, // Feature is ON, pod is waiting, so it hits Backoff path
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerPopFromBackoffQ, tc.featureEnabled)
+			legacyregistry.Reset()
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			// Use a FakeClock to deterministically control backoff calculations.
+			fakeClock := testingclock.NewFakeClock(time.Now())
+
+			pod := st.MakePod().Name("test-pod").Label("test-label", "").Obj()
+
+			// Configure the PreEnqueue plugin with an empty allowlist.
+			// This ensures that whenever the plugin runs, it returns "Wait" (Gated),
+			// rejecting the pod.
+			plugin := &preEnqueuePlugin{allowlists: []string{}}
+			preEnqueuePluginMap := map[string]map[string]fwk.PreEnqueuePlugin{
+				"": {plugin.Name(): plugin},
+			}
+
+			q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), []runtime.Object{pod},
+				WithPreEnqueuePluginMap(preEnqueuePluginMap),
+				WithPodInitialBackoffDuration(time.Hour),
+				WithPodMaxBackoffDuration(time.Hour),
+				WithClock(fakeClock))
+
+			pInfo := q.newQueuedPodInfo(pod)
+
+			// Conditional Setup:
+			// If forceBackoff is true, we set the InitialAttemptTimestamp to the FUTURE.
+			// This mathematically guarantees that isPodBackingoff() returns true,
+			// forcing the scheduler to execute the moveToBackoffQ logic path.
+			if tc.forceBackoff {
+				now := fakeClock.Now()
+				pInfo.UnschedulableCount = 1
+				pInfo.Attempts = 1
+				pInfo.InitialAttemptTimestamp = &now
+				pInfo.BackoffExpiration = now.Add(time.Hour)
+			}
+
+			// Manually inject the Pod into unschedulablePods.
+			// This sets up the "Before" state: The pod is Unschedulable, but NOT Gated yet.
+			// Metric state: UnschedulablePods=1, GatedPods=0.
+			q.unschedulablePods.addOrUpdate(pInfo, framework.EventUnscheduledPodAdd.Label())
+
+			// Sanity Check
+			val, _ := testutil.GetGaugeMetricValue(metrics.UnschedulablePods())
+			if val != 1.0 {
+				t.Fatalf("Setup failed: Expected 1 unschedulable pod, got %v", val)
+			}
+
+			newPod := pod.DeepCopy()
+			// We must modify the pod (e.g., change a label) to force the queue to see this as a "Relevant" update.
+			// If we don't do this, Update() returns early and skips the movement logic entirely.
+			newPod.Labels["v"] = "2"
+
+			// Trigger Update.
+			// Based on the test case, this will route through either moveToActiveQ or moveToBackoffQ.
+			// In all cases, the PreEnqueue plugin returns Wait, causing a transition to the Gated queue.
+			q.Update(logger, pod, newPod)
+
+			// Verify GatedPods incremented.
+			gatedVal, err := testutil.GetGaugeMetricValue(metrics.GatedPods())
+			if err != nil {
+				t.Fatalf("Error checking gated metrics: %v", err)
+			}
+			if gatedVal != 1.0 {
+				t.Errorf("Metric Mismatch in case %s: Expected 1 gated pod, actual %v", tc.name, gatedVal)
+			}
+
+			// Verify UnschedulablePods decremented.
+			unschedulableVal, err := testutil.GetGaugeMetricValue(metrics.UnschedulablePods())
+			if err != nil {
+				t.Fatalf("Error checking unschedulable metrics: %v", err)
+			}
+			if unschedulableVal != 0.0 {
+				t.Errorf("Metric Mismatch in case %s: Expected 0 unschedulable pod, actual %v", tc.name, unschedulableVal)
+			}
+		})
+	}
 }
 
 func TestPriorityQueue_moveToActiveQ(t *testing.T) {
