@@ -20,11 +20,25 @@ limitations under the License.
 package synctrack
 
 import (
+	"context"
 	"sync"
 	"sync/atomic"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 )
+
+// Synced supports waiting for some activity to finish without polling.
+type Synced interface {
+	// Name returns a string describing the entity that is being waited for.
+	//
+	// Note that this name might be computed, so callers should only
+	// get the name outside of a hot code path.
+	Name() string
+
+	// Done returns a channel that will be closed on completion
+	// of the activity.
+	Done() <-chan struct{}
+}
 
 // AsyncTracker helps propagate HasSynced in the face of multiple worker threads.
 type AsyncTracker[T comparable] struct {
@@ -32,6 +46,10 @@ type AsyncTracker[T comparable] struct {
 
 	lock    sync.Mutex
 	waiting sets.Set[T]
+
+	// TODO
+	// synced       chan struct{}
+	// syncedClosed bool
 }
 
 // Start should be called prior to processing each key which is part of the
@@ -75,16 +93,71 @@ func (t *AsyncTracker[T]) HasSynced() bool {
 	return t.waiting.Len() == 0
 }
 
+// // NamedHasSynced is done if the source is synced and every key present in the
+// // initial list has been processed. This relies on the source not considering
+// // itself synced until *after* it has delivered the notification for the last
+// // key, and that notification handler must have called Start.
+// func (t *AsyncTracker[T]) NamedHasSynced() Synced {
+// 	if t.
+// 	return &asyncTrackerSynced[T]{
+// 		tracker: t,
+// 	}
+// }
+
+// type asyncTrackerSynced[T comparable] struct {
+// 	tracker *AsyncTracker[T]
+// }
+
+// func (s *asyncTrackerSynced[T]) Name() {
+// 	return "TODO"
+// }
+
+// func (s *asyncTrackerSynced[T]) Done() <-chan struct{} {
+// 	return s.tracker.synced
+// }
+
 // SingleFileTracker helps propagate HasSynced when events are processed in
-// order (i.e. via a queue).
+// order (i.e. via a queue). The user has to monitor the upstream "has synced"
+// and notify the tracker when that changes from false to true.
 type SingleFileTracker struct {
+	// name describes the instance.
+	name string
+
 	// Important: count is used with atomic operations so it must be 64-bit
 	// aligned, otherwise atomic operations will panic. Having it at the top of
 	// the struct will guarantee that, even on 32-bit arches.
 	// See https://pkg.go.dev/sync/atomic#pkg-note-BUG for more information.
 	count int64
 
-	UpstreamHasSynced func() bool
+	// upstreamHasSynced is changed from false (initial value) to true
+	// when UpstreamHasSynced is called.
+	upstreamHasSynced atomic.Bool
+
+	// synced gets canceled once both the tracker and upstream are synced.
+	// A context is convenient for this because it gives us a channel
+	// and handles thread-safety.
+	synced context.Context
+	cancel func()
+}
+
+func NewSingleFileTracker(name string) *SingleFileTracker {
+	t := &SingleFileTracker{
+		name: name,
+	}
+	t.synced, t.cancel = context.WithCancel(context.Background())
+	return t
+}
+
+// UpstreamHasSynced needs to be called at least once as soon as
+// the upstream "has synced" becomes true. It tells SingleFileTracker
+// that the source is synced.
+func (t *SingleFileTracker) UpstreamHasSynced() {
+	// Upstream is done, but we might not be yet.
+	t.upstreamHasSynced.Store(true)
+	if atomic.LoadInt64(&t.count) == 0 {
+		// Mark as synced.
+		t.cancel()
+	}
 }
 
 // Start should be called prior to processing each key which is part of the
@@ -103,6 +176,15 @@ func (t *SingleFileTracker) Finished() {
 	if result < 0 {
 		panic("synctrack: negative counter; this logic error means HasSynced may return incorrect value")
 	}
+
+	// Not synced yet before, but maybe now?
+	if result == 0 && t.synced.Err() == nil {
+		// We are done, but upstream might not be.
+		if t.upstreamHasSynced.Load() {
+			// Mark as synced.
+			t.cancel()
+		}
+	}
 }
 
 // HasSynced returns true if the source is synced and every key present in the
@@ -110,11 +192,17 @@ func (t *SingleFileTracker) Finished() {
 // itself synced until *after* it has delivered the notification for the last
 // key, and that notification handler must have called Start.
 func (t *SingleFileTracker) HasSynced() bool {
-	// Call UpstreamHasSynced first: it might take a lock, which might take
-	// a significant amount of time, and we don't want to then act on a
-	// stale count value.
-	if !t.UpstreamHasSynced() {
-		return false
-	}
-	return atomic.LoadInt64(&t.count) <= 0
+	return t.synced.Err() != nil
+}
+
+// Done returns a channel that is closed if the source is synced and every key present in the
+// initial list has been processed. This relies on the source not considering
+// itself synced until *after* it has delivered the notification for the last
+// key, and that notification handler must have called Start.
+func (t *SingleFileTracker) Done() <-chan struct{} {
+	return t.synced.Done()
+}
+
+func (t *SingleFileTracker) Name() string {
+	return t.name
 }
