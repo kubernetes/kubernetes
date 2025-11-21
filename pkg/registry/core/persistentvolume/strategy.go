@@ -32,7 +32,6 @@ import (
 	pvutil "k8s.io/kubernetes/pkg/api/persistentvolume"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
-	volumevalidation "k8s.io/kubernetes/pkg/volume/validation"
 	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
@@ -76,8 +75,7 @@ func (persistentvolumeStrategy) PrepareForCreate(ctx context.Context, obj runtim
 func (persistentvolumeStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	persistentvolume := obj.(*api.PersistentVolume)
 	opts := validation.ValidationOptionsForPersistentVolume(persistentvolume, nil)
-	errorList := validation.ValidatePersistentVolume(persistentvolume, opts)
-	return append(errorList, volumevalidation.ValidatePersistentVolume(persistentvolume)...)
+	return validation.ValidatePersistentVolume(persistentvolume, opts)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -105,9 +103,7 @@ func (persistentvolumeStrategy) ValidateUpdate(ctx context.Context, obj, old run
 	newPv := obj.(*api.PersistentVolume)
 	oldPv := old.(*api.PersistentVolume)
 	opts := validation.ValidationOptionsForPersistentVolume(newPv, oldPv)
-	errorList := validation.ValidatePersistentVolume(newPv, opts)
-	errorList = append(errorList, volumevalidation.ValidatePersistentVolume(newPv)...)
-	return append(errorList, validation.ValidatePersistentVolumeUpdate(newPv, oldPv, opts)...)
+	return validation.ValidatePersistentVolumeUpdate(newPv, oldPv, opts)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
