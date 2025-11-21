@@ -1421,9 +1421,15 @@ func (f *frameworkImpl) RunPreBindPlugins(ctx context.Context, state fwk.CycleSt
 		logger = klog.LoggerWithName(logger, "PreBind")
 		logger = klog.LoggerWithValues(logger, "node", klog.ObjectRef{Name: nodeName})
 	}
-	for _, pl := range f.preBindPlugins {
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	statusCh := parallelize.NewErrorChannel[*fwk.Status]()
+
+	f.Parallelizer().Until(ctx, len(f.preBindPlugins), func(index int) {
+		pl := f.preBindPlugins[index]
 		if state.GetSkipPreBindPlugins().Has(pl.Name()) {
-			continue
+			return
 		}
 
 		ctx := ctx
@@ -1431,19 +1437,21 @@ func (f *frameworkImpl) RunPreBindPlugins(ctx context.Context, state fwk.CycleSt
 			logger := klog.LoggerWithName(logger, pl.Name())
 			ctx = klog.NewContext(ctx, logger)
 		}
-		status = f.runPreBindPlugin(ctx, pl, state, pod, nodeName)
-		if !status.IsSuccess() {
-			if status.IsRejected() {
-				logger.V(4).Info("Pod rejected by PreBind plugin", "pod", klog.KObj(pod), "node", nodeName, "plugin", pl.Name(), "status", status.Message())
-				status.SetPlugin(pl.Name())
-				return status
+		plStatus := f.runPreBindPlugin(ctx, pl, state, pod, nodeName)
+		if !plStatus.IsSuccess() {
+			if plStatus.IsRejected() {
+				logger.V(4).Info("Pod rejected by PreBind plugin", "pod", klog.KObj(pod), "node", nodeName, "plugin", pl.Name(), "status", plStatus.Message())
+				plStatus.SetPlugin(pl.Name())
+				statusCh.SendErrorWithCancel(plStatus, cancel)
+				return
 			}
-			err := status.AsError()
+			err := plStatus.AsError()
 			logger.Error(err, "Plugin failed", "plugin", pl.Name(), "pod", klog.KObj(pod), "node", nodeName)
-			return fwk.AsStatus(fmt.Errorf("running PreBind plugin %q: %w", pl.Name(), err))
+			statusCh.SendErrorWithCancel(fwk.AsStatus(fmt.Errorf("running PreBind plugin %q: %w", pl.Name(), err)), cancel)
 		}
-	}
-	return nil
+	}, metrics.PreBind)
+	status = statusCh.ReceiveError()
+	return status
 }
 
 func (f *frameworkImpl) runPreBindPlugin(ctx context.Context, pl fwk.PreBindPlugin, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
