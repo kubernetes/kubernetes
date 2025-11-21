@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	listersv1 "k8s.io/client-go/listers/core/v1"
@@ -172,6 +173,10 @@ func (pl *InterPodAffinity) isSchedulableAfterPodChange(logger klog.Logger, pod 
 	originalPod, modifiedPod, err := util.As[*v1.Pod](oldObj, newObj)
 	if err != nil {
 		return fwk.Queue, err
+	}
+	if modifiedPod != nil && pod.UID == modifiedPod.UID && !equality.Semantic.DeepEqual(pod.ObjectMeta.Labels, modifiedPod.ObjectMeta.Labels) {
+		logger.V(5).Info("the pending pod labels have changed and may be schedulable now")
+		return fwk.Queue, nil
 	}
 	if (modifiedPod != nil && modifiedPod.Spec.NodeName == "") || (originalPod != nil && originalPod.Spec.NodeName == "") {
 		logger.V(5).Info("the added/updated/deleted pod is unscheduled, so it doesn't make the target pod schedulable",
