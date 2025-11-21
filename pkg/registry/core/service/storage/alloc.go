@@ -21,6 +21,7 @@ import (
 	"net"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -364,6 +365,11 @@ func (al *Allocators) allocClusterIPs(service *api.Service, dryRun bool) (map[ap
 		}
 
 		toAlloc[ipFamily] = service.Spec.ClusterIPs[i]
+	}
+
+	// validate the service before allocating IPs
+	if err := preAllocIPs(service); err != nil {
+		return nil, err
 	}
 
 	// allocate
@@ -1099,4 +1105,36 @@ func familyOf(ip string) api.IPFamily {
 		return api.IPv6Protocol
 	}
 	return api.IPFamily("unknown")
+}
+
+// preAllocIPs validates service object metadata. It should be called before allocating IPs
+// to avoid the penalty of failing validation.
+func preAllocIPs(svc *api.Service) error {
+	var allErrs field.ErrorList
+
+	metaPath := field.NewPath("metadata")
+	meta := &svc.ObjectMeta
+
+	// KEP-5311 Relaxed validation for Services names
+	nameFn := validation.ValidateServiceName
+	if utilfeature.DefaultFeatureGate.Enabled(features.RelaxedServiceNameValidation) {
+		nameFn = apimachineryvalidation.NameIsDNSLabel
+	}
+
+	// If the generated name validates, but the calculated value does not, it's a problem with generation, and we
+	// report it here. This may confuse users, but indicates a programming bug and still must be validated.
+	// If there are multiple fields out of which one is required then add an or as a separator
+	if len(meta.GetName()) == 0 {
+		allErrs = append(allErrs, field.Required(metaPath.Child("name"), "name or generateName is required"))
+	} else {
+		for _, msg := range nameFn(meta.GetName(), false) {
+			allErrs = append(allErrs, field.Invalid(metaPath.Child("name"), meta.GetName(), msg))
+		}
+	}
+
+	if len(allErrs) > 0 {
+		return errors.NewInvalid(api.Kind("Service"), meta.GetName(), allErrs)
+	}
+
+	return nil
 }

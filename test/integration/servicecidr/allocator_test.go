@@ -26,11 +26,14 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
+	watchtools "k8s.io/client-go/tools/watch"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/features"
@@ -216,6 +219,136 @@ func TestServiceAllocIPAddressLargeCIDR(t *testing.T) {
 		t.Error(err)
 	}
 
+}
+
+func TestInvalidService(t *testing.T) {
+	etcdOptions := framework.SharedEtcd()
+	apiServerOptions := kubeapiservertesting.NewDefaultTestServerOptions()
+	s := kubeapiservertesting.StartTestServerOrDie(t,
+		apiServerOptions,
+		[]string{
+			"--service-cluster-ip-range=10.0.0.0/24",
+			"--disable-admission-plugins=ServiceAccount",
+		},
+		etcdOptions)
+	defer s.TearDownFn()
+
+	client, err := clientset.NewForConfig(s.ClientConfig)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	var testCases = []struct {
+		caseName     string
+		name         string
+		generateName string
+		wantErr      bool
+	}{
+		{
+			caseName: "valid Service Name",
+			name:     "valid",
+		},
+		{
+			caseName:     "valid Service Generate Name",
+			generateName: "valid-",
+		},
+		{
+			caseName: "empty Service Name",
+			name:     "",
+			wantErr:  true,
+		},
+		{
+			caseName: "invalid Service Name",
+			name:     "!!!invalid service name!!!",
+			wantErr:  true,
+		},
+		{
+			caseName:     "invalid Service Generate Name",
+			generateName: "!!!invalid-service-name-",
+			wantErr:      true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.caseName, func(t *testing.T) {
+			svc := &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:         tc.name,
+					GenerateName: tc.generateName,
+				},
+				Spec: v1.ServiceSpec{
+					ClusterIP: "10.0.0.111",
+					Type:      v1.ServiceTypeClusterIP,
+
+					Ports: []v1.ServicePort{
+						{Port: 80},
+					},
+				},
+			}
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			watcher, err := client.NetworkingV1().IPAddresses().Watch(ctx, metav1.ListOptions{ResourceVersion: "0"})
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			defer watcher.Stop()
+
+			var ipCreated atomic.Bool
+			ipCreated.Store(false)
+			go func() {
+				_, err = watchtools.UntilWithoutRetry(ctx, watcher, func(event watch.Event) (bool, error) {
+					if event.Type != watch.Added {
+						return false, nil
+					}
+
+					ipAddress, ok := event.Object.(*networkingv1.IPAddress)
+					if !ok {
+						return false, fmt.Errorf("unexpected object type: %T", event.Object)
+					}
+					if ipAddress.Name != "10.0.0.111" {
+						return false, nil
+					}
+					t.Logf("IP %s created for Service %#v", ipAddress.Name, ipAddress.Spec.ParentRef)
+					ipCreated.Store(true)
+					return true, nil
+				})
+				if err != nil && !wait.Interrupted(err) {
+					t.Errorf("unexpected error: %v", err)
+				}
+			}()
+
+			// It will fail because the service is missing a name
+			_, err = client.CoreV1().Services(metav1.NamespaceDefault).Create(context.TODO(), svc, metav1.CreateOptions{})
+			defer func() {
+				_ = client.CoreV1().Services(metav1.NamespaceDefault).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
+				_ = client.NetworkingV1().IPAddresses().Delete(context.TODO(), "10.0.0.111", metav1.DeleteOptions{})
+			}()
+			// account for the propagation delay on the watch
+			time.Sleep(100 * time.Millisecond)
+			if err == nil && !tc.wantErr {
+				if !ipCreated.Load() {
+					t.Errorf("expected IP to be created")
+				}
+				return
+			}
+			if err == nil && tc.wantErr {
+				t.Errorf("expected error")
+				return
+			}
+			if err != nil && !tc.wantErr {
+				t.Errorf("unexpected error reason: %v", err)
+				return
+			}
+			if ipCreated.Load() {
+				t.Errorf("expected IP to not be created")
+			}
+			if !apierrors.IsInvalid(err) {
+				t.Errorf("unexpected error reason: %v", err)
+			}
+		})
+	}
 }
 
 func TestMigrateService(t *testing.T) {
