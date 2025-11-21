@@ -225,8 +225,8 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 		if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentStatusz) {
 			statusz.Install(
 				unsecuredMux,
-				kubeControllerManager,
 				statusz.NewRegistry(
+					kubeControllerManager,
 					c.ComponentGlobalsRegistry.EffectiveVersionFor(basecompatibility.DefaultKubeComponent),
 					statusz.WithListedPaths(unsecuredMux.ListedPaths()),
 				),

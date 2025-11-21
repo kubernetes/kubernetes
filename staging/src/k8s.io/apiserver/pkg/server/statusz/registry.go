@@ -28,6 +28,7 @@ import (
 )
 
 type statuszRegistry interface {
+	componentName() string
 	processStartTime() time.Time
 	goVersion() string
 	binaryVersion() *version.Version
@@ -38,6 +39,7 @@ type statuszRegistry interface {
 
 type registry struct {
 	// componentGlobalsRegistry compatibility.ComponentGlobalsRegistry
+	name             string
 	effectiveVersion compatibility.EffectiveVersion
 	// listedPaths is an alphabetically sorted list of paths to be reported at /.
 	listedPaths []string
@@ -54,6 +56,10 @@ func WithListedPaths(listedPaths []string) Option {
 	copy(cpyListedPaths, listedPaths)
 
 	return func(reg *registry) { reg.listedPaths = cpyListedPaths }
+}
+
+func (r *registry) componentName() string {
+	return r.name
 }
 
 func (*registry) processStartTime() time.Time {
