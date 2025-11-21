@@ -108,8 +108,8 @@ const (
 
 	// VolumeBindingWaitForFirstConsumer indicates that PersistentVolumeClaims
 	// should not be provisioned and bound until the first Pod is created that
-	// references the PeristentVolumeClaim.  The volume provisioning and
-	// binding will occur during Pod scheduing.
+	// references the PersistentVolumeClaim.  The volume provisioning and
+	// binding will occur during Pod scheduling.
 	VolumeBindingWaitForFirstConsumer VolumeBindingMode = "WaitForFirstConsumer"
 )
 
@@ -582,6 +582,8 @@ type CSINodeDriver struct {
 	// name represents the name of the CSI driver that this object refers to.
 	// This MUST be the same name returned by the CSI GetPluginName() call for
 	// that driver.
+	// +required
+	// +k8s:required
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 
 	// nodeID of the node from the driver point of view.
