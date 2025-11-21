@@ -100,7 +100,6 @@ func NewDesiredStateOfWorldPopulator(
 	podStateProvider PodStateProvider,
 	desiredStateOfWorld cache.DesiredStateOfWorld,
 	actualStateOfWorld cache.ActualStateOfWorld,
-	csiMigratedPluginManager csimigration.PluginManager,
 	intreeToCSITranslator csimigration.InTreeToCSITranslator,
 	volumePluginMgr *volume.VolumePluginMgr) DesiredStateOfWorldPopulator {
 	return &desiredStateOfWorldPopulator{
@@ -112,27 +111,25 @@ func NewDesiredStateOfWorldPopulator(
 		actualStateOfWorld:  actualStateOfWorld,
 		pods: processedPods{
 			processedPods: make(map[volumetypes.UniquePodName]bool)},
-		hasAddedPods:             false,
-		hasAddedPodsLock:         sync.RWMutex{},
-		csiMigratedPluginManager: csiMigratedPluginManager,
-		intreeToCSITranslator:    intreeToCSITranslator,
-		volumePluginMgr:          volumePluginMgr,
+		hasAddedPods:          false,
+		hasAddedPodsLock:      sync.RWMutex{},
+		intreeToCSITranslator: intreeToCSITranslator,
+		volumePluginMgr:       volumePluginMgr,
 	}
 }
 
 type desiredStateOfWorldPopulator struct {
-	kubeClient               clientset.Interface
-	loopSleepDuration        time.Duration
-	podManager               PodManager
-	podStateProvider         PodStateProvider
-	desiredStateOfWorld      cache.DesiredStateOfWorld
-	actualStateOfWorld       cache.ActualStateOfWorld
-	pods                     processedPods
-	hasAddedPods             bool
-	hasAddedPodsLock         sync.RWMutex
-	csiMigratedPluginManager csimigration.PluginManager
-	intreeToCSITranslator    csimigration.InTreeToCSITranslator
-	volumePluginMgr          *volume.VolumePluginMgr
+	kubeClient            clientset.Interface
+	loopSleepDuration     time.Duration
+	podManager            PodManager
+	podStateProvider      PodStateProvider
+	desiredStateOfWorld   cache.DesiredStateOfWorld
+	actualStateOfWorld    cache.ActualStateOfWorld
+	pods                  processedPods
+	hasAddedPods          bool
+	hasAddedPodsLock      sync.RWMutex
+	intreeToCSITranslator csimigration.InTreeToCSITranslator
+	volumePluginMgr       *volume.VolumePluginMgr
 }
 
 type processedPods struct {
@@ -467,11 +464,7 @@ func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
 				err)
 		}
 		logger.V(5).Info("Extracted volumeSpec from bound PV and PVC", "PVC", klog.KRef(pod.Namespace, pvcSource.ClaimName), "PVCUID", pvcUID, "PVName", pvName, "volumeSpecName", volumeSpec.Name())
-		migratable, err := dswp.csiMigratedPluginManager.IsMigratable(volumeSpec)
-		if err != nil {
-			return nil, nil, "", err
-		}
-		if migratable {
+		if dswp.intreeToCSITranslator.IsMigratable(volumeSpec.PersistentVolume, volumeSpec.Volume) {
 			volumeSpec, err = csimigration.TranslateInTreeSpecToCSI(logger, volumeSpec, pod.Namespace, dswp.intreeToCSITranslator)
 			if err != nil {
 				return nil, nil, "", err
@@ -503,11 +496,8 @@ func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
 	clonedPodVolume := podVolume.DeepCopy()
 
 	spec := volume.NewSpecFromVolume(clonedPodVolume)
-	migratable, err := dswp.csiMigratedPluginManager.IsMigratable(spec)
-	if err != nil {
-		return nil, nil, "", err
-	}
-	if migratable {
+	var err error
+	if dswp.intreeToCSITranslator.IsMigratable(spec.PersistentVolume, spec.Volume) {
 		spec, err = csimigration.TranslateInTreeSpecToCSI(logger, spec, pod.Namespace, dswp.intreeToCSITranslator)
 		if err != nil {
 			return nil, nil, "", err

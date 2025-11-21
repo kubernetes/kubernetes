@@ -673,16 +673,34 @@ func wrapTestWithProvisionCalls(expectedProvisionCalls []provisionCall, toWrap t
 	return wrapTestWithPluginCalls(nil, nil, expectedProvisionCalls, toWrap)
 }
 
-type fakeCSINameTranslator struct{}
+type fakeCSITranslator struct{}
 
-func (t fakeCSINameTranslator) GetCSINameFromInTreeName(pluginName string) (string, error) {
+func (t fakeCSITranslator) GetCSINameFromInTreeName(pluginName string) (string, error) {
 	return "vendor.com/MockCSIDriver", nil
 }
 
-type fakeCSIMigratedPluginManager struct{}
+func (t fakeCSITranslator) GetInTreePluginNameFromSpec(pv *v1.PersistentVolume, vol *v1.Volume) (string, error) {
+	return mockPluginName, nil
+}
 
-func (t fakeCSIMigratedPluginManager) IsMigrationEnabledForPlugin(pluginName string) bool {
+func (t fakeCSITranslator) IsMigratableIntreePluginByName(inTreePluginName string) bool {
 	return true
+}
+
+func (t fakeCSITranslator) IsMigratable(pv *v1.PersistentVolume, vol *v1.Volume) bool {
+	return true
+}
+
+func (t fakeCSITranslator) TranslateInTreePVToCSI(logger klog.Logger, pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
+	return pv, nil
+}
+
+func (t fakeCSITranslator) TranslateInTreeInlineVolumeToCSI(logger klog.Logger, volume *v1.Volume, podNamespace string) (*v1.PersistentVolume, error) {
+	return nil, nil
+}
+
+func (t fakeCSITranslator) TranslateCSIPVToInTree(pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
+	return pv, nil
 }
 
 // wrapTestWithCSIMigrationProvisionCalls returns a testCall that:
@@ -692,8 +710,7 @@ func wrapTestWithCSIMigrationProvisionCalls(toWrap testCall) testCall {
 	plugin := &mockVolumePlugin{}
 	return func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
 		ctrl.volumePluginMgr.InitPlugins([]volume.VolumePlugin{plugin}, nil /* prober */, ctrl)
-		ctrl.translator = fakeCSINameTranslator{}
-		ctrl.csiMigratedPluginManager = fakeCSIMigratedPluginManager{}
+		ctrl.csiTranslator = fakeCSITranslator{}
 		return toWrap(ctrl, reactor, test)
 	}
 }

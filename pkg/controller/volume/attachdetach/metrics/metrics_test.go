@@ -23,7 +23,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	csitrans "k8s.io/csi-translation-lib"
@@ -31,7 +30,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	controllervolumetesting "k8s.io/kubernetes/pkg/controller/volume/attachdetach/testing"
-	"k8s.io/kubernetes/pkg/volume/csimigration"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util/types"
 )
@@ -120,7 +118,6 @@ func TestVolumesInUseMetricCollection(t *testing.T) {
 		nil,
 		nil,
 		fakeVolumePluginMgr,
-		csimigration.NewPluginManager(csiTranslator, utilfeature.DefaultFeatureGate),
 		csiTranslator)
 	logger, _ := ktesting.NewTestContext(t)
 	nodeUseMap := metricCollector.getVolumeInUseCount(logger)
@@ -163,7 +160,6 @@ func TestTotalVolumesMetricCollection(t *testing.T) {
 		asw,
 		dsw,
 		fakeVolumePluginMgr,
-		csimigration.NewPluginManager(csiTranslator, utilfeature.DefaultFeatureGate),
 		csiTranslator)
 
 	totalVolumesMap := metricCollector.getTotalVolumesCount()

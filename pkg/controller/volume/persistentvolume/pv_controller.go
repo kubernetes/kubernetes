@@ -51,6 +51,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
 	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
 	vol "k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/csimigration"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
@@ -125,16 +126,6 @@ const createProvisionedPVRetryCount = 5
 
 // Interval between retries when we create a PV object for a provisioned volume.
 const createProvisionedPVInterval = 10 * time.Second
-
-// CSINameTranslator can get the CSI Driver name based on the in-tree plugin name
-type CSINameTranslator interface {
-	GetCSINameFromInTreeName(pluginName string) (string, error)
-}
-
-// CSIMigratedPluginManager keeps track of CSI migration status of a plugin
-type CSIMigratedPluginManager interface {
-	IsMigrationEnabledForPlugin(pluginName string) bool
-}
 
 // PersistentVolumeController is a controller that synchronizes
 // PersistentVolumeClaims and PersistentVolumes. It starts two
@@ -224,8 +215,7 @@ type PersistentVolumeController struct {
 	//     abort:      N.A.
 	operationTimestamps metrics.OperationStartTimeCache
 
-	translator               CSINameTranslator
-	csiMigratedPluginManager CSIMigratedPluginManager
+	csiTranslator csimigration.InTreeToCSITranslator
 }
 
 // syncClaim is the main controller method to decide what to do with a claim.
@@ -1829,9 +1819,9 @@ func (ctrl *PersistentVolumeController) provisionClaimOperationExternal(
 	// Set provisionerName to external provisioner name by setClaimProvisioner
 	var err error
 	provisionerName := storageClass.Provisioner
-	if ctrl.csiMigratedPluginManager.IsMigrationEnabledForPlugin(storageClass.Provisioner) {
+	if ctrl.csiTranslator.IsMigratableIntreePluginByName(storageClass.Provisioner) {
 		// update the provisioner name to use the migrated CSI plugin name
-		provisionerName, err = ctrl.translator.GetCSINameFromInTreeName(storageClass.Provisioner)
+		provisionerName, err = ctrl.csiTranslator.GetCSINameFromInTreeName(storageClass.Provisioner)
 		if err != nil {
 			strerr := fmt.Sprintf("error getting CSI name for In tree plugin %s: %v", storageClass.Provisioner, err)
 			logger.V(2).Info(strerr)
@@ -1934,7 +1924,7 @@ func (ctrl *PersistentVolumeController) findProvisionablePlugin(claim *v1.Persis
 	}
 
 	// Find a plugin for the class
-	if ctrl.csiMigratedPluginManager.IsMigrationEnabledForPlugin(class.Provisioner) {
+	if ctrl.csiTranslator.IsMigratableIntreePluginByName(class.Provisioner) {
 		// CSI migration scenario - do not depend on in-tree plugin
 		return nil, class, nil
 	}
@@ -2010,8 +2000,8 @@ func (ctrl *PersistentVolumeController) getProvisionerNameFromVolume(volume *v1.
 	if err != nil {
 		return "N/A"
 	}
-	if ctrl.csiMigratedPluginManager.IsMigrationEnabledForPlugin(class.Provisioner) {
-		provisionerName, err := ctrl.translator.GetCSINameFromInTreeName(class.Provisioner)
+	if ctrl.csiTranslator.IsMigratableIntreePluginByName(class.Provisioner) {
+		provisionerName, err := ctrl.csiTranslator.GetCSINameFromInTreeName(class.Provisioner)
 		if err != nil {
 			return "N/A"
 		}
@@ -2026,10 +2016,10 @@ func (ctrl *PersistentVolumeController) getProvisionerName(plugin vol.Provisiona
 	if plugin != nil {
 		return plugin.GetPluginName()
 	}
-	if ctrl.csiMigratedPluginManager.IsMigrationEnabledForPlugin(storageClass.Provisioner) {
+	if ctrl.csiTranslator.IsMigratableIntreePluginByName(storageClass.Provisioner) {
 		// get the name of the CSI plugin that the in-tree storage class
 		// provisioner has migrated to
-		provisionerName, err := ctrl.translator.GetCSINameFromInTreeName(storageClass.Provisioner)
+		provisionerName, err := ctrl.csiTranslator.GetCSINameFromInTreeName(storageClass.Provisioner)
 		if err != nil {
 			return "N/A"
 		}
