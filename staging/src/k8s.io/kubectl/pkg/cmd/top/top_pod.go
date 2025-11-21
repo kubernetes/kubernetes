@@ -20,12 +20,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/discovery"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -85,7 +87,10 @@ var (
 		kubectl top pod POD_NAME --containers
 
 		# Show metrics for the pods defined by label name=myLabel
-		kubectl top pod -l name=myLabel`))
+		kubectl top pod -l name=myLabel
+		
+		# Show metrics for pods running on a specific node
+		kubectl top pod --field-selector spec.nodeName=NODE_NAME`))
 )
 
 func NewCmdTopPod(f cmdutil.Factory, o *TopPodOptions, streams genericiooptions.IOStreams) *cobra.Command {
@@ -111,7 +116,7 @@ func NewCmdTopPod(f cmdutil.Factory, o *TopPodOptions, streams genericiooptions.
 		Aliases: []string{"pods", "po"},
 	}
 	cmdutil.AddLabelSelectorFlagVar(cmd, &o.LabelSelector)
-	cmd.Flags().StringVar(&o.FieldSelector, "field-selector", o.FieldSelector, "Selector (field query) to filter on, supports '=', '==', and '!='.(e.g. --field-selector key1=value1,key2=value2). The server only supports a limited number of field queries per type.")
+	cmd.Flags().StringVar(&o.FieldSelector, "field-selector", o.FieldSelector, "Selector (field query) to filter on, supports '=', '==', and '!='.(e.g. --field-selector key1=value1,key2=value2). The server only supports a limited number of field queries per type. For pods, spec.nodeName is supported for filtering by node name.")
 	cmd.Flags().StringVar(&o.SortBy, "sort-by", o.SortBy, "If non-empty, sort pods list using specified field. The field can be either 'cpu' or 'memory'.")
 	cmd.Flags().BoolVar(&o.PrintContainers, "containers", o.PrintContainers, "If present, print usage of containers within a pod.")
 	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespaces", "A", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
@@ -197,7 +202,7 @@ func (o TopPodOptions) RunTopPod() error {
 	if !metricsAPIAvailable {
 		return errors.New("Metrics API not available")
 	}
-	metrics, err := getMetricsFromMetricsAPI(o.MetricsClient, o.Namespace, o.ResourceName, o.AllNamespaces, labelSelector, fieldSelector)
+	metrics, err := getMetricsFromMetricsAPI(o.MetricsClient, o.PodClient, o.Namespace, o.ResourceName, o.AllNamespaces, labelSelector, fieldSelector)
 	if err != nil {
 		return err
 	}
@@ -222,7 +227,7 @@ func (o TopPodOptions) RunTopPod() error {
 	return o.Printer.PrintPodMetrics(metrics.Items, o.PrintContainers, o.AllNamespaces, o.NoHeaders, o.SortBy, o.Sum)
 }
 
-func getMetricsFromMetricsAPI(metricsClient metricsclientset.Interface, namespace, resourceName string, allNamespaces bool, labelSelector labels.Selector, fieldSelector fields.Selector) (*metricsapi.PodMetricsList, error) {
+func getMetricsFromMetricsAPI(metricsClient metricsclientset.Interface, podClient corev1client.PodsGetter, namespace, resourceName string, allNamespaces bool, labelSelector labels.Selector, fieldSelector fields.Selector) (*metricsapi.PodMetricsList, error) {
 	var err error
 	ns := metav1.NamespaceAll
 	if !allNamespaces {
@@ -236,9 +241,21 @@ func getMetricsFromMetricsAPI(metricsClient metricsclientset.Interface, namespac
 		}
 		versionedMetrics.Items = []metricsv1beta1api.PodMetrics{*m}
 	} else {
-		versionedMetrics, err = metricsClient.MetricsV1beta1().PodMetricses(ns).List(context.TODO(), metav1.ListOptions{LabelSelector: labelSelector.String(), FieldSelector: fieldSelector.String()})
+		// Check if spec.nodeName field selector is specified
+		nodeNameFieldSelector, filteredFieldSelector := extractNodeNameFieldSelector(fieldSelector)
+		
+		// Get metrics with filtered field selector (without spec.nodeName)
+		versionedMetrics, err = metricsClient.MetricsV1beta1().PodMetricses(ns).List(context.TODO(), metav1.ListOptions{LabelSelector: labelSelector.String(), FieldSelector: filteredFieldSelector.String()})
 		if err != nil {
 			return nil, err
+		}
+		
+		// Apply client-side node filtering if needed
+		if nodeNameFieldSelector != "" {
+			versionedMetrics.Items, err = filterMetricsByNodeName(versionedMetrics.Items, nodeNameFieldSelector, ns, podClient)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 	metrics := &metricsapi.PodMetricsList{}
@@ -247,6 +264,77 @@ func getMetricsFromMetricsAPI(metricsClient metricsclientset.Interface, namespac
 		return nil, err
 	}
 	return metrics, nil
+}
+
+// extractNodeNameFieldSelector extracts spec.nodeName field selector and returns it separately
+// along with a filtered field selector that excludes spec.nodeName
+func extractNodeNameFieldSelector(fieldSelector fields.Selector) (string, fields.Selector) {
+	// Convert selector to string and parse requirements
+	selectorString := fieldSelector.String()
+	if selectorString == "" {
+		return "", fields.Everything()
+	}
+	
+	requirements := fieldSelector.Requirements()
+	var nodeNameValue string
+	var otherRequirements []fields.Requirement
+	
+	for _, req := range requirements {
+		if req.Field == "spec.nodeName" && req.Operator == selection.Equals {
+			nodeNameValue = req.Value
+		} else {
+			otherRequirements = append(otherRequirements, req)
+		}
+	}
+	
+	// Build filtered field selector without spec.nodeName
+	if len(otherRequirements) == 0 {
+		return nodeNameValue, fields.Everything()
+	}
+	
+	var selectorParts []string
+	for _, req := range otherRequirements {
+		switch req.Operator {
+		case selection.Equals:
+			selectorParts = append(selectorParts, req.Field+"="+req.Value)
+		case selection.NotEquals:
+			selectorParts = append(selectorParts, req.Field+"!="+req.Value)
+		}
+	}
+	
+	filteredSelector, err := fields.ParseSelector(strings.Join(selectorParts, ","))
+	if err != nil {
+		// If parsing fails, return everything selector
+		return nodeNameValue, fields.Everything()
+	}
+	
+	return nodeNameValue, filteredSelector
+}
+
+// filterMetricsByNodeName filters pod metrics by node name using pod specs
+func filterMetricsByNodeName(items []metricsv1beta1api.PodMetrics, nodeName, namespace string, podClient corev1client.PodsGetter) ([]metricsv1beta1api.PodMetrics, error) {
+	if nodeName == "" {
+		return items, nil
+	}
+	
+	var filteredItems []metricsv1beta1api.PodMetrics
+	
+	for _, item := range items {
+		// Get the pod to check its spec.nodeName
+		pod, err := podClient.Pods(item.Namespace).Get(context.TODO(), item.Name, metav1.GetOptions{})
+		if err != nil {
+			// If we can't get the pod, skip it (it might have been deleted)
+			klog.V(4).Infof("Could not get pod %s/%s to check node name: %v", item.Namespace, item.Name, err)
+			continue
+		}
+		
+		// Check if the pod is on the specified node
+		if pod.Spec.NodeName == nodeName {
+			filteredItems = append(filteredItems, item)
+		}
+	}
+	
+	return filteredItems, nil
 }
 
 func verifyEmptyMetrics(o TopPodOptions, labelSelector labels.Selector, fieldSelector fields.Selector) error {
