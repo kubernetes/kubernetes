@@ -468,7 +468,7 @@ func (ev *Evaluator) prepareCandidate(ctx context.Context, c Candidate, pod *v1.
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	logger := klog.FromContext(ctx)
-	errCh := parallelize.NewErrorChannel()
+	errCh := parallelize.NewErrorChannel[error]()
 	fh.Parallelizer().Until(ctx, len(c.Victims().Pods), func(index int) {
 		victim := c.Victims().Pods[index]
 		if victim.DeletionTimestamp != nil {
@@ -553,7 +553,7 @@ func (ev *Evaluator) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName 
 		return
 	}
 
-	errCh := parallelize.NewErrorChannel()
+	errCh := parallelize.NewErrorChannel[error]()
 	preemptPod := func(index int) {
 		victim := victimPods[index]
 		if err := ev.PreemptPod(ctx, c, pod, victim, pluginName); err != nil {

@@ -1288,7 +1288,7 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state fwk.CycleStat
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	errCh := parallelize.NewErrorChannel()
+	errCh := parallelize.NewErrorChannel[error]()
 
 	if len(plugins) > 0 {
 		logger := klog.FromContext(ctx)
