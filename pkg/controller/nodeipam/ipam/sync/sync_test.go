@@ -231,19 +231,24 @@ func TestNodeSyncResync(t *testing.T) {
 	fake := &fakeAPIs{
 		nodeRet:       nodeWithCIDRRange,
 		resyncTimeout: time.Millisecond,
-		reportChan:    make(chan struct{}),
+		reportChan:    make(chan struct{}, 2),
 		logger:        logger,
 	}
 	cidr, _ := cidrset.NewCIDRSet(clusterCIDRRange, 24)
 	sync := New(fake, fake, fake, SyncFromCluster, "node1", cidr)
 	doneChan := make(chan struct{})
 	go sync.Loop(logger, doneChan)
-	<-fake.reportChan
+	select {
+	case <-fake.reportChan:
+	case <-time.After(time.Second):
+		t.Fatalf("timed out waiting for resync")
+	}
 	close(sync.opChan)
-	// Unblock loop().
-	go func() {
-		<-fake.reportChan
-	}()
+	// Drain a possible in-flight resync without leaking a goroutine.
+	select {
+	case <-fake.reportChan:
+	case <-time.After(50 * time.Millisecond):
+	}
 	<-doneChan
 	fake.dumpTrace()
 }
