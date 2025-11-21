@@ -39,6 +39,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	svmv1beta1 "k8s.io/api/storagemigration/v1beta1"
+	"k8s.io/apiextensions-apiserver/pkg/apihelpers"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	crdintegration "k8s.io/apiextensions-apiserver/test/integration"
@@ -1054,6 +1055,29 @@ func (svm *svmTest) setupServerCert(t *testing.T) *certContext {
 	}
 }
 
+func (svm *svmTest) crdMigrated(t *testing.T, crdName string) bool {
+	t.Helper()
+
+	crd, err := svm.apiextensionsclient.ApiextensionsV1().CustomResourceDefinitions().Get(context.Background(), crdName, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to get CRD: %v", err)
+	}
+
+	var storedVersion string
+	for _, version := range crd.Spec.Versions {
+		if version.Storage {
+			storedVersion = version.Name
+		}
+	}
+
+	if len(crd.Status.StoredVersions) != 1 || crd.Status.StoredVersions[0] != storedVersion {
+		return false
+	}
+
+	cond := apihelpers.FindCRDCondition(crd, apiextensionsv1.Migrating)
+	return cond.Status == apiextensionsv1.ConditionFalse
+}
+
 func (svm *svmTest) isCRStoredAtVersion(t *testing.T, version, crName string) bool {
 	t.Helper()
 
@@ -1072,7 +1096,7 @@ func (svm *svmTest) isCRStoredAtVersion(t *testing.T, version, crName string) bo
 	return obj.GetAPIVersion() == fmt.Sprintf("%s/%s", crdGroup, version)
 }
 
-func (svm *svmTest) isCRDMigrated(ctx context.Context, t *testing.T, crdSVMName, triggerCRName string) bool {
+func (svm *svmTest) isCRDMigrated(ctx context.Context, t *testing.T, crdSVMName, crdName, triggerCRName string) bool {
 	t.Helper()
 
 	var triggerOnce sync.Once
@@ -1099,8 +1123,8 @@ func (svm *svmTest) isCRDMigrated(ctx context.Context, t *testing.T, crdSVMName,
 				return false, nil
 			}
 
-			if metaconditions.IsStatusConditionTrue(svmConditions, string(svmv1beta1.MigrationSucceeded)) {
-				t.Logf("%q SVM has completed migration", crdSVMName)
+			if metaconditions.IsStatusConditionTrue(svmConditions, string(svmv1beta1.MigrationSucceeded)) && svm.crdMigrated(t, crdName) {
+				t.Logf("%q SVM has completed migration for crd %s", crdSVMName, crdName)
 				return true, nil
 			}
 
