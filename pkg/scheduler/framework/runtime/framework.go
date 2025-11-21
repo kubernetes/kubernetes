@@ -1301,7 +1301,7 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state fwk.CycleStat
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	errCh := parallelize.NewErrorChannel()
+	errCh := parallelize.NewResultChannel[error]()
 
 	if len(plugins) > 0 {
 		logger := klog.FromContext(ctx)
@@ -1326,7 +1326,7 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state fwk.CycleStat
 				s, status := f.runScorePlugin(ctx, pl, state, pod, nodeInfo)
 				if !status.IsSuccess() {
 					err := fmt.Errorf("plugin %q failed with: %w", pl.Name(), status.AsError())
-					errCh.SendErrorWithCancel(err, cancel)
+					errCh.SendWithCancel(err, cancel)
 					return
 				}
 				pluginToNodeScores[pl.Name()][index] = fwk.NodeScore{
@@ -1335,7 +1335,7 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state fwk.CycleStat
 				}
 			}
 		}, metrics.Score)
-		if err := errCh.ReceiveError(); err != nil {
+		if err := errCh.Receive(); err != nil {
 			return nil, fwk.AsStatus(fmt.Errorf("running Score plugins: %w", err))
 		}
 	}
@@ -1350,11 +1350,11 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state fwk.CycleStat
 		status := f.runScoreExtension(ctx, pl, state, pod, nodeScoreList)
 		if !status.IsSuccess() {
 			err := fmt.Errorf("plugin %q failed with: %w", pl.Name(), status.AsError())
-			errCh.SendErrorWithCancel(err, cancel)
+			errCh.SendWithCancel(err, cancel)
 			return
 		}
 	}, metrics.Score)
-	if err := errCh.ReceiveError(); err != nil {
+	if err := errCh.Receive(); err != nil {
 		return nil, fwk.AsStatus(fmt.Errorf("running Normalize on Score plugins: %w", err))
 	}
 
@@ -1373,7 +1373,7 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state fwk.CycleStat
 
 			if score > fwk.MaxNodeScore || score < fwk.MinNodeScore {
 				err := fmt.Errorf("plugin %q returns an invalid score %v, it should in the range of [%v, %v] after normalizing", pl.Name(), score, fwk.MinNodeScore, fwk.MaxNodeScore)
-				errCh.SendErrorWithCancel(err, cancel)
+				errCh.SendWithCancel(err, cancel)
 				return
 			}
 			weightedScore := score * int64(weight)
@@ -1385,7 +1385,7 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state fwk.CycleStat
 		}
 		allNodePluginScores[index] = nodePluginScores
 	}, metrics.Score)
-	if err := errCh.ReceiveError(); err != nil {
+	if err := errCh.Receive(); err != nil {
 		return nil, fwk.AsStatus(fmt.Errorf("applying score defaultWeights on Score plugins: %w", err))
 	}
 

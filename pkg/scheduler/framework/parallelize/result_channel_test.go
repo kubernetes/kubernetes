@@ -25,22 +25,22 @@ import (
 )
 
 func TestErrorChannel(t *testing.T) {
-	errCh := NewErrorChannel()
+	errCh := NewResultChannel[error]()
 
-	if actualErr := errCh.ReceiveError(); actualErr != nil {
+	if actualErr := errCh.Receive(); actualErr != nil {
 		t.Errorf("expect nil from err channel, but got %v", actualErr)
 	}
 
 	err := errors.New("unknown error")
-	errCh.SendError(err)
-	if actualErr := errCh.ReceiveError(); actualErr != err {
+	errCh.Send(err)
+	if actualErr := errCh.Receive(); !errors.Is(actualErr, err) {
 		t.Errorf("expect %v from err channel, but got %v", err, actualErr)
 	}
 
 	_, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
-	errCh.SendErrorWithCancel(err, cancel)
-	if actualErr := errCh.ReceiveError(); actualErr != err {
+	errCh.SendWithCancel(err, cancel)
+	if actualErr := errCh.Receive(); !errors.Is(actualErr, err) {
 		t.Errorf("expect %v from err channel, but got %v", err, actualErr)
 	}
 
