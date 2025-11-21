@@ -38,3 +38,16 @@ const (
 	LimitedSwap SwapBehavior = "LimitedSwap"
 	NoSwap      SwapBehavior = "NoSwap"
 )
+
+// Pod status condition reasons and messages
+const (
+	// PodReadyToStartContainers condition reason
+	PodSandboxNotReadyReason = "PodSandboxNotReady"
+
+	// PodReadyToStartContainers condition messages
+	PodSandboxNotReadyMsgNoPodSandbox         = "no pod sandbox exists"
+	PodSandboxNotReadyMsgMultipleSandboxes    = "multiple pod sandboxes are ready"
+	PodSandboxNotReadyMsgSandboxNotReady      = "pod sandbox is not ready"
+	PodSandboxNotReadyMsgNetworkNamespaceMode = "network namespace mode changed"
+	PodSandboxNotReadyMsgNoIPAddress          = "pod sandbox has no IP address"
+)
