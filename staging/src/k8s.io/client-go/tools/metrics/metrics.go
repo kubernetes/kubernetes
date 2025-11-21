@@ -42,6 +42,11 @@ type LatencyMetric interface {
 	Observe(ctx context.Context, verb string, u url.URL, latency time.Duration)
 }
 
+// RateLimiterHitCountMetric observes client rate limiter hit count partitioned by verb and url.
+type RateLimiterHitCountMetric interface {
+	Increment(ctx context.Context, verb string, u url.URL)
+}
+
 type ResolverLatencyMetric interface {
 	Observe(ctx context.Context, host string, latency time.Duration)
 }
@@ -100,6 +105,8 @@ var (
 	ResponseSize SizeMetric = noopSize{}
 	// RateLimiterLatency is the client side rate limiter latency metric.
 	RateLimiterLatency LatencyMetric = noopLatency{}
+	// RateLimitHitCount is the client side rate limiter hit count metric.
+	RateLimiterHitCount RateLimiterHitCountMetric = noopRateLimiterHitCount{}
 	// RequestResult is the result metric that rest clients will update.
 	RequestResult ResultMetric = noopResult{}
 	// ExecPluginCalls is the number of calls made to an exec plugin, partitioned by
@@ -128,6 +135,7 @@ type RegisterOpts struct {
 	RequestSize           SizeMetric
 	ResponseSize          SizeMetric
 	RateLimiterLatency    LatencyMetric
+	RateLimiterHitCount   RateLimiterHitCountMetric
 	RequestResult         ResultMetric
 	ExecPluginCalls       CallsMetric
 	ExecPluginPolicyCalls PolicyCallsMetric
@@ -161,6 +169,9 @@ func Register(opts RegisterOpts) {
 		if opts.RateLimiterLatency != nil {
 			RateLimiterLatency = opts.RateLimiterLatency
 		}
+		if opts.RateLimiterHitCount != nil {
+			RateLimiterHitCount = opts.RateLimiterHitCount
+		}
 		if opts.RequestResult != nil {
 			RequestResult = opts.RequestResult
 		}
@@ -193,6 +204,10 @@ func (noopExpiry) Set(*time.Time) {}
 type noopLatency struct{}
 
 func (noopLatency) Observe(context.Context, string, url.URL, time.Duration) {}
+
+type noopRateLimiterHitCount struct{}
+
+func (noopRateLimiterHitCount) Increment(ctx context.Context, verb string, u url.URL) {}
 
 type noopResolverLatency struct{}
 
