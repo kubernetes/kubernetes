@@ -85,3 +85,88 @@ func TestClientGOMetrics(t *testing.T) {
 		})
 	}
 }
+
+func TestTransportCAReloadsMetric(t *testing.T) {
+	tests := []struct {
+		description string
+		name        string
+		metric      interface{}
+		update      func()
+		want        string
+	}{
+		{
+			description: "Reload success, reason: unchanged",
+			name:        "rest_client_transport_ca_reload_total",
+			metric:      transportCAReloads,
+			update: func() {
+				metrics.TransportCAReloads.Increment("success", "unchanged")
+			},
+			want: `
+			            # HELP rest_client_transport_ca_reload_total [ALPHA] Number of times a CA reload is attempted, partitioned by the result and reason for the reload attempt
+			            # TYPE rest_client_transport_ca_reload_total counter
+			            rest_client_transport_ca_reload_total{reason="unchanged", result="success"} 1
+				`,
+		},
+		{
+			description: "Reload success, reason: updated",
+			name:        "rest_client_transport_ca_reload_total",
+			metric:      transportCAReloads,
+			update: func() {
+				metrics.TransportCAReloads.Increment("success", "updated")
+			},
+			want: `
+			            # HELP rest_client_transport_ca_reload_total [ALPHA] Number of times a CA reload is attempted, partitioned by the result and reason for the reload attempt
+			            # TYPE rest_client_transport_ca_reload_total counter
+			            rest_client_transport_ca_reload_total{reason="updated", result="success"} 1
+				`,
+		},
+		{
+			description: "Reload failure, reason: read_error",
+			name:        "rest_client_transport_ca_reload_total",
+			metric:      transportCAReloads,
+			update: func() {
+				metrics.TransportCAReloads.Increment("failure", "read_error")
+			},
+			want: `
+			            # HELP rest_client_transport_ca_reload_total [ALPHA] Number of times a CA reload is attempted, partitioned by the result and reason for the reload attempt
+			            # TYPE rest_client_transport_ca_reload_total counter
+			            rest_client_transport_ca_reload_total{reason="read_error", result="failure"} 1
+				`,
+		},
+		{
+			description: "Reload failure, reason: ca_parse_error",
+			name:        "rest_client_transport_ca_reload_total",
+			metric:      transportCAReloads,
+			update: func() {
+				metrics.TransportCAReloads.Increment("failure", "ca_parse_error")
+			},
+			want: `
+			            # HELP rest_client_transport_ca_reload_total [ALPHA] Number of times a CA reload is attempted, partitioned by the result and reason for the reload attempt
+			            # TYPE rest_client_transport_ca_reload_total counter
+			            rest_client_transport_ca_reload_total{reason="ca_parse_error", result="failure"} 1
+				`,
+		},
+	}
+	// no need to register the metrics here, since the init function of
+	// the package registers all the client-go metrics.
+	for _, test := range tests {
+		t.Run(test.description, func(t *testing.T) {
+			resetter, resettable := test.metric.(interface {
+				Reset()
+			})
+			if !resettable {
+				t.Fatalf("the metric must be resettaable: %s", test.name)
+			}
+
+			// Since prometheus' gatherer is global, other tests may have updated
+			// metrics already, so we need to reset them prior to running this test.
+			// This also implies that we can't run this test in parallel with other tests.
+			resetter.Reset()
+			test.update()
+
+			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(test.want), test.name); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
