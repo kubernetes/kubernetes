@@ -122,10 +122,14 @@ func handleStatusz(componentName string, reg statuszRegistry, serializer runtime
 		}
 
 		var targetGV schema.GroupVersion
-		switch serializerInfo.MediaType {
-		case "application/json":
+		if serializerInfo.MediaType == "text/plain" {
+			// Even though text/plain serialization does not use the group/version,
+			// the serialization machinery expects a non-zero schema.GroupVersion to be passed.
+			// Passing the zero value can cause errors or unexpected behavior in the negotiation logic.
+			targetGV = schemeGroupVersion
+		} else {
 			if mediaType.Convert == nil {
-				err := fmt.Errorf("content negotiation failed: mediaType.Convert is nil for application/json")
+				err := fmt.Errorf("content negotiation failed: mediaType.Convert is nil for %s", serializerInfo.MediaType)
 				utilruntime.HandleError(err)
 				responsewriters.ErrorNegotiated(
 					err,
@@ -141,22 +145,6 @@ func handleStatusz(componentName string, reg statuszRegistry, serializer runtime
 			if deprecated {
 				w.Header().Set("Warning", `299 - "This version of the statusz endpoint is deprecated. Please use a newer version."`)
 			}
-		case "text/plain":
-			// Even though text/plain serialization does not use the group/version,
-			// the serialization machinery expects a non-zero schema.GroupVersion to be passed.
-			// Passing the zero value can cause errors or unexpected behavior in the negotiation logic.
-			targetGV = schemeGroupVersion
-		default:
-			err = fmt.Errorf("content negotiation failed: unsupported media type '%s'", serializerInfo.MediaType)
-			utilruntime.HandleError(err)
-			responsewriters.ErrorNegotiated(
-				err,
-				serializer,
-				schema.GroupVersion{},
-				w,
-				r,
-			)
-			return
 		}
 
 		writeResponse(obj, serializer, targetGV, restrictions, w, r)

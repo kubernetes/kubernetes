@@ -29,6 +29,10 @@ func (FlagzEndpointRestrictions) AllowsMediaTypeTransform(mimeType string, mimeS
 	if mimeType == "text" && mimeSubType == "plain" {
 		return gvk == nil
 	}
+	// Protobuf is not supported for zpages endpoints
+	if mimeType == "application" && mimeSubType == "vnd.kubernetes.protobuf" {
+		return false
+	}
 	return isStructured(gvk)
 }
 
