@@ -474,6 +474,7 @@ message Device {
   //
   // +optional
   // +oneOf=deviceType
+  // +k8s:optional
   optional BasicDevice basic = 2;
 }
 
