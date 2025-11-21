@@ -164,6 +164,41 @@ func TestGetImageRefImageNotAvailableLocally(t *testing.T) {
 	assert.Equal(t, imageNotAvailableLocallyRef, imageRef)
 }
 
+func TestGetImageRefPrefersDigest(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	_, fakeImageService, fakeManager, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	image := "localhost:5000/pause:testing"
+	imageID := "cd073f4c5f6a8e9dc6f3125ba00cf60819cae95c1ec84a1f146ee4a9cf9e803f"
+	// Simulate CRI-O behavior: multiple digests in repo_digests.
+	// CRI-O returns manifest list digest first, then platform-specific digests.
+	manifestListDigest := "localhost:5000/pause@sha256:278fb9dbcca9518083ad1e11276933a2e96f23de604a3a08cc3c80002767d24c"
+	platformDigest := "localhost:5000/pause@sha256:e5b941ef8f71de54dc3a13398226c269ba217d06650a21bd3afcf9d890cf1f41"
+	otherRegistryDigest := "registry.k8s.io/pause@sha256:e5b941ef8f71de54dc3a13398226c269ba217d06650a21bd3afcf9d890cf1f41"
+
+	// Manually create a fake image with repo_digests populated (simulating CRI-O behavior)
+	fakeImageService.Lock()
+	fakeImageService.Images = make(map[string]*runtimeapi.Image)
+	fakeImageService.Images[image] = &runtimeapi.Image{
+		Id:       imageID,
+		RepoTags: []string{image},
+		// CRI-O returns manifest list digest first, then platform-specific manifest digests
+		RepoDigests: []string{manifestListDigest, platformDigest, otherRegistryDigest},
+		Size:        742092,
+	}
+	fakeImageService.Unlock()
+
+	imageRef, err := fakeManager.GetImageRef(tCtx, kubecontainer.ImageSpec{Image: image})
+	require.NoError(t, err)
+
+	// GetImageRef returns the first digest matching the registry/repository prefix.
+	// With the fix in pkg/kubelet/images/image_manager.go, pull records are stored
+	// under ALL repo_digests, so it doesn't matter which one is returned here -
+	// the credential validation will work regardless.
+	assert.Equal(t, manifestListDigest, imageRef, "should return first digest matching localhost:5000/pause@")
+}
+
 func TestGetImageRefWithError(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	_, fakeImageService, fakeManager, err := createTestRuntimeManager(tCtx)

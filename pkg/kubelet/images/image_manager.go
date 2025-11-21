@@ -19,6 +19,7 @@ package images
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -325,7 +326,34 @@ func (m *imageManager) pullImage(ctx context.Context, logPrefix string, objRef *
 
 		defer func() {
 			if pullSucceeded {
-				m.imagePullManager.RecordImagePulled(ctx, image, imageRef, trackedToImagePullCreds(finalPullCredentials))
+				// Store pull record under all repo_digests to handle runtimes like CRI-O
+				// that return different digests from PullImage and ImageStatus.
+				// Get all digests for this image.
+				images, err := m.imageService.ListImages(ctx)
+				if err != nil {
+					klog.FromContext(ctx).Error(err, "Failed to list images after pull", "image", image, "imageRef", imageRef)
+					// Store under just the one digest we got from PullImage
+					m.imagePullManager.RecordImagePulled(ctx, image, imageRef, trackedToImagePullCreds(finalPullCredentials))
+					return
+				}
+
+				// Find the image we just pulled and store records for all its digests
+				stored := false
+				for _, img := range images {
+					if img.ID == imageRef || slices.Contains(img.RepoDigests, imageRef) || slices.Contains(img.RepoTags, image) {
+						// Store a record for each digest
+						for _, digest := range img.RepoDigests {
+							m.imagePullManager.RecordImagePulled(ctx, image, digest, trackedToImagePullCreds(finalPullCredentials))
+						}
+						stored = true
+						break
+					}
+				}
+
+				// Fall back to storing just the one digest if we couldn't find the image
+				if !stored {
+					m.imagePullManager.RecordImagePulled(ctx, image, imageRef, trackedToImagePullCreds(finalPullCredentials))
+				}
 			} else {
 				m.imagePullManager.RecordImagePullFailed(ctx, image)
 			}
