@@ -79,7 +79,7 @@ func restartAPIServer(ctx context.Context, node *v1.Node) error {
 }
 
 // This test requires that --feature-gates=APIServerIdentity=true be set on the apiserver
-var _ = SIGDescribe("kube-apiserver identity", framework.WithNodeConformance(), func() {
+var _ = SIGDescribe("kube-apiserver identity", func() {
 	f := framework.NewDefaultFramework("kube-apiserver-identity")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
