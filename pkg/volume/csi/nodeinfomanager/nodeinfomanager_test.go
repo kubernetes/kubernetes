@@ -40,7 +40,6 @@ import (
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
-	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/utils/ptr"
 )
 
@@ -811,39 +810,6 @@ func TestUninstallCSIDriver(t *testing.T) {
 				ObjectMeta: getCSINodeObjectMeta(),
 				Spec:       storage.CSINodeSpec{},
 			},
-		},
-		{
-			name:       "new node with valid max limit",
-			driverName: "com.example.csi.driver1",
-			existingNode: generateNode(
-				nil, /*nodeIDs*/
-				nil, /*labels*/
-				map[v1.ResourceName]resource.Quantity{
-					v1.ResourceCPU: *resource.NewScaledQuantity(4, -3),
-					v1.ResourceName(util.GetCSIAttachLimitKey("com.example.csi/driver1")): *resource.NewQuantity(10, resource.DecimalSI),
-				},
-			),
-			expectedNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "node1",
-				},
-				Status: v1.NodeStatus{
-					Capacity: v1.ResourceList{
-						v1.ResourceCPU: *resource.NewScaledQuantity(4, -3),
-						v1.ResourceName(util.GetCSIAttachLimitKey("com.example.csi/driver1")): *resource.NewQuantity(10, resource.DecimalSI),
-					},
-					Allocatable: v1.ResourceList{
-						v1.ResourceCPU: *resource.NewScaledQuantity(4, -3),
-						v1.ResourceName(util.GetCSIAttachLimitKey("com.example.csi/driver1")): *resource.NewQuantity(10, resource.DecimalSI),
-					},
-				},
-			},
-			expectedCSINode: &storage.CSINode{
-				ObjectMeta: getCSINodeObjectMeta(),
-				Spec:       storage.CSINodeSpec{},
-			},
-			inputTopology: nil,
-			inputNodeID:   "com.example.csi/csi-node1",
 		},
 	}
 
