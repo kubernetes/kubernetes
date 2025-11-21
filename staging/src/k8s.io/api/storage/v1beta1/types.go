@@ -168,12 +168,16 @@ type VolumeAttachmentList struct {
 type VolumeAttachmentSpec struct {
 	// attacher indicates the name of the volume driver that MUST handle this
 	// request. This is the name returned by GetPluginName().
+	// +required
+	// +k8s:required
 	Attacher string `json:"attacher" protobuf:"bytes,1,opt,name=attacher"`
 
 	// source represents the volume that should be attached.
 	Source VolumeAttachmentSource `json:"source" protobuf:"bytes,2,opt,name=source"`
 
 	// nodeName represents the node that the volume should be attached to.
+	// +required
+	// +k8s:required
 	NodeName string `json:"nodeName" protobuf:"bytes,3,opt,name=nodeName"`
 }
 

@@ -330,9 +330,18 @@ func TestVolumeAttachmentValidation(t *testing.T) {
 		},
 	}
 
+	ctx := genericapirequest.WithRequestInfo(
+		genericapirequest.NewContext(),
+		&genericapirequest.RequestInfo{
+			APIGroup:   "storage.k8s.io",
+			APIVersion: "v1",
+			Resource:   "volumeattachments",
+		},
+	)
+
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			err := Strategy.Validate(context.TODO(), test.volumeAttachment)
+			err := Strategy.Validate(ctx, test.volumeAttachment)
 			if len(err) > 0 && !test.expectError {
 				t.Errorf("Validation of object failed: %+v", err)
 			}

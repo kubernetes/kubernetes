@@ -148,7 +148,7 @@ func ValidateVolumeAttachment(volumeAttachment *storage.VolumeAttachment) field.
 // ValidateVolumeAttachmentV1 validates a v1/VolumeAttachment. It contains only extra checks missing in
 // ValidateVolumeAttachment.
 func ValidateVolumeAttachmentV1(volumeAttachment *storage.VolumeAttachment) field.ErrorList {
-	allErrs := apivalidation.ValidateCSIDriverName(volumeAttachment.Spec.Attacher, field.NewPath("spec.attacher"))
+	allErrs := apivalidation.ValidateCSIDriverName(volumeAttachment.Spec.Attacher, field.NewPath("spec.attacher"), apivalidation.RequiredCovered)
 
 	if volumeAttachment.Spec.Source.PersistentVolumeName != nil {
 		pvName := *volumeAttachment.Spec.Source.PersistentVolumeName
@@ -164,18 +164,8 @@ func ValidateVolumeAttachmentV1(volumeAttachment *storage.VolumeAttachment) fiel
 func validateVolumeAttachmentSpec(
 	spec *storage.VolumeAttachmentSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, validateAttacher(spec.Attacher, fldPath.Child("attacher"))...)
 	allErrs = append(allErrs, validateVolumeAttachmentSource(&spec.Source, fldPath.Child("source"))...)
 	allErrs = append(allErrs, validateNodeName(spec.NodeName, fldPath.Child("nodeName"))...)
-	return allErrs
-}
-
-// validateAttacher tests if attacher is a valid qualified name.
-func validateAttacher(attacher string, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	if len(attacher) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath, attacher))
-	}
 	return allErrs
 }
 
@@ -202,6 +192,10 @@ func validateVolumeAttachmentSource(source *storage.VolumeAttachmentSource, fldP
 // validateNodeName tests if the nodeName is valid for VolumeAttachment.
 func validateNodeName(nodeName string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
+	if len(nodeName) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath, "")).MarkCoveredByDeclarative()
+		return allErrs
+	}
 	for _, msg := range apivalidation.ValidateNodeName(nodeName, false /* prefix */) {
 		allErrs = append(allErrs, field.Invalid(fldPath, nodeName, msg))
 	}
