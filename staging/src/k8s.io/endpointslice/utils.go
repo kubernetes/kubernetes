@@ -407,3 +407,9 @@ func FindPort(pod *v1.Pod, svcPort *v1.ServicePort) (int, error) {
 
 	return 0, fmt.Errorf("no suitable port for manifest: %s", pod.UID)
 }
+
+// newAddrTypePortMapKey generates a PortMapKey from endpoint ports and address type.
+func newAddrTypePortMapKey(portMapKey endpointutil.PortMapKey, addrType discovery.AddressType) endpointutil.PortMapKey {
+	pmk := fmt.Sprintf("%s-%s", addrType, portMapKey)
+	return endpointutil.PortMapKey(pmk)
+}
