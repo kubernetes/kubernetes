@@ -563,12 +563,21 @@ func (o *GetOptions) Run(f cmdutil.Factory, args []string) error {
 		printer.PrintObj(info.Object, w)
 	}
 	w.Flush()
-	if trackingWriter.Written == 0 && !o.IgnoreNotFound && len(allErrs) == 0 {
-		// if we wrote no output, and had no errors, and are not ignoring NotFound, be sure we output something
-		if allResourcesNamespaced {
-			fmt.Fprintf(o.ErrOut, "No resources found in %s namespace.\n", o.Namespace)
+	if trackingWriter.Written == 0 && len(allErrs) == 0 {
+		if o.IgnoreNotFound {
+			// Output an additional warning states that --ignore-not-found has nothing to do with the error code.
+			fmt.Fprintln(o.ErrOut, "warning: Error message suppressed. Removing --ignore-not-found won't alter the exit code as the operation is considered successful by the HTTP status. "+ //nolint:errcheck
+				"See \"kubectl get -h\" for details of the flags.")
 		} else {
-			fmt.Fprintln(o.ErrOut, "No resources found")
+			// if we wrote no output, and had no errors, and are not ignoring NotFound, be sure we output something
+			if allResourcesNamespaced {
+				fmt.Fprintf(o.ErrOut, "No resources found in %s namespace.\n", o.Namespace) //nolint:errcheck
+			} else {
+				fmt.Fprintln(o.ErrOut, "No resources found.") //nolint:errcheck
+			}
+			// Output an additional warning states that --ignore-not-found has nothing to do with the error code.
+			fmt.Fprintln(o.ErrOut, "warning: Setting --ignore-not-found only suppresses error message above; it won't alter the exit code as the operation is considered successful by the HTTP status. "+ //nolint:errcheck
+				"See \"kubectl get -h\" for details of the flags.")
 		}
 	}
 	return utilerrors.NewAggregate(allErrs)
