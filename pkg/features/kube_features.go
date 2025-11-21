@@ -56,11 +56,6 @@ const (
 	// Allow spec.terminationGracePeriodSeconds to be overridden by MaxPodGracePeriodSeconds in soft evictions.
 	AllowOverwriteTerminationGracePeriodSeconds featuregate.Feature = "AllowOverwriteTerminationGracePeriodSeconds"
 
-	// owner: @bswartz
-	//
-	// Enables usage of any object for volume data source in PVCs
-	AnyVolumeDataSource featuregate.Feature = "AnyVolumeDataSource"
-
 	// owner: @liggitt
 	// kep: https://kep.k8s.io/4601
 	//
@@ -1137,12 +1132,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Deprecated, LockToDefault: true}, // remove in 1.38
 	},
 
-	AnyVolumeDataSource: {
-		{Version: version.MustParse("1.18"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.24"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.33 -> remove in 1.36
-	},
-
 	AuthorizeNodeWithSelectors: {
 		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
@@ -2171,8 +2160,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	AllowInsecureKubeletCertificateSigningRequests: {},
 
 	AllowOverwriteTerminationGracePeriodSeconds: {},
-
-	AnyVolumeDataSource: {},
 
 	AuthorizeNodeWithSelectors: {genericfeatures.AuthorizeWithSelectors},
 
