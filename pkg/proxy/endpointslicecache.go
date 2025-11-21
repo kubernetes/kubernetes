@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"sort"
 	"sync"
+	"time"
 
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -44,6 +45,11 @@ type EndpointSliceCache struct {
 	// the cache when they may have just moved to a different slice.
 	trackerByServiceMap map[types.NamespacedName]*endpointSliceTracker
 
+	// sequenceCounter is a counter that is incremented every time an EndpointSlice
+	// is updated. This allows us to track the order in which EndpointSlices were
+	// updated and process them in that order.
+	sequenceCounter uint64
+
 	makeEndpointInfo makeEndpointFunc
 	nodeName         string
 }
@@ -64,6 +70,8 @@ type endpointSliceDataByName map[string]*endpointSliceData
 type endpointSliceData struct {
 	endpointSlice *discovery.EndpointSlice
 	remove        bool
+	sequence      uint64
+	triggerTime   time.Time
 }
 
 // NewEndpointSliceCache initializes an EndpointSliceCache.
@@ -99,10 +107,16 @@ func (cache *EndpointSliceCache) updatePending(endpointSlice *discovery.Endpoint
 		return false
 	}
 
-	esData := &endpointSliceData{endpointSlice, remove}
-
 	cache.lock.Lock()
 	defer cache.lock.Unlock()
+
+	cache.sequenceCounter++
+	esData := &endpointSliceData{
+		endpointSlice: endpointSlice,
+		remove:        remove,
+		sequence:      cache.sequenceCounter,
+		triggerTime:   getLastChangeTriggerTime(endpointSlice.Annotations),
+	}
 
 	if _, ok := cache.trackerByServiceMap[serviceKey]; !ok {
 		cache.trackerByServiceMap[serviceKey] = newEndpointSliceTracker()
@@ -168,7 +182,20 @@ func (cache *EndpointSliceCache) getEndpointsMap(serviceNN types.NamespacedName,
 func (cache *EndpointSliceCache) endpointInfoByServicePort(serviceNN types.NamespacedName, sliceDataByName endpointSliceDataByName) spToEndpointMap {
 	endpointInfoBySP := spToEndpointMap{}
 
+	// Deterministic iteration order
+	sliceDataList := make([]*endpointSliceData, 0, len(sliceDataByName))
 	for _, sliceData := range sliceDataByName {
+		sliceDataList = append(sliceDataList, sliceData)
+	}
+	// Sort by trigger time and sequence
+	sort.Slice(sliceDataList, func(i, j int) bool {
+		if !sliceDataList[i].triggerTime.Equal(sliceDataList[j].triggerTime) {
+			return sliceDataList[i].triggerTime.Before(sliceDataList[j].triggerTime)
+		}
+		return sliceDataList[i].sequence < sliceDataList[j].sequence
+	})
+
+	for _, sliceData := range sliceDataList {
 		for _, port := range sliceData.endpointSlice.Ports {
 			if port.Name == nil {
 				klog.ErrorS(nil, "Ignoring port with nil name", "portName", port.Name)
@@ -233,9 +260,9 @@ func (cache *EndpointSliceCache) addEndpoints(svcPortName *ServicePortName, port
 			ready, serving, terminating, zoneHints, nodeHints)
 
 		// This logic ensures we're deduplicating potential overlapping endpoints
-		// isLocal should not vary between matching endpoints, but if it does, we
-		// favor a true value here if it exists.
-		if _, exists := endpointSet[endpointInfo.String()]; !exists || isLocal {
+		// when we can not infer which endpoint is more recent, we prefer the
+		// serving endpoint.
+		if _, exists := endpointSet[endpointInfo.String()]; !exists || serving {
 			endpointSet[endpointInfo.String()] = cache.makeEndpointInfo(endpointInfo, svcPortName)
 		}
 	}
@@ -257,13 +284,15 @@ func (cache *EndpointSliceCache) esDataChanged(serviceKey types.NamespacedName, 
 		// If there's already a pending value, return whether or not this would
 		// change that.
 		if pendingOk {
-			return !reflect.DeepEqual(esData, pendingData)
+			// compare only the data that is relevant for the proxy
+			return !reflect.DeepEqual(esData.endpointSlice, pendingData.endpointSlice) || esData.remove != pendingData.remove
 		}
 
 		// If there's already an applied value, return whether or not this would
 		// change that.
 		if appliedOk {
-			return !reflect.DeepEqual(esData, appliedData)
+			// compare only the data that is relevant for the proxy
+			return !reflect.DeepEqual(esData.endpointSlice, appliedData.endpointSlice) || esData.remove != appliedData.remove
 		}
 	}
 

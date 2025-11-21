@@ -201,6 +201,19 @@ func TestEndpointsMapFromESC(t *testing.T) {
 				},
 			},
 		},
+		"Different services with same endpoints should be independent": {
+			namespacedName: types.NamespacedName{Name: "svc1", Namespace: "ns1"},
+			hostname:       "host1",
+			endpointSlices: []*discovery.EndpointSlice{
+				generateEndpointSlice("svc1", "ns1", 1, 1, 999, 999, []string{"host1"}, []*int32{ptr.To[int32](80)}),
+				generateEndpointSlice("svc2", "ns1", 2, 1, 999, 999, []string{"host2"}, []*int32{ptr.To[int32](80)}),
+			},
+			expectedMap: map[ServicePortName][]*BaseEndpointInfo{
+				makeServicePortName("ns1", "svc1", "port-0", v1.ProtocolTCP): {
+					&BaseEndpointInfo{ip: "10.0.1.1", port: 80, endpoint: "10.0.1.1:80", isLocal: true, ready: true, serving: true, terminating: false},
+				},
+			},
+		},
 	}
 
 	for name, tc := range testCases {
@@ -303,6 +316,103 @@ func TestEndpointInfoByServicePort(t *testing.T) {
 						ip:          "10.0.1.2",
 						port:        8080,
 						endpoint:    "10.0.1.2:8080",
+						isLocal:     true,
+						ready:       true,
+						serving:     true,
+						terminating: false,
+					},
+				},
+			},
+		},
+		"two slices with duplicate IPs prefer newer triggerTime": {
+			namespacedName: types.NamespacedName{Name: "svc1", Namespace: "ns1"},
+			hostname:       "host1",
+			endpointSlices: []*discovery.EndpointSlice{
+				func() *discovery.EndpointSlice {
+					es := generateEndpointSliceWithOffset("svc1", "ns1", 1, 1, 1, 999, 999, []string{"host1"}, []*int32{ptr.To[int32](80)})
+					es.Annotations = map[string]string{v1.EndpointsLastChangeTriggerTime: time.Now().Add(time.Hour).Format(time.RFC3339Nano)}
+					es.Endpoints[0].NodeName = ptr.To("host1") // Winner
+					return es
+				}(),
+				func() *discovery.EndpointSlice {
+					es := generateEndpointSliceWithOffset("svc1", "ns1", 2, 1, 1, 999, 999, []string{"host2"}, []*int32{ptr.To[int32](80)})
+					es.Annotations = map[string]string{v1.EndpointsLastChangeTriggerTime: time.Now().Add(-time.Hour).Format(time.RFC3339Nano)}
+					es.Endpoints[0].NodeName = ptr.To("host2")
+					return es
+				}(),
+			},
+			expectedMap: spToEndpointMap{
+				makeServicePortName("ns1", "svc1", "port-0", v1.ProtocolTCP): {
+					"10.0.1.1:80": &BaseEndpointInfo{
+						ip:          "10.0.1.1",
+						port:        80,
+						endpoint:    "10.0.1.1:80",
+						isLocal:     true, // host1 is local
+						ready:       true,
+						serving:     true,
+						terminating: false,
+					},
+				},
+			},
+		},
+		"two slices with duplicate IPs prefer last one to be processed": {
+			namespacedName: types.NamespacedName{Name: "svc1", Namespace: "ns1"},
+			hostname:       "host1",
+			endpointSlices: []*discovery.EndpointSlice{
+				generateEndpointSliceWithOffset("svc1", "ns1", 1, 1, 2, 999, 999, []string{"host1"}, []*int32{ptr.To[int32](80)}),
+				generateEndpointSliceWithOffset("svc1", "ns1", 2, 1, 2, 999, 999, []string{"host2"}, []*int32{ptr.To[int32](80)}), // winner
+			},
+			expectedMap: spToEndpointMap{
+				makeServicePortName("ns1", "svc1", "port-0", v1.ProtocolTCP): {
+					"10.0.1.1:80": &BaseEndpointInfo{
+						ip:          "10.0.1.1",
+						port:        80,
+						endpoint:    "10.0.1.1:80",
+						isLocal:     false,
+						ready:       true,
+						serving:     true,
+						terminating: false,
+					},
+					"10.0.1.2:80": &BaseEndpointInfo{
+						ip:          "10.0.1.2",
+						port:        80,
+						endpoint:    "10.0.1.2:80",
+						isLocal:     false,
+						ready:       true,
+						serving:     true,
+						terminating: false,
+					},
+				},
+			},
+		},
+		"duplicates in same slice prefer serving": {
+			namespacedName: types.NamespacedName{Name: "svc1", Namespace: "ns1"},
+			hostname:       "host1",
+			endpointSlices: []*discovery.EndpointSlice{
+				func() *discovery.EndpointSlice {
+					es := generateEndpointSliceWithOffset("svc1", "ns1", 1, 1, 1, 999, 999, []string{"host1"}, []*int32{ptr.To[int32](80)})
+
+					// Duplicate the endpoint
+					ep1 := es.Endpoints[0]
+					ep1.Conditions.Ready = ptr.To(false) // Not serving
+					ep1.Conditions.Serving = ptr.To(false)
+					ep1.Conditions.Terminating = ptr.To(true)
+
+					ep2 := es.Endpoints[0]
+					ep2.Conditions.Ready = ptr.To(true) // Serving
+					ep2.Conditions.Serving = ptr.To(true)
+					ep2.Conditions.Terminating = ptr.To(false)
+					//  NotServing then Serving -> Serving should win
+					es.Endpoints = []discovery.Endpoint{ep1, ep2}
+					return es
+				}(),
+			},
+			expectedMap: spToEndpointMap{
+				makeServicePortName("ns1", "svc1", "port-0", v1.ProtocolTCP): {
+					"10.0.1.1:80": &BaseEndpointInfo{
+						ip:          "10.0.1.1",
+						port:        80,
+						endpoint:    "10.0.1.1:80",
 						isLocal:     true,
 						ready:       true,
 						serving:     true,
@@ -455,7 +565,7 @@ func TestEsDataChanged(t *testing.T) {
 				t.Fatalf("Expected no error calling endpointSliceCacheKeys(): %v", err)
 			}
 
-			esData := &endpointSliceData{tc.updatedSlice, false}
+			esData := &endpointSliceData{tc.updatedSlice, false, 0, time.Time{}}
 			changed := tc.cache.esDataChanged(serviceKey, sliceKey, esData)
 
 			if tc.expectChanged != changed {
