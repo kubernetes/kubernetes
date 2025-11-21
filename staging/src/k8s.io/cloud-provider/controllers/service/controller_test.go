@@ -2051,12 +2051,12 @@ func Test_shouldSyncUpdatedNode_individualPredicates(t *testing.T) {
 		name:       "other label changed F->T",
 		oldNode:    makeNode(),
 		newNode:    makeNode(tweakSetLabel("other", "")),
-		shouldSync: false,
+		shouldSync: true,
 	}, {
 		name:       "other label changed T->F",
 		oldNode:    makeNode(tweakSetLabel("other", "")),
 		newNode:    makeNode(),
-		shouldSync: false,
+		shouldSync: true,
 	}, {
 		name:       "readiness changed F->F",
 		oldNode:    makeNode(tweakSetReady(false)),
