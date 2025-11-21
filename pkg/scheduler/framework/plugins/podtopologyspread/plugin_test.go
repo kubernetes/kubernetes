@@ -188,6 +188,14 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 			expectedHint: fwk.Queue,
 		},
 		{
+			name: "add pod with nominated node",
+			pod: st.MakePod().UID("p").Name("p").Label("foo", "").
+				SpreadConstraint(1, "zone", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
+				Obj(),
+			newPod:       st.MakePod().UID("p2").NominatedNodeName("fake-node").Label("foo", "").Obj(),
+			expectedHint: fwk.Queue,
+		},
+		{
 			name: "add un-scheduled pod",
 			pod: st.MakePod().UID("p").Name("p").Label("foo", "").
 				SpreadConstraint(1, "zone", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).

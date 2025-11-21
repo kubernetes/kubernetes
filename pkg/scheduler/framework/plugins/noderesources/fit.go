@@ -416,7 +416,7 @@ func (f *Fit) isSchedulableAfterPodScaleDown(targetPod, originalPod, modifiedPod
 		return true
 	}
 
-	if modifiedPod.Spec.NodeName == "" {
+	if modifiedPod.Spec.NodeName == "" && modifiedPod.Status.NominatedNodeName == "" {
 		// If the update event is for a unscheduled Pod,
 		// it wouldn't make targetPod schedulable.
 		return false

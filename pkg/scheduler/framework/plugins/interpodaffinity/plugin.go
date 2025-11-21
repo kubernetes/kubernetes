@@ -173,7 +173,8 @@ func (pl *InterPodAffinity) isSchedulableAfterPodChange(logger klog.Logger, pod 
 	if err != nil {
 		return fwk.Queue, err
 	}
-	if (modifiedPod != nil && modifiedPod.Spec.NodeName == "") || (originalPod != nil && originalPod.Spec.NodeName == "") {
+	if (modifiedPod != nil && modifiedPod.Spec.NodeName == "" && modifiedPod.Status.NominatedNodeName == "") ||
+		(originalPod != nil && originalPod.Spec.NodeName == "" && originalPod.Status.NominatedNodeName == "") {
 		logger.V(5).Info("the added/updated/deleted pod is unscheduled, so it doesn't make the target pod schedulable",
 			"pod", klog.KObj(pod), "originalPod", klog.KObj(originalPod), "modifiedPod", klog.KObj(modifiedPod))
 		return fwk.QueueSkip, nil

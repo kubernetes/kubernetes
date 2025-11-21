@@ -54,6 +54,12 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 			expectedHint: fwk.QueueSkip,
 		},
 		{
+			name:         "add a pod with nominated node",
+			pod:          st.MakePod().Name("p").PodAffinityIn("service", "region", []string{"securityscan", "value2"}, st.PodAffinityWithRequiredReq).Obj(),
+			newPod:       st.MakePod().Label("service", "securityscan").NominatedNodeName("fake-node").Obj(),
+			expectedHint: fwk.Queue,
+		},
+		{
 			name:         "add a pod which doesn't match the pod affinity",
 			pod:          st.MakePod().Name("p").PodAffinityIn("service", "region", []string{"securityscan", "value2"}, st.PodAffinityWithRequiredReq).Obj(),
 			newPod:       st.MakePod().Node("fake-node").Label("aaa", "a").Obj(),
