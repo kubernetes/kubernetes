@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	genericfeatures "k8s.io/apiserver/pkg/features"
@@ -86,7 +87,12 @@ func withAuthorization(handler http.Handler, a authorizer.Authorizer, s runtime.
 		}
 		if err != nil {
 			audit.AddAuditAnnotation(ctx, reasonAnnotationKey, reasonError)
-			responsewriters.InternalError(w, req, err)
+
+			if apierrors.IsUnauthorized(err) {
+				http.Error(w, reason, http.StatusUnauthorized)
+			} else {
+				responsewriters.InternalError(w, req, err)
+			}
 			return
 		}
 
