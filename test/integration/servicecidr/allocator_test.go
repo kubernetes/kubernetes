@@ -218,6 +218,60 @@ func TestServiceAllocIPAddressLargeCIDR(t *testing.T) {
 
 }
 
+func TestInvalidService(t *testing.T) {
+	etcdOptions := framework.SharedEtcd()
+	apiServerOptions := kubeapiservertesting.NewDefaultTestServerOptions()
+	s := kubeapiservertesting.StartTestServerOrDie(t,
+		apiServerOptions,
+		[]string{
+			"--service-cluster-ip-range=10.0.0.0/24",
+			"--disable-admission-plugins=ServiceAccount",
+		},
+		etcdOptions)
+	defer s.TearDownFn()
+
+	client, err := clientset.NewForConfig(s.ClientConfig)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	var testCases = []struct {
+		name    string
+		ip      string
+		wantErr string
+	}{
+		{
+			name: "allocate",
+		},
+		{
+			name: "allocate specific IP",
+			ip:   "10.0.0.10",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			svc := &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type:      v1.ServiceTypeClusterIP,
+					ClusterIP: tc.ip,
+					Ports: []v1.ServicePort{
+						{Port: 80},
+					},
+				},
+			}
+			// It will fail because the service is missing a name
+			_, err = client.CoreV1().Services(metav1.NamespaceDefault).Create(context.TODO(), svc, metav1.CreateOptions{})
+			if !apierrors.IsInvalid(err) {
+				t.Errorf("unexpected error reason: %v", err)
+			}
+			if !strings.Contains(err.Error(), "name or generateName is required") {
+				t.Errorf("unexpected error text: %v", err)
+			}
+		})
+	}
+}
+
 func TestMigrateService(t *testing.T) {
 	etcdOptions := framework.SharedEtcd()
 	apiServerOptions := kubeapiservertesting.NewDefaultTestServerOptions()
