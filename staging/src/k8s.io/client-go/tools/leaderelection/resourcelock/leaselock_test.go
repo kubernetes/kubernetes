@@ -46,6 +46,10 @@ func (r *mockRecorder) AnnotatedEventf(object runtime.Object, annotations map[st
 	r.events = append(r.events, fmt.Sprintf(messageFmt, args...))
 }
 
+func (r *mockRecorder) LabeledAnnotatedEventf(object runtime.Object, labels, annotations map[string]string, eventtype, reason, messageFmt string, args ...interface{}) {
+	r.events = append(r.events, fmt.Sprintf(messageFmt, args...))
+}
+
 const (
 	testNamespace = "test-namespace"
 	testName      = "test-name"
