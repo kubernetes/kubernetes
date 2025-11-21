@@ -1837,7 +1837,7 @@ func ValidateCSIDriverName(driverName string, fldPath *field.Path, opts ...Valid
 	for _, msg := range validation.IsDNS1123Subdomain(strings.ToLower(driverName)) {
 		err := field.Invalid(fldPath, driverName, msg)
 		if slices.Contains(opts, FormatCovered) {
-			err = err.WithOrigin("format=k8s-long-name-caseless").MarkCoveredByDeclarative()
+			err = err.WithOrigin("format=k8s-long-name-caseless")
 		}
 		allErrs = append(allErrs, err)
 	}
