@@ -1,4 +1,4 @@
-linux/amd64=debian:stretch-slim
-linux/arm64=arm64v8/debian:stretch-slim
-linux/ppc64le=ppc64le/debian:stretch-slim
-linux/s390x=s390x/debian:stretch-slim
+linux/amd64=debian:trixie-slim
+linux/arm64=arm64v8/debian:trixie-slim
+linux/ppc64le=ppc64le/debian:trixie-slim
+linux/s390x=s390x/debian:trixie-slim
