@@ -216,8 +216,8 @@ func (h *peerProxyHandler) WrapHandler(handler http.Handler) http.Handler {
 			return
 		}
 
-		rand := rand.Intn(len(peerEndpoints))
-		peerEndpoint := peerEndpoints[rand]
+		endpointIndex := rand.Intn(len(peerEndpoints))
+		peerEndpoint := peerEndpoints[endpointIndex]
 		h.proxyRequestToDestinationAPIServer(r, w, peerEndpoint)
 	})
 }
