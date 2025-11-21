@@ -22,11 +22,6 @@ limitations under the License.
 package v1alpha1
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
-func (in BasicSchedulingPolicy) OpenAPIModelName() string {
-	return "io.k8s.api.scheduling.v1alpha1.BasicSchedulingPolicy"
-}
-
-// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in GangSchedulingPolicy) OpenAPIModelName() string {
 	return "io.k8s.api.scheduling.v1alpha1.GangSchedulingPolicy"
 }
