@@ -364,7 +364,7 @@ func validateCSINodeDriverNodeID(nodeID string, fldPath *field.Path, validationO
 
 	// nodeID is always required
 	if len(nodeID) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath, nodeID))
+		allErrs = append(allErrs, field.Required(fldPath, nodeID)).MarkCoveredByDeclarative()
 	}
 	maxLength := csiNodeIDMaxLength
 	if validationOpts.AllowLongNodeID {
