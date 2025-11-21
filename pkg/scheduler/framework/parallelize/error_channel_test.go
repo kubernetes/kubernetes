@@ -25,7 +25,7 @@ import (
 )
 
 func TestErrorChannel(t *testing.T) {
-	errCh := NewErrorChannel()
+	errCh := NewErrorChannel[error]()
 
 	if actualErr := errCh.ReceiveError(); actualErr != nil {
 		t.Errorf("expect nil from err channel, but got %v", actualErr)

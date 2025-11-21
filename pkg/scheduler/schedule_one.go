@@ -646,7 +646,7 @@ func (sched *Scheduler) findNodesThatPassFilters(
 		return feasibleNodes, nil
 	}
 
-	errCh := parallelize.NewErrorChannel()
+	errCh := parallelize.NewErrorChannel[error]()
 	var feasibleNodesLen int32
 	ctx, cancel := context.WithCancelCause(ctx)
 	defer cancel(errors.New("findNodesThatPassFilters has completed"))
