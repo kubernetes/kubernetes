@@ -36,19 +36,20 @@ type StatefulSetStatusApplyConfiguration struct {
 	// updatedReplicas is the number of Pods created by the StatefulSet controller from the StatefulSet version
 	// indicated by updateRevision.
 	UpdatedReplicas *int32 `json:"updatedReplicas,omitempty"`
-	// currentRevision, if not empty, indicates the version of the StatefulSet used to generate Pods in the
+	// currentRevision – if not empty – indicates the version of the StatefulSet used to generate Pods in the
 	// sequence [0,currentReplicas).
 	CurrentRevision *string `json:"currentRevision,omitempty"`
-	// updateRevision, if not empty, indicates the version of the StatefulSet used to generate Pods in the sequence
+	// updateRevision – if not empty – indicates the version of the StatefulSet used to generate Pods in the sequence
 	// [replicas-updatedReplicas,replicas)
 	UpdateRevision *string `json:"updateRevision,omitempty"`
 	// collisionCount is the count of hash collisions for the StatefulSet. The StatefulSet controller
 	// uses this field as a collision avoidance mechanism when it needs to create the name for the
 	// newest ControllerRevision.
 	CollisionCount *int32 `json:"collisionCount,omitempty"`
-	// Represents the latest available observations of a statefulset's current state.
+	// conditions lists the latest available observations of a StatefulSet's current state.
 	Conditions []StatefulSetConditionApplyConfiguration `json:"conditions,omitempty"`
-	// Total number of available pods (ready for at least minReadySeconds) targeted by this statefulset.
+	// availableReplicas is the number of available non-terminating pods (ready for at
+	// least minReadySeconds) targeted by this StatefulSet.
 	AvailableReplicas *int32 `json:"availableReplicas,omitempty"`
 }
 
