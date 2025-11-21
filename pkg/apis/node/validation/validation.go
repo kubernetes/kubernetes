@@ -30,7 +30,7 @@ func ValidateRuntimeClass(rc *node.RuntimeClass) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&rc.ObjectMeta, false, apivalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
 
 	for _, msg := range apivalidation.NameIsDNSLabel(rc.Handler, false) {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("handler"), rc.Handler, msg))
+		allErrs = append(allErrs, field.Invalid(field.NewPath("handler"), rc.Handler, msg)).MarkCoveredByDeclarative().WithOrigin("format=k8s-short-name")
 	}
 
 	if rc.Overhead != nil {
@@ -46,9 +46,7 @@ func ValidateRuntimeClass(rc *node.RuntimeClass) field.ErrorList {
 // ValidateRuntimeClassUpdate validates an update to the object
 func ValidateRuntimeClassUpdate(new, old *node.RuntimeClass) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&new.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))
-
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(new.Handler, old.Handler, field.NewPath("handler"))...)
-
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(new.Handler, old.Handler, field.NewPath("handler"))...).MarkCoveredByDeclarative().WithOrigin("immutable")
 	return allErrs
 }
 
