@@ -108,8 +108,8 @@ const (
 
 	// VolumeBindingWaitForFirstConsumer indicates that PersistentVolumeClaims
 	// should not be provisioned and bound until the first Pod is created that
-	// references the PeristentVolumeClaim.  The volume provisioning and
-	// binding will occur during Pod scheduing.
+	// references the PersistentVolumeClaim.  The volume provisioning and
+	// binding will occur during Pod scheduling.
 	VolumeBindingWaitForFirstConsumer VolumeBindingMode = "WaitForFirstConsumer"
 )
 
@@ -599,6 +599,8 @@ type CSINodeDriver struct {
 	// system to attach a volume to a specific node, it can use this field to
 	// refer to the node name using the ID that the storage system will
 	// understand, e.g. "nodeA" instead of "node1". This field is required.
+	// +required
+	// +k8s:required
 	NodeID string `json:"nodeID" protobuf:"bytes,2,opt,name=nodeID"`
 
 	// topologyKeys is the list of keys supported by the driver.
