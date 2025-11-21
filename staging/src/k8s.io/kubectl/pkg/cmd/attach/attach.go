@@ -18,12 +18,14 @@ package attach
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
 	"strings"
 	"time"
 
+	mobyterm "github.com/moby/term"
 	"github.com/spf13/cobra"
 
 	corev1 "k8s.io/api/core/v1"
@@ -66,6 +68,8 @@ var (
 const (
 	defaultPodAttachTimeout = 60 * time.Second
 	defaultPodLogsTimeout   = 20 * time.Second
+
+	detachSequence = "ctrl-p,ctrl-q"
 )
 
 // AttachOptions declare the arguments accepted by the Attach command
@@ -74,6 +78,8 @@ type AttachOptions struct {
 
 	// whether to disable use of standard error when streaming output from tty
 	DisableStderr bool
+
+	EnableDetachKeys bool
 
 	CommandName string
 
@@ -122,6 +128,7 @@ func NewCmdAttach(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.
 	cmd.Flags().BoolVarP(&o.Stdin, "stdin", "i", o.Stdin, "Pass stdin to the container")
 	cmd.Flags().BoolVarP(&o.TTY, "tty", "t", o.TTY, "Stdin is a TTY")
 	cmd.Flags().BoolVarP(&o.Quiet, "quiet", "q", o.Quiet, "Only print output from the remote session")
+	cmd.Flags().BoolVarP(&o.EnableDetachKeys, "detach-keys", "d", o.EnableDetachKeys, "Supports Ctrl+P and Ctrl+Q to exit")
 	return cmd
 }
 
@@ -149,8 +156,15 @@ func DefaultAttachFunc(o *AttachOptions, containerToAttach *corev1.Container, ra
 			Stderr:    !o.DisableStderr,
 			TTY:       raw,
 		}, scheme.ParameterCodec)
-
-		return o.Attach.Attach(req.URL(), o.Config, o.In, o.Out, o.ErrOut, raw, sizeQueue)
+		stdin := o.In
+		if o.Stdin && o.EnableDetachKeys {
+			detachKeys, err := mobyterm.ToBytes(detachSequence)
+			if err != nil {
+				return errors.New("could not bind detach keys")
+			}
+			stdin = mobyterm.NewEscapeProxy(stdin, detachKeys)
+		}
+		return o.Attach.Attach(req.URL(), o.Config, stdin, o.Out, o.ErrOut, raw, sizeQueue)
 	}
 }
 
