@@ -51,7 +51,7 @@ const (
 )
 
 func (h *peerProxyHandler) RunPeerDiscoveryCacheSync(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 	defer h.peerLeaseQueue.ShutDown()
 	defer func() {
 		err := h.apiserverIdentityInformer.Informer().RemoveEventHandler(h.leaseRegistration)
