@@ -2062,7 +2062,9 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		podKilled := false
 		if !pcm.Exists(pod) && !firstSync {
 			p := kubecontainer.ConvertPodStatusToRunningPod(kl.getRuntime().Type(), podStatus)
+			klog.V(3).InfoS("Attempting to kill pod to recreate cgroups", "pod", klog.KObj(pod), "podUID", pod.UID)
 			if err := kl.killPod(ctx, pod, p, nil); err == nil {
+				klog.V(3).InfoS("Killed pod to allow cgroup recreation", "pod", klog.KObj(pod), "podUID", pod.UID)
 				podKilled = true
 			} else {
 				if wait.Interrupted(err) {
