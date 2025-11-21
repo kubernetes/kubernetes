@@ -838,11 +838,40 @@ func (a *HorizontalController) reconcileAutoscaler(ctx context.Context, hpaShare
 	rescale := true
 	logger := klog.FromContext(ctx)
 
-	if currentReplicas == 0 && minReplicas != 0 {
-		// Autoscaling is disabled for this resource
-		desiredReplicas = 0
-		rescale = false
-		setCondition(hpa, autoscalingv2.ScalingActive, v1.ConditionFalse, "ScalingDisabled", "scaling is disabled since the replica count of the target is zero")
+	// Pre-compute scale-to-zero related conditions
+	scaleToZeroFeatureEnabled := utilfeature.DefaultFeatureGate.Enabled(features.HPAScaleToZero)
+	hasObjectOrExtMetrics := hasObjectOrExternalMetrics(hpa)
+	scaledToZeroCondition := getScaledToZeroConditionStatus(hpa)
+	canScaleFromZero := scaleToZeroFeatureEnabled && hasObjectOrExtMetrics && scaledToZeroCondition
+
+	// Track whether we need to compute metrics based on replicas/desired state
+	needsMetricComputation := false
+
+	if currentReplicas == 0 {
+		if minReplicas != 0 {
+			// Current replicas is 0 but minReplicas requires at least minReplicas
+			if scaledToZeroCondition {
+				// HPA previously scaled this to zero, but now minReplicas requires at least minReplicas
+				// Compute metrics first, then ensure we scale to at least minReplicas
+				needsMetricComputation = true
+			} else {
+				// This is a manually disabled workload (replicas set to 0 manually)
+				// Autoscaling is disabled for this resource
+				desiredReplicas = 0
+				rescale = false
+				setCondition(hpa, autoscalingv2.ScalingActive, v1.ConditionFalse, "ScalingDisabled", "scaling is disabled since the replica count of the target is zero")
+			}
+		} else if canScaleFromZero {
+			// minReplicas is 0 and we can scale from zero (feature gate enabled, object/external metrics, ScaledToZero=True)
+			// Need to compute metrics to determine desired replicas
+			needsMetricComputation = true
+		} else {
+			// minReplicas is 0 but we cannot scale from zero (missing feature gate, metrics, or condition)
+			// Autoscaling is disabled for this resource
+			desiredReplicas = 0
+			rescale = false
+			setCondition(hpa, autoscalingv2.ScalingActive, v1.ConditionFalse, "ScalingDisabled", "scaling is disabled since the replica count of the target is zero")
+		}
 	} else if currentReplicas > hpa.Spec.MaxReplicas {
 		rescaleReason = "Current number of replicas above Spec.MaxReplicas"
 		desiredReplicas = hpa.Spec.MaxReplicas
@@ -850,6 +879,12 @@ func (a *HorizontalController) reconcileAutoscaler(ctx context.Context, hpaShare
 		rescaleReason = "Current number of replicas below Spec.MinReplicas"
 		desiredReplicas = minReplicas
 	} else {
+		// Normal case: currentReplicas is within bounds, need to compute metrics
+		needsMetricComputation = true
+	}
+
+	// Compute metrics and normalize desired replicas for cases that require metric-based scaling
+	if needsMetricComputation {
 		var metricTimestamp time.Time
 		metricDesiredReplicas, metricName, metricStatuses, metricTimestamp, err = a.computeReplicasForMetrics(ctx, hpa, scale, hpa.Spec.Metrics)
 		// computeReplicasForMetrics may return both non-zero metricDesiredReplicas and an error.
@@ -867,7 +902,11 @@ func (a *HorizontalController) reconcileAutoscaler(ctx context.Context, hpaShare
 			retErr = err
 		}
 
-		logger.V(4).Info("Proposing desired replicas",
+		logMessage := "Proposing desired replicas"
+		if currentReplicas == 0 {
+			logMessage = "Proposing desired replicas from zero"
+		}
+		logger.V(4).Info(logMessage,
 			"desiredReplicas", metricDesiredReplicas,
 			"metric", metricName,
 			"tolerances", a.tolerancesForHpa(hpa),
@@ -889,6 +928,13 @@ func (a *HorizontalController) reconcileAutoscaler(ctx context.Context, hpaShare
 			desiredReplicas = a.normalizeDesiredReplicas(hpa, key, currentReplicas, desiredReplicas, minReplicas)
 		} else {
 			desiredReplicas = a.normalizeDesiredReplicasWithBehaviors(hpa, key, currentReplicas, desiredReplicas, minReplicas)
+		}
+		// Ensure we scale to at least minReplicas when scaling from zero with increased minReplicas
+		if currentReplicas == 0 && minReplicas != 0 && scaledToZeroCondition && desiredReplicas < minReplicas {
+			desiredReplicas = minReplicas
+			if rescaleReason == "" {
+				rescaleReason = "Current number of replicas below Spec.MinReplicas"
+			}
 		}
 		rescale = desiredReplicas != currentReplicas
 	}
@@ -939,6 +985,18 @@ func (a *HorizontalController) reconcileAutoscaler(ctx context.Context, hpaShare
 			"currentReplicas", currentReplicas,
 			"desiredReplicas", desiredReplicas,
 			"reason", rescaleReason)
+
+		// Handle ScaledToZero condition based on scale direction
+		if utilfeature.DefaultFeatureGate.Enabled(features.HPAScaleToZero) {
+			if currentReplicas > 0 && desiredReplicas == 0 && minReplicas == 0 && hasObjectOrExternalMetrics(hpa) {
+				// Scaling from >0 to 0: set ScaledToZero=True (only for object/external metrics)
+				setCondition(hpa, autoscalingv2.ScaledToZero, v1.ConditionTrue, "ScaledToZero", "the HPA controller scaled the workload to zero")
+			} else if currentReplicas == 0 && desiredReplicas > 0 {
+				// Scaling from 0 to >0: remove ScaledToZero condition (regardless of metric types)
+				// This handles the case where minReplicas was increased or metrics triggered scale-up
+				setCondition(hpa, autoscalingv2.ScaledToZero, v1.ConditionFalse, "ScaledFromZero", "the HPA controller scaled the workload from zero")
+			}
+		}
 
 		if desiredReplicas > currentReplicas {
 			actionLabel = monitor.ActionLabelScaleUp
@@ -1477,6 +1535,26 @@ func (a *HorizontalController) tolerancesForHpa(hpa *autoscalingv2.HorizontalPod
 // not present.
 func setCondition(hpa *autoscalingv2.HorizontalPodAutoscaler, conditionType autoscalingv2.HorizontalPodAutoscalerConditionType, status v1.ConditionStatus, reason, message string, args ...interface{}) {
 	hpa.Status.Conditions = setConditionInList(hpa.Status.Conditions, conditionType, status, reason, message, args...)
+}
+
+// hasObjectOrExternalMetrics checks if the HPA has at least one object or external metric.
+func hasObjectOrExternalMetrics(hpa *autoscalingv2.HorizontalPodAutoscaler) bool {
+	for _, metric := range hpa.Spec.Metrics {
+		if metric.Type == autoscalingv2.ObjectMetricSourceType || metric.Type == autoscalingv2.ExternalMetricSourceType {
+			return true
+		}
+	}
+	return false
+}
+
+// getScaledToZeroConditionStatus returns true if the ScaledToZero condition exists and is True.
+func getScaledToZeroConditionStatus(hpa *autoscalingv2.HorizontalPodAutoscaler) bool {
+	for _, condition := range hpa.Status.Conditions {
+		if condition.Type == autoscalingv2.ScaledToZero {
+			return condition.Status == v1.ConditionTrue
+		}
+	}
+	return false
 }
 
 // setConditionInList sets the specific condition type on the given HPA to the specified value with the given
