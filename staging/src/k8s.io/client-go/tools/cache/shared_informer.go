@@ -20,7 +20,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -433,7 +435,10 @@ func WaitForCacheSync(stopCh <-chan struct{}, cacheSyncs ...InformerSynced) bool
 // before all activities are completed.
 //
 // If a non-nil "what" is provided, then progress information is logged
-// while waiting ("Waiting",  for="<what>").
+// while waiting ("Waiting",  for="<what>"). Verbosity is V(0). This can
+// be made less verbose by the caller with:
+//
+//	WaitFor(klog.NewContext(ctx, klog.FromContext(ctx).V(2)), ...)
 //
 // In contrast to other WaitForCacheSync alternatives, this one here doesn't
 // need polling, which makes it react immediately. When used in a synctest unit
@@ -527,6 +532,43 @@ func IsDone(checker DoneChecker) bool {
 	default:
 		return false
 	}
+}
+
+// SyncResult is the result of a shared informer factory's WaitForCacheSyncWithContext.
+// Under the hood such factories use [WaitFor] to wait for all instantiated informers,
+// then provide this summary of what was synced.
+//
+// Note that the informers may have synced already before all event handlers registered with
+// those informers have synced. Code which wants to be sure that all of its state is up-to-date
+// should do its own WaitFor with the informer's HasSyncedChecker() *and* the
+// registration handle's HasSyncChecker() results.
+type SyncResult struct {
+	// Err is nil if all informer caches were synced, otherwise it is
+	// the reason why waiting for cache syncing stopped (= context.Cause(ctx)).
+	Err error
+
+	// Synced maps each registered informer in a SharedInformerFactory to
+	// true if it has synced, false otherwise.
+	Synced map[reflect.Type]bool
+}
+
+// AsError turns a SyncResult into an error if not all caches were synced,
+// otherwise it returns nil. The error wraps context.Cause(ctx) and
+// includes information about the informers which were not synced.
+func (c SyncResult) AsError() error {
+	if c.Err == nil {
+		return nil
+	}
+
+	unsynced := make([]string, 0, len(c.Synced))
+	for t, synced := range c.Synced {
+		if !synced {
+			unsynced = append(unsynced, t.String())
+		}
+	}
+	slices.Sort(unsynced)
+
+	return fmt.Errorf("failed to sync all caches: %s: %w", strings.Join(unsynced, ", "), c.Err)
 }
 
 // `*sharedIndexInformer` implements SharedIndexInformer and has three
@@ -888,6 +930,10 @@ func (s *sharedIndexInformer) AddEventHandlerWithOptions(handler ResourceEventHa
 		// thread adding them and the counter is temporarily zero).
 		listener.add(addNotification{newObj: item, isInInitialList: true})
 	}
+
+	// Initial list is added, now we can allow the listener to detect that "upstream has synced".
+	s.processor.wg.Start(listener.watchSynced)
+
 	return handle, nil
 }
 
@@ -1008,7 +1054,8 @@ func (p *sharedProcessor) addListener(listener *processorListener) ResourceEvent
 	p.listeners[listener] = true
 
 	if p.listenersStarted {
-		p.wg.Start(listener.watchSynced)
+		// Not starting listener.watchSynced!
+		// The caller must first add the initial list, then start it.
 		p.wg.Start(listener.run)
 		p.wg.Start(listener.pop)
 	}

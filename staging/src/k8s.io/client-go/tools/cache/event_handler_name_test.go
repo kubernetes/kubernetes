@@ -76,6 +76,12 @@ func TestNameForHandler(t *testing.T) {
 			handler:  nil,
 			wantName: "<nil>",
 		},
+		"stored-nil": {
+			// This is a bit odd, but one unit test actually registered
+			// such an event handler and it somehow worked.
+			handler:  (*mockHandler)(nil),
+			wantName: "*cache.mockHandler",
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			gotName := nameForHandler(tc.handler)

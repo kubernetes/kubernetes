@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"reflect"
 	"runtime"
 	"sync"
 	"testing"
@@ -197,4 +198,49 @@ func (m *mockChecker) Done() <-chan struct{} {
 		m.initialized = true
 	}
 	return m.done
+}
+
+func TestSyncResult(t *testing.T) {
+	for name, tc := range map[string]struct {
+		result        SyncResult
+		expectAsError string
+	}{
+		"empty": {},
+		"one": {
+			result: SyncResult{
+				Err: errors.New("my custom cancellation reason"),
+				Synced: map[reflect.Type]bool{
+					reflect.TypeFor[int]():    true,
+					reflect.TypeFor[string](): false,
+				},
+			},
+			expectAsError: "failed to sync all caches: string: my custom cancellation reason",
+		},
+		"many": {
+			result: SyncResult{
+				Err: errors.New("my custom cancellation reason"),
+				Synced: map[reflect.Type]bool{
+					reflect.TypeFor[int]():    false,
+					reflect.TypeFor[string](): false,
+				},
+			},
+			expectAsError: "failed to sync all caches: int, string: my custom cancellation reason",
+		},
+	} {
+
+		t.Run(name, func(t *testing.T) {
+			actual := tc.result.AsError()
+			switch {
+			case tc.expectAsError == "" && actual != nil:
+				t.Fatalf("expected no error, got %v", actual)
+			case tc.expectAsError != "" && actual == nil:
+				t.Fatalf("expected %q, got no error", actual)
+			case tc.expectAsError != "" && actual != nil && actual.Error() != tc.expectAsError:
+				t.Fatalf("expected %q, got %q", tc.expectAsError, actual.Error())
+			}
+			if tc.result.Err != nil && !errors.Is(actual, tc.result.Err) {
+				t.Errorf("actual error %+v should wrap %v but doesn't", actual, tc.result.Err)
+			}
+		})
+	}
 }

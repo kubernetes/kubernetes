@@ -50,7 +50,9 @@ func nameForHandler(handler ResourceEventHandler) (name string) {
 			value = value.Elem()
 		}
 		if value.Type().Kind() == reflect.Pointer {
-			value = value.Elem()
+			if !value.IsNil() {
+				value = value.Elem()
+			}
 		}
 		name := value.Type().PkgPath()
 		if name != "" {
