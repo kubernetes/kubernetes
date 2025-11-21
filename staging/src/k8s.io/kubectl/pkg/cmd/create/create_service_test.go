@@ -35,6 +35,8 @@ func TestCreateServices(t *testing.T) {
 		name         string
 		serviceType  v1.ServiceType
 		tcp          []string
+		udp          []string
+		sctp         []string
 		clusterip    string
 		externalName string
 		nodeport     int
@@ -241,6 +243,69 @@ func TestCreateServices(t *testing.T) {
 			},
 			expectErr: false,
 		},
+		{
+			name:        "my-node-port-service-udp-ok",
+			serviceType: v1.ServiceTypeNodePort,
+			udp:         []string{"53:53"},
+			clusterip:   "",
+			nodeport:    10053,
+			expected: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "my-node-port-service-udp-ok",
+					Labels: map[string]string{"app": "my-node-port-service-udp-ok"},
+				},
+				Spec: v1.ServiceSpec{Type: "NodePort",
+					Ports: []v1.ServicePort{
+						{Name: "udp-53-53", Protocol: "UDP", Port: 53, TargetPort: intstr.IntOrString{Type: 0, IntVal: 53, StrVal: ""}, NodePort: 10053},
+					},
+					Selector:  map[string]string{"app": "my-node-port-service-udp-ok"},
+					ClusterIP: "", ExternalIPs: []string(nil), LoadBalancerIP: ""},
+			},
+			expectErr: false,
+		},
+		{
+			name:        "my-node-port-service-sctp-ok",
+			serviceType: v1.ServiceTypeNodePort,
+			sctp:        []string{"3868:3868"},
+			clusterip:   "",
+			nodeport:    13868,
+			expected: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "my-node-port-service-sctp-ok",
+					Labels: map[string]string{"app": "my-node-port-service-sctp-ok"},
+				},
+				Spec: v1.ServiceSpec{Type: "NodePort",
+					Ports: []v1.ServicePort{
+						{Name: "sctp-3868-3868", Protocol: "SCTP", Port: 3868, TargetPort: intstr.IntOrString{Type: 0, IntVal: 3868, StrVal: ""}, NodePort: 13868},
+					},
+					Selector:  map[string]string{"app": "my-node-port-service-sctp-ok"},
+					ClusterIP: "", ExternalIPs: []string(nil), LoadBalancerIP: ""},
+			},
+			expectErr: false,
+		},
+		{
+			name:        "my-node-port-service-tcp-udp-ok",
+			serviceType: v1.ServiceTypeNodePort,
+			// DNS often listens on both TCP and UDP with the same port number
+			tcp:       []string{"53:53"},
+			udp:       []string{"53:53"},
+			clusterip: "",
+			nodeport:  10053,
+			expected: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "my-node-port-service-tcp-udp-ok",
+					Labels: map[string]string{"app": "my-node-port-service-tcp-udp-ok"},
+				},
+				Spec: v1.ServiceSpec{Type: "NodePort",
+					Ports: []v1.ServicePort{
+						{Name: "53-53", Protocol: "TCP", Port: 53, TargetPort: intstr.IntOrString{Type: 0, IntVal: 53, StrVal: ""}, NodePort: 10053},
+						{Name: "udp-53-53", Protocol: "UDP", Port: 53, TargetPort: intstr.IntOrString{Type: 0, IntVal: 53, StrVal: ""}, NodePort: 10053},
+					},
+					Selector:  map[string]string{"app": "my-node-port-service-tcp-udp-ok"},
+					ClusterIP: "", ExternalIPs: []string(nil), LoadBalancerIP: ""},
+			},
+			expectErr: false,
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -248,6 +313,8 @@ func TestCreateServices(t *testing.T) {
 				Name:         tc.name,
 				Type:         tc.serviceType,
 				TCP:          tc.tcp,
+				UDP:          tc.udp,
+				SCTP:         tc.sctp,
 				ClusterIP:    tc.clusterip,
 				NodePort:     tc.nodeport,
 				ExternalName: tc.externalName,
