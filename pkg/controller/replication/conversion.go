@@ -180,6 +180,10 @@ func (h conversionEventHandler) OnDelete(obj interface{}) {
 	h.handler.OnDelete(rs)
 }
 
+func (h conversionEventHandler) OnBookmark(rv string) {
+	h.handler.OnBookmark(rv)
+}
+
 type clientsetAdapter struct {
 	clientset.Interface
 }

@@ -35,6 +35,19 @@ func (f *FIFO) List() []interface{} {
 	return list
 }
 
+// GetObservedResourceVersion is unimplemented for FIFO, only used in unit testing.
+func (f *FIFO) GetObservedResourceVersion() string {
+	return ""
+}
+
+// ObserveResourceVersion is unimplemented for FIFO, only used in unit testing.
+func (f *FIFO) ObserveResourceVersion(rv string) {
+}
+
+// PauseObservingResourceVersion is unimplemented for FIFO, only used in unit testing.
+func (f *FIFO) PauseObservingResourceVersion() {
+}
+
 // ListKeys returns a list of all the keys of the objects currently
 // in the FIFO.
 // This function was moved here because it is not consistent with normal list semantics, but is used in unit testing.
