@@ -151,6 +151,17 @@ linters:
       - text: "field .* is missing godoc comment"
         path: "staging/src/k8s.io/api/autoscaling/"
       
+      
+      # notimestamp: Legacy 'Timestamp' fields retained for backward compatibility
+      - text: 'notimestamp: naming convention "notimestamp": field ExpirationTimestamp: prefer use of the term ''time'' over ''timestamp'''
+        path: "staging/src/k8s.io/api/authentication/v1/types.go"
+      - text: 'notimestamp: naming convention "notimestamp": field (Timestamps|FirstTimestamp|LastTimestamp): prefer use of the term ''time'' over ''timestamp'''
+        path: "staging/src/k8s.io/api/core/v1/types.go"
+      - text: 'notimestamp: naming convention "notimestamp": field Deprecated(FirstTimestamp|LastTimestamp): prefer use of the term ''time'' over ''timestamp'''
+        path: "staging/src/k8s.io/api/events/(v1|v1beta1)/types.go"
+      - text: 'notimestamp: naming convention "notimestamp": field AllocationTimestamp: prefer use of the term ''time'' over ''timestamp'''
+        path: "staging/src/k8s.io/api/resource/(v1|v1beta1|v1beta2)/types.go"
+      
       # Pre-existing issues from the conflictmarkers linter
       # The Error field in some older API types is marked as both optional and required.
       # This is incorrect, but cannot be changed without breaking changes.
@@ -321,7 +332,7 @@ linters:
               # - "nofloats" # Ensure floats are not used.
               # - "nomaps" # Ensure maps are not used, unless they are `map[string]string` (for labels/annotations/etc).
               # - "nophase" # Ensure field names do not have the word "phase" in them.
-              # - "notimestamp" # Ensure fields are not named "timestamp", prefer "time".
+              - "notimestamp" # Ensure fields are not named "timestamp", prefer "time".
               # - "optionalfields" # Ensure fields marked optional have omitempty and pointers.
               # - "optionalorrequired" # Every field should be marked as `+optional` xor `+required`.
               # - "requiredfields" # Required fields should only be pointers when required based on the validity of the zero value, they should always have `omitempty`.
