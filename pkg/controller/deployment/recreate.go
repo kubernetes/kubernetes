@@ -83,7 +83,7 @@ func (dc *DeploymentController) scaleDownOldReplicaSetsForRecreate(ctx context.C
 		if *(rs.Spec.Replicas) == 0 {
 			continue
 		}
-		scaledRS, updatedRS, err := dc.scaleReplicaSetAndRecordEvent(ctx, rs, 0, deployment)
+		scaledRS, updatedRS, err := dc.scaleReplicaSetWithLazyAnnotationUpdate(ctx, rs, 0, deployment)
 		if err != nil {
 			return false, err
 		}
@@ -127,6 +127,6 @@ func oldPodsRunning(newRS *apps.ReplicaSet, oldRSs []*apps.ReplicaSet, podMap ma
 
 // scaleUpNewReplicaSetForRecreate scales up new replica set when deployment strategy is "Recreate".
 func (dc *DeploymentController) scaleUpNewReplicaSetForRecreate(ctx context.Context, newRS *apps.ReplicaSet, deployment *apps.Deployment) (bool, error) {
-	scaled, _, err := dc.scaleReplicaSetAndRecordEvent(ctx, newRS, *(deployment.Spec.Replicas), deployment)
+	scaled, _, err := dc.scaleReplicaSetWithLazyAnnotationUpdate(ctx, newRS, *(deployment.Spec.Replicas), deployment)
 	return scaled, err
 }
