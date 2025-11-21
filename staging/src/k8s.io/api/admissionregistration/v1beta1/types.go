@@ -673,7 +673,7 @@ type NamedRuleWithOperations struct {
 // +k8s:prerelease-lifecycle-gen:removed=1.22
 // +k8s:prerelease-lifecycle-gen:replacement=admissionregistration.k8s.io,v1,ValidatingWebhookConfiguration
 
-// ValidatingWebhookConfiguration describes the configuration of and admission webhook that accept or reject and object without changing it.
+// ValidatingWebhookConfiguration describes the configuration of an admission webhook that accepts or rejects an object without changing it.
 // Deprecated in v1.16, planned for removal in v1.19. Use admissionregistration.k8s.io/v1 ValidatingWebhookConfiguration instead.
 type ValidatingWebhookConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
