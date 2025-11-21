@@ -29,12 +29,14 @@ import (
 	nodev1 "k8s.io/api/node/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -377,12 +379,14 @@ var _ = SIGDescribe("SchedulerPredicates", framework.WithSerial(), func() {
 
 		ginkgo.By("Starting Pods to consume most of the cluster CPU.")
 		// Create one pod per node that requires 70% of the node remaining CPU.
+		var testingPodLabel = map[string]string{"podname": "predicates-validate-resource-limits-node"}
 		fillerPods := []*v1.Pod{}
 		for nodeName, cpu := range nodeToAllocatableMap {
 			requestedCPU := cpu * 7 / 10
 			framework.Logf("Creating a pod which consumes cpu=%vm on Node %v", requestedCPU, nodeName)
 			fillerPods = append(fillerPods, createPausePod(ctx, f, pausePodConfig{
-				Name: "filler-pod-" + string(uuid.NewUUID()),
+				Name:   "filler-pod-" + string(uuid.NewUUID()),
+				Labels: testingPodLabel,
 				Resources: &v1.ResourceRequirements{
 					Limits: v1.ResourceList{
 						v1.ResourceCPU: *resource.NewMilliQuantity(requestedCPU, "DecimalSI"),
@@ -421,7 +425,7 @@ var _ = SIGDescribe("SchedulerPredicates", framework.WithSerial(), func() {
 		podName := "additional-pod"
 		conf := pausePodConfig{
 			Name:   podName,
-			Labels: map[string]string{"name": "additional"},
+			Labels: testingPodLabel,
 			Resources: &v1.ResourceRequirements{
 				Limits: v1.ResourceList{
 					v1.ResourceCPU: *resource.NewMilliQuantity(nodeMaxAllocatable*5/10, "DecimalSI"),
@@ -433,6 +437,16 @@ var _ = SIGDescribe("SchedulerPredicates", framework.WithSerial(), func() {
 		}
 		WaitForSchedulerAfterAction(ctx, f, createPausePodAction(f, conf), ns, podName, false)
 		verifyResult(ctx, cs, len(fillerPods), 1, ns)
+
+		// delete Collection of pods with a label in the current namespace
+		labelSelector := labels.SelectorFromSet(labels.Set(testingPodLabel)).String()
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: labelSelector})
+		framework.ExpectNoError(err, "failed to delete collection of pods")
+
+		// wait for all pods to be deleted
+		ginkgo.By("waiting for all pods to be deleted")
+		err = wait.PollUntilContextTimeout(ctx, 2*time.Second, f.Timeouts.PodDelete, true, checkPodListQuantity(f, labelSelector, 0))
+		framework.ExpectNoError(err, "found a pod(s)")
 	})
 
 	// Test Nodes does not have any label, hence it should be impossible to schedule Pod with
@@ -1269,4 +1283,21 @@ func getNodeHostIP(ctx context.Context, f *framework.Framework, nodeName string)
 	ips := e2enode.GetAddressesByTypeAndFamily(node, v1.NodeInternalIP, family)
 	gomega.Expect(ips).ToNot(gomega.BeEmpty())
 	return ips[0]
+}
+
+func checkPodListQuantity(f *framework.Framework, label string, quantity int) func(ctx context.Context) (bool, error) {
+	return func(ctx context.Context) (bool, error) {
+		var err error
+
+		list, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(ctx, metav1.ListOptions{LabelSelector: label})
+		if err != nil {
+			return false, err
+		}
+
+		if len(list.Items) != quantity {
+			framework.Logf("Pod quantity %d is different from expected quantity %d", len(list.Items), quantity)
+			return false, err
+		}
+		return true, nil
+	}
 }
