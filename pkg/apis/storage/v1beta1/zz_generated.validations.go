@@ -114,6 +114,8 @@ func Validate_CSINodeDriver(ctx context.Context, op operation.Operation, fldPath
 			if earlyReturn {
 				return // do not proceed
 			}
+			errs = append(errs, validate.LongNameCaseless(ctx, op, fldPath, obj, oldObj)...)
+			errs = append(errs, validate.MaxLength(ctx, op, fldPath, obj, oldObj, 63)...)
 			return
 		}(fldPath.Child("name"), &obj.Name, safe.Field(oldObj, func(oldObj *storagev1beta1.CSINodeDriver) *string { return &oldObj.Name }), oldObj != nil)...)
 

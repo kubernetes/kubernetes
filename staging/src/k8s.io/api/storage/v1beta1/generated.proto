@@ -279,6 +279,8 @@ message CSINodeDriver {
   // that driver.
   // +required
   // +k8s:required
+  // +k8s:format=k8s-long-name-caseless
+  // +k8s:maxLength=63
   optional string name = 1;
 
   // nodeID of the node from the driver point of view.

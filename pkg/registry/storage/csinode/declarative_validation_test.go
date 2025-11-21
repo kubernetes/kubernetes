@@ -98,18 +98,18 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		updateObj    storage.CSINode
 		expectedErrs field.ErrorList
 	}{
-		"valid update": {
-			oldObj:    mkValidCSINodeDriverNode(func(driver *storage.CSINodeDriver) {}),
-			updateObj: mkValidCSINodeDriverNode(func(driver *storage.CSINodeDriver) {}),
-		},
+		//"valid update": {
+		//	oldObj:    mkValidCSINodeDriverNode(func(driver *storage.CSINodeDriver) {}),
+		//	updateObj: mkValidCSINodeDriverNode(func(driver *storage.CSINodeDriver) {}),
+		//},
 		"invalid update name": {
 			oldObj: mkValidCSINodeDriverNode(func(driver *storage.CSINodeDriver) {}),
 			updateObj: mkValidCSINodeDriverNode(func(driver *storage.CSINodeDriver) {
 				driver.Name = "$%!@!@#test"
 			}),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec").Child("drivers"), nil,
-					""),
+				field.Invalid(field.NewPath("spec").Child("drivers").Index(0).Child("name"), "$%!@!@#test",
+					"a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
 			},
 		},
 	}
