@@ -312,12 +312,13 @@ type deletionTestCase struct {
 }
 
 type claimTestCase struct {
-	name      string
-	getter    ServiceAccountTokenGetter
-	private   *privateClaims
-	expiry    jwt.NumericDate
-	notBefore jwt.NumericDate
-	expectErr string
+	name          string
+	getter        ServiceAccountTokenGetter
+	private       *privateClaims
+	disableLookup bool
+	expiry        jwt.NumericDate
+	notBefore     jwt.NumericDate
+	expectErr     string
 }
 
 func TestValidatePrivateClaims(t *testing.T) {
@@ -421,6 +422,12 @@ func TestValidatePrivateClaims(t *testing.T) {
 			private:   &privateClaims{Kubernetes: kubernetes{Svcacct: ref{Name: "saname", UID: "sauid"}, Pod: &ref{Name: "podname", UID: "poduidold"}, Namespace: "ns"}},
 			expectErr: "pod UID (poduid) does not match service account pod ref claim (poduidold)",
 		},
+		{
+			name:          "disabled lookup",
+			getter:        fakeGetter{serviceAccount, nil, nil, nil},
+			private:       &privateClaims{Kubernetes: kubernetes{Svcacct: ref{Name: "not-here"}, Namespace: "ns"}},
+			disableLookup: true,
+		},
 	}
 
 	for _, deletionTestCase := range deletionTestCases {
@@ -471,7 +478,10 @@ func TestValidatePrivateClaims(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			v := &validator{getter: tc.getter}
+			v := &validator{
+				lookup: !tc.disableLookup,
+				getter: tc.getter,
+			}
 			expiry := jwt.NumericDate(nowUnix)
 			if tc.expiry != 0 {
 				expiry = tc.expiry
