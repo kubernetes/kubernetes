@@ -233,9 +233,9 @@ func (cache *EndpointSliceCache) addEndpoints(svcPortName *ServicePortName, port
 			ready, serving, terminating, zoneHints, nodeHints)
 
 		// This logic ensures we're deduplicating potential overlapping endpoints
-		// isLocal should not vary between matching endpoints, but if it does, we
-		// favor a true value here if it exists.
-		if _, exists := endpointSet[endpointInfo.String()]; !exists || isLocal {
+		// since kubernetes assumes an IP for Pod model, where a single IP maps to a single endpoint,
+		// we prefer more recent serving endpoints.
+		if _, exists := endpointSet[endpointInfo.String()]; !exists || serving {
 			endpointSet[endpointInfo.String()] = cache.makeEndpointInfo(endpointInfo, svcPortName)
 		}
 	}

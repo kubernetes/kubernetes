@@ -311,6 +311,66 @@ func TestEndpointInfoByServicePort(t *testing.T) {
 				},
 			},
 		},
+		"two slices with duplicate IPs prefer last one to be processed (non local)": {
+			namespacedName: types.NamespacedName{Name: "svc1", Namespace: "ns1"},
+			hostname:       "host1",
+			endpointSlices: []*discovery.EndpointSlice{
+				generateEndpointSliceWithOffset("svc1", "ns1", 1, 1, 2, 999, 999, []string{"host1"}, []*int32{ptr.To[int32](80)}),
+				generateEndpointSliceWithOffset("svc1", "ns1", 2, 1, 2, 999, 999, []string{"host2"}, []*int32{ptr.To[int32](80)}),
+			},
+			expectedMap: spToEndpointMap{
+				makeServicePortName("ns1", "svc1", "port-0", v1.ProtocolTCP): {
+					"10.0.1.1:80": &BaseEndpointInfo{
+						ip:          "10.0.1.1",
+						port:        80,
+						endpoint:    "10.0.1.1:80",
+						isLocal:     false,
+						ready:       true,
+						serving:     true,
+						terminating: false,
+					},
+					"10.0.1.2:80": &BaseEndpointInfo{
+						ip:          "10.0.1.2",
+						port:        80,
+						endpoint:    "10.0.1.2:80",
+						isLocal:     false,
+						ready:       true,
+						serving:     true,
+						terminating: false,
+					},
+				},
+			},
+		},
+		"two slices with duplicate IPs prefer serving": {
+			namespacedName: types.NamespacedName{Name: "svc1", Namespace: "ns1"},
+			hostname:       "host1",
+			endpointSlices: []*discovery.EndpointSlice{
+				generateEndpointSliceWithOffset("svc1", "ns1", 1, 1, 2, 999, 999, []string{"host2"}, []*int32{ptr.To[int32](80)}),
+				generateEndpointSliceWithOffset("svc1", "ns1", 2, 1, 2, 1, 1, []string{"host2"}, []*int32{ptr.To[int32](80)}),
+			},
+			expectedMap: spToEndpointMap{
+				makeServicePortName("ns1", "svc1", "port-0", v1.ProtocolTCP): {
+					"10.0.1.1:80": &BaseEndpointInfo{
+						ip:          "10.0.1.1",
+						port:        80,
+						endpoint:    "10.0.1.1:80",
+						isLocal:     false,
+						ready:       true,
+						serving:     true,
+						terminating: false,
+					},
+					"10.0.1.2:80": &BaseEndpointInfo{
+						ip:          "10.0.1.2",
+						port:        80,
+						endpoint:    "10.0.1.2:80",
+						isLocal:     false,
+						ready:       true,
+						serving:     true,
+						terminating: false,
+					},
+				},
+			},
+		},
 	}
 
 	for name, tc := range testCases {
