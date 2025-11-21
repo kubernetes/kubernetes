@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
+	"reflect"
 
 	"sigs.k8s.io/randfill"
 
@@ -69,5 +70,87 @@ func NormalizeJSONRawExtension(ext *runtime.RawExtension) {
 		if err != nil {
 			panic(fmt.Sprintf("Failed to encode object: %v", err))
 		}
+	}
+}
+
+// SchemeDefaultingFuzzerFuncs returns fuzzer functions that automatically apply
+// scheme defaults to objects after fuzzing. This eliminates the need to manually
+// duplicate defaulting logic in fuzzer functions.
+//
+// This function addresses the issue described in kubernetes/kubernetes#130791 where
+// fuzzer functions were manually duplicating defaulting logic that was already
+// registered in the scheme. Instead of manually setting defaults in each fuzzer
+// function, this automatically applies the scheme's registered defaults.
+//
+// Usage:
+//
+//	// OLD WAY - Manual defaulting duplication
+//	func(obj *SomeType, c randfill.Continue) {
+//		c.FillNoCustom(obj)
+//		// Manual defaulting duplication
+//		if obj.FailurePolicy == nil {
+//			p := SomeFailurePolicyType("Fail")
+//			obj.FailurePolicy = &p
+//		}
+//		// ... more manual defaulting
+//	}
+//
+//	// NEW WAY - Automatic scheme defaulting
+//	fuzzer := fuzzer.FuzzerFor(
+//		fuzzer.MergeFuzzerFuncs(
+//			metafuzzer.Funcs,
+//			fuzzer.SchemeDefaultingFuzzerFuncs(scheme), // Automatic defaults
+//			customFuzzerFuncs, // No manual defaulting needed
+//		),
+//		rand.NewSource(seed),
+//		codecs,
+//	)
+//
+//	// In roundtrip tests:
+//	roundtrip.RoundTripTestForScheme(t, scheme, fuzzer.MergeFuzzerFuncs(
+//		metafuzzer.Funcs,
+//		fuzzer.SchemeDefaultingFuzzerFuncs(scheme),
+//		customFuzzerFuncs,
+//	))
+func SchemeDefaultingFuzzerFuncs(scheme *runtime.Scheme) FuzzerFuncs {
+	return func(codecs runtimeserializer.CodecFactory) []interface{} {
+		// Get all known types from the scheme
+		knownTypes := scheme.AllKnownTypes()
+		fuzzerFuncs := make([]interface{}, 0, len(knownTypes))
+
+		for gvk, objType := range knownTypes {
+			// Skip internal types as they don't have external defaults
+			if gvk.Version == runtime.APIVersionInternal {
+				continue
+			}
+
+			// Create a fuzzer function for this type that applies defaults
+			fuzzerFunc := func(obj interface{}, c randfill.Continue) {
+				// First, let the fuzzer fill the object normally
+				c.FillNoCustom(obj)
+
+				// Then apply scheme defaults
+				if runtimeObj, ok := obj.(runtime.Object); ok {
+					scheme.Default(runtimeObj)
+				}
+			}
+
+			// Create a typed version of the function for this specific type
+			typedFunc := reflect.MakeFunc(
+				reflect.FuncOf(
+					[]reflect.Type{reflect.PtrTo(objType), reflect.TypeOf((*randfill.Continue)(nil)).Elem()},
+					[]reflect.Type{},
+					false,
+				),
+				func(args []reflect.Value) []reflect.Value {
+					fuzzerFunc(args[0].Interface(), args[1].Interface().(randfill.Continue))
+					return nil
+				},
+			).Interface()
+
+			fuzzerFuncs = append(fuzzerFuncs, typedFunc)
+		}
+
+		return fuzzerFuncs
 	}
 }
