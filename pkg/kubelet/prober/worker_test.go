@@ -59,7 +59,7 @@ func newTestWorkerWithRestartableInitContainer(m *manager, probeType probeType) 
 		Name: "main-container",
 	}}
 
-	return newWorker(m, probeType, pod, initContainer)
+	return newWorker(m, m.recorder, probeType, pod, initContainer)
 }
 
 func TestDoProbe(t *testing.T) {
@@ -290,7 +290,7 @@ func TestDoProbeWithContainerRestartRules(t *testing.T) {
 			c.RestartPolicy = tc.container.RestartPolicy
 			c.RestartPolicyRules = tc.container.RestartPolicyRules
 			pod.Spec.Containers[0] = c
-			w := newWorker(m, probeType, pod, pod.Spec.Containers[0])
+			w := newWorker(m, m.recorder, probeType, pod, pod.Spec.Containers[0])
 
 			m.statusManager.SetPodStatus(logger, w.pod, tc.podStatus)
 
@@ -405,7 +405,7 @@ func TestDoProbeWithContainerRestartAllContainers(t *testing.T) {
 		for _, tc := range testcases {
 			pod := tc.pod()
 			podStatus := tc.podStatus()
-			w := newWorker(m, probeType, &pod, pod.Spec.Containers[0])
+			w := newWorker(m, m.recorder, probeType, &pod, pod.Spec.Containers[0])
 
 			m.statusManager.SetPodStatus(logger, w.pod, podStatus)
 
