@@ -25,83 +25,101 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
-
-	netutils "k8s.io/utils/net"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 type fakeHandler struct {
-	tableType netlink.ConntrackTableType
-	ipFamily  netlink.InetFamily
-	filters   []*conntrackFilter
-}
-
-func (f *fakeHandler) ConntrackTableList(_ netlink.ConntrackTableType, _ netlink.InetFamily) ([]*netlink.ConntrackFlow, error) {
-	return nil, nil
+	tableType             netlink.ConntrackTableType
+	ipFamily              netlink.InetFamily
+	filter                *conntrackFilter
+	calls                 int
+	throwEINTROnFirstCall bool
 }
 
 func (f *fakeHandler) ConntrackDeleteFilters(tableType netlink.ConntrackTableType, family netlink.InetFamily, netlinkFilters ...netlink.CustomConntrackFilter) (uint, error) {
+	f.calls++
+	if f.calls == 1 && f.throwEINTROnFirstCall {
+		return 0, unix.EINTR
+	}
+
 	f.tableType = tableType
 	f.ipFamily = family
-	f.filters = make([]*conntrackFilter, 0, len(netlinkFilters))
-	for _, netlinkFilter := range netlinkFilters {
-		f.filters = append(f.filters, netlinkFilter.(*conntrackFilter))
-	}
-	return uint(len(f.filters)), nil
+	f.filter = netlinkFilters[0].(*conntrackFilter)
+	return 0, nil
 }
 
 var _ netlinkHandler = (*fakeHandler)(nil)
 
 func TestConntracker_ClearEntries(t *testing.T) {
 	testCases := []struct {
-		name     string
-		ipFamily uint8
-		filters  []netlink.CustomConntrackFilter
+		name                  string
+		ipFamily              uint8
+		filter                netlink.CustomConntrackFilter
+		throwEINTROnFirstCall bool
 	}{
 		{
-			name:     "single IPv6 filter",
-			ipFamily: unix.AF_INET6,
-			filters: []netlink.CustomConntrackFilter{
-				&conntrackFilter{
-					protocol: 17,
-					original: &connectionTuple{dstPort: 8000},
-					reply:    &connectionTuple{srcIP: netutils.ParseIPSloppy("2001:db8:1::2")},
+			name:     "no filter",
+			ipFamily: unix.AF_INET,
+		},
+		{
+			name:     "IPv4 filter",
+			ipFamily: unix.AF_INET,
+			filter: &conntrackFilter{
+				protocol: unix.IPPROTO_TCP,
+				serviceNodePortEndpoints: map[int]sets.Set[string]{
+					32000: sets.New("10.244.10.10:8000"),
+				},
+				serviceIPEndpoints: map[string]sets.Set[string]{
+					"10.96.10.10:80": sets.New("10.244.20.20:5000"),
 				},
 			},
 		},
 		{
-			name:     "multiple IPv4 filters",
-			ipFamily: unix.AF_INET,
-			filters: []netlink.CustomConntrackFilter{
-				&conntrackFilter{
-					protocol: 6,
-					original: &connectionTuple{dstPort: 3000},
+			name:     "IPv6 filter",
+			ipFamily: unix.AF_INET6,
+			filter: &conntrackFilter{
+				protocol: unix.IPPROTO_UDP,
+				serviceNodePortEndpoints: map[int]sets.Set[string]{
+					32000: sets.New("[fd00:1::6]:9090"),
 				},
-				&conntrackFilter{
-					protocol: 17,
-					original: &connectionTuple{dstPort: 5000},
-					reply:    &connectionTuple{srcIP: netutils.ParseIPSloppy("10.244.0.3")},
-				},
-				&conntrackFilter{
-					protocol: 132,
-					original: &connectionTuple{dstIP: netutils.ParseIPSloppy("10.96.0.10")},
-					reply:    &connectionTuple{srcIP: netutils.ParseIPSloppy("10.244.0.3")},
+				serviceIPEndpoints: map[string]sets.Set[string]{
+					"[fd00:1::5]:3000": sets.New("[fd00:1::6]:9090"),
 				},
 			},
+		},
+		{
+			name:     "IPv4 filter with interrupt",
+			ipFamily: unix.AF_INET,
+			filter: &conntrackFilter{
+				protocol: unix.IPPROTO_UDP,
+				serviceNodePortEndpoints: map[int]sets.Set[string]{
+					32000: sets.New("[fd00:1::6]:9090"),
+				},
+				serviceIPEndpoints: map[string]sets.Set[string]{
+					"[fd00:1::5]:3000": sets.New("[fd00:1::6]:9090"),
+				},
+			},
+			throwEINTROnFirstCall: true,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			handler := &fakeHandler{}
-			ct := newConntracker(handler)
-			_, err := ct.ClearEntries(tc.ipFamily, tc.filters...)
-			require.NoError(t, err)
-			require.Equal(t, netlink.ConntrackTableType(netlink.ConntrackTable), handler.tableType)
-			require.Equal(t, netlink.InetFamily(tc.ipFamily), handler.ipFamily)
-			require.Equal(t, len(tc.filters), len(handler.filters))
-			for i := 0; i < len(tc.filters); i++ {
-				require.Equal(t, tc.filters[i], handler.filters[i])
+			handler := &fakeHandler{
+				throwEINTROnFirstCall: tc.throwEINTROnFirstCall,
 			}
+			ct := newConntracker(handler)
+
+			var err error
+			if tc.filter != nil {
+				_, err = ct.ClearEntries(tc.ipFamily, tc.filter)
+				require.Equal(t, netlink.ConntrackTableType(netlink.ConntrackTable), handler.tableType)
+				require.Equal(t, netlink.InetFamily(tc.ipFamily), handler.ipFamily)
+				require.Equal(t, tc.filter, handler.filter)
+			} else {
+				_, err = ct.ClearEntries(tc.ipFamily)
+			}
+			require.NoError(t, err)
 		})
 	}
 }
