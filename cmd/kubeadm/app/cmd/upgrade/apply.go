@@ -119,16 +119,16 @@ func newCmdApply(apf *applyPlanFlags) *cobra.Command {
 		},
 	}
 
-	// Register the common flags for apply and plan
+	// Register the common flags for apply and plan.
 	addApplyPlanFlags(cmd.Flags(), flags.applyPlanFlags)
-	// Specify the valid flags specific for apply
+	// Specify the valid flags specific to apply.
 	cmd.Flags().BoolVarP(&flags.nonInteractiveMode, "yes", "y", flags.nonInteractiveMode, "Perform the upgrade and do not prompt for confirmation (non-interactive mode).")
 	cmd.Flags().BoolVarP(&flags.force, options.Force, "f", flags.force, "Force upgrading although some requirements might not be met. This also implies non-interactive mode.")
 	cmd.Flags().BoolVar(&flags.dryRun, options.DryRun, flags.dryRun, "Do not change any state, just output what actions would be performed.")
 	cmd.Flags().BoolVar(&flags.renewCerts, options.CertificateRenewal, flags.renewCerts, "Perform the renewal of certificates used by component changed during upgrades.")
 	options.AddPatchesFlag(cmd.Flags(), &flags.patchesDir)
 
-	// Initialize the workflow runner with the list of phases
+	// Initialize the workflow runner with the list of phases.
 	applyRunner.AppendPhase(phases.NewPreflightPhase())
 	applyRunner.AppendPhase(phases.NewControlPlanePhase())
 	applyRunner.AppendPhase(phases.NewUploadConfigPhase())
@@ -138,8 +138,8 @@ func newCmdApply(apf *applyPlanFlags) *cobra.Command {
 	applyRunner.AppendPhase(commonphases.NewAddonPhase())
 	applyRunner.AppendPhase(commonphases.NewPostUpgradePhase())
 
-	// Sets the data builder function, that will be used by the runner,
-	// both when running the entire workflow or single phases.
+	// Set the data builder function that will be used by the runner,
+	// both when running the entire workflow and when running individual phases.
 	applyRunner.SetDataInitializer(func(cmd *cobra.Command, args []string) (workflow.RunData, error) {
 		data, err := newApplyData(cmd, args, flags)
 		if err != nil {
@@ -152,8 +152,8 @@ func newCmdApply(apf *applyPlanFlags) *cobra.Command {
 		return data, nil
 	})
 
-	// Binds the Runner to kubeadm upgrade apply command by altering
-	// command help, adding --skip-phases flag and by adding phases subcommands.
+	// Bind the runner to the "kubeadm upgrade apply" command by altering
+	// command help, adding the --skip-phases flag and adding phase subcommands.
 	applyRunner.BindToCommand(cmd)
 
 	return cmd
@@ -196,7 +196,7 @@ func newApplyData(cmd *cobra.Command, args []string, applyFlags *applyFlags) (*a
 		return nil, cmdutil.TypeMismatchErr("dryRun", "bool")
 	}
 
-	// If dry running creates a temporary directory for saving kubeadm generated files.
+	// If dry running, create a temporary directory for saving kubeadm-generated files.
 	dryRunDir := ""
 	if *dryRun {
 		if dryRunDir, err = constants.GetDryRunDir(constants.EnvVarUpgradeDryRunDir, "kubeadm-upgrade-apply-dryrun", klog.Warningf); err != nil {
@@ -236,7 +236,7 @@ func newApplyData(cmd *cobra.Command, args []string, applyFlags *applyFlags) (*a
 		return nil, errors.Wrapf(err, "couldn't create a Kubernetes client from file %q", applyFlags.kubeConfigPath)
 	}
 
-	// Fetches the cluster configuration.
+	// Fetch the cluster configuration.
 	klog.V(1).Infoln("[upgrade] retrieving configuration from cluster")
 	getNodeRegistration := true
 	isControlPlaneNode := true
@@ -251,7 +251,7 @@ func newApplyData(cmd *cobra.Command, args []string, applyFlags *applyFlags) (*a
 		return nil, errors.Wrap(err, "[upgrade] FATAL")
 	}
 
-	// Also set the union of pre-flight errors to InitConfiguration, to provide a consistent view of the runtime configuration:
+	// Also set the union of pre-flight errors on InitConfiguration, to provide a consistent view of the runtime configuration.
 	initCfg.NodeRegistration.IgnorePreflightErrors = sets.List(ignorePreflightErrorsSet)
 
 	// Set the ImagePullPolicy and ImagePullSerial from the UpgradeApplyConfiguration to the InitConfiguration.
@@ -342,7 +342,8 @@ func (d *applyData) OutputWriter() io.Writer {
 	return d.outputWriter
 }
 
-// SessionIsInteractive returns true if the session is of an interactive type (the default, can be opted out of with -y, -f or --dry-run).
+
+// SessionIsInteractive returns true if the session is of an interactive type (the default; can be opted out of with -y, -f or --dry-run).
 func (d *applyData) SessionIsInteractive() bool {
 	return !(d.nonInteractiveMode || d.dryRun || d.force)
 }
@@ -362,13 +363,13 @@ func (d *applyData) ForceUpgrade() bool {
 	return d.force
 }
 
-// IsControlPlaneNode returns if the node is a control-plane node.
+// IsControlPlaneNode returns true if the node is a control-plane node.
 func (d *applyData) IsControlPlaneNode() bool {
 	// `kubeadm upgrade apply` should always be executed on a control-plane node
 	return true
 }
 
-// KubeConfigDir returns the Kubernetes configuration directory or the temporary directory if DryRun is true.
+// KubeConfigDir returns the Kubernetes configuration directory or the temporary directory if dryRun is true.
 func (j *applyData) KubeConfigDir() string {
 	if j.dryRun {
 		return j.dryRunDir
@@ -376,7 +377,7 @@ func (j *applyData) KubeConfigDir() string {
 	return constants.KubernetesDir
 }
 
-// KubeletDir returns the kubelet configuration directory or the temporary directory if DryRun is true.
+// KubeletDir returns the kubelet configuration directory or the temporary directory if dryRun is true.
 func (j *applyData) KubeletDir() string {
 	if j.dryRun {
 		return j.dryRunDir

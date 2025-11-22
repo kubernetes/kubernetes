@@ -169,7 +169,7 @@ func (e *Runner) computePhaseRunFlags() (map[string]bool, error) {
 	return phaseRunFlags, nil
 }
 
-// SetDataInitializer allows to setup a function that initialize the runtime data shared
+// SetDataInitializer allows to setup a function that initializes the runtime data shared
 // among all the phases included in the workflow.
 // The method will receive in input the cmd that triggers the Runner (only if the runner is BindToCommand)
 func (e *Runner) SetDataInitializer(builder func(cmd *cobra.Command, args []string) (RunData, error)) {

@@ -81,7 +81,7 @@ func LongDesc(s string) string {
 // Examples is designed to help with producing examples for command line usage.
 // Its behavior is mimicking a similar kubectl function in the following ways:
 // - Beginning and trailing space characters (including empty lines), are stripped from the output.
-// - All lines of text are stripped of beginning and trailing spaces (thus loosing indentation) and are then double-space indented.
+// - All lines of text are stripped of beginning and trailing spaces (thus losing indentation) and are then double-space indented.
 func Examples(s string) string {
 	trimmedText := strings.TrimSpace(s)
 	if trimmedText == "" {

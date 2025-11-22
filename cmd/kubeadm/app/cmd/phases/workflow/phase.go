@@ -50,7 +50,7 @@ type Phase struct {
 
 	// RunAllSiblings allows to assign to a phase the responsibility to
 	// run all the sibling phases
-	// Nb. phase marked as RunAllSiblings can not have Run functions
+	// Nb. phase marked as RunAllSiblings cannot have Run functions
 	RunAllSiblings bool
 
 	// Run defines a function implementing the phase action.
