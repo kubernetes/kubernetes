@@ -248,12 +248,12 @@ func TestProbe(t *testing.T) {
 				testContainer.StartupProbe = test.probe
 			}
 			if test.execError {
-				prober.exec = fakeExecProber{test.execResult, errors.New("exec error")}
+				prober.exec = fakeExecProber{test.execResult, "", errors.New("exec error")}
 			} else {
-				prober.exec = fakeExecProber{test.execResult, nil}
+				prober.exec = fakeExecProber{test.execResult, "", nil}
 			}
 
-			result, err := prober.probe(ctx, pType, &v1.Pod{}, v1.PodStatus{}, testContainer, containerID)
+			result, _, err := prober.probe(ctx, pType, &v1.Pod{}, v1.PodStatus{}, testContainer, containerID)
 
 			if test.expectError {
 				require.Error(t, err, "[%s] Expected probe error but no error was returned.", testID)
@@ -266,7 +266,7 @@ func TestProbe(t *testing.T) {
 			if len(test.expectCommand) > 0 {
 				prober.exec = execprobe.New()
 				prober.runner = &containertest.FakeContainerCommandRunner{}
-				_, err := prober.probe(ctx, pType, &v1.Pod{}, v1.PodStatus{}, testContainer, containerID)
+				_, _, err := prober.probe(ctx, pType, &v1.Pod{}, v1.PodStatus{}, testContainer, containerID)
 				require.NoError(t, err, "[%s] Didn't expect probe error ", testID)
 
 				if !reflect.DeepEqual(test.expectCommand, prober.runner.(*containertest.FakeContainerCommandRunner).Cmd) {
@@ -430,8 +430,8 @@ func TestRecordContainerEventUnknownStatus(t *testing.T) {
 				recorder: fakeRecorder,
 			}
 
-			pb.recordContainerEvent(tCtx, pod, &container, v1.EventTypeWarning, "ContainerProbeWarning", "%s probe warning: %s", tc.probeType, output)
-			pb.recordContainerEvent(tCtx, pod, &container, v1.EventTypeWarning, "ContainerProbeWarning", "Unknown %s probe status: %s", tc.probeType, tc.result)
+			RecordContainerEvent(pb.recorder, tCtx, pod, &container, v1.EventTypeWarning, "ContainerProbeWarning", "%s probe warning: %s", tc.probeType, output)
+			RecordContainerEvent(pb.recorder, tCtx, pod, &container, v1.EventTypeWarning, "ContainerProbeWarning", "Unknown %s probe status: %s", tc.probeType, tc.result)
 
 			assert.Equal(t, len(tc.expected), len(fakeRecorder.Events), "unexpected number of events")
 			for _, expected := range tc.expected {
