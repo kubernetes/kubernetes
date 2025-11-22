@@ -606,6 +606,7 @@ type CSINodeDriver struct {
 	// understand, e.g. "nodeA" instead of "node1". This field is required.
 	// +required
 	// +k8s:required
+	// +k8s:immutable
 	NodeID string `json:"nodeID" protobuf:"bytes,2,opt,name=nodeID"`
 
 	// topologyKeys is the list of keys supported by the driver.

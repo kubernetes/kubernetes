@@ -289,6 +289,7 @@ message CSINodeDriver {
   // understand, e.g. "nodeA" instead of "node1". This field is required.
   // +required
   // +k8s:required
+  // +k8s:immutable
   optional string nodeID = 2;
 
   // topologyKeys is the list of keys supported by the driver.
