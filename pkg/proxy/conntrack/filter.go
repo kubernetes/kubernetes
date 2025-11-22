@@ -21,23 +21,20 @@ package conntrack
 
 import (
 	"net"
+	"strconv"
 
 	"github.com/vishvananda/netlink"
 
-	"k8s.io/klog/v2"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
-
-type connectionTuple struct {
-	srcIP   net.IP
-	srcPort uint16
-	dstIP   net.IP
-	dstPort uint16
-}
 
 type conntrackFilter struct {
 	protocol uint8
-	original *connectionTuple
-	reply    *connectionTuple
+	// serviceIPEndpoints maps service IPs (ClusterIP, LoadBalancerIPs and ExternalIPs) and Service Port
+	// to the set of serving endpoints (Endpoint IP and Port).
+	serviceIPEndpoints map[string]sets.Set[string]
+	// serviceNodePortEndpoints maps service NodePort to the set of serving endpoints  (Endpoint IP and Port).
+	serviceNodePortEndpoints map[int]sets.Set[string]
 }
 
 var _ netlink.CustomConntrackFilter = (*conntrackFilter)(nil)
@@ -45,57 +42,34 @@ var _ netlink.CustomConntrackFilter = (*conntrackFilter)(nil)
 // MatchConntrackFlow applies the filter to the flow and returns true if the flow matches the filter
 // false otherwise.
 func (f *conntrackFilter) MatchConntrackFlow(flow *netlink.ConntrackFlow) bool {
-	// return false in case of empty filter
-	if f.protocol == 0 && f.original == nil && f.reply == nil {
+	// filter out the protocol
+	if flow.Forward.Protocol != f.protocol {
 		return false
 	}
 
-	// -p, --protonum proto [Layer 4 Protocol, eg. 'tcp']
-	if f.protocol != 0 && f.protocol != flow.Forward.Protocol {
-		return false
+	origDst := flow.Forward.DstIP.String()   // match Service IP
+	origPortDst := int(flow.Forward.DstPort) // match Service Port
+	origPortDstStr := strconv.Itoa(origPortDst)
+	replySrc := flow.Reverse.SrcIP.String()   // match Serving Endpoint IP
+	replyPortSrc := int(flow.Reverse.SrcPort) // match Serving Endpoint Port
+	replyPortSrcStr := strconv.Itoa(replyPortSrc)
+
+	// if the original destination (--orig-dst) of the entry is service IP (ClusterIP,
+	// LoadBalancerIPs or ExternalIPs) and (--orig-port-dst) is service Port and
+	// the reply source IP (--reply-src) and port (--reply-port-src) does not
+	// represent a serving endpoint of the service, we clear the entry.
+	endpoints, ok := f.serviceIPEndpoints[net.JoinHostPort(origDst, origPortDstStr)]
+	if ok && !endpoints.Has(net.JoinHostPort(replySrc, replyPortSrcStr)) {
+		return true
 	}
 
-	// filter on original direction
-	if f.original != nil {
-		// --orig-src ip  [Source address from original direction]
-		if f.original.srcIP != nil && !f.original.srcIP.Equal(flow.Forward.SrcIP) {
-			return false
-		}
-		// --orig-dst ip  [Destination address from original direction]
-		if f.original.dstIP != nil && !f.original.dstIP.Equal(flow.Forward.DstIP) {
-			return false
-		}
-		// --orig-port-src port [Source port from original direction]
-		if f.original.srcPort != 0 && f.original.srcPort != flow.Forward.SrcPort {
-			return false
-		}
-		// --orig-port-dst port	[Destination port from original direction]
-		if f.original.dstPort != 0 && f.original.dstPort != flow.Forward.DstPort {
-			return false
-		}
+	// if the original destination port (--orig-port-dst) of the entry is service
+	// NodePort and the reply source IP (--reply-src) and port (--reply-port-src)
+	// does not represent a serving endpoint of the service, we clear the entry.
+	endpoints, ok = f.serviceNodePortEndpoints[origPortDst]
+	if ok && !endpoints.Has(net.JoinHostPort(replySrc, replyPortSrcStr)) {
+		return true
 	}
 
-	// filter on reply direction
-	if f.reply != nil {
-		// --reply-src ip  [Source NAT ip]
-		if f.reply.srcIP != nil && !f.reply.srcIP.Equal(flow.Reverse.SrcIP) {
-			return false
-		}
-		// --reply-dst ip [Destination NAT ip]
-		if f.reply.dstIP != nil && !f.reply.dstIP.Equal(flow.Reverse.DstIP) {
-			return false
-		}
-		// --reply-port-src port [Source port from reply direction]
-		if f.reply.srcPort != 0 && f.reply.srcPort != flow.Reverse.SrcPort {
-			return false
-		}
-		// --reply-port-dst port	[Destination port from reply direction]
-		if f.reply.dstPort != 0 && f.reply.dstPort != flow.Reverse.DstPort {
-			return false
-		}
-	}
-
-	// appending a new line to the flow makes klog print multiline log which is easier to debug and understand.
-	klog.V(5).InfoS("Deleting conntrack entry", "flow", flow.String()+"\n")
-	return true
+	return false
 }

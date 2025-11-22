@@ -36,16 +36,6 @@ func NewFake() *FakeInterface {
 	return &FakeInterface{entries: make([]*netlink.ConntrackFlow, 0)}
 }
 
-// ListEntries is part of Interface
-func (fake *FakeInterface) ListEntries(_ uint8) ([]*netlink.ConntrackFlow, error) {
-	entries := make([]*netlink.ConntrackFlow, len(fake.entries))
-	copy(entries, fake.entries)
-	// 1 netlink request to dump the table
-	// https://github.com/vishvananda/netlink/blob/0af32151e72b990c271ef6268e8aadb7e015f2bd/conntrack_linux.go#L93-L94
-	fake.netlinkRequests++
-	return entries, nil
-}
-
 // ClearEntries is part of Interface
 func (fake *FakeInterface) ClearEntries(_ uint8, filters ...netlink.CustomConntrackFilter) (int, error) {
 	var flows []*netlink.ConntrackFlow
