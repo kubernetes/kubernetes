@@ -167,6 +167,7 @@ type ControlPlaneComponent struct {
 	// An argument name in this list is the flag name as it appears on the
 	// command line except without leading dash(es). Extra arguments will override existing
 	// default arguments. Duplicate extra arguments are allowed.
+	// The default arguments are sorted alpha-numerically but the extra arguments are not.
 	ExtraArgs []Arg
 
 	// ExtraVolumes is an extra set of host volumes, mounted to the control plane component.
@@ -249,6 +250,7 @@ type NodeRegistrationOptions struct {
 	// Flags have higher priority when parsing. These values are local and specific to the node kubeadm is executing on.
 	// An argument name in this list is the flag name as it appears on the command line except without leading dash(es).
 	// Extra arguments will override existing default arguments. Duplicate extra arguments are allowed.
+	// The default arguments are sorted alpha-numerically but the extra arguments are not.
 	KubeletExtraArgs []Arg
 
 	// IgnorePreflightErrors provides a slice of pre-flight errors to be ignored when the current node is registered, e.g. 'IsPrivilegedUser,Swap'.
@@ -301,6 +303,7 @@ type LocalEtcd struct {
 	// An argument name in this list is the flag name as it appears on the
 	// command line except without leading dash(es). Extra arguments will override existing
 	// default arguments. Duplicate extra arguments are allowed.
+	// The default arguments are sorted alpha-numerically but the extra arguments are not.
 	ExtraArgs []Arg
 
 	// ExtraEnvs is an extra set of environment variables to pass to the control plane component.
