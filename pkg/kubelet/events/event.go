@@ -1,4 +1,4 @@
-/*
+c/*
 Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -96,6 +96,8 @@ const (
 const (
 	ContainerUnhealthy    = "Unhealthy"
 	ContainerProbeWarning = "ProbeWarning"
+	ContainerProbeResultFailure = "ContainerProbeResultFailure"
+	ContainerProbeResultSuccess = "ContainerProbeResultSuccess"
 )
 
 // Pod worker event reason list
