@@ -901,6 +901,121 @@ func TestEnvelopeMetrics(t *testing.T) {
 	}
 }
 
+func TestTransformFromStorageContention(t *testing.T) {
+
+	t.Parallel()
+
+	ctx := testContext(t)
+
+	envelopeService := newTestEnvelopeService()
+
+	state, err := testStateFunc(testContext(t), envelopeService, clock.RealClock{}, randomBool())()
+	if err != nil {
+		t.Fatalf("failed to prepare state: %v", err)
+	}
+
+	transformer := NewEnvelopeTransformer(
+		envelopeService,
+		testProviderName,
+		func() (State, error) { return state, nil },
+		testAPIServerID,
+	)
+
+	dataCtx := value.DefaultContext(testContextText)
+	originalText := []byte(testText)
+
+	encryptedData, err := transformer.TransformToStorage(context.Background(), originalText, dataCtx)
+	if err != nil {
+		t.Fatalf("failed to encrypt test data: %v", err)
+	}
+
+	const (
+		numLists     = 2000
+		itemsPerList = 500
+	)
+	var wg sync.WaitGroup
+	wg.Add(numLists)
+
+	start := time.Now()
+
+	for i := 0; i < numLists; i++ {
+		go func() {
+			defer wg.Done()
+			for j := 0; j < itemsPerList; j++ {
+				_, _, err := transformer.TransformFromStorage(ctx, encryptedData, dataCtx)
+				if err != nil {
+					t.Errorf("TransformFromStorage failed: %v", err)
+					return
+				}
+			}
+		}()
+	}
+
+	wg.Wait()
+	elapsed := time.Since(start)
+	totalDecrypts := numLists * itemsPerList
+
+	t.Logf("TransformFromStorage contention: %d LIST goroutines × %d items = %d decrypts in %s",
+		numLists, itemsPerList, totalDecrypts, elapsed)
+
+	// this test should run fast unless contention is heavy.
+	if elapsed > 2*time.Second {
+		t.Logf(" likely lockRecordKeyID contention observed: %v", elapsed)
+	}
+}
+
+func BenchmarkKMSV2TransformFromStorageContention(b *testing.B) {
+	ctx := context.Background()
+
+	envelopeService := newTestEnvelopeService()
+	state, err := testStateFunc(ctx, envelopeService, clock.RealClock{}, randomBool())()
+	if err != nil {
+		b.Fatalf("failed to prepare initial state: %v", err)
+	}
+
+	transformer := NewEnvelopeTransformer(
+		envelopeService,
+		testProviderName,
+		func() (State, error) { return state, nil },
+		testAPIServerID,
+	)
+
+	dataCtx := value.DefaultContext(testContextText)
+	originalText := []byte(testText)
+
+	encryptedData, err := transformer.TransformToStorage(ctx, originalText, dataCtx)
+	if err != nil {
+		b.Fatalf("TransformToStorage failed: %v", err)
+	}
+
+	for _, numLists := range []int{1, 8, 32, 64} {
+		b.Run(fmt.Sprintf("lists=%d", numLists), func(b *testing.B) {
+			const itemsPerList = 256
+
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				var wg sync.WaitGroup
+				wg.Add(numLists)
+
+				for l := 0; l < numLists; l++ {
+					go func() {
+						defer wg.Done()
+						for j := 0; j < itemsPerList; j++ {
+							_, _, err := transformer.TransformFromStorage(ctx, encryptedData, dataCtx)
+							if err != nil {
+								b.Errorf("TransformFromStorage failed: %v", err)
+								return
+							}
+						}
+					}()
+				}
+
+				wg.Wait()
+			}
+		})
+	}
+}
+
 // TestEnvelopeMetricsCache validates the correctness of the apiserver_envelope_encryption_dek_source_cache_size metric
 // and asserts that all of the associated logic is go routine safe.
 // 1. Multiple transformers are created, which should result in unique cache size for each provider
