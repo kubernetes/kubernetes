@@ -156,6 +156,14 @@ type TContext interface {
 	//     tCtx.Expect(myAmazingThing()).Should(gomega.Equal(1))
 	Expect(actual interface{}, extra ...interface{}) gomega.Assertion
 
+	// Require is an alias for [Expect].
+	Require(actual interface{}, extra ...interface{}) gomega.Assertion
+
+	// Assert also wraps [gomega.Expect], but in contrast to [Expect] = [Require],
+	// it reports a failure through [TContext.Error]. This makes it possible
+	// to test several different assertions.
+	Assert(actual interface{}, extra ...interface{}) gomega.Assertion
+
 	// ExpectNoError asserts that no error has occurred.
 	//
 	// As in [gomega], the optional explanation can be:
@@ -206,7 +214,7 @@ type TContext interface {
 	// of TContext to ensure that the leaf TContext is used, not some
 	// embedded TContext:
 	// - CleanupCtx
-	// - Expect
+	// - Expect/Require/Assert
 	// - ExpectNoError
 	// - Run
 	// - Logger
@@ -504,7 +512,17 @@ func (tCtx tContext) CleanupCtx(cb func(TContext)) {
 
 func (tCtx tContext) Expect(actual interface{}, extra ...interface{}) gomega.Assertion {
 	tCtx.Helper()
-	return expect(tCtx, actual, extra...)
+	return gomegaAssertion(tCtx, true, actual, extra...)
+}
+
+func (tCtx tContext) Require(actual interface{}, extra ...interface{}) gomega.Assertion {
+	tCtx.Helper()
+	return gomegaAssertion(tCtx, true, actual, extra...)
+}
+
+func (tCtx tContext) Assert(actual interface{}, extra ...interface{}) gomega.Assertion {
+	tCtx.Helper()
+	return gomegaAssertion(tCtx, false, actual, extra...)
 }
 
 func (tCtx tContext) ExpectNoError(err error, explain ...interface{}) {

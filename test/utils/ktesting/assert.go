@@ -24,6 +24,7 @@ import (
 
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/format"
+	gtypes "github.com/onsi/gomega/types"
 )
 
 // FailureError is an error where the error string is meant to be passed to
@@ -57,10 +58,23 @@ func (f FailureError) Is(target error) bool {
 //	}
 var ErrFailure error = FailureError{}
 
-func expect(tCtx TContext, actual interface{}, extra ...interface{}) gomega.Assertion {
+func gomegaAssertion(tCtx TContext, fatal bool, actual interface{}, extra ...interface{}) gomega.Assertion {
 	tCtx.Helper()
-	return gomega.NewWithT(tCtx).Expect(actual, extra...)
+	testingT := gtypes.GomegaTestingT(tCtx)
+	if !fatal {
+		testingT = assertTestingT{tCtx}
+	}
+	return gomega.NewWithT(testingT).Expect(actual, extra...)
 }
+
+// assertTestingT implements Fatalf using TContext.Errorf, i.e. testing continues
+// after a failed assertion.
+type assertTestingT struct {
+	tCtx TContext
+}
+
+func (a assertTestingT) Helper()                           { a.tCtx.Helper() }
+func (a assertTestingT) Fatalf(format string, args ...any) { a.tCtx.Errorf(format, args...) }
 
 // suppressUnexpectedErrorLoggingKeyType is the type for a key which, if set to true in a context,
 // suppresses logging of an unexpected error. The context returned by WithError uses this because

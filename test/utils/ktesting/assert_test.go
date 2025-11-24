@@ -172,7 +172,6 @@ Timed out while waiting on TryAgainAfter after x.y s.
 told to try again after 1ms: intermittent error
 `,
 		},
-
 		"expect-equal": {
 			cb: func(tCtx TContext) {
 				tCtx.Expect(1).To(gomega.Equal(42))
@@ -183,6 +182,31 @@ Expected
     <int>: 1
 to equal
     <int>: 42
+`,
+		},
+		"require-equal": {
+			cb: func(tCtx TContext) {
+				tCtx.Require(1).To(gomega.Equal(42))
+				tCtx.Log("not reached")
+			},
+			expectTrace: `(FATAL) <klog header>: FATAL ERROR: 
+Expected
+    <int>: 1
+to equal
+    <int>: 42
+`,
+		},
+		"assert-equal": {
+			cb: func(tCtx TContext) {
+				tCtx.Assert(1).To(gomega.Equal(42))
+				tCtx.Log("reached")
+			},
+			expectTrace: `(ERROR) <klog header>: ERROR: 
+Expected
+    <int>: 1
+to equal
+    <int>: 42
+(LOG) <klog header>: reached
 `,
 		},
 		"expect-no-error-success": {
