@@ -809,6 +809,10 @@ func TestPodEvaluatorUsageStats(t *testing.T) {
 func TestPodEvaluatorMatchingScopes(t *testing.T) {
 	fakeClock := testingclock.NewFakeClock(time.Now())
 	evaluator := NewPodEvaluator(nil, fakeClock)
+	// Fixed: Now using deletionTimestamp for Terminating scope tests
+	// See: https://github.com/kubernetes/kubernetes/issues/135411
+	deletionTimestamp := metav1.Now()
+	// Added: For new ActiveDeadline scope tests
 	activeDeadlineSeconds := int64(30)
 	testCases := map[string]struct {
 		pod           *api.Pod
@@ -858,10 +862,12 @@ func TestPodEvaluatorMatchingScopes(t *testing.T) {
 				{ScopeName: corev1.ResourceQuotaScopeNotBestEffort},
 			},
 		},
+		// Fixed: This test now correctly uses deletionTimestamp instead of activeDeadlineSeconds
+		// to test the Terminating scope. See: https://github.com/kubernetes/kubernetes/issues/135411
 		"Terminating": {
 			pod: &api.Pod{
-				Spec: api.PodSpec{
-					ActiveDeadlineSeconds: &activeDeadlineSeconds,
+				ObjectMeta: metav1.ObjectMeta{
+					DeletionTimestamp: &deletionTimestamp,
 				},
 			},
 			wantSelectors: []corev1.ScopedResourceSelectorRequirement{
@@ -871,8 +877,8 @@ func TestPodEvaluatorMatchingScopes(t *testing.T) {
 		},
 		"OnlyTerminating": {
 			pod: &api.Pod{
-				Spec: api.PodSpec{
-					ActiveDeadlineSeconds: &activeDeadlineSeconds,
+				ObjectMeta: metav1.ObjectMeta{
+					DeletionTimestamp: &deletionTimestamp,
 				},
 			},
 			selectors: []corev1.ScopedResourceSelectorRequirement{
@@ -884,8 +890,10 @@ func TestPodEvaluatorMatchingScopes(t *testing.T) {
 		},
 		"CrossNamespaceRequiredAffinity": {
 			pod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					DeletionTimestamp: &deletionTimestamp,
+				},
 				Spec: api.PodSpec{
-					ActiveDeadlineSeconds: &activeDeadlineSeconds,
 					Affinity: &api.Affinity{
 						PodAffinity: &api.PodAffinity{
 							RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
@@ -903,8 +911,10 @@ func TestPodEvaluatorMatchingScopes(t *testing.T) {
 		},
 		"CrossNamespaceRequiredAffinityWithSlice": {
 			pod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					DeletionTimestamp: &deletionTimestamp,
+				},
 				Spec: api.PodSpec{
-					ActiveDeadlineSeconds: &activeDeadlineSeconds,
 					Affinity: &api.Affinity{
 						PodAffinity: &api.PodAffinity{
 							RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
@@ -922,8 +932,10 @@ func TestPodEvaluatorMatchingScopes(t *testing.T) {
 		},
 		"CrossNamespacePreferredAffinity": {
 			pod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					DeletionTimestamp: &deletionTimestamp,
+				},
 				Spec: api.PodSpec{
-					ActiveDeadlineSeconds: &activeDeadlineSeconds,
 					Affinity: &api.Affinity{
 						PodAffinity: &api.PodAffinity{
 							PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
@@ -941,8 +953,10 @@ func TestPodEvaluatorMatchingScopes(t *testing.T) {
 		},
 		"CrossNamespacePreferredAffinityWithSelector": {
 			pod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					DeletionTimestamp: &deletionTimestamp,
+				},
 				Spec: api.PodSpec{
-					ActiveDeadlineSeconds: &activeDeadlineSeconds,
 					Affinity: &api.Affinity{
 						PodAffinity: &api.PodAffinity{
 							PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
@@ -960,8 +974,10 @@ func TestPodEvaluatorMatchingScopes(t *testing.T) {
 		},
 		"CrossNamespacePreferredAntiAffinity": {
 			pod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					DeletionTimestamp: &deletionTimestamp,
+				},
 				Spec: api.PodSpec{
-					ActiveDeadlineSeconds: &activeDeadlineSeconds,
 					Affinity: &api.Affinity{
 						PodAntiAffinity: &api.PodAntiAffinity{
 							PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
@@ -979,8 +995,10 @@ func TestPodEvaluatorMatchingScopes(t *testing.T) {
 		},
 		"CrossNamespaceRequiredAntiAffinity": {
 			pod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					DeletionTimestamp: &deletionTimestamp,
+				},
 				Spec: api.PodSpec{
-					ActiveDeadlineSeconds: &activeDeadlineSeconds,
 					Affinity: &api.Affinity{
 						PodAntiAffinity: &api.PodAntiAffinity{
 							RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
@@ -996,13 +1014,53 @@ func TestPodEvaluatorMatchingScopes(t *testing.T) {
 				{ScopeName: corev1.ResourceQuotaScopeCrossNamespacePodAffinity},
 			},
 		},
+		// NEW: Test for the new ActiveDeadline scope
+		// Verifies that pods with activeDeadlineSeconds set match the ActiveDeadline scope.
+		// See: https://github.com/kubernetes/kubernetes/issues/135411
+		"ActiveDeadline": {
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					ActiveDeadlineSeconds: &activeDeadlineSeconds,
+				},
+			},
+			wantSelectors: []corev1.ScopedResourceSelectorRequirement{
+				{ScopeName: corev1.ResourceQuotaScopeNotTerminating},
+				{ScopeName: corev1.ResourceQuotaScopeActiveDeadline},
+				{ScopeName: corev1.ResourceQuotaScopeBestEffort},
+			},
+		},
+		// NEW: Test for the new NotActiveDeadline scope
+		// Verifies that pods without activeDeadlineSeconds match the NotActiveDeadline scope.
+		// See: https://github.com/kubernetes/kubernetes/issues/135411
+		"NotActiveDeadline": {
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{{
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{
+								api.ResourceCPU: resource.MustParse("1"),
+							},
+						},
+					}},
+				},
+			},
+			wantSelectors: []corev1.ScopedResourceSelectorRequirement{
+				{ScopeName: corev1.ResourceQuotaScopeNotTerminating},
+				{ScopeName: corev1.ResourceQuotaScopeNotActiveDeadline},
+				{ScopeName: corev1.ResourceQuotaScopeNotBestEffort},
+			},
+		},
 	}
 	for testName, testCase := range testCases {
 		t.Run(testName, func(t *testing.T) {
 			if testCase.selectors == nil {
+				// Added: New ActiveDeadline and NotActiveDeadline scopes to default test selector list
+				// See: https://github.com/kubernetes/kubernetes/issues/135411
 				testCase.selectors = []corev1.ScopedResourceSelectorRequirement{
 					{ScopeName: corev1.ResourceQuotaScopeTerminating},
 					{ScopeName: corev1.ResourceQuotaScopeNotTerminating},
+					{ScopeName: corev1.ResourceQuotaScopeActiveDeadline},
+					{ScopeName: corev1.ResourceQuotaScopeNotActiveDeadline},
 					{ScopeName: corev1.ResourceQuotaScopeBestEffort},
 					{ScopeName: corev1.ResourceQuotaScopeNotBestEffort},
 					{ScopeName: corev1.ResourceQuotaScopePriorityClass, Operator: corev1.ScopeSelectorOpIn, Values: []string{"class1"}},

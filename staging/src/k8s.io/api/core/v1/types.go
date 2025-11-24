@@ -7740,9 +7740,13 @@ const (
 type ResourceQuotaScope string
 
 const (
-	// Match all pod objects where spec.activeDeadlineSeconds >=0
+	// Match all pod objects where metadata.deletionTimestamp is set
+	// Fixed: Previously incorrectly documented as checking spec.activeDeadlineSeconds
+	// See: https://github.com/kubernetes/kubernetes/issues/135411
 	ResourceQuotaScopeTerminating ResourceQuotaScope = "Terminating"
-	// Match all pod objects where spec.activeDeadlineSeconds is nil
+	// Match all pod objects where metadata.deletionTimestamp is nil
+	// Fixed: Previously incorrectly documented as checking spec.activeDeadlineSeconds
+	// See: https://github.com/kubernetes/kubernetes/issues/135411
 	ResourceQuotaScopeNotTerminating ResourceQuotaScope = "NotTerminating"
 	// Match all pod objects that have best effort quality of service
 	ResourceQuotaScopeBestEffort ResourceQuotaScope = "BestEffort"
@@ -7752,6 +7756,16 @@ const (
 	ResourceQuotaScopePriorityClass ResourceQuotaScope = "PriorityClass"
 	// Match all pod objects that have cross-namespace pod (anti)affinity mentioned.
 	ResourceQuotaScopeCrossNamespacePodAffinity ResourceQuotaScope = "CrossNamespacePodAffinity"
+	// NEW: Match all pod objects where spec.activeDeadlineSeconds >= 0
+	// This is a NEW scope added to separate time-constrained pods from terminating pods.
+	// Use this for batch jobs and other pods with time limits.
+	// See: https://github.com/kubernetes/kubernetes/issues/135411
+	ResourceQuotaScopeActiveDeadline ResourceQuotaScope = "ActiveDeadline"
+	// NEW: Match all pod objects where spec.activeDeadlineSeconds is nil
+	// This is a NEW scope added to separate time-constrained pods from terminating pods.
+	// Use this for long-running pods without time limits.
+	// See: https://github.com/kubernetes/kubernetes/issues/135411
+	ResourceQuotaScopeNotActiveDeadline ResourceQuotaScope = "NotActiveDeadline"
 
 	// Match all pvc objects that have volume attributes class mentioned.
 	ResourceQuotaScopeVolumeAttributesClass ResourceQuotaScope = "VolumeAttributesClass"
