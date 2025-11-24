@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/history"
 	"k8s.io/kubernetes/pkg/controller/statefulset/metrics"
+	"k8s.io/utils/clock"
 
 	"k8s.io/klog/v2"
 )
@@ -81,6 +82,7 @@ type StatefulSetController struct {
 	queue workqueue.TypedRateLimitingInterface[string]
 	// eventBroadcaster is the core of event processing pipeline.
 	eventBroadcaster record.EventBroadcaster
+	clock            clock.PassiveClock
 }
 
 // NewStatefulSetController creates a new statefulset controller.
@@ -118,6 +120,7 @@ func NewStatefulSetController(
 		podControl: controller.RealPodControl{KubeClient: kubeClient, Recorder: recorder},
 
 		eventBroadcaster: eventBroadcaster,
+		clock:            clock.RealClock{},
 	}
 
 	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -463,7 +466,7 @@ func (ssc *StatefulSetController) worker(ctx context.Context) {
 
 // sync syncs the given statefulset.
 func (ssc *StatefulSetController) sync(ctx context.Context, key string) error {
-	startTime := time.Now()
+	startTime := ssc.clock.Now()
 	logger := klog.FromContext(ctx)
 	defer func() {
 		logger.V(4).Info("Finished syncing statefulset", "key", key, "time", time.Since(startTime))
@@ -508,7 +511,8 @@ func (ssc *StatefulSetController) syncStatefulSet(ctx context.Context, set *apps
 	logger.V(4).Info("Syncing StatefulSet with pods", "statefulSet", klog.KObj(set), "pods", len(pods))
 	var status *apps.StatefulSetStatus
 	var err error
-	status, err = ssc.control.UpdateStatefulSet(ctx, set, pods)
+	now := ssc.clock.Now()
+	status, err = ssc.control.UpdateStatefulSet(ctx, set, pods, now)
 	if err != nil {
 		return err
 	}
