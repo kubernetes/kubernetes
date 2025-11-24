@@ -21,6 +21,7 @@ import (
 	"path"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -48,8 +49,9 @@ var _ = SIGDescribe("Ensure Credential Pulled Images", func() {
 			_, is, err = getCRIClient()
 			framework.ExpectNoError(err)
 
-			registryAddress, _, err := e2eregistry.SetupRegistry(ctx, f, true)
+			registryAddress, registryNodeNames, err := e2eregistry.SetupRegistry(ctx, f, true)
 			framework.ExpectNoError(err)
+			gomega.Expect(registryNodeNames).ToNot(gomega.BeEmpty(), "registry should run on at least one node")
 			// this is to wait for the complete removal of all registry pods between tests
 			ginkgo.DeferCleanup(func(ctx context.Context) {
 				f.DeleteNamespace(ctx, f.Namespace.Name)
@@ -62,8 +64,10 @@ var _ = SIGDescribe("Ensure Credential Pulled Images", func() {
 			testSecret.GenerateName = f.UniqueName
 			testSecret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(ctx, testSecret, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
-			origPod := e2ecommonnode.ImagePullTest(ctx, f, testImage, v1.PullIfNotPresent, testSecret, "", v1.PodRunning, false)
-			testNode = origPod.Spec.NodeName
+			// Use the registry node for scheduling - in node e2e tests, this is the single test node
+			testNode = registryNodeNames[0]
+			origPod := e2ecommonnode.ImagePullTest(ctx, f, testImage, v1.PullIfNotPresent, testSecret, testNode, v1.PodRunning, false)
+			gomega.Expect(origPod.Spec.NodeName).To(gomega.Equal(testNode), "pod should be scheduled on the expected node")
 		})
 
 		for _, pullPolicy := range []v1.PullPolicy{v1.PullIfNotPresent, v1.PullNever} {
