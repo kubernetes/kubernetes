@@ -58,3 +58,25 @@ For example:
 
 Some of the definitions may have these extensions. For more information about PatchStrategy and PatchMergeKey see
 [strategic-merge-patch](https://git.k8s.io/community/contributors/devel/sig-api-machinery/strategic-merge-patch.md).
+
+### `x-kubernetes-list-type`
+
+Operations and Definitions may have `x-kubernetes-list-type` if they
+are associated with a [kubernetes resource](https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources).
+This extension is used to specify the type of the list. It can be one of `atomic`, `set`, or `map`.
+
+* `atomic`: The list is treated as a single entity.
+* `set`: The list is treated as a set.
+* `map`: The list is treated as a map.
+
+### `x-kubernetes-list-map-keys`
+
+Operations and Definitions may have `x-kubernetes-list-map-keys` if they
+are associated with a [kubernetes resource](https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources).
+This extension is used to specify the keys of the map when `x-kubernetes-list-type` is set to `map`.
+
+### `x-kubernetes-unions`
+
+Operations and Definitions may have `x-kubernetes-unions` if they
+are associated with a [kubernetes resource](https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources).
+This extension is used to specify the unions in the resource.
