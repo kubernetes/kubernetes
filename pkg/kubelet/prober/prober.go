@@ -80,7 +80,7 @@ func (pb *prober) recordContainerEvent(ctx context.Context, pod *v1.Pod, contain
 }
 
 // probe probes the container.
-func (pb *prober) probe(ctx context.Context, probeType probeType, pod *v1.Pod, status v1.PodStatus, container v1.Container, containerID kubecontainer.ContainerID) (results.Result, error) {
+func (pb *prober) probe(ctx context.Context, probeType probeType, pod *v1.Pod, status v1.PodStatus, container v1.Container, containerID kubecontainer.ContainerID) (results.Result, string, error) {
 	var probeSpec *v1.Probe
 	switch probeType {
 	case readiness:
@@ -90,13 +90,13 @@ func (pb *prober) probe(ctx context.Context, probeType probeType, pod *v1.Pod, s
 	case startup:
 		probeSpec = container.StartupProbe
 	default:
-		return results.Failure, fmt.Errorf("unknown probe type: %q", probeType)
+		return results.Failure, "", fmt.Errorf("unknown probe type: %q", probeType)
 	}
 
 	logger := klog.FromContext(ctx)
 	if probeSpec == nil {
 		logger.Info("Probe is nil", "probeType", probeType, "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name)
-		return results.Success, nil
+		return results.Success, "", nil
 	}
 
 	result, output, err := pb.runProbeWithRetries(ctx, probeType, probeSpec, pod, status, container, containerID, maxProbeRetries)
@@ -105,31 +105,31 @@ func (pb *prober) probe(ctx context.Context, probeType probeType, pod *v1.Pod, s
 		// Handle probe error
 		logger.V(1).Error(err, "Probe errored", "probeType", probeType, "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name, "probeResult", result)
 		pb.recordContainerEvent(ctx, pod, &container, v1.EventTypeWarning, events.ContainerUnhealthy, "%s probe errored and resulted in %s state: %s", probeType, result, err)
-		return results.Failure, err
+		return results.Failure, output, err
 	}
 
 	switch result {
 	case probe.Success:
 		logger.V(3).Info("Probe succeeded", "probeType", probeType, "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name)
-		return results.Success, nil
+		return results.Success, output, nil
 
 	case probe.Warning:
 		pb.recordContainerEvent(ctx, pod, &container, v1.EventTypeWarning, events.ContainerProbeWarning, "%s probe warning: %s", probeType, output)
 		logger.V(3).Info("Probe succeeded with a warning", "probeType", probeType, "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name, "output", output)
-		return results.Success, nil
+		return results.Success, output, nil
 
 	case probe.Failure:
 		logger.V(1).Info("Probe failed", "probeType", probeType, "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name, "probeResult", result, "output", output)
-		pb.recordContainerEvent(ctx, pod, &container, v1.EventTypeWarning, events.ContainerUnhealthy, "%s probe failed: %s", probeType, output)
-		return results.Failure, nil
+		// Event recording moved to worker.go to include FailureThreshold context
+		return results.Failure, output, nil
 
 	case probe.Unknown:
 		logger.V(1).Info("Probe unknown without error", "probeType", probeType, "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name, "probeResult", result)
-		return results.Failure, nil
+		return results.Failure, output, nil
 
 	default:
 		logger.V(1).Info("Unsupported probe result", "probeType", probeType, "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name, "probeResult", result)
-		return results.Failure, nil
+		return results.Failure, output, nil
 	}
 }
 
