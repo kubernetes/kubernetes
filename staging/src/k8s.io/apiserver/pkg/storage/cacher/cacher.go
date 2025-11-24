@@ -420,12 +420,6 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 		<-cacher.timer.C
 	}
 	var contextMetadata metadata.MD
-	if utilfeature.DefaultFeatureGate.Enabled(features.SeparateCacheWatchRPC) {
-		// Add grpc context metadata to watch and progress notify requests done by cacher to:
-		// * Prevent starvation of watch opened by cacher, by moving it to separate Watch RPC than watch request that bypass cacher.
-		// * Ensure that progress notification requests are executed on the same Watch RPC as their watch, which is required for it to work.
-		contextMetadata = metadata.New(map[string]string{"source": "cache"})
-	}
 
 	eventFreshDuration := config.EventsHistoryWindow
 	if eventFreshDuration < DefaultEventFreshDuration {
