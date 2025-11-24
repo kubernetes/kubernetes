@@ -353,10 +353,17 @@ func podMatchesScopeFunc(selector corev1.ScopedResourceSelectorRequirement, obje
 		return false, err
 	}
 	switch selector.ScopeName {
+	// Fixed: Now correctly checks deletionTimestamp instead of activeDeadlineSeconds
+	// See: https://github.com/kubernetes/kubernetes/issues/135411
 	case corev1.ResourceQuotaScopeTerminating:
 		return IsTerminating(pod), nil
 	case corev1.ResourceQuotaScopeNotTerminating:
 		return !IsTerminating(pod), nil
+	// New: Separate scope for pods with time limits (activeDeadlineSeconds)
+	case corev1.ResourceQuotaScopeActiveDeadline:
+		return HasActiveDeadline(pod), nil
+	case corev1.ResourceQuotaScopeNotActiveDeadline:
+		return !HasActiveDeadline(pod), nil
 	case corev1.ResourceQuotaScopeBestEffort:
 		return isBestEffort(pod), nil
 	case corev1.ResourceQuotaScopeNotBestEffort:
@@ -414,7 +421,34 @@ func isBestEffort(pod *corev1.Pod) bool {
 	return qos.GetPodQOS(pod) == corev1.PodQOSBestEffort
 }
 
+// IsTerminating returns true if the pod is actively being deleted.
+// Fixed in https://github.com/kubernetes/kubernetes/issues/135411
+//
+// Previously this incorrectly checked activeDeadlineSeconds, but that field
+// indicates a time limit, not termination status. The correct field to check
+// is deletionTimestamp, which is set when a pod deletion is triggered.
+//
+// This function is used by ResourceQuota's "Terminating" scope to identify
+// pods that are in the termination process (e.g., after kubectl delete).
 func IsTerminating(pod *corev1.Pod) bool {
+	// A pod is terminating when it has a deletion timestamp set.
+	// This indicates the pod is in the termination process (being deleted).
+	return pod.DeletionTimestamp != nil
+}
+
+// HasActiveDeadline returns true if the pod has a time constraint.
+// Added in https://github.com/kubernetes/kubernetes/issues/135411
+//
+// This is a NEW function to support the separate "ActiveDeadline" ResourceQuota scope.
+// Previously, activeDeadlineSeconds was incorrectly mixed with termination status.
+// Now it has its own dedicated scope for tracking time-limited pods (e.g., batch jobs).
+//
+// This function is used by ResourceQuota's "ActiveDeadline" scope to identify
+// pods that will be automatically killed after a specified duration.
+func HasActiveDeadline(pod *corev1.Pod) bool {
+	// A pod has an active deadline when activeDeadlineSeconds is set.
+	// This indicates the pod has a time limit and will be killed after X seconds.
+	// Note: This is independent of termination status.
 	if pod.Spec.ActiveDeadlineSeconds != nil && *pod.Spec.ActiveDeadlineSeconds >= int64(0) {
 		return true
 	}
