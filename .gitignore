@@ -3,6 +3,7 @@
 
 # OSX trash
 .DS_Store
+.env
 
 # Developers can store local stuff in dirs named __something
 __*
