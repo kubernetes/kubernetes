@@ -2896,6 +2896,19 @@ func TestAllowRelaxedServiceNameValidation(t *testing.T) {
 		return &networking.Ingress{Spec: networking.IngressSpec{Rules: rules}}
 	}
 
+	ingressWithDefaultBackend := func(defaultBackendName string, ruleServiceNames ...string) *networking.Ingress {
+		ing := basicIngress(ruleServiceNames...)
+		if defaultBackendName != "" {
+			ing.Spec.DefaultBackend = &networking.IngressBackend{
+				Service: &networking.IngressServiceBackend{
+					Name: defaultBackendName,
+					Port: networking.ServiceBackendPort{Number: 80},
+				},
+			}
+		}
+		return ing
+	}
+
 	tests := []struct {
 		name    string
 		ingress *networking.Ingress
@@ -2924,6 +2937,26 @@ func TestAllowRelaxedServiceNameValidation(t *testing.T) {
 		{
 			name:    "multiple rules, one triggers relaxed validation",
 			ingress: basicIngress("validname", "1abc-def"),
+			expect:  true,
+		},
+		{
+			name:    "defaultBackend with valid DNS1035 name",
+			ingress: ingressWithDefaultBackend("validname"),
+			expect:  false,
+		},
+		{
+			name:    "defaultBackend with DNS1123 valid but DNS1035 invalid name (starts with digit)",
+			ingress: ingressWithDefaultBackend("1-default-service"),
+			expect:  true,
+		},
+		{
+			name:    "defaultBackend relaxed name with valid rules",
+			ingress: ingressWithDefaultBackend("1-default", "valid-rule-service"),
+			expect:  true,
+		},
+		{
+			name:    "only rules have relaxed name, defaultBackend is valid",
+			ingress: ingressWithDefaultBackend("valid-default", "1-rule-service"),
 			expect:  true,
 		},
 	}
