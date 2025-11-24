@@ -111,7 +111,10 @@ type quotaController struct {
 
 func setupQuotaController(t *testing.T, kubeClient kubernetes.Interface, lister quota.ListerForResourceFunc, discoveryFunc NamespacedResourcesFunc) quotaController {
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
-	quotaConfiguration := install.NewQuotaConfigurationForControllers(lister, informerFactory)
+	quotaConfiguration, err := install.NewQuotaConfigurationForControllers(lister, informerFactory)
+	if err != nil {
+		t.Fatal(err)
+	}
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
 	resourceQuotaControllerOptions := &ControllerOptions{
