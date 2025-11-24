@@ -45,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/history"
 	"k8s.io/kubernetes/pkg/controller/statefulset/metrics"
 	"k8s.io/utils/clock"
+	"k8s.io/utils/ptr"
 
 	"k8s.io/klog/v2"
 )
@@ -269,9 +270,10 @@ func (ssc *StatefulSetController) updatePod(logger klog.Logger, old, cur interfa
 		// having its status updated with the newly available replica.
 		if !podutil.IsPodReady(oldPod) && podutil.IsPodReady(curPod) && set.Spec.MinReadySeconds > 0 {
 			logger.V(2).Info("StatefulSet will be enqueued after minReadySeconds for availability check", "statefulSet", klog.KObj(set), "minReadySeconds", set.Spec.MinReadySeconds)
-			// Add a second to avoid milliseconds skew in AddAfter.
-			// See https://github.com/kubernetes/kubernetes/issues/39785#issuecomment-279959133 for more info.
-			ssc.enqueueSSAfter(logger, set, (time.Duration(set.Spec.MinReadySeconds)*time.Second)+time.Second)
+			// If there are multiple pods with varying readiness times, we cannot correctly track it
+			// with the current queue. Further resyncs are attempted at the end of the syncStatefulSet
+			// function.
+			ssc.enqueueSSAfter(logger, set, time.Duration(set.Spec.MinReadySeconds)*time.Second)
 		}
 		return
 	}
@@ -510,17 +512,27 @@ func (ssc *StatefulSetController) syncStatefulSet(ctx context.Context, set *apps
 	logger := klog.FromContext(ctx)
 	logger.V(4).Info("Syncing StatefulSet with pods", "statefulSet", klog.KObj(set), "pods", len(pods))
 	var status *apps.StatefulSetStatus
+	var nextSyncDuration *time.Duration
 	var err error
+	// Use the same time for calculating status and nextSyncDuration.
 	now := ssc.clock.Now()
 	status, err = ssc.control.UpdateStatefulSet(ctx, set, pods, now)
 	if err != nil {
 		return err
 	}
 	logger.V(4).Info("Successfully synced StatefulSet", "statefulSet", klog.KObj(set))
-	// One more sync to handle the clock skew. This is also helping in requeuing right after status update
-	if set.Spec.MinReadySeconds > 0 && status != nil && status.AvailableReplicas != *set.Spec.Replicas {
-		ssc.enqueueSSAfter(logger, set, time.Duration(set.Spec.MinReadySeconds)*time.Second)
+	// Plan the next availability check as a last line of defense against queue preemption (we have one queue key for checking availability of all the pods)
+	// or early sync (see https://github.com/kubernetes/kubernetes/issues/39785#issuecomment-279959133 for more info).
+	if set.Spec.MinReadySeconds > 0 && status != nil && status.ReadyReplicas != status.AvailableReplicas {
+		// Safeguard fallback to the .spec.minReadySeconds to ensure that we always end up with .status.availableReplicas updated.
+		nextSyncDuration = ptr.To(time.Duration(set.Spec.MinReadySeconds) * time.Second)
+		// Use the same point in time (now) for calculating status and nextSyncDuration to get matching availability for the pods.
+		if nextCheck := controller.FindMinNextPodAvailabilityCheck(pods, set.Spec.MinReadySeconds, now, ssc.clock); nextCheck != nil {
+			nextSyncDuration = nextCheck
+		}
 	}
-
+	if nextSyncDuration != nil {
+		ssc.enqueueSSAfter(logger, set, *nextSyncDuration)
+	}
 	return nil
 }
