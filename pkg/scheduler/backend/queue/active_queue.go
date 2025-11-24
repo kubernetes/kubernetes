@@ -323,14 +323,13 @@ func (aq *activeQueue) unlockedPop(logger klog.Logger) (*framework.QueuedPodInfo
 	}
 	aq.schedCycle++
 
-	// Update metrics and reset the set of pending plugins for the next attempt.
-	// Note: We don't clear UnschedulablePlugins here because:
-	// 1. If the pod schedules successfully, we need UnschedulablePlugins for logging/debugging
-	// 2. If the pod fails to schedule again, UnschedulablePlugins will be overwritten anyway
+	// Update metrics for unschedulable plugins.
+	// Note: We don't clear UnschedulablePlugins and PendingPlugins here because:
+	// 1. If the pod schedules successfully, we need them for logging/debugging
+	// 2. If the pod fails to schedule, they will be cleared and repopulated in handleSchedulingFailure
 	for plugin := range pInfo.UnschedulablePlugins.Union(pInfo.PendingPlugins) {
 		metrics.UnschedulableReason(plugin, pInfo.Pod.Spec.SchedulerName).Dec()
 	}
-	pInfo.PendingPlugins.Clear()
 	pInfo.GatingPlugin = ""
 	pInfo.GatingPluginEvents = nil
 

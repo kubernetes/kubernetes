@@ -649,7 +649,7 @@ func Test_InFlightPods(t *testing.T) {
 			},
 		},
 		{
-			name:                         "popped pod preserves UnschedulablePlugins but clears PendingPlugins",
+			name:                         "popped pod preserves UnschedulablePlugins and PendingPlugins",
 			isSchedulingQueueHintEnabled: true,
 			initialPods:                  []*v1.Pod{pod1},
 			actions: []action{
@@ -670,9 +670,9 @@ func Test_InFlightPods(t *testing.T) {
 					if !poppedPod.UnschedulablePlugins.Equal(sets.New("fooPlugin2")) {
 						t.Errorf("QueuedPodInfo from Pop should preserve UnschedulablePlugins, expected fooPlugin2, got: %+v", poppedPod.UnschedulablePlugins)
 					}
-					// PendingPlugins should still be cleared
-					if len(poppedPod.PendingPlugins) > 0 {
-						t.Errorf("QueuedPodInfo from Pop should have empty PendingPlugins, got instead: %+v", poppedPod.PendingPlugins)
+					// PendingPlugins are preserved after Pop() for logging
+					if !poppedPod.PendingPlugins.Equal(sets.New("fooPlugin1")) {
+						t.Errorf("QueuedPodInfo from Pop should preserve PendingPlugins, expected fooPlugin1, got: %+v", poppedPod.PendingPlugins)
 					}
 				}},
 				{callback: func(t *testing.T, q *PriorityQueue) {
@@ -940,8 +940,10 @@ func TestPop(t *testing.T) {
 
 			// Now check result of Pop.
 			poppedPod = popPod(t, logger, q, pod)
-			if len(poppedPod.PendingPlugins) > 0 {
-				t.Errorf("QueuedPodInfo from Pop should have empty PendingPlugins, got instead: %+v", poppedPod)
+			// PendingPlugins are preserved after Pop() so they can be logged if scheduling
+			// succeeds, or cleared in handleSchedulingFailure() if it fails.
+			if len(poppedPod.PendingPlugins) != 1 || !poppedPod.PendingPlugins.Has("fooPlugin1") {
+				t.Errorf("QueuedPodInfo from Pop should preserve PendingPlugins, expected fooPlugin1, got instead: %+v", poppedPod)
 			}
 		})
 	}
