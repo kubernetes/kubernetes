@@ -552,12 +552,16 @@ message VolumeAttachmentSource {
 message VolumeAttachmentSpec {
   // attacher indicates the name of the volume driver that MUST handle this
   // request. This is the name returned by GetPluginName().
+  // +required
+  // +k8s:required
   optional string attacher = 1;
 
   // source represents the volume that should be attached.
   optional VolumeAttachmentSource source = 2;
 
   // nodeName represents the node that the volume should be attached to.
+  // +required
+  // +k8s:required
   optional string nodeName = 3;
 }
 
