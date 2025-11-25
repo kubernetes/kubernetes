@@ -172,10 +172,9 @@ func (pl *NodePorts) Filter(ctx context.Context, cycleState fwk.CycleState, pod 
 }
 
 // Fits checks if the pod has any ports conflicting with nodeInfo's ports.
-// It returns true if there are no conflicts (which means that pod fits the node), otherwise false with the errMessage.
+// It returns true if there are no conflicts (which means that pod fits the node), otherwise false with the err message.
 func Fits(pod *v1.Pod, nodeInfo fwk.NodeInfo) (fits bool, err error) {
-	portFits, portConflictErr := fitsPorts(util.GetHostPorts(pod), nodeInfo.GetUsedPorts())
-	return portFits, portConflictErr
+	return fitsPorts(util.GetHostPorts(pod), nodeInfo.GetUsedPorts())
 }
 
 func fitsPorts(wantPorts []v1.ContainerPort, portsInUse fwk.HostPortInfo) (bool, error) {
