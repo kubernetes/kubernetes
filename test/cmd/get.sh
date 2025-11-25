@@ -196,6 +196,24 @@ run_kubectl_get_tests() {
   output_message=$(! kubectl get pods/invalid-pod -w --request-timeout=1 "${kube_flags[@]}" 2>&1)
   kube::test::if_has_string "${output_message}" '"invalid-pod" not found'
 
+  ### Test kubectl get --stale flag
+  # Check that --stale flag is recognized and works with pods
+  # Using --stale=0s should return all pods (everything is at least 0 seconds old)
+  output_message=$(kubectl get pods --stale=0s "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" 'valid-pod'
+
+  # Check that --stale with --watch returns an error
+  output_message=$(! kubectl get pods --stale=1h --watch 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" '--stale option cannot be used with --watch'
+
+  # Check that --stale with --watch-only returns an error
+  output_message=$(! kubectl get pods --stale=1h --watch-only 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" '--stale option cannot be used with --watch'
+
+  # Check that --stale with a high value filters out the pod (it's too new)
+  output_message=$(kubectl get pods --stale=999h 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" 'No resources found'
+
   # cleanup
   kubectl delete pods valid-pod "${kube_flags[@]}"
 

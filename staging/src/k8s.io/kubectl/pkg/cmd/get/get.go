@@ -23,6 +23,7 @@ import (
 	"io"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -81,6 +82,8 @@ type GetOptions struct {
 	NoHeaders      bool
 	IgnoreNotFound bool
 
+	Stale time.Duration
+
 	genericiooptions.IOStreams
 }
 
@@ -137,7 +140,10 @@ var (
 		kubectl get deployments.apps --namespace backend
 
 		# List all pods existing in all namespaces
-		kubectl get pods --all-namespaces`))
+		kubectl get pods --all-namespaces
+
+		# List pods that haven't had any condition changes in the last 2 hours
+		kubectl get pods --stale=2h`))
 )
 
 const (
@@ -190,6 +196,7 @@ func NewCmdGet(parent string, f cmdutil.Factory, streams genericiooptions.IOStre
 	cmdutil.AddChunkSizeFlag(cmd, &o.ChunkSize)
 	cmdutil.AddLabelSelectorFlagVar(cmd, &o.LabelSelector)
 	cmdutil.AddSubresourceFlags(cmd, &o.Subresource, "If specified, gets the subresource of the requested object.")
+	cmd.Flags().DurationVar(&o.Stale, "stale", 0, "If non-zero, filter pods to show only those whose most recent condition LastTransitionTime is older than the specified duration (e.g., 2h, 30m). Falls back to status.startTime if no conditions exist.")
 	return cmd
 }
 
@@ -316,6 +323,9 @@ func (o *GetOptions) Validate() error {
 	if o.OutputWatchEvents && !(o.Watch || o.WatchOnly) {
 		return fmt.Errorf("--output-watch-events option can only be used with --watch or --watch-only")
 	}
+	if o.Stale > 0 && (o.Watch || o.WatchOnly) {
+		return fmt.Errorf("--stale option cannot be used with --watch or --watch-only")
+	}
 	return nil
 }
 
@@ -432,10 +442,138 @@ func (o *GetOptions) transformRequests(req *rest.Request) {
 		"application/json",
 	}, ","))
 
-	// if sorting, ensure we receive the full object in order to introspect its fields via jsonpath
-	if len(o.SortBy) > 0 {
+	// if sorting or filtering by stale, ensure we receive the full object in order to introspect its fields
+	if len(o.SortBy) > 0 || o.Stale > 0 {
 		req.Param("includeObject", "Object")
 	}
+}
+
+// getMostRecentConditionTime returns the most recent LastTransitionTime from the pod's conditions.
+// If no conditions exist, it falls back to status.startTime, then to metadata.creationTimestamp.
+// Returns zero time if none are available.
+func getMostRecentConditionTime(obj runtime.Object) time.Time {
+	unstrObj, ok := obj.(*unstructured.Unstructured)
+	if !ok {
+		return time.Time{}
+	}
+
+	// Try to get conditions from status.conditions
+	conditions, found, err := unstructured.NestedSlice(unstrObj.Object, "status", "conditions")
+	if err == nil && found && len(conditions) > 0 {
+		var mostRecent time.Time
+		for _, c := range conditions {
+			condition, ok := c.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			lastTransitionStr, found, err := unstructured.NestedString(condition, "lastTransitionTime")
+			if err != nil || !found || lastTransitionStr == "" {
+				continue
+			}
+			t, err := time.Parse(time.RFC3339, lastTransitionStr)
+			if err != nil {
+				continue
+			}
+			if t.After(mostRecent) {
+				mostRecent = t
+			}
+		}
+		if !mostRecent.IsZero() {
+			return mostRecent
+		}
+	}
+
+	// Fall back to status.startTime
+	startTimeStr, found, err := unstructured.NestedString(unstrObj.Object, "status", "startTime")
+	if err == nil && found && startTimeStr != "" {
+		t, err := time.Parse(time.RFC3339, startTimeStr)
+		if err == nil {
+			return t
+		}
+	}
+
+	// Fall back to metadata.creationTimestamp
+	creationTimeStr, found, err := unstructured.NestedString(unstrObj.Object, "metadata", "creationTimestamp")
+	if err == nil && found && creationTimeStr != "" {
+		t, err := time.Parse(time.RFC3339, creationTimeStr)
+		if err == nil {
+			return t
+		}
+	}
+
+	return time.Time{}
+}
+
+// isPodStale checks if a pod is stale based on the given duration.
+// A pod is considered stale if its most recent condition LastTransitionTime
+// (or status.startTime as fallback) is older than the specified duration.
+func isPodStale(obj runtime.Object, staleDuration time.Duration) bool {
+	mostRecent := getMostRecentConditionTime(obj)
+	if mostRecent.IsZero() {
+		// If we can't determine the time, don't filter it out
+		return false
+	}
+	return time.Since(mostRecent) >= staleDuration
+}
+
+// filterStaleTableRows filters rows in a Table object, keeping only stale pods.
+// For non-Table objects, it checks if the object itself is stale.
+func filterStaleTableRows(obj runtime.Object, staleDuration time.Duration) runtime.Object {
+	// First, try to convert to a typed Table
+	table, ok := obj.(*metav1.Table)
+	if !ok {
+		// Check if it's an unstructured object that represents a Table
+		unstrObj, isUnstr := obj.(*unstructured.Unstructured)
+		if isUnstr {
+			// Check if this unstructured object is a Table
+			gvk := unstrObj.GetObjectKind().GroupVersionKind()
+			if gvk.Kind == "Table" && (gvk.Group == metav1.GroupName || gvk.Group == metav1beta1.GroupName) {
+				// Convert unstructured to Table
+				table = &metav1.Table{}
+				if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstrObj.Object, table); err != nil {
+					// Conversion failed, check if it's a stale pod directly
+					if isPodStale(obj, staleDuration) {
+						return obj
+					}
+					return nil
+				}
+			} else {
+				// Not a Table, check if it's a stale pod directly
+				if isPodStale(obj, staleDuration) {
+					return obj
+				}
+				return nil
+			}
+		} else {
+			// Not a Table or Unstructured, check if it's a stale pod directly
+			if isPodStale(obj, staleDuration) {
+				return obj
+			}
+			return nil
+		}
+	}
+
+	// Filter table rows
+	filteredRows := make([]metav1.TableRow, 0, len(table.Rows))
+	for _, row := range table.Rows {
+		// Check the embedded object in the row
+		if row.Object.Object != nil {
+			if isPodStale(row.Object.Object, staleDuration) {
+				filteredRows = append(filteredRows, row)
+			}
+		} else if row.Object.Raw != nil {
+			// Try to decode the raw object
+			decoded, err := runtime.Decode(unstructured.UnstructuredJSONScheme, row.Object.Raw)
+			if err == nil && isPodStale(decoded, staleDuration) {
+				filteredRows = append(filteredRows, row)
+			}
+		}
+	}
+
+	// Create a new table with filtered rows
+	filteredTable := table.DeepCopy()
+	filteredTable.Rows = filteredRows
+	return filteredTable
 }
 
 // Run performs the get operation.
@@ -453,9 +591,10 @@ func (o *GetOptions) Run(f cmdutil.Factory, args []string) error {
 	}
 
 	chunkSize := o.ChunkSize
-	if len(o.SortBy) > 0 {
+	if len(o.SortBy) > 0 || o.Stale > 0 {
 		// TODO(juanvallejo): in the future, we could have the client use chunking
 		// to gather all results, then sort them all at the end to reduce server load.
+		// For stale filtering, we also need all results to filter client-side.
 		chunkSize = 0
 	}
 
@@ -496,6 +635,34 @@ func (o *GetOptions) Run(f cmdutil.Factory, args []string) error {
 	objs := make([]runtime.Object, len(infos))
 	for ix := range infos {
 		objs[ix] = infos[ix].Object
+	}
+
+	// Filter stale pods if --stale flag is set
+	if o.Stale > 0 {
+		filteredObjs := make([]runtime.Object, 0, len(objs))
+		filteredInfos := make([]*resource.Info, 0, len(infos))
+		for ix, obj := range objs {
+			filteredObj := filterStaleTableRows(obj, o.Stale)
+			if filteredObj != nil {
+				// For Table objects, check if any rows remain
+				if table, ok := filteredObj.(*metav1.Table); ok {
+					if len(table.Rows) > 0 {
+						filteredObjs = append(filteredObjs, filteredObj)
+						// Update the info's object to point to the filtered table
+						infoCopy := *infos[ix]
+						infoCopy.Object = filteredObj
+						filteredInfos = append(filteredInfos, &infoCopy)
+					}
+				} else {
+					filteredObjs = append(filteredObjs, filteredObj)
+					filteredInfos = append(filteredInfos, infos[ix])
+				}
+			}
+		}
+		objs = filteredObjs
+		infos = filteredInfos
+		// Update printWithKind after filtering
+		printWithKind = multipleGVKsRequested(infos)
 	}
 
 	var positioner OriginalPositioner

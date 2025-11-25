@@ -21,11 +21,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"net/http"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	appsv1 "k8s.io/api/apps/v1"
@@ -35,6 +35,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
@@ -45,6 +46,7 @@ import (
 	"k8s.io/client-go/rest/fake"
 	restclientwatch "k8s.io/client-go/rest/watch"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
 )
 
@@ -3097,4 +3099,246 @@ func replicationControllersScaleSubresourceTableObjBody(codec runtime.Codec, rep
 		})
 	}
 	return cmdtesting.ObjBody(codec, table)
+}
+
+func TestGetPodsWithStaleFlag(t *testing.T) {
+	now := metav1.Now()
+	oldTime := metav1.NewTime(now.Add(-3 * time.Hour))       // 3 hours ago
+	recentTime := metav1.NewTime(now.Add(-30 * time.Minute)) // 30 minutes ago
+
+	// Create pods with different condition times
+	stalePod := corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "stale-pod",
+			Namespace: "test",
+		},
+		Status: corev1.PodStatus{
+			Conditions: []corev1.PodCondition{
+				{
+					Type:               corev1.PodReady,
+					Status:             corev1.ConditionTrue,
+					LastTransitionTime: oldTime,
+				},
+			},
+		},
+	}
+
+	recentPod := corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "recent-pod",
+			Namespace: "test",
+		},
+		Status: corev1.PodStatus{
+			Conditions: []corev1.PodCondition{
+				{
+					Type:               corev1.PodReady,
+					Status:             corev1.ConditionTrue,
+					LastTransitionTime: recentTime,
+				},
+			},
+		},
+	}
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Resp:                 &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: podTableObjBodyWithConditions(codec, stalePod, recentPod)},
+	}
+
+	streams, _, buf, errBuf := genericiooptions.NewTestIOStreams()
+	cmd := NewCmdGet("kubectl", tf, streams)
+	cmd.SetOut(buf)
+	cmd.SetErr(errBuf)
+	cmd.Flags().Set("stale", "2h")
+	cmd.Run(cmd, []string{"pods"})
+
+	output := buf.String()
+	// Should contain the stale pod (3 hours old, older than 2h threshold)
+	if !strings.Contains(output, "stale-pod") {
+		t.Errorf("expected output to contain stale-pod, got:\n%v", output)
+	}
+	// Should NOT contain the recent pod (30 min old, not older than 2h threshold)
+	if strings.Contains(output, "recent-pod") {
+		t.Errorf("expected output NOT to contain recent-pod, got:\n%v", output)
+	}
+}
+
+func TestGetPodsWithStaleValidation(t *testing.T) {
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	streams, _, _, _ := genericiooptions.NewTestIOStreams()
+
+	o := NewGetOptions("kubectl", streams)
+	o.Stale = 2 * time.Hour
+	o.Watch = true
+
+	err := o.Validate()
+	if err == nil {
+		t.Error("expected validation error when using --stale with --watch")
+	}
+	if !strings.Contains(err.Error(), "--stale option cannot be used with --watch") {
+		t.Errorf("unexpected error message: %v", err)
+	}
+}
+
+func TestGetMostRecentConditionTime(t *testing.T) {
+	now := time.Now()
+	oldTime := now.Add(-2 * time.Hour)
+	recentTime := now.Add(-30 * time.Minute)
+
+	testCases := []struct {
+		name     string
+		obj      map[string]interface{}
+		expected time.Time
+	}{
+		{
+			name: "pod with multiple conditions returns most recent",
+			obj: map[string]interface{}{
+				"apiVersion": "v1",
+				"kind":       "Pod",
+				"metadata":   map[string]interface{}{"name": "test"},
+				"status": map[string]interface{}{
+					"conditions": []interface{}{
+						map[string]interface{}{
+							"type":               "Ready",
+							"lastTransitionTime": oldTime.Format(time.RFC3339),
+						},
+						map[string]interface{}{
+							"type":               "ContainersReady",
+							"lastTransitionTime": recentTime.Format(time.RFC3339),
+						},
+					},
+				},
+			},
+			expected: recentTime.Truncate(time.Second),
+		},
+		{
+			name: "pod with no conditions falls back to startTime",
+			obj: map[string]interface{}{
+				"apiVersion": "v1",
+				"kind":       "Pod",
+				"metadata":   map[string]interface{}{"name": "test"},
+				"status": map[string]interface{}{
+					"startTime": oldTime.Format(time.RFC3339),
+				},
+			},
+			expected: oldTime.Truncate(time.Second),
+		},
+		{
+			name: "pod with no conditions or startTime falls back to creationTimestamp",
+			obj: map[string]interface{}{
+				"apiVersion": "v1",
+				"kind":       "Pod",
+				"metadata": map[string]interface{}{
+					"name":              "test",
+					"creationTimestamp": oldTime.Format(time.RFC3339),
+				},
+				"status": map[string]interface{}{},
+			},
+			expected: oldTime.Truncate(time.Second),
+		},
+		{
+			name: "pod with no conditions, startTime, or creationTimestamp returns zero",
+			obj: map[string]interface{}{
+				"apiVersion": "v1",
+				"kind":       "Pod",
+				"metadata":   map[string]interface{}{"name": "test"},
+				"status":     map[string]interface{}{},
+			},
+			expected: time.Time{},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			unstrObj := &unstructured.Unstructured{Object: tc.obj}
+			result := getMostRecentConditionTime(unstrObj)
+			// Truncate to second for comparison since RFC3339 only has second precision
+			resultTrunc := result.Truncate(time.Second)
+			if !resultTrunc.Equal(tc.expected) {
+				t.Errorf("expected %v, got %v", tc.expected, resultTrunc)
+			}
+		})
+	}
+}
+
+func TestIsPodStale(t *testing.T) {
+	now := time.Now()
+	oldTime := now.Add(-3 * time.Hour)
+	recentTime := now.Add(-30 * time.Minute)
+
+	testCases := []struct {
+		name          string
+		conditionTime time.Time
+		staleDuration time.Duration
+		expected      bool
+	}{
+		{
+			name:          "old pod with 2h threshold is stale",
+			conditionTime: oldTime,
+			staleDuration: 2 * time.Hour,
+			expected:      true,
+		},
+		{
+			name:          "recent pod with 2h threshold is not stale",
+			conditionTime: recentTime,
+			staleDuration: 2 * time.Hour,
+			expected:      false,
+		},
+		{
+			name:          "old pod with 4h threshold is not stale",
+			conditionTime: oldTime,
+			staleDuration: 4 * time.Hour,
+			expected:      false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			obj := &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "v1",
+					"kind":       "Pod",
+					"metadata":   map[string]interface{}{"name": "test"},
+					"status": map[string]interface{}{
+						"conditions": []interface{}{
+							map[string]interface{}{
+								"type":               "Ready",
+								"lastTransitionTime": tc.conditionTime.Format(time.RFC3339),
+							},
+						},
+					},
+				},
+			}
+			result := isPodStale(obj, tc.staleDuration)
+			if result != tc.expected {
+				t.Errorf("expected %v, got %v", tc.expected, result)
+			}
+		})
+	}
+}
+
+// Helper function to build a table with pods that have condition times
+func podTableObjBodyWithConditions(codec runtime.Codec, pods ...corev1.Pod) io.ReadCloser {
+	table := &metav1.Table{
+		TypeMeta:          metav1.TypeMeta{APIVersion: "meta.k8s.io/v1", Kind: "Table"},
+		ColumnDefinitions: podColumns,
+	}
+	for i := range pods {
+		b := bytes.NewBuffer(nil)
+		codec.Encode(&pods[i], b)
+		table.Rows = append(table.Rows, metav1.TableRow{
+			Object: runtime.RawExtension{Raw: b.Bytes()},
+			Cells:  []interface{}{pods[i].Name, "1/1", "Running", int64(0), "<unknown>", "<none>", "<none>", "<none>", "<none>"},
+		})
+	}
+	data, err := json.Marshal(table)
+	if err != nil {
+		panic(err)
+	}
+	return cmdtesting.BytesBody(data)
 }
