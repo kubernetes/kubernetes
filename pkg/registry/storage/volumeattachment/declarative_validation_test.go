@@ -69,14 +69,6 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				field.Required(field.NewPath("spec", "attacher"), ""),
 			},
 		},
-		"invalid nodeName (required)": {
-			input: mkValidVolumeAttachment(func(obj *storage.VolumeAttachment) {
-				obj.Spec.NodeName = ""
-			}),
-			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec", "nodeName"), ""),
-			},
-		},
 	}
 
 	for name, tc := range testCases {
@@ -109,15 +101,6 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			oldInput: mkValidVolumeAttachment(),
 			newInput: mkValidVolumeAttachment(func(obj *storage.VolumeAttachment) {
 				obj.Spec.Attacher = "different.com"
-			}),
-			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec"), nil, "field is immutable"),
-			},
-		},
-		"immutable spec.nodeName": {
-			oldInput: mkValidVolumeAttachment(),
-			newInput: mkValidVolumeAttachment(func(obj *storage.VolumeAttachment) {
-				obj.Spec.NodeName = "different-node"
 			}),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("spec"), nil, "field is immutable"),

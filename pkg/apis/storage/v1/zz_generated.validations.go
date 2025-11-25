@@ -191,29 +191,11 @@ func Validate_VolumeAttachmentSpec(ctx context.Context, op operation.Operation, 
 			if earlyReturn {
 				return // do not proceed
 			}
+			errs = append(errs, validate.LongNameCaseless(ctx, op, fldPath, obj, oldObj)...)
 			return
 		}(fldPath.Child("attacher"), &obj.Attacher, safe.Field(oldObj, func(oldObj *storagev1.VolumeAttachmentSpec) *string { return &oldObj.Attacher }), oldObj != nil)...)
 
 	// field storagev1.VolumeAttachmentSpec.Source has no validation
-
-	// field storagev1.VolumeAttachmentSpec.NodeName
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
-			}
-			// call field-attached validations
-			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
-			}
-			return
-		}(fldPath.Child("nodeName"), &obj.NodeName, safe.Field(oldObj, func(oldObj *storagev1.VolumeAttachmentSpec) *string { return &oldObj.NodeName }), oldObj != nil)...)
-
+	// field storagev1.VolumeAttachmentSpec.NodeName has no validation
 	return errs
 }
