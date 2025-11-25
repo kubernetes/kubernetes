@@ -146,8 +146,8 @@ func (pl *NodePorts) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Po
 	for _, p := range ports {
 		portsInUse.Add(p.HostIP, string(p.Protocol), p.HostPort)
 	}
-	portFits, portNotFittingMessage := fitsPorts(util.GetHostPorts(pod), portsInUse)
-	if portFits {
+	fits, err := fitsPorts(util.GetHostPorts(pod), portsInUse)
+	if fits {
 		logger.V(4).Info("the deleted pod and the target pod don't have any common port(s), returning QueueSkip as deleting this Pod won't make the Pod schedulable", "pod", klog.KObj(pod), "deletedPod", klog.KObj(deletedPod))
 		return fwk.QueueSkip, nil
 	}
