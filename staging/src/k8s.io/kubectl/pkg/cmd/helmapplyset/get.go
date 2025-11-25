@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/spf13/cobra"
 
@@ -220,7 +219,7 @@ func (o *GetApplySetsOptions) secretToApplySetInfo(secret *v1.Secret, client kub
 	resourceCount := o.countResources(secret, client)
 
 	// Calculate age
-	age := getAge(secret.CreationTimestamp.Time)
+	age := GetAge(secret.CreationTimestamp.Time)
 
 	// Extract release name from Secret name (format: applyset-<release-name>)
 	releaseName := strings.TrimPrefix(secret.Name, parent.ParentSecretNamePrefix)
@@ -406,29 +405,3 @@ func (o *GetApplySetsOptions) printNames(applySets []ApplySetInfo) error {
 	return nil
 }
 
-// getAge returns a human-readable age string
-func getAge(t time.Time) string {
-	if t.IsZero() {
-		return "<unknown>"
-	}
-	duration := time.Since(t)
-	if duration < time.Minute {
-		return fmt.Sprintf("%ds", int(duration.Seconds()))
-	}
-	if duration < time.Hour {
-		return fmt.Sprintf("%dm", int(duration.Minutes()))
-	}
-	if duration < 24*time.Hour {
-		return fmt.Sprintf("%dh", int(duration.Hours()))
-	}
-	days := int(duration.Hours() / 24)
-	if days < 30 {
-		return fmt.Sprintf("%dd", days)
-	}
-	months := days / 30
-	if months < 12 {
-		return fmt.Sprintf("%dmo", months)
-	}
-	years := months / 12
-	return fmt.Sprintf("%dy", years)
-}

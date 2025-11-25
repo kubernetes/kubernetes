@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"sort"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
@@ -115,16 +114,14 @@ func (cm *ConditionManager) computeReadyCondition(health *ReleaseHealth, now met
 	case "degraded":
 		condition.Status = metav1.ConditionFalse
 		condition.Reason = "ResourcesDegraded"
-		unhealthyResources := cm.getUnhealthyResources(health)
 		condition.Message = fmt.Sprintf("%d resources are degraded: %s",
-			health.DegradedResources, strings.Join(unhealthyResources, ", "))
+			health.DegradedResources, strings.Join(health.GetUnhealthyResourceNames(), ", "))
 
 	case "failed":
 		condition.Status = metav1.ConditionFalse
 		condition.Reason = "ResourcesFailed"
-		failedResources := cm.getFailedResources(health)
 		condition.Message = fmt.Sprintf("%d resources failed: %s",
-			health.FailedResources, strings.Join(failedResources, ", "))
+			health.FailedResources, strings.Join(health.GetFailedResourceNames(), ", "))
 
 	default:
 		condition.Status = metav1.ConditionUnknown
@@ -145,9 +142,8 @@ func (cm *ConditionManager) computeProgressingCondition(health *ReleaseHealth, n
 	if health.ProgressingResources > 0 {
 		condition.Status = metav1.ConditionTrue
 		condition.Reason = "RolloutInProgress"
-		progressingResources := cm.getProgressingResources(health)
 		condition.Message = fmt.Sprintf("%d resources are progressing: %s",
-			health.ProgressingResources, strings.Join(progressingResources, ", "))
+			health.ProgressingResources, strings.Join(health.GetProgressingResourceNames(), ", "))
 	} else {
 		condition.Status = metav1.ConditionFalse
 		condition.Reason = "NoRolloutInProgress"
@@ -168,8 +164,8 @@ func (cm *ConditionManager) computeDegradedCondition(health *ReleaseHealth, now 
 		condition.Status = metav1.ConditionTrue
 		condition.Reason = "ResourcesUnhealthy"
 		unhealthyResources := append(
-			cm.getUnhealthyResources(health),
-			cm.getFailedResources(health)...,
+			health.GetUnhealthyResourceNames(),
+			health.GetFailedResourceNames()...,
 		)
 		condition.Message = fmt.Sprintf("%d resources are unhealthy: %s",
 			health.DegradedResources+health.FailedResources,
@@ -209,59 +205,6 @@ func (cm *ConditionManager) computeAvailableCondition(health *ReleaseHealth, now
 	}
 
 	return condition
-}
-
-// getUnhealthyResources returns a list of unhealthy resource names
-func (cm *ConditionManager) getUnhealthyResources(health *ReleaseHealth) []string {
-	resources := make([]string, 0)
-	for key, status := range health.ResourceHealth {
-		if !status.Healthy && !strings.Contains(status.Reason, "Progressing") &&
-			!strings.Contains(status.Reason, "Failed") {
-			// Extract resource name from key (format: "gvk/namespace/name")
-			parts := strings.Split(key, "/")
-			if len(parts) >= 3 {
-				resources = append(resources, fmt.Sprintf("%s/%s", parts[len(parts)-2], parts[len(parts)-1]))
-			} else {
-				resources = append(resources, key)
-			}
-		}
-	}
-	sort.Strings(resources)
-	return resources
-}
-
-// getFailedResources returns a list of failed resource names
-func (cm *ConditionManager) getFailedResources(health *ReleaseHealth) []string {
-	resources := make([]string, 0)
-	for key, status := range health.ResourceHealth {
-		if !status.Healthy && strings.Contains(status.Reason, "Failed") {
-			parts := strings.Split(key, "/")
-			if len(parts) >= 3 {
-				resources = append(resources, fmt.Sprintf("%s/%s", parts[len(parts)-2], parts[len(parts)-1]))
-			} else {
-				resources = append(resources, key)
-			}
-		}
-	}
-	sort.Strings(resources)
-	return resources
-}
-
-// getProgressingResources returns a list of progressing resource names
-func (cm *ConditionManager) getProgressingResources(health *ReleaseHealth) []string {
-	resources := make([]string, 0)
-	for key, status := range health.ResourceHealth {
-		if !status.Healthy && strings.Contains(status.Reason, "Progressing") {
-			parts := strings.Split(key, "/")
-			if len(parts) >= 3 {
-				resources = append(resources, fmt.Sprintf("%s/%s", parts[len(parts)-2], parts[len(parts)-1]))
-			} else {
-				resources = append(resources, key)
-			}
-		}
-	}
-	sort.Strings(resources)
-	return resources
 }
 
 // updateParentConditions updates conditions on the ApplySet parent Secret

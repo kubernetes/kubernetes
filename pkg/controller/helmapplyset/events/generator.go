@@ -19,7 +19,6 @@ package events
 import (
 	"context"
 	"fmt"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -194,25 +193,22 @@ func (eg *EventGenerator) formatHealthyMessage(releaseName string, health *statu
 
 // formatProgressingMessage formats message for progressing release
 func (eg *EventGenerator) formatProgressingMessage(releaseName string, health *status.ReleaseHealth) string {
-	progressingResources := eg.getProgressingResources(health)
 	return fmt.Sprintf("Helm release '%s' rollout in progress. %d resources are progressing: %s. %d/%d resources are healthy.",
-		releaseName, health.ProgressingResources, strings.Join(progressingResources, ", "),
+		releaseName, health.ProgressingResources, strings.Join(health.GetProgressingResourceNames(), ", "),
 		health.HealthyResources, health.TotalResources)
 }
 
 // formatDegradedMessage formats message for degraded release
 func (eg *EventGenerator) formatDegradedMessage(releaseName string, health *status.ReleaseHealth) string {
-	unhealthyResources := eg.getUnhealthyResources(health)
 	return fmt.Sprintf("Helm release '%s' is degraded. %d resources are unhealthy: %s. %d/%d resources are healthy.",
-		releaseName, health.DegradedResources, strings.Join(unhealthyResources, ", "),
+		releaseName, health.DegradedResources, strings.Join(health.GetUnhealthyResourceNames(), ", "),
 		health.HealthyResources, health.TotalResources)
 }
 
 // formatFailedMessage formats message for failed release
 func (eg *EventGenerator) formatFailedMessage(releaseName string, health *status.ReleaseHealth) string {
-	failedResources := eg.getFailedResources(health)
 	return fmt.Sprintf("Helm release '%s' has failed. %d resources failed: %s.",
-		releaseName, health.FailedResources, strings.Join(failedResources, ", "))
+		releaseName, health.FailedResources, strings.Join(health.GetFailedResourceNames(), ", "))
 }
 
 // formatResourceUnhealthyMessage formats message for unhealthy resource
@@ -238,58 +234,6 @@ func (eg *EventGenerator) formatResourceRecoveredMessage(releaseName, resourceKe
 
 	return fmt.Sprintf("Resource %s in release '%s' recovered: %s",
 		resourceName, releaseName, healthStatus.Message)
-}
-
-// getProgressingResources returns list of progressing resource names
-func (eg *EventGenerator) getProgressingResources(health *status.ReleaseHealth) []string {
-	resources := make([]string, 0)
-	for key, status := range health.ResourceHealth {
-		if !status.Healthy && strings.Contains(status.Reason, "Progressing") {
-			parts := strings.Split(key, "/")
-			if len(parts) >= 3 {
-				resources = append(resources, fmt.Sprintf("%s/%s", parts[len(parts)-2], parts[len(parts)-1]))
-			} else {
-				resources = append(resources, key)
-			}
-		}
-	}
-	sort.Strings(resources)
-	return resources
-}
-
-// getUnhealthyResources returns list of unhealthy resource names
-func (eg *EventGenerator) getUnhealthyResources(health *status.ReleaseHealth) []string {
-	resources := make([]string, 0)
-	for key, status := range health.ResourceHealth {
-		if !status.Healthy && !strings.Contains(status.Reason, "Progressing") &&
-			!strings.Contains(status.Reason, "Failed") {
-			parts := strings.Split(key, "/")
-			if len(parts) >= 3 {
-				resources = append(resources, fmt.Sprintf("%s/%s", parts[len(parts)-2], parts[len(parts)-1]))
-			} else {
-				resources = append(resources, key)
-			}
-		}
-	}
-	sort.Strings(resources)
-	return resources
-}
-
-// getFailedResources returns list of failed resource names
-func (eg *EventGenerator) getFailedResources(health *status.ReleaseHealth) []string {
-	resources := make([]string, 0)
-	for key, status := range health.ResourceHealth {
-		if !status.Healthy && strings.Contains(status.Reason, "Failed") {
-			parts := strings.Split(key, "/")
-			if len(parts) >= 3 {
-				resources = append(resources, fmt.Sprintf("%s/%s", parts[len(parts)-2], parts[len(parts)-1]))
-			} else {
-				resources = append(resources, key)
-			}
-		}
-	}
-	sort.Strings(resources)
-	return resources
 }
 
 // shouldEmitEvent checks if an event should be emitted (deduplication)

@@ -19,6 +19,8 @@ package status
 import (
 	"context"
 	"fmt"
+	"sort"
+	"strings"
 	"sync"
 
 	apps "k8s.io/api/apps/v1"
@@ -66,6 +68,53 @@ type ReleaseHealth struct {
 	FailedResources      int
 
 	Timestamp metav1.Time
+}
+
+// GetUnhealthyResourceNames returns a sorted list of unhealthy (degraded) resource names
+func (h *ReleaseHealth) GetUnhealthyResourceNames() []string {
+	resources := make([]string, 0)
+	for key, status := range h.ResourceHealth {
+		if !status.Healthy && !strings.Contains(status.Reason, "Progressing") &&
+			!strings.Contains(status.Reason, "Failed") {
+			resources = append(resources, extractResourceName(key))
+		}
+	}
+	sort.Strings(resources)
+	return resources
+}
+
+// GetFailedResourceNames returns a sorted list of failed resource names
+func (h *ReleaseHealth) GetFailedResourceNames() []string {
+	resources := make([]string, 0)
+	for key, status := range h.ResourceHealth {
+		if !status.Healthy && strings.Contains(status.Reason, "Failed") {
+			resources = append(resources, extractResourceName(key))
+		}
+	}
+	sort.Strings(resources)
+	return resources
+}
+
+// GetProgressingResourceNames returns a sorted list of progressing resource names
+func (h *ReleaseHealth) GetProgressingResourceNames() []string {
+	resources := make([]string, 0)
+	for key, status := range h.ResourceHealth {
+		if !status.Healthy && strings.Contains(status.Reason, "Progressing") {
+			resources = append(resources, extractResourceName(key))
+		}
+	}
+	sort.Strings(resources)
+	return resources
+}
+
+// extractResourceName extracts a readable resource name from a resource key
+// key format: "gvk/namespace/name"
+func extractResourceName(key string) string {
+	parts := strings.Split(key, "/")
+	if len(parts) >= 3 {
+		return fmt.Sprintf("%s/%s", parts[len(parts)-2], parts[len(parts)-1])
+	}
+	return key
 }
 
 // HealthChecker computes health for a specific resource type
@@ -293,9 +342,9 @@ func (h *ReleaseHealth) computeAggregateStatus() {
 			h.HealthyResources++
 		} else {
 			// Determine if progressing or degraded based on reason
-			if contains(status.Reason, "Progressing", "Updating", "Scaling") {
+			if containsAny(status.Reason, "Progressing", "Updating", "Scaling") {
 				h.ProgressingResources++
-			} else if contains(status.Reason, "Failed", "Error", "CrashLoopBackOff") {
+			} else if containsAny(status.Reason, "Failed", "Error", "CrashLoopBackOff") {
 				h.FailedResources++
 			} else {
 				h.DegradedResources++
@@ -319,15 +368,11 @@ func (h *ReleaseHealth) computeAggregateStatus() {
 	}
 }
 
-// contains checks if a string contains any of the given substrings
-func contains(s string, substrings ...string) bool {
+// containsAny checks if a string contains any of the given substrings
+func containsAny(s string, substrings ...string) bool {
 	for _, substr := range substrings {
-		if len(s) >= len(substr) {
-			for i := 0; i <= len(s)-len(substr); i++ {
-				if s[i:i+len(substr)] == substr {
-					return true
-				}
-			}
+		if strings.Contains(s, substr) {
+			return true
 		}
 	}
 	return false

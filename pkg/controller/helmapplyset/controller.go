@@ -326,12 +326,9 @@ func (c *Controller) syncHandler(ctx context.Context, key string) error {
 	c.recorder.Eventf(secret, v1.EventTypeNormal, "Reconciled",
 		"Successfully reconciled Helm release %s with ApplySet metadata", releaseInfo.Name)
 
-	// Update metrics
+	// Record reconciliation duration metric
 	reconcileDuration := time.Since(reconcileStart)
-	// Note: For full metrics, we'd need to aggregate health status using the status aggregator
-	// For now, metrics are registered and ready. Full integration with status aggregator
-	// would update metrics here: c.metricsExporter.UpdateMetrics(health, secret.CreationTimestamp.Time, reconcileDuration)
-	_ = reconcileDuration // Suppress unused variable warning until full integration
+	c.metricsExporter.RecordReconcileDuration(releaseInfo.Name, releaseInfo.Namespace, reconcileDuration)
 
 	return nil
 }

@@ -257,3 +257,12 @@ func (e *Exporter) statusToValue(status string) float64 {
 func (e *Exporter) releaseKey(releaseName, namespace string) string {
 	return fmt.Sprintf("%s/%s", namespace, releaseName)
 }
+
+// RecordReconcileDuration records just the reconciliation duration metric
+// This is a simpler alternative to UpdateMetrics for cases where full health status isn't available
+func (e *Exporter) RecordReconcileDuration(releaseName, namespace string, duration time.Duration) {
+	helmApplySetReconcileDurationSeconds.WithLabelValues(releaseName, namespace).
+		Observe(duration.Seconds())
+	helmApplySetLastReconcileTimestamp.WithLabelValues(releaseName, namespace).
+		Set(float64(time.Now().Unix()))
+}

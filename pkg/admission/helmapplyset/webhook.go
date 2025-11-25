@@ -139,7 +139,9 @@ func (s *WebhookServer) Start(ctx context.Context) error {
 // handleHealth handles health check requests
 func (s *WebhookServer) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("ok"))
+	if _, err := w.Write([]byte("ok")); err != nil {
+		s.logger.Error(err, "Failed to write health response")
+	}
 }
 
 // handleReady handles readiness check requests
@@ -147,12 +149,16 @@ func (s *WebhookServer) handleReady(w http.ResponseWriter, r *http.Request) {
 	// Check if TLS config is ready
 	if s.tlsConfig == nil || len(s.tlsConfig.Certificates) == 0 {
 		w.WriteHeader(http.StatusServiceUnavailable)
-		w.Write([]byte("not ready: TLS not configured"))
+		if _, err := w.Write([]byte("not ready: TLS not configured")); err != nil {
+			s.logger.Error(err, "Failed to write readiness response")
+		}
 		return
 	}
 
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("ready"))
+	if _, err := w.Write([]byte("ready")); err != nil {
+		s.logger.Error(err, "Failed to write readiness response")
+	}
 }
 
 // handleValidate handles validating admission webhook requests

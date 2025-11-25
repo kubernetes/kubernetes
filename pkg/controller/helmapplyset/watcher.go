@@ -158,10 +158,7 @@ func IsHelmReleaseSecret(secret *v1.Secret) bool {
 // handleAdd handles Secret add events
 func (w *Watcher) handleAdd(obj interface{}) {
 	secret := obj.(*v1.Secret)
-	if !IsHelmReleaseSecret(secret) {
-		return
-	}
-
+	// Note: FilterFunc already ensures this is a Helm release Secret
 	w.logger.V(4).Info("Helm release Secret added", "secret", klog.KObj(secret))
 	w.enqueueFunc(secret)
 }
@@ -169,9 +166,7 @@ func (w *Watcher) handleAdd(obj interface{}) {
 // handleUpdate handles Secret update events
 func (w *Watcher) handleUpdate(oldObj, newObj interface{}) {
 	newSecret := newObj.(*v1.Secret)
-	if !IsHelmReleaseSecret(newSecret) {
-		return
-	}
+	// Note: FilterFunc already ensures this is a Helm release Secret
 
 	// Skip if ResourceVersion hasn't changed (periodic resync)
 	oldSecret, ok := oldObj.(*v1.Secret)
@@ -199,10 +194,7 @@ func (w *Watcher) handleDelete(obj interface{}) {
 			return
 		}
 	}
-
-	if !IsHelmReleaseSecret(secret) {
-		return
-	}
+	// Note: FilterFunc already ensures this is a Helm release Secret
 
 	w.logger.V(4).Info("Helm release Secret deleted", "secret", klog.KObj(secret))
 	w.enqueueFunc(secret)

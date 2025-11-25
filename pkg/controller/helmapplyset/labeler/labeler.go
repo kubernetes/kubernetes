@@ -50,9 +50,6 @@ const (
 	// HelmInstanceLabel is the standard Helm label for instance name
 	HelmInstanceLabel = "app.kubernetes.io/instance"
 
-	// HelmNameLabel is the standard Helm label for resource name
-	HelmNameLabel = "app.kubernetes.io/name"
-
 	// DefaultRetryAttempts is the default number of retry attempts for labeling operations
 	DefaultRetryAttempts = 3
 

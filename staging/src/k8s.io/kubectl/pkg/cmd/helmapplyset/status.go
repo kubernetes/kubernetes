@@ -39,13 +39,9 @@ import (
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 
+	"k8s.io/kubernetes/pkg/controller/helmapplyset/labeler"
 	"k8s.io/kubernetes/pkg/controller/helmapplyset/parent"
 	"k8s.io/kubernetes/pkg/controller/helmapplyset/status"
-)
-
-const (
-	// ApplySetPartOfLabel is the label key for ApplySet membership
-	ApplySetPartOfLabel = "applyset.kubernetes.io/part-of"
 )
 
 var (
@@ -213,7 +209,7 @@ func (o *StatusOptions) aggregateHealth(ctx context.Context, applySetID string, 
 	// This is a simplified version - in production, this would use the status aggregator
 	// For now, we'll query resources and compute basic health
 
-	labelSelector := fmt.Sprintf("%s=%s", ApplySetPartOfLabel, applySetID)
+	labelSelector := fmt.Sprintf("%s=%s", labeler.ApplysetPartOfLabel, applySetID)
 
 	// Get all resources with the ApplySet label
 	// This is simplified - in production, we'd use the status aggregator
@@ -246,10 +242,10 @@ func (o *StatusOptions) aggregateHealth(ctx context.Context, applySetID string, 
 		}
 	}
 
-	// Query resources by label selector
-	// Note: This is a simplified implementation
+	// Note: labelSelector would be used by the status aggregator in production
 	// Full implementation would use the status aggregator from pkg/controller/helmapplyset/status
-	_ = labelSelector // Suppress unused variable warning
+	// to query resources: c.statusAggregator.AggregateHealth(ctx, releaseName, namespace, applySetID, groupKinds)
+	_ = labelSelector
 
 	return health, nil
 }

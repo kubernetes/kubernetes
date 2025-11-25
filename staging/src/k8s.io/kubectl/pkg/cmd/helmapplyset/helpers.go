@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -116,4 +117,31 @@ func FormatGroupKind(gk schema.GroupKind) string {
 		return gk.Kind
 	}
 	return fmt.Sprintf("%s.%s", gk.Kind, gk.Group)
+}
+
+// GetAge returns a human-readable age string from a time
+func GetAge(t time.Time) string {
+	if t.IsZero() {
+		return "<unknown>"
+	}
+	duration := time.Since(t)
+	if duration < time.Minute {
+		return fmt.Sprintf("%ds", int(duration.Seconds()))
+	}
+	if duration < time.Hour {
+		return fmt.Sprintf("%dm", int(duration.Minutes()))
+	}
+	if duration < 24*time.Hour {
+		return fmt.Sprintf("%dh", int(duration.Hours()))
+	}
+	days := int(duration.Hours() / 24)
+	if days < 30 {
+		return fmt.Sprintf("%dd", days)
+	}
+	months := days / 30
+	if months < 12 {
+		return fmt.Sprintf("%dmo", months)
+	}
+	years := months / 12
+	return fmt.Sprintf("%dy", years)
 }
