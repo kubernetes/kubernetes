@@ -2745,6 +2745,7 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 		// the pod worker is invoked it will also avoid setting up the pod, so
 		// we simply avoid doing any work.
 		// We also do not try to admit the pod that is already in terminated state.
+		var admissionFailed bool
 		if !kl.podWorkers.IsPodTerminationRequested(pod.UID) && !podutil.IsPodPhaseTerminal(pod.Status.Phase) {
 			// Check if we can admit the pod; if not, reject it.
 			// We failed pods that we rejected, so activePods include all admitted
@@ -2756,10 +2757,11 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 				// Instead, we record the metric here in HandlePodAdditions for new pods
 				// and capture resize events separately.
 				recordAdmissionRejection(reason)
-				continue
+				// Mark that admission failed so we can update the pod status below before calling UpdatePod.
+				admissionFailed = true
 			}
 
-			if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+			if !admissionFailed && utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 				// Backfill the queue of pending resizes, but only after all the pods have
 				// been added. This ensures that no resizes get resolved until all the
 				// existing pods are added.
@@ -2769,10 +2771,23 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 				}
 			}
 		}
+
+		// For admission-failed pods, we need to update the pod's status to Failed so the pod worker
+		// can detect it as terminal when UpdatePod() is called. This ensures the pod worker will
+		// mark the pod as terminated and it will be excluded from the active pods list.
+		// See filterOutInactivePods() which excludes terminal pods from active pods.
+		updateType := kubetypes.SyncPodCreate
+		podToUpdate := pod
+		if admissionFailed {
+			// Create a copy of the pod with Failed status so UpdatePod can detect it as terminal
+			podToUpdate = pod.DeepCopy()
+			podToUpdate.Status.Phase = v1.PodFailed
+		}
+
 		kl.podWorkers.UpdatePod(UpdatePodOptions{
-			Pod:        pod,
+			Pod:        podToUpdate,
 			MirrorPod:  mirrorPod,
-			UpdateType: kubetypes.SyncPodCreate,
+			UpdateType: updateType,
 			StartTime:  start,
 		})
 	}

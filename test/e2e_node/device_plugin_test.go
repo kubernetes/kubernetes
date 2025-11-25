@@ -993,10 +993,19 @@ func testDevicePluginNodeReboot(f *framework.Framework, pluginSockDir string) {
 			// because pods that failed admission are no longer reported in the list
 			// (see https://github.com/kubernetes/kubernetes/pull/132028).
 			// Hence, we verify that our test pod is NOT present in the podresources response.
+			// We use Eventually because the pod worker processes the admission failure asynchronously.
 
-			_, found := checkPodResourcesAssignment(v1PodResources, pod1.Namespace, pod1.Name, pod1.Spec.Containers[0].Name, SampleDeviceResourceName, []string{})
-			framework.ExpectNoError(err, "unexpected device assignment mismatch for %s/%s", pod1.Namespace, pod1.Name)
-			gomega.Expect(found).To(gomega.BeFalseBecause("%s/%s/%s failed admission, so it must not appear in podresources list", pod1.Namespace, pod1.Name, pod1.Spec.Containers[0].Name))
+			ginkgo.By("Waiting for failed pod to be excluded from podresources API")
+			gomega.Eventually(ctx, func() bool {
+				v1PodResources, err := getV1NodeDevices(ctx)
+				if err != nil {
+					framework.Logf("Failed to get podresources: %v", err)
+					return false
+				}
+
+				_, found := checkPodResourcesAssignment(v1PodResources, pod1.Namespace, pod1.Name, pod1.Spec.Containers[0].Name, SampleDeviceResourceName, []string{})
+				return !found // We want found to be false (pod should NOT be in the list)
+			}, 30*time.Second, 2*time.Second).Should(gomega.BeTrueBecause("%s/%s/%s failed admission, so it must not appear in podresources list", pod1.Namespace, pod1.Name, pod1.Spec.Containers[0].Name))
 		})
 	})
 }

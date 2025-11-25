@@ -603,25 +603,19 @@ func (m *ManagerImpl) devicesToAllocate(ctx context.Context, podUID, contName, r
 	// 3. node reboot. In this scenario device plugins may not be running yet when we try to allocate devices.
 	//    note: if we get this far the runtime is surely running. This is usually enforced at OS level by startup system services dependencies.
 
-	// First we take care of the exceptional flow (scenarios 2 and 3). In both flows, kubelet is reinitializing, and while kubelet is initializing, sources are NOT all ready.
-	// Is this a simple kubelet restart (scenario 2)? To distinguish, we use the information we got for runtime. If we are asked to allocate devices for containers reported
-	// running, then it can only be a kubelet restart. On node reboot the runtime and the containers were also shut down. Then, if the container was running, it can only be
-	// because it already has access to all the required devices, so we got nothing to do and we can bail out.
-	if !m.sourcesReady.AllReady() && m.isContainerAlreadyRunning(logger, podUID, contName) {
-		logger.V(3).Info("Container detected running, nothing to do", "deviceNumber", needed, "resourceName", resource, "podUID", podUID, "containerName", contName)
-		return nil, nil
-	}
-
-	// We dealt with scenario 2. If we got this far it's either scenario 3 (node reboot) or scenario 1 (steady state, normal flow).
+	// We need to check the device health and registration status before allowing pre-allocated devices.
+	// This handles the scenario where kubelet restarts after a node reboot and containers were removed,
+	// but the pod configuration still exists. In this case, we should fail admission if the device plugin
+	// hasn't re-registered or has no healthy devices, even if the pod had devices allocated before the reboot.
+	// Note: we need to check the device health and registration status *before* we check how many devices are needed, doing otherwise caused issue #109595
+	// Note: if the scheduler is bypassed, we fall back in scenario 1, so we still need these checks.
 	logger.V(3).Info("Need devices to allocate for pod", "deviceNumber", needed, "resourceName", resource, "podUID", podUID, "containerName", contName)
 	healthyDevices, hasRegistered := m.healthyDevices[resource]
 
-	// The following checks are expected to fail only happen on scenario 3 (node reboot).
+	// The following checks are expected to fail on scenario 3 (node reboot).
 	// The kubelet is reinitializing and got a container from sources. But there's no ordering, so an app container may attempt allocation _before_ the device plugin was created,
 	// has registered and reported back to kubelet the devices.
 	// This can only happen on scenario 3 because at steady state (scenario 1) the scheduler prevents pod to be sent towards node which don't report enough devices.
-	// Note: we need to check the device health and registration status *before* we check how many devices are needed, doing otherwise caused issue #109595
-	// Note: if the scheduler is bypassed, we fall back in scenario 1, so we still need these checks.
 	if !hasRegistered {
 		return nil, fmt.Errorf("cannot allocate unregistered device %s", resource)
 	}
@@ -635,6 +629,19 @@ func (m *ManagerImpl) devicesToAllocate(ctx context.Context, podUID, contName, r
 	if !healthyDevices.IsSuperset(devices) {
 		return nil, fmt.Errorf("previously allocated devices are no longer healthy; cannot allocate unhealthy devices %s", resource)
 	}
+
+	// First we take care of the exceptional flow (scenarios 2 and 3). In both flows, kubelet is reinitializing, and while kubelet is initializing, sources are NOT all ready.
+	// Is this a simple kubelet restart (scenario 2)? To distinguish, we use the information we got for runtime. If we are asked to allocate devices for containers reported
+	// running, then it can only be a kubelet restart. On node reboot the runtime and the containers were also shut down. Then, if the container was running, it can only be
+	// because it already has access to all the required devices, so we got nothing to do and we can bail out.
+	// Note: We perform this check AFTER validating that the device plugin has registered and has healthy devices, to ensure
+	// that we fail admission if devices are not available (e.g., device plugin hasn't re-registered after node reboot).
+	if !m.sourcesReady.AllReady() && m.isContainerAlreadyRunning(logger, podUID, contName) {
+		logger.V(3).Info("Container detected running, nothing to do", "deviceNumber", needed, "resourceName", resource, "podUID", podUID, "containerName", contName)
+		return nil, nil
+	}
+
+	// We dealt with scenario 2. If we got this far it's either scenario 3 (node reboot) or scenario 1 (steady state, normal flow).
 
 	// We handled the known error paths in scenario 3 (node reboot), so from now on we can fall back in a common path.
 	// We cover container restart on kubelet steady state with the same flow.
