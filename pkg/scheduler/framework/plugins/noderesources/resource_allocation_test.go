@@ -18,6 +18,7 @@ package noderesources
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -36,6 +37,7 @@ import (
 	"k8s.io/dynamic-resource-allocation/deviceclass/extendedresourcecache"
 	"k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/dynamic-resource-allocation/structured"
+	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
@@ -545,42 +547,10 @@ func TestCalculateResourceAllocatableRequest(t *testing.T) {
 
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, tc.enableDRAExtendedResource)
 
-			client := fake.NewClientset(tc.objects...)
-			informerFactory := informers.NewSharedInformerFactory(client, 0)
-			resourceSliceTrackerOpts := tracker.Options{
-				SliceInformer: informerFactory.Resource().V1().ResourceSlices(),
-				TaintInformer: informerFactory.Resource().V1alpha3().DeviceTaintRules(),
-				ClassInformer: informerFactory.Resource().V1().DeviceClasses(),
-				KubeClient:    client,
-			}
-			resourceSliceTracker, err := tracker.StartTracker(tCtx, resourceSliceTrackerOpts)
+			draManager, err := newTestDRAManager(t, tCtx, logger, tc.objects...)
 			if err != nil {
-				t.Fatalf("couldn't start resource slice tracker: %v", err)
+				t.Fatalf("failed to create fake DRA manager: %v", err)
 			}
-			draManager := dynamicresources.NewDRAManager(
-				tCtx,
-				assumecache.NewAssumeCache(
-					logger,
-					informerFactory.Resource().V1().ResourceClaims().Informer(),
-					"resource claim",
-					"",
-					nil),
-				resourceSliceTracker,
-				informerFactory)
-
-			if tc.enableDRAExtendedResource {
-				cache := draManager.DeviceClassResolver().(*extendedresourcecache.ExtendedResourceCache)
-				if _, err := informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandler(cache); err != nil {
-					logger.Error(err, "failed to add device class informer event handler")
-				}
-			}
-
-			informerFactory.Start(tCtx.Done())
-			t.Cleanup(func() {
-				// Now we can wait for all goroutines to stop.
-				informerFactory.Shutdown()
-			})
-			informerFactory.WaitForCacheSync(tCtx.Done())
 
 			nodeInfo := framework.NewNodeInfo()
 			nodeInfo.SetNode(tc.node)
@@ -613,6 +583,46 @@ func TestCalculateResourceAllocatableRequest(t *testing.T) {
 			}
 		})
 	}
+}
+
+// newTestDRAManager creates a DefaultDRAManager for testing purposes
+func newTestDRAManager(t *testing.T, ctx context.Context, logger klog.Logger, objects ...apiruntime.Object) (*dynamicresources.DefaultDRAManager, error) {
+	client := fake.NewClientset(objects...)
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
+	resourceSliceTrackerOpts := tracker.Options{
+		SliceInformer: informerFactory.Resource().V1().ResourceSlices(),
+		TaintInformer: informerFactory.Resource().V1alpha3().DeviceTaintRules(),
+		ClassInformer: informerFactory.Resource().V1().DeviceClasses(),
+		KubeClient:    client,
+	}
+	resourceSliceTracker, err := tracker.StartTracker(ctx, resourceSliceTrackerOpts)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't start resource slice tracker: %w", err)
+	}
+	draManager := dynamicresources.NewDRAManager(
+		ctx,
+		assumecache.NewAssumeCache(
+			logger,
+			informerFactory.Resource().V1().ResourceClaims().Informer(),
+			"resource claim",
+			"",
+			nil),
+		resourceSliceTracker,
+		informerFactory)
+
+	cache := draManager.DeviceClassResolver().(*extendedresourcecache.ExtendedResourceCache)
+	if _, err := informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandler(cache); err != nil {
+		return nil, fmt.Errorf("failed to add device class informer event handler: %w", err)
+	}
+
+	informerFactory.Start(ctx.Done())
+	t.Cleanup(func() {
+		// Now we can wait for all goroutines to stop.
+		informerFactory.Shutdown()
+	})
+	informerFactory.WaitForCacheSync(ctx.Done())
+
+	return draManager, nil
 }
 
 // getCachedDeviceMatch checks the cache for a DeviceMatches result
