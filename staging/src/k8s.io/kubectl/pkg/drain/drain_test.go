@@ -535,8 +535,8 @@ func TestEvictDuringNamespaceTerminating(t *testing.T) {
 	testPodName := "test-pod"
 	testNamespace := "default"
 
-	retryDelay := 5 * time.Millisecond
-	globalTimeout := 2 * retryDelay
+	retryDelay := 1 * time.Millisecond
+	globalTimeout := 100 * time.Millisecond
 
 	tests := []struct {
 		description string
