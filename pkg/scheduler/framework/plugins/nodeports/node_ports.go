@@ -163,9 +163,9 @@ func (pl *NodePorts) Filter(ctx context.Context, cycleState fwk.CycleState, pod 
 		return fwk.AsStatus(err)
 	}
 
-	portFits, portConflictErr := fitsPorts(wantPorts, nodeInfo.GetUsedPorts())
-	if !portFits {
-		return fwk.NewStatus(fwk.Unschedulable, portConflictErr.Error())
+	fits, err := fitsPorts(wantPorts, nodeInfo.GetUsedPorts())
+	if !fits {
+		return fwk.NewStatus(fwk.Unschedulable, err.Error())
 	}
 
 	return nil
