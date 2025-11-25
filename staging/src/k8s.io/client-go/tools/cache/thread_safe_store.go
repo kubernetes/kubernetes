@@ -394,6 +394,9 @@ func (c *threadSafeMap) ListIndexFuncValues(indexName string) []string {
 }
 
 func (c *threadSafeMap) GetIndexers() Indexers {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
 	return c.index.indexers
 }
 
