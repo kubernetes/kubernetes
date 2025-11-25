@@ -711,16 +711,22 @@ func (m *kubeGenericRuntimeManager) toKubeContainerStatus(ctx context.Context, p
 		}
 	}
 
+	var image, runtimeHandler string
+	if status.Image != nil {
+		image = status.Image.Image
+		runtimeHandler = status.Image.RuntimeHandler
+	}
+
 	cStatus := &kubecontainer.Status{
 		ID: kubecontainer.ContainerID{
 			Type: runtimeName,
 			ID:   status.Id,
 		},
 		Name:                labeledInfo.ContainerName,
-		Image:               status.Image.Image,
+		Image:               image,
 		ImageID:             imageID,
 		ImageRef:            status.ImageRef,
-		ImageRuntimeHandler: status.Image.RuntimeHandler,
+		ImageRuntimeHandler: runtimeHandler,
 		Hash:                annotatedInfo.Hash,
 		RestartCount:        annotatedInfo.RestartCount,
 		State:               toKubeContainerState(status.State),
