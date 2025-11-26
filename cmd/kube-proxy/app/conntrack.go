@@ -1,3 +1,6 @@
+//go:build linux
+// +build linux
+
 /*
 Copyright 2015 The Kubernetes Authors.
 
@@ -19,18 +22,24 @@ package app
 import (
 	"context"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
+	"time"
+
+	"github.com/google/cadvisor/machine"
+	"github.com/google/cadvisor/utils/sysfs"
 
 	"k8s.io/component-helpers/node/util/sysctl"
 	"k8s.io/klog/v2"
+	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
 )
 
-// Conntracker is an interface to the global sysctl. Descriptions of the various
-// sysctl fields can be found here:
+// conntrackConfigurer is a mockable interface for setting conntrack sysctls.
 //
+// Descriptions of the various sysctl fields can be found here:
 // https://www.kernel.org/doc/Documentation/networking/nf_conntrack-sysctl.txt
-type Conntracker interface {
+type conntrackConfigurer interface {
 	// SetMax adjusts nf_conntrack_max.
 	SetMax(ctx context.Context, max int) error
 	// SetTCPEstablishedTimeout adjusts nf_conntrack_tcp_timeout_established.
@@ -45,10 +54,86 @@ type Conntracker interface {
 	SetUDPStreamTimeout(ctx context.Context, seconds int) error
 }
 
-type realConntracker struct {
+func setupConntrack(ctx context.Context, ct conntrackConfigurer, config *proxyconfigapi.KubeProxyConntrackConfiguration) error {
+	max, err := getConntrackMax(ctx, config)
+	if err != nil {
+		return err
+	}
+	if max > 0 {
+		err := ct.SetMax(ctx, max)
+		if err != nil {
+			return err
+		}
+	}
+
+	if config.TCPEstablishedTimeout != nil && config.TCPEstablishedTimeout.Duration > 0 {
+		timeout := int(config.TCPEstablishedTimeout.Duration / time.Second)
+		if err := ct.SetTCPEstablishedTimeout(ctx, timeout); err != nil {
+			return err
+		}
+	}
+
+	if config.TCPCloseWaitTimeout != nil && config.TCPCloseWaitTimeout.Duration > 0 {
+		timeout := int(config.TCPCloseWaitTimeout.Duration / time.Second)
+		if err := ct.SetTCPCloseWaitTimeout(ctx, timeout); err != nil {
+			return err
+		}
+	}
+
+	if config.TCPBeLiberal {
+		if err := ct.SetTCPBeLiberal(ctx, 1); err != nil {
+			return err
+		}
+	}
+
+	if config.UDPTimeout.Duration > 0 {
+		timeout := int(config.UDPTimeout.Duration / time.Second)
+		if err := ct.SetUDPTimeout(ctx, timeout); err != nil {
+			return err
+		}
+	}
+
+	if config.UDPStreamTimeout.Duration > 0 {
+		timeout := int(config.UDPStreamTimeout.Duration / time.Second)
+		if err := ct.SetUDPStreamTimeout(ctx, timeout); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
-func (rct realConntracker) SetMax(ctx context.Context, max int) error {
+func getConntrackMax(ctx context.Context, config *proxyconfigapi.KubeProxyConntrackConfiguration) (int, error) {
+	logger := klog.FromContext(ctx)
+	if config.MaxPerCore != nil && *config.MaxPerCore > 0 {
+		floor := 0
+		if config.Min != nil {
+			floor = int(*config.Min)
+		}
+		scaled := int(*config.MaxPerCore) * detectNumCPU()
+		if scaled > floor {
+			logger.V(3).Info("GetConntrackMax: using scaled conntrack-max-per-core")
+			return scaled, nil
+		}
+		logger.V(3).Info("GetConntrackMax: using conntrack-min")
+		return floor, nil
+	}
+	return 0, nil
+}
+
+func detectNumCPU() int {
+	// try get numCPU from /sys firstly due to a known issue (https://github.com/kubernetes/kubernetes/issues/99225)
+	_, numCPU, err := machine.GetTopology(sysfs.NewRealSysFs())
+	if err != nil || numCPU < 1 {
+		return runtime.NumCPU()
+	}
+	return numCPU
+}
+
+type realConntrackConfigurer struct {
+}
+
+func (rct realConntrackConfigurer) SetMax(ctx context.Context, max int) error {
 	logger := klog.FromContext(ctx)
 	logger.Info("Setting nf_conntrack_max", "nfConntrackMax", max)
 	if err := rct.setIntSysCtl(ctx, "nf_conntrack_max", max); err != nil {
@@ -68,27 +153,27 @@ func (rct realConntracker) SetMax(ctx context.Context, max int) error {
 	return writeIntStringFile("/sys/module/nf_conntrack/parameters/hashsize", max/4)
 }
 
-func (rct realConntracker) SetTCPEstablishedTimeout(ctx context.Context, seconds int) error {
+func (rct realConntrackConfigurer) SetTCPEstablishedTimeout(ctx context.Context, seconds int) error {
 	return rct.setIntSysCtl(ctx, "nf_conntrack_tcp_timeout_established", seconds)
 }
 
-func (rct realConntracker) SetTCPCloseWaitTimeout(ctx context.Context, seconds int) error {
+func (rct realConntrackConfigurer) SetTCPCloseWaitTimeout(ctx context.Context, seconds int) error {
 	return rct.setIntSysCtl(ctx, "nf_conntrack_tcp_timeout_close_wait", seconds)
 }
 
-func (rct realConntracker) SetTCPBeLiberal(ctx context.Context, value int) error {
+func (rct realConntrackConfigurer) SetTCPBeLiberal(ctx context.Context, value int) error {
 	return rct.setIntSysCtl(ctx, "nf_conntrack_tcp_be_liberal", value)
 }
 
-func (rct realConntracker) SetUDPTimeout(ctx context.Context, seconds int) error {
+func (rct realConntrackConfigurer) SetUDPTimeout(ctx context.Context, seconds int) error {
 	return rct.setIntSysCtl(ctx, "nf_conntrack_udp_timeout", seconds)
 }
 
-func (rct realConntracker) SetUDPStreamTimeout(ctx context.Context, seconds int) error {
+func (rct realConntrackConfigurer) SetUDPStreamTimeout(ctx context.Context, seconds int) error {
 	return rct.setIntSysCtl(ctx, "nf_conntrack_udp_timeout_stream", seconds)
 }
 
-func (rct realConntracker) setIntSysCtl(ctx context.Context, name string, value int) error {
+func (rct realConntrackConfigurer) setIntSysCtl(ctx context.Context, name string, value int) error {
 	logger := klog.FromContext(ctx)
 	entry := "net/netfilter/" + name
 
