@@ -161,6 +161,10 @@ linters:
         path: "staging/src/k8s.io/api/events/(v1|v1beta1)/types.go"
       - text: 'notimestamp: naming convention "notimestamp": field AllocationResult.AllocationTimestamp: prefer use of the term ''time'' over ''timestamp'''
         path: "staging/src/k8s.io/api/resource/(v1|v1beta1|v1beta2)/types.go"
+      # optionalfields - Ignore optionalfields issues for existing API group
+      # TODO: For each existing API group, we aim to remove it over time.
+      - text: "optionalfields: field .* should (?:be a pointer|have the omitempty tag)\\."
+        path: "staging/src/k8s.io/api/(admission|admissionregistration|apiserverinternal|apps|authentication|authorization|autoscaling|batch|certificates|coordination|core|discovery|events|extensions|flowcontrol|imagepolicy|networking|node|policy|rbac|resource|scheduling|storage|storagemigration)"
       
       # Pre-existing issues from the conflictmarkers linter
       # The Error field in some older API types is marked as both optional and required.
