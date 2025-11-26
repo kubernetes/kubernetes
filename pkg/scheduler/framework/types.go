@@ -619,6 +619,16 @@ func (pqi *QueuedPodInfo) DeepCopy() *QueuedPodInfo {
 	}
 }
 
+// ClearRejectorPlugins clears the plugin-related fields that track why a pod
+// was rejected in a previous scheduling attempt. This should be called at the
+// beginning of a new scheduling attempt to ensure stale data doesn't persist.
+func (pqi *QueuedPodInfo) ClearRejectorPlugins() {
+	pqi.UnschedulablePlugins.Clear()
+	pqi.PendingPlugins.Clear()
+	pqi.GatingPlugin = ""
+	pqi.GatingPluginEvents = nil
+}
+
 // PodInfo is a wrapper to a Pod with additional pre-computed information to
 // accelerate processing. This information is typically immutable (e.g., pre-processed
 // inter-pod affinity selectors).

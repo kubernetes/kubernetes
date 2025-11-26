@@ -1063,10 +1063,11 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, fwk framewo
 	err := status.AsError()
 	errMsg := status.Message()
 
-	// Clear plugin sets to avoid stale data from previous scheduling attempts.
-	// They will be repopulated below for FitError cases.
-	podInfo.UnschedulablePlugins.Clear()
-	podInfo.PendingPlugins.Clear()
+	// Clear plugin-related fields to avoid stale data from previous scheduling attempts.
+	// These fields will be repopulated below for FitError cases.
+	// We clear them here (rather than at Pop) because we sometimes want to use them
+	// for logging when a pod schedules successfully (e.g., after being flushed).
+	podInfo.ClearRejectorPlugins()
 
 	if err == ErrNoNodesAvailable {
 		logger.V(2).Info("Unable to schedule pod; no nodes are registered to the cluster; waiting", "pod", klog.KObj(pod))
