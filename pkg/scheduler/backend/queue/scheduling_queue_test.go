@@ -942,7 +942,7 @@ func TestPop(t *testing.T) {
 			poppedPod = popPod(t, logger, q, pod)
 			// PendingPlugins are preserved after Pop() so they can be logged if scheduling
 			// succeeds, or cleared in handleSchedulingFailure() if it fails.
-			if len(poppedPod.PendingPlugins) != 1 || !poppedPod.PendingPlugins.Has("fooPlugin1") {
+			if !poppedPod.PendingPlugins.Equal(sets.New("fooPlugin1")) {
 				t.Errorf("QueuedPodInfo from Pop should preserve PendingPlugins, expected fooPlugin1, got instead: %+v", poppedPod)
 			}
 		})
@@ -3080,9 +3080,6 @@ func TestFlushUnschedulablePodsLeftoverSetsFlag(t *testing.T) {
 	}
 
 	// Verify flag is cleared when pod returns to queue
-	q.lock.Lock()
-	defer q.lock.Unlock()
-
 	internalPInfo := q.unschedulablePods.get(pod)
 	if internalPInfo == nil {
 		t.Fatalf("pod should be in unschedulablePods")

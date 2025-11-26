@@ -529,7 +529,7 @@ type QueuedPodInfo struct {
 	// WasFlushedFromUnschedulable tracks whether this pod was most recently moved to activeQ
 	// by the periodic flush from unschedulablePods due to timeout (rather than by an event).
 	// This is used to detect if the pod becomes schedulable soon after flush, which may
-	// indicate missing queue hint optimizations or event handling bugs.
+	// indicate queueing hint misconfigurations or event handling bugs.
 	// This flag is cleared when the pod returns to the queue for any reason.
 	WasFlushedFromUnschedulable bool
 	// The time when the pod is added to the queue for the first time. The pod may be added
@@ -620,8 +620,7 @@ func (pqi *QueuedPodInfo) DeepCopy() *QueuedPodInfo {
 }
 
 // ClearRejectorPlugins clears the plugin-related fields that track why a pod
-// was rejected in a previous scheduling attempt. This should be called at the
-// beginning of a new scheduling attempt to ensure stale data doesn't persist.
+// was rejected in a previous scheduling attempt.
 func (pqi *QueuedPodInfo) ClearRejectorPlugins() {
 	pqi.UnschedulablePlugins.Clear()
 	pqi.PendingPlugins.Clear()
