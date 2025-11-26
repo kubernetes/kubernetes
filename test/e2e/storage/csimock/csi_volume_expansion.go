@@ -591,33 +591,36 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 
 func validateQuotaUsage(ctx context.Context, m *mockDriverSetup, currentQuota, expectedQuota *v1.ResourceQuota) {
 	ginkgo.By("Waiting for resource quota usage to be updated")
-	var err error
-	var quota *v1.ResourceQuota
-	var usedCount resource.Quantity
-	var usedSize resource.Quantity
+	var (
+		quota     *v1.ResourceQuota
+		usedCount resource.Quantity
+		usedSize  resource.Quantity
+	)
 
 	expectedCount := expectedQuota.Status.Used[pvcCountQuotaKey]
 	expectedUsedSize := expectedQuota.Status.Used[pvcSizeQuotaKey]
 
-	waitErr := wait.PollUntilContextTimeout(ctx, resizePollInterval, csiResizeWaitPeriod, true, func(pollContext context.Context) (bool, error) {
-		quota, err = m.cs.CoreV1().ResourceQuotas(currentQuota.Namespace).Get(pollContext, currentQuota.Name, metav1.GetOptions{})
+	gomega.Eventually(func() error {
+		q, err := m.cs.CoreV1().ResourceQuotas(currentQuota.Namespace).Get(ctx, currentQuota.Name, metav1.GetOptions{})
 		if err != nil {
-			return false, fmt.Errorf("error fetching resource quota %q: %w", expectedQuota.Name, err)
+			return fmt.Errorf("failed to get resource quota %s/%s: %w", currentQuota.Namespace, currentQuota.Name, err)
 		}
-		if quota.Status.Used == nil {
-			return false, nil
+		if q.Status.Used == nil {
+			return fmt.Errorf("resource quota %s/%s has nil Status.Used", currentQuota.Namespace, currentQuota.Name)
 		}
+
+		quota = q
 		usedCount = quota.Status.Used[pvcCountQuotaKey]
 		usedSize = quota.Status.Used[pvcSizeQuotaKey]
-		if usedCount.Cmp(expectedCount) == 0 && usedSize.Cmp(expectedUsedSize) == 0 {
-			return true, nil
-		}
-		return false, nil
-	})
 
-	if waitErr != nil {
-		framework.Failf("error while waiting for resource quota usage to be updated, currentlyUsed: %s/%s, expected: %s/%s: %v", usedCount.String(), usedSize.String(), expectedCount.String(), expectedUsedSize.String(), waitErr)
-	}
+		if usedCount.Cmp(expectedCount) != 0 || usedSize.Cmp(expectedUsedSize) != 0 {
+			return fmt.Errorf(
+				"resource quota usage did not converge; currentlyUsed: %s/%s, expected: %s/%s",
+				usedCount.String(), usedSize.String(), expectedCount.String(), expectedUsedSize.String(),
+			)
+		}
+		return nil
+	}, csiResizeWaitPeriod, resizePollInterval).Should(gomega.Succeed())
 }
 
 func validateRecoveryBehaviour(ctx context.Context, pvc *v1.PersistentVolumeClaim, m *mockDriverSetup, test recoveryTest) {
@@ -647,8 +650,10 @@ func validateRecoveryBehaviour(ctx context.Context, pvc *v1.PersistentVolumeClai
 		framework.Failf("error updating pvc size %q", pvc.Name)
 	}
 
-	// if expansion failed on controller with final error, then recovery should be possible
-	if test.simulatedCSIDriverError == expansionFailedOnControllerWithInfeasibleError {
+	// If expansion failed on controller (infeasible or final), recovery should be possible.
+	// Wait for the recovery resize to settle before checking quota.
+	if test.simulatedCSIDriverError == expansionFailedOnControllerWithInfeasibleError ||
+		test.simulatedCSIDriverError == expansionFailedOnControllerWithFinalError {
 		validateExpansionSuccess(ctx, pvc, m, test, test.recoverySize.String())
 		return
 	}
