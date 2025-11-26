@@ -412,6 +412,98 @@ func TestLabelValue(t *testing.T) {
 	}
 }
 
+func TestPathSegmentName(t *testing.T) {
+	ctx := context.Background()
+	fldPath := field.NewPath("test")
+
+	testCases := []struct {
+		name     string
+		input    string
+		wantErrs field.ErrorList
+	}{{
+		name:     "valid simple name",
+		input:    "valid-name",
+		wantErrs: nil,
+	}, {
+		name:     "valid with dots",
+		input:    "foo.bar.baz",
+		wantErrs: nil,
+	}, {
+		name:     "valid with mixed case",
+		input:    "MyResource",
+		wantErrs: nil,
+	}, {
+		name:     "valid with numbers",
+		input:    "resource123",
+		wantErrs: nil,
+	}, {
+		name:     "valid with underscores",
+		input:    "my_resource",
+		wantErrs: nil,
+	}, {
+		name:     "valid complex identifier",
+		input:    "sha256:ABCDEF012345@ABCDEF012345",
+		wantErrs: nil,
+	}, {
+		name:     "valid with non-ASCII characters",
+		input:    "Iñtërnâtiônàlizætiøn",
+		wantErrs: nil,
+	}, {
+		name:     "valid with leading dot",
+		input:    ".test",
+		wantErrs: nil,
+	}, {
+		name:     "valid with leading double dot",
+		input:    "..test",
+		wantErrs: nil,
+	}, {
+		name:     "valid empty string",
+		input:    "",
+		wantErrs: nil,
+	}, {
+		name:  "invalid: exactly dot",
+		input: ".",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, ".", "may not be '.'").WithOrigin("format=k8s-path-segment-name"),
+		},
+	}, {
+		name:  "invalid: exactly double dot",
+		input: "..",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "..", "may not be '..'").WithOrigin("format=k8s-path-segment-name"),
+		},
+	}, {
+		name:  "invalid: contains slash",
+		input: "foo/bar",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "foo/bar", "may not contain '/'").WithOrigin("format=k8s-path-segment-name"),
+		},
+	}, {
+		name:  "invalid: contains percent",
+		input: "foo%bar",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "foo%bar", "may not contain '%'").WithOrigin("format=k8s-path-segment-name"),
+		},
+	}, {
+		name:  "invalid: contains both slash and percent",
+		input: "foo/bar%baz",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "may not contain '/'").WithOrigin("format=k8s-path-segment-name"),
+			field.Invalid(fldPath, nil, "may not contain '%'").WithOrigin("format=k8s-path-segment-name"),
+		},
+	}}
+
+	exactMatcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin().ByDetailSubstring()
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			value := tc.input
+			gotErrs := PathSegmentName(ctx, operation.Operation{}, fldPath, &value, nil)
+
+			exactMatcher.Test(t, tc.wantErrs, gotErrs)
+		})
+	}
+}
+
 func TestLongNameCaseless(t *testing.T) {
 	ctx := context.Background()
 	fldPath := field.NewPath("test")

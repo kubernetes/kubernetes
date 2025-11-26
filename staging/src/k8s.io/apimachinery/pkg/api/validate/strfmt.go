@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/api/validate/content"
+	"k8s.io/apimachinery/pkg/api/validation/path"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
@@ -129,6 +130,23 @@ func LabelValue[T ~string](_ context.Context, op operation.Operation, fldPath *f
 	var allErrs field.ErrorList
 	for _, msg := range content.IsLabelValue((string)(*value)) {
 		allErrs = append(allErrs, field.Invalid(fldPath, *value, msg).WithOrigin("format=k8s-label-value"))
+	}
+	return allErrs
+}
+
+// PathSegmentName verifies that the specified value is a valid path segment name.
+// A path segment name can be safely encoded as a path segment in URLs and file paths.
+//   - must not be exactly "." or ".."
+//   - must not contain "/" (forward slash)
+//   - must not contain "%" (percent sign)
+//   - can contain any other characters including mixed case, numbers, dots, hyphens, underscores, and non-ASCII characters
+func PathSegmentName[T ~string](_ context.Context, op operation.Operation, fldPath *field.Path, value, _ *T) field.ErrorList {
+	if value == nil {
+		return nil
+	}
+	var allErrs field.ErrorList
+	for _, msg := range path.IsValidPathSegmentName((string)(*value)) {
+		allErrs = append(allErrs, field.Invalid(fldPath, *value, msg).WithOrigin("format=k8s-path-segment-name"))
 	}
 	return allErrs
 }
