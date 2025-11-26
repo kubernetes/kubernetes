@@ -21,8 +21,6 @@ import (
 	"fmt"
 	"time"
 
-	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
-
 	csipbv1 "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -584,16 +582,14 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 				}
 
 				if test.expectedQuotaUsage != nil {
-					// Use uncached client to avoid watch/cache lag when validating quota usage
-					uncachedClient := f.ClientSet.CoreV1()
-					validateQuotaUsage(ctx, m, currentQuota, test.expectedQuotaUsage, uncachedClient)
+					validateQuotaUsage(ctx, m, currentQuota, test.expectedQuotaUsage)
 				}
 			})
 		}
 	})
 })
 
-func validateQuotaUsage(ctx context.Context, m *mockDriverSetup, currentQuota, expectedQuota *v1.ResourceQuota, uncachedClient corev1client.CoreV1Interface) {
+func validateQuotaUsage(ctx context.Context, m *mockDriverSetup, currentQuota, expectedQuota *v1.ResourceQuota) {
 	ginkgo.By("Waiting for resource quota usage to be updated")
 	var (
 		quota     *v1.ResourceQuota
@@ -605,7 +601,7 @@ func validateQuotaUsage(ctx context.Context, m *mockDriverSetup, currentQuota, e
 	expectedUsedSize := expectedQuota.Status.Used[pvcSizeQuotaKey]
 
 	gomega.Eventually(func() error {
-		q, err := uncachedClient.ResourceQuotas(currentQuota.Namespace).Get(ctx, currentQuota.Name, metav1.GetOptions{})
+		q, err := m.cs.CoreV1().ResourceQuotas(currentQuota.Namespace).Get(ctx, currentQuota.Name, metav1.GetOptions{})
 		if err != nil {
 			return fmt.Errorf("failed to get resource quota %s/%s: %w", currentQuota.Namespace, currentQuota.Name, err)
 		}
