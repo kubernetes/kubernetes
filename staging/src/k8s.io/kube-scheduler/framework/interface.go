@@ -739,6 +739,9 @@ type Handle interface {
 	// RunFilterPluginsWithNominatedPods runs the set of configured filter plugins for nominated pod on the given node.
 	RunFilterPluginsWithNominatedPods(ctx context.Context, state CycleState, pod *v1.Pod, info NodeInfo) *Status
 
+	// RunFilterWithNominatedPods runs the full filter plugins and extenders for nominated pod on the given node.
+	RunFilterWithNominatedPods(ctx context.Context, state CycleState, pod *v1.Pod, info NodeInfo) *Status
+
 	// Extenders returns registered scheduler extenders.
 	Extenders() []Extender
 

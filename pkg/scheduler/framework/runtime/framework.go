@@ -1134,14 +1134,9 @@ func (f *frameworkImpl) runPostFilterPlugin(ctx context.Context, pl fwk.PostFilt
 
 // RunFilterPluginsWithNominatedPods runs the set of configured filter plugins
 // for nominated pod on the given node.
-// This function is called from two different places: Schedule and Preempt.
-// When it is called from Schedule, we want to test whether the pod is
+// This function is called from Schedule. When it is called, we want to test whether the pod is
 // schedulable on the node with all the existing pods on the node plus higher
 // and equal priority pods nominated to run on the node.
-// When it is called from Preempt, we should remove the victims of preemption
-// and add the nominated pods. Removal of the victims is done by
-// SelectVictimsOnNode(). Preempt removes victims from PreFilter state and
-// NodeInfo before calling this function.
 func (f *frameworkImpl) RunFilterPluginsWithNominatedPods(ctx context.Context, state fwk.CycleState, pod *v1.Pod, info fwk.NodeInfo) *fwk.Status {
 	var status *fwk.Status
 
@@ -1186,6 +1181,34 @@ func (f *frameworkImpl) RunFilterPluginsWithNominatedPods(ctx context.Context, s
 		}
 	}
 
+	return status
+}
+
+// RunFilterWithNominatedPods runs the set of configured filter plugins and extenders.
+// This function is called from Preemption. When it is called, we should remove the 
+// victims of preemption and add the nominated pods. Removal of the victims is done by
+// SelectVictimsOnNode(). Preempt removes victims from PreFilter state and
+// NodeInfo before calling this function.
+func (f *frameworkImpl) RunFilterWithNominatedPods(ctx context.Context, state fwk.CycleState, pod *v1.Pod, info fwk.NodeInfo) *fwk.Status {
+	status := f.RunFilterPluginsWithNominatedPods(ctx, state, pod, info)
+	if status.IsSuccess() {
+		for _, extender := range f.extenders { 
+			if !extender.IsInterested(pod) {
+				continue
+			}
+			node, _, _, err := extender.Filter(pod, []fwk.NodeInfo{info})
+			if err != nil {
+				if extender.IsIgnorable() {
+					continue
+				}
+				return fwk.AsStatus(err)
+			}
+			if len(node) == 0 {
+				// Unschedulable is expected by the preemption, reason is not important.
+				return fwk.NewStatus(fwk.Unschedulable, "")
+			}
+		}
+	}
 	return status
 }
 
