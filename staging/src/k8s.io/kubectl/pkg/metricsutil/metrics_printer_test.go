@@ -376,7 +376,7 @@ test-1   400m         5120Mi
 
 			top := NewTopCmdPrinter(out, false)
 			err := top.PrintPodMetrics(test.podMetric, test.printContainers,
-				test.withNamespace, test.noHeader, test.sortBy, test.sum)
+				test.withNamespace, test.noHeader, test.sortBy, test.sum, false, nil)
 			assert.Equal(t, test.expectedErr, err)
 			assert.Equal(t, test.expectedOutput, out.String())
 		})

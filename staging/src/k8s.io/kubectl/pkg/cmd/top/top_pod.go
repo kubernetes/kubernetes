@@ -54,6 +54,7 @@ type TopPodOptions struct {
 	UseProtocolBuffers bool
 	Sum                bool
 	ShowSwap           bool
+	ShowUtilization    bool
 
 	PodClient       corev1client.PodsGetter
 	Printer         *metricsutil.TopCmdPrinter
@@ -72,7 +73,10 @@ var (
 		The 'top pod' command allows you to see the resource consumption of pods.
 
 		Due to the metrics pipeline delay, they may be unavailable for a few minutes
-		since pod creation.`))
+		since pod creation.
+
+		Use --utilization to compare actual usage against resource requests and limits,
+		helping identify over-provisioned or at-risk workloads.`))
 
 	topPodExample = templates.Examples(i18n.T(`
 		# Show metrics for all pods in the default namespace
@@ -85,7 +89,16 @@ var (
 		kubectl top pod POD_NAME --containers
 
 		# Show metrics for the pods defined by label name=myLabel
-		kubectl top pod -l name=myLabel`))
+		kubectl top pod -l name=myLabel
+
+		# Show utilization percentages compared to requests and limits
+		kubectl top pod --utilization
+
+		# Show utilization and sort by CPU utilization percentage
+		kubectl top pod --utilization --sort-by=cpu-util
+
+		# Show utilization and sort by memory utilization percentage
+		kubectl top pod --utilization --sort-by=mem-util`))
 )
 
 func NewCmdTopPod(f cmdutil.Factory, o *TopPodOptions, streams genericiooptions.IOStreams) *cobra.Command {
@@ -112,13 +125,17 @@ func NewCmdTopPod(f cmdutil.Factory, o *TopPodOptions, streams genericiooptions.
 	}
 	cmdutil.AddLabelSelectorFlagVar(cmd, &o.LabelSelector)
 	cmd.Flags().StringVar(&o.FieldSelector, "field-selector", o.FieldSelector, "Selector (field query) to filter on, supports '=', '==', and '!='.(e.g. --field-selector key1=value1,key2=value2). The server only supports a limited number of field queries per type.")
-	cmd.Flags().StringVar(&o.SortBy, "sort-by", o.SortBy, "If non-empty, sort pods list using specified field. The field can be either 'cpu' or 'memory'.")
+	cmd.Flags().StringVar(&o.SortBy, "sort-by", o.SortBy, "If non-empty, sort pods list using specified field. The field can be 'cpu', 'memory', or with --utilization: 'cpu-util', 'mem-util'.")
 	cmd.Flags().BoolVar(&o.PrintContainers, "containers", o.PrintContainers, "If present, print usage of containers within a pod.")
 	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespaces", "A", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
 	cmd.Flags().BoolVar(&o.NoHeaders, "no-headers", o.NoHeaders, "If present, print output without headers.")
 	cmd.Flags().BoolVar(&o.UseProtocolBuffers, "use-protocol-buffers", o.UseProtocolBuffers, "Enables using protocol-buffers to access Metrics API.")
 	cmd.Flags().BoolVar(&o.Sum, "sum", o.Sum, "Print the sum of the resource usage")
 	cmd.Flags().BoolVar(&o.ShowSwap, "show-swap", o.ShowSwap, "Print pod resources related to swap memory.")
+	cmd.Flags().BoolVar(&o.ShowUtilization, "utilization", o.ShowUtilization,
+		"Show resource utilization as percentage of requests and limits. "+
+			"Adds CPU:REQ, CPU:LIM, MEM:REQ, MEM:LIM, and STATUS columns. "+
+			"Enables --sort-by=cpu-util and --sort-by=mem-util options.")
 	return cmd
 }
 
@@ -160,7 +177,19 @@ func (o *TopPodOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []s
 
 func (o *TopPodOptions) Validate() error {
 	if len(o.SortBy) > 0 {
-		if o.SortBy != sortByCPU && o.SortBy != sortByMemory {
+		validSortKeys := map[string]bool{
+			sortByCPU:    true,
+			sortByMemory: true,
+		}
+		// Add utilization sort keys if flag is enabled
+		if o.ShowUtilization {
+			validSortKeys["cpu-util"] = true
+			validSortKeys["mem-util"] = true
+		}
+		if !validSortKeys[o.SortBy] {
+			if o.ShowUtilization {
+				return errors.New("--sort-by accepts only cpu, memory, cpu-util, or mem-util")
+			}
 			return errors.New("--sort-by accepts only cpu or memory")
 		}
 	}
@@ -219,7 +248,52 @@ func (o TopPodOptions) RunTopPod() error {
 		}
 	}
 
-	return o.Printer.PrintPodMetrics(metrics.Items, o.PrintContainers, o.AllNamespaces, o.NoHeaders, o.SortBy, o.Sum)
+	// Fetch pod specs if utilization flag is enabled
+	var podSpecs map[string]*corev1.Pod
+	if o.ShowUtilization {
+		podSpecs, err = o.fetchPodSpecs(labelSelector, fieldSelector)
+		if err != nil {
+			return err
+		}
+	}
+
+	return o.Printer.PrintPodMetrics(metrics.Items, o.PrintContainers, o.AllNamespaces, o.NoHeaders, o.SortBy, o.Sum, o.ShowUtilization, podSpecs)
+}
+
+// fetchPodSpecs retrieves pod specs for utilization calculation
+func (o TopPodOptions) fetchPodSpecs(labelSelector labels.Selector, fieldSelector fields.Selector) (map[string]*corev1.Pod, error) {
+	podSpecs := make(map[string]*corev1.Pod)
+
+	ns := o.Namespace
+	if o.AllNamespaces {
+		ns = metav1.NamespaceAll
+	}
+
+	if o.ResourceName != "" {
+		// Fetch single pod
+		pod, err := o.PodClient.Pods(ns).Get(context.TODO(), o.ResourceName, metav1.GetOptions{})
+		if err != nil {
+			return nil, err
+		}
+		key := pod.Namespace + "/" + pod.Name
+		podSpecs[key] = pod
+	} else {
+		// Fetch all pods matching selectors
+		pods, err := o.PodClient.Pods(ns).List(context.TODO(), metav1.ListOptions{
+			LabelSelector: labelSelector.String(),
+			FieldSelector: fieldSelector.String(),
+		})
+		if err != nil {
+			return nil, err
+		}
+		for i := range pods.Items {
+			pod := &pods.Items[i]
+			key := pod.Namespace + "/" + pod.Name
+			podSpecs[key] = pod
+		}
+	}
+
+	return podSpecs, nil
 }
 
 func getMetricsFromMetricsAPI(metricsClient metricsclientset.Interface, namespace, resourceName string, allNamespaces bool, labelSelector labels.Selector, fieldSelector fields.Selector) (*metricsapi.PodMetricsList, error) {
