@@ -390,6 +390,8 @@ type fakeExtender struct {
 	errProcessPreemption bool
 	supportsPreemption   bool
 	returnsNoVictims     bool
+	victimsToAdd         []*v1.Pod
+	trimVictims          *int
 }
 
 func newFakeExtender() *fakeExtender {
@@ -416,6 +418,16 @@ func (f *fakeExtender) WithReturnNoVictims(returnsNoVictims bool) *fakeExtender 
 	return f
 }
 
+func (f *fakeExtender) WithVictimsToAdd(victims ...*v1.Pod) *fakeExtender {
+	f.victimsToAdd = victims
+	return f
+}
+
+func (f *fakeExtender) WithTrimVictims(n int) *fakeExtender {
+	f.trimVictims = &n
+	return f
+}
+
 func (f *fakeExtender) Name() string {
 	return "fakeExtender"
 }
@@ -434,7 +446,40 @@ func (f *fakeExtender) ProcessPreemption(
 			return nil, errors.New("extender preempt error")
 		}
 		if f.returnsNoVictims {
-			return map[string]*extenderv1.Victims{"mock": {}}, nil
+			result := make(map[string]*extenderv1.Victims, len(victims))
+			for nodeName := range victims {
+				result[nodeName] = &extenderv1.Victims{}
+			}
+			return result, nil
+		}
+		if f.trimVictims != nil {
+			result := make(map[string]*extenderv1.Victims, len(victims))
+			for nodeName, nodeVictims := range victims {
+				updatedVictims := &extenderv1.Victims{}
+				if nodeVictims != nil {
+					updatedVictims.NumPDBViolations = nodeVictims.NumPDBViolations
+					if len(nodeVictims.Pods) > *f.trimVictims {
+						updatedVictims.Pods = append([]*v1.Pod{}, nodeVictims.Pods[:*f.trimVictims]...)
+					} else {
+						updatedVictims.Pods = append([]*v1.Pod{}, nodeVictims.Pods...)
+					}
+				}
+				result[nodeName] = updatedVictims
+			}
+			return result, nil
+		}
+		if len(f.victimsToAdd) != 0 {
+			result := make(map[string]*extenderv1.Victims, len(victims))
+			for nodeName, nodeVictims := range victims {
+				updatedVictims := &extenderv1.Victims{}
+				if nodeVictims != nil {
+					updatedVictims.Pods = append(updatedVictims.Pods, nodeVictims.Pods...)
+					updatedVictims.NumPDBViolations = nodeVictims.NumPDBViolations
+				}
+				updatedVictims.Pods = append(updatedVictims.Pods, f.victimsToAdd...)
+				result[nodeName] = updatedVictims
+			}
+			return result, nil
 		}
 		return victims, nil
 	}
@@ -488,6 +533,10 @@ func TestCallExtenders(t *testing.T) {
 			Node(node1Name).SchedulerName(defaultSchedulerName).Priority(midPriority).
 			Containers([]v1.Container{st.MakeContainer().Name("container1").Obj()}).
 			Obj()
+		victim2 = st.MakePod().Name("victim2").UID("victim2").
+			Node(node1Name).SchedulerName(defaultSchedulerName).Priority(midPriority).
+			Containers([]v1.Container{st.MakeContainer().Name("container1").Obj()}).
+			Obj()
 		makeCandidates = func(nodeName string, pods ...*v1.Pod) []Candidate {
 			return []Candidate{
 				&candidate{
@@ -530,6 +579,34 @@ func TestCallExtenders(t *testing.T) {
 			candidates:     makeCandidates(node1Name, victim),
 			wantStatus:     fwk.AsStatus(fmt.Errorf("expected at least one victim pod on node %q", node1Name)),
 			wantCandidates: []Candidate{},
+		},
+		{
+			name: "extender may shrink a non-empty victim list without emptying it",
+			extenders: []fwk.Extender{
+				newFakeExtender().WithSupportsPreemption(true).WithTrimVictims(1),
+			},
+			candidates:     makeCandidates(node1Name, victim, victim2),
+			wantStatus:     nil,
+			wantCandidates: makeCandidates(node1Name, victim),
+		},
+		{
+			name: "empty victim list is dropped after extender passthrough",
+			extenders: []fwk.Extender{
+				newFakeExtender().WithSupportsPreemption(true),
+			},
+			candidates:     makeCandidates(node1Name),
+			wantStatus:     nil,
+			wantCandidates: []Candidate{},
+		},
+		{
+			name: "later extender adds victims to empty placeholder",
+			extenders: []fwk.Extender{
+				newFakeExtender().WithSupportsPreemption(true),
+				newFakeExtender().WithSupportsPreemption(true).WithVictimsToAdd(victim),
+			},
+			candidates:     makeCandidates(node1Name),
+			wantStatus:     nil,
+			wantCandidates: makeCandidates(node1Name, victim),
 		},
 		{
 			name: "one extender does not support preemption",

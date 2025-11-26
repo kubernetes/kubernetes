@@ -2696,6 +2696,41 @@ func TestPreempt(t *testing.T) {
 			expectedPods:   []string{},
 		},
 		{
+			name:      "Scheduler extenders do not allow any preemption but plugins allow",
+			preemptor: st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Priority(highPriority).Req(smallRes).PreemptionPolicy(v1.PreemptLowerPriority).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1.1").UID("p1.1").Namespace(v1.NamespaceDefault).Node("node1").Priority(midPriority).Req(smallRes).Obj(),
+			},
+			nodeNames: []string{"node1"},
+			extenders: []*tf.FakeExtender{
+				{
+					ExtenderName: "FakeExtender1",
+					Predicates:   []tf.FitPredicate{tf.FalsePredicateExtender},
+				},
+			},
+			registerPlugin: tf.RegisterPluginAsExtensions(noderesources.Name, nodeResourcesFitFunc, "Filter", "PreFilter"),
+			want:           nil,
+			expectedPods:   []string{},
+		},
+		{
+			name:      "in-tree filters fit without victims but extender ProcessPreemption still preempts",
+			preemptor: st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Priority(highPriority).Req(smallRes).PreemptionPolicy(v1.PreemptLowerPriority).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1.1").UID("p1.1").Namespace(v1.NamespaceDefault).Node("node1").Priority(midPriority).Req(smallRes).Obj(),
+			},
+			nodeNames: []string{"node1"},
+			extenders: []*tf.FakeExtender{
+				{
+					ExtenderName:     "FakeExtender1",
+					NodeCacheCapable: true,
+					Predicates:       []tf.FitPredicate{tf.OccupiedNodePredicateExtender},
+				},
+			},
+			registerPlugin: tf.RegisterPluginAsExtensions(noderesources.Name, nodeResourcesFitFunc, "Filter", "PreFilter"),
+			want:           framework.NewPostFilterResultWithNominatedNode("node1"),
+			expectedPods:   []string{"p1.1"},
+		},
+		{
 			name:      "One scheduler extender allows only node1, the other returns error but ignorable. Only node1 would be chosen",
 			preemptor: st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Priority(highPriority).Req(veryLargeRes).PreemptionPolicy(v1.PreemptLowerPriority).Obj(),
 			pods: []*v1.Pod{
@@ -2874,6 +2909,11 @@ func TestPreempt(t *testing.T) {
 						cachedNodeInfo := framework.NewNodeInfo()
 						cachedNodeInfo.SetNode(node)
 						cachedNodeInfoMap[node.Name] = cachedNodeInfo
+					}
+					for _, pod := range testPods {
+						if ni, ok := cachedNodeInfoMap[pod.Spec.NodeName]; ok {
+							ni.AddPod(pod)
+						}
 					}
 					var extenders []fwk.Extender
 					for _, extender := range test.extenders {
