@@ -306,6 +306,10 @@ func Validate_WorkloadSpec(ctx context.Context, op operation.Operation, fldPath 
 			}
 			// call field-attached validations
 			earlyReturn := false
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 8); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
 			if e := validate.RequiredSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
@@ -313,8 +317,10 @@ func Validate_WorkloadSpec(ctx context.Context, op operation.Operation, fldPath 
 			if earlyReturn {
 				return // do not proceed
 			}
+			// lists with map semantics require unique keys
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a schedulingv1alpha1.PodGroup, b schedulingv1alpha1.PodGroup) bool { return a.Name == b.Name })...)
 			// iterate the list and call the type's validation function
-			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_PodGroup)...)
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, func(a schedulingv1alpha1.PodGroup, b schedulingv1alpha1.PodGroup) bool { return a.Name == b.Name }, validate.SemanticDeepEqual, Validate_PodGroup)...)
 			return
 		}(fldPath.Child("podGroups"), obj.PodGroups, safe.Field(oldObj, func(oldObj *schedulingv1alpha1.WorkloadSpec) []schedulingv1alpha1.PodGroup { return oldObj.PodGroups }), oldObj != nil)...)
 
