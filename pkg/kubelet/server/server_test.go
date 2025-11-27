@@ -152,6 +152,14 @@ func (fk *fakeKubelet) ListPodSandboxMetrics(ctx context.Context) ([]*runtimeapi
 	return nil, nil
 }
 
+func (fk *fakeKubelet) GetIdlePodsMap() map[types.UID]metav1.Time {
+	return nil
+}
+
+func (fk *fakeKubelet) RecordPodActivity(podUID types.UID) {
+	// no-op for tests
+}
+
 func (fk *fakeKubelet) SyncLoopHealthCheck(req *http.Request) error {
 	duration := fk.resyncInterval * 2
 	minDuration := time.Minute * 5

@@ -646,6 +646,11 @@ func NewMainKubelet(ctx context.Context,
 		flagz:                        kubeDeps.Flagz,
 	}
 
+	// Initialize activity tracker if IdlePodTracking feature is enabled
+	if utilfeature.DefaultFeatureGate.Enabled(features.IdlePodTracking) {
+		klet.activityTracker = NewActivityTracker(clock.RealClock{})
+	}
+
 	var secretManager secret.Manager
 	var configMapManager configmap.Manager
 	if klet.kubeClient != nil {
@@ -1517,6 +1522,10 @@ type Kubelet struct {
 
 	// flagz is the Reader interface to get flags for flagz page.
 	flagz flagz.Reader
+
+	// activityTracker tracks the last activity time for each pod for idle pod tracking.
+	// Only used when IdlePodTracking feature is enabled.
+	activityTracker *ActivityTracker
 }
 
 // ListPodStats is delegated to StatsProvider, which implements stats.Provider interface
@@ -1562,6 +1571,24 @@ func (kl *Kubelet) RootFsStats() (*statsapi.FsStats, error) {
 // RlimitStats is delegated to StatsProvider, which implements stats.Provider interface
 func (kl *Kubelet) RlimitStats() (*statsapi.RlimitStats, error) {
 	return kl.StatsProvider.RlimitStats()
+}
+
+// GetIdlePodsMap returns a map of all tracked pod UIDs to their last activity time.
+// Only available when IdlePodTracking feature is enabled.
+func (kl *Kubelet) GetIdlePodsMap() map[types.UID]metav1.Time {
+	if kl.activityTracker == nil {
+		return nil
+	}
+	return kl.activityTracker.GetIdlePodsMap()
+}
+
+// RecordPodActivity records an activity timestamp for the given pod.
+// Only available when IdlePodTracking feature is enabled.
+func (kl *Kubelet) RecordPodActivity(podUID types.UID) {
+	if kl.activityTracker == nil {
+		return
+	}
+	kl.activityTracker.RecordActivity(podUID, ActivityTypeExec)
 }
 
 // setupDataDirs creates:

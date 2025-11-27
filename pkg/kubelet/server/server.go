@@ -116,6 +116,12 @@ const (
 	ComponentKubelet = "kubelet"
 )
 
+// IdlePodsResponse represents the response from /pods/idle endpoint
+type IdlePodsResponse struct {
+	// Pods maps pod UID to the last activity time
+	Pods map[string]metav1.Time `json:"pods"`
+}
+
 // Server is a http.Handler which exposes kubelet functionality over HTTP.
 type Server struct {
 	flagz                flagz.Reader
@@ -286,6 +292,12 @@ type HostInterface interface {
 	GetPortForward(ctx context.Context, podName, podNamespace string, podUID types.UID, portForwardOpts portforward.V4Options) (*url.URL, error)
 	ListMetricDescriptors(ctx context.Context) ([]*runtimeapi.MetricDescriptor, error)
 	ListPodSandboxMetrics(ctx context.Context) ([]*runtimeapi.PodSandboxMetrics, error)
+	// GetIdlePodsMap returns a map of all tracked pod UIDs to their last activity time.
+	// Only available when IdlePodTracking feature is enabled.
+	GetIdlePodsMap() map[types.UID]metav1.Time
+	// RecordPodActivity records an activity timestamp for the given pod.
+	// Only available when IdlePodTracking feature is enabled.
+	RecordPodActivity(podUID types.UID)
 }
 
 // NewServer initializes and configures a kubelet.Server object to handle HTTP requests.
@@ -627,6 +639,17 @@ func (s *Server) InstallAuthRequiredHandlers(ctx context.Context) {
 			Operation("checkpoint"))
 		s.restfulCont.Add(ws)
 	}
+
+	// Only enable idle pods endpoint if the feature is enabled
+	if utilfeature.DefaultFeatureGate.Enabled(features.IdlePodTracking) {
+		s.addMetricsBucketMatcher("podsIdle")
+		ws = &restful.WebService{}
+		ws.Path("/pods/idle").Produces(restful.MIME_JSON)
+		ws.Route(ws.GET("").
+			To(s.getIdlePods).
+			Operation("getIdlePods"))
+		s.restfulCont.Add(ws)
+	}
 }
 
 // InstallDebuggingDisabledHandlers registers the HTTP request patterns that provide better error message
@@ -798,6 +821,11 @@ func (s *Server) getContainerLogs(request *restful.Request, response *restful.Re
 		return
 	}
 
+	// Record activity for idle pod tracking
+	if utilfeature.DefaultFeatureGate.Enabled(features.IdlePodTracking) {
+		s.host.RecordPodActivity(pod.UID)
+	}
+
 	if _, ok := response.ResponseWriter.(http.Flusher); !ok {
 		response.WriteError(http.StatusInternalServerError, fmt.Errorf("unable to convert %v into http.Flusher, cannot show logs", reflect.TypeOf(response)))
 		return
@@ -954,6 +982,11 @@ func (s *Server) getAttach(request *restful.Request, response *restful.Response)
 		return
 	}
 
+	// Record activity for idle pod tracking
+	if utilfeature.DefaultFeatureGate.Enabled(features.IdlePodTracking) {
+		s.host.RecordPodActivity(pod.UID)
+	}
+
 	podFullName := kubecontainer.GetPodFullName(pod)
 	url, err := s.host.GetAttach(request.Request.Context(), podFullName, params.podUID, params.containerName, *streamOpts)
 	if err != nil {
@@ -977,6 +1010,11 @@ func (s *Server) getExec(request *restful.Request, response *restful.Response) {
 	if !ok {
 		response.WriteError(http.StatusNotFound, fmt.Errorf("pod does not exist"))
 		return
+	}
+
+	// Record activity for idle pod tracking
+	if utilfeature.DefaultFeatureGate.Enabled(features.IdlePodTracking) {
+		s.host.RecordPodActivity(pod.UID)
 	}
 
 	podFullName := kubecontainer.GetPodFullName(pod)
@@ -1040,6 +1078,11 @@ func (s *Server) getPortForward(request *restful.Request, response *restful.Resp
 	if len(params.podUID) > 0 && pod.UID != params.podUID {
 		response.WriteError(http.StatusNotFound, fmt.Errorf("pod not found"))
 		return
+	}
+
+	// Record activity for idle pod tracking
+	if utilfeature.DefaultFeatureGate.Enabled(features.IdlePodTracking) {
+		s.host.RecordPodActivity(pod.UID)
 	}
 
 	url, err := s.host.GetPortForward(request.Request.Context(), pod.Name, pod.Namespace, pod.UID, *portForwardOptions)
@@ -1131,6 +1174,20 @@ func (s *Server) checkpoint(request *restful.Request, response *restful.Response
 		response,
 		[]byte(fmt.Sprintf("{\"items\":[\"%s\"]}", options.Location)),
 	)
+}
+
+// getIdlePods handles requests to get the map of idle pods with their last activity time.
+func (s *Server) getIdlePods(request *restful.Request, response *restful.Response) {
+	idlePodsMap := s.host.GetIdlePodsMap()
+
+	resp := IdlePodsResponse{
+		Pods: make(map[string]metav1.Time, len(idlePodsMap)),
+	}
+	for uid, activityTime := range idlePodsMap {
+		resp.Pods[string(uid)] = activityTime
+	}
+
+	response.WriteAsJson(resp)
 }
 
 // getURLRootPath trims a URL path.

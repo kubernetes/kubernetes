@@ -23,6 +23,7 @@ import (
 	"io"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -79,7 +80,7 @@ type GetOptions struct {
 	ServerPrint bool
 
 	NoHeaders      bool
-	IgnoreNotFound bool
+	IgnoreNotFound bool	Idle  time.Duration
 
 	genericiooptions.IOStreams
 }
@@ -137,7 +138,10 @@ var (
 		kubectl get deployments.apps --namespace backend
 
 		# List all pods existing in all namespaces
-		kubectl get pods --all-namespaces`))
+		kubectl get pods --all-namespaces
+
+		# List pods that haven't had any condition changes in the last 2 hours
+		kubectl get pods --stale=2h`))
 )
 
 const (
@@ -189,7 +193,7 @@ func NewCmdGet(parent string, f cmdutil.Factory, streams genericiooptions.IOStre
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, "identifying the resource to get from a server.")
 	cmdutil.AddChunkSizeFlag(cmd, &o.ChunkSize)
 	cmdutil.AddLabelSelectorFlagVar(cmd, &o.LabelSelector)
-	cmdutil.AddSubresourceFlags(cmd, &o.Subresource, "If specified, gets the subresource of the requested object.")
+	cmdutil.AddSubresourceFlags(cmd, &o.Subresource, "If specified, gets the subresource of the requested object.")	cmd.Flags().DurationVar(&o.Idle, "idle", 0, "If non-zero, filter pods to show only those that have been idle (no exec, attach, port-forward, or logs activity) for longer than the specified duration (e.g., 30m, 2h). Shows IDLE-SINCE column. Default 30m when flag is specified without value.")
 	return cmd
 }
 
@@ -315,6 +319,12 @@ func (o *GetOptions) Validate() error {
 	}
 	if o.OutputWatchEvents && !(o.Watch || o.WatchOnly) {
 		return fmt.Errorf("--output-watch-events option can only be used with --watch or --watch-only")
+	}	}
+	if o.Idle > 0 && (o.Watch || o.WatchOnly) {
+		return fmt.Errorf("--idle option cannot be used with --watch or --watch-only")
+	}
+	if o.Idle < 0 {
+		return fmt.Errorf("--idle duration must be non-negative")
 	}
 	return nil
 }
@@ -432,10 +442,279 @@ func (o *GetOptions) transformRequests(req *rest.Request) {
 		"application/json",
 	}, ","))
 
-	// if sorting, ensure we receive the full object in order to introspect its fields via jsonpath
-	if len(o.SortBy) > 0 {
+	// if sorting or filtering by stale/idle, ensure we receive the full object in order to introspect its fields
+	if len(o.SortBy) > 0 || o.Idle > 0 {
 		req.Param("includeObject", "Object")
 	}
+}
+
+	}
+
+	// Try to get conditions from status.conditions
+	conditions, found, err := unstructured.NestedSlice(unstrObj.Object, "status", "conditions")
+	if err == nil && found && len(conditions) > 0 {
+		var mostRecent time.Time
+		for _, c := range conditions {
+			condition, ok := c.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			lastTransitionStr, found, err := unstructured.NestedString(condition, "lastTransitionTime")
+			if err != nil || !found || lastTransitionStr == "" {
+				continue
+			}
+			t, err := time.Parse(time.RFC3339, lastTransitionStr)
+			if err != nil {
+				continue
+			}
+			if t.After(mostRecent) {
+				mostRecent = t
+			}
+		}
+		if !mostRecent.IsZero() {
+			return mostRecent
+		}
+	}
+
+	// Fall back to status.startTime
+	startTimeStr, found, err := unstructured.NestedString(unstrObj.Object, "status", "startTime")
+	if err == nil && found && startTimeStr != "" {
+		t, err := time.Parse(time.RFC3339, startTimeStr)
+		if err == nil {
+			return t
+		}
+	}
+
+	// Fall back to metadata.creationTimestamp
+	creationTimeStr, found, err := unstructured.NestedString(unstrObj.Object, "metadata", "creationTimestamp")
+	if err == nil && found && creationTimeStr != "" {
+		t, err := time.Parse(time.RFC3339, creationTimeStr)
+		if err == nil {
+			return t
+		}
+	}
+
+	return time.Time{}
+}
+
+}
+
+					}
+					return nil
+				}
+			} else {
+				// Not a Table, check if it's a stale pod directly
+				if isPodStale(obj, staleDuration) {
+					return obj
+				}
+				return nil
+			}
+		} else {
+			// Not a Table or Unstructured, check if it's a stale pod directly
+			if isPodStale(obj, staleDuration) {
+				return obj
+			}
+			return nil
+		}
+	}
+
+	// Filter table rows
+	filteredRows := make([]metav1.TableRow, 0, len(table.Rows))
+	for _, row := range table.Rows {
+		// Check the embedded object in the row
+		if row.Object.Object != nil {
+			if isPodStale(row.Object.Object, staleDuration) {
+				filteredRows = append(filteredRows, row)
+			}
+		} else if row.Object.Raw != nil {
+			// Try to decode the raw object
+			decoded, err := runtime.Decode(unstructured.UnstructuredJSONScheme, row.Object.Raw)
+			if err == nil && isPodStale(decoded, staleDuration) {
+				filteredRows = append(filteredRows, row)
+			}
+		}
+	}
+
+	// Create a new table with filtered rows
+	filteredTable := table.DeepCopy()
+	filteredTable.Rows = filteredRows
+	return filteredTable
+}
+
+// lastActivityAnnotationKey is the annotation key for storing last activity time
+const lastActivityAnnotationKey = "kubernetes.io/last-activity"
+
+// formatIdleDuration formats a duration into a human-readable idle time string.
+// Returns "-" for zero duration, "<1m" for durations under a minute,
+// and formats like "5m", "2h", "1h30m", "2d", "1d1h" for longer durations.
+func formatIdleDuration(d time.Duration) string {
+	if d == 0 {
+		return "-"
+	}
+	if d < time.Minute {
+		return "<1m"
+	}
+
+	days := int(d.Hours() / 24)
+	hours := int(d.Hours()) % 24
+	minutes := int(d.Minutes()) % 60
+
+	if days > 0 {
+		if hours > 0 {
+			return fmt.Sprintf("%dd%dh", days, hours)
+		}
+		return fmt.Sprintf("%dd", days)
+	}
+	if hours > 0 {
+		if minutes > 0 {
+			return fmt.Sprintf("%dh%dm", hours, minutes)
+		}
+		return fmt.Sprintf("%dh", hours)
+	}
+	return fmt.Sprintf("%dm", minutes)
+}
+
+// parseIdleDuration parses an idle duration string.
+// Returns default of 30 minutes if input is empty.
+func parseIdleDuration(s string) (time.Duration, error) {
+	if s == "" {
+		return 30 * time.Minute, nil // default
+	}
+	d, err := time.ParseDuration(s)
+	if err != nil {
+		return 0, err
+	}
+	if d < 0 {
+		return 0, fmt.Errorf("duration must be non-negative")
+	}
+	return d, nil
+}
+
+// getLastActivityTime returns the last activity time from the pod's annotation.
+// Returns zero time if the annotation doesn't exist or is invalid.
+func getLastActivityTime(obj runtime.Object) time.Time {
+	unstrObj, ok := obj.(*unstructured.Unstructured)
+	if !ok {
+		return time.Time{}
+	}
+
+	annotations, found, err := unstructured.NestedStringMap(unstrObj.Object, "metadata", "annotations")
+	if err != nil || !found {
+		return time.Time{}
+	}
+
+	lastActivityStr, exists := annotations[lastActivityAnnotationKey]
+	if !exists || lastActivityStr == "" {
+		return time.Time{}
+	}
+
+	t, err := time.Parse(time.RFC3339Nano, lastActivityStr)
+	if err != nil {
+		// Try RFC3339 format as fallback
+		t, err = time.Parse(time.RFC3339, lastActivityStr)
+		if err != nil {
+			return time.Time{}
+		}
+	}
+	return t
+}
+
+// isPodIdle checks if a pod is idle based on the given duration.
+// A pod is considered idle if its last activity annotation shows activity
+// older than the specified duration. Pods without the annotation are considered
+// idle (never had activity).
+func isPodIdle(obj runtime.Object, idleDuration time.Duration) bool {
+	lastActivity := getLastActivityTime(obj)
+	if lastActivity.IsZero() {
+		// No activity recorded means the pod is idle (never had exec/attach/etc.)
+		return true
+	}
+	return time.Since(lastActivity) >= idleDuration
+}
+
+// filterIdleTableRows filters rows in a Table object, keeping only idle pods.
+// For non-Table objects, it checks if the object itself is idle.
+// It also adds an IDLE-SINCE column to the table.
+func filterIdleTableRows(obj runtime.Object, idleDuration time.Duration) runtime.Object {
+	// First, try to convert to a typed Table
+	table, ok := obj.(*metav1.Table)
+	if !ok {
+		// Check if it's an unstructured object that represents a Table
+		unstrObj, isUnstr := obj.(*unstructured.Unstructured)
+		if isUnstr {
+			// Check if this unstructured object is a Table
+			gvk := unstrObj.GetObjectKind().GroupVersionKind()
+			if gvk.Kind == "Table" && (gvk.Group == metav1.GroupName || gvk.Group == metav1beta1.GroupName) {
+				// Convert unstructured to Table
+				table = &metav1.Table{}
+				if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstrObj.Object, table); err != nil {
+					// Conversion failed, check if it's an idle pod directly
+					if isPodIdle(obj, idleDuration) {
+						return obj
+					}
+					return nil
+				}
+			} else {
+				// Not a Table, check if it's an idle pod directly
+				if isPodIdle(obj, idleDuration) {
+					return obj
+				}
+				return nil
+			}
+		} else {
+			// Not a Table or Unstructured, check if it's an idle pod directly
+			if isPodIdle(obj, idleDuration) {
+				return obj
+			}
+			return nil
+		}
+	}
+
+	// Filter table rows and calculate idle duration for each
+	filteredRows := make([]metav1.TableRow, 0, len(table.Rows))
+	for _, row := range table.Rows {
+		var podObj runtime.Object
+		if row.Object.Object != nil {
+			podObj = row.Object.Object
+		} else if row.Object.Raw != nil {
+			decoded, err := runtime.Decode(unstructured.UnstructuredJSONScheme, row.Object.Raw)
+			if err == nil {
+				podObj = decoded
+			}
+		}
+
+		if podObj != nil && isPodIdle(podObj, idleDuration) {
+			// Calculate idle duration and add to row cells
+			idleSince := getIdleSinceString(podObj)
+			newRow := row.DeepCopy()
+			newRow.Cells = append(newRow.Cells, idleSince)
+			filteredRows = append(filteredRows, *newRow)
+		}
+	}
+
+	// Create a new table with filtered rows and IDLE-SINCE column
+	filteredTable := table.DeepCopy()
+	filteredTable.Rows = filteredRows
+
+	// Add IDLE-SINCE column definition
+	filteredTable.ColumnDefinitions = append(filteredTable.ColumnDefinitions, metav1.TableColumnDefinition{
+		Name:        "IDLE-SINCE",
+		Type:        "string",
+		Description: "Time since last activity (exec, attach, port-forward, logs)",
+		Priority:    0,
+	})
+
+	return filteredTable
+}
+
+// getIdleSinceString returns a human-readable idle duration string for a pod
+func getIdleSinceString(obj runtime.Object) string {
+	lastActivity := getLastActivityTime(obj)
+	if lastActivity.IsZero() {
+		return "-" // Never had activity
+	}
+	idleDuration := time.Since(lastActivity)
+	return formatIdleDuration(idleDuration)
 }
 
 // Run performs the get operation.
@@ -453,9 +732,10 @@ func (o *GetOptions) Run(f cmdutil.Factory, args []string) error {
 	}
 
 	chunkSize := o.ChunkSize
-	if len(o.SortBy) > 0 {
+	if len(o.SortBy) > 0 || o.Idle > 0 {
 		// TODO(juanvallejo): in the future, we could have the client use chunking
 		// to gather all results, then sort them all at the end to reduce server load.
+		// For stale/idle filtering, we also need all results to filter client-side.
 		chunkSize = 0
 	}
 
@@ -496,6 +776,54 @@ func (o *GetOptions) Run(f cmdutil.Factory, args []string) error {
 	objs := make([]runtime.Object, len(infos))
 	for ix := range infos {
 		objs[ix] = infos[ix].Object
+	}			if filteredObj != nil {
+				// For Table objects, check if any rows remain
+				if table, ok := filteredObj.(*metav1.Table); ok {
+					if len(table.Rows) > 0 {
+						filteredObjs = append(filteredObjs, filteredObj)
+						// Update the info's object to point to the filtered table
+						infoCopy := *infos[ix]
+						infoCopy.Object = filteredObj
+						filteredInfos = append(filteredInfos, &infoCopy)
+					}
+				} else {
+					filteredObjs = append(filteredObjs, filteredObj)
+					filteredInfos = append(filteredInfos, infos[ix])
+				}
+			}
+		}
+		objs = filteredObjs
+		infos = filteredInfos
+		// Update printWithKind after filtering
+		printWithKind = multipleGVKsRequested(infos)
+	}
+
+	// Filter idle pods if --idle flag is set
+	if o.Idle > 0 {
+		filteredObjs := make([]runtime.Object, 0, len(objs))
+		filteredInfos := make([]*resource.Info, 0, len(infos))
+		for ix, obj := range objs {
+			filteredObj := filterIdleTableRows(obj, o.Idle)
+			if filteredObj != nil {
+				// For Table objects, check if any rows remain
+				if table, ok := filteredObj.(*metav1.Table); ok {
+					if len(table.Rows) > 0 {
+						filteredObjs = append(filteredObjs, filteredObj)
+						// Update the info's object to point to the filtered table
+						infoCopy := *infos[ix]
+						infoCopy.Object = filteredObj
+						filteredInfos = append(filteredInfos, &infoCopy)
+					}
+				} else {
+					filteredObjs = append(filteredObjs, filteredObj)
+					filteredInfos = append(filteredInfos, infos[ix])
+				}
+			}
+		}
+		objs = filteredObjs
+		infos = filteredInfos
+		// Update printWithKind after filtering
+		printWithKind = multipleGVKsRequested(infos)
 	}
 
 	var positioner OriginalPositioner
