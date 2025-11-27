@@ -125,9 +125,9 @@ type WorkloadSpec struct {
 	// The maximum number of pod groups is 8. This field is immutable.
 	//
 	// +required
-	// +k8s:required
 	// +listType=map
 	// +listMapKey=name
+	// +k8s:required
 	// +k8s:listType=map
 	// +k8s:listMapKey=name
 	// +k8s:maxItems=8
