@@ -213,5 +213,6 @@ type GangSchedulingPolicy struct {
 	//
 	// +required
 	// +k8s:required
+	// +k8s:minimum=0
 	MinCount int32 `json:"minCount" protobuf:"varint,1,opt,name=minCount"`
 }

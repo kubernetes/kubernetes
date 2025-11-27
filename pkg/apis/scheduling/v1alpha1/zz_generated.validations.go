@@ -77,6 +77,7 @@ func Validate_GangSchedulingPolicy(ctx context.Context, op operation.Operation, 
 			if earlyReturn {
 				return // do not proceed
 			}
+			errs = append(errs, validate.Minimum(ctx, op, fldPath, obj, oldObj, 0)...)
 			return
 		}(fldPath.Child("minCount"), &obj.MinCount, safe.Field(oldObj, func(oldObj *schedulingv1alpha1.GangSchedulingPolicy) *int32 { return &oldObj.MinCount }), oldObj != nil)...)
 

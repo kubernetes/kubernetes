@@ -161,7 +161,17 @@ func validatBasicSchedulingPolicy(policy *scheduling.BasicSchedulingPolicy, fldP
 }
 
 func validateGangSchedulingPolicy(policy *scheduling.GangSchedulingPolicy, fldPath *field.Path) field.ErrorList {
-	allErrs := apivalidation.ValidatePositiveField(int64(policy.MinCount), fldPath.Child("minCount"))
+	// To match the declarative validation behavior, we return Required for 0.
+	// Declarative validation treats 0 as "missing" via validate.RequiredValue()
+	// and returns early before checking the minimum constraint.
+	// For non-zero values, declarative validation returns early without any validation,
+	// so we don't mark them as covered.
+	var allErrs field.ErrorList
+	if policy.MinCount == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("minCount"), "").MarkCoveredByDeclarative())
+	} else if policy.MinCount < 0 {
+		allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(policy.MinCount), fldPath.Child("minCount")).WithOrigin("minimum").MarkCoveredByDeclarative()...)
+	}
 	return allErrs
 }
 
