@@ -177,6 +177,14 @@ type PodGroup struct {
 	Policy PodGroupPolicy `json:"policy" protobuf:"bytes,3,opt,name=policy"`
 }
 
+// +k8s:unionDiscriminator
+type PolicySelection string
+
+const (
+	PolicySelectionBasic PolicySelection = "basic"
+	PolicySelectionGang  PolicySelection = "gang"
+)
+
 // PodGroupPolicy defines the scheduling configuration for a PodGroup.
 type PodGroupPolicy struct {
 	// Basic specifies that the pods in this group should be scheduled using
@@ -185,6 +193,7 @@ type PodGroupPolicy struct {
 	// +optional
 	// +k8s:optional
 	// +oneOf=PolicySelection
+	// +k8s:unionMember(memberName: "PolicySelectionBasic")
 	Basic *BasicSchedulingPolicy `json:"basic,omitempty" protobuf:"bytes,2,opt,name=basic"`
 
 	// Gang specifies that the pods in this group should be scheduled using
@@ -193,6 +202,7 @@ type PodGroupPolicy struct {
 	// +optional
 	// +k8s:optional
 	// +oneOf=PolicySelection
+	// +k8s:unionMember(memberName: "PolicySelectionGang")
 	Gang *GangSchedulingPolicy `json:"gang,omitempty" protobuf:"bytes,3,opt,name=gang"`
 }
 
