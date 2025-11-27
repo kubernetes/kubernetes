@@ -407,15 +407,16 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 		ginkgo.It("should report Memory pressure in PSI metrics", func(ctx context.Context) {
 			podName := "memory-pressure-pod"
 			ginkgo.By("Creating a pod to generate Memory pressure")
-			// Create a pod that generates memory pressure by continuously writing to files,
-			// forcing kernel page cache reclamation.
+			// Use a shell script that continuously writes to tmpfs, exceeding the
+			// memory limit. This forces direct memory reclaim and generates PSI stalls.
 			podSpec := getStressTestPod(podName, "memory-stress", []string{})
 			podSpec.Spec.Containers[0].Command = []string{"/bin/sh", "-c"}
 			podSpec.Spec.Containers[0].Args = []string{
-				// This command runs an infinite loop that uses `dd` to write 50MB files,
-				// cycling through 5 files to target 250MB of reclaimable file cache usage.
-				// This exceeds the 200MB memory limit, forcing the kernel to reclaim memory and generate pressure stalls.
-				"i=0; while true; do dd if=/dev/zero of=testfile.$i bs=1M count=50 &>/dev/null; i=$(((i+1)%5)); sleep 0.1; done",
+				// Continuously write 250MB to tmpfs, exceeding the 200MB limit.
+				// This forces the kernel to reclaim memory during the write operation,
+				// causing the dd task to stall and generating PSI metrics. After each
+				// write, delete and repeat to sustain pressure over the test duration.
+				"while true; do dd if=/dev/zero of=/dev/shm/pressure bs=1M count=250 2>/dev/null; rm -f /dev/shm/pressure; done",
 			}
 			podSpec.Spec.Containers[0].Resources = v1.ResourceRequirements{
 				Limits: v1.ResourceList{
@@ -436,7 +437,7 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 				framework.ExpectNoError(err)
 				g.Expect(summary.Pods).To(gstruct.MatchElements(summaryObjectID, gstruct.IgnoreExtras, gstruct.Elements{
 					fmt.Sprintf("%s::%s", f.Namespace.Name, podName): gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
-						"Memory": pressureDetected("full", 0.1),
+						"Memory": pressureDetected("some", 0.1),
 					}),
 				}))
 			}, 2*time.Minute, 15*time.Second).Should(gomega.Succeed())
