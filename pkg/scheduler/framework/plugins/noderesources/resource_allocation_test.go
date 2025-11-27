@@ -453,7 +453,7 @@ func TestCalculateResourceAllocatableRequest(t *testing.T) {
 		},
 		"DRA-backed-resource-with-per-device-node-selection": {
 			enableDRAExtendedResource: true,
-			node:                      st.MakeNode().Name(nodeName).Obj(),
+			node:                      st.MakeNode().Name(nodeName).Label("zone", "us-east-1a").Obj(),
 			extendedResource:          explicitExtendedResource,
 			objects: []apiruntime.Object{
 				&resourceapi.DeviceClass{
@@ -502,13 +502,26 @@ func TestCalculateResourceAllocatableRequest(t *testing.T) {
 								},
 							},
 							{
-								Name:     "device-3",
-								AllNodes: ptr.To(true), // This device matches all nodes
+								Name: "device-3",
+								// Use a node selector to ensure nodeMatches is exercised for this device
+								NodeSelector: &v1.NodeSelector{
+									NodeSelectorTerms: []v1.NodeSelectorTerm{
+										{
+											MatchExpressions: []v1.NodeSelectorRequirement{
+												{
+													Key:      "zone",
+													Operator: v1.NodeSelectorOpIn,
+													Values:   []string{"us-east-1a"},
+												},
+											},
+										},
+									},
+								},
 								Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
 									"model": {StringValue: ptr.To("SOME-XZY")},
 								},
 								Capacity: map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
-									"memory": {Value: resource.MustParse("24Gi")}, // 24GB GPU - matches CEL (>= 8GB)
+									"memory": {Value: resource.MustParse("24Gi")}, // 24GB GPU - matches CEL (>= 8GiB)
 								},
 							},
 						},
@@ -533,7 +546,7 @@ func TestCalculateResourceAllocatableRequest(t *testing.T) {
 					Obj(),
 			},
 			podRequest:          1,
-			expectedAllocatable: 2, // Only device-1 (matches test-node) and device-3 (matches all nodes)
+			expectedAllocatable: 2, // device-1 matches the test node and device-3 matches via its selector
 			expectedRequested:   2, // 1 allocated (device-1) + 1 requested
 		},
 	}
@@ -849,6 +862,45 @@ func TestNodeMatchCaching(t *testing.T) {
 			assert.True(t, found2, "Result should be found in cache")
 			assert.Equal(t, tc.expectedMatch, matches2, "Cached result should match expected value")
 		})
+	}
+}
+
+func TestNodeMatchesCacheHit(t *testing.T) {
+	scorer := &resourceAllocationScorer{
+		DRACaches: DRACaches{
+			celCache: cel.NewCache(1, cel.Features{}),
+		},
+	}
+
+	node := st.MakeNode().Name("cache-node").Label("zone", "us-east-1a").Obj()
+	selector := &v1.NodeSelector{
+		NodeSelectorTerms: []v1.NodeSelectorTerm{
+			{
+				MatchExpressions: []v1.NodeSelectorRequirement{
+					{
+						Key:      "zone",
+						Operator: v1.NodeSelectorOpIn,
+						Values:   []string{"us-east-1a"},
+					},
+				},
+			},
+		},
+	}
+
+	firstMatch, err := scorer.nodeMatches(node, "", false, selector)
+	if err != nil {
+		t.Fatalf("unexpected error while evaluating selector: %v", err)
+	}
+	if !firstMatch {
+		t.Fatalf("expected nodeMatches to return true for the selector")
+	}
+
+	secondMatch, err := scorer.nodeMatches(node, "", false, selector)
+	if err != nil {
+		t.Fatalf("unexpected error while hitting cache: %v", err)
+	}
+	if !secondMatch {
+		t.Fatalf("expected cached nodeMatches to be true")
 	}
 }
 
