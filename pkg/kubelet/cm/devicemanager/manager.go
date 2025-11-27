@@ -1165,21 +1165,37 @@ func (m *ManagerImpl) ShouldResetExtendedResourceCapacity() bool {
 }
 
 func (m *ManagerImpl) isContainerAlreadyRunning(podUID, cntName string) bool {
-	cntID, err := m.containerMap.GetContainerID(podUID, cntName)
-	if err != nil {
-		klog.ErrorS(err, "Container not found in the initial map, assumed NOT running", "podUID", podUID, "containerName", cntName)
+	// Check if ANY container for this pod/container name is running.
+	// This handles the case where a container restarted before kubelet restart,
+	// so the containerMap might have multiple entries (old exited + new running).
+	// We need to check all of them to see if any are running.
+	foundAnyContainer := false
+	foundRunningContainer := false
+
+	m.containerMap.Visit(func(visitPodUID, visitContainerName, visitContainerID string) {
+		if visitPodUID == podUID && visitContainerName == cntName {
+			foundAnyContainer = true
+			if m.containerRunningSet.Has(visitContainerID) {
+				foundRunningContainer = true
+				klog.V(4).InfoS("Container found in the initial running set", "podUID", podUID, "containerName", cntName, "containerID", visitContainerID)
+			}
+		}
+	})
+
+	if !foundAnyContainer {
+		klog.V(4).InfoS("Container not found in the initial map, assumed NOT running", "podUID", podUID, "containerName", cntName)
 		return false
 	}
 
-	// note that if container runtime is down when kubelet restarts, this set will be empty,
-	// so on kubelet restart containers will again fail admission, hitting https://github.com/kubernetes/kubernetes/issues/118559 again.
-	// This scenario should however be rare enough.
-	if !m.containerRunningSet.Has(cntID) {
-		klog.V(4).InfoS("Container not present in the initial running set", "podUID", podUID, "containerName", cntName, "containerID", cntID)
+	if !foundRunningContainer {
+		// note that if container runtime is down when kubelet restarts, this set will be empty,
+		// so on kubelet restart containers will again fail admission, hitting https://github.com/kubernetes/kubernetes/issues/118559 again.
+		// This scenario should however be rare enough.
+		klog.V(4).InfoS("Container found in map but not in running set", "podUID", podUID, "containerName", cntName)
 		return false
 	}
 
-	// Once we make it here we know we have a running container.
-	klog.V(4).InfoS("Container found in the initial set, assumed running", "podUID", podUID, "containerName", cntName, "containerID", cntID)
+	klog.V(4).InfoS("Container assumed running", "podUID", podUID, "containerName", cntName)
 	return true
 }
+
