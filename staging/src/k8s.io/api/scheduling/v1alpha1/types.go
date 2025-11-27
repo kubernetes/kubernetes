@@ -128,6 +128,9 @@ type WorkloadSpec struct {
 	// +k8s:required
 	// +listType=map
 	// +listMapKey=name
+	// +k8s:listType=map
+	// +k8s:listMapKey=name
+	// +k8s:maxItems=8
 	PodGroups []PodGroup `json:"podGroups" protobuf:"bytes,2,rep,name=podGroups"`
 }
 
