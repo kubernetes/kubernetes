@@ -42,6 +42,7 @@ message GangSchedulingPolicy {
   //
   // +required
   // +k8s:required
+  // +k8s:minimum=0
   optional int32 minCount = 1;
 }
 
