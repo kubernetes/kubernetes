@@ -41,6 +41,7 @@ message GangSchedulingPolicy {
   // It must be a positive integer.
   //
   // +required
+  // +k8s:required
   optional int32 minCount = 1;
 }
 
@@ -50,6 +51,7 @@ message PodGroup {
   // It must be a DNS label. This field is immutable.
   //
   // +required
+  // +k8s:required
   optional string name = 1;
 
   // Policy defines the scheduling policy for this PodGroup.
@@ -64,6 +66,7 @@ message PodGroupPolicy {
   // standard Kubernetes scheduling behavior.
   //
   // +optional
+  // +k8s:optional
   // +oneOf=PolicySelection
   optional BasicSchedulingPolicy basic = 2;
 
@@ -71,6 +74,7 @@ message PodGroupPolicy {
   // all-or-nothing semantics.
   //
   // +optional
+  // +k8s:optional
   // +oneOf=PolicySelection
   optional GangSchedulingPolicy gang = 3;
 }
@@ -127,18 +131,21 @@ message TypedLocalObjectReference {
   // It must be a DNS subdomain.
   //
   // +optional
+  // +k8s:optional
   optional string apiGroup = 1;
 
   // Kind is the type of resource being referenced.
   // It must be a path segment name.
   //
   // +required
+  // +k8s:required
   optional string kind = 2;
 
   // Name is the name of resource being referenced.
   // It must be a path segment name.
   //
   // +required
+  // +k8s:required
   optional string name = 3;
 }
 
@@ -177,12 +184,14 @@ message WorkloadSpec {
   // When set, it cannot be changed.
   //
   // +optional
+  // +k8s:optional
   optional TypedLocalObjectReference controllerRef = 1;
 
   // PodGroups is the list of pod groups that make up the Workload.
   // The maximum number of pod groups is 8. This field is immutable.
   //
   // +required
+  // +k8s:required
   // +listType=map
   // +listMapKey=name
   repeated PodGroup podGroups = 2;
