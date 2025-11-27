@@ -22,7 +22,16 @@ limitations under the License.
 package v1alpha1
 
 import (
+	context "context"
+	fmt "fmt"
+
+	schedulingv1alpha1 "k8s.io/api/scheduling/v1alpha1"
+	equality "k8s.io/apimachinery/pkg/api/equality"
+	operation "k8s.io/apimachinery/pkg/api/operation"
+	safe "k8s.io/apimachinery/pkg/api/safe"
+	validate "k8s.io/apimachinery/pkg/api/validate"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	field "k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 func init() { localSchemeBuilder.Register(RegisterValidations) }
@@ -30,6 +39,284 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *runtime.Scheme) error {
+	// type Workload
+	scheme.AddValidationFunc((*schedulingv1alpha1.Workload)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_Workload(ctx, op, nil /* fldPath */, obj.(*schedulingv1alpha1.Workload), safe.Cast[*schedulingv1alpha1.Workload](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
+	// type WorkloadList
+	scheme.AddValidationFunc((*schedulingv1alpha1.WorkloadList)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_WorkloadList(ctx, op, nil /* fldPath */, obj.(*schedulingv1alpha1.WorkloadList), safe.Cast[*schedulingv1alpha1.WorkloadList](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
 	return nil
 }
 
+// Validate_GangSchedulingPolicy validates an instance of GangSchedulingPolicy according
+// to declarative validation rules in the API schema.
+func Validate_GangSchedulingPolicy(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *schedulingv1alpha1.GangSchedulingPolicy) (errs field.ErrorList) {
+	// field schedulingv1alpha1.GangSchedulingPolicy.MinCount
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *int32, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("minCount"), &obj.MinCount, safe.Field(oldObj, func(oldObj *schedulingv1alpha1.GangSchedulingPolicy) *int32 { return &oldObj.MinCount }), oldObj != nil)...)
+
+	return errs
+}
+
+// Validate_PodGroup validates an instance of PodGroup according
+// to declarative validation rules in the API schema.
+func Validate_PodGroup(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *schedulingv1alpha1.PodGroup) (errs field.ErrorList) {
+	// field schedulingv1alpha1.PodGroup.Name
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("name"), &obj.Name, safe.Field(oldObj, func(oldObj *schedulingv1alpha1.PodGroup) *string { return &oldObj.Name }), oldObj != nil)...)
+
+	// field schedulingv1alpha1.PodGroup.Policy
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *schedulingv1alpha1.PodGroupPolicy, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_PodGroupPolicy(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("policy"), &obj.Policy, safe.Field(oldObj, func(oldObj *schedulingv1alpha1.PodGroup) *schedulingv1alpha1.PodGroupPolicy { return &oldObj.Policy }), oldObj != nil)...)
+
+	return errs
+}
+
+// Validate_PodGroupPolicy validates an instance of PodGroupPolicy according
+// to declarative validation rules in the API schema.
+func Validate_PodGroupPolicy(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *schedulingv1alpha1.PodGroupPolicy) (errs field.ErrorList) {
+	// field schedulingv1alpha1.PodGroupPolicy.Basic
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *schedulingv1alpha1.BasicSchedulingPolicy, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("basic"), obj.Basic, safe.Field(oldObj, func(oldObj *schedulingv1alpha1.PodGroupPolicy) *schedulingv1alpha1.BasicSchedulingPolicy {
+			return oldObj.Basic
+		}), oldObj != nil)...)
+
+	// field schedulingv1alpha1.PodGroupPolicy.Gang
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *schedulingv1alpha1.GangSchedulingPolicy, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_GangSchedulingPolicy(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("gang"), obj.Gang, safe.Field(oldObj, func(oldObj *schedulingv1alpha1.PodGroupPolicy) *schedulingv1alpha1.GangSchedulingPolicy {
+			return oldObj.Gang
+		}), oldObj != nil)...)
+
+	return errs
+}
+
+// Validate_TypedLocalObjectReference validates an instance of TypedLocalObjectReference according
+// to declarative validation rules in the API schema.
+func Validate_TypedLocalObjectReference(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *schedulingv1alpha1.TypedLocalObjectReference) (errs field.ErrorList) {
+	// field schedulingv1alpha1.TypedLocalObjectReference.APIGroup
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("apiGroup"), &obj.APIGroup, safe.Field(oldObj, func(oldObj *schedulingv1alpha1.TypedLocalObjectReference) *string { return &oldObj.APIGroup }), oldObj != nil)...)
+
+	// field schedulingv1alpha1.TypedLocalObjectReference.Kind
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("kind"), &obj.Kind, safe.Field(oldObj, func(oldObj *schedulingv1alpha1.TypedLocalObjectReference) *string { return &oldObj.Kind }), oldObj != nil)...)
+
+	// field schedulingv1alpha1.TypedLocalObjectReference.Name
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("name"), &obj.Name, safe.Field(oldObj, func(oldObj *schedulingv1alpha1.TypedLocalObjectReference) *string { return &oldObj.Name }), oldObj != nil)...)
+
+	return errs
+}
+
+// Validate_Workload validates an instance of Workload according
+// to declarative validation rules in the API schema.
+func Validate_Workload(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *schedulingv1alpha1.Workload) (errs field.ErrorList) {
+	// field schedulingv1alpha1.Workload.TypeMeta has no validation
+	// field schedulingv1alpha1.Workload.ObjectMeta has no validation
+
+	// field schedulingv1alpha1.Workload.Spec
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *schedulingv1alpha1.WorkloadSpec, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_WorkloadSpec(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("spec"), &obj.Spec, safe.Field(oldObj, func(oldObj *schedulingv1alpha1.Workload) *schedulingv1alpha1.WorkloadSpec { return &oldObj.Spec }), oldObj != nil)...)
+
+	return errs
+}
+
+// Validate_WorkloadList validates an instance of WorkloadList according
+// to declarative validation rules in the API schema.
+func Validate_WorkloadList(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *schedulingv1alpha1.WorkloadList) (errs field.ErrorList) {
+	// field schedulingv1alpha1.WorkloadList.TypeMeta has no validation
+	// field schedulingv1alpha1.WorkloadList.ListMeta has no validation
+
+	// field schedulingv1alpha1.WorkloadList.Items
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []schedulingv1alpha1.Workload, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// iterate the list and call the type's validation function
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_Workload)...)
+			return
+		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *schedulingv1alpha1.WorkloadList) []schedulingv1alpha1.Workload { return oldObj.Items }), oldObj != nil)...)
+
+	return errs
+}
+
+// Validate_WorkloadSpec validates an instance of WorkloadSpec according
+// to declarative validation rules in the API schema.
+func Validate_WorkloadSpec(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *schedulingv1alpha1.WorkloadSpec) (errs field.ErrorList) {
+	// field schedulingv1alpha1.WorkloadSpec.ControllerRef
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *schedulingv1alpha1.TypedLocalObjectReference, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_TypedLocalObjectReference(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("controllerRef"), obj.ControllerRef, safe.Field(oldObj, func(oldObj *schedulingv1alpha1.WorkloadSpec) *schedulingv1alpha1.TypedLocalObjectReference {
+			return oldObj.ControllerRef
+		}), oldObj != nil)...)
+
+	// field schedulingv1alpha1.WorkloadSpec.PodGroups
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []schedulingv1alpha1.PodGroup, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// iterate the list and call the type's validation function
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_PodGroup)...)
+			return
+		}(fldPath.Child("podGroups"), obj.PodGroups, safe.Field(oldObj, func(oldObj *schedulingv1alpha1.WorkloadSpec) []schedulingv1alpha1.PodGroup { return oldObj.PodGroups }), oldObj != nil)...)
+
+	return errs
+}
