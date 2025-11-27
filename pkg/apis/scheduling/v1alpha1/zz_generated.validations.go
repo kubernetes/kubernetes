@@ -122,9 +122,23 @@ func Validate_PodGroup(ctx context.Context, op operation.Operation, fldPath *fie
 	return errs
 }
 
+var unionMembershipFor_k8s_io_api_scheduling_v1alpha1_PodGroupPolicy_ = validate.NewUnionMembership(validate.NewUnionMember("basic"), validate.NewUnionMember("gang"))
+
 // Validate_PodGroupPolicy validates an instance of PodGroupPolicy according
 // to declarative validation rules in the API schema.
 func Validate_PodGroupPolicy(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *schedulingv1alpha1.PodGroupPolicy) (errs field.ErrorList) {
+	errs = append(errs, validate.Union(ctx, op, fldPath, obj, oldObj, unionMembershipFor_k8s_io_api_scheduling_v1alpha1_PodGroupPolicy_, func(obj *schedulingv1alpha1.PodGroupPolicy) bool {
+		if obj == nil {
+			return false
+		}
+		return obj.Basic != nil
+	}, func(obj *schedulingv1alpha1.PodGroupPolicy) bool {
+		if obj == nil {
+			return false
+		}
+		return obj.Gang != nil
+	})...)
+
 	// field schedulingv1alpha1.PodGroupPolicy.Basic
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *schedulingv1alpha1.BasicSchedulingPolicy, oldValueCorrelated bool) (errs field.ErrorList) {
