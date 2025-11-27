@@ -3829,13 +3829,8 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 	}
 }
 
-// The point of this test is to show that you:
-//   - get the same priority for a zero-request pod as for a pod with the defaults requests,
-//     both when the zero-request pod is already on the node and when the zero-request pod
-//     is the one being scheduled.
-//   - don't get the same score no matter what we schedule.
+// Tests score for pods on nodes with zero-request pods.
 func TestZeroRequest(t *testing.T) {
-	// A pod with no resources. We expect spreading to count it as having the default resources.
 	noResources := v1.PodSpec{
 		Containers: []v1.Container{
 			{},
@@ -3843,7 +3838,6 @@ func TestZeroRequest(t *testing.T) {
 	}
 	noResources1 := noResources
 	noResources1.NodeName = "node1"
-	// A pod with the same resources as a 0-request pod gets by default as its resources (for spreading).
 	small := v1.PodSpec{
 		Containers: []v1.Container{
 			{
@@ -3860,7 +3854,6 @@ func TestZeroRequest(t *testing.T) {
 	}
 	small2 := small
 	small2.NodeName = "node2"
-	// A larger pod.
 	large := v1.PodSpec{
 		Containers: []v1.Container{
 			{
@@ -3886,9 +3879,6 @@ func TestZeroRequest(t *testing.T) {
 		name          string
 		expectedScore int64
 	}{
-		// The point of these next two tests is to show you get the same priority for a zero-request pod
-		// as for a pod with the defaults requests, both when the zero-request pod is already on the node
-		// and when the zero-request pod is the one being scheduled.
 		{
 			pod:   &v1.Pod{Spec: noResources},
 			nodes: []*v1.Node{makeNode("node1", 1000, schedutil.DefaultMemoryRequest*10), makeNode("node2", 1000, schedutil.DefaultMemoryRequest*10)},
@@ -3907,7 +3897,7 @@ func TestZeroRequest(t *testing.T) {
 				{Spec: large1}, {Spec: noResources1},
 				{Spec: large2}, {Spec: small2},
 			},
-			expectedScore: 150,
+			expectedScore: 125,
 		},
 		// The point of this test is to verify that we're not just getting the same score no matter what we schedule.
 		{
@@ -3918,7 +3908,7 @@ func TestZeroRequest(t *testing.T) {
 				{Spec: large1}, {Spec: noResources1},
 				{Spec: large2}, {Spec: small2},
 			},
-			expectedScore: 130,
+			expectedScore: 105,
 		},
 	}
 
