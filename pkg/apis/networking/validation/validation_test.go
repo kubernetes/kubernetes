@@ -1663,6 +1663,23 @@ func TestValidateIngressUpdate(t *testing.T) {
 			},
 			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec").Child("rules").Index(0).Child("http").Child("paths").Index(0).Child("backend").Child("service").Child("name"), "1-test-service", `a DNS-1035 label must consist of lower case alphanumeric characters or '-', start with an alphabetic character, and end with an alphanumeric character (e.g. 'my-name',  or 'abc-123', regex used for validation is '[a-z]([-a-z0-9]*[a-z0-9])?')`)},
 		},
+		"update defaultBackend service to conform to relaxed service name - RelaxedServiceNameValidation disabled": {
+			tweakIngresses: func(newIngress, oldIngress *networking.Ingress) {
+				oldIngress.Spec.DefaultBackend = &networking.IngressBackend{
+					Service: &networking.IngressServiceBackend{
+						Name: "test-service",
+						Port: networking.ServiceBackendPort{Number: 80},
+					},
+				}
+				newIngress.Spec.DefaultBackend = &networking.IngressBackend{
+					Service: &networking.IngressServiceBackend{
+						Name: "1-test-service",
+						Port: networking.ServiceBackendPort{Number: 80},
+					},
+				}
+			},
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec").Child("defaultBackend").Child("service").Child("name"), "1-test-service", `a DNS-1035 label must consist of lower case alphanumeric characters or '-', start with an alphabetic character, and end with an alphanumeric character (e.g. 'my-name',  or 'abc-123', regex used for validation is '[a-z]([-a-z0-9]*[a-z0-9])?')`)},
+		},
 		"update service to conform to relaxed service name - RelaxedServiceNameValidation enabled": {
 			tweakIngresses: func(newIngress, oldIngress *networking.Ingress) {
 				oldIngress.Spec.Rules = []networking.IngressRule{{
@@ -1699,6 +1716,23 @@ func TestValidateIngressUpdate(t *testing.T) {
 						},
 					},
 				}}
+			},
+			relaxedServiceName: true,
+		},
+		"update defaultBackend service to conform to relaxed service name - RelaxedServiceNameValidation enabled": {
+			tweakIngresses: func(newIngress, oldIngress *networking.Ingress) {
+				oldIngress.Spec.DefaultBackend = &networking.IngressBackend{
+					Service: &networking.IngressServiceBackend{
+						Name: "test-service",
+						Port: networking.ServiceBackendPort{Number: 80},
+					},
+				}
+				newIngress.Spec.DefaultBackend = &networking.IngressBackend{
+					Service: &networking.IngressServiceBackend{
+						Name: "1-test-service",
+						Port: networking.ServiceBackendPort{Number: 80},
+					},
+				}
 			},
 			relaxedServiceName: true,
 		},
@@ -1740,6 +1774,22 @@ func TestValidateIngressUpdate(t *testing.T) {
 				}}
 			},
 		},
+		"updating an already existing relaxed validation defaultBackend service name with RelaxedServiceNameValidation disabled": {
+			tweakIngresses: func(newIngress, oldIngress *networking.Ingress) {
+				oldIngress.Spec.DefaultBackend = &networking.IngressBackend{
+					Service: &networking.IngressServiceBackend{
+						Name: "1-test-service",
+						Port: networking.ServiceBackendPort{Number: 80},
+					},
+				}
+				newIngress.Spec.DefaultBackend = &networking.IngressBackend{
+					Service: &networking.IngressServiceBackend{
+						Name: "2-test-service",
+						Port: networking.ServiceBackendPort{Number: 80},
+					},
+				}
+			},
+		},
 		"updating an already existing relaxed validation service name to a non-relaxed name with RelaxedServiceNameValidation disabled": {
 			tweakIngresses: func(newIngress, oldIngress *networking.Ingress) {
 				oldIngress.Spec.Rules = []networking.IngressRule{{
@@ -1776,6 +1826,22 @@ func TestValidateIngressUpdate(t *testing.T) {
 						},
 					},
 				}}
+			},
+		},
+		"updating an already existing relaxed validation defaultBackend service name to a non-relaxed name with RelaxedServiceNameValidation disabled": {
+			tweakIngresses: func(newIngress, oldIngress *networking.Ingress) {
+				oldIngress.Spec.DefaultBackend = &networking.IngressBackend{
+					Service: &networking.IngressServiceBackend{
+						Name: "1-test-service",
+						Port: networking.ServiceBackendPort{Number: 80},
+					},
+				}
+				newIngress.Spec.DefaultBackend = &networking.IngressBackend{
+					Service: &networking.IngressServiceBackend{
+						Name: "test-service",
+						Port: networking.ServiceBackendPort{Number: 80},
+					},
+				}
 			},
 		},
 	}
@@ -2896,6 +2962,19 @@ func TestAllowRelaxedServiceNameValidation(t *testing.T) {
 		return &networking.Ingress{Spec: networking.IngressSpec{Rules: rules}}
 	}
 
+	ingressWithDefaultBackend := func(defaultBackendName string, ruleServiceNames ...string) *networking.Ingress {
+		ing := basicIngress(ruleServiceNames...)
+		if defaultBackendName != "" {
+			ing.Spec.DefaultBackend = &networking.IngressBackend{
+				Service: &networking.IngressServiceBackend{
+					Name: defaultBackendName,
+					Port: networking.ServiceBackendPort{Number: 80},
+				},
+			}
+		}
+		return ing
+	}
+
 	tests := []struct {
 		name    string
 		ingress *networking.Ingress
@@ -2924,6 +3003,26 @@ func TestAllowRelaxedServiceNameValidation(t *testing.T) {
 		{
 			name:    "multiple rules, one triggers relaxed validation",
 			ingress: basicIngress("validname", "1abc-def"),
+			expect:  true,
+		},
+		{
+			name:    "defaultBackend with valid DNS1035 name",
+			ingress: ingressWithDefaultBackend("validname"),
+			expect:  false,
+		},
+		{
+			name:    "defaultBackend with DNS1123 valid but DNS1035 invalid name (starts with digit)",
+			ingress: ingressWithDefaultBackend("1-default-service"),
+			expect:  true,
+		},
+		{
+			name:    "defaultBackend relaxed name with valid rules",
+			ingress: ingressWithDefaultBackend("1-default", "valid-rule-service"),
+			expect:  true,
+		},
+		{
+			name:    "only rules have relaxed name, defaultBackend is valid",
+			ingress: ingressWithDefaultBackend("valid-default", "1-rule-service"),
 			expect:  true,
 		},
 	}
