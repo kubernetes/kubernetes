@@ -670,7 +670,7 @@ func handleSELinuxMetricError(logger klog.Logger, err error, seLinuxSupported bo
 
 	// This is not an error yet, but it will be when support for other access modes is added.
 	warningMetric.Add(1.0)
-	logger.V(4).Error(err, "Please report this error in https://github.com/kubernetes/enhancements/issues/1710, together with full Pod yaml file")
+	logger.V(4).Info("Please report this error in https://github.com/kubernetes/enhancements/issues/1710, together with full Pod yaml file", "error", err)
 	return nil
 }
 
@@ -685,7 +685,7 @@ func getVolumePluginNameWithDriver(logger klog.Logger, plugin volume.VolumePlugi
 	driverName, err := csi.GetCSIDriverName(spec)
 	if err != nil {
 		// In theory this is unreachable - such volume would not pass validation.
-		logger.V(4).Error(err, "failed to get CSI driver name from volume spec")
+		logger.V(4).Info("failed to get CSI driver name from volume spec", "error", err)
 		driverName = "unknown"
 	}
 	// `/` is used to separate plugin + CSI driver in util.GetUniqueVolumeName() too
