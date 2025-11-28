@@ -450,6 +450,7 @@ func TestPostFilter(t *testing.T) {
 					frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(tt.pods, tt.nodes)),
 					frameworkruntime.WithLogger(logger),
 					frameworkruntime.WithWaitingPods(frameworkruntime.NewWaitingPodsMap()),
+					frameworkruntime.WithBindingPods(frameworkruntime.NewBindingPodsMap()),
 				)
 				if err != nil {
 					t.Fatal(err)
@@ -2217,6 +2218,7 @@ func TestPreempt(t *testing.T) {
 						frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(testPods, nodes)),
 						frameworkruntime.WithInformerFactory(informerFactory),
 						frameworkruntime.WithWaitingPods(waitingPods),
+						frameworkruntime.WithBindingPods(frameworkruntime.NewBindingPodsMap()),
 						frameworkruntime.WithLogger(logger),
 						frameworkruntime.WithPodActivator(&fakePodActivator{}),
 					)

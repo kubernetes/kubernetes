@@ -127,7 +127,11 @@ func (sched *Scheduler) ScheduleOne(ctx context.Context) {
 		metrics.Goroutines.WithLabelValues(metrics.Binding).Inc()
 		defer metrics.Goroutines.WithLabelValues(metrics.Binding).Dec()
 
-		status := sched.bindingCycle(bindingCycleCtx, state, fwk, scheduleResult, assumedPodInfo, start, podsToActivate)
+		bindingPodCtx, bindingPodCancel := context.WithCancel(bindingCycleCtx)
+		defer bindingPodCancel()
+		defer fwk.RemoveBindingPod(pod.UID)
+		fwk.AddBindingPod(pod.UID, bindingPodCancel)
+		status := sched.bindingCycle(bindingPodCtx, state, fwk, scheduleResult, assumedPodInfo, start, podsToActivate)
 		if !status.IsSuccess() {
 			sched.handleBindingCycleError(bindingCycleCtx, state, fwk, assumedPodInfo, start, scheduleResult, status)
 			return
@@ -326,6 +330,12 @@ func (sched *Scheduler) bindingCycle(
 	// Run "prebind" plugins.
 	if status := schedFramework.RunPreBindPlugins(ctx, state, assumedPod, scheduleResult.SuggestedHost); !status.IsSuccess() {
 		return status
+	}
+
+	// Verify that pod was not preempted during prebinding
+	bindingPod := schedFramework.GetBindingPod(assumedPod.UID)
+	if !bindingPod.MarkBinded() {
+		return fwk.AsStatus(ctx.Err())
 	}
 
 	// Run "bind" plugins.

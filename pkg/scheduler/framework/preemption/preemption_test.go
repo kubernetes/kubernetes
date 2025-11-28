@@ -761,6 +761,7 @@ func TestPrepareCandidate(t *testing.T) {
 						frameworkruntime.WithLogger(logger),
 						frameworkruntime.WithInformerFactory(informerFactory),
 						frameworkruntime.WithWaitingPods(frameworkruntime.NewWaitingPodsMap()),
+						frameworkruntime.WithBindingPods(frameworkruntime.NewBindingPodsMap()),
 						frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(tt.testPods, nodes)),
 						frameworkruntime.WithPodNominator(nominator),
 						frameworkruntime.WithEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, "test-scheduler")),
@@ -1351,6 +1352,7 @@ func TestPrepareCandidateAsyncSetsPreemptingSets(t *testing.T) {
 					frameworkruntime.WithLogger(logger),
 					frameworkruntime.WithInformerFactory(informerFactory),
 					frameworkruntime.WithWaitingPods(frameworkruntime.NewWaitingPodsMap()),
+					frameworkruntime.WithBindingPods(frameworkruntime.NewBindingPodsMap()),
 					frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(testPods, nodes)),
 					frameworkruntime.WithEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, "test-scheduler")),
 					frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
@@ -1586,4 +1588,129 @@ func TestIsPodRunningPreemption(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPreemptPod(t *testing.T) {
+	preemptorPod := st.MakePod().Name("p").UID("p").Priority(highPriority).Obj()
+	victimPod := st.MakePod().Name("v").UID("v").Priority(midPriority).Obj()
+
+	tests := []struct {
+		name               string
+		addVictimToBinding bool
+		addVictimToWaiting bool
+		expectCancel       bool
+		expectedActions    []string
+	}{
+		{
+			name:               "victim is in binding, context should be cancelled",
+			addVictimToBinding: true,
+			expectCancel:       true,
+			expectedActions:    []string{},
+		},
+		{
+			name:               "victim is in waiting pods, it should be rejected (no calls to apiserver)",
+			addVictimToBinding: false,
+			addVictimToWaiting: true,
+			expectCancel:       false,
+			expectedActions:    []string{},
+		},
+		{
+			name:               "victim is not in binding, pod should be preempted",
+			addVictimToBinding: false,
+			expectCancel:       false,
+			expectedActions:    []string{"patch", "delete"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			bindingPods := frameworkruntime.NewBindingPodsMap()
+			waitingPods := frameworkruntime.NewWaitingPodsMap()
+			registeredPlugins := append([]tf.RegisterPluginFunc{
+				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New)},
+				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+				tf.RegisterPermitPlugin(waitingPermitPluginName, NewWaitPermitPlugin),
+			)
+			objs := []runtime.Object{preemptorPod, victimPod}
+			cs := clientsetfake.NewClientset(objs...)
+			informerFactory := informers.NewSharedInformerFactory(cs, 0)
+			eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: cs.EventsV1()})
+			logger, ctx := ktesting.NewTestContext(t)
+
+			fwk, err := tf.NewFramework(
+				ctx,
+				registeredPlugins, "",
+				frameworkruntime.WithClientSet(cs),
+				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot([]*v1.Pod{}, []*v1.Node{})),
+				frameworkruntime.WithInformerFactory(informerFactory),
+				frameworkruntime.WithWaitingPods(waitingPods),
+				frameworkruntime.WithBindingPods(bindingPods),
+				frameworkruntime.WithLogger(logger),
+				frameworkruntime.WithEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, "test-scheduler")),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var victimCtx context.Context
+			var cancel context.CancelFunc
+			if tt.addVictimToBinding {
+				victimCtx, cancel = context.WithCancel(context.Background())
+				fwk.AddBindingPod(victimPod.UID, cancel)
+			}
+			if tt.addVictimToWaiting {
+				status := fwk.RunPermitPlugins(ctx, framework.NewCycleState(), victimPod, "fake-node")
+				if !status.IsWait() {
+					t.Fatalf("Failed to add a pod to waiting list")
+				}
+			}
+			pe := NewEvaluator("FakePreemptionScorePostFilter", fwk, &FakePreemptionScorePostFilterPlugin{}, false)
+
+			err = pe.PreemptPod(ctx, &fakeCandidate{}, preemptorPod, victimPod, "test-plugin")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tt.expectCancel {
+				if victimCtx.Err() == nil {
+					t.Errorf("Context of a binding pod should be cancelled")
+				}
+			} else {
+				if victimCtx != nil && victimCtx.Err() != nil {
+					t.Errorf("Context of a normal pod should not be cancelled")
+				}
+			}
+
+			// check if the API call was made
+			actions := cs.Actions()
+			if len(actions) != len(tt.expectedActions) {
+				for _, action := range actions {
+					t.Logf("action=%v", action)
+				}
+				t.Errorf("Expected %d actions, but got %d", len(tt.expectedActions), len(actions))
+			}
+			for i, action := range actions {
+				if action.GetVerb() != tt.expectedActions[i] {
+					t.Errorf("Expected action %s, but got %s", tt.expectedActions[i], action.GetVerb())
+				}
+			}
+		})
+	}
+}
+
+// waitingPermitPlugin is a PermitPlugin that always returns Wait.
+type waitingPermitPlugin struct{}
+
+var _ fwk.PermitPlugin = &waitingPermitPlugin{}
+
+const waitingPermitPluginName = "waitingPermitPlugin"
+
+func NewWaitPermitPlugin(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+	return &waitingPermitPlugin{}, nil
+}
+
+func (pl *waitingPermitPlugin) Name() string {
+	return waitingPermitPluginName
+}
+
+func (pl *waitingPermitPlugin) Permit(ctx context.Context, _ fwk.CycleState, _ *v1.Pod, nodeName string) (*fwk.Status, time.Duration) {
+	return fwk.NewStatus(fwk.Wait, ""), 10 * time.Second
 }
