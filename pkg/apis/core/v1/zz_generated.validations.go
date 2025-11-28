@@ -40,6 +40,22 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *runtime.Scheme) error {
+	// type Namespace
+	scheme.AddValidationFunc((*corev1.Namespace)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_Namespace(ctx, op, nil /* fldPath */, obj.(*corev1.Namespace), safe.Cast[*corev1.Namespace](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
+	// type NamespaceList
+	scheme.AddValidationFunc((*corev1.NamespaceList)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_NamespaceList(ctx, op, nil /* fldPath */, obj.(*corev1.NamespaceList), safe.Cast[*corev1.NamespaceList](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
 	// type ReplicationController
 	scheme.AddValidationFunc((*corev1.ReplicationController)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
 		switch op.Request.SubresourcePath() {
@@ -57,6 +73,63 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
 	return nil
+}
+
+// Validate_Namespace validates an instance of Namespace according
+// to declarative validation rules in the API schema.
+func Validate_Namespace(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *corev1.Namespace) (errs field.ErrorList) {
+	// field corev1.Namespace.TypeMeta has no validation
+
+	// field corev1.Namespace.ObjectMeta
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *metav1.ObjectMeta, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			func() { // cohort name
+				earlyReturn := false
+				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "name", func(o *metav1.ObjectMeta) *string { return &o.Name }, validate.DirectEqualPtr, validate.RequiredValue); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "name", func(o *metav1.ObjectMeta) *string { return &o.Name }, validate.DirectEqualPtr, validate.Immutable); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
+				errs = append(errs, validate.Subfield(ctx, op, fldPath, obj, oldObj, "name", func(o *metav1.ObjectMeta) *string { return &o.Name }, validate.DirectEqualPtr, validate.LongName)...)
+			}()
+			return
+		}(fldPath.Child("metadata"), &obj.ObjectMeta, safe.Field(oldObj, func(oldObj *corev1.Namespace) *metav1.ObjectMeta { return &oldObj.ObjectMeta }), oldObj != nil)...)
+
+	// field corev1.Namespace.Spec has no validation
+	// field corev1.Namespace.Status has no validation
+	return errs
+}
+
+// Validate_NamespaceList validates an instance of NamespaceList according
+// to declarative validation rules in the API schema.
+func Validate_NamespaceList(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *corev1.NamespaceList) (errs field.ErrorList) {
+	// field corev1.NamespaceList.TypeMeta has no validation
+	// field corev1.NamespaceList.ListMeta has no validation
+
+	// field corev1.NamespaceList.Items
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []corev1.Namespace, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// iterate the list and call the type's validation function
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_Namespace)...)
+			return
+		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *corev1.NamespaceList) []corev1.Namespace { return oldObj.Items }), oldObj != nil)...)
+
+	return errs
 }
 
 // Validate_ReplicationController validates an instance of ReplicationController according

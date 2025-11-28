@@ -21,11 +21,13 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/registry/rest"
 	apistorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -95,7 +97,8 @@ func (namespaceStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 // Validate validates a new namespace.
 func (namespaceStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	namespace := obj.(*api.Namespace)
-	return validation.ValidateNamespace(namespace)
+	allErrs := validation.ValidateNamespace(namespace)
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, namespace, nil, allErrs, operation.Create)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -136,8 +139,13 @@ func (namespaceStrategy) AllowCreateOnUpdate() bool {
 
 // ValidateUpdate is the default update validation for an end user.
 func (namespaceStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	errorList := validation.ValidateNamespace(obj.(*api.Namespace))
-	return append(errorList, validation.ValidateNamespaceUpdate(obj.(*api.Namespace), old.(*api.Namespace))...)
+
+	newNamespace := obj.(*api.Namespace)
+	oldNamespace := old.(*api.Namespace)
+
+	errorList := validation.ValidateNamespace(newNamespace)
+	allErrs := append(errorList, validation.ValidateNamespaceUpdate(newNamespace, oldNamespace)...)
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newNamespace, oldNamespace, allErrs, operation.Update)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -172,7 +180,12 @@ func (namespaceStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old ru
 }
 
 func (namespaceStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidateNamespaceStatusUpdate(obj.(*api.Namespace), old.(*api.Namespace))
+	newNamespace := obj.(*api.Namespace)
+	oldNamespace := old.(*api.Namespace)
+
+	allErrs := validation.ValidateNamespaceStatusUpdate(newNamespace, oldNamespace)
+
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newNamespace, oldNamespace, allErrs, operation.Update)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -187,7 +200,13 @@ type namespaceFinalizeStrategy struct {
 var FinalizeStrategy = namespaceFinalizeStrategy{Strategy}
 
 func (namespaceFinalizeStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidateNamespaceFinalizeUpdate(obj.(*api.Namespace), old.(*api.Namespace))
+
+	newNamespace := obj.(*api.Namespace)
+	oldNamespace := old.(*api.Namespace)
+
+	allErrs := validation.ValidateNamespaceFinalizeUpdate(newNamespace, oldNamespace)
+
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newNamespace, oldNamespace, allErrs, operation.Update)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
