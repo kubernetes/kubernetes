@@ -13,7 +13,6 @@
 // limitations under the License.
 
 //go:build cgo
-// +build cgo
 
 package util
 
@@ -54,6 +53,7 @@ package util
 //   return (getsid(0) == getpid());
 // }
 import "C"
+
 import (
 	"fmt"
 	"syscall"
