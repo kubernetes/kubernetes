@@ -49,6 +49,7 @@ const (
 type StatefulSet struct {
 	metav1.TypeMeta `json:",inline"`
 	// metadata is the standard object metadata.
+	// The name is <group>.<resource>.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -363,6 +364,7 @@ type StatefulSetList struct {
 type Deployment struct {
 	metav1.TypeMeta `json:",inline"`
 	// metadata is the standard object metadata.
+	// The name is <group>.<resource>.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -574,6 +576,7 @@ type DeploymentCondition struct {
 type DeploymentList struct {
 	metav1.TypeMeta `json:",inline"`
 	// metadata is the standard list metadata.
+	// The name is <group>.<resource>.
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
@@ -766,6 +769,7 @@ type DaemonSetCondition struct {
 type DaemonSet struct {
 	metav1.TypeMeta `json:",inline"`
 	// metadata is the standard object metadata.
+	// The name is <group>.<resource>.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -818,6 +822,7 @@ type ReplicaSet struct {
 	metav1.TypeMeta `json:",inline"`
 
 	// metadata is the standard object metadata.
+	// The name is <group>.<resource>.
 	// If the Labels of a ReplicaSet are empty, they are defaulted to
 	// be the same as the Pod(s) that the ReplicaSet manages.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -965,6 +970,7 @@ type ReplicaSetCondition struct {
 type ControllerRevision struct {
 	metav1.TypeMeta `json:",inline"`
 	// metadata is the standard object metadata.
+	// The name is <group>.<resource>.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
