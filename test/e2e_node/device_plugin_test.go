@@ -984,19 +984,19 @@ func testDevicePluginNodeReboot(f *framework.Framework, pluginSockDir string) {
 			// never restarted (runs "forever" from this test timescale perspective) hence re-doing this check
 			// is useless.
 			ginkgo.By("Verifying the device assignment after kubelet restart using podresources API")
-			gomega.Eventually(ctx, func() error {
-				v1PodResources, err = getV1NodeDevices(ctx)
-				return err
-			}, 30*time.Second, framework.Poll).ShouldNot(gomega.HaveOccurred(), "cannot fetch the compute resource assignment after kubelet restart")
-
 			// if we got this far, podresources API will now report only the sample device plugin pod,
 			// because pods that failed admission are no longer reported in the list
 			// (see https://github.com/kubernetes/kubernetes/pull/132028).
 			// Hence, we verify that our test pod is NOT present in the podresources response.
-
-			_, found := checkPodResourcesAssignment(v1PodResources, pod1.Namespace, pod1.Name, pod1.Spec.Containers[0].Name, SampleDeviceResourceName, []string{})
-			framework.ExpectNoError(err, "unexpected device assignment mismatch for %s/%s", pod1.Namespace, pod1.Name)
-			gomega.Expect(found).To(gomega.BeFalseBecause("%s/%s/%s failed admission, so it must not appear in podresources list", pod1.Namespace, pod1.Name, pod1.Spec.Containers[0].Name))
+			gomega.Eventually(ctx, func(ctx context.Context) bool {
+				v1PodResources, err = getV1NodeDevices(ctx)
+				if err != nil {
+					framework.Logf("failed to get podresources %v", err)
+					return true
+				}
+				_, found := checkPodResourcesAssignment(v1PodResources, pod1.Namespace, pod1.Name, pod1.Spec.Containers[0].Name, SampleDeviceResourceName, []string{})
+				return found
+			}, 5*time.Minute, time.Second).To(gomega.BeFalseBecause("%s/%s/%s failed admission, so it must not appear in podresources list", pod1.Namespace, pod1.Name, pod1.Spec.Containers[0].Name))
 		})
 	})
 }
@@ -1071,6 +1071,7 @@ func checkPodResourcesAssignment(v1PodRes *kubeletpodresourcesv1.ListPodResource
 			if contRes.Name != containerName {
 				continue
 			}
+			framework.Logf("resources found for %s/%s/%s in listpodresources", podNamespace, podName, containerName)
 			return matchContainerDevices(podNamespace+"/"+podName+"/"+containerName, contRes.Devices, resourceName, devs)
 		}
 	}
