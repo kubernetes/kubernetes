@@ -58,6 +58,7 @@ type frameworkImpl struct {
 	registry             Registry
 	snapshotSharedLister fwk.SharedLister
 	waitingPods          *waitingPodsMap
+	bindingPods          *podsInPrebindMap
 	scorePluginWeight    map[string]int
 	preEnqueuePlugins    []fwk.PreEnqueuePlugin
 	enqueueExtensions    []fwk.EnqueueExtensions
@@ -153,6 +154,7 @@ type frameworkOptions struct {
 	captureProfile         CaptureProfile
 	parallelizer           parallelize.Parallelizer
 	waitingPods            *waitingPodsMap
+	podsInPrebind          *podsInPrebindMap
 	apiDispatcher          *apidispatcher.APIDispatcher
 	workloadManager        fwk.WorkloadManager
 	logger                 *klog.Logger
@@ -285,6 +287,12 @@ func WithWaitingPods(wp *waitingPodsMap) Option {
 	}
 }
 
+func WithPodsInPrebind(bp *podsInPrebindMap) Option {
+	return func(o *frameworkOptions) {
+		o.podsInPrebind = bp
+	}
+}
+
 // WithLogger overrides the default logger from k8s.io/klog.
 func WithLogger(logger klog.Logger) Option {
 	return func(o *frameworkOptions) {
@@ -319,6 +327,7 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 		sharedCSIManager:     options.sharedCSIManager,
 		scorePluginWeight:    make(map[string]int),
 		waitingPods:          options.waitingPods,
+		bindingPods:          options.podsInPrebind,
 		clientSet:            options.clientSet,
 		kubeConfig:           options.kubeConfig,
 		eventRecorder:        options.eventRecorder,
@@ -1439,6 +1448,10 @@ func (f *frameworkImpl) RunPreBindPlugins(ctx context.Context, state fwk.CycleSt
 				return status
 			}
 			err := status.AsError()
+			if errors.Is(err, context.Canceled) {
+				err = context.Cause(ctx)
+			}
+
 			logger.Error(err, "Plugin failed", "plugin", pl.Name(), "pod", klog.KObj(pod), "node", nodeName)
 			return fwk.AsStatus(fmt.Errorf("running PreBind plugin %q: %w", pl.Name(), err))
 		}
@@ -1798,6 +1811,23 @@ func (f *frameworkImpl) RejectWaitingPod(uid types.UID) bool {
 		return true
 	}
 	return false
+}
+
+func (f *frameworkImpl) AddPodInPrebind(uid types.UID, cancel context.CancelCauseFunc) {
+	f.bindingPods.add(uid, cancel)
+}
+
+// GetPodInPrebind returns a pod that is in the binding cycle but before it is bound given its UID
+func (f *frameworkImpl) GetPodInPrebind(uid types.UID) fwk.PodInPrebind {
+	if bp := f.bindingPods.get(uid); bp != nil {
+		return bp
+	}
+	return nil
+}
+
+// GetBindingPod returns a pod that is in the binding cycle but before it is bound given its UID
+func (f *frameworkImpl) RemovePodInPrebind(uid types.UID) {
+	f.bindingPods.remove(uid)
 }
 
 // HasFilterPlugins returns true if at least one filter plugin is defined.
