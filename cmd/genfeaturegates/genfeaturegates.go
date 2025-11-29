@@ -17,124 +17,282 @@ limitations under the License.
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/component-base/featuregate"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	_ "k8s.io/kubernetes/pkg/features"
 )
 
+var (
+	sortBy  = flag.String("sort", "name", "Sort by: name, stage, alpha, beta, ga, deprecated")
+	reverse = flag.Bool("reverse", false, "Reverse sort order")
+	output  = flag.String("output", "", "Output file path (stdout if empty)")
+)
+
+// featureInfo holds processed information about a feature gate
+type featureInfo struct {
+	name         string
+	stage        string
+	stageOrder   int // for sorting: 1=Alpha, 2=Beta, 3=GA, 4=Deprecated
+	stageDisplay string
+	alpha        string
+	alphaVersion *version.Version
+	beta         string
+	betaVersion  *version.Version
+	ga           string
+	gaVersion    *version.Version
+	deprecated   string
+	depVersion   *version.Version
+	deps         string
+	linkCode     string
+	linkKEPs     string
+}
+
 func main() {
-	var outputPath string
-	if len(os.Args) == 2 {
-		outputPath = os.Args[1]
-	} else if len(os.Args) > 2 {
-		fmt.Fprintf(os.Stderr, "usage: %s [output file path]\n", os.Args[0])
-		os.Exit(1)
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: %s [flags]\n\nFlags:\n", os.Args[0])
+		flag.PrintDefaults()
+		fmt.Fprintf(os.Stderr, "\nExamples:\n")
+		fmt.Fprintf(os.Stderr, "  %s                          # Sort by name (default)\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s -sort=stage              # Sort by current stage\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s -sort=alpha              # Sort by alpha version\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s -sort=ga -reverse        # Sort by GA version, newest first\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s -output=features.md      # Write to file\n", os.Args[0])
 	}
+	flag.Parse()
 
-	markdown := generateMarkdown()
+	markdown := generateMarkdown(*sortBy, *reverse)
 
-	if outputPath == "" {
+	if *output == "" {
 		fmt.Print(markdown)
 	} else {
-		dir := filepath.Dir(outputPath)
+		dir := filepath.Dir(*output)
 		if dir != "" && dir != "." {
 			if err := os.MkdirAll(dir, 0755); err != nil {
 				fmt.Fprintf(os.Stderr, "failed to create output directory: %v\n", err)
 				os.Exit(1)
 			}
 		}
-		if err := os.WriteFile(outputPath, []byte(markdown), 0644); err != nil {
+		if err := os.WriteFile(*output, []byte(markdown), 0644); err != nil {
 			fmt.Fprintf(os.Stderr, "failed to write output file: %v\n", err)
 			os.Exit(1)
 		}
 	}
 }
 
-func generateMarkdown() string {
-	var sb strings.Builder
-	sb.WriteString("| Feature | Alpha | Beta | GA | Deprecated | Links |\n")
-	sb.WriteString("|---------|-------|------|----|----|----|\n")
-
-	// Get all versioned feature specs using the public method
+func generateMarkdown(sortBy string, reverseSort bool) string {
+	// Get all versioned feature specs and dependencies using public methods
 	allFeatures := utilfeature.DefaultMutableFeatureGate.GetAllVersioned()
+	allDependencies := utilfeature.DefaultMutableFeatureGate.Dependencies()
 
-	// Extract and sort feature names
-	keys := make([]string, 0, len(allFeatures))
-	for key := range allFeatures {
-		keys = append(keys, string(key))
-	}
-	sort.Strings(keys)
+	// Build feature info list
+	features := make([]featureInfo, 0, len(allFeatures))
 
-	for _, feature := range keys {
-		specs := allFeatures[featuregate.Feature(feature)]
-		alpha, beta, ga, deprecated := "", "", "", ""
+	for featureName, specs := range allFeatures {
+		feature := string(featureName)
+		info := featureInfo{
+			name: feature,
+		}
+
+		// Sort specs by version to process in order
+		sort.Sort(featuregate.VersionedSpecs(specs))
+
 		for _, spec := range specs {
+			verStr := spec.Version.String()
+			indicator := ""
+			if spec.Default {
+				indicator += " :ballot_box_with_check:"
+			}
+			if spec.LockToDefault {
+				indicator += " :closed_lock_with_key:"
+			}
+
 			switch spec.PreRelease {
 			case featuregate.Alpha:
-				if len(alpha) > 0 {
-					alpha += ", "
+				if len(info.alpha) > 0 {
+					info.alpha += ", "
 				}
-				alpha += spec.Version.String()
+				info.alpha += verStr + indicator
+				if info.alphaVersion == nil {
+					info.alphaVersion = spec.Version
+				}
+				info.stage = "Alpha"
+				info.stageOrder = 1
+				info.stageDisplay = "Alpha"
 				if spec.Default {
-					alpha += " :ballot_box_with_check:"
+					info.stageDisplay += " :ballot_box_with_check:"
 				}
 				if spec.LockToDefault {
-					alpha += " :closed_lock_with_key:"
+					info.stageDisplay += " :closed_lock_with_key:"
 				}
 			case featuregate.Beta:
-				if len(beta) > 0 {
-					beta += ", "
+				if len(info.beta) > 0 {
+					info.beta += ", "
 				}
-				beta += spec.Version.String()
+				info.beta += verStr + indicator
+				if info.betaVersion == nil {
+					info.betaVersion = spec.Version
+				}
+				info.stage = "Beta"
+				info.stageOrder = 2
+				info.stageDisplay = "Beta"
 				if spec.Default {
-					beta += " :ballot_box_with_check:"
+					info.stageDisplay += " :ballot_box_with_check:"
 				}
 				if spec.LockToDefault {
-					beta += " :closed_lock_with_key:"
+					info.stageDisplay += " :closed_lock_with_key:"
 				}
 			case featuregate.GA:
-				if len(ga) > 0 {
-					ga += ", "
+				if len(info.ga) > 0 {
+					info.ga += ", "
 				}
-				ga += spec.Version.String()
+				info.ga += verStr + indicator
+				if info.gaVersion == nil {
+					info.gaVersion = spec.Version
+				}
+				info.stage = "GA"
+				info.stageOrder = 3
+				info.stageDisplay = "GA"
 				if spec.Default {
-					ga += " :ballot_box_with_check:"
+					info.stageDisplay += " :ballot_box_with_check:"
 				}
 				if spec.LockToDefault {
-					ga += " :closed_lock_with_key:"
+					info.stageDisplay += " :closed_lock_with_key:"
 				}
 			case featuregate.Deprecated:
-				depVer := spec.Version.String()
+				depIndicator := ""
 				if spec.Default {
-					depVer += " :ballot_box_with_check:"
+					depIndicator += " :ballot_box_with_check:"
 				} else {
-					depVer += " :red_circle:"
+					depIndicator += " :red_circle:"
 				}
 				if spec.LockToDefault {
-					depVer += " :closed_lock_with_key:"
+					depIndicator += " :closed_lock_with_key:"
 				}
-				if len(deprecated) > 0 {
-					deprecated += ", "
-					deprecated += depVer
+				if len(info.deprecated) > 0 {
+					info.deprecated += ", "
+				}
+				info.deprecated += verStr + depIndicator
+				if info.depVersion == nil {
+					info.depVersion = spec.Version
+				}
+				info.stage = "Deprecated"
+				info.stageOrder = 4
+				info.stageDisplay = "Deprecated"
+				if spec.Default {
+					info.stageDisplay += " :ballot_box_with_check:"
 				} else {
-					deprecated = depVer
+					info.stageDisplay += " :red_circle:"
+				}
+				if spec.LockToDefault {
+					info.stageDisplay += " :closed_lock_with_key:"
 				}
 			}
 		}
-		linkToCode := fmt.Sprintf("[code](https://cs.k8s.io/?q=%%5Cb%s%%5Cb&i=nope&files=&excludeFiles=CHANGELOG&repos=kubernetes/kubernetes)", feature)
-		linkToEnhancements := fmt.Sprintf("[KEPs](https://cs.k8s.io/?q=%%5Cb%s%%5Cb&i=nope&files=&excludeFiles=CHANGELOG&repos=kubernetes/enhancements)", feature)
-		sb.WriteString(fmt.Sprintf("| %s | %s | %s | %s | %s |%s %s\n", feature, alpha, beta, ga, deprecated, linkToCode, linkToEnhancements))
+
+		// Get dependencies for this feature as bullet list (one per line)
+		deps := allDependencies[featuregate.Feature(feature)]
+		if len(deps) > 0 {
+			depItems := make([]string, len(deps))
+			for i, d := range deps {
+				depItems[i] = "• " + string(d)
+			}
+			info.deps = strings.Join(depItems, "<br>")
+		}
+
+		info.linkCode = fmt.Sprintf("[code](https://cs.k8s.io/?q=%%5Cb%s%%5Cb&i=nope&files=&excludeFiles=CHANGELOG&repos=kubernetes/kubernetes)", feature)
+		info.linkKEPs = fmt.Sprintf("[KEPs](https://cs.k8s.io/?q=%%5Cb%s%%5Cb&i=nope&files=&excludeFiles=CHANGELOG&repos=kubernetes/enhancements)", feature)
+
+		features = append(features, info)
 	}
 
-	sb.WriteString("\n\n Legend: :ballot_box_with_check: - enabled, :red_circle: - disabled\n")
-	sb.WriteString("\t\t:closed_lock_with_key: - locked to default\n")
+	// Sort features based on sortBy parameter
+	sortFeatures(features, sortBy, reverseSort)
+
+	// Build markdown output
+	var sb strings.Builder
+	sb.WriteString("# Kubernetes Feature Gates\n\n")
+	sb.WriteString("| Feature | Stage | Alpha | Beta | GA | Deprecated | Dependencies | Links |\n")
+	sb.WriteString("|---------|-------|-------|------|----|------------|--------------|-------|\n")
+
+	for _, info := range features {
+		sb.WriteString(fmt.Sprintf("| %s | %s | %s | %s | %s | %s | %s | %s %s |\n",
+			info.name, info.stageDisplay, info.alpha, info.beta, info.ga, info.deprecated, info.deps, info.linkCode, info.linkKEPs))
+	}
+
+	sb.WriteString("\n## Legend\n\n")
+	sb.WriteString("| Symbol | Meaning |\n")
+	sb.WriteString("|--------|--------|\n")
+	sb.WriteString("| :ballot_box_with_check: | Enabled by default |\n")
+	sb.WriteString("| :red_circle: | Disabled by default |\n")
+	sb.WriteString("| :closed_lock_with_key: | Locked to default (cannot be changed) |\n")
 
 	return sb.String()
+}
+
+func sortFeatures(features []featureInfo, sortBy string, reverseSort bool) {
+	var less func(i, j int) bool
+
+	switch sortBy {
+	case "stage":
+		less = func(i, j int) bool {
+			if features[i].stageOrder != features[j].stageOrder {
+				return features[i].stageOrder < features[j].stageOrder
+			}
+			return features[i].name < features[j].name
+		}
+	case "alpha":
+		less = func(i, j int) bool {
+			return compareVersions(features[i].alphaVersion, features[j].alphaVersion, features[i].name, features[j].name)
+		}
+	case "beta":
+		less = func(i, j int) bool {
+			return compareVersions(features[i].betaVersion, features[j].betaVersion, features[i].name, features[j].name)
+		}
+	case "ga":
+		less = func(i, j int) bool {
+			return compareVersions(features[i].gaVersion, features[j].gaVersion, features[i].name, features[j].name)
+		}
+	case "deprecated":
+		less = func(i, j int) bool {
+			return compareVersions(features[i].depVersion, features[j].depVersion, features[i].name, features[j].name)
+		}
+	default: // "name"
+		less = func(i, j int) bool {
+			return features[i].name < features[j].name
+		}
+	}
+
+	if reverseSort {
+		sort.Slice(features, func(i, j int) bool {
+			return less(j, i)
+		})
+	} else {
+		sort.Slice(features, less)
+	}
+}
+
+// compareVersions compares two versions, putting nil versions last
+func compareVersions(v1, v2 *version.Version, name1, name2 string) bool {
+	if v1 == nil && v2 == nil {
+		return name1 < name2
+	}
+	if v1 == nil {
+		return false // nil goes last
+	}
+	if v2 == nil {
+		return true // nil goes last
+	}
+	if v1.EqualTo(v2) {
+		return name1 < name2
+	}
+	return v1.LessThan(v2)
 }
