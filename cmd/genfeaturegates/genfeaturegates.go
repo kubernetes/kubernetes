@@ -32,9 +32,10 @@ import (
 )
 
 var (
-	sortBy  = flag.String("sort", "name", "Sort by: name, stage, alpha, beta, ga, deprecated")
-	reverse = flag.Bool("reverse", false, "Reverse sort order")
-	output  = flag.String("output", "", "Output file path (stdout if empty)")
+	sortBy      = flag.String("sort", "name", "Sort by: name, stage, alpha, beta, ga, deprecated")
+	reverse     = flag.Bool("reverse", false, "Reverse sort order")
+	output      = flag.String("output", "", "Output file path (stdout if empty)")
+	filterStage = flag.String("stage", "", "Filter by stage: alpha, beta, ga, deprecated")
 )
 
 // featureInfo holds processed information about a feature gate
@@ -65,11 +66,12 @@ func main() {
 		fmt.Fprintf(os.Stderr, "  %s -sort=stage              # Sort by current stage\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "  %s -sort=alpha              # Sort by alpha version\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "  %s -sort=ga -reverse        # Sort by GA version, newest first\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s -stage=alpha             # Show only alpha features\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "  %s -output=features.md      # Write to file\n", os.Args[0])
 	}
 	flag.Parse()
 
-	markdown := generateMarkdown(*sortBy, *reverse)
+	markdown := generateMarkdown(*sortBy, *reverse, *filterStage)
 
 	if *output == "" {
 		fmt.Print(markdown)
@@ -88,10 +90,13 @@ func main() {
 	}
 }
 
-func generateMarkdown(sortBy string, reverseSort bool) string {
+func generateMarkdown(sortBy string, reverseSort bool, filterStage string) string {
 	// Get all versioned feature specs and dependencies using public methods
 	allFeatures := utilfeature.DefaultMutableFeatureGate.GetAllVersioned()
 	allDependencies := utilfeature.DefaultMutableFeatureGate.Dependencies()
+
+	// Statistics counters
+	var alphaCount, betaCount, gaCount, deprecatedCount int
 
 	// Build feature info list
 	features := make([]featureInfo, 0, len(allFeatures))
@@ -198,6 +203,23 @@ func generateMarkdown(sortBy string, reverseSort bool) string {
 			}
 		}
 
+		// Update statistics
+		switch info.stage {
+		case "Alpha":
+			alphaCount++
+		case "Beta":
+			betaCount++
+		case "GA":
+			gaCount++
+		case "Deprecated":
+			deprecatedCount++
+		}
+
+		// Apply stage filter
+		if filterStage != "" && !strings.EqualFold(info.stage, filterStage) {
+			continue
+		}
+
 		// Get dependencies for this feature as bullet list (one per line)
 		deps := allDependencies[featuregate.Feature(feature)]
 		if len(deps) > 0 {
@@ -220,12 +242,18 @@ func generateMarkdown(sortBy string, reverseSort bool) string {
 	// Build markdown output
 	var sb strings.Builder
 	sb.WriteString("# Kubernetes Feature Gates\n\n")
+
+	if filterStage != "" {
+		sb.WriteString(fmt.Sprintf("*Showing only %s features (%d)*\n\n", strings.ToUpper(filterStage), len(features)))
+	}
+
 	sb.WriteString("| Feature | Stage | Alpha | Beta | GA | Deprecated | Dependencies | Links |\n")
 	sb.WriteString("|---------|-------|-------|------|----|------------|--------------|-------|\n")
 
 	for _, info := range features {
 		sb.WriteString(fmt.Sprintf("| %s | %s | %s | %s | %s | %s | %s | %s %s |\n",
-			info.name, info.stageDisplay, info.alpha, info.beta, info.ga, info.deprecated, info.deps, info.linkCode, info.linkKEPs))
+			info.name, info.stageDisplay, info.alpha, info.beta, info.ga, info.deprecated,
+			info.deps, info.linkCode, info.linkKEPs))
 	}
 
 	sb.WriteString("\n## Legend\n\n")
@@ -234,6 +262,17 @@ func generateMarkdown(sortBy string, reverseSort bool) string {
 	sb.WriteString("| :ballot_box_with_check: | Enabled by default |\n")
 	sb.WriteString("| :red_circle: | Disabled by default |\n")
 	sb.WriteString("| :closed_lock_with_key: | Locked to default (cannot be changed) |\n")
+
+	// Always show statistics at the end
+	total := alphaCount + betaCount + gaCount + deprecatedCount
+	sb.WriteString("\n## Statistics\n\n")
+	sb.WriteString("| Stage | Count | Percentage |\n")
+	sb.WriteString("|-------|-------|------------|\n")
+	sb.WriteString(fmt.Sprintf("| Alpha | %d | %.1f%% |\n", alphaCount, float64(alphaCount)*100/float64(total)))
+	sb.WriteString(fmt.Sprintf("| Beta | %d | %.1f%% |\n", betaCount, float64(betaCount)*100/float64(total)))
+	sb.WriteString(fmt.Sprintf("| GA | %d | %.1f%% |\n", gaCount, float64(gaCount)*100/float64(total)))
+	sb.WriteString(fmt.Sprintf("| Deprecated | %d | %.1f%% |\n", deprecatedCount, float64(deprecatedCount)*100/float64(total)))
+	sb.WriteString(fmt.Sprintf("| **Total** | **%d** | **100%%** |\n", total))
 
 	return sb.String()
 }
