@@ -7903,6 +7903,7 @@ type Secret struct {
 	// Used to facilitate programmatic handling of secret data.
 	// More info: https://kubernetes.io/docs/concepts/configuration/secret/#secret-types
 	// +optional
+	// +k8:optional
 	// +k8s:immutable
 	Type SecretType `json:"type,omitempty" protobuf:"bytes,3,opt,name=type,casttype=SecretType"`
 }
