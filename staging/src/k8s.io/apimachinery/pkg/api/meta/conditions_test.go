@@ -175,10 +175,25 @@ func TestRemoveStatusCondition(t *testing.T) {
 			},
 		},
 		{
+			name:          "single-condition",
+			expectRemoval: true,
+			conditions: []metav1.Condition{
+				{Type: "first"},
+			},
+			conditionType: "first",
+			expected:      []metav1.Condition{},
+		},
+		{
 			name:          "empty-conditions",
 			conditions:    []metav1.Condition{},
 			conditionType: "Foo",
 			expected:      []metav1.Condition{},
+		},
+		{
+			name:          "nil-conditions",
+			conditions:    nil,
+			conditionType: "Foo",
+			expected:      nil,
 		},
 	}
 
