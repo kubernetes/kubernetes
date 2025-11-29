@@ -7905,6 +7905,7 @@ type Secret struct {
 	// +optional
 	// +k8:optional
 	// +k8s:immutable
+	// +default="Opaque"
 	Type SecretType `json:"type,omitempty" protobuf:"bytes,3,opt,name=type,casttype=SecretType"`
 }
 
