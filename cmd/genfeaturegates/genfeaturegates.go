@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -36,9 +37,26 @@ var (
 	reverse     = flag.Bool("reverse", false, "Reverse sort order")
 	output      = flag.String("output", "", "Output file path (stdout if empty)")
 	filterStage = flag.String("stage", "", "Filter by stage: alpha, beta, ga, deprecated")
+	format      = flag.String("format", "markdown", "Output format: markdown, json")
 )
 
-// featureInfo holds processed information about a feature gate
+// FeatureGateJSON represents a feature gate in JSON output format
+type FeatureGateJSON struct {
+	Name         string       `json:"name"`
+	Stages       []StageJSON  `json:"stages"`
+	Dependencies []string     `json:"dependencies,omitempty"`
+}
+
+// StageJSON represents a stage in the feature gate lifecycle
+type StageJSON struct {
+	Stage       string `json:"stage"`
+	FromVersion string `json:"fromVersion"`
+	ToVersion   string `json:"toVersion,omitempty"`
+	Default     bool   `json:"defaultValue"`
+	Locked      bool   `json:"locked,omitempty"`
+}
+
+// featureInfo holds processed information about a feature gate (for markdown)
 type featureInfo struct {
 	name         string
 	stage        string
@@ -62,19 +80,25 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Usage: %s [flags]\n\nFlags:\n", os.Args[0])
 		flag.PrintDefaults()
 		fmt.Fprintf(os.Stderr, "\nExamples:\n")
-		fmt.Fprintf(os.Stderr, "  %s                          # Sort by name (default)\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s                          # Markdown output (default)\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s -format=json             # JSON output\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "  %s -sort=stage              # Sort by current stage\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "  %s -sort=alpha              # Sort by alpha version\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "  %s -sort=ga -reverse        # Sort by GA version, newest first\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "  %s -stage=alpha             # Show only alpha features\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  %s -output=features.md      # Write to file\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s -output=features.json    # Write to file\n", os.Args[0])
 	}
 	flag.Parse()
 
-	markdown := generateMarkdown(*sortBy, *reverse, *filterStage)
+	var result string
+	if *format == "json" {
+		result = generateJSON(*filterStage)
+	} else {
+		result = generateMarkdown(*sortBy, *reverse, *filterStage)
+	}
 
 	if *output == "" {
-		fmt.Print(markdown)
+		fmt.Print(result)
 	} else {
 		dir := filepath.Dir(*output)
 		if dir != "" && dir != "." {
@@ -83,11 +107,169 @@ func main() {
 				os.Exit(1)
 			}
 		}
-		if err := os.WriteFile(*output, []byte(markdown), 0644); err != nil {
+		if err := os.WriteFile(*output, []byte(result), 0644); err != nil {
 			fmt.Fprintf(os.Stderr, "failed to write output file: %v\n", err)
 			os.Exit(1)
 		}
 	}
+}
+
+func generateJSON(filterStage string) string {
+	// Get all versioned feature specs and dependencies using public methods
+	allFeatures := utilfeature.DefaultMutableFeatureGate.GetAllVersioned()
+	allDependencies := utilfeature.DefaultMutableFeatureGate.Dependencies()
+
+	// Build feature list
+	features := make([]FeatureGateJSON, 0, len(allFeatures))
+
+	for featureName, specs := range allFeatures {
+		feature := string(featureName)
+
+		// Sort specs by version to process in order
+		sort.Sort(featuregate.VersionedSpecs(specs))
+
+		fg := FeatureGateJSON{
+			Name:   feature,
+			Stages: make([]StageJSON, 0),
+		}
+
+		// Track versions for each stage to compute toVersion
+		type stageEntry struct {
+			stage       string
+			fromVersion string
+			defaultVal  bool
+			locked      bool
+		}
+		var entries []stageEntry
+
+		for _, spec := range specs {
+			stageName := ""
+			switch spec.PreRelease {
+			case featuregate.Alpha:
+				stageName = "alpha"
+			case featuregate.Beta:
+				stageName = "beta"
+			case featuregate.GA:
+				stageName = "stable"
+			case featuregate.Deprecated:
+				stageName = "deprecated"
+			}
+
+			entries = append(entries, stageEntry{
+				stage:       stageName,
+				fromVersion: spec.Version.String(),
+				defaultVal:  spec.Default,
+				locked:      spec.LockToDefault,
+			})
+		}
+
+		// Convert entries to stages with toVersion
+		for i, entry := range entries {
+			stage := StageJSON{
+				Stage:       entry.stage,
+				FromVersion: entry.fromVersion,
+				Default:     entry.defaultVal,
+				Locked:      entry.locked,
+			}
+
+			// Find toVersion: look for next entry that represents a change
+			// (different stage, different default, or different locked status)
+			for j := i + 1; j < len(entries); j++ {
+				if entries[j].stage != entry.stage ||
+					entries[j].defaultVal != entry.defaultVal ||
+					entries[j].locked != entry.locked {
+					// toVersion is one minor version before the next entry's fromVersion
+					stage.ToVersion = getPreviousMinorVersion(entries[j].fromVersion)
+					break
+				}
+			}
+
+			fg.Stages = append(fg.Stages, stage)
+		}
+
+		// Deduplicate stages - keep first occurrence of each stage with merged version range
+		fg.Stages = deduplicateStages(fg.Stages)
+
+		// Apply stage filter
+		if filterStage != "" {
+			hasStage := false
+			for _, s := range fg.Stages {
+				if strings.EqualFold(s.Stage, filterStage) || (filterStage == "ga" && s.Stage == "stable") {
+					hasStage = true
+					break
+				}
+			}
+			if !hasStage {
+				continue
+			}
+		}
+
+		// Get dependencies
+		deps := allDependencies[featuregate.Feature(feature)]
+		if len(deps) > 0 {
+			fg.Dependencies = make([]string, len(deps))
+			for i, d := range deps {
+				fg.Dependencies[i] = string(d)
+			}
+		}
+
+		features = append(features, fg)
+	}
+
+	// Sort by name
+	sort.Slice(features, func(i, j int) bool {
+		return features[i].Name < features[j].Name
+	})
+
+	jsonBytes, err := json.MarshalIndent(features, "", "  ")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to marshal JSON: %v\n", err)
+		os.Exit(1)
+	}
+
+	return string(jsonBytes) + "\n"
+}
+
+// getPreviousMinorVersion returns the previous minor version (e.g., "1.30" -> "1.29")
+func getPreviousMinorVersion(ver string) string {
+	v, err := version.Parse(ver)
+	if err != nil {
+		return ""
+	}
+	minor := v.Minor()
+	if minor > 0 {
+		return fmt.Sprintf("%d.%d", v.Major(), minor-1)
+	}
+	return ""
+}
+
+// deduplicateStages merges consecutive entries with the same stage, default, and locked values.
+// If defaultValue or locked changes within the same stage, we keep separate entries to preserve
+// the full lifecycle history (e.g., beta disabled in 1.23, beta enabled in 1.24).
+func deduplicateStages(stages []StageJSON) []StageJSON {
+	if len(stages) == 0 {
+		return stages
+	}
+
+	result := make([]StageJSON, 0)
+	current := stages[0]
+
+	for i := 1; i < len(stages); i++ {
+		// Only merge if stage, default, AND locked are all the same
+		if stages[i].Stage == current.Stage &&
+			stages[i].Default == current.Default &&
+			stages[i].Locked == current.Locked {
+			// Same stage with same settings, extend the version range
+			current.ToVersion = stages[i].ToVersion
+		} else {
+			// Different stage or settings changed, save current and start new
+			result = append(result, current)
+			current = stages[i]
+		}
+	}
+	result = append(result, current)
+
+	return result
 }
 
 func generateMarkdown(sortBy string, reverseSort bool, filterStage string) string {
