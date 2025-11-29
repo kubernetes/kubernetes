@@ -117,17 +117,47 @@ func TestRemoveStatusCondition(t *testing.T) {
 		expected      []metav1.Condition
 	}{
 		{
-			name: "present",
+			name: "present-first",
 			conditions: []metav1.Condition{
 				{Type: "first"},
 				{Type: "second"},
 				{Type: "third"},
+			},
+			conditionType: "first",
+			expectRemoval: true,
+			expected: []metav1.Condition{
+				{Type: "second"},
+				{Type: "third"},
+			},
+		},
+		{
+			name: "present-last",
+			conditions: []metav1.Condition{
+				{Type: "first"},
+				{Type: "second"},
+				{Type: "third"},
+			},
+			conditionType: "third",
+			expectRemoval: true,
+			expected: []metav1.Condition{
+				{Type: "first"},
+				{Type: "second"},
+			},
+		},
+		{
+			name: "preserve-order",
+			conditions: []metav1.Condition{
+				{Type: "first"},
+				{Type: "second"},
+				{Type: "third"},
+				{Type: "fourth"},
 			},
 			conditionType: "second",
 			expectRemoval: true,
 			expected: []metav1.Condition{
 				{Type: "first"},
 				{Type: "third"},
+				{Type: "fourth"},
 			},
 		},
 		{
@@ -145,7 +175,7 @@ func TestRemoveStatusCondition(t *testing.T) {
 			},
 		},
 		{
-			name:          "empty_conditions",
+			name:          "empty-conditions",
 			conditions:    []metav1.Condition{},
 			conditionType: "Foo",
 			expected:      []metav1.Condition{},
