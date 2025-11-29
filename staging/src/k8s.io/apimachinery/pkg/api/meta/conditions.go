@@ -71,8 +71,7 @@ func SetStatusCondition(conditions *[]metav1.Condition, newCondition metav1.Cond
 // true if it was present and got removed.
 // conditions must be non-nil.
 func RemoveStatusCondition(conditions *[]metav1.Condition, conditionType string) (removed bool) {
-	length := len(*conditions)
-	if conditions == nil || length == 0 {
+	if conditions == nil || len(*conditions) == 0 {
 		return false
 	}
 
