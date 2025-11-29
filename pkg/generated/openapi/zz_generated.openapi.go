@@ -32379,6 +32379,7 @@ func schema_k8sio_api_core_v1_Secret(ref common.ReferenceCallback) common.OpenAP
 					"type": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Used to facilitate programmatic handling of secret data. More info: https://kubernetes.io/docs/concepts/configuration/secret/#secret-types",
+							Default:     "Opaque",
 							Type:        []string{"string"},
 							Format:      "",
 						},
