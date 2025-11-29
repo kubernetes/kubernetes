@@ -1,5 +1,5 @@
 /*
-Copyright 2024 The Kubernetes Authors.
+Copyright 2025 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -42,9 +42,9 @@ var (
 
 // FeatureGateJSON represents a feature gate in JSON output format
 type FeatureGateJSON struct {
-	Name         string       `json:"name"`
-	Stages       []StageJSON  `json:"stages"`
-	Dependencies []string     `json:"dependencies,omitempty"`
+	Name         string      `json:"name"`
+	Stages       []StageJSON `json:"stages"`
+	Dependencies []string    `json:"dependencies,omitempty"`
 }
 
 // StageJSON represents a stage in the feature gate lifecycle
@@ -56,19 +56,27 @@ type StageJSON struct {
 	Locked      bool   `json:"locked,omitempty"`
 }
 
+// stageInfo holds version range info for a single stage entry
+type stageInfo struct {
+	fromVersion string
+	toVersion   string
+	defaultOn   bool
+	locked      bool
+}
+
 // featureInfo holds processed information about a feature gate (for markdown)
 type featureInfo struct {
 	name         string
 	stage        string
 	stageOrder   int // for sorting: 1=Alpha, 2=Beta, 3=GA, 4=Deprecated
 	stageDisplay string
-	alpha        string
+	alphaStages  []stageInfo
 	alphaVersion *version.Version
-	beta         string
+	betaStages   []stageInfo
 	betaVersion  *version.Version
-	ga           string
+	gaStages     []stageInfo
 	gaVersion    *version.Version
-	deprecated   string
+	depStages    []stageInfo
 	depVersion   *version.Version
 	deps         string
 	linkCode     string
@@ -292,22 +300,41 @@ func generateMarkdown(sortBy string, reverseSort bool, filterStage string) strin
 		// Sort specs by version to process in order
 		sort.Sort(featuregate.VersionedSpecs(specs))
 
-		for _, spec := range specs {
-			verStr := spec.Version.String()
-			indicator := ""
-			if spec.Default {
-				indicator += " :ballot_box_with_check:"
-			}
-			if spec.LockToDefault {
-				indicator += " :closed_lock_with_key:"
-			}
+		// First pass: collect all entries with their stage info
+		type rawEntry struct {
+			version      *version.Version
+			verStr       string
+			isAlpha      bool
+			isBeta       bool
+			isGA         bool
+			isDeprecated bool
+			defaultOn    bool
+			locked       bool
+		}
+		var entries []rawEntry
 
+		for _, spec := range specs {
+			entry := rawEntry{
+				version:   spec.Version,
+				verStr:    spec.Version.String(),
+				defaultOn: spec.Default,
+				locked:    spec.LockToDefault,
+			}
 			switch spec.PreRelease {
 			case featuregate.Alpha:
-				if len(info.alpha) > 0 {
-					info.alpha += ", "
-				}
-				info.alpha += verStr + indicator
+				entry.isAlpha = true
+			case featuregate.Beta:
+				entry.isBeta = true
+			case featuregate.GA:
+				entry.isGA = true
+			case featuregate.Deprecated:
+				entry.isDeprecated = true
+			}
+			entries = append(entries, entry)
+
+			// Track first version and current stage
+			switch spec.PreRelease {
+			case featuregate.Alpha:
 				if info.alphaVersion == nil {
 					info.alphaVersion = spec.Version
 				}
@@ -321,10 +348,6 @@ func generateMarkdown(sortBy string, reverseSort bool, filterStage string) strin
 					info.stageDisplay += " :closed_lock_with_key:"
 				}
 			case featuregate.Beta:
-				if len(info.beta) > 0 {
-					info.beta += ", "
-				}
-				info.beta += verStr + indicator
 				if info.betaVersion == nil {
 					info.betaVersion = spec.Version
 				}
@@ -338,10 +361,6 @@ func generateMarkdown(sortBy string, reverseSort bool, filterStage string) strin
 					info.stageDisplay += " :closed_lock_with_key:"
 				}
 			case featuregate.GA:
-				if len(info.ga) > 0 {
-					info.ga += ", "
-				}
-				info.ga += verStr + indicator
 				if info.gaVersion == nil {
 					info.gaVersion = spec.Version
 				}
@@ -355,19 +374,6 @@ func generateMarkdown(sortBy string, reverseSort bool, filterStage string) strin
 					info.stageDisplay += " :closed_lock_with_key:"
 				}
 			case featuregate.Deprecated:
-				depIndicator := ""
-				if spec.Default {
-					depIndicator += " :ballot_box_with_check:"
-				} else {
-					depIndicator += " :red_circle:"
-				}
-				if spec.LockToDefault {
-					depIndicator += " :closed_lock_with_key:"
-				}
-				if len(info.deprecated) > 0 {
-					info.deprecated += ", "
-				}
-				info.deprecated += verStr + depIndicator
 				if info.depVersion == nil {
 					info.depVersion = spec.Version
 				}
@@ -382,6 +388,70 @@ func generateMarkdown(sortBy string, reverseSort bool, filterStage string) strin
 				if spec.LockToDefault {
 					info.stageDisplay += " :closed_lock_with_key:"
 				}
+			}
+		}
+
+		// Second pass: build stage ranges with toVersion, grouping by stage+default+locked
+		for i := 0; i < len(entries); i++ {
+			entry := entries[i]
+			si := stageInfo{
+				fromVersion: entry.verStr,
+				defaultOn:   entry.defaultOn,
+				locked:      entry.locked,
+			}
+
+			// Find toVersion: look for next entry that represents a change
+			for j := i + 1; j < len(entries); j++ {
+				sameStage := (entry.isAlpha == entries[j].isAlpha &&
+					entry.isBeta == entries[j].isBeta &&
+					entry.isGA == entries[j].isGA &&
+					entry.isDeprecated == entries[j].isDeprecated)
+				if !sameStage ||
+					entries[j].defaultOn != entry.defaultOn ||
+					entries[j].locked != entry.locked {
+					si.toVersion = getPreviousMinorVersion(entries[j].verStr)
+					break
+				}
+			}
+
+			// Skip if this is a duplicate (same stage, same default, same locked as previous)
+			// by checking if we should merge with previous entry
+			if entry.isAlpha {
+				if len(info.alphaStages) > 0 {
+					last := &info.alphaStages[len(info.alphaStages)-1]
+					if last.defaultOn == si.defaultOn && last.locked == si.locked {
+						last.toVersion = si.toVersion
+						continue
+					}
+				}
+				info.alphaStages = append(info.alphaStages, si)
+			} else if entry.isBeta {
+				if len(info.betaStages) > 0 {
+					last := &info.betaStages[len(info.betaStages)-1]
+					if last.defaultOn == si.defaultOn && last.locked == si.locked {
+						last.toVersion = si.toVersion
+						continue
+					}
+				}
+				info.betaStages = append(info.betaStages, si)
+			} else if entry.isGA {
+				if len(info.gaStages) > 0 {
+					last := &info.gaStages[len(info.gaStages)-1]
+					if last.defaultOn == si.defaultOn && last.locked == si.locked {
+						last.toVersion = si.toVersion
+						continue
+					}
+				}
+				info.gaStages = append(info.gaStages, si)
+			} else if entry.isDeprecated {
+				if len(info.depStages) > 0 {
+					last := &info.depStages[len(info.depStages)-1]
+					if last.defaultOn == si.defaultOn && last.locked == si.locked {
+						last.toVersion = si.toVersion
+						continue
+					}
+				}
+				info.depStages = append(info.depStages, si)
 			}
 		}
 
@@ -434,7 +504,11 @@ func generateMarkdown(sortBy string, reverseSort bool, filterStage string) strin
 
 	for _, info := range features {
 		sb.WriteString(fmt.Sprintf("| %s | %s | %s | %s | %s | %s | %s | %s %s |\n",
-			info.name, info.stageDisplay, info.alpha, info.beta, info.ga, info.deprecated,
+			info.name, info.stageDisplay,
+			formatStageRanges(info.alphaStages, false),
+			formatStageRanges(info.betaStages, false),
+			formatStageRanges(info.gaStages, false),
+			formatStageRanges(info.depStages, true),
 			info.deps, info.linkCode, info.linkKEPs))
 	}
 
@@ -457,6 +531,39 @@ func generateMarkdown(sortBy string, reverseSort bool, filterStage string) strin
 	sb.WriteString(fmt.Sprintf("| **Total** | **%d** | **100%%** |\n", total))
 
 	return sb.String()
+}
+
+// formatStageRanges formats a list of stage ranges for markdown display
+// Each range shows "fromVersion-toVersion" with indicators for default/locked state
+// If showDisabledIndicator is true, shows :red_circle: for disabled (used for Deprecated)
+func formatStageRanges(stages []stageInfo, showDisabledIndicator bool) string {
+	if len(stages) == 0 {
+		return ""
+	}
+
+	var parts []string
+	for _, s := range stages {
+		var versionRange string
+		if s.toVersion != "" && s.toVersion != s.fromVersion {
+			versionRange = s.fromVersion + "-" + s.toVersion
+		} else {
+			versionRange = s.fromVersion
+		}
+
+		indicator := ""
+		if s.defaultOn {
+			indicator += " :ballot_box_with_check:"
+		} else if showDisabledIndicator {
+			indicator += " :red_circle:"
+		}
+		if s.locked {
+			indicator += " :closed_lock_with_key:"
+		}
+
+		parts = append(parts, versionRange+indicator)
+	}
+
+	return strings.Join(parts, ", ")
 }
 
 func sortFeatures(features []featureInfo, sortBy string, reverseSort bool) {
