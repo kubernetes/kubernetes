@@ -188,9 +188,9 @@ func Validate_Secret(ctx context.Context, op operation.Operation, fldPath *field
 
 	// field corev1.Secret.Immutable
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *bool) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *bool, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call field-attached validations
@@ -202,16 +202,16 @@ func Validate_Secret(ctx context.Context, op operation.Operation, fldPath *field
 				return // do not proceed
 			}
 			return
-		}(fldPath.Child("immutable"), obj.Immutable, safe.Field(oldObj, func(oldObj *corev1.Secret) *bool { return oldObj.Immutable }))...)
+		}(fldPath.Child("immutable"), obj.Immutable, safe.Field(oldObj, func(oldObj *corev1.Secret) *bool { return oldObj.Immutable }), oldObj != nil)...)
 
 	// field corev1.Secret.Data has no validation
 	// field corev1.Secret.StringData has no validation
 
 	// field corev1.Secret.Type
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *corev1.SecretType) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *corev1.SecretType, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call field-attached validations
@@ -224,7 +224,7 @@ func Validate_Secret(ctx context.Context, op operation.Operation, fldPath *field
 				return // do not proceed
 			}
 			return
-		}(fldPath.Child("type"), &obj.Type, safe.Field(oldObj, func(oldObj *corev1.Secret) *corev1.SecretType { return &oldObj.Type }))...)
+		}(fldPath.Child("type"), &obj.Type, safe.Field(oldObj, func(oldObj *corev1.Secret) *corev1.SecretType { return &oldObj.Type }), oldObj != nil)...)
 
 	return errs
 }
@@ -237,15 +237,15 @@ func Validate_SecretList(ctx context.Context, op operation.Operation, fldPath *f
 
 	// field corev1.SecretList.Items
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []corev1.Secret) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj []corev1.Secret, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
 			// iterate the list and call the type's validation function
 			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_Secret)...)
 			return
-		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *corev1.SecretList) []corev1.Secret { return oldObj.Items }))...)
+		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *corev1.SecretList) []corev1.Secret { return oldObj.Items }), oldObj != nil)...)
 
 	return errs
 }
