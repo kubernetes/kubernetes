@@ -725,36 +725,43 @@ See https://kubernetes.io/docs/reference/using-api/server-side-apply/#conflicts`
 		return err
 	}
 
-	if o.DryRunStrategy != cmdutil.DryRunClient {
-		metadata, _ := meta.Accessor(info.Object)
-		annotationMap := metadata.GetAnnotations()
-		if _, ok := annotationMap[corev1.LastAppliedConfigAnnotation]; !ok {
-			fmt.Fprintf(o.ErrOut, warningNoLastAppliedConfigAnnotation, info.ObjectName(), corev1.LastAppliedConfigAnnotation, o.cmdBaseName)
-		}
+	metadata, _ := meta.Accessor(info.Object)
+	annotationMap := metadata.GetAnnotations()
+	if _, ok := annotationMap[corev1.LastAppliedConfigAnnotation]; !ok {
+		fmt.Fprintf(o.ErrOut, warningNoLastAppliedConfigAnnotation, info.ObjectName(), corev1.LastAppliedConfigAnnotation, o.cmdBaseName) //nolint:errcheck
+	}
 
-		patcher, err := newPatcher(o, info, helper)
+	patcher, err := newPatcher(o, info, helper)
+	if err != nil {
+		return err
+	}
+
+	var patchBytes []byte
+	var patchedObject runtime.Object
+
+	if o.DryRunStrategy != cmdutil.DryRunClient {
+		patchBytes, patchedObject, err = patcher.Patch(info.Object, modified, info.Source, info.Namespace, info.Name, o.ErrOut)
+	} else {
+		patchBytes, patchedObject, err = patcher.PatchLocal(info.Object, modified, o.ErrOut)
+	}
+
+	if err != nil {
+		return cmdutil.AddSourceToErr(fmt.Sprintf("applying patch:\n%s\nto:\n%v\nfor:", patchBytes, info), info.Source, err)
+	}
+
+	info.Refresh(patchedObject, true) //nolint:errcheck
+
+	WarnIfDeleting(info.Object, o.ErrOut)
+
+	if string(patchBytes) == "{}" && !o.shouldPrintObject() {
+		printer, err := o.ToPrinter("unchanged")
 		if err != nil {
 			return err
 		}
-		patchBytes, patchedObject, err := patcher.Patch(info.Object, modified, info.Source, info.Namespace, info.Name, o.ErrOut)
-		if err != nil {
-			return cmdutil.AddSourceToErr(fmt.Sprintf("applying patch:\n%s\nto:\n%v\nfor:", patchBytes, info), info.Source, err)
+		if err = printer.PrintObj(info.Object, o.Out); err != nil {
+			return err
 		}
-
-		info.Refresh(patchedObject, true)
-
-		WarnIfDeleting(info.Object, o.ErrOut)
-
-		if string(patchBytes) == "{}" && !o.shouldPrintObject() {
-			printer, err := o.ToPrinter("unchanged")
-			if err != nil {
-				return err
-			}
-			if err = printer.PrintObj(info.Object, o.Out); err != nil {
-				return err
-			}
-			return nil
-		}
+		return nil
 	}
 
 	if o.shouldPrintObject() {
