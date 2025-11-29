@@ -71,20 +71,19 @@ func SetStatusCondition(conditions *[]metav1.Condition, newCondition metav1.Cond
 // true if it was present and got removed.
 // conditions must be non-nil.
 func RemoveStatusCondition(conditions *[]metav1.Condition, conditionType string) (removed bool) {
-	if conditions == nil || len(*conditions) == 0 {
+	length := len(*conditions)
+	if conditions == nil || length == 0 {
 		return false
 	}
-	newConditions := make([]metav1.Condition, 0, len(*conditions)-1)
-	for _, condition := range *conditions {
-		if condition.Type != conditionType {
-			newConditions = append(newConditions, condition)
+
+	for i, condition := range *conditions {
+		if condition.Type == conditionType {
+			(*conditions) = append((*conditions)[:i], (*conditions)[i+1:]...)
+			return true
 		}
 	}
 
-	removed = len(*conditions) != len(newConditions)
-	*conditions = newConditions
-
-	return removed
+	return false
 }
 
 // FindStatusCondition finds the conditionType in conditions.
