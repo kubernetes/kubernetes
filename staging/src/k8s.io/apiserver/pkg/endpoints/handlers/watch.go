@@ -297,7 +297,7 @@ func (s *WatchServer) HandleWS(ws *websocket.Conn) {
 	defer cleanup()
 
 	go func() {
-		defer utilruntime.HandleCrash()
+		defer utilruntime.HandleCrashWithContext(ws.Request().Context())
 		// This blocks until the connection is closed.
 		// Client should not send anything.
 		wsstream.IgnoreReceives(ws, 0)
