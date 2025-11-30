@@ -140,8 +140,8 @@ func (d *validatingDispatcher) Dispatch(ctx context.Context, attr admission.Attr
 				// This failure mode for the handler functions properly using the channel below.
 				recover()
 			}()
-			defer utilruntime.HandleCrash(
-				func(r interface{}) {
+			defer utilruntime.HandleCrashWithContext(ctx,
+				func(ctx context.Context, r interface{}) {
 					if r == nil {
 						return
 					}
