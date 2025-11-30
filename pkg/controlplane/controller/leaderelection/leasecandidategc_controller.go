@@ -61,7 +61,7 @@ func NewLeaseCandidateGC(clientset kubernetes.Interface, gcCheckPeriod time.Dura
 
 // Run starts one worker.
 func (c *LeaseCandidateGCController) Run(ctx context.Context) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 	defer klog.Infof("Shutting down apiserver leasecandidate garbage collector")
 
 	klog.Infof("Starting apiserver leasecandidate garbage collector")
