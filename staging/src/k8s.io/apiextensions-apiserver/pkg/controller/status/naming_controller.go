@@ -299,7 +299,7 @@ func (c *NamingConditionController) Run(stopCh <-chan struct{}) {
 
 // RunWithContext is a context-aware version of Run.
 func (c *NamingConditionController) RunWithContext(ctx context.Context) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 	defer c.queue.ShutDown()
 
 	klog.Info("Starting NamingConditionController")

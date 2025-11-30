@@ -324,7 +324,7 @@ type attachDetachController struct {
 }
 
 func (adc *attachDetachController) Run(ctx context.Context) {
-	defer runtime.HandleCrash()
+	defer runtime.HandleCrashWithContext(ctx)
 
 	// Start events processing pipeline.
 	adc.broadcaster.StartStructuredLogging(3)

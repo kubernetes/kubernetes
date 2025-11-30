@@ -169,7 +169,7 @@ func (cnc *CloudNodeController) RunWithContext(ctx context.Context, controllerMa
 	cnc.recorder = cnc.broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"})
 	stopCh := ctx.Done()
 
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 	defer cnc.workqueue.ShutDown()
 
 	// Start event processing pipeline.

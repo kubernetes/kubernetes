@@ -196,7 +196,7 @@ func (c *ConditionController) Run(workers int, stopCh <-chan struct{}) {
 
 // RunWithContext is a context-aware version of Run.
 func (c *ConditionController) RunWithContext(workers int, ctx context.Context) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 	defer c.queue.ShutDown()
 
 	klog.Infof("Starting NonStructuralSchemaConditionController")

@@ -200,7 +200,7 @@ func NewVACProtectionController(logger klog.Logger,
 
 // Run runs the controller goroutines.
 func (c *Controller) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting VAC protection controller")

@@ -160,7 +160,7 @@ func NewController(
 // is closed, at which point it will shutdown the workqueue and wait for
 // workers to finish processing their current work items.
 func (c *Controller) Run(ctx context.Context, workers int) error {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 	defer c.workqueue.ShutDown()
 	logger := klog.FromContext(ctx)
 

@@ -411,7 +411,7 @@ WaitForStreams:
 func (*v1ProtocolHandler) supportsTerminalResizing() bool { return false }
 
 func handleResizeEvents(reqctx context.Context, stream io.Reader, channel chan<- remotecommand.TerminalSize) {
-	defer runtime.HandleCrash()
+	defer runtime.HandleCrashWithContext(reqctx)
 	defer close(channel)
 
 	decoder := json.NewDecoder(stream)

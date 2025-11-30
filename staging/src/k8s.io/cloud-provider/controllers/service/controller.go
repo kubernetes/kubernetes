@@ -223,7 +223,7 @@ func (c *Controller) Run(ctx context.Context, workers int, controllerManagerMetr
 	c.eventBroadcaster = record.NewBroadcaster(record.WithContext(ctx))
 	c.eventRecorder = c.eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "service-controller"})
 
-	defer runtime.HandleCrash()
+	defer runtime.HandleCrashWithContext(ctx)
 	defer c.serviceQueue.ShutDown()
 	defer c.nodeQueue.ShutDown()
 

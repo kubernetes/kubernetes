@@ -182,7 +182,7 @@ type Controller struct {
 // Run will not return until stopCh is closed. workers determines how many
 // endpoints will be handled in parallel.
 func (e *Controller) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	// Start events processing pipeline.
 	e.eventBroadcaster.StartStructuredLogging(3)
