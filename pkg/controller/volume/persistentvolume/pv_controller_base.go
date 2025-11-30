@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -64,6 +63,7 @@ import (
 type ControllerParameters struct {
 	KubeClient                clientset.Interface
 	SyncPeriod                time.Duration
+	ConcurrentSyncs           int
 	VolumePlugins             []vol.VolumePlugin
 	VolumeInformer            coreinformers.PersistentVolumeInformer
 	ClaimInformer             coreinformers.PersistentVolumeClaimInformer
@@ -91,6 +91,7 @@ func NewController(ctx context.Context, p ControllerParameters) (*PersistentVolu
 		claimQueue:                    workqueue.NewTypedWithConfig(workqueue.TypedQueueConfig[string]{Name: "claims"}),
 		volumeQueue:                   workqueue.NewTypedWithConfig(workqueue.TypedQueueConfig[string]{Name: "volumes"}),
 		resyncPeriod:                  p.SyncPeriod,
+		workers:                       p.ConcurrentSyncs,
 		operationTimestamps:           metrics.NewOperationStartTimeCache(),
 	}
 
@@ -306,7 +307,7 @@ func (ctrl *PersistentVolumeController) Run(ctx context.Context) {
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting persistent volume controller")
 
-	var wg sync.WaitGroup
+	var wg wait.Group
 	defer func() {
 		logger.Info("Shutting down persistent volume controller")
 		ctrl.claimQueue.ShutDown()
@@ -321,15 +322,22 @@ func (ctrl *PersistentVolumeController) Run(ctx context.Context) {
 	ctrl.initializeCaches(logger, ctrl.volumeLister, ctrl.claimLister)
 	metrics.Register(ctrl.volumes.store, ctrl.claims, &ctrl.volumePluginMgr)
 
-	wg.Go(func() {
-		wait.Until(func() { ctrl.resync(ctx) }, ctrl.resyncPeriod, ctx.Done())
+	wg.StartWithContext(ctx, func(ctx context.Context) {
+		wait.UntilWithContext(ctx, ctrl.resync, ctrl.resyncPeriod)
 	})
-	wg.Go(func() {
-		wait.UntilWithContext(ctx, ctrl.volumeWorker, time.Second)
-	})
-	wg.Go(func() {
-		wait.UntilWithContext(ctx, ctrl.claimWorker, time.Second)
-	})
+
+	for i := 0; i < ctrl.workers; i++ {
+		wg.StartWithContext(ctx, func(ctx context.Context) {
+			wait.UntilWithContext(ctx, ctrl.volumeWorker, time.Second)
+		})
+	}
+
+	for i := 0; i < ctrl.workers; i++ {
+		wg.StartWithContext(ctx, func(ctx context.Context) {
+			wait.UntilWithContext(ctx, ctrl.claimWorker, time.Second)
+		})
+	}
+
 	<-ctx.Done()
 }
 
