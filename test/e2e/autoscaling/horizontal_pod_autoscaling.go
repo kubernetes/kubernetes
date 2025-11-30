@@ -246,20 +246,20 @@ func scaleUp(ctx context.Context, name string, kind schema.GroupVersionKind, res
 		perPodMemRequest: 500,
 		targetValue:      getTargetValueByType(100, 20, metricTargetType),
 		minPods:          1,
-		maxPods:          5,
+		maxPods:          4,
 		firstScale:       3,
 		firstScaleStasis: stasis,
-		secondScale:      5,
+		secondScale:      4,
 		resourceType:     resourceType,
 		metricTargetType: metricTargetType,
 	}
 	if resourceType == cpuResource {
 		st.initCPUTotal = 250
-		st.cpuBurst = 700
+		st.cpuBurst = 500
 	}
 	if resourceType == memResource {
 		st.initMemTotal = 250
-		st.memBurst = 700
+		st.memBurst = 500
 	}
 	st.run(ctx, name, kind, f)
 }
