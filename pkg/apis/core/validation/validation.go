@@ -299,11 +299,6 @@ var ValidateNodeName = apimachineryvalidation.NameIsDNSSubdomain
 // trailing dashes are allowed.
 var ValidateNamespaceName = apimachineryvalidation.ValidateNamespaceName
 
-// ValidateLimitRangeName can be used to check whether the given limit range name is valid.
-// Prefix indicates this name will be used as part of generation, in which case
-// trailing dashes are allowed.
-var ValidateLimitRangeName = apimachineryvalidation.NameIsDNSSubdomain
-
 // ValidateResourceQuotaName can be used to check whether the given
 // resource quota name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
@@ -7512,7 +7507,10 @@ func validateLimitRangeResourceName(limitType core.LimitType, value core.Resourc
 
 // ValidateLimitRange tests if required fields in the LimitRange are set.
 func ValidateLimitRange(limitRange *core.LimitRange) field.ErrorList {
-	allErrs := ValidateObjectMeta(&limitRange.ObjectMeta, true, ValidateLimitRangeName, field.NewPath("metadata"))
+	validateLongName := func(fldPath *field.Path, name string) field.ErrorList {
+		return validate.LongName(context.Background(), operation.Operation{}, fldPath, &name, nil).MarkCoveredByDeclarative()
+	}
+	allErrs := ValidateObjectMetaWithOpts(&limitRange.ObjectMeta, true, validateLongName, field.NewPath("metadata"))
 
 	// ensure resource names are properly qualified per docs/design/resources.md
 	limitTypeSet := map[core.LimitType]bool{}
