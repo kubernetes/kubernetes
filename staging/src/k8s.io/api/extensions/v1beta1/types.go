@@ -536,9 +536,10 @@ type DaemonSetCondition struct {
 // +k8s:prerelease-lifecycle-gen:removed=1.16
 // +k8s:prerelease-lifecycle-gen:replacement=apps,v1,DaemonSet
 
-// DEPRECATED - This group version of DaemonSet is deprecated by apps/v1beta2/DaemonSet. See the release notes for
-// more information.
 // DaemonSet represents the configuration of a daemon set.
+//
+// Deprecated: This group version of DaemonSet is deprecated by apps/v1beta2/DaemonSet. See the release notes for
+// more information.
 type DaemonSet struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -561,10 +562,11 @@ type DaemonSet struct {
 }
 
 const (
-	// DEPRECATED: DefaultDaemonSetUniqueLabelKey is used instead.
 	// DaemonSetTemplateGenerationKey is the key of the labels that is added
 	// to daemon set pods to distinguish between old and new pod templates
 	// during DaemonSet template update.
+	//
+	// Deprecated: DefaultDaemonSetUniqueLabelKey is used instead.
 	DaemonSetTemplateGenerationKey string = "pod-template-generation"
 
 	// DefaultDaemonSetUniqueLabelKey is the default label key that is added

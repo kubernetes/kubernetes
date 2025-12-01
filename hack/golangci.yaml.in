@@ -158,6 +158,7 @@ linters:
     - forbidigo
     - ginkgolinter
     - gocritic
+    - godoclint
     - govet
     {{- if .Hints}}
     - errorlint
@@ -234,7 +235,7 @@ linters:
           pkg: ^github.com/onsi/gomega$
           msg: "it does not produce a good failure message - use BeFalseBecause with an explicit printf-style failure message instead, or plain Go: if ... { ginkgo.Fail(...) }"        
       {{- end}}
-      {{- if .Base }}
+    {{- if .Base }}
     gocritic:
       enabled-checks: # These are in addition to the default checks - see https://golangci-lint.run/docs/linters/configuration/#gocritic
         - boolExprSimplify
@@ -255,6 +256,11 @@ linters:
         - unslice
         - valSwap
     {{- end}}
+    godoclint:
+      default: none
+      enable:
+        - deprecated
+        - no-unused-link
     revive:
       # Only these rules are enabled.
       rules:

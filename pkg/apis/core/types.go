@@ -1134,7 +1134,7 @@ type AWSElasticBlockStoreVolumeSource struct {
 // Git repo volumes do not support ownership management.
 // Git repo volumes support SELinux relabeling.
 //
-// DEPRECATED: GitRepo is deprecated. To provision a container with a git repo, mount an
+// Deprecated: GitRepo is deprecated. To provision a container with a git repo, mount an
 // EmptyDir into an InitContainer that clones the repo using git, then mount the EmptyDir
 // into the Pod's container.
 type GitRepoVolumeSource struct {

@@ -22,7 +22,7 @@ limitations under the License.
 // Package v1beta3 defines the v1beta3 version of the kubeadm configuration file format.
 // This version improves on the v1beta2 format by fixing some minor issues and adding a few new fields.
 //
-// DEPRECATED: v1beta3 is deprecated in favor of v1beta4 and will be removed in a future release, 1.34 or later.
+// v1beta3 is deprecated in favor of v1beta4 and will be removed in a future release, 1.34 or later.
 // Please migrate.
 //
 // A list of changes since v1beta2:
@@ -282,4 +282,6 @@ limitations under the License.
 // node only (e.g. the node ip).
 //
 // - APIEndpoint, that represents the endpoint of the instance of the API server to be eventually deployed on this node.
+//
+// Deprecated: v1beta3 is deprecated in favor of v1beta4 and will be removed in a future release, 1.34 or later.
 package v1beta3

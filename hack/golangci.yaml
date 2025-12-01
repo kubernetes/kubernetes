@@ -180,6 +180,7 @@ linters:
     - forbidigo
     - ginkgolinter
     - gocritic
+    - godoclint
     - govet
     - ineffassign
     - kubeapilinter
@@ -433,6 +434,11 @@ linters:
         - underef
         - unslice
         - valSwap
+    godoclint:
+      default: none
+      enable:
+        - deprecated
+        - no-unused-link
     revive:
       # Only these rules are enabled.
       rules:

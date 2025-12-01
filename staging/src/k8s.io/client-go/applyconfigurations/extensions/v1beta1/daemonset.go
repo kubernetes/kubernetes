@@ -30,9 +30,10 @@ import (
 // DaemonSetApplyConfiguration represents a declarative configuration of the DaemonSet type for use
 // with apply.
 //
-// DEPRECATED - This group version of DaemonSet is deprecated by apps/v1beta2/DaemonSet. See the release notes for
-// more information.
 // DaemonSet represents the configuration of a daemon set.
+//
+// Deprecated: This group version of DaemonSet is deprecated by apps/v1beta2/DaemonSet. See the release notes for
+// more information.
 type DaemonSetApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration `json:",inline"`
 	// Standard object's metadata.
