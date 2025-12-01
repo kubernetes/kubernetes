@@ -66,6 +66,22 @@ type resourceAllocationScorer struct {
 	DRACaches
 }
 
+// Filtering and scoring based on the container resources and overheads.
+func (r *resourceAllocationScorer) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
+	opts := ResourceRequestsOptions{
+		EnablePodLevelResources:   r.enablePodLevelResources,
+		EnableDRAExtendedResource: r.enableDRAExtendedResource,
+	}
+
+	if r.enableDRAExtendedResource {
+		return nil, fwk.NewStatus(fwk.Unschedulable, "signature disabled when dra extended resources enabled")
+	}
+
+	return []fwk.SignFragment{
+		{Key: fwk.ResourcesSignerName, Value: computePodResourceRequest(pod, opts)},
+	}, nil
+}
+
 // buildNodeMatchCacheKey creates a string cache key for node matching results
 // Using a string key is significantly faster than struct keys with sync.Map
 func buildNodeMatchCacheKey(nodeName string, nodeNameToMatch string, allNodesMatch bool, nodeSelectorHash string) string {

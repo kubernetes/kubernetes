@@ -117,22 +117,6 @@ func (ba *BalancedAllocation) Name() string {
 	return BalancedAllocationName
 }
 
-// Filtering and scoring based on the container resources and overheads.
-func (pl *BalancedAllocation) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
-	opts := ResourceRequestsOptions{
-		EnablePodLevelResources:   pl.enablePodLevelResources,
-		EnableDRAExtendedResource: pl.enableDRAExtendedResource,
-	}
-
-	if pl.enableDRAExtendedResource {
-		return nil, fwk.NewStatus(fwk.Unschedulable, "signature disabled when dra extended resources enabled")
-	}
-
-	return []fwk.SignFragment{
-		{Key: fwk.ResourcesSignerName, Value: computePodResourceRequest(pod, opts)},
-	}, nil
-}
-
 // Score invoked at the score extension point.
 func (ba *BalancedAllocation) Score(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) (int64, *fwk.Status) {
 	s, err := getBalancedAllocationPreScoreState(state)
