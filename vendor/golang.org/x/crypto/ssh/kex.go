@@ -8,13 +8,14 @@ import (
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
+	"crypto/fips140"
 	"crypto/rand"
-	"crypto/subtle"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
 	"math/big"
+	"slices"
 
 	"golang.org/x/crypto/curve25519"
 )
@@ -396,9 +397,27 @@ func ecHash(curve elliptic.Curve) crypto.Hash {
 	return crypto.SHA512
 }
 
+// kexAlgoMap defines the supported KEXs. KEXs not included are not supported
+// and will not be negotiated, even if explicitly configured. When FIPS mode is
+// enabled, only FIPS-approved algorithms are included.
 var kexAlgoMap = map[string]kexAlgorithm{}
 
 func init() {
+	// mlkem768x25519-sha256 we'll work with fips140=on but not fips140=only
+	// until Go 1.26.
+	kexAlgoMap[KeyExchangeMLKEM768X25519] = &mlkem768WithCurve25519sha256{}
+	kexAlgoMap[KeyExchangeECDHP521] = &ecdh{elliptic.P521()}
+	kexAlgoMap[KeyExchangeECDHP384] = &ecdh{elliptic.P384()}
+	kexAlgoMap[KeyExchangeECDHP256] = &ecdh{elliptic.P256()}
+
+	if fips140.Enabled() {
+		defaultKexAlgos = slices.DeleteFunc(defaultKexAlgos, func(algo string) bool {
+			_, ok := kexAlgoMap[algo]
+			return !ok
+		})
+		return
+	}
+
 	p, _ := new(big.Int).SetString(oakleyGroup2, 16)
 	kexAlgoMap[InsecureKeyExchangeDH1SHA1] = &dhGroup{
 		g:        new(big.Int).SetInt64(2),
@@ -432,9 +451,6 @@ func init() {
 		hashFunc: crypto.SHA512,
 	}
 
-	kexAlgoMap[KeyExchangeECDHP521] = &ecdh{elliptic.P521()}
-	kexAlgoMap[KeyExchangeECDHP384] = &ecdh{elliptic.P384()}
-	kexAlgoMap[KeyExchangeECDHP256] = &ecdh{elliptic.P256()}
 	kexAlgoMap[KeyExchangeCurve25519] = &curve25519sha256{}
 	kexAlgoMap[keyExchangeCurve25519LibSSH] = &curve25519sha256{}
 	kexAlgoMap[InsecureKeyExchangeDHGEXSHA1] = &dhGEXSHA{hashFunc: crypto.SHA1}
@@ -454,14 +470,16 @@ func (kp *curve25519KeyPair) generate(rand io.Reader) error {
 	if _, err := io.ReadFull(rand, kp.priv[:]); err != nil {
 		return err
 	}
-	curve25519.ScalarBaseMult(&kp.pub, &kp.priv)
+	p, err := curve25519.X25519(kp.priv[:], curve25519.Basepoint)
+	if err != nil {
+		return fmt.Errorf("curve25519: %w", err)
+	}
+	if len(p) != 32 {
+		return fmt.Errorf("curve25519: internal error: X25519 returned %d bytes, expected 32", len(p))
+	}
+	copy(kp.pub[:], p)
 	return nil
 }
-
-// curve25519Zeros is just an array of 32 zero bytes so that we have something
-// convenient to compare against in order to reject curve25519 points with the
-// wrong order.
-var curve25519Zeros [32]byte
 
 func (kex *curve25519sha256) Client(c packetConn, rand io.Reader, magics *handshakeMagics) (*kexResult, error) {
 	var kp curve25519KeyPair
@@ -485,11 +503,9 @@ func (kex *curve25519sha256) Client(c packetConn, rand io.Reader, magics *handsh
 		return nil, errors.New("ssh: peer's curve25519 public value has wrong length")
 	}
 
-	var servPub, secret [32]byte
-	copy(servPub[:], reply.EphemeralPubKey)
-	curve25519.ScalarMult(&secret, &kp.priv, &servPub)
-	if subtle.ConstantTimeCompare(secret[:], curve25519Zeros[:]) == 1 {
-		return nil, errors.New("ssh: peer's curve25519 public value has wrong order")
+	secret, err := curve25519.X25519(kp.priv[:], reply.EphemeralPubKey)
+	if err != nil {
+		return nil, fmt.Errorf("ssh: peer's curve25519 public value is not valid: %w", err)
 	}
 
 	h := crypto.SHA256.New()
@@ -531,11 +547,9 @@ func (kex *curve25519sha256) Server(c packetConn, rand io.Reader, magics *handsh
 		return nil, err
 	}
 
-	var clientPub, secret [32]byte
-	copy(clientPub[:], kexInit.ClientPubKey)
-	curve25519.ScalarMult(&secret, &kp.priv, &clientPub)
-	if subtle.ConstantTimeCompare(secret[:], curve25519Zeros[:]) == 1 {
-		return nil, errors.New("ssh: peer's curve25519 public value has wrong order")
+	secret, err := curve25519.X25519(kp.priv[:], kexInit.ClientPubKey)
+	if err != nil {
+		return nil, fmt.Errorf("ssh: peer's curve25519 public value is not valid: %w", err)
 	}
 
 	hostKeyBytes := priv.PublicKey().Marshal()

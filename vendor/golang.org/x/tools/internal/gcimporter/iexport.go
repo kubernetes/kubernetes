@@ -569,7 +569,6 @@ func (p *iexporter) exportName(obj types.Object) (res string) {
 
 type iexporter struct {
 	fset    *token.FileSet
-	out     *bytes.Buffer
 	version int
 
 	shallow    bool                // don't put types from other packages in the index
