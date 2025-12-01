@@ -54,32 +54,26 @@ import (
 type KubeControllerManagerConfiguration struct {
 	metav1.TypeMeta
 
-	// Generic holds configuration for a generic controller-manager
-	Generic cmconfig.GenericControllerManagerConfiguration
-	// KubeCloudSharedConfiguration holds configuration for shared related features
-	// both in cloud controller manager and kube-controller manager.
-	KubeCloudShared cpconfig.KubeCloudSharedConfiguration
-
 	// AttachDetachControllerConfiguration holds configuration for
 	// AttachDetachController related features.
 	AttachDetachController attachdetachconfig.AttachDetachControllerConfiguration
-	// CronJobControllerConfiguration holds configuration for CronJobController
-	// related features.
-	CronJobController cronjobconfig.CronJobControllerConfiguration
 	// CSRSigningControllerConfiguration holds configuration for
 	// CSRSigningController related features.
 	CSRSigningController csrsigningconfig.CSRSigningControllerConfiguration
+	// CronJobControllerConfiguration holds configuration for CronJobController
+	// related features.
+	CronJobController cronjobconfig.CronJobControllerConfiguration
 	// DaemonSetControllerConfiguration holds configuration for DaemonSetController
 	// related features.
 	DaemonSetController daemonconfig.DaemonSetControllerConfiguration
 	// DeploymentControllerConfiguration holds configuration for
 	// DeploymentController related features.
 	DeploymentController deploymentconfig.DeploymentControllerConfiguration
-	// DeviceTaintEvictionControllerConfiguration contains elements configuring the device taint eviction controller.
-	DeviceTaintEvictionController devicetaintevictionconfig.DeviceTaintEvictionControllerConfiguration
 	// DeprecatedControllerConfiguration holds configuration for some deprecated
 	// features.
 	DeprecatedController DeprecatedControllerConfiguration
+	// DeviceTaintEvictionControllerConfiguration contains elements configuring the device taint eviction controller.
+	DeviceTaintEvictionController devicetaintevictionconfig.DeviceTaintEvictionControllerConfiguration
 	// EndpointControllerConfiguration holds configuration for EndpointController
 	// related features.
 	EndpointController endpointconfig.EndpointControllerConfiguration
@@ -95,10 +89,15 @@ type KubeControllerManagerConfiguration struct {
 	// GarbageCollectorControllerConfiguration holds configuration for
 	// GarbageCollectorController related features.
 	GarbageCollectorController garbagecollectorconfig.GarbageCollectorControllerConfiguration
+	// Generic holds configuration for a generic controller-manager
+	Generic cmconfig.GenericControllerManagerConfiguration
 	// HPAControllerConfiguration holds configuration for HPAController related features.
 	HPAController poautosclerconfig.HPAControllerConfiguration
 	// JobControllerConfiguration holds configuration for JobController related features.
 	JobController jobconfig.JobControllerConfiguration
+	// KubeCloudSharedConfiguration holds configuration for shared related features
+	// both in cloud controller manager and kube-controller manager.
+	KubeCloudShared cpconfig.KubeCloudSharedConfiguration
 	// LegacySATokenCleanerConfiguration holds configuration for LegacySATokenCleaner related features.
 	LegacySATokenCleaner serviceaccountconfig.LegacySATokenCleanerConfiguration
 	// NamespaceControllerConfiguration holds configuration for NamespaceController
