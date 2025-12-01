@@ -348,6 +348,66 @@ const (
 	}
 }
 
+func TestCheckStructMembers(t *testing.T) {
+	fset := token.NewFileSet()
+	f, err := parser.ParseFile(fset, "test.go", `
+package test
+
+type SampleConfiguration struct {
+	metav1.TypeMeta
+
+	FieldB field.FieldB
+	FieldA FieldA
+	FieldD *FieldD
+	FieldC *field.FieldC
+}
+`, parser.ParseComments)
+	if err != nil {
+		t.Fatalf("Failed to parse test file: %v", err)
+	}
+
+	var foundDecl *ast.GenDecl
+	ast.Inspect(f, func(n ast.Node) bool {
+		if decl, ok := n.(*ast.GenDecl); ok {
+			foundDecl = decl
+			return false
+		}
+		return true
+	})
+
+	if foundDecl == nil {
+		t.Fatalf("Failed to find top-level declaration")
+	}
+
+	var reportMessage string
+	pass := &analysis.Pass{
+		Fset:     fset,
+		Files:    []*ast.File{f},
+		ResultOf: make(map[*analysis.Analyzer]interface{}),
+		Report:   func(d analysis.Diagnostic) { reportMessage = d.Message },
+	}
+
+	checkStructMembers(pass, foundDecl)
+
+	if reportMessage == "" {
+		t.Errorf("Expected Report to be called")
+	}
+
+	// Check that the diff shows all the features
+	if !strings.Contains(reportMessage, "FieldB field.FieldB") ||
+		!strings.Contains(reportMessage, "FieldA FieldA") ||
+		!strings.Contains(reportMessage, "FieldD *FieldD") ||
+		!strings.Contains(reportMessage, "FieldC *field.FieldC") {
+		t.Errorf("Expected diff to contain all fields, got: %s", reportMessage)
+	}
+
+	// Check that the diff contains the expected content
+	expectedContent := "type SampleConfiguration struct {"
+	if !strings.Contains(reportMessage, expectedContent) {
+		t.Errorf("Expected diff to contain %q, got: %s", expectedContent, reportMessage)
+	}
+}
+
 func TestSortedFeatures(t *testing.T) {
 	// Test with properly sorted features
 	src := `
@@ -577,6 +637,7 @@ const FeatureC Feature = "FeatureC"
 func TestAnalyzerRunSimulatingGolangciLint(t *testing.T) {
 	defaultTargetFiles := []string{
 		"pkg/features/kube_features.go",
+		"pkg/controller/apis/config/types.go",
 		"staging/src/k8s.io/apiserver/pkg/features/kube_features.go",
 		"staging/src/k8s.io/client-go/features/known_features.go",
 		"staging/src/k8s.io/controller-manager/pkg/features/kube_features.go",
