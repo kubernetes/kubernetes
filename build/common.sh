@@ -97,8 +97,8 @@ readonly KUBE_RSYNC_PORT="${KUBE_RSYNC_PORT:-}"
 readonly KUBE_CONTAINER_RSYNC_PORT=8730
 
 # These are the default versions (image tags) for their respective base images.
-readonly __default_distroless_iptables_version=v0.7.11
-readonly __default_go_runner_version=v2.4.0-go1.24.9-bookworm.0
+readonly __default_distroless_iptables_version=v0.7.12
+readonly __default_go_runner_version=v2.4.0-go1.24.10-bookworm.0
 readonly __default_setcap_version=bookworm-v1.0.6
 
 # These are the base images for the Docker-wrapped binaries.
