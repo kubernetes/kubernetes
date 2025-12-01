@@ -749,7 +749,18 @@ func inProgress(rule *resourcealpha.DeviceTaintRule, status bool, reason, messag
 	return rule
 }
 
-// TestController covers the event handler logic and handling work.
+func Test(t *testing.T) {
+	ktesting.Run(t,
+		testController,
+		testEviction,
+		synctestDeviceTaintRule,
+		testCancelEviction,
+		testParallelPodDeletion,
+		synctestRetry,
+	)
+}
+
+// testController covers the event handler logic and handling work.
 //
 // It runs inside a synctest bubble without actually starting the
 // controller. Each test case starts with
@@ -760,7 +771,7 @@ func inProgress(rule *resourcealpha.DeviceTaintRule, status bool, reason, messag
 //
 // Then pending work gets handled, potentially multiple times after
 // advancing time to reach "later" work items.
-func TestController(t *testing.T) {
+func testController(tCtx ktesting.TContext) {
 	for name, tc := range map[string]testCase{
 		"empty": {},
 		"populate-pools": {
@@ -1842,8 +1853,6 @@ func TestController(t *testing.T) {
 			wantEvents: l(cancelPodEviction),
 		},
 	} {
-		tCtx := ktesting.Init(t)
-
 		tCtx.Run(name, func(tCtx ktesting.TContext) {
 			numEvents := len(tc.events)
 			if numEvents <= 1 {
@@ -2162,15 +2171,14 @@ device_taint_eviction_controller_pod_deletions_total %[1]d
 	return metricstestutil.GatherAndCompare(metricstestutil.GathererFunc(gather), strings.NewReader(expectedMetric), names...)
 }
 
-// TestEviction runs through the full flow of starting the controller and evicting one pod.
+// testEviction runs through the full flow of starting the controller and evicting one pod.
 // This scenario is the same as "evict-pod-resourceclaim" above. It also covers all
 // event handlers by leading to the same end state through several different combinations
 // of initial objects and add/update/delete calls.
 //
 // This runs in a bubble (https://pkg.go.dev/testing/synctest), so we can wait for goroutine
 // activity to settle down and then check the state.
-func TestEviction(t *testing.T) {
-	tCtx := ktesting.Init(t)
+func testEviction(tCtx ktesting.TContext) {
 	do := func(tCtx ktesting.TContext, what string, action func(tCtx ktesting.TContext) error) {
 		tCtx.Log(what)
 		err := action(tCtx)
@@ -2272,19 +2280,19 @@ func TestEviction(t *testing.T) {
 			fakeClientset.PrependReactor("get", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 				podGets++
 				podName := action.(core.GetAction).GetName()
-				assert.Equal(t, podWithClaimName.Name, podName, "name of pod to patch")
+				assert.Equal(tCtx, podWithClaimName.Name, podName, "name of pod to patch")
 				return false, nil, nil
 			})
 			fakeClientset.PrependReactor("patch", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 				podUpdates++
 				podName := action.(core.PatchAction).GetName()
-				assert.Equal(t, podWithClaimName.Name, podName, "name of pod to get")
+				assert.Equal(tCtx, podWithClaimName.Name, podName, "name of pod to get")
 				return false, nil, nil
 			})
 			fakeClientset.PrependReactor("delete", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 				podDeletions++
 				podName := action.(core.DeleteAction).GetName()
-				assert.Equal(t, podWithClaimName.Name, podName, "name of pod to delete")
+				assert.Equal(tCtx, podWithClaimName.Name, podName, "name of pod to delete")
 				obj, err := fakeClientset.Tracker().Get(v1.SchemeGroupVersion.WithResource("pods"), pod.Namespace, pod.Name)
 				require.NoError(tCtx, err)
 				updatedPod = obj.(*v1.Pod)
@@ -2370,17 +2378,12 @@ func TestEviction(t *testing.T) {
 	}
 }
 
-// TestDeviceTaintRule runs through the full flow of simulating eviction with the None effect,
+// synctestDeviceTaintRule runs through the full flow of simulating eviction with the None effect,
 // updating the rule with NoExecute, and then evicting the pod.
 //
 // This runs in a bubble (https://pkg.go.dev/testing/synctest), so we can wait for goroutine
 // activity to settle down and then check the state.
-func TestDeviceTaintRule(t *testing.T) {
-	tCtx := ktesting.Init(t)
-	tCtx.SyncTest("", testDeviceTaintRule)
-}
-
-func testDeviceTaintRule(tCtx ktesting.TContext) {
+func synctestDeviceTaintRule(tCtx ktesting.TContext) {
 	rule := ruleNone.DeepCopy()
 	fakeClientset := fake.NewClientset(podWithClaimName, inUseClaim, rule)
 	tCtx = ktesting.WithClients(tCtx, nil, nil, fakeClientset, nil, nil)
@@ -2470,15 +2473,14 @@ func check(tCtx ktesting.TContext, prefix string, expectRules []*resourcealpha.D
 	assertEqual(tCtx, expectRules, trimRules(rules.Items), prefix+"rules", opts...)
 }
 
-// TestCancelEviction deletes the pod before the controller deletes it
+// testCancelEviction deletes the pod before the controller deletes it
 // or removes the slice. Either way, eviction gets cancelled.
-func TestCancelEviction(t *testing.T) {
-	tCtx := ktesting.Init(t)
-	tCtx.SyncTest("pod-deleted", func(tCtx ktesting.TContext) { testCancelEviction(tCtx, true) })
-	tCtx.SyncTest("slice-deleted", func(tCtx ktesting.TContext) { testCancelEviction(tCtx, false) })
+func testCancelEviction(tCtx ktesting.TContext) {
+	tCtx.SyncTest("pod-deleted", func(tCtx ktesting.TContext) { doCancelEviction(tCtx, true) })
+	tCtx.SyncTest("slice-deleted", func(tCtx ktesting.TContext) { doCancelEviction(tCtx, false) })
 }
 
-func testCancelEviction(tCtx ktesting.TContext, deletePod bool) {
+func doCancelEviction(tCtx ktesting.TContext, deletePod bool) {
 	// The claim tolerates the taint long enough for us to
 	// do something which cancels eviction.
 	pod := podWithClaimName.DeepCopy()
@@ -2608,10 +2610,9 @@ func testCancelEviction(tCtx ktesting.TContext, deletePod bool) {
 	tCtx.ExpectNoError(testPodDeletionsMetrics(controller, 0))
 }
 
-// TestParallelPodDeletion covers the scenario that a pod gets deleted right before
+// testParallelPodDeletion covers the scenario that a pod gets deleted right before
 // trying to evict it.
-func TestParallelPodDeletion(t *testing.T) {
-	tCtx := ktesting.Init(t)
+func testParallelPodDeletion(tCtx ktesting.TContext) {
 	tCtx.Parallel()
 
 	tCtx.SyncTest("", func(tCtx ktesting.TContext) {
@@ -2638,7 +2639,7 @@ func TestParallelPodDeletion(t *testing.T) {
 			defer mutex.Unlock()
 			podGets++
 			podName := action.(core.GetAction).GetName()
-			assert.Equal(t, podWithClaimName.Name, podName, "name of patched pod")
+			assert.Equal(tCtx, podWithClaimName.Name, podName, "name of patched pod")
 
 			// This gets called directly before eviction. Pretend that it is deleted.
 			err = fakeClientset.Tracker().Delete(v1.SchemeGroupVersion.WithResource("pods"), pod.Namespace, pod.Name)
@@ -2650,7 +2651,7 @@ func TestParallelPodDeletion(t *testing.T) {
 			defer mutex.Unlock()
 			podDeletions++
 			podName := action.(core.DeleteAction).GetName()
-			assert.Equal(t, podWithClaimName.Name, podName, "name of deleted pod")
+			assert.Equal(tCtx, podWithClaimName.Name, podName, "name of deleted pod")
 			return false, nil, nil
 		})
 		controller := newTestController(tCtx, fakeClientset)
@@ -2683,77 +2684,73 @@ func TestParallelPodDeletion(t *testing.T) {
 	})
 }
 
-// TestRetry covers the scenario that an eviction attempt must be retried.
-func TestRetry(t *testing.T) {
-	tCtx := ktesting.Init(t)
+// synctestRetry covers the scenario that an eviction attempt must be retried.
+func synctestRetry(tCtx ktesting.TContext) {
+	// This scenario is the same as "evict-pod-resourceclaim" above.
+	pod := podWithClaimName.DeepCopy()
+	fakeClientset := fake.NewClientset(
+		sliceTainted,
+		slice2,
+		inUseClaim,
+		pod,
+	)
+	tCtx = ktesting.WithClients(tCtx, nil, nil, fakeClientset, nil, nil)
 
-	tCtx.SyncTest("", func(tCtx ktesting.TContext) {
-		// This scenario is the same as "evict-pod-resourceclaim" above.
-		pod := podWithClaimName.DeepCopy()
-		fakeClientset := fake.NewClientset(
-			sliceTainted,
-			slice2,
-			inUseClaim,
-			pod,
-		)
-		tCtx = ktesting.WithClients(tCtx, nil, nil, fakeClientset, nil, nil)
+	pod, err := fakeClientset.CoreV1().Pods(pod.Namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
+	require.NoError(tCtx, err, "get pod before eviction")
+	assert.Equal(tCtx, podWithClaimName, pod, "test pod")
 
-		pod, err := fakeClientset.CoreV1().Pods(pod.Namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
-		require.NoError(tCtx, err, "get pod before eviction")
-		assert.Equal(tCtx, podWithClaimName, pod, "test pod")
+	var mutex sync.Mutex
+	var podGets int
+	var podDeletions int
 
-		var mutex sync.Mutex
-		var podGets int
-		var podDeletions int
+	fakeClientset.PrependReactor("get", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		mutex.Lock()
+		defer mutex.Unlock()
+		podGets++
+		podName := action.(core.GetAction).GetName()
+		assert.Equal(tCtx, podWithClaimName.Name, podName, "name of patched pod")
 
-		fakeClientset.PrependReactor("get", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-			mutex.Lock()
-			defer mutex.Unlock()
-			podGets++
-			podName := action.(core.GetAction).GetName()
-			assert.Equal(t, podWithClaimName.Name, podName, "name of patched pod")
-
-			// This gets called directly before eviction. Pretend that there is an intermittent error.
-			if podGets == 1 {
-				return true, nil, apierrors.NewInternalError(errors.New("fake error"))
-			}
-			return false, nil, nil
-		})
-		fakeClientset.PrependReactor("delete", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-			mutex.Lock()
-			defer mutex.Unlock()
-			podDeletions++
-			podName := action.(core.DeleteAction).GetName()
-			assert.Equal(t, podWithClaimName.Name, podName, "name of deleted pod")
-			return false, nil, nil
-		})
-		controller := newTestController(tCtx, fakeClientset)
-
-		var wg sync.WaitGroup
-		defer func() {
-			t.Log("Waiting for goroutine termination...")
-			tCtx.Cancel("time to stop")
-			wg.Wait()
-		}()
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			assert.NoError(tCtx, controller.Run(tCtx, 10 /* workers */), "eviction controller failed")
-		}()
-
-		// Eventually the pod gets deleted and the event is recorded.
-		ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) error {
-			gomega.NewWithT(tCtx).Expect(listEvents(tCtx)).Should(matchDeletionEvent())
-			return testPodDeletionsMetrics(controller, 1)
-		}).WithTimeout(30*time.Second).Should(gomega.Succeed(), "pod eviction done")
-
-		// Now we can check the API calls.
-		tCtx.Wait()
-		assert.Equal(tCtx, 2, podGets, "number of pod get calls")
-		assert.Equal(tCtx, 1, podDeletions, "number of pod delete calls")
-		gomega.NewWithT(tCtx).Expect(listEvents(tCtx)).Should(matchDeletionEvent())
-		tCtx.ExpectNoError(testPodDeletionsMetrics(controller, 1))
+		// This gets called directly before eviction. Pretend that there is an intermittent error.
+		if podGets == 1 {
+			return true, nil, apierrors.NewInternalError(errors.New("fake error"))
+		}
+		return false, nil, nil
 	})
+	fakeClientset.PrependReactor("delete", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		mutex.Lock()
+		defer mutex.Unlock()
+		podDeletions++
+		podName := action.(core.DeleteAction).GetName()
+		assert.Equal(tCtx, podWithClaimName.Name, podName, "name of deleted pod")
+		return false, nil, nil
+	})
+	controller := newTestController(tCtx, fakeClientset)
+
+	var wg sync.WaitGroup
+	defer func() {
+		tCtx.Log("Waiting for goroutine termination...")
+		tCtx.Cancel("time to stop")
+		wg.Wait()
+	}()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		assert.NoError(tCtx, controller.Run(tCtx, 10 /* workers */), "eviction controller failed")
+	}()
+
+	// Eventually the pod gets deleted and the event is recorded.
+	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) error {
+		gomega.NewWithT(tCtx).Expect(listEvents(tCtx)).Should(matchDeletionEvent())
+		return testPodDeletionsMetrics(controller, 1)
+	}).WithTimeout(30*time.Second).Should(gomega.Succeed(), "pod eviction done")
+
+	// Now we can check the API calls.
+	tCtx.Wait()
+	assert.Equal(tCtx, 2, podGets, "number of pod get calls")
+	assert.Equal(tCtx, 1, podDeletions, "number of pod delete calls")
+	gomega.NewWithT(tCtx).Expect(listEvents(tCtx)).Should(matchDeletionEvent())
+	tCtx.ExpectNoError(testPodDeletionsMetrics(controller, 1))
 }
 
 // BenchTaintUntaint checks the full flow of detecting a claim as
