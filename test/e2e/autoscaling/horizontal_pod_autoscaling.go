@@ -223,7 +223,7 @@ func (st *HPAScaleTest) run(ctx context.Context, name string, kind schema.GroupV
 
 	rc.WaitForReplicas(ctx, st.firstScale, timeToWait)
 	if st.firstScaleStasis > 0 {
-		rc.EnsureDesiredReplicasInRange(ctx, st.firstScale, st.firstScale+1, st.firstScaleStasis, hpa.Name)
+		rc.EnsureDesiredReplicasInRange(ctx, st.firstScale, int(st.maxPods)-1, st.firstScaleStasis, hpa.Name)
 	}
 	if st.resourceType == cpuResource && st.cpuBurst > 0 && st.secondScale > 0 {
 		rc.ConsumeCPU(st.cpuBurst)
@@ -246,20 +246,20 @@ func scaleUp(ctx context.Context, name string, kind schema.GroupVersionKind, res
 		perPodMemRequest: 500,
 		targetValue:      getTargetValueByType(100, 20, metricTargetType),
 		minPods:          1,
-		maxPods:          4,
+		maxPods:          5,
 		firstScale:       3,
 		firstScaleStasis: stasis,
-		secondScale:      4,
+		secondScale:      5,
 		resourceType:     resourceType,
 		metricTargetType: metricTargetType,
 	}
 	if resourceType == cpuResource {
 		st.initCPUTotal = 250
-		st.cpuBurst = 500
+		st.cpuBurst = 700
 	}
 	if resourceType == memResource {
 		st.initMemTotal = 250
-		st.memBurst = 500
+		st.memBurst = 700
 	}
 	st.run(ctx, name, kind, f)
 }
