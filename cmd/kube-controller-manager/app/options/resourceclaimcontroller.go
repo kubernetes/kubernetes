@@ -57,7 +57,7 @@ func (o *ResourceClaimControllerOptions) Validate() []error {
 
 	var errs []error
 	if o.ConcurrentSyncs <= 0 {
-		errs = append(errs, fmt.Errorf("concurrent-resource-claim-syncs must be larger than zero, got %d", o.ConcurrentSyncs))
+		errs = append(errs, fmt.Errorf("concurrent-resource-claim-syncs must be larger than 0, got %d", o.ConcurrentSyncs))
 	}
 	return errs
 }
