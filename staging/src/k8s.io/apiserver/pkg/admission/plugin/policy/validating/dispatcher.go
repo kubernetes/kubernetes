@@ -189,7 +189,7 @@ func (c *dispatcher) Dispatch(ctx context.Context, a admission.Attributes, o adm
 			// if it is cluster scoped, namespaceName will be empty
 			// Otherwise, get the Namespace resource.
 			if namespaceName != "" {
-				namespace, err = c.matcher.GetNamespace(namespaceName)
+				namespace, err = c.matcher.GetNamespace(ctx, namespaceName)
 				if err != nil {
 					return err
 				}
