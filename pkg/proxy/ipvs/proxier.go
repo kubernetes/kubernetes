@@ -576,13 +576,13 @@ func CanUseIPVSProxier(ctx context.Context, ipvs utilipvs.Interface, ipsetver IP
 	// to return ok (err==nil). If/when this bug is fixed parameter "ipvs" will be nil
 	// if ipvs is not supported by the kernel. Until then a re-read work-around is used.
 	if ipvs == nil {
-		return fmt.Errorf("Ipvs not supported by the kernel")
+		return fmt.Errorf("ipvs not supported by the kernel")
 	}
 
 	// Check ipset version
 	versionString, err := ipsetver.GetVersion()
 	if err != nil {
-		return fmt.Errorf("error getting ipset version, error: %v", err)
+		return fmt.Errorf("error getting ipset version, error: %w", err)
 	}
 	if !checkMinVersion(versionString) {
 		return fmt.Errorf("ipset version: %s is less than min required version: %s", versionString, MinIPSetCheckVersion)
@@ -642,7 +642,7 @@ func CanUseIPVSProxier(ctx context.Context, ipvs utilipvs.Interface, ipsetver IP
 	logger.V(5).Info("Virtual Servers after adding dummy", "count", len(vservers))
 	if len(vservers) == 0 {
 		logger.Info("Dummy VS not created", "scheduler", scheduler)
-		return fmt.Errorf("Ipvs not supported") // This is a BUG work-around
+		return fmt.Errorf("ipvs not supported") // This is a BUG work-around
 	}
 	logger.V(5).Info("Dummy VS created", "vs", vs)
 

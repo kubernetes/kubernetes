@@ -300,7 +300,7 @@ func TestCleanupLeftovers(t *testing.T) {
 		}),
 	)
 
-	fp.syncProxyRules()
+	_ = fp.syncProxyRules()
 
 	// test cleanup left over
 	encounteredError := cleanupLeftovers(ctx, ipvs, ipts, ipset)

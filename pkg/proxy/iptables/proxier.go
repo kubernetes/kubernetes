@@ -415,7 +415,8 @@ func cleanupLeftoversForFamily(ctx context.Context, ipt utiliptables.Interface) 
 	logger := klog.FromContext(ctx)
 	// Unlink our chains
 	for _, jump := range append(iptablesJumpChains, iptablesCleanupOnlyChains...) {
-		args := append(jump.extraArgs,
+		args := append([]string{}, jump.extraArgs...)
+		args = append(args,
 			"-m", "comment", "--comment", jump.comment,
 			"-j", string(jump.dstChain),
 		)
