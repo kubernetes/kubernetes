@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -61,7 +62,8 @@ func (eventStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Obje
 func (eventStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	groupVersion := requestGroupVersion(ctx)
 	event := obj.(*api.Event)
-	return validation.ValidateEventCreate(event, groupVersion)
+	allErrs := validation.ValidateEventCreate(event, groupVersion)
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, event, nil, allErrs, operation.Create)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
