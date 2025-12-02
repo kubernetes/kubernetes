@@ -3528,8 +3528,7 @@ message PersistentVolumeSource {
 
   // portworxVolume represents a portworx volume attached and mounted on kubelets host machine.
   // Deprecated: PortworxVolume is deprecated. All operations for the in-tree portworxVolume type
-  // are redirected to the pxd.portworx.com CSI driver when the CSIMigrationPortworx feature-gate
-  // is on.
+  // are redirected to the pxd.portworx.com CSI driver.
   // +optional
   optional PortworxVolumeSource portworxVolume = 18;
 
@@ -7126,8 +7125,7 @@ message VolumeSource {
 
   // portworxVolume represents a portworx volume attached and mounted on kubelets host machine.
   // Deprecated: PortworxVolume is deprecated. All operations for the in-tree portworxVolume type
-  // are redirected to the pxd.portworx.com CSI driver when the CSIMigrationPortworx feature-gate
-  // is on.
+  // are redirected to the pxd.portworx.com CSI driver.
   // +optional
   optional PortworxVolumeSource portworxVolume = 24;
 

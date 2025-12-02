@@ -714,9 +714,7 @@ func (adc *attachDetachController) processVolumeAttachments(logger klog.Logger) 
 		var plugin volume.AttachableVolumePlugin
 		volumeSpec := volume.NewSpecFromPersistentVolume(pv, false)
 
-		// Consult csiMigratedPluginManager first before querying the plugins registered during runtime in volumePluginMgr.
-		// In-tree plugins that provisioned PVs will not be registered anymore after migration to CSI, once the respective
-		// feature gate is enabled.
+		// If the PV has been migrated, translate the in-tree volumeSpec to CSI volumeSpec.
 		if inTreePluginName, err := adc.csiMigratedPluginManager.GetInTreePluginNameFromSpec(pv, nil); err == nil {
 			if adc.csiMigratedPluginManager.IsMigrationEnabledForPlugin(inTreePluginName) {
 				// PV is migrated and should be handled by the CSI plugin instead of the in-tree one
