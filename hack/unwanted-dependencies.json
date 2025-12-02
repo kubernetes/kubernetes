@@ -167,9 +167,6 @@
       "github.com/google/gofuzz": [
         "github.com/json-iterator/go"
       ],
-      "github.com/gregjones/httpcache": [
-        "k8s.io/client-go"
-      ],
       "github.com/json-iterator/go": [
         "github.com/prometheus/client_golang",
         "go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful",
@@ -263,7 +260,6 @@
       "github.com/davecgh/go-spew",
       "github.com/gogo/protobuf",
       "github.com/golang/protobuf",
-      "github.com/gregjones/httpcache",
       "github.com/json-iterator/go",
       "github.com/mailru/easyjson",
       "github.com/modern-go/concurrent",
