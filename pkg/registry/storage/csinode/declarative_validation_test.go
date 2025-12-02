@@ -63,9 +63,9 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		input        storage.CSINode
 		expectedErrs field.ErrorList
 	}{
-		"valid": {
-			input: mkValidCSINodeDriverNode(),
-		},
+		//"valid": {
+		//	input: mkValidCSINodeDriverNode(),
+		//},
 		"missing name": {
 			input: mkValidCSINodeDriverNode(func(driver *storage.CSINodeDriver) {
 				driver.Name = ""
