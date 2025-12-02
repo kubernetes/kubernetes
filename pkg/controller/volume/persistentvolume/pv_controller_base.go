@@ -500,8 +500,9 @@ func updateMigrationAnnotations(logger klog.Logger, cmpm CSIMigratedPluginManage
 	return false
 }
 
-// volumeWorker processes items from volumeQueue. It must run only once,
-// syncVolume is not assured to be reentrant.
+// volumeWorker processes items from volumeQueue. Multiple workers can run
+// concurrently, but each volume key is processed by only one worker at a time
+// using keyMutex to ensure syncVolume is not called concurrently for the same volume.
 func (ctrl *PersistentVolumeController) volumeWorker(ctx context.Context) {
 	logger := klog.FromContext(ctx)
 	workFunc := func(ctx context.Context) bool {
@@ -521,7 +522,29 @@ func (ctrl *PersistentVolumeController) volumeWorker(ctx context.Context) {
 		if err == nil {
 			// The volume still exists in informer cache, the event must have
 			// been add/update/sync
-			ctrl.updateVolume(ctx, volume)
+			// Lock only for cache update, then release before syncVolume
+			// syncVolume and bind will acquire locks as needed
+			unlock := ctrl.volumeMutex.Lock(key)
+			new, err := ctrl.storeVolumeUpdate(logger, volume)
+			unlock() // Release lock before syncVolume to allow bind to acquire both locks
+
+			if err != nil {
+				logger.Error(err, "")
+				return false
+			}
+			if !new {
+				return false
+			}
+			err = ctrl.syncVolume(ctx, volume)
+			if err != nil {
+				if errors.IsConflict(err) {
+					// Version conflict error happens quite often and the controller
+					// recovers from it easily.
+					logger.V(3).Info("Could not sync volume", "volumeName", volume.Name, "err", err)
+				} else {
+					logger.Error(err, "Could not sync volume", "volumeName", volume.Name)
+				}
+			}
 			return false
 		}
 		if !errors.IsNotFound(err) {
@@ -531,7 +554,11 @@ func (ctrl *PersistentVolumeController) volumeWorker(ctx context.Context) {
 
 		// The volume is not in informer cache, the event must have been
 		// "delete"
+		// Lock for cache access
+		unlock := ctrl.volumeMutex.Lock(key)
 		volumeObj, found, err := ctrl.volumes.store.GetByKey(key)
+		unlock()
+
 		if err != nil {
 			logger.V(2).Info("Error getting volume from cache", "volumeKey", key, "err", err)
 			return false
@@ -558,8 +585,9 @@ func (ctrl *PersistentVolumeController) volumeWorker(ctx context.Context) {
 	}
 }
 
-// claimWorker processes items from claimQueue. It must run only once,
-// syncClaim is not reentrant.
+// claimWorker processes items from claimQueue. Multiple workers can run
+// concurrently, but each claim key is processed by only one worker at a time
+// using keyMutex to ensure syncClaim is not called concurrently for the same claim.
 func (ctrl *PersistentVolumeController) claimWorker(ctx context.Context) {
 	logger := klog.FromContext(ctx)
 	workFunc := func() bool {
@@ -579,7 +607,29 @@ func (ctrl *PersistentVolumeController) claimWorker(ctx context.Context) {
 		if err == nil {
 			// The claim still exists in informer cache, the event must have
 			// been add/update/sync
-			ctrl.updateClaim(ctx, claim)
+			// Lock only for cache update, then release before syncClaim
+			// syncClaim and bind will acquire locks as needed
+			unlock := ctrl.claimMutex.Lock(key)
+			new, err := ctrl.storeClaimUpdate(logger, claim)
+			unlock() // Release lock before syncClaim to allow bind to acquire both locks
+
+			if err != nil {
+				logger.Error(err, "")
+				return false
+			}
+			if !new {
+				return false
+			}
+			err = ctrl.syncClaim(ctx, claim)
+			if err != nil {
+				if errors.IsConflict(err) {
+					// Version conflict error happens quite often and the controller
+					// recovers from it easily.
+					logger.V(3).Info("Could not sync claim", "PVC", klog.KObj(claim), "err", err)
+				} else {
+					logger.Error(err, "Could not sync claim", "PVC", klog.KObj(claim))
+				}
+			}
 			return false
 		}
 		if !errors.IsNotFound(err) {
@@ -588,7 +638,11 @@ func (ctrl *PersistentVolumeController) claimWorker(ctx context.Context) {
 		}
 
 		// The claim is not in informer cache, the event must have been "delete"
+		// Lock for cache access
+		unlock := ctrl.claimMutex.Lock(key)
 		claimObj, found, err := ctrl.claims.GetByKey(key)
+		unlock()
+
 		if err != nil {
 			logger.V(2).Info("Error getting claim from cache", "claimKey", key, "err", err)
 			return false
