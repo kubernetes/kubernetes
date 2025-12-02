@@ -17,6 +17,7 @@ limitations under the License.
 package generic
 
 import (
+	"context"
 	"fmt"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
@@ -41,8 +42,8 @@ type PolicyMatcher interface {
 	BindingMatches(a admission.Attributes, o admission.ObjectInterfaces, binding BindingAccessor) (bool, error)
 
 	// GetNamespace retrieves the Namespace resource by the given name. The name may be empty, in which case
-	// GetNamespace must return nil, nil
-	GetNamespace(name string) (*corev1.Namespace, error)
+	// GetNamespace must return nil, NotFound
+	GetNamespace(ctx context.Context, name string) (*corev1.Namespace, error)
 }
 
 type matcher struct {
@@ -82,8 +83,8 @@ func (c *matcher) BindingMatches(a admission.Attributes, o admission.ObjectInter
 	return isMatch, err
 }
 
-func (c *matcher) GetNamespace(name string) (*corev1.Namespace, error) {
-	return c.Matcher.GetNamespace(name)
+func (c *matcher) GetNamespace(ctx context.Context, name string) (*corev1.Namespace, error) {
+	return c.Matcher.GetNamespace(ctx, name)
 }
 
 var _ matching.MatchCriteria = &matchCriteria{}
