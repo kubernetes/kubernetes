@@ -401,6 +401,7 @@ func (ex *ExamplePlugin) nodePrepareResource(ctx context.Context, claim *resourc
 		device := kubeletplugin.Device{
 			PoolName:     result.Pool,
 			DeviceName:   result.Device,
+			ShareID:      result.ShareID,
 			Requests:     []string{result.Request}, // May also return baseRequestName here.
 			CDIDeviceIDs: []string{cdiDeviceID},
 		}

@@ -59,6 +59,19 @@ func (s *stateMemory) GetContainerResources(podUID types.UID, containerName stri
 	return *resources.DeepCopy(), ok
 }
 
+// GetPodLevelResources returns current resources information at pod-level
+func (s *stateMemory) GetPodLevelResources(podUID types.UID) (*v1.ResourceRequirements, bool) {
+	s.RLock()
+	defer s.RUnlock()
+
+	pr, ok := s.podResources[podUID]
+	if !ok {
+		return nil, ok
+	}
+
+	return pr.PodLevelResources.DeepCopy(), ok
+}
+
 func (s *stateMemory) GetPodResourceInfoMap() PodResourceInfoMap {
 	s.RLock()
 	defer s.RUnlock()
@@ -77,14 +90,38 @@ func (s *stateMemory) SetContainerResources(podUID types.UID, containerName stri
 	s.Lock()
 	defer s.Unlock()
 
-	if _, ok := s.podResources[podUID]; !ok {
-		s.podResources[podUID] = PodResourceInfo{
+	podInfo, ok := s.podResources[podUID]
+	if !ok {
+		podInfo = PodResourceInfo{
 			ContainerResources: make(map[string]v1.ResourceRequirements),
 		}
 	}
 
-	s.podResources[podUID].ContainerResources[containerName] = resources
+	if podInfo.ContainerResources == nil {
+		podInfo.ContainerResources = make(map[string]v1.ResourceRequirements)
+	}
+
+	podInfo.ContainerResources[containerName] = resources
+	s.podResources[podUID] = podInfo
+
 	klog.V(3).InfoS("Updated container resource information", "podUID", podUID, "containerName", containerName, "resources", resources)
+	return nil
+}
+
+func (s *stateMemory) SetPodLevelResources(podUID types.UID, resources *v1.ResourceRequirements) error {
+	s.Lock()
+	defer s.Unlock()
+
+	podInfo, ok := s.podResources[podUID]
+	if !ok {
+		podInfo.PodLevelResources = &v1.ResourceRequirements{}
+	}
+
+	podInfo.PodLevelResources = resources
+
+	s.podResources[podUID] = podInfo
+
+	klog.V(3).InfoS("Updated pod-level resource info", "podUID", podUID, "resources", resources)
 	return nil
 }
 

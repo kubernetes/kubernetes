@@ -63,39 +63,39 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 
 	// field Struct.LongNameField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call field-attached validations
 			errs = append(errs, validate.LongNameCaseless(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("longNameField"), &obj.LongNameField, safe.Field(oldObj, func(oldObj *Struct) *string { return &oldObj.LongNameField }))...)
+		}(fldPath.Child("longNameField"), &obj.LongNameField, safe.Field(oldObj, func(oldObj *Struct) *string { return &oldObj.LongNameField }), oldObj != nil)...)
 
 	// field Struct.LongNamePtrField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call field-attached validations
 			errs = append(errs, validate.LongNameCaseless(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("longNamePtrField"), obj.LongNamePtrField, safe.Field(oldObj, func(oldObj *Struct) *string { return oldObj.LongNamePtrField }))...)
+		}(fldPath.Child("longNamePtrField"), obj.LongNamePtrField, safe.Field(oldObj, func(oldObj *Struct) *string { return oldObj.LongNamePtrField }), oldObj != nil)...)
 
 	// field Struct.LongNameTypedefField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *LongNameStringType) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *LongNameStringType, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_LongNameStringType(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("longNameTypedefField"), &obj.LongNameTypedefField, safe.Field(oldObj, func(oldObj *Struct) *LongNameStringType { return &oldObj.LongNameTypedefField }))...)
+		}(fldPath.Child("longNameTypedefField"), &obj.LongNameTypedefField, safe.Field(oldObj, func(oldObj *Struct) *LongNameStringType { return &oldObj.LongNameTypedefField }), oldObj != nil)...)
 
 	return errs
 }

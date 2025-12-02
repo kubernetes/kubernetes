@@ -2436,6 +2436,63 @@
     its new label found. Deleting the Node MUST succeed and its deletion MUST be confirmed.
   release: v1.32
   file: test/e2e/node/node_lifecycle.go
+- testname: In-place Pod Resize, burtable pod with multiple containers and various
+    operations
+  codename: '[sig-node] Pod InPlace Resize Container burstable pods - extended 6 containers
+    - various operations performed (including adding limits and requests) [MinimumKubeletVersion:1.34]
+    [Conformance]'
+  description: Issuing a Pod Resize request via the Pod Resize subresource patch endpoint
+    to modify CPU and memory requests and limits on a 6-container pod with various
+    operations MUST result in the Pod resources being updated as expected.
+  release: v1.35
+  file: test/e2e/common/node/pod_resize.go
+- testname: In-place Pod Resize, burstable pod resized with equivalents
+  codename: '[sig-node] Pod InPlace Resize Container burstable pods - extended resize
+    with equivalents [MinimumKubeletVersion:1.34] [Conformance]'
+  description: Issuing an in-place Pod Resize request via the Pod Resize subresource
+    patch endpoint to modify CPU requests and limits using equivalent values (e.g.
+    2m -> 1m) MUST result in the updated Pod resources displayed correctly in the
+    status.
+  release: v1.35
+  file: test/e2e/common/node/pod_resize.go
+- testname: In-place Pod Resize, guaranteed pods with multiple containers, net increase
+  codename: '[sig-node] Pod InPlace Resize Container guaranteed pods with multiple
+    containers 3 containers - increase cpu & mem on c1, c2, decrease cpu & mem on
+    c3 - net increase [MinimumKubeletVersion:1.34] [Conformance]'
+  description: Issuing an in-place Pod Resize request via the Pod Resize subresource
+    patch endpoint to modify CPU and memory requests and limits for a guaranteed pod
+    with 3 containers with a net increase MUST result in the Pod resources being updated
+    as expected.
+  release: v1.35
+  file: test/e2e/common/node/pod_resize.go
+- testname: In-place Pod Resize, guaranteed pods with multiple containers, net decrease
+  codename: '[sig-node] Pod InPlace Resize Container guaranteed pods with multiple
+    containers 3 containers - increase cpu & mem on c1, decrease cpu & mem on c2,
+    c3 - net decrease [MinimumKubeletVersion:1.34] [Conformance]'
+  description: Issuing an in-place Pod Resize request via the Pod Resize subresource
+    patch endpoint to modify CPU and memory requests and limits for a pod with 3 containers
+    with a net decrease MUST result in the Pod resources being updated as expected.
+  release: v1.35
+  file: test/e2e/common/node/pod_resize.go
+- testname: In-place Pod Resize, guaranteed pods with multiple containers, various
+    operations
+  codename: '[sig-node] Pod InPlace Resize Container guaranteed pods with multiple
+    containers 3 containers - increase: CPU (c1,c3), memory (c2, c3) ; decrease: CPU
+    (c2) [MinimumKubeletVersion:1.34] [Conformance]'
+  description: Issuing an in-place Pod Resize request via the Pod Resize subresource
+    patch endpoint to modify CPU and memory requests and limits for a pod with 3 containers
+    with various operations MUST result in the Pod resources being updated as expected.
+  release: v1.35
+  file: test/e2e/common/node/pod_resize.go
+- testname: In-place Pod Resize, read and replace endpoints
+  codename: '[sig-node] Pod InPlace Resize Container resize pod via the replace endpoint
+    [MinimumKubeletVersion:1.34] [Conformance]'
+  description: Issuing a Pod Resize request via the Pod Resize subresource replace
+    endpoint MUST result in the Pod resources being updated as expected. The Pod object
+    fetched from the Pod Resize subresource MUST be equivalent to the Pod object fetched
+    from the main Pod endpoint after the resize is completed.
+  release: v1.35
+  file: test/e2e/common/node/pod_resize.go
 - testname: PodTemplate, delete a collection
   codename: '[sig-node] PodTemplates should delete a collection of pod templates [Conformance]'
   description: A set of Pod Templates is created with a label selector which MUST
@@ -2458,6 +2515,28 @@
     The PodTemplate must be deleted.
   release: v1.19
   file: test/e2e/common/node/podtemplates.go
+- testname: Pods Generation, graceful delete
+  codename: '[sig-node] Pods Extended (pod generation) Pod Generation custom-set generation
+    on new pods and graceful delete [Conformance]'
+  description: Create a Pod, ensure that triggering a graceful delete causes the generation
+    to be updated.
+  release: v1.35
+  file: test/e2e/node/pods.go
+- testname: Pods Generation, 500 updates
+  codename: '[sig-node] Pods Extended (pod generation) Pod Generation issue 500 podspec
+    updates and verify generation and observedGeneration eventually converge [MinimumKubeletVersion:1.34]
+    [Conformance]'
+  description: Create a Pod, issue 499 podSpec updates and verify generation and observedGeneration
+    eventually converge to 500.
+  release: v1.35
+  file: test/e2e/node/pods.go
+- testname: Pods Generation, updates
+  codename: '[sig-node] Pods Extended (pod generation) Pod Generation pod generation
+    should start at 1 and increment per update [MinimumKubeletVersion:1.34] [Conformance]'
+  description: Create a Pod, and perform a few updates, ensuring that the pod's metadata.generation
+    and status.observedGeneration are updated as expected.
+  release: v1.35
+  file: test/e2e/node/pods.go
 - testname: Pods, QOS
   codename: '[sig-node] Pods Extended Pods Set QOS Class should be set on Pods with
     matching resource requests and limits for memory and cpu [Conformance]'
@@ -2779,7 +2858,7 @@
   file: test/e2e/common/node/security_context.go
 - testname: Sysctls, reject invalid sysctls
   codename: '[sig-node] Sysctls [LinuxOnly] [NodeConformance] should reject invalid
-    sysctls [MinimumKubeletVersion:1.21] [Conformance]'
+    sysctls [Conformance]'
   description: 'Pod is created with one valid and two invalid sysctls. Pod should
     not apply invalid sysctls. [LinuxOnly]: This test is marked as LinuxOnly since
     Windows does not support sysctls'
@@ -2787,7 +2866,7 @@
   file: test/e2e/common/node/sysctl.go
 - testname: Sysctl, test sysctls
   codename: '[sig-node] Sysctls [LinuxOnly] [NodeConformance] should support sysctls
-    [MinimumKubeletVersion:1.21] [Environment:NotInUserNS] [Conformance]'
+    [Environment:NotInUserNS] [Conformance]'
   description: 'Pod is created with kernel.shm_rmid_forced sysctl. Kernel.shm_rmid_forced
     must be set to 1 [LinuxOnly]: This test is marked as LinuxOnly since Windows does
     not support sysctls [Environment:NotInUserNS]: The test fails in UserNS (as expected):
@@ -2853,6 +2932,31 @@
     lifecycle of a container.
   release: v1.19
   file: test/e2e/common/node/expansion.go
+- testname: CRUD operations for deviceclasses
+  codename: '[sig-node] [DRA] CRUD Tests resource.k8s.io/v1 DeviceClass [Conformance]'
+  description: kube-apiserver must support create/update/list/patch/delete operations
+    for resource.k8s.io/v1 DeviceClass.
+  release: v1.35
+  file: test/e2e/dra/dra.go
+- testname: CRUD operations for resourceclaims
+  codename: '[sig-node] [DRA] CRUD Tests resource.k8s.io/v1 ResourceClaim [Conformance]'
+  description: kube-apiserver must support create/update/list/patch/delete operations
+    for resource.k8s.io/v1 ResourceClaim.
+  release: v1.35
+  file: test/e2e/dra/dra.go
+- testname: CRUD operations for resourceclaimtemplates
+  codename: '[sig-node] [DRA] CRUD Tests resource.k8s.io/v1 ResourceClaimTemplate
+    [Conformance]'
+  description: kube-apiserver must support create/update/list/patch/delete operations
+    for resource.k8s.io/v1 ResourceClaimTemplate.
+  release: v1.35
+  file: test/e2e/dra/dra.go
+- testname: CRUD operations for resoureslices
+  codename: '[sig-node] [DRA] CRUD Tests resource.k8s.io/v1 ResourceSlice [Conformance]'
+  description: kube-apiserver must support create/update/list/patch/delete operations
+    for resource.k8s.io/v1 ResourceSlice.
+  release: v1.35
+  file: test/e2e/dra/dra.go
 - testname: LimitRange, resources
   codename: '[sig-scheduling] LimitRange should create a LimitRange with defaults
     and ensure pod has those defaults applied. [Conformance]'

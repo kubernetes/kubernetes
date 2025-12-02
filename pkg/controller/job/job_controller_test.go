@@ -2690,6 +2690,9 @@ func TestSyncJobPastDeadline(t *testing.T) {
 			if !tc.enableJobPodReplacementPolicy {
 				// TODO: this will be removed in 1.37.
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.33"))
+			} else if !tc.enableJobManagedBy {
+				// TODO: this will be removed in 1.38.
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.34"))
 			}
 			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.JobManagedBy:            tc.enableJobManagedBy,
@@ -3022,6 +3025,8 @@ func TestSyncJobWhenManagedBy(t *testing.T) {
 	}
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
+			// TODO: this will be removed in 1.38.
+			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.34"))
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobManagedBy, tc.enableJobManagedBy)
 
 			clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
@@ -5184,6 +5189,9 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 			if !tc.enableBackoffLimitPerIndex || !tc.enableJobSuccessPolicy {
 				// TODO: this will be removed in 1.36
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.32"))
+			} else if !tc.enableJobManagedBy {
+				// TODO: this will be remove in 1.38
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.34"))
 			}
 			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.JobBackoffLimitPerIndex: tc.enableBackoffLimitPerIndex,
@@ -5871,6 +5879,9 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 			} else if !tc.enableJobPodReplacementPolicy {
 				// TODO: this will be removed in 1.37.
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.33"))
+			} else if !tc.enableJobManagedBy {
+				// TODO: this will be removed in 1.38.
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.34"))
 			}
 			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.JobBackoffLimitPerIndex: tc.enableJobBackoffLimitPerIndex,
@@ -6667,7 +6678,7 @@ func TestWatchPods(t *testing.T) {
 	}
 	// Start only the pod watcher and the workqueue, send a watch event,
 	// and make sure it hits the sync method for the right job.
-	go sharedInformerFactory.Core().V1().Pods().Informer().Run(ctx.Done())
+	go sharedInformerFactory.Core().V1().Pods().Informer().RunWithContext(ctx)
 	go manager.Run(ctx, 1)
 
 	pods := newPodList(1, v1.PodRunning, testJob)
@@ -6693,7 +6704,7 @@ func TestWatchOrphanPods(t *testing.T) {
 	manager.jobStoreSynced = alwaysReady
 
 	podInformer := sharedInformers.Core().V1().Pods().Informer()
-	go podInformer.Run(ctx.Done())
+	go podInformer.RunWithContext(ctx)
 	cache.WaitForCacheSync(ctx.Done(), podInformer.HasSynced)
 	go manager.Run(ctx, 1)
 
@@ -6764,7 +6775,7 @@ func TestSyncOrphanPod(t *testing.T) {
 	manager.jobStoreSynced = alwaysReady
 
 	podInformer := sharedInformers.Core().V1().Pods().Informer()
-	go podInformer.Run(ctx.Done())
+	go podInformer.RunWithContext(ctx)
 	cache.WaitForCacheSync(ctx.Done(), podInformer.HasSynced)
 	go manager.Run(ctx, 1)
 
@@ -7378,6 +7389,9 @@ func TestJobBackoffForOnFailure(t *testing.T) {
 			if !tc.enableJobPodReplacementPolicy {
 				// TODO: this will be removed in 1.37.
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.33"))
+			} else if !tc.enableJobManagedBy {
+				// TODO: this will be removed in 1.38.
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.34"))
 			}
 			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.JobPodReplacementPolicy: tc.enableJobPodReplacementPolicy,
@@ -7717,7 +7731,7 @@ func TestFinalizersRemovedExpectations(t *testing.T) {
 		t.Errorf("Different expectations for removed finalizers after syncJob (-want,+got):\n%s", diff)
 	}
 
-	go sharedInformers.Core().V1().Pods().Informer().Run(ctx.Done())
+	go sharedInformers.Core().V1().Pods().Informer().RunWithContext(ctx)
 	cache.WaitForCacheSync(ctx.Done(), podInformer.HasSynced)
 
 	// Make sure the first syncJob sets the expectations, even after the caches synced.

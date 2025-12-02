@@ -35,6 +35,7 @@ import (
 	"time"
 
 	"github.com/coreos/go-systemd/v22/daemon"
+	"github.com/go-logr/logr"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"go.opentelemetry.io/otel"
@@ -64,6 +65,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericapiserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/flagz"
 	"k8s.io/apiserver/pkg/server/healthz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
@@ -86,7 +88,6 @@ import (
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
 	zpagesfeatures "k8s.io/component-base/zpages/features"
-	"k8s.io/component-base/zpages/flagz"
 	nodeutil "k8s.io/component-helpers/node/util"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
@@ -207,11 +208,6 @@ is checked every 20 seconds (also configurable with a flag).`,
 			// validate the initial KubeletFlags
 			if err := options.ValidateKubeletFlags(kubeletFlags); err != nil {
 				return fmt.Errorf("failed to validate kubelet flags: %w", err)
-			}
-
-			if cleanFlagSet.Changed("pod-infra-container-image") {
-				logger.Info("--pod-infra-container-image will not be pruned by the image garbage collector in kubelet and should also be set in the remote runtime")
-				_ = cmd.Flags().MarkDeprecated("pod-infra-container-image", "--pod-infra-container-image will be removed in 1.35. Image garbage collector will get sandbox image information from CRI.")
 			}
 
 			// load kubelet config file, if provided
@@ -583,14 +579,14 @@ func makeEventRecorder(ctx context.Context, kubeDeps *kubelet.Dependencies, node
 	}
 }
 
-func getReservedCPUs(machineInfo *cadvisorapi.MachineInfo, cpus string) (cpuset.CPUSet, error) {
+func getReservedCPUs(logger logr.Logger, machineInfo *cadvisorapi.MachineInfo, cpus string) (cpuset.CPUSet, error) {
 	emptyCPUSet := cpuset.New()
 
 	if cpus == "" {
 		return emptyCPUSet, nil
 	}
 
-	topo, err := topology.Discover(machineInfo)
+	topo, err := topology.Discover(logger, machineInfo)
 	if err != nil {
 		return emptyCPUSet, fmt.Errorf("unable to discover CPU topology info: %s", err)
 	}
@@ -607,16 +603,14 @@ func getReservedCPUs(machineInfo *cadvisorapi.MachineInfo, cpus string) (cpuset.
 
 func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Dependencies, featureGate featuregate.FeatureGate) (err error) {
 	logger := klog.FromContext(ctx)
-	if utilfeature.DefaultFeatureGate.Enabled(features.SystemdWatchdog) {
-		// NewHealthChecker returns an error indicating that the watchdog is configured but the configuration is incorrect,
-		// the kubelet will not be started.
-		healthChecker, err := watchdog.NewHealthChecker(logger)
-		if err != nil {
-			return fmt.Errorf("create health checker: %w", err)
-		}
-		kubeDeps.HealthChecker = healthChecker
-		healthChecker.Start(ctx)
+	// NewHealthChecker returns an error indicating that the watchdog is configured but the configuration is incorrect,
+	// the kubelet will not be started.
+	healthChecker, err := watchdog.NewHealthChecker(logger)
+	if err != nil {
+		return fmt.Errorf("create health checker: %w", err)
 	}
+	kubeDeps.HealthChecker = healthChecker
+	healthChecker.Start(ctx)
 	// Set global feature gates based on the value on the initial KubeletServer
 	err = utilfeature.DefaultMutableFeatureGate.SetFromMap(s.KubeletConfiguration.FeatureGates)
 	if err != nil {
@@ -648,12 +642,6 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 				return err
 			}
 		}
-	}
-
-	// Register current configuration with /configz endpoint
-	err = initConfigz(ctx, &s.KubeletConfiguration)
-	if err != nil {
-		logger.Error(err, "Failed to register kubelet configuration with configz")
 	}
 
 	if len(s.ShowHiddenMetricsForVersion) > 0 {
@@ -745,10 +733,16 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		return err
 	}
 
+	// Register current configuration with /configz endpoint
+	err = initConfigz(ctx, &s.KubeletConfiguration)
+	if err != nil {
+		logger.Error(err, "Failed to register kubelet configuration with configz")
+	}
+
 	var cgroupRoots []string
 	nodeAllocatableRoot := cm.NodeAllocatableRoot(s.CgroupRoot, s.CgroupsPerQOS, s.CgroupDriver)
 	cgroupRoots = append(cgroupRoots, nodeAllocatableRoot)
-	kubeletCgroup, err := cm.GetKubeletContainer(s.KubeletCgroups)
+	kubeletCgroup, err := cm.GetKubeletContainer(logger, s.KubeletCgroups)
 	if err != nil {
 		logger.Info("Failed to get the kubelet's cgroup. Kubelet system container metrics may be missing", "err", err)
 	} else if kubeletCgroup != "" {
@@ -786,7 +780,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		if err != nil {
 			return err
 		}
-		reservedSystemCPUs, err := getReservedCPUs(machineInfo, s.ReservedSystemCPUs)
+		reservedSystemCPUs, err := getReservedCPUs(logger, machineInfo, s.ReservedSystemCPUs)
 		if err != nil {
 			return err
 		}
@@ -844,6 +838,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		}
 
 		kubeDeps.ContainerManager, err = cm.NewContainerManager(
+			ctx,
 			kubeDeps.Mounter,
 			kubeDeps.CAdvisorInterface,
 			cm.NodeConfig{

@@ -17,8 +17,10 @@ limitations under the License.
 package selinuxwarning
 
 import (
+	"context"
 	"reflect"
 	"sort"
+	"sync"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -355,7 +357,12 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxChangePolicy, true)
 
+			var wg sync.WaitGroup
+			defer wg.Wait()
 			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
 			_, plugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
 			plugin.SupportsSELinux = true
 
@@ -393,7 +400,9 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 			fakeInformerFactory.Start(ctx.Done())
 			fakeInformerFactory.WaitForCacheSync(ctx.Done())
 			// Start the controller
-			go c.Run(ctx, 1)
+			wg.Go(func() {
+				c.Run(ctx, 1)
+			})
 
 			// Inject fake existing objects
 			for _, pvc := range tt.existingPVCs {

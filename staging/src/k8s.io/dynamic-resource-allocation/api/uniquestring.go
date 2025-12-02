@@ -41,6 +41,12 @@ func (us UniqueString) MarshalJSON() ([]byte, error) {
 	return json.Marshal(us.String())
 }
 
+// MarshalText allows UniqueString to be used as the key in maps
+// without causing problems for logging.
+func (us UniqueString) MarshalText() ([]byte, error) {
+	return []byte(us.String()), nil
+}
+
 // MakeUniqueString constructs a new unique string.
 func MakeUniqueString(str string) UniqueString {
 	return UniqueString(unique.Make(str))

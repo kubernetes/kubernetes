@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/status"
@@ -69,6 +70,9 @@ const (
 type Manager interface {
 	// GetContainerResourceAllocation returns the AllocatedResources value for the container
 	GetContainerResourceAllocation(podUID types.UID, containerName string) (v1.ResourceRequirements, bool)
+
+	// GetPodLevelResourceAllocation returns the AllocatedResources value for the container
+	GetPodLevelResourceAllocation(podUID types.UID) (*v1.ResourceRequirements, bool)
 
 	// UpdatePodFromAllocation overwrites the pod spec with the allocation.
 	// This function does a deep copy only if updates are needed.
@@ -187,6 +191,7 @@ func NewInMemoryManager(nodeConfig cm.NodeConfig,
 	getActivePods func() []*v1.Pod,
 	getPodByUID func(types.UID) (*v1.Pod, bool),
 	sourcesReady config.SourcesReady,
+	recorder record.EventRecorder,
 ) Manager {
 	return &manager{
 		allocated: state.NewStateMemory(nil),
@@ -201,6 +206,7 @@ func NewInMemoryManager(nodeConfig cm.NodeConfig,
 		triggerPodSync: triggerPodSync,
 		getActivePods:  getActivePods,
 		getPodByUID:    getPodByUID,
+		recorder:       recorder,
 	}
 }
 
@@ -416,6 +422,12 @@ func (m *manager) GetContainerResourceAllocation(podUID types.UID, containerName
 	return m.allocated.GetContainerResources(podUID, containerName)
 }
 
+// GetPodLevelResourceAllocation returns the last checkpointed AllocatedResources values
+// If checkpoint manager has not been initialized, it returns nil, false
+func (m *manager) GetPodLevelResourceAllocation(podUID types.UID) (*v1.ResourceRequirements, bool) {
+	return m.allocated.GetPodLevelResources(podUID)
+}
+
 // UpdatePodFromAllocation overwrites the pod spec with the allocation.
 // This function does a deep copy only if updates are needed.
 func (m *manager) UpdatePodFromAllocation(pod *v1.Pod) (*v1.Pod, bool) {
@@ -437,6 +449,15 @@ func updatePodFromAllocation(pod *v1.Pod, allocated state.PodResourceInfo) (*v1.
 	}
 
 	updated := false
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
+		pAlloc := allocated.PodLevelResources
+		if !apiequality.Semantic.DeepEqual(pod.Spec.Resources, pAlloc) {
+			// Allocation differs from pod spec, retrieve the allocation
+			pod = pod.DeepCopy()
+			pod.Spec.Resources = pAlloc
+			updated = true
+		}
+	}
 	containerAlloc := func(c v1.Container) (v1.ResourceRequirements, bool) {
 		if cAlloc, ok := allocated.ContainerResources[c.Name]; ok {
 			if !apiequality.Semantic.DeepEqual(c.Resources, cAlloc) {
@@ -474,6 +495,9 @@ func (m *manager) SetAllocatedResources(pod *v1.Pod) error {
 
 func allocationFromPod(pod *v1.Pod) state.PodResourceInfo {
 	var podAlloc state.PodResourceInfo
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) && pod.Spec.Resources != nil {
+		podAlloc.PodLevelResources = pod.Spec.Resources.DeepCopy()
+	}
 	podAlloc.ContainerResources = make(map[string]v1.ResourceRequirements)
 	for _, container := range pod.Spec.Containers {
 		alloc := *container.Resources.DeepCopy()
@@ -556,6 +580,15 @@ func (m *manager) handlePodResourcesResize(pod *v1.Pod) (bool, error) {
 		return false, nil
 	}
 
+	if !apiequality.Semantic.DeepEqual(pod.Spec.Resources, allocatedPod.Spec.Resources) {
+		if resizable, msg, reason := IsInPlacePodLevelResourcesVerticalScalingAllowed(pod); !resizable {
+			// If there is a pending pod-level resources resize but the resize is not allowed, always use the allocated resources.
+			metrics.PodInfeasibleResizes.WithLabelValues(reason).Inc()
+			m.statusManager.SetPodResizePendingCondition(pod.UID, v1.PodReasonInfeasible, msg, pod.Generation)
+			return false, nil
+		}
+	}
+
 	// Desired resources != allocated resources. Can we update the allocation to the desired resources?
 	fit, reason, message := m.canResizePod(m.getAllocatedPods(m.getActivePods()), pod)
 	if fit {
@@ -563,6 +596,7 @@ func (m *manager) handlePodResourcesResize(pod *v1.Pod) (bool, error) {
 		if err := m.SetAllocatedResources(pod); err != nil {
 			return false, err
 		}
+		allocatedPod = pod
 		m.statusManager.ClearPodResizePendingCondition(pod.UID)
 
 		// Clear any errors that may have been surfaced from a previous resize and update the
@@ -570,11 +604,21 @@ func (m *manager) handlePodResourcesResize(pod *v1.Pod) (bool, error) {
 		m.statusManager.ClearPodResizeInProgressCondition(pod.UID)
 		m.statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", pod.Generation)
 
+		msg := events.PodResizeStartedMsg(allocatedPod, pod.Generation)
+		m.recorder.Eventf(pod, v1.EventTypeNormal, events.ResizeStarted, msg)
+
 		return true, nil
 	}
 
 	if reason != "" {
-		m.statusManager.SetPodResizePendingCondition(pod.UID, reason, message, pod.Generation)
+		if m.statusManager.SetPodResizePendingCondition(pod.UID, reason, message, pod.Generation) {
+			eventType := events.ResizeDeferred
+			if reason == v1.PodReasonInfeasible {
+				eventType = events.ResizeInfeasible
+			}
+			msg := events.PodResizePendingMsg(pod, reason, message, pod.Generation)
+			m.recorder.Eventf(pod, v1.EventTypeWarning, eventType, msg)
+		}
 	}
 
 	return false, nil

@@ -122,33 +122,33 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 
 	// field Struct.TypedefItems
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj ItemList) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj ItemList, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_ItemList(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("typedefItems"), obj.TypedefItems, safe.Field(oldObj, func(oldObj *Struct) ItemList { return oldObj.TypedefItems }))...)
+		}(fldPath.Child("typedefItems"), obj.TypedefItems, safe.Field(oldObj, func(oldObj *Struct) ItemList { return oldObj.TypedefItems }), oldObj != nil)...)
 
 	// field Struct.NestedTypedefItems
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj ItemListAlias) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj ItemListAlias, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_ItemListAlias(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("nestedTypedefItems"), obj.NestedTypedefItems, safe.Field(oldObj, func(oldObj *Struct) ItemListAlias { return oldObj.NestedTypedefItems }))...)
+		}(fldPath.Child("nestedTypedefItems"), obj.NestedTypedefItems, safe.Field(oldObj, func(oldObj *Struct) ItemListAlias { return oldObj.NestedTypedefItems }), oldObj != nil)...)
 
 	// field Struct.DualItems
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj DualItemList) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj DualItemList, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
 			// call field-attached validations
@@ -160,13 +160,13 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			// call the type's validation function
 			errs = append(errs, Validate_DualItemList(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("dualItems"), obj.DualItems, safe.Field(oldObj, func(oldObj *Struct) DualItemList { return oldObj.DualItems }))...)
+		}(fldPath.Child("dualItems"), obj.DualItems, safe.Field(oldObj, func(oldObj *Struct) DualItemList { return oldObj.DualItems }), oldObj != nil)...)
 
 	// field Struct.ConflictingItems
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj ConflictingItemList) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj ConflictingItemList, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
 			// call field-attached validations
@@ -178,7 +178,7 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			// call the type's validation function
 			errs = append(errs, Validate_ConflictingItemList(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("conflictingItems"), obj.ConflictingItems, safe.Field(oldObj, func(oldObj *Struct) ConflictingItemList { return oldObj.ConflictingItems }))...)
+		}(fldPath.Child("conflictingItems"), obj.ConflictingItems, safe.Field(oldObj, func(oldObj *Struct) ConflictingItemList { return oldObj.ConflictingItems }), oldObj != nil)...)
 
 	return errs
 }

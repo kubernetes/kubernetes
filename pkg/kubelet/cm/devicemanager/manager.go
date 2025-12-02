@@ -445,7 +445,6 @@ func (m *ManagerImpl) GetCapacity() (v1.ResourceList, v1.ResourceList, []string)
 	// Use logger.TODO() because we currently do not have a proper logger to pass in.
 	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
 	logger := klog.TODO()
-	needsUpdateCheckpoint := false
 	var capacity = v1.ResourceList{}
 	var allocatable = v1.ResourceList{}
 	deletedResources := sets.New[string]()
@@ -459,10 +458,7 @@ func (m *ManagerImpl) GetCapacity() (v1.ResourceList, v1.ResourceList, []string)
 			if !ok {
 				logger.Info("Unexpected: healthyDevices and endpoints are out of sync")
 			}
-			delete(m.endpoints, resourceName)
-			delete(m.healthyDevices, resourceName)
 			deletedResources.Insert(resourceName)
-			needsUpdateCheckpoint = true
 		} else {
 			capacity[v1.ResourceName(resourceName)] = *resource.NewQuantity(int64(devices.Len()), resource.DecimalSI)
 			allocatable[v1.ResourceName(resourceName)] = *resource.NewQuantity(int64(devices.Len()), resource.DecimalSI)
@@ -474,10 +470,7 @@ func (m *ManagerImpl) GetCapacity() (v1.ResourceList, v1.ResourceList, []string)
 			if !ok {
 				logger.Info("Unexpected: unhealthyDevices and endpoints became out of sync")
 			}
-			delete(m.endpoints, resourceName)
-			delete(m.unhealthyDevices, resourceName)
 			deletedResources.Insert(resourceName)
-			needsUpdateCheckpoint = true
 		} else {
 			capacityCount := capacity[v1.ResourceName(resourceName)]
 			unhealthyCount := *resource.NewQuantity(int64(devices.Len()), resource.DecimalSI)
@@ -485,8 +478,16 @@ func (m *ManagerImpl) GetCapacity() (v1.ResourceList, v1.ResourceList, []string)
 			capacity[v1.ResourceName(resourceName)] = capacityCount
 		}
 	}
+
+	for resourceName := range deletedResources {
+		delete(m.endpoints, resourceName)
+		delete(m.healthyDevices, resourceName)
+		delete(m.unhealthyDevices, resourceName)
+	}
+
 	m.mutex.Unlock()
-	if needsUpdateCheckpoint {
+
+	if deletedResources.Len() > 0 {
 		if err := m.writeCheckpoint(logger); err != nil {
 			logger.Error(err, "Failed to write checkpoint file")
 		}
@@ -849,6 +850,11 @@ func (m *ManagerImpl) allocateContainerResources(ctx context.Context, pod *v1.Po
 		resource := string(k)
 		needed := int(v.Value())
 		logger.V(3).Info("Looking for needed resources", "resourceName", resource, "pod", klog.KObj(pod), "containerName", container.Name, "needed", needed)
+		if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) && isDRAExtendedResource(pod, container.Name, resource) {
+			// Skip extended resources managed by DRA
+			logger.V(3).Info("Skipping allocation for DRA-backed extended resource", "resourceName", resource, "pod", klog.KObj(pod), "containerName", container.Name)
+			continue
+		}
 		if !m.isDevicePluginResource(resource) {
 			continue
 		}
@@ -1086,6 +1092,20 @@ func (m *ManagerImpl) isDevicePluginResource(resource string) bool {
 	// a resource we have previously allocated.
 	if registeredResource || allocatedResource {
 		return true
+	}
+	return false
+}
+
+// isDRAExtendedResource checks if the specified resource for a given container
+// in the provided pod is an extended resource managed by DRA.
+func isDRAExtendedResource(pod *v1.Pod, containerName, resourceName string) bool {
+	claimStatus := pod.Status.ExtendedResourceClaimStatus
+	if claimStatus != nil {
+		for _, resMap := range claimStatus.RequestMappings {
+			if resMap.ContainerName == containerName && resMap.ResourceName == resourceName {
+				return true
+			}
+		}
 	}
 	return false
 }

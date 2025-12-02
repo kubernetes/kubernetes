@@ -58,6 +58,7 @@ var statusData = map[schema.GroupVersionResource]string{
 	gvr("storage.k8s.io", "v1", "volumeattachments"):                `{"status": {"attached": true}}`,
 	gvr("policy", "v1", "poddisruptionbudgets"):                     `{"status": {"currentHealthy": 5}}`,
 	gvr("policy", "v1beta1", "poddisruptionbudgets"):                `{"status": {"currentHealthy": 5}}`,
+	gvr("resource.k8s.io", "v1alpha3", "devicetaintrules"):          `{"status": {"conditions": [{"type": "EvictionInProgress", "status": "True", "reason: "PodsLeft", "message: "100 pods left", "lastTransitionTime": "2020-01-01T00:00:00Z"}]}}`,
 	gvr("resource.k8s.io", "v1beta1", "resourceclaims"):             `{"status": {"allocation": {"nodeSelector": {"nodeSelectorTerms": [{"matchExpressions": [{"key": "some-label", "operator": "In", "values": ["some-value"]}] }]}}}}`,
 	gvr("resource.k8s.io", "v1beta2", "resourceclaims"):             `{"status": {"allocation": {"nodeSelector": {"nodeSelectorTerms": [{"matchExpressions": [{"key": "some-label", "operator": "In", "values": ["some-value"]}] }]}}}}`,
 	gvr("resource.k8s.io", "v1", "resourceclaims"):                  `{"status": {"allocation": {"nodeSelector": {"nodeSelectorTerms": [{"matchExpressions": [{"key": "some-label", "operator": "In", "values": ["some-value"]}] }]}}}}`,

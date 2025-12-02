@@ -7001,6 +7001,81 @@ func TestPrintClusterTrustBundle(t *testing.T) {
 	}
 }
 
+func TestPrintPodCertificateRequest(t *testing.T) {
+	tests := []struct {
+		bundle   certificates.PodCertificateRequest
+		options  printers.GenerateOptions
+		expected []metav1.TableRow
+	}{
+		{
+			bundle: certificates.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: certificates.PodCertificateRequestSpec{
+					SignerName:                "foo.com/abc",
+					PodName:                   "pod-1",
+					ServiceAccountName:        "sa-1",
+					NodeName:                  types.NodeName("node-1"),
+					UnverifiedUserAnnotations: map[string]string{"test/domain": "bar", "test/foo": "abc"},
+				},
+				Status: certificates.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type: certificates.PodCertificateRequestConditionTypeIssued,
+						},
+					}},
+			},
+			expected: []metav1.TableRow{
+				{
+					Cells: []interface{}{"bar", "pod-1", "sa-1", "node-1", "foo.com/abc", "Issued", "test/domain=bar,test/foo=abc"},
+				},
+			},
+			options: printers.GenerateOptions{Wide: true},
+		},
+		{
+			bundle: certificates.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: certificates.PodCertificateRequestSpec{
+					SignerName:                "foo.com/abc",
+					PodName:                   "pod-1",
+					ServiceAccountName:        "sa-1",
+					NodeName:                  types.NodeName("node-1"),
+					UnverifiedUserAnnotations: map[string]string{"test/domain": "bar", "test/foo": "abc"},
+				},
+				Status: certificates.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type: certificates.PodCertificateRequestConditionTypeIssued,
+						},
+					}},
+			},
+			expected: []metav1.TableRow{
+				{
+					Cells: []interface{}{"bar", "pod-1", "sa-1", "node-1", "foo.com/abc", "Issued"},
+				},
+			},
+		},
+	}
+
+	for i, test := range tests {
+		rows, err := printPodCertificateRequest(&test.bundle, test.options)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i := range rows {
+			rows[i].Object.Object = nil
+		}
+		if !reflect.DeepEqual(test.expected, rows) {
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+		}
+	}
+}
+
 func TestPrintValidatingAdmissionPolicyBinding(t *testing.T) {
 	tests := []struct {
 		validatingAdmissionPolicyBinding admissionregistration.ValidatingAdmissionPolicyBinding
@@ -7318,6 +7393,12 @@ func TestTableRowDeepCopyShouldNotPanic(t *testing.T) {
 			name: "PersistentVolumeClaim",
 			printer: func() ([]metav1.TableRow, error) {
 				return printPersistentVolumeClaim(&api.PersistentVolumeClaim{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "PodCertificateRequest",
+			printer: func() ([]metav1.TableRow, error) {
+				return printPodCertificateRequest(&certificates.PodCertificateRequest{}, printers.GenerateOptions{})
 			},
 		},
 		{
@@ -7723,16 +7804,27 @@ func TestPrintStorageVersionMigration(t *testing.T) {
 			Name: "print-test",
 		},
 		Spec: storagemigration.StorageVersionMigrationSpec{
-			Resource: storagemigration.GroupVersionResource{
+			Resource: metav1.GroupResource{
 				Group:    "test-group",
-				Version:  "test-version",
 				Resource: "test-resource",
+			},
+		},
+		Status: storagemigration.StorageVersionMigrationStatus{
+			Conditions: []metav1.Condition{
+				{
+					Type:   string(storagemigration.MigrationRunning),
+					Status: metav1.ConditionFalse,
+				},
+				{
+					Type:   string(storagemigration.MigrationSucceeded),
+					Status: metav1.ConditionTrue,
+				},
 			},
 		},
 	}
 
-	// Columns: Name, GVRTOMIGRATE
-	expected := []metav1.TableRow{{Cells: []interface{}{"print-test", "test-resource.test-version.test-group"}}}
+	// Columns: Name, Resource, Status
+	expected := []metav1.TableRow{{Cells: []interface{}{"print-test", "test-resource.test-group", "Succeeded"}}}
 
 	rows, err := printStorageVersionMigration(&storageVersionMigration, printers.GenerateOptions{})
 	if err != nil {
@@ -7756,10 +7848,21 @@ func TestPrintStorageVersionMigrationList(t *testing.T) {
 					Name: "print-test",
 				},
 				Spec: storagemigration.StorageVersionMigrationSpec{
-					Resource: storagemigration.GroupVersionResource{
-						Group:    "test-group",
-						Version:  "test-version",
+					Resource: metav1.GroupResource{
+						Group:    "",
 						Resource: "test-resource",
+					},
+				},
+				Status: storagemigration.StorageVersionMigrationStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   string(storagemigration.MigrationRunning),
+							Status: metav1.ConditionFalse,
+						},
+						{
+							Type:   string(storagemigration.MigrationSucceeded),
+							Status: metav1.ConditionTrue,
+						},
 					},
 				},
 			},
@@ -7772,25 +7875,128 @@ func TestPrintStorageVersionMigrationList(t *testing.T) {
 					Name: "print-test2",
 				},
 				Spec: storagemigration.StorageVersionMigrationSpec{
-					Resource: storagemigration.GroupVersionResource{
+					Resource: metav1.GroupResource{
 						Group:    "test-group2",
-						Version:  "test-version2",
 						Resource: "test-resource2",
+					},
+				},
+				Status: storagemigration.StorageVersionMigrationStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   string(storagemigration.MigrationRunning),
+							Status: metav1.ConditionTrue,
+						},
 					},
 				},
 			},
 		},
 	}
 
-	// Columns: Name, GVRTOMIGRATE
+	// Columns: Name, Resource, Status
 	expected := []metav1.TableRow{
-		{Cells: []interface{}{"print-test", "test-resource.test-version.test-group"}},
-		{Cells: []interface{}{"print-test2", "test-resource2.test-version2.test-group2"}},
+		{Cells: []interface{}{"print-test", "test-resource", "Succeeded"}},
+		{Cells: []interface{}{"print-test2", "test-resource2.test-group2", "Running"}},
 	}
 
 	rows, err := printStorageVersionMigrationList(&storageVersionMigrationList, printers.GenerateOptions{})
 	if err != nil {
 		t.Fatalf("Error generating table rows for StorageVersionMigration: %#v", err)
+	}
+
+	for i := range rows {
+		rows[i].Object.Object = nil
+	}
+
+	if !reflect.DeepEqual(expected, rows) {
+		t.Errorf("mismatch: %s", cmp.Diff(expected, rows))
+	}
+}
+
+func TestPrintWorkload(t *testing.T) {
+	workload := &scheduling.Workload{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "workload1",
+			Namespace: "ns1",
+		},
+		Spec: scheduling.WorkloadSpec{
+			PodGroups: []scheduling.PodGroup{
+				{
+					Name: "foo",
+					Policy: scheduling.PodGroupPolicy{
+						Gang: &scheduling.GangSchedulingPolicy{
+							MinCount: 5,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// Columns: Name, Age
+	expected := []metav1.TableRow{{Cells: []interface{}{"workload1", "<unknown>"}}}
+
+	rows, err := printWorkload(workload, printers.GenerateOptions{})
+	if err != nil {
+		t.Fatalf("Error generating table rows for Workload: %#v", err)
+	}
+	rows[0].Object.Object = nil
+	if !reflect.DeepEqual(expected, rows) {
+		t.Errorf("mismatch: %s", cmp.Diff(expected, rows))
+	}
+}
+
+func TestPrintWorkloadList(t *testing.T) {
+	workloadList := &scheduling.WorkloadList{
+		Items: []scheduling.Workload{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "workload1",
+					Namespace: "ns1",
+				},
+				Spec: scheduling.WorkloadSpec{
+					PodGroups: []scheduling.PodGroup{
+						{
+							Name: "foo",
+							Policy: scheduling.PodGroupPolicy{
+								Gang: &scheduling.GangSchedulingPolicy{
+									MinCount: 5,
+								},
+							},
+						},
+					},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "workload2",
+					Namespace:         "ns1",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: scheduling.WorkloadSpec{
+					PodGroups: []scheduling.PodGroup{
+						{
+							Name: "bar",
+							Policy: scheduling.PodGroupPolicy{
+								Gang: &scheduling.GangSchedulingPolicy{
+									MinCount: 5,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// Columns: Name, Age
+	expected := []metav1.TableRow{
+		{Cells: []interface{}{"workload1", "<unknown>"}},
+		{Cells: []interface{}{"workload2", "0s"}},
+	}
+
+	rows, err := printWorkloadList(workloadList, printers.GenerateOptions{})
+	if err != nil {
+		t.Fatalf("Error generating table rows for WorkloadList: %#v", err)
 	}
 
 	for i := range rows {

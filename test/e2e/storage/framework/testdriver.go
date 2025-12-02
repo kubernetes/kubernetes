@@ -130,7 +130,8 @@ type SnapshottableTestDriver interface {
 	GetSnapshotClass(ctx context.Context, config *PerTestConfig, parameters map[string]string) *unstructured.Unstructured
 }
 
-type VoulmeGroupSnapshottableTestDriver interface {
+// VolumeGroupSnapshottableTestDriver represents an interface for a TestDriver that supports DynamicGroupSnapshot
+type VolumeGroupSnapshottableTestDriver interface {
 	TestDriver
 	// GetVolumeGroupSnapshotClass returns a VolumeGroupSnapshotClass to create group snapshot.
 	GetVolumeGroupSnapshotClass(ctx context.Context, config *PerTestConfig, parameters map[string]string) *unstructured.Unstructured

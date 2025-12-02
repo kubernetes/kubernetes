@@ -541,7 +541,11 @@ func (s *sharedIndexInformer) RunWithContext(ctx context.Context) {
 
 		var fifo Queue
 		if clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.InOrderInformers) {
-			fifo = NewRealFIFO(MetaNamespaceKeyFunc, s.indexer, s.transform)
+			fifo = NewRealFIFOWithOptions(RealFIFOOptions{
+				KeyFunction:  MetaNamespaceKeyFunc,
+				KnownObjects: s.indexer,
+				Transformer:  s.transform,
+			})
 		} else {
 			fifo = NewDeltaFIFOWithOptions(DeltaFIFOOptions{
 				KnownObjects:          s.indexer,
@@ -559,6 +563,7 @@ func (s *sharedIndexInformer) RunWithContext(ctx context.Context) {
 			ShouldResync:      s.processor.shouldResync,
 
 			Process:                      s.HandleDeltas,
+			ProcessBatch:                 s.HandleBatchDeltas,
 			WatchErrorHandlerWithContext: s.watchErrorHandler,
 		}
 
@@ -729,6 +734,12 @@ func (s *sharedIndexInformer) HandleDeltas(obj interface{}, isInInitialList bool
 		return processDeltas(s, s.indexer, deltas, isInInitialList)
 	}
 	return errors.New("object given as Process argument is not Deltas")
+}
+
+func (s *sharedIndexInformer) HandleBatchDeltas(deltas []Delta, isInInitialList bool) error {
+	s.blockDeltas.Lock()
+	defer s.blockDeltas.Unlock()
+	return processDeltasInBatch(s, s.indexer, deltas, isInInitialList)
 }
 
 // Conforms to ResourceEventHandler

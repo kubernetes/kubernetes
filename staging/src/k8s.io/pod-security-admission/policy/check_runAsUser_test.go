@@ -25,12 +25,11 @@ import (
 
 func TestRunAsUser(t *testing.T) {
 	tests := []struct {
-		name           string
-		pod            *corev1.Pod
-		expectAllowed  bool
-		expectReason   string
-		expectDetail   string
-		relaxForUserNS bool
+		name          string
+		pod           *corev1.Pod
+		expectAllowed bool
+		expectReason  string
+		expectDetail  string
 	}{
 		{
 			name: "pod runAsUser=0",
@@ -92,38 +91,17 @@ func TestRunAsUser(t *testing.T) {
 			expectAllowed: true,
 		},
 		{
-			name: "UserNamespacesPodSecurityStandards enabled without HostUsers",
+			name: "host users false allowed",
 			pod: &corev1.Pod{Spec: corev1.PodSpec{
 				HostUsers: ptr.To(false),
 			}},
-			expectAllowed:  true,
-			relaxForUserNS: true,
-		},
-		{
-			name: "UserNamespacesPodSecurityStandards enabled with HostUsers",
-			pod: &corev1.Pod{Spec: corev1.PodSpec{
-				SecurityContext: &corev1.PodSecurityContext{RunAsUser: ptr.To[int64](0)},
-				Containers: []corev1.Container{
-					{Name: "a", SecurityContext: nil},
-				},
-				HostUsers: ptr.To(true),
-			}},
-			expectAllowed:  false,
-			expectReason:   `runAsUser=0`,
-			expectDetail:   `pod must not set runAsUser=0`,
-			relaxForUserNS: true,
+			expectAllowed: true,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.relaxForUserNS {
-				RelaxPolicyForUserNamespacePods(true)
-				t.Cleanup(func() {
-					RelaxPolicyForUserNamespacePods(false)
-				})
-			}
-			result := runAsUser_1_23(&tc.pod.ObjectMeta, &tc.pod.Spec)
+			result := runAsUser1_35(&tc.pod.ObjectMeta, &tc.pod.Spec)
 			if result.Allowed != tc.expectAllowed {
 				t.Fatalf("expected Allowed to be %v was %v", tc.expectAllowed, result.Allowed)
 			}

@@ -36,10 +36,7 @@ import (
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	auditv1 "k8s.io/apiserver/pkg/apis/audit/v1"
-	genericfeatures "k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/rest"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/utils/ptr"
 
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
@@ -2126,7 +2123,6 @@ func Test_ValidatingAdmissionPolicy_ParamResourceDeletedThenRecreated(t *testing
 func Test_CostLimitForValidation(t *testing.T) {
 	resetPolicyRefreshInterval := generic.SetPolicyRefreshIntervalForTests(policyRefreshInterval)
 	defer resetPolicyRefreshInterval()
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.StrictCostEnforcementForVAP, true)
 	server, err := apiservertesting.StartTestServer(t, nil, []string{
 		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
 	}, framework.SharedEtcd())
@@ -2221,98 +2217,6 @@ func Test_CostLimitForValidation(t *testing.T) {
 					Name: "test-k8s",
 				},
 			}
-			_, err = client.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
-			checkExpectedError(t, err, testcase.err)
-			checkFailureReason(t, err, testcase.failureReason)
-			if err := cleanupPolicy(t, client, policy, policyBinding); err != nil {
-				t.Fatalf("error while cleaning up policy and its bindings: %v", err)
-			}
-		})
-	}
-}
-
-// Test_CostLimitForValidationWithFeatureDisabled tests the cost limit set for a ValidatingAdmissionPolicy
-// with StrictCostEnforcementForVAP feature disabled.
-func Test_CostLimitForValidationWithFeatureDisabled(t *testing.T) {
-	resetPolicyRefreshInterval := generic.SetPolicyRefreshIntervalForTests(policyRefreshInterval)
-	defer resetPolicyRefreshInterval()
-	server, err := apiservertesting.StartTestServer(t, nil, []string{
-		"--emulated-version", "1.31",
-		"--feature-gates", "StrictCostEnforcementForVAP=false",
-		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
-	}, framework.SharedEtcd())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer server.TearDownFn()
-
-	config := server.ClientConfig
-	client, err := clientset.NewForConfig(config)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	testcases := []struct {
-		name          string
-		policy        *admissionregistrationv1.ValidatingAdmissionPolicy
-		err           string
-		failureReason metav1.StatusReason
-	}{
-		{
-			name: "Without StrictCostEnforcementForVAP: Single expression exceeds per call cost limit for native library",
-			policy: withValidations([]admissionregistrationv1.Validation{
-				{
-					Expression: "[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(x, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(y, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(z, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(z2, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(z3, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(z4, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(z5, int('1'.find('[0-9]*')) < 100)))))))",
-				},
-			}, withFailurePolicy(admissionregistrationv1.Fail, withNamespaceMatch(makePolicy("validate-namespace-suffix")))),
-			err:           "operation cancelled: actual cost limit exceeded",
-			failureReason: metav1.StatusReasonInvalid,
-		},
-		{
-			name: "Without StrictCostEnforcementForVAP: Expression does not exceed per call cost limit for extended library",
-			policy: withValidations([]admissionregistrationv1.Validation{
-				{
-
-					Expression: "authorizer.group('apps').resource('deployments').subresource('status').namespace('test').name('backend').check('create').allowed() && authorizer.group('apps').resource('deployments').subresource('status').namespace('test').name('backend').check('create').allowed() && authorizer.group('apps').resource('deployments').subresource('status').namespace('test').name('backend').check('create').allowed()",
-				},
-			}, withFailurePolicy(admissionregistrationv1.Fail, withNamespaceMatch(makePolicy("validate-namespace-suffix")))),
-		},
-		{
-			name: "Without StrictCostEnforcementForVAP: Expression does not exceed per call cost limit for extended library in variables",
-			policy: withVariables([]admissionregistrationv1.Variable{
-				{
-					Name:       "authzCheck",
-					Expression: "authorizer.group('apps').resource('deployments').subresource('status').namespace('test').name('backend').check('create').allowed() && authorizer.group('apps').resource('deployments').subresource('status').namespace('test').name('backend').check('create').allowed() && authorizer.group('apps').resource('deployments').subresource('status').namespace('test').name('backend').check('create').allowed()",
-				},
-			}, withValidations([]admissionregistrationv1.Validation{
-				{
-					Expression: "variables.authzCheck",
-				},
-			}, withFailurePolicy(admissionregistrationv1.Fail, withNamespaceMatch(makePolicy("validate-namespace-suffix"))))),
-		},
-		{
-			name:   "Without StrictCostEnforcementForVAP: Expression does not exceed per policy cost limit for extended library",
-			policy: withValidations(generateValidationsWithAuthzCheck(29, "authorizer.group('apps').resource('deployments').subresource('status').namespace('test').name('backend').check('create').allowed()"), withFailurePolicy(admissionregistrationv1.Fail, withNamespaceMatch(makePolicy("validate-namespace-suffix")))),
-		},
-	}
-	for i, testcase := range testcases {
-		t.Run(testcase.name, func(t *testing.T) {
-			policy := withWaitReadyConstraintAndExpression(testcase.policy)
-			if _, err := client.AdmissionregistrationV1().ValidatingAdmissionPolicies().Create(context.TODO(), policy, metav1.CreateOptions{}); err != nil {
-				t.Fatal(err)
-			}
-			policyBinding := makeBinding("validate-namespace-suffix-binding", "validate-namespace-suffix", "")
-			if err := createAndWaitReady(t, client, policyBinding, nil); err != nil {
-				t.Fatal(err)
-			}
-
-			nsName := fmt.Sprintf("test-%d-k8s", i)
-			ns := &v1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: nsName,
-				},
-			}
-
 			_, err = client.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
 			checkExpectedError(t, err, testcase.err)
 			checkFailureReason(t, err, testcase.failureReason)

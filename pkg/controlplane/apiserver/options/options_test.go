@@ -123,6 +123,7 @@ func TestAddFlags(t *testing.T) {
 		"--storage-backend=etcd3",
 		"--lease-reuse-duration-seconds=100",
 		"--emulated-version=test=1.31",
+		"--min-compatibility-version=test=1.29",
 		"--coordinated-leadership-lease-duration=10s",
 		"--coordinated-leadership-renew-deadline=5s",
 		"--coordinated-leadership-retry-period=1s",
@@ -321,6 +322,9 @@ func TestAddFlags(t *testing.T) {
 	testEffectiveVersion := s.GenericServerRunOptions.ComponentGlobalsRegistry.EffectiveVersionFor("test")
 	if testEffectiveVersion.EmulationVersion().String() != "1.31" {
 		t.Errorf("Got emulation version %s, wanted %s", testEffectiveVersion.EmulationVersion().String(), "1.31")
+	}
+	if testEffectiveVersion.MinCompatibilityVersion().String() != "1.29" {
+		t.Errorf("Got min compatibility version %s, wanted %s", testEffectiveVersion.MinCompatibilityVersion().String(), "1.29")
 	}
 }
 

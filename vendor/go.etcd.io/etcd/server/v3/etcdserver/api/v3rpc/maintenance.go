@@ -46,6 +46,10 @@ type BackendGetter interface {
 	Backend() backend.Backend
 }
 
+type Defrager interface {
+	Defragment() error
+}
+
 type Alarmer interface {
 	// Alarms is implemented in Server interface located in etcdserver/server.go
 	// It returns a list of alarms present in the AlarmStore
@@ -74,6 +78,7 @@ type maintenanceServer struct {
 	rg     apply.RaftStatusGetter
 	hasher mvcc.HashStorage
 	bg     BackendGetter
+	defrag Defrager
 	a      Alarmer
 	lt     LeaderTransferrer
 	hdr    header
@@ -91,6 +96,7 @@ func NewMaintenanceServer(s *etcdserver.EtcdServer, healthNotifier notifier) pb.
 		rg:             s,
 		hasher:         s.KV().HashStorage(),
 		bg:             s,
+		defrag:         s,
 		a:              s,
 		lt:             s,
 		hdr:            newHeader(s),
@@ -110,7 +116,7 @@ func (ms *maintenanceServer) Defragment(ctx context.Context, sr *pb.DefragmentRe
 	ms.lg.Info("starting defragment")
 	ms.healthNotifier.defragStarted()
 	defer ms.healthNotifier.defragFinished()
-	err := ms.bg.Backend().Defrag()
+	err := ms.defrag.Defragment()
 	if err != nil {
 		ms.lg.Warn("failed to defragment", zap.Error(err))
 		return nil, togRPCError(err)

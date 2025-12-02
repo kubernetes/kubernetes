@@ -1158,13 +1158,16 @@ func TestValidateRequestedToCapacityRatioScoringStrategy(t *testing.T) {
 
 func TestValidateDynamicResourcesArgs(t *testing.T) {
 	cases := map[string]struct {
-		args                  config.DynamicResourcesArgs
-		wantErrs              field.ErrorList
-		filterTimeoutDisabled bool
+		args                      config.DynamicResourcesArgs
+		wantErrs                  field.ErrorList
+		filterTimeoutDisabled     bool
+		bindingConditionsDisabled bool
+		deviceStatusDisabled      bool
 	}{
 		"valid args (default)": {
 			args: config.DynamicResourcesArgs{
-				FilterTimeout: &metav1.Duration{Duration: config.DynamicResourcesFilterTimeoutDefault},
+				FilterTimeout:  &metav1.Duration{Duration: config.DynamicResourcesFilterTimeoutDefault},
+				BindingTimeout: &metav1.Duration{Duration: config.DynamicResourcesBindingTimeoutDefault},
 			},
 		},
 		"valid args (disabled)": {
@@ -1195,11 +1198,76 @@ func TestValidateDynamicResourcesArgs(t *testing.T) {
 				},
 			},
 		},
+
+		// BindingTimeout tests
+		"valid BindingTimeout": {
+			args: config.DynamicResourcesArgs{
+				BindingTimeout: &metav1.Duration{Duration: 30 * time.Second},
+			},
+		},
+		"BindingTimeout < 1s (0s)": {
+			args: config.DynamicResourcesArgs{
+				BindingTimeout: &metav1.Duration{Duration: 0},
+			},
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:   field.ErrorTypeInvalid,
+					Field:  "bindingTimeout",
+					Detail: "must be at least 1 second",
+				},
+			},
+		},
+		"BindingTimeout < 1s (negative)": {
+			args: config.DynamicResourcesArgs{
+				BindingTimeout: &metav1.Duration{Duration: -time.Second},
+			},
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:   field.ErrorTypeInvalid,
+					Field:  "bindingTimeout",
+					Detail: "must be at least 1 second",
+				},
+			},
+		},
+		"BindingTimeout set but DRADeviceBindingConditions disabled": {
+			args: config.DynamicResourcesArgs{
+				BindingTimeout: &metav1.Duration{Duration: time.Second},
+			},
+			bindingConditionsDisabled: true,
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:   field.ErrorTypeForbidden,
+					Field:  "bindingTimeout",
+					Detail: "requires DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates to be enabled",
+				},
+			},
+		},
+		"BindingTimeout set but DRAResourceClaimDeviceStatus disabled": {
+			args: config.DynamicResourcesArgs{
+				BindingTimeout: &metav1.Duration{Duration: time.Second},
+			},
+			deviceStatusDisabled: true,
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:   field.ErrorTypeForbidden,
+					Field:  "bindingTimeout",
+					Detail: "requires DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates to be enabled",
+				},
+			},
+		},
 	}
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			err := ValidateDynamicResourcesArgs(nil, &tc.args, schedfeature.Features{EnableDRASchedulerFilterTimeout: !tc.filterTimeoutDisabled})
+			err := ValidateDynamicResourcesArgs(
+				nil,
+				&tc.args,
+				schedfeature.Features{
+					EnableDRASchedulerFilterTimeout:    !tc.filterTimeoutDisabled,
+					EnableDRADeviceBindingConditions:   !tc.bindingConditionsDisabled,
+					EnableDRAResourceClaimDeviceStatus: !tc.deviceStatusDisabled,
+				},
+			)
 			if diff := cmp.Diff(tc.wantErrs.ToAggregate(), err, ignoreBadValueDetail); diff != "" {
 				t.Errorf("ValidateDynamicResourcesArgs returned err (-want,+got):\n%s", diff)
 			}

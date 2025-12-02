@@ -69,10 +69,25 @@ func TestSchedulerPerf(t *testing.T) {
 	}
 }
 
+// These benchmarks have to contain the word BenchmarkPerfScheduling to be picked up
+// by benchmark jobs.
+//
+// Sub-tests should have worked, too, but gotestsum was unhappy.
+
 func BenchmarkPerfScheduling(b *testing.B) {
 	// Restrict benchmarking to the default allocator.
 	structured.EnableAllocators("incubating")
 	defer structured.EnableAllocators()
 
+	// "dra" is how this was called traditionally.
+	// It's kept to avoid changing perf-dash results.
 	perf.RunBenchmarkPerfScheduling(b, "performance-config.yaml", "dra", nil)
+}
+
+func BenchmarkPerfSchedulingExperimental(b *testing.B) {
+	// And now the experimental allocator.
+	structured.EnableAllocators("experimental")
+	defer structured.EnableAllocators()
+
+	perf.RunBenchmarkPerfScheduling(b, "performance-config.yaml", "dra_experimental", nil)
 }

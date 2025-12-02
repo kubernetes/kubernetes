@@ -10,10 +10,10 @@ import (
 )
 
 type BeAnExistingFileMatcher struct {
-	expected interface{}
+	expected any
 }
 
-func (matcher *BeAnExistingFileMatcher) Match(actual interface{}) (success bool, err error) {
+func (matcher *BeAnExistingFileMatcher) Match(actual any) (success bool, err error) {
 	actualFilename, ok := actual.(string)
 	if !ok {
 		return false, fmt.Errorf("BeAnExistingFileMatcher matcher expects a file path")
@@ -31,10 +31,10 @@ func (matcher *BeAnExistingFileMatcher) Match(actual interface{}) (success bool,
 	return true, nil
 }
 
-func (matcher *BeAnExistingFileMatcher) FailureMessage(actual interface{}) (message string) {
+func (matcher *BeAnExistingFileMatcher) FailureMessage(actual any) (message string) {
 	return format.Message(actual, "to exist")
 }
 
-func (matcher *BeAnExistingFileMatcher) NegatedFailureMessage(actual interface{}) (message string) {
+func (matcher *BeAnExistingFileMatcher) NegatedFailureMessage(actual any) (message string) {
 	return format.Message(actual, "not to exist")
 }

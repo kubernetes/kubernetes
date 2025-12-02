@@ -32,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 
@@ -246,6 +247,9 @@ func TestToKubeContainerStatus(t *testing.T) {
 // TestToKubeContainerStatusWithResources tests the converting the CRI container status to
 // the internal type (i.e., toKubeContainerStatus()) for containers that returns Resources.
 func TestToKubeContainerStatusWithResources(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("InPlacePodVerticalScaling is not currently supported on Windows.")
+	}
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	tCtx := ktesting.Init(t)
 
@@ -503,6 +507,8 @@ func TestToKubeContainerStatusWithUser(t *testing.T) {
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
+			// Set emulation version so that the feature gate can be disabled in the test
+			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SupplementalGroupsPolicy, test.featureEnabled)
 			cStatus := &runtimeapi.ContainerStatus{
 				Id:        cid.ID,

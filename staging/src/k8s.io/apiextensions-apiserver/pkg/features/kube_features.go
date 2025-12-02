@@ -33,6 +33,12 @@ import (
 // of code conflicts because changes are more likely to be scattered
 // across the file.
 const (
+	// owner: @michaelasp
+	// kep: https://kep.k8s.io/4192
+	//
+	// Enables the tracking of observed generation in CRD status and conditions.
+	CRDObservedGenerationTracking featuregate.Feature = "CRDObservedGenerationTracking"
+
 	// owner: @alexzielenski
 	//
 	// Ignores errors raised on unchanged fields of Custom Resources
@@ -57,6 +63,9 @@ func init() {
 //
 // Entries are alphabetized.
 var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate.VersionedSpecs{
+	CRDObservedGenerationTracking: {
+		{Version: version.MustParse("1.35"), PreRelease: featuregate.Beta, Default: false},
+	},
 	CRDValidationRatcheting: {
 		{Version: version.MustParse("1.28"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.Beta},

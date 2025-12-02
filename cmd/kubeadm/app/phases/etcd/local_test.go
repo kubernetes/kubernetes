@@ -285,14 +285,15 @@ func TestCreateLocalEtcdStaticPodManifestFileWithPatches(t *testing.T) {
 
 func TestGetEtcdCommand(t *testing.T) {
 	var tests = []struct {
-		name             string
-		advertiseAddress string
-		k8sVersion       string
-		etcdImageTag     string
-		nodeName         string
-		extraArgs        []kubeadmapi.Arg
-		initialCluster   []etcdutil.Member
-		expected         []string
+		name                 string
+		advertiseAddress     string
+		k8sVersion           string
+		etcdImageTag         string
+		nodeName             string
+		extraArgs            []kubeadmapi.Arg
+		initialCluster       []etcdutil.Member
+		supportedEtcdVersion map[uint8]string
+		expected             []string
 	}{
 		{
 			name:             "Default args - with empty etcd initial cluster",
@@ -416,6 +417,10 @@ func TestGetEtcdCommand(t *testing.T) {
 			advertiseAddress: "1.2.3.4",
 			k8sVersion:       "1.33.0",
 			nodeName:         "bar",
+			supportedEtcdVersion: map[uint8]string{
+				33: "3.5.24",
+				34: "3.6.5",
+			},
 			expected: []string{
 				"etcd",
 				"--name=bar",
@@ -514,7 +519,10 @@ func TestGetEtcdCommand(t *testing.T) {
 					},
 				},
 			}
-			actual := getEtcdCommand(cfg, endpoint, rt.nodeName, rt.initialCluster)
+			if len(rt.supportedEtcdVersion) == 0 {
+				rt.supportedEtcdVersion = kubeadmconstants.SupportedEtcdVersion
+			}
+			actual := getEtcdCommand(cfg, endpoint, rt.nodeName, rt.initialCluster, rt.supportedEtcdVersion)
 			sort.Strings(actual)
 			sort.Strings(rt.expected)
 			if !reflect.DeepEqual(actual, rt.expected) {

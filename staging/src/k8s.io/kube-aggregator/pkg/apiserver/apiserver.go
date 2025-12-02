@@ -36,6 +36,7 @@ import (
 	"k8s.io/apiserver/pkg/server/egressselector"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilpeerproxy "k8s.io/apiserver/pkg/util/peerproxy"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/transport"
 	"k8s.io/component-base/metrics/legacyregistry"
@@ -108,6 +109,10 @@ type ExtraConfig struct {
 	// the concept of services and endpoints might differ, and might require another implementation of this
 	// controller. Local APIService are reconciled nevertheless.
 	DisableRemoteAvailableConditionController bool
+
+	// PeerProxy, if not nil, sets proxy transport between kube-apiserver peers for requests
+	// that can not be served locally
+	PeerProxy utilpeerproxy.Interface
 }
 
 // Config represents the configuration needed to create an APIAggregator.
@@ -275,7 +280,16 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		discoveryGroup: discoveryGroup(enabledVersions),
 	}
 
-	apisHandlerWithAggregationSupport := aggregated.WrapAggregatedDiscoveryToHandler(apisHandler, s.GenericAPIServer.AggregatedDiscoveryGroupManager)
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.UnknownVersionInteroperabilityProxy) && c.ExtraConfig.PeerProxy != nil {
+		s.GenericAPIServer.PeerAggregatedDiscoveryManager = aggregated.NewPeerAggregatedDiscoveryHandler(s.GenericAPIServer.APIServerID, s.GenericAPIServer.AggregatedDiscoveryGroupManager, c.ExtraConfig.PeerProxy, "apis")
+
+		// Register cache invalidation callback to the peer proxy handler
+		if s.GenericAPIServer.PeerAggregatedDiscoveryManager != nil {
+			c.ExtraConfig.PeerProxy.RegisterCacheInvalidationCallback(s.GenericAPIServer.PeerAggregatedDiscoveryManager.InvalidateCache)
+		}
+	}
+
+	apisHandlerWithAggregationSupport := aggregated.WrapAggregatedDiscoveryToHandler(apisHandler, s.GenericAPIServer.AggregatedDiscoveryGroupManager, s.GenericAPIServer.PeerAggregatedDiscoveryManager)
 	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle("/apis", apisHandlerWithAggregationSupport)
 	s.GenericAPIServer.Handler.NonGoRestfulMux.UnlistedHandle("/apis/", apisHandler)
 

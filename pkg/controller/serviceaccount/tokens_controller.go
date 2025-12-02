@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -113,7 +114,7 @@ func NewTokensController(logger klog.Logger, serviceAccounts informers.ServiceAc
 				case *v1.Secret:
 					return t.Type == v1.SecretTypeServiceAccountToken
 				default:
-					utilruntime.HandleError(fmt.Errorf("object passed to %T that is not expected: %T", e, obj))
+					utilruntime.HandleErrorWithLogger(logger, nil, "Unexpected object type passed to tokens controller", "type", fmt.Sprintf("%T", obj))
 					return false
 				}
 			},
@@ -163,23 +164,31 @@ type TokensController struct {
 
 // Run runs controller blocks until stopCh is closed
 func (e *TokensController) Run(ctx context.Context, workers int) {
-	// Shut down queues
-	defer utilruntime.HandleCrash()
-	defer e.syncServiceAccountQueue.ShutDown()
-	defer e.syncSecretQueue.ShutDown()
+	defer utilruntime.HandleCrashWithContext(ctx)
+	logger := klog.FromContext(ctx)
+
+	var wg sync.WaitGroup
+	defer func() {
+		logger.V(1).Info("Shutting down")
+		e.syncServiceAccountQueue.ShutDown()
+		e.syncSecretQueue.ShutDown()
+		wg.Wait()
+	}()
 
 	if !cache.WaitForNamedCacheSyncWithContext(ctx, e.serviceAccountSynced, e.secretSynced) {
 		return
 	}
 
-	logger := klog.FromContext(ctx)
 	logger.V(5).Info("Starting workers")
 	for i := 0; i < workers; i++ {
-		go wait.UntilWithContext(ctx, e.syncServiceAccount, 0)
-		go wait.UntilWithContext(ctx, e.syncSecret, 0)
+		wg.Go(func() {
+			wait.UntilWithContext(ctx, e.syncServiceAccount, 0)
+		})
+		wg.Go(func() {
+			wait.UntilWithContext(ctx, e.syncSecret, 0)
+		})
 	}
 	<-ctx.Done()
-	logger.V(1).Info("Shutting down")
 }
 
 func (e *TokensController) queueServiceAccountSync(obj interface{}) {

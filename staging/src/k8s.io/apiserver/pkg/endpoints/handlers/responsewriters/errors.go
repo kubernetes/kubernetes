@@ -17,12 +17,12 @@ limitations under the License.
 package responsewriters
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"strings"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -33,10 +33,13 @@ import (
 var sanitizer = strings.NewReplacer(`&`, "&amp;", `<`, "&lt;", `>`, "&gt;")
 
 // Forbidden renders a simple forbidden error
-func Forbidden(ctx context.Context, attributes authorizer.Attributes, w http.ResponseWriter, req *http.Request, reason string, s runtime.NegotiatedSerializer) {
+func Forbidden(attributes authorizer.Attributes, w http.ResponseWriter, req *http.Request, reason string, s runtime.NegotiatedSerializer) {
+	RespondWithError(w, req, ForbiddenStatusError(attributes, reason), s)
+}
+
+func RespondWithError(w http.ResponseWriter, req *http.Request, err error, s runtime.NegotiatedSerializer) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
-	gv := schema.GroupVersion{Group: attributes.GetAPIGroup(), Version: attributes.GetAPIVersion()}
-	ErrorNegotiated(ForbiddenStatusError(attributes, reason), s, gv, w, req)
+	ErrorNegotiated(err, s, metav1.Unversioned, w, req)
 }
 
 func ForbiddenStatusError(attributes authorizer.Attributes, reason string) *apierrors.StatusError {

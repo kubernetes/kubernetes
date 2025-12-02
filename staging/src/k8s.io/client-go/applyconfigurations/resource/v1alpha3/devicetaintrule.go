@@ -41,6 +41,8 @@ type DeviceTaintRuleApplyConfiguration struct {
 	//
 	// Changing the spec automatically increments the metadata.generation number.
 	Spec *DeviceTaintRuleSpecApplyConfiguration `json:"spec,omitempty"`
+	// Status provides information about what was requested in the spec.
+	Status *DeviceTaintRuleStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // DeviceTaintRule constructs a declarative configuration of the DeviceTaintRule type for use with
@@ -85,6 +87,12 @@ func ExtractDeviceTaintRuleFrom(deviceTaintRule *resourcev1alpha3.DeviceTaintRul
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 func ExtractDeviceTaintRule(deviceTaintRule *resourcev1alpha3.DeviceTaintRule, fieldManager string) (*DeviceTaintRuleApplyConfiguration, error) {
 	return ExtractDeviceTaintRuleFrom(deviceTaintRule, fieldManager, "")
+}
+
+// ExtractDeviceTaintRuleStatus extracts the applied configuration owned by fieldManager from
+// deviceTaintRule for the status subresource.
+func ExtractDeviceTaintRuleStatus(deviceTaintRule *resourcev1alpha3.DeviceTaintRule, fieldManager string) (*DeviceTaintRuleApplyConfiguration, error) {
+	return ExtractDeviceTaintRuleFrom(deviceTaintRule, fieldManager, "status")
 }
 
 func (b DeviceTaintRuleApplyConfiguration) IsApplyConfiguration() {}
@@ -252,6 +260,14 @@ func (b *DeviceTaintRuleApplyConfiguration) ensureObjectMetaApplyConfigurationEx
 // If called multiple times, the Spec field is set to the value of the last call.
 func (b *DeviceTaintRuleApplyConfiguration) WithSpec(value *DeviceTaintRuleSpecApplyConfiguration) *DeviceTaintRuleApplyConfiguration {
 	b.Spec = value
+	return b
+}
+
+// WithStatus sets the Status field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Status field is set to the value of the last call.
+func (b *DeviceTaintRuleApplyConfiguration) WithStatus(value *DeviceTaintRuleStatusApplyConfiguration) *DeviceTaintRuleApplyConfiguration {
+	b.Status = value
 	return b
 }
 

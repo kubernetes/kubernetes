@@ -1,5 +1,5 @@
-# Do not edit, downloaded from https://github.com/kubernetes-csi/external-attacher/raw/v4.6.1/deploy/kubernetes//rbac.yaml
-# for csi-driver-host-path release-1.14
+# Do not edit, downloaded from https://github.com/kubernetes-csi/external-attacher/raw/v4.10.0/deploy/kubernetes//rbac.yaml
+# for csi-driver-host-path master
 # by ./update-hostpath.sh
 #
 # This YAML file contains all RBAC objects that are necessary to run external

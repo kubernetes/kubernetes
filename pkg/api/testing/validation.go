@@ -66,17 +66,17 @@ func VerifyVersionedValidationEquivalence(t *testing.T, obj, old runtime.Object,
 					break
 				}
 			}
-			// Re-sort the error list based primarily on the normalized field paths
-			// to ensure errors align correctly during index-by-index comparison,
-			// regardless of their original structure.
-			sort.Slice(errs, func(i, j int) bool {
-				if errs[i].Field != errs[j].Field {
-					return errs[i].Field < errs[j].Field
-				}
-				// Secondary sort by full error string for determinism when fields are equal
-				return errs[i].Error() < errs[j].Error()
-			})
 		}
+		// Re-sort the error list based primarily on the normalized field paths
+		// to ensure errors align correctly during index-by-index comparison,
+		// regardless of their original structure.
+		sort.Slice(errs, func(i, j int) bool {
+			if errs[i].Field != errs[j].Field {
+				return errs[i].Field < errs[j].Field
+			}
+			// Secondary sort by full error string for determinism when fields are equal
+			return errs[i].Error() < errs[j].Error()
+		})
 		all[gv] = errs
 	}
 	// Convert versioned object to internal format before validation.

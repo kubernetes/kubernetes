@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -296,8 +297,6 @@ func (ctrl *PersistentVolumeController) deleteClaim(ctx context.Context, claim *
 // Run starts all of this controller's control loops
 func (ctrl *PersistentVolumeController) Run(ctx context.Context) {
 	defer utilruntime.HandleCrash()
-	defer ctrl.claimQueue.ShutDown()
-	defer ctrl.volumeQueue.ShutDown()
 
 	// Start events processing pipeline.
 	ctrl.eventBroadcaster.StartStructuredLogging(3)
@@ -306,20 +305,31 @@ func (ctrl *PersistentVolumeController) Run(ctx context.Context) {
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting persistent volume controller")
-	defer logger.Info("Shutting down persistent volume controller")
+
+	var wg sync.WaitGroup
+	defer func() {
+		logger.Info("Shutting down persistent volume controller")
+		ctrl.claimQueue.ShutDown()
+		ctrl.volumeQueue.ShutDown()
+		wg.Wait()
+	}()
 
 	if !cache.WaitForNamedCacheSyncWithContext(ctx, ctrl.volumeListerSynced, ctrl.claimListerSynced, ctrl.classListerSynced, ctrl.podListerSynced, ctrl.NodeListerSynced) {
 		return
 	}
 
 	ctrl.initializeCaches(logger, ctrl.volumeLister, ctrl.claimLister)
-
-	go wait.Until(func() { ctrl.resync(ctx) }, ctrl.resyncPeriod, ctx.Done())
-	go wait.UntilWithContext(ctx, ctrl.volumeWorker, time.Second)
-	go wait.UntilWithContext(ctx, ctrl.claimWorker, time.Second)
-
 	metrics.Register(ctrl.volumes.store, ctrl.claims, &ctrl.volumePluginMgr)
 
+	wg.Go(func() {
+		wait.Until(func() { ctrl.resync(ctx) }, ctrl.resyncPeriod, ctx.Done())
+	})
+	wg.Go(func() {
+		wait.UntilWithContext(ctx, ctrl.volumeWorker, time.Second)
+	})
+	wg.Go(func() {
+		wait.UntilWithContext(ctx, ctrl.claimWorker, time.Second)
+	})
 	<-ctx.Done()
 }
 

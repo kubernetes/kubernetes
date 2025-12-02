@@ -60,6 +60,23 @@ type Queue interface {
 	Close()
 }
 
+// QueueWithBatch extends the Queue interface with support for batch processing.
+//
+// In addition to the standard single-item Pop method, QueueWithBatch provides
+// PopBatch, which allows multiple items to be popped and processed together as
+// a batch. This can be used to improve processing efficiency when it is
+// beneficial to handle multiple queued keys or accumulators in a single
+// operation.
+// TODO: Consider merging this interface into Queue after feature gate GA
+type QueueWithBatch interface {
+	Queue
+
+	// PopBatch behaves similarly to Queue#Pop, but processes multiple keys
+	// as a batch. The implementation determines the batching strategy,
+	// such as the number of keys to include per batch.
+	PopBatch(ProcessBatchFunc) error
+}
+
 // Pop is helper function for popping from Queue.
 // WARNING: Do NOT use this function in non-test code to avoid races
 // unless you really really really really know what you are doing.

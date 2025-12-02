@@ -341,9 +341,9 @@ func TestProgressTracking(t *testing.T) {
 	var permissionSleepDuration = 5 * time.Millisecond
 
 	// Override how often progress is reported
-	progressReportDuration = 200 * time.Millisecond
+	progressReportDuration = 300 * time.Millisecond
 	// Override when first event about progress is reported
-	firstEventReportDuration = 50 * time.Millisecond
+	firstEventReportDuration = 150 * time.Millisecond
 
 	// Override how permission change is applied, so as to artificially slow
 	// permission change
@@ -400,7 +400,7 @@ func TestProgressTracking(t *testing.T) {
 		},
 		{
 			name:                             "When permission change takes loo long and pod is specified",
-			filePermissionChangeTimeDuration: 300 * time.Millisecond,
+			filePermissionChangeTimeDuration: 600 * time.Millisecond,
 			totalWaitTime:                    1 * time.Second,
 			currentPod:                       pod,
 			expectedEvents: []string{

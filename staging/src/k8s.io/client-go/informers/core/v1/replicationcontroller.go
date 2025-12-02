@@ -57,7 +57,7 @@ func NewReplicationControllerInformer(client kubernetes.Interface, namespace str
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredReplicationControllerInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
+		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
@@ -82,7 +82,7 @@ func NewFilteredReplicationControllerInformer(client kubernetes.Interface, names
 				}
 				return client.CoreV1().ReplicationControllers(namespace).Watch(ctx, options)
 			},
-		},
+		}, client),
 		&apicorev1.ReplicationController{},
 		resyncPeriod,
 		indexers,

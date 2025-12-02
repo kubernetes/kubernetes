@@ -23,15 +23,15 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/intstr"
+	versionutil "k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
+	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -47,6 +47,9 @@ const (
 
 	AppArmorNotAdmittedReason          = "AppArmor"
 	PodLevelResourcesNotAdmittedReason = "PodLevelResourcesNotSupported"
+
+	// Reasons for pod features admission failure
+	PodFeatureUnsupported = "PodFeatureUnsupported"
 )
 
 type handlerRunner struct {
@@ -104,29 +107,6 @@ func (hr *handlerRunner) Run(ctx context.Context, containerID kubecontainer.Cont
 		logger.Error(err, "Cannot run handler")
 		return msg, err
 	}
-}
-
-// resolvePort attempts to turn an IntOrString port reference into a concrete port number.
-// If portReference has an int value, it is treated as a literal, and simply returns that value.
-// If portReference is a string, an attempt is first made to parse it as an integer.  If that fails,
-// an attempt is made to find a port with the same name in the container spec.
-// If a port with the same name is found, it's ContainerPort value is returned.  If no matching
-// port is found, an error is returned.
-func resolvePort(portReference intstr.IntOrString, container *v1.Container) (int, error) {
-	if portReference.Type == intstr.Int {
-		return portReference.IntValue(), nil
-	}
-	portName := portReference.StrVal
-	port, err := strconv.Atoi(portName)
-	if err == nil {
-		return port, nil
-	}
-	for _, portSpec := range container.Ports {
-		if portSpec.Name == portName {
-			return int(portSpec.ContainerPort), nil
-		}
-	}
-	return -1, fmt.Errorf("couldn't find port: %v in %v", portReference, container)
 }
 
 func (hr *handlerRunner) runSleepHandler(ctx context.Context, seconds int64) error {
@@ -255,4 +235,58 @@ type podFeaturesAdmitHandler struct{}
 
 func (h *podFeaturesAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult {
 	return isPodLevelResourcesSupported(attrs.Pod)
+}
+
+// declaredFeaturesAdmitHandler is a PodAdmitHandler that checks a pod's feature requirements.
+type declaredFeaturesAdmitHandler struct {
+	ndfFramework *ndf.Framework
+	ndfSet       ndf.FeatureSet
+	version      *versionutil.Version
+}
+
+// NewDeclaredFeaturesAdmitHandler returns a new features admit handler.
+func NewDeclaredFeaturesAdmitHandler(nodeDeclaredFeaturesHelper *ndf.Framework, nodeDeclaredFeaturesSet ndf.FeatureSet, version *versionutil.Version) PodAdmitHandler {
+	return &declaredFeaturesAdmitHandler{
+		ndfFramework: nodeDeclaredFeaturesHelper,
+		ndfSet:       nodeDeclaredFeaturesSet,
+		version:      version,
+	}
+}
+
+// Admit checks if a pod's feature requirements are met by the node.
+func (c *declaredFeaturesAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult {
+	pod := attrs.Pod
+
+	podInfo := &ndf.PodInfo{Spec: &pod.Spec, Status: &pod.Status}
+	reqs, err := c.ndfFramework.InferForPodScheduling(podInfo, c.version)
+	if err != nil {
+		return PodAdmitResult{
+			Admit:   false,
+			Reason:  PodFeatureUnsupported,
+			Message: fmt.Sprintf("Failed to infer pod's feature requirements: %v", err),
+		}
+	}
+
+	if reqs.Len() == 0 {
+		return PodAdmitResult{Admit: true}
+	}
+
+	matchResult, err := ndf.MatchNodeFeatureSet(reqs, c.ndfSet)
+	if err != nil {
+		return PodAdmitResult{
+			Admit:   false,
+			Reason:  PodFeatureUnsupported,
+			Message: fmt.Sprintf("Failed to match pod's feature requirements against the node: %v", err),
+		}
+	}
+
+	if !matchResult.IsMatch {
+		return PodAdmitResult{
+			Admit:   false,
+			Reason:  PodFeatureUnsupported,
+			Message: fmt.Sprintf("Pod requires node features that are not available: %s", strings.Join(matchResult.UnsatisfiedRequirements, ", ")),
+		}
+	}
+
+	return PodAdmitResult{Admit: true}
 }

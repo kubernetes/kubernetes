@@ -101,6 +101,12 @@ func Test_stateCheckpoint_storeState(t *testing.T) {
 									},
 								},
 							},
+							PodLevelResources: &v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse(fmt.Sprintf("%s%s", fact, suf)),
+									v1.ResourceMemory: resource.MustParse(fmt.Sprintf("%s%s", fact, suf)),
+								},
+							},
 						},
 					},
 				},
@@ -142,6 +148,7 @@ func Test_stateCheckpoint_storeState(t *testing.T) {
 				ContainerResources: map[string]v1.ResourceRequirements{
 					"container1": {Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")}},
 				},
+				PodLevelResources: &v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")}},
 			}))
 			require.FileExists(t, checkpointPath, "checkpoint should be re-written")
 		})

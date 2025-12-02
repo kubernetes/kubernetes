@@ -17,10 +17,10 @@ limitations under the License.
 package config
 
 import (
-	"crypto/md5"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
@@ -59,7 +59,7 @@ func generatePodName(name string, nodeName types.NodeName) string {
 
 func applyDefaults(logger klog.Logger, pod *api.Pod, source string, isFile bool, nodeName types.NodeName) error {
 	if len(pod.UID) == 0 {
-		hasher := md5.New()
+		hasher := fnv.New128a()
 		hash.DeepHashObject(hasher, pod)
 		// DeepHashObject resets the hash, so we should write the pod source
 		// information AFTER it.
@@ -138,7 +138,8 @@ func tryDecodeSinglePod(logger klog.Logger, data []byte, defaultFn defaultFunc) 
 	if err = defaultFn(logger, newPod); err != nil {
 		return true, pod, err
 	}
-	if errs := validation.ValidatePodCreate(newPod, validation.PodValidationOptions{}); len(errs) > 0 {
+	opts := podutil.GetValidationOptionsFromPodSpecAndMeta(&newPod.Spec, nil, &newPod.ObjectMeta, nil)
+	if errs := validation.ValidatePodCreate(newPod, opts); len(errs) > 0 {
 		return true, pod, fmt.Errorf("invalid pod: %v", errs)
 	}
 	v1Pod := &v1.Pod{}
@@ -199,7 +200,8 @@ func tryDecodePodList(logger klog.Logger, data []byte, defaultFn defaultFunc) (p
 		if err = defaultFn(logger, newPod); err != nil {
 			return true, pods, err
 		}
-		if errs := validation.ValidatePodCreate(newPod, validation.PodValidationOptions{}); len(errs) > 0 {
+		opts := podutil.GetValidationOptionsFromPodSpecAndMeta(&newPod.Spec, nil, &newPod.ObjectMeta, nil)
+		if errs := validation.ValidatePodCreate(newPod, opts); len(errs) > 0 {
 			err = fmt.Errorf("invalid pod: %v", errs)
 			return true, pods, err
 		}

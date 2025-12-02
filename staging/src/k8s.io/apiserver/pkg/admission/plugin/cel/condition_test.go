@@ -99,8 +99,8 @@ func TestCompile(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			c := conditionCompiler{compiler: NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true))}
-			e := c.CompileCondition(tc.validation, OptionalVariableDeclarations{HasParams: false, HasAuthorizer: false, StrictCost: true}, environment.NewExpressions)
+			c := conditionCompiler{compiler: NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()))}
+			e := c.CompileCondition(tc.validation, OptionalVariableDeclarations{HasParams: false, HasAuthorizer: false}, environment.NewExpressions)
 			if e == nil {
 				t.Fatalf("unexpected nil validator")
 			}
@@ -197,7 +197,6 @@ func TestCondition(t *testing.T) {
 		authorizer       authorizer.Authorizer
 		testPerCallLimit uint64
 		namespaceObject  *corev1.Namespace
-		strictCost       bool
 		enableSelectors  bool
 
 		compatibilityVersion *version.Version
@@ -932,7 +931,7 @@ func TestCondition(t *testing.T) {
 			if compatibilityVersion == nil {
 				compatibilityVersion = environment.DefaultCompatibilityVersion()
 			}
-			env, err := environment.MustBaseEnvSet(compatibilityVersion, tc.strictCost).Extend(
+			env, err := environment.MustBaseEnvSet(compatibilityVersion).Extend(
 				environment.VersionedOptions{
 					IntroducedVersion: compatibilityVersion,
 					ProgramOptions:    []celgo.ProgramOption{celgo.CostLimit(tc.testPerCallLimit)},
@@ -946,7 +945,7 @@ func TestCondition(t *testing.T) {
 			if envType == "" {
 				envType = environment.NewExpressions
 			}
-			f := c.CompileCondition(tc.validations, OptionalVariableDeclarations{HasParams: tc.hasParamKind, HasAuthorizer: tc.authorizer != nil, StrictCost: tc.strictCost}, envType)
+			f := c.CompileCondition(tc.validations, OptionalVariableDeclarations{HasParams: tc.hasParamKind, HasAuthorizer: tc.authorizer != nil}, envType)
 			if f == nil {
 				t.Fatalf("unexpected nil validator")
 			}
@@ -989,6 +988,8 @@ func TestCondition(t *testing.T) {
 }
 
 func TestRuntimeCELCostBudget(t *testing.T) {
+	checkCost := int64(350000)
+
 	configMapParams := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "foo",
@@ -999,17 +1000,16 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 	}
 
 	cases := []struct {
-		name                        string
-		attributes                  admission.Attributes
-		params                      runtime.Object
-		validations                 []ExpressionAccessor
-		hasParamKind                bool
-		authorizer                  authorizer.Authorizer
-		testRuntimeCELCostBudget    int64
-		exceedBudget                bool
-		expectRemainingBudget       *int64
-		enableStrictCostEnforcement bool
-		exceedPerCallLimit          bool
+		name                     string
+		attributes               admission.Attributes
+		params                   runtime.Object
+		validations              []ExpressionAccessor
+		hasParamKind             bool
+		authorizer               authorizer.Authorizer
+		testRuntimeCELCostBudget int64
+		exceedBudget             bool
+		expectRemainingBudget    *int64
+		exceedPerCallLimit       bool
 	}{
 		{
 			name: "expression exceed RuntimeCELCostBudget at fist expression",
@@ -1106,7 +1106,7 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 			attributes:               newValidAttribute(nil, false),
 			hasParamKind:             false,
 			exceedBudget:             false,
-			testRuntimeCELCostBudget: 6,
+			testRuntimeCELCostBudget: checkCost + 5,
 			expectRemainingBudget:    pointer.To(int64(0)),
 			authorizer:               denyAll,
 		},
@@ -1120,7 +1120,7 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 			attributes:               newValidAttribute(nil, false),
 			hasParamKind:             false,
 			exceedBudget:             false,
-			testRuntimeCELCostBudget: 1,
+			testRuntimeCELCostBudget: 4,
 			expectRemainingBudget:    pointer.To(int64(0)),
 		},
 		{
@@ -1133,7 +1133,7 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 			attributes:               newValidAttribute(nil, false),
 			hasParamKind:             false,
 			exceedBudget:             false,
-			testRuntimeCELCostBudget: 2,
+			testRuntimeCELCostBudget: 4,
 			expectRemainingBudget:    pointer.To(int64(0)),
 		},
 		{
@@ -1146,7 +1146,7 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 			attributes:               newValidAttribute(nil, false),
 			hasParamKind:             false,
 			exceedBudget:             false,
-			testRuntimeCELCostBudget: 3,
+			testRuntimeCELCostBudget: 5,
 			expectRemainingBudget:    pointer.To(int64(0)),
 		},
 		{
@@ -1159,7 +1159,7 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 			attributes:               newValidAttribute(nil, false),
 			hasParamKind:             false,
 			exceedBudget:             false,
-			testRuntimeCELCostBudget: 3,
+			testRuntimeCELCostBudget: 7,
 			expectRemainingBudget:    pointer.To(int64(0)),
 		},
 		{
@@ -1172,7 +1172,7 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 			attributes:               newValidAttribute(nil, false),
 			hasParamKind:             false,
 			exceedBudget:             false,
-			testRuntimeCELCostBudget: 3,
+			testRuntimeCELCostBudget: 4,
 			expectRemainingBudget:    pointer.To(int64(0)),
 		},
 		{
@@ -1198,12 +1198,11 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 					Expression: "has(object.subsets)",
 				},
 			},
-			attributes:                  newValidAttribute(nil, false),
-			hasParamKind:                false,
-			testRuntimeCELCostBudget:    35000,
-			exceedBudget:                true,
-			authorizer:                  denyAll,
-			enableStrictCostEnforcement: true,
+			attributes:               newValidAttribute(nil, false),
+			hasParamKind:             false,
+			testRuntimeCELCostBudget: 35000,
+			exceedBudget:             true,
+			authorizer:               denyAll,
 		},
 		{
 			name: "With StrictCostEnforcementForVAP enabled: expression exceed RuntimeCELCostBudget at last expression",
@@ -1215,12 +1214,11 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 					Expression: "!authorizer.group('').resource('endpoints').check('create').allowed()",
 				},
 			},
-			attributes:                  newValidAttribute(nil, false),
-			hasParamKind:                false,
-			testRuntimeCELCostBudget:    700000,
-			exceedBudget:                true,
-			authorizer:                  denyAll,
-			enableStrictCostEnforcement: true,
+			attributes:               newValidAttribute(nil, false),
+			hasParamKind:             false,
+			testRuntimeCELCostBudget: 700000,
+			exceedBudget:             true,
+			authorizer:               denyAll,
 		},
 		{
 			name: "With StrictCostEnforcementForVAP enabled: test RuntimeCELCostBudge is not exceed",
@@ -1232,14 +1230,13 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 					Expression: "!authorizer.group('').resource('endpoints').check('create').allowed()",
 				},
 			},
-			attributes:                  newValidAttribute(nil, false),
-			hasParamKind:                true,
-			params:                      configMapParams,
-			exceedBudget:                false,
-			testRuntimeCELCostBudget:    700011,
-			expectRemainingBudget:       pointer.To(int64(1)), // 700011 - 700010
-			authorizer:                  denyAll,
-			enableStrictCostEnforcement: true,
+			attributes:               newValidAttribute(nil, false),
+			hasParamKind:             true,
+			params:                   configMapParams,
+			exceedBudget:             false,
+			testRuntimeCELCostBudget: 700011,
+			expectRemainingBudget:    pointer.To(int64(1)), // 700011 - 700010
+			authorizer:               denyAll,
 		},
 		{
 			name: "With StrictCostEnforcementForVAP enabled: test RuntimeCELCostBudge exactly covers",
@@ -1251,14 +1248,13 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 					Expression: "!authorizer.group('').resource('endpoints').check('create').allowed()",
 				},
 			},
-			attributes:                  newValidAttribute(nil, false),
-			hasParamKind:                true,
-			params:                      configMapParams,
-			exceedBudget:                false,
-			testRuntimeCELCostBudget:    700010,
-			expectRemainingBudget:       pointer.To(int64(0)),
-			authorizer:                  denyAll,
-			enableStrictCostEnforcement: true,
+			attributes:               newValidAttribute(nil, false),
+			hasParamKind:             true,
+			params:                   configMapParams,
+			exceedBudget:             false,
+			testRuntimeCELCostBudget: 700010,
+			expectRemainingBudget:    pointer.To(int64(0)),
+			authorizer:               denyAll,
 		},
 		{
 			name: "With StrictCostEnforcementForVAP enabled: per call limit exceeds",
@@ -1267,13 +1263,12 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 					Expression: "!authorizer.group('').resource('endpoints').check('create').allowed() && !authorizer.group('').resource('endpoints').check('create').allowed() && !authorizer.group('').resource('endpoints').check('create').allowed()",
 				},
 			},
-			attributes:                  newValidAttribute(nil, false),
-			hasParamKind:                true,
-			params:                      configMapParams,
-			authorizer:                  denyAll,
-			exceedPerCallLimit:          true,
-			testRuntimeCELCostBudget:    -1,
-			enableStrictCostEnforcement: true,
+			attributes:               newValidAttribute(nil, false),
+			hasParamKind:             true,
+			params:                   configMapParams,
+			authorizer:               denyAll,
+			exceedPerCallLimit:       true,
+			testRuntimeCELCostBudget: -1,
 		},
 		{
 			name: "With StrictCostEnforcementForVAP enabled: Extended library cost: isSorted()",
@@ -1282,12 +1277,11 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 					Expression: "[1,2,3,4].isSorted()",
 				},
 			},
-			attributes:                  newValidAttribute(nil, false),
-			hasParamKind:                false,
-			exceedBudget:                false,
-			testRuntimeCELCostBudget:    4,
-			expectRemainingBudget:       pointer.To(int64(0)),
-			enableStrictCostEnforcement: true,
+			attributes:               newValidAttribute(nil, false),
+			hasParamKind:             false,
+			exceedBudget:             false,
+			testRuntimeCELCostBudget: 4,
+			expectRemainingBudget:    pointer.To(int64(0)),
 		},
 		{
 			name: "With StrictCostEnforcementForVAP enabled: Extended library cost: url",
@@ -1296,12 +1290,11 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 					Expression: "url('https:://kubernetes.io/').getHostname() == 'kubernetes.io'",
 				},
 			},
-			attributes:                  newValidAttribute(nil, false),
-			hasParamKind:                false,
-			exceedBudget:                false,
-			testRuntimeCELCostBudget:    4,
-			expectRemainingBudget:       pointer.To(int64(0)),
-			enableStrictCostEnforcement: true,
+			attributes:               newValidAttribute(nil, false),
+			hasParamKind:             false,
+			exceedBudget:             false,
+			testRuntimeCELCostBudget: 4,
+			expectRemainingBudget:    pointer.To(int64(0)),
 		},
 		{
 			name: "With StrictCostEnforcementForVAP enabled: Extended library cost: split",
@@ -1310,12 +1303,11 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 					Expression: "size('abc 123 def 123'.split(' ')) > 0",
 				},
 			},
-			attributes:                  newValidAttribute(nil, false),
-			hasParamKind:                false,
-			exceedBudget:                false,
-			testRuntimeCELCostBudget:    5,
-			expectRemainingBudget:       pointer.To(int64(0)),
-			enableStrictCostEnforcement: true,
+			attributes:               newValidAttribute(nil, false),
+			hasParamKind:             false,
+			exceedBudget:             false,
+			testRuntimeCELCostBudget: 5,
+			expectRemainingBudget:    pointer.To(int64(0)),
 		},
 		{
 			name: "With StrictCostEnforcementForVAP enabled: Extended library cost: join",
@@ -1324,12 +1316,11 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 					Expression: "size(['aa', 'bb', 'cc', 'd', 'e', 'f', 'g', 'h', 'i', 'j'].join(' ')) > 0",
 				},
 			},
-			attributes:                  newValidAttribute(nil, false),
-			hasParamKind:                false,
-			exceedBudget:                false,
-			testRuntimeCELCostBudget:    7,
-			expectRemainingBudget:       pointer.To(int64(0)),
-			enableStrictCostEnforcement: true,
+			attributes:               newValidAttribute(nil, false),
+			hasParamKind:             false,
+			exceedBudget:             false,
+			testRuntimeCELCostBudget: 7,
+			expectRemainingBudget:    pointer.To(int64(0)),
 		},
 		{
 			name: "With StrictCostEnforcementForVAP enabled: Extended library cost: find",
@@ -1338,12 +1329,11 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 					Expression: "size('abc 123 def 123'.find('123')) > 0",
 				},
 			},
-			attributes:                  newValidAttribute(nil, false),
-			hasParamKind:                false,
-			exceedBudget:                false,
-			testRuntimeCELCostBudget:    4,
-			expectRemainingBudget:       pointer.To(int64(0)),
-			enableStrictCostEnforcement: true,
+			attributes:               newValidAttribute(nil, false),
+			hasParamKind:             false,
+			exceedBudget:             false,
+			testRuntimeCELCostBudget: 4,
+			expectRemainingBudget:    pointer.To(int64(0)),
 		},
 		{
 			name: "With StrictCostEnforcementForVAP enabled: Extended library cost: quantity",
@@ -1352,19 +1342,18 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 					Expression: "quantity(\"200M\") == quantity(\"0.2G\") && quantity(\"0.2G\") == quantity(\"200M\")",
 				},
 			},
-			attributes:                  newValidAttribute(nil, false),
-			hasParamKind:                false,
-			exceedBudget:                false,
-			testRuntimeCELCostBudget:    6,
-			expectRemainingBudget:       pointer.To(int64(0)),
-			enableStrictCostEnforcement: true,
+			attributes:               newValidAttribute(nil, false),
+			hasParamKind:             false,
+			exceedBudget:             false,
+			testRuntimeCELCostBudget: 6,
+			expectRemainingBudget:    pointer.To(int64(0)),
 		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			c := conditionCompiler{compiler: NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), tc.enableStrictCostEnforcement))}
-			f := c.CompileCondition(tc.validations, OptionalVariableDeclarations{HasParams: tc.hasParamKind, HasAuthorizer: true, StrictCost: tc.enableStrictCostEnforcement}, environment.NewExpressions)
+			c := conditionCompiler{compiler: NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()))}
+			f := c.CompileCondition(tc.validations, OptionalVariableDeclarations{HasParams: tc.hasParamKind, HasAuthorizer: true}, environment.NewExpressions)
 			if f == nil {
 				t.Fatalf("unexpected nil validator")
 			}

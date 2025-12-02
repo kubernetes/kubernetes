@@ -34,14 +34,15 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
-	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/server/flagz"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/apiserver/pkg/server/routes"
+	"k8s.io/apiserver/pkg/server/statusz"
 	"k8s.io/apiserver/pkg/util/compatibility"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
@@ -62,8 +63,6 @@ import (
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
 	zpagesfeatures "k8s.io/component-base/zpages/features"
-	"k8s.io/component-base/zpages/flagz"
-	"k8s.io/component-base/zpages/statusz"
 	nodeutil "k8s.io/component-helpers/node/util"
 	"k8s.io/klog/v2"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -236,10 +235,10 @@ func newProxyServer(ctx context.Context, config *kubeproxyconfig.KubeProxyConfig
 	s.Recorder = s.Broadcaster.NewRecorder(proxyconfigscheme.Scheme, kubeProxy)
 
 	s.NodeRef = &v1.ObjectReference{
-		Kind:      "Node",
-		Name:      s.NodeName,
-		UID:       types.UID(s.NodeName),
-		Namespace: "",
+		APIVersion: "v1",
+		Kind:       "Node",
+		Name:       s.NodeName,
+		Namespace:  "",
 	}
 
 	if len(config.HealthzBindAddress) > 0 {
@@ -440,7 +439,7 @@ func serveHealthz(ctx context.Context, hz *healthcheck.ProxyHealthServer, errCh 
 		return
 	}
 
-	fn := func() {
+	fn := func(ctx context.Context) {
 		err := hz.Run(ctx)
 		if err != nil {
 			logger.Error(err, "Healthz server failed")
@@ -454,7 +453,7 @@ func serveHealthz(ctx context.Context, hz *healthcheck.ProxyHealthServer, errCh 
 			logger.Error(nil, "Healthz server returned without error")
 		}
 	}
-	go wait.Until(fn, 5*time.Second, ctx.Done())
+	go wait.UntilWithContext(ctx, fn, 5*time.Second)
 }
 
 func serveMetrics(ctx context.Context, bindAddress string, proxyMode kubeproxyconfig.ProxyMode, enableProfiling bool, flagzReader flagz.Reader, errCh chan error) {
@@ -493,12 +492,11 @@ func serveMetrics(ctx context.Context, bindAddress string, proxyMode kubeproxyco
 		statusz.Install(proxyMux, kubeProxy, reg)
 	}
 
-	fn := func() {
+	fn := func(ctx context.Context) {
 		var err error
 		defer func() {
 			if err != nil {
-				err = fmt.Errorf("starting metrics server failed: %w", err)
-				utilruntime.HandleError(err)
+				utilruntime.HandleErrorWithContext(ctx, err, "starting metrics server failed")
 				if errCh != nil {
 					errCh <- err
 					// if in hardfail mode, never retry again
@@ -520,7 +518,7 @@ func serveMetrics(ctx context.Context, bindAddress string, proxyMode kubeproxyco
 		}
 
 	}
-	go wait.Until(fn, 5*time.Second, wait.NeverStop)
+	go wait.UntilWithContext(ctx, fn, 5*time.Second)
 }
 
 // Run runs the specified ProxyServer.  This should never exit (unless CleanupAndExit is set).

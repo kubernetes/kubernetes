@@ -39,6 +39,7 @@ spec:
   podInfoOnMount: true
   requiresRepublish: true
   seLinuxMount: true
+  serviceAccountTokenInSecrets: true
   storageCapacity: true
   tokenRequests:
   - audience: audienceValue

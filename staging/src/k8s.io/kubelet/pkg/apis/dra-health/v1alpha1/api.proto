@@ -56,6 +56,11 @@ message DeviceHealth {
 
   // The Unix time (in seconds) of when this health status was last determined by the plugin.
   int64 last_updated_time = 3;
+
+  // Health check timeout in seconds for this device.
+  // If not specified, zero, or negative, Kubelet will use a default timeout.
+  // Negative values will be logged and treated as if not specified.
+  int64 health_check_timeout_seconds = 4;
 }
 
 // NodeWatchResourcesResponse contains a list of devices and their current health.

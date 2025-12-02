@@ -149,7 +149,7 @@ func waitUntilPodInfoInLog(ctx context.Context, m *mockDriverSetup, expectPodInf
 			framework.ExpectNoError(err, "while deleting")
 
 			ginkgo.By("Checking CSI driver logs")
-			err = checkNodePublishVolume(ctx, m.driver.GetCalls, pod, expectPodInfo, expectEphemeral, csiInlineVolumesEnabled, false)
+			err = checkNodePublishVolume(ctx, m.driver.GetCalls, pod, expectPodInfo, expectEphemeral, csiInlineVolumesEnabled, false, false)
 			framework.ExpectNoError(err)
 		})
 

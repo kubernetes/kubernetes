@@ -37,7 +37,7 @@ set -xe
 cd "$(dirname "$0")"
 
 # Remove stale files.
-rm -rf external-attacher external-provisioner external-resizer external-snapshotter external-health-monitor hostpath csi-driver-host-path
+rm -rf external-attacher external-provisioner external-resizer external-snapshotter/csi-snapshotter external-health-monitor hostpath csi-driver-host-path
 
 # Check out desired release.
 git clone https://github.com/kubernetes-csi/csi-driver-host-path.git
@@ -127,6 +127,10 @@ for image in $images; do
                     path="csi-snapshotter"
                     rbac="rbac-csi-snapshotter.yaml"
                     ;;
+                external-snapshot-metadata)
+                    # Another special case. There is no e2e test that needs the RBAC manifest + it's on an unusual place.
+                    continue
+                    ;;
             esac
             ;;
     esac
@@ -137,5 +141,12 @@ done
 grep -r image: hostpath/hostpath/csi-hostpath-plugin.yaml | while read -r image; do
     version=$(echo "$image" | sed -e 's/.*:\(.*\)/\1/')
     image=$(echo "$image" | sed -e 's/.*image: \([^:]*\).*/\1/')
-    sed -i '' -e "s;$image:.*;$image:$version;" mock/*.yaml
+
+    if sed --version >/dev/null 2>&1; then
+        # GNU sed, `-i ''` fails
+        sed -i -e "s;$image:.*;$image:$version;" mock/*.yaml
+    else
+        # BSD sed (macOS)
+        sed -i '' -e "s;$image:.*;$image:$version;" mock/*.yaml
+    fi
 done

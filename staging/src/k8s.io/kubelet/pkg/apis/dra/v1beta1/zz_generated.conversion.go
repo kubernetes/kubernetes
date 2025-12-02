@@ -166,6 +166,7 @@ func autoConvert_v1_Device_To_v1beta1_Device(in *v1.Device, out *Device, s conve
 	out.PoolName = in.PoolName
 	out.DeviceName = in.DeviceName
 	out.CdiDeviceIds = *(*[]string)(unsafe.Pointer(&in.CdiDeviceIds))
+	// WARNING: in.ShareId requires manual conversion: does not exist in peer-type
 	// WARNING: in.unknownFields is not exported and cannot be read
 	// WARNING: in.sizeCache is not exported and cannot be read
 	return nil

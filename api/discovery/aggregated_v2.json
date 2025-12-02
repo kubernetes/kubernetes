@@ -705,32 +705,6 @@
                 "update",
                 "watch"
               ]
-            }
-          ],
-          "version": "v1beta1"
-        },
-        {
-          "freshness": "Current",
-          "resources": [
-            {
-              "resource": "clustertrustbundles",
-              "responseKind": {
-                "group": "",
-                "kind": "ClusterTrustBundle",
-                "version": ""
-              },
-              "scope": "Cluster",
-              "singularResource": "clustertrustbundle",
-              "verbs": [
-                "create",
-                "delete",
-                "deletecollection",
-                "get",
-                "list",
-                "patch",
-                "update",
-                "watch"
-              ]
             },
             {
               "resource": "podcertificaterequests",
@@ -756,6 +730,32 @@
                   ]
                 }
               ],
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            }
+          ],
+          "version": "v1beta1"
+        },
+        {
+          "freshness": "Current",
+          "resources": [
+            {
+              "resource": "clustertrustbundles",
+              "responseKind": {
+                "group": "",
+                "kind": "ClusterTrustBundle",
+                "version": ""
+              },
+              "scope": "Cluster",
+              "singularResource": "clustertrustbundle",
               "verbs": [
                 "create",
                 "delete",
@@ -1627,6 +1627,32 @@
             }
           ],
           "version": "v1"
+        },
+        {
+          "freshness": "Current",
+          "resources": [
+            {
+              "resource": "workloads",
+              "responseKind": {
+                "group": "",
+                "kind": "Workload",
+                "version": ""
+              },
+              "scope": "Namespaced",
+              "singularResource": "workload",
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            }
+          ],
+          "version": "v1alpha1"
         }
       ]
     },
@@ -2101,6 +2127,21 @@
               },
               "scope": "Cluster",
               "singularResource": "devicetaintrule",
+              "subresources": [
+                {
+                  "responseKind": {
+                    "group": "",
+                    "kind": "DeviceTaintRule",
+                    "version": ""
+                  },
+                  "subresource": "status",
+                  "verbs": [
+                    "get",
+                    "patch",
+                    "update"
+                  ]
+                }
+              ],
               "verbs": [
                 "create",
                 "delete",
@@ -2292,7 +2333,7 @@
               ]
             }
           ],
-          "version": "v1alpha1"
+          "version": "v1beta1"
         }
       ]
     }

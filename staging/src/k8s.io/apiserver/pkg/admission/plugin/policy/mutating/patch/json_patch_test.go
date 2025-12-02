@@ -18,9 +18,10 @@ package patch
 
 import (
 	"context"
-	"github.com/google/go-cmp/cmp"
 	"strings"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -403,7 +404,7 @@ func TestJSONPatch(t *testing.T) {
 		},
 	}
 
-	compiler, err := cel.NewCompositedCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true))
+	compiler, err := cel.NewCompositedCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()))
 
 	if err != nil {
 		t.Fatal(err)
@@ -411,7 +412,7 @@ func TestJSONPatch(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			accessor := &JSONPatchCondition{Expression: tc.expression}
-			compileResult := compiler.CompileMutatingEvaluator(accessor, cel.OptionalVariableDeclarations{StrictCost: true, HasPatchTypes: true}, environment.StoredExpressions)
+			compileResult := compiler.CompileMutatingEvaluator(accessor, cel.OptionalVariableDeclarations{HasPatchTypes: true}, environment.StoredExpressions)
 
 			patcher := jsonPatcher{PatchEvaluator: compileResult}
 

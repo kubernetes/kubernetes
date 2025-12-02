@@ -173,7 +173,11 @@ func (eCtx *errorContext) ExpectNoError(err error, explain ...interface{}) {
 }
 
 func (cCtx *errorContext) Run(name string, cb func(tCtx TContext)) bool {
-	return run(cCtx, name, cb)
+	return run(cCtx, name, false, cb)
+}
+
+func (cCtx *errorContext) SyncTest(name string, cb func(tCtx TContext)) bool {
+	return run(cCtx, name, true, cb)
 }
 
 func (eCtx *errorContext) Logger() klog.Logger {

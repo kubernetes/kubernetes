@@ -21,20 +21,21 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	quota "k8s.io/apiserver/pkg/quota/v1"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
+	"k8s.io/client-go/informers"
 	"k8s.io/kubernetes/pkg/apis/authentication"
 	"k8s.io/kubernetes/pkg/apis/authorization"
 	"k8s.io/kubernetes/pkg/quota/v1/evaluator/core"
 )
 
 // NewQuotaConfigurationForAdmission returns a quota configuration for admission control.
-func NewQuotaConfigurationForAdmission() quota.Configuration {
-	evaluators := core.NewEvaluators(nil)
+func NewQuotaConfigurationForAdmission(i informers.SharedInformerFactory) quota.Configuration {
+	evaluators := core.NewEvaluators(nil, i)
 	return generic.NewConfiguration(evaluators, DefaultIgnoredResources())
 }
 
 // NewQuotaConfigurationForControllers returns a quota configuration for controllers.
-func NewQuotaConfigurationForControllers(f quota.ListerForResourceFunc) quota.Configuration {
-	evaluators := core.NewEvaluators(f)
+func NewQuotaConfigurationForControllers(f quota.ListerForResourceFunc, i informers.SharedInformerFactory) quota.Configuration {
+	evaluators := core.NewEvaluators(f, i)
 	return generic.NewConfiguration(evaluators, DefaultIgnoredResources())
 }
 

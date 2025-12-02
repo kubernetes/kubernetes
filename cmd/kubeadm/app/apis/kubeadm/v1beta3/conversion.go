@@ -161,3 +161,17 @@ func convertFromArgs(in []kubeadm.Arg) map[string]string {
 func Convert_v1beta3_APIServer_To_kubeadm_APIServer(in *APIServer, out *kubeadm.APIServer, s conversion.Scope) error {
 	return autoConvert_v1beta3_APIServer_To_kubeadm_APIServer(in, out, s)
 }
+
+// Convert_kubeadm_ExternalEtcd_To_v1beta3_ExternalEtcd converts a private ExternalEtcd to public ExternalEtcd.
+func Convert_kubeadm_ExternalEtcd_To_v1beta3_ExternalEtcd(in *kubeadm.ExternalEtcd, out *ExternalEtcd, s conversion.Scope) error {
+	return autoConvert_kubeadm_ExternalEtcd_To_v1beta3_ExternalEtcd(in, out, s)
+}
+
+// Convert_v1beta3_ExternalEtcd_To_kubeadm_ExternalEtcd converts a public ExternalEtcd to private ExternalEtcd.
+// It is required due to missing HTTPEndpoints in v1beta3.
+func Convert_v1beta3_ExternalEtcd_To_kubeadm_ExternalEtcd(in *ExternalEtcd, out *kubeadm.ExternalEtcd, s conversion.Scope) error {
+	// set the HTTPEndpoints to the same as the Endpoints
+	// this is to maintain backwards compatibility with the v1beta3 API
+	out.HTTPEndpoints = in.Endpoints
+	return autoConvert_v1beta3_ExternalEtcd_To_kubeadm_ExternalEtcd(in, out, s)
+}

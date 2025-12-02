@@ -18,6 +18,7 @@ package dynamicinformer_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -68,6 +69,12 @@ func TestWatchListSemanticsSimple(t *testing.T) {
 	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.WatchListClient, true)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if _, ok := req.URL.Query()["watch"]; !ok {
+			t.Errorf("expected a watch request, params: %v", req.URL.Query())
+			http.Error(w, fmt.Errorf("unexpected request").Error(), http.StatusInternalServerError)
+			return
+		}
+
 		obj := &appsv1.Deployment{
 			TypeMeta: metav1.TypeMeta{
 				APIVersion: "apps/v1",

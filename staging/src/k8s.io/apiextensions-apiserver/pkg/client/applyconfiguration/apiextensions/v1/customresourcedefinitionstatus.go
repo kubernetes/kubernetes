@@ -35,6 +35,8 @@ type CustomResourceDefinitionStatusApplyConfiguration struct {
 	// versions from this list.
 	// Versions may not be removed from `spec.versions` while they exist in this list.
 	StoredVersions []string `json:"storedVersions,omitempty"`
+	// The generation observed by the CRD controller.
+	ObservedGeneration *int64 `json:"observedGeneration,omitempty"`
 }
 
 // CustomResourceDefinitionStatusApplyConfiguration constructs a declarative configuration of the CustomResourceDefinitionStatus type for use with
@@ -71,5 +73,13 @@ func (b *CustomResourceDefinitionStatusApplyConfiguration) WithStoredVersions(va
 	for i := range values {
 		b.StoredVersions = append(b.StoredVersions, values[i])
 	}
+	return b
+}
+
+// WithObservedGeneration sets the ObservedGeneration field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ObservedGeneration field is set to the value of the last call.
+func (b *CustomResourceDefinitionStatusApplyConfiguration) WithObservedGeneration(value int64) *CustomResourceDefinitionStatusApplyConfiguration {
+	b.ObservedGeneration = &value
 	return b
 }

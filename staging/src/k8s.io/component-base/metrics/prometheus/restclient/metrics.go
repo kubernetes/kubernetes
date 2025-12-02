@@ -165,6 +165,17 @@ var (
 		[]string{"code", "call_status"},
 	)
 
+	execPluginPolicyCalls = k8smetrics.NewCounterVec(
+		&k8smetrics.CounterOpts{
+			StabilityLevel: k8smetrics.ALPHA,
+			Name:           "rest_client_exec_plugin_policy_call_total",
+			Help: "Number of comparisons of an exec plugin to the plugin policy " +
+				"and allowlist (if any), partitioned by whether or not the policy " +
+				"permits the plugin",
+		},
+		[]string{"allowed", "denied"},
+	)
+
 	transportCacheEntries = k8smetrics.NewGauge(
 		&k8smetrics.GaugeOpts{
 			Name:           "rest_client_transport_cache_entries",
@@ -208,6 +219,7 @@ func init() {
 		RequestResult:         &resultAdapter{requestResult},
 		RequestRetry:          &retryAdapter{requestRetry},
 		ExecPluginCalls:       &callsAdapter{m: execPluginCalls},
+		ExecPluginPolicyCalls: &policyAdapter{m: execPluginPolicyCalls},
 		TransportCacheEntries: &transportCacheAdapter{m: transportCacheEntries},
 		TransportCreateCalls:  &transportCacheCallsAdapter{m: transportCacheCalls},
 	})
@@ -267,6 +279,14 @@ type callsAdapter struct {
 
 func (r *callsAdapter) Increment(code int, callStatus string) {
 	r.m.WithLabelValues(fmt.Sprintf("%d", code), callStatus).Inc()
+}
+
+type policyAdapter struct {
+	m *k8smetrics.CounterVec
+}
+
+func (r *policyAdapter) Increment(status string) {
+	r.m.WithLabelValues(status).Inc()
 }
 
 type retryAdapter struct {

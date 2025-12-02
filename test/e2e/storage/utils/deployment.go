@@ -155,6 +155,9 @@ func PatchCSIDeployment(f *e2eframework.Framework, o PatchCSIOptions, object int
 		if o.RequiresRepublish != nil {
 			object.Spec.RequiresRepublish = o.RequiresRepublish
 		}
+		if o.ServiceAccountTokenInSecrets != nil {
+			object.Spec.ServiceAccountTokenInSecrets = o.ServiceAccountTokenInSecrets
+		}
 		if o.FSGroupPolicy != nil {
 			object.Spec.FSGroupPolicy = o.FSGroupPolicy
 		}
@@ -216,6 +219,10 @@ type PatchCSIOptions struct {
 	// field *if* the driver deploys a CSIDriver object. Ignored
 	// otherwise.
 	RequiresRepublish *bool
+	// If not nil, the value to use for the CSIDriver.Spec.ServiceAccountTokenInSecrets
+	// field *if* the driver deploys a CSIDriver object. Ignored
+	// otherwise.
+	ServiceAccountTokenInSecrets *bool
 	// If not nil, the value to use for the CSIDriver.Spec.FSGroupPolicy
 	// field *if* the driver deploys a CSIDriver object. Ignored
 	// otherwise.

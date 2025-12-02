@@ -24,7 +24,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/utils/ptr"
 )
@@ -541,8 +544,30 @@ func TestGeneratePodInitializedCondition(t *testing.T) {
 				Status: v1.ConditionTrue,
 			},
 		},
+		{
+			spec: oneInitContainer,
+			containerStatuses: []v1.ContainerStatus{{
+				Name: "1234",
+				State: v1.ContainerState{
+					Waiting: &v1.ContainerStateWaiting{},
+				},
+			}, {
+				Name: "regular",
+				State: v1.ContainerState{
+					Terminated: &v1.ContainerStateTerminated{},
+				},
+			}},
+			podPhase: v1.PodRunning,
+			expected: v1.PodCondition{
+				Status: v1.ConditionTrue,
+			},
+		},
 	}
-
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.ContainerRestartRules:                true,
+		features.NodeDeclaredFeatures:                 true,
+		features.RestartAllContainersOnContainerExits: true,
+	})
 	for _, test := range tests {
 		test.expected.Type = v1.PodInitialized
 		pod := &v1.Pod{Spec: *test.spec}
@@ -621,6 +646,131 @@ func TestGeneratePodReadyToStartContainersCondition(t *testing.T) {
 			condition := GeneratePodReadyToStartContainersCondition(test.pod, &v1.PodStatus{}, test.status)
 			require.Equal(t, test.expected.Type, condition.Type)
 			require.Equal(t, test.expected.Status, condition.Status)
+		})
+	}
+}
+
+func TestGenerateAllContainersRestartingCondition(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.ContainerRestartRules:                true,
+		features.NodeDeclaredFeatures:                 true,
+		features.RestartAllContainersOnContainerExits: true,
+	})
+
+	restartPolicyNever := v1.ContainerRestartPolicyNever
+	defaultPod := &v1.Pod{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{
+				Name: "container1",
+			}, {
+				Name:          "trigger",
+				RestartPolicy: &restartPolicyNever,
+				RestartPolicyRules: []v1.ContainerRestartRule{{
+					Action: v1.ContainerRestartRuleActionRestartAllContainers,
+					ExitCodes: &v1.ContainerRestartRuleOnExitCodes{
+						Operator: v1.ContainerRestartRuleOnExitCodesOpIn,
+						Values:   []int32{42},
+					},
+				}},
+			}},
+		},
+	}
+
+	for desc, test := range map[string]struct {
+		podStatus    *kubecontainer.PodStatus
+		oldAPIStatus *v1.PodStatus
+		phase        v1.PodPhase
+		expected     v1.PodCondition
+	}{
+		"pod pending": {
+			phase: v1.PodPending,
+			expected: v1.PodCondition{
+				Status: v1.ConditionFalse,
+			},
+		},
+		"pod failed": {
+			phase: v1.PodFailed,
+			expected: v1.PodCondition{
+				Status: v1.ConditionFalse,
+				Reason: PodFailed,
+			},
+		},
+		"pod succeeded": {
+			phase: v1.PodSucceeded,
+			expected: v1.PodCondition{
+				Status: v1.ConditionFalse,
+				Reason: PodCompleted,
+			},
+		},
+		"container triggers RestartAllContainers rule": {
+			podStatus: &kubecontainer.PodStatus{
+				ContainerStatuses: []*kubecontainer.Status{
+					{
+						Name:  "container",
+						State: kubecontainer.ContainerStateRunning,
+					},
+					{
+						Name:     "trigger",
+						State:    kubecontainer.ContainerStateExited,
+						ExitCode: 42,
+					},
+				},
+			},
+			phase: v1.PodRunning,
+			expected: v1.PodCondition{
+				Status:  v1.ConditionTrue,
+				Reason:  "RestartAllContainersStarted",
+				Message: "container exited with restart policy rule",
+			},
+		},
+		"container triggres RestartAllContainers rule, cleaning up": {
+			podStatus: &kubecontainer.PodStatus{
+				ContainerStatuses: []*kubecontainer.Status{
+					{
+						Name:  "container",
+						State: kubecontainer.ContainerStateExited,
+					},
+					{
+						Name:     "trigger",
+						State:    kubecontainer.ContainerStateExited,
+						ExitCode: 42,
+					},
+				},
+			},
+			oldAPIStatus: &v1.PodStatus{
+				Conditions: []v1.PodCondition{{
+					Type:   v1.AllContainersRestarting,
+					Status: v1.ConditionTrue,
+				}},
+			},
+			phase: v1.PodRunning,
+			expected: v1.PodCondition{
+				Status:  v1.ConditionTrue,
+				Reason:  "RestartAllContainersStarted",
+				Message: "container exited with restart policy rule",
+			},
+		},
+		"container triggres RestartAllContainers rule, cleaned up": {
+			oldAPIStatus: &v1.PodStatus{
+				Conditions: []v1.PodCondition{{
+					Type:   v1.AllContainersRestarting,
+					Status: v1.ConditionTrue,
+				}},
+			},
+			phase: v1.PodPending,
+			expected: v1.PodCondition{
+				Status: v1.ConditionFalse,
+			},
+		},
+	} {
+		t.Run(desc, func(t *testing.T) {
+			test.expected.Type = v1.AllContainersRestarting
+			podStatus := &kubecontainer.PodStatus{}
+			if test.podStatus != nil {
+				podStatus = test.podStatus
+			}
+			condition := GenerateAllContainersRestartingCondition(defaultPod, podStatus, test.oldAPIStatus, test.phase)
+			require.Equal(t, test.expected, condition)
 		})
 	}
 }

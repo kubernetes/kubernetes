@@ -1043,9 +1043,9 @@ func TestForgetPod(t *testing.T) {
 		if err := isForgottenFromCache(pod, cache); err != nil {
 			t.Errorf("pod %q: %v", pod.Name, err)
 		}
-		// trying to forget a pod already forgotten should return an error
-		if err := cache.ForgetPod(logger, pod); err == nil {
-			t.Error("expected error, no error found")
+		// trying to forget a pod already forgotten should return nil
+		if err := cache.ForgetPod(logger, pod); err != nil {
+			t.Error("expected no error, error found")
 		}
 	}
 }

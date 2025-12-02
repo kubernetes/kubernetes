@@ -78,7 +78,7 @@ func TestForbidden(t *testing.T) {
 		observer := httptest.NewRecorder()
 		scheme := runtime.NewScheme()
 		negotiatedSerializer := serializer.NewCodecFactory(scheme).WithoutConversion()
-		Forbidden(request.NewDefaultContext(), test.attributes, observer, &http.Request{URL: &url.URL{Path: "/path"}}, test.reason, negotiatedSerializer)
+		Forbidden(test.attributes, observer, &http.Request{URL: &url.URL{Path: "/path"}}, test.reason, negotiatedSerializer)
 		result := observer.Body.String()
 		if result != test.expected {
 			t.Errorf("Forbidden response body(%#v...)\n expected: %v\ngot:       %v", test.attributes, test.expected, result)

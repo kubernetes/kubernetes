@@ -17,11 +17,17 @@ limitations under the License.
 package core
 
 import (
+	"context"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	quota "k8s.io/apiserver/pkg/quota/v1"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/informers"
+	corev1listers "k8s.io/client-go/listers/core/v1"
+	"k8s.io/dynamic-resource-allocation/deviceclass/extendedresourcecache"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/clock"
 )
@@ -35,7 +41,7 @@ var legacyObjectCountAliases = map[schema.GroupVersionResource]corev1.ResourceNa
 }
 
 // NewEvaluators returns the list of static evaluators that manage more than counts
-func NewEvaluators(f quota.ListerForResourceFunc) []quota.Evaluator {
+func NewEvaluators(f quota.ListerForResourceFunc, i informers.SharedInformerFactory) []quota.Evaluator {
 	// these evaluators have special logic
 	result := []quota.Evaluator{
 		NewPodEvaluator(f, clock.RealClock{}),
@@ -43,7 +49,17 @@ func NewEvaluators(f quota.ListerForResourceFunc) []quota.Evaluator {
 		NewPersistentVolumeClaimEvaluator(f),
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-		result = append(result, NewResourceClaimEvaluator(f))
+		var podLister corev1listers.PodLister
+		var deviceClassMapping *extendedresourcecache.ExtendedResourceCache
+		if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
+			podLister = i.Core().V1().Pods().Lister()
+			logger := klog.FromContext(context.Background())
+			deviceClassMapping = extendedresourcecache.NewExtendedResourceCache(logger)
+			if _, err := i.Resource().V1().DeviceClasses().Informer().AddEventHandler(deviceClassMapping); err != nil {
+				logger.Error(err, "failed to add device class informer event handler")
+			}
+		}
+		result = append(result, NewResourceClaimEvaluator(f, deviceClassMapping, podLister))
 	}
 
 	// these evaluators require an alias for backwards compatibility

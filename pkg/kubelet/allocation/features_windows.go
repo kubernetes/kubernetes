@@ -24,3 +24,7 @@ import v1 "k8s.io/api/core/v1"
 func IsInPlacePodVerticalScalingAllowed(_ *v1.Pod) (allowed bool, msg, reason string) {
 	return false, "In-place pod resize is not supported on Windows", "windows"
 }
+
+func IsInPlacePodLevelResourcesVerticalScalingAllowed(pod *v1.Pod) (allowed bool, msg, reason string) {
+	return false, "In-place pod-level resources resize is not supported on Windows", "windows"
+}

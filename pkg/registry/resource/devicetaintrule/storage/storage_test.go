@@ -20,19 +20,24 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
+	"k8s.io/apiserver/pkg/registry/rest"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	_ "k8s.io/kubernetes/pkg/apis/resource/install"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 )
 
-func newStorage(t *testing.T) (*REST, *etcd3testing.EtcdTestServer) {
+func newStorage(t *testing.T) (*REST, *StatusREST, *etcd3testing.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorageForResource(t, resource.Resource("devicetaintrules"))
 	restOptions := generic.RESTOptions{
 		StorageConfig:           etcdStorage,
@@ -40,11 +45,11 @@ func newStorage(t *testing.T) (*REST, *etcd3testing.EtcdTestServer) {
 		DeleteCollectionWorkers: 1,
 		ResourcePrefix:          "devicetaintrules",
 	}
-	deviceTaintStorage, err := NewREST(restOptions)
+	deviceTaintStorage, statusStorage, err := NewREST(restOptions)
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}
-	return deviceTaintStorage, server
+	return deviceTaintStorage, statusStorage, server
 }
 
 func validNewDeviceTaint(name string) *resource.DeviceTaintRule {
@@ -63,7 +68,7 @@ func validNewDeviceTaint(name string) *resource.DeviceTaintRule {
 }
 
 func TestCreate(t *testing.T) {
-	storage, server := newStorage(t)
+	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store).ClusterScope()
@@ -80,7 +85,7 @@ func TestCreate(t *testing.T) {
 }
 
 func TestUpdate(t *testing.T) {
-	storage, server := newStorage(t)
+	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store).ClusterScope()
@@ -98,7 +103,7 @@ func TestUpdate(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	storage, server := newStorage(t)
+	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store).ClusterScope().ReturnDeletedObject()
@@ -106,7 +111,7 @@ func TestDelete(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
-	storage, server := newStorage(t)
+	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store).ClusterScope()
@@ -114,7 +119,7 @@ func TestGet(t *testing.T) {
 }
 
 func TestList(t *testing.T) {
-	storage, server := newStorage(t)
+	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store).ClusterScope()
@@ -122,7 +127,7 @@ func TestList(t *testing.T) {
 }
 
 func TestWatch(t *testing.T) {
-	storage, server := newStorage(t)
+	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store).ClusterScope()
@@ -143,4 +148,40 @@ func TestWatch(t *testing.T) {
 			{"metadata.name": "bar"},
 		},
 	)
+}
+
+func TestUpdateStatus(t *testing.T) {
+	storage, statusStorage, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+	ctx := genericapirequest.NewDefaultContext()
+
+	key, _ := storage.KeyFunc(ctx, "foo")
+	deviceTaintStart := validNewDeviceTaint("foo")
+	err := storage.Storage.Create(ctx, key, deviceTaintStart, nil, 0, false)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	deviceTaint := deviceTaintStart.DeepCopy()
+	deviceTaint.Status.Conditions = []metav1.Condition{{
+		Type:               "EvicitionInProgress",
+		Status:             metav1.ConditionTrue,
+		Reason:             "PodsLeft",
+		Message:            "100 pods left",
+		LastTransitionTime: metav1.Time{Time: time.Now().Truncate(time.Second)},
+	}}
+	_, _, err = statusStorage.Update(ctx, deviceTaint.Name, rest.DefaultUpdatedObjectInfo(deviceTaint), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	obj, err := storage.Get(ctx, "foo", &metav1.GetOptions{})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	deviceTaintOut := obj.(*resource.DeviceTaintRule)
+	// only compare relevant changes b/c of difference in metadata
+	if !apiequality.Semantic.DeepEqual(deviceTaint.Status, deviceTaintOut.Status) {
+		t.Errorf("unexpected object: %s", cmp.Diff(deviceTaint.Status, deviceTaintOut.Status))
+	}
 }

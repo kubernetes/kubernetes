@@ -17,11 +17,16 @@ limitations under the License.
 package cache
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"runtime"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	clientfeatures "k8s.io/client-go/features"
+	clientfeaturestesting "k8s.io/client-go/features/testing"
 )
 
 func (f *RealFIFO) getItems() []Delta {
@@ -972,5 +977,315 @@ func TestRealFIFO_PopShouldUnblockWhenClosed(t *testing.T) {
 		case <-time.After(500 * time.Millisecond):
 			t.Fatalf("timed out waiting for Pop to return after Close")
 		}
+	}
+}
+
+func TestRealFIFO_PopMultipleDeltaInBatch(t *testing.T) {
+	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.InOrderInformersBatchProcess, true)
+	const unlimitedBatchSize = 999999
+	obj1 := mkFifoObj("foo1", 5)
+	obj2 := mkFifoObj("foo2", 5)
+	obj3 := mkFifoObj("foo3", 5)
+	obj4 := mkFifoObj("foo4", 5)
+	testCases := []struct {
+		name            string
+		initialItems    []testFifoObject
+		actions         []func(f *RealFIFO)
+		batchSize       int
+		expectedBatches [][]Delta
+	}{
+		{
+			name: "non-split: pop unique items should work",
+			initialItems: []testFifoObject{
+				obj1, obj2, obj3,
+			},
+			actions:   []func(f *RealFIFO){},
+			batchSize: unlimitedBatchSize,
+			expectedBatches: [][]Delta{
+				{{Replaced, obj1}, {Replaced, obj2}, {Replaced, obj3}},
+			},
+		},
+		{
+			name: "split due to initial list: initial 2 items with 2 updates should have 2 batches",
+			initialItems: []testFifoObject{
+				obj1, obj2,
+			},
+			actions: []func(f *RealFIFO){
+				func(f *RealFIFO) { _ = f.Update(obj3) },
+				func(f *RealFIFO) { _ = f.Update(obj4) },
+			},
+			batchSize: 2,
+			expectedBatches: [][]Delta{
+				{{Replaced, obj1}, {Replaced, obj2}},
+				{{Updated, obj3}, {Updated, obj4}},
+			},
+		},
+		{
+			name: "split due to non-unique#1: update single item for multiple items should have separate batch",
+			initialItems: []testFifoObject{
+				obj1,
+			},
+			actions: []func(f *RealFIFO){
+				func(f *RealFIFO) { _ = f.Update(obj1) },
+				func(f *RealFIFO) { _ = f.Update(obj1) },
+			},
+			batchSize: unlimitedBatchSize,
+			expectedBatches: [][]Delta{
+				{{Replaced, obj1}},
+				{{Updated, obj1}},
+				{{Updated, obj1}},
+			},
+		},
+		{
+			name: "split due to non-unique#2: update 3 item for with non-unique item at the end should have separate batch",
+			initialItems: []testFifoObject{
+				obj1, obj2,
+			},
+			actions: []func(f *RealFIFO){
+				func(f *RealFIFO) { _ = f.Update(obj2) },
+				func(f *RealFIFO) { _ = f.Update(obj3) },
+			},
+			batchSize: unlimitedBatchSize,
+			expectedBatches: [][]Delta{
+				{{Replaced, obj1}, {Replaced, obj2}},
+				{{Updated, obj2}, {Updated, obj3}},
+			},
+		},
+		{
+			name: "split due to non-unique#3: update 3 item for with non-unique item in the mid should have separate batch",
+			initialItems: []testFifoObject{
+				obj1, obj2, obj3,
+			},
+			actions: []func(f *RealFIFO){
+				func(f *RealFIFO) { _ = f.Update(obj2) },
+			},
+			batchSize: unlimitedBatchSize,
+			expectedBatches: [][]Delta{
+				{{Replaced, obj1}, {Replaced, obj2}, {Replaced, obj3}},
+				{{Updated, obj2}},
+			},
+		},
+		{
+			name: "split due to batch size#1: batching initial list should work",
+			initialItems: []testFifoObject{
+				obj1, obj2, obj3,
+			},
+			actions:   []func(f *RealFIFO){},
+			batchSize: 2,
+			expectedBatches: [][]Delta{
+				{{Replaced, obj1}, {Replaced, obj2}},
+				{{Replaced, obj3}},
+			},
+		},
+		{
+			name:         "split due to batch size#2: batching incoming non-initial deltas should work",
+			initialItems: []testFifoObject{},
+			actions: []func(f *RealFIFO){
+				func(f *RealFIFO) { _ = f.Update(obj1) },
+				func(f *RealFIFO) { _ = f.Update(obj2) },
+				func(f *RealFIFO) { _ = f.Update(obj3) },
+			},
+			batchSize: 2,
+			expectedBatches: [][]Delta{
+				{{Updated, obj1}, {Updated, obj2}},
+				{{Updated, obj3}},
+			},
+		},
+		{
+			name: "split due to batch size#3: pop 4 mixed initial & non-initial items with 2 batch size should have 3 batch",
+			initialItems: []testFifoObject{
+				obj1, obj2, obj3,
+			},
+			actions: []func(f *RealFIFO){
+				func(f *RealFIFO) { _ = f.Update(obj4) },
+			},
+			batchSize: 2,
+			expectedBatches: [][]Delta{
+				{{Replaced, obj1}, {Replaced, obj2}},
+				{{Replaced, obj3}},
+				{{Updated, obj4}},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			f := NewRealFIFO(
+				testFifoObjectKeyFunc,
+				literalListerGetter(func() []testFifoObject {
+					return tc.initialItems
+				}),
+				nil)
+			f.batchSize = tc.batchSize
+
+			initialItems := make([]interface{}, len(tc.initialItems))
+			for i, item := range tc.initialItems {
+				initialItems[i] = item
+			}
+			_ = f.Replace(initialItems, "")
+			for _, action := range tc.actions {
+				action(f)
+			}
+
+			const maxAttempts = 10
+			receivedItems := make([][]Delta, 0)
+			receivedInitialDeltas := make([][]Delta, 0)
+
+			for i := 0; i < maxAttempts; i++ {
+				received := make(chan []Delta, 100)
+				receivedInitial := make(chan []Delta, 100)
+				go func() {
+					_ = f.PopBatch(func(obj []Delta, isInInitialList bool) error {
+						received <- obj
+						if isInInitialList {
+							receivedInitial <- obj
+						}
+						return nil
+					})
+				}()
+				timer := time.NewTimer(time.Millisecond * 50)
+				select {
+				case <-timer.C:
+					close(received)
+				case item := <-received:
+					receivedItems = append(receivedItems, item)
+					close(received)
+				}
+				timerInitial := time.NewTimer(time.Millisecond * 50)
+				select {
+				case <-timerInitial.C:
+					close(receivedInitial)
+				case item := <-receivedInitial:
+					receivedInitialDeltas = append(receivedInitialDeltas, item)
+					close(receivedInitial)
+				}
+			}
+
+			runtime.Gosched()
+			f.Close()
+
+			idx := 0
+			for _, batch := range tc.expectedBatches {
+				assert.Equal(t, receivedItems[idx], batch)
+				idx++
+			}
+			receivedInitialItems := make([]testFifoObject, 0)
+			for _, deltas := range receivedInitialDeltas {
+				for _, delta := range deltas {
+					receivedInitialItems = append(receivedInitialItems, delta.Object.(testFifoObject))
+				}
+			}
+
+			assert.Equal(t, tc.initialItems, receivedInitialItems)
+		})
+	}
+}
+
+func TestRealFIFO_PopBrokenItemsInBatch(t *testing.T) {
+	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.InOrderInformersBatchProcess, true)
+	const unlimitedBatchSize = 999999
+	sucessObj1 := mkFifoObj("foo1", 5)
+	sucessObj2 := mkFifoObj("foo2", 5)
+	failObj3 := mkFifoObj("foo3", 5)
+	failObj4 := mkFifoObj("foo4", 5)
+	testDeltaType := Added
+	testCases := []struct {
+		name            string
+		batchSize       int
+		incomingItems   []testFifoObject
+		expectedBatches [][]Delta
+	}{
+		{
+			name: "1st item is broken",
+			incomingItems: []testFifoObject{
+				failObj3,
+			},
+			expectedBatches: [][]Delta{
+				{{testDeltaType, failObj3}},
+			},
+		},
+		{
+			name: "nth item is broken",
+			incomingItems: []testFifoObject{
+				sucessObj1, sucessObj2, failObj3,
+			},
+			expectedBatches: [][]Delta{
+				{{testDeltaType, sucessObj1}, {testDeltaType, sucessObj2}, {testDeltaType, failObj3}},
+			},
+		},
+		{
+			name: "multiple nth items are broken",
+			incomingItems: []testFifoObject{
+				sucessObj1, sucessObj2, failObj3, failObj4,
+			},
+			expectedBatches: [][]Delta{
+				{{testDeltaType, sucessObj1}, {testDeltaType, sucessObj2}, {testDeltaType, failObj3}},
+				{{testDeltaType, failObj4}},
+			},
+		},
+		{
+			name: "mixed 1st and nth items are broken",
+			incomingItems: []testFifoObject{
+				failObj3, sucessObj1, failObj4,
+			},
+			expectedBatches: [][]Delta{
+				{{testDeltaType, failObj3}},
+				{{testDeltaType, sucessObj1}, {testDeltaType, failObj4}},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			testBrokenItemKeyFunc := func(obj interface{}) (string, error) {
+				if obj == failObj3 || obj == failObj4 {
+					return "", errors.New("test key func error")
+				}
+				// otherwise success
+				return testFifoObjectKeyFunc(obj)
+			}
+			f := NewRealFIFO(
+				testBrokenItemKeyFunc,
+				literalListerGetter(func() []testFifoObject {
+					return nil
+				}),
+				nil)
+			f.batchSize = unlimitedBatchSize
+
+			for _, item := range tc.incomingItems {
+				f.items = append(f.items, Delta{testDeltaType, item})
+			}
+
+			const maxAttempts = 10
+			receivedItems := make([][]Delta, 0)
+
+			for i := 0; i < maxAttempts; i++ {
+				received := make(chan []Delta, 100)
+				go func() {
+					_ = f.PopBatch(func(obj []Delta, isInInitialList bool) error {
+						received <- obj
+						return nil
+					})
+				}()
+				timer := time.NewTimer(time.Millisecond * 50)
+				select {
+				case <-timer.C:
+					close(received)
+				case item := <-received:
+					receivedItems = append(receivedItems, item)
+					close(received)
+				}
+			}
+
+			runtime.Gosched()
+			f.Close()
+
+			idx := 0
+			assert.Len(t, tc.expectedBatches, len(receivedItems))
+			for _, batch := range tc.expectedBatches {
+				assert.Equal(t, receivedItems[idx], batch)
+				idx++
+			}
+		})
 	}
 }

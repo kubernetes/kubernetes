@@ -56,7 +56,7 @@ func NewCSINodeInformer(client kubernetes.Interface, resyncPeriod time.Duration,
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredCSINodeInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
+		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
@@ -81,7 +81,7 @@ func NewFilteredCSINodeInformer(client kubernetes.Interface, resyncPeriod time.D
 				}
 				return client.StorageV1beta1().CSINodes().Watch(ctx, options)
 			},
-		},
+		}, client),
 		&apistoragev1beta1.CSINode{},
 		resyncPeriod,
 		indexers,

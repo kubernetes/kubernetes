@@ -31,6 +31,8 @@ import (
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/kubectl/pkg/config"
 )
 
@@ -856,6 +858,8 @@ func TestApplyOverride(t *testing.T) {
 			rootCmd := &cobra.Command{
 				Use: "root",
 			}
+
+			opts := genericclioptions.NewConfigFlags(false)
 			prefHandler := NewPreferences()
 			prefHandler.AddFlags(rootCmd.PersistentFlags())
 			pref, ok := prefHandler.(*Preferences)
@@ -866,7 +870,7 @@ func TestApplyOverride(t *testing.T) {
 			pref.getPreferencesFunc = test.getPreferencesFunc
 			errWriter := &bytes.Buffer{}
 
-			_, err := pref.Apply(rootCmd, test.args, errWriter)
+			_, err := pref.Apply(rootCmd, opts, test.args, errWriter)
 			if test.expectedErr == nil && err != nil {
 				t.Fatalf("unexpected error %v\n", err)
 			}
@@ -1114,7 +1118,8 @@ func TestApplyOverrideBool(t *testing.T) {
 			addCommands(rootCmd, test.nestedCmds)
 			pref.getPreferencesFunc = test.getPreferencesFunc
 			errWriter := &bytes.Buffer{}
-			_, err := pref.Apply(rootCmd, test.args, errWriter)
+			opts := genericclioptions.NewConfigFlags(false)
+			_, err := pref.Apply(rootCmd, opts, test.args, errWriter)
 			if err != nil {
 				t.Fatalf("unexpected error %v\n", err)
 			}
@@ -1403,7 +1408,8 @@ func TestApplyAliasBool(t *testing.T) {
 			addCommands(rootCmd, test.nestedCmds)
 			pref.getPreferencesFunc = test.getPreferencesFunc
 			errWriter := &bytes.Buffer{}
-			lastArgs, err := pref.Apply(rootCmd, test.args, errWriter)
+			opts := genericclioptions.NewConfigFlags(false)
+			lastArgs, err := pref.Apply(rootCmd, opts, test.args, errWriter)
 			if test.expectedErr == nil && err != nil {
 				t.Fatalf("unexpected error %v\n", err)
 			}
@@ -2606,7 +2612,8 @@ func TestApplyAlias(t *testing.T) {
 			addCommands(rootCmd, test.nestedCmds)
 			pref.getPreferencesFunc = test.getPreferencesFunc
 			errWriter := &bytes.Buffer{}
-			lastArgs, err := pref.Apply(rootCmd, test.args, errWriter)
+			opts := genericclioptions.NewConfigFlags(false)
+			lastArgs, err := pref.Apply(rootCmd, opts, test.args, errWriter)
 			if test.expectedErr == nil && err != nil {
 				t.Fatalf("unexpected error %v\n", err)
 			}
@@ -2918,6 +2925,247 @@ unknownField: value`,
 			}
 			if !apiequality.Semantic.DeepEqual(tc.expectedPreferences, actual) {
 				t.Errorf("expected prefs:\n%#v\ngot:\n%#v\n\n", tc.expectedPreferences, actual)
+			}
+		})
+	}
+}
+
+func TestApplyPluginPolicy(t *testing.T) {
+	kubeconfigData := `
+apiVersion: v1
+clusters:
+- cluster:
+    server: https://example.test:443
+  name: foo
+contexts:
+- context:
+    cluster: foo
+    user: me
+  name: foo
+current-context: foo
+kind: Config
+preferences: {}
+users:
+- name: me
+  user:
+    exec:
+      apiVersion: client.authentication.k8s.io/v1beta1
+      args:
+      - get-token
+      - --login
+      command: foo`
+
+	tmpDir := t.TempDir()
+	kubeconfig := filepath.Join(tmpDir, "kubeconfig")
+	err := os.WriteFile(kubeconfig, []byte(kubeconfigData), 0o644)
+	require.NoError(t, err, "writing fake kubeconfig")
+
+	rootCmd := &cobra.Command{
+		Use: "root",
+	}
+
+	args := []string{"placeholder", "two"}
+
+	opts := genericclioptions.NewConfigFlags(false)
+	opts.KubeConfig = &kubeconfig
+
+	p := NewPreferences()
+	pref, ok := p.(*Preferences)
+	require.True(t, ok, "preference type")
+
+	t.Run("plumbing", func(t *testing.T) {
+		pref.getPreferencesFunc = func(_ string, _ io.Writer) (*config.Preference, error) {
+			return &config.Preference{
+				CredentialPluginPolicy: config.CredentialPluginPolicy("Allowlist"),
+				CredentialPluginAllowlist: []config.AllowlistEntry{
+					{Name: "bar"},
+					{Name: "baz"},
+				},
+			}, nil
+		}
+
+		_, err = p.Apply(rootCmd, opts, args, io.Discard)
+		require.NoError(t, err, "error applying preferences")
+
+		cfg, err := opts.ToRESTConfig()
+		require.NoError(t, err, "unexpected error")
+		require.NotNil(t, cfg, "rest config")
+		require.NotNil(t, cfg.ExecProvider, "exec config")
+		require.Equal(t, clientcmdapi.PolicyType("Allowlist"), cfg.ExecProvider.PluginPolicy.PolicyType)
+		require.Equal(t, "bar", cfg.ExecProvider.PluginPolicy.Allowlist[0].Name)
+		require.Equal(t, "baz", cfg.ExecProvider.PluginPolicy.Allowlist[1].Name)
+	})
+
+	type pluginPolicyTest struct {
+		name      string
+		kuberc    string
+		shouldErr bool
+	}
+	tests := []pluginPolicyTest{
+		{
+			name:      "invalid-plugin-policy-with-nil-allowlist",
+			shouldErr: true,
+			kuberc: `kind: Preference
+apiVersion: kubectl.config.k8s.io/v1beta1
+credentialPluginPolicy: "foo"
+`,
+		},
+		{
+			name:      "invalid-policy-with-empty-allowlist",
+			shouldErr: true,
+			kuberc: `
+kind: Preference
+apiVersion: kubectl.config.k8s.io/v1beta1
+credentialPluginPolicy:    "foo"
+credentialPluginAllowlist: []
+`,
+		},
+		{
+			name:      "invalid-policy-with-allowlist",
+			shouldErr: true,
+			kuberc: `
+kind: Preference
+apiVersion: kubectl.config.k8s.io/v1beta1
+credentialPluginPolicy: "foo"
+credentialPluginAllowlist:
+- name: "bar"
+`,
+		},
+		{
+			name:      "allowlist-policy-with-nil-allowlist",
+			shouldErr: true,
+			kuberc: `
+kind: Preference
+apiVersion: kubectl.config.k8s.io/v1beta1
+credentialPluginPolicy: "Allowlist"
+`,
+		},
+		{
+			name:      "allowlist-policy-with-empty-allowlist",
+			shouldErr: true,
+			kuberc: `
+kind: Preference
+apiVersion: kubectl.config.k8s.io/v1beta1
+credentialPluginPolicy:    "Allowlist"
+credentialPluginAllowlist: []
+`,
+		},
+		{
+			name:      "unspecified-policy-with-non-nil-allowlist",
+			shouldErr: true,
+			kuberc: `
+kind: Preference
+apiVersion: kubectl.config.k8s.io/v1beta1
+credentialPluginAllowlist:
+- name: "bar"
+- name: "baz"
+`,
+		},
+		{
+			name:      "allowall-policy-with-non-nil-allowlist",
+			shouldErr: true,
+			kuberc: `
+kind: Preference
+apiVersion: kubectl.config.k8s.io/v1beta1
+credentialPluginPolicy: "AllowAll"
+credentialPluginAllowlist: []clientcmdapi.AllowlistEntry{
+- name: "bar"
+- name: "baz"
+`,
+		},
+		{
+			name:      "allowall-policy-with-non-nil-allowlist",
+			shouldErr: true,
+			kuberc: `
+kind: Preference
+apiVersion: kubectl.config.k8s.io/v1beta1
+credentialPluginPolicy: "DenyAll"
+credentialPluginAllowlist:
+- name: "bar"
+- name: "baz"
+`,
+		},
+		{
+			name:      "non-allowlist-policy-with-non-nil-empty-allowlist",
+			shouldErr: true,
+			kuberc: `
+kind: Preference
+apiVersion: kubectl.config.k8s.io/v1beta1
+credentialPluginPolicy:    "DenyAll"
+credentialPluginAllowlist: []
+`,
+		},
+		{
+			name:      "allowlist-policy-with-one-empty-allowlist-entry",
+			shouldErr: true,
+			kuberc: `
+kind: Preference
+apiVersion: kubectl.config.k8s.io/v1beta1
+credentialPluginPolicy: "Allowlist"
+credentialPluginAllowlist:
+- name: "foo"
+- name: ""
+`,
+		},
+		{
+			name:      "allowlist-policy-with-nonempty-allowlist",
+			shouldErr: false,
+			kuberc: `apiVersion: kubectl.config.k8s.io/v1beta1
+kind: Preference
+credentialPluginPolicy: "Allowlist"
+credentialPluginAllowlist:
+- name: "foo"
+`,
+		},
+		{
+			name:      "allowall-policy-with-nil-allowlist",
+			shouldErr: false,
+			kuberc: `
+kind: Preference
+apiVersion: kubectl.config.k8s.io/v1beta1
+credentialPluginPolicy: "AllowAll"
+`,
+		},
+		{
+			name:      "denyall-policy-with-nil-allowlist",
+			shouldErr: false,
+			kuberc: `
+kind: Preference
+apiVersion: kubectl.config.k8s.io/v1beta1
+credentialPluginPolicy: "DenyAll"
+`,
+		},
+		{
+			name:      "unspecified-policy-with-nil-allowlist",
+			shouldErr: false,
+			kuberc: `
+kind: Preference
+apiVersion: kubectl.config.k8s.io/v1beta1
+credentialPluginPolicy: ""
+`,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			kuberc := filepath.Join(tmpDir, "kuberc")
+			require.NoError(t, os.WriteFile(kuberc, []byte(test.kuberc), 0o644))
+
+			pref.getPreferencesFunc = func(_ string, errOut io.Writer) (*config.Preference, error) {
+				pref, err := DefaultGetPreferences(kuberc, errOut)
+				if err != nil {
+					return nil, err
+				}
+
+				return pref, nil
+			}
+
+			_, err := p.Apply(rootCmd, opts, args, io.Discard)
+			if test.shouldErr {
+				require.Error(t, err, "expected error, but error was nil")
+			} else {
+				require.NoError(t, err)
 			}
 		})
 	}

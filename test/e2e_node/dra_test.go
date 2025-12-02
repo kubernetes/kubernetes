@@ -19,7 +19,7 @@ E2E Node test for DRA (Dynamic Resource Allocation)
 This test covers node-specific aspects of DRA
 The test can be run locally on Linux this way:
     make test-e2e-node FOCUS='\[Feature:DynamicResourceAllocation\]' SKIP='\[Flaky\]' PARALLELISM=1 \
-       TEST_ARGS='--feature-gates="DynamicResourceAllocation=true,ResourceHealthStatus=true" --service-feature-gates="DynamicResourceAllocation=true,ResourceHealthStatus=true" --runtime-config=api/all=true'
+       TEST_ARGS='--feature-gates="DynamicResourceAllocation=true,ResourceHealthStatus=true,DRAConsumableCapacity=true" --service-feature-gates="DynamicResourceAllocation=true,ResourceHealthStatus=true,DRAConsumableCapacity=true" --runtime-config=api/all=true'
 */
 
 package e2enode
@@ -47,6 +47,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
@@ -1090,6 +1091,73 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 				return fmt.Errorf("could not find container 'testcontainer' in pod status")
 			}).WithContext(ctx).WithTimeout(30*time.Second).WithPolling(2*time.Second).Should(gomega.Succeed(), "The allocatedResourcesStatus field should be absent when the feature gate is disabled")
 		})
+
+		f.Context("Device ShareID", framework.WithFeatureGate(features.DRAConsumableCapacity), f.WithSerial(), func() {
+
+			ginkgo.BeforeEach(func() {
+				if e2eskipper.IsFeatureGateEnabled(features.DRAConsumableCapacity) {
+					e2eskipper.Skipf("feature %s is enabled", features.DRAConsumableCapacity)
+				}
+			})
+
+			testWithDeviceRequestAllocationResults := func(ctx context.Context, results []resourceapi.DeviceRequestAllocationResult) {
+				nodeName := getNodeName(ctx, f)
+				kubeletPlugin := newKubeletPlugin(ctx, f.ClientSet, f.Namespace.Name, getNodeName(ctx, f), driverName)
+
+				ginkgo.By("wait for registration to complete")
+				gomega.Eventually(kubeletPlugin.GetGRPCCalls).WithTimeout(pluginRegistrationTimeout).Should(testdrivergomega.BeRegistered)
+
+				pod := createTestObjects(ctx, f.ClientSet, nodeName, f.Namespace.Name, "draclass", "external-claim", "drapod", false, []string{driverName}, results...)
+
+				ginkgo.By("wait for NodePrepareResources call to succeed with given allocation results")
+				gomega.Eventually(kubeletPlugin.GetGRPCCalls).WithTimeout(retryTestTimeout).Should(testdrivergomega.NodePrepareResourcesSucceeded)
+
+				ginkgo.By("wait for pod to succeed")
+				err := e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name)
+				framework.ExpectNoError(err)
+
+				ginkgo.By("delete pod")
+				e2epod.DeletePodOrFail(ctx, f.ClientSet, f.Namespace.Name, pod.Name)
+
+				ginkgo.By("wait for NodeUnprepareResources call to succeed")
+				gomega.Eventually(kubeletPlugin.GetGRPCCalls).WithTimeout(retryTestTimeout).Should(testdrivergomega.NodeUnprepareResourcesSucceeded)
+			}
+			ginkgo.DescribeTable("must be functional when plugin starts to listen on a service socket after registration with the specified allocation results",
+				testWithDeviceRequestAllocationResults,
+				ginkgo.Entry("without ShareID", nil),
+				ginkgo.Entry("with a ShareID", []resourceapi.DeviceRequestAllocationResult{
+					{
+						Driver:      driverName,
+						Pool:        "some-pool",
+						Device:      "some-device",
+						Request:     "my-request",
+						ShareID:     ptr.To(uuid.NewUUID()),
+						AdminAccess: ptr.To(false),
+					},
+				},
+				),
+				ginkgo.Entry("same device with two ShareIDs", []resourceapi.DeviceRequestAllocationResult{
+					{
+						Driver:      driverName,
+						Pool:        "some-pool",
+						Device:      "some-device",
+						Request:     "my-request",
+						ShareID:     ptr.To(uuid.NewUUID()),
+						AdminAccess: ptr.To(false),
+					},
+					{
+						Driver:      driverName,
+						Pool:        "some-pool",
+						Device:      "some-device",
+						Request:     "my-request",
+						ShareID:     ptr.To(uuid.NewUUID()),
+						AdminAccess: ptr.To(false),
+					},
+				},
+				),
+			)
+
+		})
 	})
 })
 
@@ -1295,7 +1363,8 @@ func draServiceCleanup(ctx context.Context, clientSet kubernetes.Interface, driv
 // and placed on the node without involving the scheduler and the DRA controller.
 //
 // Instead adding more parameters, the podName determines what the pod does.
-func createTestObjects(ctx context.Context, clientSet kubernetes.Interface, nodename, namespace, className, claimName, podName string, deferPodDeletion bool, driverNames []string) *v1.Pod {
+func createTestObjects(ctx context.Context, clientSet kubernetes.Interface, nodename, namespace, className, claimName, podName string, deferPodDeletion bool, driverNames []string,
+	deviceRequestResults ...resourceapi.DeviceRequestAllocationResult) *v1.Pod {
 	// DeviceClass
 	class := &resourceapi.DeviceClass{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1383,17 +1452,28 @@ func createTestObjects(ctx context.Context, clientSet kubernetes.Interface, node
 
 	// Update claim status: set ReservedFor and AllocationResult
 	// NOTE: This is usually done by the DRA controller or the scheduler.
-	results := make([]resourceapi.DeviceRequestAllocationResult, len(driverNames))
+
+	var results []resourceapi.DeviceRequestAllocationResult
+	if len(deviceRequestResults) > 0 {
+		// Specify DeviceRequestAllocationResult to test specific condition of allocation result such as ShareID
+		results = deviceRequestResults
+	} else {
+		// Generate `some-device` DeviceRequestAllocationResult for each driver
+		results = make([]resourceapi.DeviceRequestAllocationResult, len(driverNames))
+		for i, driverName := range driverNames {
+			results[i] = resourceapi.DeviceRequestAllocationResult{
+				Driver:      driverName,
+				Pool:        "some-pool",
+				Device:      "some-device",
+				Request:     claim.Spec.Devices.Requests[0].Name,
+				AdminAccess: ptr.To(false),
+			}
+		}
+	}
+
 	config := make([]resourceapi.DeviceAllocationConfiguration, len(driverNames))
 
 	for i, driverName := range driverNames {
-		results[i] = resourceapi.DeviceRequestAllocationResult{
-			Driver:      driverName,
-			Pool:        "some-pool",
-			Device:      "some-device",
-			Request:     claim.Spec.Devices.Requests[0].Name,
-			AdminAccess: ptr.To(false),
-		}
 		config[i] = resourceapi.DeviceAllocationConfiguration{
 			Source: resourceapi.AllocationConfigSourceClaim,
 			DeviceConfiguration: resourceapi.DeviceConfiguration{
@@ -1583,6 +1663,15 @@ func createHealthTestPodAndClaim(ctx context.Context, f *framework.Framework, dr
 	ginkgo.DeferCleanup(func(ctx context.Context) {
 		e2epod.DeletePodOrFail(ctx, f.ClientSet, createdPod.Namespace, createdPod.Name)
 	})
+
+	// Update the Pod's status to include the ResourceClaimStatuses, mimicking the scheduler.
+	podToUpdate, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, createdPod.Name, metav1.GetOptions{})
+	framework.ExpectNoError(err)
+	podToUpdate.Status.ResourceClaimStatuses = []v1.PodResourceClaimStatus{
+		{Name: claimName, ResourceClaimName: &claimName},
+	}
+	_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).UpdateStatus(ctx, podToUpdate, metav1.UpdateOptions{})
+	framework.ExpectNoError(err, "failed to update Pod status with ResourceClaimStatuses")
 
 	ginkgo.By(fmt.Sprintf("Allocating claim %q to pod %q with its real UID", claimName, podName))
 	// Get the created claim to ensure the latest version before updating.

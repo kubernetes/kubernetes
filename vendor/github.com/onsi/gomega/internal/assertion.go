@@ -9,19 +9,19 @@ import (
 )
 
 type Assertion struct {
-	actuals     []interface{} // actual value plus all extra values
-	actualIndex int           // value to pass to the matcher
-	vet         vetinari      // the vet to call before calling Gomega matcher
+	actuals     []any    // actual value plus all extra values
+	actualIndex int      // value to pass to the matcher
+	vet         vetinari // the vet to call before calling Gomega matcher
 	offset      int
 	g           *Gomega
 }
 
 // ...obligatory discworld reference, as "vetineer" doesn't sound ... quite right.
-type vetinari func(assertion *Assertion, optionalDescription ...interface{}) bool
+type vetinari func(assertion *Assertion, optionalDescription ...any) bool
 
-func NewAssertion(actualInput interface{}, g *Gomega, offset int, extra ...interface{}) *Assertion {
+func NewAssertion(actualInput any, g *Gomega, offset int, extra ...any) *Assertion {
 	return &Assertion{
-		actuals:     append([]interface{}{actualInput}, extra...),
+		actuals:     append([]any{actualInput}, extra...),
 		actualIndex: 0,
 		vet:         (*Assertion).vetActuals,
 		offset:      offset,
@@ -44,37 +44,37 @@ func (assertion *Assertion) Error() types.Assertion {
 	}
 }
 
-func (assertion *Assertion) Should(matcher types.GomegaMatcher, optionalDescription ...interface{}) bool {
+func (assertion *Assertion) Should(matcher types.GomegaMatcher, optionalDescription ...any) bool {
 	assertion.g.THelper()
 	vetOptionalDescription("Assertion", optionalDescription...)
 	return assertion.vet(assertion, optionalDescription...) && assertion.match(matcher, true, optionalDescription...)
 }
 
-func (assertion *Assertion) ShouldNot(matcher types.GomegaMatcher, optionalDescription ...interface{}) bool {
+func (assertion *Assertion) ShouldNot(matcher types.GomegaMatcher, optionalDescription ...any) bool {
 	assertion.g.THelper()
 	vetOptionalDescription("Assertion", optionalDescription...)
 	return assertion.vet(assertion, optionalDescription...) && assertion.match(matcher, false, optionalDescription...)
 }
 
-func (assertion *Assertion) To(matcher types.GomegaMatcher, optionalDescription ...interface{}) bool {
+func (assertion *Assertion) To(matcher types.GomegaMatcher, optionalDescription ...any) bool {
 	assertion.g.THelper()
 	vetOptionalDescription("Assertion", optionalDescription...)
 	return assertion.vet(assertion, optionalDescription...) && assertion.match(matcher, true, optionalDescription...)
 }
 
-func (assertion *Assertion) ToNot(matcher types.GomegaMatcher, optionalDescription ...interface{}) bool {
+func (assertion *Assertion) ToNot(matcher types.GomegaMatcher, optionalDescription ...any) bool {
 	assertion.g.THelper()
 	vetOptionalDescription("Assertion", optionalDescription...)
 	return assertion.vet(assertion, optionalDescription...) && assertion.match(matcher, false, optionalDescription...)
 }
 
-func (assertion *Assertion) NotTo(matcher types.GomegaMatcher, optionalDescription ...interface{}) bool {
+func (assertion *Assertion) NotTo(matcher types.GomegaMatcher, optionalDescription ...any) bool {
 	assertion.g.THelper()
 	vetOptionalDescription("Assertion", optionalDescription...)
 	return assertion.vet(assertion, optionalDescription...) && assertion.match(matcher, false, optionalDescription...)
 }
 
-func (assertion *Assertion) buildDescription(optionalDescription ...interface{}) string {
+func (assertion *Assertion) buildDescription(optionalDescription ...any) string {
 	switch len(optionalDescription) {
 	case 0:
 		return ""
@@ -86,7 +86,7 @@ func (assertion *Assertion) buildDescription(optionalDescription ...interface{})
 	return fmt.Sprintf(optionalDescription[0].(string), optionalDescription[1:]...) + "\n"
 }
 
-func (assertion *Assertion) match(matcher types.GomegaMatcher, desiredMatch bool, optionalDescription ...interface{}) bool {
+func (assertion *Assertion) match(matcher types.GomegaMatcher, desiredMatch bool, optionalDescription ...any) bool {
 	actualInput := assertion.actuals[assertion.actualIndex]
 	matches, err := matcher.Match(actualInput)
 	assertion.g.THelper()
@@ -113,7 +113,7 @@ func (assertion *Assertion) match(matcher types.GomegaMatcher, desiredMatch bool
 // vetActuals vets the actual values, with the (optional) exception of a
 // specific value, such as the first value in case non-error assertions, or the
 // last value in case of Error()-based assertions.
-func (assertion *Assertion) vetActuals(optionalDescription ...interface{}) bool {
+func (assertion *Assertion) vetActuals(optionalDescription ...any) bool {
 	success, message := vetActuals(assertion.actuals, assertion.actualIndex)
 	if success {
 		return true
@@ -129,7 +129,7 @@ func (assertion *Assertion) vetActuals(optionalDescription ...interface{}) bool 
 // the final error value is non-zero. Otherwise, it doesn't vet the actual
 // values, as these are allowed to take on any values unless there is a non-zero
 // error value.
-func (assertion *Assertion) vetError(optionalDescription ...interface{}) bool {
+func (assertion *Assertion) vetError(optionalDescription ...any) bool {
 	if err := assertion.actuals[assertion.actualIndex]; err != nil {
 		// Go error result idiom: all other actual values must be zero values.
 		return assertion.vetActuals(optionalDescription...)
@@ -139,7 +139,7 @@ func (assertion *Assertion) vetError(optionalDescription ...interface{}) bool {
 
 // vetActuals vets a slice of actual values, optionally skipping a particular
 // value slice element, such as the first or last value slice element.
-func vetActuals(actuals []interface{}, skipIndex int) (bool, string) {
+func vetActuals(actuals []any, skipIndex int) (bool, string) {
 	for i, actual := range actuals {
 		if i == skipIndex {
 			continue

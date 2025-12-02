@@ -212,12 +212,14 @@ func TestValidateAPIApproval(t *testing.T) {
 // TestDropDisabledFields tests if the drop functionality is working fine or not with feature gate switch
 func TestDropDisabledFields(t *testing.T) {
 	testCases := []struct {
-		name                   string
-		enableRatcheting       bool
-		enableSelectableFields bool
-		crd                    *apiextensions.CustomResourceDefinition
-		oldCRD                 *apiextensions.CustomResourceDefinition
-		expectedCRD            *apiextensions.CustomResourceDefinition
+		name                     string
+		overrideEmulatedVersion  string
+		enableRatcheting         bool
+		enableSelectableFields   bool
+		enableObservedGeneration bool
+		crd                      *apiextensions.CustomResourceDefinition
+		oldCRD                   *apiextensions.CustomResourceDefinition
+		expectedCRD              *apiextensions.CustomResourceDefinition
 	}{
 		{
 			name:             "Ratcheting, For creation, FG disabled, no OptionalOldSelf, no field drop",
@@ -1309,14 +1311,104 @@ func TestDropDisabledFields(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:                     "Drop observed generation while feature gate is not set",
+			enableObservedGeneration: false,
+			enableSelectableFields:   true, // Features are enabled by default since we use 1.35
+			enableRatcheting:         true,
+			overrideEmulatedVersion:  "1.35", // Pre-alpha before 1.35
+			crd: &apiextensions.CustomResourceDefinition{
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					ObservedGeneration: 123,
+					Conditions: []apiextensions.CustomResourceDefinitionCondition{{
+						ObservedGeneration: 123,
+						Type:               apiextensions.Established,
+					}},
+				},
+			},
+			oldCRD: nil,
+			expectedCRD: &apiextensions.CustomResourceDefinition{
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					Conditions: []apiextensions.CustomResourceDefinitionCondition{{
+						Type: apiextensions.Established,
+					}},
+				},
+			},
+		},
+		{
+			name:                     "Keep observed generation while feature gate is not set",
+			enableObservedGeneration: true,
+			enableSelectableFields:   true, // Features are enabled by default since we use 1.35
+			enableRatcheting:         true,
+			overrideEmulatedVersion:  "1.35", // Pre-alpha before 1.35
+			crd: &apiextensions.CustomResourceDefinition{
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					ObservedGeneration: 123,
+					Conditions: []apiextensions.CustomResourceDefinitionCondition{{
+						ObservedGeneration: 123,
+						Type:               apiextensions.Established,
+					}},
+				},
+			},
+			oldCRD: nil,
+			expectedCRD: &apiextensions.CustomResourceDefinition{
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					ObservedGeneration: 123,
+					Conditions: []apiextensions.CustomResourceDefinitionCondition{{
+						ObservedGeneration: 123,
+						Type:               apiextensions.Established,
+					}},
+				},
+			},
+		},
+		{
+			name:                     "Persists generation if previously set while feature gate is not set",
+			enableObservedGeneration: false,
+			enableSelectableFields:   true, // Features are enabled by default since we use 1.35
+			enableRatcheting:         true,
+			overrideEmulatedVersion:  "1.35", // Pre-alpha before 1.35
+			crd: &apiextensions.CustomResourceDefinition{
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					ObservedGeneration: 123,
+					Conditions: []apiextensions.CustomResourceDefinitionCondition{{
+						ObservedGeneration: 123,
+						Type:               apiextensions.Established,
+					}},
+				},
+			},
+			oldCRD: &apiextensions.CustomResourceDefinition{
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					ObservedGeneration: 123,
+					Conditions: []apiextensions.CustomResourceDefinitionCondition{{
+						ObservedGeneration: 123,
+						Type:               apiextensions.Established,
+					}},
+				},
+			},
+			expectedCRD: &apiextensions.CustomResourceDefinition{
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					ObservedGeneration: 123,
+					Conditions: []apiextensions.CustomResourceDefinitionCondition{{
+						ObservedGeneration: 123,
+						Type:               apiextensions.Established,
+					}},
+				},
+			},
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.31"))
-			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+			fg := featuregatetesting.FeatureOverrides{
 				apiextensionsfeatures.CRDValidationRatcheting:      tc.enableRatcheting,
 				apiextensionsfeatures.CustomResourceFieldSelectors: tc.enableSelectableFields,
-			})
+			}
+			if tc.overrideEmulatedVersion == "" {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.31"))
+			} else {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse(tc.overrideEmulatedVersion))
+				fg[apiextensionsfeatures.CRDObservedGenerationTracking] = tc.enableObservedGeneration
+			}
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, fg)
 			old := tc.oldCRD.DeepCopy()
 
 			dropDisabledFields(tc.crd, tc.oldCRD)

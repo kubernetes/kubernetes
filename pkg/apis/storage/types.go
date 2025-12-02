@@ -433,6 +433,31 @@ type CSIDriverSpec struct {
 	// +featureGate=MutableCSINodeAllocatableCount
 	// +optional
 	NodeAllocatableUpdatePeriodSeconds *int64
+
+	// serviceAccountTokenInSecrets is an opt-in for CSI drivers to indicate that
+	// service account tokens should be passed via the Secrets field in NodePublishVolumeRequest
+	// instead of the VolumeContext field. The CSI specification provides a dedicated Secrets
+	// field for sensitive information like tokens, which is the appropriate mechanism for
+	// handling credentials. This addresses security concerns where sensitive tokens were being
+	// logged as part of volume context, leading to vulnerabilities like CVE-2023-2878 and
+	// CVE-2024-3744.
+	//
+	// When "true", kubelet will pass the tokens only in the Secrets field with the key
+	// "csi.storage.k8s.io/serviceAccount.tokens". The CSI driver must be updated to read
+	// tokens from the Secrets field instead of VolumeContext.
+	//
+	// When "false" or not set, kubelet will pass the tokens in VolumeContext with the key
+	// "csi.storage.k8s.io/serviceAccount.tokens" (existing behavior). This maintains backward
+	// compatibility with existing CSI drivers.
+	//
+	// This field can only be set when TokenRequests is configured. The API server will reject
+	// CSIDriver specs that set this field without TokenRequests.
+	//
+	// Default is "false".
+	//
+	// +featureGate=CSIServiceAccountTokenSecrets
+	// +optional
+	ServiceAccountTokenInSecrets *bool
 }
 
 // FSGroupPolicy specifies if a CSI Driver supports modifying

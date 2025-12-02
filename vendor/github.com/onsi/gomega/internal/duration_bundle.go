@@ -49,7 +49,7 @@ func durationFromEnv(key string, defaultDuration time.Duration) time.Duration {
 	return duration
 }
 
-func toDuration(input interface{}) (time.Duration, error) {
+func toDuration(input any) (time.Duration, error) {
 	duration, ok := input.(time.Duration)
 	if ok {
 		return duration, nil

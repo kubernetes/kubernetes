@@ -1154,7 +1154,7 @@ func Test_PreBindPreFlight(t *testing.T) {
 					"node-a": {},
 				},
 			},
-			want: fwk.NewStatus(fwk.Success),
+			want: nil,
 		},
 		{
 			name:     "error: state is nil",

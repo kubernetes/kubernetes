@@ -285,6 +285,7 @@ func Convert_config_DefaultPreemptionArgs_To_v1_DefaultPreemptionArgs(in *config
 
 func autoConvert_v1_DynamicResourcesArgs_To_config_DynamicResourcesArgs(in *configv1.DynamicResourcesArgs, out *config.DynamicResourcesArgs, s conversion.Scope) error {
 	out.FilterTimeout = (*metav1.Duration)(unsafe.Pointer(in.FilterTimeout))
+	out.BindingTimeout = (*metav1.Duration)(unsafe.Pointer(in.BindingTimeout))
 	return nil
 }
 
@@ -295,6 +296,7 @@ func Convert_v1_DynamicResourcesArgs_To_config_DynamicResourcesArgs(in *configv1
 
 func autoConvert_config_DynamicResourcesArgs_To_v1_DynamicResourcesArgs(in *config.DynamicResourcesArgs, out *configv1.DynamicResourcesArgs, s conversion.Scope) error {
 	out.FilterTimeout = (*metav1.Duration)(unsafe.Pointer(in.FilterTimeout))
+	out.BindingTimeout = (*metav1.Duration)(unsafe.Pointer(in.BindingTimeout))
 	return nil
 }
 

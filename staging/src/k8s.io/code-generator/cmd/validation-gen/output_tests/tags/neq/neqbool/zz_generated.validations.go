@@ -55,39 +55,39 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 
 	// field Struct.NeqTrueField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *bool) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *bool, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call field-attached validations
 			errs = append(errs, validate.NEQ(ctx, op, fldPath, obj, oldObj, true)...)
 			return
-		}(fldPath.Child("neqTrueField"), &obj.NeqTrueField, safe.Field(oldObj, func(oldObj *Struct) *bool { return &oldObj.NeqTrueField }))...)
+		}(fldPath.Child("neqTrueField"), &obj.NeqTrueField, safe.Field(oldObj, func(oldObj *Struct) *bool { return &oldObj.NeqTrueField }), oldObj != nil)...)
 
 	// field Struct.NeqFalsePtrField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *bool) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *bool, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call field-attached validations
 			errs = append(errs, validate.NEQ(ctx, op, fldPath, obj, oldObj, false)...)
 			return
-		}(fldPath.Child("neqFalsePtrField"), obj.NeqFalsePtrField, safe.Field(oldObj, func(oldObj *Struct) *bool { return oldObj.NeqFalsePtrField }))...)
+		}(fldPath.Child("neqFalsePtrField"), obj.NeqFalsePtrField, safe.Field(oldObj, func(oldObj *Struct) *bool { return oldObj.NeqFalsePtrField }), oldObj != nil)...)
 
 	// field Struct.ValidatedTypedefField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *ValidatedBoolType) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *ValidatedBoolType, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_ValidatedBoolType(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("validatedTypedefField"), &obj.ValidatedTypedefField, safe.Field(oldObj, func(oldObj *Struct) *ValidatedBoolType { return &oldObj.ValidatedTypedefField }))...)
+		}(fldPath.Child("validatedTypedefField"), &obj.ValidatedTypedefField, safe.Field(oldObj, func(oldObj *Struct) *ValidatedBoolType { return &oldObj.ValidatedTypedefField }), oldObj != nil)...)
 
 	return errs
 }

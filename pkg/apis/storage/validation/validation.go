@@ -88,7 +88,7 @@ func ValidateStorageClassUpdate(storageClass, oldStorageClass *storage.StorageCl
 func validateProvisioner(provisioner string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(provisioner) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath, provisioner))
+		allErrs = append(allErrs, field.Required(fldPath, provisioner)).MarkCoveredByDeclarative()
 	}
 	if len(provisioner) > 0 {
 		allErrs = append(allErrs, apivalidation.ValidateQualifiedName(strings.ToLower(provisioner), fldPath)...)
@@ -456,6 +456,7 @@ func validateCSIDriverSpec(
 	allErrs = append(allErrs, validateVolumeLifecycleModes(spec.VolumeLifecycleModes, fldPath.Child("volumeLifecycleModes"))...)
 	allErrs = append(allErrs, validateSELinuxMount(spec.SELinuxMount, fldPath.Child("seLinuxMount"))...)
 	allErrs = append(allErrs, validateNodeAllocatableUpdatePeriodSeconds(spec.NodeAllocatableUpdatePeriodSeconds, fldPath.Child("nodeAllocatableUpdatePeriodSeconds"))...)
+	allErrs = append(allErrs, validateServiceAccountTokenInSecrets(spec.ServiceAccountTokenInSecrets, spec.TokenRequests, fldPath.Child("serviceAccountTokenInSecrets"))...)
 	return allErrs
 }
 
@@ -567,6 +568,16 @@ func validateSELinuxMount(seLinuxMount *bool, fldPath *field.Path) field.ErrorLi
 	allErrs := field.ErrorList{}
 	if seLinuxMount == nil && utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
 		allErrs = append(allErrs, field.Required(fldPath, ""))
+	}
+
+	return allErrs
+}
+
+// validvalidateServiceAccountTokenInSecrets validates serviceAccountTokenInSecrets and its relation to tokenRequests.
+func validateServiceAccountTokenInSecrets(serviceAccountTokenInSecrets *bool, tokenRequests []storage.TokenRequest, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if serviceAccountTokenInSecrets != nil && len(tokenRequests) == 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath, serviceAccountTokenInSecrets, "serviceAccountTokenInSecrets is set but no tokenRequests are specified"))
 	}
 
 	return allErrs

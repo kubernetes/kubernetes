@@ -58,9 +58,9 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 
 	// field Struct.Tasks
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []Task) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj []Task, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
 			// call field-attached validations
@@ -82,7 +82,7 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 				return false
 			})...)
 			return
-		}(fldPath.Child("tasks"), obj.Tasks, safe.Field(oldObj, func(oldObj *Struct) []Task { return oldObj.Tasks }))...)
+		}(fldPath.Child("tasks"), obj.Tasks, safe.Field(oldObj, func(oldObj *Struct) []Task { return oldObj.Tasks }), oldObj != nil)...)
 
 	return errs
 }

@@ -31,8 +31,6 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/matchconditions"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/cel/environment"
-	"k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -46,31 +44,17 @@ const (
 var (
 	lazyCompositionEnvTemplateWithStrictCostInit sync.Once
 	lazyCompositionEnvTemplateWithStrictCost     *cel.CompositionEnv
-
-	lazyCompositionEnvTemplateWithoutStrictCostInit sync.Once
-	lazyCompositionEnvTemplateWithoutStrictCost     *cel.CompositionEnv
 )
 
 func getCompositionEnvTemplateWithStrictCost() *cel.CompositionEnv {
 	lazyCompositionEnvTemplateWithStrictCostInit.Do(func() {
-		env, err := cel.NewCompositionEnv(cel.VariablesTypeName, environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true))
+		env, err := cel.NewCompositionEnv(cel.VariablesTypeName, environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()))
 		if err != nil {
 			panic(err)
 		}
 		lazyCompositionEnvTemplateWithStrictCost = env
 	})
 	return lazyCompositionEnvTemplateWithStrictCost
-}
-
-func getCompositionEnvTemplateWithoutStrictCost() *cel.CompositionEnv {
-	lazyCompositionEnvTemplateWithoutStrictCostInit.Do(func() {
-		env, err := cel.NewCompositionEnv(cel.VariablesTypeName, environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), false))
-		if err != nil {
-			panic(err)
-		}
-		lazyCompositionEnvTemplateWithoutStrictCost = env
-	})
-	return lazyCompositionEnvTemplateWithoutStrictCost
 }
 
 // Register registers a plugin
@@ -131,18 +115,13 @@ func compilePolicy(policy *Policy) Validator {
 	if policy.Spec.ParamKind != nil {
 		hasParam = true
 	}
-	strictCost := utilfeature.DefaultFeatureGate.Enabled(features.StrictCostEnforcementForVAP)
-	optionalVars := cel.OptionalVariableDeclarations{HasParams: hasParam, HasAuthorizer: true, StrictCost: strictCost}
-	expressionOptionalVars := cel.OptionalVariableDeclarations{HasParams: hasParam, HasAuthorizer: false, StrictCost: strictCost}
+	optionalVars := cel.OptionalVariableDeclarations{HasParams: hasParam, HasAuthorizer: true}
+	expressionOptionalVars := cel.OptionalVariableDeclarations{HasParams: hasParam, HasAuthorizer: false}
 	failurePolicy := policy.Spec.FailurePolicy
 	var matcher matchconditions.Matcher = nil
 	matchConditions := policy.Spec.MatchConditions
 	var compositionEnvTemplate *cel.CompositionEnv
-	if strictCost {
-		compositionEnvTemplate = getCompositionEnvTemplateWithStrictCost()
-	} else {
-		compositionEnvTemplate = getCompositionEnvTemplateWithoutStrictCost()
-	}
+	compositionEnvTemplate = getCompositionEnvTemplateWithStrictCost()
 	filterCompiler := cel.NewCompositedCompilerFromTemplate(compositionEnvTemplate)
 	filterCompiler.CompileAndStoreVariables(convertv1beta1Variables(policy.Spec.Variables), optionalVars, environment.StoredExpressions)
 

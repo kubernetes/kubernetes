@@ -22,9 +22,11 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpreemption"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources"
 	plfeature "k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/gangscheduling"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/imagelocality"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodedeclaredfeatures"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
@@ -52,6 +54,7 @@ func NewInTreeRegistry() runtime.Registry {
 		nodename.Name:                        runtime.FactoryAdapter(fts, nodename.New),
 		nodeports.Name:                       runtime.FactoryAdapter(fts, nodeports.New),
 		nodeaffinity.Name:                    runtime.FactoryAdapter(fts, nodeaffinity.New),
+		nodedeclaredfeatures.Name:            runtime.FactoryAdapter(fts, nodedeclaredfeatures.New),
 		podtopologyspread.Name:               runtime.FactoryAdapter(fts, podtopologyspread.New),
 		nodeunschedulable.Name:               runtime.FactoryAdapter(fts, nodeunschedulable.New),
 		noderesources.Name:                   runtime.FactoryAdapter(fts, noderesources.NewFit),
@@ -65,6 +68,7 @@ func NewInTreeRegistry() runtime.Registry {
 		defaultbinder.Name:                   defaultbinder.New,
 		defaultpreemption.Name:               runtime.FactoryAdapter(fts, defaultpreemption.New),
 		schedulinggates.Name:                 runtime.FactoryAdapter(fts, schedulinggates.New),
+		gangscheduling.Name:                  runtime.FactoryAdapter(fts, gangscheduling.New),
 	}
 
 	return registry

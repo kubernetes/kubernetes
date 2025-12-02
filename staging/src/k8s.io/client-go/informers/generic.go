@@ -70,7 +70,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
-	storagemigrationv1alpha1 "k8s.io/api/storagemigration/v1alpha1"
+	storagemigrationv1beta1 "k8s.io/api/storagemigration/v1beta1"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	cache "k8s.io/client-go/tools/cache"
 )
@@ -200,14 +200,14 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		// Group=certificates.k8s.io, Version=v1alpha1
 	case certificatesv1alpha1.SchemeGroupVersion.WithResource("clustertrustbundles"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Certificates().V1alpha1().ClusterTrustBundles().Informer()}, nil
-	case certificatesv1alpha1.SchemeGroupVersion.WithResource("podcertificaterequests"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Certificates().V1alpha1().PodCertificateRequests().Informer()}, nil
 
 		// Group=certificates.k8s.io, Version=v1beta1
 	case certificatesv1beta1.SchemeGroupVersion.WithResource("certificatesigningrequests"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Certificates().V1beta1().CertificateSigningRequests().Informer()}, nil
 	case certificatesv1beta1.SchemeGroupVersion.WithResource("clustertrustbundles"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Certificates().V1beta1().ClusterTrustBundles().Informer()}, nil
+	case certificatesv1beta1.SchemeGroupVersion.WithResource("podcertificaterequests"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Certificates().V1beta1().PodCertificateRequests().Informer()}, nil
 
 		// Group=coordination.k8s.io, Version=v1
 	case coordinationv1.SchemeGroupVersion.WithResource("leases"):
@@ -426,6 +426,8 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		// Group=scheduling.k8s.io, Version=v1alpha1
 	case schedulingv1alpha1.SchemeGroupVersion.WithResource("priorityclasses"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Scheduling().V1alpha1().PriorityClasses().Informer()}, nil
+	case schedulingv1alpha1.SchemeGroupVersion.WithResource("workloads"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Scheduling().V1alpha1().Workloads().Informer()}, nil
 
 		// Group=scheduling.k8s.io, Version=v1beta1
 	case schedulingv1beta1.SchemeGroupVersion.WithResource("priorityclasses"):
@@ -467,9 +469,9 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 	case storagev1beta1.SchemeGroupVersion.WithResource("volumeattributesclasses"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Storage().V1beta1().VolumeAttributesClasses().Informer()}, nil
 
-		// Group=storagemigration.k8s.io, Version=v1alpha1
-	case storagemigrationv1alpha1.SchemeGroupVersion.WithResource("storageversionmigrations"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Storagemigration().V1alpha1().StorageVersionMigrations().Informer()}, nil
+		// Group=storagemigration.k8s.io, Version=v1beta1
+	case storagemigrationv1beta1.SchemeGroupVersion.WithResource("storageversionmigrations"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Storagemigration().V1beta1().StorageVersionMigrations().Informer()}, nil
 
 	}
 

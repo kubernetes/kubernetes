@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"runtime"
+	"sync"
 	"testing"
 	"time"
 
@@ -288,7 +289,11 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 	var podsNum, extraPodsNum, nodesNum, i int
 
 	// Create the controller
+	var wg sync.WaitGroup
+	defer wg.Wait()
 	logger, tCtx := ktesting.NewTestContext(t)
+	defer tCtx.Cancel("test case terminating")
+
 	adcObj, err := NewAttachDetachController(
 		tCtx,
 		fakeKubeClient,
@@ -425,8 +430,12 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 		podInformer.GetIndexer().Add(newPod)
 	}
 
-	go adc.reconciler.Run(tCtx)
-	go adc.desiredStateOfWorldPopulator.Run(tCtx)
+	wg.Go(func() {
+		adc.reconciler.Run(tCtx)
+	})
+	wg.Go(func() {
+		adc.desiredStateOfWorldPopulator.Run(tCtx)
+	})
 
 	time.Sleep(time.Second * 1) // Wait so the reconciler calls sync at least once
 
@@ -457,7 +466,6 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 	if testPlugin.GetErrorEncountered() {
 		t.Fatalf("Fatal error encountered in the testing volume plugin")
 	}
-
 }
 
 type vaTest struct {
@@ -539,7 +547,11 @@ func volumeAttachmentRecoveryTestCase(t *testing.T, tc vaTest) {
 	vaInformer := informerFactory.Storage().V1().VolumeAttachments().Informer()
 
 	// Create the controller
+	var wg sync.WaitGroup
+	defer wg.Wait()
 	logger, tCtx := ktesting.NewTestContext(t)
+	defer tCtx.Cancel("test case terminating")
+
 	adc := createADC(t, tCtx, fakeKubeClient, informerFactory, plugins)
 
 	// Add existing objects (created by testplugin) to the respective informers
@@ -642,8 +654,12 @@ func volumeAttachmentRecoveryTestCase(t *testing.T, tc vaTest) {
 		t.Fatalf("Run failed with error. Expected: <no error> Actual: %v", err)
 	}
 	// Run reconciler and DSW populator loops
-	go adc.reconciler.Run(tCtx)
-	go adc.desiredStateOfWorldPopulator.Run(tCtx)
+	wg.Go(func() {
+		adc.reconciler.Run(tCtx)
+	})
+	wg.Go(func() {
+		adc.desiredStateOfWorldPopulator.Run(tCtx)
+	})
 	if tc.csiMigration {
 		verifyExpectedVolumeState(t, adc, tc)
 	} else {
@@ -651,7 +667,6 @@ func volumeAttachmentRecoveryTestCase(t *testing.T, tc vaTest) {
 		testPlugin := plugins[0].(*controllervolumetesting.TestPlugin)
 		verifyAttachDetachCalls(t, testPlugin, tc)
 	}
-
 }
 
 func verifyExpectedVolumeState(t *testing.T, adc *attachDetachController, tc vaTest) {

@@ -279,6 +279,11 @@ func (in *ExternalEtcd) DeepCopyInto(out *ExternalEtcd) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.HTTPEndpoints != nil {
+		in, out := &in.HTTPEndpoints, &out.HTTPEndpoints
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

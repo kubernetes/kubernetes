@@ -90,6 +90,7 @@ message AllocatedDeviceStatus {
   // NetworkData contains network-related information specific to the device.
   //
   // +optional
+  // +k8s:optional
   optional NetworkDeviceData networkData = 6;
 }
 
@@ -141,14 +142,17 @@ message BasicDevice {
   //
   // There can only be a single entry per counterSet.
   //
-  // The total number of device counter consumption entries
-  // must be <= 32. In addition, the total number in the
-  // entire ResourceSlice must be <= 1024 (for example,
-  // 64 devices with 16 counters each).
+  // The maximum number of device counter consumptions per
+  // device is 2.
   //
   // +optional
+  // +k8s:optional
   // +listType=atomic
+  // +k8s:listType=atomic
+  // +k8s:unique=map
+  // +k8s:listMapKey=counterSet
   // +featureGate=DRAPartitionableDevices
+  // +k8s:maxItems=2
   repeated DeviceCounterConsumption consumesCounters = 3;
 
   // NodeName identifies the node where the device is available.
@@ -184,7 +188,9 @@ message BasicDevice {
 
   // If specified, these are the driver-defined taints.
   //
-  // The maximum number of taints is 4.
+  // The maximum number of taints is 16. If taints are set for
+  // any device in a ResourceSlice, then the maximum number of
+  // allowed devices per ResourceSlice is 64 instead of 128.
   //
   // This is an alpha field and requires enabling the DRADeviceTaints
   // feature gate.
@@ -221,6 +227,8 @@ message BasicDevice {
   // +optional
   // +listType=atomic
   // +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
+  // +k8s:optional
+  // +k8s:maxItems=4
   repeated string bindingConditions = 9;
 
   // BindingFailureConditions defines the conditions for binding failure.
@@ -237,6 +245,8 @@ message BasicDevice {
   // +optional
   // +listType=atomic
   // +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
+  // +k8s:optional
+  // +k8s:maxItems=4
   repeated string bindingFailureConditions = 10;
 
   // AllowMultipleAllocations marks whether the device is allowed to be allocated to multiple DeviceRequests.
@@ -427,7 +437,7 @@ message Counter {
 
 // CounterSet defines a named set of counters
 // that are available to be used by devices defined in the
-// ResourceSlice.
+// ResourcePool.
 //
 // The counters are not allocatable by themselves, but
 // can be referenced by devices. When a device is allocated,
@@ -438,6 +448,8 @@ message CounterSet {
   // It must be a DNS label.
   //
   // +required
+  // +k8s:required
+  // +k8s:format=k8s-short-name
   optional string name = 1;
 
   // Counters defines the set of counters for this CounterSet
@@ -484,6 +496,10 @@ message DeviceAllocationConfiguration {
   //
   // +optional
   // +listType=atomic
+  // +k8s:optional
+  // +k8s:listType=atomic
+  // +k8s:unique=set
+  // +k8s:maxItems=32
   repeated string requests = 2;
 
   optional DeviceConfiguration deviceConfiguration = 3;
@@ -495,6 +511,7 @@ message DeviceAllocationResult {
   //
   // +optional
   // +listType=atomic
+  // +k8s:optional
   // +k8s:maxItems=32
   repeated DeviceRequestAllocationResult results = 1;
 
@@ -508,6 +525,7 @@ message DeviceAllocationResult {
   //
   // +optional
   // +listType=atomic
+  // +k8s:optional
   // +k8s:maxItems=64
   repeated DeviceAllocationConfiguration config = 2;
 }
@@ -517,26 +535,30 @@ message DeviceAttribute {
   // IntValue is a number.
   //
   // +optional
-  // +oneOf=ValueType
+  // +k8s:optional
+  // +k8s:unionMember
   optional int64 int = 2;
 
   // BoolValue is a true/false value.
   //
   // +optional
-  // +oneOf=ValueType
+  // +k8s:optional
+  // +k8s:unionMember
   optional bool bool = 3;
 
   // StringValue is a string. Must not be longer than 64 characters.
   //
   // +optional
-  // +oneOf=ValueType
+  // +k8s:optional
+  // +k8s:unionMember
   optional string string = 4;
 
   // VersionValue is a semantic version according to semver.org spec 2.0.0.
   // Must not be longer than 64 characters.
   //
   // +optional
-  // +oneOf=ValueType
+  // +k8s:optional
+  // +k8s:unionMember
   optional string version = 5;
 }
 
@@ -573,6 +595,7 @@ message DeviceClaim {
   //
   // +optional
   // +listType=atomic
+  // +k8s:optional
   // +k8s:listType=atomic
   // +k8s:unique=map
   // +k8s:listMapKey=name
@@ -584,6 +607,7 @@ message DeviceClaim {
   //
   // +optional
   // +listType=atomic
+  // +k8s:optional
   // +k8s:maxItems=32
   repeated DeviceConstraint constraints = 2;
 
@@ -593,6 +617,7 @@ message DeviceClaim {
   //
   // +optional
   // +listType=atomic
+  // +k8s:optional
   // +k8s:maxItems=32
   repeated DeviceClaimConfiguration config = 3;
 }
@@ -608,6 +633,7 @@ message DeviceClaimConfiguration {
   //
   // +optional
   // +listType=atomic
+  // +k8s:optional
   // +k8s:listType=atomic
   // +k8s:unique=set
   // +k8s:maxItems=32
@@ -626,6 +652,8 @@ message DeviceClaimConfiguration {
 message DeviceClass {
   // Standard object metadata
   // +optional
+  // +k8s:subfield(name)=+k8s:optional
+  // +k8s:subfield(name)=+k8s:format=k8s-long-name
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec defines what can be allocated and how to configure it.
@@ -689,6 +717,8 @@ message DeviceClassSpec {
   // This is an alpha field.
   // +optional
   // +featureGate=DRAExtendedResource
+  // +k8s:optional
+  // +k8s:format=k8s-extended-resource-name
   optional string extendedResourceName = 4;
 }
 
@@ -718,6 +748,7 @@ message DeviceConstraint {
   //
   // +optional
   // +listType=atomic
+  // +k8s:optional
   // +k8s:listType=atomic
   // +k8s:unique=set
   // +k8s:maxItems=32
@@ -738,6 +769,8 @@ message DeviceConstraint {
   //
   // +optional
   // +oneOf=ConstraintType
+  // +k8s:optional
+  // +k8s:format=k8s-resource-fully-qualified-name
   optional string matchAttribute = 2;
 
   // DistinctAttribute requires that all devices in question have this
@@ -764,14 +797,13 @@ message DeviceCounterConsumption {
   // counters defined will be consumed.
   //
   // +required
+  // +k8s:required
+  // +k8s:format=k8s-short-name
   optional string counterSet = 1;
 
   // Counters defines the counters that will be consumed by the device.
   //
-  // The maximum number counters in a device is 32.
-  // In addition, the maximum number of all counters
-  // in all devices is 1024 (for example, 64 devices with
-  // 16 counters each).
+  // The maximum number of counters is 32.
   //
   // +required
   map<string, Counter> counters = 2;
@@ -819,6 +851,7 @@ message DeviceRequest {
   //
   // +optional
   // +listType=atomic
+  // +k8s:optional
   // +k8s:maxItems=32
   repeated DeviceSelector selectors = 3;
 
@@ -895,6 +928,7 @@ message DeviceRequest {
   // +oneOf=deviceRequestType
   // +listType=atomic
   // +featureGate=DRAPrioritizedList
+  // +k8s:optional
   // +k8s:listType=atomic
   // +k8s:unique=map
   // +k8s:listMapKey=name
@@ -1010,6 +1044,7 @@ message DeviceRequestAllocationResult {
   // +optional
   // +listType=atomic
   // +featureGate=DRADeviceTaints
+  // +k8s:optional
   // +k8s:maxItems=16
   repeated DeviceToleration tolerations = 6;
 
@@ -1022,6 +1057,7 @@ message DeviceRequestAllocationResult {
   // +optional
   // +listType=atomic
   // +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
+  // +k8s:optional
   // +k8s:maxItems=4
   repeated string bindingConditions = 7;
 
@@ -1034,6 +1070,7 @@ message DeviceRequestAllocationResult {
   // +optional
   // +listType=atomic
   // +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
+  // +k8s:optional
   // +k8s:maxItems=4
   repeated string bindingFailureConditions = 8;
 
@@ -1206,10 +1243,13 @@ message DeviceTaint {
 
   // The effect of the taint on claims that do not tolerate the taint
   // and through such claims on the pods using them.
-  // Valid effects are NoSchedule and NoExecute. PreferNoSchedule as used for
-  // nodes is not valid here.
+  //
+  // Valid effects are None, NoSchedule and NoExecute. PreferNoSchedule as used for
+  // nodes is not valid here. More effects may get added in the future.
+  // Consumers must treat unknown effects like None.
   //
   // +required
+  // +k8s:required
   optional string effect = 3;
 
   // TimeAdded represents the time at which the taint was added.
@@ -1275,6 +1315,8 @@ message NetworkDeviceData {
   // Must not be longer than 256 characters.
   //
   // +optional
+  // +k8s:optional
+  // +k8s:maxLength=256
   optional string interfaceName = 1;
 
   // IPs lists the network addresses assigned to the device's network interface.
@@ -1287,6 +1329,10 @@ message NetworkDeviceData {
   //
   // +optional
   // +listType=atomic
+  // +k8s:optional
+  // +k8s:listType=atomic
+  // +k8s:unique=set
+  // +k8s:maxItems=16
   repeated string ips = 2;
 
   // HardwareAddress represents the hardware address (e.g. MAC Address) of the device's network interface.
@@ -1294,6 +1340,8 @@ message NetworkDeviceData {
   // Must not be longer than 128 characters.
   //
   // +optional
+  // +k8s:optional
+  // +k8s:maxLength=128
   optional string hardwareAddress = 3;
 }
 
@@ -1628,10 +1676,14 @@ message ResourceSliceSpec {
 
   // Devices lists some or all of the devices in this pool.
   //
-  // Must not have more than 128 entries.
+  // Must not have more than 128 entries. If any device uses taints or consumes counters the limit is 64.
+  //
+  // Only one of Devices and SharedCounters can be set in a ResourceSlice.
   //
   // +optional
   // +listType=atomic
+  // +k8s:optional
+  // +zeroOrOneOf=ResourceSliceType
   repeated Device devices = 6;
 
   // PerDeviceNodeSelection defines whether the access from nodes to
@@ -1649,13 +1701,21 @@ message ResourceSliceSpec {
   // SharedCounters defines a list of counter sets, each of which
   // has a name and a list of counters available.
   //
-  // The names of the SharedCounters must be unique in the ResourceSlice.
+  // The names of the counter sets must be unique in the ResourcePool.
   //
-  // The maximum number of SharedCounters is 32.
+  // Only one of Devices and SharedCounters can be set in a ResourceSlice.
+  //
+  // The maximum number of counter sets is 8.
   //
   // +optional
+  // +k8s:optional
   // +listType=atomic
+  // +k8s:listType=atomic
+  // +k8s:unique=map
+  // +k8s:listMapKey=name
   // +featureGate=DRAPartitionableDevices
+  // +zeroOrOneOf=ResourceSliceType
+  // +k8s:maxItems=8
   repeated CounterSet sharedCounters = 8;
 }
 

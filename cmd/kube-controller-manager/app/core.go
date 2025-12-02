@@ -276,7 +276,7 @@ func newDeviceTaintEvictionController(ctx context.Context, controllerContext Con
 		controllerName,
 	)
 	return newControllerLoop(func(ctx context.Context) {
-		if err := deviceTaintEvictionController.Run(ctx); err != nil {
+		if err := deviceTaintEvictionController.Run(ctx, int(controllerContext.ComponentConfig.DeviceTaintEvictionController.ConcurrentSyncs)); err != nil {
 			klog.FromContext(ctx).Error(err, "Device taint processing leading to Pod eviction failed and is now paused")
 		}
 		<-ctx.Done()
@@ -597,7 +597,7 @@ func newResourceQuotaController(ctx context.Context, controllerContext Controlle
 
 	discoveryFunc := resourceQuotaControllerDiscoveryClient.ServerPreferredNamespacedResources
 	listerFuncForResource := generic.ListerFuncForResourceFunc(controllerContext.InformerFactory.ForResource)
-	quotaConfiguration := quotainstall.NewQuotaConfigurationForControllers(listerFuncForResource)
+	quotaConfiguration := quotainstall.NewQuotaConfigurationForControllers(listerFuncForResource, controllerContext.InformerFactory)
 
 	resourceQuotaControllerOptions := &resourcequotacontroller.ControllerOptions{
 		QuotaClient:               resourceQuotaControllerClient.CoreV1(),
@@ -692,8 +692,10 @@ func newServiceAccountController(ctx context.Context, controllerContext Controll
 	if err != nil {
 		return nil, err
 	}
+	logger := klog.FromContext(ctx)
 
 	sac, err := serviceaccountcontroller.NewServiceAccountsController(
+		logger,
 		controllerContext.InformerFactory.Core().V1().ServiceAccounts(),
 		controllerContext.InformerFactory.Core().V1().Namespaces(),
 		client,

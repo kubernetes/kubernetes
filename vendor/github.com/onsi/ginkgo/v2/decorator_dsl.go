@@ -2,6 +2,7 @@ package ginkgo
 
 import (
 	"github.com/onsi/ginkgo/v2/internal"
+	"github.com/onsi/ginkgo/v2/types"
 )
 
 /*
@@ -100,6 +101,23 @@ You can learn more here: https://onsi.github.io/ginkgo/#spec-labels
 type Labels = internal.Labels
 
 /*
+SemVerConstraint decorates specs with SemVerConstraints. Multiple semantic version constraints can be passed to SemVerConstraint and these strings must follow the semantic version constraint rules.
+SemVerConstraints can be applied to container and subject nodes, but not setup nodes. You can provide multiple SemVerConstraints to a given node and a spec's semantic version constraints is the union of all semantic version constraints in its node hierarchy.
+
+You can learn more here: https://onsi.github.io/ginkgo/#spec-semantic-version-filtering
+You can learn more about decorators here: https://onsi.github.io/ginkgo/#decorator-reference
+*/
+func SemVerConstraint(semVerConstraints ...string) SemVerConstraints {
+	return SemVerConstraints(semVerConstraints)
+}
+
+/*
+SemVerConstraints are the type for spec SemVerConstraint decorators. Use SemVerConstraint(...) to construct SemVerConstraints.
+You can learn more here: https://onsi.github.io/ginkgo/#spec-semantic-version-filtering
+*/
+type SemVerConstraints = internal.SemVerConstraints
+
+/*
 PollProgressAfter allows you to override the configured value for --poll-progress-after for a particular node.
 
 Ginkgo will start emitting node progress if the node is still running after a duration of PollProgressAfter.  This allows you to get quicker feedback about the state of a long-running spec.
@@ -137,7 +155,39 @@ Nodes that do not finish within a GracePeriod will be leaked and Ginkgo will pro
 type GracePeriod = internal.GracePeriod
 
 /*
+SpecPriority allows you to assign a priority to a spec or container.
+
+Specs with higher priority will be scheduled to run before specs with lower priority.  The default priority is 0 and negative priorities are allowed.
+*/
+type SpecPriority = internal.SpecPriority
+
+/*
 SuppressProgressReporting is a decorator that allows you to disable progress reporting of a particular node.  This is useful if `ginkgo -v -progress` is generating too much noise; particularly
 if you have a `ReportAfterEach` node that is running for every skipped spec and is generating lots of progress reports.
 */
 const SuppressProgressReporting = internal.SuppressProgressReporting
+
+/*
+AroundNode registers a function that runs before each individual node.  This is considered a more advanced decorator.
+
+Please read the [docs](https://onsi.github.io/ginkgo/#advanced-around-node) for more information.
+
+Allowed signatures:
+
+- AroundNode(func()) - func will be called before the node is run.
+- AroundNode(func(ctx context.Context) context.Context) - func can wrap the passed in context and return a new one which will be passed on to the node.
+- AroundNode(func(ctx context.Context, body func(ctx context.Context))) - ctx is the context for the node and body is a function that must be called to run the node.  This gives you complete control over what runs before and after the node.
+
+Multiple AroundNode decorators can be applied to a single node and they will run in the order they are applied.
+
+Unlike setup nodes like BeforeEach and DeferCleanup, AroundNode is guaranteed to run in the same goroutine as the decorated node.  This is necessary when working with lower-level libraries that must run on a single thread (you can call runtime.LockOSThread() in the AroundNode to ensure that the node runs on a single thread).
+
+Since AroundNode allows you to modify the context you can also use AroundNode to implement shared setup that attaches values to the context.  You must return a context that inherits from the passed in context.
+
+If applied to a container, AroundNode will run before every node in the container.  Including setup nodes like BeforeEach and DeferCleanup.
+
+AroundNode can also be applied to RunSpecs to run before every node in the suite.
+*/
+func AroundNode[F types.AroundNodeAllowedFuncs](f F) types.AroundNodeDecorator {
+	return types.AroundNode(f, types.NewCodeLocation(1))
+}

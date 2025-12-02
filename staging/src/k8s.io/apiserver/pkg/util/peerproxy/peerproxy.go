@@ -33,19 +33,32 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/transport"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/klog/v2"
 
 	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
-	v1 "k8s.io/api/coordination/v1"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	coordinationv1informers "k8s.io/client-go/informers/coordination/v1"
 )
 
-// Local discovery cache needs to be refreshed periodically to store
-// updates made to custom resources or aggregated resource that can
-// change dynamically.
-const localDiscoveryRefreshInterval = 30 * time.Minute
+const (
+	// localDiscoveryRefreshInterval is the interval at which the local discovery cache is refreshed.
+	// This cache is only used for mixed version proxy routing decisions (shouldServeLocally), not for serving discovery responses.
+	// Periodic refreshes ensure that we prefer serving requests locally when possible. Without this refresh,
+	// a stale cache could cause us to proxy a request to a peer even when we can serve it locally, resulting
+	// in unnecessary network hops. This is particularly important during upgrades when new built-in APIs become
+	// available on this server.
+	localDiscoveryRefreshInterval = 30 * time.Minute
+	// defaultExclusionGracePeriod is the default duration to wait before
+	// removing a group from the exclusion set after it is deleted from
+	// CRDs and aggregated APIs.
+	// This is to allow time for all peer API servers to also observe
+	// the deleted CRD or aggregated API before this server stops excluding it
+	// in peer-aggregated discovery and while proxying requests to peers.
+	defaultExclusionGracePeriod = 5 * time.Minute
+	// defaultExclusionReaperInterval is the interval at which the we
+	// clean up deleted groups from the exclusion list.
+	defaultExclusionReaperInterval = 1 * time.Minute
+)
 
 // Interface defines how the Mixed Version Proxy filter interacts with the underlying system.
 type Interface interface {
@@ -54,6 +67,12 @@ type Interface interface {
 	HasFinishedSync() bool
 	RunLocalDiscoveryCacheSync(stopCh <-chan struct{}) error
 	RunPeerDiscoveryCacheSync(ctx context.Context, workers int)
+	RunExcludedGVsReaper(stopCh <-chan struct{})
+	RunGVDeletionWorkers(ctx context.Context, workers int)
+	GetPeerResources() map[string][]apidiscoveryv2.APIGroupDiscovery
+	RegisterCacheInvalidationCallback(cb func())
+	RegisterCRDInformerHandlers(crdInformer cache.SharedIndexInformer, extractor GVExtractor) error
+	RegisterAPIServiceInformerHandlers(apiServiceInformer cache.SharedIndexInformer, extractor GVExtractor) error
 }
 
 // New creates a new instance to implement unknown version proxy
@@ -80,9 +99,17 @@ func NewPeerProxyHandler(
 		peerLeaseQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{
-				Name: controllerName,
+				Name: peerDiscoveryControllerName,
 			}),
 		apiserverIdentityInformer: leaseInformer,
+		excludedGVs:               make(map[schema.GroupVersion]*time.Time),
+		exclusionGracePeriod:      defaultExclusionGracePeriod,
+		reaperCheckInterval:       defaultExclusionReaperInterval,
+		gvDeletionQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Name: "gv-deletion",
+			}),
 	}
 
 	if parts := strings.Split(identityLeaseLabelSelector, "="); len(parts) != 2 {
@@ -102,9 +129,12 @@ func NewPeerProxyHandler(
 	if err != nil {
 		return nil, fmt.Errorf("error creating discovery client: %w", err)
 	}
+
+	// Always use local discovery to get local view of resources.
+	discoveryClient.NoPeerDiscovery = true
 	h.discoveryClient = discoveryClient
 	h.localDiscoveryInfoCache.Store(map[schema.GroupVersionResource]bool{})
-	h.peerDiscoveryInfoCache.Store(map[string]map[schema.GroupVersionResource]bool{})
+	h.peerDiscoveryInfoCache.Store(map[string]PeerDiscoveryCacheEntry{})
 
 	proxyTransport, err := transport.New(proxyClientConfig)
 	if err != nil {
@@ -138,50 +168,4 @@ func NewPeerProxyHandler(
 
 	h.leaseRegistration = peerDiscoveryRegistration
 	return h, nil
-}
-
-func (h *peerProxyHandler) isValidPeerIdentityLease(obj interface{}) (*v1.Lease, bool) {
-	lease, ok := obj.(*v1.Lease)
-	if !ok {
-		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("unexpected object type: %T", obj))
-			return nil, false
-		}
-		if lease, ok = tombstone.Obj.(*v1.Lease); !ok {
-			utilruntime.HandleError(fmt.Errorf("unexpected object type: %T", obj))
-			return nil, false
-		}
-	}
-
-	if lease == nil {
-		klog.Error(fmt.Errorf("nil lease object provided"))
-		return nil, false
-	}
-
-	if h.identityLeaseLabelSelector != nil && h.identityLeaseLabelSelector.String() != "" {
-		identityLeaseLabel := strings.Split(h.identityLeaseLabelSelector.String(), "=")
-		if len(identityLeaseLabel) != 2 {
-			klog.Errorf("invalid identityLeaseLabelSelector format: %s", h.identityLeaseLabelSelector.String())
-			return nil, false
-		}
-
-		if lease.Labels == nil || lease.Labels[identityLeaseLabel[0]] != identityLeaseLabel[1] {
-			klog.V(4).Infof("lease %s/%s does not match label selector: %s=%s", lease.Namespace, lease.Name, identityLeaseLabel[0], identityLeaseLabel[1])
-			return nil, false
-		}
-
-	}
-
-	// Ignore self.
-	if lease.Name == h.serverID {
-		return nil, false
-	}
-
-	if lease.Spec.HolderIdentity == nil {
-		klog.Error(fmt.Errorf("invalid lease object provided, missing holderIdentity in lease obj"))
-		return nil, false
-	}
-
-	return lease, true
 }

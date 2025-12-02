@@ -26,12 +26,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage/names"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/kubernetes/pkg/api/resourceclaimspec"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/apis/resource/validation"
-	"k8s.io/kubernetes/pkg/features"
 	resourceutils "k8s.io/kubernetes/pkg/registry/resource"
 )
 
@@ -112,115 +111,9 @@ func toSelectableFields(template *resource.ResourceClaimTemplate) fields.Set {
 }
 
 func dropDisabledFields(newClaimTemplate, oldClaimTemplate *resource.ResourceClaimTemplate) {
-	dropDisabledDRAPrioritizedListFields(newClaimTemplate, oldClaimTemplate)
-	dropDisabledDRAAdminAccessFields(newClaimTemplate, oldClaimTemplate)
-	dropDisabledDRAResourceClaimConsumableCapacityFields(newClaimTemplate, oldClaimTemplate)
-}
-
-func dropDisabledDRAPrioritizedListFields(newClaimTemplate, oldClaimTemplate *resource.ResourceClaimTemplate) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRAPrioritizedList) {
-		return
+	var oldClaimSpec *resource.ResourceClaimSpec
+	if oldClaimTemplate != nil {
+		oldClaimSpec = &oldClaimTemplate.Spec.Spec
 	}
-	if draPrioritizedListFeatureInUse(oldClaimTemplate) {
-		return
-	}
-
-	for i := range newClaimTemplate.Spec.Spec.Devices.Requests {
-		newClaimTemplate.Spec.Spec.Devices.Requests[i].FirstAvailable = nil
-	}
-}
-
-func draPrioritizedListFeatureInUse(claimTemplate *resource.ResourceClaimTemplate) bool {
-	if claimTemplate == nil {
-		return false
-	}
-
-	for _, request := range claimTemplate.Spec.Spec.Devices.Requests {
-		if len(request.FirstAvailable) > 0 {
-			return true
-		}
-	}
-
-	return false
-}
-
-func dropDisabledDRAAdminAccessFields(newClaimTemplate, oldClaimTemplate *resource.ResourceClaimTemplate) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess) {
-		// No need to drop anything.
-		return
-	}
-	if draAdminAccessFeatureInUse(oldClaimTemplate) {
-		// If anything was set in the past, then fields must not get
-		// dropped on potentially unrelated updates.
-		return
-	}
-
-	for i := range newClaimTemplate.Spec.Spec.Devices.Requests {
-		if newClaimTemplate.Spec.Spec.Devices.Requests[i].Exactly != nil {
-			newClaimTemplate.Spec.Spec.Devices.Requests[i].Exactly.AdminAccess = nil
-		}
-	}
-}
-
-func draAdminAccessFeatureInUse(claimTemplate *resource.ResourceClaimTemplate) bool {
-	if claimTemplate == nil {
-		return false
-	}
-
-	for _, request := range claimTemplate.Spec.Spec.Devices.Requests {
-		if request.Exactly != nil && request.Exactly.AdminAccess != nil {
-			return true
-		}
-	}
-
-	return false
-}
-
-func draConsumableCapacityFeatureInUse(claimTemplate *resource.ResourceClaimTemplate) bool {
-	if claimTemplate == nil {
-		return false
-	}
-
-	for _, constaint := range claimTemplate.Spec.Spec.Devices.Constraints {
-		if constaint.DistinctAttribute != nil {
-			return true
-		}
-	}
-
-	for _, request := range claimTemplate.Spec.Spec.Devices.Requests {
-		if request.Exactly != nil && request.Exactly.Capacity != nil {
-			return true
-		}
-		for _, subRequest := range request.FirstAvailable {
-			if subRequest.Capacity != nil {
-				return true
-			}
-		}
-	}
-
-	return false
-}
-
-// dropDisabledDRAResourceClaimConsumableCapacityFields drops any new feature field
-// from the newClaimTemplate if they were not used in the oldClaimTemplate.
-func dropDisabledDRAResourceClaimConsumableCapacityFields(newClaimTemplate, oldClaimTemplate *resource.ResourceClaimTemplate) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity) ||
-		draConsumableCapacityFeatureInUse(oldClaimTemplate) {
-		// No need to drop anything.
-		return
-	}
-
-	for _, constaint := range newClaimTemplate.Spec.Spec.Devices.Constraints {
-		constaint.DistinctAttribute = nil
-	}
-
-	for i := range newClaimTemplate.Spec.Spec.Devices.Requests {
-		if newClaimTemplate.Spec.Spec.Devices.Requests[i].Exactly != nil {
-			newClaimTemplate.Spec.Spec.Devices.Requests[i].Exactly.Capacity = nil
-		}
-		request := newClaimTemplate.Spec.Spec.Devices.Requests[i]
-		for j := range request.FirstAvailable {
-			newClaimTemplate.Spec.Spec.Devices.Requests[i].FirstAvailable[j].Capacity = nil
-		}
-	}
+	resourceclaimspec.DropDisabledFields(&newClaimTemplate.Spec.Spec, oldClaimSpec)
 }

@@ -31,7 +31,7 @@ func (m *NoopImagePullManager) RecordPullIntent(string) error { return nil }
 func (m *NoopImagePullManager) RecordImagePulled(context.Context, string, string, *kubeletconfiginternal.ImagePullCredentials) {
 }
 func (m *NoopImagePullManager) RecordImagePullFailed(context.Context, string) {}
-func (m *NoopImagePullManager) MustAttemptImagePull(context.Context, string, string, []kubeletconfiginternal.ImagePullSecret, *kubeletconfiginternal.ImagePullServiceAccount) bool {
-	return false
+func (m *NoopImagePullManager) MustAttemptImagePull(context.Context, string, string, GetPodCredentials) (bool, error) {
+	return false, nil
 }
 func (m *NoopImagePullManager) PruneUnknownRecords(context.Context, []string, time.Time) {}

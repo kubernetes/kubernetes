@@ -92,8 +92,7 @@ func ValidateCustomResourceDefinition(ctx context.Context, obj *apiextensions.Cu
 		requirePrunedDefaults:                    true,
 		requireAtomicSetType:                     true,
 		requireMapListKeysMapSetValidation:       true,
-		// strictCost is always true to enforce cost limits.
-		celEnvironmentSet: environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true),
+		celEnvironmentSet:                        environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()),
 		// allowInvalidCABundle is set to true since the CRD is not established yet.
 		allowInvalidCABundle: true,
 	}
@@ -241,10 +240,9 @@ func ValidateCustomResourceDefinitionUpdate(ctx context.Context, obj, oldObj *ap
 		requireMapListKeysMapSetValidation:       requireMapListKeysMapSetValidation(&oldObj.Spec),
 		preexistingExpressions:                   findPreexistingExpressions(&oldObj.Spec),
 		versionsWithUnchangedSchemas:             findVersionsWithUnchangedSchemas(obj, oldObj),
-		// strictCost is always true to enforce cost limits.
-		celEnvironmentSet:            environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true),
-		allowInvalidCABundle:         allowInvalidCABundle(oldObj),
-		allowTooManySelectableFields: findTooManySelectableFieldsAllowed(obj, oldObj),
+		celEnvironmentSet:                        environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()),
+		allowInvalidCABundle:                     allowInvalidCABundle(oldObj),
+		allowTooManySelectableFields:             findTooManySelectableFieldsAllowed(obj, oldObj),
 	}
 	return validateCustomResourceDefinitionUpdate(ctx, obj, oldObj, opts)
 }

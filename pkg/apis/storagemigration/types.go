@@ -17,7 +17,6 @@ limitations under the License.
 package storagemigration
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -47,25 +46,7 @@ type StorageVersionMigrationSpec struct {
 	// The resource that is being migrated. The migrator sends requests to
 	// the endpoint serving the resource.
 	// Immutable.
-	Resource GroupVersionResource
-	// The token used in the list options to get the next chunk of objects
-	// to migrate. When the .status.conditions indicates the migration is
-	// "Running", users can use this token to check the progress of the
-	// migration.
-	// +optional
-	ContinueToken string
-	// TODO: consider recording the storage version hash when the migration
-	// is created. It can avoid races.
-}
-
-// The names of the group, the version, and the resource.
-type GroupVersionResource struct {
-	// The name of the group.
-	Group string
-	// The name of the version.
-	Version string
-	// The name of the resource.
-	Resource string
+	Resource metav1.GroupResource
 }
 
 type MigrationConditionType string
@@ -79,23 +60,6 @@ const (
 	MigrationFailed MigrationConditionType = "Failed"
 )
 
-// Describes the state of a migration at a certain point.
-type MigrationCondition struct {
-	// Type of the condition.
-	Type MigrationConditionType
-	// Status of the condition, one of True, False, Unknown.
-	Status corev1.ConditionStatus
-	// The last time this condition was updated.
-	// +optional
-	LastUpdateTime metav1.Time
-	// The reason for the condition's last transition.
-	// +optional
-	Reason string
-	// A human readable message indicating details about the transition.
-	// +optional
-	Message string
-}
-
 // Status of the storage version migration.
 type StorageVersionMigrationStatus struct {
 	// The latest available observations of the migration's current state.
@@ -104,7 +68,7 @@ type StorageVersionMigrationStatus struct {
 	// +listType=map
 	// +listMapKey=type
 	// +optional
-	Conditions []MigrationCondition
+	Conditions []metav1.Condition
 	// ResourceVersion to compare with the GC cache for performing the migration.
 	// This is the current resource version of given group, version and resource when
 	// kube-controller-manager first observes this StorageVersionMigration resource.
@@ -123,9 +87,5 @@ type StorageVersionMigrationList struct {
 	// +optional
 	metav1.ListMeta
 	// Items is the list of StorageVersionMigration
-	// +patchMergeKey=type
-	// +patchStrategy=merge
-	// +listType=map
-	// +listMapKey=type
 	Items []StorageVersionMigration
 }

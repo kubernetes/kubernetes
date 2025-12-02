@@ -2066,3 +2066,128 @@ func TestFeatureGateResourceHealthStatus(t *testing.T) {
 		}, u)
 	}
 }
+
+// TestAdmitPodWithDRAResources verifies the behavior of admission
+// of the pods referring DRA extended resources depending on whether
+// the DRAExtendedResource feature gate is enabled or disabled.
+func TestAdmitPodWithDRAResources(t *testing.T) {
+	testCases := map[string]struct {
+		enableFeatureGate bool
+		checkError        func(t require.TestingT, err error, msgAndArgs ...interface{})
+	}{
+		"DRAExtendedResource enabled": {
+			enableFeatureGate: true,
+			checkError:        require.NoError,
+		},
+		"DRAExtendedResource disabled": {
+			enableFeatureGate: false,
+			checkError:        require.Error,
+		},
+	}
+
+	containerName := "container1"
+	resourceName := "domain1.com/resource1"
+
+	for description, test := range testCases {
+		t.Run(description, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, test.enableFeatureGate)
+
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID: uuid.NewUUID(),
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: containerName,
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName(resourceName): resource.MustParse("1"),
+								},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					ExtendedResourceClaimStatus: &v1.PodExtendedResourceClaimStatus{
+						RequestMappings: []v1.ContainerExtendedResourceRequest{
+							{
+								ContainerName: containerName,
+								ResourceName:  resourceName,
+							},
+						},
+					},
+				},
+			}
+
+			require.True(t, isDRAExtendedResource(pod, containerName, resourceName))
+
+			testManager := &ManagerImpl{
+				devicesToReuse: make(PodReusableDevices),
+				podDevices:     newPodDevices(),
+				allocatedDevices: map[string]sets.Set[string]{
+					resourceName: sets.New("Dev"),
+				},
+				activePods:   func() []*v1.Pod { return nil },
+				sourcesReady: &sourcesReadyStub{},
+			}
+
+			err := testManager.Allocate(pod, &pod.Spec.Containers[0])
+			test.checkError(t, err)
+		})
+	}
+}
+
+// TestEndpointSyncOnDisconnect verifies that when a device plugin disconnects,
+// the device manager correctly updates its internal state by marking all
+// devices from that endpoint as unhealthy. It ensures that the healthyDevices
+// and unhealthyDevices maps are in sync with the plugin endpoint info.
+func TestEndpointSyncOnDisconnect(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	socketDir, socketName, _, err := tmpSocketDir()
+	require.NoError(t, err)
+	defer func() {
+		if err := os.RemoveAll(socketDir); err != nil {
+			logger.Error(err, "unable to remove socket directory", "dir", socketDir)
+		}
+	}()
+
+	manager, err := newManagerImpl(logger, socketName, nil, nil)
+	require.NoError(t, err)
+
+	resourceName := "domain1.com/resource1"
+	ep := &endpointImpl{
+		resourceName: resourceName,
+		client:       plugin.NewPluginClient(resourceName, socketName, manager),
+		stopTime:     time.Now().Add(-endpointStopGracePeriod * 2), // make the grace period expired
+	}
+
+	manager.endpoints[resourceName] = endpointInfo{e: ep, opts: nil}
+	devs := []*pluginapi.Device{
+		{ID: "Device1", Health: pluginapi.Healthy},
+		{ID: "Device2", Health: pluginapi.Healthy},
+		{ID: "Device3", Health: pluginapi.Unhealthy},
+	}
+	manager.genericDeviceUpdateCallback(logger, resourceName, devs)
+
+	// Disconnect should result in all devices for this resource
+	// moved to the unhealthy set.
+	err = ep.client.Disconnect(logger)
+	require.NoError(t, err)
+
+	require.Contains(t, manager.endpoints, resourceName)
+	require.Contains(t, manager.healthyDevices, resourceName)
+	require.Contains(t, manager.unhealthyDevices, resourceName)
+	require.Len(t, manager.endpoints, 1)
+	require.Empty(t, manager.healthyDevices[resourceName])
+	require.Equal(t, len(devs), manager.unhealthyDevices[resourceName].Len())
+
+	// Expire endpoint to shorten the test
+	ep.stopTime = time.Now().Add(-endpointStopGracePeriod * 2)
+	// Call GetCapacity to trigger https://github.com/kubernetes/kubernetes/issues/133702
+	manager.GetCapacity()
+
+	require.Empty(t, manager.endpoints)
+	require.Empty(t, manager.healthyDevices)
+	require.Empty(t, manager.unhealthyDevices)
+}

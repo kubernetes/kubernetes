@@ -17,14 +17,19 @@ limitations under the License.
 package storage
 
 import (
+	"context"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/resource/devicetaintrule"
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 // REST implements a RESTStorage for DeviceTaintRule.
@@ -33,7 +38,7 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against DeviceTaintRule.
-func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
+func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 	store := &genericregistry.Store{
 		NewFunc:                   func() runtime.Object { return &resource.DeviceTaintRule{} },
 		NewListFunc:               func() runtime.Object { return &resource.DeviceTaintRuleList{} },
@@ -44,13 +49,50 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 		UpdateStrategy:      devicetaintrule.Strategy,
 		DeleteStrategy:      devicetaintrule.Strategy,
 		ReturnDeletedObject: true,
+		ResetFieldsStrategy: devicetaintrule.Strategy,
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return &REST{store}, nil
+	statusStore := *store
+	statusStore.UpdateStrategy = devicetaintrule.StatusStrategy
+	statusStore.ResetFieldsStrategy = devicetaintrule.StatusStrategy
+
+	return &REST{store}, &StatusREST{store: &statusStore}, nil
+}
+
+// StatusREST implements the REST endpoint for changing the status of a DeviceTaintRule.
+type StatusREST struct {
+	store *genericregistry.Store
+}
+
+// New creates a new DeviceTaintRule object.
+func (r *StatusREST) New() runtime.Object {
+	return &resource.DeviceTaintRule{}
+}
+
+func (r *StatusREST) Destroy() {
+	// Given that underlying store is shared with REST,
+	// we don't destroy it here explicitly.
+}
+
+// Get retrieves the object from the storage. It is required to support Patch.
+func (r *StatusREST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
+	return r.store.Get(ctx, name, options)
+}
+
+// Update alters the status subset of an object.
+func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
+	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
+	// subresources should never allow create on update.
+	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
+}
+
+// GetResetFields implements rest.ResetFieldsStrategy
+func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return r.store.GetResetFields()
 }

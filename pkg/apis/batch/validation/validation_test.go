@@ -26,6 +26,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -2240,6 +2241,326 @@ func TestValidateJobUpdate(t *testing.T) {
 			update: func(job *batch.Job) {
 				job.Spec.Completions = ptr.To[int32](2)
 				job.Spec.Parallelism = ptr.To[int32](3)
+			},
+		},
+		"allow container resource updates only": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: batch.JobSpec{
+					Selector: validGeneratedSelector,
+					Template: validPodTemplateSpecForGenerated,
+					Suspend:  ptr.To(true),
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Template.Spec.Containers[0].Resources = api.ResourceRequirements{
+					Requests: api.ResourceList{
+						api.ResourceCPU:    resource.MustParse("200m"),
+						api.ResourceMemory: resource.MustParse("256Mi"),
+					},
+					Limits: api.ResourceList{
+						api.ResourceCPU:    resource.MustParse("500m"),
+						api.ResourceMemory: resource.MustParse("512Mi"),
+					},
+				}
+			},
+			opts: JobValidationOptions{
+				AllowMutablePodResources: true,
+			},
+		},
+		"reject container resource updates only with feature gate off": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: batch.JobSpec{
+					Selector: validGeneratedSelector,
+					Template: validPodTemplateSpecForGenerated,
+					Suspend:  ptr.To(true),
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Template.Spec.Containers[0].Resources = api.ResourceRequirements{
+					Requests: api.ResourceList{
+						api.ResourceCPU:    resource.MustParse("200m"),
+						api.ResourceMemory: resource.MustParse("256Mi"),
+					},
+					Limits: api.ResourceList{
+						api.ResourceCPU:    resource.MustParse("500m"),
+						api.ResourceMemory: resource.MustParse("512Mi"),
+					},
+				}
+			},
+			opts: JobValidationOptions{
+				AllowMutablePodResources: false,
+			},
+			err: &field.Error{
+				Type:  field.ErrorTypeInvalid,
+				Field: "spec.template",
+			},
+		},
+		"allow init container resource updates only": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: batch.JobSpec{
+					Suspend:  ptr.To(true),
+					Selector: validGeneratedSelector,
+					Template: func() api.PodTemplateSpec {
+						template := getValidPodTemplateSpecForGenerated(validGeneratedSelector)
+						template.Spec.InitContainers = []api.Container{
+							podtest.MakeContainer("init-container", podtest.SetContainerResources(api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceCPU:    resource.MustParse("100m"),
+									api.ResourceMemory: resource.MustParse("64Mi"),
+								},
+							})),
+						}
+						return template
+					}(),
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Template.Spec.InitContainers[0].Resources = api.ResourceRequirements{
+					Requests: api.ResourceList{
+						api.ResourceCPU:    resource.MustParse("200m"),
+						api.ResourceMemory: resource.MustParse("128Mi"),
+					},
+					Limits: api.ResourceList{
+						api.ResourceCPU:    resource.MustParse("400m"),
+						api.ResourceMemory: resource.MustParse("256Mi"),
+					},
+				}
+			},
+			opts: JobValidationOptions{
+				AllowMutablePodResources: true,
+			},
+		},
+		"allow both container and init container resource updates": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: batch.JobSpec{
+					Suspend:  ptr.To(true),
+					Selector: validGeneratedSelector,
+					Template: func() api.PodTemplateSpec {
+						template := getValidPodTemplateSpecForGenerated(validGeneratedSelector)
+						template.Spec.InitContainers = []api.Container{
+							podtest.MakeContainer("init-container", podtest.SetContainerResources(api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceCPU:    resource.MustParse("100m"),
+									api.ResourceMemory: resource.MustParse("64Mi"),
+								},
+							})),
+						}
+						return template
+					}(),
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Template.Spec.Containers[0].Resources = api.ResourceRequirements{
+					Requests: api.ResourceList{
+						api.ResourceCPU:    resource.MustParse("200m"),
+						api.ResourceMemory: resource.MustParse("256Mi"),
+					},
+				}
+				job.Spec.Template.Spec.InitContainers[0].Resources = api.ResourceRequirements{
+					Requests: api.ResourceList{
+						api.ResourceCPU:    resource.MustParse("150m"),
+						api.ResourceMemory: resource.MustParse("128Mi"),
+					},
+				}
+			},
+			opts: JobValidationOptions{
+				AllowMutablePodResources: true,
+			},
+		},
+		"reject container resource update with other field changes": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: batch.JobSpec{
+					Suspend:  ptr.To(true),
+					Selector: validGeneratedSelector,
+					Template: validPodTemplateSpecForGenerated,
+				},
+			},
+			update: func(job *batch.Job) {
+				// Update container resources
+				job.Spec.Template.Spec.Containers[0].Resources = api.ResourceRequirements{
+					Requests: api.ResourceList{
+						api.ResourceCPU:    resource.MustParse("200m"),
+						api.ResourceMemory: resource.MustParse("256Mi"),
+					},
+				}
+				// Also update another field (should cause validation failure)
+				job.Spec.Template.Spec.Containers[0].Image = "nginx:latest"
+			},
+			opts: JobValidationOptions{
+				AllowMutablePodResources: true,
+			},
+			err: &field.Error{
+				Type:  field.ErrorTypeInvalid,
+				Field: "spec.template.spec",
+			},
+		},
+		"reject non-resource field updates when AllowMutablePodResources is true": {
+			old: batch.Job{
+
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: batch.JobSpec{
+					Suspend:  ptr.To(true),
+					Selector: validGeneratedSelector,
+					Template: validPodTemplateSpecForGenerated,
+				},
+			},
+			update: func(job *batch.Job) {
+				// Update only a non-resource field
+				job.Spec.Template.Spec.Containers[0].Image = "nginx:latest"
+			},
+			opts: JobValidationOptions{
+				AllowMutablePodResources: true,
+			},
+			err: &field.Error{
+				Type:  field.ErrorTypeInvalid,
+				Field: "spec.template.spec",
+			},
+		},
+		"reject pod spec changes when container count differs": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: batch.JobSpec{
+					Suspend:  ptr.To(true),
+					Selector: validGeneratedSelector,
+					Template: validPodTemplateSpecForGenerated,
+				},
+			},
+			update: func(job *batch.Job) {
+				// Add a new container (changes container count)
+				job.Spec.Template.Spec.Containers = append(job.Spec.Template.Spec.Containers, podtest.MakeContainer("sidecar"))
+			},
+			opts: JobValidationOptions{
+				AllowMutablePodResources: true,
+			},
+			err: &field.Error{
+				Type:  field.ErrorTypeInvalid,
+				Field: "spec.template.spec",
+			},
+		},
+		"reject pod spec changes when init container count differs": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: batch.JobSpec{
+					Suspend:  ptr.To(true),
+					Selector: validGeneratedSelector,
+					Template: validPodTemplateSpecForGenerated,
+				},
+			},
+			update: func(job *batch.Job) {
+				// Add an init container (changes init container count)
+				job.Spec.Template.Spec.InitContainers = []api.Container{
+					podtest.MakeContainer("init-container"),
+				}
+			},
+			opts: JobValidationOptions{
+				AllowMutablePodResources: true,
+			},
+			err: &field.Error{
+				Type:  field.ErrorTypeInvalid,
+				Field: "spec.template.spec",
+			},
+		},
+		"reject pod spec changes if update reorders init containers": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: batch.JobSpec{
+					Suspend:  ptr.To(true),
+					Selector: validGeneratedSelector,
+					Template: func() api.PodTemplateSpec {
+						template := getValidPodTemplateSpecForGenerated(validGeneratedSelector)
+						template.Spec.InitContainers = []api.Container{
+							podtest.MakeContainer("init-container", podtest.SetContainerResources(api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceCPU:    resource.MustParse("100m"),
+									api.ResourceMemory: resource.MustParse("64Mi"),
+								},
+							})),
+							podtest.MakeContainer("init-container-2", podtest.SetContainerResources(api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceCPU:    resource.MustParse("100m"),
+									api.ResourceMemory: resource.MustParse("64Mi"),
+								},
+							})),
+						}
+						return template
+					}(),
+				},
+			},
+			update: func(job *batch.Job) {
+				// Reorder init container (changes init container count)
+				job.Spec.Template.Spec.InitContainers[0] = podtest.MakeContainer("init-container-2", podtest.SetContainerResources(api.ResourceRequirements{
+					Requests: api.ResourceList{
+						api.ResourceCPU:    resource.MustParse("100m"),
+						api.ResourceMemory: resource.MustParse("64Mi"),
+					},
+				}))
+				job.Spec.Template.Spec.InitContainers[1] = podtest.MakeContainer("init-container", podtest.SetContainerResources(api.ResourceRequirements{
+					Requests: api.ResourceList{
+						api.ResourceCPU:    resource.MustParse("100m"),
+						api.ResourceMemory: resource.MustParse("64Mi"),
+					},
+				}))
+			},
+			opts: JobValidationOptions{
+				AllowMutablePodResources: true,
+			},
+			err: &field.Error{
+				Type:  field.ErrorTypeInvalid,
+				Field: "spec.template.spec",
+			},
+		},
+		"reject pod spec changes if update reorders containers": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: batch.JobSpec{
+					Suspend:  ptr.To(true),
+					Selector: validGeneratedSelector,
+					Template: func() api.PodTemplateSpec {
+						template := getValidPodTemplateSpecForGenerated(validGeneratedSelector)
+						template.Spec.Containers = []api.Container{
+							podtest.MakeContainer("container", podtest.SetContainerResources(api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceCPU:    resource.MustParse("100m"),
+									api.ResourceMemory: resource.MustParse("64Mi"),
+								},
+							})),
+							podtest.MakeContainer("container-2", podtest.SetContainerResources(api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceCPU:    resource.MustParse("100m"),
+									api.ResourceMemory: resource.MustParse("64Mi"),
+								},
+							})),
+						}
+						return template
+					}(),
+				},
+			},
+			update: func(job *batch.Job) {
+				// Reorder init container (changes init container count)
+				job.Spec.Template.Spec.Containers[0] = podtest.MakeContainer("container-2", podtest.SetContainerResources(api.ResourceRequirements{
+					Requests: api.ResourceList{
+						api.ResourceCPU:    resource.MustParse("100m"),
+						api.ResourceMemory: resource.MustParse("64Mi"),
+					},
+				}))
+				job.Spec.Template.Spec.Containers[1] = podtest.MakeContainer("container", podtest.SetContainerResources(api.ResourceRequirements{
+					Requests: api.ResourceList{
+						api.ResourceCPU:    resource.MustParse("100m"),
+						api.ResourceMemory: resource.MustParse("64Mi"),
+					},
+				}))
+			},
+			opts: JobValidationOptions{
+				AllowMutablePodResources: true,
+			},
+			err: &field.Error{
+				Type:  field.ErrorTypeInvalid,
+				Field: "spec.template.spec",
 			},
 		},
 	}

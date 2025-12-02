@@ -297,11 +297,11 @@ func newPVCWatch(ctx context.Context, f *framework.Framework, provisionCount int
 	_, controller := cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-				obj, err := f.ClientSet.CoreV1().PersistentVolumeClaims(ns).List(ctx, metav1.ListOptions{})
+				obj, err := f.ClientSet.CoreV1().PersistentVolumeClaims(ns).List(ctx, options)
 				return runtime.Object(obj), err
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-				return f.ClientSet.CoreV1().PersistentVolumeClaims(ns).Watch(ctx, metav1.ListOptions{})
+				return f.ClientSet.CoreV1().PersistentVolumeClaims(ns).Watch(ctx, options)
 			},
 		},
 		&v1.PersistentVolumeClaim{},

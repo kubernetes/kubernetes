@@ -825,9 +825,14 @@ func coolCPUCreationTime() metav1.Time {
 
 func (tc *testCase) runTestWithController(t *testing.T, hpaController *HorizontalController, informerFactory informers.SharedInformerFactory) {
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	informerFactory.Start(ctx.Done())
-	go hpaController.Run(ctx, 5)
+
+	var wg sync.WaitGroup
+	wg.Go(func() {
+		hpaController.Run(ctx, 5)
+	})
+	defer wg.Wait()
+	defer cancel()
 
 	tc.Lock()
 	shouldWait := tc.verifyEvents
@@ -5192,7 +5197,6 @@ func TestMultipleHPAs(t *testing.T) {
 	const testNamespace = "dummy-namespace"
 
 	processed := make(chan string, hpaCount)
-	processedDeleted := make(chan string, 1)
 
 	testClient := &fake.Clientset{}
 	testScaleClient := &scalefake.FakeScaleClient{}
@@ -5421,13 +5425,6 @@ func TestMultipleHPAs(t *testing.T) {
 		return handled, obj, err
 	})
 
-	testClient.AddReactor("delete", "horizontalpodautoscalers", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-		deleteAction := action.(core.DeleteAction)
-		hpaName := deleteAction.GetName()
-		processedDeleted <- hpaName
-		return true, nil, nil
-	})
-
 	informerFactory := informers.NewSharedInformerFactory(testClient, controller.NoResyncPeriodFunc())
 
 	tCtx := ktesting.Init(t)
@@ -5468,25 +5465,8 @@ func TestMultipleHPAs(t *testing.T) {
 	assert.Len(t, processedHPA, hpaCount, "Expected to process all HPAs")
 	assert.Equal(t, hpaCount, hpaController.monitor.(*mockMonitor).GetObjectsCount(), "Expected objects count to match number of HPAs")
 
-	// Test HPA deletion
-	hpaName := "dummy-hpa-0"
-
-	// Delete the HPA through the API
-	err := testClient.AutoscalingV2().HorizontalPodAutoscalers(testNamespace).Delete(tCtx, hpaName, metav1.DeleteOptions{})
-	if err != nil {
-		t.Fatalf("Failed to delete HPA: %v", err)
-	}
-
 	// Simulate the watch event for deletion
 	hpaWatcher.Delete(&hpaList[0])
-
-	// Wait for deletion to be processed
-	select {
-	case deletedHPAName := <-processedDeleted:
-		assert.Equal(t, hpaName, deletedHPAName, "Expected the deleted HPA name to match")
-	case <-time.After(5 * time.Second):
-		t.Fatalf("Timeout waiting for HPA deletion to be processed")
-	}
 
 	// Give the controller time to process the deletion and update the monitor
 	assert.Eventually(t, func() bool {

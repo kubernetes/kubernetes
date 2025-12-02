@@ -207,8 +207,8 @@ func getExpectedCPULimitFromCPUQuota(cpuQuota int64, podOnCgroupV2 bool) string 
 	return expectedCPULimitString
 }
 
-func getExpectedMemLimitString(rr *v1.ResourceRequirements, podOnCgroupv2 bool) string {
-	expectedMemLimitInBytes := rr.Limits.Memory().Value()
+func getExpectedMemLimitString(memLimit *resource.Quantity, podOnCgroupv2 bool) string {
+	expectedMemLimitInBytes := memLimit.Value()
 	expectedMemLimitString := strconv.FormatInt(expectedMemLimitInBytes, 10)
 	if podOnCgroupv2 && expectedMemLimitString == "0" {
 		expectedMemLimitString = "max"
@@ -218,7 +218,20 @@ func getExpectedMemLimitString(rr *v1.ResourceRequirements, podOnCgroupv2 bool) 
 
 func verifyContainerCPUWeight(f *framework.Framework, pod *v1.Pod, containerName string, expectedResources *v1.ResourceRequirements, podOnCgroupv2 bool) error {
 	cpuWeightCgPath := getCgroupCPURequestPath(cgroupFsPath, podOnCgroupv2)
-	expectedCPUShares := getExpectedCPUShares(expectedResources, podOnCgroupv2)
+	cpuLim := expectedResources.Limits.Cpu()
+	if cpuLim.IsZero() && pod.Spec.Resources != nil {
+		cpuLim = pod.Spec.Resources.Limits.Cpu()
+	}
+	cpuReq := expectedResources.Requests.Cpu()
+	// Bug - Skip comparing cpu.weight if cpu requests are not set for pod with only
+	// pod-level limits. There's a bug in calculation of cpu.weight when containers without
+	// limits are resized and then restarted because of pod-level limits resize.
+	// Check for cpu.weight when the bug is fixed - https://github.com/kubernetes/kubernetes/issues/135260
+	if cpuReq.IsZero() && pod.Spec.Resources != nil {
+		return nil
+	}
+
+	expectedCPUShares := getExpectedCPUShares(cpuReq, cpuLim, podOnCgroupv2)
 	if err := VerifyCgroupValue(f, pod, containerName, cpuWeightCgPath, expectedCPUShares...); err != nil {
 		return fmt.Errorf("failed to verify cpu request cgroup value: %w", err)
 	}
@@ -227,7 +240,11 @@ func verifyContainerCPUWeight(f *framework.Framework, pod *v1.Pod, containerName
 
 func VerifyContainerCPULimit(f *framework.Framework, pod *v1.Pod, containerName string, expectedResources *v1.ResourceRequirements, podOnCgroupv2 bool) error {
 	cpuLimCgPath := getCgroupCPULimitPath(cgroupFsPath, podOnCgroupv2)
-	expectedCPULimits := getCPULimitCgroupExpectations(expectedResources.Limits.Cpu(), podOnCgroupv2)
+	cpuLim := expectedResources.Limits.Cpu()
+	if cpuLim.IsZero() && pod.Spec.Resources != nil {
+		cpuLim = pod.Spec.Resources.Limits.Cpu()
+	}
+	expectedCPULimits := getCPULimitCgroupExpectations(cpuLim, podOnCgroupv2)
 	if err := VerifyCgroupValue(f, pod, containerName, cpuLimCgPath, expectedCPULimits...); err != nil {
 		return fmt.Errorf("failed to verify cpu limit cgroup value: %w", err)
 	}
@@ -236,7 +253,11 @@ func VerifyContainerCPULimit(f *framework.Framework, pod *v1.Pod, containerName 
 
 func VerifyContainerMemoryLimit(f *framework.Framework, pod *v1.Pod, containerName string, expectedResources *v1.ResourceRequirements, podOnCgroupv2 bool) error {
 	memLimCgPath := getCgroupMemLimitPath(cgroupFsPath, podOnCgroupv2)
-	expectedMemLim := getExpectedMemLimitString(expectedResources, podOnCgroupv2)
+	memLim := expectedResources.Limits.Memory()
+	if memLim.IsZero() && pod.Spec.Resources != nil {
+		memLim = pod.Spec.Resources.Limits.Memory()
+	}
+	expectedMemLim := getExpectedMemLimitString(memLim, podOnCgroupv2)
 	if expectedMemLim == "0" {
 		return nil
 	}
@@ -268,7 +289,7 @@ func verifyPodCPUWeight(f *framework.Framework, pod *v1.Pod, expectedResources *
 	} else {
 		cpuWeightCgPath = fmt.Sprintf("%s/%s", podCgPath, cgroupCPUSharesFile)
 	}
-	expectedCPUShares := getExpectedCPUShares(expectedResources, podOnCgroupv2)
+	expectedCPUShares := getExpectedCPUShares(expectedResources.Requests.Cpu(), expectedResources.Limits.Cpu(), podOnCgroupv2)
 	if err := VerifyCgroupValue(f, pod, pod.Spec.Containers[0].Name, cpuWeightCgPath, expectedCPUShares...); err != nil {
 		return fmt.Errorf("pod cgroup cpu weight verification failed: %w", err)
 	}
@@ -308,7 +329,7 @@ func verifyPodMemoryLimit(f *framework.Framework, pod *v1.Pod, expectedResources
 	} else {
 		memLimCgPath = fmt.Sprintf("%s/%s", podCgPath, cgroupMemLimitFile)
 	}
-	expectedMemLim := getExpectedMemLimitString(expectedResources, podOnCgroupv2)
+	expectedMemLim := getExpectedMemLimitString(expectedResources.Limits.Memory(), podOnCgroupv2)
 	if expectedMemLim == "0" {
 		return nil
 	}

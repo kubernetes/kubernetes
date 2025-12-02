@@ -55,39 +55,53 @@ func Validate_MyType(ctx context.Context, op operation.Operation, fldPath *field
 
 	// field MyType.UUIDField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			errs = append(errs, validate.UUID(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("uuidField"), &obj.UUIDField, safe.Field(oldObj, func(oldObj *MyType) *string { return &oldObj.UUIDField }))...)
+		}(fldPath.Child("uuidField"), &obj.UUIDField, safe.Field(oldObj, func(oldObj *MyType) *string { return &oldObj.UUIDField }), oldObj != nil)...)
 
 	// field MyType.UUIDPtrField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			errs = append(errs, validate.UUID(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("uuidPtrField"), obj.UUIDPtrField, safe.Field(oldObj, func(oldObj *MyType) *string { return oldObj.UUIDPtrField }))...)
+		}(fldPath.Child("uuidPtrField"), obj.UUIDPtrField, safe.Field(oldObj, func(oldObj *MyType) *string { return oldObj.UUIDPtrField }), oldObj != nil)...)
 
 	// field MyType.UUIDTypedefField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *UUIDStringType) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *UUIDStringType, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_UUIDStringType(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("uuidTypedefField"), &obj.UUIDTypedefField, safe.Field(oldObj, func(oldObj *MyType) *UUIDStringType { return &oldObj.UUIDTypedefField }))...)
+		}(fldPath.Child("uuidTypedefField"), &obj.UUIDTypedefField, safe.Field(oldObj, func(oldObj *MyType) *UUIDStringType { return &oldObj.UUIDTypedefField }), oldObj != nil)...)
 
 	return errs
 }

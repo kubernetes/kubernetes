@@ -22,6 +22,11 @@ limitations under the License.
 package v1
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in AuthenticationMetadata) OpenAPIModelName() string {
+	return "io.k8s.apiserver.pkg.apis.audit.v1.AuthenticationMetadata"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in Event) OpenAPIModelName() string {
 	return "io.k8s.apiserver.pkg.apis.audit.v1.Event"
 }

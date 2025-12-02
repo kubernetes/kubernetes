@@ -8,9 +8,48 @@ containerdConfigPatches:
     enable_cdi = true
 nodes:
 - role: control-plane
-  kubeadmConfigPatches:
+- role: worker
+- role: worker
+- role: worker
+kubeadmConfigPatches:
+  # v1beta4 for the future (v1.35.0+ ?)
+  # https://github.com/kubernetes-sigs/kind/issues/3847
+  # TODO: drop v1beta3 when kind makes the switch
   - |
     kind: ClusterConfiguration
+    apiVersion: kubeadm.k8s.io/v1beta4
+    scheduler:
+        extraArgs:
+          - name: "v"
+            value: "5"
+          - name: "vmodule"
+            value: "allocator=6,dynamicresources=6" # structured/allocator.go, DRA scheduler plugin
+    controllerManager:
+        extraArgs:
+          - name: "v"
+            value: "5"
+          - name: "vmodule"
+            value: "controller=6" # resourceclaim/controller.go - should have renamed it when copying the controller it was based on!
+    apiServer:
+        extraArgs:
+          runtime-config: "resource.k8s.io/v1alpha3=true,resource.k8s.io/v1beta1=true,resource.k8s.io/v1beta2=true"
+  - |
+    kind: InitConfiguration
+    apiVersion: kubeadm.k8s.io/v1beta4
+    nodeRegistration:
+      kubeletExtraArgs:
+        - name: "v"
+          value: "5"
+  - |
+    kind: JoinConfiguration
+    nodeRegistration:
+      kubeletExtraArgs:
+        - name: "v"
+          value: "5"
+  # v1beta3 for v1.23.0 ... ?
+  - |
+    kind: ClusterConfiguration
+    apiVersion: kubeadm.k8s.io/v1beta3
     scheduler:
         extraArgs:
           v: "5"
@@ -24,25 +63,10 @@ nodes:
           runtime-config: "resource.k8s.io/v1alpha3=true,resource.k8s.io/v1beta1=true,resource.k8s.io/v1beta2=true"
   - |
     kind: InitConfiguration
+    apiVersion: kubeadm.k8s.io/v1beta3
     nodeRegistration:
       kubeletExtraArgs:
         v: "5"
-- role: worker
-  kubeadmConfigPatches:
-  - |
-    kind: JoinConfiguration
-    nodeRegistration:
-      kubeletExtraArgs:
-        v: "5"
-- role: worker
-  kubeadmConfigPatches:
-  - |
-    kind: JoinConfiguration
-    nodeRegistration:
-      kubeletExtraArgs:
-        v: "5"
-- role: worker
-  kubeadmConfigPatches:
   - |
     kind: JoinConfiguration
     nodeRegistration:

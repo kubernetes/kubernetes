@@ -26,7 +26,10 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	csitrans "k8s.io/csi-translation-lib"
@@ -639,7 +642,7 @@ func TestCSILimits(t *testing.T) {
 			}
 			csiTranslator := csitrans.New()
 			p := &CSILimits{
-				csiNodeLister:        getFakeCSINodeLister(csiNode),
+				csiManager:           NewCSIManager(getFakeCSINodeLister(csiNode)),
 				pvLister:             getFakeCSIPVLister(test.filterName, test.driverNames...),
 				pvcLister:            append(getFakeCSIPVCLister(test.filterName, scName, test.driverNames...), test.extraClaims...),
 				scLister:             getFakeCSIStorageClassLister(scName, test.driverNames[0]),
@@ -1246,4 +1249,111 @@ func getNodeWithPodAndVolumeLimits(limitSource string, pods []*v1.Pod, limit int
 
 	nodeInfo.SetNode(node)
 	return nodeInfo, csiNode
+}
+
+// fakeCSIDriverLister is a minimal lister for CSIDriver used in tests.
+type fakeCSIDriverLister []storagev1.CSIDriver
+
+func (l fakeCSIDriverLister) Get(name string) (*storagev1.CSIDriver, error) {
+	for i := range l {
+		if l[i].Name == name {
+			return &l[i], nil
+		}
+	}
+	return nil, apierrors.NewNotFound(schema.GroupResource{Group: "storage.k8s.io", Resource: "csidrivers"}, name)
+}
+
+func (l fakeCSIDriverLister) List(selector labels.Selector) ([]*storagev1.CSIDriver, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+func getFakeCSIDriverLister(driverNames ...string) fakeCSIDriverLister {
+	var list fakeCSIDriverLister
+	for _, name := range driverNames {
+		list = append(list, storagev1.CSIDriver{ObjectMeta: metav1.ObjectMeta{Name: name}})
+	}
+	return list
+}
+
+func TestVolumeLimitScalingGate(t *testing.T) {
+	// Pod uses a PVC that resolves to the EBS CSI driver via PV
+	newPod := st.MakePod().PVC("csi-ebs.csi.aws.com-0").Obj()
+
+	cases := []struct {
+		name                     string
+		enableVolumeLimitScaling bool
+		limitSource              string
+		limit                    int32
+		csiDriverPresent         bool
+		wantStatus               *fwk.Status
+	}{
+		{
+			name:                     "gate enabled - fail when driver not installed and CSIDriver exists",
+			enableVolumeLimitScaling: true,
+			limitSource:              "no-csi-driver",
+			limit:                    0,
+			csiDriverPresent:         true,
+			wantStatus:               fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("%s CSI driver is not installed on the node", ebsCSIDriverName)),
+		},
+		{
+			name:                     "gate disabled - skip driver presence check (regardless of CSIDriver presence)",
+			enableVolumeLimitScaling: false,
+			limitSource:              "no-csi-driver",
+			limit:                    0,
+			csiDriverPresent:         true,
+			wantStatus:               nil,
+		},
+		{
+			name:                     "gate enabled - driver installed within limit",
+			enableVolumeLimitScaling: true,
+			limitSource:              "csinode",
+			limit:                    2,
+			csiDriverPresent:         true,
+			wantStatus:               nil,
+		},
+		{
+			name:                     "gate enabled - allow scheduling when CSIDriver object missing",
+			enableVolumeLimitScaling: true,
+			limitSource:              "no-csi-driver",
+			limit:                    0,
+			csiDriverPresent:         false,
+			wantStatus:               nil,
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			node, csiNode := getNodeWithPodAndVolumeLimits(tt.limitSource, []*v1.Pod{}, tt.limit, ebsCSIDriverName)
+
+			csiTranslator := csitrans.New()
+			p := &CSILimits{
+				csiManager: NewCSIManager(getFakeCSINodeLister(csiNode)),
+				pvLister:   getFakeCSIPVLister("csi", ebsCSIDriverName),
+				pvcLister:  getFakeCSIPVCLister("csi", scName, ebsCSIDriverName),
+				scLister:   getFakeCSIStorageClassLister(scName, ebsCSIDriverName),
+				vaLister:   getFakeVolumeAttachmentLister(0, ebsCSIDriverName),
+				csiDriverLister: func() fakeCSIDriverLister {
+					if tt.csiDriverPresent {
+						return getFakeCSIDriverLister(ebsCSIDriverName)
+					}
+					return getFakeCSIDriverLister()
+				}(),
+				enableVolumeLimitScaling: tt.enableVolumeLimitScaling,
+				randomVolumeIDPrefix:     rand.String(32),
+				translator:               csiTranslator,
+			}
+
+			_, ctx := ktesting.NewTestContext(t)
+			// Ensure PreFilter doesn't skip
+			_, preStatus := p.PreFilter(ctx, nil, newPod, nil)
+			if preStatus.Code() == fwk.Skip {
+				t.Fatalf("unexpected PreFilter Skip")
+			}
+			gotStatus := p.Filter(ctx, nil, newPod, node)
+
+			if diff := cmp.Diff(tt.wantStatus, gotStatus, statusCmpOpts...); diff != "" {
+				t.Errorf("Filter status does not match (-want, +got):\n%s", diff)
+			}
+		})
+	}
 }

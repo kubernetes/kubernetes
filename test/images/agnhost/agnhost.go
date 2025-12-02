@@ -35,6 +35,8 @@ import (
 	"k8s.io/kubernetes/test/images/agnhost/liveness"
 	logsgen "k8s.io/kubernetes/test/images/agnhost/logs-generator"
 	"k8s.io/kubernetes/test/images/agnhost/mounttest"
+	"k8s.io/kubernetes/test/images/agnhost/mtlsclient"
+	"k8s.io/kubernetes/test/images/agnhost/mtlsserver"
 	"k8s.io/kubernetes/test/images/agnhost/net"
 	"k8s.io/kubernetes/test/images/agnhost/netexec"
 	"k8s.io/kubernetes/test/images/agnhost/nettest"
@@ -92,7 +94,8 @@ func main() {
 	rootCmd.AddCommand(grpchealthchecking.CmdGrpcHealthChecking)
 	rootCmd.AddCommand(vishhstress.CmdStress)
 	rootCmd.AddCommand(podcertificatesigner.CmdPodCertificateSigner)
-
+	rootCmd.AddCommand(mtlsclient.CmdMtlsClient)
+	rootCmd.AddCommand(mtlsserver.CmdMtlsServer)
 	// NOTE(claudiub): Some tests are passing logging related flags, so we need to be able to
 	// accept them. This will also include them in the printed help.
 	code := cli.Run(rootCmd)

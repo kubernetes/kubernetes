@@ -57,7 +57,7 @@ func NewResourceClaimInformer(client kubernetes.Interface, namespace string, res
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredResourceClaimInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
+		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
@@ -82,7 +82,7 @@ func NewFilteredResourceClaimInformer(client kubernetes.Interface, namespace str
 				}
 				return client.ResourceV1beta2().ResourceClaims(namespace).Watch(ctx, options)
 			},
-		},
+		}, client),
 		&apiresourcev1beta2.ResourceClaim{},
 		resyncPeriod,
 		indexers,

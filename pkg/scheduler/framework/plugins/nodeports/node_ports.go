@@ -37,6 +37,7 @@ type NodePorts struct {
 var _ fwk.PreFilterPlugin = &NodePorts{}
 var _ fwk.FilterPlugin = &NodePorts{}
 var _ fwk.EnqueueExtensions = &NodePorts{}
+var _ fwk.SignPlugin = &NodePorts{}
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
@@ -61,6 +62,13 @@ func (s preFilterState) Clone() fwk.StateData {
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *NodePorts) Name() string {
 	return Name
+}
+
+// NodePort feasibility and scheduling is based on the host ports for the containers.
+func (pl *NodePorts) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
+	return []fwk.SignFragment{
+		{Key: fwk.HostPortsSignerName, Value: fwk.HostPortsSigner(pod)},
+	}, nil
 }
 
 // PreFilter invoked at the prefilter extension point.

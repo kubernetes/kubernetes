@@ -18,11 +18,16 @@ package internal
 
 import (
 	"context"
+	"errors"
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
+
+// ErrFailedAllocationOnNode is an empty sentinel for errors.Is.
+// See allocator.go for details.
+var ErrFailedAllocationOnNode = errors.New("")
 
 type DeviceClassLister interface {
 	// List returns a list of all DeviceClasses.
