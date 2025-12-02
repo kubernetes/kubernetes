@@ -740,29 +740,44 @@ func parseProcMounts(content []byte) ([]MountPoint, error) {
 			continue
 		}
 		fields := strings.Fields(line)
-		if len(fields) != expectedNumFieldsPerLine {
+		if len(fields) < expectedNumFieldsPerLine {
 			// Do not log line in case it contains sensitive Mount options
-			return nil, fmt.Errorf("wrong number of fields (expected %d, got %d)", expectedNumFieldsPerLine, len(fields))
+			return nil, fmt.Errorf("wrong number of fields (expected at least %d, got %d)", expectedNumFieldsPerLine, len(fields))
 		}
+
+		// The mount options field (4th field) can contain unescaped spaces in some
+		// environments (e.g., WSL with Windows paths like "path=C:\Program Files\...").
+		// The standard /proc/mounts format is:
+		//   device mountpoint type options dump pass
+		// where dump and pass are always single-digit integers (0, 1, or 2).
+		// To handle options with spaces, we parse from the end: the last two fields
+		// are always dump and pass, and everything between type and dump is options.
+		numFields := len(fields)
+		passField := fields[numFields-1]
+		freqField := fields[numFields-2]
+
+		pass, err := strconv.Atoi(passField)
+		if err != nil {
+			return nil, err
+		}
+
+		freq, err := strconv.Atoi(freqField)
+		if err != nil {
+			return nil, err
+		}
+
+		// Join all fields between type (index 3) and freq (index numFields-2) as options
+		optsFields := fields[3 : numFields-2]
+		opts := strings.Join(optsFields, " ")
 
 		mp := MountPoint{
 			Device: fields[0],
 			Path:   fields[1],
 			Type:   fields[2],
-			Opts:   strings.Split(fields[3], ","),
+			Opts:   strings.Split(opts, ","),
+			Freq:   freq,
+			Pass:   pass,
 		}
-
-		freq, err := strconv.Atoi(fields[4])
-		if err != nil {
-			return nil, err
-		}
-		mp.Freq = freq
-
-		pass, err := strconv.Atoi(fields[5])
-		if err != nil {
-			return nil, err
-		}
-		mp.Pass = pass
 
 		out = append(out, mp)
 	}
