@@ -584,7 +584,7 @@ type CSINodeDriver struct {
 	// that driver.
 	// +required
 	// +k8s:required
-	//+k8s:format=k8s-long-name-caseless
+	// +k8s:format=k8s-long-name-caseless
 	// +k8s:maxLength=63
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 
