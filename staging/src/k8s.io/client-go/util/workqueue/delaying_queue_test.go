@@ -58,22 +58,42 @@ func TestSimpleQueue(t *testing.T) {
 
 func TestDeduping(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		q := NewDelayingQueue()
+		mp := testMetricsProvider{}
+		q := NewDelayingQueueWithConfig(DelayingQueueConfig{
+			Name:            "test-delay",
+			MetricsProvider: &mp,
+		})
 		defer q.ShutDown()
 
 		first := "foo"
 
 		q.AddAfter(first, 50*time.Millisecond)
 		synctest.Wait() // wait for waiting queue to fill
+		if mp.delayed.gaugeValue() != 1 {
+			t.Errorf("expected 1 delayed, got %v", mp.delayed.gaugeValue())
+		}
+		if mp.retries.gaugeValue() != 1 {
+			t.Errorf("expected 1 retry, got %v", mp.retries.gaugeValue())
+		}
+
 		q.AddAfter(first, 70*time.Millisecond)
 		synctest.Wait() // wait for waiting queue to fill
 		if q.Len() != 0 {
 			t.Errorf("should not have added")
 		}
+		if mp.delayed.gaugeValue() != 1 {
+			t.Errorf("expected 1 delayed, got %v", mp.delayed.gaugeValue())
+		}
+		if mp.retries.gaugeValue() != 2 {
+			t.Errorf("expected 2 retries, got %v", mp.retries.gaugeValue())
+		}
 
 		// step past the first block, we should receive now
 		time.Sleep(60 * time.Millisecond)
 		waitForAdded(t, q, 1)
+		if mp.delayed.gaugeValue() != 0 {
+			t.Errorf("expected 0 delayed, got %v", mp.delayed.gaugeValue())
+		}
 		item, _ := q.Get()
 		q.Done(item)
 
@@ -90,9 +110,18 @@ func TestDeduping(t *testing.T) {
 		if q.Len() != 0 {
 			t.Errorf("should not have added")
 		}
+		if mp.delayed.gaugeValue() != 1 {
+			t.Errorf("expected 1 delayed, got %v", mp.delayed.gaugeValue())
+		}
+		if mp.retries.gaugeValue() != 4 {
+			t.Errorf("expected 4 retries, got %v", mp.retries.gaugeValue())
+		}
 
 		time.Sleep(40 * time.Millisecond)
 		waitForAdded(t, q, 1)
+		if mp.delayed.gaugeValue() != 0 {
+			t.Errorf("expected 0 delayed, got %v", mp.delayed.gaugeValue())
+		}
 		item, _ = q.Get()
 		q.Done(item)
 
