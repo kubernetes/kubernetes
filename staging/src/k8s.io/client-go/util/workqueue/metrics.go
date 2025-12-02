@@ -155,10 +155,12 @@ func (m *defaultQueueMetrics[T]) sinceInSeconds(start time.Time) float64 {
 
 type retryMetrics interface {
 	retry()
+	delayedCount(count int)
 }
 
 type defaultRetryMetrics struct {
 	retries CounterMetric
+	delayed SettableGaugeMetric
 }
 
 func (m *defaultRetryMetrics) retry() {
@@ -167,6 +169,14 @@ func (m *defaultRetryMetrics) retry() {
 	}
 
 	m.retries.Inc()
+}
+
+func (m *defaultRetryMetrics) delayedCount(count int) {
+	if m == nil {
+		return
+	}
+
+	m.delayed.Set(float64(count))
 }
 
 // MetricsProvider generates various metrics used by the queue.
@@ -178,6 +188,7 @@ type MetricsProvider interface {
 	NewUnfinishedWorkSecondsMetric(name string) SettableGaugeMetric
 	NewLongestRunningProcessorSecondsMetric(name string) SettableGaugeMetric
 	NewRetriesMetric(name string) CounterMetric
+	NewDelayedMetrics(name string) SettableGaugeMetric
 }
 
 type noopMetricsProvider struct{}
@@ -207,6 +218,10 @@ func (_ noopMetricsProvider) NewLongestRunningProcessorSecondsMetric(name string
 }
 
 func (_ noopMetricsProvider) NewRetriesMetric(name string) CounterMetric {
+	return noopMetric{}
+}
+
+func (_ noopMetricsProvider) NewDelayedMetrics(name string) SettableGaugeMetric {
 	return noopMetric{}
 }
 
@@ -243,6 +258,7 @@ func newRetryMetrics(name string, provider MetricsProvider) retryMetrics {
 
 	return &defaultRetryMetrics{
 		retries: provider.NewRetriesMetric(name),
+		delayed: provider.NewDelayedMetrics(name),
 	}
 }
 
