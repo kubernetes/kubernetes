@@ -70,7 +70,7 @@ message PodGroupPolicy {
   // +optional
   // +k8s:optional
   // +oneOf=PolicySelection
-  // +k8s:unionMember(memberName: "PolicySelectionBasic")
+  // +k8s:unionMember
   optional BasicSchedulingPolicy basic = 2;
 
   // Gang specifies that the pods in this group should be scheduled using
@@ -79,7 +79,7 @@ message PodGroupPolicy {
   // +optional
   // +k8s:optional
   // +oneOf=PolicySelection
-  // +k8s:unionMember(memberName: "PolicySelectionGang")
+  // +k8s:unionMember
   optional GangSchedulingPolicy gang = 3;
 }
 
