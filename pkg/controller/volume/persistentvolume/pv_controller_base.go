@@ -518,33 +518,14 @@ func (ctrl *PersistentVolumeController) volumeWorker(ctx context.Context) {
 			logger.V(4).Info("Error getting name of volume to get volume from informer", "volumeKey", key, "err", err)
 			return false
 		}
+		unlock := ctrl.volumeMutex.Lock(name)
+		defer unlock()
+
 		volume, err := ctrl.volumeLister.Get(name)
 		if err == nil {
 			// The volume still exists in informer cache, the event must have
 			// been add/update/sync
-			// Lock only for cache update, then release before syncVolume
-			// syncVolume and bind will acquire locks as needed
-			unlock := ctrl.volumeMutex.Lock(key)
-			new, err := ctrl.storeVolumeUpdate(logger, volume)
-			unlock() // Release lock before syncVolume to allow bind to acquire both locks
-
-			if err != nil {
-				logger.Error(err, "")
-				return false
-			}
-			if !new {
-				return false
-			}
-			err = ctrl.syncVolume(ctx, volume)
-			if err != nil {
-				if errors.IsConflict(err) {
-					// Version conflict error happens quite often and the controller
-					// recovers from it easily.
-					logger.V(3).Info("Could not sync volume", "volumeName", volume.Name, "err", err)
-				} else {
-					logger.Error(err, "Could not sync volume", "volumeName", volume.Name)
-				}
-			}
+			ctrl.updateVolume(ctx, volume)
 			return false
 		}
 		if !errors.IsNotFound(err) {
@@ -554,11 +535,7 @@ func (ctrl *PersistentVolumeController) volumeWorker(ctx context.Context) {
 
 		// The volume is not in informer cache, the event must have been
 		// "delete"
-		// Lock for cache access
-		unlock := ctrl.volumeMutex.Lock(key)
 		volumeObj, found, err := ctrl.volumes.store.GetByKey(key)
-		unlock()
-
 		if err != nil {
 			logger.V(2).Info("Error getting volume from cache", "volumeKey", key, "err", err)
 			return false
@@ -603,33 +580,14 @@ func (ctrl *PersistentVolumeController) claimWorker(ctx context.Context) {
 			logger.V(4).Info("Error getting namespace & name of claim to get claim from informer", "claimKey", key, "err", err)
 			return false
 		}
+		unlock := ctrl.claimMutex.Lock(key)
+		defer unlock()
+
 		claim, err := ctrl.claimLister.PersistentVolumeClaims(namespace).Get(name)
 		if err == nil {
 			// The claim still exists in informer cache, the event must have
 			// been add/update/sync
-			// Lock only for cache update, then release before syncClaim
-			// syncClaim and bind will acquire locks as needed
-			unlock := ctrl.claimMutex.Lock(key)
-			new, err := ctrl.storeClaimUpdate(logger, claim)
-			unlock() // Release lock before syncClaim to allow bind to acquire both locks
-
-			if err != nil {
-				logger.Error(err, "")
-				return false
-			}
-			if !new {
-				return false
-			}
-			err = ctrl.syncClaim(ctx, claim)
-			if err != nil {
-				if errors.IsConflict(err) {
-					// Version conflict error happens quite often and the controller
-					// recovers from it easily.
-					logger.V(3).Info("Could not sync claim", "PVC", klog.KObj(claim), "err", err)
-				} else {
-					logger.Error(err, "Could not sync claim", "PVC", klog.KObj(claim))
-				}
-			}
+			ctrl.updateClaim(ctx, claim)
 			return false
 		}
 		if !errors.IsNotFound(err) {
@@ -638,10 +596,7 @@ func (ctrl *PersistentVolumeController) claimWorker(ctx context.Context) {
 		}
 
 		// The claim is not in informer cache, the event must have been "delete"
-		// Lock for cache access
-		unlock := ctrl.claimMutex.Lock(key)
 		claimObj, found, err := ctrl.claims.GetByKey(key)
-		unlock()
 
 		if err != nil {
 			logger.V(2).Info("Error getting claim from cache", "claimKey", key, "err", err)
