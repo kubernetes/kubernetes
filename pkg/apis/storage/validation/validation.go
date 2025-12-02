@@ -164,8 +164,18 @@ func ValidateVolumeAttachmentV1(volumeAttachment *storage.VolumeAttachment) fiel
 func validateVolumeAttachmentSpec(
 	spec *storage.VolumeAttachmentSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, validateAttacher(spec.Attacher, fldPath.Child("attacher"))...)
 	allErrs = append(allErrs, validateVolumeAttachmentSource(&spec.Source, fldPath.Child("source"))...)
 	allErrs = append(allErrs, validateNodeName(spec.NodeName, fldPath.Child("nodeName"))...)
+	return allErrs
+}
+
+// validateAttacher tests if attacher is a valid qualified name.
+func validateAttacher(attacher string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if len(attacher) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath, attacher))
+	}
 	return allErrs
 }
 
@@ -241,7 +251,7 @@ func validateVolumeError(e *storage.VolumeError, fldPath *field.Path) field.Erro
 
 // ValidateVolumeAttachmentUpdate validates a VolumeAttachment.
 func ValidateVolumeAttachmentUpdate(new, old *storage.VolumeAttachment) field.ErrorList {
-	var allErrs field.ErrorList
+	allErrs := ValidateVolumeAttachment(new)
 
 	// Spec is read-only
 	// If this ever relaxes in the future, make sure to increment the Generation number in PrepareForUpdate
