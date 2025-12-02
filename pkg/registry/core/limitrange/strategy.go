@@ -19,9 +19,11 @@ package limitrange
 import (
 	"context"
 
+	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -53,7 +55,8 @@ func (limitrangeStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime
 
 func (limitrangeStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	limitRange := obj.(*api.LimitRange)
-	return validation.ValidateLimitRange(limitRange)
+	allErrs := validation.ValidateLimitRange(limitRange)
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, limitRange, nil, allErrs, operation.Create)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -70,8 +73,10 @@ func (limitrangeStrategy) AllowCreateOnUpdate() bool {
 }
 
 func (limitrangeStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	limitRange := obj.(*api.LimitRange)
-	return validation.ValidateLimitRange(limitRange)
+	newLR := obj.(*api.LimitRange)
+	oldLR := old.(*api.LimitRange)
+	allErrs := validation.ValidateLimitRange(newLR)
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newLR, oldLR, allErrs, operation.Update)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
