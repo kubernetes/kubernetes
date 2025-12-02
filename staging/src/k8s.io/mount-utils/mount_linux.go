@@ -749,7 +749,7 @@ func parseProcMounts(content []byte) ([]MountPoint, error) {
 		// environments (e.g., WSL with Windows paths like "path=C:\Program Files\...").
 		// The standard /proc/mounts format is:
 		//   device mountpoint type options dump pass
-		// where dump and pass are always single-digit integers (0, 1, or 2).
+		// where dump and pass are integer fields (commonly 0/1 for dump and 0–2 for pass).
 		// To handle options with spaces, we parse from the end: the last two fields
 		// are always dump and pass, and everything between type and dump is options.
 		numFields := len(fields)
