@@ -74,7 +74,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				field.Required(
 					field.NewPath("spec").Child("drivers").Index(0).Child("name"),
 					"",
-				),
+				).WithOrigin("k8s-long-name-caseless"),
 			},
 		},
 	}
@@ -110,7 +110,7 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("spec").Child("drivers").Index(0).Child("name"), "$%!@!@#test",
 					"a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
-			},
+			}.WithOrigin("k8s-long-name-caseless"),
 		},
 	}
 
