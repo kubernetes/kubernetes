@@ -396,6 +396,20 @@ func underlyingType(t *types.Type) *types.Type {
 	return t
 }
 
+// isValueCopyableType returns true for types that should be treated as
+// primitive value types that can be copied with simple assignment.
+func isValueCopyableType(t *types.Type) bool {
+	// Handle net/netip types - these are comparable value types
+	// that can be safely copied by assignment
+	if t.Name.Package == "net/netip" {
+		switch t.Name.Name {
+		case "Addr", "Prefix", "AddrPort":
+			return true
+		}
+	}
+	return false
+}
+
 func (g *genDeepCopy) isOtherPackage(pkg string) bool {
 	if pkg == g.targetPackage {
 		return false
@@ -695,7 +709,7 @@ func (g *genDeepCopy) doMap(t *types.Type, sw *generator.SnippetWriter) {
 		return
 	}
 
-	if !ut.Key.IsAssignable() {
+	if !ut.Key.IsAssignable() && !isValueCopyableType(ut.Key) {
 		klog.Fatalf("Hit an unsupported type %v for: %v", uet, t)
 	}
 
@@ -720,7 +734,7 @@ func (g *genDeepCopy) doMap(t *types.Type, sw *generator.SnippetWriter) {
 		}
 	case ut.Elem.IsAnonymousStruct(): // not uet here because it needs type cast
 		sw.Do("(*out)[key] = val\n", nil)
-	case uet.IsAssignable():
+	case uet.IsAssignable() || isValueCopyableType(ut.Elem):
 		sw.Do("(*out)[key] = val\n", nil)
 	case uet.Kind == types.Interface:
 		// Note: do not generate code that won't compile as `DeepCopyinterface{}()` is not a valid function
@@ -741,7 +755,11 @@ func (g *genDeepCopy) doMap(t *types.Type, sw *generator.SnippetWriter) {
 		sw.Do("}\n", nil)
 		sw.Do("(*out)[key] = outVal\n", nil)
 	case uet.Kind == types.Struct:
-		sw.Do("(*out)[key] = *val.DeepCopy()\n", uet)
+		if ut.Elem.IsAssignable() || isValueCopyableType(ut.Elem) {
+			sw.Do("(*out)[key] = val\n", nil)
+		} else {
+			sw.Do("(*out)[key] = *val.DeepCopy()\n", uet)
+		}
 	default:
 		klog.Fatalf("Hit an unsupported type %v for %v", uet, t)
 	}
@@ -765,7 +783,7 @@ func (g *genDeepCopy) doSlice(t *types.Type, sw *generator.SnippetWriter) {
 		// Note: a DeepCopyInto exists because it is added if DeepCopy is manually defined
 		sw.Do("(*in)[i].DeepCopyInto(&(*out)[i])\n", nil)
 		sw.Do("}\n", nil)
-	} else if uet.Kind == types.Builtin || uet.IsAssignable() {
+	} else if uet.Kind == types.Builtin || uet.IsAssignable() || isValueCopyableType(ut.Elem) {
 		sw.Do("copy(*out, *in)\n", nil)
 	} else {
 		sw.Do("for i := range *in {\n", nil)
@@ -786,7 +804,11 @@ func (g *genDeepCopy) doSlice(t *types.Type, sw *generator.SnippetWriter) {
 			sw.Do(fmt.Sprintf("(*out)[i] = (*in)[i].DeepCopy%s()\n", uet.Name.Name), nil)
 			sw.Do("}\n", nil)
 		} else if uet.Kind == types.Struct {
-			sw.Do("(*in)[i].DeepCopyInto(&(*out)[i])\n", nil)
+			if ut.Elem.IsAssignable() || isValueCopyableType(ut.Elem) {
+				sw.Do("(*out)[i] = (*in)[i]\n", nil)
+			} else {
+				sw.Do("(*in)[i].DeepCopyInto(&(*out)[i])\n", nil)
+			}
 		} else {
 			klog.Fatalf("Hit an unsupported type %v for %v", uet, t)
 		}
@@ -845,7 +867,7 @@ func (g *genDeepCopy) doStruct(t *types.Type, sw *generator.SnippetWriter) {
 		case uft.Kind == types.Array:
 			sw.Do("out.$.name$ = in.$.name$\n", args)
 		case uft.Kind == types.Struct:
-			if ft.IsAssignable() {
+			if ft.IsAssignable() || isValueCopyableType(ft) {
 				sw.Do("out.$.name$ = in.$.name$\n", args)
 			} else {
 				sw.Do("in.$.name$.DeepCopyInto(&out.$.name$)\n", args)
@@ -886,7 +908,7 @@ func (g *genDeepCopy) doPointer(t *types.Type, sw *generator.SnippetWriter) {
 			sw.Do("x := (*in).DeepCopy()\n", nil)
 			sw.Do("*out = &x\n", nil)
 		}
-	case uet.IsAssignable():
+	case uet.IsAssignable() || isValueCopyableType(ut.Elem):
 		sw.Do("*out = new($.Elem|raw$)\n", ut)
 		sw.Do("**out = **in", nil)
 	case uet.Kind == types.Map, uet.Kind == types.Slice, uet.Kind == types.Pointer:
