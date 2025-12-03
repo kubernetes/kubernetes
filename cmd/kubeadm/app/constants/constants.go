@@ -503,7 +503,8 @@ var (
 	// The maximum length of the map should be 2, as kubeadm supports a maximum skew of -1
 	// with the control plane version.
 	SupportedEtcdVersion = map[uint8]string{
-		uint8(getSkewedKubernetesVersion(-1).Minor()): "3.5.24-0",
+		uint8(getSkewedKubernetesVersion(-2).Minor()): "3.5.24-0",
+		uint8(getSkewedKubernetesVersion(-1).Minor()): "3.6.5-0",
 		uint8(getSkewedKubernetesVersion(0).Minor()):  "3.6.5-0",
 	}
 
