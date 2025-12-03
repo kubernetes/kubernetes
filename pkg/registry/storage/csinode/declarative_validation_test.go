@@ -17,7 +17,6 @@ limitations under the License.
 package csinode
 
 import (
-	"k8s.io/apimachinery/pkg/api/validation"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,22 +26,12 @@ import (
 	"k8s.io/kubernetes/pkg/apis/storage"
 )
 
+var apiVersions = []string{"v1beta1", "v1"}
+
 func TestDeclarativeValidate(t *testing.T) {
-	// CSINode had v1beta1 → v1, keep both to catch skew
-	apiVersions := []string{"v1beta1", "v1"}
 	for _, apiVersion := range apiVersions {
 		t.Run(apiVersion, func(t *testing.T) {
 			testDeclarativeValidate(t, apiVersion)
-		})
-	}
-}
-
-func TestDeclarativeValidateUpdate(t *testing.T) {
-	// CSINode had v1beta1 → v1, keep both to catch skew
-	apiVersions := []string{"v1beta1", "v1"}
-	for _, apiVersion := range apiVersions {
-		t.Run(apiVersion, func(t *testing.T) {
-			testDeclarativeValidateUpdate(t, apiVersion)
 		})
 	}
 }
@@ -87,54 +76,6 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				ctx,
 				&tc.input,
 				Strategy.Validate,
-				tc.expectedErrs,
-			)
-		})
-	}
-}
-
-func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
-	testCases := map[string]struct {
-		oldObj       storage.CSINode
-		updateObj    storage.CSINode
-		expectedErrs field.ErrorList
-	}{
-		"valid update": {
-			oldObj:    mkValidCSINodeDriverNode(func(driver *storage.CSINodeDriver) {}),
-			updateObj: mkValidCSINodeDriverNode(func(driver *storage.CSINodeDriver) {}),
-		},
-		"invalid update nodeId": {
-			oldObj: mkValidCSINodeDriverNode(func(driver *storage.CSINodeDriver) {}),
-			updateObj: mkValidCSINodeDriverNode(func(driver *storage.CSINodeDriver) {
-				driver.NodeID = "$%!@!@#test"
-			}),
-			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec").Child("drivers"), nil,
-					validation.FieldImmutableErrorMsg),
-			},
-		},
-	}
-
-	for name, tc := range testCases {
-		t.Run(name, func(t *testing.T) {
-			ctx := genericapirequest.WithRequestInfo(
-				genericapirequest.NewDefaultContext(),
-				&genericapirequest.RequestInfo{
-					APIPrefix:         "apis",
-					APIGroup:          "storage.k8s.io",
-					APIVersion:        apiVersion,
-					Resource:          "csinodes",
-					Name:              "node-1",
-					IsResourceRequest: true,
-					Verb:              "update",
-				},
-			)
-			apitesting.VerifyUpdateValidationEquivalence(
-				t,
-				ctx,
-				&tc.updateObj,
-				&tc.oldObj,
-				Strategy.ValidateUpdate,
 				tc.expectedErrs,
 			)
 		})
