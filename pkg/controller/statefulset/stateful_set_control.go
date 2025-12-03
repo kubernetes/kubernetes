@@ -155,7 +155,7 @@ func (ssc *defaultStatefulSetControl) ListRevisions(set *apps.StatefulSet) ([]*a
 	if err != nil {
 		return nil, err
 	}
-	return ssc.controllerHistory.ListControllerRevisions(set, selector)
+	return ssc.controllerHistory.ListControllerRevisions(set, controllerKind, selector)
 }
 
 func (ssc *defaultStatefulSetControl) AdoptOrphanRevisions(
