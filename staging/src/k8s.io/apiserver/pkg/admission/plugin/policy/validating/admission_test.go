@@ -269,7 +269,7 @@ func (f *fakeMatcher) ValidateInitialization() error {
 	return nil
 }
 
-func (f *fakeMatcher) GetNamespace(name string) (*v1.Namespace, error) {
+func (f *fakeMatcher) GetNamespace(ctx context.Context, name string) (*v1.Namespace, error) {
 	return nil, nil
 }
 
