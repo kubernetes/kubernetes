@@ -120,6 +120,8 @@ func CopyPodLogs(ctx context.Context, cs clientset.Interface, ns, podName string
 		active := map[string]bool{}
 		// Key is pod/container/container-id, true if we have ever started to capture its output.
 		started := map[string]bool{}
+		// Key is pod/container/container-id, value the time stamp of the last log line that has been seen.
+		latest := map[string]*meta.Time{}
 
 		check := func() {
 			m.Lock()
@@ -127,7 +129,7 @@ func CopyPodLogs(ctx context.Context, cs clientset.Interface, ns, podName string
 
 			pods, err := cs.CoreV1().Pods(ns).List(ctx, options)
 			if err != nil {
-				if to.StatusWriter != nil {
+				if ctx.Err() == nil && to.StatusWriter != nil {
 					_, _ = fmt.Fprintf(to.StatusWriter, "ERROR: get pod list in %s: %s\n", ns, err)
 				}
 				return
@@ -210,10 +212,13 @@ func CopyPodLogs(ctx context.Context, cs clientset.Interface, ns, podName string
 						defer maybeClose(output)
 					}
 
+					sinceTime := latest[id]
 					readCloser, err := logsForPod(ctx, cs, ns, pod.ObjectMeta.Name,
 						&v1.PodLogOptions{
-							Container: c.Name,
-							Follow:    true,
+							Container:  c.Name,
+							Follow:     true,
+							Timestamps: true,
+							SinceTime:  sinceTime,
 						})
 					if err != nil {
 						closeOutput()
@@ -227,6 +232,9 @@ func CopyPodLogs(ctx context.Context, cs clientset.Interface, ns, podName string
 						continue
 					}
 
+					active[name] = true
+					started[id] = true
+
 					go func() {
 						defer closeOutput()
 						first := true
@@ -235,10 +243,10 @@ func CopyPodLogs(ctx context.Context, cs clientset.Interface, ns, podName string
 							// If we never printed anything, then also skip the final message.
 							if !first {
 								if logWithPrefix != nil {
-									_, _ = fmt.Fprintf(logWithPrefix, "%s==== end of pod log ====\n", prefix)
+									_, _ = fmt.Fprintf(logWithPrefix, "%s==== end of pod log at %s ====\n", prefix, latest[id])
 								}
 								if logWithoutPrefix != nil {
-									_, _ = fmt.Fprintf(logWithoutPrefix, "==== end of pod log for container %s ====\n", name)
+									_, _ = fmt.Fprintf(logWithoutPrefix, "==== end of pod log for container %s at %s ====\n", name, latest[id])
 								}
 							}
 							active[name] = false
@@ -246,6 +254,7 @@ func CopyPodLogs(ctx context.Context, cs clientset.Interface, ns, podName string
 							readCloser.Close()
 						}()
 						scanner := bufio.NewScanner(readCloser)
+						var latestTS time.Time
 						for scanner.Scan() {
 							line := scanner.Text()
 							// Filter out the expected "end of stream" error message,
@@ -259,13 +268,27 @@ func CopyPodLogs(ctx context.Context, cs clientset.Interface, ns, podName string
 									// Because the same log might be written to multiple times
 									// in different test instances, log an extra line to separate them.
 									// Also provides some useful extra information.
+									since := "(initial part)"
+									if sinceTime != nil {
+										since = fmt.Sprintf("since %s", sinceTime)
+									}
 									if logWithPrefix != nil {
-										_, _ = fmt.Fprintf(logWithPrefix, "%s==== start of pod log ====\n", prefix)
+										_, _ = fmt.Fprintf(logWithPrefix, "%s==== start of pod log %s ====\n", prefix, since)
 									}
 									if logWithoutPrefix != nil {
-										_, _ = fmt.Fprintf(logWithoutPrefix, "==== start of pod log for container %s ====\n", name)
+										_, _ = fmt.Fprintf(logWithoutPrefix, "==== start of pod log for container %s %s ====\n", name, since)
 									}
 									first = false
+								}
+								index := strings.Index(line, " ")
+								if index > 0 {
+									ts, err := time.Parse(time.RFC3339, line[:index])
+									if err == nil {
+										latestTS = ts
+										// Log output typically has it's own log header with a time stamp,
+										// so let's strip the PodLogOptions time stamp.
+										line = line[index+1:]
+									}
 								}
 								if logWithPrefix != nil {
 									_, _ = fmt.Fprintf(logWithPrefix, "%s%s\n", prefix, line)
@@ -278,20 +301,29 @@ func CopyPodLogs(ctx context.Context, cs clientset.Interface, ns, podName string
 								}
 							}
 						}
+
+						if !latestTS.IsZero() {
+							m.Lock()
+							defer m.Unlock()
+							latest[id] = &meta.Time{Time: latestTS}
+						}
 					}()
-					active[name] = true
-					started[id] = true
 				}
 			}
 		}
 
 		// Watch events to see whether we can start logging
-		// and log interesting ones.
+		// and log interesting ones. Also check periodically,
+		// in case of failures which are not followed by
+		// some pod change.
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
 		check()
 		for {
 			select {
 			case <-watcher.ResultChan():
 				check()
+			case <-ticker.C:
 			case <-ctx.Done():
 				return
 			}
