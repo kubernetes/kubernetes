@@ -3626,6 +3626,7 @@ function check-cluster() {
   echo
   echo -e "${color_green}The user name and password to use is located in ${KUBECONFIG}.${color_norm}"
   echo
+  cat ${KUBECONFIG}
 
 }
 
