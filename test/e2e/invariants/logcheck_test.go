@@ -307,7 +307,7 @@ DATA RACE:
 							continue
 						}
 						for _, line := range strings.Split(log.output, "\n") {
-							_, _ = writer.Write([]byte(line))
+							_, _ = writer.Write([]byte(line + "\n"))
 						}
 						_ = writer.(io.Closer).Close()
 					}
@@ -330,4 +330,4 @@ DATA RACE:
 	}
 }
 
-var logHeaderRE = regexp.MustCompile(`(?m)^.*log.go:[[:digit:]]+\]`)
+var logHeaderRE = regexp.MustCompile(`(?m)^.*logcheck.go:[[:digit:]]+\]`)

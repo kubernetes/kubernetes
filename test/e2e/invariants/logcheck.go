@@ -53,8 +53,8 @@ const (
 	logInvariantsContextText      = "Invariant Logs"
 	logInvariantsDataRaceLeafText = "should enable data race checking"
 
-	dataRaceStart = "WARNING: DATA RACE"
-	dataRaceEnd   = "=================="
+	dataRaceStart = "WARNING: DATA RACE\n"
+	dataRaceEnd   = "==================\n"
 )
 
 var (
@@ -231,7 +231,6 @@ func (l *logChecker) stop() (failure, stdout string) {
 			for _, line := range race {
 				buffer.WriteString(indent)
 				buffer.WriteString(line)
-				buffer.WriteString("\n")
 			}
 		}
 	}
@@ -314,6 +313,7 @@ var (
 )
 
 // Write gets called for each line of output received from a container.
+// The line ends with a newline.
 func (p *podOutputWriter) Write(l []byte) (int, error) {
 	line := string(l)
 
@@ -327,7 +327,7 @@ func (p *podOutputWriter) Write(l []byte) (int, error) {
 	case p.inDataRace && line == dataRaceEnd:
 		// Stop collecting data race lines.
 		p.inDataRace = false
-		p.l.logger.Info("Completed data race", "container", p.k, "count", len(races), "dataRace", strings.Join(races[len(races)-1], "\n"))
+		p.l.logger.Info("Completed data race", "container", p.k, "count", len(races), "dataRace", strings.Join(races[len(races)-1], ""))
 	case !p.inDataRace && line == dataRaceStart:
 		// Start collecting data race lines.
 		p.inDataRace = true
