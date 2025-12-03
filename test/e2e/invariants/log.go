@@ -21,15 +21,20 @@ import (
 	"fmt"
 	"io"
 	"maps"
+	"os"
+	"path"
 	"slices"
 	"strings"
 	"sync"
 
 	"github.com/onsi/ginkgo/v2"
 
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/textlogger"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/podlogs"
 )
@@ -37,6 +42,9 @@ import (
 // The code in this file grabs logs of system containers and checks them for certain problems:
 // - DATA RACE (depends on enabling race detection in the binary, see https://github.com/kubernetes/kubernetes/pull/133834).
 // - potential future extension: unhandled and potentially unexpected errors (https://github.com/kubernetes/kubernetes/issues/122005)
+//
+// Because it grabs log output as it is produced, it is possible to dump *all* data into $ARTIFACTS/system-logs,
+// in contrast to other approaches which potentially only capture the tail of the output (log rotation).
 //
 // Please speak to SIG-Testing leads before adding anything to this file.
 
@@ -83,9 +91,15 @@ var _ = ginkgo.ReportAfterSuite(fmt.Sprintf("[sig-%s] %s", logInvariantsSIG, log
 		// and before it actually runs anything. We can determine here what we are
 		// meant to check, but actually kicking of background goroutines has to
 		// wait until after suite initialization is done and tests start to run.
-		// We use ginkgo.ReportBeforeEach for that.
 		enabledLogChecks = logCheck{
 			dataRaces: invariantsSelected(report, logInvariantsSIG, logInvariantsContextText, logInvariantsDataRaceLeafText),
+		}
+		if enabledLogChecks.any() {
+			framework.NewFrameworkExtensions = append(framework.NewFrameworkExtensions, func(f *framework.Framework) {
+				ginkgo.BeforeEach(func() {
+					initializeLogs(f)
+				})
+			})
 		}
 	} else {
 		// This is reached after the test run has completed.
@@ -93,57 +107,63 @@ var _ = ginkgo.ReportAfterSuite(fmt.Sprintf("[sig-%s] %s", logInvariantsSIG, log
 	}
 })
 
-var _ = ginkgo.ReportBeforeEach(func(report ginkgo.SpecReport) {
-	initializeLogs()
-})
-
 // initializeLogs gets called before tests start to run. It sets up monitoring of system component log output,
 // if requested through the sentinel tests and not started yet.
-func initializeLogs() {
-	if lc != nil || !enabledLogChecks.any() {
+func initializeLogs(f *framework.Framework) {
+	if lc != nil {
 		return
 	}
 
-	// Failed assertions are okay here.
-	// They get included in the final Ginkgo report because that is generated later.
-	config, err := framework.LoadConfig()
-	framework.ExpectNoError(err, "loading client config")
-	client, err := clientset.NewForConfig(config)
-	framework.ExpectNoError(err, "creating client")
-
 	ctx, cancel := context.WithCancel(context.Background())
-	lc = newLogChecker(client, cancel, enabledLogChecks)
-	go lc.run(ctx, podlogs.CopyAllLogs)
+	l, err := newLogChecker(f.ClientSet, cancel, enabledLogChecks, framework.TestContext.ReportDir)
+	framework.ExpectNoError(err, "set up log checker")
+	lc = l
+	lc.start(ctx, podlogs.CopyAllLogs)
 }
 
 func finalizeLogs() {
 	if lc == nil {
 		return
 	}
-	failed, report := lc.stop()
 
-	if failed {
+	failure, stdout := lc.stop()
+	_, _ = ginkgo.GinkgoWriter.Write([]byte(stdout))
+	if failure != "" {
 		// Reports as post-suite failure.
-		ginkgo.Fail(report)
-	} else {
-		// Merely log the result.
-		fmt.Fprint(ginkgo.GinkgoWriter, report)
+		ginkgo.Fail(failure)
 	}
 }
 
-func newLogChecker(client kubernetes.Interface, cancel func(), check logCheck) *logChecker {
+func newLogChecker(client kubernetes.Interface, cancel func(), check logCheck, logDir string) (*logChecker, error) {
+	var logger klog.Logger // No log output unless we have a logDir.
+	var logFile string
+	if logDir != "" {
+		logFile = path.Join(logDir, "system-logs.log")
+		output, err := os.Create(logFile)
+		if err != nil {
+			return nil, fmt.Errorf("create log file: %w", err)
+		}
+		logger = textlogger.NewLogger(textlogger.NewConfig(textlogger.Output(output)))
+	}
+
 	return &logChecker{
+		logger:    logger,
 		client:    client,
 		cancel:    cancel,
 		check:     check,
+		logDir:    logDir,
+		logFile:   logFile,
 		dataRaces: make(map[string][][]string),
-	}
+	}, nil
 }
 
 type logChecker struct {
-	client kubernetes.Interface
-	cancel func()
-	check  logCheck
+	logger  klog.Logger
+	client  kubernetes.Interface
+	cancel  func()
+	check   logCheck
+	logDir  string
+	logFile string
 
 	// wg counts the number of active pod output streams. Add and Wait must be protected by wgMutex.
 	wg      sync.WaitGroup
@@ -155,14 +175,10 @@ type logChecker struct {
 	// All data races detected so far, indexed by "<namespace>/<pod name>/<container name>".
 	// The last entry is initially empty while waiting for the next data race.
 	dataRaces map[string][][]string
-
-	// errors collects all runtime errors.
-	errors strings.Builder
 }
 
-// stop cancels pod monitoring, waits until that is shut down, and then produces a failure message if
-// any issues where encountered. It may use ginkgo.Fail.
-func (l *logChecker) stop() (failed bool, report string) {
+// stop cancels pod monitoring, waits until that is shut down, and then produces text for a failure message (ideally empty) and stdout.
+func (l *logChecker) stop() (failure, stdout string) {
 	l.cancel()
 
 	// While we wait for completion, log checking must be able to lock l.mutex.
@@ -173,28 +189,34 @@ func (l *logChecker) stop() (failed bool, report string) {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 
-	var buffer strings.Builder
-
-	if l.errors.Len() > 0 {
-		failed = true
-		buffer.WriteString("#### Errors\n\n")
-		buffer.WriteString(l.errors.String())
+	var failureBuffer strings.Builder
+	var stdoutBuffer strings.Builder
+	if l.logFile != "" {
+		logData, err := os.ReadFile(l.logFile)
+		if err != nil {
+			stdoutBuffer.WriteString(fmt.Sprintf("Reading %s failed: %v", l.logFile, err))
+		} else {
+			stdoutBuffer.Write(logData)
+		}
 	}
 
 	keys := slices.AppendSeq([]string(nil), maps.Keys(l.dataRaces))
 	slices.Sort(keys)
-	for i, k := range keys {
-		if i > 0 || l.errors.Len() > 0 {
+	for _, k := range keys {
+		races := l.dataRaces[k]
+		buffer := &failureBuffer
+		if len(races) == 0 {
+			buffer = &stdoutBuffer
+		}
+		if buffer.Len() > 0 {
 			buffer.WriteString("\n")
 		}
 		buffer.WriteString("#### " + k + "\n")
-		races := l.dataRaces[k]
 		if len(races) == 0 {
 			buffer.WriteString("\nOkay.\n")
 			continue
 		}
 		for _, race := range races {
-			failed = true
 			indent := "    "
 			buffer.WriteString("\n")
 			if len(races) > 1 {
@@ -214,16 +236,14 @@ func (l *logChecker) stop() (failed bool, report string) {
 		}
 	}
 
-	return failed, buffer.String()
+	return failureBuffer.String(), stdoutBuffer.String()
 }
 
-func (l *logChecker) recordError(err error) {
-	l.mutex.Lock()
-	defer l.mutex.Unlock()
-	l.errors.WriteString(fmt.Sprintf("ERROR: %v\n", err))
-}
+func (l *logChecker) start(ctx context.Context, startCopyAllLogs func(ctx context.Context, cs clientset.Interface, ns string, to podlogs.LogOutput) error) {
+	if !l.check.any() {
+		return
+	}
 
-func (l *logChecker) run(ctx context.Context, copyAllLogs func(ctx context.Context, cs clientset.Interface, ns string, to podlogs.LogOutput) error) {
 	// Figure out which namespace(s) to watch. If we had an API for
 	// identifying "system" namespaces, we could use this here, but we
 	// don't have that yet (https://github.com/kubernetes/enhancements/issues/5708).
@@ -231,7 +251,7 @@ func (l *logChecker) run(ctx context.Context, copyAllLogs func(ctx context.Conte
 	// Instead we monitor every namespace which has "system" in the name.
 	namespaces, err := l.client.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
 	if err != nil {
-		l.recordError(fmt.Errorf("list namespaces: %w", err))
+		l.logger.Error(err, "Failed to list namespaces")
 		return
 	}
 
@@ -243,23 +263,21 @@ func (l *logChecker) run(ctx context.Context, copyAllLogs func(ctx context.Conte
 			continue
 		}
 		to := podlogs.LogOutput{
-			StatusWriter: &statusWriter{l: l},
+			StatusWriter:  &statusWriter{l: l, namespace: &namespace},
+			LogPathPrefix: path.Join(l.logDir, namespace.Name) + "/",
 			LogOpen: func(podName, containerName string) io.Writer {
 				return l.logOpen(namespace.Name, podName, containerName)
 			},
 		}
 
-		l.wg.Go(func() {
-			if err := copyAllLogs(ctx, l.client, namespace.Name, to); err != nil {
-				l.recordError(fmt.Errorf("log output collection failed for %s: %w", namespace.Name, err))
-			}
-		})
+		l.logger.Info("Watching", "namespace", klog.KObj(&namespace))
+		if err := startCopyAllLogs(ctx, l.client, namespace.Name, to); err != nil {
+			l.logger.Error(err, "Log output collection failed", "namespace", klog.KObj(&namespace))
+		}
 	}
 }
 
 func (l *logChecker) logOpen(names ...string) io.Writer {
-	k := strings.Join(names, "/")
-
 	if !l.check.dataRaces {
 		return nil
 	}
@@ -268,23 +286,19 @@ func (l *logChecker) logOpen(names ...string) io.Writer {
 	defer l.wgMutex.Unlock()
 	l.wg.Add(1)
 
-	l.mutex.Lock()
-	defer l.mutex.Unlock()
-	// No problems so far...
-	l.dataRaces[k] = nil
-
+	k := strings.Join(names, "/")
+	l.logger.Info("Starting to check for data races", "container", k)
 	return &podOutputWriter{k: k, l: l}
 }
 
 type statusWriter struct {
-	l *logChecker
+	l         *logChecker
+	namespace *v1.Namespace
 }
 
 // Write gets called with text that describes problems encountered while monitoring pods and their output.
 func (s *statusWriter) Write(msg []byte) (int, error) {
-	s.l.mutex.Lock()
-	defer s.l.mutex.Unlock()
-	s.l.errors.WriteString(string(msg))
+	s.l.logger.Info("PodLogs status", "namespace", klog.KObj(s.namespace), "msg", msg)
 	return len(msg), nil
 }
 
@@ -313,10 +327,12 @@ func (p *podOutputWriter) Write(l []byte) (int, error) {
 	case p.inDataRace && line == dataRaceEnd:
 		// Stop collecting data race lines.
 		p.inDataRace = false
+		p.l.logger.Info("Completed data race", "container", p.k, "count", len(races), "dataRace", strings.Join(races[len(races)-1], "\n"))
 	case !p.inDataRace && line == dataRaceStart:
 		// Start collecting data race lines.
 		p.inDataRace = true
 		races = append(races, nil)
+		p.l.logger.Info("Started new data race", "container", p.k, "count", len(races))
 	default:
 		// Some other log output.
 	}
@@ -327,6 +343,7 @@ func (p *podOutputWriter) Write(l []byte) (int, error) {
 
 // Close gets called once all output is processed.
 func (p *podOutputWriter) Close() error {
+	p.l.logger.Info("Done checking for data races", "container", p.k)
 	p.l.wg.Done()
 	return nil
 }
