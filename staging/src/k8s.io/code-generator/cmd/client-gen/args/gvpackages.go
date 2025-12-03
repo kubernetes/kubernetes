@@ -110,6 +110,7 @@ type groupVersionsBuilder struct {
 	value          *[]types.GroupVersions
 	groups         []string
 	importBasePath string
+	bazel          bool
 }
 
 func NewGroupVersionsBuilder(groups *[]types.GroupVersions) *groupVersionsBuilder {
@@ -128,6 +129,9 @@ func (p *groupVersionsBuilder) update() error {
 		}
 
 		versionPkg := types.PackageVersion{Package: path.Join(p.importBasePath, pth, gv.Group.NonEmpty(), gv.Version.String()), Version: gv.Version}
+		if p.bazel {
+			versionPkg = types.PackageVersion{Package: path.Join(p.importBasePath, pth, gv.Group.NonEmpty(), gv.Version.String(), gv.Version.String()), Version: gv.Version}
+		}
 		if group, ok := seenGroups[gv.Group]; ok {
 			vers := group.Versions
 			vers = append(vers, versionPkg)

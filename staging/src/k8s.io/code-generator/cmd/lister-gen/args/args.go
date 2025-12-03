@@ -31,6 +31,9 @@ type Args struct {
 	// PluralExceptions specify list of exceptions used when pluralizing certain types.
 	// For example 'Endpoints:Endpoints', otherwise the pluralizer will generate 'Endpointes'.
 	PluralExceptions []string
+
+	// Bazel determines if the generated clientset should use Bazel-style paths (repeated version).
+	Bazel bool
 }
 
 // New returns default arguments for the generator.
@@ -48,6 +51,8 @@ func (args *Args) AddFlags(fs *pflag.FlagSet) {
 		"list of comma separated plural exception definitions in Type:PluralizedType format")
 	fs.StringVar(&args.GoHeaderFile, "go-header-file", "",
 		"the path to a file containing boilerplate header text; the string \"YEAR\" will be replaced with the current 4-digit year")
+	fs.BoolVar(&args.Bazel, "bazel", args.Bazel,
+		"when set, lister-gen will generate a clientset that uses Bazel-style paths (repeated version)")
 }
 
 // Validate checks the given arguments.
