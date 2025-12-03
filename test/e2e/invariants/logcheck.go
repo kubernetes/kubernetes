@@ -59,6 +59,7 @@ const (
 
 var (
 	enabledLogChecks logCheck
+	mainProcess      bool
 	lc               *logChecker
 )
 
@@ -85,7 +86,20 @@ var _ = framework.SIGDescribe(logInvariantsSIG)(logInvariantsContextText, func()
 	ginkgo.It(logInvariantsDataRaceLeafText /* , feature.DataRace TODO: add this once the pull-kubernetes-e2e-kind-alpha-beta-features-race job also sets it */, func() {})
 })
 
+var out, _ = os.Create(fmt.Sprintf("/tmp/e2e-%d.log", os.Getpid()))
+
+var _ = ginkgo.ReportBeforeSuite(func(ctx ginkgo.SpecContext, report ginkgo.Report) {
+	if !report.SuiteConfig.DryRun {
+		// This is only reached in the main process.
+		fmt.Fprintf(out, "*** ReportBeforeSuite dry-run %v in pid %d, race detection %v ***\n", report.SuiteConfig.DryRun, os.Getpid(), invariantsSelected(report, logInvariantsSIG, logInvariantsContextText, logInvariantsDataRaceLeafText))
+		mainProcess = true
+		initializeLogs()
+	}
+})
+
 var _ = ginkgo.ReportAfterSuite(fmt.Sprintf("[sig-%s] %s", logInvariantsSIG, logInvariantsContextText), func(ctx ginkgo.SpecContext, report ginkgo.Report) {
+	fmt.Fprintf(out, "*** ReportAfterSuite dry-run %v in pid %d ***\n", report.SuiteConfig.DryRun, os.Getpid())
+
 	if report.SuiteConfig.DryRun {
 		// This is reached after Ginkgo has determined which tests it is going to run
 		// and before it actually runs anything. We can determine here what we are
@@ -94,28 +108,34 @@ var _ = ginkgo.ReportAfterSuite(fmt.Sprintf("[sig-%s] %s", logInvariantsSIG, log
 		enabledLogChecks = logCheck{
 			dataRaces: invariantsSelected(report, logInvariantsSIG, logInvariantsContextText, logInvariantsDataRaceLeafText),
 		}
-		if enabledLogChecks.any() {
-			framework.NewFrameworkExtensions = append(framework.NewFrameworkExtensions, func(f *framework.Framework) {
-				ginkgo.BeforeEach(func() {
-					initializeLogs(f)
-				})
-			})
-		}
+		// if enabledLogChecks.any() {
+		// 	framework.NewFrameworkExtensions = append(framework.NewFrameworkExtensions, func(f *framework.Framework) {
+		// 		ginkgo.BeforeEach(func() {
+		// 			initializeLogs(f)
+		// 		})
+		// 	})
+		// }
 	} else {
-		// This is reached after the test run has completed.
+		// This is reached only in the main process after the test run has completed.
 		finalizeLogs()
 	}
 })
 
 // initializeLogs gets called before tests start to run. It sets up monitoring of system component log output,
 // if requested through the sentinel tests and not started yet.
-func initializeLogs(f *framework.Framework) {
-	if lc != nil {
+func initializeLogs( /*f *framework.Framework*/ ) {
+	if lc != nil || !mainProcess {
 		return
 	}
+	fmt.Fprintf(out, "iniatializeLogs in %d\n", os.Getpid())
+
+	config, err := framework.LoadConfig()
+	framework.ExpectNoError(err, "loading client config")
+	client, err := clientset.NewForConfig(config)
+	framework.ExpectNoError(err, "creating client")
 
 	ctx, cancel := context.WithCancel(context.Background())
-	l, err := newLogChecker(f.ClientSet, cancel, enabledLogChecks, framework.TestContext.ReportDir)
+	l, err := newLogChecker(client, cancel, enabledLogChecks, framework.TestContext.ReportDir)
 	framework.ExpectNoError(err, "set up log checker")
 	lc = l
 	lc.start(ctx, podlogs.CopyAllLogs)
