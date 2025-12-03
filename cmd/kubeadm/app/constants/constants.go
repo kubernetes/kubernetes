@@ -504,7 +504,7 @@ var (
 	// with the control plane version.
 	SupportedEtcdVersion = map[uint8]string{
 		uint8(getSkewedKubernetesVersion(-2).Minor()): "3.5.24-0",
-		uint8(getSkewedKubernetesVersion(-1).Minor()): "3.5.24-0",
+		uint8(getSkewedKubernetesVersion(-1).Minor()): "3.6.5-0",
 		uint8(getSkewedKubernetesVersion(0).Minor()):  "3.6.5-0",
 	}
 
