@@ -235,8 +235,8 @@ func (pl *TestPlugin) Reserve(ctx context.Context, state fwk.CycleState, p *v1.P
 func (pl *TestPlugin) Unreserve(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) {
 }
 
-func (pl *TestPlugin) PreBindPreFlight(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) *fwk.Status {
-	return fwk.NewStatus(fwk.Code(pl.inj.PreBindPreFlightStatus), injectReason)
+func (pl *TestPlugin) PreBindPreFlight(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) (*fwk.PreBindPreFlightResult, *fwk.Status) {
+	return &fwk.PreBindPreFlightResult{AllowParallel: false}, fwk.NewStatus(fwk.Code(pl.inj.PreBindPreFlightStatus), injectReason)
 }
 
 func (pl *TestPlugin) PreBind(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) *fwk.Status {
@@ -2608,6 +2608,189 @@ func TestPreBindPlugins(t *testing.T) {
 
 			if diff := cmp.Diff(tt.wantStatus, status, statusCmpOpts...); diff != "" {
 				t.Errorf("Wrong status code (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestGetPreBindPluginGroups(t *testing.T) {
+	tests := []struct {
+		name            string
+		plugins         []fwk.PreBindPlugin
+		skippedPlugins  sets.Set[string]
+		parallelPlugins sets.Set[string]
+		expectedGroups  [][]string
+	}{
+		{
+			name:           "No plugins",
+			plugins:        []fwk.PreBindPlugin{},
+			expectedGroups: nil,
+		},
+		{
+			name: "Single plugin, not skipped, not parallel",
+			plugins: []fwk.PreBindPlugin{
+				&TestPlugin{name: "p1"},
+			},
+			expectedGroups: [][]string{{"p1"}},
+		},
+		{
+			name: "Single plugin, skipped",
+			plugins: []fwk.PreBindPlugin{
+				&TestPlugin{name: "p1"},
+			},
+			skippedPlugins: sets.New("p1"),
+			expectedGroups: nil,
+		},
+		{
+			name: "Single plugin, parallel",
+			plugins: []fwk.PreBindPlugin{
+				&TestPlugin{name: "p1"},
+			},
+			parallelPlugins: sets.New("p1"),
+			expectedGroups:  [][]string{{"p1"}},
+		},
+		{
+			name: "Single plugin, parallel & skipped",
+			plugins: []fwk.PreBindPlugin{
+				&TestPlugin{name: "p1"},
+			},
+			parallelPlugins: sets.New("p1"),
+			skippedPlugins:  sets.New("p1"),
+			expectedGroups:  nil,
+		},
+		{
+			name: "Multiple plugins, consecutive serial",
+			plugins: []fwk.PreBindPlugin{
+				&TestPlugin{name: "p1"},
+				&TestPlugin{name: "p2"},
+			},
+			expectedGroups: [][]string{
+				{"p1"},
+				{"p2"},
+			},
+		},
+		{
+			name: "Multiple plugins, consecutive parallel",
+			plugins: []fwk.PreBindPlugin{
+				&TestPlugin{name: "p1"},
+				&TestPlugin{name: "p2"},
+			},
+			parallelPlugins: sets.New("p1", "p2"),
+			expectedGroups: [][]string{
+				{"p1", "p2"},
+			},
+		},
+		{
+			name: "Multiple plugins, mixed parallel and serial",
+			plugins: []fwk.PreBindPlugin{
+				&TestPlugin{name: "p1"}, // serial
+				&TestPlugin{name: "p2"}, // parallel
+				&TestPlugin{name: "p3"}, // parallel
+				&TestPlugin{name: "p4"}, // serial
+			},
+			parallelPlugins: sets.New("p2", "p3"),
+			expectedGroups: [][]string{
+				{"p1"},
+				{"p2", "p3"},
+				{"p4"},
+			},
+		},
+		{
+			name: "Parallel plugins separated by serial",
+			plugins: []fwk.PreBindPlugin{
+				&TestPlugin{name: "p1"}, // parallel
+				&TestPlugin{name: "p2"}, // serial
+				&TestPlugin{name: "p3"}, // parallel
+			},
+			parallelPlugins: sets.New("p1", "p3"),
+			expectedGroups: [][]string{
+				{"p1"},
+				{"p2"},
+				{"p3"},
+			},
+		},
+		{
+			name: "Skipped plugins",
+			plugins: []fwk.PreBindPlugin{
+				&TestPlugin{name: "p1"}, // serial
+				&TestPlugin{name: "p2"}, // serial & skipped
+				&TestPlugin{name: "p3"}, // serial
+			},
+			skippedPlugins: sets.New("p2"),
+			expectedGroups: [][]string{
+				{"p1"},
+				{"p3"},
+			},
+		},
+		{
+			name: "Parallel plugins with one skipped in between",
+			plugins: []fwk.PreBindPlugin{
+				&TestPlugin{name: "p1"}, // parallel
+				&TestPlugin{name: "p2"}, // parallel & skipped
+				&TestPlugin{name: "p3"}, // parallel
+			},
+			parallelPlugins: sets.New("p1", "p2", "p3"),
+			skippedPlugins:  sets.New("p2"),
+			expectedGroups:  [][]string{{"p1", "p3"}},
+		},
+		{
+			name: "Parallel plugins with one serial & skipped in between",
+			plugins: []fwk.PreBindPlugin{
+				&TestPlugin{name: "p1"}, // parallel
+				&TestPlugin{name: "p2"}, // serial & skipped
+				&TestPlugin{name: "p3"}, // parallel
+			},
+			parallelPlugins: sets.New("p1", "p3"),
+			skippedPlugins:  sets.New("p2"),
+			expectedGroups: [][]string{
+				{"p1"},
+				{"p3"},
+			},
+		},
+		{
+			name: "Complex mix",
+			plugins: []fwk.PreBindPlugin{
+				&TestPlugin{name: "p1"}, // serial
+				&TestPlugin{name: "p2"}, // parallel
+				&TestPlugin{name: "p3"}, // serial & skipped
+				&TestPlugin{name: "p4"}, // parallel
+				&TestPlugin{name: "p5"}, // parallel & skipped
+				&TestPlugin{name: "p6"}, // parallel
+				&TestPlugin{name: "p7"}, // serial
+				&TestPlugin{name: "p8"}, // serial
+			},
+			parallelPlugins: sets.New("p2", "p4", "p5", "p6"),
+			skippedPlugins:  sets.New("p3", "p5"),
+			expectedGroups: [][]string{
+				{"p1"},
+				{"p2"},
+				{"p4", "p6"},
+				{"p7"},
+				{"p8"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := &frameworkImpl{
+				preBindPlugins: tt.plugins,
+			}
+			state := framework.NewCycleState()
+
+			groups := f.getPreBindPluginGroups(state, tt.skippedPlugins, tt.parallelPlugins)
+
+			var gotGroups [][]string
+			for _, g := range groups {
+				var groupNames []string
+				for _, p := range g {
+					groupNames = append(groupNames, p.Name())
+				}
+				gotGroups = append(gotGroups, groupNames)
+			}
+
+			if diff := cmp.Diff(tt.expectedGroups, gotGroups); diff != "" {
+				t.Errorf("getPreBindPluginGroups() mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}

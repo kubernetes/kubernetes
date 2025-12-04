@@ -1434,29 +1434,83 @@ func (f *frameworkImpl) RunPreBindPlugins(ctx context.Context, state fwk.CycleSt
 		logger = klog.LoggerWithName(logger, "PreBind")
 		logger = klog.LoggerWithValues(logger, "node", klog.ObjectRef{Name: nodeName})
 	}
-	for _, pl := range f.preBindPlugins {
-		if state.GetSkipPreBindPlugins().Has(pl.Name()) {
-			continue
-		}
 
+	ctx, cancel := context.WithCancelCause(ctx)
+	defer cancel(errors.New("RunPreBindPlugins has completed"))
+	statusCh := parallelize.NewResultChannel[*fwk.Status]()
+	skippedPlugins := state.GetSkipPreBindPlugins()
+	parallelPlugins := state.GetParallelPreBindPlugins()
+
+	// run operates directly on the plugin.
+	run := func(pl fwk.PreBindPlugin) *fwk.Status {
 		ctx := ctx
 		if verboseLogs {
 			logger := klog.LoggerWithName(logger, pl.Name())
 			ctx = klog.NewContext(ctx, logger)
 		}
-		status = f.runPreBindPlugin(ctx, pl, state, pod, nodeName)
-		if !status.IsSuccess() {
-			if status.IsRejected() {
-				logger.V(4).Info("Pod rejected by PreBind plugin", "pod", klog.KObj(pod), "node", nodeName, "plugin", pl.Name(), "status", status.Message())
-				status.SetPlugin(pl.Name())
-				return status
+		plStatus := f.runPreBindPlugin(ctx, pl, state, pod, nodeName)
+		if !plStatus.IsSuccess() {
+			if plStatus.IsRejected() {
+				logger.V(4).Info("Pod rejected by PreBind plugin", "pod", klog.KObj(pod), "node", nodeName, "plugin", pl.Name(), "status", plStatus.Message())
+				plStatus.SetPlugin(pl.Name())
+				return plStatus
 			}
-			err := status.AsError()
+			err := plStatus.AsError()
 			logger.Error(err, "Plugin failed", "plugin", pl.Name(), "pod", klog.KObj(pod), "node", nodeName)
 			return fwk.AsStatus(fmt.Errorf("running PreBind plugin %q: %w", pl.Name(), err))
 		}
+		return nil
+	}
+
+	pluginGroups := f.getPreBindPluginGroups(state, skippedPlugins, parallelPlugins)
+	for _, plugins := range pluginGroups {
+		// If there is just a single plugin in the group, running it in a separate goroutine
+		// does not provide any benefit.
+		if len(plugins) == 1 {
+			if status := run(plugins[0]); status != nil {
+				return status
+			}
+			continue
+		}
+		f.Parallelizer().Until(ctx, len(plugins), func(index int) {
+			if status := run(plugins[index]); !status.IsSuccess() {
+				statusCh.SendWithCancel(status, func() {
+					cancel(errors.New("some other PreBind operation failed"))
+				})
+			}
+		}, metrics.PreBind)
+		if status := statusCh.Receive(); !status.IsSuccess() {
+			return status
+		}
 	}
 	return nil
+}
+
+// getPreBindPluginGroups chunks the plugins implementing the PreBind extension point
+// into groups of plugins that can be run in parallel.
+// The returned value consists of non-skipped plugins only.
+func (f *frameworkImpl) getPreBindPluginGroups(state fwk.CycleState, skippedPlugins, parallelPlugins sets.Set[string]) [][]fwk.PreBindPlugin {
+	var groups [][]fwk.PreBindPlugin
+	var group []fwk.PreBindPlugin
+	for _, pl := range f.preBindPlugins {
+		if parallelPlugins.Has(pl.Name()) {
+			if !skippedPlugins.Has(pl.Name()) {
+				group = append(group, pl)
+			}
+			continue
+		}
+		if len(group) > 0 {
+			groups = append(groups, group)
+			group = nil
+		}
+		if !skippedPlugins.Has(pl.Name()) {
+			groups = append(groups, []fwk.PreBindPlugin{pl})
+		}
+	}
+	if len(group) > 0 {
+		groups = append(groups, group)
+	}
+	return groups
 }
 
 func (f *frameworkImpl) runPreBindPlugin(ctx context.Context, pl fwk.PreBindPlugin, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
@@ -1486,6 +1540,7 @@ func (f *frameworkImpl) RunPreBindPreFlights(ctx context.Context, state fwk.Cycl
 		logger = klog.LoggerWithValues(logger, "node", klog.ObjectRef{Name: nodeName})
 	}
 	skipPlugins := sets.New[string]()
+	parallelPlugins := sets.New[string]()
 	returningStatus := fwk.NewStatus(fwk.Skip)
 	for _, pl := range f.preBindPlugins {
 		ctx := ctx
@@ -1493,7 +1548,10 @@ func (f *frameworkImpl) RunPreBindPreFlights(ctx context.Context, state fwk.Cycl
 			logger := klog.LoggerWithName(logger, pl.Name())
 			ctx = klog.NewContext(ctx, logger)
 		}
-		status = f.runPreBindPreFlight(ctx, pl, state, pod, nodeName)
+		result, status := f.runPreBindPreFlight(ctx, pl, state, pod, nodeName)
+		if result != nil && result.AllowParallel {
+			parallelPlugins.Insert(pl.Name())
+		}
 		switch {
 		case status.Code() == fwk.Error:
 			err := status.AsError()
@@ -1510,17 +1568,18 @@ func (f *frameworkImpl) RunPreBindPreFlights(ctx context.Context, state fwk.Cycl
 		}
 	}
 	state.SetSkipPreBindPlugins(skipPlugins)
+	state.SetParallelPreBindPlugins(parallelPlugins)
 	return returningStatus
 }
 
-func (f *frameworkImpl) runPreBindPreFlight(ctx context.Context, pl fwk.PreBindPlugin, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
+func (f *frameworkImpl) runPreBindPreFlight(ctx context.Context, pl fwk.PreBindPlugin, state fwk.CycleState, pod *v1.Pod, nodeName string) (*fwk.PreBindPreFlightResult, *fwk.Status) {
 	if !state.ShouldRecordPluginMetrics() {
 		return pl.PreBindPreFlight(ctx, state, pod, nodeName)
 	}
 	startTime := time.Now()
-	status := pl.PreBindPreFlight(ctx, state, pod, nodeName)
+	result, status := pl.PreBindPreFlight(ctx, state, pod, nodeName)
 	f.metricsRecorder.ObservePluginDurationAsync(metrics.PreBindPreFlight, pl.Name(), status.Code().String(), metrics.SinceInSeconds(startTime))
-	return status
+	return result, status
 }
 
 // RunBindPlugins runs the set of configured bind plugins until one returns a non `Skip` status.
