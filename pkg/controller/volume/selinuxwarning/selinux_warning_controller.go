@@ -140,8 +140,8 @@ func NewController(
 
 	logger := klog.FromContext(ctx)
 	_, err = podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    func(obj interface{}) { c.addPod(logger, obj) },
-		DeleteFunc: func(obj interface{}) { c.deletePod(logger, obj) },
+		AddFunc:    func(obj interface{}) { c.enqueuePod(logger, obj) },
+		DeleteFunc: func(obj interface{}) { c.enqueuePod(logger, obj) },
 		// Not watching updates: Pod volumes and SecurityContext are immutable after creation
 	})
 	if err != nil {
@@ -178,15 +178,7 @@ func NewController(
 	return c, nil
 }
 
-func (c *Controller) addPod(_ klog.Logger, obj interface{}) {
-	podRef, err := cache.DeletionHandlingObjectToName(obj)
-	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("couldn't get key for pod %#v: %w", obj, err))
-	}
-	c.queue.Add(podRef)
-}
-
-func (c *Controller) deletePod(_ klog.Logger, obj interface{}) {
+func (c *Controller) enqueuePod(_ klog.Logger, obj interface{}) {
 	podRef, err := cache.DeletionHandlingObjectToName(obj)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("couldn't get key for pod %#v: %w", obj, err))
