@@ -977,6 +977,61 @@ func TestDeltaFIFO_PopShouldUnblockWhenClosed(t *testing.T) {
 	}
 }
 
+func TestDeltaFIFO_Bookmark(t *testing.T) {
+	f := NewDeltaFIFOWithOptions(DeltaFIFOOptions{
+		KeyFunction:           testFifoObjectKeyFunc,
+		EmitDeltaTypeBookmark: true,
+	})
+
+	defer f.Close()
+	if err := f.Bookmark("123"); err != nil {
+		t.Fatalf("Bookmark failed: %v", err)
+	}
+
+	// Check queue length
+	if e, a := 1, len(f.items); e != a {
+		t.Fatalf("Expected queue length %d, got %d", e, a)
+	}
+
+	// Pop the item
+	item := Pop(f)
+	deltas, ok := item.(Deltas)
+	if !ok {
+		t.Fatalf("Expected Deltas, got %T", item)
+	}
+
+	if e, a := 1, len(deltas); e != a {
+		t.Fatalf("Expected 1 delta, got %d", a)
+	}
+
+	delta := deltas.Newest()
+	if e, a := Bookmark, delta.Type; e != a {
+		t.Errorf("Expected delta type %s, got %s", e, a)
+	}
+	if e, a := "123", delta.Object; e != a {
+		t.Errorf("Expected delta object %s, got %s", e, a)
+	}
+
+	newObj := mkFifoObj("foo", 2)
+	// Test replace
+	if err := f.Replace([]interface{}{newObj}, "456"); err != nil {
+		t.Fatalf("Replace failed: %v", err)
+	}
+	_ = Pop(f)
+	item = Pop(f)
+	deltas, ok = item.(Deltas)
+	if !ok {
+		t.Fatalf("Expected Deltas, got %T", item)
+	}
+	delta = deltas.Newest()
+	if e, a := Bookmark, delta.Type; e != a {
+		t.Errorf("Expected delta type %s, got %s", e, a)
+	}
+	if e, a := "456", delta.Object; e != a {
+		t.Errorf("Expected delta object %s, got %s", e, a)
+	}
+}
+
 func BenchmarkDeltaFIFOListKeys(b *testing.B) {
 	f := NewDeltaFIFOWithOptions(DeltaFIFOOptions{KeyFunction: testFifoObjectKeyFunc})
 	const amount = 10000

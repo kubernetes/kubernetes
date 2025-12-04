@@ -265,6 +265,7 @@ type ResourceEventHandler interface {
 	OnAdd(obj interface{}, isInInitialList bool)
 	OnUpdate(oldObj, newObj interface{})
 	OnDelete(obj interface{})
+	OnBookmark(resourceVersion string)
 }
 
 // ResourceEventHandlerFuncs is an adaptor to let you easily specify as many or
@@ -274,10 +275,12 @@ type ResourceEventHandler interface {
 //
 // See ResourceEventHandlerDetailedFuncs if your use needs to propagate
 // HasSynced.
+
 type ResourceEventHandlerFuncs struct {
-	AddFunc    func(obj interface{})
-	UpdateFunc func(oldObj, newObj interface{})
-	DeleteFunc func(obj interface{})
+	AddFunc      func(obj interface{})
+	UpdateFunc   func(oldObj, newObj interface{})
+	DeleteFunc   func(obj interface{})
+	BookmarkFunc func(resourceVersion string)
 }
 
 // OnAdd calls AddFunc if it's not nil.
@@ -301,13 +304,21 @@ func (r ResourceEventHandlerFuncs) OnDelete(obj interface{}) {
 	}
 }
 
+// OnBookmark calls BookmarkFunc if it's not nil.
+func (r ResourceEventHandlerFuncs) OnBookmark(resourceVersion string) {
+	if r.BookmarkFunc != nil {
+		r.BookmarkFunc(resourceVersion)
+	}
+}
+
 // ResourceEventHandlerDetailedFuncs is exactly like ResourceEventHandlerFuncs
 // except its AddFunc accepts the isInInitialList parameter, for propagating
 // HasSynced.
 type ResourceEventHandlerDetailedFuncs struct {
-	AddFunc    func(obj interface{}, isInInitialList bool)
-	UpdateFunc func(oldObj, newObj interface{})
-	DeleteFunc func(obj interface{})
+	AddFunc      func(obj interface{}, isInInitialList bool)
+	UpdateFunc   func(oldObj, newObj interface{})
+	DeleteFunc   func(obj interface{})
+	BookmarkFunc func(resourceVersion string)
 }
 
 // OnAdd calls AddFunc if it's not nil.
@@ -328,6 +339,13 @@ func (r ResourceEventHandlerDetailedFuncs) OnUpdate(oldObj, newObj interface{}) 
 func (r ResourceEventHandlerDetailedFuncs) OnDelete(obj interface{}) {
 	if r.DeleteFunc != nil {
 		r.DeleteFunc(obj)
+	}
+}
+
+// OnBookmark calls BookmarkFunc if it's not nil.
+func (r ResourceEventHandlerDetailedFuncs) OnBookmark(resourceVersion string) {
+	if r.BookmarkFunc != nil {
+		r.BookmarkFunc(resourceVersion)
 	}
 }
 
@@ -371,6 +389,11 @@ func (r FilteringResourceEventHandler) OnDelete(obj interface{}) {
 		return
 	}
 	r.Handler.OnDelete(obj)
+}
+
+// OnBookmark calls the nested handler
+func (r FilteringResourceEventHandler) OnBookmark(rv string) {
+	r.Handler.OnBookmark(rv)
 }
 
 // DeletionHandlingMetaNamespaceKeyFunc checks for
@@ -607,6 +630,12 @@ func processDeltas(
 				return err
 			}
 			handler.OnDelete(obj)
+		case Bookmark:
+			resourceVersion, ok := obj.(string)
+			if !ok {
+				return fmt.Errorf("bookmark delta did not contain string: %T", obj)
+			}
+			handler.OnBookmark(resourceVersion)
 		}
 	}
 	return nil
@@ -719,6 +748,7 @@ func newInformer(clientState Store, options InformerOptions) Controller {
 		fifo = NewDeltaFIFOWithOptions(DeltaFIFOOptions{
 			KnownObjects:          clientState,
 			EmitDeltaTypeReplaced: true,
+			EmitDeltaTypeBookmark: true,
 			Transformer:           options.Transform,
 		})
 	}

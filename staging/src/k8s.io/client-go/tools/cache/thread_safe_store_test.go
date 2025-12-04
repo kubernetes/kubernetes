@@ -18,11 +18,14 @@ package cache
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -164,6 +167,179 @@ func TestThreadSafeStoreIndexingFunctionsWithMultipleValues(t *testing.T) {
 	assert.NoError(compare("foo", []string{}))
 	assert.NoError(compare("bar", []string{"key2"}))
 	assert.NoError(compare("baz", []string{}))
+}
+
+func TestThreadSafeStoreRV(t *testing.T) {
+	t.Run("Initial state", func(t *testing.T) {
+		store := NewThreadSafeStore(Indexers{}, Indices{}).(*threadSafeMap)
+		if rv := store.GetObservedResourceVersion(); rv != "" {
+			t.Errorf("Expected initial RV to be \"\", got %q", rv)
+		}
+	})
+
+	t.Run("Add Update and Delete", func(t *testing.T) {
+		store := NewThreadSafeStore(Indexers{}, Indices{}).(*threadSafeMap)
+
+		// Add obj with RV "10"
+		store.Add("key1", &metav1.ObjectMeta{ResourceVersion: "10"})
+		if rv := store.GetObservedResourceVersion(); rv != "10" {
+			t.Errorf("Expected RV to be \"10\", got %q", rv)
+		}
+
+		// Add obj with lower RV "5"
+		store.Add("key2", &metav1.ObjectMeta{ResourceVersion: "5"})
+		if rv := store.GetObservedResourceVersion(); rv != "10" {
+			t.Errorf("Expected RV to remain \"10\" after adding lower RV, got %q", rv)
+		}
+
+		// Add obj with same RV "10"
+		store.Add("key3", &metav1.ObjectMeta{ResourceVersion: "10"})
+		if rv := store.GetObservedResourceVersion(); rv != "10" {
+			t.Errorf("Expected RV to remain \"10\" after adding same RV, got %q", rv)
+		}
+
+		// Add obj with higher RV "20"
+		store.Add("key4", &metav1.ObjectMeta{ResourceVersion: "20"})
+		if rv := store.GetObservedResourceVersion(); rv != "20" {
+			t.Errorf("Expected RV to be \"20\", got %q", rv)
+		}
+
+		// Update obj with lower RV "15"
+		store.Update("key4", &metav1.ObjectMeta{ResourceVersion: "15"})
+		if rv := store.GetObservedResourceVersion(); rv != "20" {
+			t.Errorf("Expected RV to remain \"20\" after updating with lower RV, got %q", rv)
+		}
+
+		// Add obj with invalid RV "abc" (should be ignored due to comparison error)
+		store.Add("key5", &metav1.ObjectMeta{ResourceVersion: "abc"})
+		if rv := store.GetObservedResourceVersion(); rv != "20" {
+			t.Errorf("Expected RV to remain \"20\" after adding invalid RV, got %q", rv)
+		}
+
+		// Delete an earlier object with a newer RV
+		store.DeleteWithObject("key4", &metav1.ObjectMeta{ResourceVersion: "30"})
+		if rv := store.GetObservedResourceVersion(); rv != "30" {
+			t.Errorf("Expected RV to become \"30\" after deletion %q", rv)
+		}
+
+		// Add obj with no RV
+		store.Add("key6", &metav1.ObjectMeta{ResourceVersion: ""})
+		if rv := store.GetObservedResourceVersion(); rv != "30" {
+			t.Errorf("Expected RV to remain \"30\" after adding empty RV, got %q", rv)
+		}
+
+		// Add non-meta object
+		store.Add("key7", "just a string")
+		if rv := store.GetObservedResourceVersion(); rv != "30" {
+			t.Errorf("Expected RV to remain \"30\" after adding non-meta object, got %q", rv)
+		}
+
+		// Nil delete
+		store.Delete("key8")
+		if rv := store.GetObservedResourceVersion(); rv != "30" {
+			t.Errorf("Expected RV to remain \"30\" after delete, got %q", rv)
+		}
+
+		txns := []ThreadSafeStoreTransaction{
+			{
+				Transaction{
+					Object: &metav1.ObjectMeta{ResourceVersion: "40"},
+					Type:   TransactionTypeUpdate,
+				},
+				"key9",
+			},
+			{
+				Transaction{
+					Object: &metav1.ObjectMeta{ResourceVersion: "30"},
+					Type:   TransactionTypeUpdate,
+				},
+				"key10",
+			},
+			{
+				Transaction{
+					Object: &metav1.ObjectMeta{ResourceVersion: "50"},
+					Type:   TransactionTypeUpdate,
+				},
+				"key11",
+			},
+		}
+		store.Transaction(txns...)
+		if rv := store.GetObservedResourceVersion(); rv != "50" {
+			t.Errorf("Expected RV to be \"50\" after transaction, got %q", rv)
+		}
+	})
+
+	t.Run("Replace", func(t *testing.T) {
+		store := NewThreadSafeStore(Indexers{}, Indices{}).(*threadSafeMap)
+		store.Add("key1", &metav1.ObjectMeta{ResourceVersion: "10"})
+
+		if rv := store.GetObservedResourceVersion(); rv != "10" {
+			t.Fatalf("Setup failed, expected RV \"10\", got %q", rv)
+		}
+
+		items := map[string]interface{}{
+			"key3": &metav1.ObjectMeta{ResourceVersion: "40"},
+			"key2": &metav1.ObjectMeta{ResourceVersion: "30"},
+		}
+
+		store.Replace(items, "50")
+
+		if rv := store.GetObservedResourceVersion(); rv != "50" {
+			t.Errorf("Expected RV to be \"50\" after Replace(), got %q", rv)
+		}
+	})
+
+	t.Run("Delete", func(t *testing.T) {
+		store := NewThreadSafeStore(Indexers{}, Indices{}).(*threadSafeMap)
+		store.Add("key1", &metav1.ObjectMeta{ResourceVersion: "10"})
+
+		if rv := store.GetObservedResourceVersion(); rv != "10" {
+			t.Fatalf("Setup failed, expected RV \"10\", got %q", rv)
+		}
+
+		store.DeleteWithObject("key1", &metav1.ObjectMeta{ResourceVersion: "20"})
+
+		if rv := store.GetObservedResourceVersion(); rv != "20" {
+			t.Errorf("Expected RV to be \"20\" after Delete(), got %q", rv)
+		}
+	})
+
+	t.Run("Concurrency", func(t *testing.T) {
+		store := NewThreadSafeStore(Indexers{}, Indices{}).(*threadSafeMap)
+
+		var wg sync.WaitGroup
+		numWriters := 50
+		numReaders := 50
+
+		// Start writers
+		for i := 0; i < numWriters; i++ {
+			wg.Add(1)
+			go func(rv int) {
+				defer wg.Done()
+				key := fmt.Sprintf("key-%d", rv)
+				// RVs will be "1", "3", "5", ..., "99"
+				obj := &metav1.ObjectMeta{ResourceVersion: strconv.Itoa(rv*2 + 1)}
+				store.Add(key, obj)
+			}(i)
+		}
+
+		// Start readers
+		for i := 0; i < numReaders; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				_ = store.GetObservedResourceVersion()
+			}()
+		}
+
+		wg.Wait()
+
+		// The highest RV will be from i=49. (49*2 + 1) = 99
+		expectedRV := "99"
+		if rv := store.GetObservedResourceVersion(); rv != expectedRV {
+			t.Errorf("Expected final RV to be %q after concurrent access, got %q", expectedRV, rv)
+		}
+	})
 }
 
 func BenchmarkIndexer(b *testing.B) {
