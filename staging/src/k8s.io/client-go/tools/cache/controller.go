@@ -27,6 +27,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientgofeaturegate "k8s.io/client-go/features"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 )
 
@@ -141,6 +142,9 @@ type Controller interface {
 	// HasSynced delegates to the Config's Queue
 	HasSynced() bool
 
+	// NamedHasSynced delegates to the Config's Queue
+	NamedHasSynced() NamedSyncer
+
 	// LastSyncResourceVersion delegates to the Reflector when there
 	// is one, otherwise returns the empty string
 	LastSyncResourceVersion() string
@@ -167,11 +171,13 @@ func (c *controller) RunWithContext(ctx context.Context) {
 		<-ctx.Done()
 		c.config.Queue.Close()
 	}()
+	logger := klog.FromContext(ctx)
 	r := NewReflectorWithOptions(
 		c.config.ListerWatcher,
 		c.config.ObjectType,
 		c.config.Queue,
 		ReflectorOptions{
+			Logger:          &logger,
 			ResyncPeriod:    c.config.FullResyncPeriod,
 			MinWatchTimeout: c.config.MinWatchTimeout,
 			TypeDescription: c.config.ObjectDescription,
@@ -203,6 +209,11 @@ func (c *controller) RunWithContext(ctx context.Context) {
 // Returns true once this controller has completed an initial resource listing
 func (c *controller) HasSynced() bool {
 	return c.config.Queue.HasSynced()
+}
+
+// NamedHasSynced implements [Controller.NamedHasSynced].
+func (c *controller) NamedHasSynced() NamedSyncer {
+	return c.config.Queue.NamedHasSynced()
 }
 
 func (c *controller) LastSyncResourceVersion() string {
@@ -395,6 +406,9 @@ func DeletionHandlingObjectToName(obj interface{}) (ObjectName, error) {
 
 // InformerOptions configure a Reflector.
 type InformerOptions struct {
+	// Logger, if not nil, is used instead of klog.Background() for logging.
+	Logger *klog.Logger
+
 	// ListerWatcher implements List and Watch functions for the source of the resource
 	// the informer will be informing about.
 	ListerWatcher ListerWatcher
@@ -709,14 +723,22 @@ func newInformer(clientState Store, options InformerOptions) Controller {
 	// of update/delete deltas.
 
 	var fifo Queue
+	logger := klog.Background()
+	if options.Logger != nil {
+		logger = *options.Logger
+	}
 	if clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.InOrderInformers) {
 		fifo = NewRealFIFOWithOptions(RealFIFOOptions{
+			Logger:       &logger,
+			Name:         fmt.Sprintf("RealFIFO %T", options.ObjectType),
 			KeyFunction:  MetaNamespaceKeyFunc,
 			KnownObjects: clientState,
 			Transformer:  options.Transform,
 		})
 	} else {
 		fifo = NewDeltaFIFOWithOptions(DeltaFIFOOptions{
+			Logger:                &logger,
+			Name:                  fmt.Sprintf("DeltaFIFO %T", options.ObjectType),
 			KnownObjects:          clientState,
 			EmitDeltaTypeReplaced: true,
 			Transformer:           options.Transform,
