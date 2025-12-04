@@ -419,7 +419,10 @@ func (r *Reflector) ListAndWatchWithContext(ctx context.Context) error {
 			return nil
 		}
 		if err != nil {
-			logger.Error(err, "The watchlist request ended with an error, falling back to the standard LIST/WATCH semantics because making progress is better than deadlocking")
+			logger.V(4).Info(
+				"Data couldn't be fetched in watchlist mode. Falling back to regular list. This is expected if watchlist is not supported or disabled in kube-apiserver.",
+				"err", err,
+			)
 			fallbackToList = true
 			// ensure that we won't accidentally pass some garbage down the watch.
 			w = nil
