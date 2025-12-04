@@ -30,9 +30,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/kubernetes/pkg/controller/servicecidrs"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/utils/ktesting"
@@ -569,6 +571,80 @@ func TestFlagsIPAllocator(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
+	}
+
+}
+
+// regression test for https://issues.k8s.io/135333
+func TestInvalidService(t *testing.T) {
+	etcdOptions := framework.SharedEtcd()
+	apiServerOptions := kubeapiservertesting.NewDefaultTestServerOptions()
+	s := kubeapiservertesting.StartTestServerOrDie(t,
+		apiServerOptions,
+		[]string{
+			"--service-cluster-ip-range=10.0.0.0/24",
+			"--disable-admission-plugins=ServiceAccount",
+		},
+		etcdOptions)
+	defer s.TearDownFn()
+
+	client, err := clientset.NewForConfig(s.ClientConfig)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	// ServiceCIDR controller
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	resyncPeriod := 12 * time.Hour
+	informerFactory := informers.NewSharedInformerFactory(client, resyncPeriod)
+	go servicecidrs.NewController(
+		ctx,
+		informerFactory.Networking().V1().ServiceCIDRs(),
+		informerFactory.Networking().V1().IPAddresses(),
+		client,
+	).Run(ctx, 5)
+	informerFactory.Start(ctx.Done())
+	informerFactory.WaitForCacheSync(ctx.Done())
+
+	// Add a new service CIDR to be able to create new IPs.
+	cidr := makeServiceCIDR("test2", "10.168.0.0/24", "")
+	if _, err := client.NetworkingV1().ServiceCIDRs().Create(context.Background(), cidr, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("got unexpected error: %v", err)
+	}
+	// wait ServiceCIDR is ready
+	if err := wait.PollUntilContextTimeout(context.Background(), 1*time.Second, time.Minute, false, func(ctx context.Context) (bool, error) {
+		cidr, err := client.NetworkingV1().ServiceCIDRs().Get(context.TODO(), cidr.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		return isServiceCIDRReady(cidr), nil
+	}); err != nil {
+		t.Fatalf("waiting for service cidr ready condition %v", err)
+	}
+
+	// A service without a name keeps failing to allocate an IP address because
+	// it tries to create the IPAddress object with an invalid reference.
+	// Eventually the request times out causing high CPU usage during that time.
+	svc := &v1.Service{
+		Spec: v1.ServiceSpec{
+			Type: v1.ServiceTypeClusterIP,
+			Ports: []v1.ServicePort{
+				{Port: 80},
+			},
+		},
+	}
+
+	// The request can not time out during the allocation and should return an invalid error instead.
+	ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	// It will fail because the service is missing a name
+	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Create(ctx, svc, metav1.CreateOptions{})
+	if err == nil {
+		t.Fatalf("expected error")
+	}
+	if !apierrors.IsInvalid(err) {
+		t.Errorf("unexpected error reason: %v", err)
 	}
 
 }
