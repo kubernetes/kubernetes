@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -224,8 +225,9 @@ func runParallel(suite TestSuite, ginkgoConfig types.SuiteConfig, reporterConfig
 		args = append(args, additionalArgs...)
 
 		cmd, buf := buildAndStartCommand(suite, args, false)
+		var exited atomic.Bool
 		procOutput[proc-1] = buf
-		server.RegisterAlive(proc, func() bool { return cmd.ProcessState == nil || !cmd.ProcessState.Exited() })
+		server.RegisterAlive(proc, func() bool { return !exited.Load() })
 
 		go func() {
 			cmd.Wait()
@@ -234,6 +236,7 @@ func runParallel(suite TestSuite, ginkgoConfig types.SuiteConfig, reporterConfig
 				passed:               (exitStatus == 0) || (exitStatus == types.GINKGO_FOCUS_EXIT_CODE),
 				hasProgrammaticFocus: exitStatus == types.GINKGO_FOCUS_EXIT_CODE,
 			}
+			exited.Store(true)
 		}()
 	}
 
