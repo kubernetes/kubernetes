@@ -237,7 +237,14 @@ func (cache *EndpointSliceCache) addEndpoints(svcPortName *ServicePortName, port
 		// more-recently-updated EndpointSlice, since it may have newer
 		// conditions. But we can't easily figure that out, and the situation will
 		// resolve itself once we receive the second EndpointSlice update anyway.
-		if _, exists := endpointSet[endpointInfo.String()]; !exists {
+		//
+		// On the other hand, there maybe also be two *different* Endpoints (i.e.,
+		// with different targetRefs) that point to the same IP, if the pod
+		// network reuses the IP from a terminating pod before the Pod object is
+		// fully deleted. In this case we want to prefer the running pod over the
+		// terminating one. (If there are multiple non-terminating pods with the
+		// same podIP, then the result is undefined.)
+		if _, exists := endpointSet[endpointInfo.String()]; !exists || !terminating {
 			endpointSet[endpointInfo.String()] = cache.makeEndpointInfo(endpointInfo, svcPortName)
 		}
 	}
