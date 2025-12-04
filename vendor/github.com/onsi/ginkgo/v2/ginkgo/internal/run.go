@@ -160,12 +160,15 @@ func runSerial(suite TestSuite, ginkgoConfig types.SuiteConfig, reporterConfig t
 
 func runParallel(suite TestSuite, ginkgoConfig types.SuiteConfig, reporterConfig types.ReporterConfig, cliConfig types.CLIConfig, goFlagsConfig types.GoFlagsConfig, additionalArgs []string) TestSuite {
 	type procResult struct {
+		proc                 int
 		passed               bool
 		hasProgrammaticFocus bool
+		exitResult           string
 	}
 
 	numProcs := cliConfig.ComputedProcs()
 	procOutput := make([]*bytes.Buffer, numProcs)
+	procExitResult := make([]string, numProcs)
 	coverProfiles := []string{}
 
 	blockProfiles := []string{}
@@ -233,8 +236,10 @@ func runParallel(suite TestSuite, ginkgoConfig types.SuiteConfig, reporterConfig
 			cmd.Wait()
 			exitStatus := cmd.ProcessState.Sys().(syscall.WaitStatus).ExitStatus()
 			procResults <- procResult{
+				proc:                 proc,
 				passed:               (exitStatus == 0) || (exitStatus == types.GINKGO_FOCUS_EXIT_CODE),
 				hasProgrammaticFocus: exitStatus == types.GINKGO_FOCUS_EXIT_CODE,
+				exitResult:           cmd.ProcessState.String(),
 			}
 			exited.Store(true)
 		}()
@@ -245,6 +250,7 @@ func runParallel(suite TestSuite, ginkgoConfig types.SuiteConfig, reporterConfig
 		result := <-procResults
 		passed = passed && result.passed
 		suite.HasProgrammaticFocus = suite.HasProgrammaticFocus || result.hasProgrammaticFocus
+		procExitResult[result.proc-1] = result.exitResult
 	}
 	if passed {
 		suite.State = TestSuiteStatePassed
@@ -264,6 +270,8 @@ func runParallel(suite TestSuite, ginkgoConfig types.SuiteConfig, reporterConfig
 		for proc := 1; proc <= cliConfig.ComputedProcs(); proc++ {
 			fmt.Fprintf(formatter.ColorableStdErr, formatter.F("{{bold}}Output from proc %d:{{/}}\n", proc))
 			fmt.Fprintln(os.Stderr, formatter.Fi(1, "%s", procOutput[proc-1].String()))
+			fmt.Fprintf(formatter.ColorableStdErr, formatter.F("{{bold}}Exit result of proc %d:{{/}}\n", proc))
+			fmt.Fprintln(os.Stderr, formatter.Fi(1, "%s\n", procExitResult[proc-1]))
 		}
 		fmt.Fprintf(os.Stderr, "** End **")
 	}
