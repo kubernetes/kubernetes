@@ -232,10 +232,12 @@ func (cache *EndpointSliceCache) addEndpoints(svcPortName *ServicePortName, port
 		endpointInfo := newBaseEndpointInfo(endpointIP, portNum, isLocal,
 			ready, serving, terminating, zoneHints, nodeHints)
 
-		// This logic ensures we're deduplicating potential overlapping endpoints
-		// isLocal should not vary between matching endpoints, but if it does, we
-		// favor a true value here if it exists.
-		if _, exists := endpointSet[endpointInfo.String()]; !exists || isLocal {
+		// If an Endpoint gets moved from one slice to another, we may temporarily
+		// see it in both slices. Ideally we want to prefer the Endpoint from the
+		// more-recently-updated EndpointSlice, since it may have newer
+		// conditions. But we can't easily figure that out, and the situation will
+		// resolve itself once we receive the second EndpointSlice update anyway.
+		if _, exists := endpointSet[endpointInfo.String()]; !exists {
 			endpointSet[endpointInfo.String()] = cache.makeEndpointInfo(endpointInfo, svcPortName)
 		}
 	}
