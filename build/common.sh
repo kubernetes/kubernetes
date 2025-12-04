@@ -621,7 +621,7 @@ function kube::build::start_rsyncd_container() {
   fi
 
   local container_ip
-  container_ip=$("${DOCKER[@]}" inspect --format '{{ .NetworkSettings.IPAddress }}' "${KUBE_RSYNC_CONTAINER_NAME}")
+  container_ip=$("${DOCKER[@]}" inspect --format '{{range .NetworkSettings.Networks}}{{.IPAddress}},{{end}}' "${KUBE_RSYNC_CONTAINER_NAME}" | cut -d',' -f1)
 
   # Sometimes we can reach rsync through localhost and a NAT'd port.  Other
   # times (when we are running in another docker container on the Jenkins
