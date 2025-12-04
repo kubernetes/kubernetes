@@ -61,14 +61,14 @@ var _ = SIGDescribe("ResourceMetricsAPI", feature.ResourceMetrics, func() {
 
 			keys := []string{
 				"resource_scrape_error", "node_cpu_usage_seconds_total", "node_memory_working_set_bytes",
-				"pod_cpu_usage_seconds_total", "pod_memory_working_set_bytes", "node_swap_usage_bytes",
+				"pod_cpu_usage_seconds_total", "pod_memory_working_set_bytes",
+				"container_cpu_usage_seconds_total", "container_memory_working_set_bytes", "container_start_time_seconds",
 				"container_swap_usage_bytes", "pod_swap_usage_bytes",
 			}
 
-			// NOTE: This check should be removed when ListMetricDescriptors is implemented
-			// by CRI-O and Containerd
+			// node_swap_usage_bytes requires cAdvisor which is not available when PodAndContainerStatsFromCRI is enabled
 			if !e2eskipper.IsFeatureGateEnabled(features.PodAndContainerStatsFromCRI) {
-				keys = append(keys, "container_cpu_usage_seconds_total", "container_memory_working_set_bytes", "container_start_time_seconds")
+				keys = append(keys, "node_swap_usage_bytes")
 			}
 
 			zeroSampe := boundedSample(0, 0)
@@ -129,9 +129,23 @@ var _ = SIGDescribe("ResourceMetricsAPI", feature.ResourceMetrics, func() {
 				haveKeys(keys...),
 			)
 			ginkgo.By("Giving pods a minute to start up and produce metrics")
-			gomega.Eventually(ctx, getResourceMetrics, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics)
+			gomega.Eventually(ctx, func(ctx context.Context) (e2emetrics.KubeletMetrics, error) {
+				metrics, err := getResourceMetrics(ctx)
+				if err == nil {
+					// Dump metrics on each attempt to help diagnose failures
+					dumpResourceMetricsForPods(metrics, f.Namespace.Name, pod0, pod1)
+				}
+				return metrics, err
+			}, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics, "Resource metrics did not match expected values. Check the 'Resource Metrics Dump' above for actual values.")
+
 			ginkgo.By("Ensuring the metrics match the expectations a few more times")
-			gomega.Consistently(ctx, getResourceMetrics, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics)
+			gomega.Consistently(ctx, func(ctx context.Context) (e2emetrics.KubeletMetrics, error) {
+				metrics, err := getResourceMetrics(ctx)
+				if err == nil {
+					dumpResourceMetricsForPods(metrics, f.Namespace.Name, pod0, pod1)
+				}
+				return metrics, err
+			}, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics, "Resource metrics became inconsistent. Check logs for actual values.")
 		})
 		ginkgo.AfterEach(func(ctx context.Context) {
 			removeMetricsPods(ctx, f)
@@ -160,6 +174,62 @@ func createMetricsPods(ctx context.Context, f *framework.Framework) {
 func getResourceMetrics(ctx context.Context) (e2emetrics.KubeletMetrics, error) {
 	ginkgo.By("getting stable resource metrics API")
 	return e2emetrics.GrabKubeletMetricsWithoutProxy(ctx, nodeNameOrIP()+":10255", "/metrics/resource")
+}
+
+// dumpResourceMetricsForPods logs the actual metric values for specified pods in a clear format.
+// This helps diagnose test failures by showing exactly what values were returned.
+func dumpResourceMetricsForPods(metrics e2emetrics.KubeletMetrics, namespace string, podNames ...string) {
+	framework.Logf("=== Resource Metrics Dump for Test Pods ===")
+	framework.Logf("Namespace: %s, Pods: %v", namespace, podNames)
+
+	// Define the metrics we care about and their expected ranges for documentation
+	type metricInfo struct {
+		name        string
+		expectedMin string
+		expectedMax string
+		usesPodID   bool // true for pod-level, false for container-level
+	}
+	metricsToCheck := []metricInfo{
+		{"container_cpu_usage_seconds_total", "0", "100", false},
+		{"container_memory_working_set_bytes", "10KB", "80MB", false},
+		{"container_start_time_seconds", "now-1min", "now+2min", false},
+		{"container_swap_usage_bytes", "0", "0", false},
+		{"container_swap_limit_bytes", "0", "80MB", false},
+		{"pod_cpu_usage_seconds_total", "0", "100", true},
+		{"pod_memory_working_set_bytes", "10KB", "80MB", true},
+		{"pod_swap_usage_bytes", "0", "80MB", true},
+	}
+
+	for _, mi := range metricsToCheck {
+		samples, exists := metrics[mi.name]
+		if !exists {
+			framework.Logf("  MISSING METRIC: %s", mi.name)
+			continue
+		}
+
+		framework.Logf("  %s (expected: %s to %s):", mi.name, mi.expectedMin, mi.expectedMax)
+		foundAny := false
+		for _, sample := range samples {
+			sampleNS := string(sample.Metric["namespace"])
+			samplePod := string(sample.Metric["pod"])
+			sampleContainer := string(sample.Metric["container"])
+
+			for _, podName := range podNames {
+				if sampleNS == namespace && samplePod == podName {
+					foundAny = true
+					if mi.usesPodID {
+						framework.Logf("    %s::%s = %v", sampleNS, samplePod, sample.Value)
+					} else {
+						framework.Logf("    %s::%s::%s = %v", sampleNS, samplePod, sampleContainer, sample.Value)
+					}
+				}
+			}
+		}
+		if !foundAny {
+			framework.Logf("    NO SAMPLES FOUND for pods %v in namespace %s", podNames, namespace)
+		}
+	}
+	framework.Logf("=== End Resource Metrics Dump ===")
 }
 
 func nodeID(element interface{}) string {
