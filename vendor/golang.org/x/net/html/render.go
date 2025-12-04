@@ -184,7 +184,7 @@ func render1(w writer, n *Node) error {
 		return err
 	}
 
-	// Add initial newline where there is danger of a newline beging ignored.
+	// Add initial newline where there is danger of a newline being ignored.
 	if c := n.FirstChild; c != nil && c.Type == TextNode && strings.HasPrefix(c.Data, "\n") {
 		switch n.Data {
 		case "pre", "listing", "textarea":
