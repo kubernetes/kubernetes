@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2025 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,16 +16,19 @@ limitations under the License.
 
 package remotecommand
 
-import (
-	utilremotecommand "k8s.io/apimachinery/pkg/util/remotecommand"
-)
-
 // TerminalSize represents the width and height of a terminal.
-// This is an alias to the shared type in k8s.io/apimachinery/pkg/util/remotecommand
-// to maintain API compatibility while using a shared implementation.
-type TerminalSize = utilremotecommand.TerminalSize
+// This type is shared between k8s.io/kubectl/pkg/util/term and k8s.io/client-go/tools/remotecommand
+// to avoid dependency duplication while maintaining package decoupling.
+type TerminalSize struct {
+	Width  uint16
+	Height uint16
+}
 
 // TerminalSizeQueue is capable of returning terminal resize events as they occur.
-// This is an alias to the shared interface in k8s.io/apimachinery/pkg/util/remotecommand
-// to maintain API compatibility while using a shared implementation.
-type TerminalSizeQueue = utilremotecommand.TerminalSizeQueue
+// This interface is shared between k8s.io/kubectl/pkg/util/term and k8s.io/client-go/tools/remotecommand
+// to avoid dependency duplication while maintaining package decoupling.
+type TerminalSizeQueue interface {
+	// Next returns the new terminal size after the terminal has been resized. It returns nil when
+	// monitoring has been stopped.
+	Next() *TerminalSize
+}

@@ -20,25 +20,19 @@ import (
 	"fmt"
 
 	"github.com/moby/term"
+	"k8s.io/apimachinery/pkg/util/remotecommand"
 	"k8s.io/apimachinery/pkg/util/runtime"
 )
 
 // TerminalSize represents the width and height of a terminal.
-// It is the same as staging/src/k8s.io/client-go/tools/remotecommand.TerminalSize.
-// Copied to decouple the packages. Terminal-related package should not depend on API client and vice versa.
-type TerminalSize struct {
-	Width  uint16
-	Height uint16
-}
+// This is an alias to the shared type in k8s.io/apimachinery/pkg/util/remotecommand
+// to maintain API compatibility while using a shared implementation.
+type TerminalSize = remotecommand.TerminalSize
 
 // TerminalSizeQueue is capable of returning terminal resize events as they occur.
-// It is the same as staging/src/k8s.io/client-go/tools/remotecommand.TerminalSizeQueue.
-// Copied to decouple the packages. Terminal-related package should not depend on API client and vice versa.
-type TerminalSizeQueue interface {
-	// Next returns the new terminal size after the terminal has been resized. It returns nil when
-	// monitoring has been stopped.
-	Next() *TerminalSize
-}
+// This is an alias to the shared interface in k8s.io/apimachinery/pkg/util/remotecommand
+// to maintain API compatibility while using a shared implementation.
+type TerminalSizeQueue = remotecommand.TerminalSizeQueue
 
 // GetSize returns the current size of the user's terminal. If it isn't a terminal,
 // nil is returned.
