@@ -88,9 +88,6 @@ func NewEtcdJoinPhase() workflow.Phase {
 		Example:       etcdJoinExample,
 		InheritFlags:  getControlPlaneJoinPhaseFlags("etcd"),
 		ArgsValidator: cobra.NoArgs,
-		// TODO: unhide this phase once ControlPlaneKubeletLocalMode goes GA:
-		// https://github.com/kubernetes/enhancements/issues/4471
-		Hidden: true,
 		// Only run this phase as if `ControlPlaneKubeletLocalMode` is activated.
 		RunIf: func(c workflow.RunData) (bool, error) {
 			return checkFeatureState(c, features.ControlPlaneKubeletLocalMode, true)
