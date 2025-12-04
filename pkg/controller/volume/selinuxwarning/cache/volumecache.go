@@ -114,11 +114,19 @@ func (c *volumeCache) AddVolume(logger klog.Logger, volumeName v1.UniqueVolumeNa
 	}
 
 	// The volume is already known
-	// Add the pod to the cache or update its properties
-	volume.pods[podKey] = podInfo{
+	podInfo := podInfo{
 		seLinuxLabel: label,
 		changePolicy: changePolicy,
 	}
+	oldPodInfo, found := volume.pods[podKey]
+	if found && oldPodInfo == podInfo {
+		// The Pod is already known too and nothing changed since the last update.
+		// All conflicts were already reported when the Pod was added / updated in the cache last time.
+		return conflicts
+	}
+
+	// Add the updated pod info to the cache
+	volume.pods[podKey] = podInfo
 
 	// Emit conflicts for the pod
 	for otherPodKey, otherPodInfo := range volume.pods {
