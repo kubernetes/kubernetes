@@ -516,6 +516,46 @@ func (q *Quantity) AsFloat64Slow() float64 {
 // is possible. If false is returned, callers must use the inf.Dec form of this quantity.
 func (q *Quantity) AsInt64() (int64, bool) {
 	if q.d.Dec != nil {
+		// Attempt to convert inf.Dec to int64 if the value is representable
+		// In inf.Dec, the value is: unscaled * 10^(-scale)
+		dec := q.d.Dec
+		scale := dec.Scale()
+		unscaled := dec.UnscaledBig()
+
+		if scale == 0 {
+			// Value is the unscaled big int directly
+			if unscaled.IsInt64() {
+				return unscaled.Int64(), true
+			}
+			return 0, false
+		}
+
+		if scale > 0 {
+			// Value = unscaled / 10^scale
+			// Check if unscaled is exactly divisible by 10^scale
+			divisor := big.NewInt(10)
+			divisor.Exp(divisor, big.NewInt(int64(scale)), nil)
+			quotient := new(big.Int)
+			remainder := new(big.Int)
+			quotient.DivMod(unscaled, divisor, remainder)
+			// If there's a remainder, the value has a fractional component
+			if remainder.Sign() != 0 {
+				return 0, false
+			}
+			if quotient.IsInt64() {
+				return quotient.Int64(), true
+			}
+			return 0, false
+		}
+
+		// scale < 0: value = unscaled * 10^(-scale)
+		// Need to multiply, which could overflow
+		multiplier := big.NewInt(10)
+		multiplier.Exp(multiplier, big.NewInt(int64(-scale)), nil)
+		result := new(big.Int).Mul(unscaled, multiplier)
+		if result.IsInt64() {
+			return result.Int64(), true
+		}
 		return 0, false
 	}
 	return q.i.AsInt64()
