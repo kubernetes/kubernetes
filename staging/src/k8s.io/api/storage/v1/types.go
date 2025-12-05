@@ -586,6 +586,7 @@ type CSINodeDriver struct {
 	// +k8s:required
 	// +k8s:format=k8s-long-name-caseless
 	// +k8s:maxLength=63
+	// +k8s:immutable
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 
 	// nodeID of the node from the driver point of view.
