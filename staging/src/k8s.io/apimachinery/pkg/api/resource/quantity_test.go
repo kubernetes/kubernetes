@@ -553,6 +553,71 @@ func TestQuantityParse(t *testing.T) {
 	}
 }
 
+// TestQuantityParseInt tests that various integer quantities parse correctly
+// and that they can be represented as int64.
+func TestQuantityParseInt(t *testing.T) {
+	table := []struct {
+		input  string
+		expect Quantity
+	}{
+		{"0", intQuantity(0, 0, DecimalSI)},
+		{"2048", intQuantity(2048, 0, DecimalSI)},
+		{"1k", intQuantity(1000, 0, DecimalSI)},
+		{"1.3E+6", intQuantity(13, 5, DecimalExponent)},
+		// value larger than 1000000000000000000(1e18) previously failed because maxInt64Factors = 18, see issue#135487
+		{"1000000000000000000", intQuantity(1000000000000000000, 0, DecimalSI)},
+		{"9223372036854775807", intQuantity(mostPositive, 0, DecimalSI)},
+		{"-9223372036854775807", intQuantity(mostNegative+1, 0, DecimalSI)},
+	}
+
+	for _, item := range table {
+		got, err := ParseQuantity(item.input)
+		if err != nil {
+			t.Errorf("%v: unexpected error: %v", item.input, err)
+			continue
+		}
+
+		if e, a := item.expect, got; e.Cmp(a) != 0 {
+			t.Errorf("%v: expected %v, got %v", item.input, e.String(), a.String())
+		}
+		if e, a := item.expect.Format, got.Format; e != a {
+			t.Errorf("%v: expected %#v, got %#v", item.input, e, a)
+		}
+
+		i, ok := item.expect.AsInt64()
+		if !ok {
+			continue
+		}
+		j, ok := got.AsInt64()
+		if !ok {
+			if got.d.Dec == nil && got.i.scale >= 0 {
+				t.Errorf("%v: is an int64Amount, but can't return AsInt64: %v", item.input, got)
+			}
+			continue
+		}
+		if i != j {
+			t.Errorf("%v: expected equivalent representation as int64: %d %d", item.input, i, j)
+		}
+	}
+
+	invalidInt := []string{
+		"1.0",
+		"9223372036854775808",  // mostPositive + 1
+		"-9223372036854775809", // mostNegative - 1
+	}
+
+	for _, item := range invalidInt {
+		got, err := ParseQuantity(item)
+		if err != nil {
+			t.Errorf("%v: unexpected error: %v", item, err)
+		}
+		val, ok := got.AsInt64()
+		if ok {
+			t.Errorf("%v: expected not to be able to convert to int64, got %d", item, val)
+		}
+	}
+}
+
 func TestQuantityRoundUp(t *testing.T) {
 	table := []struct {
 		in     string
