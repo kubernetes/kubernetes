@@ -300,6 +300,15 @@ func ParseQuantity(str string) (Quantity, error) {
 	case DecimalExponent, DecimalSI:
 		scale = exponent
 		precision = maxInt64Factors - int32(len(num)+len(denom))
+		// when maxInt64Factors (18) yields -1 (19 digits), parse num+denom to verify if it
+		// still fits in int64 (≤ MaxInt64). On success, enable the fast path (precision = 0).
+		if precision == -1 {
+			shifted := num + denom
+			_, err := strconv.ParseInt(shifted, 10, 64)
+			if err == nil {
+				precision = 0 // enable the fast path
+			}
+		}
 	case BinarySI:
 		scale = 0
 		switch {
