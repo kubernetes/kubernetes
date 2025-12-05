@@ -434,6 +434,7 @@ func (tc *Controller) maybeDeletePod(ctx context.Context, podRef tainteviction.N
 			// Doing this immediately is not useful because
 			// it would just race with the informers update
 			// (rule status reads from cache!).
+			tc.logger.V(5).Info("Adding delayed status update because of pod eviction", "deviceTaintRule", klog.KObj(reason.rule), "delay", ruleStatusPeriod)
 			tc.workqueue.AddAfter(workItemForRule(reason.rule), ruleStatusPeriod)
 		}
 	}
@@ -1016,7 +1017,14 @@ func (tc *Controller) Run(ctx context.Context, numWorkers int) error {
 func (tc *Controller) evictPod(podRef tainteviction.NamespacedObject, eviction evictionAndReason) {
 	tc.deletePodAt[podRef] = eviction
 	now := time.Now()
-	tc.workqueue.AddAfter(workItem{podRef: podRef}, eviction.when.Sub(now))
+	delay := eviction.when.Sub(now)
+	if delay <= 0 {
+		tc.logger.V(3).Info("Adding immediate pod eviction", "pod", podRef, "eviction", eviction)
+		tc.workqueue.Add(workItem{podRef: podRef})
+	} else {
+		tc.logger.V(3).Info("Adding delayed pod eviction", "pod", podRef, "eviction", eviction, "delay", delay)
+		tc.workqueue.AddAfter(workItem{podRef: podRef}, delay)
+	}
 
 	if tc.evictPodHook != nil {
 		tc.evictPodHook(podRef, eviction)
@@ -1275,7 +1283,8 @@ func (tc *Controller) handleRuleChange(oldRule, newRule *resourcealpha.DeviceTai
 	}
 
 	if oldRule == nil {
-		// Update the status at least once.
+		// Update the status at least once, immediately and before evicting any pods.
+		tc.logger.V(5).Info("Adding immediate status update because of new rule", "deviceTaintRule", klog.KObj(newRule))
 		tc.workqueue.Add(workItemForRule(newRule))
 	}
 
@@ -1289,9 +1298,13 @@ func (tc *Controller) handleRuleChange(oldRule, newRule *resourcealpha.DeviceTai
 
 	if oldRule != nil &&
 		newRule != nil &&
-		oldRule.UID == newRule.UID &&
-		apiequality.Semantic.DeepEqual(&oldRule.Spec, &newRule.Spec) {
-		return
+		oldRule.UID == newRule.UID {
+		if apiequality.Semantic.DeepEqual(&oldRule.Spec, &newRule.Spec) {
+			return
+		}
+		// Update the status at least once, immediately and before evicting any pods.
+		tc.logger.V(5).Info("Adding immediate status update because of modified rule spec", "deviceTaintRule", klog.KObj(newRule))
+		tc.workqueue.Add(workItemForRule(newRule))
 	}
 
 	// Rule spec changes should be rare. Simply do a brute-force re-evaluation of all allocated claims.
@@ -1475,13 +1488,14 @@ func (tc *Controller) handlePod(pod *v1.Pod) {
 		return
 	}
 
-	tc.logger.V(3).Info("Going to evict pod", "pod", podRef, "eviction", eviction)
 	tc.evictPod(podRef, *eviction)
 
 	// If any reason is because of a taint, then eviction is in progress and the status may need to be updated.
+	// But don't do it immediately because more pod changes may be coming in.
 	for _, reason := range eviction.reason {
 		if reason.rule != nil {
-			tc.workqueue.Add(workItemForRule(reason.rule))
+			tc.logger.V(5).Info("Adding delayed status update because of pod change", "deviceTaintRule", klog.KObj(reason.rule), "delay", ruleStatusPeriod)
+			tc.workqueue.AddAfter(workItemForRule(reason.rule), ruleStatusPeriod)
 		}
 	}
 }
