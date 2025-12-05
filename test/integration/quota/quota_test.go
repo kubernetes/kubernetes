@@ -90,7 +90,10 @@ func TestQuota(t *testing.T) {
 
 	discoveryFunc := clientset.Discovery().ServerPreferredNamespacedResources
 	listerFuncForResource := generic.ListerFuncForResourceFunc(informers.ForResource)
-	qc := quotainstall.NewQuotaConfigurationForControllers(listerFuncForResource, nil)
+	qc, err := quotainstall.NewQuotaConfigurationForControllers(listerFuncForResource, nil)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
 	informersStarted := make(chan struct{})
 	resourceQuotaControllerOptions := &resourcequotacontroller.ControllerOptions{
 		QuotaClient:               clientset.CoreV1(),
@@ -319,7 +322,10 @@ plugins:
 
 	discoveryFunc := clientset.Discovery().ServerPreferredNamespacedResources
 	listerFuncForResource := generic.ListerFuncForResourceFunc(informers.ForResource)
-	qc := quotainstall.NewQuotaConfigurationForControllers(listerFuncForResource, nil)
+	qc, err := quotainstall.NewQuotaConfigurationForControllers(listerFuncForResource, nil)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
 	informersStarted := make(chan struct{})
 	resourceQuotaControllerOptions := &resourcequotacontroller.ControllerOptions{
 		QuotaClient:               clientset.CoreV1(),
@@ -445,7 +451,10 @@ plugins:
 
 	discoveryFunc := clientset.Discovery().ServerPreferredNamespacedResources
 	listerFuncForResource := generic.ListerFuncForResourceFunc(informers.ForResource)
-	qc := quotainstall.NewQuotaConfigurationForControllers(listerFuncForResource, nil)
+	qc, err := quotainstall.NewQuotaConfigurationForControllers(listerFuncForResource, nil)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
 	informersStarted := make(chan struct{})
 	resourceQuotaControllerOptions := &resourcequotacontroller.ControllerOptions{
 		QuotaClient:               clientset.CoreV1(),
