@@ -2424,7 +2424,7 @@ func synctestDeviceTaintRule(tCtx ktesting.TContext) {
 	tCtx.Wait()
 	evicted := metav1.Now()
 	tCtx.Logf("TIME: eviction done at %s", evicted)
-	check(tCtx, "evict: ", l(inProgress(rule, true, "PodsPendingEviction", "1 pod needs to be evicted in 1 namespace.", &evicted)), nil)
+	check(tCtx, "evict: ", l(inProgress(rule, true, "PodsPendingEviction", `^1 pod needs to be evicted in 1 namespace\.( 1 pod evicted since starting the controller\.)?$`, &evicted)), nil)
 
 	// AddAfter does not move time forward. Do it ourselves...
 	time.Sleep(ruleStatusPeriod)
@@ -2455,6 +2455,8 @@ func check(tCtx ktesting.TContext, prefix string, expectRules []*resourcealpha.D
 		cmpopts.AcyclicTransformer("RoundTime", func(t metav1.Time) metav1.Time {
 			return metav1.Time{Time: t.Round(time.Second)}
 		}),
+		// Ignoring the condition.Message to avoid mismatch due to race and separately compare the Message.
+		cmpopts.IgnoreFields(metav1.Condition{}, "Message"),
 	}
 
 	actualPods, err := tCtx.Client().CoreV1().Pods("").List(tCtx, metav1.ListOptions{})
@@ -2463,6 +2465,16 @@ func check(tCtx ktesting.TContext, prefix string, expectRules []*resourcealpha.D
 	rules, err := tCtx.Client().ResourceV1alpha3().DeviceTaintRules().List(tCtx, metav1.ListOptions{})
 	tCtx.ExpectNoError(err, prefix+"list rules")
 	assertEqual(tCtx, expectRules, trimRules(rules.Items), prefix+"rules", opts...)
+
+	// Compare the Condition.Message
+	// Due to race condition the Message may not only contain the expected message, it might contain Message from other stages.
+	gomega.NewWithT(tCtx).Expect(rules.Items).To(gomega.HaveLen(len(expectRules)))
+	for ruleIndex, rule := range rules.Items {
+		gomega.NewWithT(tCtx).Expect(rule.Status.Conditions).To(gomega.HaveLen(len(expectRules[ruleIndex].Status.Conditions)))
+		for conditionIndex, condition := range rule.Status.Conditions {
+			gomega.NewWithT(tCtx).Expect(condition.Message).To(gomega.MatchRegexp(expectRules[ruleIndex].Status.Conditions[conditionIndex].Message))
+		}
+	}
 }
 
 // TestCancelEviction deletes the pod before the controller deletes it
