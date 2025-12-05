@@ -341,6 +341,84 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 			},
 		},
 		{
+			name: "pending pod is processed",
+			existingPVCs: []*v1.PersistentVolumeClaim{
+				pvcBoundToPV("pv1", "pvc1"),
+			},
+			existingPVs: []*v1.PersistentVolume{
+				pvBoundToPVC("pv1", "pvc1"),
+			},
+			existingPods: []*v1.Pod{
+				pod("pod1", "s0:c1,c2", nil).withPVC("pvc1", "vol1").withPhase(v1.PodPending).build(),
+			},
+			pod:            cache.ObjectName{Namespace: namespace, Name: "pod1"},
+			expectedEvents: nil,
+			expectedAddedVolumes: []addedVolume{
+				{
+					volumeName:   "fake-plugin/pv1",
+					podKey:       cache.ObjectName{Namespace: namespace, Name: "pod1"},
+					label:        ":::s0:c1,c2",
+					changePolicy: v1.SELinuxChangePolicyMountOption,
+					csiDriver:    "ebs.csi.aws.com",
+				},
+			},
+		},
+		{
+			name: "unknown pod is processed",
+			existingPVCs: []*v1.PersistentVolumeClaim{
+				pvcBoundToPV("pv1", "pvc1"),
+			},
+			existingPVs: []*v1.PersistentVolume{
+				pvBoundToPVC("pv1", "pvc1"),
+			},
+			existingPods: []*v1.Pod{
+				pod("pod1", "s0:c1,c2", nil).withPVC("pvc1", "vol1").withPhase(v1.PodUnknown).build(),
+			},
+			pod:            cache.ObjectName{Namespace: namespace, Name: "pod1"},
+			expectedEvents: nil,
+			expectedAddedVolumes: []addedVolume{
+				{
+					volumeName:   "fake-plugin/pv1",
+					podKey:       cache.ObjectName{Namespace: namespace, Name: "pod1"},
+					label:        ":::s0:c1,c2",
+					changePolicy: v1.SELinuxChangePolicyMountOption,
+					csiDriver:    "ebs.csi.aws.com",
+				},
+			},
+		},
+		{
+			name: "succeeded pod is removed from the cache",
+			existingPVCs: []*v1.PersistentVolumeClaim{
+				pvcBoundToPV("pv1", "pvc1"),
+			},
+			existingPVs: []*v1.PersistentVolume{
+				pvBoundToPVC("pv1", "pvc1"),
+			},
+			existingPods: []*v1.Pod{
+				pod("pod1", "s0:c1,c2", nil).withPVC("pvc1", "vol1").withPhase(v1.PodSucceeded).build(),
+			},
+			pod:                  cache.ObjectName{Namespace: namespace, Name: "pod1"},
+			expectedEvents:       nil,
+			expectedAddedVolumes: nil,
+			expectedDeletedPods:  []cache.ObjectName{{Namespace: namespace, Name: "pod1"}},
+		},
+		{
+			name: "failed pod is removed from the cache",
+			existingPVCs: []*v1.PersistentVolumeClaim{
+				pvcBoundToPV("pv1", "pvc1"),
+			},
+			existingPVs: []*v1.PersistentVolume{
+				pvBoundToPVC("pv1", "pvc1"),
+			},
+			existingPods: []*v1.Pod{
+				pod("pod1", "s0:c1,c2", nil).withPVC("pvc1", "vol1").withPhase(v1.PodFailed).build(),
+			},
+			pod:                  cache.ObjectName{Namespace: namespace, Name: "pod1"},
+			expectedEvents:       nil,
+			expectedAddedVolumes: nil,
+			expectedDeletedPods:  []cache.ObjectName{{Namespace: namespace, Name: "pod1"}},
+		},
+		{
 			name:         "deleted pod",
 			existingPods: []*v1.Pod{
 				// "pod1" does not exist in the informer
@@ -542,8 +620,16 @@ func pod(podName, level string, changePolicy *v1.PodSELinuxChangePolicy) *podBui
 					},
 				},
 			},
+			Status: v1.PodStatus{
+				Phase: v1.PodRunning,
+			},
 		},
 	}
+}
+
+func (b *podBuilder) withPhase(phase v1.PodPhase) *podBuilder {
+	b.pod.Status.Phase = phase
+	return b
 }
 
 func (b *podBuilder) withInlineVolume() *podBuilder {
