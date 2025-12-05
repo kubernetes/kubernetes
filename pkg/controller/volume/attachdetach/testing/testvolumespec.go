@@ -156,11 +156,6 @@ func CreateTestClient(logger klog.Logger) *fake.Clientset {
 		for _, node := range nodes.Items {
 			csiNode := storagev1.CSINode{
 				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						// All the in-tree plugins have been migrated to CSI since v1.27.
-						// So hardcoding the migrated plugins here.
-						"storage.alpha.kubernetes.io/migrated-plugins": "kubernetes.io/aws-ebs,kubernetes.io/azure-disk,kubernetes.io/azure-file,kubernetes.io/cinder,kubernetes.io/gce-pd,kubernetes.io/vsphere-volume",
-					},
 					Name: node.Name,
 				},
 			}

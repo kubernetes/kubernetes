@@ -19,7 +19,6 @@ package nodevolumelimits
 import (
 	"errors"
 	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -31,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/rand"
-	"k8s.io/apimachinery/pkg/util/sets"
 	csitrans "k8s.io/csi-translation-lib"
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -637,9 +635,6 @@ func TestCSILimits(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.test, func(t *testing.T) {
 			node, csiNode := getNodeWithPodAndVolumeLimits(test.limitSource, test.existingPods, test.maxVols, test.driverNames...)
-			if csiNode != nil {
-				enableMigrationOnNode(csiNode, csilibplugins.AWSEBSInTreePluginName)
-			}
 			csiTranslator := csitrans.New()
 			p := &CSILimits{
 				csiManager:           NewCSIManager(getFakeCSINodeLister(csiNode)),
@@ -704,10 +699,7 @@ func TestCSILimitsQHint(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.test, func(t *testing.T) {
-			node, csiNode := getNodeWithPodAndVolumeLimits("csiNode", []*v1.Pod{}, 1, "")
-			if csiNode != nil {
-				enableMigrationOnNode(csiNode, csilibplugins.AWSEBSDriverName)
-			}
+			node, _ := getNodeWithPodAndVolumeLimits("csiNode", []*v1.Pod{}, 1, "")
 			if !test.deletedPodNotScheduled {
 				test.deletedPod.Spec.NodeName = node.Node().Name
 			} else {
@@ -1168,20 +1160,6 @@ func getFakeCSIPVCLister(volumeName, scName string, driverNames ...string) tf.Pe
 		Spec:       v1.PersistentVolumeClaimSpec{StorageClassName: &scName, VolumeName: "missing-in-action"},
 	})
 	return pvcLister
-}
-
-func enableMigrationOnNode(csiNode *storagev1.CSINode, pluginName string) {
-	nodeInfoAnnotations := csiNode.GetAnnotations()
-	if nodeInfoAnnotations == nil {
-		nodeInfoAnnotations = map[string]string{}
-	}
-
-	newAnnotationSet := sets.New[string]()
-	newAnnotationSet.Insert(pluginName)
-	nas := strings.Join(sets.List(newAnnotationSet), ",")
-	nodeInfoAnnotations[v1.MigratedPluginsAnnotationKey] = nas
-
-	csiNode.Annotations = nodeInfoAnnotations
 }
 
 func getFakeCSIStorageClassLister(scName, provisionerName string) tf.StorageClassLister {
