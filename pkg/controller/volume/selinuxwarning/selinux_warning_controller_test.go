@@ -64,7 +64,7 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 		{
 			name: "existing pod with no volumes",
 			existingPods: []*v1.Pod{
-				pod("pod1", "s0:c1,c2", nil),
+				pod("pod1", "s0:c1,c2", nil).build(),
 			},
 			pod:                  cache.ObjectName{Namespace: namespace, Name: "pod1"},
 			expectedEvents:       nil,
@@ -73,7 +73,7 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 		{
 			name: "existing pod with unbound PVC",
 			existingPods: []*v1.Pod{
-				podWithPVC("pod1", "s0:c1,c2", nil, "non-existing-pvc", "vol1"),
+				pod("pod1", "s0:c1,c2", nil).withPVC("non-existing-pvc", "vol1").build(),
 			},
 			pod:                  cache.ObjectName{Namespace: namespace, Name: "pod1"},
 			expectError:          true, // PVC is missing, add back to queue with exp. backoff
@@ -89,7 +89,7 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 				pvBoundToPVC("pv1", "pvc1"),
 			},
 			existingPods: []*v1.Pod{
-				podWithPVC("pod1", "s0:c1,c2", nil, "pvc1", "vol1"),
+				pod("pod1", "s0:c1,c2", nil).withPVC("pvc1", "vol1").build(),
 			},
 			pod:            cache.ObjectName{Namespace: namespace, Name: "pod1"},
 			expectedEvents: nil,
@@ -112,7 +112,7 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 				pvBoundToPVC("pv1", "pvc1"),
 			},
 			existingPods: []*v1.Pod{
-				podWithPVC("pod1", "s0:c1,c2", ptr.To(v1.SELinuxChangePolicyRecursive), "pvc1", "vol1"),
+				pod("pod1", "s0:c1,c2", ptr.To(v1.SELinuxChangePolicyRecursive)).withPVC("pvc1", "vol1").build(),
 			},
 			pod:            cache.ObjectName{Namespace: namespace, Name: "pod1"},
 			expectedEvents: nil,
@@ -135,7 +135,7 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 				pvBoundToPVC("pv1", "pvc1"),
 			},
 			existingPods: []*v1.Pod{
-				addInlineVolume(pod("pod1", "s0:c1,c2", nil)),
+				pod("pod1", "s0:c1,c2", nil).withInlineVolume().build(),
 			},
 			pod:            cache.ObjectName{Namespace: namespace, Name: "pod1"},
 			expectedEvents: nil,
@@ -158,7 +158,7 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 				pvBoundToPVC("pv1", "pvc1"),
 			},
 			existingPods: []*v1.Pod{
-				addInlineVolume(podWithPVC("pod1", "s0:c1,c2", nil, "pvc1", "vol1")),
+				pod("pod1", "s0:c1,c2", nil).withPVC("pvc1", "vol1").withInlineVolume().build(),
 			},
 			pod:            cache.ObjectName{Namespace: namespace, Name: "pod1"},
 			expectedEvents: nil,
@@ -188,8 +188,8 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 				pvBoundToPVC("pv1", "pvc1"),
 			},
 			existingPods: []*v1.Pod{
-				podWithPVC("pod1", "s0:c1,c2", nil, "pvc1", "vol1"),
-				pod("pod2", "s0:c98,c99", nil),
+				pod("pod1", "s0:c1,c2", nil).withPVC("pvc1", "vol1").build(),
+				pod("pod2", "s0:c98,c99", nil).build(),
 			},
 			pod: cache.ObjectName{Namespace: namespace, Name: "pod1"},
 			conflicts: []volumecache.Conflict{
@@ -233,8 +233,8 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 				pvBoundToPVC("pv1", "pvc1"),
 			},
 			existingPods: []*v1.Pod{
-				podWithPVC("pod1", "s0:c1,c2", ptr.To(v1.SELinuxChangePolicyRecursive), "pvc1", "vol1"),
-				pod("pod2", "s0:c98,c99", ptr.To(v1.SELinuxChangePolicyRecursive)),
+				pod("pod1", "s0:c1,c2", ptr.To(v1.SELinuxChangePolicyRecursive)).withPVC("pvc1", "vol1").build(),
+				pod("pod2", "s0:c98,c99", ptr.To(v1.SELinuxChangePolicyRecursive)).build(),
 			},
 			pod:       cache.ObjectName{Namespace: namespace, Name: "pod1"},
 			conflicts: []volumecache.Conflict{},
@@ -257,8 +257,8 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 				pvBoundToPVC("pv1", "pvc1"),
 			},
 			existingPods: []*v1.Pod{
-				podWithPVC("pod1", "s0:c1,c2", ptr.To(v1.SELinuxChangePolicyRecursive), "pvc1", "vol1"),
-				podWithPVC("pod2", "s0:c98,c99", ptr.To(v1.SELinuxChangePolicyMountOption), "pvc1", "vol1"),
+				pod("pod1", "s0:c1,c2", ptr.To(v1.SELinuxChangePolicyRecursive)).withPVC("pvc1", "vol1").build(),
+				pod("pod2", "s0:c98,c99", ptr.To(v1.SELinuxChangePolicyMountOption)).withPVC("pvc1", "vol1").build(),
 			},
 			pod: cache.ObjectName{Namespace: namespace, Name: "pod1"},
 			conflicts: []volumecache.Conflict{
@@ -302,7 +302,7 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 				pvBoundToPVC("pv1", "pvc1"),
 			},
 			existingPods: []*v1.Pod{
-				podWithPVC("pod1", "s0:c1,c2", nil, "pvc1", "vol1"),
+				pod("pod1", "s0:c1,c2", nil).withPVC("pvc1", "vol1").build(),
 				// "pod2" does not exist
 			},
 			pod: cache.ObjectName{Namespace: namespace, Name: "pod1"},
@@ -490,40 +490,46 @@ func pvcBoundToPV(pvName, pvcName string) *v1.PersistentVolumeClaim {
 	return pvc
 }
 
-func pod(podName, level string, changePolicy *v1.PodSELinuxChangePolicy) *v1.Pod {
+type podBuilder struct {
+	pod *v1.Pod
+}
+
+func pod(podName, level string, changePolicy *v1.PodSELinuxChangePolicy) *podBuilder {
 	var opts *v1.SELinuxOptions
 	if level != "" {
 		opts = &v1.SELinuxOptions{
 			Level: level,
 		}
 	}
-	return &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "ns1",
-			Name:      podName,
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:  "container1",
-					Image: "image1",
-					VolumeMounts: []v1.VolumeMount{
-						{
-							Name:      "vol1",
-							MountPath: "/mnt",
+	return &podBuilder{
+		pod: &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "ns1",
+				Name:      podName,
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:  "container1",
+						Image: "image1",
+						VolumeMounts: []v1.VolumeMount{
+							{
+								Name:      "vol1",
+								MountPath: "/mnt",
+							},
 						},
 					},
 				},
-			},
-			SecurityContext: &v1.PodSecurityContext{
-				SELinuxChangePolicy: changePolicy,
-				SELinuxOptions:      opts,
-			},
-			Volumes: []v1.Volume{
-				{
-					Name: "emptyDir1",
-					VolumeSource: v1.VolumeSource{
-						EmptyDir: &v1.EmptyDirVolumeSource{},
+				SecurityContext: &v1.PodSecurityContext{
+					SELinuxChangePolicy: changePolicy,
+					SELinuxOptions:      opts,
+				},
+				Volumes: []v1.Volume{
+					{
+						Name: "emptyDir1",
+						VolumeSource: v1.VolumeSource{
+							EmptyDir: &v1.EmptyDirVolumeSource{},
+						},
 					},
 				},
 			},
@@ -531,8 +537,8 @@ func pod(podName, level string, changePolicy *v1.PodSELinuxChangePolicy) *v1.Pod
 	}
 }
 
-func addInlineVolume(pod *v1.Pod) *v1.Pod {
-	pod.Spec.Volumes = append(pod.Spec.Volumes, v1.Volume{
+func (b *podBuilder) withInlineVolume() *podBuilder {
+	b.pod.Spec.Volumes = append(b.pod.Spec.Volumes, v1.Volume{
 		Name: "inlineVolume",
 		VolumeSource: v1.VolumeSource{
 			AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{
@@ -540,17 +546,15 @@ func addInlineVolume(pod *v1.Pod) *v1.Pod {
 			},
 		},
 	})
-	pod.Spec.Containers[0].VolumeMounts = append(pod.Spec.Containers[0].VolumeMounts, v1.VolumeMount{
+	b.pod.Spec.Containers[0].VolumeMounts = append(b.pod.Spec.Containers[0].VolumeMounts, v1.VolumeMount{
 		Name:      "inlineVolume",
 		MountPath: "/mnt",
 	})
-
-	return pod
+	return b
 }
 
-func podWithPVC(podName, label string, changePolicy *v1.PodSELinuxChangePolicy, pvcName, volumeName string) *v1.Pod {
-	pod := pod(podName, label, changePolicy)
-	pod.Spec.Volumes = append(pod.Spec.Volumes, v1.Volume{
+func (b *podBuilder) withPVC(pvcName, volumeName string) *podBuilder {
+	b.pod.Spec.Volumes = append(b.pod.Spec.Volumes, v1.Volume{
 		Name: volumeName,
 		VolumeSource: v1.VolumeSource{
 			PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
@@ -558,11 +562,15 @@ func podWithPVC(podName, label string, changePolicy *v1.PodSELinuxChangePolicy, 
 			},
 		},
 	})
-	pod.Spec.Containers[0].VolumeMounts = append(pod.Spec.Containers[0].VolumeMounts, v1.VolumeMount{
+	b.pod.Spec.Containers[0].VolumeMounts = append(b.pod.Spec.Containers[0].VolumeMounts, v1.VolumeMount{
 		Name:      volumeName,
 		MountPath: "/mnt",
 	})
-	return pod
+	return b
+}
+
+func (b *podBuilder) build() *v1.Pod {
+	return b.pod
 }
 
 type addedVolume struct {
