@@ -142,6 +142,77 @@ defaults:
 			},
 		},
 		{
+			name: "overwrite without options preserves existing options",
+			existingKuberc: `apiVersion: kubectl.config.k8s.io/v1beta1
+kind: Preference
+defaults:
+- command: get
+  options:
+  - name: output
+    default: wide
+`,
+			options: SetOptions{
+				Section:   sectionDefaults,
+				Command:   "get",
+				Options:   []string{}, // no options provided
+				Overwrite: true,
+			},
+			expectedPref: &v1beta1.Preference{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "kubectl.config.k8s.io/v1beta1",
+					Kind:       "Preference",
+				},
+				Defaults: []v1beta1.CommandDefaults{
+					{
+						Command: "get",
+						Options: []v1beta1.CommandOptionDefault{
+							{
+								Name:    "output",
+								Default: "wide",
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "overwrite with single option replaces all options",
+			existingKuberc: `apiVersion: kubectl.config.k8s.io/v1beta1
+kind: Preference
+defaults:
+- command: get
+  options:
+  - name: output
+    default: wide
+  - name: show-labels
+    default: "true"
+`,
+			options: SetOptions{
+				Section:   sectionDefaults,
+				Command:   "get",
+				Options:   []string{"output=json"},
+				Overwrite: true,
+			},
+			expectedPref: &v1beta1.Preference{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "kubectl.config.k8s.io/v1beta1",
+					Kind:       "Preference",
+				},
+				Defaults: []v1beta1.CommandDefaults{
+					{
+						Command: "get",
+						Options: []v1beta1.CommandOptionDefault{
+							{
+								Name:    "output",
+								Default: "json",
+							},
+							// show-labels option is overwritten and thus not present
+						},
+					},
+				},
+			},
+		},
+		{
 			name: "error without overwrite",
 			existingKuberc: `apiVersion: kubectl.config.k8s.io/v1beta1
 kind: Preference
@@ -353,6 +424,198 @@ aliases:
 						Name:        "getn",
 						Command:     "get",
 						PrependArgs: []string{"namespaces"},
+					},
+				},
+			},
+		},
+		{
+			name: "overwrite alias without options preserves existing options",
+			existingKuberc: `apiVersion: kubectl.config.k8s.io/v1beta1
+kind: Preference
+aliases:
+- name: getn
+  command: get
+  options:
+  - name: output
+    default: wide
+`,
+			options: SetOptions{
+				Section:   sectionAliases,
+				AliasName: "getn",
+				Command:   "get",
+				Options:   []string{}, // no options provided
+				Overwrite: true,
+			},
+			expectedPref: &v1beta1.Preference{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "kubectl.config.k8s.io/v1beta1",
+					Kind:       "Preference",
+				},
+				Aliases: []v1beta1.AliasOverride{
+					{
+						Name:        "getn",
+						Command:     "get",
+						PrependArgs: nil,
+						Options: []v1beta1.CommandOptionDefault{
+							{
+								Name:    "output",
+								Default: "wide",
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "overwrite alias without prependArgs preserves existing prependArgs",
+			existingKuberc: `apiVersion: kubectl.config.k8s.io/v1beta1
+kind: Preference
+aliases:
+- name: getn
+  command: get
+  prependArgs:
+  - nodes
+`,
+			options: SetOptions{
+				Section:     sectionAliases,
+				AliasName:   "getn",
+				Command:     "get",
+				PrependArgs: []string{}, // no prependArgs provided
+				Overwrite:   true,
+			},
+			expectedPref: &v1beta1.Preference{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "kubectl.config.k8s.io/v1beta1",
+					Kind:       "Preference",
+				},
+				Aliases: []v1beta1.AliasOverride{
+					{
+						Name:        "getn",
+						Command:     "get",
+						PrependArgs: []string{"nodes"},
+						Options:     nil,
+					},
+				},
+			},
+		},
+
+		{
+			name: "overwrite alias without appendArgs preserves existing appendArgs",
+			existingKuberc: `apiVersion: kubectl.config.k8s.io/v1beta1
+kind: Preference
+aliases:
+- name: getn
+  command: get
+  prependArgs:
+  - nodes
+  appendArgs:
+  - --
+  - custom-arg
+`,
+			options: SetOptions{
+				Section:    sectionAliases,
+				AliasName:  "getn",
+				Command:    "get",
+				AppendArgs: []string{}, // no appendArgs provided
+				Overwrite:  true,
+			},
+			expectedPref: &v1beta1.Preference{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "kubectl.config.k8s.io/v1beta1",
+					Kind:       "Preference",
+				},
+				Aliases: []v1beta1.AliasOverride{
+					{
+						Name:        "getn",
+						Command:     "get",
+						PrependArgs: []string{"nodes"},
+						AppendArgs:  []string{"--", "custom-arg"},
+						Options:     nil,
+					},
+				},
+			},
+		},
+		{
+			name: "update multiple fields simultaneously",
+			existingKuberc: `apiVersion: kubectl.config.k8s.io/v1beta1
+kind: Preference
+aliases:
+- name: getn
+  command: get
+  prependArgs:
+  - nodes
+  appendArgs:
+  - --watch
+  options:
+  - name: output
+    default: wide
+`,
+			options: SetOptions{
+				Section:     sectionAliases,
+				AliasName:   "getn",
+				Command:     "get",
+				PrependArgs: []string{"pods"},
+				Options:     []string{"output=json"},
+				AppendArgs:  []string{}, // no appendArgs provided
+				Overwrite:   true,
+			},
+			expectedPref: &v1beta1.Preference{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "kubectl.config.k8s.io/v1beta1",
+					Kind:       "Preference",
+				},
+				Aliases: []v1beta1.AliasOverride{
+					{
+						Name:        "getn",
+						Command:     "get",
+						PrependArgs: []string{"pods"},
+						AppendArgs:  []string{"--watch"},
+						Options: []v1beta1.CommandOptionDefault{
+							{
+								Name:    "output",
+								Default: "json",
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "overwrite with single option replaces all options",
+			existingKuberc: `apiVersion: kubectl.config.k8s.io/v1beta1
+kind: Preference
+aliases:
+- name: getn
+  command: get
+  options:
+  - name: output
+    default: wide
+  - name: show-labels
+    default: "true"
+`,
+			options: SetOptions{
+				Section:   sectionAliases,
+				AliasName: "getn",
+				Command:   "get",
+				Options:   []string{"output=json"},
+				Overwrite: true,
+			},
+			expectedPref: &v1beta1.Preference{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "kubectl.config.k8s.io/v1beta1",
+					Kind:       "Preference",
+				},
+				Aliases: []v1beta1.AliasOverride{
+					{
+						Name:    "getn",
+						Command: "get",
+						Options: []v1beta1.CommandOptionDefault{
+							{
+								Name:    "output",
+								Default: "json",
+							},
+							// show-labels option is overwritten and thus not present
+						},
 					},
 				},
 			},
