@@ -178,6 +178,154 @@ func TestTransitionInitialToWait(t *testing.T) {
 	}
 }
 
+func TestPCRDeletedWhileWaiting(t *testing.T) {
+	ctx, cancel := context.WithCancel(ktesting.Init(t))
+	defer cancel()
+
+	kc := fake.NewClientset()
+	clock := testclock.NewFakeClock(mustRFC3339(t, "2010-01-01T00:00:00Z"))
+
+	signerName := "foo.com/signer"
+
+	pcrStore := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+	pcrLister := certlistersv1beta1.NewPodCertificateRequestLister(pcrStore)
+
+	nodeStore := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+	nodeLister := corelistersv1.NewNodeLister(nodeStore)
+	node1 := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "node1",
+			UID:  "node1-uid",
+		},
+	}
+	nodeStore.Add(node1)
+
+	workloadSA, err := kc.CoreV1().ServiceAccounts("ns1").Create(ctx, &corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "ns1",
+			Name:      "workload",
+		},
+	}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Unexpected error creating workload serviceaccount: %v", err)
+	}
+
+	node1PodManager := &FakeSynchronousPodManager{
+		pods: []*corev1.Pod{},
+	}
+
+	workloadPod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "ns1",
+			Name:      "workload",
+		},
+		Spec: corev1.PodSpec{
+			ServiceAccountName: workloadSA.ObjectMeta.Name,
+			NodeName:           "node1",
+			Containers: []corev1.Container{
+				{
+					Name:  "main",
+					Image: "notarealimage",
+					VolumeMounts: []corev1.VolumeMount{
+						{
+							Name:      "certificate",
+							MountPath: "/run/foo-cert",
+						},
+					},
+				},
+			},
+			Volumes: []corev1.Volume{
+				{
+					Name: "certificate",
+					VolumeSource: corev1.VolumeSource{
+						Projected: &corev1.ProjectedVolumeSource{
+							Sources: []corev1.VolumeProjection{
+								{
+									PodCertificate: &corev1.PodCertificateProjection{
+										SignerName:           signerName,
+										KeyType:              "ED25519",
+										CredentialBundlePath: "creds.pem",
+										MaxExpirationSeconds: ptr.To[int32](86400), // Defaulting doesn't work with a fake client.
+										UserAnnotations:      map[string]string{"test.domain/foo": "bar"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	node1PodManager.pods = append(node1PodManager.pods, workloadPod)
+
+	node1PodCertificateManager := &IssuingManager{
+		kc:         kc,
+		podManager: node1PodManager,
+		pcrLister:  pcrLister,
+		nodeLister: nodeLister,
+		nodeName:   types.NodeName("node1"),
+		clock:      clock,
+		credStore:  map[projectionKey]*projectionRecord{},
+	}
+
+	// Step the handling state machine by one step.  We should now be in wait state.
+	if err := node1PodCertificateManager.handleProjection(ctx, projectionKey{workloadPod.ObjectMeta.Namespace, workloadPod.ObjectMeta.Name, string(workloadPod.ObjectMeta.UID), "certificate", 0}); err != nil {
+		t.Fatalf("Unexpected error while running handleProjection: %v", err)
+	}
+
+	// gotPCRs, err := kc.CertificatesV1beta1().PodCertificateRequests("ns1").List(ctx, metav1.ListOptions{})
+	// if err != nil {
+	// 	t.Fatalf("Unexpected error listing PodCertificateRequests in fake client: %v", err)
+	// }
+
+	// if len(gotPCRs.Items) != 1 {
+	// 	t.Fatalf("Wrong number of PodCertificateRequests after calling handleProjection; got %d, want 1", len(gotPCRs.Items))
+	// }
+
+	// gotPCR := gotPCRs.Items[0]
+
+	// Clear all PCRs and advance time past assumeDeletedThreshold.
+	if err := kc.CertificatesV1beta1().PodCertificateRequests("ns1").DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{}); err != nil {
+		t.Fatalf("Unexpected error while deleting all PCRs in ns1: %v", err)
+	}
+	clock.Step(assumeDeletedThreshold + 1*time.Minute)
+
+	// Calling handleProjection again should return an error, *not* nil panic.
+	err = node1PodCertificateManager.handleProjection(ctx, projectionKey{workloadPod.ObjectMeta.Namespace, workloadPod.ObjectMeta.Name, string(workloadPod.ObjectMeta.UID), "certificate", 0})
+	if err == nil { // EQUALS nil
+		t.Fatalf("Got no error from handleProjection, but wanted an error")
+	}
+
+	// // Check that the created PCR spec matches expectations.  Blank out fields on
+	// // gotPCR that we don't care about.
+	// wantPCR := &certsv1beta1.PodCertificateRequest{
+	// 	ObjectMeta: metav1.ObjectMeta{
+	// 		Namespace: "ns1",
+	// 	},
+	// 	Spec: certsv1beta1.PodCertificateRequestSpec{
+	// 		SignerName:                workloadPod.Spec.Volumes[0].VolumeSource.Projected.Sources[0].PodCertificate.SignerName,
+	// 		PodName:                   workloadPod.ObjectMeta.Name,
+	// 		PodUID:                    workloadPod.ObjectMeta.UID,
+	// 		ServiceAccountName:        workloadSA.ObjectMeta.Name,
+	// 		ServiceAccountUID:         workloadSA.ObjectMeta.UID,
+	// 		NodeName:                  types.NodeName("node1"),
+	// 		NodeUID:                   node1.ObjectMeta.UID,
+	// 		MaxExpirationSeconds:      ptr.To[int32](86400),
+	// 		UnverifiedUserAnnotations: map[string]string{"test.domain/foo": "bar"},
+	// 	},
+	// }
+	// gotPCRClone := gotPCR.DeepCopy()
+	// gotPCRClone.ObjectMeta = metav1.ObjectMeta{}
+	// gotPCRClone.ObjectMeta.Namespace = gotPCR.ObjectMeta.Namespace
+	// gotPCRClone.Spec.PKIXPublicKey = nil
+	// gotPCRClone.Spec.ProofOfPossession = nil
+	// gotPCRClone.Status = certsv1beta1.PodCertificateRequestStatus{}
+	// if diff := cmp.Diff(gotPCRClone, wantPCR); diff != "" {
+	// 	t.Fatalf("PodCertificateManager created a bad PCR; diff (-got +want)\n%s", diff)
+	// }
+}
+
 func TestFullFlow(t *testing.T) {
 	ctx, cancel := context.WithCancel(ktesting.Init(t))
 	defer cancel()
