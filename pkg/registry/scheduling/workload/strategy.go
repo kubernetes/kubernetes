@@ -19,8 +19,10 @@ package workload
 import (
 	"context"
 
+	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
@@ -43,7 +45,9 @@ func (workloadStrategy) NamespaceScoped() bool {
 func (workloadStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {}
 
 func (workloadStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
-	return validation.ValidateWorkload(obj.(*scheduling.Workload))
+	workloadScheduling := obj.(*scheduling.Workload)
+	allErrs := validation.ValidateWorkload(workloadScheduling)
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, obj, nil, allErrs, operation.Create)
 }
 
 func (workloadStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
@@ -59,7 +63,8 @@ func (workloadStrategy) AllowCreateOnUpdate() bool {
 func (workloadStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {}
 
 func (workloadStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidateWorkloadUpdate(obj.(*scheduling.Workload), old.(*scheduling.Workload))
+	allErrs := validation.ValidateWorkloadUpdate(obj.(*scheduling.Workload), old.(*scheduling.Workload))
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, obj, old, allErrs, operation.Update)
 }
 
 func (workloadStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
