@@ -1,8 +1,8 @@
-//go:build linux
-// +build linux
+//go:build windows
+// +build windows
 
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2025 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,12 +26,13 @@ import (
 	"os"
 	"os/exec"
 	"path"
-	"reflect"
 	"strconv"
 	"strings"
-	"syscall"
+	"sync"
 	"time"
+	"unsafe"
 
+	"golang.org/x/sys/windows"
 	"k8s.io/klog/v2"
 
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -39,6 +40,12 @@ import (
 
 var serverStartTimeout = flag.Duration("server-start-timeout", time.Second*120, "Time to wait for each server to become healthy.")
 
+var (
+	once      sync.Once
+	jobHandle windows.Handle
+)
+
+// A server manages a separate server process started and killed with
 // A server manages a separate server process started and killed with
 // commands.
 type server struct {
@@ -141,23 +148,10 @@ func (s *server) start() error {
 		s.startCommand.Stdout = outfile
 		s.startCommand.Stderr = outfile
 
-		// If monitorParent is set, set Pdeathsig when starting the server.
-		if s.monitorParent {
-			// Death of this test process should kill the server as well.
-			attrs := &syscall.SysProcAttr{}
-			// Hack to set linux-only field without build tags.
-			deathSigField := reflect.ValueOf(attrs).Elem().FieldByName("Pdeathsig")
-			if deathSigField.IsValid() {
-				deathSigField.Set(reflect.ValueOf(syscall.SIGTERM))
-			} else {
-				errCh <- fmt.Errorf("failed to set Pdeathsig field (non-linux build)")
-				return
-			}
-			s.startCommand.SysProcAttr = attrs
-		}
+		// Start the server
+		// The following function call is meant to be the only difference with the linux implementation
+		err = startProcess(s.startCommand, s.monitorParent)
 
-		// Start the command
-		err = s.startCommand.Start()
 		if err != nil {
 			errCh <- fmt.Errorf("failed to run %s: %w", s, err)
 			return
@@ -328,5 +322,96 @@ func (s *server) stopUnit() error {
 			return fmt.Errorf("Failed to stop systemd unit name: %q: %w", s.systemdUnitName, err)
 		}
 	}
+	return nil
+}
+
+// func startProcess starts the process with the given command and arguments
+func startProcess(cmd *exec.Cmd, monitorParent bool) error {
+	if monitorParent {
+		// create a job object, which is a kernel object that manages the lifetime of child processes
+		// the job object is created as an singlton instance
+		jobHandle, err := getJobHandle()
+		if err != nil {
+			return err
+		}
+
+		go func() {
+			defer windows.CloseHandle(jobHandle)
+
+			waitForTerminationSignal()
+		}()
+
+		err = cmd.Start()
+		if err != nil {
+			return err
+		}
+
+		// add the process to the job object
+		err = assignProcessToJob(jobHandle, cmd.Process.Pid)
+		if err != nil {
+			return err
+		}
+
+		return nil
+
+	} else {
+		// start the command directly
+		err := cmd.Start()
+		return err
+	}
+}
+
+// func getJobHandle() returns the single instance of job handle
+func getJobHandle() (windows.Handle, error) {
+	var err error
+
+	once.Do(func() {
+		jobHandle, err = createJobObject()
+	})
+
+	return jobHandle, err
+}
+
+// func createJobObject creates a windows job object
+func createJobObject() (windows.Handle, error) {
+	jobHandle, err := windows.CreateJobObject(nil, nil)
+	if err != nil {
+		return 0, err
+	}
+
+	var info windows.JOBOBJECT_BASIC_LIMIT_INFORMATION
+	info.LimitFlags = windows.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+	var extendedInfo windows.JOBOBJECT_EXTENDED_LIMIT_INFORMATION
+	extendedInfo.BasicLimitInformation = info
+	_, err = windows.SetInformationJobObject(
+		jobHandle,
+		windows.JobObjectExtendedLimitInformation,
+		uintptr(unsafe.Pointer(&extendedInfo)),
+		uint32(unsafe.Sizeof(extendedInfo)),
+	)
+
+	if err != nil {
+		windows.CloseHandle(jobHandle)
+		return 0, err
+	}
+
+	return jobHandle, nil
+}
+
+// func assignProcessToJob assigns the process to the job object
+func assignProcessToJob(jobHandle windows.Handle, pid int) error {
+	// open a handle to the child process using its PID
+	processHandle, err := windows.OpenProcess(windows.PROCESS_SET_QUOTA|windows.PROCESS_TERMINATE, false, uint32(pid))
+	if err != nil {
+		return err
+	}
+	defer windows.CloseHandle(processHandle)
+
+	// assign the process to the job object
+	err = windows.AssignProcessToJobObject(jobHandle, processHandle)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
