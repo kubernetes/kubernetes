@@ -19,10 +19,12 @@ package create
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	coreclient "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -174,6 +176,9 @@ func (o *NamespaceOptions) createNamespace() *corev1.Namespace {
 func (o *NamespaceOptions) Validate() error {
 	if len(o.Name) == 0 {
 		return fmt.Errorf("name must be specified")
+	}
+	if strings.HasPrefix(o.Name, "kube-") {
+		klog.Warning("Avoid creating namespaces with the prefix kube-, since it is reserved for Kubernetes system namespaces.")
 	}
 	return nil
 }
