@@ -564,10 +564,15 @@ func TestQuantityParseInt(t *testing.T) {
 		{"2048", intQuantity(2048, 0, DecimalSI)},
 		{"1k", intQuantity(1000, 0, DecimalSI)},
 		{"1.3E+6", intQuantity(13, 5, DecimalExponent)},
-		// value larger than 1000000000000000000(1e18) previously failed because maxInt64Factors = 18, see issue#135487
+		{"922337203685477580", intQuantity(922337203685477580, 0, DecimalSI)},
+		{"-922337203685477580", intQuantity(-922337203685477580, 0, DecimalSI)},
+		// value larger than 1000000000000000000(1e18) would fail if skipping attempting
+		// to convert inf.Dec because maxInt64Factors = 18, see issue#135487
 		{"1000000000000000000", intQuantity(1000000000000000000, 0, DecimalSI)},
 		{"9223372036854775807", intQuantity(mostPositive, 0, DecimalSI)},
 		{"-9223372036854775807", intQuantity(mostNegative+1, 0, DecimalSI)},
+		{"9223372036854.775807M", intQuantity(9223372036854775807, 0, DecimalSI)},
+		{"92233720368.54775807E+8", intQuantity(9223372036854775807, 0, DecimalExponent)},
 	}
 
 	for _, item := range table {
@@ -603,7 +608,8 @@ func TestQuantityParseInt(t *testing.T) {
 	invalidInt := []string{
 		"1.0",
 		"9223372036854775808",  // mostPositive + 1
-		"-9223372036854775809", // mostNegative - 1
+		"-9223372036854775808", // mostNegative, intended to go dec path
+		"99999999999999999999",
 	}
 
 	for _, item := range invalidInt {

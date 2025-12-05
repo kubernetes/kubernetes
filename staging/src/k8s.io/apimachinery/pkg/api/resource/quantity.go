@@ -302,6 +302,7 @@ func ParseQuantity(str string) (Quantity, error) {
 		precision = maxInt64Factors - int32(len(num)+len(denom))
 		// when maxInt64Factors (18) yields -1 (19 digits), parse num+denom to verify if it
 		// still fits in int64 (≤ MaxInt64). On success, enable the fast path (precision = 0).
+		// keep minInt64 still in Dec path because it's abs would overflow
 		if precision == -1 {
 			shifted := num + denom
 			_, err := strconv.ParseInt(shifted, 10, 64)
