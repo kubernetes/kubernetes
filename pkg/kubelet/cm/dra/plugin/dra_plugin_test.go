@@ -151,9 +151,8 @@ func setupFakeGRPCServer(service, addr string) (tearDown, error) {
 
 func TestGRPCConnIsReused(t *testing.T) {
 	tCtx := ktesting.Init(t)
-	service := drapbv1.DRAPluginService
 	addr := path.Join(t.TempDir(), "dra.sock")
-	teardown, err := setupFakeGRPCServer(service, addr)
+	teardown, err := setupFakeGRPCServer("", addr)
 	require.NoError(t, err)
 	defer teardown()
 
@@ -165,7 +164,7 @@ func TestGRPCConnIsReused(t *testing.T) {
 
 	// ensure the plugin we are using is registered
 	draPlugins := NewDRAPluginManager(tCtx, nil, nil, &mockStreamHandler{}, 0)
-	tCtx.ExpectNoError(draPlugins.add(driverName, addr, service, defaultClientCallTimeout), "add plugin")
+	tCtx.ExpectNoError(draPlugins.add(driverName, addr, drapbv1.DRAPluginService, defaultClientCallTimeout), "add plugin")
 	plugin, err := draPlugins.GetPlugin(driverName)
 	tCtx.ExpectNoError(err, "get plugin")
 	conn := plugin.conn
@@ -206,6 +205,62 @@ func TestGRPCConnIsReused(t *testing.T) {
 	// We should have only one entry otherwise it means another gRPC connection has been created
 	require.Len(t, reusedConns, 1, "expected length to be 1 but got %d", len(reusedConns))
 	require.Equal(t, 2, reusedConns[conn], "expected counter to be 2 but got %d", reusedConns[conn])
+
+	tCtx.Run("health_api_reuses_connection", func(tCtx ktesting.TContext) {
+		ctx, cancel := context.WithTimeout(tCtx, 5*time.Second)
+		defer cancel()
+
+		originalConn := plugin.conn
+
+		stream, err := plugin.NodeWatchResources(ctx)
+		require.NoError(tCtx, err, "Health stream should work")
+		require.NotNil(tCtx, stream)
+
+		require.Equal(tCtx, originalConn, plugin.conn, "Health API should reuse the same connection")
+
+		resp, err := stream.Recv()
+		require.NoError(tCtx, err, "Should receive health data")
+		require.NotNil(tCtx, resp)
+		require.Len(tCtx, resp.Devices, 1)
+		assert.Equal(tCtx, "pool1", resp.Devices[0].GetDevice().GetPoolName())
+		assert.Equal(tCtx, "dev1", resp.Devices[0].GetDevice().GetDeviceName())
+		assert.Equal(tCtx, drahealthv1alpha1.HealthStatus_HEALTHY, resp.Devices[0].GetHealth())
+
+		require.Equal(tCtx, originalConn, plugin.conn, "Connection should remain unchanged after health operations")
+
+		prepareReq := &drapbv1.NodePrepareResourcesRequest{
+			Claims: []*drapbv1.Claim{
+				{
+					Namespace: "dummy-namespace",
+					Uid:       "dummy-uid",
+					Name:      "dummy-claim",
+				},
+			},
+		}
+
+		prepareResp, err := plugin.NodePrepareResources(ctx, prepareReq)
+		require.NoError(tCtx, err, "NodePrepareResources should work")
+		require.NotNil(tCtx, prepareResp)
+		require.NotNil(tCtx, prepareResp.Claims["claim-uid"])
+
+		require.Equal(tCtx, originalConn, plugin.conn, "Connection should remain unchanged after NodePrepareResources")
+
+		unprepareReq := &drapbv1.NodeUnprepareResourcesRequest{
+			Claims: []*drapbv1.Claim{
+				{
+					Namespace: "dummy-namespace",
+					Uid:       "dummy-uid",
+					Name:      "dummy-claim",
+				},
+			},
+		}
+
+		unprepareResp, err := plugin.NodeUnprepareResources(ctx, unprepareReq)
+		require.NoError(tCtx, err, "NodeUnprepareResources should work")
+		require.NotNil(tCtx, unprepareResp)
+
+		require.Equal(tCtx, originalConn, plugin.conn, "Connection should remain unchanged after all API calls")
+	})
 }
 
 func TestGRPCConnUsableAfterIdle(t *testing.T) {
