@@ -496,9 +496,21 @@ func (im *realImageGCManager) freeSpace(ctx context.Context, bytesToFree int64, 
 
 		// Avoid garbage collect the image if the image is not old enough.
 		// In such a case, the image may have just been pulled down, and will be used by a container right away.
-		if freeTime.Sub(image.firstDetected) < im.policy.MinAge {
+		imageAge := freeTime.Sub(image.firstDetected)
+		unusedDuration := freeTime.Sub(image.lastUsed)
+
+		// MinAge protection: Don't delete recently pulled images (from firstDetected)
+		if im.policy.MinAge > 0 && imageAge < im.policy.MinAge {
 			imagesLeft = append(imagesLeft, image.id)
-			logger.V(5).Info("Image ID's age is less than the policy's minAge, not eligible for garbage collection", "imageID", image.id, "age", freeTime.Sub(image.firstDetected), "minAge", im.policy.MinAge)
+			logger.V(5).Info("Image ID's age is less than the policy's minAge, not eligible for garbage collection", "imageID", image.id, "age", imageAge, "minAge", im.policy.MinAge)
+			continue
+		}
+
+		// MaxAge check is independent: Force delete long-unused images (from lastUsed)
+		// This allows MaxAge < MinAge for deployment scenarios
+		if im.policy.MaxAge > 0 && unusedDuration <= im.policy.MaxAge {
+			imagesLeft = append(imagesLeft, image.id)
+			logger.V(5).Info("Image unused duration is within MaxAge threshold, not eligible for garbage collection", "imageID", image.id, "unusedDuration", unusedDuration, "maxAge", im.policy.MaxAge)
 			continue
 		}
 
