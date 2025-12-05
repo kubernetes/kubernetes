@@ -29,6 +29,7 @@ import (
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -1031,6 +1032,7 @@ func TestFitScore(t *testing.T) {
 		expectedPriorities   fwk.NodeScoreList
 		nodeResourcesFitArgs config.NodeResourcesFitArgs
 		runPreScore          bool
+		draObjects           []apiruntime.Object
 	}{
 		{
 			name: "test case for ScoringStrategy RequestedToCapacityRatio case1",
@@ -1250,11 +1252,57 @@ func TestFitScore(t *testing.T) {
 			},
 			runPreScore: true,
 		},
+		{
+			name:         "test case for ScoringStrategy LeastAllocated with Extended resources",
+			requestedPod: st.MakePod().Req(map[v1.ResourceName]string{extendedResourceDRA: "1"}).Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Obj(),
+				st.MakeNode().Name("node2").Obj(),
+			},
+			expectedPriorities: []fwk.NodeScore{{Name: "node1", Score: 50}, {Name: "node2", Score: 50}},
+			draObjects: []apiruntime.Object{
+				deviceClassWithExtendResourceName,
+				st.MakeResourceSlice("node1", "test-driver").Device("device-1").Device("device-2").Obj(),
+				st.MakeResourceSlice("node2", "test-driver").Device("device-1").Device("device-2").Obj(),
+			},
+			nodeResourcesFitArgs: config.NodeResourcesFitArgs{
+				ScoringStrategy: &config.ScoringStrategy{
+					Type: config.LeastAllocated,
+					Resources: []config.ResourceSpec{
+						{Name: extendedResourceName, Weight: 1},
+					},
+				},
+			},
+			runPreScore: true,
+		},
+		{
+			name:         "test case for ScoringStrategy LeastAllocated with Extended resources if PreScore is not called",
+			requestedPod: st.MakePod().Req(map[v1.ResourceName]string{extendedResourceDRA: "1"}).Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Obj(),
+				st.MakeNode().Name("node2").Obj(),
+			},
+			expectedPriorities: []fwk.NodeScore{{Name: "node1", Score: 50}, {Name: "node2", Score: 50}},
+			draObjects: []apiruntime.Object{
+				deviceClassWithExtendResourceName,
+				st.MakeResourceSlice("node1", "test-driver").Device("device-1").Device("device-2").Obj(),
+				st.MakeResourceSlice("node2", "test-driver").Device("device-1").Device("device-2").Obj(),
+			},
+			nodeResourcesFitArgs: config.NodeResourcesFitArgs{
+				ScoringStrategy: &config.ScoringStrategy{
+					Type: config.LeastAllocated,
+					Resources: []config.ResourceSpec{
+						{Name: extendedResourceName, Weight: 1},
+					},
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, test.draObjects != nil)
+			logger, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
@@ -1262,9 +1310,19 @@ func TestFitScore(t *testing.T) {
 			snapshot := cache.NewSnapshot(test.existingPods, test.nodes)
 			fh, _ := runtime.NewFramework(ctx, nil, nil, runtime.WithSnapshotSharedLister(snapshot))
 			args := test.nodeResourcesFitArgs
-			p, err := NewFit(ctx, &args, fh, plfeature.Features{})
+			p, err := NewFit(ctx, &args, fh, plfeature.Features{
+				EnableDRAExtendedResource: test.draObjects != nil,
+			})
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if test.draObjects != nil {
+				draManager, err := newTestDRAManager(t, ctx, logger, test.draObjects...)
+				if err != nil {
+					t.Fatalf("failed to create test DRA manager: %v", err)
+				}
+				p.(*Fit).draManager = draManager
 			}
 
 			var gotPriorities fwk.NodeScoreList
