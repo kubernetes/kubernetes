@@ -80,7 +80,7 @@ type ReflectorStore interface {
 // TransformingStore is an optional interface that can be implemented by the provided store.
 // If implemented on the provided store reflector will use the same transformer in its internal stores.
 type TransformingStore interface {
-	Store
+	ReflectorStore
 	Transformer() TransformFunc
 }
 
@@ -726,9 +726,11 @@ func (r *Reflector) watchList(ctx context.Context) (watch.Interface, error) {
 		return false
 	}
 
+	var transformer TransformFunc
 	storeOpts := []StoreOption{}
 	if tr, ok := r.store.(TransformingStore); ok && tr.Transformer() != nil {
-		storeOpts = append(storeOpts, WithTransformer(tr.Transformer()))
+		transformer = tr.Transformer()
+		storeOpts = append(storeOpts, WithTransformer(transformer))
 	}
 
 	initTrace := trace.New("Reflector WatchList", trace.Field{Key: "name", Value: r.name})
@@ -788,7 +790,7 @@ func (r *Reflector) watchList(ctx context.Context) (watch.Interface, error) {
 	// we utilize the temporaryStore to ensure independence from the current store implementation.
 	// as of today, the store is implemented as a queue and will be drained by the higher-level
 	// component as soon as it finishes replacing the content.
-	checkWatchListDataConsistencyIfRequested(ctx, r.name, resourceVersion, r.listerWatcher.ListWithContext, temporaryStore.List)
+	checkWatchListDataConsistencyIfRequested(ctx, r.name, resourceVersion, r.listerWatcher.ListWithContext, transformer, temporaryStore.List)
 
 	if err := r.store.Replace(temporaryStore.List(), resourceVersion); err != nil {
 		return nil, fmt.Errorf("unable to sync watch-list result: %w", err)
