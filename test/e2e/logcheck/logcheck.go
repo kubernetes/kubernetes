@@ -1,5 +1,5 @@
 /*
-Copyright 2025 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,15 +14,36 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package invariants
+// Package logcheck extends a Ginkgo test suite with optional monitoring
+// of system log files. Right now it can detect DATA RACE problems.
+//
+// This may get expanded in the future, for example to check also
+// for unhandled and potentially unexpected errors (https://github.com/kubernetes/kubernetes/issues/122005)
+// or log spam (https://github.com/kubernetes/kubernetes/issues/109297).
+//
+// Because it grabs log output as it is produced, it is possible to dump *all*
+// data into $ARTIFACTS/system-logs, in contrast to other approaches which
+// potentially only capture the tail of the output (log rotation).
+//
+// The additional check(s) must be opt-in because they are not portable.
+// The package registers additional command line flags for that.
+// Dedicated jobs are necessary which enable them.
+//
+// For DATA RACE, the binaries in the cluster must be compiled with race
+// detection (https://github.com/kubernetes/kubernetes/pull/133834/files).
+// It's also necessary to specify which containers to check. Other output
+// (e.g. kubelet in a kind cluster) currently cannot be checked.
+package logcheck
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"io"
 	"maps"
 	"os"
 	"path"
+	"regexp"
 	"slices"
 	"strings"
 	"sync"
@@ -39,32 +60,34 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/podlogs"
 )
 
-// The code in this file grabs logs of system containers and checks them for certain problems:
-// - DATA RACE (depends on enabling race detection in the binary, see https://github.com/kubernetes/kubernetes/pull/133834).
-// - potential future extension: unhandled and potentially unexpected errors (https://github.com/kubernetes/kubernetes/issues/122005)
-//
-// Because it grabs log output as it is produced, it is possible to dump *all* data into $ARTIFACTS/system-logs,
-// in contrast to other approaches which potentially only capture the tail of the output (log rotation).
-//
-// Please speak to SIG-Testing leads before adding anything to this file.
-
 const (
-	logInvariantsSIG              = "testing"
-	logInvariantsContextText      = "Invariant Logs"
-	logInvariantsDataRaceLeafText = "should enable data race checking"
+	// defaultNamespacesRE is the default regular expression for which namespaces need to be checked,
+	// if checking is enabled: anything which contains the word "system".
+	//
+	// If we had an API for identifying "system" namespaces, we could use that, but we
+	// don't have that yet (https://github.com/kubernetes/enhancements/issues/5708).
+	defaultNamespacesRE = `system`
 
 	dataRaceStart = "WARNING: DATA RACE\n"
 	dataRaceEnd   = "==================\n"
 )
 
 var (
-	enabledLogChecks logCheck
-	mainProcess      bool
-	lc               *logChecker
+	enabledLogChecks = logCheck{
+		namespaces: regexpValue{
+			re: regexp.MustCompile(defaultNamespacesRE),
+		},
+	}
+	mainProcess bool
+	lc          *logChecker
 )
 
 // logCheck determines what gets checked in log output.
 type logCheck struct {
+	// namespaces contains a regular expression which determines which namespaces need to be checked.
+	// All containers in those namespaces are checked.
+	namespaces regexpValue
+
 	// dataRaces enables checking for "DATA RACE" reports.
 	dataRaces bool
 	// More checks may get added in the future.
@@ -76,58 +99,56 @@ func (c logCheck) any() bool {
 	return c != empty
 }
 
-var _ = framework.SIGDescribe(logInvariantsSIG)(logInvariantsContextText, func() {
-	// This test is a sentinel for selecting the reporting of data races
-	// in system components.
-	//
-	// This allows us to run it by default in most jobs, but it can be opted-out,
-	// does not run when selecting Conformance, and it can be tagged Flaky
-	// if we encounter issues with it.
-	ginkgo.It(logInvariantsDataRaceLeafText /* , feature.DataRace TODO: add this once the pull-kubernetes-e2e-kind-alpha-beta-features-race job also sets it */, func() {})
-})
+// regexpValue implements flag.Value for a regular expression.
+type regexpValue struct {
+	re *regexp.Regexp
+}
 
-var out, _ = os.Create(fmt.Sprintf("/tmp/e2e-%d.log", os.Getpid()))
+var _ flag.Value = &regexpValue{}
+
+func (r *regexpValue) String() string { return r.re.String() }
+func (r *regexpValue) Set(expr string) error {
+	re, err := regexp.Compile(expr)
+	if err != nil {
+		// This already starts with "error parsing regexp" and
+		// the caller adds the expression string,
+		// so no need to wrap the error here.
+		return err
+	}
+	r.re = re
+	return nil
+}
+
+func init() {
+	flag.BoolVar(&enabledLogChecks.dataRaces, "logcheck-data-races", false, "enables checking logs for DATA RACE warnings")
+	flag.Var(&enabledLogChecks.namespaces, "logcheck-namespaces-regexp", "all namespaces matching this regular expressions get checked")
+}
 
 var _ = ginkgo.ReportBeforeSuite(func(ctx ginkgo.SpecContext, report ginkgo.Report) {
-	if !report.SuiteConfig.DryRun {
-		// This is only reached in the main process.
-		fmt.Fprintf(out, "*** ReportBeforeSuite dry-run %v in pid %d, race detection %v ***\n", report.SuiteConfig.DryRun, os.Getpid(), invariantsSelected(report, logInvariantsSIG, logInvariantsContextText, logInvariantsDataRaceLeafText))
-		mainProcess = true
-		initializeLogs()
-	}
-})
-
-var _ = ginkgo.ReportAfterSuite(fmt.Sprintf("[sig-%s] %s", logInvariantsSIG, logInvariantsContextText), func(ctx ginkgo.SpecContext, report ginkgo.Report) {
-	fmt.Fprintf(out, "*** ReportAfterSuite dry-run %v in pid %d ***\n", report.SuiteConfig.DryRun, os.Getpid())
-
 	if report.SuiteConfig.DryRun {
-		// This is reached after Ginkgo has determined which tests it is going to run
-		// and before it actually runs anything. We can determine here what we are
-		// meant to check, but actually kicking of background goroutines has to
-		// wait until after suite initialization is done and tests start to run.
-		enabledLogChecks = logCheck{
-			dataRaces: invariantsSelected(report, logInvariantsSIG, logInvariantsContextText, logInvariantsDataRaceLeafText),
-		}
-		// if enabledLogChecks.any() {
-		// 	framework.NewFrameworkExtensions = append(framework.NewFrameworkExtensions, func(f *framework.Framework) {
-		// 		ginkgo.BeforeEach(func() {
-		// 			initializeLogs(f)
-		// 		})
-		// 	})
-		// }
-	} else {
-		// This is reached only in the main process after the test run has completed.
-		finalizeLogs()
-	}
-})
-
-// initializeLogs gets called before tests start to run. It sets up monitoring of system component log output,
-// if requested through the sentinel tests and not started yet.
-func initializeLogs( /*f *framework.Framework*/ ) {
-	if lc != nil || !mainProcess {
 		return
 	}
-	fmt.Fprintf(out, "iniatializeLogs in %d\n", os.Getpid())
+
+	// This is only reached in the main process.
+	initialize()
+})
+
+// SIG Testing runs this as a service for the SIGs which own the code.
+var _ = ginkgo.ReportAfterSuite("[sig-testing] Log Check", func(ctx ginkgo.SpecContext, report ginkgo.Report) {
+	if report.SuiteConfig.DryRun {
+		return
+	}
+
+	// This is reached only in the main process after the test run has completed.
+	finalize()
+})
+
+// initialize gets called once before tests start to run.
+// It sets up monitoring of system component log output, if requested.
+func initialize() {
+	if !enabledLogChecks.any() {
+		return
+	}
 
 	config, err := framework.LoadConfig()
 	framework.ExpectNoError(err, "loading client config")
@@ -141,7 +162,8 @@ func initializeLogs( /*f *framework.Framework*/ ) {
 	lc.start(ctx, podlogs.CopyAllLogs)
 }
 
-func finalizeLogs() {
+// finalize gets called once after tests have run, in the process where initialize was also called.
+func finalize() {
 	if lc == nil {
 		return
 	}
@@ -186,6 +208,7 @@ type logChecker struct {
 	logFile string
 
 	// wg counts the number of active pod output streams. Add and Wait must be protected by wgMutex.
+	// Wait then only waits reliably for goroutines which were added *before* it gets called.
 	wg      sync.WaitGroup
 	wgMutex sync.Mutex
 
@@ -206,6 +229,7 @@ func (l *logChecker) stop() (failure, stdout string) {
 	defer l.wgMutex.Unlock()
 	l.wg.Wait()
 
+	// Now we can proceed and produce the report.
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 
@@ -263,11 +287,7 @@ func (l *logChecker) start(ctx context.Context, startCopyAllLogs func(ctx contex
 		return
 	}
 
-	// Figure out which namespace(s) to watch. If we had an API for
-	// identifying "system" namespaces, we could use this here, but we
-	// don't have that yet (https://github.com/kubernetes/enhancements/issues/5708).
-	//
-	// Instead we monitor every namespace which has "system" in the name.
+	// Figure out which namespace(s) to watch.
 	namespaces, err := l.client.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		l.logger.Error(err, "Failed to list namespaces")
@@ -278,7 +298,7 @@ func (l *logChecker) start(ctx context.Context, startCopyAllLogs func(ctx contex
 	defer l.wgMutex.Unlock()
 
 	for _, namespace := range namespaces.Items {
-		if !strings.Contains(namespace.Name, "system") {
+		if !l.check.namespaces.re.MatchString(namespace.Name) {
 			continue
 		}
 		to := podlogs.LogOutput{
