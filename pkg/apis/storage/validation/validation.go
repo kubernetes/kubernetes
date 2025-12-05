@@ -148,7 +148,7 @@ func ValidateVolumeAttachment(volumeAttachment *storage.VolumeAttachment) field.
 // ValidateVolumeAttachmentV1 validates a v1/VolumeAttachment. It contains only extra checks missing in
 // ValidateVolumeAttachment.
 func ValidateVolumeAttachmentV1(volumeAttachment *storage.VolumeAttachment) field.ErrorList {
-	allErrs := apivalidation.ValidateCSIDriverName(volumeAttachment.Spec.Attacher, field.NewPath("spec.attacher"))
+	allErrs := apivalidation.ValidateCSIDriverName(volumeAttachment.Spec.Attacher, field.NewPath("spec.attacher")).MarkCoveredByDeclarative()
 
 	if volumeAttachment.Spec.Source.PersistentVolumeName != nil {
 		pvName := *volumeAttachment.Spec.Source.PersistentVolumeName
