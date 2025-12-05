@@ -18,11 +18,9 @@ package e2edra
 
 import (
 	"archive/tar"
-	"bytes"
 	"compress/gzip"
 	"context"
 	_ "embed"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -38,24 +36,13 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
-	"github.com/stretchr/testify/require"
 
-	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1"
-	resourceapiv1beta2 "k8s.io/api/resource/v1beta2"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/version"
-	resourceapiac "k8s.io/client-go/applyconfigurations/resource/v1"
-	resourceapiacv1beta2 "k8s.io/client-go/applyconfigurations/resource/v1beta2"
 	restclient "k8s.io/client-go/rest"
-	draapiv1beta2 "k8s.io/dynamic-resource-allocation/api/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	drautils "k8s.io/kubernetes/test/e2e/dra/utils"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
-	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/kubernetes/test/utils/localupcluster"
@@ -68,6 +55,45 @@ func init() {
 	// -v=5 may be useful to debug driver operations, but usually isn't needed.
 	ktesting.SetDefaultVerbosity(2)
 }
+
+// The overall flow of upgrade/downgrade testing is always the same:
+//
+//   - Bring up a cluster with the previous release.
+//   - "Install" the test DRA driver with 8 devices for the one node in the cluster.
+//     There is a DeviceClass for it.
+//   - Step 1: run some test code.
+//   - Upgrade the cluster to the current code.
+//   - Step 2: run some more test code.
+//   - Downgrade to the previous release again.
+//   - Step 3: run some final test code.
+//
+// The "test code" gets registered here with a single function for each
+// sub-test. That function then returns the next piece of code, which then
+// returns the final code.
+//
+// For performance reasons there is only a single `It("works")` which
+// runs everything. Failures in sub-tests are reported separately *if they
+// are reported via the TContext*. Failures reported via ginkgo.Fail
+// currently abort the entire test. This will be addressed by converting
+// everything to ktesting-based unit tests.
+//
+// Each sub-test must be self-contained. They intentionally run in a random
+// order. However, they share the same cluster and the 8 devices which are
+// available there.
+var subTests = map[string]step1Func{
+	"core DRA":                    coreDRA,
+	"ResourceClaim device status": resourceClaimDeviceStatus,
+}
+
+// step1Func is passed everything that is needed to run
+type step1Func func(tCtx ktesting.TContext, f *framework.Framework, builder *drautils.Builder) step2Func
+
+type step2Func func(tCtx ktesting.TContext) step3Func
+
+type step3Func func(tCtx ktesting.TContext)
+
+// steps has the names for the actual ginkgo.It where sub-test results are provided.
+var steps = []string{"before downgrade", "after downgrade", "after upgrade"}
 
 var repoRoot = repoRootDefault()
 
@@ -93,6 +119,7 @@ func repoRootDefault() string {
 
 func TestUpgradeDowngrade(t *testing.T) {
 	suiteConfig, reporterConfig := framework.CreateGinkgoConfig()
+	suiteConfig.RandomizeAllSpecs = false
 	ginkgo.RunSpecs(t, "DRA", suiteConfig, reporterConfig)
 }
 
@@ -105,6 +132,14 @@ var _ = ginkgo.Describe("DRA upgrade/downgrade", func() {
 	// Some other things normally done by test/e2e.
 	e2etestfiles.AddFileSource(e2etestfiles.RootFileSource{Root: repoRoot})
 	gomega.RegisterFailHandler(ginkgo.Fail)
+
+	// sub-test -> step -> failure
+	//
+	// Initially each failure string is empty.
+	results := make(map[string]map[string]string, len(subTests))
+	for subTest := range subTests {
+		results[subTest] = make(map[string]string, len(steps))
+	}
 
 	ginkgo.It("works", func(ctx context.Context) {
 		// TODO: replace with helper code from https://github.com/kubernetes/kubernetes/pull/122481 should that get merged.
@@ -232,22 +267,33 @@ var _ = ginkgo.Describe("DRA upgrade/downgrade", func() {
 
 		tCtx.ExpectNoError(e2enode.WaitForAllNodesSchedulable(tCtx, tCtx.Client(), f.Timeouts.NodeSchedulable), "wait for all nodes to be schedulable")
 		nodes := drautils.NewNodesNow(tCtx, f, 1, 1)
-		testResourceClaimDeviceStatusAfterUpgrade, testResourceClaimDeviceStatusAfterDowngrade := testResourceClaimDeviceStatus(tCtx, namespace.Name)
 
 		// Opening sockets locally avoids intermittent errors and delays caused by proxying through the restarted apiserver.
 		// We could speed up testing by shortening the sync delay in the ResourceSlice controller, but let's better
 		// test the defaults.
 		driver := drautils.NewDriverInstance(f)
 		driver.IsLocal = true
-		driver.Run(nodes, drautils.DriverResourcesNow(nodes, 1))
+		driver.Run(nodes, drautils.DriverResourcesNow(nodes, 8))
 		b := drautils.NewBuilderNow(ctx, f, driver)
 
-		claim := b.ExternalClaim()
-		pod := b.PodExternal()
-		b.Create(ctx, claim, pod)
-		b.TestPod(ctx, f, pod)
-
 		tCtx = ktesting.End(tCtx)
+
+		steps2 := make(map[string]step2Func, len(subTests))
+		for subTest, step1 := range subTests {
+			tCtx = ktesting.Begin(tCtx, subTest)
+			var result error
+			func() {
+				tCtx, finalize := ktesting.WithError(tCtx, &result)
+				defer finalize()
+
+				// This only gets set in case of success.
+				steps2[subTest] = step1(tCtx, f, b)
+			}()
+			if result != nil {
+				results[subTest][steps[0]] = result.Error()
+			}
+			tCtx = ktesting.End(tCtx)
+		}
 
 		tCtx = ktesting.Begin(tCtx, fmt.Sprintf("update to %s", gitVersion))
 		// We could split this up into first updating the apiserver, then control plane components, then restarting kubelet.
@@ -255,7 +301,6 @@ var _ = ginkgo.Describe("DRA upgrade/downgrade", func() {
 		// TODO
 		restoreOptions := cluster.Modify(tCtx, localupcluster.ModifyOptions{Upgrade: true, BinDir: dir})
 		tCtx = ktesting.End(tCtx)
-		testResourceClaimDeviceStatusAfterUpgrade()
 
 		// The kubelet wipes all ResourceSlices on a restart because it doesn't know which drivers were running.
 		// Wait for the ResourceSlice controller in the driver to notice and recreate the ResourceSlices.
@@ -263,47 +308,70 @@ var _ = ginkgo.Describe("DRA upgrade/downgrade", func() {
 		gomega.Eventually(ctx, driver.NewGetSlices()).WithTimeout(5 * time.Minute).Should(gomega.HaveField("Items", gomega.HaveLen(len(nodes.NodeNames))))
 		tCtx = ktesting.End(tCtx)
 
-		// Remove pod prepared by previous Kubernetes.
-		framework.ExpectNoError(f.ClientSet.ResourceV1beta1().ResourceClaims(namespace.Name).Delete(ctx, claim.Name, metav1.DeleteOptions{}))
-		framework.ExpectNoError(f.ClientSet.CoreV1().Pods(namespace.Name).Delete(ctx, pod.Name, metav1.DeleteOptions{}))
-		framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, namespace.Name, f.Timeouts.PodDelete))
+		steps3 := make(map[string]step3Func, len(subTests))
+		for subTest := range subTests {
+			step2 := steps2[subTest]
+			if step2 == nil {
+				continue
+			}
+			tCtx = ktesting.Begin(tCtx, subTest)
+			var result error
+			func() {
+				tCtx, finalize := ktesting.WithError(tCtx, &result)
+				defer finalize()
 
-		// Create another claim and pod, this time using the latest Kubernetes.
-		claim = b.ExternalClaim()
-		pod = b.PodExternal()
-		pod.Spec.ResourceClaims[0].ResourceClaimName = &claim.Name
-		b.Create(ctx, claim, pod)
-		b.TestPod(ctx, f, pod)
+				// This only gets set in case of success.
+				steps3[subTest] = step2(tCtx)
+			}()
+			if result != nil {
+				results[subTest][steps[0]] = result.Error()
+			}
+			tCtx = ktesting.End(tCtx)
+		}
 
 		// Roll back.
 		tCtx = ktesting.Begin(tCtx, "downgrade")
 		cluster.Modify(tCtx, restoreOptions)
 		tCtx = ktesting.End(tCtx)
 
-		testResourceClaimDeviceStatusAfterDowngrade()
-
-		// We need to clean up explicitly because the normal
-		// cleanup doesn't work (driver shuts down first).
-		//
-		// The retry loops are necessary because of a stale connection
-		// to the restarted apiserver. Sometimes, attempts fail with "EOF" as error
-		// or (even weirder) with
-		//     getting *v1.Pod: pods "tester-2" is forbidden: User "kubernetes-admin" cannot get resource "pods" in API group "" in the namespace "dra-9021"
-		ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) error {
-			return f.ClientSet.ResourceV1beta1().ResourceClaims(namespace.Name).Delete(tCtx, claim.Name, metav1.DeleteOptions{})
-		}).Should(gomega.Succeed(), "delete claim after downgrade")
-		ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) error {
-			return f.ClientSet.CoreV1().Pods(namespace.Name).Delete(tCtx, pod.Name, metav1.DeleteOptions{})
-		}).Should(gomega.Succeed(), "delete pod after downgrade")
-		ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) *v1.Pod {
-			pod, err := f.ClientSet.CoreV1().Pods(namespace.Name).Get(tCtx, pod.Name, metav1.GetOptions{})
-			if apierrors.IsNotFound(err) {
-				return nil
+		for subTest := range subTests {
+			step3 := steps3[subTest]
+			if step3 == nil {
+				continue
 			}
-			tCtx.ExpectNoError(err, "get pod")
-			return pod
-		}).Should(gomega.BeNil(), "no pod after deletion after downgrade")
+			tCtx = ktesting.Begin(tCtx, subTest)
+			var result error
+			func() {
+				tCtx, finalize := ktesting.WithError(tCtx, &result)
+				defer finalize()
+
+				step3(tCtx)
+			}()
+			if result != nil {
+				results[subTest][steps[0]] = result.Error()
+			}
+			tCtx = ktesting.End(tCtx)
+		}
 	})
+
+	// This runs last because by default Ginkgo does not randomize within
+	// a top-level container.
+	for subTest := range subTests {
+		ginkgo.Context(subTest, func() {
+			for _, step := range steps {
+				ginkgo.It(step, func() {
+					failure := results[subTest][step]
+					if failure != "" {
+						// Source code location will be useless here. We can't have both:
+						// separate test results *and* correct source code location.
+						// This will become better with testing.T-based unit tests.
+						_, _ = ginkgo.GinkgoWriter.Write([]byte("For log output see 'DRA upgrade/downgrade works'\n"))
+						ginkgo.Fail(failure)
+					}
+				})
+			}
+		})
+	}
 })
 
 // sourceVersion identifies the Kubernetes git version based on hack/print-workspace-status.sh.
@@ -422,201 +490,4 @@ func serverDownloadURL(tCtx ktesting.TContext, prefix string, major, minor uint)
 		return "", "", fmt.Errorf("reading response body for %s failed: %w", url, err)
 	}
 	return fmt.Sprintf("https://dl.k8s.io/release/%s/kubernetes-server-%s-%s.tar.gz", string(version), runtime.GOOS, runtime.GOARCH), string(version), nil
-}
-
-// testResourceClaimDeviceStatus corresponds to testResourceClaimDeviceStatus in test/integration/dra
-// and was copied from there, therefore the unit-test style with tCtx and require.
-func testResourceClaimDeviceStatus(tCtx ktesting.TContext, namespace string) (afterUpgrade, afterDowngrade func()) {
-	claimName := "claim-with-device-status"
-	claim := &resourceapiv1beta2.ResourceClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: namespace,
-			Name:      claimName,
-		},
-		Spec: resourceapiv1beta2.ResourceClaimSpec{
-			Devices: resourceapiv1beta2.DeviceClaim{
-				Requests: []resourceapiv1beta2.DeviceRequest{
-					{
-						Name: "foo",
-						Exactly: &resourceapiv1beta2.ExactDeviceRequest{
-							DeviceClassName: "foo",
-						},
-					},
-				},
-			},
-		},
-	}
-
-	claim, err := tCtx.Client().ResourceV1beta2().ResourceClaims(namespace).Create(tCtx, claim, metav1.CreateOptions{})
-	tCtx.ExpectNoError(err, "create ResourceClaim")
-
-	// Add an allocation result.
-	// A finalizer is required for that.
-	finalizer := "test.example.com/my-test-finalizer"
-	claim.Finalizers = append(claim.Finalizers, finalizer)
-	claim, err = tCtx.Client().ResourceV1beta2().ResourceClaims(namespace).Update(tCtx, claim, metav1.UpdateOptions{})
-	claim.Status.Allocation = &resourceapiv1beta2.AllocationResult{
-		Devices: resourceapiv1beta2.DeviceAllocationResult{
-			Results: []resourceapiv1beta2.DeviceRequestAllocationResult{
-				{
-					Request: "foo",
-					Driver:  "one",
-					Pool:    "global",
-					Device:  "my-device",
-				},
-				{
-					Request: "foo",
-					Driver:  "two",
-					Pool:    "global",
-					Device:  "another-device",
-				},
-				{
-					Request: "foo",
-					Driver:  "three",
-					Pool:    "global",
-					Device:  "my-device",
-				},
-			},
-		},
-	}
-	tCtx.ExpectNoError(err, "add finalizer")
-	removeClaim := func(tCtx ktesting.TContext) {
-		client := tCtx.Client().ResourceV1beta2()
-		claim, err := client.ResourceClaims(namespace).Get(tCtx, claimName, metav1.GetOptions{})
-		if apierrors.IsNotFound(err) {
-			return
-		}
-		tCtx.ExpectNoError(err, "get claim to remove finalizer")
-		if claim.Status.Allocation != nil {
-			claim.Status.Allocation = nil
-			claim, err = client.ResourceClaims(namespace).UpdateStatus(tCtx, claim, metav1.UpdateOptions{})
-			tCtx.ExpectNoError(err, "remove allocation")
-		}
-		claim.Finalizers = nil
-		claim, err = client.ResourceClaims(namespace).Update(tCtx, claim, metav1.UpdateOptions{})
-		tCtx.ExpectNoError(err, "remove finalizer")
-		err = client.ResourceClaims(namespace).Delete(tCtx, claim.Name, metav1.DeleteOptions{})
-		tCtx.ExpectNoError(err, "delete claim")
-	}
-	tCtx.CleanupCtx(removeClaim)
-	claim, err = tCtx.Client().ResourceV1beta2().ResourceClaims(namespace).UpdateStatus(tCtx, claim, metav1.UpdateOptions{})
-	tCtx.ExpectNoError(err, "add allocation result")
-
-	// Now adding the device status should work.
-	deviceStatus := []resourceapiv1beta2.AllocatedDeviceStatus{{
-		Driver: "one",
-		Pool:   "global",
-		Device: "my-device",
-		Data: &apiruntime.RawExtension{
-			Raw: []byte(`{"kind": "foo", "apiVersion": "dra.example.com/v1"}`),
-		},
-		NetworkData: &resourceapiv1beta2.NetworkDeviceData{
-			InterfaceName: "net-1",
-			IPs: []string{
-				"10.9.8.0/24",
-				"2001:db8::/64",
-			},
-			HardwareAddress: "ea:9f:cb:40:b1:7b",
-		},
-	}}
-	claim.Status.Devices = deviceStatus
-	tCtx.ExpectNoError(err, "add device status")
-	require.Equal(tCtx, deviceStatus, claim.Status.Devices, "after adding device status")
-
-	// Strip the RawExtension. SSA re-encodes it, which causes negligble differences that nonetheless break assert.Equal.
-	claim.Status.Devices[0].Data = nil
-	deviceStatus[0].Data = nil
-	claim, err = tCtx.Client().ResourceV1beta2().ResourceClaims(namespace).UpdateStatus(tCtx, claim, metav1.UpdateOptions{})
-	tCtx.ExpectNoError(err, "add device status")
-	require.Equal(tCtx, deviceStatus, claim.Status.Devices, "after stripping RawExtension")
-
-	// Exercise SSA.
-	deviceStatusAC := resourceapiacv1beta2.AllocatedDeviceStatus().
-		WithDriver("two").
-		WithPool("global").
-		WithDevice("another-device").
-		WithNetworkData(resourceapiacv1beta2.NetworkDeviceData().WithInterfaceName("net-2"))
-	deviceStatus = append(deviceStatus, resourceapiv1beta2.AllocatedDeviceStatus{
-		Driver: "two",
-		Pool:   "global",
-		Device: "another-device",
-		NetworkData: &resourceapiv1beta2.NetworkDeviceData{
-			InterfaceName: "net-2",
-		},
-	})
-	claimAC := resourceapiacv1beta2.ResourceClaim(claim.Name, claim.Namespace).
-		WithStatus(resourceapiacv1beta2.ResourceClaimStatus().WithDevices(deviceStatusAC))
-	claim, err = tCtx.Client().ResourceV1beta2().ResourceClaims(namespace).ApplyStatus(tCtx, claimAC, metav1.ApplyOptions{
-		Force:        true,
-		FieldManager: "manager-1",
-	})
-	tCtx.ExpectNoError(err, "apply device status two")
-	require.Equal(tCtx, deviceStatus, claim.Status.Devices, "after applying device status two")
-
-	deviceStatusAC = resourceapiacv1beta2.AllocatedDeviceStatus().
-		WithDriver("three").
-		WithPool("global").
-		WithDevice("my-device").
-		WithNetworkData(resourceapiacv1beta2.NetworkDeviceData().WithInterfaceName("net-3"))
-	deviceStatus = append(deviceStatus, resourceapiv1beta2.AllocatedDeviceStatus{
-		Driver: "three",
-		Pool:   "global",
-		Device: "my-device",
-		NetworkData: &resourceapiv1beta2.NetworkDeviceData{
-			InterfaceName: "net-3",
-		},
-	})
-	claimAC = resourceapiacv1beta2.ResourceClaim(claim.Name, claim.Namespace).
-		WithStatus(resourceapiacv1beta2.ResourceClaimStatus().WithDevices(deviceStatusAC))
-	claim, err = tCtx.Client().ResourceV1beta2().ResourceClaims(namespace).ApplyStatus(tCtx, claimAC, metav1.ApplyOptions{
-		Force:        true,
-		FieldManager: "manager-2",
-	})
-	tCtx.ExpectNoError(err, "apply device status three")
-	require.Equal(tCtx, deviceStatus, claim.Status.Devices, "after applying device status three")
-	var buffer bytes.Buffer
-	encoder := json.NewEncoder(&buffer)
-	encoder.SetIndent("   ", "   ")
-	tCtx.ExpectNoError(encoder.Encode(claim))
-	tCtx.Logf("Final ResourceClaim:\n%s", buffer.String())
-
-	afterUpgrade = func() {
-		// Update one entry, remove the other.
-		deviceStatusAC := resourceapiac.AllocatedDeviceStatus().
-			WithDriver("two").
-			WithPool("global").
-			WithDevice("another-device").
-			WithNetworkData(resourceapiac.NetworkDeviceData().WithInterfaceName("yet-another-net"))
-		deviceStatus[1].NetworkData.InterfaceName = "yet-another-net"
-		claimAC := resourceapiac.ResourceClaim(claim.Name, claim.Namespace).
-			WithStatus(resourceapiac.ResourceClaimStatus().WithDevices(deviceStatusAC))
-		claim, err := tCtx.Client().ResourceV1().ResourceClaims(namespace).ApplyStatus(tCtx, claimAC, metav1.ApplyOptions{
-			Force:        true,
-			FieldManager: "manager-1",
-		})
-		tCtx.ExpectNoError(err, "update device status two")
-
-		var deviceStatusV1 []resourceapi.AllocatedDeviceStatus
-		for _, status := range deviceStatus {
-			var statusV1 resourceapi.AllocatedDeviceStatus
-			tCtx.ExpectNoError(draapiv1beta2.Convert_v1beta2_AllocatedDeviceStatus_To_v1_AllocatedDeviceStatus(&status, &statusV1, nil))
-			deviceStatusV1 = append(deviceStatusV1, statusV1)
-		}
-		require.Equal(tCtx, deviceStatusV1, claim.Status.Devices, "after updating device status two")
-	}
-	afterDowngrade = func() {
-		claimAC := resourceapiacv1beta2.ResourceClaim(claim.Name, claim.Namespace)
-		deviceStatus = deviceStatus[0:2]
-		claim, err := tCtx.Client().ResourceV1beta2().ResourceClaims(namespace).ApplyStatus(tCtx, claimAC, metav1.ApplyOptions{
-			Force:        true,
-			FieldManager: "manager-2",
-		})
-		tCtx.ExpectNoError(err, "remove device status three")
-		require.Equal(tCtx, deviceStatus, claim.Status.Devices, "after removing device status three")
-
-		// The cleanup order is so that we have to run this explicitly now.
-		// The tCtx.CleanupCtx is more for the sake of completeness.
-		removeClaim(tCtx)
-	}
-	return
 }
