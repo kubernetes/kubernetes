@@ -1820,3 +1820,54 @@ func TestQuantityRoundtripCBOR(t *testing.T) {
 		}
 	}
 }
+func TestMustParse_Int64Boundaries(t *testing.T) {
+	tests := []struct {
+		input       string
+		wantValue   int64
+		wantSuccess bool
+	}{
+		{
+			input:       "9223372036854775807", // math.MaxInt64
+			wantValue:   int64(9223372036854775807),
+			wantSuccess: true,
+		},
+		{
+			input:       "9223372036854775806", // MaxInt64 - 1
+			wantValue:   int64(9223372036854775806),
+			wantSuccess: true,
+		},
+		{
+			// Just above int64; MustParse should NOT succeed
+			// It will not panic, but AsInt64() should report false.
+			input:       "9223372036854775808",
+			wantSuccess: false,
+		},
+		{
+			input:       "-9223372036854775808", // math.MinInt64
+			wantValue:   int64(-9223372036854775808),
+			wantSuccess: true,
+		},
+		{
+			input:       "-9223372036854775809", // out of range
+			wantSuccess: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			q := MustParse(tt.input)
+			got, ok := q.AsInt64()
+
+			if tt.wantSuccess && !ok {
+				t.Fatalf("Expected success for %q, but AsInt64() returned ok=false", tt.input)
+			}
+			if !tt.wantSuccess && ok {
+				t.Fatalf("Expected failure for %q, but AsInt64() returned ok=true with value %d", tt.input, got)
+			}
+
+			if tt.wantSuccess && got != tt.wantValue {
+				t.Fatalf("Expected value %d for %q, got %d", tt.wantValue, tt.input, got)
+			}
+		})
+	}
+}
