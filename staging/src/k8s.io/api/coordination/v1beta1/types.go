@@ -51,6 +51,7 @@ type LeaseSpec struct {
 	// to wait to force acquire it. This is measure against time of last
 	// observed renewTime.
 	// +optional
+	// +k8s:minimum=1
 	LeaseDurationSeconds *int32 `json:"leaseDurationSeconds,omitempty" protobuf:"varint,2,opt,name=leaseDurationSeconds"`
 	// acquireTime is a time when the current lease was acquired.
 	// +optional
@@ -62,6 +63,7 @@ type LeaseSpec struct {
 	// leaseTransitions is the number of transitions of a lease between
 	// holders.
 	// +optional
+	// +k8s:minimum=0
 	LeaseTransitions *int32 `json:"leaseTransitions,omitempty" protobuf:"varint,5,opt,name=leaseTransitions"`
 	// Strategy indicates the strategy for picking the leader for coordinated leader election
 	// (Alpha) Using this field requires the CoordinatedLeaderElection feature gate to be enabled.
