@@ -103,8 +103,6 @@ type gaugeVecMetricKey struct {
 type MetricAsyncRecorder struct {
 	// bufferCh is a channel that serves as a metrics buffer before the metricsRecorder goroutine reports it.
 	bufferCh chan *histogramVecMetric
-	// if bufferSize is reached, incoming metrics will be discarded.
-	bufferSize int
 	// how often the recorder runs to flush the metrics.
 	interval time.Duration
 
@@ -116,6 +114,8 @@ type MetricAsyncRecorder struct {
 	aggregatedInflightEventMetricLastFlushTime time.Time
 	aggregatedInflightEventMetricBufferCh      chan *gaugeVecMetric
 
+	// flushCh dedicate if anything in bufferCh or aggregatedInflightEventMetricBufferCh is waiting for flush.
+	flushCh chan struct{}
 	// stopCh is used to stop the goroutine which periodically flushes metrics.
 	stopCh <-chan struct{}
 	// IsStoppedCh indicates whether the goroutine is stopped. It's used in tests only to make sure
@@ -126,8 +126,8 @@ type MetricAsyncRecorder struct {
 func NewMetricsAsyncRecorder(bufferSize int, interval time.Duration, stopCh <-chan struct{}) *MetricAsyncRecorder {
 	recorder := &MetricAsyncRecorder{
 		bufferCh:                      make(chan *histogramVecMetric, bufferSize),
-		bufferSize:                    bufferSize,
 		interval:                      interval,
+		flushCh:                       make(chan struct{}, 1),
 		stopCh:                        stopCh,
 		aggregatedInflightEventMetric: make(map[gaugeVecMetricKey]int),
 		aggregatedInflightEventMetricLastFlushTime: time.Now(),
@@ -169,12 +169,26 @@ func (r *MetricAsyncRecorder) ObserveInFlightEventsAsync(eventLabel string, valu
 			}
 			select {
 			case r.aggregatedInflightEventMetricBufferCh <- newMetric:
+				r.signalFlush()
 			default:
 			}
 		}
 		r.aggregatedInflightEventMetricLastFlushTime = time.Now()
 		// reset
 		r.aggregatedInflightEventMetric = make(map[gaugeVecMetricKey]int)
+	}
+}
+
+func (r *MetricAsyncRecorder) signalFlush() {
+
+	// due to performance concern, flushing is only performed when the buffer usage exceeds 50%.
+	if len(r.bufferCh) < cap(r.bufferCh)/2 {
+		return
+	}
+
+	select {
+	case r.flushCh <- struct{}{}:
+	default:
 	}
 }
 
@@ -186,39 +200,42 @@ func (r *MetricAsyncRecorder) observeMetricAsync(m *metrics.HistogramVec, value 
 	}
 	select {
 	case r.bufferCh <- newMetric:
+		r.signalFlush()
 	default:
 	}
 }
 
 // run flushes buffered metrics into Prometheus every second.
 func (r *MetricAsyncRecorder) run() {
+	timer := time.NewTimer(r.interval)
+
 	for {
 		select {
 		case <-r.stopCh:
 			close(r.IsStoppedCh)
 			return
-		default:
+		case <-timer.C:
+		case <-r.flushCh:
 		}
+
 		r.FlushMetrics()
-		time.Sleep(r.interval)
+
+		// We don’t want any extra flushes.
+		// Within each interval, there should be exactly one flush triggered by the timer.
+		timer.Reset(r.interval)
 	}
 }
 
-// FlushMetrics tries to clean up the bufferCh by reading at most bufferSize metrics.
+// FlushMetrics tries to clean up the bufferCh and aggregatedInflightEventMetricBufferCh.
 func (r *MetricAsyncRecorder) FlushMetrics() {
-	for i := 0; i < r.bufferSize; i++ {
+	for {
 		select {
 		case m := <-r.bufferCh:
 			m.metric.WithLabelValues(m.labelValues...).Observe(m.value)
-		default:
-			// no more value
-		}
-
-		select {
 		case m := <-r.aggregatedInflightEventMetricBufferCh:
 			m.metric.WithLabelValues(m.labelValues...).Add(m.valueToAdd)
 		default:
-			// no more value
+			return
 		}
 	}
 }
