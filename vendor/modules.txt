@@ -339,9 +339,6 @@ github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus
 # github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.0
 ## explicit; go 1.23
 github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors
-# github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
-## explicit
-github.com/grpc-ecosystem/go-grpc-prometheus
 # github.com/grpc-ecosystem/grpc-gateway/v2 v2.26.3
 ## explicit; go 1.23.0
 github.com/grpc-ecosystem/grpc-gateway/v2/internal/httprule
