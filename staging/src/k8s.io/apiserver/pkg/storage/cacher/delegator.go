@@ -32,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/audit"
@@ -319,7 +320,7 @@ type getLister interface {
 	GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error
 }
 
-func (c consistencyChecker) startChecking(stopCh <-chan struct{}) {
+func (c *consistencyChecker) startChecking(stopCh <-chan struct{}) {
 	klog.V(3).InfoS("Cache consistency check start", "group", c.groupResource.Group, "resource", c.groupResource.Resource)
 	jitter := 0.5 // Period between [interval, interval * (1.0 + jitter)]
 	sliding := true
@@ -344,7 +345,11 @@ func (c *consistencyChecker) check(ctx context.Context) {
 		c.cacher.MarkConsistent(true)
 		return
 	}
-	klog.ErrorS(nil, "Cache consistency check failed", "group", c.groupResource.Group, "resource", c.groupResource.Resource, "resourceVersion", digests.ResourceVersion, "etcdDigest", digests.EtcdDigest, "cacheDigest", digests.CacheDigest)
+
+	errMsgKVs := []interface{}{"group", c.groupResource.Group, "resource", c.groupResource.Resource, "resourceVersion", digests.ResourceVersion, "etcdDigest", digests.EtcdDigest, "cacheDigest", digests.CacheDigest}
+	errMsgKVs = append(errMsgKVs, enrichErrorMessageKVs(digests.EtcdKeys, digests.CacheKeys)...)
+
+	klog.ErrorS(nil, "Cache consistency check failed", errMsgKVs...)
 	metrics.StorageConsistencyCheckTotal.WithLabelValues(c.groupResource.Group, c.groupResource.Resource, "failure").Inc()
 	if panicOnCacheInconsistency {
 		panic(fmt.Sprintf("Cache consistency check failed, group: %q, resource: %q, resourceVersion: %q, etcdDigest: %q, cacheDigest: %q", c.groupResource.Group, c.groupResource.Resource, digests.ResourceVersion, digests.EtcdDigest, digests.CacheDigest))
@@ -352,15 +357,36 @@ func (c *consistencyChecker) check(ctx context.Context) {
 	c.cacher.MarkConsistent(false)
 }
 
+func enrichErrorMessageKVs(etcdKeyList, cacheKeyList *[]namespaceNameRV) []interface{} {
+	etcdKeySet := sets.New[namespaceNameRV](*etcdKeyList...)
+	cacheKeySet := sets.New[namespaceNameRV](*cacheKeyList...)
+	errMsgKVs := []interface{}{"etcdLength", len(*etcdKeyList), "cacheLength", len(*cacheKeyList)}
+	missing := etcdKeySet.Difference(cacheKeySet).UnsortedList()
+	additional := cacheKeySet.Difference(etcdKeySet).UnsortedList()
+	// If the items are different, we log the different items without considering ordering.
+	if len(missing) != 0 || len(additional) != 0 {
+		errMsgKVs = append(errMsgKVs, "missingKeysInCache", missing, "additionalKeysInCache", additional)
+	} else {
+		// When the items are same, but orderings are different, we find the 1st item that mismatch.
+		for i, keyCache := range *cacheKeyList {
+			if (*etcdKeyList)[i] != keyCache {
+				errMsgKVs = append(errMsgKVs, "first mismatching item in etcd list", (*etcdKeyList)[i], "first mismatching item in cache list", (*cacheKeyList)[i])
+				break
+			}
+		}
+	}
+	return errMsgKVs
+}
+
 func (c *consistencyChecker) calculateDigests(ctx context.Context) (*storageDigest, error) {
 	if !c.cacher.Ready() {
 		return nil, fmt.Errorf("cache is not ready")
 	}
-	cacheDigest, cacheResourceVersion, err := c.calculateStoreDigest(ctx, c.cacher, "0", 0)
+	cacheDigest, cacheResourceVersion, cacheKeyList, err := c.calculateStoreDigest(ctx, c.cacher, "0", 0)
 	if err != nil {
 		return nil, fmt.Errorf("failed calculating cache digest: %w", err)
 	}
-	etcdDigest, etcdResourceVersion, err := c.calculateStoreDigest(ctx, c.etcd, cacheResourceVersion, storageWatchListPageSize)
+	etcdDigest, etcdResourceVersion, etcdKeyList, err := c.calculateStoreDigest(ctx, c.etcd, cacheResourceVersion, storageWatchListPageSize)
 	if err != nil {
 		return nil, fmt.Errorf("failed calculating etcd digest: %w", err)
 	}
@@ -371,6 +397,8 @@ func (c *consistencyChecker) calculateDigests(ctx context.Context) (*storageDige
 		ResourceVersion: cacheResourceVersion,
 		CacheDigest:     cacheDigest,
 		EtcdDigest:      etcdDigest,
+		CacheKeys:       cacheKeyList,
+		EtcdKeys:        etcdKeyList,
 	}, nil
 }
 
@@ -378,9 +406,17 @@ type storageDigest struct {
 	ResourceVersion string
 	CacheDigest     string
 	EtcdDigest      string
+	CacheKeys       *[]namespaceNameRV
+	EtcdKeys        *[]namespaceNameRV
 }
 
-func (c *consistencyChecker) calculateStoreDigest(ctx context.Context, store getLister, resourceVersion string, limit int64) (digest, rv string, err error) {
+type namespaceNameRV struct {
+	Namespace string
+	Name      string
+	RV        string
+}
+
+func (c *consistencyChecker) calculateStoreDigest(ctx context.Context, store getLister, resourceVersion string, limit int64) (digest, rv string, keyList *[]namespaceNameRV, err error) {
 	opts := storage.ListOptions{
 		Recursive:       true,
 		Predicate:       storage.Everything,
@@ -392,27 +428,30 @@ func (c *consistencyChecker) calculateStoreDigest(ctx context.Context, store get
 	} else {
 		opts.ResourceVersionMatch = metav1.ResourceVersionMatchExact
 	}
+	total := 0
+	keyList = &[]namespaceNameRV{}
 	h := fnv.New64()
 	for {
 		resp := c.newListFunc()
 		err = store.GetList(ctx, c.resourcePrefix, opts, resp)
 		if err != nil {
-			return "", "", err
+			return "", "", nil, err
 		}
-		err = addListToDigest(h, resp)
+		cnt, err := addListToDigest(h, keyList, resp)
 		if err != nil {
-			return "", "", err
+			return "", "", nil, err
 		}
+		total += cnt
 		list, err := meta.ListAccessor(resp)
 		if err != nil {
-			return "", "", err
+			return "", "", nil, err
 		}
 		if resourceVersion == "0" {
 			resourceVersion = list.GetResourceVersion()
 		}
 		continueToken := list.GetContinue()
 		if continueToken == "" {
-			return fmt.Sprintf("%x", h.Sum64()), resourceVersion, nil
+			return fmt.Sprintf("%x", h.Sum64()), resourceVersion, keyList, nil
 		}
 		opts.Predicate.Continue = continueToken
 		opts.ResourceVersion = ""
@@ -420,13 +459,15 @@ func (c *consistencyChecker) calculateStoreDigest(ctx context.Context, store get
 	}
 }
 
-func addListToDigest(h hash.Hash64, list runtime.Object) error {
-	return meta.EachListItem(list, func(obj runtime.Object) error {
+func addListToDigest(h hash.Hash64, keyList *[]namespaceNameRV, list runtime.Object) (int, error) {
+	total := 0
+	return total, meta.EachListItem(list, func(obj runtime.Object) error {
+		total += 1
 		objectMeta, err := meta.Accessor(obj)
 		if err != nil {
 			return err
 		}
-		err = addObjectToDigest(h, objectMeta)
+		err = addObjectToDigest(h, keyList, objectMeta)
 		if err != nil {
 			return err
 		}
@@ -434,8 +475,14 @@ func addListToDigest(h hash.Hash64, list runtime.Object) error {
 	})
 }
 
-func addObjectToDigest(h hash.Hash64, objectMeta metav1.Object) error {
-	_, err := h.Write([]byte(objectMeta.GetNamespace()))
+func addObjectToDigest(h hash.Hash64, keyList *[]namespaceNameRV, objectMeta metav1.Object) error {
+	key := namespaceNameRV{
+		Namespace: objectMeta.GetNamespace(),
+		Name:      objectMeta.GetName(),
+		RV:        objectMeta.GetResourceVersion(),
+	}
+	*keyList = append(*keyList, key)
+	_, err := h.Write([]byte(key.Namespace))
 	if err != nil {
 		return err
 	}
@@ -443,7 +490,7 @@ func addObjectToDigest(h hash.Hash64, objectMeta metav1.Object) error {
 	if err != nil {
 		return err
 	}
-	_, err = h.Write([]byte(objectMeta.GetName()))
+	_, err = h.Write([]byte(key.Name))
 	if err != nil {
 		return err
 	}
@@ -451,7 +498,7 @@ func addObjectToDigest(h hash.Hash64, objectMeta metav1.Object) error {
 	if err != nil {
 		return err
 	}
-	_, err = h.Write([]byte(objectMeta.GetResourceVersion()))
+	_, err = h.Write([]byte(key.RV))
 	if err != nil {
 		return err
 	}
