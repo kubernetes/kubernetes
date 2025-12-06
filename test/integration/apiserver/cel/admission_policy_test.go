@@ -170,7 +170,7 @@ var testSpec admissionregistration.ValidatingAdmissionPolicy = admissionregistra
 	},
 }
 
-func createV1beta1ValidatingPolicyAndBinding(client clientset.Interface, convertedRules []admissionregistrationv1beta1.NamedRuleWithOperations) error {
+func createV1beta1ValidatingPolicyAndBinding(ctx ktesting.TContext, client clientset.Interface, convertedRules []admissionregistrationv1beta1.NamedRuleWithOperations) error {
 	denyAction := admissionregistrationv1beta1.DenyAction
 	exact := admissionregistrationv1beta1.Exact
 	equivalent := admissionregistrationv1beta1.Equivalent
@@ -202,18 +202,18 @@ func createV1beta1ValidatingPolicyAndBinding(client clientset.Interface, convert
 		MatchPolicy:   &equivalent,
 	}
 
-	exactPolicy, err := client.AdmissionregistrationV1beta1().ValidatingAdmissionPolicies().Create(context.TODO(), exactPolicyTemplate, metav1.CreateOptions{})
+	exactPolicy, err := client.AdmissionregistrationV1beta1().ValidatingAdmissionPolicies().Create(ctx, exactPolicyTemplate, metav1.CreateOptions{})
 	if err != nil {
 		return err
 	}
 
-	convertPolicy, err := client.AdmissionregistrationV1beta1().ValidatingAdmissionPolicies().Create(context.TODO(), convertedPolicyTemplate, metav1.CreateOptions{})
+	convertPolicy, err := client.AdmissionregistrationV1beta1().ValidatingAdmissionPolicies().Create(ctx, convertedPolicyTemplate, metav1.CreateOptions{})
 	if err != nil {
 		return err
 	}
 
 	// Create a param that holds the options for this
-	configuration, err := client.CoreV1().ConfigMaps("default").Create(context.TODO(), &corev1.ConfigMap{
+	configuration, err := client.CoreV1().ConfigMaps("default").Create(ctx, &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-policy-v1beta1-param",
 			Namespace: "default",
@@ -231,7 +231,7 @@ func createV1beta1ValidatingPolicyAndBinding(client clientset.Interface, convert
 		return err
 	}
 
-	configurationConvert, err := client.CoreV1().ConfigMaps("default").Create(context.TODO(), &corev1.ConfigMap{
+	configurationConvert, err := client.CoreV1().ConfigMaps("default").Create(ctx, &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-policy-v1beta1-convert-param",
 			Namespace: "default",
@@ -249,7 +249,7 @@ func createV1beta1ValidatingPolicyAndBinding(client clientset.Interface, convert
 		return err
 	}
 
-	_, err = client.AdmissionregistrationV1beta1().ValidatingAdmissionPolicyBindings().Create(context.TODO(), &admissionregistrationv1beta1.ValidatingAdmissionPolicyBinding{
+	_, err = client.AdmissionregistrationV1beta1().ValidatingAdmissionPolicyBindings().Create(ctx, &admissionregistrationv1beta1.ValidatingAdmissionPolicyBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-policy-v1beta1-binding",
 		},
@@ -266,7 +266,7 @@ func createV1beta1ValidatingPolicyAndBinding(client clientset.Interface, convert
 	if err != nil {
 		return err
 	}
-	_, err = client.AdmissionregistrationV1beta1().ValidatingAdmissionPolicyBindings().Create(context.TODO(), &admissionregistrationv1beta1.ValidatingAdmissionPolicyBinding{
+	_, err = client.AdmissionregistrationV1beta1().ValidatingAdmissionPolicyBindings().Create(ctx, &admissionregistrationv1beta1.ValidatingAdmissionPolicyBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-policy-v1beta1-convert-binding",
 		},
@@ -287,7 +287,7 @@ func createV1beta1ValidatingPolicyAndBinding(client clientset.Interface, convert
 	return nil
 }
 
-func createV1ValidatingPolicyAndBinding(client clientset.Interface, convertedRules []admissionregistrationv1.NamedRuleWithOperations) error {
+func createV1ValidatingPolicyAndBinding(ctx ktesting.TContext, client clientset.Interface, convertedRules []admissionregistrationv1.NamedRuleWithOperations) error {
 	exact := admissionregistrationv1.Exact
 	equivalent := admissionregistrationv1.Equivalent
 	denyAction := admissionregistrationv1.DenyAction
@@ -319,18 +319,18 @@ func createV1ValidatingPolicyAndBinding(client clientset.Interface, convertedRul
 		MatchPolicy:   &equivalent,
 	}
 
-	exactPolicy, err := client.AdmissionregistrationV1().ValidatingAdmissionPolicies().Create(context.TODO(), exactPolicyTemplate, metav1.CreateOptions{})
+	exactPolicy, err := client.AdmissionregistrationV1().ValidatingAdmissionPolicies().Create(ctx, exactPolicyTemplate, metav1.CreateOptions{})
 	if err != nil {
 		return err
 	}
 
-	convertPolicy, err := client.AdmissionregistrationV1().ValidatingAdmissionPolicies().Create(context.TODO(), convertedPolicyTemplate, metav1.CreateOptions{})
+	convertPolicy, err := client.AdmissionregistrationV1().ValidatingAdmissionPolicies().Create(ctx, convertedPolicyTemplate, metav1.CreateOptions{})
 	if err != nil {
 		return err
 	}
 
 	// Create a param that holds the options for this
-	configuration, err := client.CoreV1().ConfigMaps("default").Create(context.TODO(), &corev1.ConfigMap{
+	configuration, err := client.CoreV1().ConfigMaps("default").Create(ctx, &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-policy-v1-param",
 			Namespace: "default",
@@ -348,7 +348,7 @@ func createV1ValidatingPolicyAndBinding(client clientset.Interface, convertedRul
 		return err
 	}
 
-	configurationConvert, err := client.CoreV1().ConfigMaps("default").Create(context.TODO(), &corev1.ConfigMap{
+	configurationConvert, err := client.CoreV1().ConfigMaps("default").Create(ctx, &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-policy-v1-convert-param",
 			Namespace: "default",
@@ -366,7 +366,7 @@ func createV1ValidatingPolicyAndBinding(client clientset.Interface, convertedRul
 		return err
 	}
 
-	_, err = client.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Create(context.TODO(), &admissionregistrationv1.ValidatingAdmissionPolicyBinding{
+	_, err = client.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Create(ctx, &admissionregistrationv1.ValidatingAdmissionPolicyBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-policy-v1-binding",
 		},
@@ -383,7 +383,7 @@ func createV1ValidatingPolicyAndBinding(client clientset.Interface, convertedRul
 	if err != nil {
 		return err
 	}
-	_, err = client.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Create(context.TODO(), &admissionregistrationv1.ValidatingAdmissionPolicyBinding{
+	_, err = client.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Create(ctx, &admissionregistrationv1.ValidatingAdmissionPolicyBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-policy-v1-convert-binding",
 		},
@@ -426,6 +426,7 @@ func TestPolicyAdmission(t *testing.T) {
 }
 
 func testPolicyAdmission(t *testing.T, supportV1Beta1 bool) {
+	_, ctx := ktesting.NewTestContext(t)
 	supportedVersions := []string{}
 	if supportV1Beta1 {
 		supportedVersions = append(supportedVersions, "v1beta1")
@@ -465,7 +466,7 @@ func testPolicyAdmission(t *testing.T, supportV1Beta1 bool) {
 	// create CRDs
 	etcd.CreateTestCRDs(t, apiextensionsclientset.NewForConfigOrDie(server.ClientConfig), false, etcd.GetCustomResourceDefinitionData()...)
 
-	if _, err := client.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}, metav1.CreateOptions{}); err != nil {
+	if _, err := client.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -562,11 +563,11 @@ func testPolicyAdmission(t *testing.T, supportV1Beta1 bool) {
 	}
 
 	if supportV1Beta1 {
-		if err := createV1beta1ValidatingPolicyAndBinding(client, convertedV1beta1Rules); err != nil {
+		if err := createV1beta1ValidatingPolicyAndBinding(ctx, client, convertedV1beta1Rules); err != nil {
 			t.Fatal(err)
 		}
 	} else {
-		if err := createV1ValidatingPolicyAndBinding(client, convertedV1Rules); err != nil {
+		if err := createV1ValidatingPolicyAndBinding(ctx, client, convertedV1Rules); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -576,12 +577,11 @@ func testPolicyAdmission(t *testing.T, supportV1Beta1 bool) {
 			Name: "test-k8s",
 		},
 	}
-	_, err = client.CoreV1().ConfigMaps(testNamespace).Create(context.TODO(), &testConfigmap, metav1.CreateOptions{})
+	_, err = client.CoreV1().ConfigMaps(testNamespace).Create(ctx, &testConfigmap, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, ctx := ktesting.NewTestContext(t)
 	// Try to patch the configmap and look for the warning message.
 	if err := wait.PollUntilContextTimeout(ctx, time.Millisecond*100, time.Second*5, false, func(ctx context.Context) (bool, error) {
 		holder.reset(t)
