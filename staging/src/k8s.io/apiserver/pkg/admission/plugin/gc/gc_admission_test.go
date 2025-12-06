@@ -35,9 +35,6 @@ import (
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/restmapper"
 	coretesting "k8s.io/client-go/testing"
-
-	api "k8s.io/kubernetes/pkg/apis/core"
-	controlplaneadmission "k8s.io/kubernetes/pkg/controlplane/apiserver/admission"
 )
 
 type fakeAuthorizer struct{}
@@ -138,13 +135,13 @@ func newGCPermissionsEnforcement() (*gcPermissionsEnforcement, error) {
 		return nil, fmt.Errorf("unexpected error while constructing resource list from fake discovery client: %v", err)
 	}
 	restMapper := restmapper.NewDiscoveryRESTMapper(restMapperRes)
-	genericPluginInitializer := initializer.New(nil, nil, nil, fakeAuthorizer{}, nil, nil, nil, restMapper)
-	pluginInitializer := controlplaneadmission.NewPluginInitializer(nil, nil)
-	initializersChain := apiserveradmission.PluginInitializers{}
-	initializersChain = append(initializersChain, genericPluginInitializer)
-	initializersChain = append(initializersChain, pluginInitializer)
+	pluginInitializer := initializer.New(nil, nil, nil, fakeAuthorizer{}, nil, nil, nil, restMapper)
+	pluginInitializer.Initialize(gcAdmit)
+	err = apiserveradmission.ValidateInitialization(gcAdmit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate initialization of plugin: %w", err)
+	}
 
-	initializersChain.Initialize(gcAdmit)
 	return gcAdmit, nil
 }
 
@@ -204,140 +201,140 @@ func TestGCAdmission(t *testing.T) {
 		{
 			name:       "super-user, create, no objectref change",
 			username:   "super",
-			resource:   api.SchemeGroupVersion.WithResource("pods"),
-			newObj:     &api.Pod{},
+			resource:   corev1.SchemeGroupVersion.WithResource("pods"),
+			newObj:     &corev1.Pod{},
 			checkError: expectNoError,
 		},
 		{
 			name:       "super-user, create, objectref change",
 			username:   "super",
-			resource:   api.SchemeGroupVersion.WithResource("pods"),
-			newObj:     &api.Pod{ObjectMeta: metav1.ObjectMeta{OwnerReferences: []metav1.OwnerReference{{Name: "first"}}}},
+			resource:   corev1.SchemeGroupVersion.WithResource("pods"),
+			newObj:     &corev1.Pod{ObjectMeta: metav1.ObjectMeta{OwnerReferences: []metav1.OwnerReference{{Name: "first"}}}},
 			checkError: expectNoError,
 		},
 		{
 			name:       "non-deleter, create, no objectref change",
 			username:   "non-deleter",
-			resource:   api.SchemeGroupVersion.WithResource("pods"),
-			newObj:     &api.Pod{},
+			resource:   corev1.SchemeGroupVersion.WithResource("pods"),
+			newObj:     &corev1.Pod{},
 			checkError: expectNoError,
 		},
 		{
 			name:       "non-deleter, create, objectref change",
 			username:   "non-deleter",
-			resource:   api.SchemeGroupVersion.WithResource("pods"),
-			newObj:     &api.Pod{ObjectMeta: metav1.ObjectMeta{OwnerReferences: []metav1.OwnerReference{{Name: "first"}}}},
+			resource:   corev1.SchemeGroupVersion.WithResource("pods"),
+			newObj:     &corev1.Pod{ObjectMeta: metav1.ObjectMeta{OwnerReferences: []metav1.OwnerReference{{Name: "first"}}}},
 			checkError: expectNoError,
 		},
 		{
 			name:       "non-pod-deleter, create, no objectref change",
 			username:   "non-pod-deleter",
-			resource:   api.SchemeGroupVersion.WithResource("pods"),
-			newObj:     &api.Pod{},
+			resource:   corev1.SchemeGroupVersion.WithResource("pods"),
+			newObj:     &corev1.Pod{},
 			checkError: expectNoError,
 		},
 		{
 			name:       "non-pod-deleter, create, objectref change",
 			username:   "non-pod-deleter",
-			resource:   api.SchemeGroupVersion.WithResource("pods"),
-			newObj:     &api.Pod{ObjectMeta: metav1.ObjectMeta{OwnerReferences: []metav1.OwnerReference{{Name: "first"}}}},
+			resource:   corev1.SchemeGroupVersion.WithResource("pods"),
+			newObj:     &corev1.Pod{ObjectMeta: metav1.ObjectMeta{OwnerReferences: []metav1.OwnerReference{{Name: "first"}}}},
 			checkError: expectNoError,
 		},
 		{
 			name:       "non-pod-deleter, create, objectref change, but not a pod",
 			username:   "non-pod-deleter",
-			resource:   api.SchemeGroupVersion.WithResource("not-pods"),
-			newObj:     &api.Pod{ObjectMeta: metav1.ObjectMeta{OwnerReferences: []metav1.OwnerReference{{Name: "first"}}}},
+			resource:   corev1.SchemeGroupVersion.WithResource("not-pods"),
+			newObj:     &corev1.Pod{ObjectMeta: metav1.ObjectMeta{OwnerReferences: []metav1.OwnerReference{{Name: "first"}}}},
 			checkError: expectNoError,
 		},
 
 		{
 			name:       "super-user, update, no objectref change",
 			username:   "super",
-			resource:   api.SchemeGroupVersion.WithResource("pods"),
-			oldObj:     &api.Pod{},
-			newObj:     &api.Pod{},
+			resource:   corev1.SchemeGroupVersion.WithResource("pods"),
+			oldObj:     &corev1.Pod{},
+			newObj:     &corev1.Pod{},
 			checkError: expectNoError,
 		},
 		{
 			name:       "super-user, update, no objectref change two",
 			username:   "super",
-			resource:   api.SchemeGroupVersion.WithResource("pods"),
-			oldObj:     &api.Pod{ObjectMeta: metav1.ObjectMeta{OwnerReferences: []metav1.OwnerReference{{Name: "first"}}}},
-			newObj:     &api.Pod{ObjectMeta: metav1.ObjectMeta{OwnerReferences: []metav1.OwnerReference{{Name: "first"}}}},
+			resource:   corev1.SchemeGroupVersion.WithResource("pods"),
+			oldObj:     &corev1.Pod{ObjectMeta: metav1.ObjectMeta{OwnerReferences: []metav1.OwnerReference{{Name: "first"}}}},
+			newObj:     &corev1.Pod{ObjectMeta: metav1.ObjectMeta{OwnerReferences: []metav1.OwnerReference{{Name: "first"}}}},
 			checkError: expectNoError,
 		},
 		{
 			name:       "super-user, update, objectref change",
 			username:   "super",
-			resource:   api.SchemeGroupVersion.WithResource("pods"),
-			oldObj:     &api.Pod{},
-			newObj:     &api.Pod{ObjectMeta: metav1.ObjectMeta{OwnerReferences: []metav1.OwnerReference{{Name: "first"}}}},
+			resource:   corev1.SchemeGroupVersion.WithResource("pods"),
+			oldObj:     &corev1.Pod{},
+			newObj:     &corev1.Pod{ObjectMeta: metav1.ObjectMeta{OwnerReferences: []metav1.OwnerReference{{Name: "first"}}}},
 			checkError: expectNoError,
 		},
 		{
 			name:       "non-deleter, update, no objectref change",
 			username:   "non-deleter",
-			resource:   api.SchemeGroupVersion.WithResource("pods"),
-			oldObj:     &api.Pod{},
-			newObj:     &api.Pod{},
+			resource:   corev1.SchemeGroupVersion.WithResource("pods"),
+			oldObj:     &corev1.Pod{},
+			newObj:     &corev1.Pod{},
 			checkError: expectNoError,
 		},
 		{
 			name:       "non-deleter, update, no objectref change two",
 			username:   "non-deleter",
-			resource:   api.SchemeGroupVersion.WithResource("pods"),
-			oldObj:     &api.Pod{ObjectMeta: metav1.ObjectMeta{OwnerReferences: []metav1.OwnerReference{{Name: "first"}}}},
-			newObj:     &api.Pod{ObjectMeta: metav1.ObjectMeta{OwnerReferences: []metav1.OwnerReference{{Name: "first"}}}},
+			resource:   corev1.SchemeGroupVersion.WithResource("pods"),
+			oldObj:     &corev1.Pod{ObjectMeta: metav1.ObjectMeta{OwnerReferences: []metav1.OwnerReference{{Name: "first"}}}},
+			newObj:     &corev1.Pod{ObjectMeta: metav1.ObjectMeta{OwnerReferences: []metav1.OwnerReference{{Name: "first"}}}},
 			checkError: expectNoError,
 		},
 		{
 			name:       "non-deleter, update, objectref change",
 			username:   "non-deleter",
-			resource:   api.SchemeGroupVersion.WithResource("pods"),
-			oldObj:     &api.Pod{},
-			newObj:     &api.Pod{ObjectMeta: metav1.ObjectMeta{OwnerReferences: []metav1.OwnerReference{{Name: "first"}}}},
+			resource:   corev1.SchemeGroupVersion.WithResource("pods"),
+			oldObj:     &corev1.Pod{},
+			newObj:     &corev1.Pod{ObjectMeta: metav1.ObjectMeta{OwnerReferences: []metav1.OwnerReference{{Name: "first"}}}},
 			checkError: expectCantSetOwnerRefError,
 		},
 		{
 			name:       "non-deleter, update, objectref change two",
 			username:   "non-deleter",
-			resource:   api.SchemeGroupVersion.WithResource("pods"),
-			oldObj:     &api.Pod{ObjectMeta: metav1.ObjectMeta{OwnerReferences: []metav1.OwnerReference{{Name: "first"}}}},
-			newObj:     &api.Pod{ObjectMeta: metav1.ObjectMeta{OwnerReferences: []metav1.OwnerReference{{Name: "first"}, {Name: "second"}}}},
+			resource:   corev1.SchemeGroupVersion.WithResource("pods"),
+			oldObj:     &corev1.Pod{ObjectMeta: metav1.ObjectMeta{OwnerReferences: []metav1.OwnerReference{{Name: "first"}}}},
+			newObj:     &corev1.Pod{ObjectMeta: metav1.ObjectMeta{OwnerReferences: []metav1.OwnerReference{{Name: "first"}, {Name: "second"}}}},
 			checkError: expectCantSetOwnerRefError,
 		},
 		{
 			name:       "non-pod-deleter, update, no objectref change",
 			username:   "non-pod-deleter",
-			resource:   api.SchemeGroupVersion.WithResource("pods"),
-			oldObj:     &api.Pod{},
-			newObj:     &api.Pod{},
+			resource:   corev1.SchemeGroupVersion.WithResource("pods"),
+			oldObj:     &corev1.Pod{},
+			newObj:     &corev1.Pod{},
 			checkError: expectNoError,
 		},
 		{
 			name:        "non-pod-deleter, update status, objectref change",
 			username:    "non-pod-deleter",
-			resource:    api.SchemeGroupVersion.WithResource("pods"),
+			resource:    corev1.SchemeGroupVersion.WithResource("pods"),
 			subresource: "status",
-			oldObj:      &api.Pod{},
-			newObj:      &api.Pod{ObjectMeta: metav1.ObjectMeta{OwnerReferences: []metav1.OwnerReference{{Name: "first"}}}},
+			oldObj:      &corev1.Pod{},
+			newObj:      &corev1.Pod{ObjectMeta: metav1.ObjectMeta{OwnerReferences: []metav1.OwnerReference{{Name: "first"}}}},
 			checkError:  expectNoError,
 		},
 		{
 			name:       "non-pod-deleter, update, objectref change",
 			username:   "non-pod-deleter",
-			resource:   api.SchemeGroupVersion.WithResource("pods"),
-			oldObj:     &api.Pod{},
-			newObj:     &api.Pod{ObjectMeta: metav1.ObjectMeta{OwnerReferences: []metav1.OwnerReference{{Name: "first"}}}},
+			resource:   corev1.SchemeGroupVersion.WithResource("pods"),
+			oldObj:     &corev1.Pod{},
+			newObj:     &corev1.Pod{ObjectMeta: metav1.ObjectMeta{OwnerReferences: []metav1.OwnerReference{{Name: "first"}}}},
 			checkError: expectCantSetOwnerRefError,
 		},
 		{
 			name:       "non-pod-deleter, update, objectref change, but not a pod",
 			username:   "non-pod-deleter",
-			resource:   api.SchemeGroupVersion.WithResource("not-pods"),
-			oldObj:     &api.Pod{},
-			newObj:     &api.Pod{ObjectMeta: metav1.ObjectMeta{OwnerReferences: []metav1.OwnerReference{{Name: "first"}}}},
+			resource:   corev1.SchemeGroupVersion.WithResource("not-pods"),
+			oldObj:     &corev1.Pod{},
+			newObj:     &corev1.Pod{ObjectMeta: metav1.ObjectMeta{OwnerReferences: []metav1.OwnerReference{{Name: "first"}}}},
 			checkError: expectNoError,
 		},
 	}
@@ -367,11 +364,11 @@ func TestGCAdmission(t *testing.T) {
 }
 
 func TestBlockOwnerDeletionAdmission(t *testing.T) {
-	podWithOwnerRefs := func(refs ...metav1.OwnerReference) *api.Pod {
+	podWithOwnerRefs := func(refs ...metav1.OwnerReference) *corev1.Pod {
 		var refSlice []metav1.OwnerReference
 		refSlice = append(refSlice, refs...)
 
-		return &api.Pod{
+		return &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				OwnerReferences: refSlice,
 			},
@@ -475,28 +472,28 @@ func TestBlockOwnerDeletionAdmission(t *testing.T) {
 		{
 			name:       "super-user, create, no ownerReferences",
 			username:   "super",
-			resource:   api.SchemeGroupVersion.WithResource("pods"),
+			resource:   corev1.SchemeGroupVersion.WithResource("pods"),
 			newObj:     podWithOwnerRefs(),
 			checkError: expectNoError,
 		},
 		{
 			name:       "super-user, create, all ownerReferences have blockOwnerDeletion=false",
 			username:   "super",
-			resource:   api.SchemeGroupVersion.WithResource("pods"),
+			resource:   corev1.SchemeGroupVersion.WithResource("pods"),
 			newObj:     podWithOwnerRefs(notBlockRC1, notBlockRC2),
 			checkError: expectNoError,
 		},
 		{
 			name:       "super-user, create, some ownerReferences have blockOwnerDeletion=true",
 			username:   "super",
-			resource:   api.SchemeGroupVersion.WithResource("pods"),
+			resource:   corev1.SchemeGroupVersion.WithResource("pods"),
 			newObj:     podWithOwnerRefs(blockRC1, blockRC2, blockNode),
 			checkError: expectNoError,
 		},
 		{
 			name:               "super-user, create, some ownerReferences have blockOwnerDeletion=true, hangingRESTMapper",
 			username:           "super",
-			resource:           api.SchemeGroupVersion.WithResource("pods"),
+			resource:           corev1.SchemeGroupVersion.WithResource("pods"),
 			newObj:             podWithOwnerRefs(blockRC1, blockRC2, blockNode),
 			restMapperOverride: &neverReturningRESTMapper{},
 			checkError:         expectNoError,
@@ -504,42 +501,42 @@ func TestBlockOwnerDeletionAdmission(t *testing.T) {
 		{
 			name:       "non-rc-deleter, create, no ownerReferences",
 			username:   "non-rc-deleter",
-			resource:   api.SchemeGroupVersion.WithResource("pods"),
+			resource:   corev1.SchemeGroupVersion.WithResource("pods"),
 			newObj:     podWithOwnerRefs(),
 			checkError: expectNoError,
 		},
 		{
 			name:       "non-rc-deleter, create, all ownerReferences have blockOwnerDeletion=false or nil",
 			username:   "non-rc-deleter",
-			resource:   api.SchemeGroupVersion.WithResource("pods"),
+			resource:   corev1.SchemeGroupVersion.WithResource("pods"),
 			newObj:     podWithOwnerRefs(notBlockRC1, nilBlockRC2),
 			checkError: expectNoError,
 		},
 		{
 			name:       "non-node-deleter, create, all ownerReferences have blockOwnerDeletion=false",
 			username:   "non-node-deleter",
-			resource:   api.SchemeGroupVersion.WithResource("pods"),
+			resource:   corev1.SchemeGroupVersion.WithResource("pods"),
 			newObj:     podWithOwnerRefs(notBlockNode),
 			checkError: expectNoError,
 		},
 		{
 			name:       "non-rc-deleter, create, some ownerReferences have blockOwnerDeletion=true",
 			username:   "non-rc-deleter",
-			resource:   api.SchemeGroupVersion.WithResource("pods"),
+			resource:   corev1.SchemeGroupVersion.WithResource("pods"),
 			newObj:     podWithOwnerRefs(blockRC1, notBlockRC2),
 			checkError: expectCantSetBlockOwnerDeletionError,
 		},
 		{
 			name:       "non-rc-deleter, create, some ownerReferences have blockOwnerDeletion=true, but are pointing to daemonset",
 			username:   "non-rc-deleter",
-			resource:   api.SchemeGroupVersion.WithResource("pods"),
+			resource:   corev1.SchemeGroupVersion.WithResource("pods"),
 			newObj:     podWithOwnerRefs(blockDS1),
 			checkError: expectNoError,
 		},
 		{
 			name:       "non-node-deleter, create, some ownerReferences have blockOwnerDeletion=true",
 			username:   "non-node-deleter",
-			resource:   api.SchemeGroupVersion.WithResource("pods"),
+			resource:   corev1.SchemeGroupVersion.WithResource("pods"),
 			newObj:     podWithOwnerRefs(blockNode),
 			checkError: expectCantSetBlockOwnerDeletionError,
 		},
@@ -547,7 +544,7 @@ func TestBlockOwnerDeletionAdmission(t *testing.T) {
 		{
 			name:       "super-user, update, no ownerReferences change blockOwnerDeletion",
 			username:   "super",
-			resource:   api.SchemeGroupVersion.WithResource("pods"),
+			resource:   corev1.SchemeGroupVersion.WithResource("pods"),
 			oldObj:     podWithOwnerRefs(nilBlockRC1, nilBlockNode),
 			newObj:     podWithOwnerRefs(notBlockRC1, notBlockNode),
 			checkError: expectNoError,
@@ -555,7 +552,7 @@ func TestBlockOwnerDeletionAdmission(t *testing.T) {
 		{
 			name:       "super-user, update, some ownerReferences change to blockOwnerDeletion=true",
 			username:   "super",
-			resource:   api.SchemeGroupVersion.WithResource("pods"),
+			resource:   corev1.SchemeGroupVersion.WithResource("pods"),
 			oldObj:     podWithOwnerRefs(notBlockRC1, notBlockNode),
 			newObj:     podWithOwnerRefs(blockRC1, blockNode),
 			checkError: expectNoError,
@@ -563,7 +560,7 @@ func TestBlockOwnerDeletionAdmission(t *testing.T) {
 		{
 			name:       "super-user, update, add new ownerReferences with blockOwnerDeletion=true",
 			username:   "super",
-			resource:   api.SchemeGroupVersion.WithResource("pods"),
+			resource:   corev1.SchemeGroupVersion.WithResource("pods"),
 			oldObj:     podWithOwnerRefs(),
 			newObj:     podWithOwnerRefs(blockRC1, blockNode),
 			checkError: expectNoError,
@@ -571,7 +568,7 @@ func TestBlockOwnerDeletionAdmission(t *testing.T) {
 		{
 			name:       "non-rc-deleter, update, no ownerReferences change blockOwnerDeletion",
 			username:   "non-rc-deleter",
-			resource:   api.SchemeGroupVersion.WithResource("pods"),
+			resource:   corev1.SchemeGroupVersion.WithResource("pods"),
 			oldObj:     podWithOwnerRefs(nilBlockRC1),
 			newObj:     podWithOwnerRefs(notBlockRC1),
 			checkError: expectNoError,
@@ -579,7 +576,7 @@ func TestBlockOwnerDeletionAdmission(t *testing.T) {
 		{
 			name:       "non-rc-deleter, update, some ownerReferences change from blockOwnerDeletion=false to true",
 			username:   "non-rc-deleter",
-			resource:   api.SchemeGroupVersion.WithResource("pods"),
+			resource:   corev1.SchemeGroupVersion.WithResource("pods"),
 			oldObj:     podWithOwnerRefs(notBlockRC1),
 			newObj:     podWithOwnerRefs(blockRC1),
 			checkError: expectCantSetBlockOwnerDeletionError,
@@ -587,7 +584,7 @@ func TestBlockOwnerDeletionAdmission(t *testing.T) {
 		{
 			name:       "non-rc-deleter, update, some ownerReferences change from blockOwnerDeletion=nil to true",
 			username:   "non-rc-deleter",
-			resource:   api.SchemeGroupVersion.WithResource("pods"),
+			resource:   corev1.SchemeGroupVersion.WithResource("pods"),
 			oldObj:     podWithOwnerRefs(nilBlockRC1),
 			newObj:     podWithOwnerRefs(blockRC1),
 			checkError: expectCantSetBlockOwnerDeletionError,
@@ -595,7 +592,7 @@ func TestBlockOwnerDeletionAdmission(t *testing.T) {
 		{
 			name:       "non-node-deleter, update, some ownerReferences change from blockOwnerDeletion=nil to true",
 			username:   "non-node-deleter",
-			resource:   api.SchemeGroupVersion.WithResource("pods"),
+			resource:   corev1.SchemeGroupVersion.WithResource("pods"),
 			oldObj:     podWithOwnerRefs(nilBlockNode),
 			newObj:     podWithOwnerRefs(blockNode),
 			checkError: expectCantSetBlockOwnerDeletionError,
@@ -603,7 +600,7 @@ func TestBlockOwnerDeletionAdmission(t *testing.T) {
 		{
 			name:       "non-rc-deleter, update, some ownerReferences change from blockOwnerDeletion=true to false",
 			username:   "non-rc-deleter",
-			resource:   api.SchemeGroupVersion.WithResource("pods"),
+			resource:   corev1.SchemeGroupVersion.WithResource("pods"),
 			oldObj:     podWithOwnerRefs(blockRC1),
 			newObj:     podWithOwnerRefs(notBlockRC1),
 			checkError: expectNoError,
@@ -611,7 +608,7 @@ func TestBlockOwnerDeletionAdmission(t *testing.T) {
 		{
 			name:       "non-node-deleter, update, some ownerReferences change from blockOwnerDeletion=true to false",
 			username:   "non-node-deleter",
-			resource:   api.SchemeGroupVersion.WithResource("pods"),
+			resource:   corev1.SchemeGroupVersion.WithResource("pods"),
 			oldObj:     podWithOwnerRefs(blockNode),
 			newObj:     podWithOwnerRefs(notBlockNode),
 			checkError: expectNoError,
@@ -619,7 +616,7 @@ func TestBlockOwnerDeletionAdmission(t *testing.T) {
 		{
 			name:       "non-rc-deleter, update, some ownerReferences change blockOwnerDeletion, but all such references are to daemonset",
 			username:   "non-rc-deleter",
-			resource:   api.SchemeGroupVersion.WithResource("pods"),
+			resource:   corev1.SchemeGroupVersion.WithResource("pods"),
 			oldObj:     podWithOwnerRefs(notBlockDS1),
 			newObj:     podWithOwnerRefs(blockDS1),
 			checkError: expectNoError,
@@ -627,7 +624,7 @@ func TestBlockOwnerDeletionAdmission(t *testing.T) {
 		{
 			name:       "non-rc-deleter, update, add new ownerReferences with blockOwnerDeletion=nil or false",
 			username:   "non-rc-deleter",
-			resource:   api.SchemeGroupVersion.WithResource("pods"),
+			resource:   corev1.SchemeGroupVersion.WithResource("pods"),
 			oldObj:     podWithOwnerRefs(),
 			newObj:     podWithOwnerRefs(notBlockRC1, nilBlockRC2),
 			checkError: expectNoError,
@@ -635,7 +632,7 @@ func TestBlockOwnerDeletionAdmission(t *testing.T) {
 		{
 			name:       "non-rc-deleter, update, add new ownerReferences with blockOwnerDeletion=true",
 			username:   "non-rc-deleter",
-			resource:   api.SchemeGroupVersion.WithResource("pods"),
+			resource:   corev1.SchemeGroupVersion.WithResource("pods"),
 			oldObj:     podWithOwnerRefs(),
 			newObj:     podWithOwnerRefs(blockRC1),
 			checkError: expectCantSetBlockOwnerDeletionError,
@@ -643,7 +640,7 @@ func TestBlockOwnerDeletionAdmission(t *testing.T) {
 		{
 			name:       "non-rc-deleter, update, add new ownerReferences with blockOwnerDeletion=true, but the references are to daemonset",
 			username:   "non-rc-deleter",
-			resource:   api.SchemeGroupVersion.WithResource("pods"),
+			resource:   corev1.SchemeGroupVersion.WithResource("pods"),
 			oldObj:     podWithOwnerRefs(),
 			newObj:     podWithOwnerRefs(blockDS1),
 			checkError: expectNoError,
@@ -651,7 +648,7 @@ func TestBlockOwnerDeletionAdmission(t *testing.T) {
 		{
 			name:       "non-node-deleter, update, add ownerReferences with blockOwnerDeletion=true",
 			username:   "non-node-deleter",
-			resource:   api.SchemeGroupVersion.WithResource("pods"),
+			resource:   corev1.SchemeGroupVersion.WithResource("pods"),
 			oldObj:     podWithOwnerRefs(),
 			newObj:     podWithOwnerRefs(blockNode),
 			checkError: expectCantSetBlockOwnerDeletionError,
