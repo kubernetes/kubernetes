@@ -779,3 +779,38 @@ func (mc *memoryCollector) collect() []DataItem {
 		growthItem,
 	}
 }
+
+// schedulingDurationCollector calculates the total duration of the scheduling phase, including pod creation.
+type schedulingDurationCollector struct {
+	resultLabels map[string]string
+	duration     time.Duration
+}
+
+func newSchedulingDurationCollector(resultLabels map[string]string) *schedulingDurationCollector {
+	return &schedulingDurationCollector{
+		resultLabels: resultLabels,
+	}
+}
+
+func (sdc *schedulingDurationCollector) init() error {
+	return nil
+}
+
+func (sdc *schedulingDurationCollector) run(tCtx ktesting.TContext) {
+	start := time.Now()
+	// Wait for the scheduling to finish
+	<-tCtx.Done()
+	sdc.duration = time.Since(start)
+}
+
+func (sdc *schedulingDurationCollector) collect() []DataItem {
+	labels := maps.Clone(sdc.resultLabels)
+	labels["Metric"] = "SchedulingDuration"
+	return []DataItem{{
+		Labels: labels,
+		Data: map[string]float64{
+			"Duration": sdc.duration.Seconds(),
+		},
+		Unit: "s",
+	}}
+}
