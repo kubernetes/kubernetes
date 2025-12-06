@@ -345,72 +345,64 @@ func IsFilenameSliceEmpty(filenames []string, directory string) bool {
 	return len(filenames) == 0 && directory == ""
 }
 
-func GetFlagString(cmd *cobra.Command, flag string) string {
-	s, err := cmd.Flags().GetString(flag)
+// checkFlagAccessError logs a fatal error if there's an error accessing a flag.
+// This is a helper to centralize error handling for flag access.
+func checkFlagAccessError(cmd *cobra.Command, flag string, err error) {
 	if err != nil {
 		klog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
 	}
+}
+
+func GetFlagString(cmd *cobra.Command, flag string) string {
+	s, err := cmd.Flags().GetString(flag)
+	checkFlagAccessError(cmd, flag, err)
 	return s
 }
 
 // GetFlagStringSlice can be used to accept multiple argument with flag repetition (e.g. -f arg1,arg2 -f arg3 ...)
 func GetFlagStringSlice(cmd *cobra.Command, flag string) []string {
 	s, err := cmd.Flags().GetStringSlice(flag)
-	if err != nil {
-		klog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
-	}
+	checkFlagAccessError(cmd, flag, err)
 	return s
 }
 
 // GetFlagStringArray can be used to accept multiple argument with flag repetition (e.g. -f arg1 -f arg2 ...)
 func GetFlagStringArray(cmd *cobra.Command, flag string) []string {
 	s, err := cmd.Flags().GetStringArray(flag)
-	if err != nil {
-		klog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
-	}
+	checkFlagAccessError(cmd, flag, err)
 	return s
 }
 
 func GetFlagBool(cmd *cobra.Command, flag string) bool {
 	b, err := cmd.Flags().GetBool(flag)
-	if err != nil {
-		klog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
-	}
+	checkFlagAccessError(cmd, flag, err)
 	return b
 }
 
 // Assumes the flag has a default value.
 func GetFlagInt(cmd *cobra.Command, flag string) int {
 	i, err := cmd.Flags().GetInt(flag)
-	if err != nil {
-		klog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
-	}
+	checkFlagAccessError(cmd, flag, err)
 	return i
 }
 
 // Assumes the flag has a default value.
 func GetFlagInt32(cmd *cobra.Command, flag string) int32 {
 	i, err := cmd.Flags().GetInt32(flag)
-	if err != nil {
-		klog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
-	}
+	checkFlagAccessError(cmd, flag, err)
 	return i
 }
 
 // Assumes the flag has a default value.
 func GetFlagInt64(cmd *cobra.Command, flag string) int64 {
 	i, err := cmd.Flags().GetInt64(flag)
-	if err != nil {
-		klog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
-	}
+	checkFlagAccessError(cmd, flag, err)
 	return i
 }
 
 func GetFlagDuration(cmd *cobra.Command, flag string) time.Duration {
 	d, err := cmd.Flags().GetDuration(flag)
-	if err != nil {
-		klog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
-	}
+	checkFlagAccessError(cmd, flag, err)
 	return d
 }
 
