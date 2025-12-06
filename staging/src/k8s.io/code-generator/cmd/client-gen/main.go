@@ -40,6 +40,10 @@ func main() {
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
 
+	if err := args.ReloadGroups(); err != nil {
+		klog.Fatalf("Error: %v", err)
+	}
+
 	// add group version package as input dirs for gengo
 	inputPkgs := []string{}
 	for _, pkg := range args.Groups {
