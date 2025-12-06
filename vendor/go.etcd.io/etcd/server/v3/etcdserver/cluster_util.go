@@ -27,7 +27,9 @@ import (
 
 	"github.com/coreos/go-semver/semver"
 	"go.uber.org/zap"
+	"google.golang.org/grpc/metadata"
 
+	"go.etcd.io/etcd/api/v3/v3rpc/rpctypes"
 	"go.etcd.io/etcd/api/v3/version"
 	"go.etcd.io/etcd/client/pkg/v3/types"
 	"go.etcd.io/etcd/server/v3/etcdserver/api/membership"
@@ -305,6 +307,20 @@ func promoteMemberHTTP(ctx context.Context, url string, id uint64, peerRt http.R
 	if err != nil {
 		return nil, err
 	}
+
+	// add the auth token via HTTP header if present in gRPC metadata
+	if md, ok := metadata.FromIncomingContext(ctx); ok {
+		ts, ok := md[rpctypes.TokenFieldNameGRPC]
+		if !ok {
+			ts, ok = md[rpctypes.TokenFieldNameSwagger]
+		}
+
+		if ok && len(ts) > 0 {
+			token := ts[0]
+			req.Header.Set("Authorization", token)
+		}
+	}
+
 	req = req.WithContext(ctx)
 	resp, err := cc.Do(req)
 	if err != nil {
