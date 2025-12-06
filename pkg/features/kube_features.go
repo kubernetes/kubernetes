@@ -405,11 +405,6 @@ const (
 	// Enables the event recorder for image manager
 	ImageManagerEventRecorder featuregate.Feature = "ImageManagerEventRecorder"
 
-	// owner: @xinyunliu
-	//
-	// Enables the event recorder for image manager
-	ImageManagerEventRecorder featuregate.Feature = "ImageManagerEventRecorder"
-
 	// owner: @tallclair
 	// kep: http://kep.k8s.io/1287
 	//
