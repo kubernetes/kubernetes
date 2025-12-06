@@ -82,6 +82,10 @@ func (m *kubeGenericRuntimeManager) GetImageRef(ctx context.Context, image kubec
 	if resp.Image == nil {
 		return "", nil
 	}
+	// Prefer returning a digest reference over an image ID to ensure pull record lookups work correctly.
+	if len(resp.Image.RepoDigests) > 0 {
+		return resp.Image.RepoDigests[0], nil
+	}
 	return resp.Image.Id, nil
 }
 
