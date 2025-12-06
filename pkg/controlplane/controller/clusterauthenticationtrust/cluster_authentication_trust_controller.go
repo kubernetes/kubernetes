@@ -97,8 +97,20 @@ func NewClusterAuthenticationTrustController(requiredAuthenticationData ClusterA
 	// we construct our own informer because we need such a small subset of the information available.  Just one namespace.
 	kubeSystemConfigMapInformer := corev1informers.NewConfigMapInformer(kubeClient, configMapNamespace, 12*time.Hour, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 
+	// combine the requested authentication data with the standard Kubernetes headers
+	// used by the kube-apiserver and aggregator
+	defaultedRequiredAuthenticationData := requiredAuthenticationData
+	defaultedRequiredAuthenticationData.RequestHeaderUsernameHeaders = combineUniqueStringSlices(
+		headerrequest.StaticStringSlice{"X-Remote-User"}, defaultedRequiredAuthenticationData.RequestHeaderUsernameHeaders)
+	defaultedRequiredAuthenticationData.RequestHeaderUIDHeaders = combineUniqueStringSlices(
+		headerrequest.StaticStringSlice{"X-Remote-Uid"}, defaultedRequiredAuthenticationData.RequestHeaderUIDHeaders)
+	defaultedRequiredAuthenticationData.RequestHeaderGroupHeaders = combineUniqueStringSlices(
+		headerrequest.StaticStringSlice{"X-Remote-Group"}, defaultedRequiredAuthenticationData.RequestHeaderGroupHeaders)
+	defaultedRequiredAuthenticationData.RequestHeaderExtraHeaderPrefixes = combineUniqueStringSlices(
+		headerrequest.StaticStringSlice{"X-Remote-Extra-"}, defaultedRequiredAuthenticationData.RequestHeaderExtraHeaderPrefixes)
+
 	c := &Controller{
-		requiredAuthenticationData: requiredAuthenticationData,
+		requiredAuthenticationData: defaultedRequiredAuthenticationData,
 		configMapLister:            corev1listers.NewConfigMapLister(kubeSystemConfigMapInformer.GetIndexer()),
 		configMapClient:            kubeClient.CoreV1(),
 		namespaceClient:            kubeClient.CoreV1(),
