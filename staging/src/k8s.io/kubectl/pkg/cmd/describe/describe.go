@@ -174,6 +174,7 @@ func (o *DescribeOptions) Run() error {
 		ContinueOnError().
 		NamespaceParam(o.Namespace).DefaultNamespace().AllNamespaces(o.AllNamespaces).
 		FilenameParam(o.EnforceNamespace, o.FilenameOptions).
+		Latest().
 		LabelSelectorParam(o.Selector).
 		ResourceTypeOrNameArgs(true, o.BuilderArgs...).
 		RequestChunksOf(o.DescriberSettings.ChunkSize).
@@ -206,7 +207,7 @@ func (o *DescribeOptions) Run() error {
 			errs.Insert(err.Error())
 			continue
 		}
-		s, err := describer.Describe(info.Namespace, info.Name, *o.DescriberSettings)
+		s, err := describer.Describe(info.Object, *o.DescriberSettings)
 		if err != nil {
 			if errs.Has(err.Error()) {
 				continue
@@ -261,7 +262,7 @@ func (o *DescribeOptions) DescribeMatchingResources(originalError error, resourc
 		info := infos[ix]
 		if strings.HasPrefix(info.Name, prefix) {
 			isFound = true
-			s, err := describer.Describe(info.Namespace, info.Name, *o.DescriberSettings)
+			s, err := describer.Describe(info.Object, *o.DescriberSettings)
 			if err != nil {
 				return err
 			}
