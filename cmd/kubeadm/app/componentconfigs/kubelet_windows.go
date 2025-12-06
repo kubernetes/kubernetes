@@ -56,6 +56,11 @@ func (kc *kubeletConfig) Mutate() error {
 
 	// Mutate the paths in the config.
 	mutatePaths(&kc.config, drive)
+
+	if err := mutateStaticPodPath(&kc.config); err != nil {
+		return err
+	}
+
 	return nil
 }
 
