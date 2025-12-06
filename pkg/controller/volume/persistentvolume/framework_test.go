@@ -226,6 +226,7 @@ func newTestController(ctx context.Context, kubeClient clientset.Interface, info
 	params := ControllerParameters{
 		KubeClient:                kubeClient,
 		SyncPeriod:                5 * time.Second,
+		ConcurrentSyncs:           1, // Use single worker for tests to avoid race conditions
 		VolumePlugins:             []volume.VolumePlugin{},
 		VolumeInformer:            informerFactory.Core().V1().PersistentVolumes(),
 		ClaimInformer:             informerFactory.Core().V1().PersistentVolumeClaims(),

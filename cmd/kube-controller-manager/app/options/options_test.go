@@ -161,6 +161,7 @@ var args = []string{
 	"--pv-recycler-minimum-timeout-nfs=200",
 	"--pv-recycler-timeout-increment-hostpath=45",
 	"--pvclaimbinder-sync-period=30s",
+	"--pvclaimbinder-concurrent-syncs=5",
 	"--resource-quota-sync-period=10m",
 	"--route-reconciliation-period=30s",
 	"--secondary-node-eviction-rate=0.05",
@@ -365,7 +366,8 @@ func TestAddFlags(t *testing.T) {
 		},
 		PersistentVolumeBinderController: &PersistentVolumeBinderControllerOptions{
 			&persistentvolumeconfig.PersistentVolumeBinderControllerConfiguration{
-				PVClaimBinderSyncPeriod: metav1.Duration{Duration: 30 * time.Second},
+				PVClaimBinderSyncPeriod:      metav1.Duration{Duration: 30 * time.Second},
+				PVClaimBinderConcurrentSyncs: 5,
 				VolumeConfiguration: persistentvolumeconfig.VolumeConfiguration{
 					EnableDynamicProvisioning:  false,
 					EnableHostPathProvisioning: true,
@@ -531,6 +533,13 @@ func TestValidateFlags(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "concurrent pvclaimbinder syncs set to 0",
+			flags: []string{
+				"--pvclaimbinder-concurrent-syncs=0",
+			},
+			wantErr: true,
+		},
 	}
 
 	for _, tc := range testcases {
@@ -692,7 +701,8 @@ func TestApplyTo(t *testing.T) {
 				UnhealthyZoneThreshold:    0.6,
 			},
 			PersistentVolumeBinderController: persistentvolumeconfig.PersistentVolumeBinderControllerConfiguration{
-				PVClaimBinderSyncPeriod: metav1.Duration{Duration: 30 * time.Second},
+				PVClaimBinderSyncPeriod:      metav1.Duration{Duration: 30 * time.Second},
+				PVClaimBinderConcurrentSyncs: 5,
 				VolumeConfiguration: persistentvolumeconfig.VolumeConfiguration{
 					EnableDynamicProvisioning:  false,
 					EnableHostPathProvisioning: true,
