@@ -17,16 +17,22 @@ FROM $BASEIMAGE as build_node_perf_npb_ep
 
 CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
 
-RUN apt-get update && apt-get install -y build-essential gfortran
+RUN rm -f /etc/apt/sources.list
+RUN echo "deb [trusted=yes] http://archive.debian.org/debian buster main" >> /etc/apt/sources.list
+RUN echo "deb-src [trusted=yes] http://archive.debian.org/debian buster main" >> /etc/apt/sources.list
+RUN echo "deb [trusted=yes] http://archive.debian.org/debian buster-updates main" >> /etc/apt/sources.list
+RUN echo "deb-src [trusted=yes] http://archive.debian.org/debian buster-updates main" >> /etc/apt/sources.list
 
-ADD http://www.nas.nasa.gov/assets/npb/NPB3.3.1.tar.gz .
-RUN tar xzf NPB3.3.1.tar.gz
+RUN apt-get update && apt-get install -y --allow-downgrades libbz2-1.0=1.0.6-9.2~deb10u1 libc6=2.28-10+deb10u1 libc6-dev g++ bzip2 dpkg-dev gfortran-8 build-essential gfortran
 
-WORKDIR ./NPB3.3.1/NPB3.3-OMP
+ADD http://www.nas.nasa.gov/assets/npb/NPB3.4.3.tar.gz .
+RUN tar xzf NPB3.4.3.tar.gz
+
+WORKDIR ./NPB3.4.3/NPB3.4-OMP
 RUN if [ $(arch) != "x86_64" ]; then \
-    sed s/-mcmodel=medium//g config/NAS.samples/make.def.gcc_x86 > config/make.def; \
+    sed s/-mcmodel=medium//g config/NAS.samples/make.def_gcc > config/make.def; \
 else \
-    cp config/NAS.samples/make.def.gcc_x86 config/make.def; \
+    cp config/NAS.samples/make.def_gcc config/make.def; \
 fi
 RUN make EP CLASS=D
 
@@ -36,7 +42,7 @@ RUN mkdir -p /lib-copy && find /usr/lib -name "*.so.*" -exec cp {} /lib-copy \;
 
 FROM $BASEIMAGE
 
-COPY --from=build_node_perf_npb_ep /NPB3.3.1/NPB3.3-OMP/bin/ep.D.x /
+COPY --from=build_node_perf_npb_ep /NPB3.4.3/NPB3.4-OMP/bin/ep.D.x /
 COPY --from=build_node_perf_npb_ep /lib-copy /lib-copy
 ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/lib-copy"
 
