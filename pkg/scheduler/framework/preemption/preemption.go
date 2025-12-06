@@ -176,13 +176,23 @@ func NewEvaluator(pluginName string, fh fwk.Handle, i Interface, enableAsyncPree
 	// to prevent the misuse of the PreemptPod function.
 	ev.PreemptPod = func(ctx context.Context, c Candidate, preemptor, victim *v1.Pod, pluginName string) error {
 		logger := klog.FromContext(ctx)
+		skipAPICall := false
 
 		// If the victim is a WaitingPod, send a reject message to the PermitPlugin.
 		// Otherwise we should delete the victim.
 		if waitingPod := ev.Handler.GetWaitingPod(victim.UID); waitingPod != nil {
 			waitingPod.Reject(pluginName, "preempted")
 			logger.V(2).Info("Preemptor pod rejected a waiting pod", "preemptor", klog.KObj(preemptor), "waitingPod", klog.KObj(victim), "node", c.Name())
-		} else {
+			skipAPICall = true
+		} else if bindingPod := ev.Handler.GetBindingPod(victim.UID); bindingPod != nil {
+			// If the victim is in binding cycle but before the bind happened
+			// cancel the binding process.
+			if bindingPod.CancelPod() {
+				logger.V(2).Info("Preemptor pod rejected a binding pod", "preemptor", klog.KObj(preemptor), "bindingPod", klog.KObj(victim), "node", c.Name())
+				skipAPICall = true
+			}
+		}
+		if !skipAPICall {
 			condition := &v1.PodCondition{
 				Type:               v1.DisruptionTarget,
 				ObservedGeneration: apipod.CalculatePodConditionObservedGeneration(&victim.Status, victim.Generation, v1.DisruptionTarget),

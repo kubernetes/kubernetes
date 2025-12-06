@@ -329,6 +329,19 @@ type WaitingPod interface {
 	Reject(pluginName, msg string)
 }
 
+// BindingPod represents a pod currently in binding cycle before being bound to node
+type BindingPod interface {
+	// Cancel cancels the context attached to a goroutine running binding cycle of this pod
+	// if the pod is not marked as binded.
+	// Returns true if the cancel was successfully run
+	CancelPod() bool
+
+	// MarkBinded marks the pod as binded, making it impossible to cancel the context of binding cycle
+	// via BindingPod
+	// Returns false if the context was already canceled
+	MarkBinded() bool
+}
+
 // PreFilterResult wraps needed info for scheduler framework to act upon PreFilter phase.
 type PreFilterResult struct {
 	// The set of nodes that should be considered downstream; if nil then
@@ -716,6 +729,15 @@ type Handle interface {
 	// RejectWaitingPod rejects a waiting pod given its UID.
 	// The return value indicates if the pod is waiting or not.
 	RejectWaitingPod(uid types.UID) bool
+
+	// AddBindingPod adds a pod to the binding list.
+	AddBindingPod(uid types.UID, cancel context.CancelFunc)
+
+	// GetBindingPod returns a pod that is in the binding cycle but before it is bound given its UID
+	GetBindingPod(uid types.UID) BindingPod
+
+	// RemoveBindingPod
+	RemoveBindingPod(uid types.UID)
 
 	// ClientSet returns a kubernetes clientSet.
 	ClientSet() clientset.Interface

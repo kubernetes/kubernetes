@@ -58,6 +58,7 @@ type frameworkImpl struct {
 	registry             Registry
 	snapshotSharedLister fwk.SharedLister
 	waitingPods          *waitingPodsMap
+	bindingPods          *podsInBindingMap
 	scorePluginWeight    map[string]int
 	preEnqueuePlugins    []fwk.PreEnqueuePlugin
 	enqueueExtensions    []fwk.EnqueueExtensions
@@ -153,6 +154,7 @@ type frameworkOptions struct {
 	captureProfile         CaptureProfile
 	parallelizer           parallelize.Parallelizer
 	waitingPods            *waitingPodsMap
+	bindingPods            *podsInBindingMap
 	apiDispatcher          *apidispatcher.APIDispatcher
 	workloadManager        fwk.WorkloadManager
 	logger                 *klog.Logger
@@ -285,6 +287,12 @@ func WithWaitingPods(wp *waitingPodsMap) Option {
 	}
 }
 
+func WithBindingPods(bp *podsInBindingMap) Option {
+	return func(o *frameworkOptions) {
+		o.bindingPods = bp
+	}
+}
+
 // WithLogger overrides the default logger from k8s.io/klog.
 func WithLogger(logger klog.Logger) Option {
 	return func(o *frameworkOptions) {
@@ -319,6 +327,7 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 		sharedCSIManager:     options.sharedCSIManager,
 		scorePluginWeight:    make(map[string]int),
 		waitingPods:          options.waitingPods,
+		bindingPods:          options.bindingPods,
 		clientSet:            options.clientSet,
 		kubeConfig:           options.kubeConfig,
 		eventRecorder:        options.eventRecorder,
@@ -1798,6 +1807,23 @@ func (f *frameworkImpl) RejectWaitingPod(uid types.UID) bool {
 		return true
 	}
 	return false
+}
+
+func (f *frameworkImpl) AddBindingPod(uid types.UID, cancel context.CancelFunc) {
+	f.bindingPods.add(uid, cancel)
+}
+
+// GetBindingPod returns a pod that is in the binding cycle but before it is bound given its UID
+func (f *frameworkImpl) GetBindingPod(uid types.UID) fwk.BindingPod {
+	if bp := f.bindingPods.get(uid); bp != nil {
+		return bp
+	}
+	return nil
+}
+
+// GetBindingPod returns a pod that is in the binding cycle but before it is bound given its UID
+func (f *frameworkImpl) RemoveBindingPod(uid types.UID) {
+	f.bindingPods.remove(uid)
 }
 
 // HasFilterPlugins returns true if at least one filter plugin is defined.
