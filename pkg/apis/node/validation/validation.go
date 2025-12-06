@@ -38,9 +38,12 @@ var NodeNormalizationRules = []field.NormalizationRule{
 // ValidateRuntimeClass validates the RuntimeClass
 func ValidateRuntimeClass(rc *node.RuntimeClass) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&rc.ObjectMeta, false, apivalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
-
-	for _, msg := range apivalidation.NameIsDNSLabel(rc.Handler, false) {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("handler"), rc.Handler, msg)).MarkCoveredByDeclarative().WithOrigin("format=k8s-short-name")
+	if rc.Handler == "" {
+		allErrs = append(allErrs, field.Required(field.NewPath("handler"), "")).MarkCoveredByDeclarative()
+	} else {
+		for _, msg := range apivalidation.NameIsDNSLabel(rc.Handler, false) {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("handler"), rc.Handler, msg)).MarkCoveredByDeclarative().WithOrigin("format=k8s-short-name")
+		}
 	}
 
 	if rc.Overhead != nil {

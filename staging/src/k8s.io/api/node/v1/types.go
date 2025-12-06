@@ -52,6 +52,8 @@ type RuntimeClass struct {
 	// and is immutable.
 	// +k8s:format="k8s-short-name"
 	// +k8s:immutable
+	// +required
+	// +k8s:required
 	Handler string `json:"handler" protobuf:"bytes,2,opt,name=handler"`
 
 	// overhead represents the resource overhead associated with running a pod for a

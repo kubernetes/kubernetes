@@ -63,9 +63,35 @@ func TestRuntimeClass_DeclarativeValidate_Create(t *testing.T) {
 					}),
 					expectedErrs: field.ErrorList{},
 				},
-				"invalid handler dns label": {
+				"empty handler": {
 					obj: mkRuntimeClassHandlerOnly(func(rc *node.RuntimeClass) {
 						rc.Handler = ""
+					}),
+					expectedErrs: field.ErrorList{
+						field.Required(field.NewPath("handler"), "must be a valid DNS label"),
+					},
+				},
+				"handler with special characters": {
+					obj: mkRuntimeClassHandlerOnly(func(rc *node.RuntimeClass) {
+						rc.Handler = "asasdasda&^%"
+					}),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("handler"),
+							"", "").WithOrigin("format=k8s-short-name"),
+					},
+				},
+				"handler with uppercase and special characters": {
+					obj: mkRuntimeClassHandlerOnly(func(rc *node.RuntimeClass) {
+						rc.Handler = "asasdasda&^%&^%$UUUUUUU"
+					}),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("handler"),
+							"", "").WithOrigin("format=k8s-short-name"),
+					},
+				},
+				"handler exceeds length with invalid characters": {
+					obj: mkRuntimeClassHandlerOnly(func(rc *node.RuntimeClass) {
+						rc.Handler = "asasdasda&^%&^%$UUUUUUUaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbcccccccccccccccccccccccc"
 					}),
 					expectedErrs: field.ErrorList{
 						field.Invalid(field.NewPath("handler"),

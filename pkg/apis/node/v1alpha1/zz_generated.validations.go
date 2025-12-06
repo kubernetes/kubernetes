@@ -116,6 +116,10 @@ func Validate_RuntimeClassSpec(ctx context.Context, op operation.Operation, fldP
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
 			if earlyReturn {
 				return // do not proceed
 			}
