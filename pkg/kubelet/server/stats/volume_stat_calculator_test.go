@@ -105,7 +105,7 @@ var (
 )
 
 func TestPVCRef(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	// Setup mock stats provider
 	mockStats := statstest.NewMockProvider(t)
 	volumes := map[string]volume.Volume{vol0: &fakeVolume{}, vol1: &fakeVolume{}, vol3: &fakeVolume{}}
@@ -119,7 +119,7 @@ func TestPVCRef(t *testing.T) {
 	}
 
 	// Calculate stats for pod
-	statsCalculator := newVolumeStatCalculator(mockStats, time.Minute, fakePod, &fakeEventRecorder)
+	statsCalculator := newVolumeStatCalculator(ctx, mockStats, time.Minute, fakePod, &fakeEventRecorder)
 	statsCalculator.calcAndStoreStats(logger)
 	vs, _ := statsCalculator.GetLatest()
 
@@ -163,7 +163,7 @@ func TestPVCRef(t *testing.T) {
 }
 
 func TestNormalVolumeEvent(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	mockStats := statstest.NewMockProvider(t)
 
 	volumes := map[string]volume.Volume{vol0: &fakeVolume{}, vol1: &fakeVolume{}}
@@ -177,7 +177,7 @@ func TestNormalVolumeEvent(t *testing.T) {
 	}
 
 	// Calculate stats for pod
-	statsCalculator := newVolumeStatCalculator(mockStats, time.Minute, fakePod, &fakeEventRecorder)
+	statsCalculator := newVolumeStatCalculator(ctx, mockStats, time.Minute, fakePod, &fakeEventRecorder)
 	statsCalculator.calcAndStoreStats(logger)
 
 	event, err := WatchEvent(eventStore)
@@ -186,7 +186,7 @@ func TestNormalVolumeEvent(t *testing.T) {
 }
 
 func TestAbnormalVolumeEvent(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeHealth, true)
 
 	// Setup mock stats provider
@@ -206,7 +206,7 @@ func TestAbnormalVolumeEvent(t *testing.T) {
 		volumeCondition.Message = "The target path of the volume doesn't exist"
 		volumeCondition.Abnormal = true
 	}
-	statsCalculator := newVolumeStatCalculator(mockStats, time.Minute, fakePod, &fakeEventRecorder)
+	statsCalculator := newVolumeStatCalculator(ctx, mockStats, time.Minute, fakePod, &fakeEventRecorder)
 	statsCalculator.calcAndStoreStats(logger)
 
 	event, err := WatchEvent(eventStore)
