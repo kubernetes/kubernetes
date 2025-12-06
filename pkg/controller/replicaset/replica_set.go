@@ -229,7 +229,7 @@ func NewBaseController(logger klog.Logger, rsInformer appsinformers.ReplicaSetIn
 
 // Run begins watching and syncing.
 func (rsc *ReplicaSetController) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	// Start events processing pipeline.
 	rsc.eventBroadcaster.StartStructuredLogging(3)

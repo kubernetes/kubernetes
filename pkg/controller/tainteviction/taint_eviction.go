@@ -277,7 +277,7 @@ func New(ctx context.Context, c clientset.Interface, podInformer corev1informers
 
 // Run starts the controller which will run in loop until `stopCh` is closed.
 func (tc *Controller) Run(ctx context.Context) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting", "controller", tc.name)

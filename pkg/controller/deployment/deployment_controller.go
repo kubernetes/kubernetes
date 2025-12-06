@@ -161,7 +161,7 @@ func NewDeploymentController(ctx context.Context, dInformer appsinformers.Deploy
 
 // Run begins watching and syncing.
 func (dc *DeploymentController) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	// Start events processing pipeline.
 	dc.eventBroadcaster.StartStructuredLogging(3)

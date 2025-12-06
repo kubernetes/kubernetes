@@ -315,7 +315,7 @@ func getStatsSummary(c clientset.Interface, nodeName string) (*kubeletstatsv1alp
 }
 
 func (w *resourceGatherWorker) gather(ctx context.Context, initialSleep time.Duration) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 	defer w.wg.Done()
 	defer framework.Logf("Closing worker for %v", w.nodeName)
 	defer func() { w.finished = true }()
