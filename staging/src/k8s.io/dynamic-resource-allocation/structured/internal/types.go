@@ -57,6 +57,14 @@ type Stats struct {
 	NumAllocateOneInvocations int64
 }
 
+type AllocatorChannel string
+
+const (
+	Experimental = "experimental"
+	Stable       = "stable"
+	Incubating   = "incubating"
+)
+
 // Features control optional functionality during ResourceClaim allocation.
 // Each entry must correspond to at least one control flow change. Entries can
 // be removed when the control flow change is no longer necessary (= feature is
