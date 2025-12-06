@@ -878,7 +878,7 @@ func pullerTestEnv(
 		keyring = &credentialprovider.BasicDockerKeyring{}
 	}
 
-	puller = NewImageManager(fakeRecorder, keyring, fakeRuntime, pullManager, backOff, serialized, maxParallelImagePulls, c.qps, c.burst, fakePodPullingTimeRecorder)
+	puller = NewImageManager(fakeRecorder, nil, keyring, fakeRuntime, pullManager, backOff, serialized, maxParallelImagePulls, c.qps, c.burst, fakePodPullingTimeRecorder)
 	return
 }
 

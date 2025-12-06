@@ -26,6 +26,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	clientevents "k8s.io/client-go/tools/events"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/klog/v2"
@@ -57,6 +58,7 @@ type ImagePodPullingTimeRecorder interface {
 // imageManager provides the functionalities for image pulling.
 type imageManager struct {
 	recorder         record.EventRecorder
+	newRecorder      clientevents.EventRecorder
 	imageService     kubecontainer.ImageService
 	imagePullManager pullmanager.ImagePullManager
 	backOff          *flowcontrol.Backoff
@@ -74,6 +76,7 @@ var _ ImageManager = &imageManager{}
 // NewImageManager instantiates a new ImageManager object.
 func NewImageManager(
 	recorder record.EventRecorder,
+	newRecorder clientevents.EventRecorder,
 	nodeKeyring credentialprovider.DockerKeyring,
 	imageService kubecontainer.ImageService,
 	imagePullManager pullmanager.ImagePullManager,
@@ -139,6 +142,9 @@ func (m *imageManager) imagePullPrecheck(
 func (m *imageManager) logIt(objRef *v1.ObjectReference, eventtype, event, prefix, msg string, logFn func(args ...interface{})) {
 	if objRef != nil {
 		m.recorder.Event(objRef, eventtype, event, msg)
+		if m.newRecorder != nil {
+			m.newRecorder.Eventf(objRef, nil, eventtype, event, "", msg)
+		}
 	} else {
 		logFn(fmt.Sprint(prefix, " ", msg))
 	}

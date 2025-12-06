@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	clientevents "k8s.io/client-go/tools/events"
 	"k8s.io/client-go/tools/record"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
@@ -318,6 +319,53 @@ func (irecorder *innerEventRecorder) AnnotatedEventf(object runtime.Object, anno
 		irecorder.recorder.AnnotatedEventf(ref, annotations, eventtype, reason, messageFmt, args...)
 	}
 
+}
+
+// FilterNewEventRecorder creates an event recorder to record object's event except implicitly required container's, like infra container.
+func FilterNewEventRecorder(recorder clientevents.EventRecorder) clientevents.EventRecorder {
+	if recorder == nil {
+		return nil
+	}
+	return &innerNewEventRecorder{
+		recorder: recorder,
+	}
+}
+
+type innerNewEventRecorder struct {
+	recorder clientevents.EventRecorder
+}
+
+func (irecorder *innerNewEventRecorder) Eventf(regarding runtime.Object, related runtime.Object, eventtype, reason, action, note string, args ...interface{}) {
+	if ref, ok := regarding.(*v1.ObjectReference); ok {
+		if ref == nil {
+			return
+		}
+		if !strings.HasPrefix(ref.FieldPath, ImplicitContainerPrefix) {
+			irecorder.recorder.Eventf(regarding, related, eventtype, reason, action, note, args...)
+		}
+	}
+}
+
+func (irecorder *innerNewEventRecorder) Event(object runtime.Object, eventtype, reason, message string) {
+	if ref, ok := object.(*v1.ObjectReference); ok {
+		if ref == nil {
+			return
+		}
+		if !strings.HasPrefix(ref.FieldPath, ImplicitContainerPrefix) {
+			irecorder.recorder.Eventf(object, nil, eventtype, reason, "", message)
+		}
+	}
+}
+
+func (irecorder *innerNewEventRecorder) AnnotatedEventf(object runtime.Object, annotations map[string]string, eventtype, reason, messageFmt string, args ...interface{}) {
+	if ref, ok := object.(*v1.ObjectReference); ok {
+		if ref == nil {
+			return
+		}
+		if !strings.HasPrefix(ref.FieldPath, ImplicitContainerPrefix) {
+			irecorder.recorder.Eventf(object, nil, eventtype, reason, "", messageFmt, args...)
+		}
+	}
 }
 
 // IsHostNetworkPod returns whether the host networking requested for the given Pod.

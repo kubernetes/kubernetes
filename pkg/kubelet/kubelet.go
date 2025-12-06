@@ -68,8 +68,10 @@ import (
 	coreinformersv1 "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	eventsv1 "k8s.io/client-go/kubernetes/typed/events/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
+	clientevents "k8s.io/client-go/tools/events"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/certificate"
 	"k8s.io/client-go/util/flowcontrol"
@@ -315,6 +317,7 @@ type Dependencies struct {
 	CAdvisorInterface         cadvisor.Interface
 	ContainerManager          cm.ContainerManager
 	EventClient               v1core.EventsGetter
+	EventClientV1             eventsv1.EventsV1Interface
 	HeartbeatClient           clientset.Interface
 	OnHeartbeatFailure        func()
 	KubeClient                clientset.Interface
@@ -325,6 +328,7 @@ type Dependencies struct {
 	PodConfig                 *config.PodConfig
 	ProbeManager              prober.Manager
 	Recorder                  record.EventRecorder
+	NewRecorder               clientevents.EventRecorder
 	Subpather                 subpath.Interface
 	TracerProvider            trace.TracerProvider
 	VolumePlugins             []volume.VolumePlugin
@@ -765,6 +769,7 @@ func NewMainKubelet(ctx context.Context,
 	runtime, postImageGCHooks, err := kuberuntime.NewKubeGenericRuntimeManager(
 		ctx,
 		kubecontainer.FilterEventRecorder(kubeDeps.Recorder),
+		kubeDeps.NewRecorder,
 		klet.livenessManager,
 		klet.readinessManager,
 		klet.startupManager,
