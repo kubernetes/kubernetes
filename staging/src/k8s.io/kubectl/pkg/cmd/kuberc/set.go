@@ -78,6 +78,9 @@ type SetOptions struct {
 	AppendArgs  []string
 	Overwrite   bool
 
+	CredentialPluginPolicy    string
+	CredentialPluginAllowlist []string
+
 	preferences kuberc.PreferencesHandler
 
 	genericiooptions.IOStreams
@@ -112,14 +115,16 @@ func NewCmdKubeRCSet(streams genericiooptions.IOStreams) *cobra.Command {
 
 	o.preferences.AddFlags(cmd.Flags())
 	cmd.Flags().StringVar(&o.Section, "section", o.Section, "Section to modify: 'defaults' or 'aliases'")
-	cmd.MarkFlagRequired("section") // nolint:errcheck
+	cmd.Flags().StringVar(&o.Section, "section", o.Section, "Section to modify: 'defaults' or 'aliases'")
 	cmd.Flags().StringVar(&o.Command, "command", o.Command, "Command to configure (e.g., 'get', 'create', 'set env')")
-	cmd.MarkFlagRequired("command") // nolint:errcheck
+	cmd.Flags().StringVar(&o.Command, "command", o.Command, "Command to configure (e.g., 'get', 'create', 'set env')")
 	cmd.Flags().StringVar(&o.AliasName, "name", o.AliasName, "Alias name (required for --section=aliases)")
 	cmd.Flags().StringArrayVar(&o.Options, "option", o.Options, "Flag option in the form flag=value (can be specified multiple times)")
 	cmd.Flags().StringArrayVar(&o.PrependArgs, "prependarg", o.PrependArgs, "Argument to prepend to the command (can be specified multiple times, for aliases only)")
 	cmd.Flags().StringArrayVar(&o.AppendArgs, "appendarg", o.AppendArgs, "Argument to append to the command (can be specified multiple times, for aliases only)")
 	cmd.Flags().BoolVar(&o.Overwrite, "overwrite", o.Overwrite, "Allow overwriting existing entries")
+	cmd.Flags().StringVar(&o.CredentialPluginPolicy, "credential-plugin-policy", o.CredentialPluginPolicy, "Set the credential plugin policy (AllowAll, DenyAll, Allowlist)")
+	cmd.Flags().StringArrayVar(&o.CredentialPluginAllowlist, "credential-plugin-allowlist", o.CredentialPluginAllowlist, "Set the credential plugin allowlist (comma separated list of plugin names)")
 
 	return cmd
 }
@@ -145,20 +150,32 @@ func (o *SetOptions) Validate() error {
 		return fmt.Errorf("KUBERC is disabled via KUBERC=off environment variable")
 	}
 
-	if o.Section != sectionDefaults && o.Section != sectionAliases {
-		return fmt.Errorf("--section must be %q or %q, got: %s", sectionDefaults, sectionAliases, o.Section)
-	}
+	if o.CredentialPluginPolicy == "" && len(o.CredentialPluginAllowlist) == 0 {
+		if o.Section != sectionDefaults && o.Section != sectionAliases {
+			return fmt.Errorf("--section must be %q or %q, got: %s", sectionDefaults, sectionAliases, o.Section)
+		}
 
-	if o.Section == sectionAliases && o.AliasName == "" {
-		return fmt.Errorf("--name is required when --section=%s", sectionAliases)
-	}
+		if o.Section == sectionAliases && o.AliasName == "" {
+			return fmt.Errorf("--name is required when --section=%s", sectionAliases)
+		}
 
-	if o.Section == sectionDefaults && o.AliasName != "" {
-		return fmt.Errorf("--name should not be specified when --section=%s", sectionDefaults)
-	}
+		if o.Section == sectionDefaults && o.AliasName != "" {
+			return fmt.Errorf("--name should not be specified when --section=%s", sectionDefaults)
+		}
 
-	if o.Section == sectionDefaults && (len(o.PrependArgs) > 0 || len(o.AppendArgs) > 0) {
-		return fmt.Errorf("--prependarg and --appendarg are only valid for --section=%s", sectionAliases)
+		if o.Section == sectionDefaults && (len(o.PrependArgs) > 0 || len(o.AppendArgs) > 0) {
+			return fmt.Errorf("--prependarg and --appendarg are only valid for --section=%s", sectionAliases)
+		}
+
+		// Ensure --command is specified if we are setting defaults or aliases
+		if o.Command == "" {
+			return fmt.Errorf("--command is required when --section is specified")
+		}
+	} else {
+		// If we are setting credential policy, verify we aren't also trying to set defaults/aliases which could be confusing
+		if o.Section != "" || o.Command != "" || len(o.Options) > 0 || len(o.PrependArgs) > 0 || len(o.AppendArgs) > 0 || o.AliasName != "" {
+			return fmt.Errorf("--credential-plugin-policy and --credential-plugin-allowlist cannot be combined with other flags")
+		}
 	}
 
 	return nil
@@ -176,11 +193,25 @@ func (o *SetOptions) Run() error {
 		return err
 	}
 
-	switch o.Section {
-	case sectionDefaults:
-		err = o.setDefaults(pref, optionDefaults)
-	case sectionAliases:
-		err = o.setAlias(pref, optionDefaults)
+	if o.CredentialPluginPolicy != "" {
+		if err := o.setCredentialPluginPolicy(pref); err != nil {
+			return err
+		}
+	}
+
+	if len(o.CredentialPluginAllowlist) > 0 {
+		if err := o.setCredentialPluginAllowlist(pref); err != nil {
+			return err
+		}
+	}
+
+	if o.Section != "" {
+		switch o.Section {
+		case sectionDefaults:
+			err = o.setDefaults(pref, optionDefaults)
+		case sectionAliases:
+			err = o.setAlias(pref, optionDefaults)
+		}
 	}
 	if err != nil {
 		return err
@@ -284,5 +315,28 @@ func (o *SetOptions) setAlias(pref *v1beta1.Preference, options []v1beta1.Comman
 		Options:     options,
 	})
 
+	return nil
+}
+
+func (o *SetOptions) setCredentialPluginPolicy(pref *v1beta1.Preference) error {
+	if pref.CredentialPluginPolicy != "" && !o.Overwrite {
+		return fmt.Errorf("credentialPluginPolicy already exists, use --overwrite to replace")
+	}
+	pref.CredentialPluginPolicy = v1beta1.CredentialPluginPolicy(o.CredentialPluginPolicy)
+	return nil
+}
+
+func (o *SetOptions) setCredentialPluginAllowlist(pref *v1beta1.Preference) error {
+	if len(pref.CredentialPluginAllowlist) > 0 && !o.Overwrite {
+		return fmt.Errorf("credentialPluginAllowlist already exists, use --overwrite to replace")
+	}
+
+	allowlist := make([]v1beta1.AllowlistEntry, len(o.CredentialPluginAllowlist))
+	for i, name := range o.CredentialPluginAllowlist {
+		allowlist[i] = v1beta1.AllowlistEntry{
+			Name: name,
+		}
+	}
+	pref.CredentialPluginAllowlist = allowlist
 	return nil
 }
