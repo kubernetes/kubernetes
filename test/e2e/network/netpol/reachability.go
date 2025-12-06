@@ -24,6 +24,16 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
+const (
+	// See https://github.com/kubernetes/kubernetes/issues/95879
+	// The semantics of the effect of network policies on loopback calls may be undefined: should
+	//   they always be ALLOWED; how do Services affect this?
+	//   Calico, Cillium, Antrea seem to do different things.
+	// Since different CNIs have different results, that causes tests including loopback to fail
+	//   on some CNIs.  So let's just ignore loopback calls for the purposes of deciding test pass/fail.
+	ignoreLoopback = true
+)
+
 // TestCase describes the data for a netpol test
 type TestCase struct {
 	ToPort       int
