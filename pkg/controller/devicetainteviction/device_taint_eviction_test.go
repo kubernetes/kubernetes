@@ -2429,7 +2429,10 @@ func testDeviceTaintRule(tCtx ktesting.TContext) {
 	tCtx.Wait()
 	evicted := metav1.Now()
 	tCtx.Logf("TIME: eviction done at %s", evicted)
-	check(tCtx, "evict: ", l(inProgress(rule, false, "Completed", "1 pod evicted since starting the controller.", &evicted)), nil)
+	check(tCtx, "evict: ",
+		l(inProgress(rule, false, "Completed", "1 pod evicted since starting the controller.", &evicted),
+			inProgress(rule, true, "PodsPendingEviction", "1 pod needs to be evicted in 1 namespace. 1 pod evicted since starting the controller.", &evicted)),
+		nil)
 
 	// AddAfter does not move time forward. Do it ourselves...
 	timeAfterPodEviction := metav1.Now()
@@ -2439,7 +2442,10 @@ func testDeviceTaintRule(tCtx ktesting.TContext) {
 	tCtx.Wait()
 	done := metav1.Now()
 	tCtx.Logf("TIME: done at %s", done)
-	check(tCtx, "done: ", l(inProgress(rule, false, "Completed", "1 pod evicted since starting the controller.", &timeAfterPodEviction)), nil)
+	check(tCtx, "done: ",
+		l(inProgress(rule, false, "Completed", "1 pod evicted since starting the controller.", &timeAfterPodEviction),
+			inProgress(rule, false, "Completed", "1 pod evicted since starting the controller.", &slept)),
+		nil)
 	assertEqual(tCtx, map[types.UID]taintRuleStats{rule.UID: {numEvictedPods: 1}}, controller.taintRuleStats, "taint rule statistics should have counted the pod")
 
 	// Delete the rule and verify that we don't leak memory by still tracking it.
@@ -2461,6 +2467,8 @@ func check(tCtx ktesting.TContext, prefix string, expectRules []*resourcealpha.D
 		cmpopts.AcyclicTransformer("RoundTime", func(t metav1.Time) metav1.Time {
 			return metav1.Time{Time: t.Round(time.Second)}
 		}),
+		// Ignoring the condition.Message to avoid mismatch due to race and separately compare the Message.
+		cmpopts.IgnoreFields(metav1.Condition{}, "Message", "Reason", "LastTransitionTime"),
 	}
 
 	actualPods, err := tCtx.Client().CoreV1().Pods("").List(tCtx, metav1.ListOptions{})
@@ -2468,7 +2476,28 @@ func check(tCtx ktesting.TContext, prefix string, expectRules []*resourcealpha.D
 	assertEqual(tCtx, expectPods, trimPods(actualPods.Items), prefix+"pods", opts...)
 	rules, err := tCtx.Client().ResourceV1alpha3().DeviceTaintRules().List(tCtx, metav1.ListOptions{})
 	tCtx.ExpectNoError(err, prefix+"list rules")
-	assertEqual(tCtx, expectRules, trimRules(rules.Items), prefix+"rules", opts...)
+
+	if len(expectRules) == 2 {
+		gomega.NewWithT(tCtx).Expect(rules.Items).To(gomega.HaveLen(1))
+		gomega.NewWithT(tCtx).Expect(rules.Items[0].Status.Conditions).To(gomega.HaveLen(1))
+		// compare either of messages
+		gomega.NewWithT(tCtx).Expect(rules.Items[0].Status.Conditions[0].Message).To(gomega.Or(
+			gomega.Equal(expectRules[0].Status.Conditions[0].Message),
+			gomega.Equal(expectRules[1].Status.Conditions[0].Message),
+		))
+		// compare either of reason
+		gomega.NewWithT(tCtx).Expect(rules.Items[0].Status.Conditions[0].Reason).To(gomega.Or(
+			gomega.Equal(expectRules[0].Status.Conditions[0].Reason),
+			gomega.Equal(expectRules[1].Status.Conditions[0].Reason),
+		))
+		// compare either of last transition time
+		gomega.NewWithT(tCtx).Expect(rules.Items[0].Status.Conditions[0].LastTransitionTime).To(gomega.Or(
+			gomega.Equal(metav1.Time{Time: expectRules[0].Status.Conditions[0].LastTransitionTime.Round(time.Second)}),
+			gomega.Equal(metav1.Time{Time: expectRules[1].Status.Conditions[0].LastTransitionTime.Round(time.Second)}),
+		))
+	} else {
+		assertEqual(tCtx, expectRules, trimRules(rules.Items), prefix+"rules", opts...)
+	}
 }
 
 // TestCancelEviction deletes the pod before the controller deletes it
