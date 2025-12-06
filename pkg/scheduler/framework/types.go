@@ -526,6 +526,12 @@ type QueuedPodInfo struct {
 	// That's why we need to distinguish ConsecutiveErrorsCount for the error status and UnschedulableCount for the unschedulable status.
 	// See https://github.com/kubernetes/kubernetes/issues/128744 for the discussion.
 	ConsecutiveErrorsCount int
+	// WasFlushedFromUnschedulable tracks whether this pod was most recently moved to activeQ
+	// by the periodic flush from unschedulablePods due to timeout (rather than by an event).
+	// This is used to detect if the pod becomes schedulable soon after flush, which may
+	// indicate queueing hint misconfigurations or event handling bugs.
+	// This flag is cleared when the pod returns to the queue for any reason.
+	WasFlushedFromUnschedulable bool
 	// The time when the pod is added to the queue for the first time. The pod may be added
 	// back to the queue multiple times before it's successfully scheduled.
 	// It shouldn't be updated once initialized. It's used to record the e2e scheduling
@@ -611,6 +617,15 @@ func (pqi *QueuedPodInfo) DeepCopy() *QueuedPodInfo {
 		PendingPlugins:          pqi.PendingPlugins.Clone(),
 		ConsecutiveErrorsCount:  pqi.ConsecutiveErrorsCount,
 	}
+}
+
+// ClearRejectorPlugins clears the plugin-related fields that track why a pod
+// was rejected in a previous scheduling attempt.
+func (pqi *QueuedPodInfo) ClearRejectorPlugins() {
+	pqi.UnschedulablePlugins.Clear()
+	pqi.PendingPlugins.Clear()
+	pqi.GatingPlugin = ""
+	pqi.GatingPluginEvents = nil
 }
 
 // PodInfo is a wrapper to a Pod with additional pre-computed information to
