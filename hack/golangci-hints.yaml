@@ -169,6 +169,7 @@ linters:
     - forbidigo
     - ginkgolinter
     - gocritic
+    - godoclint
     - govet
     - errorlint
     - ineffassign
@@ -411,6 +412,11 @@ linters:
         - pattern: ^gomega\.BeFalse$
           pkg: ^github.com/onsi/gomega$
           msg: "it does not produce a good failure message - use BeFalseBecause with an explicit printf-style failure message instead, or plain Go: if ... { ginkgo.Fail(...) }"
+    godoclint:
+      default: none
+      enable:
+        - deprecated
+        - no-unused-link
     revive:
       # Only these rules are enabled.
       rules:
