@@ -129,7 +129,6 @@ func TestInvalidDryRun(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func TestValidateDeleteOptionsWithIgnoreStoreReadError(t *testing.T) {
@@ -180,7 +179,6 @@ func TestValidateDeleteOptionsWithIgnoreStoreReadError(t *testing.T) {
 				Preconditions:      &metav1.Preconditions{},
 			},
 			expectedErrors: field.ErrorList{
-				field.Invalid(fieldPath, true, "cannot be set together with .dryRun"),
 				field.Invalid(fieldPath, true, "cannot be set together with .propagationPolicy"),
 				field.Invalid(fieldPath, true, "cannot be set together with .gracePeriodSeconds"),
 				field.Invalid(fieldPath, true, "cannot be set together with .preconditions"),
@@ -197,7 +195,6 @@ func TestValidateDeleteOptionsWithIgnoreStoreReadError(t *testing.T) {
 				Preconditions:      &metav1.Preconditions{},
 			},
 			expectedErrors: field.ErrorList{
-				field.Invalid(fieldPath, true, "cannot be set together with .dryRun"),
 				field.Invalid(fieldPath, true, "cannot be set together with .orphanDependents"),
 				field.Invalid(fieldPath, true, "cannot be set together with .gracePeriodSeconds"),
 				field.Invalid(fieldPath, true, "cannot be set together with .preconditions"),
@@ -209,6 +206,24 @@ func TestValidateDeleteOptionsWithIgnoreStoreReadError(t *testing.T) {
 				IgnoreStoreReadErrorWithClusterBreakingPotential: ptr.To[bool](false),
 			},
 			expectedErrors: field.ErrorList{},
+		},
+		{
+			name: "option is true, dry-run is set (should be allowed)",
+			opts: metav1.DeleteOptions{
+				IgnoreStoreReadErrorWithClusterBreakingPotential: ptr.To(true),
+				DryRun: []string{"All"},
+			},
+			expectedErrors: field.ErrorList{},
+		},
+		{
+			name: "option is true, dry-run is set to an invalid value",
+			opts: metav1.DeleteOptions{
+				IgnoreStoreReadErrorWithClusterBreakingPotential: ptr.To(true),
+				DryRun: []string{"Invalid"},
+			},
+			expectedErrors: field.ErrorList{
+				field.NotSupported(field.NewPath("dryRun"), []string{"Invalid"}, []string{"All"}),
+			},
 		},
 	}
 
