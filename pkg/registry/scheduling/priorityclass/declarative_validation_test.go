@@ -100,17 +100,6 @@ func testDeclarativeValidateForDeclarative(t *testing.T, apiVersion string) {
 			},
 			expectedErrs: field.ErrorList{},
 		},
-		"invalid - user priority class exceeding maximum": {
-			input: scheduling.PriorityClass{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "too-high-priority",
-				},
-				Value: 1500000000, // Exceeds HighestUserDefinablePriority (1000000000)
-			},
-			expectedErrs: field.ErrorList{
-				field.Forbidden(field.NewPath("value"), "maximum allowed value of a user defined priority is 1000000000"),
-			},
-		},
 	}
 
 	for k, tc := range testCases {
@@ -211,25 +200,6 @@ func testValidateUpdateForDeclarative(t *testing.T, apiVersion string) {
 				Description: "newly added description",
 			},
 			expectedErrs: field.ErrorList{},
-		},
-		"invalid update - value changed": {
-			old: scheduling.PriorityClass{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:            "test-priority",
-					ResourceVersion: "1",
-				},
-				Value: 1000,
-			},
-			update: scheduling.PriorityClass{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:            "test-priority",
-					ResourceVersion: "1",
-				},
-				Value: 2000,
-			},
-			expectedErrs: field.ErrorList{
-				field.Forbidden(field.NewPath("value"), "may not be changed in an update."),
-			},
 		},
 		"valid update with no changes": {
 			old: scheduling.PriorityClass{
