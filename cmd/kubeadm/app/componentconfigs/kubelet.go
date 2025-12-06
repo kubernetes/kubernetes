@@ -38,8 +38,11 @@ const (
 	// 0 will disable insecure http server.
 	kubeletReadOnlyPort int32 = 0
 
-	// kubeletRotateCertificates specifies the default value to enable certificate rotation
+	// kubeletRotateCertificates specifies the default value to enable client certificate rotation
 	kubeletRotateCertificates = true
+
+	// kubeletRotateServingCertificates specifies the default value to enable serving certificate rotation
+	kubeletRotateServingCertificates = true
 
 	// kubeletAuthenticationAnonymousEnabled specifies the default value to disable anonymous access
 	kubeletAuthenticationAnonymousEnabled = false
@@ -189,7 +192,9 @@ func (kc *kubeletConfig) Default(cfg *kubeadmapi.ClusterConfiguration, _ *kubead
 
 	// We cannot show a warning for RotateCertificates==false and we must hardcode it to true.
 	// There is no way to determine if the user has set this or not, given the field is a non-pointer.
+	// The same is true for ServerTLSBootstrap==false.
 	kc.config.RotateCertificates = kubeletRotateCertificates
+	kc.config.ServerTLSBootstrap = kubeletRotateServingCertificates
 
 	if len(kc.config.CgroupDriver) == 0 {
 		klog.V(1).Infof("the value of KubeletConfiguration.cgroupDriver is empty; setting it to %q", constants.CgroupDriverSystemd)
