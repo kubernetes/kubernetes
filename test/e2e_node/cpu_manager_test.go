@@ -1915,6 +1915,65 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 			gomega.Expect(pod).ToNot(HaveContainerCPUsOverlapWith(appContainerName, nonReusableCPUs))
 		})
 	})
+
+	ginkgo.When("When checking CPU leaks in Guaranteed Pods", func() {
+		ginkgo.It("One init container(CPU number: 1) and one app container(CPU number: 2) for a pod, release leaked CPUs", func(ctx context.Context) {
+			cpuCount := 2 // total
+
+			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
+
+			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+				policyName:               string(cpumanager.PolicyStatic),
+				reservedSystemCPUs:       reservedCPUs, // Not really needed for the tests but helps to make a more precise check
+			}))
+
+			pod := makeCPUManagerMultiTypeContainersPod("gu-pod-multi-type-container", []ctnAttribute{
+				{
+					ctnName:    "init-container-1",
+					cpuRequest: "1000m",
+					cpuLimit:   "1000m",
+				},
+			}, []ctnAttribute{
+				{
+					ctnName:    "gu-container-1",
+					cpuRequest: "2000m",
+					cpuLimit:   "2000m",
+				},
+			})
+			ginkgo.By("running a Gu pod with a init container and a app container")
+			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+			podMap[string(pod.UID)] = pod
+			// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/753-sidecar-containers#resources-calculation-for-scheduling-and-pod-admission
+			// for the detail.
+			podCPUsNumber := 2
+
+			// when we get there the real initcontainer terminated, so we can only check its logs
+			ginkgo.By("checking if the expected cpuset was assigned")
+			logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, pod.Namespace, pod.Name, pod.Spec.InitContainers[0].Name)
+			framework.ExpectNoError(err, "expected log not found in init container [%s] of pod [%s]", pod.Spec.InitContainers[0].Name, pod.Name)
+
+			// Get reusable CPUs
+			initContainerCPUs := getContainerAllowedCPUsFromLogs(pod.Name, pod.Spec.InitContainers[0].Name, logs)
+			gomega.Expect(initContainerCPUs.Size()).To(gomega.Equal(1), "expected cpu set size == 1, got %q", initContainerCPUs.String())
+
+			// Get nonReusable CPUs
+			appContainerCPUs, err := getContainerAllowedCPUs(pod, pod.Spec.Containers[0].Name, false)
+			framework.ExpectNoError(err, "cannot get exclusive CPUs for pod %s/%s", pod.Namespace, pod.Name)
+			gomega.Expect(appContainerCPUs.Size()).To(gomega.Equal(2), "expected cpu set size == 2, got %q", appContainerCPUs.String())
+
+			appContainerName := pod.Spec.Containers[0].Name
+			gomega.Expect(pod).To(HaveContainerCPUsCount(appContainerName, 2))
+			gomega.Expect(pod).To(HaveContainerCPUsASubsetOf(appContainerName, onlineCPUs))
+			gomega.Expect(pod).ToNot(HaveContainerCPUsOverlapWith(appContainerName, reservedCPUs))
+			// Waiting for reconcile loop.
+			time.Sleep(10 * time.Second)
+			gomega.Expect(pod).To(HavePodCPUsCount(initContainerCPUs.Union(appContainerCPUs), podCPUsNumber))
+			/*Eventually(func() bool {
+				return HavePodCPUsCount(initContainerCPUs.Union(appContainerCPUs), podCPUsNumber)
+			}, 10*time.Second, 1*time.Second).Should(BeTrue())*/
+
+		})
+	})
 })
 
 var _ = SIGDescribe("CPU Manager Incompatibility Pod Level Resources", ginkgo.Ordered, ginkgo.ContinueOnFailure, framework.WithSerial(), feature.CPUManager, feature.PodLevelResources, framework.WithFeatureGate(features.PodLevelResources), func() {
@@ -2073,6 +2132,21 @@ type msgData struct {
 	Aligned          int
 	CurrentQuota     string
 	ExpectedQuota    string
+}
+
+func HavePodCPUsCount(podCPUSet cpuset.CPUSet, val int) types.GomegaMatcher {
+	md := &msgData{
+		CurrentCPUs: podCPUSet.String(),
+		Count:       val,
+	}
+	return gcustom.MakeMatcher(func(actual *v1.Pod) (bool, error) {
+		if podCPUSet.Size() == val {
+			return true, nil
+		} else if podCPUSet.Size() > val {
+			return false, fmt.Errorf("There are %d leaked CPUs", podCPUSet.Size() - val)
+		}
+		return false, fmt.Errorf("CPU not enough")
+	}).WithTemplate("Pod {{.Actual.Namespace}}/{{.Actual.Name}} UID {{.Actual.UID}} has allowed CPUs <{{.Data.CurrentCPUs}}> not matching expected count <{{.Data.Count}}> for container {{.Data.Name}}", md)
 }
 
 func HaveContainerCPUsCount(ctnName string, val int) types.GomegaMatcher {
@@ -2792,6 +2866,66 @@ func makeCPUManagerInitContainersPod(podName string, ctnAttributes []ctnAttribut
 					Command: []string{"sh", "-c", cpusetAndSleepCmd},
 				},
 			},
+		},
+	}
+}
+
+func makeCPUManagerMultiTypeContainersPod(podName string, initCtnAttributes []ctnAttribute, ctnAttributes []ctnAttribute) *v1.Pod {
+	var containers []v1.Container
+	var initContainers []v1.Container
+	cpusetCmd := "grep Cpus_allowed_list /proc/self/status | cut -f2"
+	cpusetAndSleepCmd := "grep Cpus_allowed_list /proc/self/status | cut -f2 && sleep 1d"
+
+	for _, ictnAttr := range initCtnAttributes {
+		ictn := v1.Container{
+			Name:  ictnAttr.ctnName,
+			Image: busyboxImage,
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse(ictnAttr.cpuRequest),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse(ictnAttr.cpuLimit),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+			},
+			Command:       []string{"sh", "-c", cpusetCmd},
+			RestartPolicy: ictnAttr.restartPolicy,
+		}
+		if ictnAttr.restartPolicy != nil && *ictnAttr.restartPolicy == v1.ContainerRestartPolicyAlways {
+			ictn.Command = []string{"sh", "-c", cpusetAndSleepCmd}
+		}
+		initContainers = append(initContainers, ictn)
+	}
+
+	for _, ctnAttr := range ctnAttributes {
+		ctn := v1.Container{
+			Name:  ctnAttr.ctnName,
+			Image: busyboxImage,
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse(ctnAttr.cpuRequest),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse(ctnAttr.cpuLimit),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+			},
+			Command: []string{"sh", "-c", cpusetAndSleepCmd},
+		}
+		containers = append(containers, ctn)
+	}
+
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: podName,
+		},
+		Spec: v1.PodSpec{
+			RestartPolicy:  v1.RestartPolicyNever,
+			InitContainers: initContainers,
+			Containers:     containers,
 		},
 	}
 }
