@@ -42,6 +42,7 @@ EXCLUDED_PATTERNS=(
   "verify-golangci-lint-pr-hints.sh" # Runs in a separate job for PRs.
   "verify-licenses.sh"           # runs in a separate job to monitor availability of the dependencies periodically
   "verify-openapi-docs-urls.sh"  # Spams docs URLs, don't run in CI.
+  "verify-featuregates-cleanup.sh"  # we only run this when releases are prepared
   )
 
 # Exclude typecheck in certain cases, if they're running in a separate job.
