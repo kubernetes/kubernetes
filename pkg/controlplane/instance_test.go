@@ -51,6 +51,7 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
+	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/server/resourceconfig"
@@ -490,6 +491,40 @@ func TestNewBetaResourcesEnabledByDefault(t *testing.T) {
 			continue // this is a legacy beta resource
 		}
 		t.Errorf("no new beta resources can be enabled by default, see https://github.com/kubernetes/enhancements/blob/0ad0fc8269165ca300d05ca51c7ce190a79976a5/keps/sig-architecture/3136-beta-apis-off-by-default/README.md: %v", gvr)
+	}
+}
+
+func TestDuplicateInitializationsOfRestStorage(t *testing.T) {
+	apiserver, etcdserver, _, _ := newInstance(t)
+	defer etcdserver.Terminate(t)
+	_, config, _ := setUp(t)
+	completed := config.Complete()
+
+	// create kube storage providers
+	client, err := kubernetes.NewForConfig(config.ControlPlane.Generic.LoopbackClientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	restStorageProviders, err := completed.StorageProviders(client)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, restStorageProvider := range restStorageProviders {
+		t.Run(restStorageProvider.GroupName(), func(t *testing.T) {
+			apiGroupInfo, err := restStorageProvider.NewRESTStorage(apiserver.ControlPlane.APIResourceConfigSource, apiserver.ControlPlane.RESTOptionsGetter)
+			assert.NoError(t, err)
+			checkDuplicateStorageMap := map[string]rest.Storage{}
+			for _, storageMap := range apiGroupInfo.VersionedResourcesStorageMap {
+				for resource, storage := range storageMap {
+					s, ok := checkDuplicateStorageMap[resource]
+					if ok {
+						assert.Equal(t, s, storage, "duplicate initialization of rest.Storage for resource %s", resource)
+					}
+					checkDuplicateStorageMap[resource] = storage
+				}
+			}
+		})
 	}
 }
 
