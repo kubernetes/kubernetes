@@ -42,7 +42,7 @@ const (
 	// PolicyStatic is the name of the static policy.
 	// Should options be given, these will be ignored and backward (up to 1.21 included)
 	// compatible behaviour will be enforced
-	PolicyStatic policyName = "static"
+	PolicyStatic policyName = "Static"
 	// ErrorSMTAlignment represents the type of an SMTAlignmentError
 	ErrorSMTAlignment = "SMTAlignmentError"
 )
