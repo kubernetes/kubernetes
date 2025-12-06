@@ -159,6 +159,10 @@ type BlkioStats struct {
 	IoTimeRecursive         []BlkioStatEntry `json:"io_time_recursive,omitempty"`
 	SectorsRecursive        []BlkioStatEntry `json:"sectors_recursive,omitempty"`
 	PSI                     *PSIStats        `json:"psi,omitempty"`
+	IoCostUsage             []BlkioStatEntry `json:"io_cost_usage,omitempty"`
+	IoCostWait              []BlkioStatEntry `json:"io_cost_wait,omitempty"`
+	IoCostIndebt            []BlkioStatEntry `json:"io_cost_indebt,omitempty"`
+	IoCostIndelay           []BlkioStatEntry `json:"io_cost_indelay,omitempty"`
 }
 
 type HugetlbStats struct {
