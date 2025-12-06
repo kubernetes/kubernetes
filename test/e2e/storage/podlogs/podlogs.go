@@ -92,7 +92,7 @@ func CopyPodLogs(ctx context.Context, cs clientset.Interface, ns, podName string
 			FieldSelector: fmt.Sprintf("metadata.name=%s", podName),
 		}
 	}
-	watcher, err := cs.CoreV1().Pods(ns).Watch(context.TODO(), options)
+	watcher, err := cs.CoreV1().Pods(ns).Watch(ctx, options)
 
 	if err != nil {
 		return fmt.Errorf("cannot create Pod event watcher: %w", err)
@@ -109,7 +109,7 @@ func CopyPodLogs(ctx context.Context, cs clientset.Interface, ns, podName string
 			m.Lock()
 			defer m.Unlock()
 
-			pods, err := cs.CoreV1().Pods(ns).List(context.TODO(), options)
+			pods, err := cs.CoreV1().Pods(ns).List(ctx, options)
 			if err != nil {
 				if to.StatusWriter != nil {
 					fmt.Fprintf(to.StatusWriter, "ERROR: get pod list in %s: %s\n", ns, err)
