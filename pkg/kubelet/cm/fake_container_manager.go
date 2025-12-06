@@ -28,7 +28,7 @@ import (
 	"k8s.io/apiserver/pkg/server/healthz"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
+	fakecpumanager "k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/fake"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/resourceupdates"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
@@ -46,7 +46,7 @@ type FakeContainerManager struct {
 	PodContainerManager                 *FakePodContainerManager
 	shouldResetExtendedResourceCapacity bool
 	nodeConfig                          NodeConfig
-	cpuManager                          cpumanager.Manager
+	cpuManager                          fakecpumanager.Manager
 	memoryManager                       memorymanager.Manager
 }
 
@@ -56,7 +56,7 @@ func NewFakeContainerManager() *FakeContainerManager {
 	return &FakeContainerManager{
 		PodContainerManager: NewFakePodContainerManager(),
 		// Using klog.Background() for fake/test implementations where no real context is available
-		cpuManager:    cpumanager.NewFakeManager(klog.Background()),
+		cpuManager:    fakecpumanager.NewFakeManager(klog.Background()),
 		memoryManager: memorymanager.NewFakeManager(klog.Background()),
 	}
 }
