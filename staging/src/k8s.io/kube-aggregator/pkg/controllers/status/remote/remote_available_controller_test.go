@@ -173,12 +173,12 @@ func BenchmarkBuildCache(b *testing.B) {
 	apiServiceName := "remote.group"
 	// model 1 APIService pointing at a given service, and 30 pointing at local group/versions
 	apiServices := []runtime.Object{newRemoteAPIService(apiServiceName)}
-	for i := 0; i < 30; i++ {
+	for i := range 30 {
 		apiServices = append(apiServices, newLocalAPIService(fmt.Sprintf("local.group%d", i)))
 	}
 	// model one service backing an API service, and 100 unrelated services
 	services := []*v1.Service{newService("foo", "bar", testServicePort, testServicePortName)}
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		services = append(services, newService("foo", fmt.Sprintf("bar%d", i), testServicePort, testServicePortName))
 	}
 	c, _ := setupAPIServices(b, apiServices)

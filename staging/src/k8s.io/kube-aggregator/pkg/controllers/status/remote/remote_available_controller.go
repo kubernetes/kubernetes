@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"net/url"
 	"reflect"
+	"slices"
 	"sync"
 	"time"
 
@@ -262,26 +263,7 @@ func (c *AvailableConditionController) sync(key string) error {
 			_, err := c.updateAPIServiceStatus(originalAPIService, apiService)
 			return err
 		}
-		hasActiveEndpoints := false
-	outer:
-		for _, slice := range endpointSlices {
-			ready := false
-			for _, endpoint := range slice.Endpoints {
-				if endpoint.Conditions.Ready == nil || *endpoint.Conditions.Ready {
-					ready = true
-					break
-				}
-			}
-			if !ready {
-				continue
-			}
-			for _, endpointPort := range slice.Ports {
-				if endpointPort.Name != nil && *endpointPort.Name == portName && endpointPort.Port != nil {
-					hasActiveEndpoints = true
-					break outer
-				}
-			}
-		}
+		hasActiveEndpoints := hasAvailableEndpoint(portName, endpointSlices...)
 		if !hasActiveEndpoints {
 			availableCondition.Status = apiregistrationv1.ConditionFalse
 			availableCondition.Reason = "MissingEndpoints"
@@ -295,7 +277,7 @@ func (c *AvailableConditionController) sync(key string) error {
 	if apiService.Spec.Service != nil && c.serviceResolver != nil {
 		attempts := 5
 		results := make(chan error, attempts)
-		for i := 0; i < attempts; i++ {
+		for range attempts {
 			go func() {
 				discoveryURL, err := c.serviceResolver.ResolveEndpoint(apiService.Spec.Service.Namespace, apiService.Spec.Service.Name, *apiService.Spec.Service.Port)
 				if err != nil {
@@ -352,7 +334,7 @@ func (c *AvailableConditionController) sync(key string) error {
 		}
 
 		var lastError error
-		for i := 0; i < attempts; i++ {
+		for range attempts {
 			lastError = <-results
 			// if we had at least one success, we are successful overall and we can return now
 			if lastError == nil {
@@ -380,6 +362,20 @@ func (c *AvailableConditionController) sync(key string) error {
 	apiregistrationv1apihelper.SetAPIServiceCondition(apiService, availableCondition)
 	_, err = c.updateAPIServiceStatus(originalAPIService, apiService)
 	return err
+}
+
+func hasAvailableEndpoint(portName string, es ...*discoveryv1.EndpointSlice) bool {
+	return slices.ContainsFunc(es, func(s *discoveryv1.EndpointSlice) bool {
+		if !slices.ContainsFunc(s.Endpoints, func(e discoveryv1.Endpoint) bool {
+			return e.Conditions.Ready == nil || *e.Conditions.Ready
+		}) {
+			return false
+		}
+
+		return slices.ContainsFunc(s.Ports, func(p discoveryv1.EndpointPort) bool {
+			return p.Name != nil && *p.Name == portName && p.Port != nil
+		})
+	})
 }
 
 // updateAPIServiceStatus only issues an update if a change is detected.  We have a tight resync loop to quickly detect dead
@@ -433,7 +429,7 @@ func (c *AvailableConditionController) Run(workers int, stopCh <-chan struct{}) 
 		return
 	}
 
-	for i := 0; i < workers; i++ {
+	for range workers {
 		go wait.Until(c.runWorker, time.Second, stopCh)
 	}
 
@@ -474,7 +470,7 @@ func (c *AvailableConditionController) addAPIService(obj interface{}) {
 	c.queue.Add(castObj.Name)
 }
 
-func (c *AvailableConditionController) updateAPIService(oldObj, newObj interface{}) {
+func (c *AvailableConditionController) updateAPIService(oldObj, newObj any) {
 	castObj := newObj.(*apiregistrationv1.APIService)
 	oldCastObj := oldObj.(*apiregistrationv1.APIService)
 	klog.V(4).Infof("Updating %s", oldCastObj.Name)
