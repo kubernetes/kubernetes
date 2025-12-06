@@ -33,8 +33,6 @@ import (
 	autoscalingrest "k8s.io/kubernetes/pkg/registry/autoscaling/rest"
 	resourcerest "k8s.io/kubernetes/pkg/registry/resource/rest"
 
-	autoscalingapiv2beta1 "k8s.io/api/autoscaling/v2beta1"
-	autoscalingapiv2beta2 "k8s.io/api/autoscaling/v2beta2"
 	batchapiv1beta1 "k8s.io/api/batch/v1beta1"
 	certificatesapiv1beta1 "k8s.io/api/certificates/v1beta1"
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
@@ -467,15 +465,13 @@ func TestNewBetaResourcesEnabledByDefault(t *testing.T) {
 	// legacyEnabledBetaResources is nearly a duplication from elsewhere.  This is intentional.  These types already have
 	// GA equivalents available and should therefore never have a beta enabled by default again.
 	legacyEnabledBetaResources := map[schema.GroupVersionResource]bool{
-		autoscalingapiv2beta1.SchemeGroupVersion.WithResource("horizontalpodautoscalers"): true,
-		autoscalingapiv2beta2.SchemeGroupVersion.WithResource("horizontalpodautoscalers"): true,
-		batchapiv1beta1.SchemeGroupVersion.WithResource("cronjobs"):                       true,
-		discoveryv1beta1.SchemeGroupVersion.WithResource("endpointslices"):                true,
-		eventsv1beta1.SchemeGroupVersion.WithResource("events"):                           true,
-		nodev1beta1.SchemeGroupVersion.WithResource("runtimeclasses"):                     true,
-		policyapiv1beta1.SchemeGroupVersion.WithResource("poddisruptionbudgets"):          true,
-		policyapiv1beta1.SchemeGroupVersion.WithResource("podsecuritypolicies"):           true,
-		storageapiv1beta1.SchemeGroupVersion.WithResource("csinodes"):                     true,
+		batchapiv1beta1.SchemeGroupVersion.WithResource("cronjobs"):              true,
+		discoveryv1beta1.SchemeGroupVersion.WithResource("endpointslices"):       true,
+		eventsv1beta1.SchemeGroupVersion.WithResource("events"):                  true,
+		nodev1beta1.SchemeGroupVersion.WithResource("runtimeclasses"):            true,
+		policyapiv1beta1.SchemeGroupVersion.WithResource("poddisruptionbudgets"): true,
+		policyapiv1beta1.SchemeGroupVersion.WithResource("podsecuritypolicies"):  true,
+		storageapiv1beta1.SchemeGroupVersion.WithResource("csinodes"):            true,
 	}
 
 	config := DefaultAPIResourceConfigSource()
