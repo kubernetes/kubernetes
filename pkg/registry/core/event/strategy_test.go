@@ -148,3 +148,65 @@ func TestValidateUpdate(t *testing.T) {
 		t.Errorf("ValidateUpdate should fail on name change")
 	}
 }
+
+func TestStrategyValidate(t *testing.T) {
+	now := metav1.Now()
+	eventTime := metav1.NewMicroTime(now.Time)
+	event := &api.Event{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test",
+			Namespace: "default",
+		},
+		InvolvedObject: api.ObjectReference{
+			Kind:            "Pod",
+			Name:            "foo",
+			Namespace:       "default",
+			UID:             "test-uid",
+			APIVersion:      "v1",
+			ResourceVersion: "0",
+			FieldPath:       "",
+		},
+		Reason:              "ForTesting",
+		ReportingController: "kube-controller-manager",     // Add this
+		ReportingInstance:   "kube-controller-manager-xyz", // Add this
+		Action:              "Testing",                     // Add this
+		EventTime:           eventTime,
+		Type:                api.EventTypeNormal,
+	}
+
+	errs := Strategy.Validate(context.Background(), event)
+	if len(errs) != 0 {
+		t.Fatalf("unexpected errors from Validate: %v", errs)
+	}
+}
+
+func TestStrategyValidateInvalid(t *testing.T) {
+	now := metav1.Now()
+	eventTime := metav1.NewMicroTime(now.Time)
+	event := &api.Event{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "", // Empty name should fail
+			Namespace: "default",
+		},
+		InvolvedObject: api.ObjectReference{
+			Kind:            "Pod",
+			Name:            "foo",
+			Namespace:       "default",
+			UID:             "test-uid",
+			APIVersion:      "v1",
+			ResourceVersion: "0",
+			FieldPath:       "",
+		},
+		Reason:              "ForTesting",
+		ReportingController: "kube-controller-manager",
+		ReportingInstance:   "kube-controller-manager-xyz",
+		Action:              "Testing",
+		EventTime:           eventTime,
+		Type:                api.EventTypeNormal,
+	}
+
+	errs := Strategy.Validate(context.Background(), event)
+	if len(errs) == 0 {
+		t.Fatalf("expected validation errors but got none")
+	}
+}
