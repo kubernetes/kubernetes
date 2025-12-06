@@ -783,7 +783,7 @@ func (gb *GraphBuilder) processGraphChanges(logger klog.Logger) bool {
 			// waiting for the deletion of their dependents.
 			gb.addUnblockedOwnersToDeleteQueue(logger, removed, changed)
 			// update the node itself
-			existingNode.owners = accessor.GetOwnerReferences()
+			existingNode.setOwners(accessor.GetOwnerReferences())
 			// Add the node to its new owners' dependent lists.
 			gb.addDependentToOwners(logger, existingNode, added)
 			// remove the node from the dependent list of node that are no longer in

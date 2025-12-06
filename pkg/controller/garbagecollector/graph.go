@@ -79,23 +79,25 @@ type node struct {
 	virtualLock sync.RWMutex
 	// when processing an Update event, we need to compare the updated
 	// ownerReferences with the owners recorded in the graph.
-	owners []metav1.OwnerReference
+	owners     []metav1.OwnerReference
+	ownersLock sync.RWMutex
 }
 
 // clone() must only be called from the single-threaded GraphBuilder.processGraphChanges()
 func (n *node) clone() *node {
+	owners := n.getOwners()
 	c := &node{
 		identity:           n.identity,
 		dependents:         make(map[*node]struct{}, len(n.dependents)),
 		deletingDependents: n.deletingDependents,
 		beingDeleted:       n.beingDeleted,
 		virtual:            n.virtual,
-		owners:             make([]metav1.OwnerReference, 0, len(n.owners)),
+		owners:             make([]metav1.OwnerReference, 0, len(owners)),
 	}
 	for dep := range n.dependents {
 		c.dependents[dep] = struct{}{}
 	}
-	for _, owner := range n.owners {
+	for _, owner := range owners {
 		c.owners = append(c.owners, owner)
 	}
 	return c
@@ -136,6 +138,18 @@ func (n *node) isDeletingDependents() bool {
 	n.deletingDependentsLock.RLock()
 	defer n.deletingDependentsLock.RUnlock()
 	return n.deletingDependents
+}
+
+func (n *node) setOwners(owners []metav1.OwnerReference) {
+	n.ownersLock.Lock()
+	defer n.ownersLock.Unlock()
+	n.owners = owners
+}
+
+func (n *node) getOwners() []metav1.OwnerReference {
+	n.ownersLock.RLock()
+	defer n.ownersLock.RUnlock()
+	return n.owners
 }
 
 func (n *node) addDependent(dependent *node) {
@@ -179,7 +193,7 @@ func (n *node) blockingDependents() []*node {
 	dependents := n.getDependents()
 	var ret []*node
 	for _, dep := range dependents {
-		for _, owner := range dep.owners {
+		for _, owner := range dep.getOwners() {
 			if owner.UID == n.identity.UID && owner.BlockOwnerDeletion != nil && *owner.BlockOwnerDeletion {
 				ret = append(ret, dep)
 			}
@@ -216,6 +230,9 @@ func (n *node) String() string {
 
 	n.dependentsLock.RLock()
 	defer n.dependentsLock.RUnlock()
+
+	n.ownersLock.RLock()
+	defer n.ownersLock.RUnlock()
 
 	return fmt.Sprintf("%#v", n)
 }
