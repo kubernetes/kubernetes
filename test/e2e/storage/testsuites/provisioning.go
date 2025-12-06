@@ -19,12 +19,13 @@ package testsuites
 import (
 	"context"
 	"fmt"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	crdclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	crdclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 
@@ -283,7 +284,7 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 
 	f.It("should provision storage with any volume data source", f.WithSerial(), func(ctx context.Context) {
 		if len(dInfo.InTreePluginName) != 0 {
-			e2eskipper.Skipf("AnyVolumeDataSource feature only works with CSI drivers - skipping")
+			e2eskipper.Skipf("It only works with CSI drivers - skipping")
 		}
 		if pattern.VolMode == v1.PersistentVolumeBlock {
 			e2eskipper.Skipf("Test for Block volumes is not implemented - skipping")
