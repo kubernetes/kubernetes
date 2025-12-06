@@ -14621,6 +14621,7 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 		old                                         core.Pod
 		err                                         string
 		enableClearingNominatedNodeNameAfterBinding bool
+		validationOptions                           PodValidationOptions
 	}{{
 		new: *podtest.MakePod("foo",
 			podtest.SetStatus(core.PodStatus{
@@ -16013,6 +16014,117 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 			}),
 		),
 		old: *podtest.MakePod("foo"),
+	}, {
+		old: *podtest.MakePod("foo",
+			podtest.SetStatus(
+				podtest.MakePodStatus(
+					podtest.SetContainerStatuses(core.ContainerStatus{
+						VolumeMounts: []core.VolumeMountStatus{
+							{
+								VolumeStatus: core.VolumeStatus{
+									Image: &core.ImageVolumeStatus{
+										ImageRef: "imageref",
+									},
+								},
+							},
+						},
+					}),
+				),
+			),
+		),
+		new: *podtest.MakePod("foo",
+			podtest.SetStatus(
+				podtest.MakePodStatus(
+					podtest.SetContainerStatuses(core.ContainerStatus{
+						VolumeMounts: []core.VolumeMountStatus{
+							{
+								VolumeStatus: core.VolumeStatus{
+									Image: nil,
+								},
+							},
+						},
+					}),
+				),
+			),
+		),
+		test:              "should wipe VolumeStatus if ImageVolumeWithDigest feature gate is disabled didn't exist on previous pod",
+		validationOptions: PodValidationOptions{AllowImageVolumeWithDigest: false},
+	}, {
+		old: *podtest.MakePod("foo",
+			podtest.SetStatus(
+				podtest.MakePodStatus(
+					podtest.SetContainerStatuses(core.ContainerStatus{
+						VolumeMounts: []core.VolumeMountStatus{
+							{
+								VolumeStatus: core.VolumeStatus{
+									Image: &core.ImageVolumeStatus{
+										ImageRef: "",
+									},
+								},
+							},
+						},
+					}),
+				),
+			),
+		),
+		new: *podtest.MakePod("foo",
+			podtest.SetStatus(
+				podtest.MakePodStatus(
+					podtest.SetContainerStatuses(core.ContainerStatus{
+						VolumeMounts: []core.VolumeMountStatus{
+							{
+								VolumeStatus: core.VolumeStatus{
+									Image: &core.ImageVolumeStatus{
+										ImageRef: "",
+									},
+								},
+							},
+						},
+					}),
+				),
+			),
+		),
+		test:              "should not be allowed to set an empty imageRef",
+		validationOptions: PodValidationOptions{AllowImageVolumeWithDigest: true},
+		err:               `status.containerStatuses[0].volumeMounts[0].volumeStatus.imageVolumeStatus.imageRef: Required value: imageRef must not be empty`,
+	}, {
+		old: *podtest.MakePod("foo",
+			podtest.SetStatus(
+				podtest.MakePodStatus(
+					podtest.SetContainerStatuses(core.ContainerStatus{
+						VolumeMounts: []core.VolumeMountStatus{
+							{
+								VolumeStatus: core.VolumeStatus{
+									Image: &core.ImageVolumeStatus{
+										ImageRef: strings.Repeat("x", 257),
+									},
+								},
+							},
+						},
+					}),
+				),
+			),
+		),
+		new: *podtest.MakePod("foo",
+			podtest.SetStatus(
+				podtest.MakePodStatus(
+					podtest.SetContainerStatuses(core.ContainerStatus{
+						VolumeMounts: []core.VolumeMountStatus{
+							{
+								VolumeStatus: core.VolumeStatus{
+									Image: &core.ImageVolumeStatus{
+										ImageRef: strings.Repeat("x", 257),
+									},
+								},
+							},
+						},
+					}),
+				),
+			),
+		),
+		test:              "should not be allowed to set an imageRef of len larger than 256",
+		validationOptions: PodValidationOptions{AllowImageVolumeWithDigest: true},
+		err:               `status.containerStatuses[0].volumeMounts[0].volumeStatus.imageVolumeStatus.imageRef: Too long: may not be more than 256`,
 	},
 	}
 
@@ -16021,7 +16133,7 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 
 		test.new.ResourceVersion = "1"
 		test.old.ResourceVersion = "1"
-		errs := ValidatePodStatusUpdate(&test.new, &test.old, PodValidationOptions{})
+		errs := ValidatePodStatusUpdate(&test.new, &test.old, test.validationOptions)
 		if test.err == "" {
 			if len(errs) != 0 {
 				t.Errorf("unexpected invalid: %s (%+v)\nA: %+v\nB: %+v", test.test, errs, test.new, test.old)

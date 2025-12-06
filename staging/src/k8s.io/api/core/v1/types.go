@@ -3623,6 +3623,29 @@ type VolumeMountStatus struct {
 	// depending on the mount result.
 	// +optional
 	RecursiveReadOnly *RecursiveReadOnlyMode `json:"recursiveReadOnly,omitempty" protobuf:"bytes,4,opt,name=recursiveReadOnly,casttype=RecursiveReadOnlyMode"`
+	// volumeStatus represents volume-type-specific status about the mounted
+	// volume.
+	// +optional
+	VolumeStatus `json:"volumeStatus,omitempty" protobuf:"bytes,5,opt,name=volumeStatus"`
+}
+
+// VolumeStatus represents the status of a mounted volume.
+// At most one of its members must be specified.
+type VolumeStatus struct {
+	// image represents an OCI object (a container image or artifact) pulled and mounted on the kubelet's host machine.
+	// +featureGate=ImageVolumeWithDigest
+	// +optional
+	Image *ImageVolumeStatus `json:"image,omitempty" protobuf:"bytes,1,opt,name=image"`
+}
+
+// ImageVolumeStatus represents the image-based volume status.
+type ImageVolumeStatus struct {
+	// ImageRef is the digest of the image used for this volume.
+	// It should have a value that's similar to the pod's status.containerStatuses[i].imageID.
+	// The ImageRef length should not exceed 256 characters.
+	// +kubebuilder:validation:MaxLength=256
+	// +required
+	ImageRef string `json:"imageRef,omitempty" protobuf:"bytes,1,opt,name=imageRef"`
 }
 
 // RestartPolicy describes how the container should be restarted.

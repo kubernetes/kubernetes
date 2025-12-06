@@ -6292,6 +6292,12 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: reference
       type:
         scalar: string
+- name: io.k8s.api.core.v1.ImageVolumeStatus
+  map:
+    fields:
+    - name: imageRef
+      type:
+        scalar: string
 - name: io.k8s.api.core.v1.KeyToPath
   map:
     fields:
@@ -8952,6 +8958,10 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: recursiveReadOnly
       type:
         scalar: string
+    - name: volumeStatus
+      type:
+        namedType: io.k8s.api.core.v1.VolumeStatus
+      default: {}
 - name: io.k8s.api.core.v1.VolumeNodeAffinity
   map:
     fields:
@@ -8992,6 +9002,12 @@ var schemaYAML = typed.YAMLObject(`types:
         map:
           elementType:
             namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+- name: io.k8s.api.core.v1.VolumeStatus
+  map:
+    fields:
+    - name: image
+      type:
+        namedType: io.k8s.api.core.v1.ImageVolumeStatus
 - name: io.k8s.api.core.v1.VsphereVirtualDiskVolumeSource
   map:
     fields:

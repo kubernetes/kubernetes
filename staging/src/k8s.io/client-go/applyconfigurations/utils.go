@@ -818,6 +818,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.HTTPHeaderApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ImageVolumeSource"):
 		return &applyconfigurationscorev1.ImageVolumeSourceApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("ImageVolumeStatus"):
+		return &applyconfigurationscorev1.ImageVolumeStatusApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ISCSIPersistentVolumeSource"):
 		return &applyconfigurationscorev1.ISCSIPersistentVolumeSourceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ISCSIVolumeSource"):
@@ -1078,6 +1080,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.VolumeResourceRequirementsApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("VolumeSource"):
 		return &applyconfigurationscorev1.VolumeSourceApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("VolumeStatus"):
+		return &applyconfigurationscorev1.VolumeStatusApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("VsphereVirtualDiskVolumeSource"):
 		return &applyconfigurationscorev1.VsphereVirtualDiskVolumeSourceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("WeightedPodAffinityTerm"):
