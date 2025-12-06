@@ -94,8 +94,10 @@ const (
 
 // Probe event reason list
 const (
-	ContainerUnhealthy    = "Unhealthy"
-	ContainerProbeWarning = "ProbeWarning"
+	ContainerUnhealthy          = "Unhealthy"
+	ContainerProbeWarning       = "ProbeWarning"
+	ContainerProbeResultFailure = "ContainerProbeResultFailure"
+	ContainerProbeResultSuccess = "ContainerProbeResultSuccess"
 )
 
 // Pod worker event reason list
