@@ -142,14 +142,6 @@ func ValidateVolumeAttachment(volumeAttachment *storage.VolumeAttachment) field.
 	allErrs := apivalidation.ValidateObjectMeta(&volumeAttachment.ObjectMeta, false, apivalidation.ValidateClassName, field.NewPath("metadata"))
 	allErrs = append(allErrs, validateVolumeAttachmentSpec(&volumeAttachment.Spec, field.NewPath("spec"))...)
 	allErrs = append(allErrs, validateVolumeAttachmentStatus(&volumeAttachment.Status, field.NewPath("status"))...)
-	return allErrs
-}
-
-// ValidateVolumeAttachmentV1 validates a v1/VolumeAttachment. It contains only extra checks missing in
-// ValidateVolumeAttachment.
-func ValidateVolumeAttachmentV1(volumeAttachment *storage.VolumeAttachment) field.ErrorList {
-	allErrs := apivalidation.ValidateCSIDriverName(volumeAttachment.Spec.Attacher, field.NewPath("spec.attacher")).MarkCoveredByDeclarative()
-
 	if volumeAttachment.Spec.Source.PersistentVolumeName != nil {
 		pvName := *volumeAttachment.Spec.Source.PersistentVolumeName
 		for _, msg := range apivalidation.ValidatePersistentVolumeName(pvName, false) {
@@ -164,18 +156,9 @@ func ValidateVolumeAttachmentV1(volumeAttachment *storage.VolumeAttachment) fiel
 func validateVolumeAttachmentSpec(
 	spec *storage.VolumeAttachmentSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, validateAttacher(spec.Attacher, fldPath.Child("attacher"))...)
+	allErrs = apivalidation.ValidateCSIDriverName(spec.Attacher, field.NewPath("spec.attacher")).MarkCoveredByDeclarative()
 	allErrs = append(allErrs, validateVolumeAttachmentSource(&spec.Source, fldPath.Child("source"))...)
 	allErrs = append(allErrs, validateNodeName(spec.NodeName, fldPath.Child("nodeName"))...)
-	return allErrs
-}
-
-// validateAttacher tests if attacher is a valid qualified name.
-func validateAttacher(attacher string, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	if len(attacher) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath, attacher))
-	}
 	return allErrs
 }
 
