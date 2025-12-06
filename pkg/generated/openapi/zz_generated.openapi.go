@@ -1509,6 +1509,10 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		metricsv1beta1.NodeMetricsList{}.OpenAPIModelName():                                                             schema_pkg_apis_metrics_v1beta1_NodeMetricsList(ref),
 		metricsv1beta1.PodMetrics{}.OpenAPIModelName():                                                                  schema_pkg_apis_metrics_v1beta1_PodMetrics(ref),
 		metricsv1beta1.PodMetricsList{}.OpenAPIModelName():                                                              schema_pkg_apis_metrics_v1beta1_PodMetricsList(ref),
+		"k8s.io/sample-controller/pkg/apis/samplecontroller/v1alpha1.Foo":                                               schema_pkg_apis_samplecontroller_v1alpha1_Foo(ref),
+		"k8s.io/sample-controller/pkg/apis/samplecontroller/v1alpha1.FooList":                                           schema_pkg_apis_samplecontroller_v1alpha1_FooList(ref),
+		"k8s.io/sample-controller/pkg/apis/samplecontroller/v1alpha1.FooSpec":                                           schema_pkg_apis_samplecontroller_v1alpha1_FooSpec(ref),
+		"k8s.io/sample-controller/pkg/apis/samplecontroller/v1alpha1.FooStatus":                                         schema_pkg_apis_samplecontroller_v1alpha1_FooStatus(ref),
 	}
 }
 
@@ -74114,5 +74118,150 @@ func schema_pkg_apis_metrics_v1beta1_PodMetricsList(ref common.ReferenceCallback
 		},
 		Dependencies: []string{
 			metav1.ListMeta{}.OpenAPIModelName(), metricsv1beta1.PodMetrics{}.OpenAPIModelName()},
+	}
+}
+
+func schema_pkg_apis_samplecontroller_v1alpha1_Foo(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "Foo is a specification for a Foo resource",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Default: map[string]interface{}{},
+							Ref:     ref(metav1.ObjectMeta{}.OpenAPIModelName()),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Default: map[string]interface{}{},
+							Ref:     ref("k8s.io/sample-controller/pkg/apis/samplecontroller/v1alpha1.FooSpec"),
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Default: map[string]interface{}{},
+							Ref:     ref("k8s.io/sample-controller/pkg/apis/samplecontroller/v1alpha1.FooStatus"),
+						},
+					},
+				},
+				Required: []string{"spec", "status"},
+			},
+		},
+		Dependencies: []string{
+			metav1.ObjectMeta{}.OpenAPIModelName(), "k8s.io/sample-controller/pkg/apis/samplecontroller/v1alpha1.FooSpec", "k8s.io/sample-controller/pkg/apis/samplecontroller/v1alpha1.FooStatus"},
+	}
+}
+
+func schema_pkg_apis_samplecontroller_v1alpha1_FooList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "FooList is a list of Foo resources",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Default: map[string]interface{}{},
+							Ref:     ref(metav1.ListMeta{}.OpenAPIModelName()),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/sample-controller/pkg/apis/samplecontroller/v1alpha1.Foo"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"metadata", "items"},
+			},
+		},
+		Dependencies: []string{
+			metav1.ListMeta{}.OpenAPIModelName(), "k8s.io/sample-controller/pkg/apis/samplecontroller/v1alpha1.Foo"},
+	}
+}
+
+func schema_pkg_apis_samplecontroller_v1alpha1_FooSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "FooSpec is the spec for a Foo resource",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"deploymentName": {
+						SchemaProps: spec.SchemaProps{
+							Default: "",
+							Type:    []string{"string"},
+							Format:  "",
+						},
+					},
+					"replicas": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"integer"},
+							Format: "int32",
+						},
+					},
+				},
+				Required: []string{"deploymentName", "replicas"},
+			},
+		},
+	}
+}
+
+func schema_pkg_apis_samplecontroller_v1alpha1_FooStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "FooStatus is the status for a Foo resource",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"availableReplicas": {
+						SchemaProps: spec.SchemaProps{
+							Default: 0,
+							Type:    []string{"integer"},
+							Format:  "int32",
+						},
+					},
+				},
+				Required: []string{"availableReplicas"},
+			},
+		},
 	}
 }
