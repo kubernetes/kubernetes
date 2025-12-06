@@ -58,9 +58,9 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		input        storage.VolumeAttachment
 		expectedErrs field.ErrorList
 	}{
-		//"valid": {
-		//	input: mkValidVolumeAttachment(),
-		//},
+		"valid": {
+			input: mkValidVolumeAttachment(),
+		},
 		"invalid attacher (required)": {
 			input: mkValidVolumeAttachment(func(obj *storage.VolumeAttachment) {
 				obj.Spec.Attacher = ""
