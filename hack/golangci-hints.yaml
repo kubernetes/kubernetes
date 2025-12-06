@@ -328,6 +328,7 @@ linters:
               - "ssatags" # Ensure lists have a listType tag.
               # - "uniquemarkers" # Ensure markers are not duplicated across field and type definitions.
               - "duplicatemarkers" #Prevent identical markers from being present on types and fields
+              - "nodurations" # Ensure duration types are not used.
           lintersConfig:
             conditions:
               isFirstField: Ignore
