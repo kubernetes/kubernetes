@@ -2279,6 +2279,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	HostnameOverride: {},
 
+	ImageManagerEventRecorder: {},
+
 	ImageMaximumGCAge: {},
 
 	ImageVolume: {},

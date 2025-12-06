@@ -1396,7 +1396,15 @@ func TestImagePullPrecheck(t *testing.T) {
 				for _, event := range fakeNewRecorder.Events {
 					recorderEvents = append(recorderEvents, eventsv1.Event{Reason: event.Reason})
 				}
-				if diff := cmp.Diff(recorderEvents, expected.events); diff != "" {
+				var gotReasons []string
+				for _, e := range recorderEvents {
+					gotReasons = append(gotReasons, e.Reason)
+				}
+				var wantReasons []string
+				for _, e := range expected.events {
+					wantReasons = append(wantReasons, e.Reason)
+				}
+				if diff := cmp.Diff(gotReasons, wantReasons); diff != "" {
 					t.Errorf("unexpected events diff (-want +got):\n%s", diff)
 				}
 				if diff := cmp.Diff(expected.err, err, cmpopts.EquateErrors()); diff != "" {

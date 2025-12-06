@@ -98,6 +98,7 @@ func NewImageManager(
 	}
 	return &imageManager{
 		recorder:               recorder,
+		newRecorder:            newRecorder,
 		imageService:           imageService,
 		imagePullManager:       imagePullManager,
 		nodeKeyring:            nodeKeyring,
