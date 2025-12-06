@@ -1994,8 +1994,12 @@ func (og *operationGenerator) expandVolumeDuringMount(volumeToMount VolumeToMoun
 }
 
 func (og *operationGenerator) checkIfSupportsNodeExpansion(volumeToMount VolumeToMount) (bool, volume.NodeExpandableVolumePlugin) {
-	if volumeToMount.VolumeSpec != nil &&
-		volumeToMount.VolumeSpec.InlineVolumeSpecForCSIMigration {
+	if volumeToMount.VolumeSpec == nil {
+		klog.V(4).Infof("VolumeSpec is nil for volume %s, skipping expansion check", volumeToMount.VolumeName)
+		return false, nil
+	}
+
+	if volumeToMount.VolumeSpec.InlineVolumeSpecForCSIMigration {
 		klog.V(4).Infof("This volume %s is a migrated inline volume and is not resizable", volumeToMount.VolumeName)
 		return false, nil
 	}
