@@ -243,6 +243,7 @@ var _ = SIGDescribe("Job", func() {
 		ginkgo.By("Evict all the Pods")
 		workqueue.ParallelizeUntil(ctx, numPods, numPods, func(index int) {
 			defer ginkgo.GinkgoRecover()
+			var err error
 
 			pod := pods[index]
 			ginkgo.By(fmt.Sprintf("Evicting the running pod: %s/%s", pod.Name, pod.Namespace))
