@@ -93,8 +93,15 @@ var (
 		Help:           "Total number of retries handled by workqueue",
 	}, []string{"name"})
 
+	delayed = k8smetrics.NewGaugeVec(&k8smetrics.GaugeOpts{
+		Subsystem:      WorkQueueSubsystem,
+		Name:           "delayed",
+		StabilityLevel: k8smetrics.ALPHA,
+		Help:           "Current number of delayed items in workqueue",
+	}, []string{"name"})
+
 	metrics = []k8smetrics.Registerable{
-		depth, adds, latency, workDuration, unfinished, longestRunningProcessor, retries,
+		depth, adds, latency, workDuration, unfinished, longestRunningProcessor, retries, delayed,
 	}
 )
 
@@ -134,4 +141,8 @@ func (prometheusMetricsProvider) NewLongestRunningProcessorSecondsMetric(name st
 
 func (prometheusMetricsProvider) NewRetriesMetric(name string) workqueue.CounterMetric {
 	return retries.WithLabelValues(name)
+}
+
+func (prometheusMetricsProvider) NewDelayedMetrics(name string) workqueue.SettableGaugeMetric {
+	return delayed.WithLabelValues(name)
 }
