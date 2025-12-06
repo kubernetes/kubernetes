@@ -161,7 +161,7 @@ kube::version::ldflags() {
     )
   }
 
-  kube::util::ensure-gnu-date
+  kube::util::ensure-gnu-compatible-date
 
   add_ldflag "buildDate" "$(${DATE} ${SOURCE_DATE_EPOCH:+"--date=@${SOURCE_DATE_EPOCH}"} -u +'%Y-%m-%dT%H:%M:%SZ')"
   if [[ -n ${KUBE_GIT_COMMIT-} ]]; then
