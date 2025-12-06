@@ -769,7 +769,7 @@ func NewMainKubelet(ctx context.Context,
 	runtime, postImageGCHooks, err := kuberuntime.NewKubeGenericRuntimeManager(
 		ctx,
 		kubecontainer.FilterEventRecorder(kubeDeps.Recorder),
-		kubeDeps.NewRecorder,
+		kubecontainer.FilterNewEventRecorder(kubeDeps.NewRecorder),
 		klet.livenessManager,
 		klet.readinessManager,
 		klet.startupManager,

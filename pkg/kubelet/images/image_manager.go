@@ -141,9 +141,10 @@ func (m *imageManager) imagePullPrecheck(
 // records an event using ref, event msg.  log to glog using prefix, msg, logFn
 func (m *imageManager) logIt(objRef *v1.ObjectReference, eventtype, event, prefix, msg string, logFn func(args ...interface{})) {
 	if objRef != nil {
-		m.recorder.Event(objRef, eventtype, event, msg)
 		if m.newRecorder != nil {
 			m.newRecorder.Eventf(objRef, nil, eventtype, event, "", msg)
+		} else {
+			m.recorder.Event(objRef, eventtype, event, msg)
 		}
 	} else {
 		logFn(fmt.Sprint(prefix, " ", msg))

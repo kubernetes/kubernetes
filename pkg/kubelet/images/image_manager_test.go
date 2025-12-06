@@ -31,6 +31,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
+	eventsv1 "k8s.io/api/events/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -832,6 +833,7 @@ func pullerTestEnv(
 	container *v1.Container,
 	fakePodPullingTimeRecorder *mockPodPullingTimeRecorder,
 	fakeRecorder *testutil.FakeRecorder,
+	fakeNewRecorder *testutil.FakeNewRecorder,
 ) {
 	container = &v1.Container{
 		Name:            "container_name",
@@ -845,6 +847,7 @@ func pullerTestEnv(
 
 	fakeRuntime = &ctest.FakeRuntime{T: t}
 	fakeRecorder = testutil.NewFakeRecorder()
+	fakeNewRecorder = testutil.NewFakeNewRecorder()
 
 	fakeRuntime.ImageList = []Image{{ID: "present_image:latest"}}
 	fakeRuntime.Err = c.pullerErr
@@ -878,7 +881,7 @@ func pullerTestEnv(
 		keyring = &credentialprovider.BasicDockerKeyring{}
 	}
 
-	puller = NewImageManager(fakeRecorder, nil, keyring, fakeRuntime, pullManager, backOff, serialized, maxParallelImagePulls, c.qps, c.burst, fakePodPullingTimeRecorder)
+	puller = NewImageManager(fakeRecorder, fakeNewRecorder, keyring, fakeRuntime, pullManager, backOff, serialized, maxParallelImagePulls, c.qps, c.burst, fakePodPullingTimeRecorder)
 	return
 }
 
@@ -889,7 +892,7 @@ func TestParallelPuller(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.testName, func(t *testing.T) {
 			ctx := ktesting.Init(t)
-			puller, fakeClock, fakeRuntime, container, fakePodPullingTimeRecorder, _ := pullerTestEnv(t, c, useSerializedEnv, nil)
+			puller, fakeClock, fakeRuntime, container, fakePodPullingTimeRecorder, _, _ := pullerTestEnv(t, c, useSerializedEnv, nil)
 
 			pod := &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -935,7 +938,7 @@ func TestSerializedPuller(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.testName, func(t *testing.T) {
 			ctx := ktesting.Init(t)
-			puller, fakeClock, fakeRuntime, container, fakePodPullingTimeRecorder, _ := pullerTestEnv(t, c, useSerializedEnv, nil)
+			puller, fakeClock, fakeRuntime, container, fakePodPullingTimeRecorder, _, _ := pullerTestEnv(t, c, useSerializedEnv, nil)
 
 			pod := &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -1030,7 +1033,7 @@ func TestPullAndListImageWithPodAnnotations(t *testing.T) {
 	useSerializedEnv := true
 	t.Run(c.testName, func(t *testing.T) {
 		ctx := ktesting.Init(t)
-		puller, fakeClock, fakeRuntime, container, fakePodPullingTimeRecorder, _ := pullerTestEnv(t, c, useSerializedEnv, nil)
+		puller, fakeClock, fakeRuntime, container, fakePodPullingTimeRecorder, _, _ := pullerTestEnv(t, c, useSerializedEnv, nil)
 		fakeRuntime.CalledFunctions = nil
 		fakeRuntime.ImageList = []Image{}
 		fakeClock.Step(time.Second)
@@ -1094,7 +1097,7 @@ func TestPullAndListImageWithRuntimeHandlerInImageCriAPIFeatureGate(t *testing.T
 	t.Run(c.testName, func(t *testing.T) {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RuntimeClassInImageCriAPI, true)
 		ctx := ktesting.Init(t)
-		puller, fakeClock, fakeRuntime, container, fakePodPullingTimeRecorder, _ := pullerTestEnv(t, c, useSerializedEnv, nil)
+		puller, fakeClock, fakeRuntime, container, fakePodPullingTimeRecorder, _, _ := pullerTestEnv(t, c, useSerializedEnv, nil)
 		fakeRuntime.CalledFunctions = nil
 		fakeRuntime.ImageList = []Image{}
 		fakeClock.Step(time.Second)
@@ -1155,7 +1158,7 @@ func TestMaxParallelImagePullsLimit(t *testing.T) {
 	maxParallelImagePulls := 5
 	var wg sync.WaitGroup
 
-	puller, fakeClock, fakeRuntime, container, _, _ := pullerTestEnv(t, *testCase, useSerializedEnv, ptr.To(int32(maxParallelImagePulls)))
+	puller, fakeClock, fakeRuntime, container, _, _, _ := pullerTestEnv(t, *testCase, useSerializedEnv, ptr.To(int32(maxParallelImagePulls)))
 	fakeRuntime.BlockImagePulls = true
 	fakeRuntime.CalledFunctions = nil
 	fakeRuntime.T = t
@@ -1246,7 +1249,7 @@ func TestParallelPodPullingTimeRecorderWithErr(t *testing.T) {
 	maxParallelImagePulls := 2
 	var wg sync.WaitGroup
 
-	puller, fakeClock, fakeRuntime, container, fakePodPullingTimeRecorder, _ := pullerTestEnv(t, *testCase, useSerializedEnv, ptr.To(int32(maxParallelImagePulls)))
+	puller, fakeClock, fakeRuntime, container, fakePodPullingTimeRecorder, _, _ := pullerTestEnv(t, *testCase, useSerializedEnv, ptr.To(int32(maxParallelImagePulls)))
 	fakeRuntime.BlockImagePulls = true
 	fakeRuntime.CalledFunctions = nil
 	fakeRuntime.T = t
@@ -1380,18 +1383,18 @@ func TestImagePullPrecheck(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.testName, func(t *testing.T) {
 			ctx := ktesting.Init(t)
-			puller, fakeClock, fakeRuntime, container, _, fakeRecorder := pullerTestEnv(t, c, useSerializedEnv, nil)
+			puller, fakeClock, fakeRuntime, container, _, _, fakeNewRecorder := pullerTestEnv(t, c, useSerializedEnv, nil)
 
 			for _, expected := range c.expected {
 				fakeRuntime.CalledFunctions = nil
-				fakeRecorder.Events = []*v1.Event{}
+				fakeNewRecorder.Events = []*eventsv1.Event{}
 				fakeClock.Step(time.Second)
 
 				_, _, err := puller.EnsureImageExists(ctx, &v1.ObjectReference{}, pod, container.Image, c.pullSecrets, podSandboxConfig, "", container.ImagePullPolicy)
 				fakeRuntime.AssertCalls(expected.calls)
-				var recorderEvents []v1.Event
-				for _, event := range fakeRecorder.Events {
-					recorderEvents = append(recorderEvents, v1.Event{Reason: event.Reason})
+				var recorderEvents []eventsv1.Event
+				for _, event := range fakeNewRecorder.Events {
+					recorderEvents = append(recorderEvents, eventsv1.Event{Reason: event.Reason})
 				}
 				if diff := cmp.Diff(recorderEvents, expected.events); diff != "" {
 					t.Errorf("unexpected events diff (-want +got):\n%s", diff)
@@ -1495,6 +1498,7 @@ func TestEnsureImageExistsWithServiceAccountCoordinates(t *testing.T) {
 			fakeClock := testingclock.NewFakeClock(time.Now())
 			fakeRuntime := &ctest.FakeRuntime{T: t}
 			fakeRecorder := testutil.NewFakeRecorder()
+			fakeNewRecorder := testutil.NewFakeNewRecorder()
 			fakePodPullingTimeRecorder := &mockPodPullingTimeRecorder{
 				startedPullingRecorded:  make(map[types.UID]bool),
 				finishedPullingRecorded: make(map[types.UID]bool),
@@ -1535,7 +1539,7 @@ func TestEnsureImageExistsWithServiceAccountCoordinates(t *testing.T) {
 			backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
 			backOff.Clock = fakeClock
 
-			puller := NewImageManager(fakeRecorder, keyring, fakeRuntime, mockPullManager, backOff, true, nil, 0.0, 0, fakePodPullingTimeRecorder)
+			puller := NewImageManager(fakeRecorder, fakeNewRecorder, keyring, fakeRuntime, mockPullManager, backOff, true, nil, 0.0, 0, fakePodPullingTimeRecorder)
 
 			container := &v1.Container{
 				Name:            "container_name",
@@ -1586,6 +1590,7 @@ func TestEnsureImageExistsWithNodeCredentialsOnly(t *testing.T) {
 	fakeClock := testingclock.NewFakeClock(time.Now())
 	fakeRuntime := &ctest.FakeRuntime{T: t}
 	fakeRecorder := testutil.NewFakeRecorder()
+	fakeNewRecorder := testutil.NewFakeNewRecorder()
 	fakePodPullingTimeRecorder := &mockPodPullingTimeRecorder{
 		startedPullingRecorded:  make(map[types.UID]bool),
 		finishedPullingRecorded: make(map[types.UID]bool),
@@ -1617,7 +1622,7 @@ func TestEnsureImageExistsWithNodeCredentialsOnly(t *testing.T) {
 	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
 	backOff.Clock = fakeClock
 
-	puller := NewImageManager(fakeRecorder, keyring, fakeRuntime, mockPullManager, backOff, true, nil, 0.0, 0, fakePodPullingTimeRecorder)
+	puller := NewImageManager(fakeRecorder, fakeNewRecorder, keyring, fakeRuntime, mockPullManager, backOff, true, nil, 0.0, 0, fakePodPullingTimeRecorder)
 
 	container := &v1.Container{
 		Name:            "container_name",

@@ -51,7 +51,7 @@ func TestEnsureImageRequestsMetrics(t *testing.T) {
 	for _, tt := range cases {
 		t.Run(tt.testName, func(t *testing.T) {
 			ctx := ktesting.Init(t)
-			puller, _, _, container, _, _ := pullerTestEnv(t, tt, useSerializedEnv, nil)
+			puller, _, _, container, _, _, _ := pullerTestEnv(t, tt, useSerializedEnv, nil)
 
 			ensureImageRequestsCounter.Reset()
 			_, _, _ = puller.EnsureImageExists(ctx, &v1.ObjectReference{}, pod, container.Image, tt.pullSecrets, podSandboxConfig, "", container.ImagePullPolicy)

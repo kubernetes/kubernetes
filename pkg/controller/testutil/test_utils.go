@@ -27,6 +27,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	eventsv1 "k8s.io/api/events/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,6 +41,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/events"
 	ref "k8s.io/client-go/tools/reference"
 	utilnode "k8s.io/component-helpers/node/topology"
 	"k8s.io/klog/v2"
@@ -470,6 +472,77 @@ func NewFakeRecorder() *FakeRecorder {
 	return &FakeRecorder{
 		source: v1.EventSource{Component: "nodeControllerTest"},
 		Events: []*v1.Event{},
+		clock:  testingclock.NewFakeClock(time.Now()),
+	}
+}
+
+// FakeNewRecorder is used as a fake during testing.
+type FakeNewRecorder struct {
+	sync.Mutex
+	Events []*eventsv1.Event
+	clock  clock.Clock
+}
+
+// Eventf emits a fake formatted event to the fake recorder
+func (f *FakeNewRecorder) Eventf(regarding, related runtime.Object, eventtype, reason, action, note string, args ...interface{}) {
+	f.Lock()
+	defer f.Unlock()
+	ctx := context.TODO()
+	if f.Events == nil {
+		f.Events = []*eventsv1.Event{}
+	}
+
+	regardingRef, err := ref.GetReference(legacyscheme.Scheme, regarding)
+	if err != nil {
+		klog.FromContext(ctx).Error(err, "Encountered error while getting reference")
+		return
+	}
+	var relatedRef *v1.ObjectReference
+	if related != nil {
+		relatedRef, err = ref.GetReference(legacyscheme.Scheme, related)
+		if err != nil {
+			klog.FromContext(ctx).Error(err, "Encountered error while getting reference")
+			return
+		}
+	}
+
+	event := f.makeEvent(regardingRef, relatedRef, eventtype, reason, action, note, args...)
+	f.Events = append(f.Events, event)
+}
+
+// WithLogger returns the recorder with the provided logger.
+func (f *FakeNewRecorder) WithLogger(logger klog.Logger) events.EventRecorderLogger {
+	return f
+}
+
+func (f *FakeNewRecorder) makeEvent(regarding, related *v1.ObjectReference, eventtype, reason, action, note string, args ...interface{}) *eventsv1.Event {
+	t := metav1.Time{Time: f.clock.Now()}
+	namespace := regarding.Namespace
+	if namespace == "" {
+		namespace = metav1.NamespaceDefault
+	}
+
+	return &eventsv1.Event{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%v.%x", regarding.Name, t.UnixNano()),
+			Namespace: namespace,
+		},
+		Regarding:           *regarding,
+		Related:             related,
+		Reason:              reason,
+		Action:              action,
+		Note:                fmt.Sprintf(note, args...),
+		Type:                eventtype,
+		EventTime:           metav1.MicroTime{Time: t.Time},
+		ReportingController: "nodeControllerTest",
+		ReportingInstance:   "nodeControllerTest",
+	}
+}
+
+// NewFakeNewRecorder returns a pointer to a newly constructed FakeNewRecorder.
+func NewFakeNewRecorder() *FakeNewRecorder {
+	return &FakeNewRecorder{
+		Events: []*eventsv1.Event{},
 		clock:  testingclock.NewFakeClock(time.Now()),
 	}
 }

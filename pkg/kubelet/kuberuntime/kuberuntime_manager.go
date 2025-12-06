@@ -110,6 +110,7 @@ type podStateProvider interface {
 type kubeGenericRuntimeManager struct {
 	runtimeName string
 	recorder    record.EventRecorder
+	newRecorder clientevents.EventRecorder
 	osInterface kubecontainer.OSInterface
 
 	// machineInfo contains the machine information.

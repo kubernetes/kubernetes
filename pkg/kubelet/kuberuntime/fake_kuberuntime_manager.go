@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	clientevents "k8s.io/client-go/tools/events"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/component-base/logs/logreduction"
@@ -97,12 +98,14 @@ func (f *fakePodPullingTimeRecorder) RecordImageFinishedPulling(podUID types.UID
 
 func newFakeKubeRuntimeManager(ctx context.Context, runtimeService internalapi.RuntimeService, imageService internalapi.ImageManagerService, machineInfo *cadvisorapi.MachineInfo, osInterface kubecontainer.OSInterface, runtimeHelper kubecontainer.RuntimeHelper, tracer trace.Tracer) (*kubeGenericRuntimeManager, error) {
 	recorder := &record.FakeRecorder{}
+	newRecorder := &clientevents.FakeRecorder{}
 	logManager, err := logs.NewContainerLogManager(runtimeService, osInterface, "1", 2, 10, metav1.Duration{Duration: 10 * time.Second})
 	if err != nil {
 		return nil, err
 	}
 	kubeRuntimeManager := &kubeGenericRuntimeManager{
 		recorder:               recorder,
+		newRecorder:            newRecorder,
 		cpuCFSQuota:            false,
 		cpuCFSQuotaPeriod:      metav1.Duration{Duration: time.Millisecond * 100},
 		livenessManager:        proberesults.NewManager(),
