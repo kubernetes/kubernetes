@@ -141,23 +141,43 @@ func (hc *healthChecker) Start(ctx context.Context) {
 	logger.Info("Starting systemd watchdog with interval", "interval", hc.interval)
 
 	go wait.UntilWithContext(ctx, func(ctx context.Context) {
-		if err := hc.doCheck(); err != nil {
+		if err := hc.doCheck(ctx); err != nil {
 			logger.Error(err, "Do not notify watchdog this iteration as the kubelet is reportedly not healthy")
 			return
 		}
 
+		// Use a timeout for SdNotify to prevent blocking if systemd socket is unresponsive
+		notifyTimeout := hc.interval / 2
 		err := wait.ExponentialBackoffWithContext(ctx, hc.retryBackoff, func(_ context.Context) (bool, error) {
-			ack, err := hc.watchdog.SdNotify(false)
-			if err != nil {
-				logger.V(5).Info("Failed to notify systemd watchdog, retrying", "error", err)
+			notifyCtx, cancel := context.WithTimeout(ctx, notifyTimeout)
+			defer cancel()
+
+			type notifyResult struct {
+				ack bool
+				err error
+			}
+			resultCh := make(chan notifyResult, 1)
+
+			go func() {
+				ack, err := hc.watchdog.SdNotify(false)
+				resultCh <- notifyResult{ack: ack, err: err}
+			}()
+
+			select {
+			case result := <-resultCh:
+				if result.err != nil {
+					logger.Error(result.err, "Failed to notify systemd watchdog, retrying")
+					return false, nil
+				}
+				if !result.ack {
+					return false, fmt.Errorf("failed to notify systemd watchdog, notification not supported - (i.e. NOTIFY_SOCKET is unset)")
+				}
+				logger.V(5).Info("Watchdog plugin notified", "acknowledgment", result.ack, "state", daemon.SdNotifyWatchdog)
+				return true, nil
+			case <-notifyCtx.Done():
+				logger.Error(nil, "SdNotify timed out waiting for systemd socket response", "timeout", notifyTimeout)
 				return false, nil
 			}
-			if !ack {
-				return false, fmt.Errorf("failed to notify systemd watchdog, notification not supported - (i.e. NOTIFY_SOCKET is unset)")
-			}
-
-			logger.V(5).Info("Watchdog plugin notified", "acknowledgment", ack, "state", daemon.SdNotifyWatchdog)
-			return true, nil
 		})
 		if err != nil {
 			logger.Error(err, "Failed to notify watchdog")
@@ -165,10 +185,30 @@ func (hc *healthChecker) Start(ctx context.Context) {
 	}, hc.interval)
 }
 
-func (hc *healthChecker) doCheck() error {
-	for _, hc := range hc.getHealthCheckers() {
-		if err := hc.Check(nil); err != nil {
-			return fmt.Errorf("checker %s failed: %w", hc.Name(), err)
+func (hc *healthChecker) doCheck(ctx context.Context) error {
+	// Use a fraction of the interval as timeout for each check
+	// This ensures all checks complete well before the watchdog interval
+	checkTimeout := hc.interval / 4
+	logger := klog.FromContext(ctx)
+
+	for _, checker := range hc.getHealthCheckers() {
+		checkCtx, cancel := context.WithTimeout(ctx, checkTimeout)
+		errCh := make(chan error, 1)
+
+		go func(c healthz.HealthChecker) {
+			errCh <- c.Check(nil)
+		}(checker)
+
+		select {
+		case err := <-errCh:
+			cancel()
+			if err != nil {
+				return fmt.Errorf("checker %s failed: %w", checker.Name(), err)
+			}
+		case <-checkCtx.Done():
+			cancel()
+			logger.Error(nil, "Health check timed out", "checker", checker.Name(), "timeout", checkTimeout)
+			return fmt.Errorf("checker %s timed out after %v", checker.Name(), checkTimeout)
 		}
 	}
 	return nil
