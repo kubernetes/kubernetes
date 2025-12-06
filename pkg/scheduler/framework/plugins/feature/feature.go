@@ -36,7 +36,6 @@ type Features struct {
 	EnableDRASchedulerFilterTimeout               bool
 	EnableDynamicResourceAllocation               bool
 	EnableVolumeAttributesClass                   bool
-	EnableCSIMigrationPortworx                    bool
 	EnableVolumeLimitScaling                      bool
 	EnableNodeInclusionPolicyInPodTopologySpread  bool
 	EnableMatchLabelKeysInPodTopologySpread       bool
@@ -65,7 +64,6 @@ func NewSchedulerFeaturesFromGates(featureGate featuregate.FeatureGate) Features
 		EnableDRADeviceBindingConditions:              featureGate.Enabled(features.DRADeviceBindingConditions),
 		EnableDynamicResourceAllocation:               featureGate.Enabled(features.DynamicResourceAllocation),
 		EnableVolumeAttributesClass:                   featureGate.Enabled(features.VolumeAttributesClass),
-		EnableCSIMigrationPortworx:                    featureGate.Enabled(features.CSIMigrationPortworx),
 		EnableVolumeLimitScaling:                      featureGate.Enabled(features.VolumeLimitScaling),
 		EnableNodeInclusionPolicyInPodTopologySpread:  featureGate.Enabled(features.NodeInclusionPolicyInPodTopologySpread),
 		EnableMatchLabelKeysInPodTopologySpread:       featureGate.Enabled(features.MatchLabelKeysInPodTopologySpread),

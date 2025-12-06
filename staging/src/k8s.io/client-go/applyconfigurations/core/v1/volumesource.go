@@ -116,8 +116,7 @@ type VolumeSourceApplyConfiguration struct {
 	Projected *ProjectedVolumeSourceApplyConfiguration `json:"projected,omitempty"`
 	// portworxVolume represents a portworx volume attached and mounted on kubelets host machine.
 	// Deprecated: PortworxVolume is deprecated. All operations for the in-tree portworxVolume type
-	// are redirected to the pxd.portworx.com CSI driver when the CSIMigrationPortworx feature-gate
-	// is on.
+	// are redirected to the pxd.portworx.com CSI driver.
 	PortworxVolume *PortworxVolumeSourceApplyConfiguration `json:"portworxVolume,omitempty"`
 	// scaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
 	// Deprecated: ScaleIO is deprecated and the in-tree scaleIO type is no longer supported.
