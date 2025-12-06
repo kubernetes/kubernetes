@@ -43,6 +43,12 @@ type RealFIFOOptions struct {
 	// If set, will be called for objects before enqueueing them. Please
 	// see the comment on TransformFunc for details.
 	Transformer TransformFunc
+
+	// AtomicReplace is used to specify whether the RealFIFO will emit replace
+	// events atomically or not. If it is set, a single ReplacedAtomic delta
+	// event will be sent upon replace, otherwise a set of delete and replace
+	// events will be sent.
+	AtomicReplace bool
 }
 
 const (
@@ -86,6 +92,17 @@ type RealFIFO struct {
 
 	// batchSize determines the maximum number of objects we can combine into a batch.
 	batchSize int
+
+	// emitReplacedAtomic defines whether a replace should only send out one
+	// batch of objects on a replace event call rather than a number of delete
+	// and replace events.
+	emitReplacedAtomic bool
+}
+
+type AtomicInfo struct {
+	Type            DeltaType
+	ResourceVersion string
+	Objects         []interface{}
 }
 
 var (
@@ -167,6 +184,46 @@ func (f *RealFIFO) addToItems_locked(deltaActionType DeltaType, skipTransform bo
 	f.items = append(f.items, Delta{
 		Type:   deltaActionType,
 		Object: obj,
+	})
+	f.cond.Broadcast()
+
+	return nil
+}
+
+// addReplaceToItemsLocked appends to the delta list.
+func (f *RealFIFO) addReplaceToItemsLocked(objs []interface{}, resourceVersion string) error {
+	// Every object comes through this code path once, so this is a good
+	// place to call the transform func.
+	//
+	// If obj is a DeletedFinalStateUnknown tombstone or the action is a Sync,
+	// then the object have already gone through the transformer.
+	//
+	// If the objects already present in the cache are passed to Replace(),
+	// the transformer must be idempotent to avoid re-mutating them,
+	// or coordinate with all readers from the cache to avoid data races.
+	// Default informers do not pass existing objects to Replace.
+	for i, obj := range objs {
+		if f.transformer != nil {
+			_, isTombstone := obj.(DeletedFinalStateUnknown)
+			if !isTombstone {
+				var err error
+				obj, err = f.transformer(obj)
+				if err != nil {
+					return err
+				}
+				objs[i] = obj
+			}
+		}
+	}
+
+	info := AtomicInfo{
+		Type:            Replaced,
+		ResourceVersion: resourceVersion,
+		Objects:         objs,
+	}
+	f.items = append(f.items, Delta{
+		Type:   AtomicEvent,
+		Object: info,
 	})
 	f.cond.Broadcast()
 
@@ -282,12 +339,18 @@ func (f *RealFIFO) PopBatch(process ProcessBatchFunc) error {
 	isInInitialList := !f.hasSynced_locked()
 	unique := sets.NewString()
 	deltas := make([]Delta, 0, min(len(f.items), f.batchSize))
-	// only bundle unique items into a batch
+	// only bundle unique items into a batch, always batch atomic replaces separately.
 	for i := 0; i < f.batchSize && i < len(f.items); i++ {
 		if f.initialPopulationCount > 0 && i >= f.initialPopulationCount {
 			break
 		}
 		item := f.items[i]
+		if item.Type == AtomicEvent {
+			if len(deltas) == 0 {
+				deltas = append(deltas, item)
+			}
+			break
+		}
 		id, err := f.keyOf(item)
 		if err != nil {
 			// close the batch here if error happens
@@ -339,6 +402,15 @@ func (f *RealFIFO) PopBatch(process ProcessBatchFunc) error {
 func (f *RealFIFO) Replace(newItems []interface{}, resourceVersion string) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
+
+	if f.emitReplacedAtomic {
+		f.items = f.items[:0]
+		if !f.populated {
+			f.populated = true
+			f.initialPopulationCount = 1
+		}
+		return f.addReplaceToItemsLocked(newItems, resourceVersion)
+	}
 
 	// determine the keys of everything we're adding.  We cannot add the items until after the synthetic deletes have been
 	// created for items that don't existing in newItems
@@ -514,11 +586,12 @@ func NewRealFIFOWithOptions(opts RealFIFOOptions) *RealFIFO {
 	}
 
 	f := &RealFIFO{
-		items:        make([]Delta, 0, 10),
-		keyFunc:      opts.KeyFunction,
-		knownObjects: opts.KnownObjects,
-		transformer:  opts.Transformer,
-		batchSize:    defaultBatchSize,
+		items:              make([]Delta, 0, 10),
+		keyFunc:            opts.KeyFunction,
+		knownObjects:       opts.KnownObjects,
+		transformer:        opts.Transformer,
+		batchSize:          defaultBatchSize,
+		emitReplacedAtomic: opts.AtomicReplace,
 	}
 
 	f.cond.L = &f.lock
