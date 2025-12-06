@@ -22,6 +22,7 @@ import (
 
 	"github.com/spf13/pflag"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/resourceconfig"
 	serverstore "k8s.io/apiserver/pkg/server/storage"
@@ -70,20 +71,22 @@ func (s *APIEnablementOptions) Validate(registries ...GroupRegistry) []error {
 	errors := []error{}
 	if s.RuntimeConfig[resourceconfig.APIAll] == "false" && len(s.RuntimeConfig) == 1 {
 		// Do not allow only set api/all=false, in such case apiserver startup has no meaning.
-		return append(errors, fmt.Errorf("invalid key with only %v=false", resourceconfig.APIAll))
+		return append(errors, fmt.Errorf("invalid runtime-config with only %v=false", resourceconfig.APIAll))
 	}
 
-	groups, err := resourceconfig.ParseGroups(s.RuntimeConfig)
+	groupVersions, err := resourceconfig.ParseGroupVersions(s.RuntimeConfig)
 	if err != nil {
 		return append(errors, err)
 	}
 
-	for _, registry := range registries {
-		// filter out known groups
-		groups = unknownGroups(groups, registry)
+	unknownGroupVersions := sets.New[string]()
+	for _, groupVersion := range groupVersions {
+		if !isGroupRegistered(groupVersion.Group, registries) {
+			unknownGroupVersions.Insert(groupVersion.String())
+		}
 	}
-	if len(groups) != 0 {
-		errors = append(errors, fmt.Errorf("unknown api groups %s", strings.Join(groups, ",")))
+	if len(unknownGroupVersions) != 0 {
+		errors = append(errors, fmt.Errorf("unknown api groups %s", strings.Join(sets.List(unknownGroupVersions), ",")))
 	}
 
 	return errors
@@ -129,18 +132,17 @@ func (s *APIEnablementOptions) ApplyTo(c *server.Config, defaultResourceConfig *
 	return err
 }
 
-func unknownGroups(groups []string, registry GroupRegistry) []string {
-	unknownGroups := []string{}
-	for _, group := range groups {
-		if !registry.IsGroupRegistered(group) {
-			unknownGroups = append(unknownGroups, group)
-		}
-	}
-	return unknownGroups
-}
-
 // GroupRegistry provides a method to check whether given group is registered.
 type GroupRegistry interface {
-	// IsRegistered returns true if given group is registered.
+	// IsGroupRegistered returns true if given group is registered.
 	IsGroupRegistered(group string) bool
+}
+
+func isGroupRegistered(group string, registries []GroupRegistry) bool {
+	for _, registry := range registries {
+		if registry.IsGroupRegistered(group) {
+			return true
+		}
+	}
+	return false
 }
