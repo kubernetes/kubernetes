@@ -46,6 +46,7 @@ import (
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/cmd/attach"
+	"k8s.io/kubectl/pkg/cmd/debug/lifecycle"
 	"k8s.io/kubectl/pkg/cmd/exec"
 	"k8s.io/kubectl/pkg/cmd/logs"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -187,6 +188,10 @@ func NewCmdDebug(restClientGetter genericclioptions.RESTClientGetter, streams ge
 	}
 
 	o.AddFlags(cmd)
+
+	// Add subcommands after flags to ensure they work independently
+	cmd.AddCommand(lifecycle.NewCmdLifecycle(restClientGetter, streams))
+
 	return cmd
 }
 
