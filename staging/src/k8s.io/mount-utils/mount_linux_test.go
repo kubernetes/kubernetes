@@ -65,6 +65,32 @@ func TestReadProcMountsFrom(t *testing.T) {
 		t.Errorf("got unexpected MountPoint[2]: %#v", mounts[2])
 	}
 
+	// Test case for WSL/Windows paths with spaces in mount options.
+	// In WSL, mount options can contain unescaped spaces like "path=C:\Program Files\Docker".
+	// The parser should handle this by treating everything between type and the last two
+	// numeric fields (dump and pass) as mount options.
+	wslCase := `C:\134Program\040Files /Docker/host 9p rw,noatime,aname=drvfs;path=C:\Program Files\Docker 0 0
+`
+	wslMounts, err := parseProcMounts([]byte(wslCase))
+	if err != nil {
+		t.Errorf("expected success for WSL case, got %v", err)
+	}
+	if len(wslMounts) != 1 {
+		t.Fatalf("expected 1 mount for WSL case, got %d", len(wslMounts))
+	}
+	// The options field includes the space-separated parts joined back together
+	wslExpected := MountPoint{
+		Device: `C:\134Program\040Files`,
+		Path:   "/Docker/host",
+		Type:   "9p",
+		Opts:   []string{"rw", "noatime", `aname=drvfs;path=C:\Program Files\Docker`},
+		Freq:   0,
+		Pass:   0,
+	}
+	if !mountPointsEqual(&wslMounts[0], &wslExpected) {
+		t.Errorf("got unexpected MountPoint for WSL case: %#v, expected: %#v", wslMounts[0], wslExpected)
+	}
+
 	errorCases := []string{
 		"/dev/0 /path/to/mount\n",
 		"/dev/1 /path/to/mount type flags a 0\n",
