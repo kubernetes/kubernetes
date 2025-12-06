@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"runtime"
+	"sort"
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
@@ -149,25 +150,42 @@ func (c *nodeInfoCache) needsUpdate(pods []*v1.Pod, node *v1.Node) bool {
 // getPodResourceHash creates a hash of pod's resource-related fields
 func getPodResourceHash(pod *v1.Pod) string {
 	// Track key resource fields that affect NodeInfo
-	// - Container requests/limits
+	// - Container requests/limits (including extended resources like GPUs)
 	// - Pod phase/status
 	// - Allocated resources (for in-place resize)
 	hash := string(pod.Status.Phase)
-	for _, container := range pod.Spec.Containers {
-		if container.Resources.Requests != nil {
-			hash += container.Resources.Requests.Cpu().String()
-			hash += container.Resources.Requests.Memory().String()
+
+	// Helper to append all resources from a ResourceList to the hash
+	// This ensures extended resources (e.g., nvidia.com/gpu) are also tracked
+	// Sort resource names for deterministic hash (map iteration order is random)
+	appendResources := func(rl v1.ResourceList) {
+		if rl == nil {
+			return
 		}
+		// Sort resource names to ensure deterministic hash
+		names := make([]string, 0, len(rl))
+		for rName := range rl {
+			names = append(names, string(rName))
+		}
+		sort.Strings(names)
+		for _, name := range names {
+			quant := rl[v1.ResourceName(name)]
+			hash += name + ":" + quant.String() + ";"
+		}
+	}
+
+	for _, container := range pod.Spec.Containers {
+		appendResources(container.Resources.Requests)
+	}
+	for _, container := range pod.Spec.InitContainers {
+		appendResources(container.Resources.Requests)
 	}
 	// Include allocated resources if present (in-place resize)
 	if pod.Status.Resize != "" {
 		hash += string(pod.Status.Resize)
 	}
 	for _, containerStatus := range pod.Status.ContainerStatuses {
-		if containerStatus.AllocatedResources != nil {
-			hash += containerStatus.AllocatedResources.Cpu().String()
-			hash += containerStatus.AllocatedResources.Memory().String()
-		}
+		appendResources(containerStatus.AllocatedResources)
 	}
 	return hash
 }
@@ -566,7 +584,7 @@ func generalFilter(logger klog.Logger, pod *v1.Pod, nodeInfo *schedulerframework
 	}
 
 	// Check taint/toleration except for static pods
-	if !types.IsStaticPod(pod) {
+	if !kubetypes.IsStaticPod(pod) {
 		_, isUntolerated := corev1.FindMatchingUntoleratedTaint(logger, nodeInfo.Node().Spec.Taints, pod.Spec.Tolerations, func(t *v1.Taint) bool {
 			// Kubelet is only interested in the NoExecute taint.
 			return t.Effect == v1.TaintEffectNoExecute

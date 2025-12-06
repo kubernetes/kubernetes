@@ -17,6 +17,7 @@ limitations under the License.
 package lifecycle
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -47,7 +48,7 @@ func BenchmarkAdmitWithCacheHit(b *testing.B) {
 			testPod := makeBenchPod("test-pod", 100, 1000000000)
 
 			handler := NewPredicateAdmitHandler(
-				func() (*v1.Node, error) { return node, nil },
+				func(ctx context.Context, useCache bool) (*v1.Node, error) { return node, nil },
 				nil,
 				func(_ *schedulerframework.NodeInfo, attrs *PodAdmitAttributes) error { return nil },
 			)
@@ -91,7 +92,7 @@ func BenchmarkAdmitWithCacheMiss(b *testing.B) {
 			testPod := makeBenchPod("test-pod", 100, 1000000000)
 
 			handler := NewPredicateAdmitHandler(
-				func() (*v1.Node, error) { return node, nil },
+				func(ctx context.Context, useCache bool) (*v1.Node, error) { return node, nil },
 				nil,
 				func(_ *schedulerframework.NodeInfo, attrs *PodAdmitAttributes) error { return nil },
 			)
@@ -135,7 +136,7 @@ func BenchmarkAdmitNoCacheBaseline(b *testing.B) {
 			testPod := makeBenchPod("test-pod", 100, 1000000000)
 
 			handler := NewPredicateAdmitHandler(
-				func() (*v1.Node, error) { return node, nil },
+				func(ctx context.Context, useCache bool) (*v1.Node, error) { return node, nil },
 				nil,
 				func(_ *schedulerframework.NodeInfo, attrs *PodAdmitAttributes) error { return nil },
 			)

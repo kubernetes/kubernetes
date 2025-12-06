@@ -960,4 +960,50 @@ func TestNodeInfoCache(t *testing.T) {
 			t.Error("Expected cache to need update after invalidation")
 		}
 	})
+
+	t.Run("cache needs update when extended resources change", func(t *testing.T) {
+		// Create a pod with extended resources (e.g., GPU)
+		podWithGPU := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				UID:             "pod-gpu",
+				Name:            "pod-gpu",
+				Namespace:       "default",
+				ResourceVersion: "200",
+				Generation:      1,
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name: "gpu-container",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
+								v1.ResourceMemory: *resource.NewQuantity(512*1024*1024, resource.BinarySI),
+								extendedResourceA: *resource.NewQuantity(2, resource.DecimalSI),
+							},
+						},
+					},
+				},
+			},
+			Status: v1.PodStatus{
+				Phase: v1.PodRunning,
+			},
+		}
+
+		cache := newNodeInfoCache()
+		pods := []*v1.Pod{podWithGPU}
+
+		nodeInfo := schedulerframework.NewNodeInfo(pods...)
+		nodeInfo.SetNode(node)
+		cache.update(pods, node, nodeInfo)
+
+		// Change extended resource quantity
+		podWithGPUUpdated := podWithGPU.DeepCopy()
+		podWithGPUUpdated.Spec.Containers[0].Resources.Requests[extendedResourceA] = *resource.NewQuantity(4, resource.DecimalSI)
+		podsWithUpdate := []*v1.Pod{podWithGPUUpdated}
+
+		if !cache.needsUpdate(podsWithUpdate, node) {
+			t.Error("Expected cache to need update when extended resources change")
+		}
+	})
 }
