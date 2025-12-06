@@ -677,6 +677,11 @@ See https://kubernetes.io/docs/reference/using-api/server-side-apply/#conflicts`
 		return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving modified configuration from:\n%s\nfor:", info.String()), info.Source, err)
 	}
 
+	// Save the original object from the manifest before info.Get() potentially
+	// replaces it with the server state. This is needed for dry-run=client to
+	// print the manifest values, not the current server state.
+	originalObject := info.Object.DeepCopyObject()
+
 	if err := info.Get(); err != nil {
 		if !errors.IsNotFound(err) {
 			return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving current configuration of:\n%s\nfrom server for:", info.String()), info.Source, err)
@@ -754,6 +759,14 @@ See https://kubernetes.io/docs/reference/using-api/server-side-apply/#conflicts`
 				return err
 			}
 			return nil
+		}
+	} else {
+		info.Object = originalObject
+		if err := util.CreateApplyAnnotation(info.Object, unstructured.UnstructuredJSONScheme); err != nil {
+			return cmdutil.AddSourceToErr("creating", info.Source, err)
+		}
+		if u, ok := info.Object.(runtime.Unstructured); ok {
+			pruneNullsFromMap(u.UnstructuredContent())
 		}
 	}
 

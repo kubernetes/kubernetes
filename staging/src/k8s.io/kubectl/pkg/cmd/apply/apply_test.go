@@ -2204,6 +2204,62 @@ func TestDontAllowForceApplyWithServerSide(t *testing.T) {
 	t.Fatalf(`expected error "%s"`, expectedError)
 }
 
+func TestApplyDryRunClientOutputsManifestValues(t *testing.T) {
+	cmdtesting.InitTestErrorHandler(t)
+
+	serverSvc := &unstructured.Unstructured{
+		Object: map[string]any{
+			"apiVersion": "v1",
+			"kind":       "Service",
+			"metadata": map[string]any{
+				"name":      "test-service",
+				"namespace": "test",
+			},
+			"spec": map[string]any{
+				"ports":     []any{map[string]any{"port": int64(9999)}},
+				"clusterIP": "10.0.0.42",
+			},
+		},
+	}
+	serverSvcBytes, err := runtime.Encode(unstructured.UnstructuredJSONScheme, serverSvc)
+	require.NoError(t, err)
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			if req.URL.Path == "/namespaces/test/services/test-service" && req.Method == "GET" {
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader(serverSvcBytes))}, nil
+			}
+			t.Fatalf("unexpected request: %s %s", req.Method, req.URL.Path)
+			return nil, nil
+		}),
+	}
+	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
+
+	ioStreams, _, buf, errBuf := genericiooptions.NewTestIOStreams()
+	cmd := NewCmdApply("kubectl", tf, ioStreams)
+	cmd.Flags().Set("filename", filenameSVC)
+	cmd.Flags().Set("dry-run", "client")
+	cmd.Flags().Set("output", "json")
+	cmd.Run(cmd, []string{})
+
+	require.Empty(t, errBuf.String(), "unexpected error output")
+
+	result := &unstructured.Unstructured{}
+	require.NoError(t, result.UnmarshalJSON(buf.Bytes()))
+
+	ports, _, _ := unstructured.NestedSlice(result.Object, "spec", "ports")
+	require.Len(t, ports, 1)
+	port, _, _ := unstructured.NestedInt64(ports[0].(map[string]any), "port")
+	assert.Equal(t, int64(80), port, "port should be from client-side manifest, not server")
+
+	_, found, _ := unstructured.NestedString(result.Object, "spec", "clusterIP")
+	assert.False(t, found, "clusterIP should not be present (server-only field)")
+}
+
 func TestDontAllowApplyWithPodGeneratedName(t *testing.T) {
 	expectedError := "error: from testing-: cannot use generate name with apply"
 	cmdutil.BehaviorOnFatal(func(str string, code int) {
