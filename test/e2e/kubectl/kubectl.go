@@ -2138,7 +2138,9 @@ metadata:
 		})
 		ginkgo.It("GET on status subresource of built-in type (node) returns identical info as GET on the built-in type", func(ctx context.Context) {
 			ginkgo.By("first listing nodes in the cluster, and using first node of the list")
-			nodes, err := c.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+			nodes, err := c.CoreV1().Nodes().List(ctx, metav1.ListOptions{
+				FieldSelector: "spec.unschedulable=false",
+			})
 			framework.ExpectNoError(err)
 			gomega.Expect(nodes.Items).ToNot(gomega.BeEmpty())
 			node := nodes.Items[0]
