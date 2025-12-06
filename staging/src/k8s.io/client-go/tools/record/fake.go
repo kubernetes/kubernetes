@@ -51,24 +51,35 @@ func annotationsString(annotations map[string]string) string {
 		return " " + fmt.Sprint(annotations)
 	}
 }
+func labelsString(labels map[string]string) string {
+	if len(labels) == 0 {
+		return ""
+	} else {
+		return " " + fmt.Sprint(labels)
+	}
+}
 
-func (f *FakeRecorder) writeEvent(object runtime.Object, annotations map[string]string, eventtype, reason, messageFmt string, args ...interface{}) {
+func (f *FakeRecorder) writeEvent(object runtime.Object, labels, annotations map[string]string, eventtype, reason, messageFmt string, args ...interface{}) {
 	if f.Events != nil {
 		f.Events <- fmt.Sprintf(eventtype+" "+reason+" "+messageFmt, args...) +
-			objectString(object, f.IncludeObject) + annotationsString(annotations)
+			objectString(object, f.IncludeObject) + annotationsString(annotations) + labelsString(labels)
 	}
 }
 
 func (f *FakeRecorder) Event(object runtime.Object, eventtype, reason, message string) {
-	f.writeEvent(object, nil, eventtype, reason, "%s", message)
+	f.writeEvent(object, nil, nil, eventtype, reason, "%s", message)
 }
 
 func (f *FakeRecorder) Eventf(object runtime.Object, eventtype, reason, messageFmt string, args ...interface{}) {
-	f.writeEvent(object, nil, eventtype, reason, messageFmt, args...)
+	f.writeEvent(object, nil, nil, eventtype, reason, messageFmt, args...)
 }
 
 func (f *FakeRecorder) AnnotatedEventf(object runtime.Object, annotations map[string]string, eventtype, reason, messageFmt string, args ...interface{}) {
-	f.writeEvent(object, annotations, eventtype, reason, messageFmt, args...)
+	f.writeEvent(object, nil, annotations, eventtype, reason, messageFmt, args...)
+}
+
+func (f *FakeRecorder) LabeledAnnotatedEventf(object runtime.Object, labels, annotations map[string]string, eventtype, reason, messageFmt string, args ...interface{}) {
+	f.writeEvent(object, labels, annotations, eventtype, reason, messageFmt, args...)
 }
 
 func (f *FakeRecorder) WithLogger(logger klog.Logger) EventRecorderLogger {
