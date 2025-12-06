@@ -32,6 +32,9 @@ func (kc *kubeletConfig) Mutate() error {
 	if err := mutateResolverConfig(&kc.config, isServiceActive); err != nil {
 		return err
 	}
+	if err := mutateStaticPodPath(&kc.config); err != nil {
+		return err
+	}
 	return nil
 }
 

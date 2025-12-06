@@ -17,6 +17,7 @@ limitations under the License.
 package componentconfigs
 
 import (
+	"os"
 	"path/filepath"
 
 	clientset "k8s.io/client-go/kubernetes"
@@ -195,4 +196,15 @@ func (kc *kubeletConfig) Default(cfg *kubeadmapi.ClusterConfiguration, _ *kubead
 		klog.V(1).Infof("the value of KubeletConfiguration.cgroupDriver is empty; setting it to %q", constants.CgroupDriverSystemd)
 		kc.config.CgroupDriver = constants.CgroupDriverSystemd
 	}
+}
+
+func mutateStaticPodPath(cfg *kubeletconfig.KubeletConfiguration) error {
+	if _, err := os.Stat(cfg.StaticPodPath); err != nil {
+		if os.IsNotExist(err) && cfg.StaticPodPath == kubeadmapiv1.DefaultManifestsDir {
+			// kubelet will complain if the StaticPodPath is set to a non-existent path
+			// TODO: should we create the directory instead? we can't tell here if the value is our default or user-provided
+			cfg.StaticPodPath = ""
+		}
+	}
+	return nil
 }
