@@ -237,9 +237,24 @@ func ValidateVolumeAttachmentUpdate(new, old *storage.VolumeAttachment) field.Er
 
 	// Spec is read-only
 	// If this ever relaxes in the future, make sure to increment the Generation number in PrepareForUpdate
-	if !apiequality.Semantic.DeepEqual(old.Spec, new.Spec) {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec"), new.Spec, "field is immutable"))
+	if old.Spec.Attacher != new.Spec.Attacher {
+		err := field.Invalid(
+			field.NewPath("spec", "attacher"),
+			new.Spec.Attacher,
+			"field is immutable",
+		).WithOrigin("immutable").MarkCoveredByDeclarative()
+
+		allErrs = append(allErrs, err)
+
+	} else if !apiequality.Semantic.DeepEqual(old.Spec, new.Spec) {
+		err := field.Invalid(
+			field.NewPath("spec"),
+			new.Spec,
+			"field is immutable",
+		)
+		allErrs = append(allErrs, err)
 	}
+
 	return allErrs
 }
 

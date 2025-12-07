@@ -165,6 +165,7 @@ type VolumeAttachmentSpec struct {
 	// +k8s:required
 	// +k8s:validation:MaxLength=63
 	// +k8s:format="k8s-long-name-caseless"
+	// +k8s:immutable
 	Attacher string `json:"attacher" protobuf:"bytes,1,opt,name=attacher"`
 
 	// source represents the volume that should be attached.
