@@ -58,3 +58,63 @@ For example:
 
 Some of the definitions may have these extensions. For more information about PatchStrategy and PatchMergeKey see
 [strategic-merge-patch](https://git.k8s.io/community/contributors/devel/sig-api-machinery/strategic-merge-patch.md).
+
+
+### `x-kubernetes-list-type`
+
+Indicates how lists are interpreted and merged. Valid values include:
+
+atomic – the entire list is treated as a single scalar value
+
+map – the list is treated as a map, using x-kubernetes-list-map-keys
+
+set – items are treated as a set
+
+Example:
+
+type: object
+properties:
+  ports:
+    type: array
+    x-kubernetes-list-type: map
+    x-kubernetes-list-map-keys:
+      - name
+
+### `x-kubernetes-list-map-keys`
+
+Used together with x-kubernetes-list-type: map.
+Specifies which fields of list items should be used as the map key (i.e., the unique identifier for merging).
+
+Example:
+
+type: object
+properties:
+  ports:
+    type: array
+    x-kubernetes-list-type: map
+    x-kubernetes-list-map-keys:
+      - name
+
+### `x-kubernetes-unions`
+
+Represents union (one-of) semantics in OpenAPI schemas, allowing only one field in the union to be set at a time.
+Used for modeling discriminated union types.
+
+Example:
+
+type: object
+x-kubernetes-unions:
+  - discriminator: type
+    fields:
+      foo: FooType
+      bar: BarType
+properties:
+  type:
+    type: string
+    enum:
+      - Foo
+      - Bar
+  foo:
+    $ref: "#/definitions/FooType"
+  bar:
+    $ref: "#/definitions/BarType"
