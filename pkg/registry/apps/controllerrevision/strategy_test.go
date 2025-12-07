@@ -22,6 +22,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -161,4 +162,49 @@ func newRawExtensionFromObject(obj runtime.Object) runtime.RawExtension {
 }
 func newObject() runtime.RawExtension {
 	return newRawExtensionFromObject(newStatefulSet())
+}
+
+func TestStrategy_Validate_DeclarativeValidationPath(t *testing.T) {
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewContext(), &genericapirequest.RequestInfo{
+		APIGroup:   "apps",
+		APIVersion: "v1",
+		Resource:   "controllerrevisions",
+		Verb:       "create",
+	})
+
+	valid := newControllerRevision("test-declarative", "default", newObject(), 0)
+
+	errs := Strategy.Validate(ctx, valid)
+	for _, err := range errs {
+		if err.Type == field.ErrorTypeInternal && err.Field == "" {
+			t.Errorf("Got internal error from declarative validation (missing requestInfo): %v", err)
+		}
+	}
+
+	if len(errs) > 0 {
+		t.Errorf("Expected no validation errors with proper context for declarative validation, got: %v", errs)
+	}
+}
+
+func TestStrategy_ValidateUpdate_DeclarativeValidationPath(t *testing.T) {
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewContext(), &genericapirequest.RequestInfo{
+		APIGroup:   "apps",
+		APIVersion: "v1",
+		Resource:   "controllerrevisions",
+		Verb:       "update",
+	})
+
+	oldRev := newControllerRevision("test-declarative-update", "default", newObject(), 0)
+	newRev := newControllerRevision("test-declarative-update", "default", newObject(), 1)
+
+	errs := Strategy.ValidateUpdate(ctx, newRev, oldRev)
+	for _, err := range errs {
+		if err.Type == field.ErrorTypeInternal && err.Field == "" {
+			t.Errorf("Got internal error from declarative validation (missing requestInfo): %v", err)
+		}
+	}
+
+	if len(errs) > 0 {
+		t.Errorf("Expected no validation errors for revision update with proper context for declarative validation, got: %v", errs)
+	}
 }
