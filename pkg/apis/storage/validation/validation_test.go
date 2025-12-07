@@ -560,6 +560,55 @@ func TestVolumeAttachmentUpdateValidation(t *testing.T) {
 	}
 }
 
+func TestVolumeAttachmentValidationV1(t *testing.T) {
+	volumeName := "pv-name"
+	invalidVolumeName := "-invalid-@#$%^&*()-"
+	successCases := []storage.VolumeAttachment{{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+		Spec: storage.VolumeAttachmentSpec{
+			Attacher: "myattacher",
+			Source: storage.VolumeAttachmentSource{
+				PersistentVolumeName: &volumeName,
+			},
+			NodeName: "mynode",
+		},
+	}}
+
+	for _, volumeAttachment := range successCases {
+		if errs := ValidateVolumeAttachment(&volumeAttachment); len(errs) != 0 {
+			t.Errorf("expected success: %+v", errs)
+		}
+	}
+
+	errorCases := []storage.VolumeAttachment{{
+		// Invalid attacher name
+		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+		Spec: storage.VolumeAttachmentSpec{
+			Attacher: "invalid-@#$%^&*()",
+			NodeName: "mynode",
+			Source: storage.VolumeAttachmentSource{
+				PersistentVolumeName: &volumeName,
+			},
+		},
+	}, {
+		// Invalid PV name
+		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+		Spec: storage.VolumeAttachmentSpec{
+			Attacher: "myattacher",
+			NodeName: "mynode",
+			Source: storage.VolumeAttachmentSource{
+				PersistentVolumeName: &invalidVolumeName,
+			},
+		},
+	}}
+
+	for _, volumeAttachment := range errorCases {
+		if errs := ValidateVolumeAttachment(&volumeAttachment); len(errs) == 0 {
+			t.Errorf("Expected failure for test: %+v", volumeAttachment)
+		}
+	}
+}
+
 func makeClass(mode *storage.VolumeBindingMode, topologies []api.TopologySelectorTerm) *storage.StorageClass {
 	return &storage.StorageClass{
 		ObjectMeta:        metav1.ObjectMeta{Name: "foo", ResourceVersion: "foo"},
