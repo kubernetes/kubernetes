@@ -263,6 +263,11 @@ func CollectData(items []v1.DownwardAPIVolumeFile, pod *v1.Pod, host volume.Volu
 			nodeAllocatable, err := host.GetNodeAllocatable()
 			if err != nil {
 				errlist = append(errlist, err)
+			} else if fileInfo.ResourceFieldRef.Resource == "status.cpuset" {
+				exclusive := host.GetExclusiveCPUs(string(pod.UID), containerName)
+				values := fmt.Sprintf("%v", exclusive)
+				fileProjection.Data = []byte(values)
+				klog.V(3).Infof("downwardAPI volume exclusive CPUs for pod %s/%s container %s: %s", pod.Namespace, pod.Name, containerName, values)
 			} else if values, err := resource.ExtractResourceValueByContainerNameAndNodeAllocatable(fileInfo.ResourceFieldRef, pod, containerName, nodeAllocatable); err != nil {
 				klog.Errorf("Unable to extract field %s: %s", fileInfo.ResourceFieldRef.Resource, err.Error())
 				errlist = append(errlist, err)

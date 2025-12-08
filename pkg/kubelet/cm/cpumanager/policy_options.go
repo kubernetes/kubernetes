@@ -19,6 +19,7 @@ package cpumanager
 import (
 	"fmt"
 	"strconv"
+	"time"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -35,12 +36,14 @@ const (
 	DistributeCPUsAcrossCoresOption string = "distribute-cpus-across-cores"
 	StrictCPUReservationOption      string = "strict-cpu-reservation"
 	PreferAlignByUnCoreCacheOption  string = "prefer-align-cpus-by-uncorecache"
+	ScaleDownDelayTimeOption		string = "scale-down-delay-time"
 )
 
 var (
 	alphaOptions = sets.New[string](
 		AlignBySocketOption,
 		DistributeCPUsAcrossCoresOption,
+		ScaleDownDelayTimeOption,
 	)
 	betaOptions = sets.New[string](
 		DistributeCPUsAcrossNUMAOption,
@@ -97,6 +100,10 @@ type StaticPolicyOptions struct {
 	// Flag that makes best-effort to align CPUs to a uncorecache boundary
 	// As long as there are CPUs available, pods will be admitted if the condition is not met.
 	PreferAlignByUncoreCacheOption bool
+	// ScaleDownDelayTime specifies the delay before initiating a downsize CPUs operation for containers.
+	// It can be expressed as a Go duration string (e.g., "5s", "500ms") or as an integer representing milliseconds.
+	// The maximum allowed value is 10 seconds. If set to 0, no delay is applied, and the scale-down occurs immediately.
+	ScaleDownDelayTime time.Duration
 }
 
 // NewStaticPolicyOptions creates a StaticPolicyOptions struct from the user configuration.
@@ -144,6 +151,15 @@ func NewStaticPolicyOptions(policyOptions map[string]string) (StaticPolicyOption
 				return opts, fmt.Errorf("bad value for option %q: %w", name, err)
 			}
 			opts.PreferAlignByUncoreCacheOption = optValue
+		case ScaleDownDelayTimeOption:
+			optValue, err := time.ParseDuration(value)
+			if err != nil {
+				return opts, fmt.Errorf("bad value for option %q: %w", name, err)
+			}
+			if optValue > 10*time.Second {
+				return opts, fmt.Errorf("bad value for option %q: scale-down-delay-time cannot exceed 10s", name)
+			}
+			opts.ScaleDownDelayTime = optValue
 		default:
 			// this should never be reached, we already detect unknown options,
 			// but we keep it as further safety.

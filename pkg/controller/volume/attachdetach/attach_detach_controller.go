@@ -830,6 +830,10 @@ func (adc *attachDetachController) GetNodeAllocatable() (v1.ResourceList, error)
 	return v1.ResourceList{}, nil
 }
 
+func (adc *attachDetachController) GetExclusiveCPUs(podUID, containerName string) []int64  {
+	return []int64{}
+}
+
 func (adc *attachDetachController) GetAttachedVolumesFromNodeStatus() (map[v1.UniqueVolumeName]string, error) {
 	return map[v1.UniqueVolumeName]string{}, nil
 }

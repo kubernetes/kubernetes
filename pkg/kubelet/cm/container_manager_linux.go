@@ -613,6 +613,7 @@ func (cm *containerManagerImpl) Start(ctx context.Context, node *v1.Node,
 	sourcesReady config.SourcesReady,
 	podStatusProvider status.PodStatusProvider,
 	runtimeService internalapi.RuntimeService,
+	runtimeHelper kubecontainer.RuntimeHelper,
 	localStorageCapacityIsolation bool) error {
 	logger := klog.FromContext(ctx)
 
@@ -627,7 +628,7 @@ func (cm *containerManagerImpl) Start(ctx context.Context, node *v1.Node,
 	}
 
 	// Initialize CPU manager
-	err := cm.cpuManager.Start(ctx, cpumanager.ActivePodsFunc(activePods), sourcesReady, podStatusProvider, runtimeService, containerMap.Clone())
+	err := cm.cpuManager.Start(ctx, cpumanager.ActivePodsFunc(activePods), sourcesReady, podStatusProvider, runtimeService, runtimeHelper, containerMap.Clone())
 	if err != nil {
 		return fmt.Errorf("start cpu manager error: %w", err)
 	}
@@ -989,6 +990,13 @@ func (cm *containerManagerImpl) GetAllocatableCPUs() []int64 {
 		return int64Slice(cm.cpuManager.GetAllocatableCPUs().UnsortedList())
 	}
 	return []int64{}
+}
+
+func (cm *containerManagerImpl) IsCPUSetUpdateInProgress(pod *v1.Pod) bool {
+	if cm.cpuManager != nil {
+		return cm.cpuManager.IsCPUSetUpdateInProgress(pod)
+	}
+	return false
 }
 
 func (cm *containerManagerImpl) GetMemory(podUID, containerName string) []*podresourcesapi.ContainerMemory {

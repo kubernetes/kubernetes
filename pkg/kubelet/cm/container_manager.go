@@ -67,7 +67,7 @@ type ContainerManager interface {
 	// Runs the container manager's housekeeping.
 	// - Ensures that the Docker daemon is in a container.
 	// - Creates the system container where all non-containerized processes run.
-	Start(context.Context, *v1.Node, ActivePodsFunc, GetNodeFunc, config.SourcesReady, status.PodStatusProvider, internalapi.RuntimeService, bool) error
+	Start(context.Context, *v1.Node, ActivePodsFunc, GetNodeFunc, config.SourcesReady, status.PodStatusProvider, internalapi.RuntimeService, kubecontainer.RuntimeHelper, bool) error
 
 	// SystemCgroupsLimit returns resources allocated to system cgroups in the machine.
 	// These cgroups include the system and Kubernetes services.
@@ -161,6 +161,9 @@ type ContainerManager interface {
 
 	// ContainerHasExclusiveCPUs returns true if the provided container in the pod has exclusive cpu
 	ContainerHasExclusiveCPUs(pod *v1.Pod, container *v1.Container) bool
+
+	// IsCPUSetUpdateInProgress return true if any container in the pod has not updated its cpuset
+	IsCPUSetUpdateInProgress(pod *v1.Pod) bool
 
 	// Implements the PodResources Provider API
 	podresources.CPUsProvider

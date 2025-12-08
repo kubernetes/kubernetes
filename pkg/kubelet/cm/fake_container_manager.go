@@ -68,7 +68,7 @@ func NewFakeContainerManagerWithNodeConfig(nodeConfig NodeConfig) *FakeContainer
 	}
 }
 
-func (cm *FakeContainerManager) Start(_ context.Context, _ *v1.Node, _ ActivePodsFunc, _ GetNodeFunc, _ config.SourcesReady, _ status.PodStatusProvider, _ internalapi.RuntimeService, _ bool) error {
+func (cm *FakeContainerManager) Start(_ context.Context, _ *v1.Node, _ ActivePodsFunc, _ GetNodeFunc, _ config.SourcesReady, _ status.PodStatusProvider, _ internalapi.RuntimeService, _ kubecontainer.RuntimeHelper, _ bool) error {
 	cm.Lock()
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "Start")
@@ -241,6 +241,13 @@ func (cm *FakeContainerManager) GetAllocatableCPUs() []int64 {
 	cm.Lock()
 	defer cm.Unlock()
 	return nil
+}
+
+func (cm *FakeContainerManager) IsCPUSetUpdateInProgress(pod *v1.Pod) bool {
+	cm.Lock()
+	defer cm.Unlock()
+	cm.CalledFunctions = append(cm.CalledFunctions, "IsCPUSetUpdateInProgress")
+	return false
 }
 
 func (cm *FakeContainerManager) GetMemory(_, _ string) []*podresourcesapi.ContainerMemory {

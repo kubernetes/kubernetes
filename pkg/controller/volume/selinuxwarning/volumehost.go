@@ -83,6 +83,10 @@ func (c *Controller) GetNodeAllocatable() (v1.ResourceList, error) {
 	return v1.ResourceList{}, nil
 }
 
+func (c *Controller) GetExclusiveCPUs(podUID, containerName string) []int64  {
+	return []int64{}
+}
+
 func (c *Controller) GetAttachedVolumesFromNodeStatus() (map[v1.UniqueVolumeName]string, error) {
 	return map[v1.UniqueVolumeName]string{}, nil
 }
