@@ -57,7 +57,7 @@ type Manager interface {
 	// Start is called during Kubelet initialization.
 	// Start takes a `Context` because it may possibly spin the reconcileState helper, which in turn
 	// needs to update container state, which takes a context.
-	Start(ctx context.Context, activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error
+	Start(ctx context.Context, activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, runtimeHelper kubecontainer.RuntimeHelper, initialContainers containermap.ContainerMap) error
 
 	// Called to trigger the allocation of CPUs to a container. This must be
 	// called at some point prior to the AddContainer() call for a container,
@@ -100,6 +100,12 @@ type Manager interface {
 	// GetAllCPUs returns all the CPUs known by cpumanager, as reported by the
 	// hardware discovery. Maps to the CPU capacity.
 	GetAllCPUs() cpuset.CPUSet
+
+	// Return true if any container in the pod has not updated its cpuset.
+	IsCPUSetUpdateInProgress(pod *v1.Pod) bool
+
+	// GetAssignments returns the current allocated CPU for the specified pod and container.
+	GetAssignments(podUID, containerName string) string
 }
 
 type manager struct {
@@ -149,6 +155,9 @@ type manager struct {
 	// allocatableCPUs is the set of online CPUs as reported by the system,
 	// and available for allocation, minus the reserved set
 	allocatableCPUs cpuset.CPUSet
+
+	// RuntimeHelper that wraps kubelet to generate runtime container options.
+	runtimeHelper kubecontainer.RuntimeHelper
 }
 
 var _ Manager = &manager{}
@@ -220,7 +229,7 @@ func NewManager(logger logr.Logger, cpuPolicyName string, cpuPolicyOptions map[s
 	return manager, nil
 }
 
-func (m *manager) Start(ctx context.Context, activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error {
+func (m *manager) Start(ctx context.Context, activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, runtimeHelper kubecontainer.RuntimeHelper, initialContainers containermap.ContainerMap) error {
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting", "policy", m.policy.Name())
 	logger.Info("Reconciling", "reconcilePeriod", m.reconcilePeriod)
@@ -228,6 +237,7 @@ func (m *manager) Start(ctx context.Context, activePods ActivePodsFunc, sourcesR
 	m.activePods = activePods
 	m.podStatusProvider = podStatusProvider
 	m.containerRuntime = containerRuntime
+	m.runtimeHelper = runtimeHelper
 	m.containerMap = initialContainers
 
 	stateImpl, err := state.NewCheckpointState(logger, m.stateFileDirectory, cpuManagerStateFileName, m.policy.Name(), m.containerMap)
@@ -423,7 +433,7 @@ func (m *manager) reconcileState(ctx context.Context) (success []reconciledConta
 	failure = []reconciledContainer{}
 
 	rootLogger := klog.FromContext(ctx)
-
+	m.policy.ReleaseTimedOutScaleDownCPUs(rootLogger, m.state)
 	m.removeStaleState(rootLogger)
 	for _, pod := range m.activePods() {
 		podLogger := klog.LoggerWithValues(rootLogger, "pod", klog.KObj(pod))
@@ -492,7 +502,7 @@ func (m *manager) reconcileState(ctx context.Context) (success []reconciledConta
 
 			lcset := m.lastUpdateState.GetCPUSetOrDefault(string(pod.UID), container.Name)
 			if !cset.Equals(lcset) {
-				logger.V(5).Info("updating container", "containerID", containerID, "cpuSet", cset)
+				logger.V(5).Info("updating container", "containerID", containerID, "cpuSet", cset, "lcset", lcset)
 				err = m.updateContainerCPUSet(ctx, containerID, cset)
 				if err != nil {
 					logger.Error(err, "failed to update container", "containerID", containerID, "cpuSet", cset)
@@ -500,6 +510,11 @@ func (m *manager) reconcileState(ctx context.Context) (success []reconciledConta
 					continue
 				}
 				m.lastUpdateState.SetCPUSet(string(pod.UID), container.Name, cset)
+				// After updating the container's exclusive CPU set, trigger the SyncLoop (PLEG) by setting the PLEG condition to check and clear the pod resize in progress.
+				exclusiveCPUSet, exist := m.state.GetCPUSet(string(pod.UID), container.Name)
+				if exist && exclusiveCPUSet.Equals(cset) {
+					m.runtimeHelper.SetPodWatchCondition(pod.UID, "reconcileState", func(*kubecontainer.PodStatus) bool { return true })
+				}
 			}
 			success = append(success, reconciledContainer{pod.Name, container.Name, containerID})
 		}
@@ -542,4 +557,22 @@ func (m *manager) GetExclusiveCPUs(podUID, containerName string) cpuset.CPUSet {
 
 func (m *manager) GetCPUAffinity(podUID, containerName string) cpuset.CPUSet {
 	return m.state.GetCPUSetOrDefault(podUID, containerName)
+}
+
+func (m *manager) IsCPUSetUpdateInProgress(pod *v1.Pod) bool {
+	for _, container := range pod.Spec.Containers {
+		cset, csetExist := m.state.GetCPUSet(string(pod.UID), container.Name)
+		lcset, lcsetExist := m.lastUpdateState.GetCPUSet(string(pod.UID), container.Name)
+		if csetExist && lcsetExist && !cset.Equals(lcset) {
+			return true
+		}
+		if m.policy.IsDuringScaleDownDelay(string(pod.UID), container.Name) {
+			return true
+		}
+	}
+	return false
+}
+
+func (m *manager) GetAssignments(podUID, containerName string) string {
+	return m.policy.GetAssignments(m.state, podUID, containerName)
 }

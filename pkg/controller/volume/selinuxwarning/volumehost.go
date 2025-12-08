@@ -79,6 +79,10 @@ func (c *Controller) GetNodeAllocatable() (v1.ResourceList, error) {
 	return v1.ResourceList{}, nil
 }
 
+func (c *Controller) GetAssignments(podUID, containerName string) string {
+	return "null"
+}
+
 func (c *Controller) GetAttachedVolumesFromNodeStatus() (map[v1.UniqueVolumeName]string, error) {
 	return map[v1.UniqueVolumeName]string{}, nil
 }

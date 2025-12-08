@@ -823,6 +823,10 @@ func (adc *attachDetachController) GetNodeAllocatable() (v1.ResourceList, error)
 	return v1.ResourceList{}, nil
 }
 
+func (adc *attachDetachController) GetAssignments(podUID, containerName string) string {
+	return "null"
+}
+
 func (adc *attachDetachController) GetAttachedVolumesFromNodeStatus() (map[v1.UniqueVolumeName]string, error) {
 	return map[v1.UniqueVolumeName]string{}, nil
 }
