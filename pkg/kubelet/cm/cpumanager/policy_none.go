@@ -75,3 +75,15 @@ func (p *nonePolicy) GetPodTopologyHints(_ logr.Logger, s state.State, pod *v1.P
 func (p *nonePolicy) GetAllocatableCPUs(m state.State) cpuset.CPUSet {
 	return cpuset.New()
 }
+
+func (p *nonePolicy) ReleaseTimedOutScaleDownCPUs(_ logr.Logger, s state.State) {
+	// Do nothing
+}
+
+func (p *nonePolicy) IsDuringScaleDownDelay(podID, containerName string) bool {
+	return false
+}
+
+func (p *nonePolicy) GetAssignments(s state.State, podUID, containerName string) string {
+	return "null"
+}

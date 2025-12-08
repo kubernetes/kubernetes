@@ -19,6 +19,7 @@ package cpumanager
 import (
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/go-logr/logr"
 
@@ -219,6 +220,15 @@ type staticPolicy struct {
 	// we compute this value multiple time, and it's not supposed to change
 	// at runtime - the cpumanager can't deal with runtime topology changes anyway.
 	cpuGroupSize int
+	// scaleDelayTimerInfos tracks pending scale‑down timers per pod and container.
+    scaleDelayTimerInfos map[string]map[string]scaleDownTimerInfo
+}
+
+type scaleDownTimerInfo struct {
+	// records current time when allocate the scale down cpuset
+    timer time.Time
+	// Record the cpuset allocate by the CPU manager
+	preAssignments cpuset.CPUSet
 }
 
 // Ensure staticPolicy implements Policy interface
@@ -424,6 +434,89 @@ func (p *staticPolicy) updateCPUsToReuse(pod *v1.Pod, container *v1.Container, c
 	p.cpusToReuse[string(pod.UID)] = p.cpusToReuse[string(pod.UID)].Difference(cset)
 }
 
+// ReleaseTimedOutScaleDownCPUs releases CPUs that have been pending for scale‑down
+// when the timer expires the configured ScaleDelayTime.
+func (p *staticPolicy) ReleaseTimedOutScaleDownCPUs(logger logr.Logger, s state.State) {
+    if p.options.ScaleDelayTime == 0 {
+        return
+    }
+    for podUID, containerMap := range p.scaleDelayTimerInfos {
+        for containerName, info := range containerMap {
+            logger.Info("ReleaseTimedOutScaleDownCPUs", "time.Since(info.timer)", time.Since(info.timer), "p.options.ScaleDelayTime", p.options.ScaleDelayTime)
+            if time.Since(info.timer) >= p.options.ScaleDelayTime {
+				currentCPUSet, ok := s.GetCPUSet(string(podUID), containerName)
+				if !ok {
+					continue
+				}
+                s.SetDefaultCPUSet(s.GetDefaultCPUSet().Union(currentCPUSet.Difference(info.preAssignments)))
+				s.SetCPUSet(string(podUID), containerName, info.preAssignments)
+                // Delete the entry after processing
+                delete(p.scaleDelayTimerInfos[podUID], containerName)
+                logger.Info("ReleaseTimedOutScaleDownCPUs, release removed CPUs to DefaultCPUSet", "podUID", podUID, "containerName", containerName, "cpusToRelease", currentCPUSet.Difference(info.preAssignments))
+            }
+        }
+        // Clean up outer map if empty
+        if len(p.scaleDelayTimerInfos[podUID]) == 0 {
+            delete(p.scaleDelayTimerInfos, podUID)
+        }
+    }
+}
+
+// updateScaleDelayTimerInfos records a new scale‑down timer for the specified pod and container. 
+func (p *staticPolicy) updateScaleDelayTimerInfos(podUID, containerName string, assignedCpus cpuset.CPUSet) {
+    if p.scaleDelayTimerInfos == nil {
+        p.scaleDelayTimerInfos = make(map[string]map[string]scaleDownTimerInfo)
+    }
+    if p.scaleDelayTimerInfos[podUID] == nil {
+        p.scaleDelayTimerInfos[podUID] = make(map[string]scaleDownTimerInfo)
+    }
+
+	p.scaleDelayTimerInfos[podUID][containerName] = scaleDownTimerInfo{
+		timer:        	time.Now(),
+		preAssignments: assignedCpus,
+	}
+}
+
+// clearScaleDelayTimerInfo removes the scale-down timer info for the specified pod and container.
+func (p *staticPolicy) clearScaleDelayTimerInfo(podUID, containerName string) {
+	if p.scaleDelayTimerInfos == nil {
+		return
+	}
+	if _, ok := p.scaleDelayTimerInfos[podUID]; ok {
+		delete(p.scaleDelayTimerInfos[podUID], containerName)
+		// Clean up outer map if empty
+		if len(p.scaleDelayTimerInfos[podUID]) == 0 {
+			delete(p.scaleDelayTimerInfos, podUID)
+		}
+	}
+}
+
+// getAssignments returns current allocated CPUS in cpu manager.
+// If preAssignments exist, the current allocated CPUs is preAssignments, if not exist, the current allocated CPUs is GetCPUSetOrDefault.
+func (p *staticPolicy) GetAssignments(s state.State, podUID, containerName string) string {
+	if p.scaleDelayTimerInfos != nil {
+		if containerMap, ok := p.scaleDelayTimerInfos[podUID]; ok {
+			if info, ok := containerMap[containerName]; ok {
+				if !info.preAssignments.IsEmpty() {
+					return info.preAssignments.String()
+				}
+			}
+		}
+	}
+	return s.GetCPUSetOrDefault(podUID, containerName).String()
+}
+
+// Returns true if the ScaleDelayTime configured and the specified pod and container still during the ScaleDelayTime.
+func (p *staticPolicy) IsDuringScaleDownDelay(podID, containerName string) bool {
+	if p.options.ScaleDelayTime == 0 {
+        return false
+    }
+	if _, ok := p.scaleDelayTimerInfos[podID][containerName]; !ok {
+		return false
+	}
+    return true
+}
+
 func (p *staticPolicy) Allocate(logger logr.Logger, s state.State, pod *v1.Pod, container *v1.Container) (rerr error) {
 	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name)
 	logger.Info("Allocate start") // V=0 for backward compatibility
@@ -535,7 +628,25 @@ func (p *staticPolicy) Allocate(logger logr.Logger, s state.State, pod *v1.Pod, 
 			}
 
 			// Allocation successful, update the current state
-			s.SetCPUSet(string(pod.UID), container.Name, newallocatedcpuset.CPUs)
+			if cpusInUseByPodContainer.Size() <= newallocatedcpuset.CPUs.Size() {
+				// Scale up
+				s.SetDefaultCPUSet(s.GetDefaultCPUSet().Difference(newallocatedcpuset.CPUs))
+				s.SetCPUSet(string(pod.UID), container.Name, newallocatedcpuset.CPUs)
+				if p.options.ScaleDelayTime != 0{
+					p.clearScaleDelayTimerInfo(string(pod.UID), container.Name)
+				}
+				// To do metric update
+			} else if cpusInUseByPodContainer.Size() > newallocatedcpuset.CPUs.Size() {
+				// Scale down
+				if p.options.ScaleDelayTime == 0 {
+					s.SetDefaultCPUSet(s.GetDefaultCPUSet().Union(cpusInUseByPodContainer.Difference(newallocatedcpuset.CPUs)))
+					s.SetCPUSet(string(pod.UID), container.Name, newallocatedcpuset.CPUs)
+				} else {
+					p.updateScaleDelayTimerInfos(string(pod.UID), container.Name, newallocatedcpuset.CPUs)
+				}
+			}
+			
+			// TO DO: Scale down delay consider updateCPUsToReuse and updateMetricsOnAllocate
 			p.updateCPUsToReuse(pod, container, newallocatedcpuset.CPUs)
 			p.updateMetricsOnAllocate(logger, s, newallocatedcpuset)
 			logger.Info("Allocated exclusive CPUs after InPlacePodVerticalScaling attempt", "pod", klog.KObj(pod), "containerName", container.Name, "cpuset", newallocatedcpuset.CPUs.String())
@@ -564,6 +675,7 @@ func (p *staticPolicy) Allocate(logger logr.Logger, s state.State, pod *v1.Pod, 
 		return err
 	}
 
+	s.SetDefaultCPUSet(s.GetDefaultCPUSet().Difference(cpuAllocation.CPUs))
 	s.SetCPUSet(string(pod.UID), container.Name, cpuAllocation.CPUs)
 	p.updateCPUsToReuse(pod, container, cpuAllocation.CPUs)
 	p.updateMetricsOnAllocate(logger, s, cpuAllocation)
@@ -664,19 +776,6 @@ func (p *staticPolicy) allocateCPUs(logger logr.Logger, s state.State, numCPUs i
 		}
 	}
 	result.Aligned = p.topology.CheckAlignment(result.CPUs)
-
-	// Remove allocated CPUs from the shared CPUSet.
-	if reusableCPUsForResize != nil {
-		if reusableCPUsForResize.Size() < result.CPUs.Size() {
-			// Scale up or creation has been performed
-			s.SetDefaultCPUSet(s.GetDefaultCPUSet().Difference(result.CPUs))
-		} else if reusableCPUsForResize.Size() > result.CPUs.Size() {
-			// Scale down has been performed
-			s.SetDefaultCPUSet(s.GetDefaultCPUSet().Union(reusableCPUsForResize.Difference(result.CPUs)))
-		}
-	} else {
-		s.SetDefaultCPUSet(s.GetDefaultCPUSet().Difference(result.CPUs))
-	}
 
 	logger.Info("AllocateCPUs", "result", result.String())
 	return result, nil

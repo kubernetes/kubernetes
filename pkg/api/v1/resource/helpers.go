@@ -27,6 +27,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 // GetResourceRequestQuantity finds and returns the request quantity for a specific resource.
@@ -82,12 +83,12 @@ func ExtractResourceValueByContainerName(fs *v1.ResourceFieldSelector, pod *v1.P
 	if err != nil {
 		return "", err
 	}
-	return ExtractContainerResourceValue(fs, container)
+	return ExtractContainerResourceValue(fs, container, nil, "")
 }
 
 // ExtractResourceValueByContainerNameAndNodeAllocatable extracts the value of a resource
 // by providing container name and node allocatable
-func ExtractResourceValueByContainerNameAndNodeAllocatable(fs *v1.ResourceFieldSelector, pod *v1.Pod, containerName string, nodeAllocatable v1.ResourceList) (string, error) {
+func ExtractResourceValueByContainerNameAndNodeAllocatable(fs *v1.ResourceFieldSelector, pod *v1.Pod, containerName string, nodeAllocatable v1.ResourceList, host volume.VolumeHost) (string, error) {
 	realContainer, err := findContainerInPod(pod, containerName)
 	if err != nil {
 		return "", err
@@ -97,12 +98,12 @@ func ExtractResourceValueByContainerNameAndNodeAllocatable(fs *v1.ResourceFieldS
 
 	MergeContainerResourceLimits(container, nodeAllocatable)
 
-	return ExtractContainerResourceValue(fs, container)
+	return ExtractContainerResourceValue(fs, container, host, string(pod.UID))
 }
 
 // ExtractContainerResourceValue extracts the value of a resource
-// in an already known container
-func ExtractContainerResourceValue(fs *v1.ResourceFieldSelector, container *v1.Container) (string, error) {
+// in an already known container with optional host parameter for CPU manager
+func ExtractContainerResourceValue(fs *v1.ResourceFieldSelector, container *v1.Container, host volume.VolumeHost, podUID string) (string, error) {
 	divisor := resource.Quantity{}
 	if divisor.Cmp(fs.Divisor) == 0 {
 		divisor = resource.MustParse("1")
@@ -123,6 +124,11 @@ func ExtractContainerResourceValue(fs *v1.ResourceFieldSelector, container *v1.C
 		return convertResourceMemoryToString(container.Resources.Requests.Memory(), divisor)
 	case "requests.ephemeral-storage":
 		return convertResourceEphemeralStorageToString(container.Resources.Requests.StorageEphemeral(), divisor)
+	case "status.cpuset":
+		if host != nil {
+			return host.GetAssignments(podUID, container.Name), nil
+		}
+		return "", nil
 	}
 	// handle extended standard resources with dynamic names
 	// example: requests.hugepages-<pageSize> or limits.hugepages-<pageSize>
