@@ -93,10 +93,10 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		newInput     storage.VolumeAttachment
 		expectedErrs field.ErrorList
 	}{
-		//"valid update": {
-		//	oldInput: mkValidVolumeAttachment(),
-		//	newInput: mkValidVolumeAttachment(),
-		//},
+		"valid update": {
+			oldInput: mkValidVolumeAttachment(),
+			newInput: mkValidVolumeAttachment(),
+		},
 		"immutable spec.attacher": {
 			oldInput: mkValidVolumeAttachment(),
 			newInput: mkValidVolumeAttachment(func(obj *storage.VolumeAttachment) {
