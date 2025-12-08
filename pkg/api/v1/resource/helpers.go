@@ -29,6 +29,11 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 )
 
+const (
+	// ErrStatusCPUSet is the error message used when status.cpuset resource is requested
+	ErrStatusCPUSetSetting = "status.cpuset is set"
+)
+
 // GetResourceRequestQuantity finds and returns the request quantity for a specific resource.
 func GetResourceRequestQuantity(pod *v1.Pod, resourceName v1.ResourceName) resource.Quantity {
 	requestQuantity := resource.Quantity{}
@@ -123,6 +128,9 @@ func ExtractContainerResourceValue(fs *v1.ResourceFieldSelector, container *v1.C
 		return convertResourceMemoryToString(container.Resources.Requests.Memory(), divisor)
 	case "requests.ephemeral-storage":
 		return convertResourceEphemeralStorageToString(container.Resources.Requests.StorageEphemeral(), divisor)
+	case "status.cpuset":
+		// This resource requires CPU manager, return a specific error to indicate this
+		return "", fmt.Errorf(ErrStatusCPUSetSetting)
 	}
 	// handle extended standard resources with dynamic names
 	// example: requests.hugepages-<pageSize> or limits.hugepages-<pageSize>

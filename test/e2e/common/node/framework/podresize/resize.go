@@ -117,6 +117,62 @@ func MakePodWithResizableContainers(ns, name, timeStamp string, tcInfo []Resizab
 	return pod
 }
 
+func MakeResizablePodWithDownwardAPI(ns, name, timeStamp string, tcInfo []ResizableContainerInfo, podResources *v1.ResourceRequirements) *v1.Pod {
+	testInitContainers, testContainers := separateContainers(tcInfo)
+
+	// Add volume mounts to all regular containers)
+	for i := range testContainers {
+		testContainers[i].VolumeMounts = append(testContainers[i].VolumeMounts,
+			v1.VolumeMount{
+				Name:      "podinfo",
+				MountPath: "/podinfo",
+			},
+		)
+	}
+
+	minGracePeriodSeconds := int64(0)
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: ns,
+			Labels: map[string]string{
+				"time": timeStamp,
+			},
+		},
+		Spec: v1.PodSpec{
+			OS:                            &v1.PodOS{Name: v1.Linux},
+			InitContainers:                testInitContainers,
+			Containers:                    testContainers,
+			RestartPolicy:                 v1.RestartPolicyOnFailure,
+			TerminationGracePeriodSeconds: &minGracePeriodSeconds,
+			Volumes: []v1.Volume{
+				{
+					Name: "podinfo",
+					VolumeSource: v1.VolumeSource{
+						DownwardAPI: &v1.DownwardAPIVolumeSource{
+							Items: []v1.DownwardAPIVolumeFile{
+								{
+									Path: "status_cpuset",
+									ResourceFieldRef: &v1.ResourceFieldSelector{
+										ContainerName: testContainers[0].Name,
+										Resource:      "status.cpuset",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	if podResources != nil {
+		pod.Spec.Resources = podResources
+	}
+
+	return pod
+}
+
 // separateContainers splits the input into initContainers and normal containers.
 func separateContainers(tcInfo []ResizableContainerInfo) ([]v1.Container, []v1.Container) {
 	var initContainers, containers []v1.Container

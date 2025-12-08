@@ -393,6 +393,9 @@ type VolumeHost interface {
 	// Returns node allocatable.
 	GetNodeAllocatable() (v1.ResourceList, error)
 
+	// Returns container exclusive CPUs.
+	GetCPUAffinity(podUID, containerName string) []int64 
+
 	// Returns a function that returns a secret.
 	GetSecretFunc() func(namespace, name string) (*v1.Secret, error)
 

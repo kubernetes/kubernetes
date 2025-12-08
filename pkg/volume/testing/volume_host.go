@@ -177,6 +177,10 @@ func (f *fakeVolumeHost) GetNodeAllocatable() (v1.ResourceList, error) {
 	return v1.ResourceList{}, nil
 }
 
+func (f *fakeVolumeHost) GetCPUAffinity(podUID, containerName string) []int64 {
+	return []int64{}
+}
+
 func (f *fakeVolumeHost) GetSecretFunc() func(namespace, name string) (*v1.Secret, error) {
 	return func(namespace, name string) (*v1.Secret, error) {
 		return f.kubeClient.CoreV1().Secrets(namespace).Get(context.TODO(), name, metav1.GetOptions{})

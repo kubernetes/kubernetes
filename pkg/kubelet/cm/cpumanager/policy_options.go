@@ -19,6 +19,7 @@ package cpumanager
 import (
 	"fmt"
 	"strconv"
+	"time"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -35,12 +36,19 @@ const (
 	DistributeCPUsAcrossCoresOption string = "distribute-cpus-across-cores"
 	StrictCPUReservationOption      string = "strict-cpu-reservation"
 	PreferAlignByUnCoreCacheOption  string = "prefer-align-cpus-by-uncorecache"
+	ScaleDelayTimeOption        	string = "scale-delay-time"
+)
+
+const (
+	MinScaleDelayTime = 0 * time.Second
+	MaxScaleDelayTime = 10 * time.Second
 )
 
 var (
 	alphaOptions = sets.New[string](
 		AlignBySocketOption,
 		DistributeCPUsAcrossCoresOption,
+		ScaleDelayTimeOption,
 	)
 	betaOptions = sets.New[string](
 		DistributeCPUsAcrossNUMAOption,
@@ -97,6 +105,10 @@ type StaticPolicyOptions struct {
 	// Flag that makes best-effort to align CPUs to a uncorecache boundary
 	// As long as there are CPUs available, pods will be admitted if the condition is not met.
 	PreferAlignByUncoreCacheOption bool
+	// ScaleDelayTime specifies the delay before initiating a downsize CPUs operation for containers.
+	// It can be expressed as a Go duration string (e.g., "5s", "500ms") or as an integer representing milliseconds.
+	// The maximum allowed value is 10 seconds. If set to 0, no delay is applied, and the scale-down occurs immediately.
+	ScaleDelayTime time.Duration
 }
 
 // NewStaticPolicyOptions creates a StaticPolicyOptions struct from the user configuration.
@@ -144,6 +156,12 @@ func NewStaticPolicyOptions(policyOptions map[string]string) (StaticPolicyOption
 				return opts, fmt.Errorf("bad value for option %q: %w", name, err)
 			}
 			opts.PreferAlignByUncoreCacheOption = optValue
+		case ScaleDelayTimeOption:
+			optValue, err := time.ParseDuration(value)
+			if err != nil {
+				return opts, fmt.Errorf("bad value for option %q: %w", name, err)
+			}
+			opts.ScaleDelayTime = optValue
 		default:
 			// this should never be reached, we already detect unknown options,
 			// but we keep it as further safety.
@@ -181,6 +199,11 @@ func ValidateStaticPolicyOptions(opts StaticPolicyOptions, topology *topology.CP
 		// Not compatible with topology when number of sockets are more than number of NUMA nodes.
 		if topology.NumSockets > topology.NumNUMANodes {
 			return fmt.Errorf("Align by socket is not compatible with hardware where number of sockets are more than number of NUMA")
+		}
+	}
+	if opts.ScaleDelayTime != 0 {
+		if opts.ScaleDelayTime > MaxScaleDelayTime || opts.ScaleDelayTime < MinScaleDelayTime {
+			return fmt.Errorf("CPUManager option %q cannot exceed %v, and cannot be smaller than %v", ScaleDelayTimeOption, MaxScaleDelayTime, MinScaleDelayTime)
 		}
 	}
 	return nil

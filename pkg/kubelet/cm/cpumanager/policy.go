@@ -43,4 +43,9 @@ type Policy interface {
 	GetPodTopologyHints(logger logr.Logger, s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint
 	// GetAllocatableCPUs returns the total set of CPUs available for allocation.
 	GetAllocatableCPUs(m state.State) cpuset.CPUSet
+	// ReleaseTimedOutScaleDownCPUs releases CPUs that have been pending for scale‑down
+	// when the timer expires the configured ScaleDelayTime.
+	ReleaseTimedOutScaleDownCPUs(logger logr.Logger, s state.State)
+	// Returns true if the ScaleDelayTime configured and the specified pod and container still during the ScaleDelayTime.
+	IsDuringScaleDownDelay(podID, containerName string) bool
 }
