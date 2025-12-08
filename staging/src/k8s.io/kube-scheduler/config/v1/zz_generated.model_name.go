@@ -57,6 +57,11 @@ func (in KubeSchedulerConfiguration) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in KubeSchedulerMetricConfiguration) OpenAPIModelName() string {
+	return "io.k8s.kube-scheduler.config.v1.KubeSchedulerMetricConfiguration"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in KubeSchedulerProfile) OpenAPIModelName() string {
 	return "io.k8s.kube-scheduler.config.v1.KubeSchedulerProfile"
 }

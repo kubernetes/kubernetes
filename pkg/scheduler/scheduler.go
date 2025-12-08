@@ -127,6 +127,8 @@ type Scheduler struct {
 	registeredHandlers []cache.ResourceEventHandlerRegistration
 
 	nominatedNodeNameForExpectationEnabled bool
+
+	pluginMetricsSamplePercent int
 }
 
 func (sched *Scheduler) applyDefaultHandlers() {
@@ -150,6 +152,7 @@ type schedulerOptions struct {
 	frameworkCapturer          FrameworkCapturer
 	parallelism                int32
 	applyDefaultProfile        bool
+	metricConfiguration        schedulerapi.KubeSchedulerMetricConfiguration
 }
 
 // Option configures a Scheduler
@@ -264,6 +267,13 @@ func WithBuildFrameworkCapturer(fc FrameworkCapturer) Option {
 	}
 }
 
+// WithMetricConfiguration sets metrics configs for the Scheduler.
+func WithMetricConfiguration(cfg schedulerapi.KubeSchedulerMetricConfiguration) Option {
+	return func(o *schedulerOptions) {
+		o.metricConfiguration = cfg
+	}
+}
+
 var defaultSchedulerOptions = schedulerOptions{
 	clock:                             clock.RealClock{},
 	percentageOfNodesToScore:          schedulerapi.DefaultPercentageOfNodesToScore,
@@ -276,6 +286,11 @@ var defaultSchedulerOptions = schedulerOptions{
 	// set dynamically in tests. Therefore, we delay creating it until New is actually
 	// invoked.
 	applyDefaultProfile: true,
+	metricConfiguration: schedulerapi.KubeSchedulerMetricConfiguration{
+		PluginMetricsSamplePercent:        schedulerapi.DefaultPluginMetricsSamplePercent,
+		MetricsAsyncRecorderBufferSize:    schedulerapi.DefaultMetricsAsyncRecorderBufferSize,
+		MetricsAsyncRecorderFlushInterval: metav1.Duration{Duration: schedulerapi.DefaultMetricsAsyncRecorderFlushInterval},
+	},
 }
 
 // New returns a Scheduler
@@ -320,7 +335,11 @@ func New(ctx context.Context,
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
 
 	snapshot := internalcache.NewEmptySnapshot()
-	metricsRecorder := metrics.NewMetricsAsyncRecorder(1000, time.Second, stopEverything)
+	metricsRecorder := metrics.NewMetricsAsyncRecorder(
+		options.metricConfiguration.MetricsAsyncRecorderBufferSize,
+		options.metricConfiguration.MetricsAsyncRecorderFlushInterval.Duration,
+		stopEverything,
+	)
 	// waitingPods holds all the pods that are in the scheduler and waiting in the permit stage
 	waitingPods := frameworkruntime.NewWaitingPodsMap()
 
@@ -413,7 +432,7 @@ func New(ctx context.Context,
 		internalqueue.WithPodMaxInUnschedulablePodsDuration(options.podMaxInUnschedulablePodsDuration),
 		internalqueue.WithPreEnqueuePluginMap(preEnqueuePluginMap),
 		internalqueue.WithQueueingHintMapPerProfile(queueingHintsPerProfile),
-		internalqueue.WithPluginMetricsSamplePercent(pluginMetricsSamplePercent),
+		internalqueue.WithPluginMetricsSamplePercent(options.metricConfiguration.PluginMetricsSamplePercent),
 		internalqueue.WithMetricsRecorder(metricsRecorder),
 		internalqueue.WithAPIDispatcher(apiDispatcher),
 	)
@@ -448,6 +467,7 @@ func New(ctx context.Context,
 		APIDispatcher:                          apiDispatcher,
 		nominatedNodeNameForExpectationEnabled: feature.DefaultFeatureGate.Enabled(features.NominatedNodeNameForExpectation),
 		WorkloadManager:                        workloadManager,
+		pluginMetricsSamplePercent:             options.metricConfiguration.PluginMetricsSamplePercent,
 	}
 	sched.NextPod = podQueue.Pop
 	sched.applyDefaultHandlers()
