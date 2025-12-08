@@ -27,11 +27,11 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
+	utiliptables "k8s.io/kube-proxy/pkg/util/iptables"
+	iptablestest "k8s.io/kube-proxy/pkg/util/iptables/testing"
 	"k8s.io/kubernetes/pkg/proxy"
 	ipsettest "k8s.io/kubernetes/pkg/proxy/ipvs/ipset/testing"
 	ipvstest "k8s.io/kubernetes/pkg/proxy/ipvs/util/testing"
-	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
-	iptablestest "k8s.io/kubernetes/pkg/util/iptables/testing"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )

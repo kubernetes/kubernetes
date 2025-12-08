@@ -24,9 +24,9 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
+	utiliptables "k8s.io/kube-proxy/pkg/util/iptables"
 	utilipset "k8s.io/kubernetes/pkg/proxy/ipvs/ipset"
 	utilipvs "k8s.io/kubernetes/pkg/proxy/ipvs/util"
-	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 )
 
 // CleanupIptablesLeftovers removes all iptables rules and chains created by the Proxier

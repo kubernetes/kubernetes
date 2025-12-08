@@ -45,6 +45,8 @@ import (
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
 	klogtesting "k8s.io/klog/v2/ktesting"
+	utiliptables "k8s.io/kube-proxy/pkg/util/iptables"
+	iptablestest "k8s.io/kube-proxy/pkg/util/iptables/testing"
 	"k8s.io/kubernetes/pkg/proxy"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/proxy/conntrack"
@@ -53,8 +55,6 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/runner"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	proxyutiltest "k8s.io/kubernetes/pkg/proxy/util/testing"
-	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
-	iptablestest "k8s.io/kubernetes/pkg/util/iptables/testing"
 	netutils "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
 )

@@ -30,6 +30,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	"k8s.io/klog/v2"
+	utiliptables "k8s.io/kube-proxy/pkg/util/iptables"
 	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/proxy/conntrack"
@@ -39,7 +40,6 @@ import (
 	utilipvs "k8s.io/kubernetes/pkg/proxy/ipvs/util"
 	"k8s.io/kubernetes/pkg/proxy/nftables"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
-	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 )
 
 // platformApplyDefaults is called after parsing command-line flags and/or reading the
