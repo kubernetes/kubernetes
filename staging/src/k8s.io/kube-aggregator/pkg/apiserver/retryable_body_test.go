@@ -210,14 +210,12 @@ func TestLimitedWriterStopsBuffering(t *testing.T) {
 			limit:        3,
 			writes:       []string{"hello"},
 			wantExceeded: true,
-			wantBufLen:   0, // buffer should be reset
 		},
 		{
 			name:         "exceeds on later write",
 			limit:        8,
 			writes:       []string{"hello", " ", "world"},
 			wantExceeded: true,
-			wantBufLen:   0, // buffer should be reset
 		},
 	}
 
@@ -232,7 +230,6 @@ func TestLimitedWriterStopsBuffering(t *testing.T) {
 				if err != nil {
 					t.Errorf("unexpected write error: %v", err)
 				}
-				// Write should always report full length written (even when discarding)
 				if n != len(w) {
 					t.Errorf("expected write length %d, got %d", len(w), n)
 				}
@@ -241,8 +238,14 @@ func TestLimitedWriterStopsBuffering(t *testing.T) {
 			if exceeded != tc.wantExceeded {
 				t.Errorf("expected exceeded=%v, got %v", tc.wantExceeded, exceeded)
 			}
-			if buf.Len() != tc.wantBufLen {
-				t.Errorf("expected buffer length %d, got %d", tc.wantBufLen, buf.Len())
+
+			// When exceeded, buffer is nil; otherwise check length
+			if tc.wantExceeded {
+				if lw.buf != nil {
+					t.Errorf("expected buffer to be nil after exceeding limit")
+				}
+			} else if lw.buf.Len() != tc.wantBufLen {
+				t.Errorf("expected buffer length %d, got %d", tc.wantBufLen, lw.buf.Len())
 			}
 		})
 	}

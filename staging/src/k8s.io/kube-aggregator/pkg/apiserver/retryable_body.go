@@ -63,10 +63,7 @@ func wrapBodyForRetry(originalBody io.ReadCloser, config retryableBodyConfig) (i
 
 	lw := &limitedWriter{buf: &buf, limit: config.limit, exceeded: &exceeded}
 
-	wrappedBody := &retryableBody{
-		reader: io.TeeReader(originalBody, lw),
-		closer: originalBody,
-	}
+	wrappedBody := io.NopCloser(io.TeeReader(originalBody, lw))
 
 	getBody := func() (io.ReadCloser, error) {
 		if exceeded {
@@ -95,24 +92,8 @@ func (lw *limitedWriter) Write(p []byte) (n int, err error) {
 	}
 	if lw.buf.Len()+len(p) > lw.limit {
 		*lw.exceeded = true
-		lw.buf.Reset()
+		lw.buf = nil
 		return len(p), nil
 	}
 	return lw.buf.Write(p)
-}
-
-// retryableBody wraps a reader with a no-op Close
-type retryableBody struct {
-	reader io.Reader
-	closer io.Closer
-}
-
-func (r *retryableBody) Read(p []byte) (n int, err error) {
-	return r.reader.Read(p)
-}
-
-func (r *retryableBody) Close() error {
-	// No-op. We delegate closing of the underlying body to "finishRequest".
-	// https://go.googlesource.com/go/+/master/src/net/http/server.go#1680
-	return nil
 }
