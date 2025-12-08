@@ -334,9 +334,9 @@ func New(ctx context.Context,
 
 	snapshot := internalcache.NewEmptySnapshot()
 	metricsRecorder := metrics.NewMetricsAsyncRecorder(
+		ctx,
 		options.metricConfiguration.BufferSize,
 		options.metricConfiguration.FlushInterval.Duration,
-		stopEverything,
 	)
 	// waitingPods holds all the pods that are in the scheduler and waiting in the permit stage
 	waitingPods := frameworkruntime.NewWaitingPodsMap()
