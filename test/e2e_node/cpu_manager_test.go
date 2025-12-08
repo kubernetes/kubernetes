@@ -3215,11 +3215,6 @@ var _ = SIGDescribe("CPU Manager with InPlacePodVerticalScalingExclusiveCPUs dis
 	framework.WithFeatureGate(features.InPlacePodVerticalScalingExclusiveCPUs),
 	func() {
 
-		type containerCPUInfo struct {
-			Name     string
-			cpuCount int
-		}
-
 		f := framework.NewDefaultFramework("cpu-manager-pod-resize-test")
 		f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
@@ -3306,13 +3301,13 @@ var _ = SIGDescribe("CPU Manager with InPlacePodVerticalScalingExclusiveCPUs dis
 			ginkgo.DescribeTable("",
 				func(ctx context.Context,
 					originalContainers []podresize.ResizableContainerInfo,
-					originalCpuInfo []containerCPUInfo,
+					originalCPUInfo []containerCPUInfo,
 					desiredContainers []podresize.ResizableContainerInfo,
 					expectedContainers []podresize.ResizableContainerInfo,
-					expectedCpuInfo []containerCPUInfo,
+					expectedCPUInfo []containerCPUInfo,
 					wantError string,
 				) {
-					skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), expectedCpuInfo[0].cpuCount)
+					skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), expectedCPUInfo[0].cpuCount)
 
 					updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
 						policyName:         string(cpumanager.PolicyStatic),
@@ -3333,7 +3328,7 @@ var _ = SIGDescribe("CPU Manager with InPlacePodVerticalScalingExclusiveCPUs dis
 					podresize.VerifyPodResources(testPod1, originalContainers, nil)
 
 					ginkgo.By("verifying original pod cpusets are as expected")
-					gomega.Expect(testPod1).To(HaveContainerCPUsCount("gu-container-1", originalCpuInfo[0].cpuCount))
+					gomega.Expect(testPod1).To(HaveContainerCPUsCount("gu-container-1", originalCPUInfo[0].cpuCount))
 
 					ginkgo.By("patching pod for resize")
 					patchString := podresize.MakeResizePatch(originalContainers, desiredContainers, nil, nil)
@@ -3355,7 +3350,7 @@ var _ = SIGDescribe("CPU Manager with InPlacePodVerticalScalingExclusiveCPUs dis
 						podresize.VerifyPodResources(resizedPod, expectedContainers, nil)
 
 						ginkgo.By("verifying pod cpusets after resize")
-						gomega.Expect(testPod1).To(HaveContainerCPUsCount("gu-container-1", expectedCpuInfo[0].cpuCount))
+						gomega.Expect(testPod1).To(HaveContainerCPUsCount("gu-container-1", expectedCPUInfo[0].cpuCount))
 					} else {
 						patchedPod, pErr := f.ClientSet.CoreV1().Pods(testPod1.Namespace).Patch(ctx,
 							testPod1.Name, apimachinerytypes.StrategicMergePatchType, []byte(patchString), metav1.PatchOptions{}, "resize")
@@ -3510,6 +3505,45 @@ var _ = SIGDescribe("CPU Manager with InPlacePodVerticalScalingExclusiveCPUs dis
 	},
 )
 
+type containerCPUInfo struct {
+	Name     string
+	cpuCount int
+}
+
+// PodPatchOperation defines a patch operation with expected results
+type podPatchOperation struct {
+	desiredContainers  []podresize.ResizableContainerInfo
+	expectedContainers []podresize.ResizableContainerInfo
+	expectedCPUInfo    []containerCPUInfo
+}
+
+// PodCreateParameters defines the pod create parameters
+type podCreateOperation struct {
+	originalContainers []podresize.ResizableContainerInfo
+	originalCPUInfo    []containerCPUInfo
+}
+
+// podResizeWithScaleDelayTimeTestCase define the cases about scale-delay-time
+type podResizeWithScaleDelayTimeTestCase struct {
+	scaleDelayTime int
+
+	// Pod create parameters
+	podCreate podCreateOperation
+
+	// First Patch parameters
+	firstPatch podPatchOperation
+
+	// Interrupted Patch parameters
+	interruptedPatch podPatchOperation
+
+	// Second Patch parameters
+	secondPatch podPatchOperation
+
+	// other test option
+	kubeletRestartTest bool
+	rapidScaleTest     bool
+}
+
 var _ = SIGDescribe("CPU Manager with InPlacePodVerticalScalingExclusiveCPUs enabled",
 	ginkgo.Ordered,
 	ginkgo.ContinueOnFailure,
@@ -3520,11 +3554,6 @@ var _ = SIGDescribe("CPU Manager with InPlacePodVerticalScalingExclusiveCPUs ena
 	framework.WithFeatureGate(features.InPlacePodVerticalScaling),
 	framework.WithFeatureGate(features.InPlacePodVerticalScalingExclusiveCPUs),
 	func() {
-
-		type containerCPUInfo struct {
-			Name     string
-			cpuCount int
-		}
 
 		f := framework.NewDefaultFramework("cpu-manager-pod-resize-test")
 		f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
@@ -4428,13 +4457,13 @@ var _ = SIGDescribe("CPU Manager with InPlacePodVerticalScalingExclusiveCPUs ena
 			ginkgo.DescribeTable("",
 				func(ctx context.Context,
 					originalContainers []podresize.ResizableContainerInfo,
-					originalCpuInfo []containerCPUInfo,
+					originalCPUInfo []containerCPUInfo,
 					desiredContainers []podresize.ResizableContainerInfo,
 					expectedContainers []podresize.ResizableContainerInfo,
-					expectedCpuInfo []containerCPUInfo,
+					expectedCPUInfo []containerCPUInfo,
 					wantError string,
 				) {
-					skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), expectedCpuInfo[0].cpuCount)
+					skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), expectedCPUInfo[0].cpuCount)
 
 					updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
 						policyName:         string(cpumanager.PolicyStatic),
@@ -4468,7 +4497,7 @@ var _ = SIGDescribe("CPU Manager with InPlacePodVerticalScalingExclusiveCPUs ena
 					podresize.VerifyPodResources(testPod1, originalContainers, nil)
 
 					ginkgo.By("verifying original pod cpusets are as expected")
-					gomega.Expect(testPod1).To(HaveContainerCPUsCount("gu-container-1", originalCpuInfo[0].cpuCount))
+					gomega.Expect(testPod1).To(HaveContainerCPUsCount("gu-container-1", originalCPUInfo[0].cpuCount))
 
 					nodeAllocatableCPUAfterPodCreate, nodeAvailableCPUAfterPodCreate, err := e2enode.GetNodeAllocatableAndAvailableQuantities(ctx, f.ClientSet, &node, v1.ResourceCPU)
 					framework.ExpectNoError(err, "failed to get CPU resources available for allocation")
@@ -4496,7 +4525,7 @@ var _ = SIGDescribe("CPU Manager with InPlacePodVerticalScalingExclusiveCPUs ena
 
 						// we cannot nor we should predict which CPUs the container gets
 						ginkgo.By("verifying pod cpusets after resize")
-						gomega.Expect(testPod1).To(HaveContainerCPUsCount("gu-container-1", expectedCpuInfo[0].cpuCount))
+						gomega.Expect(testPod1).To(HaveContainerCPUsCount("gu-container-1", expectedCPUInfo[0].cpuCount))
 
 						nodeAllocatableCPUAfterPodResize, nodeAvailableCPUAfterPodResize, err := e2enode.GetNodeAllocatableAndAvailableQuantities(ctx, f.ClientSet, &node, v1.ResourceCPU)
 						framework.ExpectNoError(err, "failed to get CPU resources available for allocation")
@@ -4662,26 +4691,26 @@ var _ = SIGDescribe("CPU Manager with InPlacePodVerticalScalingExclusiveCPUs ena
 			ginkgo.DescribeTable("",
 				func(ctx context.Context,
 					originalContainers []podresize.ResizableContainerInfo,
-					originalCpuInfo []containerCPUInfo,
+					originalCPUInfo []containerCPUInfo,
 					desiredContainersFirstPatch []podresize.ResizableContainerInfo,
 					expectedContainersFirstPatch []podresize.ResizableContainerInfo,
-					expectedCpuInfoFirstPatch []containerCPUInfo,
+					expectedCPUInfoFirstPatch []containerCPUInfo,
 					wantErrorFirstPatch string,
 					desiredContainersSecondPatch []podresize.ResizableContainerInfo,
 					expectedContainersSecondPatch []podresize.ResizableContainerInfo,
-					expectedCpuInfoSecondPatch []containerCPUInfo,
+					expectedCPUInfoSecondPatch []containerCPUInfo,
 					wantErrorSecondPatch string,
 				) {
 
 					expectedCPUCount := 0
-					for ctx := range expectedCpuInfoFirstPatch {
-						expectedCPUCount += expectedCpuInfoFirstPatch[ctx].cpuCount
+					for ctx := range expectedCPUInfoFirstPatch {
+						expectedCPUCount += expectedCPUInfoFirstPatch[ctx].cpuCount
 					}
 					skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), expectedCPUCount)
 
 					expectedCPUCount = 0
-					for ctx := range expectedCpuInfoSecondPatch {
-						expectedCPUCount += expectedCpuInfoSecondPatch[ctx].cpuCount
+					for ctx := range expectedCPUInfoSecondPatch {
+						expectedCPUCount += expectedCPUInfoSecondPatch[ctx].cpuCount
 					}
 					skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), expectedCPUCount)
 
@@ -4710,8 +4739,8 @@ var _ = SIGDescribe("CPU Manager with InPlacePodVerticalScalingExclusiveCPUs ena
 					podresize.VerifyPodResources(testPod1, originalContainers, nil)
 
 					ginkgo.By("verifying original pod cpusets are as expected")
-					for cdx := range originalCpuInfo {
-						gomega.Expect(testPod1).To(HaveContainerCPUsCount(originalCpuInfo[cdx].Name, originalCpuInfo[cdx].cpuCount))
+					for cdx := range originalCPUInfo {
+						gomega.Expect(testPod1).To(HaveContainerCPUsCount(originalCPUInfo[cdx].Name, originalCPUInfo[cdx].cpuCount))
 					}
 
 					ginkgo.By("patching pod for resize")
@@ -4734,8 +4763,8 @@ var _ = SIGDescribe("CPU Manager with InPlacePodVerticalScalingExclusiveCPUs ena
 						podresize.VerifyPodResources(resizedPod, expected, nil)
 
 						ginkgo.By("verifying pod cpusets after resize")
-						for cdx := range originalCpuInfo {
-							gomega.Expect(testPod1).To(HaveContainerCPUsCount(expectedCpuInfoFirstPatch[cdx].Name, expectedCpuInfoFirstPatch[cdx].cpuCount))
+						for cdx := range originalCPUInfo {
+							gomega.Expect(testPod1).To(HaveContainerCPUsCount(expectedCPUInfoFirstPatch[cdx].Name, expectedCPUInfoFirstPatch[cdx].cpuCount))
 						}
 
 						ginkgo.By("patching again pod for resize")
@@ -4759,8 +4788,8 @@ var _ = SIGDescribe("CPU Manager with InPlacePodVerticalScalingExclusiveCPUs ena
 							podresize.VerifyPodResources(resizedPod, expected, nil)
 
 							ginkgo.By("verifying pod cpusets after second resize")
-							for cdx := range expectedCpuInfoSecondPatch {
-								gomega.Expect(testPod1).To(HaveContainerCPUsCount(expectedCpuInfoSecondPatch[cdx].Name, expectedCpuInfoSecondPatch[cdx].cpuCount))
+							for cdx := range expectedCPUInfoSecondPatch {
+								gomega.Expect(testPod1).To(HaveContainerCPUsCount(expectedCPUInfoSecondPatch[cdx].Name, expectedCPUInfoSecondPatch[cdx].cpuCount))
 							}
 						} else {
 							patchedPod, pErr = f.ClientSet.CoreV1().Pods(testPod1.Namespace).Patch(ctx,
@@ -4791,8 +4820,8 @@ var _ = SIGDescribe("CPU Manager with InPlacePodVerticalScalingExclusiveCPUs ena
 							ginkgo.By("ensuring the testing pod is failed for the expected reason for second patch")
 							gomega.Expect(actuatedPod).To(HaveStatusConditionsMatchingRegex(wantErrorSecondPatch))
 
-							for cdx := range expectedCpuInfoSecondPatch {
-								gomega.Expect(testPod1).To(HaveContainerCPUsCount(expectedCpuInfoSecondPatch[cdx].Name, expectedCpuInfoSecondPatch[cdx].cpuCount))
+							for cdx := range expectedCPUInfoSecondPatch {
+								gomega.Expect(testPod1).To(HaveContainerCPUsCount(expectedCPUInfoSecondPatch[cdx].Name, expectedCPUInfoSecondPatch[cdx].cpuCount))
 							}
 						}
 					} else {
@@ -4826,7 +4855,7 @@ var _ = SIGDescribe("CPU Manager with InPlacePodVerticalScalingExclusiveCPUs ena
 
 						// we cannot nor we should predict which CPUs the container gets
 						ginkgo.By("verifying pod cpusets after resize")
-						gomega.Expect(actuatedPod).To(HaveContainerCPUsCount("gu-container-1", expectedCpuInfoFirstPatch[0].cpuCount))
+						gomega.Expect(actuatedPod).To(HaveContainerCPUsCount("gu-container-1", expectedCPUInfoFirstPatch[0].cpuCount))
 					}
 				},
 				ginkgo.Entry("should first increase CPU (gu-container-1) request and limit, afterwards decrease CPU (gu-container-1) request and limit within available capacity",
@@ -4900,26 +4929,26 @@ var _ = SIGDescribe("CPU Manager with InPlacePodVerticalScalingExclusiveCPUs ena
 			ginkgo.DescribeTable("",
 				func(ctx context.Context,
 					originalContainers []podresize.ResizableContainerInfo,
-					originalCpuInfo []containerCPUInfo,
+					originalCPUInfo []containerCPUInfo,
 					desiredContainersFirstPatch []podresize.ResizableContainerInfo,
 					expectedContainersFirstPatch []podresize.ResizableContainerInfo,
-					expectedCpuInfoFirstPatch []containerCPUInfo,
+					expectedCPUInfoFirstPatch []containerCPUInfo,
 					wantErrorFirstPatch string,
 					desiredContainersSecondPatch []podresize.ResizableContainerInfo,
 					expectedContainersSecondPatch []podresize.ResizableContainerInfo,
-					expectedCpuInfoSecondPatch []containerCPUInfo,
+					expectedCPUInfoSecondPatch []containerCPUInfo,
 					wantErrorSecondPatch string,
 				) {
 
 					expectedCPUCount := 0
-					for ctx := range expectedCpuInfoFirstPatch {
-						expectedCPUCount += expectedCpuInfoFirstPatch[ctx].cpuCount
+					for ctx := range expectedCPUInfoFirstPatch {
+						expectedCPUCount += expectedCPUInfoFirstPatch[ctx].cpuCount
 					}
 					skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), expectedCPUCount)
 
 					expectedCPUCount = 0
-					for ctx := range expectedCpuInfoSecondPatch {
-						expectedCPUCount += expectedCpuInfoSecondPatch[ctx].cpuCount
+					for ctx := range expectedCPUInfoSecondPatch {
+						expectedCPUCount += expectedCPUInfoSecondPatch[ctx].cpuCount
 					}
 					skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), expectedCPUCount)
 
@@ -4948,8 +4977,8 @@ var _ = SIGDescribe("CPU Manager with InPlacePodVerticalScalingExclusiveCPUs ena
 					podresize.VerifyPodResources(testPod1, originalContainers, nil)
 
 					ginkgo.By("verifying original pod cpusets are as expected")
-					for cdx := range originalCpuInfo {
-						gomega.Expect(testPod1).To(HaveContainerCPUsCount(originalCpuInfo[cdx].Name, originalCpuInfo[cdx].cpuCount))
+					for cdx := range originalCPUInfo {
+						gomega.Expect(testPod1).To(HaveContainerCPUsCount(originalCPUInfo[cdx].Name, originalCPUInfo[cdx].cpuCount))
 					}
 
 					ginkgo.By("patching pod for resize")
@@ -4972,8 +5001,8 @@ var _ = SIGDescribe("CPU Manager with InPlacePodVerticalScalingExclusiveCPUs ena
 						podresize.VerifyPodResources(resizedPod, expected, nil)
 
 						ginkgo.By("verifying pod cpusets after resize")
-						for cdx := range originalCpuInfo {
-							gomega.Expect(testPod1).To(HaveContainerCPUsCount(expectedCpuInfoFirstPatch[cdx].Name, expectedCpuInfoFirstPatch[cdx].cpuCount))
+						for cdx := range originalCPUInfo {
+							gomega.Expect(testPod1).To(HaveContainerCPUsCount(expectedCPUInfoFirstPatch[cdx].Name, expectedCPUInfoFirstPatch[cdx].cpuCount))
 						}
 
 						ginkgo.By("patching again pod for resize")
@@ -4997,8 +5026,8 @@ var _ = SIGDescribe("CPU Manager with InPlacePodVerticalScalingExclusiveCPUs ena
 							podresize.VerifyPodResources(resizedPod, expected, nil)
 
 							ginkgo.By("verifying pod cpusets after second resize")
-							for cdx := range expectedCpuInfoSecondPatch {
-								gomega.Expect(testPod1).To(HaveContainerCPUsCount(expectedCpuInfoSecondPatch[cdx].Name, expectedCpuInfoSecondPatch[cdx].cpuCount))
+							for cdx := range expectedCPUInfoSecondPatch {
+								gomega.Expect(testPod1).To(HaveContainerCPUsCount(expectedCPUInfoSecondPatch[cdx].Name, expectedCPUInfoSecondPatch[cdx].cpuCount))
 							}
 						} else {
 							patchedPod, pErr = f.ClientSet.CoreV1().Pods(testPod1.Namespace).Patch(ctx,
@@ -5029,8 +5058,8 @@ var _ = SIGDescribe("CPU Manager with InPlacePodVerticalScalingExclusiveCPUs ena
 							ginkgo.By("ensuring the testing pod is failed for the expected reason for second patch")
 							gomega.Expect(actuatedPod).To(HaveStatusConditionsMatchingRegex(wantErrorSecondPatch))
 
-							for cdx := range expectedCpuInfoSecondPatch {
-								gomega.Expect(testPod1).To(HaveContainerCPUsCount(expectedCpuInfoSecondPatch[cdx].Name, expectedCpuInfoSecondPatch[cdx].cpuCount))
+							for cdx := range expectedCPUInfoSecondPatch {
+								gomega.Expect(testPod1).To(HaveContainerCPUsCount(expectedCPUInfoSecondPatch[cdx].Name, expectedCPUInfoSecondPatch[cdx].cpuCount))
 							}
 						}
 					} else {
@@ -5064,7 +5093,7 @@ var _ = SIGDescribe("CPU Manager with InPlacePodVerticalScalingExclusiveCPUs ena
 
 						// we cannot nor we should predict which CPUs the container gets
 						ginkgo.By("verifying pod cpusets after resize")
-						gomega.Expect(actuatedPod).To(HaveContainerCPUsCount("gu-container-1", expectedCpuInfoFirstPatch[0].cpuCount))
+						gomega.Expect(actuatedPod).To(HaveContainerCPUsCount("gu-container-1", expectedCPUInfoFirstPatch[0].cpuCount))
 					}
 				},
 				ginkgo.Entry("should first increase (gu-container-1) CPU request/limit, afterwards decrease (gu-container-1) CPU request/limit, within available capacity",
@@ -5142,26 +5171,26 @@ var _ = SIGDescribe("CPU Manager with InPlacePodVerticalScalingExclusiveCPUs ena
 				ginkgo.DescribeTable("",
 					func(ctx context.Context,
 						originalContainers []podresize.ResizableContainerInfo,
-						originalCpuInfo []containerCPUInfo,
+						originalCPUInfo []containerCPUInfo,
 						desiredContainersFirstPatch []podresize.ResizableContainerInfo,
 						expectedContainersFirstPatch []podresize.ResizableContainerInfo,
-						expectedCpuInfoFirstPatch []containerCPUInfo,
+						expectedCPUInfoFirstPatch []containerCPUInfo,
 						wantErrorFirstPatch string,
 						desiredContainersSecondPatch []podresize.ResizableContainerInfo,
 						expectedContainersSecondPatch []podresize.ResizableContainerInfo,
-						expectedCpuInfoSecondPatch []containerCPUInfo,
+						expectedCPUInfoSecondPatch []containerCPUInfo,
 						wantErrorSecondPatch string,
 					) {
 
 						expectedCPUCount := 0
-						for ctx := range expectedCpuInfoFirstPatch {
-							expectedCPUCount += expectedCpuInfoFirstPatch[ctx].cpuCount
+						for ctx := range expectedCPUInfoFirstPatch {
+							expectedCPUCount += expectedCPUInfoFirstPatch[ctx].cpuCount
 						}
 						skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), expectedCPUCount)
 
 						expectedCPUCount = 0
-						for ctx := range expectedCpuInfoSecondPatch {
-							expectedCPUCount += expectedCpuInfoSecondPatch[ctx].cpuCount
+						for ctx := range expectedCPUInfoSecondPatch {
+							expectedCPUCount += expectedCPUInfoSecondPatch[ctx].cpuCount
 						}
 						skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), expectedCPUCount)
 
@@ -5189,8 +5218,8 @@ var _ = SIGDescribe("CPU Manager with InPlacePodVerticalScalingExclusiveCPUs ena
 						podresize.VerifyPodResources(testPod1, originalContainers, nil)
 
 						ginkgo.By("verifying original pod cpusets are as expected")
-						for cdx := range originalCpuInfo {
-							gomega.Expect(testPod1).To(HaveContainerCPUsCount(originalCpuInfo[cdx].Name, originalCpuInfo[cdx].cpuCount))
+						for cdx := range originalCPUInfo {
+							gomega.Expect(testPod1).To(HaveContainerCPUsCount(originalCPUInfo[cdx].Name, originalCPUInfo[cdx].cpuCount))
 						}
 
 						ginkgo.By("patching pod for resize")
@@ -5213,8 +5242,8 @@ var _ = SIGDescribe("CPU Manager with InPlacePodVerticalScalingExclusiveCPUs ena
 							podresize.VerifyPodResources(resizedPod, expected, nil)
 
 							ginkgo.By("verifying pod cpusets after resize")
-							for cdx := range originalCpuInfo {
-								gomega.Expect(testPod1).To(HaveContainerCPUsCount(expectedCpuInfoFirstPatch[cdx].Name, expectedCpuInfoFirstPatch[cdx].cpuCount))
+							for cdx := range originalCPUInfo {
+								gomega.Expect(testPod1).To(HaveContainerCPUsCount(expectedCPUInfoFirstPatch[cdx].Name, expectedCPUInfoFirstPatch[cdx].cpuCount))
 							}
 
 							ginkgo.By("patching again pod for resize")
@@ -5238,8 +5267,8 @@ var _ = SIGDescribe("CPU Manager with InPlacePodVerticalScalingExclusiveCPUs ena
 								podresize.VerifyPodResources(resizedPod, expected, nil)
 
 								ginkgo.By("verifying pod cpusets after second resize")
-								for cdx := range expectedCpuInfoSecondPatch {
-									gomega.Expect(testPod1).To(HaveContainerCPUsCount(expectedCpuInfoSecondPatch[cdx].Name, expectedCpuInfoSecondPatch[cdx].cpuCount))
+								for cdx := range expectedCPUInfoSecondPatch {
+									gomega.Expect(testPod1).To(HaveContainerCPUsCount(expectedCPUInfoSecondPatch[cdx].Name, expectedCPUInfoSecondPatch[cdx].cpuCount))
 								}
 							} else {
 								patchedPod, pErr = f.ClientSet.CoreV1().Pods(testPod1.Namespace).Patch(ctx,
@@ -5270,8 +5299,8 @@ var _ = SIGDescribe("CPU Manager with InPlacePodVerticalScalingExclusiveCPUs ena
 								ginkgo.By("ensuring the testing pod is failed for the expected reason for second patch")
 								gomega.Expect(actuatedPod).To(HaveStatusConditionsMatchingRegex(wantErrorSecondPatch))
 
-								for cdx := range expectedCpuInfoSecondPatch {
-									gomega.Expect(testPod1).To(HaveContainerCPUsCount(expectedCpuInfoSecondPatch[cdx].Name, expectedCpuInfoSecondPatch[cdx].cpuCount))
+								for cdx := range expectedCPUInfoSecondPatch {
+									gomega.Expect(testPod1).To(HaveContainerCPUsCount(expectedCPUInfoSecondPatch[cdx].Name, expectedCPUInfoSecondPatch[cdx].cpuCount))
 								}
 							}
 						} else {
@@ -5305,7 +5334,7 @@ var _ = SIGDescribe("CPU Manager with InPlacePodVerticalScalingExclusiveCPUs ena
 
 							// we cannot nor we should predict which CPUs the container gets
 							ginkgo.By("verifying pod cpusets after resize")
-							gomega.Expect(actuatedPod).To(HaveContainerCPUsCount("gu-container-1", expectedCpuInfoFirstPatch[0].cpuCount))
+							gomega.Expect(actuatedPod).To(HaveContainerCPUsCount("gu-container-1", expectedCPUInfoFirstPatch[0].cpuCount))
 						}
 					},
 					ginkgo.Entry("should first increase (gu-container-1) CPU request/limit, afterwards decrease (gu-container-1) CPU request/limit, within available capacity",
@@ -5375,26 +5404,26 @@ var _ = SIGDescribe("CPU Manager with InPlacePodVerticalScalingExclusiveCPUs ena
 				ginkgo.DescribeTable("",
 					func(ctx context.Context,
 						originalContainers []podresize.ResizableContainerInfo,
-						originalCpuInfo []containerCPUInfo,
+						originalCPUInfo []containerCPUInfo,
 						desiredContainersFirstPatch []podresize.ResizableContainerInfo,
 						expectedContainersFirstPatch []podresize.ResizableContainerInfo,
-						expectedCpuInfoFirstPatch []containerCPUInfo,
+						expectedCPUInfoFirstPatch []containerCPUInfo,
 						wantErrorFirstPatch string,
 						desiredContainersSecondPatch []podresize.ResizableContainerInfo,
 						expectedContainersSecondPatch []podresize.ResizableContainerInfo,
-						expectedCpuInfoSecondPatch []containerCPUInfo,
+						expectedCPUInfoSecondPatch []containerCPUInfo,
 						wantErrorSecondPatch string,
 					) {
 
 						expectedCPUCount := 0
-						for ctx := range expectedCpuInfoFirstPatch {
-							expectedCPUCount += expectedCpuInfoFirstPatch[ctx].cpuCount
+						for ctx := range expectedCPUInfoFirstPatch {
+							expectedCPUCount += expectedCPUInfoFirstPatch[ctx].cpuCount
 						}
 						skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), expectedCPUCount)
 
 						expectedCPUCount = 0
-						for ctx := range expectedCpuInfoSecondPatch {
-							expectedCPUCount += expectedCpuInfoSecondPatch[ctx].cpuCount
+						for ctx := range expectedCPUInfoSecondPatch {
+							expectedCPUCount += expectedCPUInfoSecondPatch[ctx].cpuCount
 						}
 						skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), expectedCPUCount)
 
@@ -5423,8 +5452,8 @@ var _ = SIGDescribe("CPU Manager with InPlacePodVerticalScalingExclusiveCPUs ena
 						podresize.VerifyPodResources(testPod1, originalContainers, nil)
 
 						ginkgo.By("verifying original pod cpusets are as expected")
-						for cdx := range originalCpuInfo {
-							gomega.Expect(testPod1).To(HaveContainerCPUsCount(originalCpuInfo[cdx].Name, originalCpuInfo[cdx].cpuCount))
+						for cdx := range originalCPUInfo {
+							gomega.Expect(testPod1).To(HaveContainerCPUsCount(originalCPUInfo[cdx].Name, originalCPUInfo[cdx].cpuCount))
 						}
 
 						ginkgo.By("patching pod for resize")
@@ -5447,8 +5476,8 @@ var _ = SIGDescribe("CPU Manager with InPlacePodVerticalScalingExclusiveCPUs ena
 							podresize.VerifyPodResources(resizedPod, expected, nil)
 
 							ginkgo.By("verifying pod cpusets after resize")
-							for cdx := range originalCpuInfo {
-								gomega.Expect(testPod1).To(HaveContainerCPUsCount(expectedCpuInfoFirstPatch[cdx].Name, expectedCpuInfoFirstPatch[cdx].cpuCount))
+							for cdx := range originalCPUInfo {
+								gomega.Expect(testPod1).To(HaveContainerCPUsCount(expectedCPUInfoFirstPatch[cdx].Name, expectedCPUInfoFirstPatch[cdx].cpuCount))
 							}
 
 							ginkgo.By("patching again pod for resize")
@@ -5472,8 +5501,8 @@ var _ = SIGDescribe("CPU Manager with InPlacePodVerticalScalingExclusiveCPUs ena
 								podresize.VerifyPodResources(resizedPod, expected, nil)
 
 								ginkgo.By("verifying pod cpusets after second resize")
-								for cdx := range expectedCpuInfoSecondPatch {
-									gomega.Expect(testPod1).To(HaveContainerCPUsCount(expectedCpuInfoSecondPatch[cdx].Name, expectedCpuInfoSecondPatch[cdx].cpuCount))
+								for cdx := range expectedCPUInfoSecondPatch {
+									gomega.Expect(testPod1).To(HaveContainerCPUsCount(expectedCPUInfoSecondPatch[cdx].Name, expectedCPUInfoSecondPatch[cdx].cpuCount))
 								}
 							} else {
 								patchedPod, pErr = f.ClientSet.CoreV1().Pods(testPod1.Namespace).Patch(ctx,
@@ -5504,8 +5533,8 @@ var _ = SIGDescribe("CPU Manager with InPlacePodVerticalScalingExclusiveCPUs ena
 								ginkgo.By("ensuring the testing pod is failed for the expected reason for second patch")
 								gomega.Expect(actuatedPod).To(HaveStatusConditionsMatchingRegex(wantErrorSecondPatch))
 
-								for cdx := range expectedCpuInfoSecondPatch {
-									gomega.Expect(testPod1).To(HaveContainerCPUsCount(expectedCpuInfoSecondPatch[cdx].Name, expectedCpuInfoSecondPatch[cdx].cpuCount))
+								for cdx := range expectedCPUInfoSecondPatch {
+									gomega.Expect(testPod1).To(HaveContainerCPUsCount(expectedCPUInfoSecondPatch[cdx].Name, expectedCPUInfoSecondPatch[cdx].cpuCount))
 								}
 							}
 						} else {
@@ -5539,7 +5568,7 @@ var _ = SIGDescribe("CPU Manager with InPlacePodVerticalScalingExclusiveCPUs ena
 
 							// we cannot nor we should predict which CPUs the container gets
 							ginkgo.By("verifying pod cpusets after resize")
-							gomega.Expect(actuatedPod).To(HaveContainerCPUsCount("gu-container-1", expectedCpuInfoFirstPatch[0].cpuCount))
+							gomega.Expect(actuatedPod).To(HaveContainerCPUsCount("gu-container-1", expectedCPUInfoFirstPatch[0].cpuCount))
 						}
 					},
 					ginkgo.Entry("should first increase (gu-container-1) CPU request/limit, afterwards fail to decrease (gu-container-1) CPU request/limit, within available capacity because of TopologyAffinityError",
@@ -5619,26 +5648,26 @@ var _ = SIGDescribe("CPU Manager with InPlacePodVerticalScalingExclusiveCPUs ena
 				ginkgo.DescribeTable("",
 					func(ctx context.Context,
 						originalContainers []podresize.ResizableContainerInfo,
-						originalCpuInfo []containerCPUInfo,
+						originalCPUInfo []containerCPUInfo,
 						desiredContainersFirstPatch []podresize.ResizableContainerInfo,
 						expectedContainersFirstPatch []podresize.ResizableContainerInfo,
-						expectedCpuInfoFirstPatch []containerCPUInfo,
+						expectedCPUInfoFirstPatch []containerCPUInfo,
 						wantErrorFirstPatch string,
 						desiredContainersSecondPatch []podresize.ResizableContainerInfo,
 						expectedContainersSecondPatch []podresize.ResizableContainerInfo,
-						expectedCpuInfoSecondPatch []containerCPUInfo,
+						expectedCPUInfoSecondPatch []containerCPUInfo,
 						wantErrorSecondPatch string,
 					) {
 
 						expectedCPUCount := 0
-						for ctx := range expectedCpuInfoFirstPatch {
-							expectedCPUCount += expectedCpuInfoFirstPatch[ctx].cpuCount
+						for ctx := range expectedCPUInfoFirstPatch {
+							expectedCPUCount += expectedCPUInfoFirstPatch[ctx].cpuCount
 						}
 						skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), expectedCPUCount)
 
 						expectedCPUCount = 0
-						for ctx := range expectedCpuInfoSecondPatch {
-							expectedCPUCount += expectedCpuInfoSecondPatch[ctx].cpuCount
+						for ctx := range expectedCPUInfoSecondPatch {
+							expectedCPUCount += expectedCPUInfoSecondPatch[ctx].cpuCount
 						}
 						skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), expectedCPUCount)
 
@@ -5667,8 +5696,8 @@ var _ = SIGDescribe("CPU Manager with InPlacePodVerticalScalingExclusiveCPUs ena
 						podresize.VerifyPodResources(testPod1, originalContainers, nil)
 
 						ginkgo.By("verifying original pod cpusets are as expected")
-						for cdx := range originalCpuInfo {
-							gomega.Expect(testPod1).To(HaveContainerCPUsCount(originalCpuInfo[cdx].Name, originalCpuInfo[cdx].cpuCount))
+						for cdx := range originalCPUInfo {
+							gomega.Expect(testPod1).To(HaveContainerCPUsCount(originalCPUInfo[cdx].Name, originalCPUInfo[cdx].cpuCount))
 						}
 
 						ginkgo.By("patching pod for resize")
@@ -5691,8 +5720,8 @@ var _ = SIGDescribe("CPU Manager with InPlacePodVerticalScalingExclusiveCPUs ena
 							podresize.VerifyPodResources(resizedPod, expected, nil)
 
 							ginkgo.By("verifying pod cpusets after resize")
-							for cdx := range originalCpuInfo {
-								gomega.Expect(testPod1).To(HaveContainerCPUsCount(expectedCpuInfoFirstPatch[cdx].Name, expectedCpuInfoFirstPatch[cdx].cpuCount))
+							for cdx := range originalCPUInfo {
+								gomega.Expect(testPod1).To(HaveContainerCPUsCount(expectedCPUInfoFirstPatch[cdx].Name, expectedCPUInfoFirstPatch[cdx].cpuCount))
 							}
 
 							ginkgo.By("patching again pod for resize")
@@ -5716,8 +5745,8 @@ var _ = SIGDescribe("CPU Manager with InPlacePodVerticalScalingExclusiveCPUs ena
 								podresize.VerifyPodResources(resizedPod, expected, nil)
 
 								ginkgo.By("verifying pod cpusets after second resize")
-								for cdx := range expectedCpuInfoSecondPatch {
-									gomega.Expect(testPod1).To(HaveContainerCPUsCount(expectedCpuInfoSecondPatch[cdx].Name, expectedCpuInfoSecondPatch[cdx].cpuCount))
+								for cdx := range expectedCPUInfoSecondPatch {
+									gomega.Expect(testPod1).To(HaveContainerCPUsCount(expectedCPUInfoSecondPatch[cdx].Name, expectedCPUInfoSecondPatch[cdx].cpuCount))
 								}
 							} else {
 								patchedPod, pErr = f.ClientSet.CoreV1().Pods(testPod1.Namespace).Patch(ctx,
@@ -5748,8 +5777,8 @@ var _ = SIGDescribe("CPU Manager with InPlacePodVerticalScalingExclusiveCPUs ena
 								ginkgo.By("ensuring the testing pod is failed for the expected reason for second patch")
 								gomega.Expect(actuatedPod).To(HaveStatusConditionsMatchingRegex(wantErrorSecondPatch))
 
-								for cdx := range expectedCpuInfoSecondPatch {
-									gomega.Expect(testPod1).To(HaveContainerCPUsCount(expectedCpuInfoSecondPatch[cdx].Name, expectedCpuInfoSecondPatch[cdx].cpuCount))
+								for cdx := range expectedCPUInfoSecondPatch {
+									gomega.Expect(testPod1).To(HaveContainerCPUsCount(expectedCPUInfoSecondPatch[cdx].Name, expectedCPUInfoSecondPatch[cdx].cpuCount))
 								}
 							}
 						} else {
@@ -5783,7 +5812,7 @@ var _ = SIGDescribe("CPU Manager with InPlacePodVerticalScalingExclusiveCPUs ena
 
 							// we cannot nor we should predict which CPUs the container gets
 							ginkgo.By("verifying pod cpusets after resize")
-							gomega.Expect(actuatedPod).To(HaveContainerCPUsCount("gu-container-1", expectedCpuInfoFirstPatch[0].cpuCount))
+							gomega.Expect(actuatedPod).To(HaveContainerCPUsCount("gu-container-1", expectedCPUInfoFirstPatch[0].cpuCount))
 						}
 					},
 					ginkgo.Entry("should first increase (gu-container-1) CPU request/limit and afterwards decrease (gu-container-1) CPU request/limit, within available capacity",
@@ -6133,26 +6162,26 @@ var _ = SIGDescribe("CPU Manager with InPlacePodVerticalScalingExclusiveCPUs ena
 				ginkgo.DescribeTable("",
 					func(ctx context.Context,
 						originalContainers []podresize.ResizableContainerInfo,
-						originalCpuInfo []containerCPUInfo,
+						originalCPUInfo []containerCPUInfo,
 						desiredContainersFirstPatch []podresize.ResizableContainerInfo,
 						expectedContainersFirstPatch []podresize.ResizableContainerInfo,
-						expectedCpuInfoFirstPatch []containerCPUInfo,
+						expectedCPUInfoFirstPatch []containerCPUInfo,
 						wantErrorFirstPatch string,
 						desiredContainersSecondPatch []podresize.ResizableContainerInfo,
 						expectedContainersSecondPatch []podresize.ResizableContainerInfo,
-						expectedCpuInfoSecondPatch []containerCPUInfo,
+						expectedCPUInfoSecondPatch []containerCPUInfo,
 						wantErrorSecondPatch string,
 					) {
 
 						expectedCPUCount := 0
-						for ctx := range expectedCpuInfoFirstPatch {
-							expectedCPUCount += expectedCpuInfoFirstPatch[ctx].cpuCount
+						for ctx := range expectedCPUInfoFirstPatch {
+							expectedCPUCount += expectedCPUInfoFirstPatch[ctx].cpuCount
 						}
 						skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), expectedCPUCount)
 
 						expectedCPUCount = 0
-						for ctx := range expectedCpuInfoSecondPatch {
-							expectedCPUCount += expectedCpuInfoSecondPatch[ctx].cpuCount
+						for ctx := range expectedCPUInfoSecondPatch {
+							expectedCPUCount += expectedCPUInfoSecondPatch[ctx].cpuCount
 						}
 						skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), expectedCPUCount)
 
@@ -6181,8 +6210,8 @@ var _ = SIGDescribe("CPU Manager with InPlacePodVerticalScalingExclusiveCPUs ena
 						podresize.VerifyPodResources(testPod1, originalContainers, nil)
 
 						ginkgo.By("verifying original pod cpusets are as expected")
-						for cdx := range originalCpuInfo {
-							gomega.Expect(testPod1).To(HaveContainerCPUsCount(originalCpuInfo[cdx].Name, originalCpuInfo[cdx].cpuCount))
+						for cdx := range originalCPUInfo {
+							gomega.Expect(testPod1).To(HaveContainerCPUsCount(originalCPUInfo[cdx].Name, originalCPUInfo[cdx].cpuCount))
 						}
 
 						ginkgo.By("patching pod for resize")
@@ -6205,8 +6234,8 @@ var _ = SIGDescribe("CPU Manager with InPlacePodVerticalScalingExclusiveCPUs ena
 							podresize.VerifyPodResources(resizedPod, expected, nil)
 
 							ginkgo.By("verifying pod cpusets after resize")
-							for cdx := range originalCpuInfo {
-								gomega.Expect(testPod1).To(HaveContainerCPUsCount(expectedCpuInfoFirstPatch[cdx].Name, expectedCpuInfoFirstPatch[cdx].cpuCount))
+							for cdx := range originalCPUInfo {
+								gomega.Expect(testPod1).To(HaveContainerCPUsCount(expectedCPUInfoFirstPatch[cdx].Name, expectedCPUInfoFirstPatch[cdx].cpuCount))
 							}
 
 							ginkgo.By("patching again pod for resize")
@@ -6230,8 +6259,8 @@ var _ = SIGDescribe("CPU Manager with InPlacePodVerticalScalingExclusiveCPUs ena
 								podresize.VerifyPodResources(resizedPod, expected, nil)
 
 								ginkgo.By("verifying pod cpusets after second resize")
-								for cdx := range expectedCpuInfoSecondPatch {
-									gomega.Expect(testPod1).To(HaveContainerCPUsCount(expectedCpuInfoSecondPatch[cdx].Name, expectedCpuInfoSecondPatch[cdx].cpuCount))
+								for cdx := range expectedCPUInfoSecondPatch {
+									gomega.Expect(testPod1).To(HaveContainerCPUsCount(expectedCPUInfoSecondPatch[cdx].Name, expectedCPUInfoSecondPatch[cdx].cpuCount))
 								}
 							} else {
 								patchedPod, pErr = f.ClientSet.CoreV1().Pods(testPod1.Namespace).Patch(ctx,
@@ -6262,8 +6291,8 @@ var _ = SIGDescribe("CPU Manager with InPlacePodVerticalScalingExclusiveCPUs ena
 								ginkgo.By("ensuring the testing pod is failed for the expected reason for second patch")
 								gomega.Expect(actuatedPod).To(HaveStatusConditionsMatchingRegex(wantErrorSecondPatch))
 
-								for cdx := range expectedCpuInfoSecondPatch {
-									gomega.Expect(testPod1).To(HaveContainerCPUsCount(expectedCpuInfoSecondPatch[cdx].Name, expectedCpuInfoSecondPatch[cdx].cpuCount))
+								for cdx := range expectedCPUInfoSecondPatch {
+									gomega.Expect(testPod1).To(HaveContainerCPUsCount(expectedCPUInfoSecondPatch[cdx].Name, expectedCPUInfoSecondPatch[cdx].cpuCount))
 								}
 							}
 						} else {
@@ -6297,7 +6326,7 @@ var _ = SIGDescribe("CPU Manager with InPlacePodVerticalScalingExclusiveCPUs ena
 
 							// we cannot nor we should predict which CPUs the container gets
 							ginkgo.By("verifying pod cpusets after resize")
-							gomega.Expect(actuatedPod).To(HaveContainerCPUsCount("gu-container-1", expectedCpuInfoFirstPatch[0].cpuCount))
+							gomega.Expect(actuatedPod).To(HaveContainerCPUsCount("gu-container-1", expectedCPUInfoFirstPatch[0].cpuCount))
 						}
 					},
 					ginkgo.Entry("should first increase (gu-container-1) CPU request/limit and afterwards decrease (gu-container-1) CPU request/limit, within available capacity",
@@ -6643,6 +6672,830 @@ var _ = SIGDescribe("CPU Manager with InPlacePodVerticalScalingExclusiveCPUs ena
 					),
 				)
 			}
+		})
+
+		ginkgo.When("Pod scale down time exceed the configured scale-delay-time, and downward API file can get the CPUSet in CPU manager", ginkgo.Label("scale-delay-time"), func() {
+			ginkgo.BeforeEach(func(ctx context.Context) {
+				reservedCPUs = cpuset.New(0)
+			})
+			ginkgo.DescribeTable("",
+				func(ctx context.Context,
+					testCase podResizeWithScaleDelayTimeTestCase,
+				) {
+					expectedCPUCount := 0
+					for ctx := range testCase.firstPatch.expectedCPUInfo {
+						expectedCPUCount += testCase.firstPatch.expectedCPUInfo[ctx].cpuCount
+					}
+					skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), expectedCPUCount)
+
+					expectedCPUCount = 0
+					for ctx := range testCase.secondPatch.expectedCPUInfo {
+						expectedCPUCount += testCase.secondPatch.expectedCPUInfo[ctx].cpuCount
+					}
+					skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), expectedCPUCount)
+
+					delayStr := fmt.Sprintf("%ds", testCase.scaleDelayTime)
+
+					updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+						policyName:         string(cpumanager.PolicyStatic),
+						reservedSystemCPUs: reservedCPUs, // Not really needed for the tests but helps to make a more precise check
+						enableInPlacePodVerticalScalingExclusiveCPUs: true,
+						enableCPUManagerOptions:                      true,
+						options: map[string]string{
+							cpumanager.ScaleDelayTimeOption: delayStr,
+						},
+					}))
+
+					tStamp := strconv.Itoa(time.Now().Nanosecond())
+					testPod1 := podresize.MakeResizablePodWithDownwardAPI(f.Namespace.Name, "testpod1", tStamp, testCase.podCreate.originalContainers, nil)
+					testPod1 = e2epod.MustMixinRestrictedPodSecurity(testPod1)
+
+					newPods, podClient := createAndVerifyPod(ctx, f, testPod1, testCase.podCreate.originalContainers, testCase.podCreate.originalCPUInfo)
+
+					// Pod scale up
+					expected := patchAndVerifyPodResize(ctx, f, newPods, podClient, testCase.podCreate.originalContainers, testCase.podCreate.originalCPUInfo, testCase.firstPatch.desiredContainers, testCase.firstPatch.expectedContainers, testCase.firstPatch.expectedCPUInfo, false, false, testCase)
+
+					// Pod scale down (InterruptedPatch)
+					if testCase.rapidScaleTest == true {
+						ginkgo.By("patching again pod for resize")
+						interruptedPatchString := podresize.MakeResizePatch(expected, testCase.interruptedPatch.desiredContainers, nil, nil)
+
+						patchedPod, pErr := f.ClientSet.CoreV1().Pods(newPods[0].Namespace).Patch(ctx,
+							newPods[0].Name, apimachinerytypes.StrategicMergePatchType, []byte(interruptedPatchString), metav1.PatchOptions{}, "resize")
+						framework.ExpectNoError(pErr, "failed to patch again pod for resize")
+
+						expected = podresize.UpdateExpectedContainerRestarts(ctx, patchedPod, testCase.interruptedPatch.desiredContainers)
+					}
+
+					// Pod scale up/down (secondPatch)
+					// time before scale down
+					timeBeforeScaleDown := time.Now()
+
+					patchAndVerifyPodResize(ctx, f, newPods, podClient, expected, testCase.firstPatch.expectedCPUInfo, testCase.secondPatch.desiredContainers, testCase.secondPatch.expectedContainers, testCase.secondPatch.expectedCPUInfo, testCase.kubeletRestartTest, true, testCase)
+
+					// time after scale down
+					timeAfterScaleDown := time.Now()
+
+					if testCase.secondPatch.expectedCPUInfo[0].cpuCount < testCase.firstPatch.expectedCPUInfo[0].cpuCount {
+						ginkgo.By("verifying pod scale down delay time")
+						gomega.Expect(timeAfterScaleDown.Sub(timeBeforeScaleDown).Seconds()).To(gomega.BeNumerically(">", float64(testCase.scaleDelayTime)),
+							fmt.Sprintf("Resize delay should exceed %d seconds threshold (actual: %.2f seconds)", testCase.scaleDelayTime, timeAfterScaleDown.Sub(timeBeforeScaleDown).Seconds()),
+						)
+					} else if testCase.secondPatch.expectedCPUInfo[0].cpuCount > testCase.firstPatch.expectedCPUInfo[0].cpuCount {
+						ginkgo.By("verifying pod scale up delay time")
+						gomega.Expect(timeAfterScaleDown.Sub(timeBeforeScaleDown).Seconds()).To(gomega.BeNumerically("<", float64(testCase.scaleDelayTime)),
+							fmt.Sprintf("Resize delay should not exceed %d seconds threshold (actual: %.2f seconds)", testCase.scaleDelayTime, timeAfterScaleDown.Sub(timeBeforeScaleDown).Seconds()),
+						)
+					}
+				},
+				ginkgo.Entry("decrease CPU (gu-container-1) request and limit with scale down delay 0s",
+					podResizeWithScaleDelayTimeTestCase{
+						podCreate: podCreateOperation{
+							originalContainers: []podresize.ResizableContainerInfo{
+								{
+									Name:      "gu-container-1",
+									Resources: &cgroups.ContainerResources{CPUReq: "2000m", CPULim: "2000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+							},
+							originalCPUInfo: []containerCPUInfo{
+								{
+									Name:     "gu-container-1",
+									cpuCount: 2,
+								},
+							},
+						},
+						firstPatch: podPatchOperation{
+							desiredContainers: []podresize.ResizableContainerInfo{
+								{
+									Name:      "gu-container-1",
+									Resources: &cgroups.ContainerResources{CPUReq: "4000m", CPULim: "4000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+							},
+							expectedContainers: []podresize.ResizableContainerInfo{
+								{
+									Name:      "gu-container-1",
+									Resources: &cgroups.ContainerResources{CPUReq: "4000m", CPULim: "4000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+							},
+							expectedCPUInfo: []containerCPUInfo{
+								{
+									Name:     "gu-container-1",
+									cpuCount: 4,
+								},
+							},
+						},
+						secondPatch: podPatchOperation{
+							desiredContainers: []podresize.ResizableContainerInfo{
+								{
+									Name:      "gu-container-1",
+									Resources: &cgroups.ContainerResources{CPUReq: "2000m", CPULim: "2000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+							},
+							expectedContainers: []podresize.ResizableContainerInfo{
+								{
+									Name:      "gu-container-1",
+									Resources: &cgroups.ContainerResources{CPUReq: "2000m", CPULim: "2000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+							},
+							expectedCPUInfo: []containerCPUInfo{
+								{
+									Name:     "gu-container-1",
+									cpuCount: 2,
+								},
+							},
+						},
+						scaleDelayTime: 0,
+					},
+				),
+				ginkgo.Entry("decrease CPU (gu-container-1) request and limit with scale down delay 5s",
+					podResizeWithScaleDelayTimeTestCase{
+						podCreate: podCreateOperation{
+							originalContainers: []podresize.ResizableContainerInfo{
+								{
+									Name:      "gu-container-1",
+									Resources: &cgroups.ContainerResources{CPUReq: "2000m", CPULim: "2000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+							},
+							originalCPUInfo: []containerCPUInfo{
+								{
+									Name:     "gu-container-1",
+									cpuCount: 2,
+								},
+							},
+						},
+						firstPatch: podPatchOperation{
+							desiredContainers: []podresize.ResizableContainerInfo{
+								{
+									Name:      "gu-container-1",
+									Resources: &cgroups.ContainerResources{CPUReq: "4000m", CPULim: "4000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+							},
+							expectedContainers: []podresize.ResizableContainerInfo{
+								{
+									Name:      "gu-container-1",
+									Resources: &cgroups.ContainerResources{CPUReq: "4000m", CPULim: "4000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+							},
+							expectedCPUInfo: []containerCPUInfo{
+								{
+									Name:     "gu-container-1",
+									cpuCount: 4,
+								},
+							},
+						},
+						secondPatch: podPatchOperation{
+							desiredContainers: []podresize.ResizableContainerInfo{
+								{
+									Name:      "gu-container-1",
+									Resources: &cgroups.ContainerResources{CPUReq: "2000m", CPULim: "2000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+							},
+							expectedContainers: []podresize.ResizableContainerInfo{
+								{
+									Name:      "gu-container-1",
+									Resources: &cgroups.ContainerResources{CPUReq: "2000m", CPULim: "2000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+							},
+							expectedCPUInfo: []containerCPUInfo{
+								{
+									Name:     "gu-container-1",
+									cpuCount: 2,
+								},
+							},
+						},
+						scaleDelayTime: 5,
+					},
+				),
+				ginkgo.Entry("decrease CPU (gu-container-1) request and limit with scale down delay 10s",
+					podResizeWithScaleDelayTimeTestCase{
+						podCreate: podCreateOperation{
+							originalContainers: []podresize.ResizableContainerInfo{
+								{
+									Name:      "gu-container-1",
+									Resources: &cgroups.ContainerResources{CPUReq: "2000m", CPULim: "2000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+							},
+							originalCPUInfo: []containerCPUInfo{
+								{
+									Name:     "gu-container-1",
+									cpuCount: 2,
+								},
+							},
+						},
+						firstPatch: podPatchOperation{
+							desiredContainers: []podresize.ResizableContainerInfo{
+								{
+									Name:      "gu-container-1",
+									Resources: &cgroups.ContainerResources{CPUReq: "4000m", CPULim: "4000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+							},
+							expectedContainers: []podresize.ResizableContainerInfo{
+								{
+									Name:      "gu-container-1",
+									Resources: &cgroups.ContainerResources{CPUReq: "4000m", CPULim: "4000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+							},
+							expectedCPUInfo: []containerCPUInfo{
+								{
+									Name:     "gu-container-1",
+									cpuCount: 4,
+								},
+							},
+						},
+						secondPatch: podPatchOperation{
+							desiredContainers: []podresize.ResizableContainerInfo{
+								{
+									Name:      "gu-container-1",
+									Resources: &cgroups.ContainerResources{CPUReq: "2000m", CPULim: "2000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+							},
+							expectedContainers: []podresize.ResizableContainerInfo{
+								{
+									Name:      "gu-container-1",
+									Resources: &cgroups.ContainerResources{CPUReq: "2000m", CPULim: "2000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+							},
+							expectedCPUInfo: []containerCPUInfo{
+								{
+									Name:     "gu-container-1",
+									cpuCount: 2,
+								},
+							},
+						},
+						scaleDelayTime: 10,
+					},
+				),
+				ginkgo.Entry("decrease CPU (gu-container-1) request and limit with scale down delay 10s and restart the kubelet during scale down process",
+					podResizeWithScaleDelayTimeTestCase{
+						podCreate: podCreateOperation{
+							originalContainers: []podresize.ResizableContainerInfo{
+								{
+									Name:      "gu-container-1",
+									Resources: &cgroups.ContainerResources{CPUReq: "2000m", CPULim: "2000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+							},
+							originalCPUInfo: []containerCPUInfo{
+								{
+									Name:     "gu-container-1",
+									cpuCount: 2,
+								},
+							},
+						},
+						firstPatch: podPatchOperation{
+							desiredContainers: []podresize.ResizableContainerInfo{
+								{
+									Name:      "gu-container-1",
+									Resources: &cgroups.ContainerResources{CPUReq: "4000m", CPULim: "4000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+							},
+							expectedContainers: []podresize.ResizableContainerInfo{
+								{
+									Name:      "gu-container-1",
+									Resources: &cgroups.ContainerResources{CPUReq: "4000m", CPULim: "4000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+							},
+							expectedCPUInfo: []containerCPUInfo{
+								{
+									Name:     "gu-container-1",
+									cpuCount: 4,
+								},
+							},
+						},
+						secondPatch: podPatchOperation{
+							desiredContainers: []podresize.ResizableContainerInfo{
+								{
+									Name:      "gu-container-1",
+									Resources: &cgroups.ContainerResources{CPUReq: "2000m", CPULim: "2000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+							},
+							expectedContainers: []podresize.ResizableContainerInfo{
+								{
+									Name:      "gu-container-1",
+									Resources: &cgroups.ContainerResources{CPUReq: "2000m", CPULim: "2000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+							},
+							expectedCPUInfo: []containerCPUInfo{
+								{
+									Name:     "gu-container-1",
+									cpuCount: 2,
+								},
+							},
+						},
+						scaleDelayTime:     10,
+						kubeletRestartTest: true,
+					},
+				),
+				ginkgo.Entry("decrease CPU (gu-container-1) request and limit to 3 with scale down delay 10s and within 10 secs send another request to scale-down to 2 cpu's.",
+					podResizeWithScaleDelayTimeTestCase{
+						podCreate: podCreateOperation{
+							originalContainers: []podresize.ResizableContainerInfo{
+								{
+									Name:      "gu-container-1",
+									Resources: &cgroups.ContainerResources{CPUReq: "2000m", CPULim: "2000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+							},
+							originalCPUInfo: []containerCPUInfo{
+								{
+									Name:     "gu-container-1",
+									cpuCount: 2,
+								},
+							},
+						},
+						firstPatch: podPatchOperation{
+							desiredContainers: []podresize.ResizableContainerInfo{
+								{
+									Name:      "gu-container-1",
+									Resources: &cgroups.ContainerResources{CPUReq: "4000m", CPULim: "4000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+							},
+							expectedContainers: []podresize.ResizableContainerInfo{
+								{
+									Name:      "gu-container-1",
+									Resources: &cgroups.ContainerResources{CPUReq: "4000m", CPULim: "4000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+							},
+							expectedCPUInfo: []containerCPUInfo{
+								{
+									Name:     "gu-container-1",
+									cpuCount: 4,
+								},
+							},
+						},
+						interruptedPatch: podPatchOperation{
+							desiredContainers: []podresize.ResizableContainerInfo{
+								{
+									Name:      "gu-container-1",
+									Resources: &cgroups.ContainerResources{CPUReq: "3000m", CPULim: "3000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+							},
+							expectedContainers: nil, // Not used in interrupted patch
+							expectedCPUInfo:    nil, // Not used in interrupted patch
+						},
+						secondPatch: podPatchOperation{
+							desiredContainers: []podresize.ResizableContainerInfo{
+								{
+									Name:      "gu-container-1",
+									Resources: &cgroups.ContainerResources{CPUReq: "2000m", CPULim: "2000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+							},
+							expectedContainers: []podresize.ResizableContainerInfo{
+								{
+									Name:      "gu-container-1",
+									Resources: &cgroups.ContainerResources{CPUReq: "2000m", CPULim: "2000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+							},
+							expectedCPUInfo: []containerCPUInfo{
+								{
+									Name:     "gu-container-1",
+									cpuCount: 2,
+								},
+							},
+						},
+						scaleDelayTime: 10,
+						rapidScaleTest: true,
+					},
+				),
+				ginkgo.Entry("decrease CPU (gu-container-1) request and limit to 2 with scale down delay 10s and within 10 secs send another request to scale-up to 5 cpu's.",
+					podResizeWithScaleDelayTimeTestCase{
+						podCreate: podCreateOperation{
+							originalContainers: []podresize.ResizableContainerInfo{
+								{
+									Name:      "gu-container-1",
+									Resources: &cgroups.ContainerResources{CPUReq: "2000m", CPULim: "2000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+							},
+							originalCPUInfo: []containerCPUInfo{
+								{
+									Name:     "gu-container-1",
+									cpuCount: 2,
+								},
+							},
+						},
+						firstPatch: podPatchOperation{
+							desiredContainers: []podresize.ResizableContainerInfo{
+								{
+									Name:      "gu-container-1",
+									Resources: &cgroups.ContainerResources{CPUReq: "4000m", CPULim: "4000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+							},
+							expectedContainers: []podresize.ResizableContainerInfo{
+								{
+									Name:      "gu-container-1",
+									Resources: &cgroups.ContainerResources{CPUReq: "4000m", CPULim: "4000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+							},
+							expectedCPUInfo: []containerCPUInfo{
+								{
+									Name:     "gu-container-1",
+									cpuCount: 4,
+								},
+							},
+						},
+						interruptedPatch: podPatchOperation{
+							desiredContainers: []podresize.ResizableContainerInfo{
+								{
+									Name:      "gu-container-1",
+									Resources: &cgroups.ContainerResources{CPUReq: "2000m", CPULim: "2000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+							},
+							expectedContainers: nil, // Not used in interrupted patch
+							expectedCPUInfo:    nil, // Not used in interrupted patch
+						},
+						secondPatch: podPatchOperation{
+							desiredContainers: []podresize.ResizableContainerInfo{
+								{
+									Name:      "gu-container-1",
+									Resources: &cgroups.ContainerResources{CPUReq: "5000m", CPULim: "5000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+							},
+							expectedContainers: []podresize.ResizableContainerInfo{
+								{
+									Name:      "gu-container-1",
+									Resources: &cgroups.ContainerResources{CPUReq: "5000m", CPULim: "5000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+							},
+							expectedCPUInfo: []containerCPUInfo{
+								{
+									Name:     "gu-container-1",
+									cpuCount: 5,
+								},
+							},
+						},
+						scaleDelayTime: 10,
+						rapidScaleTest: true,
+					},
+				),
+				ginkgo.Entry("Pod with multiple containers scaling with configured scale-delay-time",
+					podResizeWithScaleDelayTimeTestCase{
+						podCreate: podCreateOperation{
+							originalContainers: []podresize.ResizableContainerInfo{
+								{
+									Name:      "gu-container-1",
+									Resources: &cgroups.ContainerResources{CPUReq: "2000m", CPULim: "2000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+								{
+									Name:      "gu-container-2",
+									Resources: &cgroups.ContainerResources{CPUReq: "2000m", CPULim: "2000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+							},
+							originalCPUInfo: []containerCPUInfo{
+								{
+									Name:     "gu-container-1",
+									cpuCount: 2,
+								},
+								{
+									Name:     "gu-container-2",
+									cpuCount: 2,
+								},
+							},
+						},
+						firstPatch: podPatchOperation{
+							desiredContainers: []podresize.ResizableContainerInfo{
+								{
+									Name:      "gu-container-1",
+									Resources: &cgroups.ContainerResources{CPUReq: "4000m", CPULim: "4000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+								{
+									Name:      "gu-container-2",
+									Resources: &cgroups.ContainerResources{CPUReq: "4000m", CPULim: "4000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+							},
+							expectedContainers: []podresize.ResizableContainerInfo{
+								{
+									Name:      "gu-container-1",
+									Resources: &cgroups.ContainerResources{CPUReq: "4000m", CPULim: "4000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+								{
+									Name:      "gu-container-2",
+									Resources: &cgroups.ContainerResources{CPUReq: "4000m", CPULim: "4000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+							},
+							expectedCPUInfo: []containerCPUInfo{
+								{
+									Name:     "gu-container-1",
+									cpuCount: 4,
+								},
+								{
+									Name:     "gu-container-2",
+									cpuCount: 4,
+								},
+							},
+						},
+						secondPatch: podPatchOperation{
+							desiredContainers: []podresize.ResizableContainerInfo{
+								{
+									Name:      "gu-container-1",
+									Resources: &cgroups.ContainerResources{CPUReq: "2000m", CPULim: "2000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+								{
+									Name:      "gu-container-2",
+									Resources: &cgroups.ContainerResources{CPUReq: "2000m", CPULim: "2000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+							},
+							expectedContainers: []podresize.ResizableContainerInfo{
+								{
+									Name:      "gu-container-1",
+									Resources: &cgroups.ContainerResources{CPUReq: "2000m", CPULim: "2000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+								{
+									Name:      "gu-container-2",
+									Resources: &cgroups.ContainerResources{CPUReq: "2000m", CPULim: "2000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+							},
+							expectedCPUInfo: []containerCPUInfo{
+								{
+									Name:     "gu-container-1",
+									cpuCount: 2,
+								},
+								{
+									Name:     "gu-container-2",
+									cpuCount: 2,
+								},
+							},
+						},
+						scaleDelayTime: 10,
+					},
+				),
+				/*ginkgo.Entry("Pod with multiple containers scaling with configured scale-delay-time, 1 container scale up, 1 container scale down",
+					podResizeWithScaleDelayTimeTestCase{
+						podCreate: podCreateOperation{
+							originalContainers: []podresize.ResizableContainerInfo{
+								{
+									Name:      "gu-container-1",
+									Resources: &cgroups.ContainerResources{CPUReq: "2000m", CPULim: "2000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+								{
+									Name:      "gu-container-2",
+									Resources: &cgroups.ContainerResources{CPUReq: "2000m", CPULim: "2000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+							},
+							originalCPUInfo: []containerCPUInfo{
+								{
+									Name:     "gu-container-1",
+									cpuCount: 2,
+								},
+								{
+									Name:     "gu-container-2",
+									cpuCount: 2,
+								},
+							},
+						},
+						firstPatch: podPatchOperation{
+							desiredContainers: []podresize.ResizableContainerInfo{
+								{
+									Name:      "gu-container-1",
+									Resources: &cgroups.ContainerResources{CPUReq: "2000m", CPULim: "2000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+								{
+									Name:      "gu-container-2",
+									Resources: &cgroups.ContainerResources{CPUReq: "4000m", CPULim: "4000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+							},
+							expectedContainers: []podresize.ResizableContainerInfo{
+								{
+									Name:      "gu-container-1",
+									Resources: &cgroups.ContainerResources{CPUReq: "2000m", CPULim: "2000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+								{
+									Name:      "gu-container-2",
+									Resources: &cgroups.ContainerResources{CPUReq: "4000m", CPULim: "4000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+							},
+							expectedCPUInfo: []containerCPUInfo{
+								{
+									Name:     "gu-container-1",
+									cpuCount: 2,
+								},
+								{
+									Name:     "gu-container-2",
+									cpuCount: 4,
+								},
+							},
+						},
+						secondPatch: podPatchOperation{
+							desiredContainers: []podresize.ResizableContainerInfo{
+								{
+									Name:      "gu-container-1",
+									Resources: &cgroups.ContainerResources{CPUReq: "4000m", CPULim: "4000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+								{
+									Name:      "gu-container-2",
+									Resources: &cgroups.ContainerResources{CPUReq: "2000m", CPULim: "2000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+							},
+							expectedContainers: []podresize.ResizableContainerInfo{
+								{
+									Name:      "gu-container-1",
+									Resources: &cgroups.ContainerResources{CPUReq: "4000m", CPULim: "4000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+								{
+									Name:      "gu-container-2",
+									Resources: &cgroups.ContainerResources{CPUReq: "2000m", CPULim: "2000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+							},
+							expectedCPUInfo: []containerCPUInfo{
+								{
+									Name:     "gu-container-1",
+									cpuCount: 4,
+								},
+								{
+									Name:     "gu-container-2",
+									cpuCount: 2,
+								},
+							},
+						},
+						scaleDelayTime:    10,
+						kubeletRestartTest: false,
+						rapidScaleTest:    false,
+					},
+				),*/
+			)
+		})
+
+		ginkgo.When("other pod can not allocate the removed CPUs until scale down pod (gu-container-1) release this CPUs after scale-delay-time", ginkgo.Label("scale-delay-time"), func() {
+			ginkgo.BeforeEach(func(ctx context.Context) {
+				reservedCPUs = cpuset.New(0)
+			})
+			ginkgo.DescribeTable("",
+				func(ctx context.Context,
+					testCasePod1 podResizeWithScaleDelayTimeTestCase,
+					testCasePod2 podResizeWithScaleDelayTimeTestCase,
+				) {
+					expectedCPUCount := 0
+					for ctx := range testCasePod1.firstPatch.expectedCPUInfo {
+						expectedCPUCount += testCasePod1.firstPatch.expectedCPUInfo[ctx].cpuCount
+					}
+					skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), expectedCPUCount)
+
+					expectedCPUCount = 0
+					for ctx := range testCasePod1.secondPatch.expectedCPUInfo {
+						expectedCPUCount += testCasePod1.secondPatch.expectedCPUInfo[ctx].cpuCount
+					}
+					for ctx := range testCasePod2.firstPatch.expectedCPUInfo {
+						expectedCPUCount += testCasePod2.firstPatch.expectedCPUInfo[ctx].cpuCount
+					}
+					skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), expectedCPUCount)
+
+					delayStr := fmt.Sprintf("%ds", testCasePod1.scaleDelayTime)
+
+					updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+						policyName:         string(cpumanager.PolicyStatic),
+						reservedSystemCPUs: reservedCPUs, // Not really needed for the tests but helps to make a more precise check
+						enableInPlacePodVerticalScalingExclusiveCPUs: true,
+						enableCPUManagerOptions:                      true,
+						options: map[string]string{
+							cpumanager.ScaleDelayTimeOption: delayStr,
+						},
+					}))
+					// Pod1 create
+					tStamp := strconv.Itoa(time.Now().Nanosecond())
+					testPod1 := podresize.MakeResizablePodWithDownwardAPI(f.Namespace.Name, "testpod1", tStamp, testCasePod1.podCreate.originalContainers, nil)
+					testPod1 = e2epod.MustMixinRestrictedPodSecurity(testPod1)
+					newPods1, podClient1 := createAndVerifyPod(ctx, f, testPod1, testCasePod1.podCreate.originalContainers, testCasePod1.podCreate.originalCPUInfo)
+
+					// Pod2 create
+					// tStamp = strconv.Itoa(time.Now().Nanosecond())
+					testPod2 := podresize.MakePodWithResizableContainers(f.Namespace.Name, "testpod2", tStamp, testCasePod2.podCreate.originalContainers, nil)
+					testPod2 = e2epod.MustMixinRestrictedPodSecurity(testPod2)
+					newPods2, podClient2 := createAndVerifyPod(ctx, f, testPod2, testCasePod2.podCreate.originalContainers, testCasePod2.podCreate.originalCPUInfo)
+
+					// Pod1 scale up
+					patchAndVerifyPodResize(ctx, f, newPods1, podClient1, testCasePod1.podCreate.originalContainers, testCasePod1.podCreate.originalCPUInfo, testCasePod1.firstPatch.desiredContainers, testCasePod1.firstPatch.expectedContainers, testCasePod1.firstPatch.expectedCPUInfo, false, false, testCasePod1)
+
+					// Pod1 scale down (secondPatch)
+					// time before scale down
+					timeBeforeScaleDown := time.Now()
+
+					ginkgo.By("patching pod1 for scale down")
+					patchString1 := podresize.MakeResizePatch(testCasePod1.firstPatch.desiredContainers, testCasePod1.secondPatch.desiredContainers, nil, nil)
+
+					_, pErr := f.ClientSet.CoreV1().Pods(newPods1[0].Namespace).Patch(ctx,
+						newPods1[0].Name, apimachinerytypes.StrategicMergePatchType, []byte(patchString1), metav1.PatchOptions{}, "resize")
+					framework.ExpectNoError(pErr, "failed to patch pod for resize")
+
+					// Pod2 scale up
+					maxRequestCPUs := getLocalNode(ctx, f).Status.Allocatable.Cpu().MilliValue() - int64(testCasePod1.secondPatch.expectedCPUInfo[0].cpuCount*1000)
+					maxRequestCPUsStr := fmt.Sprintf("%dm", maxRequestCPUs)
+					originalPod2Containers := []podresize.ResizableContainerInfo{
+						{
+							Name:      "gu-container-1",
+							Resources: &cgroups.ContainerResources{CPUReq: maxRequestCPUsStr, CPULim: maxRequestCPUsStr, MemReq: "200Mi", MemLim: "200Mi"},
+						},
+					}
+					originalPod2ContainersInfo := []containerCPUInfo{
+						{
+							Name:     "gu-container-1",
+							cpuCount: int(maxRequestCPUs / 1000),
+						},
+					}
+					testCasePod2.firstPatch.desiredContainers = originalPod2Containers
+					testCasePod2.firstPatch.expectedContainers = originalPod2Containers
+					testCasePod2.firstPatch.expectedCPUInfo = originalPod2ContainersInfo
+
+					ginkgo.By("patching pod2 for scale up")
+					patchString2 := podresize.MakeResizePatch(testCasePod2.podCreate.originalContainers, testCasePod2.firstPatch.desiredContainers, nil, nil)
+
+					patchedPod2, pErr := f.ClientSet.CoreV1().Pods(newPods2[0].Namespace).Patch(ctx,
+						newPods2[0].Name, apimachinerytypes.StrategicMergePatchType, []byte(patchString2), metav1.PatchOptions{}, "resize")
+					framework.ExpectNoError(pErr, "failed to patch pod for resize")
+
+					ginkgo.By("verifying pod2 resources are as expected post patch, pre-actuation")
+					expected2 := podresize.UpdateExpectedContainerRestarts(ctx, patchedPod2, testCasePod2.firstPatch.expectedContainers)
+					podresize.VerifyPodResources(patchedPod2, expected2, nil)
+
+					ginkgo.By("waiting for pod2 resize to be actuated")
+					resizedPod2 := podresize.WaitForPodResizeActuation(ctx, f, podClient2, newPods2[0], expected2)
+					podresize.ExpectPodResized(ctx, f, resizedPod2, expected2)
+
+					ginkgo.By("verifying pod resources after resize")
+					podresize.VerifyPodResources(resizedPod2, expected2, nil)
+
+					timeAfterScaleDown := time.Now()
+					ginkgo.By("verifying pod2 scale up delay time")
+					gomega.Expect(timeAfterScaleDown.Sub(timeBeforeScaleDown).Seconds()).To(gomega.BeNumerically(">", float64(testCasePod1.scaleDelayTime)),
+						fmt.Sprintf("Resize delay should exceed %d seconds threshold (actual: %.2f seconds)", testCasePod1.scaleDelayTime, timeAfterScaleDown.Sub(timeBeforeScaleDown).Seconds()),
+					)
+				},
+				ginkgo.Entry("decrease CPU (gu-container-1) request and limit with scale down delay 0s",
+					// Pod1 configure
+					podResizeWithScaleDelayTimeTestCase{
+						podCreate: podCreateOperation{
+							originalContainers: []podresize.ResizableContainerInfo{
+								{
+									Name:      "gu-container-1",
+									Resources: &cgroups.ContainerResources{CPUReq: "2000m", CPULim: "2000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+							},
+							originalCPUInfo: []containerCPUInfo{
+								{
+									Name:     "gu-container-1",
+									cpuCount: 2,
+								},
+							},
+						},
+						firstPatch: podPatchOperation{
+							desiredContainers: []podresize.ResizableContainerInfo{
+								{
+									Name:      "gu-container-1",
+									Resources: &cgroups.ContainerResources{CPUReq: "4000m", CPULim: "4000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+							},
+							expectedContainers: []podresize.ResizableContainerInfo{
+								{
+									Name:      "gu-container-1",
+									Resources: &cgroups.ContainerResources{CPUReq: "4000m", CPULim: "4000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+							},
+							expectedCPUInfo: []containerCPUInfo{
+								{
+									Name:     "gu-container-1",
+									cpuCount: 4,
+								},
+							},
+						},
+						secondPatch: podPatchOperation{
+							desiredContainers: []podresize.ResizableContainerInfo{
+								{
+									Name:      "gu-container-1",
+									Resources: &cgroups.ContainerResources{CPUReq: "2000m", CPULim: "2000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+							},
+							expectedContainers: []podresize.ResizableContainerInfo{
+								{
+									Name:      "gu-container-1",
+									Resources: &cgroups.ContainerResources{CPUReq: "2000m", CPULim: "2000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+							},
+							expectedCPUInfo: []containerCPUInfo{
+								{
+									Name:     "gu-container-1",
+									cpuCount: 2,
+								},
+							},
+						},
+						scaleDelayTime:     10,
+						kubeletRestartTest: false,
+						rapidScaleTest:     false,
+					},
+					// Pod2 configure
+					podResizeWithScaleDelayTimeTestCase{
+						podCreate: podCreateOperation{
+							originalContainers: []podresize.ResizableContainerInfo{
+								{
+									Name:      "gu-container-1",
+									Resources: &cgroups.ContainerResources{CPUReq: "2000m", CPULim: "2000m", MemReq: "200Mi", MemLim: "200Mi"},
+								},
+							},
+							originalCPUInfo: []containerCPUInfo{
+								{
+									Name:     "gu-container-1",
+									cpuCount: 2,
+								},
+							},
+						},
+					},
+				),
+			)
 		})
 	},
 )
@@ -6723,6 +7576,22 @@ func HaveContainerCPUsCount(ctnName string, val int) types.GomegaMatcher {
 		}
 		return cpus.Size() == val, nil
 	}).WithTemplate("Pod {{.Actual.Namespace}}/{{.Actual.Name}} UID {{.Actual.UID}} has allowed CPUs <{{.Data.CurrentCPUs}}> not matching expected count <{{.Data.Count}}> for container {{.Data.Name}}", md)
+}
+
+func HaveDownwardAPICPUsCount(f *framework.Framework, ctnName string, val int) types.GomegaMatcher {
+	md := &msgData{
+		Name:  ctnName,
+		Count: val,
+	}
+	return gcustom.MakeMatcher(func(actual *v1.Pod) (bool, error) {
+		cpuSet, err := getStatusCpusetFromContainer(f, actual, ctnName)
+		md.CurrentCPUs = cpuSet.String()
+		if err != nil {
+			framework.Logf("getStatusCpusetFromContainer(%s) failed: %v", ctnName, err)
+			return false, err
+		}
+		return cpuSet.Size() == val, nil
+	}).WithTemplate("Pod {{.Actual.Namespace}}/{{.Actual.Name}} UID {{.Actual.UID}} has DownwardAPI CPUs <{{.Data.CurrentCPUs}}> not matching expected count <{{.Data.Count}}> for container {{.Data.Name}}", md)
 }
 
 func HaveContainerCPUsAlignedTo(ctnName string, val int) types.GomegaMatcher {
@@ -7099,6 +7968,23 @@ func getContainerCFSQuota(pod *v1.Pod, ctnName string, isInit bool) (string, err
 	quota := strings.TrimSpace(string(data))
 	framework.Logf("pod %s/%s qos=%s cnt %s path %q quota %q", pod.Namespace, pod.Name, pod.Status.QOSClass, ctnName, cgPath, quota)
 	return quota, nil
+}
+
+// getContainerStatusCpusetFromPodInfo reads the status_cpuset value from /podinfo/status_cpuset file in a container
+func getStatusCpusetFromContainer(f *framework.Framework, pod *v1.Pod, containerName string) (cpuset.CPUSet, error) {
+	mycmd := fmt.Sprintf("cat /podinfo/status_cpuset_%s", containerName)
+	calValue, _, err := e2epod.ExecCommandInContainerWithFullOutput(f, pod.Name, containerName, "/bin/sh", "-c", mycmd)
+	if err != nil {
+		return cpuset.CPUSet{}, fmt.Errorf("failed to read status_cpuset from container %s in pod %s: %w", containerName, pod.Name, err)
+	}
+
+	framework.Logf("Namespace %s Pod %s Container %s - status_cpuset value: %s", pod.Namespace, pod.Name, containerName, strings.TrimSpace(calValue))
+
+	cpus, err := cpuset.Parse(calValue)
+	if err != nil {
+		return cpuset.CPUSet{}, fmt.Errorf("failed to parse cpuset string '%s': %w", calValue, err)
+	}
+	return cpus, nil
 }
 
 const (
@@ -7580,4 +8466,110 @@ func checkAllocatableCPUs(node *v1.Node, val int, reservedCPUs cpuset.CPUSet, on
 	if nodeCPUDetails.Allocatable < cpuReq {
 		e2eskipper.Skipf("Skipping CPU Manager test: not allocatable %s", msg)
 	}
+}
+
+// createAndVerifyPod creates a pod and verifies its resources and cpusets
+func createAndVerifyPod(ctx context.Context, f *framework.Framework, testPod1 *v1.Pod, originalContainers []podresize.ResizableContainerInfo, originalCPUInfo []containerCPUInfo) ([]*v1.Pod, *e2epod.PodClient) {
+	ginkgo.By("creating pod")
+	podClient := e2epod.NewPodClient(f)
+	newPods := podClient.CreateBatch(ctx, []*v1.Pod{testPod1})
+
+	ginkgo.By("verifying original pod resources, allocations are as expected")
+	podresize.VerifyPodResources(newPods[0], originalContainers, nil)
+
+	ginkgo.By("verifying original pod cpusets are as expected")
+	for cdx := range originalCPUInfo {
+		gomega.Expect(newPods[0]).To(HaveContainerCPUsCount(originalCPUInfo[cdx].Name, originalCPUInfo[cdx].cpuCount))
+	}
+	return newPods, podClient
+}
+
+// patchAndVerifyPodResize patches a pod, verifies the resize operation, and returns the actuated pod
+func patchAndVerifyPodResize(
+	ctx context.Context,
+	f *framework.Framework,
+	newPods []*v1.Pod,
+	podClient *e2epod.PodClient,
+	containersBeforeResize []podresize.ResizableContainerInfo,
+	originalCPUInfo []containerCPUInfo,
+	desiredContainers []podresize.ResizableContainerInfo,
+	expectedContainers []podresize.ResizableContainerInfo,
+	expectedCPUInfo []containerCPUInfo,
+	kubeletRestartTest bool,
+	isCheckscaleDelayTime bool,
+	testCase podResizeWithScaleDelayTimeTestCase,
+) []podresize.ResizableContainerInfo {
+	// time before scaling
+	timeBeforeScaleDown := time.Now()
+
+	ginkgo.By("patching pod for resize")
+	patchString := podresize.MakeResizePatch(containersBeforeResize, desiredContainers, nil, nil)
+
+	patchedPod, pErr := f.ClientSet.CoreV1().Pods(newPods[0].Namespace).Patch(ctx,
+		newPods[0].Name, apimachinerytypes.StrategicMergePatchType, []byte(patchString), metav1.PatchOptions{}, "resize")
+	framework.ExpectNoError(pErr, "failed to patch pod for resize")
+
+	ginkgo.By("verifying cpuset in downward API volume")
+	for cdx := range originalCPUInfo {
+		gomega.Eventually(newPods[0]).WithTimeout(1500 * time.Millisecond).WithPolling(100 * time.Millisecond).Should(HaveDownwardAPICPUsCount(f, expectedCPUInfo[cdx].Name, expectedCPUInfo[cdx].cpuCount))
+	}
+
+	if kubeletRestartTest {
+		// Stop and restart kubelet
+		ginkgo.By("stopping the kubelet")
+		restartKubelet := mustStopKubelet(ctx, f)
+		ginkgo.By("restarting the kubelet")
+		restartKubelet(ctx)
+
+		// Wait for kubelet to be healthy and ready
+		gomega.Eventually(ctx, func() bool {
+			ok := e2enode.HealthCheck(kubeletHealthCheckURL)
+			framework.Logf("kubelet health check at %q value=%v", kubeletHealthCheckURL, ok)
+			return ok
+		}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeFalseBecause("expected kubelet health check to be failed"))
+	}
+
+	ginkgo.By("verifying pod resources are as expected post patch, pre-actuation")
+	expected := podresize.UpdateExpectedContainerRestarts(ctx, patchedPod, expectedContainers)
+	podresize.VerifyPodResources(patchedPod, expected, nil)
+
+	ginkgo.By("waiting for resize to be actuated")
+	resizedPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, newPods[0], expected)
+	podresize.ExpectPodResized(ctx, f, resizedPod, expected)
+
+	ginkgo.By("verifying pod resources after resize")
+	podresize.VerifyPodResources(resizedPod, expected, nil)
+
+	/*ginkgo.By("verifying pod cpusets after resize")
+	for cdx := range originalCPUInfo {
+		gomega.Expect(newPods[0]).To(HaveContainerCPUsCount(expectedCPUInfo[cdx].Name, expectedCPUInfo[cdx].cpuCount))
+	}*/
+
+	for cdx := range originalCPUInfo {
+		/*ginkgo.By("waiting for resize to be actuated")
+		resizedPod := podresize.WaitForContainerResizeActuation(ctx, f, podClient, newPods[0], expected[cdx])
+		podresize.ExpectContainerResized(ctx, f, resizedPod, expected[cdx])*/
+
+		ginkgo.By("verifying pod cpusets after resize")
+		gomega.Expect(newPods[0]).To(HaveContainerCPUsCount(expectedCPUInfo[cdx].Name, expectedCPUInfo[cdx].cpuCount))
+
+		// time after scale down
+		timeAfterScaleDown := time.Now()
+
+		if isCheckscaleDelayTime {
+			if testCase.secondPatch.expectedCPUInfo[cdx].cpuCount < testCase.firstPatch.expectedCPUInfo[cdx].cpuCount {
+				ginkgo.By("verifying pod scale down delay time")
+				gomega.Expect(timeAfterScaleDown.Sub(timeBeforeScaleDown).Seconds()).To(gomega.BeNumerically(">", float64(testCase.scaleDelayTime)),
+					fmt.Sprintf("Resize delay should exceed %d seconds threshold (actual: %.2f seconds)", testCase.scaleDelayTime, timeAfterScaleDown.Sub(timeBeforeScaleDown).Seconds()),
+				)
+			} else if testCase.secondPatch.expectedCPUInfo[cdx].cpuCount > testCase.firstPatch.expectedCPUInfo[cdx].cpuCount {
+				ginkgo.By("verifying pod scale up delay time")
+				gomega.Expect(timeAfterScaleDown.Sub(timeBeforeScaleDown).Seconds()).To(gomega.BeNumerically("<", float64(testCase.scaleDelayTime)),
+					fmt.Sprintf("Resize delay should not exceed %d seconds threshold (actual: %.2f seconds)", testCase.scaleDelayTime, timeAfterScaleDown.Sub(timeBeforeScaleDown).Seconds()),
+				)
+			}
+		}
+	}
+
+	return expected
 }

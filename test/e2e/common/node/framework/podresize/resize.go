@@ -117,6 +117,67 @@ func MakePodWithResizableContainers(ns, name, timeStamp string, tcInfo []Resizab
 	return pod
 }
 
+func MakeResizablePodWithDownwardAPI(ns, name, timeStamp string, tcInfo []ResizableContainerInfo, podResources *v1.ResourceRequirements) *v1.Pod {
+	testInitContainers, testContainers := separateContainers(tcInfo)
+
+	// Add volume mounts to all regular containers)
+	for i := range testContainers {
+		testContainers[i].VolumeMounts = append(testContainers[i].VolumeMounts,
+			v1.VolumeMount{
+				Name:      "podinfo",
+				MountPath: "/podinfo",
+			},
+		)
+	}
+
+	// Create downward API items for each container's status.cpuset
+	// Each container needs a unique file name to avoid overwriting
+	var downwardAPIItems []v1.DownwardAPIVolumeFile
+	for _, container := range testContainers {
+		downwardAPIItems = append(downwardAPIItems, v1.DownwardAPIVolumeFile{
+			Path: "status_cpuset_" + container.Name,
+			ResourceFieldRef: &v1.ResourceFieldSelector{
+				ContainerName: container.Name,
+				Resource:      "status.cpuset",
+			},
+		})
+	}
+
+	minGracePeriodSeconds := int64(0)
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: ns,
+			Labels: map[string]string{
+				"time": timeStamp,
+			},
+		},
+		Spec: v1.PodSpec{
+			OS:                            &v1.PodOS{Name: v1.Linux},
+			InitContainers:                testInitContainers,
+			Containers:                    testContainers,
+			RestartPolicy:                 v1.RestartPolicyOnFailure,
+			TerminationGracePeriodSeconds: &minGracePeriodSeconds,
+			Volumes: []v1.Volume{
+				{
+					Name: "podinfo",
+					VolumeSource: v1.VolumeSource{
+						DownwardAPI: &v1.DownwardAPIVolumeSource{
+							Items: downwardAPIItems,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	if podResources != nil {
+		pod.Spec.Resources = podResources
+	}
+
+	return pod
+}
+
 // separateContainers splits the input into initContainers and normal containers.
 func separateContainers(tcInfo []ResizableContainerInfo) ([]v1.Container, []v1.Container) {
 	var initContainers, containers []v1.Container
@@ -415,6 +476,109 @@ func WaitForPodResizeActuation(ctx context.Context, f *framework.Framework, podC
 	framework.ExpectNoError(err, "failed to get resized pod")
 	return resizedPod
 }
+
+/*
+// WaitForContainerResizeActuation waits for a specific container's resize to complete.
+// This is useful when you want to verify each container's resize independently.
+func WaitForContainerResizeActuation(ctx context.Context, f *framework.Framework, podClient *e2epod.PodClient, pod *v1.Pod, expectedContainer ResizableContainerInfo) *v1.Pod {
+	ginkgo.GinkgoHelper()
+	// Wait for resize to complete for the specific container.
+
+	framework.ExpectNoError(framework.Gomega().
+		Eventually(ctx, framework.RetryNotFound(framework.GetObject(f.ClientSet.CoreV1().Pods(pod.Namespace).Get, pod.Name, metav1.GetOptions{}))).
+		WithTimeout(f.Timeouts.PodStart).
+		Should(framework.MakeMatcher(func(pod *v1.Pod) (func() string, error) {
+			if helpers.IsPodResizeInfeasible(pod) {
+				// This is a terminal resize state
+				return func() string {
+					return "resize is infeasible"
+				}, nil
+			}
+			// Verify only the specific container's status resources
+			if resourceErrs := VerifyContainerStatusResources(pod, expectedContainer); resourceErrs != nil {
+				return func() string {
+					return fmt.Sprintf("container %s status resources don't match expected: %v", expectedContainer.Name, formatErrors(resourceErrs))
+				}, nil
+			}
+			// Wait for kubelet to clear the resize status conditions.
+			for _, c := range pod.Status.Conditions {
+				if c.Type == v1.PodResizePending || c.Type == v1.PodResizeInProgress {
+					return func() string {
+						return fmt.Sprintf("resize status %v is still present in the pod status", c)
+					}, nil
+				}
+			}
+			// Wait for the pod to be ready.
+			if !podutils.IsPodReady(pod) {
+				return func() string { return "pod is not ready" }, nil
+			}
+			return nil, nil
+		})),
+	)
+
+	resizedPod, err := framework.GetObject(podClient.Get, pod.Name, metav1.GetOptions{})(ctx)
+	framework.ExpectNoError(err, "failed to get resized pod")
+	return resizedPod
+}
+
+// VerifyContainerStatusResources verifies the status resources of a specific container.
+func VerifyContainerStatusResources(gotPod *v1.Pod, wantContainer ResizableContainerInfo) error {
+	ginkgo.GinkgoHelper()
+
+	// Find the container status
+	var gotCtrStatus *v1.ContainerStatus
+	for i := range gotPod.Status.ContainerStatuses {
+		if gotPod.Status.ContainerStatuses[i].Name == wantContainer.Name {
+			gotCtrStatus = &gotPod.Status.ContainerStatuses[i]
+			break
+		}
+	}
+	if gotCtrStatus == nil {
+		return fmt.Errorf("container %s not found in pod status", wantContainer.Name)
+	}
+
+	var errs []error
+
+	wantResReq := wantContainer.Resources.ResourceRequirements()
+	if wantResReq == nil {
+		return fmt.Errorf("container %s has nil ResourceRequirements", wantContainer.Name)
+	}
+
+	if err := framework.Gomega().Expect(gotCtrStatus.AllocatedResources).To(gomega.BeComparableTo(wantResReq.Requests)); err != nil {
+		errs = append(errs, fmt.Errorf("container[%s] status allocatedResources mismatch: %w", wantContainer.Name, err))
+	}
+
+	if err := framework.Gomega().Expect(*gotCtrStatus.Resources).To(gomega.BeComparableTo(*wantResReq)); err != nil {
+		errs = append(errs, fmt.Errorf("container[%s] status resources mismatch: %w", wantContainer.Name, err))
+	}
+
+	return utilerrors.NewAggregate(errs)
+}
+
+// ExpectContainerResized verifies that a specific container has been resized correctly.
+func ExpectContainerResized(ctx context.Context, f *framework.Framework, resizedPod *v1.Pod, expectedContainer ResizableContainerInfo) {
+	ginkgo.GinkgoHelper()
+
+	var errs []error
+
+	// Verify container cgroup values
+	tc := makeResizableContainer(expectedContainer)
+	onCgroupv2 := cgroups.IsPodOnCgroupv2Node(f, resizedPod)
+	if cgroupErrs := cgroups.VerifyContainerCgroupValues(f, resizedPod, &tc, onCgroupv2); cgroupErrs != nil {
+		errs = append(errs, fmt.Errorf("container %s cgroup values don't match expected: %w", expectedContainer.Name, formatErrors(cgroupErrs)))
+	}
+
+	// Verify container status resources
+	if resourceErrs := VerifyContainerStatusResources(resizedPod, expectedContainer); resourceErrs != nil {
+		errs = append(errs, fmt.Errorf("container %s status resources don't match expected: %w", expectedContainer.Name, formatErrors(resourceErrs)))
+	}
+
+	if len(errs) > 0 {
+		resizedPod.ManagedFields = nil // Suppress managed fields in error output.
+		framework.ExpectNoError(formatErrors(utilerrors.NewAggregate(errs)),
+			"Verifying container %s resources resize state. Pod: %s", expectedContainer.Name, framework.PrettyPrintJSON(resizedPod))
+	}
+}*/
 
 func ExpectPodResized(ctx context.Context, f *framework.Framework, resizedPod *v1.Pod, expectedContainers []ResizableContainerInfo) {
 	ginkgo.GinkgoHelper()

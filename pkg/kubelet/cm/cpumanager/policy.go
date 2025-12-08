@@ -46,4 +46,10 @@ type Policy interface {
 	AllocatePod(logger logr.Logger, s state.State, pod *v1.Pod, operation lifecycle.Operation) error
 	// GetAllocatableCPUs returns the total set of CPUs available for allocation.
 	GetAllocatableCPUs(m state.State) cpuset.CPUSet
+	// Releases CPUs that have been pending for scale‑down after the timer expires.
+	ReleaseTimedOutScaleDownCPUs(logger logr.Logger, s state.State)
+	// Returns true if the ScaleDelayTime configured and the specified pod and container still during the ScaleDelayTime.
+	IsDuringScaleDownDelay(podID, containerName string) bool
+	// Returns the current allocated CPU for the specified pod and container.
+	GetAssignments(s state.State, podUID, containerName string) string
 }

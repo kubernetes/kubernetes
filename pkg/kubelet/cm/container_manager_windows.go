@@ -78,6 +78,7 @@ func (cm *containerManagerImpl) Start(ctx context.Context, node *v1.Node,
 	sourcesReady config.SourcesReady,
 	podStatusProvider status.PodStatusProvider,
 	runtimeService internalapi.RuntimeService,
+	runtimeHelper kubecontainer.RuntimeHelper,
 	localStorageCapacityIsolation bool) error {
 	logger := klog.FromContext(ctx)
 	logger.V(2).Info("Starting Windows container manager")
@@ -97,7 +98,7 @@ func (cm *containerManagerImpl) Start(ctx context.Context, node *v1.Node,
 	containerMap, containerRunningSet := buildContainerMapAndRunningSetFromRuntime(ctx, runtimeService)
 
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WindowsCPUAndMemoryAffinity) {
-		err := cm.cpuManager.Start(ctx, cpumanager.ActivePodsFunc(activePods), sourcesReady, podStatusProvider, runtimeService, containerMap.Clone())
+		err := cm.cpuManager.Start(ctx, cpumanager.ActivePodsFunc(activePods), sourcesReady, podStatusProvider, runtimeService, runtimeHelper, containerMap.Clone())
 		if err != nil {
 			return fmt.Errorf("start cpu manager error: %v", err)
 		}
@@ -336,6 +337,16 @@ func (cm *containerManagerImpl) GetCPUs(podUID, containerName string) []int64 {
 	return nil
 }
 
+func (cm *containerManagerImpl) GetAssignments(podUID, containerName string) string {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WindowsCPUAndMemoryAffinity) {
+		if cm.cpuManager != nil {
+			return cm.cpuManager.GetAssignments(podUID, containerName)
+		}
+		return "null"
+	}
+	return "null"
+}
+
 func (cm *containerManagerImpl) GetAllocatableCPUs() []int64 {
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WindowsCPUAndMemoryAffinity) {
 		if cm.cpuManager != nil {
@@ -344,6 +355,15 @@ func (cm *containerManagerImpl) GetAllocatableCPUs() []int64 {
 		return []int64{}
 	}
 	return nil
+}
+
+func (cm *containerManagerImpl) IsCPUSetUpdateInProgress(pod *v1.Pod) bool {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WindowsCPUAndMemoryAffinity) {
+		if cm.cpuManager != nil {
+			return cm.cpuManager.IsCPUSetUpdateInProgress(pod)
+		}
+	}
+	return false
 }
 
 func (cm *containerManagerImpl) GetMemory(_, _ string) []*podresourcesapi.ContainerMemory {
