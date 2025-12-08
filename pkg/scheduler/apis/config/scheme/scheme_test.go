@@ -633,6 +633,7 @@ leaderElection:
   resourceName: ""
   resourceNamespace: ""
   retryPeriod: 0s
+metric: {}
 profiles:
 - pluginConfig:
   - args:
@@ -736,6 +737,10 @@ leaderElection:
   resourceName: ""
   resourceNamespace: ""
   retryPeriod: 0s
+metric:
+  bufferSize: 0
+  flushInterval: 0s
+  samplingRatePercent: 0
 parallelism: 8
 podInitialBackoffSeconds: 0
 podMaxBackoffSeconds: 0
@@ -810,6 +815,10 @@ leaderElection:
   resourceName: ""
   resourceNamespace: ""
   retryPeriod: 0s
+metric:
+  bufferSize: 0
+  flushInterval: 0s
+  samplingRatePercent: 0
 parallelism: 8
 podInitialBackoffSeconds: 0
 podMaxBackoffSeconds: 0

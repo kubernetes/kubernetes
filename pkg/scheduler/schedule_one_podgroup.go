@@ -182,7 +182,9 @@ type podSchedulingContext struct {
 }
 
 // initPodSchedulingContext initializes the scheduling context of a single pod for pod group scheduling cycle.
-func initPodSchedulingContext(ctx context.Context, pod *v1.Pod, podGroupState *framework.CycleState, postFilterMode podGroupPostFilterMode) *podSchedulingContext {
+func initPodSchedulingContext(ctx context.Context, pod *v1.Pod, podGroupState *framework.CycleState,
+	postFilterMode podGroupPostFilterMode, pluginMetricsSamplePercent int,
+) *podSchedulingContext {
 	logger := klog.FromContext(ctx)
 	// TODO(knelasevero): Remove duplicated keys from log entry calls
 	// When contextualized logging hits GA
@@ -405,7 +407,7 @@ func (sched *Scheduler) podGroupSchedulingDefaultAlgorithm(ctx context.Context, 
 // It returns the algorithm result and, if successful or the preemption is required, the permit status together with the revert function.
 func (sched *Scheduler) podGroupPodSchedulingAlgorithm(ctx context.Context, schedFwk framework.Framework, podGroupCycleState *framework.CycleState, podGroupInfo *framework.QueuedPodGroupInfo, podInfo *framework.QueuedPodInfo, postFilterMode podGroupPostFilterMode) (algorithmResult, func()) {
 	pod := podInfo.Pod
-	podCtx := initPodSchedulingContext(ctx, pod, podGroupCycleState, postFilterMode)
+	podCtx := initPodSchedulingContext(ctx, pod, podGroupCycleState, postFilterMode, sched.pluginMetricsSamplePercent)
 	logger := podCtx.logger
 	ctx = klog.NewContext(ctx, logger)
 	start := time.Now()
@@ -504,7 +506,7 @@ func (sched *Scheduler) submitPodGroupAlgorithmResult(ctx context.Context, sched
 			// In pod group-level unschedulable or error cases, podResult may not be defined.
 			// Initialize it now to handle pod failure correctly.
 			podResult = algorithmResult{
-				podCtx: initPodSchedulingContext(ctx, pInfo.Pod, podGroupState, runAllPostFilters),
+				podCtx: initPodSchedulingContext(ctx, pInfo.Pod, podGroupState, runAllPostFilters, sched.pluginMetricsSamplePercent),
 				status: podGroupResult.status.Clone(),
 			}
 		}

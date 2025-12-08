@@ -1640,7 +1640,7 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 
 			for i := range tt.algorithmResult.podResults {
 				pod := podGroupInfo.QueuedPodInfos[i].Pod
-				podCtx := initPodSchedulingContext(ctx, pod, podGroupCycleState, runAllPostFilters)
+				podCtx := initPodSchedulingContext(ctx, pod, podGroupCycleState, runAllPostFilters, 0)
 				tt.algorithmResult.podResults[i].podCtx = podCtx
 			}
 

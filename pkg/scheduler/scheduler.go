@@ -122,6 +122,7 @@ type Scheduler struct {
 	nominatedNodeNameForExpectationEnabled bool
 	genericWorkloadEnabled                 bool
 	workloadAwarePreemptionEnabled         bool
+	pluginMetricsSamplePercent             int
 }
 
 func (sched *Scheduler) applyDefaultHandlers() {
@@ -145,6 +146,7 @@ type schedulerOptions struct {
 	frameworkCapturer          FrameworkCapturer
 	parallelism                int32
 	applyDefaultProfile        bool
+	metricConfiguration        schedulerapi.KubeSchedulerMetricConfiguration
 }
 
 // Option configures a Scheduler
@@ -259,6 +261,13 @@ func WithBuildFrameworkCapturer(fc FrameworkCapturer) Option {
 	}
 }
 
+// WithMetricConfiguration sets metrics configs for the Scheduler.
+func WithMetricConfiguration(cfg schedulerapi.KubeSchedulerMetricConfiguration) Option {
+	return func(o *schedulerOptions) {
+		o.metricConfiguration = cfg
+	}
+}
+
 var defaultSchedulerOptions = schedulerOptions{
 	clock:                             clock.RealClock{},
 	percentageOfNodesToScore:          schedulerapi.DefaultPercentageOfNodesToScore,
@@ -271,6 +280,11 @@ var defaultSchedulerOptions = schedulerOptions{
 	// set dynamically in tests. Therefore, we delay creating it until New is actually
 	// invoked.
 	applyDefaultProfile: true,
+	metricConfiguration: schedulerapi.KubeSchedulerMetricConfiguration{
+		SamplingRatePercent: schedulerapi.DefaultMetricsSamplingRatePercent,
+		BufferSize:          schedulerapi.DefaultMetricsBufferSize,
+		FlushInterval:       metav1.Duration{Duration: schedulerapi.DefaultMetricsFlushInterval},
+	},
 }
 
 // New returns a Scheduler
@@ -319,7 +333,11 @@ func New(ctx context.Context,
 	}
 
 	snapshot := internalcache.NewEmptySnapshot()
-	metricsRecorder := metrics.NewMetricsAsyncRecorder(1000, time.Second, stopEverything)
+	metricsRecorder := metrics.NewMetricsAsyncRecorder(
+		options.metricConfiguration.BufferSize,
+		options.metricConfiguration.FlushInterval.Duration,
+		stopEverything,
+	)
 	// waitingPods holds all the pods that are in the scheduler and waiting in the permit stage
 	waitingPods := frameworkruntime.NewWaitingPodsMap()
 
@@ -420,7 +438,7 @@ func New(ctx context.Context,
 		internalqueue.WithPodMaxInUnschedulablePodsDuration(options.podMaxInUnschedulablePodsDuration),
 		internalqueue.WithPreEnqueuePluginMap(preEnqueuePluginMap),
 		internalqueue.WithQueueingHintMapPerProfile(queueingHintsPerProfile),
-		internalqueue.WithPluginMetricsSamplePercent(pluginMetricsSamplePercent),
+		internalqueue.WithPluginMetricsSamplePercent(options.metricConfiguration.SamplingRatePercent),
 		internalqueue.WithMetricsRecorder(metricsRecorder),
 		internalqueue.WithAPIDispatcher(apiDispatcher),
 		internalqueue.WithPodSigners(podSigners),
@@ -456,6 +474,7 @@ func New(ctx context.Context,
 		podGroupLister:                         podGroupLister,
 		genericWorkloadEnabled:                 feature.DefaultFeatureGate.Enabled(features.GenericWorkload),
 		workloadAwarePreemptionEnabled:         feature.DefaultFeatureGate.Enabled(features.WorkloadAwarePreemption),
+		pluginMetricsSamplePercent:             options.metricConfiguration.SamplingRatePercent,
 	}
 	sched.NextPod = podQueue.Pop
 	sched.applyDefaultHandlers()

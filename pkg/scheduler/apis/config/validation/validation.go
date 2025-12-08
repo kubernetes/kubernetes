@@ -80,6 +80,7 @@ func ValidateKubeSchedulerConfiguration(cc *config.KubeSchedulerConfiguration) u
 	}
 
 	errs = append(errs, validateExtenders(field.NewPath("extenders"), cc.Extenders)...)
+	errs = append(errs, validateMetrics(field.NewPath("metric"), &cc.Metric)...)
 	return utilerrors.Flatten(utilerrors.NewAggregate(errs))
 }
 
@@ -297,5 +298,19 @@ func validateExtendedResourceName(path *field.Path, name v1.ResourceName) []erro
 	if !v1helper.IsExtendedResourceName(name) {
 		validationErrors = append(validationErrors, field.Invalid(path, string(name), "is an invalid extended resource name"))
 	}
+	return validationErrors
+}
+
+func validateMetrics(path *field.Path, metrics *config.KubeSchedulerMetricConfiguration) []error {
+	if metrics == nil {
+		return nil
+	}
+
+	var validationErrors []error
+	if metrics.SamplingRatePercent < 0 || metrics.SamplingRatePercent > 100 {
+		err := field.Invalid(path.Child("samplingRatePercent"), metrics.SamplingRatePercent, "not in valid range [0-100]")
+		validationErrors = append(validationErrors, err)
+	}
+
 	return validationErrors
 }

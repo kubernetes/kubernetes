@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"k8s.io/component-base/metrics"
+	"k8s.io/klog/v2"
 )
 
 // MetricRecorder represents a metric recorder which takes action when the
