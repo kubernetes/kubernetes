@@ -511,8 +511,15 @@ func (c *Controller) syncVolume(logger klog.Logger, pod *v1.Pod, spec *volume.Sp
 	changePolicy := v1.SELinuxChangePolicyMountOption
 	if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.SELinuxChangePolicy != nil {
 		changePolicy = *pod.Spec.SecurityContext.SELinuxChangePolicy
+		logger.V(5).Info("Using Pod SELinux change policy", "pod", klog.KObj(pod), "changePolicy", changePolicy)
 	}
-	if !pluginSupportsSELinuxContextMount {
+	if !pluginSupportsSELinuxContextMount && changePolicy != v1.SELinuxChangePolicyRecursive {
+		logger.V(5).Info("Volume does not support SELinux context mount, setting changePolicy to Recursive", "pod", klog.KObj(pod), "volume", spec.Name())
+		changePolicy = v1.SELinuxChangePolicyRecursive
+	}
+
+	if seLinuxLabel == "" && changePolicy != v1.SELinuxChangePolicyRecursive {
+		logger.V(5).Info("Pod has empty SELinux label, setting changePolicy to Recursive", "pod", klog.KObj(pod))
 		changePolicy = v1.SELinuxChangePolicyRecursive
 	}
 
