@@ -3169,7 +3169,7 @@ func TestRecordingMetrics(t *testing.T) {
 				PostBind:  pluginSet,
 			}
 
-			recorder := metrics.NewMetricsAsyncRecorder(100, time.Nanosecond, ctx.Done())
+			recorder := metrics.NewMetricsAsyncRecorder(ctx, 100, time.Nanosecond)
 			profile := config.KubeSchedulerProfile{
 				PercentageOfNodesToScore: ptr.To[int32](testPercentageOfNodesToScore),
 				SchedulerName:            testProfileName,
@@ -3288,7 +3288,7 @@ func TestRunBindPlugins(t *testing.T) {
 			plugins := &config.Plugins{Bind: pluginSet}
 			_, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
-			recorder := metrics.NewMetricsAsyncRecorder(100, time.Nanosecond, ctx.Done())
+			recorder := metrics.NewMetricsAsyncRecorder(ctx, 100, time.Nanosecond)
 			profile := config.KubeSchedulerProfile{
 				SchedulerName:            testProfileName,
 				PercentageOfNodesToScore: ptr.To[int32](testPercentageOfNodesToScore),
