@@ -37,8 +37,10 @@ func TestStepContext(t *testing.T) {
 			},
 			expectTrace: `(LOG) <klog header>: step: Log a b 42
 (LOG) <klog header>: step: Logf a b 42
-(ERROR) <klog header>: ERROR: step: Error a b 42
-(ERROR) <klog header>: ERROR: step: Errorf a b 42
+(ERROR) ERROR: <klog header>:
+	step: Error a b 42
+(ERROR) ERROR: <klog header>:
+	step: Errorf a b 42
 `,
 		},
 		"fatal": {
@@ -48,7 +50,8 @@ func TestStepContext(t *testing.T) {
 				// not reached
 				tCtx.Log("Log")
 			},
-			expectTrace: `(FATAL) <klog header>: FATAL ERROR: step: Error a b 42
+			expectTrace: `(FATAL) FATAL ERROR: <klog header>:
+	step: Error a b 42
 `,
 		},
 		"fatalf": {
@@ -58,7 +61,8 @@ func TestStepContext(t *testing.T) {
 				// not reached
 				tCtx.Log("Log")
 			},
-			expectTrace: `(FATAL) <klog header>: FATAL ERROR: step: Error a b 42
+			expectTrace: `(FATAL) FATAL ERROR: <klog header>:
+	step: Error a b 42
 `,
 		},
 		"progress": {
@@ -79,8 +83,8 @@ func TestStepContext(t *testing.T) {
 				assert.Nil(tCtx, noSuchValue, "value for unknown context value key")
 			},
 			expectTrace: `(LOG) <klog header>: step: You requested a progress report.
-
-step: hello world
+	
+	step: hello world
 `,
 			expectDuration: 5 * time.Second,
 		},
