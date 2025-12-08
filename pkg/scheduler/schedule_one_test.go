@@ -3873,27 +3873,27 @@ func TestZeroRequest(t *testing.T) {
 	large2 := large
 	large2.NodeName = "node2"
 	tests := []struct {
-		pod           *v1.Pod
-		pods          []*v1.Pod
+		requestedPod  *v1.Pod
+		existingPods  []*v1.Pod
 		nodes         []*v1.Node
 		name          string
 		expectedScore int64
 	}{
 		{
-			pod:   &v1.Pod{Spec: noResources},
-			nodes: []*v1.Node{makeNode("node1", 1000, schedutil.DefaultMemoryRequest*10), makeNode("node2", 1000, schedutil.DefaultMemoryRequest*10)},
-			name:  "test priority of zero-request pod with node with zero-request pod",
-			pods: []*v1.Pod{
+			name:         "test priority of zero-request pod with node with zero-request pod",
+			requestedPod: &v1.Pod{Spec: noResources},
+			nodes:        []*v1.Node{makeNode("node1", 1000, schedutil.DefaultMemoryRequest*10), makeNode("node2", 1000, schedutil.DefaultMemoryRequest*10)},
+			existingPods: []*v1.Pod{
 				{Spec: large1}, {Spec: noResources1},
 				{Spec: large2}, {Spec: small2},
 			},
 			expectedScore: 50,
 		},
 		{
-			pod:   &v1.Pod{Spec: small},
-			nodes: []*v1.Node{makeNode("node1", 1000, schedutil.DefaultMemoryRequest*10), makeNode("node2", 1000, schedutil.DefaultMemoryRequest*10)},
-			name:  "test priority of nonzero-request pod with node with zero-request pod",
-			pods: []*v1.Pod{
+			name:         "test priority of nonzero-request pod with node with zero-request pod",
+			requestedPod: &v1.Pod{Spec: small},
+			nodes:        []*v1.Node{makeNode("node1", 1000, schedutil.DefaultMemoryRequest*10), makeNode("node2", 1000, schedutil.DefaultMemoryRequest*10)},
+			existingPods: []*v1.Pod{
 				{Spec: large1}, {Spec: noResources1},
 				{Spec: large2}, {Spec: small2},
 			},
@@ -3901,10 +3901,10 @@ func TestZeroRequest(t *testing.T) {
 		},
 		// The point of this test is to verify that we're not just getting the same score no matter what we schedule.
 		{
-			pod:   &v1.Pod{Spec: large},
-			nodes: []*v1.Node{makeNode("node1", 1000, schedutil.DefaultMemoryRequest*10), makeNode("node2", 1000, schedutil.DefaultMemoryRequest*10)},
-			name:  "test priority of larger pod with node with zero-request pod",
-			pods: []*v1.Pod{
+			name:         "test priority of larger pod with node with zero-request pod",
+			requestedPod: &v1.Pod{Spec: large},
+			nodes:        []*v1.Node{makeNode("node1", 1000, schedutil.DefaultMemoryRequest*10), makeNode("node2", 1000, schedutil.DefaultMemoryRequest*10)},
+			existingPods: []*v1.Pod{
 				{Spec: large1}, {Spec: noResources1},
 				{Spec: large2}, {Spec: small2},
 			},
@@ -3917,7 +3917,7 @@ func TestZeroRequest(t *testing.T) {
 			client := clientsetfake.NewClientset()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 
-			snapshot := internalcache.NewSnapshot(test.pods, test.nodes)
+			snapshot := internalcache.NewSnapshot(test.existingPods, test.nodes)
 			fts := feature.Features{}
 			pluginRegistrations := []tf.RegisterPluginFunc{
 				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
@@ -3947,7 +3947,7 @@ func TestZeroRequest(t *testing.T) {
 			sched.applyDefaultHandlers()
 
 			state := framework.NewCycleState()
-			_, _, _, _, err = sched.findNodesThatFitPod(ctx, fwk, state, test.pod)
+			_, _, _, _, err = sched.findNodesThatFitPod(ctx, fwk, state, test.requestedPod)
 			if err != nil {
 				t.Fatalf("error filtering nodes: %+v", err)
 			}
@@ -3955,8 +3955,8 @@ func TestZeroRequest(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to list node from snapshot: %v", err)
 			}
-			fwk.RunPreScorePlugins(ctx, state, test.pod, nodeInfos)
-			list, err := prioritizeNodes(ctx, nil, fwk, state, test.pod, nodeInfos)
+			fwk.RunPreScorePlugins(ctx, state, test.requestedPod, nodeInfos)
+			list, err := prioritizeNodes(ctx, nil, fwk, state, test.requestedPod, nodeInfos)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}

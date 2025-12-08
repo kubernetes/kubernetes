@@ -286,7 +286,7 @@ func testCalculateResourceAllocatableRequest(tCtx ktesting.TContext) {
 		enableDRAExtendedResource bool
 		node                      *v1.Node
 		extendedResource          v1.ResourceName
-		objects                   []apiruntime.Object
+		draObjects                []apiruntime.Object
 		expectedAllocatable       int64
 		expectedAllocated         int64
 	}{
@@ -308,18 +308,18 @@ func testCalculateResourceAllocatableRequest(tCtx ktesting.TContext) {
 			enableDRAExtendedResource: true,
 			node:                      st.MakeNode().Name(nodeName).Obj(),
 			extendedResource:          explicitExtendedResource,
-			objects: []apiruntime.Object{
+			draObjects: []apiruntime.Object{
 				deviceClassWithExtendResourceName,
 				st.MakeResourceSlice(nodeName, driverName).Device("device-1").Obj(),
 			},
-			expectedAllocatable: 1,
+			expectedAllocatable: 1, // 1 device `device-1`
 			expectedAllocated:   0,
 		},
 		"DRA-backed-resource-implicit": {
 			enableDRAExtendedResource: true,
 			node:                      st.MakeNode().Name(nodeName).Obj(),
 			extendedResource:          implicitExtendedResource,
-			objects: []apiruntime.Object{
+			draObjects: []apiruntime.Object{
 				&resourceapi.DeviceClass{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: deviceClassName,
@@ -327,22 +327,24 @@ func testCalculateResourceAllocatableRequest(tCtx ktesting.TContext) {
 				},
 				st.MakeResourceSlice(nodeName, driverName).Device("device-1").Obj(),
 			},
-			expectedAllocatable: 1,
+			expectedAllocatable: 1, // 1 device `device-1`
 			expectedAllocated:   0,
 		},
 		"DRA-backed-resource-no-slices": {
 			enableDRAExtendedResource: true,
 			node:                      st.MakeNode().Name(nodeName).Obj(),
 			extendedResource:          explicitExtendedResource,
-			objects:                   []apiruntime.Object{deviceClassWithExtendResourceName},
-			expectedAllocatable:       0,
-			expectedAllocated:         0,
+			draObjects: []apiruntime.Object{
+				deviceClassWithExtendResourceName,
+			},
+			expectedAllocatable: 0,
+			expectedAllocated:   0,
 		},
 		"DRA-backed-resource-with-allocated-device": {
 			enableDRAExtendedResource: true,
 			node:                      st.MakeNode().Name(nodeName).Obj(),
 			extendedResource:          explicitExtendedResource,
-			objects: []apiruntime.Object{
+			draObjects: []apiruntime.Object{
 				deviceClassWithExtendResourceName,
 				st.MakeResourceSlice(nodeName, driverName).Devices("device-1", "device-2").Obj(),
 				// Create a resource claim that fully allocates device-1
@@ -363,14 +365,14 @@ func testCalculateResourceAllocatableRequest(tCtx ktesting.TContext) {
 					}).
 					Obj(),
 			},
-			expectedAllocatable: 2,
-			expectedAllocated:   1, // 1 allocated
+			expectedAllocatable: 2, // 2 allocatable devices `device-1`, `device-2`
+			expectedAllocated:   1, // 1 allocated by `testClaim`
 		},
 		"DRA-backed-resource-with-shared-device-allocation": {
 			enableDRAExtendedResource: true,
 			node:                      st.MakeNode().Name(nodeName).Obj(),
 			extendedResource:          explicitExtendedResource,
-			objects: []apiruntime.Object{
+			draObjects: []apiruntime.Object{
 				deviceClassWithExtendResourceName,
 				st.MakeResourceSlice(nodeName, driverName).Devices("device-1", "device-2").Obj(),
 				// Create a resource claim with shared device allocation (consumable capacity)
@@ -392,14 +394,14 @@ func testCalculateResourceAllocatableRequest(tCtx ktesting.TContext) {
 					}).
 					Obj(),
 			},
-			expectedAllocatable: 2,
-			expectedAllocated:   1, // 1 allocated (shared)
+			expectedAllocatable: 2, // 2 allocatable devices `device-1`, `device-2`
+			expectedAllocated:   1, // 1 allocated (shared) by `testClaim`
 		},
 		"DRA-backed-resource-multiple-devices-mixed-allocation": {
 			enableDRAExtendedResource: true,
 			node:                      st.MakeNode().Name(nodeName).Obj(),
 			extendedResource:          explicitExtendedResource,
-			objects: []apiruntime.Object{
+			draObjects: []apiruntime.Object{
 				deviceClassWithExtendResourceName,
 				st.MakeResourceSlice(nodeName, driverName).Devices("device-1", "device-2", "device-3").Obj(),
 				// Mix of fully allocated and shared device allocations
@@ -439,14 +441,14 @@ func testCalculateResourceAllocatableRequest(tCtx ktesting.TContext) {
 					Obj(),
 				// device-3 remains unallocated
 			},
-			expectedAllocatable: 3,
-			expectedAllocated:   2, // 2 allocated (1 full + 1 shared)
+			expectedAllocatable: 3, // 3 allocatable devices `device-1`, `device-2`, `device-3`
+			expectedAllocated:   2, // 2 allocated (1 full `test-claim-1` + 1 shared `test-claim-2`)
 		},
 		"DRA-backed-resource-with-per-device-node-selection": {
 			enableDRAExtendedResource: true,
 			node:                      st.MakeNode().Name(nodeName).Label("zone", "us-east-1a").Obj(),
 			extendedResource:          explicitExtendedResource,
-			objects: []apiruntime.Object{
+			draObjects: []apiruntime.Object{
 				&resourceapi.DeviceClass{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: deviceClassName,
@@ -546,7 +548,7 @@ func testCalculateResourceAllocatableRequest(tCtx ktesting.TContext) {
 			// Setup environment, create required objects
 			featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, tc.enableDRAExtendedResource)
 
-			draManager := newTestDRAManager(tCtx, tc.objects...)
+			draManager := newTestDRAManager(tCtx, tc.draObjects...)
 
 			nodeInfo := framework.NewNodeInfo()
 			nodeInfo.SetNode(tc.node)
@@ -572,10 +574,10 @@ func testCalculateResourceAllocatableRequest(tCtx ktesting.TContext) {
 			// Test calculateResourceAllocatableRequest API
 			allocatable, allocated := scorer.calculateResourceAllocatableRequest(tCtx, nodeInfo, tc.extendedResource, draPreScoreState)
 			if !cmp.Equal(allocatable, tc.expectedAllocatable) {
-				tCtx.Errorf("Expected allocatable=%v, but got allocatable=%v", tc.expectedAllocatable, allocatable)
+				tCtx.Errorf("Expected allocatable=%v, but got %v", tc.expectedAllocatable, allocatable)
 			}
 			if !cmp.Equal(allocated, tc.expectedAllocated) {
-				tCtx.Errorf("Expected allocated=%v, but got allocated=%v", tc.expectedAllocated, allocated)
+				tCtx.Errorf("Expected allocated=%v, but got %v", tc.expectedAllocated, allocated)
 			}
 		})
 	}
