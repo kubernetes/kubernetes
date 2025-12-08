@@ -1124,7 +1124,11 @@ func validateDownwardAPIVolumeFile(file *core.DownwardAPIVolumeFile, fldPath *fi
 		}
 	} else if file.ResourceFieldRef != nil {
 		localValidContainerResourceFieldPathPrefixes := validContainerResourceFieldPathPrefixesWithDownwardAPIHugePages
-		allErrs = append(allErrs, validateContainerResourceFieldSelector(file.ResourceFieldRef, &validContainerResourceFieldPathExpressions, &localValidContainerResourceFieldPathPrefixes, fldPath.Child("resourceFieldRef"), true)...)
+		validExpressions := validContainerResourceFieldPathExpressions
+		if opts.AllowDownwardAPIAssignedResources {
+			validExpressions = validExpressions.Union(validContainerResourceFieldPathExpressionsDownwardAPIAssignedResources)
+		}
+		allErrs = append(allErrs, validateContainerResourceFieldSelector(file.ResourceFieldRef, &validExpressions, &localValidContainerResourceFieldPathPrefixes, fldPath.Child("resourceFieldRef"), true, opts)...)
 	} else {
 		allErrs = append(allErrs, field.Required(fldPath, "one of fieldRef and resourceFieldRef is required"))
 	}
@@ -2799,6 +2803,10 @@ var validContainerResourceFieldPathExpressions = sets.New(
 	"requests.ephemeral-storage",
 )
 
+var validContainerResourceFieldPathExpressionsDownwardAPIAssignedResources = sets.New(resourceAssignedCpuset)
+
+const resourceAssignedCpuset string = "assigned.cpuset"
+
 var validContainerResourceFieldPathPrefixesWithDownwardAPIHugePages = sets.New(hugepagesRequestsPrefixDownwardAPI, hugepagesLimitsPrefixDownwardAPI)
 
 const hugepagesRequestsPrefixDownwardAPI string = `requests.hugepages-`
@@ -2820,7 +2828,7 @@ func validateEnvVarValueFrom(ev core.EnvVar, fldPath *field.Path, opts PodValida
 	if ev.ValueFrom.ResourceFieldRef != nil {
 		numSources++
 		localValidContainerResourceFieldPathPrefixes := validContainerResourceFieldPathPrefixesWithDownwardAPIHugePages
-		allErrs = append(allErrs, validateContainerResourceFieldSelector(ev.ValueFrom.ResourceFieldRef, &validContainerResourceFieldPathExpressions, &localValidContainerResourceFieldPathPrefixes, fldPath.Child("resourceFieldRef"), false)...)
+		allErrs = append(allErrs, validateContainerResourceFieldSelector(ev.ValueFrom.ResourceFieldRef, &validContainerResourceFieldPathExpressions, &localValidContainerResourceFieldPathPrefixes, fldPath.Child("resourceFieldRef"), false, opts)...)
 	}
 	if ev.ValueFrom.ConfigMapKeyRef != nil {
 		numSources++
@@ -2888,7 +2896,7 @@ func validateObjectFieldSelector(fs *core.ObjectFieldSelector, expressions *sets
 	return allErrs
 }
 
-func validateContainerResourceFieldSelector(fs *core.ResourceFieldSelector, expressions *sets.Set[string], prefixes *sets.Set[string], fldPath *field.Path, volume bool) field.ErrorList {
+func validateContainerResourceFieldSelector(fs *core.ResourceFieldSelector, expressions *sets.Set[string], prefixes *sets.Set[string], fldPath *field.Path, volume bool, opts PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if volume && len(fs.ContainerName) == 0 {
@@ -2906,10 +2914,16 @@ func validateContainerResourceFieldSelector(fs *core.ResourceFieldSelector, expr
 			}
 		}
 		if !foundPrefix {
-			allErrs = append(allErrs, field.NotSupported(fldPath.Child("resource"), fs.Resource, sets.List(*expressions)))
+			// When the DownwardAPIAssignedResources feature gate is disabled and
+			// the resource is assigned.cpuset, silently skip validation to allow seamless rollout/rollback.
+			if fs.Resource == resourceAssignedCpuset && !opts.AllowDownwardAPIAssignedResources {
+				// skip validation for assigned.cpuset when feature is disabled
+			} else {
+				allErrs = append(allErrs, field.NotSupported(fldPath.Child("resource"), fs.Resource, sets.List(*expressions)))
+			}
 		}
 	}
-	allErrs = append(allErrs, validateContainerResourceDivisor(fs.Resource, fs.Divisor, fldPath)...)
+	allErrs = append(allErrs, validateContainerResourceDivisor(fs.Resource, fs.Divisor, fldPath, opts)...)
 	return allErrs
 }
 
@@ -2986,7 +3000,7 @@ var validContainerResourceDivisorForEphemeralStorage = sets.New(
 	"1k", "1M", "1G", "1T", "1P", "1E",
 	"1Ki", "1Mi", "1Gi", "1Ti", "1Pi", "1Ei")
 
-func validateContainerResourceDivisor(rName string, divisor resource.Quantity, fldPath *field.Path) field.ErrorList {
+func validateContainerResourceDivisor(rName string, divisor resource.Quantity, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	unsetDivisor := resource.Quantity{}
 	if unsetDivisor.Cmp(divisor) == 0 {
@@ -3004,6 +3018,12 @@ func validateContainerResourceDivisor(rName string, divisor resource.Quantity, f
 	case "limits.ephemeral-storage", "requests.ephemeral-storage":
 		if !validContainerResourceDivisorForEphemeralStorage.Has(divisor.String()) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("divisor"), rName, "only divisor's values 1, 1k, 1M, 1G, 1T, 1P, 1E, 1Ki, 1Mi, 1Gi, 1Ti, 1Pi, 1Ei are supported with the local ephemeral storage resource"))
+		}
+	case resourceAssignedCpuset:
+		// When the DownwardAPIAssignedResources feature gate is disabled,
+		// assigned.cpuset divisor check is silently skipped to allow seamless rollout/rollback.
+		if opts.AllowDownwardAPIAssignedResources && !divisor.IsZero() {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("divisor"), rName, fmt.Sprintf("%s can not configured divisor", resourceAssignedCpuset)))
 		}
 	}
 	if strings.HasPrefix(rName, hugepagesRequestsPrefixDownwardAPI) || strings.HasPrefix(rName, hugepagesLimitsPrefixDownwardAPI) {
@@ -4504,6 +4524,8 @@ type PodValidationOptions struct {
 	AllowImageVolumeWithDigest bool
 	// Allow empty image volume reference for backward compatibility
 	AllowEmptyImageVolumeReference bool
+	// Allow DownwardAPI assigned resources feature
+	AllowDownwardAPIAssignedResources bool
 }
 
 // validatePodMetadataAndSpec tests if required fields in the pod.metadata and pod.spec are set,

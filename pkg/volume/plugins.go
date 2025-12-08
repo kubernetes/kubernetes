@@ -393,6 +393,9 @@ type VolumeHost interface {
 	// Returns node allocatable.
 	GetNodeAllocatable() (v1.ResourceList, error)
 
+	// GetAssignments returns the current allocated CPU in cpu manager for the specified pod and container.
+	GetAssignments(podUID, containerName string) string
+
 	// Returns a function that returns a secret.
 	GetSecretFunc() func(namespace, name string) (*v1.Secret, error)
 

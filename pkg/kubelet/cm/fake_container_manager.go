@@ -69,7 +69,7 @@ func NewFakeContainerManagerWithNodeConfig(nodeConfig NodeConfig) *FakeContainer
 	}
 }
 
-func (cm *FakeContainerManager) Start(_ context.Context, _ *v1.Node, _ ActivePodsFunc, _ GetNodeFunc, _ config.SourcesReady, _ status.PodStatusProvider, _ internalapi.RuntimeService, _ bool) error {
+func (cm *FakeContainerManager) Start(_ context.Context, _ *v1.Node, _ ActivePodsFunc, _ GetNodeFunc, _ config.SourcesReady, _ status.PodStatusProvider, _ internalapi.RuntimeService, _ kubecontainer.RuntimeHelper, _ bool) error {
 	cm.Lock()
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "Start")
@@ -236,6 +236,13 @@ func (cm *FakeContainerManager) GetCPUs(_, _ string) []int64 {
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "GetCPUs")
 	return nil
+}
+
+func (cm *FakeContainerManager) GetAssignments(_, _ string) string {
+	cm.Lock()
+	defer cm.Unlock()
+	cm.CalledFunctions = append(cm.CalledFunctions, "GetAssignments")
+	return ""
 }
 
 func (cm *FakeContainerManager) GetAllocatableCPUs() []int64 {

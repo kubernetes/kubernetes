@@ -7035,3 +7035,290 @@ func TestHasRestartContainerForNonSidecarInitContainer(t *testing.T) {
 		})
 	}
 }
+
+func Test_dropDisabledAssignedCpuset(t *testing.T) {
+	tests := []struct {
+		name        string
+		enabled     bool
+		podSpec     *api.PodSpec
+		oldPodSpec  *api.PodSpec
+		wantPodSpec *api.PodSpec
+	}{
+		{
+			name:    "feature disabled, only old pod uses assigned.cpuset",
+			enabled: false,
+			oldPodSpec: &api.PodSpec{
+				Volumes: []api.Volume{
+					{
+						Name: "downward-api",
+						VolumeSource: api.VolumeSource{
+							DownwardAPI: &api.DownwardAPIVolumeSource{
+								Items: []api.DownwardAPIVolumeFile{
+									{
+										Path: "cpuset",
+										ResourceFieldRef: &api.ResourceFieldSelector{
+											Resource: "assigned.cpuset",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			podSpec: &api.PodSpec{
+				Volumes: nil,
+			},
+			wantPodSpec: &api.PodSpec{
+				Volumes: nil,
+			},
+		},
+		{
+			name:    "feature disabled, only current pod uses assigned.cpuset - items filtered but volume retained",
+			enabled: false,
+			oldPodSpec: &api.PodSpec{
+				Volumes: nil,
+			},
+			podSpec: &api.PodSpec{
+				Volumes: []api.Volume{
+					{
+						Name: "downward-api",
+						VolumeSource: api.VolumeSource{
+							DownwardAPI: &api.DownwardAPIVolumeSource{
+								Items: []api.DownwardAPIVolumeFile{
+									{
+										Path: "cpuset",
+										ResourceFieldRef: &api.ResourceFieldSelector{
+											Resource: "assigned.cpuset",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantPodSpec: &api.PodSpec{
+				Volumes: []api.Volume{
+					{
+						Name: "downward-api",
+						VolumeSource: api.VolumeSource{
+							DownwardAPI: &api.DownwardAPIVolumeSource{
+								Items: []api.DownwardAPIVolumeFile{},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:    "feature disabled, both pods use assigned.cpuset (should preserve)",
+			enabled: false,
+			oldPodSpec: &api.PodSpec{
+				Volumes: []api.Volume{
+					{
+						Name: "downward-api",
+						VolumeSource: api.VolumeSource{
+							DownwardAPI: &api.DownwardAPIVolumeSource{
+								Items: []api.DownwardAPIVolumeFile{
+									{
+										Path: "cpuset",
+										ResourceFieldRef: &api.ResourceFieldSelector{
+											Resource: "assigned.cpuset",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			podSpec: &api.PodSpec{
+				Volumes: []api.Volume{
+					{
+						Name: "downward-api",
+						VolumeSource: api.VolumeSource{
+							DownwardAPI: &api.DownwardAPIVolumeSource{
+								Items: []api.DownwardAPIVolumeFile{
+									{
+										Path: "cpuset",
+										ResourceFieldRef: &api.ResourceFieldSelector{
+											Resource: "assigned.cpuset",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantPodSpec: &api.PodSpec{
+				Volumes: []api.Volume{
+					{
+						Name: "downward-api",
+						VolumeSource: api.VolumeSource{
+							DownwardAPI: &api.DownwardAPIVolumeSource{
+								Items: []api.DownwardAPIVolumeFile{
+									{
+										Path: "cpuset",
+										ResourceFieldRef: &api.ResourceFieldSelector{
+											Resource: "assigned.cpuset",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:    "feature enabled, only old pod uses assigned.cpuset",
+			enabled: true,
+			oldPodSpec: &api.PodSpec{
+				Volumes: []api.Volume{
+					{
+						Name: "downward-api",
+						VolumeSource: api.VolumeSource{
+							DownwardAPI: &api.DownwardAPIVolumeSource{
+								Items: []api.DownwardAPIVolumeFile{
+									{
+										Path: "cpuset",
+										ResourceFieldRef: &api.ResourceFieldSelector{
+											Resource: "assigned.cpuset",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			podSpec: &api.PodSpec{
+				Volumes: nil,
+			},
+			wantPodSpec: &api.PodSpec{
+				Volumes: nil,
+			},
+		},
+		{
+			name:    "feature enabled, only current pod uses assigned.cpuset",
+			enabled: true,
+			oldPodSpec: &api.PodSpec{
+				Volumes: nil,
+			},
+			podSpec: &api.PodSpec{
+				Volumes: []api.Volume{
+					{
+						Name: "downward-api",
+						VolumeSource: api.VolumeSource{
+							DownwardAPI: &api.DownwardAPIVolumeSource{
+								Items: []api.DownwardAPIVolumeFile{
+									{
+										Path: "cpuset",
+										ResourceFieldRef: &api.ResourceFieldSelector{
+											Resource: "assigned.cpuset",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantPodSpec: &api.PodSpec{
+				Volumes: []api.Volume{
+					{
+						Name: "downward-api",
+						VolumeSource: api.VolumeSource{
+							DownwardAPI: &api.DownwardAPIVolumeSource{
+								Items: []api.DownwardAPIVolumeFile{
+									{
+										Path: "cpuset",
+										ResourceFieldRef: &api.ResourceFieldSelector{
+											Resource: "assigned.cpuset",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:    "feature disabled, mixed items with and without assigned.cpuset",
+			enabled: false,
+			oldPodSpec: &api.PodSpec{
+				Volumes: nil,
+			},
+			podSpec: &api.PodSpec{
+				Volumes: []api.Volume{
+					{
+						Name: "downward-api",
+						VolumeSource: api.VolumeSource{
+							DownwardAPI: &api.DownwardAPIVolumeSource{
+								Items: []api.DownwardAPIVolumeFile{
+									{
+										Path: "cpu-limit",
+										ResourceFieldRef: &api.ResourceFieldSelector{
+											Resource: "limits.cpu",
+										},
+									},
+									{
+										Path: "cpuset",
+										ResourceFieldRef: &api.ResourceFieldSelector{
+											Resource: "assigned.cpuset",
+										},
+									},
+									{
+										Path: "memory-limit",
+										ResourceFieldRef: &api.ResourceFieldSelector{
+											Resource: "limits.memory",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantPodSpec: &api.PodSpec{
+				Volumes: []api.Volume{
+					{
+						Name: "downward-api",
+						VolumeSource: api.VolumeSource{
+							DownwardAPI: &api.DownwardAPIVolumeSource{
+								Items: []api.DownwardAPIVolumeFile{
+									{
+										Path: "cpu-limit",
+										ResourceFieldRef: &api.ResourceFieldSelector{
+											Resource: "limits.cpu",
+										},
+									},
+									{
+										Path: "memory-limit",
+										ResourceFieldRef: &api.ResourceFieldSelector{
+											Resource: "limits.memory",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DownwardAPIAssignedResources, test.enabled)
+
+			dropDisabledAssignedCpuset(test.podSpec, test.oldPodSpec)
+			if diff := cmp.Diff(test.wantPodSpec, test.podSpec); diff != "" {
+				t.Errorf("unexpected pod spec (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}

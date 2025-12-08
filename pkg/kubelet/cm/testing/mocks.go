@@ -321,6 +321,63 @@ func (_c *MockContainerManager_GetAllocateResourcesPodAdmitHandler_Call) RunAndR
 	return _c
 }
 
+// GetAssignments provides a mock function for the type MockContainerManager
+func (_mock *MockContainerManager) GetAssignments(podUID string, containerName string) string {
+	ret := _mock.Called(podUID, containerName)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetAssignments")
+	}
+
+	var r0 string
+	if returnFunc, ok := ret.Get(0).(func(string, string) string); ok {
+		r0 = returnFunc(podUID, containerName)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	return r0
+}
+
+// MockContainerManager_GetAssignments_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetAssignments'
+type MockContainerManager_GetAssignments_Call struct {
+	*mock.Call
+}
+
+// GetAssignments is a helper method to define mock.On call
+//   - podUID string
+//   - containerName string
+func (_e *MockContainerManager_Expecter) GetAssignments(podUID interface{}, containerName interface{}) *MockContainerManager_GetAssignments_Call {
+	return &MockContainerManager_GetAssignments_Call{Call: _e.mock.On("GetAssignments", podUID, containerName)}
+}
+
+func (_c *MockContainerManager_GetAssignments_Call) Run(run func(podUID string, containerName string)) *MockContainerManager_GetAssignments_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockContainerManager_GetAssignments_Call) Return(s string) *MockContainerManager_GetAssignments_Call {
+	_c.Call.Return(s)
+	return _c
+}
+
+func (_c *MockContainerManager_GetAssignments_Call) RunAndReturn(run func(podUID string, containerName string) string) *MockContainerManager_GetAssignments_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetCPUs provides a mock function for the type MockContainerManager
 func (_mock *MockContainerManager) GetCPUs(podUID string, containerName string) []int64 {
 	ret := _mock.Called(podUID, containerName)
@@ -1496,16 +1553,16 @@ func (_c *MockContainerManager_ShouldResetExtendedResourceCapacity_Call) RunAndR
 }
 
 // Start provides a mock function for the type MockContainerManager
-func (_mock *MockContainerManager) Start(context1 context.Context, node *v1.Node, activePodsFunc cm.ActivePodsFunc, getNodeFunc cm.GetNodeFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, runtimeService cri.RuntimeService, b bool) error {
-	ret := _mock.Called(context1, node, activePodsFunc, getNodeFunc, sourcesReady, podStatusProvider, runtimeService, b)
+func (_mock *MockContainerManager) Start(context1 context.Context, node *v1.Node, activePodsFunc cm.ActivePodsFunc, getNodeFunc cm.GetNodeFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, runtimeService cri.RuntimeService, runtimeHelper container.RuntimeHelper, b bool) error {
+	ret := _mock.Called(context1, node, activePodsFunc, getNodeFunc, sourcesReady, podStatusProvider, runtimeService, runtimeHelper, b)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Start")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *v1.Node, cm.ActivePodsFunc, cm.GetNodeFunc, config.SourcesReady, status.PodStatusProvider, cri.RuntimeService, bool) error); ok {
-		r0 = returnFunc(context1, node, activePodsFunc, getNodeFunc, sourcesReady, podStatusProvider, runtimeService, b)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *v1.Node, cm.ActivePodsFunc, cm.GetNodeFunc, config.SourcesReady, status.PodStatusProvider, cri.RuntimeService, container.RuntimeHelper, bool) error); ok {
+		r0 = returnFunc(context1, node, activePodsFunc, getNodeFunc, sourcesReady, podStatusProvider, runtimeService, runtimeHelper, b)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -1525,12 +1582,13 @@ type MockContainerManager_Start_Call struct {
 //   - sourcesReady config.SourcesReady
 //   - podStatusProvider status.PodStatusProvider
 //   - runtimeService cri.RuntimeService
+//   - runtimeHelper container.RuntimeHelper
 //   - b bool
-func (_e *MockContainerManager_Expecter) Start(context1 interface{}, node interface{}, activePodsFunc interface{}, getNodeFunc interface{}, sourcesReady interface{}, podStatusProvider interface{}, runtimeService interface{}, b interface{}) *MockContainerManager_Start_Call {
-	return &MockContainerManager_Start_Call{Call: _e.mock.On("Start", context1, node, activePodsFunc, getNodeFunc, sourcesReady, podStatusProvider, runtimeService, b)}
+func (_e *MockContainerManager_Expecter) Start(context1 interface{}, node interface{}, activePodsFunc interface{}, getNodeFunc interface{}, sourcesReady interface{}, podStatusProvider interface{}, runtimeService interface{}, runtimeHelper interface{}, b interface{}) *MockContainerManager_Start_Call {
+	return &MockContainerManager_Start_Call{Call: _e.mock.On("Start", context1, node, activePodsFunc, getNodeFunc, sourcesReady, podStatusProvider, runtimeService, runtimeHelper, b)}
 }
 
-func (_c *MockContainerManager_Start_Call) Run(run func(context1 context.Context, node *v1.Node, activePodsFunc cm.ActivePodsFunc, getNodeFunc cm.GetNodeFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, runtimeService cri.RuntimeService, b bool)) *MockContainerManager_Start_Call {
+func (_c *MockContainerManager_Start_Call) Run(run func(context1 context.Context, node *v1.Node, activePodsFunc cm.ActivePodsFunc, getNodeFunc cm.GetNodeFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, runtimeService cri.RuntimeService, runtimeHelper container.RuntimeHelper, b bool)) *MockContainerManager_Start_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -1560,9 +1618,13 @@ func (_c *MockContainerManager_Start_Call) Run(run func(context1 context.Context
 		if args[6] != nil {
 			arg6 = args[6].(cri.RuntimeService)
 		}
-		var arg7 bool
+		var arg7 container.RuntimeHelper
 		if args[7] != nil {
-			arg7 = args[7].(bool)
+			arg7 = args[7].(container.RuntimeHelper)
+		}
+		var arg8 bool
+		if args[8] != nil {
+			arg8 = args[8].(bool)
 		}
 		run(
 			arg0,
@@ -1573,6 +1635,7 @@ func (_c *MockContainerManager_Start_Call) Run(run func(context1 context.Context
 			arg5,
 			arg6,
 			arg7,
+			arg8,
 		)
 	})
 	return _c
@@ -1583,7 +1646,7 @@ func (_c *MockContainerManager_Start_Call) Return(err error) *MockContainerManag
 	return _c
 }
 
-func (_c *MockContainerManager_Start_Call) RunAndReturn(run func(context1 context.Context, node *v1.Node, activePodsFunc cm.ActivePodsFunc, getNodeFunc cm.GetNodeFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, runtimeService cri.RuntimeService, b bool) error) *MockContainerManager_Start_Call {
+func (_c *MockContainerManager_Start_Call) RunAndReturn(run func(context1 context.Context, node *v1.Node, activePodsFunc cm.ActivePodsFunc, getNodeFunc cm.GetNodeFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, runtimeService cri.RuntimeService, runtimeHelper container.RuntimeHelper, b bool) error) *MockContainerManager_Start_Call {
 	_c.Call.Return(run)
 	return _c
 }
