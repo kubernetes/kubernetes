@@ -19,7 +19,6 @@ package create
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
@@ -175,9 +174,6 @@ func (o *NamespaceOptions) createNamespace() *corev1.Namespace {
 func (o *NamespaceOptions) Validate() error {
 	if len(o.Name) == 0 {
 		return fmt.Errorf("name must be specified")
-	}
-	if strings.HasPrefix(o.Name, "kube-") {
-		fmt.Fprintf(o.ErrOut, "Warning: avoid creating namespaces with the prefix kube-, since it is reserved for Kubernetes system namespaces.\n")
 	}
 	return nil
 }
