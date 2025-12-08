@@ -1472,27 +1472,34 @@ func valueWithinThreshold(value, threshold float64, expectLower bool) bool {
 	return value > threshold
 }
 
-func compareMetricWithThreshold(items []DataItem, threshold float64, metricSelector thresholdMetricSelector) error {
+// applyThreshold adds the threshold to data item with metric specified via metricSelector and verifies that
+// this metrics value is within threshold.
+func applyThreshold(items []DataItem, threshold float64, metricSelector thresholdMetricSelector) error {
 	if threshold == 0 {
 		return nil
 	}
 	dataBucket := metricSelector.DataBucket
+	var errs []error
 	for _, item := range items {
 		if item.Labels["Metric"] != metricSelector.Name || !labelsMatch(item.Labels, metricSelector.Labels) {
 			continue
 		}
+		thresholdItemName := dataBucket + "Threshold"
+		item.Data[thresholdItemName] = threshold
 		dataItem, ok := item.Data[dataBucket]
 		if !ok {
-			return fmt.Errorf("%s: no data present for %q metric %q bucket", item.Labels["Name"], metricSelector.Name, dataBucket)
+			errs = append(errs, fmt.Errorf("%s: no data present for %q metric %q bucket", item.Labels["Name"], metricSelector.Name, dataBucket))
+			continue
 		}
 		if !valueWithinThreshold(dataItem, threshold, metricSelector.ExpectLower) {
 			if metricSelector.ExpectLower {
-				return fmt.Errorf("%s: expected %q %q to be lower: got %f, want %f", item.Labels["Name"], metricSelector.Name, dataBucket, dataItem, threshold)
+				errs = append(errs, fmt.Errorf("%s: expected %q %q to be lower: got %f, want %f", item.Labels["Name"], metricSelector.Name, dataBucket, dataItem, threshold))
+			} else {
+				errs = append(errs, fmt.Errorf("%s: expected %q %q to be higher: got %f, want %f", item.Labels["Name"], metricSelector.Name, dataBucket, dataItem, threshold))
 			}
-			return fmt.Errorf("%s: expected %q %q to be higher: got %f, want %f", item.Labels["Name"], metricSelector.Name, dataBucket, dataItem, threshold)
 		}
 	}
-	return nil
+	return errors.Join(errs...)
 }
 
 func checkEmptyInFlightEvents() error {
@@ -1554,7 +1561,7 @@ func stopCollectingMetrics(tCtx ktesting.TContext, collectorCtx ktesting.TContex
 	for _, collector := range collectors {
 		items := collector.collect()
 		dataItems = append(dataItems, items...)
-		err := compareMetricWithThreshold(items, threshold, tms)
+		err := applyThreshold(items, threshold, tms)
 		if err != nil {
 			tCtx.Errorf("op %d: %s", opIndex, err)
 		}
@@ -2026,7 +2033,8 @@ type testDataCollector interface {
 	collect() []DataItem
 }
 
-func getTestDataCollectors(podInformer coreinformers.PodInformer, name string, namespaces []string, labelSelector map[string]string, mcc *metricsCollectorConfig, throughputErrorMargin float64) []testDataCollector {
+// var for mocking in tests.
+var getTestDataCollectors = func(podInformer coreinformers.PodInformer, name string, namespaces []string, labelSelector map[string]string, mcc *metricsCollectorConfig, throughputErrorMargin float64) []testDataCollector {
 	if mcc == nil {
 		mcc = &defaultMetricsCollectorConfig
 	}
