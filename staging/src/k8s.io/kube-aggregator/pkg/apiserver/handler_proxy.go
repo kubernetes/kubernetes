@@ -17,9 +17,6 @@ limitations under the License.
 package apiserver
 
 import (
-	"bytes"
-	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"sync/atomic"
@@ -93,31 +90,6 @@ type proxyHandlingInfo struct {
 	servicePort int32
 }
 
-// retryableBody is a wrapper around the incoming request body that
-// will record the body bytes up to a limit to replay them (once).
-// This is needed to replay the body after GOAWAY errors are received
-// from downstream services.
-// For more info see the issue: https://issue.k8s.io/135285
-type retryableBody struct {
-	io.Reader
-	io.Closer
-	buf      *bytes.Buffer
-	limit    int
-	exceeded *bool
-}
-
-func (r *retryableBody) Read(p []byte) (n int, err error) {
-	n, err = r.Reader.Read(p)
-	if *r.exceeded {
-		return
-	}
-	if r.buf.Len() > r.limit {
-		*r.exceeded = true
-		r.buf.Reset()
-	}
-	return
-}
-
 func proxyError(w http.ResponseWriter, req *http.Request, error string, code int) {
 	http.Error(w, error, code)
 
@@ -181,31 +153,9 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	// For HTTP/2.0 requests, we need to define GetBody to replay
 	// the request body after GOAWAY errors are received
+	// For more info see the issue: https://issue.k8s.io/135285
 	if newReq.Body != nil && newReq.Body != http.NoBody {
-		const limit = 32 * 1024 // 32KiB fixed replayable body limit
-		var buf bytes.Buffer
-		var exceeded, used bool
-
-		originalBody := newReq.Body
-		newReq.Body = &retryableBody{
-			Reader:   io.TeeReader(originalBody, &buf),
-			Closer:   originalBody,
-			buf:      &buf,
-			limit:    limit,
-			exceeded: &exceeded,
-		}
-
-		newReq.GetBody = func() (io.ReadCloser, error) {
-			if exceeded {
-				return nil, fmt.Errorf("http/2.0 request body too large for retry")
-			}
-			if used {
-				return nil, fmt.Errorf("http/2.0 retry already attempted")
-			}
-			used = true
-
-			return io.NopCloser(io.MultiReader(bytes.NewReader(buf.Bytes()), originalBody)), nil
-		}
+		newReq.Body, newReq.GetBody = wrapBodyForRetry(newReq.Body, defaultRetryableBodyConfig())
 	}
 
 	if handlingInfo.proxyRoundTripper == nil {

@@ -17,9 +17,6 @@ limitations under the License.
 package proxy
 
 import (
-	"bytes"
-	"io"
-	"net/http"
 	"net/url"
 	"testing"
 
@@ -615,114 +612,6 @@ func TestResolveEndpointDistribution(t *testing.T) {
 			missingURLs := expectedURLs.Difference(gotURLs)
 			if len(missingURLs) > 0 {
 				t.Errorf("ResolveEndpoint failed to pick some valid endpoints: %v", sets.List(missingURLs))
-			}
-		})
-	}
-}
-
-func TestNewRequestForProxy_GetBody(t *testing.T) {
-	testCases := []struct {
-		name          string
-		bodyContent   []byte
-		setupGetBody  bool
-		expectGetBody bool
-	}{
-		{
-			name:          "request with GetBody already set",
-			bodyContent:   []byte("test body"),
-			setupGetBody:  true,
-			expectGetBody: true,
-		},
-		{
-			name:          "request with Body but no GetBody",
-			bodyContent:   []byte("test body"),
-			setupGetBody:  false,
-			expectGetBody: true,
-		},
-		{
-			name:          "request with empty body",
-			bodyContent:   []byte{},
-			setupGetBody:  false,
-			expectGetBody: true,
-		},
-		{
-			name:          "request with no body",
-			bodyContent:   nil,
-			setupGetBody:  false,
-			expectGetBody: false,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			location := &url.URL{Scheme: "https", Host: "example.com"}
-
-			var req *http.Request
-			if tc.bodyContent != nil {
-				req = &http.Request{
-					Method: "POST",
-					URL:    &url.URL{Path: "/test"},
-					Header: http.Header{"Content-Type": []string{"application/json"}},
-					Body:   io.NopCloser(bytes.NewReader(tc.bodyContent)),
-				}
-
-				if tc.setupGetBody {
-					bodyBytes := tc.bodyContent
-					req.GetBody = func() (io.ReadCloser, error) {
-						return io.NopCloser(bytes.NewReader(bodyBytes)), nil
-					}
-				}
-			} else {
-				req = &http.Request{
-					Method: "GET",
-					URL:    &url.URL{Path: "/test"},
-					Header: http.Header{},
-				}
-			}
-
-			newReq, cancelFn := NewRequestForProxy(location, req)
-			defer cancelFn()
-
-			if tc.expectGetBody {
-				if newReq.GetBody == nil {
-					t.Error("expected GetBody to be set, but it was nil")
-				} else {
-					// Verify GetBody can be called multiple times (important for retries)
-					for i := 0; i < 2; i++ {
-						body, err := newReq.GetBody()
-						if err != nil {
-							t.Errorf("GetBody() returned error: %v", err)
-						}
-						if body == nil {
-							t.Error("GetBody() returned nil body")
-							continue
-						}
-
-						content, err := io.ReadAll(body)
-						if err != nil {
-							t.Errorf("failed to read body: %v", err)
-						}
-						if !bytes.Equal(content, tc.bodyContent) {
-							t.Errorf("GetBody() content mismatch: got %q, want %q", content, tc.bodyContent)
-						}
-						body.Close()
-					}
-				}
-			} else {
-				if newReq.GetBody != nil {
-					t.Error("expected GetBody to be nil, but it was set")
-				}
-			}
-
-			// Verify the main Body is readable
-			if tc.bodyContent != nil {
-				content, err := io.ReadAll(newReq.Body)
-				if err != nil {
-					t.Errorf("failed to read request Body: %v", err)
-				}
-				if !bytes.Equal(content, tc.bodyContent) {
-					t.Errorf("Body content mismatch: got %q, want %q", content, tc.bodyContent)
-				}
 			}
 		})
 	}
