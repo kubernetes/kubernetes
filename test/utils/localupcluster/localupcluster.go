@@ -182,7 +182,7 @@ processLocalUpClusterOutput:
 		select {
 		case <-tCtx.Done():
 			c.Stop(tCtx)
-			tCtx.Fatalf("interrupted cluster startup: %w", context.Cause(tCtx))
+			tCtx.Fatalf("interrupted cluster startup: %v", context.Cause(tCtx))
 		case output := <-lines:
 			if c.processLocalUpClusterOutput(tCtx, output) {
 				break processLocalUpClusterOutput

@@ -176,7 +176,7 @@ func testEvictCluster(tCtx ktesting.TContext, useRule bool) {
 	}
 	wg.Go(func() {
 		if err := controller.Run(tCtx, 10 /* workers */); err != nil {
-			tCtx.Errorf("Unexpected Run error: %w", err)
+			tCtx.Errorf("Unexpected Run error: %v", err)
 		}
 	})
 

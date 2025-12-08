@@ -76,6 +76,14 @@ type mockTB struct {
 	log strings.Builder
 }
 
+func (m *mockTB) Attr(key, value string) {
+	m.log.WriteString(fmt.Sprintf("(ATTR) %q %q\n", key, value))
+}
+
+func (m *mockTB) Chdir(dir string) {
+	m.log.WriteString(fmt.Sprintf("(CHDIR) %q\n", dir))
+}
+
 func (m *mockTB) Cleanup(func()) {
 	// Gets called by Init all the time, not logged because it's distracting.
 	// m.log.WriteString("(CLEANUP)\n")
