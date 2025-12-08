@@ -281,12 +281,17 @@ func TestCalculateResourceAllocatableRequest(t *testing.T) {
 		ConsumableCapacity:     true,
 	}
 
+	type DraResources = struct {
+		deviceClass *resourceapi.DeviceClass
+		slice       *resourceapi.ResourceSlice
+		claims      []*resourceapi.ResourceClaim
+	}
 	// Define test cases
 	tests := map[string]struct {
 		enableDRAExtendedResource bool
 		node                      *v1.Node
 		extendedResource          v1.ResourceName
-		objects                   []apiruntime.Object
+		draResources              *DraResources
 		expectedAllocatable       int64
 		expectedAllocated         int64
 	}{
@@ -308,146 +313,154 @@ func TestCalculateResourceAllocatableRequest(t *testing.T) {
 			enableDRAExtendedResource: true,
 			node:                      st.MakeNode().Name(nodeName).Obj(),
 			extendedResource:          explicitExtendedResource,
-			objects: []apiruntime.Object{
-				deviceClassWithExtendResourceName,
-				st.MakeResourceSlice(nodeName, driverName).Device("device-1").Obj(),
+			draResources: &DraResources{
+				deviceClass: deviceClassWithExtendResourceName,
+				slice:       st.MakeResourceSlice(nodeName, driverName).Device("device-1").Obj(),
 			},
-			expectedAllocatable: 1,
+			expectedAllocatable: 1, // 1 device `device-1`
 			expectedAllocated:   0,
 		},
 		"DRA-backed-resource-implicit": {
 			enableDRAExtendedResource: true,
 			node:                      st.MakeNode().Name(nodeName).Obj(),
 			extendedResource:          implicitExtendedResource,
-			objects: []apiruntime.Object{
-				&resourceapi.DeviceClass{
+			draResources: &DraResources{
+				deviceClass: &resourceapi.DeviceClass{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: deviceClassName,
 					},
 				},
-				st.MakeResourceSlice(nodeName, driverName).Device("device-1").Obj(),
+				slice: st.MakeResourceSlice(nodeName, driverName).Device("device-1").Obj(),
 			},
-			expectedAllocatable: 1,
+			expectedAllocatable: 1, // 1 device `device-1`
 			expectedAllocated:   0,
 		},
 		"DRA-backed-resource-no-slices": {
 			enableDRAExtendedResource: true,
 			node:                      st.MakeNode().Name(nodeName).Obj(),
 			extendedResource:          explicitExtendedResource,
-			objects:                   []apiruntime.Object{deviceClassWithExtendResourceName},
-			expectedAllocatable:       0,
-			expectedAllocated:         0,
+			draResources: &DraResources{
+				deviceClass: deviceClassWithExtendResourceName,
+			},
+			expectedAllocatable: 0,
+			expectedAllocated:   0,
 		},
 		"DRA-backed-resource-with-allocated-device": {
 			enableDRAExtendedResource: true,
 			node:                      st.MakeNode().Name(nodeName).Obj(),
 			extendedResource:          explicitExtendedResource,
-			objects: []apiruntime.Object{
-				deviceClassWithExtendResourceName,
-				st.MakeResourceSlice(nodeName, driverName).Devices("device-1", "device-2").Obj(),
+			draResources: &DraResources{
+				deviceClass: deviceClassWithExtendResourceName,
+				slice:       st.MakeResourceSlice(nodeName, driverName).Devices("device-1", "device-2").Obj(),
 				// Create a resource claim that fully allocates device-1
-				st.MakeResourceClaim().
-					Name(testClaim).
-					Request(deviceClassName).
-					Allocation(&resourceapi.AllocationResult{
-						Devices: resourceapi.DeviceAllocationResult{
-							Results: []resourceapi.DeviceRequestAllocationResult{
-								{
-									Request: "req-1",
-									Driver:  driverName,
-									Pool:    nodeName,
-									Device:  "device-1",
+				claims: []*resourceapi.ResourceClaim{
+					st.MakeResourceClaim().
+						Name(testClaim).
+						Request(deviceClassName).
+						Allocation(&resourceapi.AllocationResult{
+							Devices: resourceapi.DeviceAllocationResult{
+								Results: []resourceapi.DeviceRequestAllocationResult{
+									{
+										Request: "req-1",
+										Driver:  driverName,
+										Pool:    nodeName,
+										Device:  "device-1",
+									},
 								},
 							},
-						},
-					}).
-					Obj(),
+						}).
+						Obj(),
+				},
 			},
-			expectedAllocatable: 2,
-			expectedAllocated:   1, // 1 allocated
+			expectedAllocatable: 2, // 2 allocatable devices `device-1`, `device-2`
+			expectedAllocated:   1, // 1 allocated by `testClaim`
 		},
 		"DRA-backed-resource-with-shared-device-allocation": {
 			enableDRAExtendedResource: true,
 			node:                      st.MakeNode().Name(nodeName).Obj(),
 			extendedResource:          explicitExtendedResource,
-			objects: []apiruntime.Object{
-				deviceClassWithExtendResourceName,
-				st.MakeResourceSlice(nodeName, driverName).Devices("device-1", "device-2").Obj(),
+			draResources: &DraResources{
+				deviceClass: deviceClassWithExtendResourceName,
+				slice:       st.MakeResourceSlice(nodeName, driverName).Devices("device-1", "device-2").Obj(),
 				// Create a resource claim with shared device allocation (consumable capacity)
-				st.MakeResourceClaim().
-					Name(testClaim).
-					Request(deviceClassName).
-					Allocation(&resourceapi.AllocationResult{
-						Devices: resourceapi.DeviceAllocationResult{
-							Results: []resourceapi.DeviceRequestAllocationResult{
-								{
-									Request: "req-1",
-									Driver:  driverName,
-									Pool:    nodeName,
-									Device:  "device-1",
-									ShareID: ptr.To(types.UID("share-123")), // Shared device allocation
+				claims: []*resourceapi.ResourceClaim{
+					st.MakeResourceClaim().
+						Name(testClaim).
+						Request(deviceClassName).
+						Allocation(&resourceapi.AllocationResult{
+							Devices: resourceapi.DeviceAllocationResult{
+								Results: []resourceapi.DeviceRequestAllocationResult{
+									{
+										Request: "req-1",
+										Driver:  driverName,
+										Pool:    nodeName,
+										Device:  "device-1",
+										ShareID: ptr.To(types.UID("share-123")), // Shared device allocation
+									},
 								},
 							},
-						},
-					}).
-					Obj(),
+						}).
+						Obj(),
+				},
 			},
-			expectedAllocatable: 2,
-			expectedAllocated:   1, // 1 allocated (shared)
+			expectedAllocatable: 2, // 2 allocatable devices `device-1`, `device-2`
+			expectedAllocated:   1, // 1 allocated (shared) by `testClaim`
 		},
 		"DRA-backed-resource-multiple-devices-mixed-allocation": {
 			enableDRAExtendedResource: true,
 			node:                      st.MakeNode().Name(nodeName).Obj(),
 			extendedResource:          explicitExtendedResource,
-			objects: []apiruntime.Object{
-				deviceClassWithExtendResourceName,
-				st.MakeResourceSlice(nodeName, driverName).Devices("device-1", "device-2", "device-3").Obj(),
+			draResources: &DraResources{
+				deviceClass: deviceClassWithExtendResourceName,
+				slice:       st.MakeResourceSlice(nodeName, driverName).Devices("device-1", "device-2", "device-3").Obj(),
 				// Mix of fully allocated and shared device allocations
-				st.MakeResourceClaim().
-					Name("test-claim-1").
-					Request(deviceClassName).
-					Allocation(&resourceapi.AllocationResult{
-						Devices: resourceapi.DeviceAllocationResult{
-							Results: []resourceapi.DeviceRequestAllocationResult{
-								{
-									Request: "req-1",
-									Driver:  driverName,
-									Pool:    nodeName,
-									Device:  "device-1",
-									// No ShareID = fully allocated device
+				claims: []*resourceapi.ResourceClaim{
+					st.MakeResourceClaim().
+						Name("test-claim-1").
+						Request(deviceClassName).
+						Allocation(&resourceapi.AllocationResult{
+							Devices: resourceapi.DeviceAllocationResult{
+								Results: []resourceapi.DeviceRequestAllocationResult{
+									{
+										Request: "req-1",
+										Driver:  driverName,
+										Pool:    nodeName,
+										Device:  "device-1",
+										// No ShareID = fully allocated device
+									},
 								},
 							},
-						},
-					}).
-					Obj(),
-				st.MakeResourceClaim().
-					Name("test-claim-2").
-					Request(deviceClassName).
-					Allocation(&resourceapi.AllocationResult{
-						Devices: resourceapi.DeviceAllocationResult{
-							Results: []resourceapi.DeviceRequestAllocationResult{
-								{
-									Request: "req-1",
-									Driver:  driverName,
-									Pool:    nodeName,
-									Device:  "device-2",
-									ShareID: ptr.To(types.UID("share-456")), // Shared device allocation
+						}).
+						Obj(),
+					st.MakeResourceClaim().
+						Name("test-claim-2").
+						Request(deviceClassName).
+						Allocation(&resourceapi.AllocationResult{
+							Devices: resourceapi.DeviceAllocationResult{
+								Results: []resourceapi.DeviceRequestAllocationResult{
+									{
+										Request: "req-1",
+										Driver:  driverName,
+										Pool:    nodeName,
+										Device:  "device-2",
+										ShareID: ptr.To(types.UID("share-456")), // Shared device allocation
+									},
 								},
 							},
-						},
-					}).
-					Obj(),
-				// device-3 remains unallocated
+						}).
+						Obj(),
+					// device-3 remains unallocated
+				},
 			},
-			expectedAllocatable: 3,
-			expectedAllocated:   2, // 2 allocated (1 full + 1 shared)
+			expectedAllocatable: 3, // 3 allocatable devices `device-1`, `device-2`, `device-3`
+			expectedAllocated:   2, // 2 allocated (1 full `test-claim-1` + 1 shared `test-claim-2`)
 		},
 		"DRA-backed-resource-with-per-device-node-selection": {
 			enableDRAExtendedResource: true,
 			node:                      st.MakeNode().Name(nodeName).Label("zone", "us-east-1a").Obj(),
 			extendedResource:          explicitExtendedResource,
-			objects: []apiruntime.Object{
-				&resourceapi.DeviceClass{
+			draResources: &DraResources{
+				deviceClass: &resourceapi.DeviceClass{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: deviceClassName,
 					},
@@ -464,7 +477,7 @@ func TestCalculateResourceAllocatableRequest(t *testing.T) {
 					},
 				},
 				// Create a custom resource slice with per-device node selection
-				&resourceapi.ResourceSlice{
+				slice: &resourceapi.ResourceSlice{
 					ObjectMeta: metav1.ObjectMeta{Name: "per-device-slice"},
 					Spec: resourceapi.ResourceSliceSpec{
 						Driver:                 driverName, // Match the CEL expression driver
@@ -519,22 +532,24 @@ func TestCalculateResourceAllocatableRequest(t *testing.T) {
 					},
 				},
 				// Create a resource claim that allocates gpu-1
-				st.MakeResourceClaim().
-					Name("test-claim").
-					Request(deviceClassName).
-					Allocation(&resourceapi.AllocationResult{
-						Devices: resourceapi.DeviceAllocationResult{
-							Results: []resourceapi.DeviceRequestAllocationResult{
-								{
-									Request: "req-1",
-									Driver:  driverName,
-									Pool:    "per-device-pool",
-									Device:  "device-1",
+				claims: []*resourceapi.ResourceClaim{
+					st.MakeResourceClaim().
+						Name("test-claim").
+						Request(deviceClassName).
+						Allocation(&resourceapi.AllocationResult{
+							Devices: resourceapi.DeviceAllocationResult{
+								Results: []resourceapi.DeviceRequestAllocationResult{
+									{
+										Request: "req-1",
+										Driver:  driverName,
+										Pool:    "per-device-pool",
+										Device:  "device-1",
+									},
 								},
 							},
-						},
-					}).
-					Obj(),
+						}).
+						Obj(),
+				},
 			},
 			expectedAllocatable: 2, // device-1 matches the test node and device-3 matches via its selector
 			expectedAllocated:   1, // 1 allocated (device-1)
@@ -550,7 +565,19 @@ func TestCalculateResourceAllocatableRequest(t *testing.T) {
 
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, tc.enableDRAExtendedResource)
 
-			draManager, err := newTestDRAManager(t, tCtx, logger, tc.objects...)
+			var objects []apiruntime.Object
+			if tc.draResources != nil {
+				if tc.draResources.deviceClass != nil {
+					objects = append(objects, tc.draResources.deviceClass)
+				}
+				if tc.draResources.slice != nil {
+					objects = append(objects, tc.draResources.slice)
+				}
+				for _, claim := range tc.draResources.claims {
+					objects = append(objects, claim)
+				}
+			}
+			draManager, err := newTestDRAManager(t, tCtx, logger, objects...)
 			if err != nil {
 				t.Fatalf("failed to create fake DRA manager: %v", err)
 			}
@@ -579,10 +606,10 @@ func TestCalculateResourceAllocatableRequest(t *testing.T) {
 			// Test calculateResourceAllocatableRequest API
 			allocatable, allocated := scorer.calculateResourceAllocatableRequest(tCtx, nodeInfo, tc.extendedResource, draPreScoreState)
 			if !cmp.Equal(allocatable, tc.expectedAllocatable) {
-				t.Errorf("Expected allocatable=%v, but got allocatable=%v", tc.expectedAllocatable, allocatable)
+				t.Errorf("Expected allocatable=%v, but got %v", tc.expectedAllocatable, allocatable)
 			}
 			if !cmp.Equal(allocated, tc.expectedAllocated) {
-				t.Errorf("Expected allocated=%v, but got allocated=%v", tc.expectedAllocated, allocated)
+				t.Errorf("Expected allocated=%v, but got %v", tc.expectedAllocated, allocated)
 			}
 		})
 	}
