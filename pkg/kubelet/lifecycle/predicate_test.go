@@ -40,8 +40,9 @@ import (
 )
 
 var (
-	quantity         = *resource.NewQuantity(1, resource.DecimalSI)
-	extendedResource = v1.ResourceName("foo.com/bar")
+	quantity                    = *resource.NewQuantity(1, resource.DecimalSI)
+	extendedResource            = v1.ResourceName("foo.com/bar")
+	implicitDRAExtendedResource = v1.ResourceName("deviceclass.resource.kubernetes.io/bar")
 )
 
 func TestRemoveMissingExtendedResources(t *testing.T) {
@@ -139,6 +140,15 @@ func TestRemoveMissingExtendedResources(t *testing.T) {
 			),
 			enableDRAExtendedResource: true,
 			expectedPod:               emptyRequests(makeTestPodWithDRAResource(extendedResource, quantity)),
+		},
+		{
+			desc: "request for implicit extended resource backed by DRA should be removed",
+			pod:  makeTestPodWithDRAResource(implicitDRAExtendedResource, quantity),
+			node: makeTestNode(
+				v1.ResourceList{},
+			),
+			enableDRAExtendedResource: true,
+			expectedPod:               emptyRequests(makeTestPodWithDRAResource(implicitDRAExtendedResource, quantity)),
 		},
 	} {
 		t.Run(test.desc, func(t *testing.T) {
