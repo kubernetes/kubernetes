@@ -339,6 +339,29 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 			},
 		},
 		{
+			name: "empty label implies Recursive policy",
+			existingPVCs: []*v1.PersistentVolumeClaim{
+				pvcBoundToPV("pv1", "pvc1"),
+			},
+			existingPVs: []*v1.PersistentVolume{
+				pvBoundToPVC("pv1", "pvc1"),
+			},
+			existingPods: []*v1.Pod{
+				pod("pod1", "", ptr.To(v1.SELinuxChangePolicyMountOption)).withPVC("pvc1", "vol1").build(),
+			},
+			pod:       cache.ObjectName{Namespace: namespace, Name: "pod1"},
+			conflicts: []volumecache.Conflict{},
+			expectedAddedVolumes: []addedVolume{
+				{
+					volumeName:   "fake-plugin/pv1",
+					podKey:       cache.ObjectName{Namespace: namespace, Name: "pod1"},
+					label:        "",
+					changePolicy: v1.SELinuxChangePolicyRecursive, // Reset to Recursive when the label is empty
+					csiDriver:    "ebs.csi.aws.com",
+				},
+			},
+		},
+		{
 			name: "pending pod is processed",
 			existingPVCs: []*v1.PersistentVolumeClaim{
 				pvcBoundToPV("pv1", "pvc1"),
