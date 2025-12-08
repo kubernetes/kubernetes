@@ -557,28 +557,43 @@ func TestQuantityParse(t *testing.T) {
 // and that they can be represented as int64.
 func TestQuantityParseInt(t *testing.T) {
 	table := []struct {
-		input  string
-		expect Quantity
+		input       string
+		expect      Quantity
+		expectError bool
 	}{
-		{"0", intQuantity(0, 0, DecimalSI)},
-		{"2048", intQuantity(2048, 0, DecimalSI)},
-		{"1k", intQuantity(1000, 0, DecimalSI)},
-		{"1.3E+6", intQuantity(13, 5, DecimalExponent)},
-		{"922337203685477580", intQuantity(922337203685477580, 0, DecimalSI)},
-		{"-922337203685477580", intQuantity(-922337203685477580, 0, DecimalSI)},
+		{"0", intQuantity(0, 0, DecimalSI), false},
+		{"2048", intQuantity(2048, 0, DecimalSI), false},
+		{"1k", intQuantity(1000, 0, DecimalSI), false},
+		{"1.3E+6", intQuantity(13, 5, DecimalExponent), false},
+		{"922337203685477580", intQuantity(922337203685477580, 0, DecimalSI), false},
+		{"-922337203685477580", intQuantity(-922337203685477580, 0, DecimalSI), false},
 		// value larger than 1000000000000000000(1e18) would fail if skipping attempting
 		// to convert inf.Dec because maxInt64Factors = 18, see issue#135487
-		{"1000000000000000000", intQuantity(1000000000000000000, 0, DecimalSI)},
-		{"9223372036854775807", intQuantity(mostPositive, 0, DecimalSI)},
-		{"-9223372036854775807", intQuantity(mostNegative+1, 0, DecimalSI)},
-		{"9223372036854.775807M", intQuantity(9223372036854775807, 0, DecimalSI)},
-		{"92233720368.54775807E+8", intQuantity(9223372036854775807, 0, DecimalExponent)},
+		{"1000000000000000000", intQuantity(1000000000000000000, 0, DecimalSI), false},
+		{"9223372036854775807", intQuantity(mostPositive, 0, DecimalSI), false},
+		{"-9223372036854775807", intQuantity(mostNegative+1, 0, DecimalSI), false},
+		{"9223372036854.775807M", intQuantity(9223372036854775807, 0, DecimalSI), false},
+		{"92233720368.54775807E+8", intQuantity(9223372036854775807, 0, DecimalExponent), false},
+		// values that are expected to go to Dec path
+		{"1.0", Quantity{}, true},
+		{"9223372036854775808", Quantity{}, true},  // mostPositive + 1
+		{"-9223372036854775808", Quantity{}, true}, // mostNegative, intended to go dec path
+		{"99999999999999999999", Quantity{}, true},
 	}
 
 	for _, item := range table {
 		got, err := ParseQuantity(item.input)
 		if err != nil {
 			t.Errorf("%v: unexpected error: %v", item.input, err)
+			continue
+		}
+
+		j, ok := got.AsInt64()
+
+		if item.expectError {
+			if ok {
+				t.Errorf("%v: expected not to be able to convert to int64, got %d", item.input, j)
+			}
 			continue
 		}
 
@@ -593,7 +608,6 @@ func TestQuantityParseInt(t *testing.T) {
 		if !ok {
 			continue
 		}
-		j, ok := got.AsInt64()
 		if !ok {
 			if got.d.Dec == nil && got.i.scale >= 0 {
 				t.Errorf("%v: is an int64Amount, but can't return AsInt64: %v", item.input, got)
@@ -602,24 +616,6 @@ func TestQuantityParseInt(t *testing.T) {
 		}
 		if i != j {
 			t.Errorf("%v: expected equivalent representation as int64: %d %d", item.input, i, j)
-		}
-	}
-
-	invalidInt := []string{
-		"1.0",
-		"9223372036854775808",  // mostPositive + 1
-		"-9223372036854775808", // mostNegative, intended to go dec path
-		"99999999999999999999",
-	}
-
-	for _, item := range invalidInt {
-		got, err := ParseQuantity(item)
-		if err != nil {
-			t.Errorf("%v: unexpected error: %v", item, err)
-		}
-		val, ok := got.AsInt64()
-		if ok {
-			t.Errorf("%v: expected not to be able to convert to int64, got %d", item, val)
 		}
 	}
 }
