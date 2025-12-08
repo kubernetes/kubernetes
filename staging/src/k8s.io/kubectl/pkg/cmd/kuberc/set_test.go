@@ -468,3 +468,150 @@ aliases:
 		})
 	}
 }
+
+
+func TestSetOptions_Run_CredentialPlugins(t *testing.T) {
+	tests := []struct {
+		name           string
+		existingKuberc string
+		options        SetOptions
+		expectedPref   *v1beta1.Preference
+		expectError    bool
+		errorContains  string
+	}{
+		{
+			name:           "set credential plugin policy",
+			existingKuberc: "",
+			options: SetOptions{
+				CredentialPluginPolicy: "AllowAll",
+			},
+			expectedPref: &v1beta1.Preference{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "kubectl.config.k8s.io/v1beta1",
+					Kind:       "Preference",
+				},
+				CredentialPluginPolicy: "AllowAll",
+			},
+		},
+		{
+			name:           "set credential plugin allowlist",
+			existingKuberc: "",
+			options: SetOptions{
+				CredentialPluginAllowlist: []string{"plugin1", "plugin2"},
+			},
+			expectedPref: &v1beta1.Preference{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "kubectl.config.k8s.io/v1beta1",
+					Kind:       "Preference",
+				},
+				CredentialPluginAllowlist: []v1beta1.AllowlistEntry{
+					{Name: "plugin1"},
+					{Name: "plugin2"},
+				},
+			},
+		},
+		{
+			name: "overwrite existing policy",
+			existingKuberc: `apiVersion: kubectl.config.k8s.io/v1beta1
+kind: Preference
+credentialPluginPolicy: DenyAll
+`,
+			options: SetOptions{
+				CredentialPluginPolicy: "Allowlist",
+				Overwrite:              true,
+			},
+			expectedPref: &v1beta1.Preference{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "kubectl.config.k8s.io/v1beta1",
+					Kind:       "Preference",
+				},
+				CredentialPluginPolicy: "Allowlist",
+			},
+		},
+		{
+			name: "error overwriting policy without overwrite flag",
+			existingKuberc: `apiVersion: kubectl.config.k8s.io/v1beta1
+kind: Preference
+credentialPluginPolicy: DenyAll
+`,
+			options: SetOptions{
+				CredentialPluginPolicy: "Allowlist",
+				Overwrite:              false,
+			},
+			expectError:   true,
+			errorContains: "already exists",
+		},
+		{
+			name:           "error mixing section and policy",
+			existingKuberc: "",
+			options: SetOptions{
+				Section:                sectionDefaults,
+				CredentialPluginPolicy: "AllowAll",
+			},
+			expectError:   true,
+			errorContains: "cannot be combined",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir, err := os.MkdirTemp("", "kuberc-set-test-")
+			if err != nil {
+				t.Fatalf("failed to create temp dir: %v", err)
+			}
+			defer func() {
+				os.RemoveAll(tmpDir) // nolint:errcheck
+			}()
+
+			kubercPath := filepath.Join(tmpDir, "kuberc")
+			if tt.existingKuberc != "" {
+				if err := os.WriteFile(kubercPath, []byte(tt.existingKuberc), 0644); err != nil {
+					t.Fatalf("failed to write existing kuberc file: %v", err)
+				}
+			}
+
+			streams, _, out, _ := genericiooptions.NewTestIOStreams()
+			tt.options.KubeRCFile = kubercPath
+			tt.options.IOStreams = streams
+
+			err = tt.options.Validate()
+			if err == nil {
+				err = tt.options.Run()
+			}
+
+			if tt.expectError {
+				if err == nil {
+					t.Fatalf("expected error but got none")
+				}
+				if !strings.Contains(err.Error(), tt.errorContains) {
+					t.Errorf("expected error to contain %q, got: %v", tt.errorContains, err)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("Run() unexpected error = %v", err)
+			}
+
+			// Verify the file was written
+			data, err := os.ReadFile(kubercPath)
+			if err != nil {
+				t.Fatalf("failed to read written kuberc file: %v", err)
+			}
+
+			var actualPref v1beta1.Preference
+			if err := yaml.Unmarshal(data, &actualPref); err != nil {
+				t.Fatalf("failed to unmarshal actual output: %v", err)
+			}
+
+			if diff := cmp.Diff(tt.expectedPref, &actualPref); diff != "" {
+				t.Errorf("Run() output mismatch (-expected +got):\n%s", diff)
+			}
+
+			// Verify output message
+			if !strings.Contains(out.String(), "Updated") {
+				t.Errorf("expected output to contain 'Updated', got: %s", out.String())
+			}
+		})
+	}
+}
