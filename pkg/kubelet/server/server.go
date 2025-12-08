@@ -1194,7 +1194,12 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	defer servermetrics.HTTPInflightRequests.WithLabelValues(method, path, serverType, longRunning).Dec()
 
 	startTime := time.Now()
-	defer servermetrics.HTTPRequestsDuration.WithLabelValues(method, path, serverType, longRunning).Observe(servermetrics.SinceInSeconds(startTime))
+	// Use an anonymous function to ensure SinceInSeconds(startTime) is evaluated
+	// when the defer executes, not when it's declared. In Go, arguments to deferred
+	// functions are evaluated immediately at the defer statement.
+	defer func() {
+		servermetrics.HTTPRequestsDuration.WithLabelValues(method, path, serverType, longRunning).Observe(servermetrics.SinceInSeconds(startTime))
+	}()
 
 	handler.ServeHTTP(w, req)
 }
