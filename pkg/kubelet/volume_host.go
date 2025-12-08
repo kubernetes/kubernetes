@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"runtime"
+	"strings"
 
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
@@ -34,6 +35,7 @@ import (
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	"k8s.io/kubernetes/pkg/kubelet/clustertrustbundle"
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
 	"k8s.io/kubernetes/pkg/kubelet/podcertificate"
@@ -234,6 +236,13 @@ func (kvh *kubeletVolumeHost) GetNodeAllocatable() (v1.ResourceList, error) {
 		return nil, fmt.Errorf("error retrieving node: %v", err)
 	}
 	return node.Status.Allocatable, nil
+}
+
+func (kvh *kubeletVolumeHost) GetAssignments(podUID, containerName string) string {
+	if kvh.kubelet.containerManager != nil {
+		return kvh.kubelet.containerManager.GetAssignments(podUID, containerName)
+	}
+	return ""
 }
 
 func (kvh *kubeletVolumeHost) GetSecretFunc() func(namespace, name string) (*v1.Secret, error) {

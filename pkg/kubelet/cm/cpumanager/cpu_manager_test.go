@@ -45,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
+	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/utils/cpuset"
 )
@@ -215,6 +216,18 @@ func (p *mockPolicy) AllocatePod(_ logr.Logger, s state.State, pod *v1.Pod, oper
 
 func (p *mockPolicy) GetAllocatableCPUs(m state.State) cpuset.CPUSet {
 	return cpuset.New()
+}
+
+func (p *mockPolicy) ReleaseTimedOutScaleDownCPUs(_ logr.Logger, s state.State) {
+	// Do nothing
+}
+
+func (p *mockPolicy) IsDuringScaleDownDelay(podID, containerName string) bool {
+	return false
+}
+
+func (p *mockPolicy) GetAssignments(s state.State, podUID, containerName string) string {
+	return ""
 }
 
 type mockRuntimeService struct {
@@ -1399,6 +1412,7 @@ func TestReconcileState(t *testing.T) {
 				podStatus: testCase.pspPS,
 				found:     testCase.pspFound,
 			},
+			runtimeHelper: &containertest.FakeRuntimeHelper{},
 		}
 		mgr.sourcesReady = &sourcesReadyStub{}
 		success, failure := mgr.reconcileState(context.Background())
@@ -2661,6 +2675,7 @@ func TestReconcileStateWithInPlacePodVerticalScalingExclusiveCPUs(t *testing.T) 
 				podStatus: testCase.pspPS,
 				found:     testCase.pspFound,
 			},
+			runtimeHelper: &containertest.FakeRuntimeHelper{},
 		}
 		mgr.sourcesReady = &sourcesReadyStub{}
 		success, failure := mgr.reconcileState(context.Background())

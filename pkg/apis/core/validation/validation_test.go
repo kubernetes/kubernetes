@@ -4793,6 +4793,43 @@ func TestValidateVolumes(t *testing.T) {
 				},
 			},
 		}, {
+			name: "assigned.cpuset valid test",
+			vol: core.Volume{
+				Name: "downwardapi",
+				VolumeSource: core.VolumeSource{
+					DownwardAPI: &core.DownwardAPIVolumeSource{
+						Items: []core.DownwardAPIVolumeFile{{
+							Path: "cpuset_assigned",
+							ResourceFieldRef: &core.ResourceFieldSelector{
+								ContainerName: "test-container",
+								Resource:      "assigned.cpuset",
+							},
+						}},
+					},
+				},
+			},
+		}, {
+			name: "assigned.cpuset invalid test",
+			vol: core.Volume{
+				Name: "downwardapi",
+				VolumeSource: core.VolumeSource{
+					DownwardAPI: &core.DownwardAPIVolumeSource{
+						Items: []core.DownwardAPIVolumeFile{{
+							Path: "cpuset_assigned",
+							ResourceFieldRef: &core.ResourceFieldSelector{
+								ContainerName: "test-container",
+								Resource:      "assigned.cpuset",
+								Divisor:       resource.MustParse("1"),
+							},
+						}},
+					},
+				},
+			},
+			errs: []verr{{
+				etype: field.ErrorTypeInvalid,
+				field: "field[0].downwardAPI.resourceFieldRef.divisor",
+			}},
+		}, {
 			name: "hugepages-downwardAPI-enabled",
 			vol: core.Volume{
 				Name: "downwardapi",

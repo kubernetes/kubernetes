@@ -318,6 +318,12 @@ const (
 	// The Feature Gate will be locked to true and then removed in +2 releases (1.35) if there are no bug reported
 	DisableCPUQuotaWithExclusiveCPUs featuregate.Feature = "DisableCPUQuotaWithExclusiveCPUs"
 
+	// owner: @Chunxia202410
+	// kep: http://kep.k8s.io/6122
+	//
+	// Allows downward API volume to expose CPU Manager assigned cpuset via assigned.cpuset field.
+	DownwardAPIAssignedResources featuregate.Feature = "DownwardAPIAssignedResources"
+
 	// owner: @HirazawaUi
 	// kep: http://kep.k8s.io/4004
 	//
@@ -1374,6 +1380,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Deprecated, LockToDefault: true}, // remove in 1.38
 	},
 
+	DownwardAPIAssignedResources: {
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	DisableNodeKubeProxyVersion: {
 		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Deprecated},
@@ -2377,6 +2387,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	InPlacePodVerticalScalingExclusiveMemory: {InPlacePodVerticalScaling},
 
 	InPlacePodVerticalScalingInitContainers: {InPlacePodVerticalScaling, NodeDeclaredFeatures},
+	
+	DownwardAPIAssignedResources:            {},
 
 	JobManagedBy: {},
 
