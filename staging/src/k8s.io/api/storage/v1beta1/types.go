@@ -122,6 +122,7 @@ const (
 // +k8s:prerelease-lifecycle-gen:introduced=1.10
 // +k8s:prerelease-lifecycle-gen:deprecated=1.19
 // +k8s:prerelease-lifecycle-gen:replacement=storage.k8s.io,v1,VolumeAttachment
+// +k8s:supportsSubresource=/status
 
 // VolumeAttachment captures the intent to attach or detach the specified volume
 // to/from the specified node.
