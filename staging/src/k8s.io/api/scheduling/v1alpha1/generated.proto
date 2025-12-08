@@ -86,6 +86,7 @@ message PriorityClass {
 
   // value represents the integer value of this priority class. This is the actual priority that pods
   // receive when they have the name of this class in their pod spec.
+  // +required
   optional int32 value = 2;
 
   // globalDefault specifies whether this PriorityClass should be considered as
@@ -116,6 +117,7 @@ message PriorityClassList {
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // items is the list of PriorityClasses
+  // +required
   repeated PriorityClass items = 2;
 }
 
@@ -166,6 +168,7 @@ message WorkloadList {
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is the list of Workloads.
+  // +required
   repeated Workload items = 2;
 }
 
