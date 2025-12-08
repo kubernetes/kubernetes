@@ -188,7 +188,7 @@ linters:
       # The following exceptions are for fields in stable or deprecated APIs that cannot be
       # changed due to backward compatibility constraints. Each rule is scoped to the
       # specific field to avoid hiding new violations.
-      
+
       ## For the "Extra" field, which is common across several auth-related APIs.
       - text: "field UserInfo.Extra should not use a map type, use a list type with a unique name/identifier instead"
         path: "staging/src/k8s.io/api/authentication/(v1|v1beta1)/types.go"
@@ -196,7 +196,7 @@ linters:
         path: "staging/src/k8s.io/api/authorization/(v1|v1beta1)/types.go"
       - text: "field CertificateSigningRequestSpec.Extra should not use a map type, use a list type with a unique name/identifier instead"
         path: "staging/src/k8s.io/api/certificates/(v1|v1beta1)/types.go"
-      
+
       ## For ResourceList fields in the core API.
       - text: "field (PersistentVolumeSpec.Capacity|ContainerStatus.AllocatedResources|PodSpec.Overhead|ResourceQuotaSpec.Hard) type ResourceList should not use a map type, use a list type with a unique name/identifier instead"
         path: "staging/src/k8s.io/api/core/v1/types.go"
@@ -208,11 +208,11 @@ linters:
         path: "staging/src/k8s.io/api/core/v1/types.go"
       - text: "type ResourceList should not use a map type, use a list type with a unique name/identifier instead"
         path: "staging/src/k8s.io/api/core/v1/types.go"
-      
+
       ## For the Secret.Data and ConfigMap.BinaryData fields in the core API.
       - text: "field (Secret.Data|ConfigMap.BinaryData) should not use a map type, use a list type with a unique name/identifier instead"
         path: "staging/src/k8s.io/api/core/v1/types.go"
-      
+
       ## For map fields in the resource API (across all versions).
       - text: "field (CounterSet|DeviceCounterConsumption).Counters should not use a map type, use a list type with a unique name/identifier instead"
         path: "staging/src/k8s.io/api/resource/(v1|v1beta1|v1beta2)/types.go"
@@ -222,6 +222,14 @@ linters:
         path: "staging/src/k8s.io/api/resource/(v1|v1beta2)/types.go"
       - text: "field (CapacityRequirements.Requests|DeviceRequestAllocationResult.ConsumedCapacity) should not use a map type, use a list type with a unique name/identifier instead"
         path: "staging/src/k8s.io/api/resource/(v1|v1beta1|v1beta2)/types.go"
+
+      # OptionalOrRequired is being enabled over time. For now, each API group should be added to this list until we comb through each group and fix the missing tags.
+      - text: "must be marked as optional or required"
+        path: "staging/src/k8s.io/api/(admission|apidiscovery|apiserverinternal|apps|authentication|authorization|autoscaling|batch|certificates|coordination|core|discovery|events|extensions|flowcontrol|imagepolicy|networking|node|policy|rbac|resource|storage|storagemigration)"
+
+      # OptionalOrRequired - Existing fields that are marked as both optional and required (based on standard optional vs kubebuilder:validation:Required) and should not be fixed.
+      - text: "field (PortStatus|IngressPortStatus)\\.Error must not be marked as both optional and required"
+        path: "staging/src/k8s.io/api/(core/v1|extensions/v1beta1|networking/(v1|v1beta1))"
 
   default: none
   enable: # please keep this alphabetized
@@ -381,7 +389,7 @@ linters:
               # - "nophase" # Ensure field names do not have the word "phase" in them.
               - "notimestamp" # Ensure fields are not named "timestamp", prefer "time".
               # - "optionalfields" # Ensure fields marked optional have omitempty and pointers.
-              # - "optionalorrequired" # Every field should be marked as `+optional` xor `+required`.
+              - "optionalorrequired" # Every field should be marked as `+optional` xor `+required`.
               # - "requiredfields" # Required fields should only be pointers when required based on the validity of the zero value, they should always have `omitempty`.
               - "ssatags" # Ensure lists have a listType tag.
               # - "uniquemarkers" # Ensure markers are not duplicated across field and type definitions.
