@@ -117,6 +117,7 @@ const (
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.13
+// +k8s:supportsSubresource=/status
 
 // VolumeAttachment captures the intent to attach or detach the specified volume
 // to/from the specified node.
