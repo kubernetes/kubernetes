@@ -2447,6 +2447,133 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			}
 			drautils.TestContainerEnv(ctx, f, pod, pod.Spec.Containers[0].Name, false, containerEnv...)
 		})
+
+		ginkgo.It("must prevent overcommitment of extended resources", func(ctx context.Context) {
+			// Create first pod consuming all available resources
+			pod1 := b.Pod()
+			res := v1.ResourceList{
+				v1.ResourceName(b.ExtendedResourceName(0)): resource.MustParse("10"), // All available
+			}
+			pod1.Spec.Containers[0].Resources.Requests = res
+			pod1.Spec.Containers[0].Resources.Limits = res
+			b.Create(ctx, pod1)
+			err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod1)
+			framework.ExpectNoError(err, "start pod")
+
+			ginkgo.By("Check that pod is processed by the DRA driver")
+			containerEnv := []string{
+				"container_0_request_0", "true",
+			}
+			drautils.TestContainerEnv(ctx, f, pod1, pod1.Spec.Containers[0].Name, false, containerEnv...)
+
+			// Second pod should remain unschedulable
+			pod2 := b.Pod()
+			pod2.Spec.Containers[0].Resources.Requests = res
+			pod2.Spec.Containers[0].Resources.Limits = res
+			b.Create(ctx, pod2)
+
+			framework.ExpectNoError(e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, pod2.Name, f.Namespace.Name))
+
+			// After deleting pod1, pod2 should be schedulable and run successfully
+			b.DeletePodAndWaitForNotFound(ctx, pod1)
+			err = e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod2)
+			framework.ExpectNoError(err, "start pod")
+			drautils.TestContainerEnv(ctx, f, pod2, pod2.Spec.Containers[0].Name, false, containerEnv...)
+		})
+
+		ginkgo.It("must reject pod with invalid extended resource name", func(ctx context.Context) {
+			pod := b.Pod()
+			res := v1.ResourceList{
+				v1.ResourceName("invalid_resource_name"): resource.MustParse("1"),
+			}
+			pod.Spec.Containers[0].Resources.Requests = res
+			pod.Spec.Containers[0].Resources.Limits = res
+
+			_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{})
+			gomega.Expect(err).Should(gomega.HaveOccurred())
+			gomega.Expect(apierrors.IsInvalid(err)).Should(gomega.BeTrueBecause("pod with invalid extended resource name should be rejected"))
+		})
+
+		ginkgo.It("must accurately populate ExtendedResourceClaimStatus", func(ctx context.Context) {
+			pod := b.Pod()
+			resource0 := b.ExtendedResourceName(0)
+			resource1 := b.ExtendedResourceName(1)
+			res := v1.ResourceList{
+				v1.ResourceName(resource0): resource.MustParse("2"),
+				v1.ResourceName(resource1): resource.MustParse("1"),
+			}
+			pod.Spec.Containers[0].Resources.Requests = res
+			pod.Spec.Containers[0].Resources.Limits = res
+
+			b.Create(ctx, b.Class(1), pod)
+			err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
+			framework.ExpectNoError(err, "start pod")
+
+			ginkgo.By("Check that pod is processed by the DRA driver")
+			containerEnv := []string{
+				"container_0_request_0", "true",
+				"container_0_request_1", "true",
+			}
+			drautils.TestContainerEnv(ctx, f, pod, pod.Spec.Containers[0].Name, false, containerEnv...)
+
+			// Verify status
+			updatedPod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+
+			gomega.Expect(updatedPod.Status.ExtendedResourceClaimStatus).ShouldNot(gomega.BeNil())
+			gomega.Expect(updatedPod.Status.ExtendedResourceClaimStatus.ResourceClaimName).ShouldNot(gomega.BeEmpty())
+
+			// Verify mappings are correct
+			mappings := updatedPod.Status.ExtendedResourceClaimStatus.RequestMappings
+			gomega.Expect(mappings).Should(gomega.HaveLen(len(res)))
+
+			for i, mapping := range mappings {
+				gomega.Expect(mapping.ContainerName).Should(gomega.Equal(pod.Spec.Containers[0].Name))
+				gomega.Expect(v1.ResourceName(mapping.ResourceName)).Should(gomega.BeKeyOf(res))
+				gomega.Expect(mapping.RequestName).Should(gomega.Equal(fmt.Sprintf("container-0-request-%d", i)))
+			}
+		})
+
+		f.It("must run a pod with extended resource requesting zero", func(ctx context.Context) {
+			pod := b.Pod()
+			res := v1.ResourceList{
+				v1.ResourceName(b.ExtendedResourceName(0)): resource.MustParse("0"),
+			}
+			pod.Spec.Containers[0].Resources.Requests = res
+			pod.Spec.Containers[0].Resources.Limits = res
+
+			b.Create(ctx, pod)
+			err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
+			framework.ExpectNoError(err, "start pod")
+
+			ginkgo.By("Check that pod is not processed by the DRA driver")
+			updatedPod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			gomega.Expect(updatedPod.Status.ExtendedResourceClaimStatus).Should(gomega.BeNil())
+		})
+
+		f.It("must process extended resource after Device Class creation", func(ctx context.Context) {
+			resourceName := b.ExtendedResourceName(1)
+			res := v1.ResourceList{v1.ResourceName(resourceName): resource.MustParse("1")}
+			pod := b.Pod()
+			pod.Spec.Containers[0].Resources.Requests = res
+			pod.Spec.Containers[0].Resources.Limits = res
+
+			b.Create(ctx, pod)
+
+			err := e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name)
+			framework.ExpectNoError(err, "pod should be unschedulable before device class creation")
+
+			ginkgo.By("Creating Device Class after pod creation")
+			b.Create(ctx, b.Class(1))
+
+			err = e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
+			framework.ExpectNoError(err, "start pod")
+
+			ginkgo.By("Check that pod is processed by the DRA driver")
+			containerEnv := []string{"container_0_request_0", "true"}
+			drautils.TestContainerEnv(ctx, f, pod, pod.Spec.Containers[0].Name, false, containerEnv...)
+		})
 	})
 
 	framework.Context(f.WithFeatureGate(features.DRAExtendedResource), func() {
