@@ -1450,15 +1450,16 @@ func (tc *Controller) handlePods(claim *resourceapi.ResourceClaim) {
 			pod, err := tc.podLister.Pods(claim.Namespace).Get(consumer.Name)
 			if err != nil {
 				if apierrors.IsNotFound(err) {
-					return
+					// Skip stale reservation entries.
+					continue
 				}
 				// Should not happen.
 				utilruntime.HandleErrorWithLogger(tc.logger, err, "retrieve pod from cache")
-				return
+				continue
 			}
 			if pod.UID != consumer.UID {
 				// Not the pod we were looking for.
-				return
+				continue
 			}
 			tc.handlePod(pod)
 		}
