@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"math/rand"
 	"sort"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -31,6 +32,7 @@ import (
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -40,8 +42,6 @@ import (
 	"k8s.io/klog/v2/ktesting"
 
 	"sigs.k8s.io/randfill"
-
-	"k8s.io/apimachinery/pkg/api/meta"
 )
 
 func Example() {
@@ -853,7 +853,8 @@ func TestProcessDeltasInBatch(t *testing.T) {
 				dummyListener,
 				mockStore,
 				tc.deltaList,
-				true)
+				true,
+				DeletionHandlingMetaNamespaceKeyFunc)
 			if tc.assertErr != nil {
 				assert.True(t, tc.assertErr(err))
 			}
@@ -902,45 +903,46 @@ func TestReplaceEvents(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	// Test that both atomic and non-atomic replace have the same behavior
+	// in regards to events and store state.
+	for _, atomic := range []bool{false, true} {
+		source := fcache.NewFakeControllerSource()
+		t.Cleanup(func() {
+			source.Shutdown()
+		})
+		store := NewStore(DeletionHandlingMetaNamespaceKeyFunc)
+		fifo := NewRealFIFOWithOptions(RealFIFOOptions{
+			KnownObjects:  store,
+			AtomicReplace: atomic,
+		})
+		recorder := newEventRecorder(store)
 
-	source := fcache.NewFakeControllerSource()
-	store := NewStore(DeletionHandlingMetaNamespaceKeyFunc)
-	t.Cleanup(func() {
-		source.Shutdown()
-	})
+		cfg := &Config{
+			Queue:            fifo,
+			ListerWatcher:    source,
+			ObjectType:       &v1.Pod{},
+			FullResyncPeriod: 0,
 
-	recorder := newEventRecorder(store)
-
-	fifo := NewRealFIFOWithOptions(RealFIFOOptions{
-		KnownObjects: store,
-	})
-
-	cfg := &Config{
-		Queue:            fifo,
-		ListerWatcher:    source,
-		ObjectType:       &v1.Pod{},
-		FullResyncPeriod: 0,
-
-		Process: func(obj interface{}, isInInitialList bool) error {
-			if deltas, ok := obj.(Deltas); ok {
-				return processDeltas(recorder, store, deltas, isInInitialList)
-			}
-			return errors.New("object given as Process argument is not Deltas")
-		},
-		ProcessBatch: func(deltaList []Delta, isInInitialList bool) error {
-			return processDeltasInBatch(recorder, store, deltaList, isInInitialList)
-		},
+			Process: func(obj interface{}, isInInitialList bool) error {
+				if deltas, ok := obj.(Deltas); ok {
+					return processDeltas(recorder, store, deltas, isInInitialList, DeletionHandlingMetaNamespaceKeyFunc)
+				}
+				return errors.New("object given as Process argument is not Deltas")
+			},
+			ProcessBatch: func(deltaList []Delta, isInInitialList bool) error {
+				return processDeltasInBatch(recorder, store, deltaList, isInInitialList, DeletionHandlingMetaNamespaceKeyFunc)
+			},
+		}
+		c := New(cfg)
+		go c.RunWithContext(ctx)
+		if !WaitForCacheSync(ctx.Done(), c.HasSynced) {
+			t.Fatal("Timed out waiting for cache sync")
+		}
+		testReplaceEvents(t, ctx, fifo, recorder, store, atomic)
 	}
-
-	c := New(cfg)
-	go c.RunWithContext(ctx)
-	if !WaitForCacheSync(ctx.Done(), c.HasSynced) {
-		t.Fatal("Timed out waiting for cache sync")
-	}
-	testReplaceEvents(t, ctx, fifo, recorder, store)
 }
 
-func testReplaceEvents(t *testing.T, ctx context.Context, fifo Queue, m *eventRecorder, store Store) {
+func testReplaceEvents(t *testing.T, ctx context.Context, fifo Queue, m *eventRecorder, store Store, atomic bool) {
 	tcs := []struct {
 		name            string
 		initialObjs     []metav1.Object
@@ -994,8 +996,9 @@ func testReplaceEvents(t *testing.T, ctx context.Context, fifo Queue, m *eventRe
 	}
 
 	for _, tc := range tcs {
-		t.Run(tc.name, func(t *testing.T) {
-			// Clear history so we don't get noise from previous tests.
+		testName := tc.name + " atomic: " + strconv.FormatBool(atomic)
+		t.Run(testName, func(t *testing.T) {
+			// Clear history to ensure we don't count events from previous tests
 			m.clearHistory()
 
 			for _, obj := range tc.initialObjs {
