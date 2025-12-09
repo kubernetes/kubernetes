@@ -45,16 +45,28 @@ func IsDataConsistencyDetectionForWatchListEnabled() bool {
 	return dataConsistencyDetectionForWatchListEnabled
 }
 
+// SetDataConsistencyDetectionForWatchListEnabledForTest allows to enable/disable data consistency detection for testing purposes.
+// It returns a function that restores the original value.
+func SetDataConsistencyDetectionForWatchListEnabledForTest(enabled bool) func() {
+	original := dataConsistencyDetectionForWatchListEnabled
+	dataConsistencyDetectionForWatchListEnabled = enabled
+	return func() {
+		dataConsistencyDetectionForWatchListEnabled = original
+	}
+}
+
 type RetrieveItemsFunc[U any] func() []U
 
 type ListFunc[T runtime.Object] func(ctx context.Context, options metav1.ListOptions) (T, error)
+
+type TransformFunc func(interface{}) (interface{}, error)
 
 // CheckDataConsistency exists solely for testing purposes.
 // we cannot use checkWatchListDataConsistencyIfRequested because
 // it is guarded by an environmental variable.
 // we cannot manipulate the environmental variable because
 // it will affect other tests in this package.
-func CheckDataConsistency[T runtime.Object, U any](ctx context.Context, identity string, lastSyncedResourceVersion string, listFn ListFunc[T], listOptions metav1.ListOptions, retrieveItemsFn RetrieveItemsFunc[U]) {
+func CheckDataConsistency[T runtime.Object, U any](ctx context.Context, identity string, lastSyncedResourceVersion string, listFn ListFunc[T], listItemTransformFunc TransformFunc, listOptions metav1.ListOptions, retrieveItemsFn RetrieveItemsFunc[U]) {
 	if !canFormAdditionalListCall(lastSyncedResourceVersion, listOptions) {
 		klog.V(4).Infof("data consistency check for %s is enabled but the parameters (RV, ListOptions) doesn't allow for creating a valid LIST request. Skipping the data consistency check.", identity)
 		return
@@ -83,6 +95,15 @@ func CheckDataConsistency[T runtime.Object, U any](ctx context.Context, identity
 	rawListItems, err := meta.ExtractListWithAlloc(list)
 	if err != nil {
 		panic(err) // this should never happen
+	}
+	if listItemTransformFunc != nil {
+		for i := range rawListItems {
+			obj, err := listItemTransformFunc(rawListItems[i])
+			if err != nil {
+				panic(err)
+			}
+			rawListItems[i] = obj.(runtime.Object)
+		}
 	}
 	listItems := toMetaObjectSliceOrDie(rawListItems)
 

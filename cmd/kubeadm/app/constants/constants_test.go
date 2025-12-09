@@ -98,13 +98,6 @@ func TestGetStaticPodFilepath(t *testing.T) {
 	}
 }
 
-func TestEtcdSupportedVersionLength(t *testing.T) {
-	const max = 2
-	if len(SupportedEtcdVersion) > max {
-		t.Fatalf("SupportedEtcdVersion must not include more than %d versions", max)
-	}
-}
-
 func TestEtcdSupportedVersion(t *testing.T) {
 	var supportedEtcdVersion = map[uint8]string{
 		17: "3.3.17-0",

@@ -123,6 +123,20 @@ var _ = ginkgo.Describe("DRA upgrade/downgrade", func() {
 		version, err := version.ParseGeneric(gitVersion)
 		tCtx.ExpectNoError(err, "parse version %s of repo root %q", gitVersion, repoRoot)
 		major, previousMinor := version.Major(), version.Minor()-1
+		if strings.Contains(gitVersion, "-alpha.0") {
+			// All version up to and including x.y.z-alpha.0 are treated as if we were
+			// still the previous minor version x.(y-1). There are two reason for this:
+			//
+			// - During code freeze around (at?) -rc.0, the master branch already
+			//   identfies itself as the next release with -alpha.0. Without this
+			//   special case, we would change the version skew testing from what
+			//   has been tested and been known to work to something else, which
+			//   can and at least once did break.
+			//
+			// - Early in the next cycle the differences compared to the previous
+			//   release are small, so it's more interesting to go back further.
+			previousMinor--
+		}
 		tCtx.Logf("got version: major: %d, minor: %d, previous minor: %d", major, version.Minor(), previousMinor)
 		tCtx = ktesting.End(tCtx)
 

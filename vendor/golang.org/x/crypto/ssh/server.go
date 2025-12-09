@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"slices"
 	"strings"
 )
 
@@ -43,6 +44,9 @@ type Permissions struct {
 	// pass data from the authentication callbacks to the server
 	// application layer.
 	Extensions map[string]string
+
+	// ExtraData allows to store user defined data.
+	ExtraData map[any]any
 }
 
 type GSSAPIWithMICConfig struct {
@@ -125,6 +129,21 @@ type ServerConfig struct {
 	// depending on the public key, store it inside a
 	// Permissions.Extensions entry.
 	PublicKeyCallback func(conn ConnMetadata, key PublicKey) (*Permissions, error)
+
+	// VerifiedPublicKeyCallback, if non-nil, is called after a client
+	// successfully confirms having control over a key that was previously
+	// approved by PublicKeyCallback. The permissions object passed to the
+	// callback is the one returned by PublicKeyCallback for the given public
+	// key and its ownership is transferred to the callback. The returned
+	// Permissions object can be the same object, optionally modified, or a
+	// completely new object. If VerifiedPublicKeyCallback is non-nil,
+	// PublicKeyCallback is not allowed to return a PartialSuccessError, which
+	// can instead be returned by VerifiedPublicKeyCallback.
+	//
+	// VerifiedPublicKeyCallback does not affect which authentication methods
+	// are included in the list of methods that can be attempted by the client.
+	VerifiedPublicKeyCallback func(conn ConnMetadata, key PublicKey, permissions *Permissions,
+		signatureAlgorithm string) (*Permissions, error)
 
 	// KeyboardInteractiveCallback, if non-nil, is called when
 	// keyboard-interactive authentication is selected (RFC
@@ -246,7 +265,7 @@ func NewServerConn(c net.Conn, config *ServerConfig) (*ServerConn, <-chan NewCha
 		fullConf.PublicKeyAuthAlgorithms = defaultPubKeyAuthAlgos
 	} else {
 		for _, algo := range fullConf.PublicKeyAuthAlgorithms {
-			if !contains(SupportedAlgorithms().PublicKeyAuths, algo) && !contains(InsecureAlgorithms().PublicKeyAuths, algo) {
+			if !slices.Contains(SupportedAlgorithms().PublicKeyAuths, algo) && !slices.Contains(InsecureAlgorithms().PublicKeyAuths, algo) {
 				c.Close()
 				return nil, nil, nil, fmt.Errorf("ssh: unsupported public key authentication algorithm %s", algo)
 			}
@@ -631,7 +650,7 @@ userAuthLoop:
 				return nil, parseError(msgUserAuthRequest)
 			}
 			algo := string(algoBytes)
-			if !contains(config.PublicKeyAuthAlgorithms, underlyingAlgo(algo)) {
+			if !slices.Contains(config.PublicKeyAuthAlgorithms, underlyingAlgo(algo)) {
 				authErr = fmt.Errorf("ssh: algorithm %q not accepted", algo)
 				break
 			}
@@ -652,6 +671,9 @@ userAuthLoop:
 				candidate.pubKeyData = pubKeyData
 				candidate.perms, candidate.result = authConfig.PublicKeyCallback(s, pubKey)
 				_, isPartialSuccessError := candidate.result.(*PartialSuccessError)
+				if isPartialSuccessError && config.VerifiedPublicKeyCallback != nil {
+					return nil, errors.New("ssh: invalid library usage: PublicKeyCallback must not return partial success when VerifiedPublicKeyCallback is defined")
+				}
 
 				if (candidate.result == nil || isPartialSuccessError) &&
 					candidate.perms != nil &&
@@ -695,7 +717,7 @@ userAuthLoop:
 				// ssh-rsa-cert-v01@openssh.com algorithm with ssh-rsa public
 				// key type. The algorithm and public key type must be
 				// consistent: both must be certificate algorithms, or neither.
-				if !contains(algorithmsForKeyFormat(pubKey.Type()), algo) {
+				if !slices.Contains(algorithmsForKeyFormat(pubKey.Type()), algo) {
 					authErr = fmt.Errorf("ssh: public key type %q not compatible with selected algorithm %q",
 						pubKey.Type(), algo)
 					break
@@ -705,7 +727,7 @@ userAuthLoop:
 				// algorithm name that corresponds to algo with
 				// sig.Format.  This is usually the same, but
 				// for certs, the names differ.
-				if !contains(config.PublicKeyAuthAlgorithms, sig.Format) {
+				if !slices.Contains(config.PublicKeyAuthAlgorithms, sig.Format) {
 					authErr = fmt.Errorf("ssh: algorithm %q not accepted", sig.Format)
 					break
 				}
@@ -722,6 +744,12 @@ userAuthLoop:
 
 				authErr = candidate.result
 				perms = candidate.perms
+				if authErr == nil && config.VerifiedPublicKeyCallback != nil {
+					// Only call VerifiedPublicKeyCallback after the key has been accepted
+					// and successfully verified. If authErr is non-nil, the key is not
+					// considered verified and the callback must not run.
+					perms, authErr = config.VerifiedPublicKeyCallback(s, pubKey, perms, algo)
+				}
 			}
 		case "gssapi-with-mic":
 			if authConfig.GSSAPIWithMICConfig == nil {

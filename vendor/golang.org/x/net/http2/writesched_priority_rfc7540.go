@@ -11,7 +11,7 @@ import (
 )
 
 // RFC 7540, Section 5.3.5: the default weight is 16.
-const priorityDefaultWeight = 15 // 16 = 15 + 1
+const priorityDefaultWeightRFC7540 = 15 // 16 = 15 + 1
 
 // PriorityWriteSchedulerConfig configures a priorityWriteScheduler.
 type PriorityWriteSchedulerConfig struct {
@@ -66,8 +66,8 @@ func NewPriorityWriteScheduler(cfg *PriorityWriteSchedulerConfig) WriteScheduler
 		}
 	}
 
-	ws := &priorityWriteScheduler{
-		nodes:                make(map[uint32]*priorityNode),
+	ws := &priorityWriteSchedulerRFC7540{
+		nodes:                make(map[uint32]*priorityNodeRFC7540),
 		maxClosedNodesInTree: cfg.MaxClosedNodesInTree,
 		maxIdleNodesInTree:   cfg.MaxIdleNodesInTree,
 		enableWriteThrottle:  cfg.ThrottleOutOfOrderWrites,
@@ -81,32 +81,32 @@ func NewPriorityWriteScheduler(cfg *PriorityWriteSchedulerConfig) WriteScheduler
 	return ws
 }
 
-type priorityNodeState int
+type priorityNodeStateRFC7540 int
 
 const (
-	priorityNodeOpen priorityNodeState = iota
-	priorityNodeClosed
-	priorityNodeIdle
+	priorityNodeOpenRFC7540 priorityNodeStateRFC7540 = iota
+	priorityNodeClosedRFC7540
+	priorityNodeIdleRFC7540
 )
 
-// priorityNode is a node in an HTTP/2 priority tree.
+// priorityNodeRFC7540 is a node in an HTTP/2 priority tree.
 // Each node is associated with a single stream ID.
 // See RFC 7540, Section 5.3.
-type priorityNode struct {
-	q            writeQueue        // queue of pending frames to write
-	id           uint32            // id of the stream, or 0 for the root of the tree
-	weight       uint8             // the actual weight is weight+1, so the value is in [1,256]
-	state        priorityNodeState // open | closed | idle
-	bytes        int64             // number of bytes written by this node, or 0 if closed
-	subtreeBytes int64             // sum(node.bytes) of all nodes in this subtree
+type priorityNodeRFC7540 struct {
+	q            writeQueue               // queue of pending frames to write
+	id           uint32                   // id of the stream, or 0 for the root of the tree
+	weight       uint8                    // the actual weight is weight+1, so the value is in [1,256]
+	state        priorityNodeStateRFC7540 // open | closed | idle
+	bytes        int64                    // number of bytes written by this node, or 0 if closed
+	subtreeBytes int64                    // sum(node.bytes) of all nodes in this subtree
 
 	// These links form the priority tree.
-	parent     *priorityNode
-	kids       *priorityNode // start of the kids list
-	prev, next *priorityNode // doubly-linked list of siblings
+	parent     *priorityNodeRFC7540
+	kids       *priorityNodeRFC7540 // start of the kids list
+	prev, next *priorityNodeRFC7540 // doubly-linked list of siblings
 }
 
-func (n *priorityNode) setParent(parent *priorityNode) {
+func (n *priorityNodeRFC7540) setParent(parent *priorityNodeRFC7540) {
 	if n == parent {
 		panic("setParent to self")
 	}
@@ -141,7 +141,7 @@ func (n *priorityNode) setParent(parent *priorityNode) {
 	}
 }
 
-func (n *priorityNode) addBytes(b int64) {
+func (n *priorityNodeRFC7540) addBytes(b int64) {
 	n.bytes += b
 	for ; n != nil; n = n.parent {
 		n.subtreeBytes += b
@@ -154,7 +154,7 @@ func (n *priorityNode) addBytes(b int64) {
 //
 // f(n, openParent) takes two arguments: the node to visit, n, and a bool that is true
 // if any ancestor p of n is still open (ignoring the root node).
-func (n *priorityNode) walkReadyInOrder(openParent bool, tmp *[]*priorityNode, f func(*priorityNode, bool) bool) bool {
+func (n *priorityNodeRFC7540) walkReadyInOrder(openParent bool, tmp *[]*priorityNodeRFC7540, f func(*priorityNodeRFC7540, bool) bool) bool {
 	if !n.q.empty() && f(n, openParent) {
 		return true
 	}
@@ -165,7 +165,7 @@ func (n *priorityNode) walkReadyInOrder(openParent bool, tmp *[]*priorityNode, f
 	// Don't consider the root "open" when updating openParent since
 	// we can't send data frames on the root stream (only control frames).
 	if n.id != 0 {
-		openParent = openParent || (n.state == priorityNodeOpen)
+		openParent = openParent || (n.state == priorityNodeOpenRFC7540)
 	}
 
 	// Common case: only one kid or all kids have the same weight.
@@ -195,7 +195,7 @@ func (n *priorityNode) walkReadyInOrder(openParent bool, tmp *[]*priorityNode, f
 		*tmp = append(*tmp, n.kids)
 		n.kids.setParent(nil)
 	}
-	sort.Sort(sortPriorityNodeSiblings(*tmp))
+	sort.Sort(sortPriorityNodeSiblingsRFC7540(*tmp))
 	for i := len(*tmp) - 1; i >= 0; i-- {
 		(*tmp)[i].setParent(n) // setParent inserts at the head of n.kids
 	}
@@ -207,15 +207,15 @@ func (n *priorityNode) walkReadyInOrder(openParent bool, tmp *[]*priorityNode, f
 	return false
 }
 
-type sortPriorityNodeSiblings []*priorityNode
+type sortPriorityNodeSiblingsRFC7540 []*priorityNodeRFC7540
 
-func (z sortPriorityNodeSiblings) Len() int      { return len(z) }
-func (z sortPriorityNodeSiblings) Swap(i, k int) { z[i], z[k] = z[k], z[i] }
-func (z sortPriorityNodeSiblings) Less(i, k int) bool {
+func (z sortPriorityNodeSiblingsRFC7540) Len() int      { return len(z) }
+func (z sortPriorityNodeSiblingsRFC7540) Swap(i, k int) { z[i], z[k] = z[k], z[i] }
+func (z sortPriorityNodeSiblingsRFC7540) Less(i, k int) bool {
 	// Prefer the subtree that has sent fewer bytes relative to its weight.
 	// See sections 5.3.2 and 5.3.4.
-	wi, bi := float64(z[i].weight+1), float64(z[i].subtreeBytes)
-	wk, bk := float64(z[k].weight+1), float64(z[k].subtreeBytes)
+	wi, bi := float64(z[i].weight)+1, float64(z[i].subtreeBytes)
+	wk, bk := float64(z[k].weight)+1, float64(z[k].subtreeBytes)
 	if bi == 0 && bk == 0 {
 		return wi >= wk
 	}
@@ -225,13 +225,13 @@ func (z sortPriorityNodeSiblings) Less(i, k int) bool {
 	return bi/bk <= wi/wk
 }
 
-type priorityWriteScheduler struct {
+type priorityWriteSchedulerRFC7540 struct {
 	// root is the root of the priority tree, where root.id = 0.
 	// The root queues control frames that are not associated with any stream.
-	root priorityNode
+	root priorityNodeRFC7540
 
 	// nodes maps stream ids to priority tree nodes.
-	nodes map[uint32]*priorityNode
+	nodes map[uint32]*priorityNodeRFC7540
 
 	// maxID is the maximum stream id in nodes.
 	maxID uint32
@@ -239,7 +239,7 @@ type priorityWriteScheduler struct {
 	// lists of nodes that have been closed or are idle, but are kept in
 	// the tree for improved prioritization. When the lengths exceed either
 	// maxClosedNodesInTree or maxIdleNodesInTree, old nodes are discarded.
-	closedNodes, idleNodes []*priorityNode
+	closedNodes, idleNodes []*priorityNodeRFC7540
 
 	// From the config.
 	maxClosedNodesInTree int
@@ -248,19 +248,19 @@ type priorityWriteScheduler struct {
 	enableWriteThrottle  bool
 
 	// tmp is scratch space for priorityNode.walkReadyInOrder to reduce allocations.
-	tmp []*priorityNode
+	tmp []*priorityNodeRFC7540
 
 	// pool of empty queues for reuse.
 	queuePool writeQueuePool
 }
 
-func (ws *priorityWriteScheduler) OpenStream(streamID uint32, options OpenStreamOptions) {
+func (ws *priorityWriteSchedulerRFC7540) OpenStream(streamID uint32, options OpenStreamOptions) {
 	// The stream may be currently idle but cannot be opened or closed.
 	if curr := ws.nodes[streamID]; curr != nil {
-		if curr.state != priorityNodeIdle {
+		if curr.state != priorityNodeIdleRFC7540 {
 			panic(fmt.Sprintf("stream %d already opened", streamID))
 		}
-		curr.state = priorityNodeOpen
+		curr.state = priorityNodeOpenRFC7540
 		return
 	}
 
@@ -272,11 +272,11 @@ func (ws *priorityWriteScheduler) OpenStream(streamID uint32, options OpenStream
 	if parent == nil {
 		parent = &ws.root
 	}
-	n := &priorityNode{
+	n := &priorityNodeRFC7540{
 		q:      *ws.queuePool.get(),
 		id:     streamID,
-		weight: priorityDefaultWeight,
-		state:  priorityNodeOpen,
+		weight: priorityDefaultWeightRFC7540,
+		state:  priorityNodeOpenRFC7540,
 	}
 	n.setParent(parent)
 	ws.nodes[streamID] = n
@@ -285,24 +285,23 @@ func (ws *priorityWriteScheduler) OpenStream(streamID uint32, options OpenStream
 	}
 }
 
-func (ws *priorityWriteScheduler) CloseStream(streamID uint32) {
+func (ws *priorityWriteSchedulerRFC7540) CloseStream(streamID uint32) {
 	if streamID == 0 {
 		panic("violation of WriteScheduler interface: cannot close stream 0")
 	}
 	if ws.nodes[streamID] == nil {
 		panic(fmt.Sprintf("violation of WriteScheduler interface: unknown stream %d", streamID))
 	}
-	if ws.nodes[streamID].state != priorityNodeOpen {
+	if ws.nodes[streamID].state != priorityNodeOpenRFC7540 {
 		panic(fmt.Sprintf("violation of WriteScheduler interface: stream %d already closed", streamID))
 	}
 
 	n := ws.nodes[streamID]
-	n.state = priorityNodeClosed
+	n.state = priorityNodeClosedRFC7540
 	n.addBytes(-n.bytes)
 
 	q := n.q
 	ws.queuePool.put(&q)
-	n.q.s = nil
 	if ws.maxClosedNodesInTree > 0 {
 		ws.addClosedOrIdleNode(&ws.closedNodes, ws.maxClosedNodesInTree, n)
 	} else {
@@ -310,7 +309,7 @@ func (ws *priorityWriteScheduler) CloseStream(streamID uint32) {
 	}
 }
 
-func (ws *priorityWriteScheduler) AdjustStream(streamID uint32, priority PriorityParam) {
+func (ws *priorityWriteSchedulerRFC7540) AdjustStream(streamID uint32, priority PriorityParam) {
 	if streamID == 0 {
 		panic("adjustPriority on root")
 	}
@@ -324,11 +323,11 @@ func (ws *priorityWriteScheduler) AdjustStream(streamID uint32, priority Priorit
 			return
 		}
 		ws.maxID = streamID
-		n = &priorityNode{
+		n = &priorityNodeRFC7540{
 			q:      *ws.queuePool.get(),
 			id:     streamID,
-			weight: priorityDefaultWeight,
-			state:  priorityNodeIdle,
+			weight: priorityDefaultWeightRFC7540,
+			state:  priorityNodeIdleRFC7540,
 		}
 		n.setParent(&ws.root)
 		ws.nodes[streamID] = n
@@ -340,7 +339,7 @@ func (ws *priorityWriteScheduler) AdjustStream(streamID uint32, priority Priorit
 	parent := ws.nodes[priority.StreamDep]
 	if parent == nil {
 		n.setParent(&ws.root)
-		n.weight = priorityDefaultWeight
+		n.weight = priorityDefaultWeightRFC7540
 		return
 	}
 
@@ -381,8 +380,8 @@ func (ws *priorityWriteScheduler) AdjustStream(streamID uint32, priority Priorit
 	n.weight = priority.Weight
 }
 
-func (ws *priorityWriteScheduler) Push(wr FrameWriteRequest) {
-	var n *priorityNode
+func (ws *priorityWriteSchedulerRFC7540) Push(wr FrameWriteRequest) {
+	var n *priorityNodeRFC7540
 	if wr.isControl() {
 		n = &ws.root
 	} else {
@@ -401,8 +400,8 @@ func (ws *priorityWriteScheduler) Push(wr FrameWriteRequest) {
 	n.q.push(wr)
 }
 
-func (ws *priorityWriteScheduler) Pop() (wr FrameWriteRequest, ok bool) {
-	ws.root.walkReadyInOrder(false, &ws.tmp, func(n *priorityNode, openParent bool) bool {
+func (ws *priorityWriteSchedulerRFC7540) Pop() (wr FrameWriteRequest, ok bool) {
+	ws.root.walkReadyInOrder(false, &ws.tmp, func(n *priorityNodeRFC7540, openParent bool) bool {
 		limit := int32(math.MaxInt32)
 		if openParent {
 			limit = ws.writeThrottleLimit
@@ -428,7 +427,7 @@ func (ws *priorityWriteScheduler) Pop() (wr FrameWriteRequest, ok bool) {
 	return wr, ok
 }
 
-func (ws *priorityWriteScheduler) addClosedOrIdleNode(list *[]*priorityNode, maxSize int, n *priorityNode) {
+func (ws *priorityWriteSchedulerRFC7540) addClosedOrIdleNode(list *[]*priorityNodeRFC7540, maxSize int, n *priorityNodeRFC7540) {
 	if maxSize == 0 {
 		return
 	}
@@ -442,7 +441,7 @@ func (ws *priorityWriteScheduler) addClosedOrIdleNode(list *[]*priorityNode, max
 	*list = append(*list, n)
 }
 
-func (ws *priorityWriteScheduler) removeNode(n *priorityNode) {
+func (ws *priorityWriteSchedulerRFC7540) removeNode(n *priorityNodeRFC7540) {
 	for n.kids != nil {
 		n.kids.setParent(n.parent)
 	}
