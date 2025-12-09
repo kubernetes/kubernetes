@@ -231,7 +231,7 @@ func (c *controller) processLoop(ctx context.Context) {
 		default:
 			var err error
 			if useBatchProcess {
-				err = batchQueue.PopBatch(c.config.ProcessBatch)
+				err = batchQueue.PopBatch(c.config.ProcessBatch, PopProcessFunc(c.config.Process))
 			} else {
 				// otherwise fallback to non-batch process behavior
 				_, err = c.config.Pop(PopProcessFunc(c.config.Process))
@@ -584,12 +584,21 @@ func processDeltas(
 	clientState Store,
 	deltas Deltas,
 	isInInitialList bool,
+	keyFunc KeyFunc,
 ) error {
 	// from oldest to newest
 	for _, d := range deltas {
 		obj := d.Object
 
 		switch d.Type {
+		case ReplacedList:
+			info, ok := obj.(ReplacedListInfo)
+			if !ok {
+				return fmt.Errorf("ReplacedList did not contain ReplacedListInfo: %T", obj)
+			}
+			if err := processReplacedListInfo(handler, info, clientState, keyFunc); err != nil {
+				return err
+			}
 		case Sync, Replaced, Added, Updated:
 			if old, exists, err := clientState.Get(obj); err == nil && exists {
 				if err := clientState.Update(obj); err != nil {
@@ -626,6 +635,7 @@ func processDeltasInBatch(
 	clientState Store,
 	deltas []Delta,
 	isInInitialList bool,
+	keyFunc KeyFunc,
 ) error {
 	// from oldest to newest
 	txns := make([]Transaction, 0)
@@ -634,7 +644,7 @@ func processDeltasInBatch(
 	if !txnSupported {
 		var errs []error
 		for _, delta := range deltas {
-			if err := processDeltas(handler, clientState, Deltas{delta}, isInInitialList); err != nil {
+			if err := processDeltas(handler, clientState, Deltas{delta}, isInInitialList, keyFunc); err != nil {
 				errs = append(errs, err)
 			}
 		}
@@ -643,11 +653,14 @@ func processDeltasInBatch(
 		}
 		return nil
 	}
+
 	// deltasList is a list of unique objects
 	for _, d := range deltas {
 		obj := d.Object
 		switch d.Type {
-		case Sync, Replaced, Added, Updated:
+		case ReplacedList:
+			return fmt.Errorf("ReplacedList is not supported in batch processing")
+		case Sync, Added, Updated, Replaced:
 			// it will only return one old object for each because items are unique
 			if old, exists, err := clientState.Get(obj); err == nil && exists {
 				txn := Transaction{
@@ -697,6 +710,56 @@ func processDeltasInBatch(
 	return nil
 }
 
+func processReplacedListInfo(handler ResourceEventHandler, info ReplacedListInfo, clientState Store, keyFunc KeyFunc) error {
+	var deletions []interface{}
+	type replacement struct {
+		oldObj interface{}
+		newObj interface{}
+	}
+	var replacements []replacement
+
+	err := reconcileReplacement(nil, clientState, info.Objects, keyFunc,
+		func(obj interface{}) error {
+			deletions = append(deletions, obj)
+			return nil
+		},
+		func(obj interface{}) error {
+			key, err := keyFunc(obj)
+			if err != nil {
+				return err
+			}
+			oldObj, exists, err := clientState.GetByKey(key)
+			if err != nil {
+				return err
+			}
+			if exists {
+				replacements = append(replacements, replacement{oldObj: oldObj, newObj: obj})
+			} else {
+				replacements = append(replacements, replacement{newObj: obj})
+			}
+			return nil
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	if err := clientState.Replace(info.Objects, info.ResourceVersion); err != nil {
+		return err
+	}
+	for _, objToDelete := range deletions {
+		handler.OnDelete(objToDelete)
+	}
+	for _, r := range replacements {
+		if r.oldObj != nil {
+			handler.OnUpdate(r.oldObj, r.newObj)
+		} else {
+			handler.OnAdd(r.newObj, true)
+		}
+	}
+	return nil
+}
+
 // newInformer returns a controller for populating the store while also
 // providing event notifications.
 //
@@ -719,12 +782,12 @@ func newInformer(clientState Store, options InformerOptions) Controller {
 
 		Process: func(obj interface{}, isInInitialList bool) error {
 			if deltas, ok := obj.(Deltas); ok {
-				return processDeltas(options.Handler, clientState, deltas, isInInitialList)
+				return processDeltas(options.Handler, clientState, deltas, isInInitialList, MetaNamespaceKeyFunc)
 			}
 			return errors.New("object given as Process argument is not Deltas")
 		},
 		ProcessBatch: func(deltaList []Delta, isInInitialList bool) error {
-			return processDeltasInBatch(options.Handler, clientState, deltaList, isInInitialList)
+			return processDeltasInBatch(options.Handler, clientState, deltaList, isInInitialList, MetaNamespaceKeyFunc)
 		},
 	}
 	return New(cfg)
@@ -736,6 +799,7 @@ func newQueueFIFO(clientState Store, transform TransformFunc) Queue {
 			KeyFunction:  MetaNamespaceKeyFunc,
 			KnownObjects: clientState,
 			Transformer:  transform,
+			AtomicEvents: clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.AtomicFIFO),
 		})
 	} else {
 		return NewDeltaFIFOWithOptions(DeltaFIFOOptions{
