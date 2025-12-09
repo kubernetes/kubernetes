@@ -27,9 +27,12 @@ import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	resourcehelper "k8s.io/component-helpers/resource"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
@@ -104,6 +107,9 @@ type Manager interface {
 	// GetAllCPUs returns all the CPUs known by cpumanager, as reported by the
 	// hardware discovery. Maps to the CPU capacity.
 	GetAllCPUs() cpuset.CPUSet
+
+	// GetResourceIsolationLevel returns the isolation level of the container.
+	GetResourceIsolationLevel(pod *v1.Pod, container *v1.Container) cmqos.ResourceIsolationLevel
 }
 
 type manager struct {
@@ -573,4 +579,16 @@ func ResourcesQualifyForExclusiveCPUs(container *v1.Container) bool {
 
 	cpuLimit := container.Resources.Limits[v1.ResourceCPU]
 	return cpuLimit.Value()*1000 == cpuLimit.MilliValue()
+}
+
+func (m *manager) GetResourceIsolationLevel(pod *v1.Pod, container *v1.Container) cmqos.ResourceIsolationLevel {
+	if _, ok := m.state.GetCPUSet(string(pod.UID), container.Name); !ok {
+		return cmqos.ResourceIsolationHost
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResourceManagers) && resourcehelper.IsPodLevelResourcesSet(pod) && !ResourcesQualifyForExclusiveCPUs(container) {
+		return cmqos.ResourceIsolationPod
+	}
+
+	return cmqos.ResourceIsolationContainer
 }

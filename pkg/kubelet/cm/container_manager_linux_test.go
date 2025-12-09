@@ -39,13 +39,15 @@ import (
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
+	cmqos "k8s.io/kubernetes/pkg/kubelet/cm/qos"
 	"k8s.io/mount-utils"
 	"k8s.io/utils/cpuset"
 )
 
 type mockCPUAllocationReader struct {
 	cpumanager.Manager
-	sets map[string]cpuset.CPUSet
+	sets            map[string]cpuset.CPUSet
+	isolationLevels map[string]cmqos.ResourceIsolationLevel
 }
 
 func (m *mockCPUAllocationReader) GetExclusiveCPUs(podUID, containerName string) cpuset.CPUSet {
@@ -54,6 +56,20 @@ func (m *mockCPUAllocationReader) GetExclusiveCPUs(podUID, containerName string)
 		return cset
 	}
 	return cpuset.New()
+}
+
+func (m *mockCPUAllocationReader) GetResourceIsolationLevel(pod *v1.Pod, container *v1.Container) cmqos.ResourceIsolationLevel {
+	key := string(pod.UID) + "/" + container.Name
+	if level, ok := m.isolationLevels[key]; ok {
+		return level
+	}
+	// Fallback to behavior based on sets existence if isolation level not explicitly set,
+	// to maintain compatibility with other tests or provide a reasonable default.
+	// For TestContainerHasExclusiveCPUs, we set isolationLevels explicitly.
+	if _, ok := m.sets[key]; ok {
+		return cmqos.ResourceIsolationContainer
+	}
+	return cmqos.ResourceIsolationHost
 }
 
 func fakeContainerMgrMountInt() mount.Interface {
@@ -397,6 +413,7 @@ func TestContainerHasExclusiveCPUs(t *testing.T) {
 		pod                             *v1.Pod
 		containerName                   string
 		cpuSets                         map[string]cpuset.CPUSet
+		isolationLevels                 map[string]cmqos.ResourceIsolationLevel
 		expectExclusiveCPUs             bool
 		podLevelResourceManagersEnabled bool
 	}{
@@ -424,6 +441,7 @@ func TestContainerHasExclusiveCPUs(t *testing.T) {
 			},
 			containerName:                   "c1",
 			cpuSets:                         map[string]cpuset.CPUSet{"pod1/c1": cpuset.New(1)},
+			isolationLevels:                 map[string]cmqos.ResourceIsolationLevel{"pod1/c1": cmqos.ResourceIsolationContainer},
 			expectExclusiveCPUs:             true,
 			podLevelResourceManagersEnabled: true,
 		},
@@ -452,6 +470,7 @@ func TestContainerHasExclusiveCPUs(t *testing.T) {
 			},
 			containerName:                   "c1",
 			cpuSets:                         map[string]cpuset.CPUSet{"pod1/c1": cpuset.New(1)},
+			isolationLevels:                 map[string]cmqos.ResourceIsolationLevel{"pod1/c1": cmqos.ResourceIsolationPod},
 			expectExclusiveCPUs:             false,
 			podLevelResourceManagersEnabled: true,
 		},
@@ -466,6 +485,7 @@ func TestContainerHasExclusiveCPUs(t *testing.T) {
 			},
 			containerName:                   "c1",
 			cpuSets:                         map[string]cpuset.CPUSet{"pod1/c1": cpuset.New(1)},
+			isolationLevels:                 map[string]cmqos.ResourceIsolationLevel{"pod1/c1": cmqos.ResourceIsolationPod},
 			expectExclusiveCPUs:             false,
 			podLevelResourceManagersEnabled: true,
 		},
@@ -480,6 +500,7 @@ func TestContainerHasExclusiveCPUs(t *testing.T) {
 			},
 			containerName:                   "c1",
 			cpuSets:                         map[string]cpuset.CPUSet{"pod1/c1": cpuset.New(1)},
+			isolationLevels:                 map[string]cmqos.ResourceIsolationLevel{"pod1/c1": cmqos.ResourceIsolationPod},
 			expectExclusiveCPUs:             false,
 			podLevelResourceManagersEnabled: true,
 		},
@@ -518,7 +539,8 @@ func TestContainerHasExclusiveCPUs(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.PodLevelResourceManagers, tc.podLevelResourceManagersEnabled)
 
 			mockReader := &mockCPUAllocationReader{
-				sets: tc.cpuSets,
+				sets:            tc.cpuSets,
+				isolationLevels: tc.isolationLevels,
 			}
 			cm := &containerManagerImpl{
 				cpuManager: mockReader,
