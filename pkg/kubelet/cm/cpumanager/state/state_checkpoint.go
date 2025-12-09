@@ -254,3 +254,33 @@ func (sc *stateCheckpoint) ClearState() {
 		sc.logger.Error(err, "Failed to store state to checkpoint")
 	}
 }
+
+func (sc *stateCheckpoint) Allocate(podUID string, containerName string, cset cpuset.CPUSet) {
+	sc.mux.Lock()
+	defer sc.mux.Unlock()
+	// set default cpuset
+	sc.cache.SetDefaultCPUSet(sc.cache.GetDefaultCPUSet().Difference(cset))
+
+	// set cpu assignment
+	sc.cache.SetCPUSet(podUID, containerName, cset)
+
+	err := sc.storeState()
+	if err != nil {
+		klog.InfoS("Store state to checkpoint error", "err", err)
+	}
+}
+
+func (sc *stateCheckpoint) Reclaim(podUID string, containerName string, cset cpuset.CPUSet) {
+	sc.mux.Lock()
+	defer sc.mux.Unlock()
+	// delete cpu assignment
+	sc.cache.Delete(podUID, containerName)
+
+	// set default cpuset
+	sc.cache.SetDefaultCPUSet(cset)
+
+	err := sc.storeState()
+	if err != nil {
+		klog.InfoS("Store state to checkpoint error", "err", err)
+	}
+}
