@@ -20,7 +20,6 @@ package nodeinfomanager
 
 import (
 	"context"
-	"encoding/json"
 	goerrors "errors"
 	"fmt"
 	"math"
@@ -46,7 +45,7 @@ import (
 
 const (
 	// Name of node annotation that contains JSON map of driver names to node
-	annotationKeyNodeID = "csi.volume.kubernetes.io/nodeid"
+	deprecatedAnnotationKeyNodeID = "csi.volume.kubernetes.io/nodeid"
 )
 
 var (
@@ -117,7 +116,7 @@ func (nim *nodeInfoManager) InstallCSIDriver(driverName string, driverNodeID str
 
 	nodeUpdateFuncs := []nodeUpdateFunc{
 		removeMaxAttachLimit(driverName), // remove in 1.35 due to the version skew policy, we have to keep it for 3 releases
-		updateNodeIDInNode(driverName, driverNodeID),
+		removeNodeIDFromNode(),           // remove in 1.37
 		updateTopologyLabels(topology),
 	}
 
@@ -155,7 +154,7 @@ func (nim *nodeInfoManager) UninstallCSIDriver(driverName string) error {
 
 	err = nim.updateNode(
 		removeMaxAttachLimit(driverName), // remove it when this function is removed from nodeUpdateFuncs
-		removeNodeIDFromNode(driverName),
+		removeNodeIDFromNode(),           // remove in 1.37
 	)
 	if err != nil {
 		return fmt.Errorf("error removing CSI driver node info from Node object %v", err)
@@ -222,116 +221,20 @@ func (nim *nodeInfoManager) tryUpdateNode(updateFuncs ...nodeUpdateFunc) error {
 	return nil
 }
 
-// Guarantees the map is non-nil if no error is returned.
-func buildNodeIDMapFromAnnotation(node *v1.Node) (map[string]string, error) {
-	var previousAnnotationValue string
-	if node.ObjectMeta.Annotations != nil {
-		previousAnnotationValue =
-			node.ObjectMeta.Annotations[annotationKeyNodeID]
-	}
-
-	var existingDriverMap map[string]string
-	if previousAnnotationValue != "" {
-		// Parse previousAnnotationValue as JSON
-		if err := json.Unmarshal([]byte(previousAnnotationValue), &existingDriverMap); err != nil {
-			return nil, fmt.Errorf(
-				"failed to parse node's %q annotation value (%q) err=%v",
-				annotationKeyNodeID,
-				previousAnnotationValue,
-				err)
-		}
-	}
-
-	if existingDriverMap == nil {
-		return make(map[string]string), nil
-	}
-	return existingDriverMap, nil
-}
-
-// updateNodeIDInNode returns a function that updates a Node object with the given
-// Node ID information.
-func updateNodeIDInNode(
-	csiDriverName string,
-	csiDriverNodeID string) nodeUpdateFunc {
-	return func(node *v1.Node) (*v1.Node, bool, error) {
-		existingDriverMap, err := buildNodeIDMapFromAnnotation(node)
-		if err != nil {
-			return nil, false, err
-		}
-
-		if val, ok := existingDriverMap[csiDriverName]; ok {
-			if val == csiDriverNodeID {
-				// Value already exists in node annotation, nothing more to do
-				return node, false, nil
-			}
-		}
-
-		// Add/update annotation value
-		existingDriverMap[csiDriverName] = csiDriverNodeID
-		jsonObj, err := json.Marshal(existingDriverMap)
-		if err != nil {
-			return nil, false, fmt.Errorf(
-				"error while marshalling node ID map updated with driverName=%q, nodeID=%q: %v",
-				csiDriverName,
-				csiDriverNodeID,
-				err)
-		}
-
-		if node.ObjectMeta.Annotations == nil {
-			node.ObjectMeta.Annotations = make(map[string]string)
-		}
-		node.ObjectMeta.Annotations[annotationKeyNodeID] = string(jsonObj)
-
-		return node, true, nil
-	}
-}
-
-// removeNodeIDFromNode returns a function that removes node ID information matching the given
-// driver name from a Node object.
-func removeNodeIDFromNode(csiDriverName string) nodeUpdateFunc {
+// removeNodeIDFromNode returns a function that removes node ID annotation from a Node object.
+func removeNodeIDFromNode() nodeUpdateFunc {
 	return func(node *v1.Node) (*v1.Node, bool, error) {
 		var previousAnnotationValue string
 		if node.ObjectMeta.Annotations != nil {
 			previousAnnotationValue =
-				node.ObjectMeta.Annotations[annotationKeyNodeID]
+				node.ObjectMeta.Annotations[deprecatedAnnotationKeyNodeID]
 		}
 
 		if previousAnnotationValue == "" {
 			return node, false, nil
 		}
 
-		// Parse previousAnnotationValue as JSON
-		existingDriverMap := map[string]string{}
-		if err := json.Unmarshal([]byte(previousAnnotationValue), &existingDriverMap); err != nil {
-			return nil, false, fmt.Errorf(
-				"failed to parse node's %q annotation value (%q) err=%v",
-				annotationKeyNodeID,
-				previousAnnotationValue,
-				err)
-		}
-
-		if _, ok := existingDriverMap[csiDriverName]; !ok {
-			// Value is already missing in node annotation, nothing more to do
-			return node, false, nil
-		}
-
-		// Delete annotation value
-		delete(existingDriverMap, csiDriverName)
-		if len(existingDriverMap) == 0 {
-			delete(node.ObjectMeta.Annotations, annotationKeyNodeID)
-		} else {
-			jsonObj, err := json.Marshal(existingDriverMap)
-			if err != nil {
-				return nil, false, fmt.Errorf(
-					"failed while trying to remove key %q from node %q annotation. Existing data: %v",
-					csiDriverName,
-					annotationKeyNodeID,
-					previousAnnotationValue)
-			}
-
-			node.ObjectMeta.Annotations[annotationKeyNodeID] = string(jsonObj)
-		}
-
+		delete(node.ObjectMeta.Annotations, deprecatedAnnotationKeyNodeID)
 		return node, true, nil
 	}
 }
