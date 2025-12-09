@@ -614,22 +614,30 @@ func (ctrl *PersistentVolumeController) resync(ctx context.Context) {
 	logger := klog.FromContext(ctx)
 	logger.V(4).Info("Resyncing PV controller")
 
-	pvcs, err := ctrl.claimLister.List(labels.NewSelector())
-	if err != nil {
-		logger.Info("Cannot list claims", "err", err)
-		return
-	}
-	for _, pvc := range pvcs {
-		ctrl.enqueueWork(ctx, ctrl.claimQueue, pvc)
+	if ctrl.claimQueue.Len() > 0 {
+		logger.V(4).Info("Resync of claims skipped because queue is not empty", "queueLength", ctrl.claimQueue.Len())
+	} else {
+		pvcs, err := ctrl.claimLister.List(labels.NewSelector())
+		if err != nil {
+			logger.Info("Cannot list claims", "err", err)
+			return
+		}
+		for _, pvc := range pvcs {
+			ctrl.enqueueWork(ctx, ctrl.claimQueue, pvc)
+		}
 	}
 
-	pvs, err := ctrl.volumeLister.List(labels.NewSelector())
-	if err != nil {
-		logger.Info("Cannot list persistent volumes", "err", err)
-		return
-	}
-	for _, pv := range pvs {
-		ctrl.enqueueWork(ctx, ctrl.volumeQueue, pv)
+	if ctrl.volumeQueue.Len() > 0 {
+		logger.V(4).Info("Resync of volumes skipped because queue is not empty", "queueLength", ctrl.volumeQueue.Len())
+	} else {
+		pvs, err := ctrl.volumeLister.List(labels.NewSelector())
+		if err != nil {
+			logger.Info("Cannot list persistent volumes", "err", err)
+			return
+		}
+		for _, pv := range pvs {
+			ctrl.enqueueWork(ctx, ctrl.volumeQueue, pv)
+		}
 	}
 }
 
