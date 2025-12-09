@@ -129,7 +129,7 @@ var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 		}
 	})
 
-	f.It("should be able to change the type and ports of a TCP service", f.WithSlow(), func(ctx context.Context) {
+	f.It("should be able to change the type and ports of a TCP service", f.WithSlow(), ginkgo.Timeout(30*time.Minute), func(ctx context.Context) {
 		// FIXME: need a better platform-independent timeout
 		loadBalancerLagTimeout := e2eservice.LoadBalancerLagTimeoutAWS
 		loadBalancerCreateTimeout := e2eservice.GetServiceLoadBalancerCreationTimeout(ctx, cs)
@@ -267,7 +267,7 @@ var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 		testNotReachableHTTP(ctx, tcpIngressIP, svcPort, loadBalancerLagTimeout)
 	})
 
-	f.It("should be able to change the type and ports of a UDP service", f.WithSlow(), func(ctx context.Context) {
+	f.It("should be able to change the type and ports of a UDP service", f.WithSlow(), ginkgo.Timeout(30*time.Minute), func(ctx context.Context) {
 		// FIXME: some cloud providers do not support UDP LoadBalancers
 
 		loadBalancerLagTimeout := e2eservice.LoadBalancerLagTimeoutDefault
