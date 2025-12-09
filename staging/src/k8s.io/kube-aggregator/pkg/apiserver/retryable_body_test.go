@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"sync/atomic"
 	"testing"
 )
 
@@ -222,7 +223,7 @@ func TestLimitedWriterStopsBuffering(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			exceeded := false
+			exceeded := atomic.Bool{}
 			lw := &limitedWriter{buf: &buf, limit: tc.limit, exceeded: &exceeded}
 
 			for _, w := range tc.writes {
@@ -235,8 +236,8 @@ func TestLimitedWriterStopsBuffering(t *testing.T) {
 				}
 			}
 
-			if exceeded != tc.wantExceeded {
-				t.Errorf("expected exceeded=%v, got %v", tc.wantExceeded, exceeded)
+			if exceeded.Load() != tc.wantExceeded {
+				t.Errorf("expected exceeded=%v, got %v", tc.wantExceeded, exceeded.Load())
 			}
 
 			// When exceeded, buffer is nil; otherwise check length

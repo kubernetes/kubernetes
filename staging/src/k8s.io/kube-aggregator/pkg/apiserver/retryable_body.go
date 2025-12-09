@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"sync/atomic"
 )
 
 const (
@@ -58,21 +59,20 @@ func wrapBodyForRetry(originalBody io.ReadCloser, config retryableBodyConfig) (i
 	}
 
 	var buf bytes.Buffer
-	var exceeded bool
-	var attempts int
+	var exceeded atomic.Bool
+	var attempts atomic.Int32
 
 	lw := &limitedWriter{buf: &buf, limit: config.limit, exceeded: &exceeded}
 
 	wrappedBody := io.NopCloser(io.TeeReader(originalBody, lw))
 
 	getBody := func() (io.ReadCloser, error) {
-		if exceeded {
+		if exceeded.Load() {
 			return nil, errRequestBodyTooLarge
 		}
-		if attempts >= config.maxAttempts {
+		if int(attempts.Add(1)) > config.maxAttempts {
 			return nil, errRetryAlreadyAttempted
 		}
-		attempts++
 		return io.NopCloser(io.MultiReader(bytes.NewReader(buf.Bytes()), originalBody)), nil
 	}
 
@@ -83,15 +83,15 @@ func wrapBodyForRetry(originalBody io.ReadCloser, config retryableBodyConfig) (i
 type limitedWriter struct {
 	buf      *bytes.Buffer
 	limit    int
-	exceeded *bool
+	exceeded *atomic.Bool
 }
 
 func (lw *limitedWriter) Write(p []byte) (n int, err error) {
-	if *lw.exceeded {
+	if lw.exceeded.Load() {
 		return len(p), nil
 	}
 	if lw.buf.Len()+len(p) > lw.limit {
-		*lw.exceeded = true
+		lw.exceeded.Store(true)
 		lw.buf = nil
 		return len(p), nil
 	}
