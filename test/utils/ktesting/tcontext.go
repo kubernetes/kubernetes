@@ -392,6 +392,9 @@ type TC struct {
 	dynamic       dynamic.Interface
 	apiextensions apiextensions.Interface
 
+	// for WithNamespace
+	namespace string
+
 	// capture, if non-nil, changes Error/Errorf/Fatal/Fatalf/Fail/FailNow so
 	// that they intercept the problem and convert to errors. Log messages
 	// are passed through.
@@ -597,4 +600,21 @@ func (tc *TC) Require(actual interface{}, extra ...interface{}) gomega.Assertion
 // to test several different assertions.
 func (tc *TC) Assert(actual interface{}, extra ...interface{}) gomega.Assertion {
 	return gomegaAssertion(tc, false, actual, extra...)
+}
+
+// WithNamespace creates a new context with a Kubernetes namespace name for retrieval through [Namespace].
+func (tc *TC) WithNamespace(namespace string) TContext {
+	tc = tc.clone()
+	tc.namespace = namespace
+	return tc
+}
+
+// Namespace returns the Kubernetes namespace name that was set previously
+// through WithNamespace and the empty string if none is available.
+//
+// This namespace is the one to be used by tests which need to create namespace-scoped
+// objects. The name is guaranteed to be unique for the test context, so tests running
+// in parallel need to be set up so that each test has its own namespace.
+func (tc *TC) Namespace() string {
+	return tc.namespace
 }

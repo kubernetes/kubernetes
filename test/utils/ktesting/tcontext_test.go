@@ -20,6 +20,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/onsi/gomega"
 	"github.com/stretchr/testify/assert"
 
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -127,4 +128,11 @@ func TestRun(t *testing.T) {
 	if err := tCtx.Err(); err != nil {
 		t.Errorf("parent TContext should not have been cancelled: %v", err)
 	}
+}
+
+func TestWithNamespace(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	namespace := "foo"
+	tCtxWithNamespace := tCtx.WithNamespace(namespace)
+	tCtx.Expect(tCtxWithNamespace.Namespace()).To(gomega.Equal(namespace))
 }
