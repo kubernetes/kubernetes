@@ -119,6 +119,8 @@ type controller struct {
 	clock          clock.Clock
 }
 
+var _ NamedController = &controller{}
+
 // Controller is a low-level controller that is parameterized by a
 // Config and used in sharedIndexInformer.
 type Controller interface {
@@ -142,16 +144,26 @@ type Controller interface {
 	// HasSynced delegates to the Config's Queue
 	HasSynced() bool
 
-	// NamedHasSynced delegates to the Config's Queue
-	NamedHasSynced() NamedSyncer
-
 	// LastSyncResourceVersion delegates to the Reflector when there
 	// is one, otherwise returns the empty string
 	LastSyncResourceVersion() string
 }
 
+// NamedController adds NamedHasSynced to Controller.
+type NamedController interface {
+	Controller
+	// NamedHasSynced delegates to the Config's Queue
+	NamedHasSynced() NamedSyncer
+}
+
 // New makes a new Controller from the given Config.
+//
+// The returned implementation is guaranteed to also implement NamedController.
 func New(c *Config) Controller {
+	return newController(c)
+}
+
+func newController(c *Config) *controller {
 	ctlr := &controller{
 		config: *c,
 		clock:  &clock.RealClock{},

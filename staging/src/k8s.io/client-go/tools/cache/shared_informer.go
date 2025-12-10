@@ -502,7 +502,7 @@ type NamedSyncer interface {
 // notifications to each of the informer's clients.
 type sharedIndexInformer struct {
 	indexer    Indexer
-	controller Controller
+	controller *controller
 
 	// synced gets created when creating the sharedIndexInformer.
 	// It gets closed when Run detects that the processor created
@@ -653,8 +653,8 @@ func (s *sharedIndexInformer) RunWithContext(ctx context.Context) {
 			WatchErrorHandlerWithContext: s.watchErrorHandler,
 		}
 
-		s.controller = New(cfg)
-		s.controller.(*controller).clock = s.clock
+		s.controller = newController(cfg)
+		s.controller.clock = s.clock
 		s.syncedName.Store(ptr.To(s.controller.NamedHasSynced().Name()))
 		s.started = true
 	}()
