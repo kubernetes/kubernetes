@@ -266,15 +266,15 @@ var _ = ginkgo.Describe("DRA upgrade/downgrade", func() {
 		tCtx = ktesting.Begin(tCtx, fmt.Sprintf("v%d.%d", major, previousMinor))
 
 		tCtx.ExpectNoError(e2enode.WaitForAllNodesSchedulable(tCtx, tCtx.Client(), f.Timeouts.NodeSchedulable), "wait for all nodes to be schedulable")
-		nodes := drautils.NewNodesNow(tCtx, f, 1, 1)
+		nodes := drautils.NewNodesNow(tCtx, 1, 1)
 
 		// Opening sockets locally avoids intermittent errors and delays caused by proxying through the restarted apiserver.
 		// We could speed up testing by shortening the sync delay in the ResourceSlice controller, but let's better
 		// test the defaults.
-		driver := drautils.NewDriverInstance(f)
+		driver := drautils.NewDriverInstance(tCtx)
 		driver.IsLocal = true
-		driver.Run(nodes, drautils.DriverResourcesNow(nodes, 8))
-		b := drautils.NewBuilderNow(ctx, f, driver)
+		driver.Run(tCtx, nodes, drautils.DriverResourcesNow(nodes, 8))
+		b := drautils.NewBuilderNow(tCtx, driver)
 
 		tCtx = ktesting.End(tCtx)
 
@@ -305,7 +305,7 @@ var _ = ginkgo.Describe("DRA upgrade/downgrade", func() {
 		// The kubelet wipes all ResourceSlices on a restart because it doesn't know which drivers were running.
 		// Wait for the ResourceSlice controller in the driver to notice and recreate the ResourceSlices.
 		tCtx = ktesting.Begin(tCtx, "wait for ResourceSlices")
-		gomega.Eventually(ctx, driver.NewGetSlices()).WithTimeout(5 * time.Minute).Should(gomega.HaveField("Items", gomega.HaveLen(len(nodes.NodeNames))))
+		ktesting.Eventually(tCtx, driver.NewGetSlices()).WithTimeout(5 * time.Minute).Should(gomega.HaveField("Items", gomega.HaveLen(len(nodes.NodeNames))))
 		tCtx = ktesting.End(tCtx)
 
 		steps3 := make(map[string]step3Func, len(subTests))
