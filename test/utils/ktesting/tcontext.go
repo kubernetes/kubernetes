@@ -562,12 +562,12 @@ func (tc *TC) Logger() klog.Logger {
 	return klog.FromContext(tc.Context)
 }
 
-// RESTConfig returns a config for a rest client with the UserAgent set
-// to include the current test name or nil if not available. Several
-// typed clients using this config are available through [Client],
-// [Dynamic], [APIExtensions].
+// RESTConfig returns a copy of the config for a rest client with the UserAgent
+// set to include the current test name or nil if not available. Several typed
+// clients using this config are available through [Client], [Dynamic],
+// [APIExtensions].
 func (tc *TC) RESTConfig() *rest.Config {
-	return tc.restConfig
+	return rest.CopyConfig(tc.restConfig)
 }
 
 func (tc *TC) RESTMapper() *restmapper.DeferredDiscoveryRESTMapper { return tc.restMapper }
