@@ -445,7 +445,11 @@ func TestCheckpointStateAllocateAndReclaim(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(testingDir)
+	defer func() {
+		if rmErr := os.RemoveAll(testingDir); rmErr != nil {
+			t.Fatalf("could not remove checkpoint: %v", rmErr)
+		}
+	}()
 
 	cpm, err := checkpointmanager.NewCheckpointManager(testingDir)
 	if err != nil {
@@ -455,7 +459,9 @@ func TestCheckpointStateAllocateAndReclaim(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 			// ensure there is no previous checkpoint
-			cpm.RemoveCheckpoint(testingCheckpoint)
+			if rmErr := cpm.RemoveCheckpoint(testingCheckpoint); rmErr != nil {
+				t.Fatalf("could not remove previous checkpoint: %v", rmErr)
+			}
 
 			logger, _ := ktesting.NewTestContext(t)
 			state, err := NewCheckpointState(logger, testingDir, testingCheckpoint, "none", nil)
