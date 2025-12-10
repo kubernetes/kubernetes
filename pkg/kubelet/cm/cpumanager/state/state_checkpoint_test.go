@@ -423,6 +423,82 @@ func TestCheckpointStateClear(t *testing.T) {
 	}
 }
 
+func TestCheckpointStateAllocateAndReclaim(t *testing.T) {
+	testCases := []struct {
+		description   string
+		defaultCPUset cpuset.CPUSet
+		assignments   map[string]map[string]cpuset.CPUSet
+	}{
+		{
+			description:   "One container",
+			defaultCPUset: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8),
+			assignments: map[string]map[string]cpuset.CPUSet{
+				"pod": {
+					"c1": cpuset.New(0, 1),
+				},
+			},
+		},
+	}
+
+	// create temp dir
+	testingDir, err := os.MkdirTemp("", "cpumanager_state_test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(testingDir)
+
+	cpm, err := checkpointmanager.NewCheckpointManager(testingDir)
+	if err != nil {
+		t.Fatalf("could not create testing checkpoint manager: %v", err)
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			// ensure there is no previous checkpoint
+			cpm.RemoveCheckpoint(testingCheckpoint)
+
+			logger, _ := ktesting.NewTestContext(t)
+			state, err := NewCheckpointState(logger, testingDir, testingCheckpoint, "none", nil)
+			if err != nil {
+				t.Fatalf("could not create testing checkpointState instance: %v", err)
+			}
+
+			defaultCPUset := tc.defaultCPUset
+			assignments := tc.assignments
+			state.SetDefaultCPUSet(defaultCPUset)
+
+			for pod := range assignments {
+				for container, set := range assignments[pod] {
+					state.Allocate(pod, container, set)
+
+					var cpus cpuset.CPUSet
+					if cpus, _ = state.GetCPUSet(pod, container); !cpus.Equals(set) {
+						t.Fatalf("state inconsistent, got %q instead of %q", set, cpus)
+					}
+
+					if cpus.Intersection(state.GetDefaultCPUSet()).Size() != 0 {
+						t.Fatalf("defaultCPUset state inconsistent, got %q instead of %q", state.GetDefaultCPUSet(), defaultCPUset.Difference(cpus))
+					}
+
+					if !cpus.Union(state.GetDefaultCPUSet()).Equals(defaultCPUset) {
+						t.Fatalf("defaultCPUset state inconsistent, got %q instead of %q", state.GetDefaultCPUSet(), defaultCPUset.Difference(cpus))
+					}
+
+					state.Reclaim(pod, container, defaultCPUset)
+
+					if _, ok := state.GetCPUSet(pod, container); ok {
+						t.Fatal("deleted container still existing in state")
+					}
+
+					if !state.GetDefaultCPUSet().Equals(defaultCPUset) {
+						t.Fatalf("defaultCPUset state inconsistent, got %q instead of %q", state.GetDefaultCPUSet(), defaultCPUset)
+					}
+				}
+			}
+		})
+	}
+}
+
 func AssertStateEqual(t *testing.T, sf State, sm State) {
 	cpusetSf := sf.GetDefaultCPUSet()
 	cpusetSm := sm.GetDefaultCPUSet()

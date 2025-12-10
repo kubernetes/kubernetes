@@ -266,7 +266,7 @@ func (sc *stateCheckpoint) Allocate(podUID string, containerName string, cset cp
 
 	err := sc.storeState()
 	if err != nil {
-		klog.InfoS("Store state to checkpoint error", "err", err)
+		sc.logger.Error(err, "Failed to store state to checkpoint", "podUID", podUID, "containerName", containerName)
 	}
 }
 
@@ -281,6 +281,6 @@ func (sc *stateCheckpoint) Reclaim(podUID string, containerName string, cset cpu
 
 	err := sc.storeState()
 	if err != nil {
-		klog.InfoS("Store state to checkpoint error", "err", err)
+		sc.logger.Error(err, "Failed to store state to checkpoint", "podUID", podUID, "containerName", containerName)
 	}
 }
