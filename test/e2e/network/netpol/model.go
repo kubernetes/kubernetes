@@ -35,11 +35,6 @@ type Model struct {
 	Protocols  []v1.Protocol
 }
 
-// NewWindowsModel returns a model specific to windows testing.
-func NewWindowsModel(namespaceBaseNames []string, podNames []string, ports []int32) *Model {
-	return NewModel(namespaceBaseNames, podNames, ports, []v1.Protocol{v1.ProtocolTCP, v1.ProtocolUDP})
-}
-
 // NewModel instantiates a model based on:
 // - namespaceBaseNames
 // - pods
