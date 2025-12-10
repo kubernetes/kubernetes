@@ -1718,6 +1718,10 @@ message RuntimeHandlerFeatures {
     // user_namespaces is set to true if the runtime handler supports user namespaces as implemented
     // in Kubernetes. This means support for both, user namespaces and idmap mounts.
     bool user_namespaces = 2;
+
+    // user_namespaces_host_network is set to true if the runtime supports containers using both
+    // host network and user namespace simultaneously.
+    bool user_namespaces_host_network = 3;
 }
 
 message RuntimeHandler {

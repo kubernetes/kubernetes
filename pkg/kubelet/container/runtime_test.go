@@ -607,7 +607,7 @@ func TestRuntimeStatusString(t *testing.T) {
 	}
 
 	result := status.String()
-	expected := "Runtime Conditions: RuntimeReady=true reason:ready message:runtime is ready, NetworkReady=false reason:not ready message:network is not ready; Handlers: Name=handler1 SupportsRecursiveReadOnlyMounts: true SupportsUserNamespaces: false, Name=handler2 SupportsRecursiveReadOnlyMounts: false SupportsUserNamespaces: true, Features: SupplementalGroupsPolicy: true"
+	expected := "Runtime Conditions: RuntimeReady=true reason:ready message:runtime is ready, NetworkReady=false reason:not ready message:network is not ready; Handlers: Name=handler1 SupportsRecursiveReadOnlyMounts: true SupportsUserNamespaces: false SupportsUserNamespacesHostNetwork: false, Name=handler2 SupportsRecursiveReadOnlyMounts: false SupportsUserNamespaces: true SupportsUserNamespacesHostNetwork: false, Features: SupplementalGroupsPolicy: true"
 	assert.Equal(t, expected, result, "String()")
 }
 
@@ -620,20 +620,22 @@ func TestRuntimeHandlerString(t *testing.T) {
 		{
 			name: "handler with all features",
 			handler: RuntimeHandler{
-				Name:                            "test-handler",
-				SupportsRecursiveReadOnlyMounts: true,
-				SupportsUserNamespaces:          true,
+				Name:                              "test-handler",
+				SupportsRecursiveReadOnlyMounts:   true,
+				SupportsUserNamespaces:            true,
+				SupportsUserNamespacesHostNetwork: true,
 			},
-			expected: "Name=test-handler SupportsRecursiveReadOnlyMounts: true SupportsUserNamespaces: true",
+			expected: "Name=test-handler SupportsRecursiveReadOnlyMounts: true SupportsUserNamespaces: true SupportsUserNamespacesHostNetwork: true",
 		},
 		{
 			name: "handler with no features",
 			handler: RuntimeHandler{
-				Name:                            "test-handler",
-				SupportsRecursiveReadOnlyMounts: false,
-				SupportsUserNamespaces:          false,
+				Name:                              "test-handler",
+				SupportsRecursiveReadOnlyMounts:   false,
+				SupportsUserNamespaces:            false,
+				SupportsUserNamespacesHostNetwork: false,
 			},
-			expected: "Name=test-handler SupportsRecursiveReadOnlyMounts: false SupportsUserNamespaces: false",
+			expected: "Name=test-handler SupportsRecursiveReadOnlyMounts: false SupportsUserNamespaces: false SupportsUserNamespacesHostNetwork: false",
 		},
 	}
 
