@@ -99,6 +99,16 @@ func (s *mockState) GetCPUAssignments() state.ContainerCPUAssignments {
 	return s.assignments.Clone()
 }
 
+func (s *mockState) Allocate(podUID string, containerName string, cpuset cpuset.CPUSet) {
+	s.SetDefaultCPUSet(s.GetDefaultCPUSet().Difference(cpuset))
+	s.SetCPUSet(podUID, containerName, cpuset)
+}
+
+func (s *mockState) Reclaim(podUID string, containerName string, cpuset cpuset.CPUSet) {
+	s.Delete(podUID, containerName)
+	s.SetDefaultCPUSet(cpuset)
+}
+
 type mockPolicy struct {
 	err error
 }
