@@ -26,6 +26,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/test/utils/format"
 	"k8s.io/kubernetes/test/utils/ktesting"
@@ -161,28 +162,12 @@ func testDeviceBindingConditionsBasicFlow(tCtx ktesting.TContext, enabled bool) 
 	}))), "second allocated claim")
 
 	// fail the binding condition for the second claim, so that it gets scheduled later.
-	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		latest, err := tCtx.Client().ResourceV1().ResourceClaims(namespace).Get(tCtx, claim2.Name, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-		latest.Status.Devices = []resourceapi.AllocatedDeviceStatus{{
-			Driver: driverName,
-			Pool:   poolWithBinding,
-			Device: "with-binding",
-			Conditions: []metav1.Condition{{
-				Type:               failureCondition,
-				Status:             metav1.ConditionTrue,
-				ObservedGeneration: latest.Generation,
-				LastTransitionTime: metav1.Now(),
-				Reason:             "Testing",
-				Message:            "The test has seen the allocation and is failing the binding.",
-			}},
-		}}
-		_, err = tCtx.Client().ResourceV1().ResourceClaims(namespace).UpdateStatus(tCtx, latest, metav1.UpdateOptions{})
-		return err
+	addAllocatedDeviceCondition(tCtx, namespace, claim2.Name, metav1.Condition{
+		Type:    failureCondition,
+		Status:  metav1.ConditionTrue,
+		Reason:  "Testing",
+		Message: "The test has seen the allocation and is failing the binding.",
 	})
-	tCtx.ExpectNoError(err, "add binding failure condition to second claim")
 
 	// Then wait until the scheduler has cleared the device statuses again.
 	waitForClaim(tCtx, namespace, claim2.Name, 30*time.Second,
@@ -195,29 +180,12 @@ func testDeviceBindingConditionsBasicFlow(tCtx ktesting.TContext, enabled bool) 
 
 	// Now it's safe to set the final binding condition.
 	// Allow the scheduler to proceed.
-	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		latest, err := tCtx.Client().ResourceV1().ResourceClaims(namespace).Get(tCtx, claim2.Name, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-		// Write status.devices for the CURRENT allocation device.
-		latest.Status.Devices = []resourceapi.AllocatedDeviceStatus{{
-			Driver: driverName,
-			Pool:   poolWithBinding,
-			Device: "with-binding",
-			Conditions: []metav1.Condition{{
-				Type:               bindingCondition,
-				Status:             metav1.ConditionTrue,
-				ObservedGeneration: latest.Generation,
-				LastTransitionTime: metav1.Now(),
-				Reason:             "Testing",
-				Message:            "The test has seen the allocation.",
-			}},
-		}}
-		_, err = tCtx.Client().ResourceV1().ResourceClaims(namespace).UpdateStatus(tCtx, latest, metav1.UpdateOptions{})
-		return err
+	addAllocatedDeviceCondition(tCtx, namespace, claim2.Name, metav1.Condition{
+		Type:    bindingCondition,
+		Status:  metav1.ConditionTrue,
+		Reason:  "Testing",
+		Message: "The test has seen the allocation.",
 	})
-	tCtx.ExpectNoError(err, "add binding condition to second claim")
 	waitForPodScheduled(tCtx, namespace, pod.Name)
 }
 
@@ -331,29 +299,12 @@ func testDeviceBindingFailureConditionsReschedule(tCtx ktesting.TContext, useTai
 	createSlice(tCtx, sliceWithoutBinding)
 
 	// Explicitly fail the binding condition for the third claim to trigger rescheduling logic.
-	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		latest, err := tCtx.Client().ResourceV1().ResourceClaims(namespace).Get(tCtx, claim1.Name, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-		claim1 = latest.DeepCopy()
-		claim1.Status.Devices = []resourceapi.AllocatedDeviceStatus{{
-			Driver: driverName,
-			Pool:   poolWithBinding,
-			Device: "with-binding",
-			Conditions: []metav1.Condition{{
-				Type:               failureCondition,
-				Status:             metav1.ConditionTrue,
-				ObservedGeneration: claim1.Generation,
-				LastTransitionTime: metav1.Now(),
-				Reason:             "Testing",
-				Message:            "The test has seen the allocation and is failing the binding.",
-			}},
-		}}
-		_, err = tCtx.Client().ResourceV1().ResourceClaims(namespace).UpdateStatus(tCtx, claim1, metav1.UpdateOptions{})
-		return err
+	addAllocatedDeviceCondition(tCtx, namespace, claim1.Name, metav1.Condition{
+		Type:    failureCondition,
+		Status:  metav1.ConditionTrue,
+		Reason:  "Testing",
+		Message: "The test has seen the allocation and is failing the binding.",
 	})
-	tCtx.ExpectNoError(err, "add binding failure condition to claim")
 
 	// Then wait until the scheduler has cleared the device statuses again.
 	waitForClaim(tCtx, namespace, claim1.Name, 30*time.Second,
@@ -605,4 +556,53 @@ profiles:
 		)), "Expected allocation to the device without binding conditions")
 
 	waitForPodScheduled(tCtx, namespace, pod.Name)
+}
+var claimDeviceStatusRetry = wait.Backoff{
+	Steps:    10,
+	Duration: 50 * time.Millisecond,
+	Factor:   1.5,
+	Jitter:   0.1,
+}
+
+// addAllocatedDeviceCondition updates status.devices using the currently allocated device.
+// It retries longer than the default backoff because the scheduler may be updating the same
+// ResourceClaim concurrently when these tests toggle binding conditions.
+func addAllocatedDeviceCondition(tCtx ktesting.TContext, namespace, claimName string, condition metav1.Condition) {
+	tCtx.Helper()
+
+	err := retry.RetryOnConflict(claimDeviceStatusRetry, func() error {
+		latest, err := tCtx.Client().ResourceV1().ResourceClaims(namespace).Get(tCtx, claimName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		if latest.Status.Allocation == nil || len(latest.Status.Allocation.Devices.Results) == 0 {
+			return fmt.Errorf("claim %s has no allocated devices to update status for", claimName)
+		}
+
+		statuses := make([]resourceapi.AllocatedDeviceStatus, len(latest.Status.Allocation.Devices.Results))
+		for i, result := range latest.Status.Allocation.Devices.Results {
+			cond := condition
+			cond.ObservedGeneration = latest.Generation
+			if cond.LastTransitionTime.IsZero() {
+				cond.LastTransitionTime = metav1.Now()
+			}
+			var shareID *string
+			if result.ShareID != nil {
+				s := string(*result.ShareID)
+				shareID = &s
+			}
+			statuses[i] = resourceapi.AllocatedDeviceStatus{
+				Driver:     result.Driver,
+				Pool:       result.Pool,
+				Device:     result.Device,
+				ShareID:    shareID,
+				Conditions: []metav1.Condition{cond},
+			}
+		}
+
+		latest.Status.Devices = statuses
+		_, err = tCtx.Client().ResourceV1().ResourceClaims(namespace).UpdateStatus(tCtx, latest, metav1.UpdateOptions{})
+		return err
+	})
+	tCtx.ExpectNoError(err, "update allocated device conditions for claim %s", claimName)
 }
