@@ -265,6 +265,11 @@ func (p *staticPolicy) validateState(logger logr.Logger, s state.State) error {
 			tmpCPUSets = append(tmpCPUSets, cset)
 		}
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) {
+		for _, cset := range s.GetPodCPUAssignments() {
+			tmpCPUSets = append(tmpCPUSets, cset)
+		}
+	}
 	totalKnownCPUs = totalKnownCPUs.Union(tmpCPUSets...)
 	if !totalKnownCPUs.Equals(allCPUs) {
 		return fmt.Errorf("current set of available CPUs %q doesn't match with CPUs in state %q",

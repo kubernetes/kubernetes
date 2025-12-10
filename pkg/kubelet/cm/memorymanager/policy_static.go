@@ -1027,45 +1027,18 @@ func (p *staticPolicy) validateState(logger klog.Logger, s state.State) error {
 	// calculate all memory assigned to containers
 	expectedMachineState := p.getDefaultMachineState()
 	for pod, container := range memoryAssignments {
-		for containerName, blocks := range container {
-			for _, b := range blocks {
-				requestedSize := b.Size
-				for _, nodeID := range b.NUMAAffinity {
-					nodeState, ok := expectedMachineState[nodeID]
-					if !ok {
-						return fmt.Errorf("[memorymanager] (pod: %s, container: %s) the memory assignment uses the NUMA that does not exist", pod, containerName)
-					}
-
-					nodeState.NumberOfAssignments++
-					nodeState.Cells = b.NUMAAffinity
-
-					memoryState, ok := nodeState.MemoryMap[b.Type]
-					if !ok {
-						return fmt.Errorf("[memorymanager] (pod: %s, container: %s) the memory assignment uses memory resource that does not exist", pod, containerName)
-					}
-
-					if requestedSize == 0 {
-						continue
-					}
-
-					// this node does not have enough memory continue to the next one
-					if memoryState.Free <= 0 {
-						continue
-					}
-
-					// the node has enough memory to satisfy the request
-					if memoryState.Free >= requestedSize {
-						memoryState.Reserved += requestedSize
-						memoryState.Free -= requestedSize
-						requestedSize = 0
-						continue
-					}
-
-					// the node does not have enough memory, use the node remaining memory and move to the next node
-					requestedSize -= memoryState.Free
-					memoryState.Reserved += memoryState.Free
-					memoryState.Free = 0
+		if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) {
+			if podBlocks := s.GetPodMemoryBlocks(pod); len(podBlocks) > 0 {
+				if err := p.updateExpectedMachineState(expectedMachineState, podBlocks, pod, ""); err != nil {
+					return err
 				}
+				continue
+			}
+		}
+
+		for containerName, blocks := range container {
+			if err := p.updateExpectedMachineState(expectedMachineState, blocks, pod, containerName); err != nil {
+				return err
 			}
 		}
 	}
@@ -1078,6 +1051,49 @@ func (p *staticPolicy) validateState(logger klog.Logger, s state.State) error {
 		return fmt.Errorf("[memorymanager] the expected machine state is different from the real one")
 	}
 
+	return nil
+}
+
+func (p *staticPolicy) updateExpectedMachineState(expectedMachineState state.NUMANodeMap, blocks []state.Block, podUID, containerName string) error {
+	for _, b := range blocks {
+		requestedSize := b.Size
+		for _, nodeID := range b.NUMAAffinity {
+			nodeState, ok := expectedMachineState[nodeID]
+			if !ok {
+				return fmt.Errorf("[memorymanager] (pod: %s, container: %s) the memory assignment uses the NUMA that does not exist", podUID, containerName)
+			}
+
+			nodeState.NumberOfAssignments++
+			nodeState.Cells = b.NUMAAffinity
+
+			memoryState, ok := nodeState.MemoryMap[b.Type]
+			if !ok {
+				return fmt.Errorf("[memorymanager] (pod: %s, container: %s) the memory assignment uses memory resource that does not exist", podUID, containerName)
+			}
+
+			if requestedSize == 0 {
+				continue
+			}
+
+			// this node does not have enough memory continue to the next one
+			if memoryState.Free <= 0 {
+				continue
+			}
+
+			// the node has enough memory to satisfy the request
+			if memoryState.Free >= requestedSize {
+				memoryState.Reserved += requestedSize
+				memoryState.Free -= requestedSize
+				requestedSize = 0
+				continue
+			}
+
+			// the node does not have enough memory, use the node remaining memory and move to the next node
+			requestedSize -= memoryState.Free
+			memoryState.Reserved += memoryState.Free
+			memoryState.Free = 0
+		}
+	}
 	return nil
 }
 

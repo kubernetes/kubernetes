@@ -17,10 +17,14 @@ limitations under the License.
 package cpumanager
 
 import (
+	"context"
 	"fmt"
+	"os"
 	"reflect"
 	"testing"
+	"time"
 
+	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
@@ -31,9 +35,11 @@ import (
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/testutil"
+	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
+	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
@@ -2725,6 +2731,224 @@ func TestValidatePodScopeResources(t *testing.T) {
 			}
 			if !tc.expectErr && err != nil {
 				t.Errorf("Unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+// For the scope of the test, any pod that has pod-level resources and the
+// PodLevelResourceManagers feature is enabled, will be processed by AllocatePod
+func TestCPUManagerRestoreState(t *testing.T) {
+	testCases := []struct {
+		description                     string
+		podLevelResourcesEnabled        bool
+		podLevelResourceManagersEnabled bool
+		podCPURequest                   string
+		containers                      []*containerOptions
+		expectPodBlocks                 bool
+	}{
+		{
+			description:   "Pod-level resources and managers enabled",
+			podCPURequest: "2",
+			containers: []*containerOptions{
+				{name: "container1", request: "1", limit: "1"},
+			},
+			expectPodBlocks:                 true,
+			podLevelResourceManagersEnabled: true,
+			podLevelResourcesEnabled:        true,
+		},
+		{
+			description:   "Pod-level resources enabled, managers disabled",
+			podCPURequest: "2",
+			containers: []*containerOptions{
+				{name: "container1", request: "1", limit: "1"},
+			},
+			expectPodBlocks:                 false,
+			podLevelResourceManagersEnabled: false,
+			podLevelResourcesEnabled:        true,
+		},
+		{
+			description:   "Container-level pod, features enabled",
+			podCPURequest: "",
+			containers: []*containerOptions{
+				{name: "container1", request: "1", limit: "1"},
+				{name: "container2", request: "1", limit: "1"},
+			},
+			expectPodBlocks:                 false,
+			podLevelResourceManagersEnabled: true,
+			podLevelResourcesEnabled:        true,
+		},
+		{
+			description:   "Container-level pod, features disabled",
+			podCPURequest: "",
+			containers: []*containerOptions{
+				{name: "container1", request: "1", limit: "1"},
+				{name: "container2", request: "1", limit: "1"},
+			},
+			expectPodBlocks:                 false,
+			podLevelResourceManagersEnabled: false,
+			podLevelResourcesEnabled:        false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResources, tc.podLevelResourcesEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResourceManagers, tc.podLevelResourceManagersEnabled)
+
+			sDir, err := os.MkdirTemp("", "cpu_manager_test")
+			if err != nil {
+				t.Errorf("cannot create state file: %s", err.Error())
+			}
+			defer func() {
+				err := os.RemoveAll(sDir)
+				if err != nil {
+					t.Fatalf("cannot remove state file: %s", err.Error())
+				}
+			}()
+
+			logger, _ := ktesting.NewTestContext(t)
+			mgr, err := NewManager(
+				logger,
+				"static",
+				nil,
+				5*time.Second,
+				&cadvisorapi.MachineInfo{
+					NumCores: 4,
+					Topology: []cadvisorapi.Node{
+						{
+							Cores: []cadvisorapi.Core{
+								{Id: 0, Threads: []int{0}},
+								{Id: 1, Threads: []int{1}},
+								{Id: 2, Threads: []int{2}},
+								{Id: 3, Threads: []int{3}},
+							},
+						},
+					},
+				},
+				cpuset.New(),
+				v1.ResourceList{v1.ResourceCPU: *resource.NewQuantity(1, resource.DecimalSI)},
+				sDir,
+				topologymanager.NewFakeManager(),
+			)
+			if err != nil {
+				t.Fatalf("could not create manager: %v", err)
+			}
+
+			// Create a pod
+			var pod *v1.Pod
+			if tc.podCPURequest != "" {
+				pod = makeMultiContainerPodWithOptionsAndPodLevelResources(tc.podCPURequest, nil, tc.containers)
+			} else {
+				pod = makeMultiContainerPodWithOptions(nil, tc.containers)
+			}
+			pod.Name = "pod1"
+			pod.UID = types.UID("pod1")
+
+			// Start manager to initialize state and activePods
+			err = mgr.Start(context.Background(), func() []*v1.Pod { return []*v1.Pod{pod} }, &sourcesReadyStub{}, mockPodStatusProvider{}, mockRuntimeService{}, containermap.NewContainerMap())
+			if err != nil {
+				t.Fatalf("could not start manager: %v", err)
+			}
+
+			// Allocate resources (Pod Scope)
+			if tc.podLevelResourceManagersEnabled && resourcehelper.IsPodLevelResourcesSet(pod) {
+				err = mgr.AllocatePod(pod, topologymanager.TopologyHint{})
+				if err != nil {
+					t.Fatalf("could not allocate pod: %v", err)
+				}
+			} else {
+				// Allocate resources (Container Scope / Legacy)
+				for i := range pod.Spec.Containers {
+					container := &pod.Spec.Containers[i]
+					err = mgr.Allocate(pod, container)
+					if err != nil {
+						t.Fatalf("could not allocate container %s: %v", container.Name, err)
+					}
+				}
+			}
+
+			// Add containers (simulate running)
+			for i := range pod.Spec.Containers {
+				container := &pod.Spec.Containers[i]
+				mgr.AddContainer(logger, pod, container, container.Name)
+			}
+
+			// Verify state before restart
+			podCPUSet, _ := mgr.State().GetPodCPUSet(string(pod.UID))
+			if tc.expectPodBlocks && podCPUSet.IsEmpty() {
+				t.Errorf("expected pod cpu set to be present")
+			} else if !tc.expectPodBlocks && !podCPUSet.IsEmpty() {
+				t.Errorf("expected no pod cpu set, but got some")
+			}
+
+			// Re-create manager to simulate restart
+			mgr2, err := NewManager(
+				logger,
+				"static",
+				nil,
+				5*time.Second,
+				&cadvisorapi.MachineInfo{
+					NumCores: 4,
+					Topology: []cadvisorapi.Node{
+						{
+							Cores: []cadvisorapi.Core{
+								{Id: 0, Threads: []int{0}},
+								{Id: 1, Threads: []int{1}},
+								{Id: 2, Threads: []int{2}},
+								{Id: 3, Threads: []int{3}},
+							},
+						},
+					},
+				},
+				cpuset.New(),
+				v1.ResourceList{v1.ResourceCPU: *resource.NewQuantity(1, resource.DecimalSI)},
+				sDir,
+				topologymanager.NewFakeManager(),
+			)
+			if err != nil {
+				t.Fatalf("could not create manager 2: %v", err)
+			}
+
+			err = mgr2.Start(context.Background(), func() []*v1.Pod { return []*v1.Pod{pod} }, &sourcesReadyStub{}, mockPodStatusProvider{}, mockRuntimeService{}, containermap.NewContainerMap())
+			if err != nil {
+				t.Fatalf("could not start manager 2: %v", err)
+			}
+
+			// Verify state restored
+			podCPUSetRestored, _ := mgr2.State().GetPodCPUSet(string(pod.UID))
+			if tc.expectPodBlocks {
+				if podCPUSetRestored.IsEmpty() {
+					t.Errorf("expected pod cpu set to be present after restore")
+				}
+				if podCPUSetRestored.Size() != podCPUSet.Size() {
+					t.Errorf("expected pod cpu set size to be %d, got %d", podCPUSet.Size(), podCPUSetRestored.Size())
+				}
+			} else if !podCPUSetRestored.IsEmpty() {
+				t.Errorf("expected no pod cpu set after restore, but got some")
+			}
+
+			for i := range pod.Spec.Containers {
+				container := &pod.Spec.Containers[i]
+				containerCPUSet, ok := mgr2.State().GetCPUSet(string(pod.UID), container.Name)
+				// If allocation was skipped (PLR enabled but Manager disabled), no cpuset.
+				allocationSkipped := tc.podLevelResourcesEnabled && !tc.podLevelResourceManagersEnabled && resourcehelper.IsPodLevelResourcesSet(pod)
+
+				if allocationSkipped {
+					if ok {
+						t.Errorf("expected no container cpu set for %s after restore (allocation skipped), but got some", container.Name)
+					}
+				} else {
+					if !ok {
+						t.Errorf("expected container cpu set to be present for %s after restore", container.Name)
+					}
+					// Only check size if we expect assignments (guaranteed)
+					if p := mgr2.(*manager).policy.(*staticPolicy); p.guaranteedCPUs(logger, pod, container) > 0 {
+						if containerCPUSet.IsEmpty() {
+							t.Errorf("expected container cpu set to be non-empty for guaranteed container %s", container.Name)
+						}
+					}
+				}
 			}
 		})
 	}
