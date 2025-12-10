@@ -48,10 +48,7 @@ var (
 		should specify only the command (e.g., "get", "create", "set env"), not resources.
 
 		For aliases: Creates command aliases with optional default flag values and arguments.
-		Use --prependarg and --appendarg to include resources or other arguments.
-		
-		When using --overwrite, only the specified fields are updated.
-		Unspecified fields are preserved from the existing configuration.`))
+		Use --prependarg and --appendarg to include resources or other arguments.`))
 
 	setExample = templates.Examples(i18n.T(`
 		# Set default output format for 'get' command
