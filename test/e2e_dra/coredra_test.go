@@ -32,7 +32,7 @@ func coreDRA(tCtx ktesting.TContext, f *framework.Framework, b *drautils.Builder
 	claim := b.ExternalClaim()
 	pod := b.PodExternal()
 	b.Create(tCtx, claim, pod)
-	b.TestPod(tCtx, f, pod)
+	b.TestPod(tCtx, pod)
 
 	return func(tCtx ktesting.TContext) step3Func {
 		// Remove pod prepared in step 1.
@@ -45,7 +45,7 @@ func coreDRA(tCtx ktesting.TContext, f *framework.Framework, b *drautils.Builder
 		pod = b.PodExternal()
 		pod.Spec.ResourceClaims[0].ResourceClaimName = &claim.Name
 		b.Create(tCtx, claim, pod)
-		b.TestPod(tCtx, f, pod)
+		b.TestPod(tCtx, pod)
 
 		return func(tCtx ktesting.TContext) {
 			// We need to clean up explicitly because the normal
