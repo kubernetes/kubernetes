@@ -16,7 +16,9 @@ limitations under the License.
 
 package ktesting
 
-import "strings"
+import (
+	"iter"
+)
 
 // Deprecated: use tCtx.WithStep instead
 func WithStep(tCtx TContext, step string) TContext {
@@ -57,24 +59,17 @@ func Step(tCtx TContext, what string, cb func(tCtx TContext)) {
 	cb(WithStep(tCtx, what))
 }
 
-// TODO: remove Begin+End when not needed anymore
-
-// Deprecated
-func Begin(tCtx TContext, what string) TContext {
-	return WithStep(tCtx, what)
-}
-
-// Deprecated
-func End(tc *TC) TContext {
-	// This is a quick hack to keep End working. Will be removed.
-	tc = tc.clone()
-	index := strings.LastIndex(strings.TrimSuffix(tc.steps, ": "), ": ")
-	if index > 0 {
-		tc.steps = tc.steps[:index+2]
-	} else {
-		tc.steps = ""
+// Step enables the following shorter alternative to calling [Step] with a
+// function as parameter:
+//
+//	for tCtx := range tCtx.Step("step 1") {
+//	    ...
+//	}
+func (tc *TC) Step(step string) iter.Seq[TContext] {
+	tc = tc.WithStep(step)
+	return func(cb func(TContext) bool) {
+		cb(tc)
 	}
-	return tc
 }
 
 // Value intercepts a search for the special "GINKGO_SPEC_CONTEXT" and
