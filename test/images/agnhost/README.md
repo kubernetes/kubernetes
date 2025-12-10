@@ -243,6 +243,20 @@ Usage:
     kubectl exec test-agnhost -- /agnhost help
 ```
 
+### http-echo
+
+Echoes the HTTP request as a JSON payload, containing the path, host, method, protocol, headers, the server
+http port and the environment variables of POD_NAME and POD_NAMESPACE.
+
+The subcommand can accept the following flags:
+
+- `port` (default: `8080`): The port number to listen to.
+
+Usage:
+
+```console
+    kubectl exec test-agnhost -- /agnhost http-echo [--port <port>]
+```
 
 ### inclusterclient
 

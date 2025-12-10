@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/test/images/agnhost/fakeregistryserver"
 	grpchealthchecking "k8s.io/kubernetes/test/images/agnhost/grpc-health-checking"
 	"k8s.io/kubernetes/test/images/agnhost/guestbook"
+	httpecho "k8s.io/kubernetes/test/images/agnhost/http-echo"
 	"k8s.io/kubernetes/test/images/agnhost/inclusterclient"
 	"k8s.io/kubernetes/test/images/agnhost/liveness"
 	logsgen "k8s.io/kubernetes/test/images/agnhost/logs-generator"
@@ -73,6 +74,7 @@ func main() {
 	rootCmd.AddCommand(fakegitserver.CmdFakeGitServer)
 	rootCmd.AddCommand(fakeregistryserver.CmdFakeRegistryServer)
 	rootCmd.AddCommand(guestbook.CmdGuestbook)
+	rootCmd.AddCommand(httpecho.CmdHTTPEcho)
 	rootCmd.AddCommand(inclusterclient.CmdInClusterClient)
 	rootCmd.AddCommand(liveness.CmdLiveness)
 	rootCmd.AddCommand(logsgen.CmdLogsGenerator)
