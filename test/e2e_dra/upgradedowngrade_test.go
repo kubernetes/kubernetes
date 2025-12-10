@@ -123,28 +123,32 @@ func testUpgradeDowngrade(tCtx ktesting.TContext) {
 	}
 
 	// Determine what we need to downgrade to.
-	tCtx = ktesting.Begin(tCtx, "get source code version")
-	gitVersion, _, err := sourceVersion(tCtx, repoRoot)
-	tCtx.ExpectNoError(err, "determine source code version for repo root %q", repoRoot)
-	version, err := version.ParseGeneric(gitVersion)
-	tCtx.ExpectNoError(err, "parse version %s of repo root %q", gitVersion, repoRoot)
-	major, previousMinor := version.Major(), version.Minor()-1
-	if strings.Contains(gitVersion, "-alpha.0") {
-		// All version up to and including x.y.z-alpha.0 are treated as if we were
-		// still the previous minor version x.(y-1). There are two reason for this:
-		//
-		// - During code freeze around (at?) -rc.0, the master branch already
-		//   identfies itself as the next release with -alpha.0. Without this
-		//   special case, we would change the version skew testing from what
-		//   has been tested and been known to work to something else, which
-		//   can and at least once did break.
-		//
-		// - Early in the next cycle the differences compared to the previous
-		//   release are small, so it's more interesting to go back further.
-		previousMinor--
-	}
-	tCtx.Logf("got version: major: %d, minor: %d, previous minor: %d", major, version.Minor(), previousMinor)
-	tCtx = ktesting.End(tCtx)
+	var major, previousMinor uint
+	var gitVersion string
+
+	tCtx.Step("get source code version", func(tCtx ktesting.TContext) {
+		var err error
+		gitVersion, _, err = sourceVersion(tCtx, repoRoot)
+		tCtx.ExpectNoError(err, "determine source code version for repo root %q", repoRoot)
+		version, err := version.ParseGeneric(gitVersion)
+		tCtx.ExpectNoError(err, "parse version %s of repo root %q", gitVersion, repoRoot)
+		major, previousMinor = version.Major(), version.Minor()-1
+		if strings.Contains(gitVersion, "-alpha.0") {
+			// All version up to and including x.y.z-alpha.0 are treated as if we were
+			// still the previous minor version x.(y-1). There are two reason for this:
+			//
+			// - During code freeze around (at?) -rc.0, the master branch already
+			//   identfies itself as the next release with -alpha.0. Without this
+			//   special case, we would change the version skew testing from what
+			//   has been tested and been known to work to something else, which
+			//   can and at least once did break.
+			//
+			// - Early in the next cycle the differences compared to the previous
+			//   release are small, so it's more interesting to go back further.
+			previousMinor--
+		}
+		tCtx.Logf("got version: major: %d, minor: %d, previous minor: %d", major, version.Minor(), previousMinor)
+	})
 
 	// KUBERNETES_SERVER_CACHE_DIR can be set to keep downloaded files across test restarts.
 	binDir, cacheBinaries := os.LookupEnv("KUBERNETES_SERVER_CACHE_DIR")
@@ -154,16 +158,18 @@ func testUpgradeDowngrade(tCtx ktesting.TContext) {
 	haveBinaries := false
 
 	// Get the previous release.
-	tCtx = ktesting.Begin(tCtx, "get previous release info")
-	tCtx.Logf("stable release %d.%d", major, previousMinor)
-	previousURL, previousVersion, err := serverDownloadURL(tCtx, "stable", major, previousMinor)
-	if errors.Is(err, errHTTP404) {
-		tCtx.Logf("stable doesn't exist, get latest release %d.%d", major, previousMinor)
-		previousURL, previousVersion, err = serverDownloadURL(tCtx, "latest", major, previousMinor)
-	}
-	tCtx.ExpectNoError(err)
-	tCtx.Logf("got previous release version: %s, URL: %s", previousVersion, previousURL)
-	tCtx = ktesting.End(tCtx)
+	var previousURL, previousVersion string
+	tCtx.Step("get previous release info", func(tCtx ktesting.TContext) {
+		tCtx.Logf("stable release %d.%d", major, previousMinor)
+		var err error
+		previousURL, previousVersion, err = serverDownloadURL(tCtx, "stable", major, previousMinor)
+		if errors.Is(err, errHTTP404) {
+			tCtx.Logf("stable doesn't exist, get latest release %d.%d", major, previousMinor)
+			previousURL, previousVersion, err = serverDownloadURL(tCtx, "latest", major, previousMinor)
+		}
+		tCtx.ExpectNoError(err)
+		tCtx.Logf("got previous release version: %s, URL: %s", previousVersion, previousURL)
+	})
 
 	if cacheBinaries {
 		binDir = path.Join(binDir, previousVersion)
@@ -173,51 +179,53 @@ func testUpgradeDowngrade(tCtx ktesting.TContext) {
 		}
 	}
 	if !haveBinaries {
-		tCtx = ktesting.Begin(tCtx, fmt.Sprintf("download and unpack %s", previousURL))
-		req, err := http.NewRequestWithContext(tCtx, http.MethodGet, previousURL, nil)
-		tCtx.ExpectNoError(err, "construct request")
-		response, err := http.DefaultClient.Do(req)
-		tCtx.ExpectNoError(err, "download")
-		defer func() {
-			_ = response.Body.Close()
-		}()
-		decompress, err := gzip.NewReader(response.Body)
-		tCtx.ExpectNoError(err, "construct gzip reader")
-		unpack := tar.NewReader(decompress)
-		for {
-			header, err := unpack.Next()
-			if err == io.EOF {
-				break
+		tCtx.Step(fmt.Sprintf("download and unpack %s", previousURL), func(tCtx ktesting.TContext) {
+			req, err := http.NewRequestWithContext(tCtx, http.MethodGet, previousURL, nil)
+			tCtx.ExpectNoError(err, "construct request")
+			response, err := http.DefaultClient.Do(req)
+			tCtx.ExpectNoError(err, "download")
+			defer func() {
+				_ = response.Body.Close()
+			}()
+			decompress, err := gzip.NewReader(response.Body)
+			tCtx.ExpectNoError(err, "construct gzip reader")
+			unpack := tar.NewReader(decompress)
+			for {
+				header, err := unpack.Next()
+				if err == io.EOF {
+					break
+				}
+				base := path.Base(header.Name)
+				if slices.Contains(localupcluster.KubeClusterComponents, localupcluster.KubeComponentName(base)) {
+					data, err := io.ReadAll(unpack)
+					tCtx.ExpectNoError(err, fmt.Sprintf("read content of %s", header.Name))
+					tCtx.ExpectNoError(os.MkdirAll(binDir, 0755), "create directory for binaries")
+					tCtx.ExpectNoError(os.WriteFile(path.Join(binDir, base), data, 0555), fmt.Sprintf("write content of %s", header.Name))
+				}
 			}
-			base := path.Base(header.Name)
-			if slices.Contains(localupcluster.KubeClusterComponents, localupcluster.KubeComponentName(base)) {
-				data, err := io.ReadAll(unpack)
-				tCtx.ExpectNoError(err, fmt.Sprintf("read content of %s", header.Name))
-				tCtx.ExpectNoError(os.MkdirAll(binDir, 0755), "create directory for binaries")
-				tCtx.ExpectNoError(os.WriteFile(path.Join(binDir, base), data, 0555), fmt.Sprintf("write content of %s", header.Name))
-			}
-		}
-		tCtx = ktesting.End(tCtx)
+		})
 	}
 
-	tCtx = ktesting.Begin(tCtx, fmt.Sprintf("bring up v%d.%d", major, previousMinor))
-	cluster := localupcluster.New(tCtx)
-	localUpClusterEnv := map[string]string{
-		"RUNTIME_CONFIG": "resource.k8s.io/v1beta1,resource.k8s.io/v1beta2",
-		"FEATURE_GATES":  "DynamicResourceAllocation=true",
-		// *not* needed because driver will run in "local filesystem" mode (= driver.IsLocal): "ALLOW_PRIVILEGED": "1",
-	}
-	cluster.Start(tCtx, binDir, localUpClusterEnv)
-	tCtx = ktesting.End(tCtx)
+	var cluster *localupcluster.Cluster
+	tCtx.Step(fmt.Sprintf("bring up v%d.%d", major, previousMinor), func(tCtx ktesting.TContext) {
+		cluster = localupcluster.New(tCtx)
+		localUpClusterEnv := map[string]string{
+			"RUNTIME_CONFIG": "resource.k8s.io/v1beta1,resource.k8s.io/v1beta2",
+			"FEATURE_GATES":  "DynamicResourceAllocation=true",
+			// *not* needed because driver will run in "local filesystem" mode (= driver.IsLocal): "ALLOW_PRIVILEGED": "1",
+		}
+		cluster.Start(tCtx, binDir, localUpClusterEnv)
+	})
 
 	restConfig := cluster.LoadConfig(tCtx)
 	restConfig.UserAgent = fmt.Sprintf("%s -- dra", restclient.DefaultKubernetesUserAgent())
 	tCtx = tCtx.WithRESTConfig(restConfig).WithNamespace("default")
 
-	tCtx = ktesting.Begin(tCtx, fmt.Sprintf("v%d.%d", major, previousMinor))
-
-	tCtx.ExpectNoError(e2enode.WaitForAllNodesSchedulable(tCtx, tCtx.Client(), 5*time.Minute), "wait for all nodes to be schedulable")
-	nodes := drautils.NewNodesNow(tCtx, 1, 1)
+	var nodes *drautils.Nodes
+	tCtx.Step(fmt.Sprintf("v%d.%d", major, previousMinor), func(tCtx ktesting.TContext) {
+		tCtx.ExpectNoError(e2enode.WaitForAllNodesSchedulable(tCtx, tCtx.Client(), 5*time.Minute), "wait for all nodes to be schedulable")
+		nodes = drautils.NewNodesNow(tCtx, 1, 1)
+	})
 
 	// Opening sockets locally avoids intermittent errors and delays caused by proxying through the restarted apiserver.
 	// We could speed up testing by shortening the sync delay in the ResourceSlice controller, but let's better
@@ -227,8 +235,6 @@ func testUpgradeDowngrade(tCtx ktesting.TContext) {
 	driver.Run(tCtx, "/var/lib/kubelet", nodes, drautils.DriverResourcesNow(nodes, 8))
 	b := drautils.NewBuilderNow(tCtx, driver)
 	b.SkipCleanup = true
-
-	tCtx = ktesting.End(tCtx)
 
 	upgradedTestFuncs := make(map[string]upgradedTestFunc, len(subTests))
 	tCtx.Run("after-cluster-creation", func(tCtx ktesting.TContext) {
@@ -242,18 +248,14 @@ func testUpgradeDowngrade(tCtx ktesting.TContext) {
 		}
 	})
 
-	tCtx = ktesting.Begin(tCtx, fmt.Sprintf("update to %s", gitVersion))
 	// We could split this up into first updating the apiserver, then control plane components, then restarting kubelet.
 	// For the purpose of this test here we we primarily care about full before/after comparisons, so not done yet.
 	// TODO
-	restoreOptions := cluster.Modify(tCtx, localupcluster.ModifyOptions{Upgrade: true, BinDir: dir})
-	tCtx = ktesting.End(tCtx)
+	restoreOptions := cluster.Modify(tCtx.WithStep(fmt.Sprintf("update to %s", gitVersion)), localupcluster.ModifyOptions{Upgrade: true, BinDir: dir})
 
 	// The kubelet wipes all ResourceSlices on a restart because it doesn't know which drivers were running.
 	// Wait for the ResourceSlice controller in the driver to notice and recreate the ResourceSlices.
-	tCtx = ktesting.Begin(tCtx, "wait for ResourceSlices")
-	ktesting.Eventually(tCtx, driver.NewGetSlices()).WithTimeout(5 * time.Minute).Should(gomega.HaveField("Items", gomega.HaveLen(len(nodes.NodeNames))))
-	tCtx = ktesting.End(tCtx)
+	ktesting.Eventually(tCtx.WithStep("wait for ResourceSlices"), driver.NewGetSlices()).WithTimeout(5 * time.Minute).Should(gomega.HaveField("Items", gomega.HaveLen(len(nodes.NodeNames))))
 
 	downgradedTestFuncs := make(map[string]downgradedTestFunc, len(subTests))
 	tCtx.Run("after-cluster-upgrade", func(tCtx ktesting.TContext) {
@@ -265,9 +267,7 @@ func testUpgradeDowngrade(tCtx ktesting.TContext) {
 	})
 
 	// Roll back.
-	tCtx = ktesting.Begin(tCtx, "downgrade")
-	cluster.Modify(tCtx, restoreOptions)
-	tCtx = ktesting.End(tCtx)
+	cluster.Modify(tCtx.WithStep("downgrade"), restoreOptions)
 
 	tCtx.Run("after-cluster-downgrade", func(tCtx ktesting.TContext) {
 		for subTest, f := range downgradedTestFuncs {
