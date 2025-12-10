@@ -52,6 +52,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/utils/crd"
+	"k8s.io/kubernetes/test/utils/format"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/pointer"
@@ -59,6 +60,8 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"github.com/onsi/gomega/gcustom"
+	gomegatypes "github.com/onsi/gomega/types"
 )
 
 const (
@@ -795,7 +798,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		usedResources[v1.ResourceRequestsMemory] = resource.MustParse("0")
 		usedResources[v1.ResourceLimitsCPU] = resource.MustParse("0")
 		usedResources[v1.ResourceLimitsMemory] = resource.MustParse("0")
-		err = waitForResourceQuota(ctx, f.ClientSet, f.Namespace.Name, resourceQuotaTerminating.Name, usedResources)
+		err = ensureResourceQuota(ctx, f.ClientSet, f.Namespace.Name, resourceQuotaTerminating.Name, usedResources)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Deleting the pod")
@@ -835,6 +838,8 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		usedResources[v1.ResourceLimitsCPU] = resource.MustParse("0")
 		usedResources[v1.ResourceLimitsMemory] = resource.MustParse("0")
 		err = waitForResourceQuota(ctx, f.ClientSet, f.Namespace.Name, resourceQuotaNotTerminating.Name, usedResources)
+		framework.ExpectNoError(err)
+		err = ensureResourceQuota(ctx, f.ClientSet, f.Namespace.Name, resourceQuotaNotTerminating.Name, usedResources)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Deleting the pod")
@@ -1556,6 +1561,12 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		usedResources[v1.ResourceLimitsCPU] = resource.MustParse("0")
 		usedResources[v1.ResourceLimitsMemory] = resource.MustParse("0")
 		err = waitForResourceQuota(ctx, f.ClientSet, f.Namespace.Name, resourceQuotaTerminating.Name, usedResources)
+		framework.ExpectNoError(err)
+		// It already was like this before, so typically waitForResourceQuota returns immediately.
+		// Keep checking for a while to detect unexpected changes. There has been a test flake
+		// where updating the pod failed with:
+		//   pods "test-pod" is forbidden: exceeded quota: quota-terminating, requested: pods=1, used: pods=1, limited: pods=1
+		err = ensureResourceQuota(ctx, f.ClientSet, f.Namespace.Name, resourceQuotaTerminating.Name, usedResources)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Updating the pod to have an active deadline")
@@ -2482,10 +2493,30 @@ func countResourceQuota(ctx context.Context, c clientset.Interface, namespace st
 
 // wait for resource quota status to show the expected used resources value
 func waitForResourceQuota(ctx context.Context, c clientset.Interface, ns, quotaName string, used v1.ResourceList) error {
-	return wait.PollUntilContextTimeout(ctx, framework.Poll, resourceQuotaTimeout, false, func(ctx context.Context) (bool, error) {
-		resourceQuota, err := c.CoreV1().ResourceQuotas(ns).Get(ctx, quotaName, metav1.GetOptions{})
-		if err != nil {
-			return false, err
+	var lastResourceQuota *v1.ResourceQuota
+	err := framework.Gomega().Eventually(ctx, framework.GetObject(c.CoreV1().ResourceQuotas(ns).Get, quotaName, metav1.GetOptions{})).Should(haveUsedResources(used, &lastResourceQuota))
+	if lastResourceQuota != nil && err == nil {
+		framework.Logf("Got expected ResourceQuota:\n%s", format.Object(lastResourceQuota, 1))
+	}
+	return err
+}
+
+// Ensure that the resource quota status shows the expected used resources value and does not change.
+// Other resources are ignored.
+func ensureResourceQuota(ctx context.Context, c clientset.Interface, ns, quotaName string, used v1.ResourceList) error {
+	// The longer we check the higher the confidence that it really remains the same.
+	// But we don't want to delay too long because it makes the test slower.
+	err := framework.Gomega().Consistently(ctx, framework.GetObject(c.CoreV1().ResourceQuotas(ns).Get, quotaName, metav1.GetOptions{})).WithTimeout(10 * time.Second).Should(haveUsedResources(used, nil))
+	return err
+}
+
+func haveUsedResources(used v1.ResourceList, lastResourceQuota **v1.ResourceQuota) gomegatypes.GomegaMatcher {
+	// The template emits the actual ResourceQuota object as YAML.
+	// In particular the ManagedFields are interesting because both
+	// kube-apiserver and kube-controller-manager set the status.
+	return gcustom.MakeMatcher(func(resourceQuota *v1.ResourceQuota) (bool, error) {
+		if lastResourceQuota != nil {
+			*lastResourceQuota = resourceQuota
 		}
 		// used may not yet be calculated
 		if resourceQuota.Status.Used == nil {
@@ -2499,7 +2530,7 @@ func waitForResourceQuota(ctx context.Context, c clientset.Interface, ns, quotaN
 			}
 		}
 		return true, nil
-	})
+	}).WithTemplate("Expected:\n{{.FormattedActual}}\n{{.To}} have the following .status.used entries:\n{{range $key, $value := .Data}}    {{$key}}: \"{{$value.ToUnstructured}}\"\n{{end}}").WithTemplateData(used /* Formatting of the map is done inside the template. */)
 }
 
 // updateResourceQuotaUntilUsageAppears updates the resource quota object until the usage is populated
