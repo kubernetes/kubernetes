@@ -55,18 +55,10 @@ func NewModel(namespaceBaseNames []string, podNames []string, ports []int32, pro
 	for _, ns := range namespaceBaseNames {
 		var pods []*Pod
 		for _, podName := range podNames {
-			var containers []*Container
-			for _, port := range ports {
-				for _, protocol := range protocols {
-					containers = append(containers, &Container{
-						Port:     port,
-						Protocol: protocol,
-					})
-				}
-			}
 			pods = append(pods, &Pod{
-				Name:       podName,
-				Containers: containers,
+				Name:      podName,
+				Ports:     ports,
+				Protocols: protocols,
 			})
 		}
 		model.Namespaces = append(model.Namespaces, &Namespace{
@@ -87,17 +79,9 @@ type Namespace struct {
 // Pod is the abstract representation of what matters to network policy tests for
 // a pod; i.e. it ignores kube implementation details
 type Pod struct {
-	Name       string
-	Containers []*Container
-}
-
-// ContainerSpecs builds kubernetes container specs for the pod
-func (p *Pod) ContainerSpecs() []v1.Container {
-	var containers []v1.Container
-	for _, cont := range p.Containers {
-		containers = append(containers, cont.Spec())
-	}
-	return containers
+	Name      string
+	Ports     []int32
+	Protocols []v1.Protocol
 }
 
 func podNameLabelKey() string {
@@ -157,70 +141,44 @@ func (p *Pod) Service(namespace string) *v1.Service {
 			Selector: p.Labels(),
 		},
 	}
-	for _, container := range p.Containers {
-		service.Spec.Ports = append(service.Spec.Ports, v1.ServicePort{
-			Name:     fmt.Sprintf("service-port-%s-%d", strings.ToLower(string(container.Protocol)), container.Port),
-			Protocol: container.Protocol,
-			Port:     container.Port,
-		})
+	for _, protocol := range p.Protocols {
+		for _, port := range p.Ports {
+			service.Spec.Ports = append(service.Spec.Ports, v1.ServicePort{
+				Name:     fmt.Sprintf("service-port-%s-%d", strings.ToLower(string(protocol)), port),
+				Protocol: protocol,
+				Port:     port,
+			})
+		}
 	}
 	return service
 }
 
-// Container is the abstract representation of what matters to network policy tests for
-// a container; i.e. it ignores kube implementation details
-type Container struct {
-	Port     int32
-	Protocol v1.Protocol
-}
+// ContainerSpecs builds kubernetes container specs for the pod
+func (p *Pod) ContainerSpecs() []v1.Container {
+	env := make([]v1.EnvVar, 0, len(p.Ports)*len(p.Protocols))
+	ports := make([]v1.ContainerPort, 0, len(p.Ports)*len(p.Protocols))
 
-// Name returns the container name
-func (c *Container) Name() string {
-	return fmt.Sprintf("cont-%d-%s", c.Port, strings.ToLower(string(c.Protocol)))
-}
-
-// PortName returns the container port name
-func (c *Container) PortName() string {
-	return fmt.Sprintf("serve-%d-%s", c.Port, strings.ToLower(string(c.Protocol)))
-}
-
-// Spec returns the kube container spec
-func (c *Container) Spec() v1.Container {
-	var (
-		// agnHostImage is the image URI of AgnHost
-		agnHostImage = imageutils.GetE2EImage(imageutils.Agnhost)
-		env          = []v1.EnvVar{}
-		cmd          []string
-	)
-
-	switch c.Protocol {
-	case v1.ProtocolTCP:
-		cmd = []string{"/agnhost", "serve-hostname", "--tcp", "--http=false", "--port", fmt.Sprintf("%d", c.Port)}
-	case v1.ProtocolUDP:
-		cmd = []string{"/agnhost", "serve-hostname", "--udp", "--http=false", "--port", fmt.Sprintf("%d", c.Port)}
-	case v1.ProtocolSCTP:
-		env = append(env, v1.EnvVar{
-			Name:  fmt.Sprintf("SERVE_SCTP_PORT_%d", c.Port),
-			Value: "foo",
-		})
-		cmd = []string{"/agnhost", "porter"}
-	default:
-		framework.Failf("invalid protocol %v", c.Protocol)
+	for _, protocol := range p.Protocols {
+		for _, port := range p.Ports {
+			env = append(env, v1.EnvVar{
+				Name:  fmt.Sprintf("SERVE_%s_PORT_%d", protocol, port),
+				Value: "foo",
+			})
+			ports = append(ports, v1.ContainerPort{
+				Name:          fmt.Sprintf("%s-%d", strings.ToLower(string(protocol)), port),
+				Protocol:      protocol,
+				ContainerPort: port,
+			})
+		}
 	}
 
-	return v1.Container{
-		Name:            c.Name(),
+	return []v1.Container{{
+		Name:            "agnhost",
 		ImagePullPolicy: v1.PullIfNotPresent,
-		Image:           agnHostImage,
-		Command:         cmd,
-		Env:             env,
+		Image:           imageutils.GetE2EImage(imageutils.Agnhost),
+		Command:         []string{"/agnhost", "porter"},
 		SecurityContext: &v1.SecurityContext{},
-		Ports: []v1.ContainerPort{
-			{
-				ContainerPort: c.Port,
-				Name:          c.PortName(),
-				Protocol:      c.Protocol,
-			},
-		},
-	}
+		Env:             env,
+		Ports:           ports,
+	}}
 }

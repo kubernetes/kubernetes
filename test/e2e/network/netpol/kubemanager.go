@@ -43,10 +43,9 @@ const defaultPollTimeoutSeconds = 10
 // there will be a corresponding TestPod. TestPod includes some runtime info
 // (namespace name, service IP) which is not available in the model.
 type TestPod struct {
-	Namespace     string
-	Name          string
-	ContainerName string
-	ServiceIP     string
+	Namespace string
+	Name      string
+	ServiceIP string
 }
 
 func (pod TestPod) PodString() PodString {
@@ -107,10 +106,9 @@ func (k *kubeManager) initializeClusterFromModel(ctx context.Context, model *Mod
 			}
 
 			k.allPods = append(k.allPods, TestPod{
-				Namespace:     kubePod.Namespace,
-				Name:          kubePod.Name,
-				ContainerName: pod.Containers[0].Name(),
-				ServiceIP:     svc.Spec.ClusterIP,
+				Namespace: kubePod.Namespace,
+				Name:      kubePod.Name,
+				ServiceIP: svc.Spec.ClusterIP,
 			})
 			k.allPodStrings = append(k.allPodStrings, NewPodString(kubePod.Namespace, kubePod.Name))
 		}
@@ -176,7 +174,7 @@ func (k *kubeManager) probeConnectivity(args *probeConnectivityArgs) (bool, stri
 		framework.Failf("protocol %s not supported", args.protocol)
 	}
 
-	commandDebugString := fmt.Sprintf("kubectl exec %s -c %s -n %s -- %s", args.podFrom, args.containerFrom, args.nsFrom, strings.Join(cmd, " "))
+	commandDebugString := fmt.Sprintf("kubectl exec %s -n %s -- %s", args.podFrom, args.nsFrom, strings.Join(cmd, " "))
 
 	attempt := 0
 
@@ -190,7 +188,7 @@ func (k *kubeManager) probeConnectivity(args *probeConnectivityArgs) (bool, stri
 	// the job when the observed value don't match the expected value, so we don't rely on return value of PollImmediate, we
 	// simply discard it and use probeError, defined outside scope of conditionFunc, for returning the result of probeConnectivity.
 	conditionFunc := func() (bool, error) {
-		_, stderr, probeError = k.executeRemoteCommand(args.nsFrom, args.podFrom, args.containerFrom, cmd)
+		_, stderr, probeError = k.executeRemoteCommand(args.nsFrom, args.podFrom, cmd)
 		// retry should only occur if expected and observed value don't match.
 		if args.expectConnectivity {
 			if probeError != nil {
@@ -237,12 +235,11 @@ func (k *kubeManager) probeConnectivity(args *probeConnectivityArgs) (bool, stri
 }
 
 // executeRemoteCommand executes a remote shell command on the given pod.
-func (k *kubeManager) executeRemoteCommand(namespace string, pod string, containerName string, command []string) (string, string, error) {
+func (k *kubeManager) executeRemoteCommand(namespace string, pod string, command []string) (string, string, error) {
 	return e2epod.ExecWithOptions(k.framework, e2epod.ExecOptions{
 		Command:            command,
 		Namespace:          namespace,
 		PodName:            pod,
-		ContainerName:      containerName,
 		Stdin:              nil,
 		CaptureStdout:      true,
 		CaptureStderr:      true,
