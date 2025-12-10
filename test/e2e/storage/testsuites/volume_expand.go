@@ -76,6 +76,7 @@ func InitCustomVolumeExpandTestSuite(patterns []storageframework.TestPattern) st
 func InitVolumeExpandTestSuite() storageframework.TestSuite {
 	patterns := []storageframework.TestPattern{
 		storageframework.DefaultFsDynamicPV,
+		storageframework.XfsDynamicPV,
 		storageframework.BlockVolModeDynamicPV,
 		storageframework.DefaultFsDynamicPVAllowExpansion,
 		storageframework.BlockVolModeDynamicPVAllowExpansion,
