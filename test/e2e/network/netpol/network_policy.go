@@ -1402,10 +1402,10 @@ var _ = common.SIGDescribe("Netpol", feature.SCTPConnectivity, "[LinuxOnly]", fu
 	})
 })
 
-// getNamespaceBaseNames returns the set of base namespace names used by this test, taking a root ns as input.
+// getNamespaceNames returns the set of base namespace names used by this test, taking a root ns as input.
 // The framework will also append a unique suffix when creating the namespaces.
 // This allows tests to run in parallel.
-func getNamespaceBaseNames(rootNs string) []string {
+func getNamespaceNames(rootNs string) []string {
 	if rootNs != "" {
 		rootNs += "-"
 	}
@@ -1433,9 +1433,9 @@ func initializeCluster(ctx context.Context, f *framework.Framework, protocols []
 
 	k8s := newKubeManager(f, dnsDomain)
 	rootNs := f.BaseName
-	namespaceBaseNames := getNamespaceBaseNames(rootNs)
+	namespaceNames := getNamespaceNames(rootNs)
 
-	model := defaultModel(namespaceBaseNames, protocols, ports)
+	model := defaultModel(namespaceNames, protocols, ports)
 
 	framework.Logf("initializing cluster: ensuring namespaces, pods and services exist and are ready")
 
