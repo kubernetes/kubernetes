@@ -329,7 +329,7 @@ var sharedInformerFactoryInterface = `
 //	ctx, cancel := context.WithCancel(context.Background())
 //	defer cancel()
 //	factory := NewSharedInformerFactory(client, resyncPeriod)
-//	defer factory.WaitForStop()    // Returns immediately if nothing was started.
+//	defer factory.Shutdown()    // Returns immediately if nothing was started.
 //	genericInformer := factory.ForResource(resource)
 //	typedInformer := factory.SomeAPIGroup().V1().SomeType()
 //	handle, err := typeInformer.Informer().AddEventHandler(...)
