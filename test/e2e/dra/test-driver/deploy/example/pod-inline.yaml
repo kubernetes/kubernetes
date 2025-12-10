@@ -1,0 +1,43 @@
+# One inline resource claim, one pod, two containers.
+# One container uses resource, one does not.
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaimTemplate
+metadata:
+  name: test-inline-claim-template
+  namespace: default
+spec:
+  metadata:
+    labels:
+      app: inline-resource
+  spec:
+    devices:
+      requests:
+      - name: my-device
+        exactly:
+          deviceClassName: example
+      config:
+      - opaque:
+          driver: test-driver.cdi.k8s.io
+          parameters:
+            a: b
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-inline-claim
+spec:
+  restartPolicy: Never
+  containers:
+  - name: with-resource
+    image: registry.k8s.io/e2e-test-images/agnhost:2.54
+    command: ["sh", "-c", "set && mount && ls -la /dev/ && /agnhost pause"]
+    resources:
+      claims:
+      - name: resource
+  - name: without-resource
+    image: registry.k8s.io/e2e-test-images/agnhost:2.54
+    command: ["sh", "-c", "set && mount && ls -la /dev/ && /agnhost pause"]
+  terminationGracePeriodSeconds: 0 # Shut down immediately.
+  resourceClaims:
+  - name: resource
+    resourceClaimTemplateName: test-inline-claim-template

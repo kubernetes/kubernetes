@@ -1,0 +1,45 @@
+# Copyright The OpenTelemetry Authors
+# SPDX-License-Identifier: Apache-2.0
+
+module-sets:
+  stable-v1:
+    version: v1.36.0
+    modules:
+      - go.opentelemetry.io/otel
+      - go.opentelemetry.io/otel/bridge/opencensus
+      - go.opentelemetry.io/otel/bridge/opencensus/test
+      - go.opentelemetry.io/otel/bridge/opentracing
+      - go.opentelemetry.io/otel/bridge/opentracing/test
+      - go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc
+      - go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp
+      - go.opentelemetry.io/otel/exporters/otlp/otlptrace
+      - go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc
+      - go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp
+      - go.opentelemetry.io/otel/exporters/stdout/stdoutmetric
+      - go.opentelemetry.io/otel/exporters/stdout/stdouttrace
+      - go.opentelemetry.io/otel/exporters/zipkin
+      - go.opentelemetry.io/otel/metric
+      - go.opentelemetry.io/otel/sdk
+      - go.opentelemetry.io/otel/sdk/metric
+      - go.opentelemetry.io/otel/trace
+  experimental-metrics:
+    version: v0.58.0
+    modules:
+      - go.opentelemetry.io/otel/exporters/prometheus
+  experimental-logs:
+    version: v0.12.0
+    modules:
+      - go.opentelemetry.io/otel/log
+      - go.opentelemetry.io/otel/sdk/log
+      - go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc
+      - go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp
+      - go.opentelemetry.io/otel/exporters/stdout/stdoutlog
+  experimental-schema:
+    version: v0.0.12
+    modules:
+      - go.opentelemetry.io/otel/schema
+excluded-modules:
+  - go.opentelemetry.io/otel/internal/tools
+  - go.opentelemetry.io/otel/log/logtest
+  - go.opentelemetry.io/otel/sdk/log/logtest
+  - go.opentelemetry.io/otel/trace/internal/telemetry/test

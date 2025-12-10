@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: restrictedvolumes5
+spec:
+  containers:
+  - image: registry.k8s.io/pause
+    name: container1
+    securityContext:
+      allowPrivilegeEscalation: false
+  initContainers:
+  - image: registry.k8s.io/pause
+    name: initcontainer1
+    securityContext:
+      allowPrivilegeEscalation: false
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  volumes:
+  - glusterfs:
+      endpoints: test
+      path: test
+    name: volume1

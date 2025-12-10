@@ -1,0 +1,25 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: applysets.company.com
+  labels:
+    applyset.kubernetes.io/is-parent-type: "true"
+spec:
+  group: company.com
+  names:
+    kind: ApplySet
+    listKind: ApplySetList
+    plural: applysets
+    singular: applyset
+  scope: Cluster
+  versions:
+  - name: v1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+

@@ -1,0 +1,11 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+reviewers:
+  - sig-storage-reviewers
+  - andyzhangx
+approvers:
+  - sig-storage-approvers
+labels:
+  - sig/storage
+emeritus_approvers:
+  - davidz627

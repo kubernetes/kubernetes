@@ -1,0 +1,87 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: csi-mock
+
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: csi-controller-attacher-role
+subjects:
+  - kind: ServiceAccount
+    name: csi-mock
+    namespace: default
+roleRef:
+  kind: ClusterRole
+  name: external-attacher-runner
+  apiGroup: rbac.authorization.k8s.io
+
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: csi-controller-provisioner-role
+subjects:
+  - kind: ServiceAccount
+    name: csi-mock
+    namespace: default
+roleRef:
+  kind: ClusterRole
+  name: external-provisioner-runner
+  apiGroup: rbac.authorization.k8s.io
+
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: csi-controller-cluster-driver-registrar-role
+subjects:
+  - kind: ServiceAccount
+    name: csi-mock
+    namespace: default
+roleRef:
+  kind: ClusterRole
+  name: cluster-driver-registrar-runner
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# privileged Pod Security Policy, previously defined via PrivilegedTestPSPClusterRoleBinding()
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: psp-csi-controller-driver-registrar-role
+subjects:
+  - kind: ServiceAccount
+    name: csi-mock
+    namespace: default
+roleRef:
+  kind: ClusterRole
+  name: e2e-test-privileged-psp
+  apiGroup: rbac.authorization.k8s.io
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: csi-controller-resizer-role
+subjects:
+  - kind: ServiceAccount
+    name: csi-mock
+    namespace: default
+roleRef:
+  kind: ClusterRole
+  name: external-resizer-runner
+  apiGroup: rbac.authorization.k8s.io
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: csi-controller-snapshotter-role
+subjects:
+  - kind: ServiceAccount
+    name: csi-mock
+    namespace: default
+roleRef:
+  kind: ClusterRole
+  name: external-snapshotter-runner
+  apiGroup: rbac.authorization.k8s.io
