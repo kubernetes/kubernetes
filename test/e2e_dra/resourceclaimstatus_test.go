@@ -31,15 +31,12 @@ import (
 	resourceapiacv1beta2 "k8s.io/client-go/applyconfigurations/resource/v1beta2"
 	draapiv1beta2 "k8s.io/dynamic-resource-allocation/api/v1beta2"
 	drautils "k8s.io/kubernetes/test/e2e/dra/utils"
-	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
-// resourceClaimDeviceStatus corresponds to testResourceClaimDeviceStatus in test/integration/dra
-// and was copied from there, therefore the unit-test style with tCtx and require.
-// This is the preferred style for new tests.
-func resourceClaimDeviceStatus(tCtx ktesting.TContext, f *framework.Framework, b *drautils.Builder) step2Func {
-	namespace := f.Namespace.Name
+// resourceClaimDeviceStatus corresponds to testResourceClaimDeviceStatus in test/integration/dra.
+func resourceClaimDeviceStatus(tCtx ktesting.TContext, b *drautils.Builder) upgradedTestFunc {
+	namespace := tCtx.Namespace()
 	claimName := "claim-with-device-status"
 	claim := &resourceapiv1beta2.ResourceClaim{
 		ObjectMeta: metav1.ObjectMeta{
@@ -111,7 +108,6 @@ func resourceClaimDeviceStatus(tCtx ktesting.TContext, f *framework.Framework, b
 		err = client.ResourceClaims(namespace).Delete(tCtx, claim.Name, metav1.DeleteOptions{})
 		tCtx.ExpectNoError(err, "delete claim")
 	}
-	tCtx.CleanupCtx(removeClaim)
 	claim, err = tCtx.Client().ResourceV1beta2().ResourceClaims(namespace).UpdateStatus(tCtx, claim, metav1.UpdateOptions{})
 	tCtx.ExpectNoError(err, "add allocation result")
 
@@ -193,7 +189,7 @@ func resourceClaimDeviceStatus(tCtx ktesting.TContext, f *framework.Framework, b
 	tCtx.ExpectNoError(encoder.Encode(claim))
 	tCtx.Logf("Final ResourceClaim:\n%s", buffer.String())
 
-	return func(tCtx ktesting.TContext) step3Func {
+	return func(tCtx ktesting.TContext) downgradedTestFunc {
 		// Update one entry, remove the other.
 		deviceStatusAC := resourceapiac.AllocatedDeviceStatus().
 			WithDriver("two").
@@ -227,8 +223,9 @@ func resourceClaimDeviceStatus(tCtx ktesting.TContext, f *framework.Framework, b
 			tCtx.ExpectNoError(err, "remove device status three")
 			require.Equal(tCtx, deviceStatus, claim.Status.Devices, "after removing device status three")
 
-			// The cleanup order is so that we have to run this explicitly now.
-			// The tCtx.CleanupCtx is more for the sake of completeness.
+			// This was created in a prior sub-test, so we have to
+			// clean up manually for a proper termination of the
+			// overall test.
 			removeClaim(tCtx)
 		}
 	}
