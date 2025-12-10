@@ -17,28 +17,29 @@ limitations under the License.
 package e2edra
 
 import (
+	"time"
+
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	drautils "k8s.io/kubernetes/test/e2e/dra/utils"
-	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
-func coreDRA(tCtx ktesting.TContext, f *framework.Framework, b *drautils.Builder) step2Func {
-	namespace := f.Namespace.Name
+func coreDRA(tCtx ktesting.TContext, b *drautils.Builder) upgradedTestFunc {
+	namespace := tCtx.Namespace()
 	claim := b.ExternalClaim()
 	pod := b.PodExternal()
 	b.Create(tCtx, claim, pod)
 	b.TestPod(tCtx, pod)
 
-	return func(tCtx ktesting.TContext) step3Func {
+	return func(tCtx ktesting.TContext) downgradedTestFunc {
 		// Remove pod prepared in step 1.
-		framework.ExpectNoError(f.ClientSet.ResourceV1beta1().ResourceClaims(namespace).Delete(tCtx, claim.Name, metav1.DeleteOptions{}))
-		framework.ExpectNoError(f.ClientSet.CoreV1().Pods(namespace).Delete(tCtx, pod.Name, metav1.DeleteOptions{}))
-		framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(tCtx, f.ClientSet, pod.Name, namespace, f.Timeouts.PodDelete))
+		tCtx.ExpectNoError(tCtx.Client().ResourceV1beta1().ResourceClaims(namespace).Delete(tCtx, claim.Name, metav1.DeleteOptions{}))
+		tCtx.ExpectNoError(tCtx.Client().CoreV1().Pods(namespace).Delete(tCtx, pod.Name, metav1.DeleteOptions{}))
+		tCtx.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(tCtx, tCtx.Client(), pod.Name, namespace, 3*time.Minute))
 
 		// Create another claim and pod, this time using the latest Kubernetes.
 		claim = b.ExternalClaim()
@@ -56,13 +57,13 @@ func coreDRA(tCtx ktesting.TContext, f *framework.Framework, b *drautils.Builder
 			// or (even weirder) with
 			//     getting *v1.Pod: pods "tester-2" is forbidden: User "kubernetes-admin" cannot get resource "pods" in API group "" in the namespace "dra-9021"
 			ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) error {
-				return f.ClientSet.ResourceV1beta1().ResourceClaims(namespace).Delete(tCtx, claim.Name, metav1.DeleteOptions{})
+				return tCtx.Client().ResourceV1beta1().ResourceClaims(namespace).Delete(tCtx, claim.Name, metav1.DeleteOptions{})
 			}).Should(gomega.Succeed(), "delete claim after downgrade")
 			ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) error {
-				return f.ClientSet.CoreV1().Pods(namespace).Delete(tCtx, pod.Name, metav1.DeleteOptions{})
+				return tCtx.Client().CoreV1().Pods(namespace).Delete(tCtx, pod.Name, metav1.DeleteOptions{})
 			}).Should(gomega.Succeed(), "delete pod after downgrade")
 			ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) *v1.Pod {
-				pod, err := f.ClientSet.CoreV1().Pods(namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
+				pod, err := tCtx.Client().CoreV1().Pods(namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
 				if apierrors.IsNotFound(err) {
 					return nil
 				}
