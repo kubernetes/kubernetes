@@ -18,8 +18,6 @@ package ingressclass
 
 import (
 	"context"
-	"k8s.io/apimachinery/pkg/api/operation"
-	"k8s.io/apiserver/pkg/registry/rest"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -69,8 +67,7 @@ func (ingressClassStrategy) PrepareForUpdate(ctx context.Context, obj, old runti
 // Validate validates a new IngressClass.
 func (ingressClassStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	ingressClass := obj.(*networking.IngressClass)
-	allErrs := validation.ValidateIngressClass(ingressClass)
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, ingressClass, nil, allErrs, operation.Create)
+	return validation.ValidateIngressClass(ingressClass)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -93,8 +90,7 @@ func (ingressClassStrategy) ValidateUpdate(ctx context.Context, obj, old runtime
 	newIngressClass := obj.(*networking.IngressClass)
 	oldIngressClass := old.(*networking.IngressClass)
 
-	allErrs := validation.ValidateIngressClassUpdate(newIngressClass, oldIngressClass)
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newIngressClass, oldIngressClass, allErrs, operation.Update)
+	return validation.ValidateIngressClassUpdate(newIngressClass, oldIngressClass)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
