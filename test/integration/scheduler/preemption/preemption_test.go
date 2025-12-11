@@ -28,6 +28,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -1619,3 +1620,188 @@ var _ fwk.PreFilterPlugin = &reservingPlugin{}
 var _ fwk.FilterPlugin = &reservingPlugin{}
 var _ fwk.PreFilterExtensions = &reservingPlugin{}
 var _ fwk.ReservePlugin = &reservingPlugin{}
+
+type blockedPod struct {
+	blocked chan struct{}
+}
+
+// blockingPermitPlugin is a Permit plugin that blocks until a signal is received.
+type blockingPermitPlugin struct {
+	podsToBlock map[string]*blockedPod
+}
+
+const blockingPermitPluginName = "blocking-permit-plugin"
+
+var _ fwk.PermitPlugin = &blockingPermitPlugin{}
+
+func newBlockingPermitPlugin(_ context.Context, _ runtime.Object, h fwk.Handle) fwk.Plugin {
+	return &blockingPermitPlugin{
+		podsToBlock: make(map[string]*blockedPod),
+	}
+}
+
+func (pl *blockingPermitPlugin) Name() string {
+	return blockingPermitPluginName
+}
+
+func (pl *blockingPermitPlugin) Permit(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) (*fwk.Status, time.Duration) {
+	if p, ok := pl.podsToBlock[pod.Name]; ok {
+		p.blocked <- struct{}{}
+		delete(pl.podsToBlock, pod.Name)
+		return fwk.NewStatus(fwk.Wait, "waiting"), time.Minute
+	}
+	return nil, 0
+}
+
+func TestPreemptionRespectsWaitingPod(t *testing.T) {
+	// 1. Create a "blocking" permit plugin that signals when it's running and waits for a specific close.
+	// 2. Create a big node on which low-priority pod will be scheduled.
+	// 3. Schedule a low-priority pod (victim) that hits this plugin (after being selected to run on a big node).
+	// 4. While victim is blocked in WaitOnPermit, add a smaller node on which the victim should be rescheduled.
+	// 5. Schedule a high-priority pod (preemptor), that can only fit on big node.
+	// 6. High-priority pod should be scheduled on a big node and victim should be preempted.
+	// 7. Victim should be rescheduled on a smaller node.
+
+	// Create a node with resources for only one pod.
+	nodeRes := map[v1.ResourceName]string{
+		v1.ResourceCPU:    "2",
+		v1.ResourceMemory: "2Gi",
+	}
+	node := st.MakeNode().Name("big-node").Capacity(nodeRes).Obj()
+
+	victim := st.MakePod().Name("victim").Priority(lowPriority).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "1Gi"}).Obj()
+	// Preemptor requires more resources than the small node has.
+	preemptor := st.MakePod().Name("preemptor").Priority(highPriority).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1.5", v1.ResourceMemory: "1.5Gi"}).Obj()
+
+	// Register the blocking plugin
+	var plugin *blockingPermitPlugin
+	registry := make(frameworkruntime.Registry)
+	err := registry.Register(blockingPermitPluginName, func(ctx context.Context, obj runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
+		pl := newBlockingPermitPlugin(ctx, obj, fh)
+		plugin = pl.(*blockingPermitPlugin)
+		return pl, nil
+	})
+	if err != nil {
+		t.Fatalf("Error registering plugin: %v", err)
+	}
+
+	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
+		Profiles: []configv1.KubeSchedulerProfile{{
+			SchedulerName: ptr.To(v1.DefaultSchedulerName),
+			Plugins: &configv1.Plugins{
+				Permit: configv1.PluginSet{
+					Enabled: []configv1.Plugin{
+						{Name: blockingPermitPluginName},
+					},
+				},
+			},
+		}},
+	})
+
+	testCtx := testutils.InitTestSchedulerWithOptions(t,
+		testutils.InitTestAPIServer(t, "preemption-waiting", nil),
+		0,
+		scheduler.WithProfiles(cfg.Profiles...),
+		scheduler.WithFrameworkOutOfTreeRegistry(registry))
+	testutils.SyncSchedulerInformerFactory(testCtx)
+	go testCtx.Scheduler.Run(testCtx.Ctx)
+
+	victimToBlock := &blockedPod{
+		blocked: make(chan struct{}),
+	}
+	plugin.podsToBlock[victim.Name] = victimToBlock
+
+	cs := testCtx.ClientSet
+
+	if _, err := createNode(cs, node); err != nil {
+		t.Fatalf("Error creating node: %v", err)
+	}
+
+	t.Logf("Creating victim pod")
+	victim, err = cs.CoreV1().Pods(testCtx.NS.Name).Create(testCtx.Ctx, victim, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Error creating victim: %v", err)
+	}
+
+	t.Logf("Waiting for victim to reach WaitOnPermit")
+	select {
+	case <-victimToBlock.blocked:
+		t.Logf("Victim reached WaitOnPermit")
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatalf("Timed out waiting for victim to reach WaitOnPermit")
+	}
+
+	smallNodeRes := map[v1.ResourceName]string{
+		v1.ResourceCPU:    "1",
+		v1.ResourceMemory: "1Gi",
+	}
+	smallNode := st.MakeNode().Name("small-node").Capacity(smallNodeRes).Obj()
+	if _, err := createNode(cs, smallNode); err != nil {
+		t.Fatalf("Error creating node: %v", err)
+	}
+
+	t.Logf("Creating preemptor pod")
+	_, err = cs.CoreV1().Pods(testCtx.NS.Name).Create(testCtx.Ctx, preemptor, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Error creating preemptor: %v", err)
+	}
+
+	// Preemptor should eventually be scheduled or cause victim preemption.
+	// Since victim is in WaitingOnPermit, Preemptor's preemption logic (PostFilter) should find it.
+	// It should call PreemptPod() on waiting victim.
+	// The plugin returns error on preemption, so the victim scheduling fails.
+	// The victim should NOT be deleted from API server.
+	// Instead the victim  should go to the backoff queue and get rescheduled eventually.
+	t.Logf("Waiting for preemptor to be scheduled")
+	err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 15*time.Second, false, func(ctx context.Context) (bool, error) {
+		// Ensure that victim is not deleted
+		_, err := cs.CoreV1().Pods(testCtx.NS.Name).Get(ctx, victim.Name, metav1.GetOptions{})
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return false, fmt.Errorf("victim pod was deleted")
+			}
+			return false, err
+		}
+		// Check if preemptor was scheduled
+		p, err := cs.CoreV1().Pods(testCtx.NS.Name).Get(ctx, preemptor.Name, metav1.GetOptions{})
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return false, fmt.Errorf("preemptor pod was deleted")
+			}
+			return false, err
+		}
+		return p.Spec.NodeName != "", nil
+	})
+	if err != nil {
+		t.Fatalf("Failed waiting for preemptor validation: %v", err)
+	}
+
+	t.Logf("waiting for victim to be rescheduled")
+	err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 15*time.Second, false, func(ctx context.Context) (bool, error) {
+		v, err := cs.CoreV1().Pods(testCtx.NS.Name).Get(ctx, victim.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		return v.Spec.NodeName != "", nil
+	})
+	if err != nil {
+		t.Fatalf("Failed waiting for victim validation: %v", err)
+	}
+
+	// Check that preemptor and victim are scheduled on expected nodes: victim on a small node and preemptor on a big node.
+	v, err := cs.CoreV1().Pods(testCtx.NS.Name).Get(testCtx.Ctx, victim.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Error getting victim: %v", err)
+	}
+	if v.Spec.NodeName != "small-node" {
+		t.Fatalf("Victim should be scheduled on small-node, but was scheduled on %s", v.Spec.NodeName)
+	}
+
+	p, err := cs.CoreV1().Pods(testCtx.NS.Name).Get(testCtx.Ctx, preemptor.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Error getting preemptor: %v", err)
+	}
+	if p.Spec.NodeName != "big-node" {
+		t.Fatalf("Preemptor should be scheduled on big-node, but was scheduled on %s", p.Spec.NodeName)
+	}
+}
