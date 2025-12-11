@@ -39,22 +39,6 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *runtime.Scheme) error {
-	// type IngressClass
-	scheme.AddValidationFunc((*networkingv1.IngressClass)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_IngressClass(ctx, op, nil /* fldPath */, obj.(*networkingv1.IngressClass), safe.Cast[*networkingv1.IngressClass](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
-	// type IngressClassList
-	scheme.AddValidationFunc((*networkingv1.IngressClassList)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_IngressClassList(ctx, op, nil /* fldPath */, obj.(*networkingv1.IngressClassList), safe.Cast[*networkingv1.IngressClassList](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
 	// type NetworkPolicy
 	scheme.AddValidationFunc((*networkingv1.NetworkPolicy)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
 		switch op.Request.SubresourcePath() {
@@ -97,76 +81,6 @@ func Validate_IPBlock(ctx context.Context, op operation.Operation, fldPath *fiel
 		}(fldPath.Child("cidr"), &obj.CIDR, safe.Field(oldObj, func(oldObj *networkingv1.IPBlock) *string { return &oldObj.CIDR }), oldObj != nil)...)
 
 	// field networkingv1.IPBlock.Except has no validation
-	return errs
-}
-
-// Validate_IngressClass validates an instance of IngressClass according
-// to declarative validation rules in the API schema.
-func Validate_IngressClass(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *networkingv1.IngressClass) (errs field.ErrorList) {
-	// field networkingv1.IngressClass.TypeMeta has no validation
-	// field networkingv1.IngressClass.ObjectMeta has no validation
-
-	// field networkingv1.IngressClass.Spec
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *networkingv1.IngressClassSpec, oldValueCorrelated bool) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
-			}
-			// call the type's validation function
-			errs = append(errs, Validate_IngressClassSpec(ctx, op, fldPath, obj, oldObj)...)
-			return
-		}(fldPath.Child("spec"), &obj.Spec, safe.Field(oldObj, func(oldObj *networkingv1.IngressClass) *networkingv1.IngressClassSpec { return &oldObj.Spec }), oldObj != nil)...)
-
-	return errs
-}
-
-// Validate_IngressClassList validates an instance of IngressClassList according
-// to declarative validation rules in the API schema.
-func Validate_IngressClassList(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *networkingv1.IngressClassList) (errs field.ErrorList) {
-	// field networkingv1.IngressClassList.TypeMeta has no validation
-	// field networkingv1.IngressClassList.ListMeta has no validation
-
-	// field networkingv1.IngressClassList.Items
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []networkingv1.IngressClass, oldValueCorrelated bool) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
-			}
-			// iterate the list and call the type's validation function
-			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_IngressClass)...)
-			return
-		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *networkingv1.IngressClassList) []networkingv1.IngressClass { return oldObj.Items }), oldObj != nil)...)
-
-	return errs
-}
-
-// Validate_IngressClassSpec validates an instance of IngressClassSpec according
-// to declarative validation rules in the API schema.
-func Validate_IngressClassSpec(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *networkingv1.IngressClassSpec) (errs field.ErrorList) {
-	// field networkingv1.IngressClassSpec.Controller has no validation
-
-	// field networkingv1.IngressClassSpec.Parameters
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *networkingv1.IngressClassParametersReference, oldValueCorrelated bool) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
-			}
-			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
-			}
-			return
-		}(fldPath.Child("parameters"), obj.Parameters, safe.Field(oldObj, func(oldObj *networkingv1.IngressClassSpec) *networkingv1.IngressClassParametersReference {
-			return oldObj.Parameters
-		}), oldObj != nil)...)
-
 	return errs
 }
 

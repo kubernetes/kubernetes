@@ -29,6 +29,7 @@ import (
 var apiVersions = []string{"v1"}
 
 func TestDeclarativeValidateIPBlockCIDR(t *testing.T) {
+
 	for _, apiVersion := range apiVersions {
 		t.Run(apiVersion, func(t *testing.T) {
 			ctx := genericapirequest.WithRequestInfo(
@@ -85,14 +86,6 @@ func TestDeclarativeValidateIPBlockCIDRUpdate(t *testing.T) {
 				updateObj    networking.NetworkPolicy
 				expectedErrs field.ErrorList
 			}{
-				//	oldObj: mkValidNetworkPolicy(func(obj *networking.NetworkPolicy) {
-				//		obj.ResourceVersion = "1"
-				//	}),
-				//	updateObj: mkValidNetworkPolicy(func(obj *networking.NetworkPolicy) {
-				//		obj.ResourceVersion = "1"
-				//	}),
-				//},"valid update": {
-
 				"invalid update clears ipBlock.cidr": {
 					oldObj: mkValidNetworkPolicy(func(obj *networking.NetworkPolicy) {
 						obj.ResourceVersion = "1"
