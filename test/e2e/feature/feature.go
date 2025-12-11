@@ -25,9 +25,6 @@ import (
 // Please keep the list in alphabetical, case-sensitive
 // (upper before any lower case character) order.
 var (
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	APIServerIdentity = framework.WithFeature(framework.ValidFeatures.Add("APIServerIdentity"))
-
 	// Owner: sig-lifecycle
 	// This label is used for tests which need the following controllers to be enabled:
 	// - bootstrap-signer-controller
