@@ -246,7 +246,7 @@ func ValidateNetworkPolicyUpdate(update, old *networking.NetworkPolicy, opts Net
 func ValidateIPBlock(ipb *networking.IPBlock, fldPath *field.Path, opts NetworkPolicyValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if ipb.CIDR == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("cidr"), "")).MarkCoveredByDeclarative()
+		allErrs = append(allErrs, field.Required(fldPath.Child("cidr"), ""))
 		return allErrs
 	}
 	allErrs = append(allErrs, apivalidation.IsValidCIDRForLegacyField(fldPath.Child("cidr"), ipb.CIDR, opts.AllowCIDRsEvenIfInvalid)...)
@@ -632,27 +632,11 @@ func validateIngressClassParametersReference(params *networking.IngressClassPara
 		return allErrs
 	}
 
-	if params.APIGroup != nil {
-		for _, msg := range validation.IsDNS1123Subdomain(*params.APIGroup) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("apiGroup"), *params.APIGroup, msg))
-		}
-	}
-
-	if params.Kind == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("kind"), "")).MarkCoveredByDeclarative()
-	} else {
-		for _, msg := range pathvalidation.IsValidPathSegmentName(params.Kind) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("kind"), params.Kind, msg))
-		}
-	}
-
-	if params.Name == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "")).MarkCoveredByDeclarative()
-	} else {
-		for _, msg := range pathvalidation.IsValidPathSegmentName(params.Name) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), params.Name, msg))
-		}
-	}
+	allErrs = append(allErrs, validateIngressTypedLocalObjectReference(&api.TypedLocalObjectReference{
+		APIGroup: params.APIGroup,
+		Kind:     params.Kind,
+		Name:     params.Name,
+	}, fldPath)...)
 
 	if params.Scope == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("scope"), ""))
