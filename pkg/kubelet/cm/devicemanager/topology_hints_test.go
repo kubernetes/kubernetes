@@ -976,6 +976,86 @@ func TestGetPodTopologyHints(t *testing.T) {
 	}
 }
 
+func TestCandidateNUMANodes(t *testing.T) {
+	resource := "testdevice"
+	deviceOnNode := func(id string, node int) *pluginapi.Device {
+		return &pluginapi.Device{
+			ID:       id,
+			Topology: &pluginapi.TopologyInfo{Nodes: []*pluginapi.NUMANode{{ID: int64(node)}}},
+		}
+	}
+
+	t.Run("filters to nodes with usable devices", func(t *testing.T) {
+		m := ManagerImpl{
+			allDevices: NewResourceDeviceInstances(),
+		}
+		m.allDevices[resource] = DeviceInstances{
+			"a": deviceOnNode("a", 3),
+			"b": deviceOnNode("b", 5),
+		}
+
+		available := sets.New[string]("a")
+		reusable := sets.New[string]()
+
+		nodes := m.candidateNUMANodes(resource, available, reusable)
+		expected := []int{3}
+		if !reflect.DeepEqual(nodes, expected) {
+			t.Fatalf("expected nodes %v, got %v", expected, nodes)
+		}
+	})
+
+	t.Run("falls back to nodes with topology info when no devices selected", func(t *testing.T) {
+		m := ManagerImpl{
+			allDevices: NewResourceDeviceInstances(),
+		}
+		m.allDevices[resource] = DeviceInstances{
+			"a": deviceOnNode("a", 3),
+			"b": deviceOnNode("b", 1),
+		}
+
+		nodes := m.candidateNUMANodes(resource, nil, nil)
+		expected := []int{1, 3}
+		if !reflect.DeepEqual(nodes, expected) {
+			t.Fatalf("expected nodes %v, got %v", expected, nodes)
+		}
+	})
+}
+
+func TestGenerateDeviceTopologyHintsAddsDefaultMaskWhenFiltered(t *testing.T) {
+	resource := "gpu"
+	m := ManagerImpl{
+		allDevices: NewResourceDeviceInstances(),
+		numaNodes:  []int{0, 1},
+	}
+	m.allDevices[resource] = DeviceInstances{
+		"a": {
+			ID:       "a",
+			Topology: &pluginapi.TopologyInfo{Nodes: []*pluginapi.NUMANode{{ID: 0}}},
+		},
+	}
+
+	hints := m.generateDeviceTopologyHints(resource, sets.New[string]("a"), nil, 1)
+	sort.SliceStable(hints, func(i, j int) bool { return hints[i].LessThan(hints[j]) })
+
+	maskNode0, _ := bitmask.NewBitMask(0)
+	defaultMask, _ := bitmask.NewBitMask(0, 1)
+	expected := []topologymanager.TopologyHint{
+		{
+			NUMANodeAffinity: maskNode0,
+			Preferred:        true,
+		},
+		{
+			NUMANodeAffinity: defaultMask,
+			Preferred:        false,
+		},
+	}
+	sort.SliceStable(expected, func(i, j int) bool { return expected[i].LessThan(expected[j]) })
+
+	if !reflect.DeepEqual(hints, expected) {
+		t.Fatalf("expected hints %v, got %v", expected, hints)
+	}
+}
+
 type topologyHintTestCase struct {
 	description      string
 	pod              *v1.Pod
