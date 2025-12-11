@@ -17,66 +17,77 @@ limitations under the License.
 package api_test
 
 import (
-    "math/rand"
-    "testing"
-    "time"
+	"math/rand"
+	"testing"
+	"time"
 
-    "k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
-    "k8s.io/apimachinery/pkg/api/apitesting/roundtrip"
-    metafuzzer "k8s.io/apimachinery/pkg/apis/meta/fuzzer"
-    "k8s.io/apimachinery/pkg/runtime"
-    "k8s.io/apimachinery/pkg/runtime/schema"
-    "k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
+	"k8s.io/apimachinery/pkg/api/apitesting/roundtrip"
+	metafuzzer "k8s.io/apimachinery/pkg/apis/meta/fuzzer"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 
-    // DRA conversion packages
-    drav1beta1 "k8s.io/dynamic-resource-allocation/api/v1beta1"
-    drav1beta2 "k8s.io/dynamic-resource-allocation/api/v1beta2"
-    
-    // External API packages
-    resourcev1 "k8s.io/api/resource/v1"
-    resourcev1beta1 "k8s.io/api/resource/v1beta1"
-    resourcev1beta2 "k8s.io/api/resource/v1beta2"
+	// DRA conversion packages
+	drav1beta1 "k8s.io/dynamic-resource-allocation/api/v1beta1"
+	drav1beta2 "k8s.io/dynamic-resource-allocation/api/v1beta2"
+
+	// External API packages
+	resourcev1 "k8s.io/api/resource/v1"
+	resourcev1beta1 "k8s.io/api/resource/v1beta1"
+	resourcev1beta2 "k8s.io/api/resource/v1beta2"
 )
 
 func TestDynamicResourceAllocationRoundTripFuzz(t *testing.T) {
-    scheme := runtime.NewScheme()
+	scheme := runtime.NewScheme()
 
-    // Add external types to scheme (all versions)
-    resourcev1.AddToScheme(scheme)
-    resourcev1beta1.AddToScheme(scheme)
-    resourcev1beta2.AddToScheme(scheme)
-    
-    // Add DRA conversion functions to scheme
-    drav1beta1.AddToScheme(scheme)
-    drav1beta2.AddToScheme(scheme)
+	if err := resourcev1.AddToScheme(scheme); err != nil {
+		t.Fatalf("failed to add resourcev1 to scheme: %v", err)
+	}
 
-    codecs := serializer.NewCodecFactory(scheme)
+	if err := resourcev1beta1.AddToScheme(scheme); err != nil {
+		t.Fatalf("failed to add resourcev1beta1 to scheme: %v", err)
+	}
 
-    seed := time.Now().UnixNano()
-    t.Logf("Fuzz seed: %d", seed)
+	if err := resourcev1beta2.AddToScheme(scheme); err != nil {
+		t.Fatalf("failed to add resourcev1beta2 to scheme: %v", err)
+	}
 
-    f := fuzzer.FuzzerFor(metafuzzer.Funcs, rand.NewSource(seed), codecs)
+	if err := drav1beta1.AddToScheme(scheme); err != nil {
+		t.Fatalf("failed to add drav1beta1 to scheme: %v", err)
+	}
 
-    // Test conversion between all versions via internal types
-    kinds := map[schema.GroupVersionKind]bool{
-        // v1 types (the hub version)
-        resourcev1.SchemeGroupVersion.WithKind("ResourceClaim"):        true,
-        resourcev1.SchemeGroupVersion.WithKind("ResourceClaimTemplate"): true,
-        resourcev1.SchemeGroupVersion.WithKind("ResourceClass"):         true,
-        resourcev1.SchemeGroupVersion.WithKind("ResourceSlice"):         true,
-        
-        // v1beta1 types
-        resourcev1beta1.SchemeGroupVersion.WithKind("ResourceClaim"):        true,
-        resourcev1beta1.SchemeGroupVersion.WithKind("ResourceClaimTemplate"): true,
-        resourcev1beta1.SchemeGroupVersion.WithKind("ResourceClass"):         true,
-        resourcev1beta1.SchemeGroupVersion.WithKind("ResourceSlice"):         true,
-        
-        // v1beta2 types
-        resourcev1beta2.SchemeGroupVersion.WithKind("ResourceClaim"):        true,
-        resourcev1beta2.SchemeGroupVersion.WithKind("ResourceClaimTemplate"): true,
-        resourcev1beta2.SchemeGroupVersion.WithKind("ResourceClass"):         true,
-        resourcev1beta2.SchemeGroupVersion.WithKind("ResourceSlice"):         true,
-    }
+	if err := drav1beta2.AddToScheme(scheme); err != nil {
+		t.Fatalf("failed to add drav1beta2 to scheme: %v", err)
+	}
 
-    roundtrip.RoundTripTypes(t, scheme, codecs, f, kinds)
+	codecs := serializer.NewCodecFactory(scheme)
+
+	seed := time.Now().UnixNano()
+	t.Logf("Fuzz seed: %d", seed)
+
+	f := fuzzer.FuzzerFor(metafuzzer.Funcs, rand.NewSource(seed), codecs)
+
+	// Test conversion between all versions via internal types
+	kinds := map[schema.GroupVersionKind]bool{
+		// v1 types (the hub version)
+		resourcev1.SchemeGroupVersion.WithKind("ResourceClaim"):         true,
+		resourcev1.SchemeGroupVersion.WithKind("ResourceClaimTemplate"): true,
+		resourcev1.SchemeGroupVersion.WithKind("ResourceClass"):         true,
+		resourcev1.SchemeGroupVersion.WithKind("ResourceSlice"):         true,
+
+		// v1beta1 types
+		resourcev1beta1.SchemeGroupVersion.WithKind("ResourceClaim"):         true,
+		resourcev1beta1.SchemeGroupVersion.WithKind("ResourceClaimTemplate"): true,
+		resourcev1beta1.SchemeGroupVersion.WithKind("ResourceClass"):         true,
+		resourcev1beta1.SchemeGroupVersion.WithKind("ResourceSlice"):         true,
+
+		// v1beta2 types
+		resourcev1beta2.SchemeGroupVersion.WithKind("ResourceClaim"):         true,
+		resourcev1beta2.SchemeGroupVersion.WithKind("ResourceClaimTemplate"): true,
+		resourcev1beta2.SchemeGroupVersion.WithKind("ResourceClass"):         true,
+		resourcev1beta2.SchemeGroupVersion.WithKind("ResourceSlice"):         true,
+	}
+
+	roundtrip.RoundTripTypes(t, scheme, codecs, f, kinds)
 }
