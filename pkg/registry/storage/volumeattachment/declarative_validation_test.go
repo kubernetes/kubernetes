@@ -17,6 +17,7 @@ limitations under the License.
 package volumeattachment
 
 import (
+	"strings"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -76,6 +77,14 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "attacher"),
 					"", "").WithOrigin("format=k8s-long-name-caseless"),
+			},
+		},
+		"attacher with number of characters exceeds 63": {
+			input: mkValidVolumeAttachment(func(obj *storage.VolumeAttachment) {
+				obj.Spec.Attacher = strings.Repeat("a", 64)
+			}),
+			expectedErrs: field.ErrorList{
+				field.TooLong(field.NewPath("spec", "attacher"), "", 63),
 			},
 		},
 	}
