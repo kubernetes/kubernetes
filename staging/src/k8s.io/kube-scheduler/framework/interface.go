@@ -326,7 +326,10 @@ type WaitingPod interface {
 	// to unblock the pod.
 	Allow(pluginName string)
 	// Reject declares the waiting pod unschedulable.
-	Reject(pluginName, msg string)
+	Reject(pluginName, msg string) bool
+	// Preempt preempts the waiting pod. Compared to reject it does not mark the pod as unschedulable,
+	// allowing it to be rescheduled.
+	Preempt(pluginName, msg string) bool
 }
 
 // PreFilterResult wraps needed info for scheduler framework to act upon PreFilter phase.
