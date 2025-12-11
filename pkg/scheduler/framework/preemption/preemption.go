@@ -177,12 +177,16 @@ func NewEvaluator(pluginName string, fh fwk.Handle, i Interface, enableAsyncPree
 	ev.PreemptPod = func(ctx context.Context, c Candidate, preemptor, victim *v1.Pod, pluginName string) error {
 		logger := klog.FromContext(ctx)
 
-		// If the victim is a WaitingPod, send a reject message to the PermitPlugin.
+		skipAPICall := false
+		// If the victim is a WaitingPod, try to preempt it without a delete call (victim will go back to backoff queue).
 		// Otherwise we should delete the victim.
 		if waitingPod := ev.Handler.GetWaitingPod(victim.UID); waitingPod != nil {
-			waitingPod.Reject(pluginName, "preempted")
-			logger.V(2).Info("Preemptor pod rejected a waiting pod", "preemptor", klog.KObj(preemptor), "waitingPod", klog.KObj(victim), "node", c.Name())
-		} else {
+			if waitingPod.Preempt(pluginName, "preempted") {
+				logger.V(2).Info("Preemptor pod preempted a waiting pod", "preemptor", klog.KObj(preemptor), "waitingPod", klog.KObj(victim), "node", c.Name())
+				skipAPICall = true
+			}
+		}
+		if !skipAPICall {
 			condition := &v1.PodCondition{
 				Type:               v1.DisruptionTarget,
 				ObservedGeneration: apipod.CalculatePodConditionObservedGeneration(&victim.Status, victim.Generation, v1.DisruptionTarget),
