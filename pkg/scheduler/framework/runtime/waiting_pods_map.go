@@ -163,3 +163,20 @@ func (w *waitingPod) Reject(pluginName, msg string) {
 	default:
 	}
 }
+
+// Preempt declares the waiting pod is preempted. Compared to reject it does not mark the pod as unschedulable,
+// allowing it to be rescheduled.
+func (w *waitingPod) Preempt(pluginName, msg string) {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	for _, timer := range w.pendingPlugins {
+		timer.Stop()
+	}
+
+	// The select clause works as a non-blocking send.
+	// If there is no receiver, it's a no-op (default case).
+	select {
+	case w.s <- fwk.NewStatus(fwk.Error, msg).WithPlugin(pluginName):
+	default:
+	}
+}
