@@ -3808,6 +3808,20 @@ func TestInternalExternalMasquerade(t *testing.T) {
 	}
 }
 
+// assertNumOperations asserts that the last transaction on nft had a number of operations
+// equal to the sum of the values in ops[]. (ops is multiple values just for ease of
+// explaining the math; see the callers below.)
+func assertNumOperations(t *testing.T, nft *knftables.Fake, ops ...int) {
+	t.Helper()
+	expectedOps := 0
+	for _, n := range ops {
+		expectedOps += n
+	}
+	if nft.LastTransaction.NumOperations() != expectedOps {
+		t.Errorf("Expected transaction with %d operations, got %d", expectedOps, nft.LastTransaction.NumOperations())
+	}
+}
+
 // Test calling syncProxyRules() multiple times with various changes
 func TestSyncProxyRulesRepeated(t *testing.T) {
 	nft, fp := NewFakeProxier(v1.IPv4Protocol)
@@ -3953,12 +3967,11 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add rule ip kube-proxy endpoint-2OCDJSZQ-ns3/svc3/tcp/p80__10.0.3.1/80 meta l4proto tcp dnat to 10.0.3.1:80
 		`)
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
-	// add 1 element to cluster-ips and service-ips = 2 operations
-	// add+flush 2 chains for service and endpoint, add 2 rules in each = 8 operations
-	// 10 operations total.
-	if nft.LastTransaction.NumOperations() != 10 {
-		t.Errorf("Expected 10 trasaction operations, got %d", nft.LastTransaction.NumOperations())
-	}
+	assertNumOperations(t, nft,
+		2, // add 1 element each to cluster-ips and service-ips
+		4, // add+flush service chain, add 2 rules
+		4, // add+flush endpoint chain, add 2 rules
+	)
 
 	// Delete a service; its chains will be flushed, but not immediately deleted.
 	fp.OnServiceDelete(svc2)
@@ -3987,12 +4000,10 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add rule ip kube-proxy endpoint-2OCDJSZQ-ns3/svc3/tcp/p80__10.0.3.1/80 meta l4proto tcp dnat to 10.0.3.1:80
 		`)
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
-	// delete 1 element from cluster-ips and service-ips = 2 operations
-	// flush 2 chains for service and endpoint = 2 operations
-	// 4 operations total.
-	if nft.LastTransaction.NumOperations() != 4 {
-		t.Errorf("Expected 4 trasaction operations, got %d", nft.LastTransaction.NumOperations())
-	}
+	assertNumOperations(t, nft,
+		2, // delete 1 element each from cluster-ips and service-ips
+		2, // flush 2 chains for service and endpoint
+	)
 
 	// Fake the passage of time and confirm that the stale chains get deleted.
 	ageStaleChains()
@@ -4018,10 +4029,8 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add rule ip kube-proxy endpoint-2OCDJSZQ-ns3/svc3/tcp/p80__10.0.3.1/80 meta l4proto tcp dnat to 10.0.3.1:80
 		`)
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
-	// delete stale chains happens in a separate transaction, nothing else changed => last transaction will have 0 operations.
-	if nft.LastTransaction.NumOperations() != 0 {
-		t.Errorf("Expected 0 trasaction operations, got %d", nft.LastTransaction.NumOperations())
-	}
+	// delete stale chains happens in a separate transaction, nothing else changed
+	assertNumOperations(t, nft, 0)
 
 	// Add a service, sync, then add its endpoints.
 	makeServiceMap(fp,
@@ -4060,10 +4069,9 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add element ip kube-proxy no-endpoint-services { 172.30.0.44 . tcp . 80 comment "ns4/svc4:p80" : goto reject-chain }
 		`)
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
-	// add 1 element to cluster-ips and no-endpoint-services = 2 operations
-	if nft.LastTransaction.NumOperations() != 2 {
-		t.Errorf("Expected 2 trasaction operations, got %d", nft.LastTransaction.NumOperations())
-	}
+	assertNumOperations(t, nft,
+		2, // add 1 element each to cluster-ips and no-endpoint-services
+	)
 
 	populateEndpointSlices(fp,
 		makeTestEndpointSlice("ns4", "svc4", 1, func(eps *discovery.EndpointSlice) {
@@ -4109,11 +4117,11 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add rule ip kube-proxy endpoint-WAHRBT2B-ns4/svc4/tcp/p80__10.0.4.1/80 meta l4proto tcp dnat to 10.0.4.1:80
 		`)
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
-	// add 1 element to service-ips, remove 1 element from no-endpoint-services = 2 operations
-	// add+flush 2 chains for service and endpoint, add 2 rules in each = 8 operations
-	if nft.LastTransaction.NumOperations() != 10 {
-		t.Errorf("Expected 10 trasaction operations, got %d", nft.LastTransaction.NumOperations())
-	}
+	assertNumOperations(t, nft,
+		2, // add 1 element to service-ips, remove 1 element from no-endpoint-services
+		4, // add+flush service chain, add 2 rules
+		4, // add+flush endpoint chain, add 2 rules
+	)
 
 	// Change an endpoint of an existing service.
 	eps3update := eps3.DeepCopy()
@@ -4153,11 +4161,11 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add rule ip kube-proxy endpoint-WAHRBT2B-ns4/svc4/tcp/p80__10.0.4.1/80 meta l4proto tcp dnat to 10.0.4.1:80
 		`)
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
-	// add+flush 2 chains for service and endpoint, add 2 rules in each = 8 operations
-	// flush old endpoint chain = 1 operation
-	if nft.LastTransaction.NumOperations() != 9 {
-		t.Errorf("Expected 9 trasaction operations, got %d", nft.LastTransaction.NumOperations())
-	}
+	assertNumOperations(t, nft,
+		4, // add+flush service chain, add 2 rules
+		4, // add+flush endpoint chain, add 2 rules
+		1, // flush old endpoint chain
+	)
 
 	// (Ensure the old svc3 chain gets deleted in the next sync.)
 	ageStaleChains()
@@ -4201,10 +4209,12 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add rule ip kube-proxy endpoint-WAHRBT2B-ns4/svc4/tcp/p80__10.0.4.1/80 meta l4proto tcp dnat to 10.0.4.1:80
 		`)
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
-	// add+flush 3 chains for 1 service and 2 endpoints, add 2 rules in each = 12 operations
-	if nft.LastTransaction.NumOperations() != 12 {
-		t.Errorf("Expected 12 trasaction operations, got %d", nft.LastTransaction.NumOperations())
-	}
+	// (The first endpoint chain is unchanged, but the code recreates it anyway.)
+	assertNumOperations(t, nft,
+		4, // add+flush service chain, add 2 rules
+		4, // add+flush original endpoint chain, add 2 rules
+		4, // add+flush new endpoint chain, add 2 rules
+	)
 
 	// Empty a service's endpoints; its chains will be flushed, but not immediately deleted.
 	eps3update3 := eps3update2.DeepCopy()
@@ -4238,11 +4248,10 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add rule ip kube-proxy endpoint-WAHRBT2B-ns4/svc4/tcp/p80__10.0.4.1/80 meta l4proto tcp dnat to 10.0.4.1:80
 		`)
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
-	// remove 1 element from service-ips, add 1 element to no-endpoint-services = 2 operations
-	// flush 3 chains = 3 operations
-	if nft.LastTransaction.NumOperations() != 5 {
-		t.Errorf("Expected 5 trasaction operations, got %d", nft.LastTransaction.NumOperations())
-	}
+	assertNumOperations(t, nft,
+		2, // remove 1 element from service-ips, add 1 element to no-endpoint-services
+		3, // flush 3 chains
+	)
 
 	expectedStaleChains := sets.NewString("service-4AT6LBPK-ns3/svc3/tcp/p80", "endpoint-SWWHDC7X-ns3/svc3/tcp/p80__10.0.3.2/80", "endpoint-TQ2QKHCZ-ns3/svc3/tcp/p80__10.0.3.3/80")
 	gotStaleChains := sets.StringKeySet(fp.staleChains)
@@ -4285,11 +4294,11 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add rule ip kube-proxy endpoint-WAHRBT2B-ns4/svc4/tcp/p80__10.0.4.1/80 meta l4proto tcp dnat to 10.0.4.1:80
 		`)
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
-	// remove 1 element from no-endpoint-services, add 1 element to service-ips = 2 operations
-	// add+flush 3 chains for 1 service and 2 endpoints, add 2 rules in each = 12 operations
-	if nft.LastTransaction.NumOperations() != 14 {
-		t.Errorf("Expected 14 trasaction operations, got %d", nft.LastTransaction.NumOperations())
-	}
+	assertNumOperations(t, nft,
+		2, // remove 1 element from no-endpoint-services, add 1 element to service-ips
+		4, // add+flush service chain, add 2 rules
+		8, // add+flush 2 endpoint chains, add 2 rules to each
+	)
 
 	if len(fp.staleChains) != 0 {
 		t.Errorf("unexpected stale chains: %v", fp.staleChains)
@@ -4309,9 +4318,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	// Sync with no new changes, so same expected rules as last time
 	fp.syncProxyRules()
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
-	if nft.LastTransaction.NumOperations() != 0 {
-		t.Errorf("Expected 0 trasaction operations, got %d", nft.LastTransaction.NumOperations())
-	}
+	assertNumOperations(t, nft, 0)
 }
 
 func TestSyncProxyRulesStartup(t *testing.T) {
@@ -4437,17 +4444,12 @@ func TestSyncProxyRulesStartup(t *testing.T) {
 		add rule ip kube-proxy endpoint-7RVP4LUQ-ns2/svc2/tcp/p8080__10.0.2.1/8080 meta l4proto tcp dnat to 10.0.2.1:8080
 	`)
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
-	// initial transaction consists of:
-	// 1. nft setup, total ops = setupOps
-	// 2. services setup (should skip adding existing set/map elements and endpoint chains+rules)
-	//    - add svc3 IP to the cluster-ips, and to the no-endpoint-services set = 2 ops
-	//    - add+flush 2 service chains + 2 rules each = 8 ops
-	//    - add+flush svc1 endpoint chain + 2 rules = 4 ops
-	//    total: 14 ops
-	if nft.LastTransaction.NumOperations() != setupOps+14 {
-		fmt.Println(nft.LastTransaction)
-		t.Errorf("Expected %v trasaction operations, got %d", setupOps+14, nft.LastTransaction.NumOperations())
-	}
+	assertNumOperations(t, nft,
+		setupOps, // nft setup
+		2,        // add svc3 IP to the cluster-ips, and to the no-endpoint-services set
+		8,        // add+flush 2 service chains + 2 rules each
+		4,        // add+flush svc1 endpoint chain + 2 rules
+	)
 }
 
 func TestNoEndpointsMetric(t *testing.T) {
