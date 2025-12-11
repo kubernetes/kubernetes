@@ -94,7 +94,6 @@ const (
 	firewallCheckChain = "firewall-check"
 
 	// masquerading
-	markMasqChain     = "mark-for-masquerade"
 	masqueradingChain = "masquerading"
 )
 
@@ -168,6 +167,7 @@ type Proxier struct {
 	nftables       knftables.Interface
 	masqueradeAll  bool
 	masqueradeMark string
+	masqueradeRule string
 	conntrack      conntrack.Interface
 	localDetector  proxyutil.LocalTrafficDetector
 	nodeName       string
@@ -250,6 +250,7 @@ func NewProxier(ctx context.Context,
 		nftables:            nft,
 		masqueradeAll:       masqueradeAll,
 		masqueradeMark:      masqueradeMark,
+		masqueradeRule:      fmt.Sprintf("mark set mark or %s", masqueradeMark),
 		conntrack:           conntrack.New(),
 		localDetector:       localDetector,
 		nodeName:            nodeName,
@@ -459,18 +460,11 @@ func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
 	}
 
 	// Ensure all of our other "top-level" chains exist
-	for _, chain := range []string{servicesChain, clusterIPsCheckChain, masqueradingChain, markMasqChain} {
+	for _, chain := range []string{servicesChain, clusterIPsCheckChain, masqueradingChain} {
 		ensureChain(chain, tx, createdChains, false)
 	}
 
-	// Add the rules in the mark-for-masquerade and masquerading chains
-	tx.Add(&knftables.Rule{
-		Chain: markMasqChain,
-		Rule: knftables.Concat(
-			"mark", "set", "mark", "or", proxier.masqueradeMark,
-		),
-	})
-
+	// Add the rules in the masquerading chain
 	tx.Add(&knftables.Rule{
 		Chain: masqueradingChain,
 		Rule: knftables.Concat(
@@ -1444,8 +1438,9 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 					Chain: internalTrafficChain,
 					Rule: knftables.Concat(
 						ipX, "daddr", svcInfo.ClusterIP(),
-						"jump", markMasqChain,
+						proxier.masqueradeRule,
 					),
+					Comment: ptr.To("masquerade all service traffic"),
 				})
 			} else if proxier.localDetector.IsImplemented() {
 				// This masquerades off-cluster traffic to a service VIP. The
@@ -1458,8 +1453,9 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 					Rule: knftables.Concat(
 						ipX, "daddr", svcInfo.ClusterIP(),
 						proxier.localDetector.IfNotLocalNFT(),
-						"jump", markMasqChain,
+						proxier.masqueradeRule,
 					),
+					Comment: ptr.To("masquerade traffic from outside cluster"),
 				})
 			}
 		}
@@ -1475,8 +1471,9 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 				tx.Add(&knftables.Rule{
 					Chain: externalTrafficChain,
 					Rule: knftables.Concat(
-						"jump", markMasqChain,
+						proxier.masqueradeRule,
 					),
+					Comment: ptr.To("masquerade"),
 				})
 			} else {
 				// If we are only using same-node endpoints, we can retain the
@@ -1504,7 +1501,7 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 					Chain: externalTrafficChain,
 					Rule: knftables.Concat(
 						"fib", "saddr", "type", "local",
-						"jump", markMasqChain,
+						proxier.masqueradeRule,
 					),
 					Comment: ptr.To("masquerade local traffic"),
 				})
@@ -1631,8 +1628,9 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 				Chain: endpointChain,
 				Rule: knftables.Concat(
 					ipX, "saddr", epInfo.IP(),
-					"jump", markMasqChain,
+					proxier.masqueradeRule,
 				),
+				Comment: ptr.To("masquerade hairpin traffic"),
 			})
 
 			// Handle session affinity
