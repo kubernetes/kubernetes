@@ -91,6 +91,34 @@ func TestRemoveMissingExtendedResources(t *testing.T) {
 				v1.ResourceList{}, // Limits
 			),
 		},
+		{
+			desc: "requests for extended resources with Allocatable 0 should not be removed",
+			pod: makeTestPod(
+				v1.ResourceList{"foo.com/bar": quantity}, // Requests
+				v1.ResourceList{"foo.com/bar": quantity}, // Limits
+			),
+			node: makeTestNode(
+				v1.ResourceList{"foo.com/bar": *resource.NewQuantity(0, resource.DecimalSI)}, // Allocatable = 0
+			),
+			expectedPod: makeTestPod(
+				v1.ResourceList{"foo.com/bar": quantity}, // Requests
+				v1.ResourceList{"foo.com/bar": quantity}, // Limits
+			),
+		},
+		{
+			desc: "requests for extended resources that are not available in node should be removed",
+			pod: makeTestPod(
+				v1.ResourceList{"foo.com/bar": quantity}, // Requests
+				v1.ResourceList{"foo.com/bar": quantity}, // Limits
+			),
+			node: makeTestNode(
+				v1.ResourceList{}, // Allocatable is absent for foo.com/bar
+			),
+			expectedPod: makeTestPod(
+				v1.ResourceList{},                        // Requests are filtered
+				v1.ResourceList{"foo.com/bar": quantity}, // Limits
+			),
+		},
 	} {
 		nodeInfo := schedulerframework.NewNodeInfo()
 		nodeInfo.SetNode(test.node)
