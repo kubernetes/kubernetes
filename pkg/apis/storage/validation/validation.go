@@ -155,7 +155,7 @@ func ValidateVolumeAttachment(volumeAttachment *storage.VolumeAttachment) field.
 // has valid data.
 func validateVolumeAttachmentSpec(
 	spec *storage.VolumeAttachmentSpec, fldPath *field.Path) field.ErrorList {
-	allErrs := apivalidation.ValidateCSIDriverName(spec.Attacher, fldPath.Child("attacher")).MarkCoveredByDeclarative()
+	allErrs := apivalidation.ValidateCSIDriverName(spec.Attacher, fldPath.Child("attacher"), apivalidation.RequiredCovered, apivalidation.FormatCovered)
 	allErrs = append(allErrs, validateVolumeAttachmentSource(&spec.Source, fldPath.Child("source"))...)
 	allErrs = append(allErrs, validateNodeName(spec.NodeName, fldPath.Child("nodeName"))...)
 	return allErrs

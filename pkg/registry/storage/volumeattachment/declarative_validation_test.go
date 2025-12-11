@@ -78,14 +78,6 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 					"", "").WithOrigin("format=k8s-long-name-caseless"),
 			},
 		},
-		"attacher exceeds length with invalid characters": {
-			input: mkValidVolumeAttachment(func(obj *storage.VolumeAttachment) {
-				obj.Spec.Attacher = "this-name-is-way-too-long-because-it-has-more-than-63-characters-total"
-			}),
-			expectedErrs: field.ErrorList{
-				field.TooLong(field.NewPath("spec", "attacher"), "", 63),
-			},
-		},
 	}
 
 	for name, tc := range testCases {
