@@ -295,11 +295,7 @@ func (c *Controller) enqueueAllPodsForPVC(logger klog.Logger, namespace, name st
 		return
 	}
 	for _, obj := range objs {
-		podRef, err := cache.DeletionHandlingObjectToName(obj)
-		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("couldn't get key for pod %#v: %w", obj, err))
-		}
-		c.queue.Add(podRef)
+		c.enqueuePod(logger, obj)
 	}
 }
 
