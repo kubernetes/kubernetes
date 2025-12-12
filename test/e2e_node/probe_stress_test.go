@@ -45,24 +45,26 @@ const (
 
 var _ = SIGDescribe("Probe Stress", framework.WithSerial(), func() {
 	f := framework.NewDefaultFramework("probe-stress")
+	// LevelPrivileged is required because the stress tests create pods with many containers
+	// that may require elevated permissions for networking and resource allocation
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Context("HTTP liveness probes", func() {
-		ginkgo.It("should not cause unexpected container restarts under load [Serial]", func(ctx context.Context) {
+		ginkgo.It("should not cause unexpected container restarts under load", func(ctx context.Context) {
 			pod := createPodWithHTTPProbes(probeStressNumContainers)
 			runProbeStressTest(ctx, f, pod)
 		})
 	})
 
 	ginkgo.Context("TCP liveness probes", func() {
-		ginkgo.It("should not cause unexpected container restarts under load [Serial]", func(ctx context.Context) {
+		ginkgo.It("should not cause unexpected container restarts under load", func(ctx context.Context) {
 			pod := createPodWithTCPProbes(probeStressNumContainers)
 			runProbeStressTest(ctx, f, pod)
 		})
 	})
 
 	ginkgo.Context("gRPC liveness probes", func() {
-		ginkgo.It("should not cause unexpected container restarts under load [Serial]", func(ctx context.Context) {
+		ginkgo.It("should not cause unexpected container restarts under load", func(ctx context.Context) {
 			pod := createPodWithGRPCProbes(probeStressNumContainers)
 			runProbeStressTest(ctx, f, pod)
 		})
@@ -79,143 +81,96 @@ func runProbeStressTest(ctx context.Context, f *framework.Framework, pod *v1.Pod
 	err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
 	framework.ExpectNoError(err, "Failed to start pod")
 
-	ginkgo.By(fmt.Sprintf("Waiting %v to observe probe behavior", probeStressWaitTime))
-	time.Sleep(probeStressWaitTime)
-
-	ginkgo.By("Verifying no containers have restarted")
-	updatedPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err, "Failed to get pod")
-
-	for _, containerStatus := range updatedPod.Status.ContainerStatuses {
-		gomega.Expect(containerStatus.RestartCount).To(gomega.BeZero(),
-			"Container %s should not have restarted, but has restart count %d",
-			containerStatus.Name, containerStatus.RestartCount)
-	}
+	ginkgo.By("Verifying no containers restarted")
+	gomega.Consistently(ctx, func(ctx context.Context) error {
+		updatedPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		for _, containerStatus := range updatedPod.Status.ContainerStatuses {
+			if containerStatus.RestartCount > 0 {
+				return fmt.Errorf("container %s restarted %d times", containerStatus.Name, containerStatus.RestartCount)
+			}
+		}
+		return nil
+	}, probeStressWaitTime, 1*time.Second).Should(gomega.Succeed())
 
 	ginkgo.By("Test passed: no unexpected container restarts")
 }
 
-// createPodWithHTTPProbes creates a pod with multiple containers, each with an HTTP liveness probe.
 func createPodWithHTTPProbes(numContainers int) *v1.Pod {
-	podName := "probe-stress-http-" + string(uuid.NewUUID())
-	containers := make([]v1.Container, numContainers)
-
-	for i := 0; i < numContainers; i++ {
-		containerName := fmt.Sprintf("container-%d", i)
+	return createProbeStressPod(numContainers, func(i int) (v1.Probe, []v1.ContainerPort, []string) {
 		port := int32(8080 + i)
-
-		containers[i] = v1.Container{
-			Name:  containerName,
-			Image: imageutils.GetE2EImage(imageutils.Agnhost),
-			Args:  []string{"netexec", fmt.Sprintf("--http-port=%d", port)},
-			Ports: []v1.ContainerPort{
-				{
-					ContainerPort: port,
-					Protocol:      v1.ProtocolTCP,
+		probe := v1.Probe{
+			ProbeHandler: v1.ProbeHandler{
+				HTTPGet: &v1.HTTPGetAction{
+					Path: "/",
+					Port: intstr.FromInt(int(port)),
 				},
 			},
-			LivenessProbe: &v1.Probe{
-				ProbeHandler: v1.ProbeHandler{
-					HTTPGet: &v1.HTTPGetAction{
-						Path: "/",
-						Port: intstr.FromInt(int(port)),
-					},
-				},
-				PeriodSeconds:    probeStressPeriodSeconds,
-				TimeoutSeconds:   1,
-				SuccessThreshold: 1,
-				FailureThreshold: 3,
-			},
-			ImagePullPolicy: v1.PullIfNotPresent,
+			PeriodSeconds:    probeStressPeriodSeconds,
+			TimeoutSeconds:   1,
+			SuccessThreshold: 1,
+			FailureThreshold: 3,
 		}
-	}
-
-	return &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: podName,
-		},
-		Spec: v1.PodSpec{
-			Containers:    containers,
-			RestartPolicy: v1.RestartPolicyNever,
-		},
-	}
+		ports := []v1.ContainerPort{{ContainerPort: port, Protocol: v1.ProtocolTCP}}
+		args := []string{"netexec", fmt.Sprintf("--http-port=%d", port)}
+		return probe, ports, args
+	})
 }
 
-// createPodWithTCPProbes creates a pod with multiple containers, each with a TCP liveness probe.
 func createPodWithTCPProbes(numContainers int) *v1.Pod {
-	podName := "probe-stress-tcp-" + string(uuid.NewUUID())
-	containers := make([]v1.Container, numContainers)
-
-	for i := 0; i < numContainers; i++ {
-		containerName := fmt.Sprintf("container-%d", i)
+	return createProbeStressPod(numContainers, func(i int) (v1.Probe, []v1.ContainerPort, []string) {
 		port := int32(8080 + i)
-
-		containers[i] = v1.Container{
-			Name:  containerName,
-			Image: imageutils.GetE2EImage(imageutils.Agnhost),
-			Args:  []string{"netexec", fmt.Sprintf("--http-port=%d", port)},
-			Ports: []v1.ContainerPort{
-				{
-					ContainerPort: port,
-					Protocol:      v1.ProtocolTCP,
+		probe := v1.Probe{
+			ProbeHandler: v1.ProbeHandler{
+				TCPSocket: &v1.TCPSocketAction{
+					Port: intstr.FromInt(int(port)),
 				},
 			},
-			LivenessProbe: &v1.Probe{
-				ProbeHandler: v1.ProbeHandler{
-					TCPSocket: &v1.TCPSocketAction{
-						Port: intstr.FromInt(int(port)),
-					},
-				},
-				PeriodSeconds:    probeStressPeriodSeconds,
-				TimeoutSeconds:   1,
-				SuccessThreshold: 1,
-				FailureThreshold: 3,
-			},
-			ImagePullPolicy: v1.PullIfNotPresent,
+			PeriodSeconds:    probeStressPeriodSeconds,
+			TimeoutSeconds:   1,
+			SuccessThreshold: 1,
+			FailureThreshold: 3,
 		}
-	}
-
-	return &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: podName,
-		},
-		Spec: v1.PodSpec{
-			Containers:    containers,
-			RestartPolicy: v1.RestartPolicyNever,
-		},
-	}
+		ports := []v1.ContainerPort{{ContainerPort: port, Protocol: v1.ProtocolTCP}}
+		args := []string{"netexec", fmt.Sprintf("--http-port=%d", port)}
+		return probe, ports, args
+	})
 }
 
-// createPodWithGRPCProbes creates a pod with multiple containers, each with a gRPC liveness probe.
 func createPodWithGRPCProbes(numContainers int) *v1.Pod {
-	podName := "probe-stress-grpc-" + string(uuid.NewUUID())
+	return createProbeStressPod(numContainers, func(i int) (v1.Probe, []v1.ContainerPort, []string) {
+		port := int32(5000 + i)
+		probe := v1.Probe{
+			ProbeHandler: v1.ProbeHandler{
+				GRPC: &v1.GRPCAction{
+					Port: port,
+				},
+			},
+			PeriodSeconds:    probeStressPeriodSeconds,
+			TimeoutSeconds:   1,
+			SuccessThreshold: 1,
+			FailureThreshold: 3,
+		}
+		ports := []v1.ContainerPort{{ContainerPort: port, Protocol: v1.ProtocolTCP}}
+		args := []string{"grpc-health-checking", fmt.Sprintf("--port=%d", port)}
+		return probe, ports, args
+	})
+}
+
+func createProbeStressPod(numContainers int, generator func(i int) (v1.Probe, []v1.ContainerPort, []string)) *v1.Pod {
+	podName := "probe-stress-" + string(uuid.NewUUID())
 	containers := make([]v1.Container, numContainers)
 
 	for i := 0; i < numContainers; i++ {
-		containerName := fmt.Sprintf("container-%d", i)
-		port := int32(5000 + i)
-
+		probe, ports, args := generator(i)
 		containers[i] = v1.Container{
-			Name:  containerName,
-			Image: imageutils.GetE2EImage(imageutils.Agnhost),
-			Args:  []string{"grpc-health-checking", fmt.Sprintf("--port=%d", port)},
-			Ports: []v1.ContainerPort{
-				{
-					ContainerPort: port,
-					Protocol:      v1.ProtocolTCP,
-				},
-			},
-			LivenessProbe: &v1.Probe{
-				ProbeHandler: v1.ProbeHandler{
-					GRPC: &v1.GRPCAction{
-						Port: port,
-					},
-				},
-				PeriodSeconds:    probeStressPeriodSeconds,
-				TimeoutSeconds:   1,
-				SuccessThreshold: 1,
-				FailureThreshold: 3,
-			},
+			Name:            fmt.Sprintf("container-%d", i),
+			Image:           imageutils.GetE2EImage(imageutils.Agnhost),
+			Args:            args,
+			Ports:           ports,
+			LivenessProbe:   &probe,
 			ImagePullPolicy: v1.PullIfNotPresent,
 		}
 	}
