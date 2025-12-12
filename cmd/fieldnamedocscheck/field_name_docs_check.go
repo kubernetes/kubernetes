@@ -29,8 +29,10 @@ import (
 )
 
 var (
-	typeSrc = flag.StringP("type-src", "s", "", "From where we are going to read the types")
-	re      = regexp.MustCompile("`(\\b\\w+\\b)`")
+	typeSrc               = flag.StringP("type-src", "s", "", "From where we are going to read the types")
+	re                    = regexp.MustCompile("`(\\b\\w+\\b)`")
+	checkMissingBackticks = flag.Bool("check-missing-backticks", false, "Check for missing backticks around field names in doc strings")
+	reAllWords            = regexp.MustCompile("\\b\\w+\\b")
 )
 
 // kubeTypesMap is a map from field name to its tag name and doc.
@@ -79,9 +81,8 @@ func checkFieldNameAndDoc(structName, fieldName, doc string, typesMap kubeTypesM
 	// 3. Skip the name whose lowercase is different from the lowercase of tag names,
 	//    because some docs use back-tick to quote field value or nil
 	// 4. Check if the name is different from its tag name
+	// 5. Check if there are any unquoted field names in the doc
 
-	// TODO: a manual pass adding back-ticks to the doc strings, then update the linter to
-	// check the existence of back-ticks
 	nameGroups := re.FindAllStringSubmatch(doc, -1)
 	for _, nameGroup := range nameGroups {
 		name := nameGroup[1]
@@ -92,12 +93,50 @@ func checkFieldNameAndDoc(structName, fieldName, doc string, typesMap kubeTypesM
 			rc = true
 			visited.Insert(name)
 
-			fmt.Fprintf(os.Stderr, "Error: doc for %s", structName)
+			fmt.Fprintf(os.Stderr, "Error (Case Mismatch): doc for %s", structName)
 			if fieldName != "" {
 				fmt.Fprintf(os.Stderr, ".%s", fieldName)
 			}
 
 			fmt.Fprintf(os.Stderr, " contains: %s, which should be: %s\n", name, p.Name)
+		}
+	}
+
+	if !*checkMissingBackticks {
+		return rc
+	}
+
+	wordIndices := reAllWords.FindAllStringIndex(doc, -1)
+
+	for _, loc := range wordIndices {
+		start, end := loc[0], loc[1]
+		word := doc[start:end]
+
+		p, isField := typesMap[strings.ToLower(word)]
+		if !isField {
+			continue
+		}
+
+		if visited.Has(word) {
+			continue
+		}
+
+		hasBacktick := false
+		if start > 0 && end < len(doc) {
+			if doc[start-1] == '`' && doc[end] == '`' {
+				hasBacktick = true
+			}
+		}
+
+		if !hasBacktick {
+			rc = true
+			visited.Insert(word)
+
+			fmt.Fprintf(os.Stderr, "Error (Missing Backticks): doc for %s", structName)
+			if fieldName != "" {
+				fmt.Fprintf(os.Stderr, ".%s", fieldName)
+			}
+			fmt.Fprintf(os.Stderr, " mentions field %s without backticks. Should be: `%s`\n", word, p.Name)
 		}
 	}
 

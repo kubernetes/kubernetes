@@ -30,6 +30,11 @@ kube::golang::setup_env
 
 GOPROXY=off go install ./cmd/fieldnamedocscheck
 
+# TODO: Once every file is enforced, remove this array and always check all files with check-missing-backticks
+ENFORCED_FILES=(
+  "./staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1/types.go"
+)
+
 find_files() {
   find . -not \( \
       \( \
@@ -48,13 +53,32 @@ find_files() {
     \)
 }
 
+# TODO: once every file is enforced, we can remove this function and always check with check-missing-backticks
+is_enforced_file() {
+  local target="$1"
+  for file in "${ENFORCED_FILES[@]}"; do
+    if [[ "$file" == "$target" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
 versioned_api_files=$(find_files) || true
 
 result=0
 for file in ${versioned_api_files}; do
   package="${file%"/types.go"}"
-  echo "Checking ${package}"
-  fieldnamedocscheck -s "${file}" || result=$?
+
+  if is_enforced_file "${file}"; then
+    # [Strict Mode]
+    echo -e "Checking ${package}"
+    fieldnamedocscheck -s "${file}" --check-missing-backticks || result=$?
+  else
+    # [Legacy Mode]
+    echo "Checking ${package} with --check-missing-backticks disabled"
+    fieldnamedocscheck -s "${file}" || result=$?
+  fi
 done
 
 exit ${result}
