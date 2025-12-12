@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -28,6 +29,7 @@ import (
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/registry/rest"
 	pkgstorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -88,8 +90,11 @@ func (svcStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 // Validate validates a new service.
 func (svcStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	service := obj.(*api.Service)
+
+	// imperative validation
 	allErrs := validation.ValidateServiceCreate(service)
-	return allErrs
+
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, service, nil, allErrs, operation.Create)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -106,8 +111,13 @@ func (svcStrategy) AllowCreateOnUpdate() bool {
 }
 
 func (strategy svcStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	allErrs := validation.ValidateServiceUpdate(obj.(*api.Service), old.(*api.Service))
-	return allErrs
+	newService := obj.(*api.Service)
+	oldService := old.(*api.Service)
+
+	// imperative validation
+	allErrs := validation.ValidateServiceUpdate(newService, oldService)
+
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newService, oldService, allErrs, operation.Update)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -164,7 +174,13 @@ func (serviceStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runt
 
 // ValidateUpdate is the default update validation for an end user updating status
 func (serviceStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidateServiceStatusUpdate(obj.(*api.Service), old.(*api.Service))
+	newService := obj.(*api.Service)
+	oldService := old.(*api.Service)
+
+	// imperative validation
+	allErrs := validation.ValidateServiceStatusUpdate(newService, oldService)
+
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newService, oldService, allErrs, operation.Update)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
