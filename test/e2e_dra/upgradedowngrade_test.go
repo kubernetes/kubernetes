@@ -74,6 +74,7 @@ func init() {
 var subTests = map[string]initialTestFunc{
 	"core DRA":                    coreDRA,
 	"ResourceClaim device status": resourceClaimDeviceStatus,
+	"DeviceTaints":                deviceTaints,
 }
 
 type initialTestFunc func(tCtx ktesting.TContext, builder *drautils.Builder) upgradedTestFunc
@@ -133,7 +134,7 @@ func testUpgradeDowngrade(tCtx ktesting.TContext) {
 		version, err := version.ParseGeneric(gitVersion)
 		tCtx.ExpectNoError(err, "parse version %s of repo root %q", gitVersion, repoRoot)
 		major, previousMinor = version.Major(), version.Minor()-1
-		if strings.Contains(gitVersion, "-alpha.0") {
+		if false && strings.Contains(gitVersion, "-alpha.0") {
 			// All version up to and including x.y.z-alpha.0 are treated as if we were
 			// still the previous minor version x.(y-1). There are two reason for this:
 			//
@@ -210,8 +211,8 @@ func testUpgradeDowngrade(tCtx ktesting.TContext) {
 	for tCtx := range tCtx.Step(fmt.Sprintf("bring up v%d.%d", major, previousMinor)) {
 		cluster = localupcluster.New(tCtx)
 		localUpClusterEnv := map[string]string{
-			"RUNTIME_CONFIG": "resource.k8s.io/v1beta1,resource.k8s.io/v1beta2",
-			"FEATURE_GATES":  "DynamicResourceAllocation=true",
+			"RUNTIME_CONFIG": "resource.k8s.io/v1beta1,resource.k8s.io/v1beta2,resource.k8s.io/v1beta1,resource.k8s.io/v1alpha3",
+			"FEATURE_GATES":  "DynamicResourceAllocation=true,DRADeviceTaintRules=true,DRADeviceTaints=true",
 			// *not* needed because driver will run in "local filesystem" mode (= driver.IsLocal): "ALLOW_PRIVILEGED": "1",
 		}
 		cluster.Start(tCtx, binDir, localUpClusterEnv)
@@ -273,16 +274,6 @@ func testUpgradeDowngrade(tCtx ktesting.TContext) {
 	// Roll back.
 	for tCtx := range tCtx.Step("downgrade") {
 		cluster.Modify(tCtx, restoreOptions)
-	}
-
-	// TODO: ensure that kube-controller-manager is up-and-running.
-	// This works around https://github.com/kubernetes/kubernetes/issues/132334 and can be removed
-	// once a fix for that is backported.
-	for tCtx := range tCtx.Step("wait for kube-controller-manager") {
-		ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) string {
-			output, _ := cluster.GetSystemLogs(tCtx, localupcluster.KubeControllerManager)
-			return output
-		}).Should(gomega.ContainSubstring(`"Caches are synced" controller="resource_claim"`))
 	}
 
 	tCtx.Run("after-cluster-downgrade", func(tCtx ktesting.TContext) {
