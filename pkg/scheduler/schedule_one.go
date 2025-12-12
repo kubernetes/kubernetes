@@ -75,12 +75,9 @@ func (sched *Scheduler) ScheduleOne(ctx context.Context) {
 	}
 
 	pod := podInfo.Pod
-	// TODO(knelasevero): Remove duplicated keys from log entry calls
-	// When contextualized logging hits GA
-	// https://github.com/kubernetes/kubernetes/issues/111672
 	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod))
 	ctx = klog.NewContext(ctx, logger)
-	logger.V(4).Info("About to try and schedule pod", "pod", klog.KObj(pod))
+	logger.V(4).Info("About to try and schedule pod")
 
 	fwk, err := sched.frameworkForPod(pod)
 	if err != nil {
@@ -96,7 +93,7 @@ func (sched *Scheduler) ScheduleOne(ctx context.Context) {
 		return
 	}
 
-	logger.V(3).Info("Attempting to schedule pod", "pod", klog.KObj(pod))
+	logger.V(3).Info("Attempting to schedule pod")
 
 	// Synchronously attempt to find a fit for the pod.
 	start := time.Now()
@@ -160,7 +157,7 @@ func (sched *Scheduler) schedulingCycle(
 
 		fitError, ok := err.(*framework.FitError)
 		if !ok {
-			logger.Error(err, "Error selecting node for pod", "pod", klog.KObj(pod))
+			logger.Error(err, "Error selecting node for pod")
 			return ScheduleResult{nominatingInfo: clearNominatedNode}, podInfo, fwk.AsStatus(err)
 		}
 
@@ -179,9 +176,9 @@ func (sched *Scheduler) schedulingCycle(
 		msg := status.Message()
 		fitError.Diagnosis.PostFilterMsg = msg
 		if status.Code() == fwk.Error {
-			utilruntime.HandleErrorWithContext(ctx, nil, "Status after running PostFilter plugins for pod", "pod", klog.KObj(pod), "status", msg)
+			utilruntime.HandleErrorWithContext(ctx, nil, "Status after running PostFilter plugins", "status", msg)
 		} else {
-			logger.V(5).Info("Status after running PostFilter plugins for pod", "pod", klog.KObj(pod), "status", msg)
+			logger.V(5).Info("Status after running PostFilter plugins", "status", msg)
 		}
 
 		var nominatingInfo *fwk.NominatingInfo
@@ -400,7 +397,7 @@ func (sched *Scheduler) skipPodSchedule(ctx context.Context, fwk framework.Frame
 	// Case 1: pod is being deleted.
 	if pod.DeletionTimestamp != nil {
 		fwk.EventRecorder().Eventf(pod, nil, v1.EventTypeWarning, "FailedScheduling", "Scheduling", "skip schedule deleting pod: %v/%v", pod.Namespace, pod.Name)
-		klog.FromContext(ctx).V(3).Info("Skip schedule deleting pod", "pod", klog.KObj(pod))
+		klog.FromContext(ctx).V(3).Info("Skip schedule deleting pod", "pod")
 		return true
 	}
 
@@ -409,7 +406,7 @@ func (sched *Scheduler) skipPodSchedule(ctx context.Context, fwk framework.Frame
 	// during its previous scheduling cycle but before getting assumed.
 	isAssumed, err := sched.Cache.IsAssumedPod(pod)
 	if err != nil {
-		utilruntime.HandleErrorWithContext(ctx, err, "Failed to check whether pod is assumed", "pod", klog.KObj(pod))
+		utilruntime.HandleErrorWithContext(ctx, err, "Failed to check whether pod is assumed")
 		return false
 	}
 	return isAssumed
@@ -502,7 +499,7 @@ func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, schedFramework 
 		// Record the messages from PreFilter in Diagnosis.PreFilterMsg.
 		msg := s.Message()
 		diagnosis.PreFilterMsg = msg
-		logger.V(5).Info("Status after running PreFilter plugins for pod", "pod", klog.KObj(pod), "status", msg)
+		logger.V(5).Info("Status after running PreFilter plugins for pod", "status", msg)
 		diagnosis.AddPluginStatus(s)
 		return nil, diagnosis, "", nil, nil
 	}
@@ -521,7 +518,7 @@ func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, schedFramework 
 	if len(pod.Status.NominatedNodeName) > 0 || len(nodeHint) > 0 {
 		feasibleNodes, err := sched.evaluateNominatedNode(ctx, pod, schedFramework, state, nodeHint, diagnosis)
 		if err != nil {
-			utilruntime.HandleErrorWithContext(ctx, err, "Evaluation failed on nominated node", "pod", klog.KObj(pod), "node", pod.Status.NominatedNodeName)
+			utilruntime.HandleErrorWithContext(ctx, err, "Evaluation failed on nominated node", "node", pod.Status.NominatedNodeName)
 		}
 		// Nominated node passes all the filters, scheduler is good to assign this node to the pod.
 		if len(feasibleNodes) != 0 {
@@ -827,7 +824,7 @@ func prioritizeNodes(
 	if loggerVTen.Enabled() {
 		for _, nodeScore := range nodesScores {
 			for _, pluginScore := range nodeScore.Scores {
-				loggerVTen.Info("Plugin scored node for pod", "pod", klog.KObj(pod), "plugin", pluginScore.Name, "node", nodeScore.Name, "score", pluginScore.Score)
+				loggerVTen.Info("Plugin scored node for pod", "plugin", pluginScore.Name, "node", nodeScore.Name, "score", pluginScore.Score)
 			}
 		}
 	}
@@ -852,7 +849,7 @@ func prioritizeNodes(
 				prioritizedList, weight, err := extenders[extIndex].Prioritize(pod, nodes)
 				if err != nil {
 					// Prioritization errors from extender can be ignored, let k8s/other extenders determine the priorities
-					logger.V(5).Info("Failed to run extender's priority function. No score given by this extender.", "error", err, "pod", klog.KObj(pod), "extender", extenders[extIndex].Name())
+					logger.V(5).Info("Failed to run extender's priority function. No score given by this extender.", "error", err, "extender", extenders[extIndex].Name())
 					return
 				}
 				mu.Lock()
@@ -861,7 +858,7 @@ func prioritizeNodes(
 					nodename := (*prioritizedList)[i].Host
 					score := (*prioritizedList)[i].Score
 					if loggerVTen.Enabled() {
-						loggerVTen.Info("Extender scored node for pod", "pod", klog.KObj(pod), "extender", extenders[extIndex].Name(), "node", nodename, "score", score)
+						loggerVTen.Info("Extender scored node for pod", "extender", extenders[extIndex].Name(), "node", nodename, "score", score)
 					}
 
 					// MaxExtenderPriority may diverge from the max priority used in the scheduler and defined by MaxNodeScore,
@@ -895,7 +892,7 @@ func prioritizeNodes(
 
 	if loggerVTen.Enabled() {
 		for i := range nodesScores {
-			loggerVTen.Info("Calculated node's final score for pod", "pod", klog.KObj(pod), "node", nodesScores[i].Name, "score", nodesScores[i].TotalScore)
+			loggerVTen.Info("Calculated node's final score for pod", "node", nodesScores[i].Name, "score", nodesScores[i].TotalScore)
 		}
 	}
 	return nodesScores, nil
@@ -1059,26 +1056,26 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, fwk framewo
 	errMsg := status.Message()
 
 	if err == ErrNoNodesAvailable {
-		logger.V(2).Info("Unable to schedule pod; no nodes are registered to the cluster; waiting", "pod", klog.KObj(pod))
+		logger.V(2).Info("Unable to schedule pod; no nodes are registered to the cluster; waiting")
 	} else if fitError, ok := err.(*framework.FitError); ok { // Inject UnschedulablePlugins to PodInfo, which will be used later for moving Pods between queues efficiently.
 		podInfo.UnschedulablePlugins = fitError.Diagnosis.UnschedulablePlugins
 		podInfo.PendingPlugins = fitError.Diagnosis.PendingPlugins
-		logger.V(2).Info("Unable to schedule pod; no fit; waiting", "pod", klog.KObj(pod), "err", errMsg)
+		logger.V(2).Info("Unable to schedule pod; no fit; waiting", "pod")
 	} else {
-		utilruntime.HandleErrorWithContext(ctx, err, "Error scheduling pod; retrying", "pod", klog.KObj(pod))
+		utilruntime.HandleErrorWithContext(ctx, err, "Error scheduling pod; retrying")
 	}
 
 	// Check if the Pod exists in informer cache.
 	podLister := fwk.SharedInformerFactory().Core().V1().Pods().Lister()
 	cachedPod, e := podLister.Pods(pod.Namespace).Get(pod.Name)
 	if e != nil {
-		logger.Info("Pod doesn't exist in informer cache", "pod", klog.KObj(pod), "err", e)
+		logger.Info("Pod doesn't exist in informer cache", "err", e)
 		// We need to call DonePod here because we don't call AddUnschedulableIfNotPresent in this case.
 	} else {
 		// In the case of extender, the pod may have been bound successfully, but timed out returning its response to the scheduler.
 		// It could result in the live version to carry .spec.nodeName, and that's inconsistent with the internal-queued version.
 		if len(cachedPod.Spec.NodeName) != 0 {
-			logger.Info("Pod has been assigned to node. Abort adding it back to queue.", "pod", klog.KObj(pod), "node", cachedPod.Spec.NodeName)
+			logger.Info("Pod has been assigned to node. Abort adding it back to queue.", "node", cachedPod.Spec.NodeName)
 			// We need to call DonePod here because we don't call AddUnschedulableIfNotPresent in this case.
 		} else {
 			// As <cachedPod> is from SharedInformer, we need to do a DeepCopy() here.
