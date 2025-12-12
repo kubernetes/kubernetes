@@ -171,7 +171,7 @@ func cleanupSubpathVolumePath(subpathVolumePath string, mounter mount.Interface,
 		return nil
 	}
 
-	// Attempt to unmount subpathVolumePath if it cannot be deleted because it is still mounted.
+	// If subpathVolumePath cannot be deleted because it is still mounted, attempt to unmount it first.
 	// This is required for hostPath volumes when pods are force-deleted while the kubelet is down,
 	// as the volume manager cannot reconstruct orphaned pods' hostPath volumes, so it cannot automatically tear down such volumes.
 	if err = mount.CleanupMountPoint(subpathVolumePath, mounter, true); err == nil {
