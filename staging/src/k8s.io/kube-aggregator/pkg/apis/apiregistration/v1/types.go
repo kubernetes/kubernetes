@@ -24,8 +24,8 @@ import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 // APIServiceList is a list of APIService objects.
 type APIServiceList struct {
 	metav1.TypeMeta `json:",inline"`
-	// Standard list metadata
-	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	// Standard list `metadata`
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#`metadata`
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
@@ -37,7 +37,7 @@ type APIServiceList struct {
 type ServiceReference struct {
 	// `namespace` is the `namespace` of the service
 	Namespace string `json:"namespace,omitempty" protobuf:"bytes,1,opt,name=namespace"`
-	// Name is the name of the service
+	// `name` is the `name` of the service
 	Name string `json:"name,omitempty" protobuf:"bytes,2,opt,name=name"`
 	// If specified, the `port` on the service that hosting webhook.
 	// Default to 443 for backward compatibility.
@@ -116,7 +116,7 @@ const (
 
 // APIServiceCondition describes the state of an APIService at a particular point
 type APIServiceCondition struct {
-	// Type is the type of the condition.
+	// `type` is the `type` of the condition.
 	Type APIServiceConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=APIServiceConditionType"`
 	// `status` is the `status` of the condition.
 	// Can be True, False, Unknown.
@@ -152,9 +152,9 @@ type APIServiceStatus struct {
 // Name must be "version.group".
 type APIService struct {
 	metav1.TypeMeta `json:",inline"`
-	// Standard object's metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-	// +optional
+	// Standard object's `metadata`.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#``
+	// +optionalmetadata
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// `spec` contains information for locating and communicating with a server
