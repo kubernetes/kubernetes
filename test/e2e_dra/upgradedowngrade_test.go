@@ -66,7 +66,8 @@ func init() {
 // sub-test. That function then returns the next piece of code, which then
 // returns the final code. Each callback function is executed as a sub-test.
 // The builder is configured to not delete objects when that sub-test ends,
-// so objects persist until the entire test is done.
+// so objects persist until the entire test is done. The same DRA driver
+// is used for all sub-tests.
 //
 // Each sub-test must be self-contained. They intentionally run in a random
 // order. However, they share the same cluster and the 8 devices which are
@@ -74,6 +75,7 @@ func init() {
 var subTests = map[string]initialTestFunc{
 	"core DRA":                    coreDRA,
 	"ResourceClaim device status": resourceClaimDeviceStatus,
+	"DeviceTaints":                deviceTaints,
 }
 
 type initialTestFunc func(tCtx ktesting.TContext, builder *drautils.Builder) upgradedTestFunc
@@ -210,8 +212,8 @@ func testUpgradeDowngrade(tCtx ktesting.TContext) {
 	tCtx.Step(fmt.Sprintf("bring up v%d.%d", major, previousMinor), func(tCtx ktesting.TContext) {
 		cluster = localupcluster.New(tCtx)
 		localUpClusterEnv := map[string]string{
-			"RUNTIME_CONFIG": "resource.k8s.io/v1beta1,resource.k8s.io/v1beta2",
-			"FEATURE_GATES":  "DynamicResourceAllocation=true",
+			"RUNTIME_CONFIG": "resource.k8s.io/v1beta1,resource.k8s.io/v1beta2,resource.k8s.io/v1beta1,resource.k8s.io/v1alpha3",
+			"FEATURE_GATES":  "DynamicResourceAllocation=true,DRADeviceTaintRules=true,DRADeviceTaints=true",
 			// *not* needed because driver will run in "local filesystem" mode (= driver.IsLocal): "ALLOW_PRIVILEGED": "1",
 		}
 		cluster.Start(tCtx, binDir, localUpClusterEnv)
@@ -247,6 +249,7 @@ func testUpgradeDowngrade(tCtx ktesting.TContext) {
 			})
 		}
 	})
+	numSlices := len(driver.NewGetSlices()(tCtx).Items)
 
 	// We could split this up into first updating the apiserver, then control plane components, then restarting kubelet.
 	// For the purpose of this test here we we primarily care about full before/after comparisons, so not done yet.
@@ -255,7 +258,7 @@ func testUpgradeDowngrade(tCtx ktesting.TContext) {
 
 	// The kubelet wipes all ResourceSlices on a restart because it doesn't know which drivers were running.
 	// Wait for the ResourceSlice controller in the driver to notice and recreate the ResourceSlices.
-	tCtx.WithStep("wait for ResourceSlices").Eventually(driver.NewGetSlices()).WithTimeout(5 * time.Minute).Should(gomega.HaveField("Items", gomega.HaveLen(len(nodes.NodeNames))))
+	tCtx.WithStep("wait for ResourceSlices").Eventually(driver.NewGetSlices()).WithTimeout(5 * time.Minute).Should(gomega.HaveField("Items", gomega.HaveLen(numSlices)))
 
 	downgradedTestFuncs := make(map[string]downgradedTestFunc, len(subTests))
 	tCtx.Run("after-cluster-upgrade", func(tCtx ktesting.TContext) {

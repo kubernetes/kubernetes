@@ -1027,6 +1027,7 @@ func (d *Driver) TearDown(tCtx ktesting.TContext) {
 //
 // Only use this in tests where kubelet support for DRA is guaranteed.
 func (d *Driver) IsGone(tCtx ktesting.TContext) {
+	tCtx.Helper()
 	tCtx.Logf("Waiting for ResourceSlices of driver %s to be removed...", d.Name)
 	tCtx.Eventually(d.NewGetSlices()).WithTimeout(2 * time.Minute).Should(gomega.HaveField("Items", gomega.BeEmpty()))
 }
