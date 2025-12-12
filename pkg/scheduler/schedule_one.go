@@ -1131,6 +1131,7 @@ func updatePod(ctx context.Context, client clientset.Interface, apiCacher fwk.AP
 		_, err := apiCacher.PatchPodStatus(pod, condition, nominatingInfo)
 		return err
 	}
+
 	logger := klog.FromContext(ctx)
 	logValues := []any{"pod", klog.KObj(pod)}
 	if condition != nil {
