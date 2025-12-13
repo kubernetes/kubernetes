@@ -393,7 +393,7 @@ func (s *Server) InstallTracingFilter(tp oteltrace.TracerProvider, opts ...otelr
 func (s *Server) installStatusZ() {
 	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentStatusz) {
 		s.addMetricsBucketMatcher("statusz")
-		statusz.Install(s.restfulCont, ComponentKubelet, statusz.NewRegistry(compatibility.DefaultBuildEffectiveVersion(), statusz.WithListedPaths(s.restfulCont.RegisteredHandlePaths())))
+		statusz.Install(s.restfulCont, statusz.NewRegistry(ComponentKubelet, compatibility.DefaultBuildEffectiveVersion(), statusz.WithListedPaths(s.restfulCont.RegisteredHandlePaths())))
 	}
 }
 
