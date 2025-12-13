@@ -918,7 +918,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				}},
 			},
 		},
-		msg: "may not set both a target raw value and a target utilization",
+		msg: "must not set both a target raw value and a target utilization",
 	}, {
 		horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
 			ObjectMeta: metav1.ObjectMeta{
@@ -943,7 +943,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				}},
 			},
 		},
-		msg: "may not set both a target raw value and a target utilization",
+		msg: "must not set both a target raw value and a target utilization",
 	}, {
 		horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
 			ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
@@ -1334,7 +1334,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 					}},
 				},
 			},
-			msg: "must set either a target value for metric or a per-pod target",
+			msg: "must set either a target value or averageValue",
 		}, {
 			horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
 				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
@@ -1404,7 +1404,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 					}},
 				},
 			},
-			msg: "may not set both a target value for metric and a per-pod target",
+			msg: "must not set both a target value or averageValue",
 		}, {
 			horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
 				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
