@@ -50,6 +50,8 @@ type staticPolicy struct {
 	systemReserved systemReservedMemory
 	// topology manager reference to get container Topology affinity
 	affinity topologymanager.Store
+	// numaNodesWithCPUs keeps track of the NUMA IDs that actually host CPUs.
+	numaNodesWithCPUs map[int]bool
 	// initContainersReusableMemory contains the memory allocated for init
 	// containers that can be reused.
 	// Note that the restartable init container memory is not included here,
@@ -74,10 +76,20 @@ func NewPolicyStatic(logger klog.Logger, machineInfo *cadvisorapi.MachineInfo, r
 		return nil, fmt.Errorf("[memorymanager] you should specify the system reserved memory")
 	}
 
+	numaNodesWithCPUs := map[int]bool{}
+	if machineInfo != nil {
+		for _, node := range machineInfo.Topology {
+			if len(node.Cores) > 0 {
+				numaNodesWithCPUs[node.Id] = true
+			}
+		}
+	}
+
 	return &staticPolicy{
 		machineInfo:                  machineInfo,
 		systemReserved:               reserved,
 		affinity:                     affinity,
+		numaNodesWithCPUs:            numaNodesWithCPUs,
 		initContainersReusableMemory: reusableMemory{},
 	}, nil
 }
@@ -481,11 +493,10 @@ func getRequestedResources(pod *v1.Pod, container *v1.Container) (map[v1.Resourc
 }
 
 func (p *staticPolicy) calculateHints(machineState state.NUMANodeMap, pod *v1.Pod, requestedResources map[v1.ResourceName]uint64) map[string][]topologymanager.TopologyHint {
-	var numaNodes []int
-	for n := range machineState {
-		numaNodes = append(numaNodes, n)
+	numaNodes := p.selectableNUMANodes(machineState)
+	if len(numaNodes) == 0 {
+		return nil
 	}
-	sort.Ints(numaNodes)
 
 	// Initialize minAffinitySize to include all NUMA Cells.
 	minAffinitySize := len(numaNodes)
@@ -573,6 +584,25 @@ func (p *staticPolicy) calculateHints(machineState state.NUMANodeMap, pod *v1.Po
 	}
 
 	return hints
+}
+
+func (p *staticPolicy) selectableNUMANodes(machineState state.NUMANodeMap) []int {
+	numaNodes := make([]int, 0, len(machineState))
+	for nodeID := range machineState {
+		if !p.nodeHasCPUs(nodeID) {
+			continue
+		}
+		numaNodes = append(numaNodes, nodeID)
+	}
+	sort.Ints(numaNodes)
+	return numaNodes
+}
+
+func (p *staticPolicy) nodeHasCPUs(nodeID int) bool {
+	if len(p.numaNodesWithCPUs) == 0 {
+		return true
+	}
+	return p.numaNodesWithCPUs[nodeID]
 }
 
 func (p *staticPolicy) isHintPreferred(maskBits []int, minAffinitySize int) bool {

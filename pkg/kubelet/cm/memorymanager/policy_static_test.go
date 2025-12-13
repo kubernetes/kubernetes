@@ -3635,6 +3635,144 @@ func TestStaticPolicyGetTopologyHints(t *testing.T) {
 			},
 		},
 		{
+			description: "should ignore NUMA nodes without CPU cores when building hints",
+			machineInfo: &cadvisorapi.MachineInfo{
+				Topology: []cadvisorapi.Node{
+					{Id: 0, Cores: []cadvisorapi.Core{{Id: 0, Threads: []int{0}}}},
+					{Id: 1, Cores: []cadvisorapi.Core{{Id: 1, Threads: []int{1}}}},
+					{Id: 2},
+					{Id: 3},
+				},
+			},
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    1536 * mb,
+							Free:           1536 * mb,
+							Reserved:       0,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   2 * gb,
+						},
+						hugepages1Gi: {
+							Allocatable:    gb,
+							Free:           gb,
+							Reserved:       0,
+							SystemReserved: 0,
+							TotalMemSize:   gb,
+						},
+					},
+					Cells:               []int{0},
+					NumberOfAssignments: 0,
+				},
+				1: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    1536 * mb,
+							Free:           1536 * mb,
+							Reserved:       0,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   2 * gb,
+						},
+						hugepages1Gi: {
+							Allocatable:    gb,
+							Free:           gb,
+							Reserved:       0,
+							SystemReserved: 0,
+							TotalMemSize:   gb,
+						},
+					},
+					Cells:               []int{1},
+					NumberOfAssignments: 0,
+				},
+				2: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    1536 * mb,
+							Free:           1536 * mb,
+							Reserved:       0,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   2 * gb,
+						},
+						hugepages1Gi: {
+							Allocatable:    0,
+							Free:           0,
+							Reserved:       0,
+							SystemReserved: 0,
+							TotalMemSize:   0,
+						},
+					},
+					Cells:               []int{2},
+					NumberOfAssignments: 0,
+				},
+				3: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    1536 * mb,
+							Free:           1536 * mb,
+							Reserved:       0,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   2 * gb,
+						},
+						hugepages1Gi: {
+							Allocatable:    0,
+							Free:           0,
+							Reserved:       0,
+							SystemReserved: 0,
+							TotalMemSize:   0,
+						},
+					},
+					Cells:               []int{3},
+					NumberOfAssignments: 0,
+				},
+			},
+			pod: getPod("pod2", "container2", requirementsGuaranteed),
+			systemReserved: systemReservedMemory{
+				0: map[v1.ResourceName]uint64{
+					v1.ResourceMemory: 512 * mb,
+				},
+				1: map[v1.ResourceName]uint64{
+					v1.ResourceMemory: 512 * mb,
+				},
+				2: map[v1.ResourceName]uint64{
+					v1.ResourceMemory: 512 * mb,
+				},
+				3: map[v1.ResourceName]uint64{
+					v1.ResourceMemory: 512 * mb,
+				},
+			},
+			expectedTopologyHints: map[string][]topologymanager.TopologyHint{
+				string(v1.ResourceMemory): {
+					{
+						NUMANodeAffinity: newNUMAAffinity(0),
+						Preferred:        true,
+					},
+					{
+						NUMANodeAffinity: newNUMAAffinity(1),
+						Preferred:        true,
+					},
+					{
+						NUMANodeAffinity: newNUMAAffinity(0, 1),
+						Preferred:        false,
+					},
+				},
+				string(hugepages1Gi): {
+					{
+						NUMANodeAffinity: newNUMAAffinity(0),
+						Preferred:        true,
+					},
+					{
+						NUMANodeAffinity: newNUMAAffinity(1),
+						Preferred:        true,
+					},
+					{
+						NUMANodeAffinity: newNUMAAffinity(0, 1),
+						Preferred:        false,
+					},
+				},
+			},
+		},
+		{
 			description: "should fail when number of existing memory assignment resources are different from resources requested by container",
 			assignments: state.ContainerMemoryAssignments{
 				"pod1": map[string][]state.Block{
