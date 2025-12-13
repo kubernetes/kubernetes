@@ -606,6 +606,63 @@ func Test_extractTagParams(t *testing.T) {
 	}
 }
 
+func Test_isValueCopyableType(t *testing.T) {
+	testCases := []struct {
+		typ    types.Type
+		expect bool
+	}{
+		{
+			typ: types.Type{
+				Name: types.Name{Package: "net/netip", Name: "Addr"},
+				Kind: types.Struct,
+			},
+			expect: true,
+		},
+		{
+			typ: types.Type{
+				Name: types.Name{Package: "net/netip", Name: "Prefix"},
+				Kind: types.Struct,
+			},
+			expect: true,
+		},
+		{
+			typ: types.Type{
+				Name: types.Name{Package: "net/netip", Name: "AddrPort"},
+				Kind: types.Struct,
+			},
+			expect: true,
+		},
+		{
+			typ: types.Type{
+				Name: types.Name{Package: "net/netip", Name: "OtherType"},
+				Kind: types.Struct,
+			},
+			expect: false,
+		},
+		{
+			typ: types.Type{
+				Name: types.Name{Package: "other/package", Name: "Addr"},
+				Kind: types.Struct,
+			},
+			expect: false,
+		},
+		{
+			typ: types.Type{
+				Name: types.Name{Package: "pkgname", Name: "CustomType"},
+				Kind: types.Struct,
+			},
+			expect: false,
+		},
+	}
+
+	for i, tc := range testCases {
+		result := isValueCopyableType(&tc.typ)
+		if result != tc.expect {
+			t.Errorf("case[%d]: expected %v, got %v for type %v", i, tc.expect, result, tc.typ.Name)
+		}
+	}
+}
+
 func Test_extractInterfacesTag(t *testing.T) {
 	testCases := []struct {
 		comments, secondComments []string
