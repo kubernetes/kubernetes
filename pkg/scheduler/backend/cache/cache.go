@@ -30,7 +30,7 @@ import (
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
+	apicalls "k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 )
 
@@ -44,8 +44,8 @@ var (
 // "ctx" is the context that would close the background goroutine.
 func New(ctx context.Context, ttl time.Duration, apiDispatcher fwk.APIDispatcher) Cache {
 	logger := klog.FromContext(ctx)
-	cache := newCache(ctx, ttl, cleanAssumedPeriod, apiDispatcher)
-	cache.run(logger)
+	cache := newCache(logger, ttl, cleanAssumedPeriod, apiDispatcher)
+	cache.run(ctx, logger)
 	return cache
 }
 
@@ -59,7 +59,6 @@ type nodeInfoListItem struct {
 }
 
 type cacheImpl struct {
-	stop   <-chan struct{}
 	ttl    time.Duration
 	period time.Duration
 
@@ -92,12 +91,10 @@ type podState struct {
 	bindingFinished bool
 }
 
-func newCache(ctx context.Context, ttl, period time.Duration, apiDispatcher fwk.APIDispatcher) *cacheImpl {
-	logger := klog.FromContext(ctx)
+func newCache(logger klog.Logger, ttl, period time.Duration, apiDispatcher fwk.APIDispatcher) *cacheImpl {
 	return &cacheImpl{
 		ttl:    ttl,
 		period: period,
-		stop:   ctx.Done(),
 
 		nodes:         make(map[string]*nodeInfoListItem),
 		nodeTree:      newNodeTree(logger, nil),
@@ -729,10 +726,14 @@ func (cache *cacheImpl) removeNodeImageStates(node *v1.Node) {
 	}
 }
 
-func (cache *cacheImpl) run(logger klog.Logger) {
-	go wait.Until(func() {
-		cache.cleanupAssumedPods(logger, time.Now())
-	}, cache.period, cache.stop)
+func (cache *cacheImpl) run(ctx context.Context, logger klog.Logger) {
+	go wait.UntilWithContext(
+		ctx,
+		func(ctx context.Context) {
+			cache.cleanupAssumedPods(logger, time.Now())
+		},
+		cache.period,
+	)
 }
 
 // cleanupAssumedPods exists for making test deterministic by taking time as input argument.
