@@ -135,7 +135,7 @@ func NewController(ctx context.Context, p ControllerParameters) (*PersistentVolu
 
 	csiTranslator := csitrans.New()
 	controller.translator = csiTranslator
-	controller.csiMigratedPluginManager = csimigration.NewPluginManager(csiTranslator, utilfeature.DefaultFeatureGate)
+	controller.csiMigratedPluginManager = csimigration.NewPluginManager(csiTranslator)
 
 	return controller, nil
 }
