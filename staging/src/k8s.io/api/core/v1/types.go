@@ -17,6 +17,10 @@ limitations under the License.
 package v1
 
 import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -6960,6 +6964,46 @@ const (
 
 // ResourceList is a set of (resource name, quantity) pairs.
 type ResourceList map[ResourceName]resource.Quantity
+
+// UnmarshalJSON implements the json.Unmarshaller interface for ResourceList.
+// It handles null values by omitting them from the map, ensuring consistency
+// between different kubectl commands (create, apply, etc.) and proper
+// Server-Side Apply field ownership semantics.
+// See: https://github.com/kubernetes/kubernetes/issues/135423
+func (rl *ResourceList) UnmarshalJSON(data []byte) error {
+	if rl == nil {
+		return fmt.Errorf("core.ResourceList: UnmarshalJSON on nil pointer")
+	}
+
+	// Decode into a temporary map to handle null values
+	var temp map[ResourceName]json.RawMessage
+	if err := json.Unmarshal(data, &temp); err != nil {
+		return err
+	}
+
+	// Initialize the map if needed
+	if *rl == nil {
+		*rl = make(ResourceList)
+	}
+
+	// Process each entry, skipping null values
+	for key, rawValue := range temp {
+		// Skip null values - don't add them to the map
+		// This ensures null means "field not set" rather than "field set to zero"
+		if bytes.Equal(rawValue, []byte("null")) {
+			continue
+		}
+
+		var quantity resource.Quantity
+		if err := json.Unmarshal(rawValue, &quantity); err != nil {
+			return fmt.Errorf("failed to unmarshal quantity for %q: %w", key, err)
+		}
+		(*rl)[key] = quantity
+	}
+
+	return nil
+}
+
 
 // +genclient
 // +genclient:nonNamespaced
