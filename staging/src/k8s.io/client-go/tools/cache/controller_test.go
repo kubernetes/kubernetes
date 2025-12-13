@@ -21,11 +21,13 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"sort"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -68,16 +70,8 @@ func Example() {
 			// Obj is from the Pop method of the Queue we make above.
 			newest := obj.(Deltas).Newest()
 
-			if newest.Type != Deleted {
-				// Update our downstream store.
-				err := downstream.Add(newest.Object)
-				if err != nil {
-					return err
-				}
-
-				// Delete this object.
-				source.Delete(newest.Object.(runtime.Object))
-			} else {
+			switch newest.Type {
+			case Deleted:
 				// Update our downstream store.
 				err := downstream.Delete(newest.Object)
 				if err != nil {
@@ -93,6 +87,23 @@ func Example() {
 
 				// Report this deletion.
 				deletionCounter <- key
+			case AtomicEvent:
+				info := newest.Object.(AtomicInfo)
+				err := downstream.Replace(info.Objects, info.ResourceVersion)
+				if err != nil {
+					return err
+				}
+				for _, obj := range info.Objects {
+					source.Delete(obj.(runtime.Object))
+				}
+			default:
+				// Update our downstream store.
+				err := downstream.Add(newest.Object)
+				if err != nil {
+					return err
+				}
+				// Delete this object.
+				source.Delete(newest.Object.(runtime.Object))
 			}
 			return nil
 		},
@@ -849,7 +860,8 @@ func TestProcessDeltasInBatch(t *testing.T) {
 				dummyListener,
 				mockStore,
 				tc.deltaList,
-				true)
+				true,
+				MetaNamespaceKeyFunc)
 			if tc.assertErr != nil {
 				assert.True(t, tc.assertErr(err))
 			}
@@ -892,4 +904,215 @@ func (m *mockTxnStore) Transaction(txns ...Transaction) *TransactionError {
 	}
 	m.succeedCount = len(txns)
 	return nil
+}
+
+func TestReplaceEvents(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	for _, atomic := range []bool{true, false} {
+		t.Run(fmt.Sprintf("Atomic=%v", atomic), func(t *testing.T) {
+			source := fcache.NewFakeControllerSource()
+			store := NewStore(DeletionHandlingMetaNamespaceKeyFunc)
+			t.Cleanup(func() {
+				source.Shutdown()
+			})
+
+			recorder := &eventRecorder{
+				updateCh: make(chan bool, 1),
+			}
+			fifo := NewRealFIFOWithOptions(RealFIFOOptions{
+				KeyFunction:   MetaNamespaceKeyFunc,
+				KnownObjects:  store,
+				AtomicReplace: atomic,
+			})
+
+			cfg := &Config{
+				Queue:            fifo,
+				ListerWatcher:    source,
+				ObjectType:       &v1.Pod{},
+				FullResyncPeriod: 0,
+
+				Process: func(obj interface{}, isInInitialList bool) error {
+					if deltas, ok := obj.(Deltas); ok {
+						return processDeltas(recorder, store, deltas, isInInitialList, MetaNamespaceKeyFunc)
+					}
+					return errors.New("object given as Process argument is not Deltas")
+				},
+				ProcessBatch: func(deltaList []Delta, isInInitialList bool) error {
+					return processDeltasInBatch(recorder, store, deltaList, isInInitialList, MetaNamespaceKeyFunc)
+				},
+			}
+
+			c := New(cfg)
+			go c.RunWithContext(ctx)
+			if !WaitForCacheSync(ctx.Done(), c.HasSynced) {
+				t.Fatal("Timed out waiting for cache sync")
+			}
+			testReplaceEvents(t, ctx, fifo, recorder, store)
+		})
+	}
+}
+
+func testReplaceEvents(t *testing.T, ctx context.Context, fifo Queue, m *eventRecorder, store Store) {
+	// Set up 3 pods initially
+	pKeep := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-keep", Namespace: "default"}}
+	pMod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-mod", Namespace: "default", Labels: map[string]string{"ver": "1"}}}
+	pDel := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-del", Namespace: "default"}}
+
+	addFifo(t, fifo, pKeep)
+	addFifo(t, fifo, pMod)
+	addFifo(t, fifo, pDel)
+
+	// Wait for all 3 events to appear
+	err := m.waitForEventCount(ctx, 3, 5*time.Second)
+	if err != nil {
+		t.Fatalf("Controller failed to receive all initial setup events, got: %v", m.getHistory())
+	}
+
+	// Clear history so we only compare what happens during the RESYNC/REPLACE
+	m.clearHistory()
+
+	// Silent Drift (Events missed by controller)
+
+	// Modify: Update pod
+	pModUpdated := pMod.DeepCopy()
+	pModUpdated.Labels["ver"] = "2"
+
+	// Create pod-add
+	pAdd := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-add", Namespace: "default"}}
+
+	// Run replace
+	replaceFifo(t, fifo, []interface{}{pAdd, pKeep, pModUpdated})
+
+	err = m.waitForEventCount(ctx, 4, 5*time.Second)
+	if err != nil {
+		t.Fatalf("Controller failed to receive all events, got: %v", m.getHistory())
+	}
+
+	expectItems := []any{
+		pAdd,
+		pKeep,
+		pModUpdated,
+	}
+	items := sortItemsByKey(store.List(), DeletionHandlingMetaNamespaceKeyFunc)
+	if !apiequality.Semantic.DeepEqual(expectItems, items) {
+		t.Error(cmp.Diff(expectItems, items))
+	}
+	expectHistory := []eventRecord{
+		{Action: "add", Key: "default/pod-add"},
+		{Action: "delete", Key: "default/pod-del"},
+		{Action: "update", Key: "default/pod-keep"},
+		{Action: "update", Key: "default/pod-mod"},
+	}
+	if !apiequality.Semantic.DeepEqual(expectHistory, m.getHistory()) {
+		t.Error(cmp.Diff(expectHistory, m.getHistory()))
+	}
+}
+
+type eventRecord struct {
+	Action string
+	Key    string
+}
+
+type eventRecorder struct {
+	historyLock sync.Mutex
+	history     []eventRecord
+
+	updateCh chan bool
+}
+
+func (m *eventRecorder) OnAdd(obj interface{}, _ bool) {
+	m.record("add", obj)
+}
+func (m *eventRecorder) OnUpdate(_, obj interface{}) {
+	m.record("update", obj)
+}
+func (m *eventRecorder) OnDelete(obj interface{}) {
+	m.record("delete", obj)
+}
+
+func (m *eventRecorder) record(action string, obj interface{}) {
+	m.historyLock.Lock()
+	defer m.historyLock.Unlock()
+	key, _ := DeletionHandlingMetaNamespaceKeyFunc(obj)
+	m.history = append(m.history, eventRecord{Action: action, Key: key})
+
+	select {
+	case m.updateCh <- true:
+	default:
+	}
+}
+
+func (m *eventRecorder) clearHistory() {
+	m.historyLock.Lock()
+	defer m.historyLock.Unlock()
+	m.history = []eventRecord{}
+}
+
+func (m *eventRecorder) getHistory() []eventRecord {
+	m.historyLock.Lock()
+	historyCopy := make([]eventRecord, len(m.history))
+	copy(historyCopy, m.history)
+	m.historyLock.Unlock()
+
+	sortEvents := func(events []eventRecord) {
+		sort.Slice(events, func(i, j int) bool {
+			if events[i].Key != events[j].Key {
+				return events[i].Key < events[j].Key
+			}
+			return events[i].Action < events[j].Action
+		})
+	}
+	sortEvents(historyCopy)
+
+	return historyCopy
+}
+
+func (m *eventRecorder) waitForEventCount(ctx context.Context, count int, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	for {
+		m.historyLock.Lock()
+		currentCount := len(m.history)
+		m.historyLock.Unlock()
+
+		if currentCount >= count {
+			return nil
+		}
+
+		select {
+		case <-m.updateCh:
+			continue
+		case <-ctx.Done():
+			return fmt.Errorf("context canceled waiting for %d events, currently have %d", count, currentCount)
+		}
+	}
+}
+
+func sortItemsByKey(items []interface{}, keyFunc KeyFunc) []interface{} {
+	sort.Slice(items, func(i, j int) bool {
+		keyI, _ := keyFunc(items[i])
+		keyJ, _ := keyFunc(items[j])
+		return keyI < keyJ
+	})
+	return items
+}
+
+func addFifo(t *testing.T, fifo Queue, obj interface{}) {
+	t.Helper()
+	err := fifo.Add(obj)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func replaceFifo(t *testing.T, fifo Queue, obj []interface{}) {
+	t.Helper()
+	err := fifo.Replace(obj, "123")
+	if err != nil {
+		t.Fatal(err)
+	}
 }
