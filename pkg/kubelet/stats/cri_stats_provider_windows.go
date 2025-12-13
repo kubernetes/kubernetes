@@ -274,6 +274,66 @@ func criInterfaceToWinSummary(criIface *runtimeapi.WindowsNetworkInterfaceUsage)
 	}
 }
 
+// addCRIPodContainerCPUAndMemoryStats adds container CPU and memory stats from CRI to the PodStats.
+func (p *criStatsProvider) addCRIPodContainerCPUAndMemoryStats(
+	criSandboxStat *runtimeapi.PodSandboxStats,
+	ps *statsapi.PodStats,
+	containerMap map[string]*runtimeapi.Container) {
+	if criSandboxStat == nil || criSandboxStat.Windows == nil {
+		return
+	}
+	for _, criContainerStat := range criSandboxStat.Windows.Containers {
+		container, found := containerMap[criContainerStat.Attributes.Id]
+		if !found {
+			continue
+		}
+		// Fill available CPU and memory stats for resource metrics
+		cs := p.makeWinContainerCPUAndMemoryStats(criContainerStat, time.Unix(0, container.CreatedAt))
+		ps.Containers = append(ps.Containers, *cs)
+	}
+}
+
+// makeWinContainerCPUAndMemoryStats creates container stats with only CPU and memory populated.
+// This is a lighter-weight version for the resource metrics endpoint.
+func (p *criStatsProvider) makeWinContainerCPUAndMemoryStats(
+	stats *runtimeapi.WindowsContainerStats,
+	startTime time.Time,
+) *statsapi.ContainerStats {
+	result := &statsapi.ContainerStats{
+		Name:      stats.Attributes.Metadata.Name,
+		StartTime: metav1.NewTime(startTime),
+	}
+	if stats.Cpu != nil {
+		result.CPU = &statsapi.CPUStats{
+			Time:                 metav1.NewTime(time.Unix(0, stats.Cpu.Timestamp)),
+			UsageCoreNanoSeconds: ptr.To(stats.Cpu.UsageCoreNanoSeconds.GetValue()),
+			UsageNanoCores:       ptr.To(stats.Cpu.UsageNanoCores.GetValue()),
+		}
+	} else {
+		result.CPU = &statsapi.CPUStats{
+			Time:                 metav1.NewTime(time.Unix(0, time.Now().UnixNano())),
+			UsageCoreNanoSeconds: ptr.To[uint64](0),
+			UsageNanoCores:       ptr.To[uint64](0),
+		}
+	}
+	if stats.Memory != nil {
+		result.Memory = &statsapi.MemoryStats{
+			Time:            metav1.NewTime(time.Unix(0, stats.Memory.Timestamp)),
+			WorkingSetBytes: ptr.To(stats.Memory.WorkingSetBytes.GetValue()),
+			AvailableBytes:  ptr.To(stats.Memory.AvailableBytes.GetValue()),
+			PageFaults:      ptr.To(stats.Memory.PageFaults.GetValue()),
+		}
+	} else {
+		result.Memory = &statsapi.MemoryStats{
+			Time:            metav1.NewTime(time.Unix(0, time.Now().UnixNano())),
+			WorkingSetBytes: ptr.To[uint64](0),
+			AvailableBytes:  ptr.To[uint64](0),
+			PageFaults:      ptr.To[uint64](0),
+		}
+	}
+	return result
+}
+
 // newNetworkStatsProvider uses the real windows hnslib if not provided otherwise if the interface is provided
 // by the cristatsprovider in testing scenarios it uses that one
 func newNetworkStatsProvider(p *criStatsProvider) windowsNetworkStatsProvider {
