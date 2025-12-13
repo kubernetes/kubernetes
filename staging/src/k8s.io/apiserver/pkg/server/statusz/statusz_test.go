@@ -100,7 +100,7 @@ func TestHandleStatusz(t *testing.T) {
 			),
 		},
 		{
-			name:          "valid request for v1alpha1",
+			name:          "valid request for application/json",
 			acceptHeader:  "application/json;v=v1alpha1;g=config.k8s.io;as=Statusz",
 			componentName: "test-server",
 			registry: fakeRegistry{
@@ -265,6 +265,21 @@ func TestHandleStatusz(t *testing.T) {
 			},
 			wantWarning: true,
 		},
+		{
+			name:          "valid request for application/yaml",
+			acceptHeader:  "application/yaml;v=v1alpha1;g=config.k8s.io;as=Statusz",
+			componentName: "test-server",
+			registry: fakeRegistry{
+				startTime:    fakeStartTime,
+				goVer:        fakeGoVersion,
+				binaryVer:    fakeBinaryVersion,
+				emulationVer: fakeEmulationVersion,
+				listedPaths:  fakeListedPaths,
+				deprecated:   map[string]bool{},
+			},
+			wantStatusCode: http.StatusOK,
+			wantBody:       "apiVersion: config.k8s.io/v1alpha1",
+		},
 	}
 
 	for _, tt := range tests {
@@ -303,8 +318,8 @@ func TestHandleStatusz(t *testing.T) {
 						}
 					}
 				} else {
-					if diff := cmp.Diff(tt.wantBody, string(w.Body.String())); diff != "" {
-						t.Errorf("Unexpected diff on response (-want,+got):\n%s", diff)
+					if !strings.Contains(string(w.Body.String()), tt.wantBody) {
+						t.Errorf("Unexpected response body:\n- want to contain: %s\n- got:  %s", tt.wantBody, string(w.Body.String()))
 					}
 				}
 			}

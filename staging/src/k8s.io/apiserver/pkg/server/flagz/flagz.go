@@ -95,10 +95,12 @@ func handleFlagz(componentName string, reg *registry, serializer runtime.Negotia
 		}
 
 		var targetGV schema.GroupVersion
-		switch serializerInfo.MediaType {
-		case "application/json":
+		if serializerInfo.MediaType == "text/plain" {
+			writePlainTextResponse(obj, serializer, w, reg)
+			return
+		} else {
 			if mediaType.Convert == nil {
-				err := fmt.Errorf("content negotiation failed: mediaType.Convert is nil for application/json")
+				err := fmt.Errorf("content negotiation failed: mediaType.Convert is nil for %s", serializerInfo.MediaType)
 				utilruntime.HandleError(err)
 				responsewriters.ErrorNegotiated(
 					err,
@@ -113,20 +115,6 @@ func handleFlagz(componentName string, reg *registry, serializer runtime.Negotia
 			if reg.deprecatedVersions()[targetGV.Version] {
 				w.Header().Set("Warning", `299 - "This version of the flagz endpoint is deprecated. Please use a newer version."`)
 			}
-		case "text/plain":
-			writePlainTextResponse(obj, serializer, w, reg)
-			return
-		default:
-			err = fmt.Errorf("content negotiation failed: unsupported media type '%s'", serializerInfo.MediaType)
-			utilruntime.HandleError(err)
-			responsewriters.ErrorNegotiated(
-				err,
-				serializer,
-				schema.GroupVersion{},
-				w,
-				r,
-			)
-			return
 		}
 
 		writeResponse(obj, serializer, targetGV, restrictions, w, r)

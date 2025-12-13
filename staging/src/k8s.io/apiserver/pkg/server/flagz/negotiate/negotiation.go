@@ -25,11 +25,15 @@ import (
 type FlagzEndpointRestrictions struct{}
 
 // AllowsMediaTypeTransform checks if the provided GVK is supported for structured z-page responses.
+// Only JSON and YAML are supported for structured responses.
 func (FlagzEndpointRestrictions) AllowsMediaTypeTransform(mimeType string, mimeSubType string, gvk *schema.GroupVersionKind) bool {
 	if mimeType == "text" && mimeSubType == "plain" {
 		return gvk == nil
 	}
-	return isStructured(gvk)
+	if mimeType == "application" && (mimeSubType == "json" || mimeSubType == "yaml") {
+		return isStructured(gvk)
+	}
+	return false
 }
 
 func (FlagzEndpointRestrictions) AllowsServerVersion(string) bool {
