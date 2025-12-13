@@ -356,19 +356,43 @@ func smartLabelFor(field string) string {
 		return field
 	}
 
-	commonAcronyms := []string{"API", "URL", "UID", "OSB", "GUID"}
+	commonAcronyms := []string{"API", "URL", "UID", "OSB", "GUID", "PDB"}
 	parts := camelcase.Split(field)
-	result := make([]string, 0, len(parts))
-	for _, part := range parts {
+
+	mergedParts := make([]string, 0, len(parts))
+	for i := 0; i < len(parts); i++ {
+		part := parts[i]
+		if i < len(parts)-1 {
+			nextPart := parts[i+1]
+			// Merge if current part is 2+ uppercase letters and next starts with uppercase
+			allUpper := true
+			for _, r := range part {
+				if unicode.IsLetter(r) && !unicode.IsUpper(r) {
+					allUpper = false
+					break
+				}
+			}
+			if len(part) >= 2 && allUpper && len(nextPart) > 0 && unicode.IsUpper(rune(nextPart[0])) {
+				mergedParts = append(mergedParts, part+nextPart)
+				i++
+				continue
+			}
+		}
+		mergedParts = append(mergedParts, part)
+	}
+
+	result := make([]string, 0, len(mergedParts))
+	for _, part := range mergedParts {
 		if part == "_" {
 			continue
 		}
 
-		if slice.Contains[string](commonAcronyms, strings.ToUpper(part), nil) {
+		if slice.Contains(commonAcronyms, strings.ToUpper(part), nil) {
 			part = strings.ToUpper(part)
-		} else {
+		} else if strings.ToLower(part) == part {
 			part = cases.Title(language.English).String(part)
 		}
+
 		result = append(result, part)
 	}
 
