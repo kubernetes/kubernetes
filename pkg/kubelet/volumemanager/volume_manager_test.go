@@ -487,6 +487,11 @@ func (p *fakePodStateProvider) ShouldPodContainersBeTerminating(uid kubetypes.UI
 	return ok
 }
 
+func (p *fakePodStateProvider) IsPodForMirrorPodTerminatingByFullName(podFullname string) bool {
+	// this does not impact existing tests
+	return false
+}
+
 func newTestVolumeManager(t *testing.T, tmpDir string, podManager kubepod.Manager, kubeClient clientset.Interface, node *v1.Node) VolumeManager {
 	attachablePlug := &volumetest.FakeVolumePlugin{
 		PluginName: "fake",
