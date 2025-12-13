@@ -26,6 +26,12 @@ import (
 	"github.com/Microsoft/hnslib/hcn"
 )
 
+const (
+	DefaultRootEndpointName = "RootEndpointName"
+	DefaultRootEndpointID   = "RootEndpointID"
+	DefaultRootEndpointIP   = "10.0.0.1"
+)
+
 var (
 	epIdCounter     int
 	lbIdCounter     int
@@ -34,8 +40,13 @@ var (
 )
 
 type HcnMock struct {
-	supportedFeatures hcn.SupportedFeatures
-	network           *hcn.HostComputeNetwork
+	supportedFeatures   hcn.SupportedFeatures
+	network             *hcn.HostComputeNetwork
+	ShouldFailCreateLB  bool   // If this flag is set, the CreateLB call will fail
+	ShouldFailUpdateLB  bool   // If this flag is set, the UpdateLB call will fail
+	UnsupportedUpdateLB bool   // If this flag is set, the UpdateLB call will be unsupported
+	CreateLBErrorStr    string // The error string to return when CreateLB fails
+	UpdateLBErrorStr    string // The error string to return when UpdateLB fails
 }
 
 func (hcnObj HcnMock) generateEndpointGuid() (endpointId string, endpointName string) {
@@ -122,6 +133,18 @@ func (hcnObj HcnMock) GetEndpointByID(endpointId string) (*hcn.HostComputeEndpoi
 }
 
 func (hcnObj HcnMock) GetEndpointByName(endpointName string) (*hcn.HostComputeEndpoint, error) {
+	if endpointName == DefaultRootEndpointName {
+		return &hcn.HostComputeEndpoint{
+			Id:   DefaultRootEndpointID,
+			Name: DefaultRootEndpointName,
+			IpConfigurations: []hcn.IpConfig{
+				{
+					IpAddress:    DefaultRootEndpointIP,
+					PrefixLength: 24,
+				},
+			},
+		}, nil
+	}
 	if ep, ok := endpointMap[endpointName]; ok {
 		return ep, nil
 	}
@@ -176,6 +199,9 @@ func (hcnObj HcnMock) GetLoadBalancerByID(loadBalancerId string) (*hcn.HostCompu
 }
 
 func (hcnObj HcnMock) CreateLoadBalancer(loadBalancer *hcn.HostComputeLoadBalancer) (*hcn.HostComputeLoadBalancer, error) {
+	if hcnObj.ShouldFailCreateLB {
+		return nil, errors.New(hcnObj.CreateLBErrorStr)
+	}
 	if _, ok := loadbalancerMap[loadBalancer.Id]; ok {
 		return nil, fmt.Errorf("LoadBalancer id %s Already Present", loadBalancer.Id)
 	}
@@ -185,6 +211,12 @@ func (hcnObj HcnMock) CreateLoadBalancer(loadBalancer *hcn.HostComputeLoadBalanc
 }
 
 func (hcnObj HcnMock) UpdateLoadBalancer(loadBalancer *hcn.HostComputeLoadBalancer, hnsLbID string) (*hcn.HostComputeLoadBalancer, error) {
+	if hcnObj.ShouldFailUpdateLB {
+		return nil, errors.New(hcnObj.UpdateLBErrorStr)
+	}
+	if hcnObj.UnsupportedUpdateLB {
+		return nil, fmt.Errorf("LoadBalancer id %s Not Present", loadBalancer.Id)
+	}
 	if _, ok := loadbalancerMap[hnsLbID]; !ok {
 		return nil, fmt.Errorf("LoadBalancer id %s Not Present", loadBalancer.Id)
 	}
@@ -231,4 +263,8 @@ func (hcnObj HcnMock) RemoteSubnetSupported() error {
 	}
 
 	return errors.New("remote Subnet Not Supported")
+}
+
+func (hcnObj HcnMock) IsNotImplemented(err error) bool {
+	return hcnObj.UnsupportedUpdateLB
 }
