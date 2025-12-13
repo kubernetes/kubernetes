@@ -40,6 +40,22 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *runtime.Scheme) error {
+	// type LimitRange
+	scheme.AddValidationFunc((*corev1.LimitRange)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_LimitRange(ctx, op, nil /* fldPath */, obj.(*corev1.LimitRange), safe.Cast[*corev1.LimitRange](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
+	// type LimitRangeList
+	scheme.AddValidationFunc((*corev1.LimitRangeList)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_LimitRangeList(ctx, op, nil /* fldPath */, obj.(*corev1.LimitRangeList), safe.Cast[*corev1.LimitRangeList](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
 	// type ReplicationController
 	scheme.AddValidationFunc((*corev1.ReplicationController)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
 		switch op.Request.SubresourcePath() {
@@ -57,6 +73,57 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
 	return nil
+}
+
+// Validate_LimitRange validates an instance of LimitRange according
+// to declarative validation rules in the API schema.
+func Validate_LimitRange(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *corev1.LimitRange) (errs field.ErrorList) {
+	// field corev1.LimitRange.TypeMeta has no validation
+
+	// field corev1.LimitRange.ObjectMeta
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *metav1.ObjectMeta, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			func() { // cohort name
+				earlyReturn := false
+				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "name", func(o *metav1.ObjectMeta) *string { return &o.Name }, validate.DirectEqualPtr, validate.OptionalValue); len(e) != 0 {
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
+				errs = append(errs, validate.Subfield(ctx, op, fldPath, obj, oldObj, "name", func(o *metav1.ObjectMeta) *string { return &o.Name }, validate.DirectEqualPtr, validate.LongName)...)
+			}()
+			return
+		}(fldPath.Child("metadata"), &obj.ObjectMeta, safe.Field(oldObj, func(oldObj *corev1.LimitRange) *metav1.ObjectMeta { return &oldObj.ObjectMeta }), oldObj != nil)...)
+
+	// field corev1.LimitRange.Spec has no validation
+	return errs
+}
+
+// Validate_LimitRangeList validates an instance of LimitRangeList according
+// to declarative validation rules in the API schema.
+func Validate_LimitRangeList(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *corev1.LimitRangeList) (errs field.ErrorList) {
+	// field corev1.LimitRangeList.TypeMeta has no validation
+	// field corev1.LimitRangeList.ListMeta has no validation
+
+	// field corev1.LimitRangeList.Items
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []corev1.LimitRange, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// iterate the list and call the type's validation function
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_LimitRange)...)
+			return
+		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *corev1.LimitRangeList) []corev1.LimitRange { return oldObj.Items }), oldObj != nil)...)
+
+	return errs
 }
 
 // Validate_ReplicationController validates an instance of ReplicationController according
