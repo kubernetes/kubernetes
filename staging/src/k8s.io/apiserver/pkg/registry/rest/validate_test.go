@@ -125,7 +125,7 @@ func TestValidateDeclaratively(t *testing.T) {
 	scheme.AddKnownTypes(internalGV, &Pod{})
 	scheme.AddKnownTypes(v1GV, &v1.Pod{})
 
-	scheme.AddValidationFunc(&v1.Pod{}, func(ctx context.Context, op operation.Operation, object, oldObject interface{}) field.ErrorList {
+	scheme.AddValidationFunc(&v1.Pod{}, func(ctx context.Context, op operation.Operation, object, oldObject any) field.ErrorList {
 		results := field.ErrorList{}
 		if op.HasOption("option1") {
 			results = append(results, invalidIfOptionErr)
@@ -735,10 +735,14 @@ func equalErrorLists(a, b field.ErrorList) bool {
 }
 
 func TestMetricIdentifier(t *testing.T) {
+	scheme := runtime.NewScheme()
+	scheme.AddKnownTypes(schema.GroupVersion{Version: "v1"}, &v1.Pod{})
+
 	testCases := []struct {
 		name        string
 		opType      operation.Type
 		obj         runtime.Object
+		scheme      *runtime.Scheme
 		subresource string
 		expected    string
 		expectErr   bool
@@ -747,6 +751,7 @@ func TestMetricIdentifier(t *testing.T) {
 			name:        "with subresource",
 			opType:      operation.Create,
 			obj:         &v1.Pod{TypeMeta: metav1.TypeMeta{Kind: "Pod"}},
+			scheme:      scheme,
 			subresource: "status",
 			expected:    "pod_status_create",
 			expectErr:   false,
@@ -755,6 +760,7 @@ func TestMetricIdentifier(t *testing.T) {
 			name:      "without subresource",
 			opType:    operation.Update,
 			obj:       &v1.Pod{TypeMeta: metav1.TypeMeta{Kind: "Pod"}},
+			scheme:    scheme,
 			expected:  "pod_update",
 			expectErr: false,
 		},
@@ -762,6 +768,7 @@ func TestMetricIdentifier(t *testing.T) {
 			name:      "unknown operation",
 			opType:    3, // not a valid operation.Type
 			obj:       &v1.Pod{TypeMeta: metav1.TypeMeta{Kind: "Pod"}},
+			scheme:    scheme,
 			expected:  "pod_unknown_op",
 			expectErr: true,
 		},
@@ -770,6 +777,29 @@ func TestMetricIdentifier(t *testing.T) {
 			opType:    operation.Create,
 			obj:       nil,
 			expected:  "unknown_resource_create",
+			expectErr: true,
+		},
+		{
+			name:      "known type without kind",
+			opType:    operation.Update,
+			obj:       &v1.Pod{},
+			scheme:    scheme,
+			expected:  "pod_update",
+			expectErr: false,
+		},
+		{
+			name:      "unknown type with scheme",
+			opType:    operation.Create,
+			obj:       &runtime.Unknown{}, // Not registered in the scheme
+			scheme:    scheme,
+			expected:  "unknown_resource_create",
+			expectErr: true,
+		},
+		{
+			name:      "unknown type without scheme",
+			opType:    operation.Type(4),
+			obj:       &runtime.Unknown{}, // Not registered in the scheme
+			expected:  "unknown_resource_unknown_op",
 			expectErr: true,
 		},
 	}
@@ -783,7 +813,7 @@ func TestMetricIdentifier(t *testing.T) {
 				})
 			}
 
-			result, err := metricIdentifier(ctx, tc.obj, tc.opType)
+			result, err := metricIdentifier(ctx, tc.scheme, tc.obj, tc.opType)
 			if (err != nil) != tc.expectErr {
 				t.Errorf("expected error: %v, got: %v", tc.expectErr, err)
 			}
