@@ -18,7 +18,9 @@ package describe
 
 import (
 	"fmt"
+
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 )
 
@@ -37,11 +39,11 @@ const (
 // DescriberFunc gives a way to display the specified RESTMapping type
 type DescriberFunc func(restClientGetter genericclioptions.RESTClientGetter, mapping *meta.RESTMapping) (ResourceDescriber, error)
 
-// ResourceDescriber generates output for the named resource or an error
-// if the output could not be generated. Implementers typically
-// abstract the retrieval of the named object from a remote server.
+// ResourceDescriber generates output for the provided resource or an error
+// if the output could not be generated. Implementers typically describe provided
+// object and retrieve secondary data from a remote server.
 type ResourceDescriber interface {
-	Describe(namespace, name string, describerSettings DescriberSettings) (output string, err error)
+	Describe(object runtime.Object, describerSettings DescriberSettings) (output string, err error)
 }
 
 // DescriberSettings holds display configuration for each object
