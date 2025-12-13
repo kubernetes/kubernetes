@@ -47,6 +47,7 @@ import (
 	podgcconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/podgc/config/v1alpha1"
 	replicasetconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/replicaset/config/v1alpha1"
 	replicationconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/replication/config/v1alpha1"
+	resourceclaimconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/resourceclaim/config/v1alpha1"
 	resourcequotaconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/resourcequota/config/v1alpha1"
 	serviceaccountconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/serviceaccount/config/v1alpha1"
 	statefulsetconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/statefulset/config/v1alpha1"
@@ -228,6 +229,9 @@ func autoConvert_v1alpha1_KubeControllerManagerConfiguration_To_config_KubeContr
 	if err := devicetaintevictionconfigv1alpha1.Convert_v1alpha1_DeviceTaintEvictionControllerConfiguration_To_config_DeviceTaintEvictionControllerConfiguration(&in.DeviceTaintEvictionController, &out.DeviceTaintEvictionController, s); err != nil {
 		return err
 	}
+	if err := resourceclaimconfigv1alpha1.Convert_v1alpha1_ResourceClaimControllerConfiguration_To_config_ResourceClaimControllerConfiguration(&in.ResourceClaimController, &out.ResourceClaimController, s); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -325,6 +329,9 @@ func autoConvert_config_KubeControllerManagerConfiguration_To_v1alpha1_KubeContr
 		return err
 	}
 	if err := validatingadmissionpolicystatusconfigv1alpha1.Convert_config_ValidatingAdmissionPolicyStatusControllerConfiguration_To_v1alpha1_ValidatingAdmissionPolicyStatusControllerConfiguration(&in.ValidatingAdmissionPolicyStatusController, &out.ValidatingAdmissionPolicyStatusController, s); err != nil {
+		return err
+	}
+	if err := resourceclaimconfigv1alpha1.Convert_config_ResourceClaimControllerConfiguration_To_v1alpha1_ResourceClaimControllerConfiguration(&in.ResourceClaimController, &out.ResourceClaimController, s); err != nil {
 		return err
 	}
 	return nil
