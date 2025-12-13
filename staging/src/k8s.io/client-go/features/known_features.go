@@ -31,6 +31,13 @@ import (
 // of code conflicts because changes are more likely to be scattered
 // across the file.
 const (
+	// owner: @yt2985
+	// alpha: 1.35
+	//
+	// If enabled, allows clients to gracefully handle Certificate Authority (CA)
+	// rotations without dropping connections or requiring a restart.
+	ClientsAllowCARotation Feature = "ClientsAllowCARotation"
+
 	// owner: @benluddy
 	// kep: https://kep.k8s.io/4222
 	// alpha: 1.32
@@ -82,6 +89,9 @@ const (
 // After registering with the binary, the features are, by default, controllable using environment variables.
 // For more details, please see envVarFeatureGates implementation.
 var defaultVersionedKubernetesFeatureGates = map[Feature]VersionedSpecs{
+	ClientsAllowCARotation: {
+		{Version: version.MustParse("1.35"), Default: false, PreRelease: Alpha},
+	},
 	ClientsAllowCBOR: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: Alpha},
 	},
