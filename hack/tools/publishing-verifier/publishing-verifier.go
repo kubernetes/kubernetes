@@ -177,7 +177,7 @@ func verifyPublishingBotRules() error {
 
 		// if this no longer exists in master
 		if _, ok := gomodDependencies[rule.DestinationRepository]; !ok {
-			// make sure we dont include a rule to publish it from master
+			// make sure we don't include a rule to publish it from master
 			for _, branch := range rule.Branches {
 				if branch.Name == "master" {
 					err := fmt.Errorf("cannot find master branch for destination `%s`", rule.DestinationRepository)
