@@ -36,11 +36,13 @@ func TestAssert(t *testing.T) {
 				}).WithTimeout(time.Second).Should(gomega.Equal(1))
 			},
 			expectDuration: time.Second,
-			expectError: `Timed out after x.y s.
-Expected
-    <int>: 0
-to equal
-    <int>: 1`,
+			expectTrace: `(FATAL) FATAL ERROR: <klog header>:
+	Timed out after x.y s.
+	Expected
+	    <int>: 0
+	to equal
+	    <int>: 1
+`,
 		},
 		"eventually-final": {
 			cb: func(tCtx TContext) {
@@ -50,8 +52,10 @@ to equal
 				}).WithTimeout(time.Second).Should(gomega.Equal(1.0))
 			},
 			expectDuration: 0,
-			expectError: `Told to stop trying after x.y s.
-final error`,
+			expectTrace: `(FATAL) FATAL ERROR: <klog header>:
+	Told to stop trying after x.y s.
+	final error
+`,
 		},
 		"eventually-error": {
 			cb: func(tCtx TContext) {
@@ -61,15 +65,17 @@ final error`,
 				}).WithTimeout(time.Second).Should(gomega.Equal(1.0))
 			},
 			expectDuration: time.Second,
-			expectError: `Timed out after x.y s.
-The function passed to Eventually returned the following error:
-    <*errors.joinError | 0xXXXX>: 
-    some error
-    {
-        errs: [
-            <*errors.errorString | 0xXXXX>{s: "some error"},
-        ],
-    }`,
+			expectTrace: `(FATAL) FATAL ERROR: <klog header>:
+	Timed out after x.y s.
+	The function passed to Eventually returned the following error:
+	    <*errors.joinError | 0xXXXX>: 
+	    some error
+	    {
+	        errs: [
+	            <*errors.errorString | 0xXXXX>{s: "some error"},
+	        ],
+	    }
+`,
 		},
 		"eventually-success": {
 			cb: func(tCtx TContext) {
@@ -78,8 +84,7 @@ The function passed to Eventually returned the following error:
 				}).WithTimeout(time.Second).Should(gomega.Equal(1.0))
 			},
 			expectDuration: 0,
-			expectNoFail:   true,
-			expectError:    ``,
+			expectTrace:    ``,
 		},
 		"eventually-retry": {
 			cb: func(tCtx TContext) {
@@ -89,8 +94,10 @@ The function passed to Eventually returned the following error:
 				}).WithTimeout(time.Second).Should(gomega.Equal(1.0))
 			},
 			expectDuration: time.Second,
-			expectError: `Timed out after x.y s.
-told to try again after 1ms`,
+			expectTrace: `(FATAL) FATAL ERROR: <klog header>:
+	Timed out after x.y s.
+	told to try again after 1ms
+`,
 		},
 		"consistently-timeout": {
 			cb: func(tCtx TContext) {
@@ -101,11 +108,13 @@ told to try again after 1ms`,
 				}).WithTimeout(time.Second).Should(gomega.Equal(1.0))
 			},
 			expectDuration: 0,
-			expectError: `Failed after x.y s.
-Expected
-    <float64>: 0
-to equal
-    <float64>: 1`,
+			expectTrace: `(FATAL) FATAL ERROR: <klog header>:
+	Failed after x.y s.
+	Expected
+	    <float64>: 0
+	to equal
+	    <float64>: 1
+`,
 		},
 		"consistently-final": {
 			cb: func(tCtx TContext) {
@@ -116,8 +125,10 @@ to equal
 				}).WithTimeout(time.Second).Should(gomega.Equal(1.0))
 			},
 			expectDuration: 0,
-			expectError: `Told to stop trying after x.y s.
-final error`,
+			expectTrace: `(FATAL) FATAL ERROR: <klog header>:
+	Told to stop trying after x.y s.
+	final error
+`,
 		},
 		"consistently-error": {
 			cb: func(tCtx TContext) {
@@ -127,15 +138,17 @@ final error`,
 				}).WithTimeout(time.Second).Should(gomega.Equal(1.0))
 			},
 			expectDuration: 0,
-			expectError: `Failed after x.y s.
-The function passed to Consistently returned the following error:
-    <*errors.joinError | 0xXXXX>: 
-    some error
-    {
-        errs: [
-            <*errors.errorString | 0xXXXX>{s: "some error"},
-        ],
-    }`,
+			expectTrace: `(FATAL) FATAL ERROR: <klog header>:
+	Failed after x.y s.
+	The function passed to Consistently returned the following error:
+	    <*errors.joinError | 0xXXXX>: 
+	    some error
+	    {
+	        errs: [
+	            <*errors.errorString | 0xXXXX>{s: "some error"},
+	        ],
+	    }
+`,
 		},
 		"consistently-success": {
 			cb: func(tCtx TContext) {
@@ -144,8 +157,7 @@ The function passed to Consistently returned the following error:
 				}).WithTimeout(time.Second).Should(gomega.Equal(1.0))
 			},
 			expectDuration: time.Second,
-			expectNoFail:   true,
-			expectError:    ``,
+			expectTrace:    ``,
 		},
 		"consistently-retry": {
 			cb: func(tCtx TContext) {
@@ -155,88 +167,120 @@ The function passed to Consistently returned the following error:
 				}).WithTimeout(time.Second).Should(gomega.Equal(1.0))
 			},
 			expectDuration: time.Second,
-			expectError: `Timed out while waiting on TryAgainAfter after x.y s.
-told to try again after 1ms: intermittent error`,
+			expectTrace: `(FATAL) FATAL ERROR: <klog header>:
+	Timed out while waiting on TryAgainAfter after x.y s.
+	told to try again after 1ms: intermittent error
+`,
 		},
-
 		"expect-equal": {
 			cb: func(tCtx TContext) {
 				tCtx.Expect(1).To(gomega.Equal(42))
+				tCtx.Log("not reached")
 			},
-			expectError: `Expected
-    <int>: 1
-to equal
-    <int>: 42`,
+			expectTrace: `(FATAL) FATAL ERROR: <klog header>:
+	Expected
+	    <int>: 1
+	to equal
+	    <int>: 42
+`,
 		},
-
+		"require-equal": {
+			cb: func(tCtx TContext) {
+				tCtx.Require(1).To(gomega.Equal(42))
+				tCtx.Log("not reached")
+			},
+			expectTrace: `(FATAL) FATAL ERROR: <klog header>:
+	Expected
+	    <int>: 1
+	to equal
+	    <int>: 42
+`,
+		},
+		"assert-equal": {
+			cb: func(tCtx TContext) {
+				tCtx.Assert(1).To(gomega.Equal(42))
+				tCtx.Log("reached")
+			},
+			expectTrace: `(ERROR) ERROR: <klog header>:
+	Expected
+	    <int>: 1
+	to equal
+	    <int>: 42
+(LOG) <klog header>: reached
+`,
+		},
 		"expect-no-error-success": {
 			cb: func(tCtx TContext) {
 				tCtx.ExpectNoError(nil)
 			},
-			expectNoFail: true,
 		},
 		"expect-no-error-normal-error": {
 
 			cb: func(tCtx TContext) {
 				tCtx.ExpectNoError(errors.New("fake error"))
 			},
-			expectError: `Unexpected error: fake error`,
-			expectLog: `<klog header>: Unexpected error:
-    <*errors.errorString | 0xXXXX>: 
-    fake error
-    {s: "fake error"}
+			expectTrace: `(LOG) <klog header>: Unexpected error:
+	<*errors.errorString | 0xXXXX>: 
+	fake error
+	{s: fake error}
+(FATAL) FATAL ERROR: <klog header>:
+	Unexpected error: fake error
 `,
-		},
-		"expect-no-error-normal-error-no-logging": {
-			suppressUnexpectedErrorLogging: true,
-			cb: func(tCtx TContext) {
-				tCtx.ExpectNoError(errors.New("fake error"))
-			},
-			expectError: `Unexpected error: fake error`,
+			// {s: fake error} depends on indentation (https://github.com/onsi/gomega/issues/886).
 		},
 		"expect-no-error-failure": {
 			cb: func(tCtx TContext) {
 				tCtx.ExpectNoError(fmt.Errorf("doing something: %w", FailureError{Msg: "fake error"}))
 			},
-			expectError: `doing something: fake error`,
+			expectTrace: `(FATAL) FATAL ERROR: <klog header>:
+	doing something: fake error
+`,
 		},
 		"expect-no-error-explanation-string": {
 			cb: func(tCtx TContext) {
 				tCtx.ExpectNoError(fmt.Errorf("doing something: %w", FailureError{Msg: "fake error"}), "testing error checking")
 			},
-			expectError: `testing error checking: doing something: fake error`,
+			expectTrace: `(FATAL) FATAL ERROR: <klog header>:
+	testing error checking: doing something: fake error
+`,
 		},
 		"expect-no-error-explanation-printf": {
 			cb: func(tCtx TContext) {
 				tCtx.ExpectNoError(fmt.Errorf("doing something: %w", FailureError{Msg: "fake error"}), "testing %s %d checking", "error", 42)
 			},
-			expectError: `testing error 42 checking: doing something: fake error`,
+			expectTrace: `(FATAL) FATAL ERROR: <klog header>:
+	testing error 42 checking: doing something: fake error
+`,
 		},
 		"expect-no-error-explanation-callback": {
 			cb: func(tCtx TContext) {
 				tCtx.ExpectNoError(fmt.Errorf("doing something: %w", FailureError{Msg: "fake error"}), func() string { return "testing error checking" })
 			},
-			expectError: `testing error checking: doing something: fake error`,
+			expectTrace: `(FATAL) FATAL ERROR: <klog header>:
+	testing error checking: doing something: fake error
+`,
 		},
 		"expect-no-error-backtrace": {
 			cb: func(tCtx TContext) {
 				tCtx.ExpectNoError(fmt.Errorf("doing something: %w", FailureError{Msg: "fake error", FullStackTrace: "abc\nxyz"}))
 			},
-			expectError: `doing something: fake error`,
-			expectLog: `<klog header>: Failed at:
-    abc
-    xyz
+			expectTrace: `(LOG) <klog header>: Failed at:
+	abc
+	xyz
+(FATAL) FATAL ERROR: <klog header>:
+	doing something: fake error
 `,
 		},
 		"expect-no-error-backtrace-and-explanation": {
 			cb: func(tCtx TContext) {
 				tCtx.ExpectNoError(fmt.Errorf("doing something: %w", FailureError{Msg: "fake error", FullStackTrace: "abc\nxyz"}), "testing error checking")
 			},
-			expectError: `testing error checking: doing something: fake error`,
-			expectLog: `<klog header>: testing error checking
-<klog header>: Failed at:
-    abc
-    xyz
+			expectTrace: `(LOG) <klog header>: testing error checking
+(LOG) <klog header>: Failed at:
+	abc
+	xyz
+(FATAL) FATAL ERROR: <klog header>:
+	testing error checking: doing something: fake error
 `,
 		},
 
@@ -244,14 +288,29 @@ to equal
 			cb: func(tCtx TContext) {
 				tCtx.Log("Log", "a", "b", 42)
 				tCtx.Logf("Logf %s %s %d", "a", "b", 42)
+				tCtx.Log("multi\nline")
+				tCtx.Logf("multi\n%s", "line")
 				tCtx.Error("Error", "a", "b", 42)
 				tCtx.Errorf("Errorf %s %s %d", "a", "b", 42)
+				tCtx.Logger().Info("Hello", "what", "world")
+				tCtx.Logger().Info("Hello", "msg", "multi\nline")
 			},
-			expectLog: `<klog header>: Log a b 42
-<klog header>: Logf a b 42
+			expectTrace: `(LOG) <klog header>: Log a b 42
+(LOG) <klog header>: Logf a b 42
+(LOG) <klog header>: multi
+	line
+(LOG) <klog header>: multi
+	line
+(ERROR) ERROR: <klog header>:
+	Error a b 42
+(ERROR) ERROR: <klog header>:
+	Errorf a b 42
+(LOG) <klog header>: Hello what="world"
+(LOG) <klog header>: Hello msg=<
+	multi
+	line
+ >
 `,
-			expectError: `Error a b 42
-Errorf a b 42`,
 		},
 		"fatal": {
 			cb: func(tCtx TContext) {
@@ -259,7 +318,9 @@ Errorf a b 42`,
 				// not reached
 				tCtx.Log("Log")
 			},
-			expectError: `Error a b 42`,
+			expectTrace: `(FATAL) FATAL ERROR: <klog header>:
+	Error a b 42
+`,
 		},
 		"fatalf": {
 			cb: func(tCtx TContext) {
@@ -267,7 +328,9 @@ Errorf a b 42`,
 				// not reached
 				tCtx.Log("Log")
 			},
-			expectError: `Error a b 42`,
+			expectTrace: `(FATAL) FATAL ERROR: <klog header>:
+	Error a b 42
+`,
 		},
 	} {
 		tc := tc

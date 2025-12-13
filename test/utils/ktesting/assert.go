@@ -20,10 +20,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/format"
+	gtypes "github.com/onsi/gomega/types"
 )
 
 // FailureError is an error where the error string is meant to be passed to
@@ -57,52 +57,78 @@ func (f FailureError) Is(target error) bool {
 //	}
 var ErrFailure error = FailureError{}
 
-func expect(tCtx TContext, actual interface{}, extra ...interface{}) gomega.Assertion {
-	tCtx.Helper()
-	return gomega.NewWithT(tCtx).Expect(actual, extra...)
+func gomegaAssertion(tc *TC, fatal bool, actual interface{}, extra ...interface{}) gomega.Assertion {
+	testingT := gtypes.GomegaTestingT(tc)
+	if !fatal {
+		testingT = assertTestingT{tc}
+	}
+	return gomega.NewWithT(testingT).Expect(actual, extra...)
 }
 
-// suppressUnexpectedErrorLoggingKeyType is the type for a key which, if set to true in a context,
-// suppresses logging of an unexpected error. The context returned by WithError uses this because
-// the caller catches all failures in an error and then decides about logging.
-type suppressUnexpectedErrorLoggingKeyType struct{}
+// assertTestingT implements Fatalf using TContext.Errorf, i.e. testing continues
+// after a failed assertion.
+type assertTestingT struct {
+	tc *TC
+}
 
-var suppressUnexpectedErrorLoggingKey suppressUnexpectedErrorLoggingKeyType
+func (a assertTestingT) Helper()                           { a.tc.Helper() }
+func (a assertTestingT) Fatalf(format string, args ...any) { a.tc.Errorf(format, args...) }
 
-func expectNoError(tCtx TContext, err error, explain ...interface{}) {
+// ExpectNoError asserts that no error has occurred and fails the test if it does.
+//
+// As in [gomega], the optional explanation can be:
+//   - a [fmt.Sprintf] format string plus its argument
+//   - a function returning a string, which will be called
+//     lazy to construct the explanation if needed
+//
+// If an explanation is provided, then it replaces the default "Unexpected
+// error" in the failure message. It's combined with additional details by
+// adding a colon at the end, as when wrapping an error. Therefore it should
+// not end with a punctuation mark or line break.
+//
+// Using ExpectNoError instead of the corresponding Gomega or testify
+// assertions has the advantage that the failure message is short (good for
+// aggregation in https://go.k8s.io/triage) with more details captured in the
+// test log output (good when investigating one particular failure).
+//
+// Helper packages should return errors that are derived from [FailureError].
+// The test code then is forced to check for that error by the normal
+// linter and should provide additional context for the failure, just
+// as it would when printing or wrapping an error:
+//
+//	tCtx.ExpectNoError(somehelper.CreateSomething(tCtx, ...), "creating the first foobar")
+//	tCtx.ExpectNoError(somehelper.CreateSomething(tCtx, ...), "creating the second foobar")
+func (tc *TC) ExpectNoError(err error, explain ...interface{}) {
 	if err == nil {
 		return
 	}
 
-	tCtx.Helper()
-	value, ok := tCtx.Value(suppressUnexpectedErrorLoggingKey).(bool)
-	suppressLogging := ok && value
-
+	tc.Helper()
 	description := buildDescription(explain...)
 
 	if errors.Is(err, ErrFailure) {
 		var failure FailureError
-		if !suppressLogging && errors.As(err, &failure) {
+		if tc.capture == nil && errors.As(err, &failure) {
 			if backtrace := failure.Backtrace(); backtrace != "" {
 				if description != "" {
-					tCtx.Log(description)
+					tc.Log(description)
 				}
-				tCtx.Logf("Failed at:\n    %s", strings.ReplaceAll(backtrace, "\n", "\n    "))
+				tc.Logf("Failed at:\n%s", backtrace)
 			}
 		}
 		if description != "" {
-			tCtx.Fatalf("%s: %s", description, err.Error())
+			tc.Fatalf("%s: %s", description, err.Error())
 		}
-		tCtx.Fatal(err.Error())
+		tc.Fatal(err.Error())
 	}
 
 	if description == "" {
 		description = "Unexpected error"
 	}
-	if !suppressLogging {
-		tCtx.Logf("%s:\n%s", description, format.Object(err, 1))
+	if tc.capture == nil {
+		tc.Logf("%s:\n%s", description, format.Object(err, 0))
 	}
-	tCtx.Fatalf("%s: %v", description, err.Error())
+	tc.Fatalf("%s: %v", description, err.Error())
 }
 
 func buildDescription(explain ...interface{}) string {
