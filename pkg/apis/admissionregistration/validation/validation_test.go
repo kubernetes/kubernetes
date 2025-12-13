@@ -4233,6 +4233,57 @@ func TestValidateMutatingAdmissionPolicy(t *testing.T) {
 		config        *admissionregistration.MutatingAdmissionPolicy
 		expectedError string
 	}{{
+		name: "check initial evaluation on match condition and mutation with variables",
+		config: &admissionregistration.MutatingAdmissionPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicySpec{
+				MatchConstraints: &admissionregistration.MatchResources{
+					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
+						RuleWithOperations: admissionregistration.RuleWithOperations{
+							Operations: []admissionregistration.OperationType{"CREATE", "UPDATE"},
+							Rule: admissionregistration.Rule{
+								APIGroups:   []string{"a"},
+								APIVersions: []string{"a"},
+								Resources:   []string{"a"},
+							},
+						},
+					}},
+					NamespaceSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					ObjectSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					MatchPolicy: func() *admissionregistration.MatchPolicyType {
+						r := admissionregistration.MatchPolicyType("Exact")
+						return &r
+					}(),
+				},
+				FailurePolicy: func() *admissionregistration.FailurePolicyType {
+					r := admissionregistration.FailurePolicyType("Fail")
+					return &r
+				}(),
+				MatchConditions: []admissionregistration.MatchCondition{{
+					Name:       "always-matched",
+					Expression: "true",
+				}},
+				Variables: []admissionregistration.Variable{{
+					Name:       "maxReplicas",
+					Expression: "int(5)",
+				}},
+				ReinvocationPolicy: admissionregistration.IfNeededReinvocationPolicy,
+				Mutations: []admissionregistration.Mutation{{
+					ApplyConfiguration: &admissionregistration.ApplyConfiguration{
+						Expression: "Object{ spec: Object.spec{ replicas: variables.maxReplicas } }",
+					},
+					PatchType: admissionregistration.PatchTypeApplyConfiguration,
+				}},
+			},
+		},
+		expectedError: "",
+	}, {
 		name: "metadata.name validation",
 		config: &admissionregistration.MutatingAdmissionPolicy{
 			ObjectMeta: metav1.ObjectMeta{
