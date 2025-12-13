@@ -18,6 +18,7 @@ package rollout
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -54,6 +55,10 @@ type RestartOptions struct {
 	genericiooptions.IOStreams
 
 	fieldManager string
+
+	All               bool
+	AllNamespaces     bool
+	ResourceTypesFlag string
 }
 
 var (
@@ -71,6 +76,15 @@ var (
 
 		# Restart a daemon set
 		kubectl rollout restart daemonset/abc
+
+		# Restart all rollout-capable resources (Deployment, DaemonSet, StatefulSet) in the current namespace
+		kubectl rollout restart --all
+	
+		# Restart all rollout-capable resources across all namespaces
+		kubectl rollout restart --all --all-namespaces
+	
+		# Restart all deployments across all namespaces
+		kubectl rollout restart deployment --all-namespaces
 
 		# Restart deployments with the app=nginx label
 		kubectl rollout restart deployment --selector=app=nginx`)
@@ -108,6 +122,8 @@ func NewCmdRolloutRestart(f cmdutil.Factory, streams genericiooptions.IOStreams)
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.fieldManager, "kubectl-rollout")
 	cmdutil.AddLabelSelectorFlagVar(cmd, &o.LabelSelector)
+	cmd.Flags().BoolVar(&o.All, "all", false, "Restart all rollout-capable resources in the current namespace")
+	cmd.Flags().BoolVar(&o.AllNamespaces, "all-namespaces", false, "If present, list the requested resource across all namespaces")
 	o.PrintFlags.AddFlags(cmd)
 	return cmd
 }
@@ -124,6 +140,10 @@ func (o *RestartOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 		return err
 	}
 
+	if o.AllNamespaces {
+		o.Namespace = ""
+	}
+
 	o.ToPrinter = func(operation string) (printers.ResourcePrinter, error) {
 		o.PrintFlags.NamePrintFlags.Operation = operation
 		return o.PrintFlags.ToPrinter()
@@ -135,45 +155,51 @@ func (o *RestartOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 }
 
 func (o *RestartOptions) Validate() error {
-	if len(o.Resources) == 0 && cmdutil.IsFilenameSliceEmpty(o.Filenames, o.Kustomize) {
+	if !o.All && len(o.Resources) == 0 && cmdutil.IsFilenameSliceEmpty(o.Filenames, o.Kustomize) {
 		return fmt.Errorf("required resource not specified")
+	}
+	if o.All && len(o.Resources) > 0 {
+		return fmt.Errorf("`--all` cannot be used with resource arguments (%v)", o.Resources)
+	}
+	if o.All && !cmdutil.IsFilenameSliceEmpty(o.Filenames, o.Kustomize) {
+		return fmt.Errorf("`--all` cannot be used with `-f` or `--filename`")
+	}
+	if o.AllNamespaces && len(o.Namespace) != 0 {
+		return fmt.Errorf("`--all-namespaces` cannot be used with `--namespace`")
 	}
 	return nil
 }
 
+// Supported rollout-capable resource types
+var rolloutCapableResources = []string{"deployment", "daemonset", "statefulset"}
+
 // RunRestart performs the execution of 'rollout restart' sub command
 func (o RestartOptions) RunRestart() error {
-	r := o.Builder().
-		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
-		NamespaceParam(o.Namespace).DefaultNamespace().
-		FilenameParam(o.EnforceNamespace, &o.FilenameOptions).
-		LabelSelectorParam(o.LabelSelector).
-		ResourceTypeOrNameArgs(true, o.Resources...).
-		ContinueOnError().
-		Latest().
-		Flatten().
-		Do()
-	if err := r.Err(); err != nil {
-		return err
+	if len(o.Resources) > 0 || !cmdutil.IsFilenameSliceEmpty(o.Filenames, o.Kustomize) {
+		return o.handleExplicitResources()
 	}
 
+	if o.All {
+		allErrs, resourcesFound, notFoundResources := o.handleAllResources()
+		o.printAllResourcesNotFoundMessage(resourcesFound, notFoundResources)
+
+		if len(allErrs) > 0 {
+			return utilerrors.NewAggregate(allErrs)
+		}
+		return nil
+	}
+
+	return fmt.Errorf("you must specify resources or use --all")
+}
+
+func (o RestartOptions) restartResources(r *resource.Result) error {
 	allErrs := []error{}
 	infos, err := r.Infos()
 	if err != nil {
-		// restore previous command behavior where
-		// an error caused by retrieving infos due to
-		// at least a single broken object did not result
-		// in an immediate return, but rather an overall
-		// aggregation of errors.
 		allErrs = append(allErrs, err)
 	}
 
 	patches := set.CalculatePatches(infos, scheme.DefaultJSONEncoder(), set.PatchFn(o.Restarter))
-
-	if len(patches) == 0 && len(allErrs) == 0 {
-		fmt.Fprintf(o.ErrOut, "No resources found in %s namespace.\n", o.Namespace)
-		return nil
-	}
 
 	for _, patch := range patches {
 		info := patch.Info
@@ -200,7 +226,11 @@ func (o RestartOptions) RunRestart() error {
 			continue
 		}
 
-		info.Refresh(obj, true)
+		err = info.Refresh(obj, true)
+		if err != nil {
+			allErrs = append(allErrs, err)
+			continue
+		}
 		printer, err := o.ToPrinter("restarted")
 		if err != nil {
 			allErrs = append(allErrs, err)
@@ -212,4 +242,119 @@ func (o RestartOptions) RunRestart() error {
 	}
 
 	return utilerrors.NewAggregate(allErrs)
+}
+
+func (o RestartOptions) handleExplicitResources() error {
+	r := o.Builder().
+		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
+		NamespaceParam(o.Namespace).DefaultNamespace().
+		FilenameParam(o.EnforceNamespace, &o.FilenameOptions).
+		LabelSelectorParam(o.LabelSelector).
+		ResourceTypeOrNameArgs(true, o.Resources...).
+		ContinueOnError().
+		Latest().
+		Flatten().
+		Do()
+
+	if err := r.Err(); err != nil {
+		return err
+	}
+
+	infos, err := r.Infos()
+	if err != nil {
+		return err
+	}
+
+	if len(infos) == 0 {
+		o.printNoResourcesFoundMessage()
+		return nil
+	}
+
+	return o.restartResources(r)
+}
+
+func (o RestartOptions) printNoResourcesFoundMessage() {
+	var parts []string
+
+	if len(o.Resources) > 0 {
+		parts = append(parts, fmt.Sprintf("%v", o.Resources))
+	}
+	if o.LabelSelector != "" {
+		parts = append(parts, fmt.Sprintf("label selector: %s", o.LabelSelector))
+	}
+	if !cmdutil.IsFilenameSliceEmpty(o.Filenames, o.Kustomize) {
+		parts = append(parts, "files")
+	}
+
+	var msg string
+	switch len(parts) {
+	case 0:
+		msg = "No resources found matching the given criteria"
+	default:
+		msg = fmt.Sprintf("No resources found matching: %s", strings.Join(parts, ", "))
+	}
+
+	if o.Namespace != "" {
+		msg += fmt.Sprintf(" in namespace %q", o.Namespace)
+	} else {
+		msg += " in the cluster"
+	}
+
+	_, _ = fmt.Fprintf(o.ErrOut, "%s.\n", msg)
+}
+
+func (o RestartOptions) handleAllResources() ([]error, bool, []string) {
+	allErrs := []error{}
+	resourcesFound := false
+	notFoundResources := []string{}
+
+	for _, rt := range rolloutCapableResources {
+		r := o.Builder().
+			WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
+			NamespaceParam(o.Namespace).DefaultNamespace().
+			ResourceTypeOrNameArgs(true, rt).
+			LabelSelectorParam(o.LabelSelector).
+			ContinueOnError().
+			Latest().
+			Flatten().
+			Do()
+
+		if err := r.Err(); err != nil {
+			allErrs = append(allErrs, fmt.Errorf("error listing %s: %w", rt, err))
+			continue
+		}
+
+		infos, _ := r.Infos()
+		if len(infos) == 0 {
+			notFoundResources = append(notFoundResources, rt)
+			continue
+		}
+
+		resourcesFound = true
+
+		if err := o.restartResources(r); err != nil {
+			allErrs = append(allErrs, err)
+		}
+	}
+
+	return allErrs, resourcesFound, notFoundResources
+}
+
+func (o RestartOptions) printAllResourcesNotFoundMessage(resourcesFound bool, notFoundResources []string) {
+	if !resourcesFound {
+		if o.Namespace != "" {
+			_, _ = fmt.Fprintf(o.ErrOut, "No rollout-capable resources found in namespace %q.\n", o.Namespace)
+
+		} else {
+			_, _ = fmt.Fprintf(o.ErrOut, "No rollout-capable resources found in the cluster.\n")
+		}
+	}
+
+	if len(notFoundResources) > 0 {
+		msg := fmt.Sprintf("No resources found for: %s", strings.Join(notFoundResources, ", "))
+		if o.LabelSelector != "" {
+			msg += fmt.Sprintf(", label selector: %s", o.LabelSelector)
+		}
+		_, _ = fmt.Fprintf(o.ErrOut, "%s\n", msg)
+	}
 }
