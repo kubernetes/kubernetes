@@ -27,6 +27,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientgofeaturegate "k8s.io/client-go/features"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 )
 
@@ -118,6 +119,8 @@ type controller struct {
 	clock          clock.Clock
 }
 
+var _ NamedController = &controller{}
+
 // Controller is a low-level controller that is parameterized by a
 // Config and used in sharedIndexInformer.
 type Controller interface {
@@ -146,8 +149,21 @@ type Controller interface {
 	LastSyncResourceVersion() string
 }
 
+// NamedController adds NamedHasSynced to Controller.
+type NamedController interface {
+	Controller
+	// NamedHasSynced delegates to the Config's Queue
+	NamedHasSynced() NamedSyncer
+}
+
 // New makes a new Controller from the given Config.
+//
+// The returned implementation is guaranteed to also implement NamedController.
 func New(c *Config) Controller {
+	return newController(c)
+}
+
+func newController(c *Config) *controller {
 	ctlr := &controller{
 		config: *c,
 		clock:  &clock.RealClock{},
@@ -167,11 +183,13 @@ func (c *controller) RunWithContext(ctx context.Context) {
 		<-ctx.Done()
 		c.config.Queue.Close()
 	}()
+	logger := klog.FromContext(ctx)
 	r := NewReflectorWithOptions(
 		c.config.ListerWatcher,
 		c.config.ObjectType,
 		c.config.Queue,
 		ReflectorOptions{
+			Logger:          &logger,
 			ResyncPeriod:    c.config.FullResyncPeriod,
 			MinWatchTimeout: c.config.MinWatchTimeout,
 			TypeDescription: c.config.ObjectDescription,
@@ -203,6 +221,11 @@ func (c *controller) RunWithContext(ctx context.Context) {
 // Returns true once this controller has completed an initial resource listing
 func (c *controller) HasSynced() bool {
 	return c.config.Queue.HasSynced()
+}
+
+// NamedHasSynced implements [Controller.NamedHasSynced].
+func (c *controller) NamedHasSynced() NamedSyncer {
+	return c.config.Queue.NamedHasSynced()
 }
 
 func (c *controller) LastSyncResourceVersion() string {
@@ -395,6 +418,9 @@ func DeletionHandlingObjectToName(obj interface{}) (ObjectName, error) {
 
 // InformerOptions configure a Reflector.
 type InformerOptions struct {
+	// Logger, if not nil, is used instead of klog.Background() for logging.
+	Logger *klog.Logger
+
 	// ListerWatcher implements List and Watch functions for the source of the resource
 	// the informer will be informing about.
 	ListerWatcher ListerWatcher
@@ -708,7 +734,11 @@ func newInformer(clientState Store, options InformerOptions) Controller {
 	// KeyLister, that way resync operations will result in the correct set
 	// of update/delete deltas.
 
-	fifo := newQueueFIFO(clientState, options.Transform)
+	logger := klog.Background()
+	if options.Logger != nil {
+		logger = *options.Logger
+	}
+	fifo := newQueueFIFO(logger, clientState, options.Transform)
 
 	cfg := &Config{
 		Queue:            fifo,
@@ -730,15 +760,17 @@ func newInformer(clientState Store, options InformerOptions) Controller {
 	return New(cfg)
 }
 
-func newQueueFIFO(clientState Store, transform TransformFunc) Queue {
+func newQueueFIFO(logger klog.Logger, clientState Store, transform TransformFunc) Queue {
 	if clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.InOrderInformers) {
 		return NewRealFIFOWithOptions(RealFIFOOptions{
+			Logger:       &logger,
 			KeyFunction:  MetaNamespaceKeyFunc,
 			KnownObjects: clientState,
 			Transformer:  transform,
 		})
 	} else {
 		return NewDeltaFIFOWithOptions(DeltaFIFOOptions{
+			Logger:                &logger,
 			KnownObjects:          clientState,
 			EmitDeltaTypeReplaced: true,
 			Transformer:           transform,
