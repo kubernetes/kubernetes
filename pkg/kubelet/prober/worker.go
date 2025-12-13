@@ -24,11 +24,13 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/component-base/metrics"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 )
 
@@ -61,6 +63,9 @@ type worker struct {
 	// Where to store this workers results.
 	resultsManager results.Manager
 	probeManager   *manager
+
+	// The event recorder to use for this worker
+	recorder record.EventRecorder
 
 	// The last known container ID for this worker.
 	containerID kubecontainer.ContainerID
@@ -96,6 +101,7 @@ func (w *worker) isInitContainer() bool {
 // Creates and starts a new probe worker.
 func newWorker(
 	m *manager,
+	recorder record.EventRecorder,
 	probeType probeType,
 	pod *v1.Pod,
 	container v1.Container) *worker {
@@ -107,6 +113,7 @@ func newWorker(
 		container:       container,
 		probeType:       probeType,
 		probeManager:    m,
+		recorder:        recorder,
 	}
 
 	switch probeType {
@@ -332,7 +339,7 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 	}
 
 	// Note, exec probe does NOT have access to pod environment variables or downward API
-	result, err := w.probeManager.prober.probe(ctx, w.probeType, w.pod, status, w.container, w.containerID)
+	result, output, err := w.probeManager.prober.probe(ctx, w.probeType, w.pod, status, w.container, w.containerID)
 	if err != nil {
 		// Prober error, throw away the result.
 		return true
@@ -348,7 +355,7 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 		ProberResults.With(w.proberResultsUnknownMetricLabels).Inc()
 		ProberDuration.With(w.proberDurationUnknownMetricLabels).Observe(time.Since(startTime).Seconds())
 	}
-
+	resultChanged := w.lastResult != result
 	if w.lastResult == result {
 		w.resultRun++
 	} else {
@@ -360,6 +367,30 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 		(result == results.Success && w.resultRun < int(w.spec.SuccessThreshold)) {
 		// Success or failure is below threshold - leave the probe state unchanged.
 		return true
+	}
+
+	if resultChanged {
+		var eventType string
+		var eventReason string
+		if result == results.Success {
+			eventType = v1.EventTypeNormal
+			eventReason = events.ContainerProbeResultSuccess
+		} else {
+			eventType = v1.EventTypeWarning
+			eventReason = events.ContainerProbeResultFailure
+		}
+		RecordContainerEvent(
+			w.recorder,
+			ctx,
+			w.pod,
+			&w.container,
+			eventType,
+			eventReason,
+			"%s probe result changed to %s%s",
+			w.probeType,
+			result,
+			getPrefixedOutputEventString(result, output),
+		)
 	}
 
 	w.resultsManager.Set(w.containerID, result, w.pod)
@@ -385,4 +416,14 @@ func deepCopyPrometheusLabels(m metrics.Labels) metrics.Labels {
 		ret[k] = v
 	}
 	return ret
+}
+
+func getPrefixedOutputEventString(result results.Result, output string) string {
+	if result == results.Success {
+		return ""
+	} else if output == "" {
+		return ""
+	} else {
+		return ": " + output
+	}
 }
