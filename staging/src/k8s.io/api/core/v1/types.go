@@ -3575,7 +3575,6 @@ type PodCondition struct {
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-conditions
 	Type PodConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=PodConditionType"`
 	// If set, this represents the .metadata.generation that the pod condition was set based upon.
-	// The PodObservedGenerationTracking feature gate must be enabled to use this field.
 	// +featureGate=PodObservedGenerationTracking
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty" protobuf:"varint,7,opt,name=observedGeneration"`
