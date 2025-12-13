@@ -184,8 +184,13 @@ func (pl *PodTopologySpread) EventsToRegister(_ context.Context) ([]fwk.ClusterE
 
 // involvedInTopologySpreading returns true if the incomingPod is involved in the topology spreading of podWithSpreading.
 func involvedInTopologySpreading(incomingPod, podWithSpreading *v1.Pod) bool {
-	return incomingPod.UID == podWithSpreading.UID ||
-		(incomingPod.Spec.NodeName != "" && incomingPod.Namespace == podWithSpreading.Namespace)
+	if incomingPod.UID == podWithSpreading.UID {
+		return true
+	}
+	if incomingPod.Spec.NodeName == "" && incomingPod.Status.NominatedNodeName == "" {
+		return false
+	}
+	return incomingPod.Namespace == podWithSpreading.Namespace
 }
 
 // hasConstraintWithNodeTaintsPolicyHonor returns true if any constraint has `NodeTaintsPolicy: Honor`.
