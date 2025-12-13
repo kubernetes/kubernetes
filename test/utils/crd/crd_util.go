@@ -116,8 +116,8 @@ func CreateMultiVersionTestCRD(f *framework.Framework, group string, opts ...Opt
 // the opts, it will create a default version "v1" with an allow-all schema.
 func genRandomCRD(f *framework.Framework, group string, opts ...Option) *apiextensionsv1.CustomResourceDefinition {
 	suffix := framework.RandomSuffix()
-	name := fmt.Sprintf("e2e-test-%s-%s-crd", f.UniqueName, suffix)
-	kind := fmt.Sprintf("e2e-test-%s-%s-crd", f.UniqueName, suffix)
+	name := fmt.Sprintf("e2e-test-%s-%s-crd", f.BaseName, suffix)
+	kind := fmt.Sprintf("e2e-test-%s-%s-crd", f.BaseName, suffix)
 
 	crd := &apiextensionsv1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{Name: name + "s." + group},
