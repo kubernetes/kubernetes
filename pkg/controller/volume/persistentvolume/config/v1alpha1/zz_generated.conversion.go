@@ -103,6 +103,7 @@ func Convert_v1_GroupResource_To_v1alpha1_GroupResource(in *v1.GroupResource, ou
 
 func autoConvert_v1alpha1_PersistentVolumeBinderControllerConfiguration_To_config_PersistentVolumeBinderControllerConfiguration(in *configv1alpha1.PersistentVolumeBinderControllerConfiguration, out *config.PersistentVolumeBinderControllerConfiguration, s conversion.Scope) error {
 	out.PVClaimBinderSyncPeriod = in.PVClaimBinderSyncPeriod
+	out.PVClaimBinderConcurrentSyncs = in.PVClaimBinderConcurrentSyncs
 	if err := Convert_v1alpha1_VolumeConfiguration_To_config_VolumeConfiguration(&in.VolumeConfiguration, &out.VolumeConfiguration, s); err != nil {
 		return err
 	}
@@ -111,6 +112,7 @@ func autoConvert_v1alpha1_PersistentVolumeBinderControllerConfiguration_To_confi
 
 func autoConvert_config_PersistentVolumeBinderControllerConfiguration_To_v1alpha1_PersistentVolumeBinderControllerConfiguration(in *config.PersistentVolumeBinderControllerConfiguration, out *configv1alpha1.PersistentVolumeBinderControllerConfiguration, s conversion.Scope) error {
 	out.PVClaimBinderSyncPeriod = in.PVClaimBinderSyncPeriod
+	out.PVClaimBinderConcurrentSyncs = in.PVClaimBinderConcurrentSyncs
 	if err := Convert_config_VolumeConfiguration_To_v1alpha1_VolumeConfiguration(&in.VolumeConfiguration, &out.VolumeConfiguration, s); err != nil {
 		return err
 	}

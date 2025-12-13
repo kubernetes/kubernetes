@@ -26,6 +26,10 @@ type PersistentVolumeBinderControllerConfiguration struct {
 	// pvClaimBinderSyncPeriod is the period for syncing persistent volumes
 	// and persistent volume claims.
 	PVClaimBinderSyncPeriod metav1.Duration
+	// PVClaimBinderConcurrentSyncs is the number of PVCs that are
+	// allowed to sync concurrently. Larger number = more responsive PVC binding,
+	// but more CPU (and network) load.
+	PVClaimBinderConcurrentSyncs int32
 	// volumeConfiguration holds configuration for volume related features.
 	VolumeConfiguration VolumeConfiguration
 }
