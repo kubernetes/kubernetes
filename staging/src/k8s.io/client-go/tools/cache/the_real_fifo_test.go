@@ -25,8 +25,10 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	v1 "k8s.io/api/core/v1"
 	clientfeatures "k8s.io/client-go/features"
 	clientfeaturestesting "k8s.io/client-go/features/testing"
+	"k8s.io/component-base/metrics/prometheus/fifo"
 )
 
 func (f *RealFIFO) getItems() []Delta {
@@ -1288,4 +1290,16 @@ func TestRealFIFO_PopBrokenItemsInBatch(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRealFIFO_metrics(t *testing.T) {
+	f := NewRealFIFOWithOptions(RealFIFOOptions{
+		KeyFunction:     testFifoObjectKeyFunc,
+		KnownObjects:    emptyKnownObjects(),
+		Transformer:     nil,
+		Identifier:      NewIdentifier("shared-informer", &v1.Pod{}),
+		MetricsProvider: provider,
+	})
+	f.Add(mkFifoObj("a", nil))
+	fifo.Register()
 }
