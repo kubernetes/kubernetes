@@ -29,7 +29,7 @@ import (
 	"sync"
 	"time"
 
-	grpcprom "github.com/grpc-ecosystem/go-grpc-prometheus"
+	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"go.etcd.io/etcd/client/pkg/v3/logutil"
 	"go.etcd.io/etcd/client/pkg/v3/transport"
 	clientv3 "go.etcd.io/etcd/client/v3"
@@ -79,12 +79,15 @@ const (
 // https://github.com/kubernetes/kubernetes/issues/111476 for more.
 var etcd3ClientLogger *zap.Logger
 
+// grpcpromClientMetrics is a singleton instance of grpc client prometheus metrics.
+var grpcpromClientMetrics = grpcprom.NewClientMetrics()
+
 func init() {
-	// grpcprom auto-registers (via an init function) their client metrics, since we are opting out of
-	// using the global prometheus registry and using our own wrapped global registry,
-	// we need to explicitly register these metrics to our global registry here.
+	// Since we are opting out of using the global prometheus registry and using
+	// our own wrapped global registry, we need to explicitly register the client
+	// metrics to our global registry here.
 	// For reference: https://github.com/kubernetes/kubernetes/pull/81387
-	legacyregistry.RawMustRegister(grpcprom.DefaultClientMetrics)
+	legacyregistry.RawMustRegister(grpcpromClientMetrics)
 	dbMetricsMonitors = make(map[string]struct{})
 
 	l, err := logutil.CreateDefaultZapLogger(etcdClientDebugLevel())
@@ -313,8 +316,8 @@ var newETCD3Client = func(c storagebackend.TransportConfig) (*kubernetes.Client,
 		//
 		// these optional interceptors will be placed after the default ones.
 		// which seems to be what we want as the metrics will be collected on each attempt (retry)
-		grpc.WithChainUnaryInterceptor(grpcprom.UnaryClientInterceptor),
-		grpc.WithChainStreamInterceptor(grpcprom.StreamClientInterceptor),
+		grpc.WithChainUnaryInterceptor(grpcpromClientMetrics.UnaryClientInterceptor()),
+		grpc.WithChainStreamInterceptor(grpcpromClientMetrics.StreamClientInterceptor()),
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerTracing) {
 		tracingOpts := []otelgrpc.Option{

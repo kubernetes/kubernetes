@@ -44,7 +44,6 @@
       "github.com/gorilla/rpc": "unmaintained, archive mode",
       "github.com/gorilla/schema": "unmaintained, archive mode",
       "github.com/gregjones/httpcache": "unmaintained, archive mode",
-      "github.com/grpc-ecosystem/go-grpc-prometheus": "unmaintained, archive mode",
       "github.com/grpc-ecosystem/grpc-gateway": "use github.com/grpc-ecosystem/grpc-gateway/v2",
       "github.com/hashicorp/consul": "MPL license not in CNCF allowlist",
       "github.com/hashicorp/errwrap": "MPL license not in CNCF allowlist",
@@ -171,9 +170,6 @@
       "github.com/gregjones/httpcache": [
         "k8s.io/client-go"
       ],
-      "github.com/grpc-ecosystem/go-grpc-prometheus": [
-        "k8s.io/apiserver"
-      ],
       "github.com/json-iterator/go": [
         "github.com/prometheus/client_golang",
         "go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful",
@@ -269,7 +265,6 @@
       "github.com/gogo/protobuf",
       "github.com/golang/protobuf",
       "github.com/gregjones/httpcache",
-      "github.com/grpc-ecosystem/go-grpc-prometheus",
       "github.com/json-iterator/go",
       "github.com/mailru/easyjson",
       "github.com/modern-go/concurrent",
