@@ -59,7 +59,7 @@ var InitFeatureGates = FeatureList{
 			" Once UserNamespacesSupport graduates to GA, kubeadm will start using it and RootlessControlPlane will be removed.",
 	},
 	ControlPlaneKubeletLocalMode: {FeatureSpec: featuregate.FeatureSpec{Default: true, PreRelease: featuregate.GA, LockToDefault: true}},
-	NodeLocalCRISocket:           {FeatureSpec: featuregate.FeatureSpec{Default: true, PreRelease: featuregate.Beta}},
+	NodeLocalCRISocket:           {FeatureSpec: featuregate.FeatureSpec{Default: true, PreRelease: featuregate.GA, LockToDefault: true}},
 }
 
 // Feature represents a feature being gated
