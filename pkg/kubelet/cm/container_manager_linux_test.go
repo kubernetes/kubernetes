@@ -66,7 +66,8 @@ func fakeContainerMgrMountInt() mount.Interface {
 }
 
 func TestCgroupMountValidationSuccess(t *testing.T) {
-	f, err := validateSystemRequirements(fakeContainerMgrMountInt())
+	logger, _ := ktesting.NewTestContext(t)
+	f, err := validateSystemRequirements(logger, fakeContainerMgrMountInt())
 	assert.NoError(t, err)
 	if cgroups.IsCgroup2UnifiedMode() {
 		assert.True(t, f.cpuHardcapping, "cpu hardcapping is expected to be enabled")
@@ -79,6 +80,7 @@ func TestCgroupMountValidationMemoryMissing(t *testing.T) {
 	if cgroups.IsCgroup2UnifiedMode() {
 		t.Skip("skipping cgroup v1 test on a cgroup v2 system")
 	}
+	logger, _ := ktesting.NewTestContext(t)
 	mountInt := mount.NewFakeMounter(
 		[]mount.MountPoint{
 			{
@@ -97,7 +99,7 @@ func TestCgroupMountValidationMemoryMissing(t *testing.T) {
 				Opts:   []string{"rw", "relatime", "cpuacct"},
 			},
 		})
-	_, err := validateSystemRequirements(mountInt)
+	_, err := validateSystemRequirements(logger, mountInt)
 	assert.Error(t, err)
 }
 
@@ -105,6 +107,7 @@ func TestCgroupMountValidationMultipleSubsystem(t *testing.T) {
 	if cgroups.IsCgroup2UnifiedMode() {
 		t.Skip("skipping cgroup v1 test on a cgroup v2 system")
 	}
+	logger, _ := ktesting.NewTestContext(t)
 	mountInt := mount.NewFakeMounter(
 		[]mount.MountPoint{
 			{
@@ -123,7 +126,7 @@ func TestCgroupMountValidationMultipleSubsystem(t *testing.T) {
 				Opts:   []string{"rw", "relatime", "cpuacct"},
 			},
 		})
-	_, err := validateSystemRequirements(mountInt)
+	_, err := validateSystemRequirements(logger, mountInt)
 	assert.NoError(t, err)
 }
 
@@ -144,6 +147,7 @@ func TestSoftRequirementsValidationSuccess(t *testing.T) {
 	if cgroups.IsCgroup2UnifiedMode() {
 		t.Skip("skipping cgroup v1 test on a cgroup v2 system")
 	}
+	logger, _ := ktesting.NewTestContext(t)
 	req := require.New(t)
 	tempDir, err := os.MkdirTemp("", "")
 	req.NoError(err)
@@ -169,7 +173,7 @@ func TestSoftRequirementsValidationSuccess(t *testing.T) {
 				Opts:   []string{"rw", "relatime", "cpuacct", "memory"},
 			},
 		})
-	f, err := validateSystemRequirements(mountInt)
+	f, err := validateSystemRequirements(logger, mountInt)
 	assert.NoError(t, err)
 	assert.True(t, f.cpuHardcapping, "cpu hardcapping is expected to be enabled")
 }
