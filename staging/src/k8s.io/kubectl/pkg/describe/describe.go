@@ -3025,6 +3025,9 @@ func describeService(service *corev1.Service, endpointSlices []discoveryv1.Endpo
 			} else {
 				w.Write(LEVEL_0, "TargetPort:\t%s/%s\n", sp.TargetPort.StrVal, sp.Protocol)
 			}
+			if sp.AppProtocol != nil {
+				w.Write(LEVEL_0, "AppProtocol:\t%s\n", *sp.AppProtocol)
+			}
 			if sp.NodePort != 0 {
 				w.Write(LEVEL_0, "NodePort:\t%s\t%d/%s\n", name, sp.NodePort, sp.Protocol)
 			}
