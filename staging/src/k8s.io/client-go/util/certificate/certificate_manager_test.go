@@ -1132,6 +1132,75 @@ func TestStop(t *testing.T) {
 	}, 10*time.Second, time.Microsecond, "current certificate")
 }
 
+func TestInterruptWaitForCertificate(t *testing.T) {
+	logger := ktesting.NewLogger(t, ktesting.NewConfig(
+		ktesting.BufferLogs(true),
+		ktesting.Verbosity(2),
+	))
+	ctx := klog.NewContext(context.Background(), logger)
+	ctx, cancel := context.WithCancelCause(ctx)
+	defer cancel(errors.New("test is done"))
+	var templatePtr *x509.CertificateRequest
+	originalTemplate := x509.CertificateRequest{
+		Subject: pkix.Name{
+			Organization: []string{"system:nodes"},
+			CommonName:   "system:node:fake-node-name",
+		},
+	}
+	templatePtr = &originalTemplate
+	certificateManager, err := NewManager(&Config{
+		GetTemplate: func() *x509.CertificateRequest { return templatePtr },
+		Usages: []certificatesv1.KeyUsage{
+			certificatesv1.UsageDigitalSignature,
+			certificatesv1.UsageKeyEncipherment,
+			certificatesv1.UsageClientAuth,
+		},
+		CertificateStore: &fakeStore{},
+		ClientsetFn: func(_ *tls.Certificate) (clientset.Interface, error) {
+			return newClientset(fakeClient{}), nil
+		},
+		Ctx: &ctx,
+	})
+	if err != nil {
+		t.Errorf("Got %v, wanted no error.", err)
+	}
+	require.NoError(t, err, "initialize the certificate manager")
+	m := certificateManager.(*manager)
+	require.Nil(t, m.Current(), "no initial certificate")
+
+	var wg sync.WaitGroup
+	defer func() {
+		t.Log("Waiting for manager to stop...")
+		wg.Wait()
+	}()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		m.run()
+	}()
+	defer m.Stop()
+
+	require.Eventually(t, func() bool {
+		_, lastRequest := m.getLastRequest()
+		return lastRequest != nil
+	}, 5*time.Second, time.Microsecond, "initial request")
+
+	newTemplate := x509.CertificateRequest{
+		Subject: pkix.Name{
+			Organization: []string{"system:nodes"},
+			CommonName:   "system:node:fake-node-name",
+		},
+		IPAddresses: []net.IP{netutils.ParseIPSloppy("192.168.1.1")},
+	}
+	templatePtr = &newTemplate
+
+	require.Eventually(t, func() bool {
+		_, lastRequest := m.getLastRequest()
+		return len(lastRequest.IPAddresses) == 1 && lastRequest.IPAddresses[0].String() == templatePtr.IPAddresses[0].String()
+	}, 10*time.Second, time.Microsecond, "certificate request updates to new template")
+	require.Nil(t, m.Current(), "no signed certificate") // test requires a stuck WaitForCertificate
+}
+
 func TestContext(t *testing.T) {
 	logger := ktesting.NewLogger(t, ktesting.NewConfig(
 		ktesting.BufferLogs(true),
