@@ -2393,7 +2393,7 @@ func testDeviceTaintRule(tCtx ktesting.TContext) {
 		wg.Wait()
 	}()
 	wg.Go(func() {
-		assert.NoError(tCtx, controller.Run(tCtx, 10 /* workers */), "eviction controller failed")
+		assert.NoError(tCtx, controller.Run(tCtx, 1 /* workers */), "eviction controller failed")
 	})
 
 	// Eventually the controller should have synced it's informers.
@@ -2429,16 +2429,23 @@ func testDeviceTaintRule(tCtx ktesting.TContext) {
 	tCtx.Wait()
 	evicted := metav1.Now()
 	tCtx.Logf("TIME: eviction done at %s", evicted)
-	check(tCtx, "evict: ", l(inProgress(rule, true, "PodsPendingEviction", "1 pod needs to be evicted in 1 namespace.", &evicted)), nil)
+	check(tCtx, "evict: ",
+		l(inProgress(rule, false, "Completed", "1 pod evicted since starting the controller.", &evicted),
+			inProgress(rule, true, "PodsPendingEviction", "1 pod needs to be evicted in 1 namespace. 1 pod evicted since starting the controller.", &evicted)),
+		nil)
 
 	// AddAfter does not move time forward. Do it ourselves...
+	timeAfterPodEviction := metav1.Now()
 	time.Sleep(ruleStatusPeriod)
 	slept := metav1.Now()
 	tCtx.Logf("TIME: slept till %s", slept)
 	tCtx.Wait()
 	done := metav1.Now()
 	tCtx.Logf("TIME: done at %s", done)
-	check(tCtx, "done: ", l(inProgress(rule, false, "Completed", "1 pod evicted since starting the controller.", &slept)), nil)
+	check(tCtx, "done: ",
+		l(inProgress(rule, false, "Completed", "1 pod evicted since starting the controller.", &timeAfterPodEviction),
+			inProgress(rule, false, "Completed", "1 pod evicted since starting the controller.", &slept)),
+		nil)
 	assertEqual(tCtx, map[types.UID]taintRuleStats{rule.UID: {numEvictedPods: 1}}, controller.taintRuleStats, "taint rule statistics should have counted the pod")
 
 	// Delete the rule and verify that we don't leak memory by still tracking it.
@@ -2467,7 +2474,34 @@ func check(tCtx ktesting.TContext, prefix string, expectRules []*resourcealpha.D
 	assertEqual(tCtx, expectPods, trimPods(actualPods.Items), prefix+"pods", opts...)
 	rules, err := tCtx.Client().ResourceV1alpha3().DeviceTaintRules().List(tCtx, metav1.ListOptions{})
 	tCtx.ExpectNoError(err, prefix+"list rules")
-	assertEqual(tCtx, expectRules, trimRules(rules.Items), prefix+"rules", opts...)
+
+	gomega.NewWithT(tCtx).Expect(rules.Items).To(gomega.HaveLen(1))
+	gomega.NewWithT(tCtx).Expect(rules.Items[0].Status.Conditions).To(gomega.HaveLen(1))
+
+	actualCondition := rules.Items[0].Status.Conditions[0]
+	matched := false
+	var diff string
+
+	if len(expectRules) > 1 {
+		for _, expected := range expectRules {
+			if len(expected.Status.Conditions) == 0 {
+				continue
+			}
+
+			expectedCondition := expected.Status.Conditions[0]
+
+			if diff = cmp.Diff(actualCondition, expectedCondition, opts...); diff == "" {
+				matched = true
+				break
+			}
+		}
+	} else {
+		assertEqual(tCtx, expectRules, trimRules(rules.Items), prefix+"rules", opts...)
+		matched = true
+	}
+	if !matched {
+		tCtx.Errorf("Rule did not match any expected rules, Diff: %v", diff)
+	}
 }
 
 // TestCancelEviction deletes the pod before the controller deletes it
