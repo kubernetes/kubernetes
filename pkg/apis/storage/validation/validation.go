@@ -44,14 +44,8 @@ const (
 	maxAttachedVolumeMetadataSize = 256 * (1 << 10) // 256 kB
 	maxVolumeErrorMessageSize     = 1024
 
-	csiNodeIDMaxLength       = 192
-	csiNodeIDLongerMaxLength = 256
+	csiNodeIDMaxLength = 256
 )
-
-// CSINodeValidationOptions contains the validation options for validating CSINode
-type CSINodeValidationOptions struct {
-	AllowLongNodeID bool
-}
 
 // ValidateStorageClass validates a StorageClass.
 func ValidateStorageClass(storageClass *storage.StorageClass) field.ErrorList {
@@ -303,15 +297,15 @@ func validateAllowedTopologies(topologies []api.TopologySelectorTerm, fldPath *f
 }
 
 // ValidateCSINode validates a CSINode.
-func ValidateCSINode(csiNode *storage.CSINode, validationOpts CSINodeValidationOptions) field.ErrorList {
+func ValidateCSINode(csiNode *storage.CSINode) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&csiNode.ObjectMeta, false, apivalidation.ValidateNodeName, field.NewPath("metadata"))
-	allErrs = append(allErrs, validateCSINodeSpec(&csiNode.Spec, field.NewPath("spec"), validationOpts)...)
+	allErrs = append(allErrs, validateCSINodeSpec(&csiNode.Spec, field.NewPath("spec"))...)
 	return allErrs
 }
 
 // ValidateCSINodeUpdate validates a CSINode.
-func ValidateCSINodeUpdate(new, old *storage.CSINode, validationOpts CSINodeValidationOptions) field.ErrorList {
-	allErrs := ValidateCSINode(new, validationOpts)
+func ValidateCSINodeUpdate(new, old *storage.CSINode) field.ErrorList {
+	allErrs := ValidateCSINode(new)
 
 	// Validate modifying fields inside an existing CSINodeDriver entry
 	for _, oldDriver := range old.Spec.Drivers {
@@ -339,39 +333,35 @@ func ValidateCSINodeUpdate(new, old *storage.CSINode, validationOpts CSINodeVali
 }
 
 // ValidateCSINodeSpec tests that the specified CSINodeSpec has valid data.
-func validateCSINodeSpec(
-	spec *storage.CSINodeSpec, fldPath *field.Path, validationOpts CSINodeValidationOptions) field.ErrorList {
+func validateCSINodeSpec(spec *storage.CSINodeSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, validateCSINodeDrivers(spec.Drivers, fldPath.Child("drivers"), validationOpts)...)
+	allErrs = append(allErrs, validateCSINodeDrivers(spec.Drivers, fldPath.Child("drivers"))...)
 	return allErrs
 }
 
 // ValidateCSINodeDrivers tests that the specified CSINodeDrivers have valid data.
-func validateCSINodeDrivers(drivers []storage.CSINodeDriver, fldPath *field.Path, validationOpts CSINodeValidationOptions) field.ErrorList {
+func validateCSINodeDrivers(drivers []storage.CSINodeDriver, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	driverNamesInSpecs := sets.New[string]()
 	for i, driver := range drivers {
 		idxPath := fldPath.Index(i)
-		allErrs = append(allErrs, validateCSINodeDriver(driver, driverNamesInSpecs, idxPath, validationOpts)...)
+		allErrs = append(allErrs, validateCSINodeDriver(driver, driverNamesInSpecs, idxPath)...)
 	}
 
 	return allErrs
 }
 
 // validateCSINodeDriverNodeID tests if Name in CSINodeDriver is a valid node id.
-func validateCSINodeDriverNodeID(nodeID string, fldPath *field.Path, validationOpts CSINodeValidationOptions) field.ErrorList {
+func validateCSINodeDriverNodeID(nodeID string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	// nodeID is always required
 	if len(nodeID) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath, nodeID))
 	}
-	maxLength := csiNodeIDMaxLength
-	if validationOpts.AllowLongNodeID {
-		maxLength = csiNodeIDLongerMaxLength
-	}
-	if len(nodeID) > maxLength {
-		allErrs = append(allErrs, field.Invalid(fldPath, nodeID, fmt.Sprintf("must be %d characters or less", maxLength)))
+
+	if len(nodeID) > csiNodeIDMaxLength {
+		allErrs = append(allErrs, field.Invalid(fldPath, nodeID, fmt.Sprintf("must be %d characters or less", csiNodeIDMaxLength)))
 	}
 	return allErrs
 }
@@ -389,12 +379,11 @@ func validateCSINodeDriverAllocatable(a *storage.VolumeNodeResources, fldPath *f
 }
 
 // validateCSINodeDriver tests if CSINodeDriver has valid entries
-func validateCSINodeDriver(driver storage.CSINodeDriver, driverNamesInSpecs sets.Set[string], fldPath *field.Path,
-	validationOpts CSINodeValidationOptions) field.ErrorList {
+func validateCSINodeDriver(driver storage.CSINodeDriver, driverNamesInSpecs sets.Set[string], fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	allErrs = append(allErrs, apivalidation.ValidateCSIDriverName(driver.Name, fldPath.Child("name"))...)
-	allErrs = append(allErrs, validateCSINodeDriverNodeID(driver.NodeID, fldPath.Child("nodeID"), validationOpts)...)
+	allErrs = append(allErrs, validateCSINodeDriverNodeID(driver.NodeID, fldPath.Child("nodeID"))...)
 	allErrs = append(allErrs, validateCSINodeDriverAllocatable(driver.Allocatable, fldPath.Child("allocatable"))...)
 
 	// check for duplicate entries for the same driver in specs
