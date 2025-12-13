@@ -224,7 +224,7 @@ func TestAudit(t *testing.T) {
 	shortRunningPath := "/api/v1/namespaces/default/pods/foo"
 	longRunningPath := "/api/v1/namespaces/default/pods?watch=true"
 
-	delay := 500 * time.Millisecond
+	delay := 501 * time.Millisecond
 
 	for _, test := range []struct {
 		desc       string
@@ -351,6 +351,9 @@ func TestAudit(t *testing.T) {
 					Verb:           "update",
 					RequestURI:     shortRunningPath,
 					ResponseStatus: &metav1.Status{Code: 200},
+					Annotations: map[string]string{
+						"apiserver.latency.k8s.io/total": "",
+					},
 				},
 			},
 			true,
@@ -713,6 +716,7 @@ func TestAudit(t *testing.T) {
 				// simplified long-running check
 				return ri.Verb == "watch"
 			})
+			handler = WithLatencyTrackers(handler)
 			handler = WithAuditInit(handler)
 
 			req, _ := http.NewRequestWithContext(ctx, test.verb, test.path, nil)
@@ -771,6 +775,13 @@ func TestAudit(t *testing.T) {
 				}
 				if (event.ResponseStatus != nil) && (event.ResponseStatus.Code != expect.ResponseStatus.Code) {
 					t.Errorf("Unexpected status code : %d", event.ResponseStatus.Code)
+				}
+				if expect.Annotations != nil {
+					for k := range expect.Annotations {
+						if _, exists := event.Annotations[k]; !exists {
+							t.Errorf("Expect key %s in the annotations but it does not exist", k)
+						}
+					}
 				}
 			}
 		})
