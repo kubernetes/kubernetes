@@ -1432,8 +1432,16 @@ type ImageServiceClient interface {
 	// RemoveImage removes the image.
 	// This call is idempotent, and must not return an error if the image has
 	// already been removed.
+	// Note that if the image is referenced by multiple tags (even across different repositories
+	// if they resolve to the same image digest), removing the image by a single tag
+	// will remove all of its tags. For example, if `repo/image:v1` and `another_repo/image:latest`
+	// point to the same image, removing `repo/image:v1` will also remove `another_repo/image:latest`.
+	// The next call to ListImages, ImageStatus, ImageFsInfo will not return this image.
+	// The resources (e.g. disk space) may be cleaned asynchronously
+	// and not guaranteed to be cleaned up by the time this method returns.
 	RemoveImage(ctx context.Context, in *RemoveImageRequest, opts ...grpc.CallOption) (*RemoveImageResponse, error)
 	// ImageFSInfo returns information of the filesystem that is used to store images.
+	// Usage information may include images that were removed, but are still being cleaned up.
 	ImageFsInfo(ctx context.Context, in *ImageFsInfoRequest, opts ...grpc.CallOption) (*ImageFsInfoResponse, error)
 }
 
@@ -1512,8 +1520,16 @@ type ImageServiceServer interface {
 	// RemoveImage removes the image.
 	// This call is idempotent, and must not return an error if the image has
 	// already been removed.
+	// Note that if the image is referenced by multiple tags (even across different repositories
+	// if they resolve to the same image digest), removing the image by a single tag
+	// will remove all of its tags. For example, if `repo/image:v1` and `another_repo/image:latest`
+	// point to the same image, removing `repo/image:v1` will also remove `another_repo/image:latest`.
+	// The next call to ListImages, ImageStatus, ImageFsInfo will not return this image.
+	// The resources (e.g. disk space) may be cleaned asynchronously
+	// and not guaranteed to be cleaned up by the time this method returns.
 	RemoveImage(context.Context, *RemoveImageRequest) (*RemoveImageResponse, error)
 	// ImageFSInfo returns information of the filesystem that is used to store images.
+	// Usage information may include images that were removed, but are still being cleaned up.
 	ImageFsInfo(context.Context, *ImageFsInfoRequest) (*ImageFsInfoResponse, error)
 	mustEmbedUnimplementedImageServiceServer()
 }
