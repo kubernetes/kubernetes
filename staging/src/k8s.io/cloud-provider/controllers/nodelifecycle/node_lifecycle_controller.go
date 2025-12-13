@@ -104,7 +104,7 @@ func (c *CloudNodeLifecycleController) Run(ctx context.Context, controllerManage
 	c.broadcaster = record.NewBroadcaster(record.WithContext(ctx))
 	c.recorder = c.broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-lifecycle-controller"})
 
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 	controllerManagerMetrics.ControllerStarted("cloud-node-lifecycle")
 	defer controllerManagerMetrics.ControllerStopped("cloud-node-lifecycle")
 

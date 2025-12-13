@@ -519,7 +519,7 @@ func (c *AssumeCache) emitEvents() {
 			return
 		}
 		func() {
-			defer utilruntime.HandleCrash()
+			defer utilruntime.HandleCrashWithLogger(c.logger)
 			deliver()
 		}()
 	}

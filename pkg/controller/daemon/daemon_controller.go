@@ -299,7 +299,7 @@ func (dsc *DaemonSetsController) deleteDaemonset(logger klog.Logger, obj interfa
 
 // Run begins watching and syncing daemon sets.
 func (dsc *DaemonSetsController) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	dsc.eventBroadcaster.StartStructuredLogging(3)
 	dsc.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: dsc.kubeClient.CoreV1().Events("")})
