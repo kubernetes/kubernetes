@@ -326,7 +326,7 @@ func (ssc *StatefulSetController) deletePod(logger klog.Logger, obj interface{})
 // NOTE: Returned Pods are pointers to objects from the cache.
 // If you need to modify one, you need to copy it first.
 func (ssc *StatefulSetController) getPodsForStatefulSet(ctx context.Context, set *apps.StatefulSet, selector labels.Selector) ([]*v1.Pod, error) {
-	podsForSts, err := controller.FilterPodsByOwner(ssc.podIndexer, &set.ObjectMeta, "StatefulSet", true)
+	podsForSts, err := controller.FilterPodsByOwner(ctx, ssc.podIndexer, &set.ObjectMeta, "StatefulSet", true)
 	if err != nil {
 		return nil, err
 	}
