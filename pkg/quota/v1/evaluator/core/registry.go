@@ -18,6 +18,7 @@ package core
 
 import (
 	"context"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -41,13 +42,14 @@ var legacyObjectCountAliases = map[schema.GroupVersionResource]corev1.ResourceNa
 }
 
 // NewEvaluators returns the list of static evaluators that manage more than counts
-func NewEvaluators(f quota.ListerForResourceFunc, i informers.SharedInformerFactory) []quota.Evaluator {
+func NewEvaluators(f quota.ListerForResourceFunc, i informers.SharedInformerFactory) ([]quota.Evaluator, error) {
 	// these evaluators have special logic
 	result := []quota.Evaluator{
 		NewPodEvaluator(f, clock.RealClock{}),
 		NewServiceEvaluator(f),
 		NewPersistentVolumeClaimEvaluator(f),
 	}
+	var claimGetter resourceClaimPodOwnerGetter
 	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
 		var podLister corev1listers.PodLister
 		var deviceClassMapping *extendedresourcecache.ExtendedResourceCache
@@ -56,10 +58,15 @@ func NewEvaluators(f quota.ListerForResourceFunc, i informers.SharedInformerFact
 			logger := klog.FromContext(context.Background())
 			deviceClassMapping = extendedresourcecache.NewExtendedResourceCache(logger)
 			if _, err := i.Resource().V1().DeviceClasses().Informer().AddEventHandler(deviceClassMapping); err != nil {
-				logger.Error(err, "failed to add device class informer event handler")
+				return nil, fmt.Errorf("failed to add device class informer event handler: %w", err)
+			}
+			var err error
+			claimGetter, err = makeResourceClaimPodOwnerGetter(i.Resource().V1().ResourceClaims())
+			if err != nil {
+				return nil, err
 			}
 		}
-		result = append(result, NewResourceClaimEvaluator(f, deviceClassMapping, podLister))
+		result = append(result, NewResourceClaimEvaluator(f, deviceClassMapping, podLister, claimGetter))
 	}
 
 	// these evaluators require an alias for backwards compatibility
@@ -67,5 +74,5 @@ func NewEvaluators(f quota.ListerForResourceFunc, i informers.SharedInformerFact
 		result = append(result,
 			generic.NewObjectCountEvaluator(gvr.GroupResource(), generic.ListResourceUsingListerFunc(f, gvr), alias))
 	}
-	return result
+	return result, nil
 }
