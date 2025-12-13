@@ -39,6 +39,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	clientevents "k8s.io/client-go/tools/events"
 	"k8s.io/client-go/tools/record"
 	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/client-go/util/flowcontrol"
@@ -204,6 +205,7 @@ type KubeGenericRuntime interface {
 func NewKubeGenericRuntimeManager(
 	ctx context.Context,
 	recorder record.EventRecorder,
+	newRecorder clientevents.EventRecorder,
 	livenessManager proberesults.Manager,
 	readinessManager proberesults.Manager,
 	startupManager proberesults.Manager,
@@ -338,6 +340,7 @@ func NewKubeGenericRuntimeManager(
 	nodeKeyring := credentialprovider.NewDefaultDockerKeyring()
 	kubeRuntimeManager.imagePuller = images.NewImageManager(
 		kubecontainer.FilterEventRecorder(recorder),
+		kubecontainer.FilterNewEventRecorder(newRecorder),
 		nodeKeyring,
 		kubeRuntimeManager,
 		imagePullManager,
