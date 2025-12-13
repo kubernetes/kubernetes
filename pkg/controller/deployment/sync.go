@@ -311,7 +311,7 @@ func (dc *DeploymentController) scale(ctx context.Context, deployment *apps.Depl
 		if *(activeOrLatest.Spec.Replicas) == *(deployment.Spec.Replicas) {
 			return nil
 		}
-		_, _, err := dc.scaleReplicaSetAndRecordEvent(ctx, activeOrLatest, *(deployment.Spec.Replicas), deployment)
+		_, _, err := dc.scaleReplicaSetWithLazyAnnotationUpdate(ctx, activeOrLatest, *(deployment.Spec.Replicas), deployment)
 		return err
 	}
 
@@ -319,7 +319,7 @@ func (dc *DeploymentController) scale(ctx context.Context, deployment *apps.Depl
 	// This case handles replica set adoption during a saturated new replica set.
 	if deploymentutil.IsSaturated(deployment, newRS) {
 		for _, old := range controller.FilterActiveReplicaSets(oldRSs) {
-			if _, _, err := dc.scaleReplicaSetAndRecordEvent(ctx, old, 0, deployment); err != nil {
+			if _, _, err := dc.scaleReplicaSetWithLazyAnnotationUpdate(ctx, old, 0, deployment); err != nil {
 				return err
 			}
 		}
@@ -400,7 +400,11 @@ func (dc *DeploymentController) scale(ctx context.Context, deployment *apps.Depl
 	return nil
 }
 
-func (dc *DeploymentController) scaleReplicaSetAndRecordEvent(ctx context.Context, rs *apps.ReplicaSet, newScale int32, deployment *apps.Deployment) (bool, *apps.ReplicaSet, error) {
+// scaleReplicaSetWithLazyAnnotationUpdate does not update the replica set annotations (DesiredReplicasAnnotation and
+// MaxReplicasAnnotation) if no replica set scaling is requested.
+// IMPORTANT: This method should not be called when an annotation update is necessary (e.g. scale during a rolling update)
+// and scaleReplicaSet should be used instead.
+func (dc *DeploymentController) scaleReplicaSetWithLazyAnnotationUpdate(ctx context.Context, rs *apps.ReplicaSet, newScale int32, deployment *apps.Deployment) (bool, *apps.ReplicaSet, error) {
 	// No need to scale
 	if *(rs.Spec.Replicas) == newScale {
 		return false, rs, nil
