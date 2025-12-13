@@ -27,7 +27,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kubetypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/klog/v2/ktesting"
@@ -43,7 +42,6 @@ import (
 )
 
 const (
-	testHostName      = "test-hostname"
 	socketPath        = "/var/run/kmsplugin"
 	migratedVolume    = "migrated-volume-name"
 	nonMigratedVolume = "non-migrated-volume-name"
@@ -52,7 +50,6 @@ const (
 
 var (
 	dirOrCreate = v1.HostPathType(v1.HostPathDirectoryOrCreate)
-	nodeName    = kubetypes.NodeName(testNodeName)
 	hostPath    = &v1.HostPathVolumeSource{
 		Path: socketPath,
 		Type: &dirOrCreate,
@@ -64,7 +61,6 @@ var (
 
 type vaTest struct {
 	desc                 string
-	createNodeName       kubetypes.NodeName
 	pod                  *v1.Pod
 	wantVolume           *v1.Volume
 	wantPersistentVolume *v1.PersistentVolume
@@ -74,8 +70,7 @@ type vaTest struct {
 func Test_CreateVolumeSpec(t *testing.T) {
 	for _, test := range []vaTest{
 		{
-			desc:           "inline volume type that does not support csi migration",
-			createNodeName: nodeName,
+			desc: "inline volume type that does not support csi migration",
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "kube-apiserver",
@@ -100,8 +95,7 @@ func Test_CreateVolumeSpec(t *testing.T) {
 			},
 		},
 		{
-			desc:           "inline volume type that supports csi migration",
-			createNodeName: nodeName,
+			desc: "inline volume type that supports csi migration",
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "kube-apiserver",
@@ -143,8 +137,7 @@ func Test_CreateVolumeSpec(t *testing.T) {
 			},
 		},
 		{
-			desc:           "pv type that does not support csi migration",
-			createNodeName: nodeName,
+			desc: "pv type that does not support csi migration",
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "kube-apiserver",
@@ -177,8 +170,7 @@ func Test_CreateVolumeSpec(t *testing.T) {
 			},
 		},
 		{
-			desc:           "pv type that supports csi migration",
-			createNodeName: nodeName,
+			desc: "pv type that supports csi migration",
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "kube-apiserver",
@@ -217,8 +209,7 @@ func Test_CreateVolumeSpec(t *testing.T) {
 			},
 		},
 		{
-			desc:           "CSINode not found for a volume type that completes csi migration",
-			createNodeName: kubetypes.NodeName("another-node"),
+			desc: "CSINode not found for a volume type that completes csi migration",
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "kube-apiserver",
@@ -242,8 +233,8 @@ func Test_CreateVolumeSpec(t *testing.T) {
 	} {
 		t.Run(test.desc, func(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
-			plugMgr, intreeToCSITranslator, csiTranslator, pvLister, pvcLister := setup(testNodeName, t)
-			actualSpec, err := CreateVolumeSpecWithNodeMigration(logger, test.pod.Spec.Volumes[0], test.pod, test.createNodeName, plugMgr, pvcLister, pvLister, intreeToCSITranslator, csiTranslator)
+			_, intreeToCSITranslator, csiTranslator, pvLister, pvcLister := setup(testNodeName, t)
+			actualSpec, err := CreateVolumeSpec(logger, test.pod.Spec.Volumes[0], test.pod, pvcLister, pvLister, intreeToCSITranslator, csiTranslator)
 
 			if actualSpec == nil && (test.wantPersistentVolume != nil || test.wantVolume != nil) {
 				t.Errorf("got volume spec is nil")
