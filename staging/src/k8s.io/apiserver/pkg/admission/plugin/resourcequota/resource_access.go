@@ -19,9 +19,7 @@ package resourcequota
 import (
 	"context"
 	"fmt"
-	"time"
 
-	"golang.org/x/sync/singleflight"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -48,15 +46,6 @@ type quotaAccessor struct {
 	// lister can list/get quota objects from a shared informer's cache
 	lister corev1listers.ResourceQuotaLister
 
-	// hasSynced indicates whether the lister has completed its initial sync
-	hasSynced func() bool
-
-	// liveLookups holds the last few live lookups we've done to help ammortize cost on repeated lookup failures.
-	// This lets us handle the case of latent caches, by looking up actual results for a namespace on cache miss/no results.
-	// We track the lookup result here so that for repeated requests, we don't look it up very often.
-	liveLookupCache *lru.Cache
-	group           singleflight.Group
-	liveTTL         time.Duration
 	// updatedQuotas holds a cache of quotas that we've updated.  This is used to pull the "really latest" during back to
 	// back quota evaluations that touch the same quota doc.  This only works because we can compare etcd resourceVersions
 	// for the same resource as integers.  Before this change: 22 updates with 12 conflicts.  after this change: 15 updates with 0 conflicts
@@ -65,14 +54,11 @@ type quotaAccessor struct {
 
 // newQuotaAccessor creates an object that conforms to the QuotaAccessor interface to be used to retrieve quota objects.
 func newQuotaAccessor() (*quotaAccessor, error) {
-	liveLookupCache := lru.New(100)
 	updatedCache := lru.New(100)
 
 	// client and lister will be set when SetInternalKubeClientSet and SetInternalKubeInformerFactory are invoked
 	return &quotaAccessor{
-		liveLookupCache: liveLookupCache,
-		liveTTL:         time.Duration(30 * time.Second),
-		updatedQuotas:   updatedCache,
+		updatedQuotas: updatedCache,
 	}, nil
 }
 
@@ -113,34 +99,6 @@ func (e *quotaAccessor) GetQuotas(namespace string) ([]corev1.ResourceQuota, err
 	items, err := e.lister.ResourceQuotas(namespace).List(labels.Everything())
 	if err != nil {
 		return nil, fmt.Errorf("error resolving quota: %v", err)
-	}
-
-	// if there are no items held in our unsynced lister, check our live-lookup LRU, if that misses, do the live lookup to prime it.
-	if len(items) == 0 && !e.hasSynced() {
-		lruItemObj, ok := e.liveLookupCache.Get(namespace)
-		if !ok || lruItemObj.(liveLookupEntry).expiry.Before(time.Now()) {
-			// use singleflight.Group to avoid flooding the apiserver with repeated
-			// requests. See #22422 for details.
-			lruItemObj, err, _ = e.group.Do(namespace, func() (interface{}, error) {
-				liveList, err := e.client.CoreV1().ResourceQuotas(namespace).List(context.TODO(), metav1.ListOptions{})
-				if err != nil {
-					return nil, err
-				}
-				newEntry := liveLookupEntry{expiry: time.Now().Add(e.liveTTL)}
-				for i := range liveList.Items {
-					newEntry.items = append(newEntry.items, &liveList.Items[i])
-				}
-				e.liveLookupCache.Add(namespace, newEntry)
-				return newEntry, nil
-			})
-			if err != nil {
-				return nil, err
-			}
-		}
-		lruEntry := lruItemObj.(liveLookupEntry)
-		for i := range lruEntry.items {
-			items = append(items, lruEntry.items[i])
-		}
 	}
 
 	resourceQuotas := []corev1.ResourceQuota{}
