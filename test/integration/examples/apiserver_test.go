@@ -261,6 +261,8 @@ func TestAggregatedAPIServer(t *testing.T) {
 
 func TestFrontProxyConfig(t *testing.T) {
 	t.Run("WithoutUID", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MajorMinor(1, 33))
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RemoteRequestHeaderUID, false)
 		testFrontProxyConfig(t, false)
 	})
 	t.Run("WithUID", func(t *testing.T) {

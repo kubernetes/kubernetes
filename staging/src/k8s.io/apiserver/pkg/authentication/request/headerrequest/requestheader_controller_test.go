@@ -57,12 +57,12 @@ func TestRequestHeaderAuthRequestController(t *testing.T) {
 	}{
 		{
 			name: "happy-path: headers values are populated form a config map",
-			cm:   defaultConfigMap(t, []string{"user-val"}, []string{"uid-val"}, []string{"group-val"}, []string{"extra-val"}, []string{"names-val"}),
+			cm:   defaultConfigMap(t, []string{"user-val", "USER-val"}, []string{"uid-val"}, []string{"group-val", "gRoUp-VaL"}, []string{"extra-val"}, []string{"names-val"}),
 			expectedHeader: expectedHeadersHolder{
-				usernameHeaders:     []string{"user-val"},
-				uidHeaders:          []string{"uid-val"},
-				groupHeaders:        []string{"group-val"},
-				extraHeaderPrefixes: []string{"extra-val"},
+				usernameHeaders:     []string{"User-Val"},
+				uidHeaders:          []string{"Uid-Val"},
+				groupHeaders:        []string{"Group-Val"},
+				extraHeaderPrefixes: []string{"Extra-Val"},
 				allowedClientNames:  []string{"names-val"},
 			},
 		},
@@ -124,10 +124,10 @@ func TestRequestHeaderAuthRequestControllerPreserveState(t *testing.T) {
 			name: "scenario 1: headers values are populated form a config map",
 			cm:   defaultConfigMap(t, []string{"user-val"}, []string{"uid-val"}, []string{"group-val"}, []string{"extra-val"}, []string{"names-val"}),
 			expectedHeader: expectedHeadersHolder{
-				usernameHeaders:     []string{"user-val"},
-				uidHeaders:          []string{"uid-val"},
-				groupHeaders:        []string{"group-val"},
-				extraHeaderPrefixes: []string{"extra-val"},
+				usernameHeaders:     []string{"User-Val"},
+				uidHeaders:          []string{"Uid-Val"},
+				groupHeaders:        []string{"Group-Val"},
+				extraHeaderPrefixes: []string{"Extra-Val"},
 				allowedClientNames:  []string{"names-val"},
 			},
 		},
@@ -142,10 +142,10 @@ func TestRequestHeaderAuthRequestControllerPreserveState(t *testing.T) {
 			}(),
 			expectErr: true,
 			expectedHeader: expectedHeadersHolder{
-				usernameHeaders:     []string{"user-val"},
-				uidHeaders:          []string{"uid-val"},
-				groupHeaders:        []string{"group-val"},
-				extraHeaderPrefixes: []string{"extra-val"},
+				usernameHeaders:     []string{"User-Val"},
+				uidHeaders:          []string{"Uid-Val"},
+				groupHeaders:        []string{"Group-Val"},
+				extraHeaderPrefixes: []string{"Extra-Val"},
 				allowedClientNames:  []string{"names-val"},
 			},
 		},
@@ -153,10 +153,10 @@ func TestRequestHeaderAuthRequestControllerPreserveState(t *testing.T) {
 			name: "scenario 3: some headers values have changed (prev set by scenario 1)",
 			cm:   defaultConfigMap(t, []string{"user-val"}, []string{"uid-val"}, []string{"group-val-scenario-3"}, []string{"extra-val"}, []string{"names-val"}),
 			expectedHeader: expectedHeadersHolder{
-				usernameHeaders:     []string{"user-val"},
-				uidHeaders:          []string{"uid-val"},
-				groupHeaders:        []string{"group-val-scenario-3"},
-				extraHeaderPrefixes: []string{"extra-val"},
+				usernameHeaders:     []string{"User-Val"},
+				uidHeaders:          []string{"Uid-Val"},
+				groupHeaders:        []string{"Group-Val-Scenario-3"},
+				extraHeaderPrefixes: []string{"Extra-Val"},
 				allowedClientNames:  []string{"names-val"},
 			},
 		},
@@ -164,10 +164,10 @@ func TestRequestHeaderAuthRequestControllerPreserveState(t *testing.T) {
 			name: "scenario 4: all headers values have changed (prev set by scenario 3)",
 			cm:   defaultConfigMap(t, []string{"user-val-scenario-4"}, []string{"uid-val-scenario-4"}, []string{"group-val-scenario-4"}, []string{"extra-val-scenario-4"}, []string{"names-val-scenario-4"}),
 			expectedHeader: expectedHeadersHolder{
-				usernameHeaders:     []string{"user-val-scenario-4"},
-				uidHeaders:          []string{"uid-val-scenario-4"},
-				groupHeaders:        []string{"group-val-scenario-4"},
-				extraHeaderPrefixes: []string{"extra-val-scenario-4"},
+				usernameHeaders:     []string{"User-Val-Scenario-4"},
+				uidHeaders:          []string{"Uid-Val-Scenario-4"},
+				groupHeaders:        []string{"Group-Val-Scenario-4"},
+				extraHeaderPrefixes: []string{"Extra-Val-Scenario-4"},
 				allowedClientNames:  []string{"names-val-scenario-4"},
 			},
 		},
@@ -213,10 +213,10 @@ func TestRequestHeaderAuthRequestControllerSyncOnce(t *testing.T) {
 			name: "headers values are populated form a config map",
 			cm:   defaultConfigMap(t, []string{"user-val"}, []string{"uid-val"}, []string{"group-val"}, []string{"extra-val"}, []string{"names-val"}),
 			expectedHeader: expectedHeadersHolder{
-				usernameHeaders:     []string{"user-val"},
-				uidHeaders:          []string{"uid-val"},
-				groupHeaders:        []string{"group-val"},
-				extraHeaderPrefixes: []string{"extra-val"},
+				usernameHeaders:     []string{"User-Val"},
+				uidHeaders:          []string{"Uid-Val"},
+				groupHeaders:        []string{"Group-Val"},
+				extraHeaderPrefixes: []string{"Extra-Val"},
 				allowedClientNames:  []string{"names-val"},
 			},
 		},
@@ -283,15 +283,15 @@ func newDefaultTarget() *RequestHeaderAuthRequestController {
 
 func validateExpectedHeaders(t *testing.T, target *RequestHeaderAuthRequestController, expected expectedHeadersHolder) {
 	if !equality.Semantic.DeepEqual(target.UsernameHeaders(), expected.usernameHeaders) {
-		t.Fatalf("incorrect usernameHeaders, got %v, wanted %v", target.UsernameHeaders(), expected.usernameHeaders)
+		t.Errorf("incorrect usernameHeaders, got %v, wanted %v", target.UsernameHeaders(), expected.usernameHeaders)
 	}
 	if !equality.Semantic.DeepEqual(target.GroupHeaders(), expected.groupHeaders) {
-		t.Fatalf("incorrect groupHeaders, got %v, wanted %v", target.GroupHeaders(), expected.groupHeaders)
+		t.Errorf("incorrect groupHeaders, got %v, wanted %v", target.GroupHeaders(), expected.groupHeaders)
 	}
 	if !equality.Semantic.DeepEqual(target.ExtraHeaderPrefixes(), expected.extraHeaderPrefixes) {
-		t.Fatalf("incorrect extraheaderPrefixes, got %v, wanted %v", target.ExtraHeaderPrefixes(), expected.extraHeaderPrefixes)
+		t.Errorf("incorrect extraheaderPrefixes, got %v, wanted %v", target.ExtraHeaderPrefixes(), expected.extraHeaderPrefixes)
 	}
 	if !equality.Semantic.DeepEqual(target.AllowedClientNames(), expected.allowedClientNames) {
-		t.Fatalf("incorrect expectedAllowedClientNames, got %v, wanted %v", target.AllowedClientNames(), expected.allowedClientNames)
+		t.Errorf("incorrect expectedAllowedClientNames, got %v, wanted %v", target.AllowedClientNames(), expected.allowedClientNames)
 	}
 }
