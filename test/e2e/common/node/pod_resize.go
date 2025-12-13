@@ -51,12 +51,12 @@ const (
 	increasedCPU      = "25m"
 	increasedCPULimit = "35m"
 
-	originalMem       = "20Mi"
-	originalMemLimit  = "30Mi"
-	reducedMem        = "15Mi"
-	reducedMemLimit   = "25Mi"
-	increasedMem      = "25Mi"
-	increasedMemLimit = "35Mi"
+	originalMem       = "35Mi"
+	originalMemLimit  = "45Mi"
+	reducedMem        = "30Mi"
+	reducedMemLimit   = "40Mi"
+	increasedMem      = "40Mi"
+	increasedMemLimit = "50Mi"
 )
 
 func offsetCPU(index int, value string) string {
