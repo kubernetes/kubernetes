@@ -142,14 +142,6 @@ func ValidateVolumeAttachment(volumeAttachment *storage.VolumeAttachment) field.
 	allErrs := apivalidation.ValidateObjectMeta(&volumeAttachment.ObjectMeta, false, apivalidation.ValidateClassName, field.NewPath("metadata"))
 	allErrs = append(allErrs, validateVolumeAttachmentSpec(&volumeAttachment.Spec, field.NewPath("spec"))...)
 	allErrs = append(allErrs, validateVolumeAttachmentStatus(&volumeAttachment.Status, field.NewPath("status"))...)
-	return allErrs
-}
-
-// ValidateVolumeAttachmentV1 validates a v1/VolumeAttachment. It contains only extra checks missing in
-// ValidateVolumeAttachment.
-func ValidateVolumeAttachmentV1(volumeAttachment *storage.VolumeAttachment) field.ErrorList {
-	allErrs := apivalidation.ValidateCSIDriverName(volumeAttachment.Spec.Attacher, field.NewPath("spec.attacher"))
-
 	if volumeAttachment.Spec.Source.PersistentVolumeName != nil {
 		pvName := *volumeAttachment.Spec.Source.PersistentVolumeName
 		for _, msg := range apivalidation.ValidatePersistentVolumeName(pvName, false) {
@@ -163,19 +155,9 @@ func ValidateVolumeAttachmentV1(volumeAttachment *storage.VolumeAttachment) fiel
 // has valid data.
 func validateVolumeAttachmentSpec(
 	spec *storage.VolumeAttachmentSpec, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, validateAttacher(spec.Attacher, fldPath.Child("attacher"))...)
+	allErrs := apivalidation.ValidateCSIDriverName(spec.Attacher, fldPath.Child("attacher"), apivalidation.RequiredCovered, apivalidation.FormatCovered)
 	allErrs = append(allErrs, validateVolumeAttachmentSource(&spec.Source, fldPath.Child("source"))...)
 	allErrs = append(allErrs, validateNodeName(spec.NodeName, fldPath.Child("nodeName"))...)
-	return allErrs
-}
-
-// validateAttacher tests if attacher is a valid qualified name.
-func validateAttacher(attacher string, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	if len(attacher) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath, attacher))
-	}
 	return allErrs
 }
 
@@ -255,9 +237,24 @@ func ValidateVolumeAttachmentUpdate(new, old *storage.VolumeAttachment) field.Er
 
 	// Spec is read-only
 	// If this ever relaxes in the future, make sure to increment the Generation number in PrepareForUpdate
-	if !apiequality.Semantic.DeepEqual(old.Spec, new.Spec) {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec"), new.Spec, "field is immutable"))
+	if old.Spec.Attacher != new.Spec.Attacher {
+		err := field.Invalid(
+			field.NewPath("spec", "attacher"),
+			new.Spec.Attacher,
+			"field is immutable",
+		).WithOrigin("immutable").MarkCoveredByDeclarative()
+
+		allErrs = append(allErrs, err)
+
+	} else if !apiequality.Semantic.DeepEqual(old.Spec, new.Spec) {
+		err := field.Invalid(
+			field.NewPath("spec"),
+			new.Spec,
+			"field is immutable",
+		)
+		allErrs = append(allErrs, err)
 	}
+
 	return allErrs
 }
 
