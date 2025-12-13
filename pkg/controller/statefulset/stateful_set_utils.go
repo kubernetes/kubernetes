@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"time"
 
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -457,8 +458,8 @@ func isRunningAndReady(pod *v1.Pod) bool {
 	return pod.Status.Phase == v1.PodRunning && podutil.IsPodReady(pod)
 }
 
-func isRunningAndAvailable(pod *v1.Pod, minReadySeconds int32) bool {
-	return podutil.IsPodAvailable(pod, minReadySeconds, metav1.Now())
+func isRunningAndAvailable(pod *v1.Pod, minReadySeconds int32, now time.Time) bool {
+	return podutil.IsPodAvailable(pod, minReadySeconds, metav1.Time{Time: now})
 }
 
 // isCreated returns true if pod has been created and is maintained by the API server
@@ -487,8 +488,8 @@ func isTerminating(pod *v1.Pod) bool {
 }
 
 // isUnavailable returns true if pod is not available or if it is terminating
-func isUnavailable(pod *v1.Pod, minReadySeconds int32) bool {
-	return !isRunningAndAvailable(pod, minReadySeconds) || isTerminating(pod)
+func isUnavailable(pod *v1.Pod, minReadySeconds int32, now time.Time) bool {
+	return !podutil.IsPodAvailable(pod, minReadySeconds, metav1.Time{Time: now}) || isTerminating(pod)
 }
 
 // allowsBurst is true if the alpha burst annotation is set.
