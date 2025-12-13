@@ -166,10 +166,32 @@ func (hc *healthChecker) Start(ctx context.Context) {
 }
 
 func (hc *healthChecker) doCheck() error {
-	for _, hc := range hc.getHealthCheckers() {
-		if err := hc.Check(nil); err != nil {
-			return fmt.Errorf("checker %s failed: %w", hc.Name(), err)
+	logger := klog.Background()
+	var uninitializedCheckers []string
+
+	for _, checker := range hc.getHealthCheckers() {
+		// Check if the health checker has completed initialization.
+		// If it implements InitializableHealthChecker and returns false,
+		// skip the check to avoid false alarms during startup.
+		if !healthz.IsHealthCheckerInitialized(checker) {
+			uninitializedCheckers = append(uninitializedCheckers, checker.Name())
+			logger.V(4).Info("Health checker not yet initialized, skipping check",
+				"checker", checker.Name())
+			continue
+		}
+
+		// Perform the actual health check
+		if err := checker.Check(nil); err != nil {
+			return fmt.Errorf("checker %s failed: %w", checker.Name(), err)
 		}
 	}
+
+	// Log uninitialized checkers for debugging purposes
+	if len(uninitializedCheckers) > 0 {
+		logger.V(4).Info("Some health checkers not yet initialized",
+			"uninitializedCheckers", uninitializedCheckers,
+			"count", len(uninitializedCheckers))
+	}
+
 	return nil
 }
