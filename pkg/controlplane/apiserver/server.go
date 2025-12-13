@@ -230,17 +230,23 @@ func (c completedConfig) New(name string, delegationTarget genericapiserver.Dele
 				return nil
 			})
 
-			// RunGVDeletionWorkers processes GVs from deleted CRDs/APIServices. If a GV is no longer in use,
-			// it is marked for removal from peer-discovery (with a deletion timestamp), triggering a grace period before cleanup.
-			s.GenericAPIServer.AddPostStartHookOrDie("gv-deletion-workers", func(context genericapiserver.PostStartHookContext) error {
-				go c.Extra.PeerProxy.RunGVDeletionWorkers(context, 1)
+			// RunActiveGVTracker monitors CRDs/APIServices and maintains the active GV list for exclusion.
+			s.GenericAPIServer.AddPostStartHookOrDie("gv-active-tracker", func(context genericapiserver.PostStartHookContext) error {
+				go c.Extra.PeerProxy.RunActiveGVTracker(context, 1)
 				return nil
 			})
 
-			// RunExcludedGVsReaper removes GVs from the peer-discovery exclusion list after their grace period expires.
-			// This ensures we don't include stale CRDs/aggregated APIs from peer discovery in the aggregated discovery.
-			s.GenericAPIServer.AddPostStartHookOrDie("excluded-groups-reaper", func(context genericapiserver.PostStartHookContext) error {
-				go c.Extra.PeerProxy.RunExcludedGVsReaper(context.Done())
+			// RunReaper removes expired GVs from the exclusion set after their grace period.
+			// This ensures we don't indefinitely exclude GVs that are no longer present.
+			s.GenericAPIServer.AddPostStartHookOrDie("gv-exclusion-reaper", func(context genericapiserver.PostStartHookContext) error {
+				go c.Extra.PeerProxy.RunReaper(context)
+				return nil
+			})
+
+			// RunPeerDiscoveryRefilter refilters peer discovery cache when exclusion set changes.
+			// This ensures peers don't advertise stale CRDs/APIServices in peer-aggregated discovery.
+			s.GenericAPIServer.AddPostStartHookOrDie("peer-discovery-refilter", func(context genericapiserver.PostStartHookContext) error {
+				go c.Extra.PeerProxy.RunPeerDiscoveryRefilter(context, 1)
 				return nil
 			})
 		}
