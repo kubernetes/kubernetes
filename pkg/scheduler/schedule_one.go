@@ -340,6 +340,11 @@ func (sched *Scheduler) bindingCycle(
 	if assumedPodInfo.InitialAttemptTimestamp != nil {
 		metrics.PodSchedulingSLIDuration.WithLabelValues(getAttemptsLabel(assumedPodInfo)).Observe(metrics.SinceInSeconds(*assumedPodInfo.InitialAttemptTimestamp))
 	}
+	// Count pods scheduled after being flushed from unschedulablePods
+	if assumedPodInfo.WasFlushedFromUnschedulable {
+		logger.V(4).Info("Pod scheduled after flush from unschedulablePods", "pod", klog.KObj(assumedPodInfo.Pod), "unschedulablePlugins", assumedPodInfo.UnschedulablePlugins, "pendingPlugins", assumedPodInfo.PendingPlugins)
+		metrics.PodScheduledAfterFlush.Inc()
+	}
 	// Run "postbind" plugins.
 	schedFramework.RunPostBindPlugins(ctx, state, assumedPod, scheduleResult.SuggestedHost)
 
@@ -1057,6 +1062,12 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, fwk framewo
 	pod := podInfo.Pod
 	err := status.AsError()
 	errMsg := status.Message()
+
+	// Clear plugin-related fields to avoid stale data from previous scheduling attempts.
+	// These fields will be repopulated below for FitError cases.
+	// We clear them here (rather than at Pop) because we sometimes want to use them
+	// for logging when a pod schedules successfully (e.g., after being flushed).
+	podInfo.ClearRejectorPlugins()
 
 	if err == ErrNoNodesAvailable {
 		logger.V(2).Info("Unable to schedule pod; no nodes are registered to the cluster; waiting", "pod", klog.KObj(pod))
