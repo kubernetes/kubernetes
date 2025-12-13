@@ -260,6 +260,16 @@ items:
     - deletecollection
     - patch
     - update
+  - apiGroups:
+    - scheduling.k8s.io
+    resources:
+    - workloads
+    verbs:
+    - create
+    - delete
+    - deletecollection
+    - patch
+    - update
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:
@@ -410,6 +420,14 @@ items:
     - resourceclaims
     - resourceclaims/status
     - resourceclaimtemplates
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - scheduling.k8s.io
+    resources:
+    - workloads
     verbs:
     - get
     - list
