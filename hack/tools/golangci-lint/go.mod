@@ -218,10 +218,11 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	honnef.co/go/tools v0.6.1 // indirect
 	k8s.io/apimachinery v0.32.3 // indirect
+	k8s.io/gengo/v2 v2.0.0-20250922181213-ec3ebc5fd46b // indirect
 	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738 // indirect
 	mvdan.cc/gofumpt v0.9.1 // indirect
 	mvdan.cc/unparam v0.0.0-20250301125049-0df0534333a4 // indirect
-	sigs.k8s.io/kube-api-linter v0.0.0-20251029172002-9992248f8813 // indirect
+	sigs.k8s.io/kube-api-linter v0.0.0-20251108122134-9275b92fdeba // indirect
 	sigs.k8s.io/logtools v0.9.0 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
