@@ -143,11 +143,11 @@ github.com/xhit/go-str2duration/v2 v2.1.0/go.mod h1:ohY8p+0f07DiV6Em5LKB0s2YpLtX
 github.com/xiang90/probing v0.0.0-20221125231312-a49e3df8f510/go.mod h1:UETIi67q53MR2AWcXfiuqkDkRtnGDLqkBTpCHuJHxtU=
 github.com/zeebo/errs v1.4.0/go.mod h1:sgbWHsvVuTPHcqJJGQ1WhI5KbWlHYz+2+2C/LSEtCw4=
 go.etcd.io/bbolt v1.4.3/go.mod h1:tKQlpPaYCVFctUIgFKFnAlvbmB3tpy1vkTnDWohtc0E=
-go.etcd.io/etcd/api/v3 v3.6.5/go.mod h1:ob0/oWA/UQQlT1BmaEkWQzI0sJ1M0Et0mMpaABxguOQ=
-go.etcd.io/etcd/client/pkg/v3 v3.6.5/go.mod h1:8Wx3eGRPiy0qOFMZT/hfvdos+DjEaPxdIDiCDUv/FQk=
-go.etcd.io/etcd/client/v3 v3.6.5/go.mod h1:ZqwG/7TAFZ0BJ0jXRPoJjKQJtbFo/9NIY8uoFFKcCyo=
-go.etcd.io/etcd/pkg/v3 v3.6.5/go.mod h1:uqrXrzmMIJDEy5j00bCqhVLzR5jEJIwDp5wTlLwPGOU=
-go.etcd.io/etcd/server/v3 v3.6.5/go.mod h1:PLuhyVXz8WWRhzXDsl3A3zv/+aK9e4A9lpQkqawIaH0=
+go.etcd.io/etcd/api/v3 v3.6.6/go.mod h1:f/om26iXl2wSkcTA1zGQv8reJRSLVdoEBsi4JdfMrx4=
+go.etcd.io/etcd/client/pkg/v3 v3.6.6/go.mod h1:YngfUVmvsvOJ2rRgStIyHsKtOt9SZI2aBJrZiWJhCbI=
+go.etcd.io/etcd/client/v3 v3.6.6/go.mod h1:36Qv6baQ07znPR3+n7t+Rk5VHEzVYPvFfGmfF4wBHV8=
+go.etcd.io/etcd/pkg/v3 v3.6.6/go.mod h1:9TKZL7WUEVHXYM3srP3ESZfIms34s1G72eNtWA9YKg4=
+go.etcd.io/etcd/server/v3 v3.6.6/go.mod h1:A1OQ1x3PaiENDLywMjCiMwV1pwJSpb0h9Z5ORP2dv6I=
 go.etcd.io/raft/v3 v3.6.0/go.mod h1:nLvLevg6+xrVtHUmVaTcTz603gQPHfh7kUAwV6YpfGo=
 go.opentelemetry.io/auto/sdk v1.1.0 h1:cH53jehLUN6UFLY71z+NDOiNJqDdPRaXzTel0sJySYA=
 go.opentelemetry.io/auto/sdk v1.1.0/go.mod h1:3wSPjt5PWp2RhlCcmmOial7AvC4DQqZb7a7wCow3W8A=
