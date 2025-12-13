@@ -19,12 +19,13 @@ package testsuites
 import (
 	"context"
 	"fmt"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	crdclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	crdclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 
@@ -476,10 +477,6 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 	})
 
 	f.It("should provision correct filesystem size when restoring snapshot to larger size pvc", feature.VolumeSnapshotDataSource, func(ctx context.Context) {
-		//TODO: remove skip when issue is resolved - https://github.com/kubernetes/kubernetes/issues/113359
-		if framework.NodeOSDistroIs("windows") {
-			e2eskipper.Skipf("Test is not valid Windows - skipping")
-		}
 
 		if pattern.VolMode == "Block" {
 			e2eskipper.Skipf("Test is not valid for Block volume mode - skipping")
@@ -1358,8 +1355,19 @@ func findVolumeMountPath(pod *v1.Pod, claim *v1.PersistentVolumeClaim) string {
 	return containerMountPath
 }
 
-// getFilesystemSizeBytes returns a total size of a filesystem on given mountPath inside a pod. You can use findVolumeMountPath for mountPath lookup.
-func getFilesystemSizeBytes(pod *v1.Pod, mountPath string) (int, error) {
+// getFilesystemSizeBytes returns the total capacity of the filesystem mounted inside a pod
+// at the given mountPath. It selects the appropriate platform-specific logic (Windows/Linux).
+// This function relies on the `framework.NodeOSDistroIs` helper to determine the target OS.
+func getFilesystemSizeBytes(pod *v1.Pod, mountPath string) (int64, error) {
+	if framework.NodeOSDistroIs("windows") {
+		return getFilesystemSizeBytesWindows(pod, mountPath)
+	}
+	return getFilesystemSizeBytesLinux(pod, mountPath)
+}
+
+// getFilesystemSizeBytesLinux returns the total size of a filesystem using 'stat' (block size * block count).
+func getFilesystemSizeBytesLinux(pod *v1.Pod, mountPath string) (int64, error) {
+	// Get Block Size: Executes 'stat -f -c %s <mountPath>' inside the pod.
 	cmd := fmt.Sprintf("stat -f -c %%s %v", mountPath)
 	blockSize, err := e2ekubectl.RunKubectl(pod.Namespace, "exec", pod.Name, "--", "/bin/sh", "-c", cmd)
 	if err != nil {
@@ -1382,7 +1390,87 @@ func getFilesystemSizeBytes(pod *v1.Pod, mountPath string) (int, error) {
 		return 0, err
 	}
 
-	return bs * bc, nil
+	return int64(bs * bc), nil
+}
+
+// getFilesystemSizeBytesWindows returns the total size of the filesystem backing
+// the given mountPath inside a Windows pod.
+func getFilesystemSizeBytesWindows(pod *v1.Pod, mountPath string) (int64, error) {
+	// Resolve the underlying volume by executing: (Get-Item -Path "<mountPath>").Target
+	resolveVolumeIDCmd := fmt.Sprintf(`(Get-Item -Path "%s").Target`, mountPath)
+	out, err := e2ekubectl.RunKubectl(
+		pod.Namespace,
+		"exec", pod.Name, "--",
+		"powershell.exe",
+		"-NoProfile",
+		"-NonInteractive",
+		"-Command", fmt.Sprintf("& { %s }", resolveVolumeIDCmd),
+	)
+	if err != nil {
+		return 0, fmt.Errorf("failed resolving underlying volume for mountPath %q: %w", mountPath, err)
+	}
+
+	volumeID := strings.Trim(out, "\x00 \r\n\t")
+
+	if volumeID == "" {
+		return 0, fmt.Errorf("resolved empty volumeID for mountPath %q", mountPath)
+	}
+	// If this is a normal drive letter volume (like "C:" or "D:"),
+	// then Get-Volume -DriveLetter works fine.
+	if len(volumeID) == 2 && volumeID[1] == ':' {
+		driveLetter := volumeID[:1] // "C"
+		psCmd := fmt.Sprintf(`(Get-Volume -DriveLetter %s).Size`, driveLetter)
+
+		return runGetVolumeSize(pod, psCmd, fmt.Sprintf("drive %s", driveLetter))
+	}
+	// Otherwise, this is a real volume GUID:
+	// This path usually requires resolving to the Disk Number first, following CSI Proxy logic.
+	// We simplify the final step by executing a sequence of commands to resolve the Disk Number and get the Size.
+	psDiskNumCmd := fmt.Sprintf(`(Get-Volume -UniqueId "%s" | Get-Partition).DiskNumber`, volumeID)
+
+	diskOut, err := e2ekubectl.RunKubectl(
+		pod.Namespace,
+		"exec", pod.Name, "--",
+		"powershell.exe",
+		"-NoProfile",
+		"-NonInteractive",
+		"-Command", fmt.Sprintf("& { %s }", psDiskNumCmd),
+	)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get DiskNumber for volumeID %q: %w", volumeID, err)
+	}
+
+	diskNumStr := strings.Trim(diskOut, "\x00 \r\n\t")
+	if diskNumStr == "" {
+		return 0, fmt.Errorf("DiskNumber is empty for volume %q", volumeID)
+	}
+
+	diskSizeCmd := fmt.Sprintf(`(Get-Disk -Number %s).Size`, diskNumStr)
+	return runGetVolumeSize(pod, diskSizeCmd, fmt.Sprintf("disk %s (volumeID=%s)", diskNumStr, volumeID))
+}
+
+// runGetVolumeSize is a shared helper function that executes a PowerShell command
+// expected to return a single integer (the size in bytes) and parses it.
+func runGetVolumeSize(pod *v1.Pod, psCmd, debugTag string) (int64, error) {
+	out, err := e2ekubectl.RunKubectl(
+		pod.Namespace,
+		"exec", pod.Name, "--",
+		"powershell.exe",
+		"-NoProfile",
+		"-NonInteractive",
+		"-Command", fmt.Sprintf("& { %s }", psCmd),
+	)
+	if err != nil {
+		return 0, fmt.Errorf("failed running PowerShell Get-Volume for %s: %w", debugTag, err)
+	}
+	// Clean output of null bytes, carriage returns, and whitespace for safe parsing.
+	cleaned := strings.Trim(out, "\x00 \r\n\t")
+	totalBytes, err := strconv.ParseInt(cleaned, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("failed parsing PowerShell output %q for %s: %w",
+			cleaned, debugTag, err)
+	}
+	return totalBytes, nil
 }
 
 // MultiplePVMountSingleNodeCheck checks that multiple PV pointing to the same underlying storage can be mounted simultaneously on a single node.
