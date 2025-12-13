@@ -29,6 +29,7 @@ prepare_image() {
     local image_name="$1"
     local tag="$2"
     local internal_tag="$3"
+    local platform="$4"
     local image_dir="$REGISTRY_DIR/$image_name"
 
     echo "--- Preparing image: ${image_name}:${tag} as ${image_name}:${internal_tag} ---"
@@ -38,8 +39,8 @@ prepare_image() {
 
     echo "Downloading and filtering manifest list for $image_name:$tag..."
     local tmp_manifest_path="$image_dir/manifests/tmp_${internal_tag}"
-    # download the manifest and pipe it to jq to filter out windows images
-    crane manifest "$REGISTRY_URL/$image_name:$tag" | jq '.manifests |= map(select(.platform.os != "windows"))' > "$tmp_manifest_path"
+    # download the manifest and pipe it to jq to filter based on the platform
+    crane manifest "$REGISTRY_URL/$image_name:$tag" | jq --arg platform "$platform" '.manifests |= map(select(.platform.os == $platform))' > "$tmp_manifest_path"
     echo "Saved manifest list to $tmp_manifest_path"
 
     local manifest_digest
@@ -79,10 +80,12 @@ prepare_image() {
 mkdir -p "$REGISTRY_DIR"
 
 echo "--> Processing images.txt..."
-while read -r image tag internal_tag; do
+while read -r image tag internal_tag platform; do
     # skip empty lines or comments
     [[ -z "$image" || "$image" == \#* ]] && continue
-    prepare_image "$image" "$tag" "$internal_tag"
+    # default platform to 'linux' if not specified
+    platform="${platform:-linux}"
+    prepare_image "$image" "$tag" "$internal_tag" "$platform"
 done < /images.txt
 
 echo "--> Done"
