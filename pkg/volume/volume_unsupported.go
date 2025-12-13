@@ -21,7 +21,7 @@ package volume
 
 import (
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/kubernetes/pkg/volume/util/types"
 )
 
@@ -30,7 +30,7 @@ func NewVolumeOwnership(mounter Mounter, dir string, fsGroup *int64, fsGroupChan
 	return &VolumeOwnership{}
 }
 
-func (vo *VolumeOwnership) AddProgressNotifier(pod *v1.Pod, recorder record.EventRecorder) VolumeOwnershipChanger {
+func (vo *VolumeOwnership) AddProgressNotifier(pod *v1.Pod, recorder events.EventRecorder) VolumeOwnershipChanger {
 	return vo
 }
 

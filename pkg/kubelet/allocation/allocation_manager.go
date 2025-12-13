@@ -30,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/tools/record"
+	toolsevents "k8s.io/client-go/tools/events"
 	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -136,7 +136,7 @@ type manager struct {
 	allocationMutex        sync.Mutex
 	podsWithPendingResizes []types.UID
 
-	recorder record.EventRecorder
+	recorder toolsevents.EventRecorder
 }
 
 func NewManager(checkpointDirectory string,
@@ -147,7 +147,7 @@ func NewManager(checkpointDirectory string,
 	getActivePods func() []*v1.Pod,
 	getPodByUID func(types.UID) (*v1.Pod, bool),
 	sourcesReady config.SourcesReady,
-	recorder record.EventRecorder,
+	recorder toolsevents.EventRecorder,
 ) Manager {
 	return &manager{
 		allocated: newStateImpl(checkpointDirectory, allocatedPodsStateFile),
@@ -191,7 +191,7 @@ func NewInMemoryManager(nodeConfig cm.NodeConfig,
 	getActivePods func() []*v1.Pod,
 	getPodByUID func(types.UID) (*v1.Pod, bool),
 	sourcesReady config.SourcesReady,
-	recorder record.EventRecorder,
+	recorder toolsevents.EventRecorder,
 ) Manager {
 	return &manager{
 		allocated: state.NewStateMemory(nil),
@@ -605,7 +605,7 @@ func (m *manager) handlePodResourcesResize(pod *v1.Pod) (bool, error) {
 		m.statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", pod.Generation)
 
 		msg := events.PodResizeStartedMsg(allocatedPod, pod.Generation)
-		m.recorder.Eventf(pod, v1.EventTypeNormal, events.ResizeStarted, msg)
+		m.recorder.Eventf(pod, nil, v1.EventTypeNormal, events.ResizeStarted, "ResizingPod", msg)
 
 		return true, nil
 	}
@@ -617,7 +617,7 @@ func (m *manager) handlePodResourcesResize(pod *v1.Pod) (bool, error) {
 				eventType = events.ResizeInfeasible
 			}
 			msg := events.PodResizePendingMsg(pod, reason, message, pod.Generation)
-			m.recorder.Eventf(pod, v1.EventTypeWarning, eventType, msg)
+			m.recorder.Eventf(pod, nil, v1.EventTypeWarning, eventType, "ResizingPod", msg)
 		}
 	}
 
