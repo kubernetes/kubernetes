@@ -646,7 +646,7 @@ func (sched *Scheduler) findNodesThatPassFilters(
 		return feasibleNodes, nil
 	}
 
-	errCh := parallelize.NewErrorChannel()
+	errCh := parallelize.NewResultChannel[error]()
 	var feasibleNodesLen int32
 	ctx, cancel := context.WithCancelCause(ctx)
 	defer cancel(errors.New("findNodesThatPassFilters has completed"))
@@ -662,7 +662,7 @@ func (sched *Scheduler) findNodesThatPassFilters(
 		nodeInfo := nodes[(sched.nextStartNodeIndex+i)%numAllNodes]
 		status := schedFramework.RunFilterPluginsWithNominatedPods(ctx, state, pod, nodeInfo)
 		if status.Code() == fwk.Error {
-			errCh.SendErrorWithCancel(status.AsError(), func() {
+			errCh.SendWithCancel(status.AsError(), func() {
 				cancel(errors.New("some other Filter operation failed"))
 			})
 			return
@@ -700,7 +700,7 @@ func (sched *Scheduler) findNodesThatPassFilters(
 		diagnosis.NodeToStatus.Set(item.node, item.status)
 		diagnosis.AddPluginStatus(item.status)
 	}
-	if err := errCh.ReceiveError(); err != nil {
+	if err := errCh.Receive(); err != nil {
 		statusCode = fwk.Error
 		return feasibleNodes, err
 	}

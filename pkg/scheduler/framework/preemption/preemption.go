@@ -468,7 +468,7 @@ func (ev *Evaluator) prepareCandidate(ctx context.Context, c Candidate, pod *v1.
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	logger := klog.FromContext(ctx)
-	errCh := parallelize.NewErrorChannel()
+	errCh := parallelize.NewResultChannel[error]()
 	fh.Parallelizer().Until(ctx, len(c.Victims().Pods), func(index int) {
 		victim := c.Victims().Pods[index]
 		if victim.DeletionTimestamp != nil {
@@ -477,10 +477,10 @@ func (ev *Evaluator) prepareCandidate(ctx context.Context, c Candidate, pod *v1.
 			return
 		}
 		if err := ev.PreemptPod(ctx, c, pod, victim, pluginName); err != nil {
-			errCh.SendErrorWithCancel(err, cancel)
+			errCh.SendWithCancel(err, cancel)
 		}
 	}, ev.PluginName)
-	if err := errCh.ReceiveError(); err != nil {
+	if err := errCh.Receive(); err != nil {
 		return fwk.AsStatus(err)
 	}
 
@@ -553,11 +553,11 @@ func (ev *Evaluator) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName 
 		return
 	}
 
-	errCh := parallelize.NewErrorChannel()
+	errCh := parallelize.NewResultChannel[error]()
 	preemptPod := func(index int) {
 		victim := victimPods[index]
 		if err := ev.PreemptPod(ctx, c, pod, victim, pluginName); err != nil {
-			errCh.SendErrorWithCancel(err, cancel)
+			errCh.SendWithCancel(err, cancel)
 		}
 	}
 
@@ -603,7 +603,7 @@ func (ev *Evaluator) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName 
 			// preemptor is marked as "waiting for preemption of a victim" (by adding it to preempting map).
 			// For optimization purposes the last victim is recorded in lastVictimsPendingPreemption.
 			ev.Handler.Parallelizer().Until(ctx, len(victimPods)-1, preemptPod, ev.PluginName)
-			if err := errCh.ReceiveError(); err != nil {
+			if err := errCh.Receive(); err != nil {
 				utilruntime.HandleErrorWithContext(ctx, err, "Error occurred during async preemption")
 				result = metrics.GoroutineResultError
 			}
