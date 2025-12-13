@@ -70,12 +70,14 @@ func ValidateStorageVersionMigrationStatusUpdate(newSVMBundle, oldSVMBundle *sto
 	fldPath := field.NewPath("status")
 
 	// resource version should be a non-negative integer
-	cmp, err := resourceversion.CompareResourceVersion(newSVMBundle.Status.ResourceVersion, newSVMBundle.Status.ResourceVersion)
-	if err != nil || cmp != 0 {
-		if err == nil {
-			err = fmt.Errorf("unable to compare resource versions, %s is not equal to %s", newSVMBundle.Status.ResourceVersion, newSVMBundle.Status.ResourceVersion)
+	if len(newSVMBundle.Status.ResourceVersion) != 0 {
+		cmp, err := resourceversion.CompareResourceVersion(newSVMBundle.Status.ResourceVersion, newSVMBundle.Status.ResourceVersion)
+		if err != nil || cmp != 0 {
+			if err == nil {
+				err = fmt.Errorf("unable to compare resource versions, %s is not equal to %s", newSVMBundle.Status.ResourceVersion, newSVMBundle.Status.ResourceVersion)
+			}
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("resourceVersion"), newSVMBundle.Status.ResourceVersion, err.Error()))
 		}
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("resourceVersion"), newSVMBundle.Status.ResourceVersion, err.Error()))
 	}
 
 	allErrs = append(allErrs, metav1validation.ValidateConditions(newSVMBundle.Status.Conditions, fldPath.Child("conditions"))...)

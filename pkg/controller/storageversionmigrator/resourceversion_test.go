@@ -209,7 +209,10 @@ func TestRVSync(t *testing.T) {
 		{
 			name: "Successful RV acquisition",
 			key:  "test-svm",
-			svm:  newSVM("test-svm", ""),
+			svm: newSVMWithConditions("test-svm", "", []metav1.Condition{{
+				Type:   string(svmv1beta1.AssociatedCRD),
+				Status: metav1.ConditionFalse,
+			}}),
 			discoveryResources: &metav1.APIResourceList{
 				GroupVersion: "apps/v1",
 				APIResources: []metav1.APIResource{
@@ -225,7 +228,12 @@ func TestRVSync(t *testing.T) {
 				kubetesting.NewUpdateAction(
 					svmv1beta1.SchemeGroupVersion.WithResource("storageversionmigrations"),
 					"",
-					newSVM("test-svm", "12345"),
+					newSVMWithConditions("test-svm", "12345", []metav1.Condition{
+						{
+							Type:   string(svmv1beta1.AssociatedCRD),
+							Status: metav1.ConditionFalse,
+						},
+					}),
 				),
 			},
 		},
@@ -235,9 +243,18 @@ func TestRVSync(t *testing.T) {
 			svm:  nil,
 		},
 		{
+			name: "SVM has no CRD condition",
+			key:  "succeeded-svm",
+			svm:  newSVM("succeeded-svm", ""),
+		},
+		{
 			name: "SVM already succeeded",
 			key:  "succeeded-svm",
 			svm: newSVMWithConditions("succeeded-svm", "100", []metav1.Condition{
+				{
+					Type:   string(svmv1beta1.AssociatedCRD),
+					Status: metav1.ConditionFalse,
+				},
 				{
 					Type:   string(svmv1beta1.MigrationSucceeded),
 					Status: metav1.ConditionTrue,
@@ -249,6 +266,10 @@ func TestRVSync(t *testing.T) {
 			key:  "failed-svm",
 			svm: newSVMWithConditions("failed-svm", "100", []metav1.Condition{
 				{
+					Type:   string(svmv1beta1.AssociatedCRD),
+					Status: metav1.ConditionFalse,
+				},
+				{
 					Type:   string(svmv1beta1.MigrationFailed),
 					Status: metav1.ConditionTrue,
 				},
@@ -257,12 +278,18 @@ func TestRVSync(t *testing.T) {
 		{
 			name: "RV already set",
 			key:  "rv-set-svm",
-			svm:  newSVM("rv-set-svm", "123"),
+			svm: newSVMWithConditions("rv-set-svm", "123", []metav1.Condition{{
+				Type:   string(svmv1beta1.AssociatedCRD),
+				Status: metav1.ConditionFalse,
+			}}),
 		},
 		{
 			name: "Resource not migratable",
 			key:  "not-migratable-svm",
-			svm:  newSVM("not-migratable-svm", ""),
+			svm: newSVMWithConditions("not-migratable-svm", "", []metav1.Condition{{
+				Type:   string(svmv1beta1.AssociatedCRD),
+				Status: metav1.ConditionFalse,
+			}}),
 			discoveryResources: &metav1.APIResourceList{
 				GroupVersion: "apps/v1",
 				APIResources: []metav1.APIResource{
@@ -275,6 +302,10 @@ func TestRVSync(t *testing.T) {
 					"",
 					newSVMWithConditions("not-migratable-svm", "", []metav1.Condition{
 						{
+							Type:   string(svmv1beta1.AssociatedCRD),
+							Status: metav1.ConditionFalse,
+						},
+						{
 							Type:   string(svmv1beta1.MigrationFailed),
 							Status: metav1.ConditionTrue,
 						},
@@ -285,7 +316,10 @@ func TestRVSync(t *testing.T) {
 		{
 			name: "Metadata list error",
 			key:  "metadata-error-svm",
-			svm:  newSVM("metadata-error-svm", ""),
+			svm: newSVMWithConditions("metadata-error-svm", "", []metav1.Condition{{
+				Type:   string(svmv1beta1.AssociatedCRD),
+				Status: metav1.ConditionFalse,
+			}}),
 			discoveryResources: &metav1.APIResourceList{
 				GroupVersion: "apps/v1",
 				APIResources: []metav1.APIResource{
@@ -299,7 +333,10 @@ func TestRVSync(t *testing.T) {
 		{
 			name: "Invalid RV returned",
 			key:  "invalid-rv-svm",
-			svm:  newSVM("invalid-rv-svm", ""),
+			svm: newSVMWithConditions("invalid-rv-svm", "", []metav1.Condition{{
+				Type:   string(svmv1beta1.AssociatedCRD),
+				Status: metav1.ConditionFalse,
+			}}),
 			discoveryResources: &metav1.APIResourceList{
 				GroupVersion: "apps/v1",
 				APIResources: []metav1.APIResource{
@@ -316,6 +353,10 @@ func TestRVSync(t *testing.T) {
 					svmv1beta1.SchemeGroupVersion.WithResource("storageversionmigrations"),
 					"",
 					newSVMWithConditions("invalid-rv-svm", "", []metav1.Condition{
+						{
+							Type:   string(svmv1beta1.AssociatedCRD),
+							Status: metav1.ConditionFalse,
+						},
 						{
 							Type:   string(svmv1beta1.MigrationFailed),
 							Status: metav1.ConditionTrue,
