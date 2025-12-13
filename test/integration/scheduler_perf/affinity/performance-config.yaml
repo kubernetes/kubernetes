@@ -78,6 +78,61 @@
       initPods: 1000
       measurePods: 2000
 
+- name: SchedulingPodMatchingAntiAffinity
+  defaultPodTemplatePath: ../templates/pod-with-pod-anti-affinity.yaml
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  - opcode: createNamespaces
+    prefix: sched
+    count: 2
+  - opcode: createPods
+    countParam: $initPods
+    namespace: sched-0
+  - opcode: createPods
+    podTemplatePath: ../templates/pod-with-pod-anti-affinity-label.yaml
+    countParam: $measurePods
+    collectMetrics: true
+    namespace: sched-1
+  workloads:
+  - name: 5Nodes
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [integration-test, short]
+    params:
+      initNodes: 5
+      initPods: 1
+      measurePods: 4
+  - name: 5Nodes_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [integration-test, short]
+    params:
+      initNodes: 5
+      initPods: 1
+      measurePods: 4
+  - name: 500Nodes
+    params:
+      initNodes: 500
+      initPods: 100
+      measurePods: 400
+  - name: 5000Nodes_5000Pods
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initPods: 1000
+      measurePods: 5000
+  - name: 5000Nodes_5000Pods_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initPods: 1000
+      measurePods: 5000
+
 - name: SchedulingPodAffinity
   defaultPodTemplatePath: ../templates/pod-with-pod-affinity.yaml
   workloadTemplate:
