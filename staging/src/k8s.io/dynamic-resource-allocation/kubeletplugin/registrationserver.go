@@ -31,7 +31,8 @@ type registrationServer struct {
 	supportedVersions []string
 	status            *registerapi.RegistrationStatus
 
-	getInfoError atomic.Pointer[error]
+	getInfoError                  atomic.Pointer[error]
+	notifyRegistrationStatusError atomic.Pointer[error]
 
 	registerapi.UnsafeRegistrationServer
 }
@@ -53,6 +54,9 @@ func (e *registrationServer) GetInfo(ctx context.Context, req *registerapi.InfoR
 
 // NotifyRegistrationStatus is the RPC invoked by plugin watcher.
 func (e *registrationServer) NotifyRegistrationStatus(ctx context.Context, status *registerapi.RegistrationStatus) (*registerapi.RegistrationStatusResponse, error) {
+	if err := e.getNotifyRegistrationStatusError(); err != nil {
+		return nil, err
+	}
 	e.status = status
 	if !status.PluginRegistered {
 		return nil, fmt.Errorf("failed registration process: %+v", status.Error)
@@ -69,6 +73,14 @@ func (e *registrationServer) getGetInfoError() error {
 	return *errPtr
 }
 
+func (e *registrationServer) getNotifyRegistrationStatusError() error {
+	errPtr := e.notifyRegistrationStatusError.Load()
+	if errPtr == nil {
+		return nil
+	}
+	return *errPtr
+}
+
 // setGetInfoError sets the error to be returned by the GetInfo handler of the registration server.
 // If a non-nil error is provided, subsequent GetInfo calls will return this error.
 // Passing nil as the err argument will clear any previously set error, effectively disabling erroring.
@@ -78,4 +90,16 @@ func (e *registrationServer) setGetInfoError(err error) {
 		return
 	}
 	e.getInfoError.Store(&err)
+}
+
+// setNotifyRegistrationStatusError sets the error to be returned by the NotifyRegistrationStatus handler
+// of the registration server.
+// If a non-nil error is provided, subsequent NotifyRegistrationStatus calls will return this error.
+// Passing nil as the err argument will clear any previously set error, effectively disabling erroring.
+func (e *registrationServer) setNotifyRegistrationStatusError(err error) {
+	if err == nil {
+		e.notifyRegistrationStatusError.Store(nil)
+		return
+	}
+	e.notifyRegistrationStatusError.Store(&err)
 }
