@@ -324,6 +324,10 @@ func New(ctx context.Context,
 	// waitingPods holds all the pods that are in the scheduler and waiting in the permit stage
 	waitingPods := frameworkruntime.NewWaitingPodsMap()
 
+	// bindingPods holds all the pods that are in the scheduler in the binding cycle but
+	// before the pod is bound
+	bindingPods := frameworkruntime.NewBindingPodsMap()
+
 	var resourceClaimCache *assumecache.AssumeCache
 	var resourceSliceTracker *resourceslicetracker.Tracker
 	var draManager fwk.SharedDRAManager
@@ -371,6 +375,7 @@ func New(ctx context.Context,
 		frameworkruntime.WithExtenders(extenders),
 		frameworkruntime.WithMetricsRecorder(metricsRecorder),
 		frameworkruntime.WithWaitingPods(waitingPods),
+		frameworkruntime.WithBindingPods(bindingPods),
 		frameworkruntime.WithAPIDispatcher(apiDispatcher),
 		frameworkruntime.WithSharedCSIManager(sharedCSIManager),
 		frameworkruntime.WithWorkloadManager(workloadManager),
