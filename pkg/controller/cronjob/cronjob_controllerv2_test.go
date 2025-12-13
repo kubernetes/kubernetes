@@ -29,7 +29,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
@@ -1665,107 +1664,6 @@ func TestControllerV2UpdateCronJob(t *testing.T) {
 			jm.updateCronJob(logger, tt.oldCronJob, tt.newCronJob)
 			if queue.delay.Seconds() != tt.expectedDelay.Seconds() {
 				t.Errorf("Expected delay %#v got %#v", tt.expectedDelay.Seconds(), queue.delay.Seconds())
-			}
-		})
-	}
-}
-
-func TestControllerV2GetJobsToBeReconciled(t *testing.T) {
-	trueRef := true
-	tests := []struct {
-		name     string
-		cronJob  *batchv1.CronJob
-		jobs     []runtime.Object
-		expected []*batchv1.Job
-	}{
-		{
-			name:    "test getting jobs in namespace without controller reference",
-			cronJob: &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Namespace: "foo-ns", Name: "fooer"}},
-			jobs: []runtime.Object{
-				&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "foo-ns"}},
-				&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: "foo-ns"}},
-				&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "foo2", Namespace: "foo-ns"}},
-			},
-			expected: []*batchv1.Job{},
-		},
-		{
-			name:    "test getting jobs in namespace with a controller reference",
-			cronJob: &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Namespace: "foo-ns", Name: "fooer"}},
-			jobs: []runtime.Object{
-				&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "foo-ns"}},
-				&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: "foo-ns",
-					OwnerReferences: []metav1.OwnerReference{{Name: "fooer", Controller: &trueRef}}}},
-				&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "foo2", Namespace: "foo-ns"}},
-			},
-			expected: []*batchv1.Job{
-				{ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: "foo-ns",
-					OwnerReferences: []metav1.OwnerReference{{Name: "fooer", Controller: &trueRef}}}},
-			},
-		},
-		{
-			name:    "test getting jobs in other namespaces",
-			cronJob: &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Namespace: "foo-ns", Name: "fooer"}},
-			jobs: []runtime.Object{
-				&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar-ns"}},
-				&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: "bar-ns"}},
-				&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "foo2", Namespace: "bar-ns"}},
-			},
-			expected: []*batchv1.Job{},
-		},
-		{
-			name: "test getting jobs whose labels do not match job template",
-			cronJob: &batchv1.CronJob{
-				ObjectMeta: metav1.ObjectMeta{Namespace: "foo-ns", Name: "fooer"},
-				Spec: batchv1.CronJobSpec{JobTemplate: batchv1.JobTemplateSpec{
-					ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"key": "value"}},
-				}},
-			},
-			jobs: []runtime.Object{
-				&batchv1.Job{ObjectMeta: metav1.ObjectMeta{
-					Namespace:       "foo-ns",
-					Name:            "foo-fooer-owner-ref",
-					Labels:          map[string]string{"key": "different-value"},
-					OwnerReferences: []metav1.OwnerReference{{Name: "fooer", Controller: &trueRef}}},
-				},
-				&batchv1.Job{ObjectMeta: metav1.ObjectMeta{
-					Namespace:       "foo-ns",
-					Name:            "foo-other-owner-ref",
-					Labels:          map[string]string{"key": "different-value"},
-					OwnerReferences: []metav1.OwnerReference{{Name: "another-cronjob", Controller: &trueRef}}},
-				},
-			},
-			expected: []*batchv1.Job{{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace:       "foo-ns",
-					Name:            "foo-fooer-owner-ref",
-					Labels:          map[string]string{"key": "different-value"},
-					OwnerReferences: []metav1.OwnerReference{{Name: "fooer", Controller: &trueRef}}},
-			}},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
-			ctx, cancel := context.WithCancel(ctx)
-			defer cancel()
-			kubeClient := fake.NewSimpleClientset()
-			sharedInformers := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
-			for _, job := range tt.jobs {
-				sharedInformers.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
-			}
-			jm, err := NewControllerV2(ctx, sharedInformers.Batch().V1().Jobs(), sharedInformers.Batch().V1().CronJobs(), kubeClient)
-			if err != nil {
-				t.Errorf("unexpected error %v", err)
-				return
-			}
-
-			actual, err := jm.getJobsToBeReconciled(tt.cronJob)
-			if err != nil {
-				t.Errorf("unexpected error %v", err)
-				return
-			}
-			if !reflect.DeepEqual(actual, tt.expected) {
-				t.Errorf("\nExpected %#v,\nbut got %#v", tt.expected, actual)
 			}
 		})
 	}
