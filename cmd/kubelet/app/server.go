@@ -767,9 +767,6 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		}
 	}
 
-	// Setup event recorder if required.
-	makeEventRecorder(ctx, kubeDeps, nodeName)
-
 	if kubeDeps.ContainerManager == nil {
 		if s.CgroupsPerQOS && s.CgroupRoot == "" {
 			logger.Info("--cgroups-per-qos enabled, but --cgroup-root was not specified.  Defaulting to /")
