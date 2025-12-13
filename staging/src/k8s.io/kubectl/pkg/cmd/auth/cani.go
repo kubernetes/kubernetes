@@ -42,7 +42,6 @@ import (
 	"k8s.io/kubectl/pkg/describe"
 	rbacutil "k8s.io/kubectl/pkg/util/rbac"
 	"k8s.io/kubectl/pkg/util/templates"
-	"k8s.io/kubectl/pkg/util/term"
 )
 
 // CanIOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
@@ -154,7 +153,7 @@ func NewCmdCanI(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Co
 func (o *CanIOptions) Complete(f cmdutil.Factory, args []string) error {
 	// Set default WarningPrinter if not already set.
 	if o.WarningPrinter == nil {
-		o.WarningPrinter = printers.NewWarningPrinter(o.ErrOut, printers.WarningPrinterOptions{Color: term.AllowsColorOutput(o.ErrOut)})
+		o.WarningPrinter = printers.NewWarningPrinter(o.ErrOut, printers.WarningPrinterOptions{Color: printers.AllowsColorOutput(o.ErrOut)})
 	}
 
 	if o.List {
