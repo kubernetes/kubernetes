@@ -21,12 +21,14 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"sort"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -892,4 +894,216 @@ func (m *mockTxnStore) Transaction(txns ...Transaction) *TransactionError {
 	}
 	m.succeedCount = len(txns)
 	return nil
+}
+
+func TestReplaceEvents(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	source := fcache.NewFakeControllerSource()
+	store := NewStore(DeletionHandlingMetaNamespaceKeyFunc)
+	t.Cleanup(func() {
+		source.Shutdown()
+	})
+
+	recorder := newEventRecorder()
+
+	fifo := NewRealFIFOWithOptions(RealFIFOOptions{
+		KnownObjects: store,
+	})
+
+	cfg := &Config{
+		Queue:            fifo,
+		ListerWatcher:    source,
+		ObjectType:       &v1.Pod{},
+		FullResyncPeriod: 0,
+
+		Process: func(obj interface{}, isInInitialList bool) error {
+			if deltas, ok := obj.(Deltas); ok {
+				return processDeltas(recorder, store, deltas, isInInitialList)
+			}
+			return errors.New("object given as Process argument is not Deltas")
+		},
+		ProcessBatch: func(deltaList []Delta, isInInitialList bool) error {
+			return processDeltasInBatch(recorder, store, deltaList, isInInitialList)
+		},
+	}
+
+	c := New(cfg)
+	go c.RunWithContext(ctx)
+	if !WaitForCacheSync(ctx.Done(), c.HasSynced) {
+		t.Fatal("Timed out waiting for cache sync")
+	}
+	testReplaceEvents(t, ctx, fifo, recorder, store)
+}
+
+func testReplaceEvents(t *testing.T, ctx context.Context, fifo Queue, m *eventRecorder, store Store) {
+	tcs := []struct {
+		name            string
+		initialObjs     []metav1.Object
+		replacedItems   []interface{}
+		expectedHistory []eventRecord
+	}{
+		{
+			name: "Create with no initial objects",
+			replacedItems: []interface{}{
+				&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-1", Namespace: "default"}},
+			},
+			expectedHistory: []eventRecord{
+				{Action: "add", Key: "default/pod-1"},
+			},
+		},
+		{
+			name: "Delete all objects",
+			initialObjs: []metav1.Object{
+				&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-1", Namespace: "default"}},
+				&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-3", Namespace: "default"}},
+			},
+			replacedItems: []interface{}{},
+			expectedHistory: []eventRecord{
+				{Action: "delete", Key: "default/pod-1"},
+				{Action: "delete", Key: "default/pod-3"},
+			},
+		},
+		{
+			name: "Create, update, delete",
+			initialObjs: []metav1.Object{
+				&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-1", Namespace: "default"}},
+				&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-2", Namespace: "default", Labels: map[string]string{"ver": "1"}}},
+				&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-3", Namespace: "default"}},
+			},
+			replacedItems: []interface{}{
+				&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-1", Namespace: "default"}},
+				&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-2", Namespace: "default", Labels: map[string]string{"ver": "2"}}},
+				&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-4", Namespace: "default"}},
+			},
+			expectedHistory: []eventRecord{
+				{Action: "update", Key: "default/pod-1"},
+				{Action: "update", Key: "default/pod-2"},
+				{Action: "delete", Key: "default/pod-3"},
+				{Action: "add", Key: "default/pod-4"},
+			},
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, obj := range tc.initialObjs {
+				require.NoError(t, fifo.Add(obj), "failed to add")
+			}
+
+			// Wait for all create events to appear
+			require.NoError(t, m.waitForEventCount(ctx, len(tc.initialObjs), 5*time.Second), "Controller failed to receive initial setup all events, got: %v", m.getHistory())
+
+			// Clear history so we only compare what happens during the RESYNC/REPLACE
+			m.clearHistory()
+
+			// Run replace
+			require.NoError(t, fifo.Replace(tc.replacedItems, "123"), "failed to replace")
+
+			// Wait for all expected events to be received
+			require.NoError(t, m.waitForEventCount(ctx, len(tc.expectedHistory), 5*time.Second), "Controller failed to receive all events, got: %v", m.getHistory())
+
+			items := sortItemsByKey(store.List(), DeletionHandlingMetaNamespaceKeyFunc)
+			assert.Equal(t, tc.replacedItems, items)
+			assert.Equal(t, tc.expectedHistory, m.getHistory())
+		})
+	}
+}
+
+type eventRecord struct {
+	Action string
+	Key    string
+}
+
+type eventRecorder struct {
+	historyLock sync.Mutex
+	history     []eventRecord
+
+	updateCh chan bool
+}
+
+func newEventRecorder() *eventRecorder {
+	return &eventRecorder{
+		updateCh: make(chan bool, 1),
+	}
+}
+
+func (m *eventRecorder) OnAdd(obj interface{}, _ bool) {
+	m.record("add", obj)
+}
+func (m *eventRecorder) OnUpdate(_, obj interface{}) {
+	m.record("update", obj)
+}
+func (m *eventRecorder) OnDelete(obj interface{}) {
+	m.record("delete", obj)
+}
+
+func (m *eventRecorder) record(action string, obj interface{}) {
+	m.historyLock.Lock()
+	defer m.historyLock.Unlock()
+	key, _ := DeletionHandlingMetaNamespaceKeyFunc(obj)
+	m.history = append(m.history, eventRecord{Action: action, Key: key})
+
+	select {
+	case m.updateCh <- true:
+	default:
+	}
+}
+
+func (m *eventRecorder) clearHistory() {
+	m.historyLock.Lock()
+	defer m.historyLock.Unlock()
+	m.history = []eventRecord{}
+}
+
+func (m *eventRecorder) getHistory() []eventRecord {
+	m.historyLock.Lock()
+	historyCopy := make([]eventRecord, len(m.history))
+	copy(historyCopy, m.history)
+	m.historyLock.Unlock()
+
+	sortEvents := func(events []eventRecord) {
+		sort.Slice(events, func(i, j int) bool {
+			if events[i].Key != events[j].Key {
+				return events[i].Key < events[j].Key
+			}
+			return events[i].Action < events[j].Action
+		})
+	}
+	sortEvents(historyCopy)
+
+	return historyCopy
+}
+
+func (m *eventRecorder) waitForEventCount(ctx context.Context, count int, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	for {
+		m.historyLock.Lock()
+		currentCount := len(m.history)
+		m.historyLock.Unlock()
+
+		if currentCount >= count {
+			return nil
+		}
+
+		select {
+		case <-m.updateCh:
+			continue
+		case <-ctx.Done():
+			return fmt.Errorf("context canceled waiting for %d events, currently have %d", count, currentCount)
+		}
+	}
+}
+
+func sortItemsByKey(items []interface{}, keyFunc KeyFunc) []interface{} {
+	sort.Slice(items, func(i, j int) bool {
+		keyI, _ := keyFunc(items[i])
+		keyJ, _ := keyFunc(items[j])
+		return keyI < keyJ
+	})
+	return items
 }
