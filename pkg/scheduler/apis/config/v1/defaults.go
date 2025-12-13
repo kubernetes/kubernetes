@@ -174,6 +174,20 @@ func SetDefaults_KubeSchedulerConfiguration(obj *configv1.KubeSchedulerConfigura
 	}
 }
 
+func SetDefaults_KubeSchedulerMetricConfiguration(obj *configv1.KubeSchedulerMetricConfiguration) {
+	if obj.PluginMetricsSamplePercent == nil {
+		obj.PluginMetricsSamplePercent = ptr.To[int64](config.DefaultPluginMetricsSamplePercent)
+	}
+
+	if obj.MetricsAsyncRecorderBufferSize == nil {
+		obj.MetricsAsyncRecorderBufferSize = ptr.To[int64](config.DefaultMetricsAsyncRecorderBufferSize)
+	}
+
+	if obj.MetricsAsyncRecorderFlushInterval == nil {
+		obj.MetricsAsyncRecorderFlushInterval = ptr.To(metav1.Duration{Duration: config.DefaultMetricsAsyncRecorderFlushInterval})
+	}
+}
+
 func SetDefaults_DefaultPreemptionArgs(obj *configv1.DefaultPreemptionArgs) {
 	if obj.MinCandidateNodesPercentage == nil {
 		obj.MinCandidateNodesPercentage = ptr.To[int32](10)

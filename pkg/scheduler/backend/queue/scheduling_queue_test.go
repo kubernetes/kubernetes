@@ -3569,7 +3569,7 @@ scheduler_plugin_execution_duration_seconds_count{extension_point="PreEnqueue",p
 				},
 			}
 			preenq := map[string]map[string]fwk.PreEnqueuePlugin{"": {(&preEnqueuePlugin{}).Name(): &preEnqueuePlugin{allowlists: []string{queueable}}}}
-			recorder := metrics.NewMetricsAsyncRecorder(3, 20*time.Microsecond, ctx.Done())
+			recorder := metrics.NewMetricsAsyncRecorder(ctx, 3, 20*time.Microsecond)
 			queue := NewTestQueue(ctx, newDefaultQueueSort(), WithClock(testingclock.NewFakeClock(timestamp)), WithPreEnqueuePluginMap(preenq), WithPluginMetricsSamplePercent(test.pluginMetricsSamplePercent), WithMetricsRecorder(recorder), WithQueueingHintMapPerProfile(m))
 			for i, op := range test.operations {
 				for _, pInfo := range test.operands[i] {
