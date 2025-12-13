@@ -504,6 +504,12 @@ var (
 					Allocation(allocationResultOtherDevices).
 					ReservedFor(resourceapi.ResourceClaimConsumerReference{Resource: "pods", Name: podName, UID: types.UID(podUID)}, resourceapi.ResourceClaimConsumerReference{Resource: "pods", Name: podName + "-other", UID: types.UID(podUID + "-3")}).
 					Obj()
+	inUseClaimReservedMissingFirst = st.FromResourceClaim(inUseClaim).
+					ReservedFor(resourceapi.ResourceClaimConsumerReference{Resource: "pods", Name: podName + "-missing", UID: types.UID("missing")}, resourceapi.ResourceClaimConsumerReference{Resource: "pods", Name: podName, UID: types.UID(podUID)}).
+					Obj()
+	inUseClaimReservedUIDMismatch = st.FromResourceClaim(inUseClaim).
+					ReservedFor(resourceapi.ResourceClaimConsumerReference{Resource: "pods", Name: podName, UID: types.UID(podUID + "-stale")}, resourceapi.ResourceClaimConsumerReference{Resource: "pods", Name: podName + "-second", UID: types.UID(podUID + "-second")}).
+					Obj()
 	// A test may run for an hour without reaching the end of this period.
 	tolerationDuration       = 60 * 60 * time.Second
 	inUseClaimWithToleration = func() *resourceapi.ResourceClaim {
@@ -551,6 +557,11 @@ var (
 					PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimName: &inUseClaimOtherName.Name}).
 					Node(nodeName).
 					Obj()
+	podWithClaimNameSecond = st.MakePod().Name(podName + "-second").Namespace(namespace).
+				UID(podUID + "-second").
+				PodResourceClaims(v1.PodResourceClaim{Name: resourceName + "-second", ResourceClaimName: &claimName}).
+				Node(nodeName).
+				Obj()
 	podWithClaimTemplate = st.MakePod().Name(podName).Namespace(namespace).
 				UID(podUID).
 				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimTemplateName: &claimName}).
@@ -633,6 +644,22 @@ var (
 			Namespace:  namespace,
 			Name:       podName + "-other",
 			UID:        types.UID(podUID + "-3"),
+		},
+		Reason:  "DeviceTaintManagerEviction",
+		Message: "Marking for deletion",
+		Type:    v1.EventTypeNormal,
+		Source: v1.EventSource{
+			Component: "nodeControllerTest",
+		},
+		Count: 1,
+	}
+	deletePodEventSecond = &v1.Event{
+		InvolvedObject: v1.ObjectReference{
+			Kind:       "Pod",
+			APIVersion: "v1",
+			Namespace:  namespace,
+			Name:       podName + "-second",
+			UID:        types.UID(podUID + "-second"),
 		},
 		Reason:  "DeviceTaintManagerEviction",
 		Message: "Marking for deletion",
@@ -844,6 +871,46 @@ func TestController(t *testing.T) {
 				queued:          MockState[workItem]{Ready: newWorkItems(podWithClaimName)},
 			},
 			wantEvents: l(deletePodEvent),
+		},
+		"evict-shared-claim-missing-first-reservation": {
+			events: []any{
+				[]any{
+					add(sliceTainted),
+					add(slice2),
+					add(podWithClaimName),
+					add(inUseClaimReservedMissingFirst),
+				},
+			},
+			finalState: state{
+				slices:          l(sliceTainted, slice2),
+				allocatedClaims: l(ac(inUseClaimReservedMissingFirst, newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0))),
+				deletePodAt:     evictMap{newObject(podWithClaimName): *newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0)},
+				queued:          MockState[workItem]{Ready: newWorkItems(podWithClaimName)},
+			},
+			wantEvents: l(deletePodEvent),
+		},
+		"evict-shared-claim-uid-mismatch": {
+			events: []any{
+				[]any{
+					add(sliceTainted),
+					add(slice2),
+					add(podWithClaimName),
+					add(podWithClaimNameSecond),
+					add(inUseClaimReservedUIDMismatch),
+				},
+			},
+			finalState: state{
+				slices:          l(sliceTainted, slice2),
+				allocatedClaims: l(ac(inUseClaimReservedUIDMismatch, newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0))),
+				deletePodAt:     evictMap{newObject(podWithClaimNameSecond): *newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0)},
+				queued:          MockState[workItem]{Ready: newWorkItems(podWithClaimNameSecond)},
+			},
+			process: []step{
+				{
+					pods: l(podWithClaimName),
+				},
+			},
+			wantEvents: l(deletePodEventSecond),
 		},
 		"evict-pod-rule": {
 			events: []any{
