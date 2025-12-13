@@ -31,8 +31,6 @@ import (
 	strings "strings"
 )
 
-func (m *BasicSchedulingPolicy) Reset() { *m = BasicSchedulingPolicy{} }
-
 func (m *GangSchedulingPolicy) Reset() { *m = GangSchedulingPolicy{} }
 
 func (m *PodGroup) Reset() { *m = PodGroup{} }
@@ -50,29 +48,6 @@ func (m *Workload) Reset() { *m = Workload{} }
 func (m *WorkloadList) Reset() { *m = WorkloadList{} }
 
 func (m *WorkloadSpec) Reset() { *m = WorkloadSpec{} }
-
-func (m *BasicSchedulingPolicy) Marshal() (dAtA []byte, err error) {
-	size := m.Size()
-	dAtA = make([]byte, size)
-	n, err := m.MarshalToSizedBuffer(dAtA[:size])
-	if err != nil {
-		return nil, err
-	}
-	return dAtA[:n], nil
-}
-
-func (m *BasicSchedulingPolicy) MarshalTo(dAtA []byte) (int, error) {
-	size := m.Size()
-	return m.MarshalToSizedBuffer(dAtA[:size])
-}
-
-func (m *BasicSchedulingPolicy) MarshalToSizedBuffer(dAtA []byte) (int, error) {
-	i := len(dAtA)
-	_ = i
-	var l int
-	_ = l
-	return len(dAtA) - i, nil
-}
 
 func (m *GangSchedulingPolicy) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
@@ -169,18 +144,6 @@ func (m *PodGroupPolicy) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		}
 		i--
 		dAtA[i] = 0x1a
-	}
-	if m.Basic != nil {
-		{
-			size, err := m.Basic.MarshalToSizedBuffer(dAtA[:i])
-			if err != nil {
-				return 0, err
-			}
-			i -= size
-			i = encodeVarintGenerated(dAtA, i, uint64(size))
-		}
-		i--
-		dAtA[i] = 0x12
 	}
 	return len(dAtA) - i, nil
 }
@@ -476,15 +439,6 @@ func encodeVarintGenerated(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return base
 }
-func (m *BasicSchedulingPolicy) Size() (n int) {
-	if m == nil {
-		return 0
-	}
-	var l int
-	_ = l
-	return n
-}
-
 func (m *GangSchedulingPolicy) Size() (n int) {
 	if m == nil {
 		return 0
@@ -514,10 +468,6 @@ func (m *PodGroupPolicy) Size() (n int) {
 	}
 	var l int
 	_ = l
-	if m.Basic != nil {
-		l = m.Basic.Size()
-		n += 1 + l + sovGenerated(uint64(l))
-	}
 	if m.Gang != nil {
 		l = m.Gang.Size()
 		n += 1 + l + sovGenerated(uint64(l))
@@ -631,15 +581,6 @@ func sovGenerated(x uint64) (n int) {
 func sozGenerated(x uint64) (n int) {
 	return sovGenerated(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
-func (this *BasicSchedulingPolicy) String() string {
-	if this == nil {
-		return "nil"
-	}
-	s := strings.Join([]string{`&BasicSchedulingPolicy{`,
-		`}`,
-	}, "")
-	return s
-}
 func (this *GangSchedulingPolicy) String() string {
 	if this == nil {
 		return "nil"
@@ -666,7 +607,6 @@ func (this *PodGroupPolicy) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&PodGroupPolicy{`,
-		`Basic:` + strings.Replace(this.Basic.String(), "BasicSchedulingPolicy", "BasicSchedulingPolicy", 1) + `,`,
 		`Gang:` + strings.Replace(this.Gang.String(), "GangSchedulingPolicy", "GangSchedulingPolicy", 1) + `,`,
 		`}`,
 	}, "")
@@ -764,56 +704,6 @@ func valueToStringGenerated(v interface{}) string {
 	}
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("*%v", pv)
-}
-func (m *BasicSchedulingPolicy) Unmarshal(dAtA []byte) error {
-	l := len(dAtA)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowGenerated
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := dAtA[iNdEx]
-			iNdEx++
-			wire |= uint64(b&0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: BasicSchedulingPolicy: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: BasicSchedulingPolicy: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		default:
-			iNdEx = preIndex
-			skippy, err := skipGenerated(dAtA[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if (skippy < 0) || (iNdEx+skippy) < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
 }
 func (m *GangSchedulingPolicy) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
@@ -1028,42 +918,6 @@ func (m *PodGroupPolicy) Unmarshal(dAtA []byte) error {
 			return fmt.Errorf("proto: PodGroupPolicy: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
-		case 2:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Basic", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowGenerated
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= int(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			postIndex := iNdEx + msglen
-			if postIndex < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			if m.Basic == nil {
-				m.Basic = &BasicSchedulingPolicy{}
-			}
-			if err := m.Basic.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
 		case 3:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Gang", wireType)
