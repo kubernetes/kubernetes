@@ -302,8 +302,7 @@ func NewReflectorWithOptions(lw ListerWatcher, expectedType interface{}, store R
 		// Using klog.TODO() here because switching to a caller-provided contextual logger
 		// would require an API change and updating all existing call sites.
 		klog.TODO().V(2).Info(
-			"The provided ListWatcher doesn't support WatchList semantics. The feature will be disabled. If you are using a custom client, check the documentation of watchlist.DoesClientNotSupportWatchListSemantics() method",
-			"listWatcherType", fmt.Sprintf("%T", lw),
+			"The client used to build this informer/reflector doesn't support WatchList semantics. The feature will be disabled. This is expected in unit tests but not in production. For details, see the documentation of watchlist.DoesClientNotSupportWatchListSemantics().",
 			"feature", clientfeatures.WatchListClient,
 		)
 		r.useWatchList = false
