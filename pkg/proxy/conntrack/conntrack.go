@@ -31,7 +31,6 @@ import (
 
 // Interface for dealing with conntrack
 type Interface interface {
-	ListEntries(ipFamily uint8) ([]*netlink.ConntrackFlow, error)
 	// ClearEntries deletes conntrack entries for connections of the given IP family,
 	// filtered by the given filters.
 	ClearEntries(ipFamily uint8, filters ...netlink.CustomConntrackFilter) (int, error)
@@ -39,7 +38,6 @@ type Interface interface {
 
 // netlinkHandler allows consuming real and mockable implementation for testing.
 type netlinkHandler interface {
-	ConntrackTableList(netlink.ConntrackTableType, netlink.InetFamily) ([]*netlink.ConntrackFlow, error)
 	ConntrackDeleteFilters(netlink.ConntrackTableType, netlink.InetFamily, ...netlink.CustomConntrackFilter) (uint, error)
 }
 
@@ -56,15 +54,6 @@ func New() Interface {
 
 func newConntracker(handler netlinkHandler) Interface {
 	return &conntracker{handler: handler}
-}
-
-// ListEntries list all conntrack entries for connections of the given IP family.
-func (ct *conntracker) ListEntries(ipFamily uint8) (entries []*netlink.ConntrackFlow, err error) {
-	err = retry.OnError(util.MaxAttemptsEINTR, util.ShouldRetryOnEINTR, func() error {
-		entries, err = ct.handler.ConntrackTableList(netlink.ConntrackTable, netlink.InetFamily(ipFamily))
-		return err
-	})
-	return entries, err
 }
 
 // ClearEntries deletes conntrack entries for connections of the given IP family,
