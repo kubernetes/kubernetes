@@ -2453,7 +2453,7 @@ func makeAllocationManager(t *testing.T, runtime *containertest.FakeRuntime, all
 			},
 		}, nil
 	}
-	handler := lifecycle.NewPredicateAdmitHandler(getNode, lifecycle.NewAdmissionFailureHandlerStub(), containerManager.UpdatePluginResources)
+	handler := lifecycle.NewPredicateAdmitHandler(getNode, lifecycle.NewAdmissionFailureHandlerStub(), containerManager.UpdatePluginResources, allocationManager.IsPodAllocated)
 	allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{handler})
 
 	return allocationManager
