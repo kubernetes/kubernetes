@@ -20,15 +20,18 @@ import (
 	"sync"
 
 	"github.com/go-logr/logr"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/cpuset"
 )
 
 type stateMemory struct {
 	sync.RWMutex
-	logger        logr.Logger
-	assignments   ContainerCPUAssignments
-	defaultCPUSet cpuset.CPUSet
+	logger         logr.Logger
+	assignments    ContainerCPUAssignments
+	podAssignments map[string]cpuset.CPUSet
+	defaultCPUSet  cpuset.CPUSet
 }
 
 var _ State = &stateMemory{}
@@ -40,9 +43,10 @@ func NewMemoryState(logger logr.Logger) State {
 	logger = klog.LoggerWithName(logger, "CPUManager state memory")
 	logger.Info("Initialized")
 	return &stateMemory{
-		logger:        logger,
-		assignments:   ContainerCPUAssignments{},
-		defaultCPUSet: cpuset.New(),
+		logger:         logger,
+		assignments:    ContainerCPUAssignments{},
+		podAssignments: make(map[string]cpuset.CPUSet),
+		defaultCPUSet:  cpuset.New(),
 	}
 }
 
@@ -74,6 +78,23 @@ func (s *stateMemory) GetCPUAssignments() ContainerCPUAssignments {
 	return s.assignments.Clone()
 }
 
+func (s *stateMemory) GetPodCPUSet(podUID string) (cpuset.CPUSet, bool) {
+	s.RLock()
+	defer s.RUnlock()
+	res, ok := s.podAssignments[podUID]
+	return res.Clone(), ok
+}
+
+func (s *stateMemory) GetPodCPUAssignments() PodCPUAssignments {
+	s.RLock()
+	defer s.RUnlock()
+	clone := make(PodCPUAssignments)
+	for podUID, cset := range s.podAssignments {
+		clone[podUID] = cset.Clone()
+	}
+	return clone
+}
+
 func (s *stateMemory) SetCPUSet(podUID string, containerName string, cset cpuset.CPUSet) {
 	s.Lock()
 	defer s.Unlock()
@@ -92,6 +113,14 @@ func (s *stateMemory) SetDefaultCPUSet(cset cpuset.CPUSet) {
 
 	s.defaultCPUSet = cset
 	s.logger.Info("Updated default CPUSet", "cpuSet", cset)
+}
+
+func (s *stateMemory) SetPodCPUSet(podUID string, cset cpuset.CPUSet) {
+	s.Lock()
+	defer s.Unlock()
+
+	s.podAssignments[podUID] = cset
+	s.logger.Info("Updated pod CPUSet", "podUID", podUID, "cpuSet", cset)
 }
 
 func (s *stateMemory) SetCPUAssignments(a ContainerCPUAssignments) {
@@ -113,11 +142,23 @@ func (s *stateMemory) Delete(podUID string, containerName string) {
 	s.logger.V(2).Info("Deleted CPUSet assignment", "podUID", podUID, "containerName", containerName)
 }
 
+func (s *stateMemory) DeletePod(podUID string) {
+	s.Lock()
+	defer s.Unlock()
+
+	delete(s.assignments, podUID)
+	delete(s.podAssignments, podUID)
+	s.logger.V(2).Info("Deleted pod", "podUID", podUID)
+}
+
 func (s *stateMemory) ClearState() {
 	s.Lock()
 	defer s.Unlock()
 
 	s.defaultCPUSet = cpuset.CPUSet{}
 	s.assignments = make(ContainerCPUAssignments)
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) {
+		s.podAssignments = make(map[string]cpuset.CPUSet)
+	}
 	s.logger.V(2).Info("Cleared state")
 }

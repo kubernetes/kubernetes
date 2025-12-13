@@ -35,12 +35,28 @@ func (as ContainerCPUAssignments) Clone() ContainerCPUAssignments {
 	return ret
 }
 
+// PodCPUAssignments contains pod-level CPU assignments.
+type PodCPUAssignments map[string]cpuset.CPUSet
+
+// Clone returns a copy of PodCPUAssignments
+func (a PodCPUAssignments) Clone() PodCPUAssignments {
+	clone := make(PodCPUAssignments, len(a))
+	for podUID, cset := range a {
+		clone[podUID] = cset.Clone()
+	}
+	return clone
+}
+
 // Reader interface used to read current cpu/pod assignment state
 type Reader interface {
 	GetCPUSet(podUID string, containerName string) (cpuset.CPUSet, bool)
 	GetDefaultCPUSet() cpuset.CPUSet
 	GetCPUSetOrDefault(podUID string, containerName string) cpuset.CPUSet
 	GetCPUAssignments() ContainerCPUAssignments
+	// GetPodCPUSet returns the pod-level CPU assignments of a pod
+	GetPodCPUSet(podUID string) (cpuset.CPUSet, bool)
+	// GetPodCPUAssignments returns all pod-level CPU assignments
+	GetPodCPUAssignments() PodCPUAssignments
 }
 
 type writer interface {
@@ -49,6 +65,10 @@ type writer interface {
 	SetCPUAssignments(ContainerCPUAssignments)
 	Delete(podUID string, containerName string)
 	ClearState()
+	// SetPodCPUSet stores pod-level CPU assignments of a pod
+	SetPodCPUSet(podUID string, cpuset cpuset.CPUSet)
+	// DeletePod deletes pod-level CPU assignments for specified pod
+	DeletePod(podUID string)
 }
 
 // State interface provides methods for tracking and setting cpu/pod assignment
