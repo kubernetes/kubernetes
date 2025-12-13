@@ -563,12 +563,12 @@ func initConfigz(ctx context.Context, kc *kubeletconfiginternal.KubeletConfigura
 }
 
 // makeEventRecorder sets up kubeDeps.Recorder if it's nil. It's a no-op otherwise.
-func makeEventRecorder(ctx context.Context, kubeDeps *kubelet.Dependencies, nodeName types.NodeName) {
+func makeEventRecorder(ctx context.Context, kubeDeps *kubelet.Dependencies, nodeName types.NodeName, eventsNamespace string) {
 	if kubeDeps.Recorder != nil {
 		return
 	}
 	logger := klog.FromContext(ctx)
-	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
+	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx), record.WithDefaultNamespace(eventsNamespace))
 	kubeDeps.Recorder = eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: server.ComponentKubelet, Host: string(nodeName)})
 	eventBroadcaster.StartStructuredLogging(3)
 	if kubeDeps.EventClient != nil {
@@ -768,7 +768,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 	}
 
 	// Setup event recorder if required.
-	makeEventRecorder(ctx, kubeDeps, nodeName)
+	makeEventRecorder(ctx, kubeDeps, nodeName, s.EventNamespace)
 
 	if kubeDeps.ContainerManager == nil {
 		if s.CgroupsPerQOS && s.CgroupRoot == "" {
@@ -1211,7 +1211,7 @@ func RunKubelet(ctx context.Context, kubeServer *options.KubeletServer, kubeDeps
 	}
 	nodeName := types.NodeName(hostname)
 	// Setup event recorder if required.
-	makeEventRecorder(ctx, kubeDeps, nodeName)
+	makeEventRecorder(ctx, kubeDeps, nodeName, kubeServer.EventNamespace)
 
 	nodeIPs, invalidNodeIps, err := nodeutil.ParseNodeIPArgument(kubeServer.NodeIP, kubeServer.CloudProvider)
 	if err != nil {
