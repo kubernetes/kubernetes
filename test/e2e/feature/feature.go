@@ -102,6 +102,11 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	CustomMetricsAutoscaling = framework.WithFeature(framework.ValidFeatures.Add("CustomMetricsAutoscaling"))
 
+	// OWNER: sig-testing
+	// The cluster must have at least one control plane component which was compiled with race detection
+	// and which was deployed as a pod in a namespace that has "system" in its name.
+	DataRace = framework.WithFeature(framework.ValidFeatures.Add("DataRace"))
+
 	// OWNER: sig-node
 	// Testing device managers
 	DeviceManager = framework.WithFeature(framework.ValidFeatures.Add("DeviceManager"))
