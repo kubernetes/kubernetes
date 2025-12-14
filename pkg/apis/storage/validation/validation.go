@@ -393,7 +393,7 @@ func validateCSINodeDriver(driver storage.CSINodeDriver, driverNamesInSpecs sets
 	validationOpts CSINodeValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	allErrs = append(allErrs, apivalidation.ValidateCSIDriverName(driver.Name, fldPath.Child("name"))...).WithOrigin("k8s-long-name-caseless").MarkCoveredByDeclarative()
+	allErrs = append(allErrs, apivalidation.ValidateCSIDriverName(driver.Name, fldPath.Child("name"), apivalidation.SizeCovered, apivalidation.RequiredCovered, apivalidation.FormatCovered)...)
 	allErrs = append(allErrs, validateCSINodeDriverNodeID(driver.NodeID, fldPath.Child("nodeID"), validationOpts)...)
 	allErrs = append(allErrs, validateCSINodeDriverAllocatable(driver.Allocatable, fldPath.Child("allocatable"))...)
 
