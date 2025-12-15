@@ -23,9 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	"k8s.io/apimachinery/pkg/api/apitesting/roundtrip"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	nodevalidation "k8s.io/kubernetes/pkg/apis/node/validation"
 	resourcevalidation "k8s.io/kubernetes/pkg/apis/resource/validation"
 )
 
@@ -47,6 +45,9 @@ func TestVersionedValidationByFuzzing(t *testing.T) {
 		{Group: "node.k8s.io", Version: "v1beta1"},
 		{Group: "node.k8s.io", Version: "v1"},
 		{Group: "node.k8s.io", Version: "v1alpha1"},
+		{Group: "admissionregistration.k8s.io", Version: "v1"},
+		{Group: "admissionregistration.k8s.io", Version: "v1beta1"},
+		{Group: "admissionregistration.k8s.io", Version: "v1alpha1"},
 	}
 
 	fuzzIters := *roundtrip.FuzzIters / 10 // TODO: Find a better way to manage test running time
@@ -64,12 +65,7 @@ func TestVersionedValidationByFuzzing(t *testing.T) {
 					f.Fill(obj)
 
 					var opts []ValidationTestConfig
-					// TODO(API group level configuration): Consider configuring normalization rules at the
-					// API group level to avoid potential collisions when multiple rule sets are combined.
-					// This would allow each API group to register its own normalization rules independently.
-					allRules := append([]field.NormalizationRule{}, resourcevalidation.ResourceNormalizationRules...)
-					allRules = append(allRules, nodevalidation.NodeNormalizationRules...)
-					opts = append(opts, WithNormalizationRules(allRules...))
+					opts = append(opts, WithNormalizationRules(resourcevalidation.ResourceNormalizationRules...))
 
 					VerifyVersionedValidationEquivalence(t, obj, nil, opts...)
 

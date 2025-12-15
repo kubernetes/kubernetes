@@ -2553,6 +2553,7 @@ func schema_k8sio_api_admissionregistration_v1_ValidatingAdmissionPolicyBindingS
 						},
 					},
 				},
+				Required: []string{"policyName"},
 			},
 		},
 		Dependencies: []string{
@@ -4147,6 +4148,7 @@ func schema_k8sio_api_admissionregistration_v1alpha1_ValidatingAdmissionPolicyBi
 						},
 					},
 				},
+				Required: []string{"policyName"},
 			},
 		},
 		Dependencies: []string{
@@ -5748,6 +5750,7 @@ func schema_k8sio_api_admissionregistration_v1beta1_ValidatingAdmissionPolicyBin
 						},
 					},
 				},
+				Required: []string{"policyName"},
 			},
 		},
 		Dependencies: []string{
