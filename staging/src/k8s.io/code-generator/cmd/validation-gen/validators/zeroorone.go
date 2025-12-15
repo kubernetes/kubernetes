@@ -65,6 +65,11 @@ func (ztfv zeroOrOneOfTypeOrFieldValidator) GetValidations(context Context) (Val
 }
 
 const (
+	// This tag should only ever be used on list item types, never on struct
+	// fields directly.  If applied to struct fields, the "orR one of" behavior
+	// is frozen at this moment in time, and can never be expanded. Why?
+	// Back-rev clients can't tell the difference between "zero were specified"
+	// and "a field I don't know about was specified".
 	zeroOrOneOfMemberTagName = "k8s:zeroOrOneOfMember"
 )
 
@@ -99,6 +104,7 @@ func (zmtv zeroOrOneOfMemberTagValidator) Docs() TagDoc {
 		StabilityLevel: Beta,
 		Description:    "Indicates that this field is a member of a zero-or-one-of union.",
 		Docs:           "A zero-or-one-of union allows at most one member to be set. Unlike regular unions, having no members set is valid.",
+		Warning:        "This tag should only be used on sets of list items, and never on struct fields directly.",
 		Args: []TagArgDoc{{
 			Name:        "union",
 			Description: "<string>",
