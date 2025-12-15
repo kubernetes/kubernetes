@@ -1182,7 +1182,7 @@ func validateValidatingAdmissionPolicyBindingSpec(spec *admissionregistration.Va
 	var allErrors field.ErrorList
 
 	if len(spec.PolicyName) == 0 {
-		allErrors = append(allErrors, field.Required(fldPath.Child("policyName"), ""))
+		allErrors = append(allErrors, field.Required(fldPath.Child("policyName"), "").MarkCoveredByDeclarative())
 	} else {
 		for _, msg := range genericvalidation.NameIsDNSSubdomain(spec.PolicyName, false) {
 			allErrors = append(allErrors, field.Invalid(fldPath.Child("policyName"), spec.PolicyName, msg))
