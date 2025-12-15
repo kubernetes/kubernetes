@@ -441,15 +441,7 @@ func TestCheckpointStateAllocateAndReclaim(t *testing.T) {
 	}
 
 	// create temp dir
-	testingDir, err := os.MkdirTemp("", "cpumanager_state_test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		if rmErr := os.RemoveAll(testingDir); rmErr != nil {
-			t.Fatalf("could not remove checkpoint: %v", rmErr)
-		}
-	}()
+	testingDir := t.TempDir()
 
 	cpm, err := checkpointmanager.NewCheckpointManager(testingDir)
 	if err != nil {
@@ -478,27 +470,20 @@ func TestCheckpointStateAllocateAndReclaim(t *testing.T) {
 					state.Allocate(pod, container, set)
 
 					var cpus cpuset.CPUSet
-					if cpus, _ = state.GetCPUSet(pod, container); !cpus.Equals(set) {
-						t.Fatalf("state inconsistent, got %q instead of %q", set, cpus)
-					}
+					cpus, _ = state.GetCPUSet(pod, container)
 
-					if cpus.Intersection(state.GetDefaultCPUSet()).Size() != 0 {
-						t.Fatalf("defaultCPUset state inconsistent, got %q instead of %q", state.GetDefaultCPUSet(), defaultCPUset.Difference(cpus))
-					}
+					require.True(t, cpus.Equals(set))
 
-					if !cpus.Union(state.GetDefaultCPUSet()).Equals(defaultCPUset) {
-						t.Fatalf("defaultCPUset state inconsistent, got %q instead of %q", state.GetDefaultCPUSet(), defaultCPUset.Difference(cpus))
-					}
+					require.True(t, cpus.Intersection(state.GetDefaultCPUSet()).IsEmpty())
+
+					require.True(t, cpus.Union(state.GetDefaultCPUSet()).Equals(defaultCPUset))
 
 					state.Reclaim(pod, container, defaultCPUset)
 
-					if _, ok := state.GetCPUSet(pod, container); ok {
-						t.Fatal("deleted container still existing in state")
-					}
+					_, ok := state.GetCPUSet(pod, container)
+					require.False(t, ok)
 
-					if !state.GetDefaultCPUSet().Equals(defaultCPUset) {
-						t.Fatalf("defaultCPUset state inconsistent, got %q instead of %q", state.GetDefaultCPUSet(), defaultCPUset)
-					}
+					require.True(t, state.GetDefaultCPUSet().Equals(defaultCPUset))
 				}
 			}
 		})
