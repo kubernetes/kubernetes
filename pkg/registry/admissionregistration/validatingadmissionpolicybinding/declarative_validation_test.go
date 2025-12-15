@@ -51,10 +51,16 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		"valid": {
 			input: mkValidBinding(),
 		},
-		"invalid policyName": {
+		"spec.policyName is required": {
 			input: mkValidBinding(tweakPolicyName("")),
 			expectedErrs: field.ErrorList{
 				field.Required(field.NewPath("spec", "policyName"), ""),
+			},
+		},
+		"spec.validationActions is required": {
+			input: mkValidBinding(tweakValidateActions([]admissionregistration.ValidationAction{})),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "validationActions"), ""),
 			},
 		},
 		// TODO: Add more test cases
@@ -84,11 +90,18 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			oldObj:    mkValidBinding(),
 			updateObj: mkValidBinding(),
 		},
-		"invalid update name": {
+		"update with empty spec.policyName": {
 			oldObj:    mkValidBinding(func(obj *admissionregistration.ValidatingAdmissionPolicyBinding) { obj.ResourceVersion = "1" }),
 			updateObj: mkValidBinding(tweakPolicyName("")),
 			expectedErrs: field.ErrorList{
 				field.Required(field.NewPath("spec", "policyName"), ""),
+			},
+		},
+		"update with empty spec.validationActions": {
+			oldObj:    mkValidBinding(),
+			updateObj: mkValidBinding(tweakValidateActions([]admissionregistration.ValidationAction{})),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "validationActions"), ""),
 			},
 		},
 		// TODO: Add more test cases
@@ -129,5 +142,11 @@ func mkValidBinding(tweaks ...func(obj *admissionregistration.ValidatingAdmissio
 func tweakPolicyName(policyName string) func(obj *admissionregistration.ValidatingAdmissionPolicyBinding) {
 	return func(obj *admissionregistration.ValidatingAdmissionPolicyBinding) {
 		obj.Spec.PolicyName = policyName
+	}
+}
+
+func tweakValidateActions(actions []admissionregistration.ValidationAction) func(*admissionregistration.ValidatingAdmissionPolicyBinding) {
+	return func(obj *admissionregistration.ValidatingAdmissionPolicyBinding) {
+		obj.Spec.ValidationActions = actions
 	}
 }

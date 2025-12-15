@@ -99,6 +99,27 @@ func Validate_ValidatingAdmissionPolicyBindingSpec(ctx context.Context, op opera
 
 	// field admissionregistrationv1beta1.ValidatingAdmissionPolicyBindingSpec.ParamRef has no validation
 	// field admissionregistrationv1beta1.ValidatingAdmissionPolicyBindingSpec.MatchResources has no validation
-	// field admissionregistrationv1beta1.ValidatingAdmissionPolicyBindingSpec.ValidationActions has no validation
+
+	// field admissionregistrationv1beta1.ValidatingAdmissionPolicyBindingSpec.ValidationActions
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []admissionregistrationv1beta1.ValidationAction, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("validationActions"), obj.ValidationActions, safe.Field(oldObj, func(oldObj *admissionregistrationv1beta1.ValidatingAdmissionPolicyBindingSpec) []admissionregistrationv1beta1.ValidationAction {
+			return oldObj.ValidationActions
+		}), oldObj != nil)...)
+
 	return errs
 }
