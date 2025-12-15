@@ -237,9 +237,7 @@ type ResourceRequestsOptions struct {
 // shouldDelegateResourceToDRA checks if the given resource should be delegated to the DRA plugin.
 // It returns true if:
 //  1. The resource is not a scalar resource in the node's allocatable (not provided by device plugin)
-//  2. Either:
-//     a. A device class mapping exists for the resource in the cache (when draManager is available), OR
-//     b. draManager is nil (e.g., kubelet admission check) and the resource name suggests it's a DRA resource
+//  2. A device class mapping exists for the resource in the cache (when draManager is available)
 func shouldDelegateResourceToDRA(rName v1.ResourceName, nodeInfo fwk.NodeInfo, draManager fwk.SharedDRAManager, opts ResourceRequestsOptions) bool {
 	if !opts.EnableDRAExtendedResource {
 		return false
@@ -249,18 +247,13 @@ func shouldDelegateResourceToDRA(rName v1.ResourceName, nodeInfo fwk.NodeInfo, d
 		return false
 	}
 
-	// If draManager is available, check the cache for a mapping
-	if draManager != nil {
-		cache := draManager.DeviceClassResolver()
-		return cache.GetDeviceClass(rName) != nil
+	if draManager == nil {
+		return false
 	}
 
-	// If draManager is nil (e.g., kubelet admission check), delegate resources that are not in
-	// the node's allocatable. This allows pod to be admitted even when the kubelet
-	// doesn't have access to the device class cache.
-	// This can be removed once we have the fix for kubelet to admit pods with
-	// implicit extended resources or node's allocatable for the extended resource is zero.
-	return true
+	// If draManager is available, check the cache for a mapping
+	cache := draManager.DeviceClassResolver()
+	return cache.GetDeviceClass(rName) != nil
 }
 
 // computePodResourceRequest returns a framework.Resource that covers the largest
