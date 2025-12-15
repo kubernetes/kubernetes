@@ -24,6 +24,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/server/egressselector"
@@ -194,7 +195,7 @@ func (k *NodeConnectionInfoGetter) GetConnectionInfo(ctx context.Context, nodeNa
 	// Find a kubelet-reported address, using preferred address type
 	host, err := nodeutil.GetPreferredNodeAddress(node, k.preferredAddressTypes)
 	if err != nil {
-		return nil, err
+		return nil, errors.NewBadRequest(err.Error())
 	}
 
 	// Use the kubelet-reported port, if present
