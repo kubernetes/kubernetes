@@ -35,6 +35,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/dynamic-resource-allocation/deviceclass/extendedresourcecache"
+	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	_ "k8s.io/klog/v2/ktesting/init"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -720,22 +721,10 @@ func TestEnoughRequests(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
-			client := fake.NewSimpleClientset(deviceClassWithExtendResourceName)
-			informerFactory := informers.NewSharedInformerFactory(client, 0)
-			claimsCache := assumecache.NewAssumeCache(logger, informerFactory.Resource().V1().ResourceClaims().Informer(), "resource claim", "", nil)
-			draManager := dynamicresources.NewDRAManager(ctx, claimsCache, nil, informerFactory)
-			if test.draExtendedResourceEnabled {
-				cache := draManager.DeviceClassResolver().(*extendedresourcecache.ExtendedResourceCache)
-				if _, err := informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandler(cache); err != nil {
-					logger.Error(err, "failed to add device class informer event handler")
-				}
+			draManager, err := makeDRAmanager(t, ctx, logger, deviceClassWithExtendResourceName)
+			if err != nil {
+				t.Errorf("failed to make DRA manager: %v", err)
 			}
-			informerFactory.Start(ctx.Done())
-			t.Cleanup(func() {
-				// Now we can wait for all goroutines to stop.
-				informerFactory.Shutdown()
-			})
-			informerFactory.WaitForCacheSync(ctx.Done())
 			runOpts := []runtime.Option{
 				runtime.WithSharedDRAManager(draManager),
 			}
@@ -1995,11 +1984,11 @@ func TestIsFit(t *testing.T) {
 
 func TestHaveAnyRequestedResourcesIncreased(t *testing.T) {
 	testCases := map[string]struct {
-		pod                        *v1.Pod
-		originalNode               *v1.Node
-		modifiedNode               *v1.Node
-		draExtendedResourceEnabled bool
-		expected                   bool
+		pod          *v1.Pod
+		originalNode *v1.Node
+		modifiedNode *v1.Node
+		deviceClass  *resourceapi.DeviceClass
+		expected     bool
 	}{
 		"no-requested-resources": {
 			pod: newResourcePod(framework.Resource{}),
@@ -2056,8 +2045,12 @@ func TestHaveAnyRequestedResourcesIncreased(t *testing.T) {
 				v1.ResourceEphemeralStorage: "1",
 				extendedResourceA:           "1",
 			}).Obj(),
-			draExtendedResourceEnabled: true,
-			expected:                   false,
+			deviceClass: &resourceapi.DeviceClass{
+				Spec: resourceapi.DeviceClassSpec{
+					ExtendedResourceName: ptr.To(string(extendedResourceA)),
+				},
+			},
+			expected: false,
 		},
 		"requested-resources-dra-not-in-node": {
 			pod: newResourcePod(framework.Resource{
@@ -2076,8 +2069,12 @@ func TestHaveAnyRequestedResourcesIncreased(t *testing.T) {
 				v1.ResourceMemory:           "2",
 				v1.ResourceEphemeralStorage: "1",
 			}).Obj(),
-			draExtendedResourceEnabled: true,
-			expected:                   true,
+			deviceClass: &resourceapi.DeviceClass{
+				Spec: resourceapi.DeviceClassSpec{
+					ExtendedResourceName: ptr.To(string(extendedResourceA)),
+				},
+			},
+			expected: true,
 		},
 		"requested-resources-dra-zero-capacity": {
 			pod: newResourcePod(framework.Resource{
@@ -2089,8 +2086,12 @@ func TestHaveAnyRequestedResourcesIncreased(t *testing.T) {
 			modifiedNode: st.MakeNode().Capacity(map[v1.ResourceName]string{
 				extendedResourceA: "0",
 			}).Obj(),
-			draExtendedResourceEnabled: true,
-			expected:                   true,
+			deviceClass: &resourceapi.DeviceClass{
+				Spec: resourceapi.DeviceClassSpec{
+					ExtendedResourceName: ptr.To(string(extendedResourceA)),
+				},
+			},
+			expected: true,
 		},
 		"scalar-resources-not-in-node": {
 			pod: newResourcePod(framework.Resource{
@@ -2109,8 +2110,7 @@ func TestHaveAnyRequestedResourcesIncreased(t *testing.T) {
 				v1.ResourceMemory:           "2",
 				v1.ResourceEphemeralStorage: "1",
 			}).Obj(),
-			draExtendedResourceEnabled: false,
-			expected:                   false,
+			expected: false,
 		},
 		"requested-resources-decreased": {
 			pod: newResourcePod(framework.Resource{
@@ -2195,7 +2195,21 @@ func TestHaveAnyRequestedResourcesIncreased(t *testing.T) {
 	}
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			if got := haveAnyRequestedResourcesIncreased(tc.pod, tc.originalNode, tc.modifiedNode, nil, ResourceRequestsOptions{EnableDRAExtendedResource: tc.draExtendedResourceEnabled}); got != tc.expected {
+			enableDRAExtendedResource := tc.deviceClass != nil
+			var draManager *dynamicresources.DefaultDRAManager
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, enableDRAExtendedResource)
+			if enableDRAExtendedResource {
+				logger, ctx := ktesting.NewTestContext(t)
+				ctx, cancel := context.WithCancel(ctx)
+				defer cancel()
+
+				var err error
+				draManager, err = makeDRAmanager(t, ctx, logger, tc.deviceClass)
+				if err != nil {
+					t.Fatalf("failed to make DRA manager: %v", err)
+				}
+			}
+			if got := haveAnyRequestedResourcesIncreased(tc.pod, tc.originalNode, tc.modifiedNode, draManager, ResourceRequestsOptions{EnableDRAExtendedResource: enableDRAExtendedResource}); got != tc.expected {
 				t.Errorf("expected: %v, got: %v", tc.expected, got)
 			}
 		})
@@ -2289,4 +2303,26 @@ func TestFitSignPod(t *testing.T) {
 			}
 		})
 	}
+}
+
+func makeDRAmanager(t *testing.T, ctx context.Context, logger klog.Logger, deviceClass *resourceapi.DeviceClass) (*dynamicresources.DefaultDRAManager, error) {
+	client := fake.NewClientset(deviceClass)
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
+	resourceClaimInformer := informerFactory.Resource().V1().ResourceClaims().Informer()
+	resourceClaimCache := assumecache.NewAssumeCache(logger, resourceClaimInformer, "ResourceClaim", "", nil)
+	draManager := dynamicresources.NewDRAManager(ctx, resourceClaimCache, nil, informerFactory)
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
+		cache := draManager.DeviceClassResolver().(*extendedresourcecache.ExtendedResourceCache)
+		if _, err := informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandler(cache); err != nil {
+			logger.Error(err, "failed to add device class informer event handler")
+			return nil, err
+		}
+	}
+	informerFactory.Start(ctx.Done())
+	t.Cleanup(func() {
+		// Now we can wait for all goroutines to stop.
+		informerFactory.Shutdown()
+	})
+	informerFactory.WaitForCacheSync(ctx.Done())
+	return draManager, nil
 }
