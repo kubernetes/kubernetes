@@ -70,8 +70,14 @@ func NewCompositedCompiler(envSet *environment.EnvSet) (*CompositedCompiler, err
 }
 
 func NewCompositedCompilerFromTemplate(context *CompositionEnv) *CompositedCompiler {
+	mapType := *context.MapType
+	mapType.Fields = make(map[string]*apiservercel.DeclField, len(context.MapType.Fields))
+	for k, v := range context.MapType.Fields {
+		mapType.Fields[k] = v
+	}
+
 	context = &CompositionEnv{
-		MapType:           context.MapType,
+		MapType:           &mapType,
 		EnvSet:            context.EnvSet,
 		CompiledVariables: map[string]CompilationResult{},
 	}
