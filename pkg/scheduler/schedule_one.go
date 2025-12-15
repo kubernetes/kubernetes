@@ -289,7 +289,7 @@ func (sched *Scheduler) bindingCycle(
 				NominatedNodeName: scheduleResult.SuggestedHost,
 				NominatingMode:    fwk.ModeOverride,
 			}); err != nil {
-				logger.Error(err, "Failed to update the nominated node name in the binding cycle", "pod", klog.KObj(assumedPod), "nominatedNodeName", scheduleResult.SuggestedHost)
+				logger.Error(err, "Failed to update the nominated node name in the binding cycle", "nominatedNodeName", scheduleResult.SuggestedHost)
 				// We continue the processing because it's not critical enough to stop binding cycles here.
 			}
 		}
@@ -331,7 +331,7 @@ func (sched *Scheduler) bindingCycle(
 	}
 
 	// Calculating nodeResourceString can be heavy. Avoid it if klog verbosity is below 2.
-	logger.V(2).Info("Successfully bound pod to node", "pod", klog.KObj(assumedPod), "node", scheduleResult.SuggestedHost, "evaluatedNodes", scheduleResult.EvaluatedNodes, "feasibleNodes", scheduleResult.FeasibleNodes)
+	logger.V(2).Info("Successfully bound pod to node", "node", scheduleResult.SuggestedHost, "evaluatedNodes", scheduleResult.EvaluatedNodes, "feasibleNodes", scheduleResult.FeasibleNodes)
 	metrics.PodScheduled(schedFramework.ProfileName(), metrics.SinceInSeconds(start))
 	metrics.PodSchedulingAttempts.Observe(float64(assumedPodInfo.Attempts))
 	if assumedPodInfo.InitialAttemptTimestamp != nil {
@@ -397,7 +397,7 @@ func (sched *Scheduler) skipPodSchedule(ctx context.Context, fwk framework.Frame
 	// Case 1: pod is being deleted.
 	if pod.DeletionTimestamp != nil {
 		fwk.EventRecorder().Eventf(pod, nil, v1.EventTypeWarning, "FailedScheduling", "Scheduling", "skip schedule deleting pod: %v/%v", pod.Namespace, pod.Name)
-		klog.FromContext(ctx).V(3).Info("Skip schedule deleting pod", "pod")
+		klog.FromContext(ctx).V(3).Info("Skip schedule deleting pod")
 		return true
 	}
 
@@ -1009,7 +1009,7 @@ func (sched *Scheduler) finishBinding(logger klog.Logger, fwk framework.Framewor
 		utilruntime.HandleErrorWithLogger(logger, finErr, "Scheduler cache FinishBinding failed")
 	}
 	if !status.IsSuccess() {
-		logger.V(1).Info("Failed to bind pod", "pod", klog.KObj(assumed))
+		logger.V(1).Info("Failed to bind pod")
 		return
 	}
 
@@ -1060,7 +1060,7 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, fwk framewo
 	} else if fitError, ok := err.(*framework.FitError); ok { // Inject UnschedulablePlugins to PodInfo, which will be used later for moving Pods between queues efficiently.
 		podInfo.UnschedulablePlugins = fitError.Diagnosis.UnschedulablePlugins
 		podInfo.PendingPlugins = fitError.Diagnosis.PendingPlugins
-		logger.V(2).Info("Unable to schedule pod; no fit; waiting", "pod")
+		logger.V(2).Info("Unable to schedule pod; no fit; waiting")
 	} else {
 		utilruntime.HandleErrorWithContext(ctx, err, "Error scheduling pod; retrying")
 	}
@@ -1111,7 +1111,7 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, fwk framewo
 		Reason:             reason,
 		Message:            errMsg,
 	}, nominatingInfo); err != nil {
-		utilruntime.HandleErrorWithContext(ctx, err, "Error updating pod", "pod", klog.KObj(pod))
+		utilruntime.HandleErrorWithContext(ctx, err, "Error updating pod")
 	}
 }
 
@@ -1131,6 +1131,7 @@ func updatePod(ctx context.Context, client clientset.Interface, apiCacher fwk.AP
 		_, err := apiCacher.PatchPodStatus(pod, condition, nominatingInfo)
 		return err
 	}
+
 	logger := klog.FromContext(ctx)
 	logValues := []any{"pod", klog.KObj(pod)}
 	if condition != nil {
