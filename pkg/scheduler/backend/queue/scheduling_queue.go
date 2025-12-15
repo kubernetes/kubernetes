@@ -648,37 +648,24 @@ func (p *PriorityQueue) moveToActiveQ(logger klog.Logger, pInfo *framework.Queue
 		p.runPreEnqueuePlugins(context.Background(), pInfo)
 	}
 
-	added := false
-	p.activeQ.underLock(func(unlockedActiveQ unlockedActiveQueuer) {
-		if pInfo.Gated() {
-			// Add the Pod to unschedulablePods if it's not passing PreEnqueuePlugins.
-			if unlockedActiveQ.has(pInfo) {
-				return
-			}
-			if p.backoffQ.has(pInfo) {
-				return
-			}
+	if pInfo.Gated() {
+		p.unschedulablePods.addOrUpdate(pInfo, gatedBefore, event)
+		logger.V(5).Info("Pod moved to an internal scheduling queue, because the pod is gated", "pod", klog.KObj(pInfo.Pod), "event", event, "queue", unschedulableQ)
+		return false
+	}
 
-			if p.unschedulablePods.get(pInfo.Pod) == nil {
-				logger.V(5).Info("Pod moved to an internal scheduling queue, because the pod is gated", "pod", klog.KObj(pInfo.Pod), "event", event, "queue", unschedulableQ)
-			}
-			p.unschedulablePods.addOrUpdate(pInfo, gatedBefore, event)
-			return
-		}
-		if pInfo.InitialAttemptTimestamp == nil {
-			now := p.clock.Now()
-			pInfo.InitialAttemptTimestamp = &now
-		}
-		p.unschedulablePods.delete(pInfo.Pod, gatedBefore)
-		p.backoffQ.delete(pInfo)
+	if pInfo.InitialAttemptTimestamp == nil {
+		now := p.clock.Now()
+		pInfo.InitialAttemptTimestamp = &now
+	}
+	p.unschedulablePods.delete(pInfo.Pod, gatedBefore)
+	p.backoffQ.delete(pInfo)
 
-		unlockedActiveQ.add(logger, pInfo, event)
-		added = true
-		if event == framework.EventUnscheduledPodAdd.Label() || event == framework.EventUnscheduledPodUpdate.Label() {
-			p.nominator.addNominatedPod(logger, pInfo.PodInfo, nil)
-		}
-	})
-	return added
+	p.activeQ.add(logger, pInfo, event)
+	if event == framework.EventUnscheduledPodAdd.Label() || event == framework.EventUnscheduledPodUpdate.Label() {
+		p.nominator.addNominatedPod(logger, pInfo.PodInfo, nil)
+	}
+	return true
 }
 
 // moveToBackoffQ tries to add the pod to the backoff queue.
