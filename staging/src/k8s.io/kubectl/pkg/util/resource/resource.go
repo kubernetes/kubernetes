@@ -33,7 +33,19 @@ import (
 // total container resource requests and to the total container limits which have a
 // non-zero quantity.
 func PodRequestsAndLimits(pod *corev1.Pod) (reqs, limits corev1.ResourceList) {
-	return podRequests(pod), podLimits(pod)
+	reqs, limits = podRequests(pod), podLimits(pod)
+
+	// If Pod-level resources are specified, they overwrite the calculated sums
+	if pod.Spec.Resources != nil {
+		for name, quantity := range pod.Spec.Resources.Requests {
+			reqs[name] = quantity.DeepCopy()
+		}
+		for name, quantity := range pod.Spec.Resources.Limits {
+			limits[name] = quantity.DeepCopy()
+		}
+	}
+
+	return reqs, limits
 }
 
 // podRequests is a simplified form of PodRequests from k8s.io/kubernetes/pkg/api/v1/resource that doesn't check
@@ -255,7 +267,7 @@ func convertResourceEphemeralStorageToString(ephemeralStorage *resource.Quantity
 	return strconv.FormatInt(m, 10), nil
 }
 
-var standardContainerResources = sets.New[string](
+var standardContainerResources = sets.New(
 	string(corev1.ResourceCPU),
 	string(corev1.ResourceMemory),
 	string(corev1.ResourceEphemeralStorage),
