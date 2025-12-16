@@ -1829,7 +1829,7 @@ func ValidateCSIDriverName(driverName string, fldPath *field.Path, opts ...Valid
 	if len(driverName) > 63 {
 		err := field.TooLong(fldPath, "" /*unused*/, 63)
 		if slices.Contains(opts, SizeCovered) {
-			err = err.MarkCoveredByDeclarative()
+			err = err.WithOrigin("maxLength").MarkCoveredByDeclarative()
 		}
 		allErrs = append(allErrs, err)
 	}

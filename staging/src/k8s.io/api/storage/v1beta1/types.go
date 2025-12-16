@@ -122,6 +122,7 @@ const (
 // +k8s:prerelease-lifecycle-gen:introduced=1.10
 // +k8s:prerelease-lifecycle-gen:deprecated=1.19
 // +k8s:prerelease-lifecycle-gen:replacement=storage.k8s.io,v1,VolumeAttachment
+// +k8s:supportsSubresource=/status
 
 // VolumeAttachment captures the intent to attach or detach the specified volume
 // to/from the specified node.
@@ -137,6 +138,7 @@ type VolumeAttachment struct {
 
 	// spec represents specification of the desired attach/detach volume behavior.
 	// Populated by the Kubernetes system.
+	// +k8s:immutable
 	Spec VolumeAttachmentSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 
 	// status represents status of the VolumeAttachment request.
@@ -168,6 +170,10 @@ type VolumeAttachmentList struct {
 type VolumeAttachmentSpec struct {
 	// attacher indicates the name of the volume driver that MUST handle this
 	// request. This is the name returned by GetPluginName().
+	// +required
+	// +k8s:required
+	// +k8s:format="k8s-long-name-caseless"
+	// +k8s:maxLength=63
 	Attacher string `json:"attacher" protobuf:"bytes,1,opt,name=attacher"`
 
 	// source represents the volume that should be attached.
