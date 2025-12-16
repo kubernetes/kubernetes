@@ -41,20 +41,36 @@ import (
 )
 
 // LogOutput determines where output from CopyAllLogs goes.
+//
+// Error messages about receiving log output is kept
+// separate from the log output and optionally goes to StatusWriter
+//
+// The log output can go to one or more possible destinations.
 type LogOutput struct {
-	// If not nil, errors will be logged here.
+	// If not nil, errors encountered will be logged here.
 	StatusWriter io.Writer
 
-	// If not nil, all output goes to this writer with "<pod>/<container>:" as prefix.
+	// If not nil, all container output goes to this writer with "<pod>/<container>:" as prefix.
 	LogWriter io.Writer
 
 	// Base directory for one log file per container.
-	// The full path of each log file will be <log path prefix><pod>-<container>.log.
+	// The full path of each log file will be <log path prefix><pod>-<container>.log,
+	// if not empty.
 	LogPathPrefix string
+
+	// LogOpen, if not nil, gets called whenever log output watching starts for
+	// a certain container. Returning nil means that the output can be discarded
+	// unless it gets written elsewhere.
+	//
+	// The container's stdout and stderr output get written to the returned writer.
+	// The writer gets closed once all output is processed if the writer implements io.Closer.
+	// Each write is a single line, including a newline.
+	// Write errors are ignored.
+	LogOpen func(podName, containerName string) io.Writer
 }
 
 // Matches harmless errors from pkg/kubelet/kubelet_pods.go.
-var expectedErrors = regexp.MustCompile(`container .* in pod .* is (terminated|waiting to start|not available)|the server could not find the requested resource`)
+var expectedErrors = regexp.MustCompile(`container .* in pod .* is (terminated|waiting to start|not available)|the server could not find the requested resource|context canceled`)
 
 // CopyPodLogs is basically CopyPodLogs for all current or future pods in the given namespace ns
 func CopyAllLogs(ctx context.Context, cs clientset.Interface, ns string, to LogOutput) error {
@@ -92,7 +108,7 @@ func CopyPodLogs(ctx context.Context, cs clientset.Interface, ns, podName string
 			FieldSelector: fmt.Sprintf("metadata.name=%s", podName),
 		}
 	}
-	watcher, err := cs.CoreV1().Pods(ns).Watch(context.TODO(), options)
+	watcher, err := cs.CoreV1().Pods(ns).Watch(ctx, options)
 
 	if err != nil {
 		return fmt.Errorf("cannot create Pod event watcher: %w", err)
@@ -109,10 +125,10 @@ func CopyPodLogs(ctx context.Context, cs clientset.Interface, ns, podName string
 			m.Lock()
 			defer m.Unlock()
 
-			pods, err := cs.CoreV1().Pods(ns).List(context.TODO(), options)
+			pods, err := cs.CoreV1().Pods(ns).List(ctx, options)
 			if err != nil {
 				if to.StatusWriter != nil {
-					fmt.Fprintf(to.StatusWriter, "ERROR: get pod list in %s: %s\n", ns, err)
+					_, _ = fmt.Fprintf(to.StatusWriter, "ERROR: get pod list in %s: %s\n", ns, err)
 				}
 				return
 			}
@@ -139,41 +155,28 @@ func CopyPodLogs(ctx context.Context, cs clientset.Interface, ns, podName string
 							pod.Status.ContainerStatuses[i].State.Terminated == nil) {
 						continue
 					}
-					readCloser, err := logsForPod(ctx, cs, ns, pod.ObjectMeta.Name,
-						&v1.PodLogOptions{
-							Container: c.Name,
-							Follow:    true,
-						})
-					if err != nil {
-						// We do get "normal" errors here, like trying to read too early.
-						// We can ignore those.
-						if to.StatusWriter != nil &&
-							expectedErrors.FindStringIndex(err.Error()) == nil {
-							fmt.Fprintf(to.StatusWriter, "WARNING: pod log: %s: %s\n", name, err)
-						}
-						continue
-					}
 
 					// Determine where we write. If this fails, we intentionally return without clearing
 					// the active[name] flag, which prevents trying over and over again to
 					// create the output file.
-					var out io.Writer
-					var closer io.Closer
+					var logWithPrefix, logWithoutPrefix, output io.Writer
 					var prefix string
+					podHandled := false
 					if to.LogWriter != nil {
-						out = to.LogWriter
+						podHandled = true
+						logWithPrefix = to.LogWriter
 						nodeName := pod.Spec.NodeName
 						if len(nodeName) > 10 {
 							nodeName = nodeName[0:4] + ".." + nodeName[len(nodeName)-4:]
 						}
 						prefix = name + "@" + nodeName + ": "
-					} else {
-						var err error
+					}
+					if to.LogPathPrefix != "" {
+						podHandled = true
 						filename := to.LogPathPrefix + pod.ObjectMeta.Name + "-" + c.Name + ".log"
-						err = os.MkdirAll(path.Dir(filename), 0755)
-						if err != nil {
+						if err := os.MkdirAll(path.Dir(filename), 0755); err != nil {
 							if to.StatusWriter != nil {
-								fmt.Fprintf(to.StatusWriter, "ERROR: pod log: create directory for %s: %s\n", filename, err)
+								_, _ = fmt.Fprintf(to.StatusWriter, "ERROR: pod log: create directory for %s: %s\n", filename, err)
 							}
 							return
 						}
@@ -182,26 +185,60 @@ func CopyPodLogs(ctx context.Context, cs clientset.Interface, ns, podName string
 						file, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 						if err != nil {
 							if to.StatusWriter != nil {
-								fmt.Fprintf(to.StatusWriter, "ERROR: pod log: create file %s: %s\n", filename, err)
+								_, _ = fmt.Fprintf(to.StatusWriter, "ERROR: pod log: create file %s: %s\n", filename, err)
 							}
 							return
 						}
-						closer = file
-						out = file
+						logWithoutPrefix = file
 					}
-					go func() {
-						if closer != nil {
-							defer closer.Close()
+					if to.LogOpen != nil {
+						if writer := to.LogOpen(pod.Name, c.Name); writer != nil {
+							podHandled = true
+							output = writer
 						}
+					}
+
+					if !podHandled {
+						// No-one is interested in this pod, don't bother...
+						continue
+					}
+
+					closeOutput := func() {
+						// Execute all of these, even if one one of them panics.
+						defer maybeClose(logWithPrefix)
+						defer maybeClose(logWithoutPrefix)
+						defer maybeClose(output)
+					}
+
+					readCloser, err := logsForPod(ctx, cs, ns, pod.ObjectMeta.Name,
+						&v1.PodLogOptions{
+							Container: c.Name,
+							Follow:    true,
+						})
+					if err != nil {
+						closeOutput()
+
+						// We do get "normal" errors here, like trying to read too early.
+						// We can ignore those.
+						if to.StatusWriter != nil &&
+							expectedErrors.FindStringIndex(err.Error()) == nil {
+							_, _ = fmt.Fprintf(to.StatusWriter, "WARNING: pod log: %s: %s\n", name, err)
+						}
+						continue
+					}
+
+					go func() {
+						defer closeOutput()
 						first := true
 						defer func() {
 							m.Lock()
 							// If we never printed anything, then also skip the final message.
 							if !first {
-								if prefix != "" {
-									fmt.Fprintf(out, "%s==== end of pod log ====\n", prefix)
-								} else {
-									fmt.Fprintf(out, "==== end of pod log for container %s ====\n", name)
+								if logWithPrefix != nil {
+									_, _ = fmt.Fprintf(logWithPrefix, "%s==== end of pod log ====\n", prefix)
+								}
+								if logWithoutPrefix != nil {
+									_, _ = fmt.Fprintf(logWithoutPrefix, "==== end of pod log for container %s ====\n", name)
 								}
 							}
 							active[name] = false
@@ -222,14 +259,23 @@ func CopyPodLogs(ctx context.Context, cs clientset.Interface, ns, podName string
 									// Because the same log might be written to multiple times
 									// in different test instances, log an extra line to separate them.
 									// Also provides some useful extra information.
-									if prefix == "" {
-										fmt.Fprintf(out, "==== start of pod log for container %s ====\n", name)
-									} else {
-										fmt.Fprintf(out, "%s==== start of pod log ====\n", prefix)
+									if logWithPrefix != nil {
+										_, _ = fmt.Fprintf(logWithPrefix, "%s==== start of pod log ====\n", prefix)
+									}
+									if logWithoutPrefix != nil {
+										_, _ = fmt.Fprintf(logWithoutPrefix, "==== start of pod log for container %s ====\n", name)
 									}
 									first = false
 								}
-								fmt.Fprintf(out, "%s%s\n", prefix, line)
+								if logWithPrefix != nil {
+									_, _ = fmt.Fprintf(logWithPrefix, "%s%s\n", prefix, line)
+								}
+								if logWithoutPrefix != nil {
+									_, _ = fmt.Fprintln(logWithoutPrefix, line)
+								}
+								if output != nil {
+									_, _ = output.Write([]byte(line + "\n"))
+								}
 							}
 						}
 					}()
@@ -255,6 +301,12 @@ func CopyPodLogs(ctx context.Context, cs clientset.Interface, ns, podName string
 	return nil
 }
 
+func maybeClose(writer io.Writer) {
+	if closer, ok := writer.(io.Closer); ok {
+		_ = closer.Close()
+	}
+}
+
 // logsForPod starts reading the logs for a certain pod. If the pod has more than one
 // container, opts.Container must be set. Reading stops when the context is done.
 // The stream includes formatted error messages and ends with
@@ -276,7 +328,7 @@ func WatchPods(ctx context.Context, cs clientset.Interface, ns string, to io.Wri
 		}
 	}()
 
-	pods, err := cs.CoreV1().Pods(ns).Watch(context.Background(), meta.ListOptions{})
+	pods, err := cs.CoreV1().Pods(ns).Watch(ctx, meta.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("cannot create Pod watcher: %w", err)
 	}
@@ -286,7 +338,7 @@ func WatchPods(ctx context.Context, cs clientset.Interface, ns string, to io.Wri
 		}
 	}()
 
-	events, err := cs.CoreV1().Events(ns).Watch(context.Background(), meta.ListOptions{})
+	events, err := cs.CoreV1().Events(ns).Watch(ctx, meta.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("cannot create Event watcher: %w", err)
 	}
