@@ -356,7 +356,7 @@ func smartLabelFor(field string) string {
 		return field
 	}
 
-	commonAcronyms := []string{"API", "URL", "UID", "OSB", "GUID", "PDB"}
+	commonAcronyms := []string{"API", "URL", "UID", "OSB", "GUID"}
 	parts := camelcase.Split(field)
 
 	mergedParts := make([]string, 0, len(parts))
