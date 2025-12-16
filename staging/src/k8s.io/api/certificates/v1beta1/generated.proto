@@ -154,6 +154,7 @@ message CertificateSigningRequestSpec {
   //  "microsoft sgc",
   //  "netscape sgc"
   // +listType=atomic
+  // +k8s:required
   repeated string usages = 5;
 
   // Information about the requesting user.

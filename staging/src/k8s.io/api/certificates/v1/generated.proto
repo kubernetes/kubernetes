@@ -173,6 +173,7 @@ message CertificateSigningRequestSpec {
   //  "ipsec end system", "ipsec tunnel", "ipsec user",
   //  "timestamping", "ocsp signing", "microsoft sgc", "netscape sgc"
   // +listType=atomic
+  // +k8s:required
   repeated string usages = 5;
 
   // username contains the name of the user that created the CertificateSigningRequest.
