@@ -63,6 +63,7 @@ func TestAssert(t *testing.T) {
 					tCtx.Fatal("some error")
 					return 0
 				}).WithTimeout(time.Second).Should(gomega.Equal(1.0))
+				tCtx.Log("not reached")
 			},
 			expectDuration: time.Second,
 			expectTrace: `(FATAL) FATAL ERROR: <klog header>:
@@ -73,6 +74,102 @@ func TestAssert(t *testing.T) {
 	    {
 	        errs: [
 	            <*errors.errorString | 0xXXXX>{s: "some error"},
+	        ],
+	    }
+`,
+		},
+		"assert-eventually-error": {
+			cb: func(tCtx TContext) {
+				tCtx.AssertEventually(func(tCtx TContext) float64 {
+					tCtx.Fatal("some error")
+					return 0
+				}).WithTimeout(time.Second).Should(gomega.Equal(1.0))
+				tCtx.Log("reached")
+			},
+			expectDuration: time.Second,
+			expectTrace: `(ERROR) ERROR: <klog header>:
+	Timed out after x.y s.
+	The function passed to Eventually returned the following error:
+	    <ktesting.failures>: 
+	    some error
+(LOG) <klog header>: reached
+`,
+		},
+		"eventually-no-return-okay": {
+			cb: func(tCtx TContext) {
+				tCtx.Eventually(func(tCtx TContext) {}).WithTimeout(time.Second).Should(gomega.Succeed())
+			},
+			expectDuration: 0,
+			expectTrace:    ``,
+		},
+		"eventually-no-return-failure": {
+			cb: func(tCtx TContext) {
+				tCtx.Eventually(func(tCtx TContext) {
+					tCtx.Assert(1).To(gomega.Equal(2))
+					tCtx.Assert("hello").To(gomega.Equal("world"))
+				}).WithTimeout(time.Second).Should(gomega.Succeed())
+			},
+			expectDuration: time.Second,
+			expectTrace: `(FATAL) FATAL ERROR: <klog header>:
+	Timed out after x.y s.
+	Expected success, but got an error:
+	    <*errors.joinError | 0xXXXX>: 
+	    Expected
+	        <int>: 1
+	    to equal
+	        <int>: 2
+	    Expected
+	        <string>: hello
+	    to equal
+	        <string>: world
+	    {
+	        errs: [
+	            <*errors.errorString | 0xXXXX>{
+	                s: "Expected\n    <int>: 1\nto equal\n    <int>: 2",
+	            },
+	            <*errors.errorString | 0xXXXX>{
+	                s: "Expected\n    <string>: hello\nto equal\n    <string>: world",
+	            },
+	        ],
+	    }
+`,
+		},
+		"eventually-return-okay": {
+			cb: func(tCtx TContext) {
+				tCtx.Eventually(func(tCtx TContext) error { return nil }).WithTimeout(time.Second).Should(gomega.Succeed())
+			},
+			expectDuration: 0,
+			expectTrace:    ``,
+		},
+		"eventually-return-failure": {
+			cb: func(tCtx TContext) {
+				tCtx.Eventually(func(tCtx TContext) error {
+					tCtx.Assert(1).To(gomega.Equal(2))
+					tCtx.Assert("hello").To(gomega.Equal("world"))
+					return nil
+				}).WithTimeout(time.Second).Should(gomega.Succeed())
+			},
+			expectDuration: time.Second,
+			expectTrace: `(FATAL) FATAL ERROR: <klog header>:
+	Timed out after x.y s.
+	Expected success, but got an error:
+	    <*errors.joinError | 0xXXXX>: 
+	    Expected
+	        <int>: 1
+	    to equal
+	        <int>: 2
+	    Expected
+	        <string>: hello
+	    to equal
+	        <string>: world
+	    {
+	        errs: [
+	            <*errors.errorString | 0xXXXX>{
+	                s: "Expected\n    <int>: 1\nto equal\n    <int>: 2",
+	            },
+	            <*errors.errorString | 0xXXXX>{
+	                s: "Expected\n    <string>: hello\nto equal\n    <string>: world",
+	            },
 	        ],
 	    }
 `,
@@ -136,6 +233,7 @@ func TestAssert(t *testing.T) {
 					tCtx.Fatal("some error")
 					return 0
 				}).WithTimeout(time.Second).Should(gomega.Equal(1.0))
+				tCtx.Log("not reached")
 			},
 			expectDuration: 0,
 			expectTrace: `(FATAL) FATAL ERROR: <klog header>:
@@ -148,6 +246,23 @@ func TestAssert(t *testing.T) {
 	            <*errors.errorString | 0xXXXX>{s: "some error"},
 	        ],
 	    }
+`,
+		},
+		"assert-consistently-error": {
+			cb: func(tCtx TContext) {
+				tCtx.AssertConsistently(func(tCtx TContext) float64 {
+					tCtx.Fatal("some error")
+					return 0
+				}).WithTimeout(time.Second).Should(gomega.Equal(1.0))
+				tCtx.Log("reached")
+			},
+			expectDuration: 0,
+			expectTrace: `(ERROR) ERROR: <klog header>:
+	Failed after x.y s.
+	The function passed to Consistently returned the following error:
+	    <ktesting.failures>: 
+	    some error
+(LOG) <klog header>: reached
 `,
 		},
 		"consistently-success": {
