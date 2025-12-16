@@ -20,6 +20,9 @@ package e2enode
 
 import (
 	"context"
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -39,6 +42,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	admissionapi "k8s.io/pod-security-admission/api"
+	"sigs.k8s.io/yaml"
 )
 
 // podsAPISuite is a Ginkgo test suite for the Kubelet Pods API.
@@ -193,6 +197,94 @@ var _ = SIGDescribe("Kubelet Pods API", framework.WithSerial(), func() {
 					gomega.Equal(testPod.UID),
 				),
 			)), "did not receive DELETED event for the test pod")
+		})
+
+		ginkgo.It("should be able to list and watch static pods", func(ctx context.Context) {
+			ginkgo.By("watching for pod events")
+			watchCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+			defer cancel()
+			watchClient, err := client.WatchPods(watchCtx, &podsv1alpha1.WatchPodsRequest{})
+			framework.ExpectNoError(err, "failed to watch pods")
+
+			eventsCh := make(chan *podsv1alpha1.WatchPodsEvent, 100)
+			go func() {
+				defer ginkgo.GinkgoRecover()
+				for {
+					ev, err := watchClient.Recv()
+					if err != nil {
+						return
+					}
+					select {
+					case eventsCh <- ev:
+					case <-watchCtx.Done():
+						return
+					}
+				}
+			}()
+
+			ginkgo.By("creating a static pod manifest")
+			staticPodName := "static-pod-" + string(uuid.NewUUID())
+			staticPodPath := filepath.Join(kubeletCfg.StaticPodPath, f.Namespace.Name+"-"+staticPodName+".yaml")
+
+			pod := &v1.Pod{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Pod",
+					APIVersion: "v1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      staticPodName,
+					Namespace: f.Namespace.Name,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:    "test-container",
+							Image:   "busybox:1.36",
+							Command: []string{"sleep", "3600"},
+						},
+					},
+				},
+			}
+
+			podBytes, err := json.Marshal(pod)
+			framework.ExpectNoError(err, "failed to marshal pod")
+			podYaml, err := yaml.JSONToYAML(podBytes)
+			framework.ExpectNoError(err, "failed to convert to yaml")
+
+			err = os.WriteFile(staticPodPath, podYaml, 0644)
+			framework.ExpectNoError(err, "failed to write static pod file")
+
+			defer func() {
+				os.Remove(staticPodPath)
+			}()
+
+			ginkgo.By("waiting for the static pod ADDED event")
+			gomega.Eventually(eventsCh, "2m").Should(gomega.Receive(gomega.SatisfyAll(
+				gomega.WithTransform(func(e *podsv1alpha1.WatchPodsEvent) podsv1alpha1.EventType { return e.Type }, gomega.Equal(podsv1alpha1.EventType_ADDED)),
+				gomega.WithTransform(func(e *podsv1alpha1.WatchPodsEvent) bool {
+					var p v1.Pod
+					if err := p.Unmarshal(e.Pod); err != nil {
+						return false
+					}
+					return p.Namespace == f.Namespace.Name && p.Name == staticPodName+"-"+framework.TestContext.NodeName
+				}, gomega.BeTrue()),
+			)), "did not receive ADDED event")
+
+			ginkgo.By("deleting the static pod manifest")
+			err = os.Remove(staticPodPath)
+			framework.ExpectNoError(err, "failed to delete static pod file")
+
+			ginkgo.By("waiting for the static pod DELETED event")
+			gomega.Eventually(eventsCh, "2m").Should(gomega.Receive(gomega.SatisfyAll(
+				gomega.WithTransform(func(e *podsv1alpha1.WatchPodsEvent) podsv1alpha1.EventType { return e.Type }, gomega.Equal(podsv1alpha1.EventType_DELETED)),
+				gomega.WithTransform(func(e *podsv1alpha1.WatchPodsEvent) bool {
+					var p v1.Pod
+					if err := p.Unmarshal(e.Pod); err != nil {
+						return false
+					}
+					return p.Namespace == f.Namespace.Name && p.Name == staticPodName+"-"+framework.TestContext.NodeName
+				}, gomega.BeTrue()),
+			)), "did not receive DELETED event")
 		})
 
 	})
