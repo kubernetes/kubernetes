@@ -87,6 +87,22 @@ func testDeclarativeValidateForDeclarative(t *testing.T, apiVersion string) {
 				field.Invalid(field.NewPath("status", "conditions"), nil, "").WithOrigin("zeroOrOneOf"),
 			},
 		},
+		"spec.usages: nil = invalid": {
+			input: makeValidCSR(func(csr *api.CertificateSigningRequest) {
+				csr.Spec.Usages = nil
+			}),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "usages"), ""),
+			},
+		},
+		"spec.usages: empty = invalid": {
+			input: makeValidCSR(func(csr *api.CertificateSigningRequest) {
+				csr.Spec.Usages = []api.KeyUsage{}
+			}),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "usages"), ""),
+			},
+		},
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
