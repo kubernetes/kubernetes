@@ -17,6 +17,7 @@ limitations under the License.
 package portforward
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -24,29 +25,77 @@ import (
 	"sync"
 	"time"
 
-	gwebsocket "github.com/gorilla/websocket"
+	"github.com/coder/websocket"
 
 	"k8s.io/klog/v2"
 )
 
 var _ net.Conn = &TunnelingConnection{}
 
-// TunnelingConnection implements the "httpstream.Connection" interface, wrapping
+// TunnelingConnection implements the "net.Conn" interface, wrapping
 // a websocket connection that tunnels SPDY.
 type TunnelingConnection struct {
 	name              string
-	conn              *gwebsocket.Conn
+	conn              *websocket.Conn
+	ctx               context.Context
+	cancel            context.CancelFunc
 	inProgressMessage io.Reader
 	closeOnce         sync.Once
+	readDeadline      time.Time
+	writeDeadline     time.Time
+	deadlineMu        sync.RWMutex
+
+	// Addresses captured during connection establishment
+	// (coder/websocket doesn't expose NetConn directly)
+	localAddr  net.Addr
+	remoteAddr net.Addr
 }
 
-// NewTunnelingConnection wraps the passed gorilla/websockets connection
+// NewTunnelingConnection wraps the passed coder/websocket connection
 // with the TunnelingConnection struct (implementing net.Conn).
-func NewTunnelingConnection(name string, conn *gwebsocket.Conn) *TunnelingConnection {
+func NewTunnelingConnection(name string, conn *websocket.Conn) *TunnelingConnection {
+	return NewTunnelingConnectionWithAddrs(name, conn, nil, nil)
+}
+
+// NewTunnelingConnectionWithAddrs wraps the passed coder/websocket connection
+// with the TunnelingConnection struct (implementing net.Conn), including
+// pre-captured local and remote addresses.
+func NewTunnelingConnectionWithAddrs(name string, conn *websocket.Conn, localAddr, remoteAddr net.Addr) *TunnelingConnection {
+	ctx, cancel := context.WithCancel(context.Background())
 	return &TunnelingConnection{
-		name: name,
-		conn: conn,
+		name:       name,
+		conn:       conn,
+		ctx:        ctx,
+		cancel:     cancel,
+		localAddr:  localAddr,
+		remoteAddr: remoteAddr,
 	}
+}
+
+// withDeadline returns a context that will be cancelled when the deadline expires.
+// Uses context.AfterFunc to schedule cancellation at the deadline time.
+// Returns the context and a stop function that should be called when the operation completes.
+func withDeadline(parent context.Context, deadline time.Time) (context.Context, context.CancelFunc, func() bool) {
+	if deadline.IsZero() {
+		return parent, func() {}, func() bool { return true }
+	}
+
+	ctx, cancel := context.WithCancel(parent)
+
+	d := time.Until(deadline)
+	if d <= 0 {
+		// Deadline already passed
+		cancel()
+		return ctx, cancel, func() bool { return false }
+	}
+
+	// Schedule cancellation at the deadline
+	timer := time.AfterFunc(d, cancel)
+	stop := func() bool {
+		return timer.Stop()
+	}
+
+	return ctx, cancel, stop
 }
 
 // Read implements "io.Reader" interface, reading from the stored connection
@@ -57,17 +106,38 @@ func (c *TunnelingConnection) Read(p []byte) (int, error) {
 	defer klog.V(7).Infof("%s: tunneling connection read...complete", c.name)
 	for {
 		if c.inProgressMessage == nil {
-			klog.V(8).Infof("%s: tunneling connection read before NextReader()...", c.name)
-			messageType, nextReader, err := c.conn.NextReader()
+			klog.V(8).Infof("%s: tunneling connection read before Reader()...", c.name)
+
+			// Get current deadline
+			c.deadlineMu.RLock()
+			deadline := c.readDeadline
+			c.deadlineMu.RUnlock()
+
+			// Create context with deadline using AfterFunc pattern
+			ctx, cancel, stop := withDeadline(c.ctx, deadline)
+			messageType, nextReader, err := c.conn.Reader(ctx)
+
+			// Stop the deadline timer if it hasn't fired
+			if !stop() {
+				// Timer already fired, deadline exceeded
+				cancel()
+				return 0, context.DeadlineExceeded
+			}
+			cancel()
+
 			if err != nil {
-				closeError := &gwebsocket.CloseError{}
-				if errors.As(err, &closeError) && closeError.Code == gwebsocket.CloseNormalClosure {
+				// Check for normal closure
+				if websocket.CloseStatus(err) == websocket.StatusNormalClosure {
 					return 0, io.EOF
 				}
-				klog.V(4).Infof("%s:tunneling connection NextReader() error: %v", c.name, err)
+				// Check for context cancellation (which may indicate deadline exceeded)
+				if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+					return 0, err
+				}
+				klog.V(4).Infof("%s: tunneling connection Reader() error: %v", c.name, err)
 				return 0, err
 			}
-			if messageType != gwebsocket.BinaryMessage {
+			if messageType != websocket.MessageBinary {
 				return 0, fmt.Errorf("invalid message type received")
 			}
 			c.inProgressMessage = nextReader
@@ -89,21 +159,28 @@ func (c *TunnelingConnection) Read(p []byte) (int, error) {
 func (c *TunnelingConnection) Write(p []byte) (n int, err error) {
 	klog.V(7).Infof("%s: write: %d bytes, bytes=% X", c.name, len(p), p)
 	defer klog.V(7).Infof("%s: tunneling connection write...complete", c.name)
-	w, err := c.conn.NextWriter(gwebsocket.BinaryMessage)
+
+	// Get current deadline
+	c.deadlineMu.RLock()
+	deadline := c.writeDeadline
+	c.deadlineMu.RUnlock()
+
+	// Create context with deadline using AfterFunc pattern
+	ctx, cancel, stop := withDeadline(c.ctx, deadline)
+	defer cancel()
+
+	err = c.conn.Write(ctx, websocket.MessageBinary, p)
+
+	// Stop the deadline timer if it hasn't fired
+	if !stop() {
+		// Timer already fired, deadline exceeded
+		return 0, context.DeadlineExceeded
+	}
+
 	if err != nil {
 		return 0, err
 	}
-	defer func() {
-		// close, which flushes the message
-		closeErr := w.Close()
-		if closeErr != nil && err == nil {
-			// if closing/flushing errored and we weren't already returning an error, return the close error
-			err = closeErr
-		}
-	}()
-
-	n, err = w.Write(p)
-	return
+	return len(p), nil
 }
 
 // Close implements "io.Closer" interface, signaling the other tunneled connection
@@ -112,29 +189,28 @@ func (c *TunnelingConnection) Close() error {
 	var err error
 	c.closeOnce.Do(func() {
 		klog.V(7).Infof("%s: tunneling connection Close()...", c.name)
-		// Signal other endpoint that websocket connection is closing; ignore error.
-		normalCloseMsg := gwebsocket.FormatCloseMessage(gwebsocket.CloseNormalClosure, "")
-		writeControlErr := c.conn.WriteControl(gwebsocket.CloseMessage, normalCloseMsg, time.Now().Add(time.Second))
-		closeErr := c.conn.Close()
-		if closeErr != nil {
-			err = closeErr
-		} else if writeControlErr != nil {
-			err = writeControlErr
-		}
+		// Cancel the context to abort any ongoing operations
+		c.cancel()
+		// Close the websocket connection with normal closure status
+		err = c.conn.Close(websocket.StatusNormalClosure, "")
 	})
 	return err
 }
 
 // LocalAddr implements part of the "net.Conn" interface, returning the local
 // endpoint network address of the tunneled connection.
+// Note: coder/websocket doesn't expose the underlying net.Conn directly,
+// so this returns the address captured during connection establishment.
 func (c *TunnelingConnection) LocalAddr() net.Addr {
-	return c.conn.LocalAddr()
+	return c.localAddr
 }
 
-// LocalAddr implements part of the "net.Conn" interface, returning the remote
+// RemoteAddr implements part of the "net.Conn" interface, returning the remote
 // endpoint network address of the tunneled connection.
+// Note: coder/websocket doesn't expose the underlying net.Conn directly,
+// so this returns the address captured during connection establishment.
 func (c *TunnelingConnection) RemoteAddr() net.Addr {
-	return c.conn.RemoteAddr()
+	return c.remoteAddr
 }
 
 // SetDeadline sets the *absolute* time in the future for both
@@ -145,14 +221,20 @@ func (c *TunnelingConnection) SetDeadline(t time.Time) error {
 	return errors.Join(rerr, werr)
 }
 
-// SetDeadline sets the *absolute* time in the future for the
+// SetReadDeadline sets the *absolute* time in the future for the
 // read deadlines. Returns an error if one occurs.
 func (c *TunnelingConnection) SetReadDeadline(t time.Time) error {
-	return c.conn.SetReadDeadline(t)
+	c.deadlineMu.Lock()
+	c.readDeadline = t
+	c.deadlineMu.Unlock()
+	return nil
 }
 
-// SetDeadline sets the *absolute* time in the future for the
+// SetWriteDeadline sets the *absolute* time in the future for the
 // write deadlines. Returns an error if one occurs.
 func (c *TunnelingConnection) SetWriteDeadline(t time.Time) error {
-	return c.conn.SetWriteDeadline(t)
+	c.deadlineMu.Lock()
+	c.writeDeadline = t
+	c.deadlineMu.Unlock()
+	return nil
 }

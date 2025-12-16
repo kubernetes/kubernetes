@@ -26,7 +26,7 @@ import (
 	"testing"
 	"time"
 
-	gwebsocket "github.com/gorilla/websocket"
+	"github.com/coder/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -35,7 +35,7 @@ import (
 	constants "k8s.io/apimachinery/pkg/util/portforward"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/transport/websocket"
+	wsTransport "k8s.io/client-go/transport/websocket"
 )
 
 func TestTunnelingConnection_ReadWriteClose(t *testing.T) {
@@ -46,16 +46,14 @@ func TestTunnelingConnection_ReadWriteClose(t *testing.T) {
 	defer close(stopServerChan)
 	// Create tunneling connection server endpoint with fake upstream SPDY server.
 	tunnelingServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		var upgrader = gwebsocket.Upgrader{
-			CheckOrigin:  func(r *http.Request) bool { return true },
+		conn, err := websocket.Accept(w, req, &websocket.AcceptOptions{
 			Subprotocols: []string{constants.WebsocketsSPDYTunnelingPortForwardV1},
-		}
-		conn, err := upgrader.Upgrade(w, req, nil)
+		})
 		if err != nil {
 			t.Errorf("unexpected error %v", err)
 			return
 		}
-		defer conn.Close() //nolint:errcheck
+		defer conn.Close(websocket.StatusNormalClosure, "") //nolint:errcheck
 		if conn.Subprotocol() != constants.WebsocketsSPDYTunnelingPortForwardV1 {
 			t.Errorf("Not acceptable agreement Subprotocol: %v", conn.Subprotocol())
 			return
@@ -112,16 +110,14 @@ func TestTunnelingConnection_LocalRemoteAddress(t *testing.T) {
 	stopServerChan := make(chan struct{})
 	defer close(stopServerChan)
 	tunnelingServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		var upgrader = gwebsocket.Upgrader{
-			CheckOrigin:  func(r *http.Request) bool { return true },
+		conn, err := websocket.Accept(w, req, &websocket.AcceptOptions{
 			Subprotocols: []string{constants.WebsocketsSPDYTunnelingPortForwardV1},
-		}
-		conn, err := upgrader.Upgrade(w, req, nil)
+		})
 		if err != nil {
 			t.Errorf("unexpected error %v", err)
 			return
 		}
-		defer conn.Close() //nolint:errcheck
+		defer conn.Close(websocket.StatusNormalClosure, "") //nolint:errcheck
 		if conn.Subprotocol() != constants.WebsocketsSPDYTunnelingPortForwardV1 {
 			t.Errorf("Not acceptable agreement Subprotocol: %v", conn.Subprotocol())
 		}
@@ -149,16 +145,14 @@ func TestTunnelingConnection_ReadWriteDeadlines(t *testing.T) {
 	stopServerChan := make(chan struct{})
 	defer close(stopServerChan)
 	tunnelingServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		var upgrader = gwebsocket.Upgrader{
-			CheckOrigin:  func(r *http.Request) bool { return true },
+		conn, err := websocket.Accept(w, req, &websocket.AcceptOptions{
 			Subprotocols: []string{constants.WebsocketsSPDYTunnelingPortForwardV1},
-		}
-		conn, err := upgrader.Upgrade(w, req, nil)
+		})
 		if err != nil {
 			t.Errorf("unexpected error %v", err)
 			return
 		}
-		defer conn.Close() //nolint:errcheck
+		defer conn.Close(websocket.StatusNormalClosure, "") //nolint:errcheck
 		if conn.Subprotocol() != constants.WebsocketsSPDYTunnelingPortForwardV1 {
 			t.Errorf("Not acceptable agreement Subprotocol: %v", conn.Subprotocol())
 			return
@@ -197,15 +191,15 @@ func dialForTunnelingConnection(url *url.URL) (*TunnelingConnection, error) {
 	}
 	// Tunneling must initiate a websocket upgrade connection, using tunneling portforward protocol.
 	tunnelingProtocols := []string{constants.WebsocketsSPDYTunnelingPortForwardV1}
-	transport, holder, err := websocket.RoundTripperFor(&rest.Config{Host: url.Host})
+	transport, holder, err := wsTransport.RoundTripperFor(&rest.Config{Host: url.Host})
 	if err != nil {
 		return nil, err
 	}
-	conn, err := websocket.Negotiate(transport, holder, req, tunnelingProtocols...)
+	conn, err := wsTransport.Negotiate(transport, holder, req, tunnelingProtocols...)
 	if err != nil {
 		return nil, err
 	}
-	return NewTunnelingConnection("client", conn), nil
+	return NewTunnelingConnectionWithAddrs("client", conn.Conn, conn.LocalAddr(), conn.RemoteAddr()), nil
 }
 
 func justQueueStream(streams chan httpstream.Stream) func(httpstream.Stream, <-chan struct{}) error {

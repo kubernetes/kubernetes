@@ -85,7 +85,9 @@ func (d *tunnelingDialer) Dial(protocols ...string) (httpstream.Connection, stri
 	klog.V(4).Infof("negotiated protocol: %s", protocol)
 
 	// Wrap the websocket connection which implements "net.Conn".
-	tConn := NewTunnelingConnection("client", conn)
+	// conn.Conn is the underlying *websocket.Conn from coder/websocket
+	// Pass the captured addresses from the connection wrapper
+	tConn := NewTunnelingConnectionWithAddrs("client", conn.Conn, conn.LocalAddr(), conn.RemoteAddr())
 	// Create SPDY connection injecting the previously created tunneling connection.
 	spdyConn, err := spdy.NewClientConnectionWithPings(tConn, PingPeriod)
 
