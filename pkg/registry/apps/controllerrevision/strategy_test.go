@@ -162,3 +162,58 @@ func newRawExtensionFromObject(obj runtime.Object) runtime.RawExtension {
 func newObject() runtime.RawExtension {
 	return newRawExtensionFromObject(newStatefulSet())
 }
+
+func TestStrategy_ValidateUpdate_DataImmutable(t *testing.T) {
+	ctx := genericapirequest.NewDefaultContext()
+
+	oldHistory := newControllerRevision("validname", "validns", newObject(), 0)
+
+	newHistorySameData := newControllerRevision(
+		"validname",
+		"validns",
+		oldHistory.Data,
+		0,
+	)
+
+	newHistoryChangedData := newControllerRevision(
+		"validname",
+		"validns",
+		func() runtime.RawExtension {
+			ss := newStatefulSet()
+			ss.Name = "different"
+			return newRawExtensionFromObject(ss)
+		}(),
+		0,
+	)
+
+	tests := []struct {
+		name       string
+		newHistory *apps.ControllerRevision
+		oldHistory *apps.ControllerRevision
+		expectErr  bool
+	}{
+		{
+			name:       "update with same data is allowed",
+			newHistory: newHistorySameData,
+			oldHistory: oldHistory,
+			expectErr:  false,
+		},
+		{
+			name:       "update with changed data is rejected",
+			newHistory: newHistoryChangedData,
+			oldHistory: oldHistory,
+			expectErr:  true,
+		},
+	}
+
+	for _, tc := range tests {
+		errs := Strategy.ValidateUpdate(ctx, tc.newHistory, tc.oldHistory)
+
+		if tc.expectErr && len(errs) == 0 {
+			t.Errorf("%s: expected error for data immutability, got none", tc.name)
+		}
+		if !tc.expectErr && len(errs) > 0 {
+			t.Errorf("%s: unexpected error: %v", tc.name, errs)
+		}
+	}
+}
