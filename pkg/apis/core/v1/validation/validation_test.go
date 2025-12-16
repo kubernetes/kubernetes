@@ -479,3 +479,35 @@ func TestEventDeclarativeValidation_ReportingControllerRequired(t *testing.T) {
 		t.Fatalf("expected Required error, got %v", found.Type)
 	}
 }
+
+func TestEventDeclarativeValidation_ReportingController_Format(t *testing.T) {
+	event := &core.Event{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-event",
+			Namespace: "default",
+		},
+		InvolvedObject: core.ObjectReference{
+			Kind:      "Pod",
+			Namespace: "default",
+			Name:      "test-pod",
+		},
+		EventTime:           metav1.MicroTime{Time: time.Now()},
+		ReportingController: "my-contr@ller",
+	}
+
+	errs := corevalidation.ValidateEventCreate(event, core.SchemeGroupVersion)
+	if len(errs) == 0 {
+		t.Fatalf("expected validation error for reportingController, got none")
+	}
+
+	found := false
+	for _, err := range errs {
+		if strings.Contains(err.Error(), "reportingController") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected reportingController format error, got: %v", errs)
+	}
+}
