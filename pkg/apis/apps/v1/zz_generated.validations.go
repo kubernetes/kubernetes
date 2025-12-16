@@ -22,7 +22,16 @@ limitations under the License.
 package v1
 
 import (
+	context "context"
+	fmt "fmt"
+
+	appsv1 "k8s.io/api/apps/v1"
+	equality "k8s.io/apimachinery/pkg/api/equality"
+	operation "k8s.io/apimachinery/pkg/api/operation"
+	safe "k8s.io/apimachinery/pkg/api/safe"
+	validate "k8s.io/apimachinery/pkg/api/validate"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	field "k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 func init() { localSchemeBuilder.Register(RegisterValidations) }
@@ -30,5 +39,71 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *runtime.Scheme) error {
+	// type ControllerRevision
+	scheme.AddValidationFunc((*appsv1.ControllerRevision)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_ControllerRevision(ctx, op, nil /* fldPath */, obj.(*appsv1.ControllerRevision), safe.Cast[*appsv1.ControllerRevision](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
+	// type ControllerRevisionList
+	scheme.AddValidationFunc((*appsv1.ControllerRevisionList)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_ControllerRevisionList(ctx, op, nil /* fldPath */, obj.(*appsv1.ControllerRevisionList), safe.Cast[*appsv1.ControllerRevisionList](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
 	return nil
+}
+
+// Validate_ControllerRevision validates an instance of ControllerRevision according
+// to declarative validation rules in the API schema.
+func Validate_ControllerRevision(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *appsv1.ControllerRevision) (errs field.ErrorList) {
+	// field appsv1.ControllerRevision.TypeMeta has no validation
+	// field appsv1.ControllerRevision.ObjectMeta has no validation
+
+	// field appsv1.ControllerRevision.Data
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *runtime.RawExtension, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("data"), &obj.Data, safe.Field(oldObj, func(oldObj *appsv1.ControllerRevision) *runtime.RawExtension { return &oldObj.Data }), oldObj != nil)...)
+
+	// field appsv1.ControllerRevision.Revision has no validation
+	return errs
+}
+
+// Validate_ControllerRevisionList validates an instance of ControllerRevisionList according
+// to declarative validation rules in the API schema.
+func Validate_ControllerRevisionList(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *appsv1.ControllerRevisionList) (errs field.ErrorList) {
+	// field appsv1.ControllerRevisionList.TypeMeta has no validation
+	// field appsv1.ControllerRevisionList.ListMeta has no validation
+
+	// field appsv1.ControllerRevisionList.Items
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []appsv1.ControllerRevision, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// iterate the list and call the type's validation function
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_ControllerRevision)...)
+			return
+		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *appsv1.ControllerRevisionList) []appsv1.ControllerRevision { return oldObj.Items }), oldObj != nil)...)
+
+	return errs
 }
