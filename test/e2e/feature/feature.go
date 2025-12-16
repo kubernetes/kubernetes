@@ -34,9 +34,6 @@ var (
 	// - token-cleaner-controller
 	BootstrapTokens = framework.WithFeature(framework.ValidFeatures.Add("BootstrapTokens"))
 
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	BoundServiceAccountTokenVolume = framework.WithFeature(framework.ValidFeatures.Add("BoundServiceAccountTokenVolume"))
-
 	// Owner: sig-api-machinery
 	// Marks tests that exercise the CBOR data format for serving or storage.
 	CBOR = framework.WithFeature(framework.ValidFeatures.Add("CBOR"))
