@@ -7572,6 +7572,7 @@ type Event struct {
 
 	// Name of the controller that emitted this Event, e.g. `kubernetes.io/kubelet`.
 	// +optional
+	// +k8s:validation:Format=qualified-name
 	ReportingController string `json:"reportingComponent" protobuf:"bytes,14,opt,name=reportingComponent"`
 
 	// ID of the controller instance, e.g. `kubelet-xyzf`.

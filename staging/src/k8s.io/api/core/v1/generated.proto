@@ -1769,6 +1769,7 @@ message Event {
 
   // Name of the controller that emitted this Event, e.g. `kubernetes.io/kubelet`.
   // +optional
+  // +k8s:validation:Format=qualified-name
   optional string reportingComponent = 14;
 
   // ID of the controller instance, e.g. `kubelet-xyzf`.

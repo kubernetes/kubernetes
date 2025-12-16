@@ -19,14 +19,17 @@ package validation
 import (
 	"strings"
 	"testing"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 
-	"k8s.io/kubernetes/pkg/apis/core"
+	core "k8s.io/kubernetes/pkg/apis/core"
+	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 )
 
 func TestValidateResourceRequirements(t *testing.T) {
@@ -429,5 +432,50 @@ func TestAccumulateUniqueHostPorts(t *testing.T) {
 				t.Errorf("expected error, but get nil")
 			}
 		})
+	}
+}
+
+func TestEventDeclarativeValidation_ReportingControllerRequired(t *testing.T) {
+	validEvent := &core.Event{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test",
+			Namespace: metav1.NamespaceDefault,
+		},
+		InvolvedObject: core.ObjectReference{
+			Kind:       "Pod",
+			Name:       "pod-1",
+			Namespace:  metav1.NamespaceDefault,
+			APIVersion: "v1",
+		},
+		ReportingController: "kubernetes.io/kubelet",
+		ReportingInstance:   "kubelet-xyz",
+		Reason:              "TestReason",
+		Action:              "TestAction",
+		Type:                core.EventTypeNormal,
+		EventTime:           metav1.NewMicroTime(time.Now()),
+	}
+
+	event := validEvent.DeepCopy()
+	event.ReportingController = ""
+
+	errs := corevalidation.ValidateEventCreate(
+		event,
+		schema.GroupVersion{Group: "", Version: "v1"},
+	)
+
+	var found *field.Error
+	for i := range errs {
+		if errs[i].Field == "reportingComponent" {
+			found = errs[i]
+			break
+		}
+	}
+
+	if found == nil {
+		t.Fatalf("expected error on reportingComponent, got: %#v", errs)
+	}
+
+	if found.Type != field.ErrorTypeRequired {
+		t.Fatalf("expected Required error, got %v", found.Type)
 	}
 }
