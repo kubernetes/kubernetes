@@ -74,7 +74,17 @@ func (tc *TC) finalize(err *error) {
 	if len(errs) == 0 {
 		return
 	}
-	*err = errors.Join(errs...)
+	*err = failures{errors.Join(errs...)}
+}
+
+type failures struct {
+	error
+}
+
+func (e failures) GomegaString() string {
+	// We don't need to repeat the string. Errors already get formatted once by Gomega itself,
+	// then it calls GomegaString for a summary that isn't necessary anymore.
+	return ""
 }
 
 // buildHeader handles:
