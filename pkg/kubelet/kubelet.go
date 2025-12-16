@@ -697,7 +697,7 @@ func NewMainKubelet(ctx context.Context,
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodsAPI) {
 		broadcaster := pods.NewBroadcaster()
-		klet.podsServer = pods.NewPodsServer(broadcaster)
+		klet.podsServer = pods.NewPodsServer(broadcaster, klet.podManager)
 		podSubscribers = append(podSubscribers, klet.podsServer)
 		statusSubscribers = append(statusSubscribers, klet.podsServer)
 	}
