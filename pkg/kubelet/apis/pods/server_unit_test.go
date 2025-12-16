@@ -30,50 +30,53 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metafuzzer "k8s.io/apimachinery/pkg/apis/meta/fuzzer"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/component-base/metrics/testutil"
 	podsv1alpha1 "k8s.io/kubelet/pkg/apis/pods/v1alpha1"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	corefuzzer "k8s.io/kubernetes/pkg/apis/core/fuzzer"
-	podsapi "k8s.io/kubernetes/pkg/kubelet/apis/pods"
+	podsapi "k8s.io/kubernetes/pkg/kubele t/apis/pods"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
+	kubepodtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
 )
 
 func TestStartEventLoop(t *testing.T) {
 	broadcaster := podsapi.NewBroadcaster()
-	server := podsapi.NewPodsServerForTest(broadcaster)
+	mockManager := new(kubepodtest.MockManager)
+	server := podsapi.NewPodsServerForTest(broadcaster, mockManager)
 	pod1 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: "pod1-uid", Name: "pod1", Namespace: "ns1"}}
-	pod1Running := pod1.DeepCopy()
-	pod1Running.Status = v1.PodStatus{Phase: v1.PodRunning}
-	pod1Succeeded := pod1.DeepCopy()
-	pod1Succeeded.Status = v1.PodStatus{Phase: v1.PodSucceeded}
+
 	clientChannel := make(chan podsapi.PodWatchEvent, 100)
 	broadcaster.Register(clientChannel)
 	defer broadcaster.Unregister(clientChannel)
-	server.OnPodAdded(pod1Running)
-	server.OnPodStatusUpdated(pod1, pod1Succeeded.Status)
+
+	server.OnPodAdded(pod1)
+	server.OnPodStatusUpdated(pod1, v1.PodStatus{Phase: v1.PodSucceeded})
 	server.OnPodRemoved(pod1)
+
 	event := <-clientChannel
 	assert.Equal(t, "ADDED", string(event.Type))
-	assert.Equal(t, pod1.UID, event.Pod.UID)
+	assert.Equal(t, pod1.UID, event.UID)
+
 	event = <-clientChannel
 	assert.Equal(t, "MODIFIED", string(event.Type))
-	assert.Equal(t, v1.PodSucceeded, event.Pod.Status.Phase)
+	assert.Equal(t, pod1.UID, event.UID)
+
 	event = <-clientChannel
 	assert.Equal(t, "DELETED", string(event.Type))
-	assert.Equal(t, pod1.UID, event.Pod.UID)
+	assert.Equal(t, pod1.UID, event.UID)
+	assert.Equal(t, pod1, event.Pod)
 }
 
 func TestListPods(t *testing.T) {
 	broadcaster := podsapi.NewBroadcaster()
-	server := podsapi.NewPodsServerForTest(broadcaster)
+	mockManager := new(kubepodtest.MockManager)
+	server := podsapi.NewPodsServerForTest(broadcaster, mockManager)
 	pod1 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: "pod1-uid", Name: "pod1", Namespace: "ns1"}}
 	pod2 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: "pod2-uid", Name: "pod2", Namespace: "ns2"}}
-	status1 := v1.PodStatus{Phase: v1.PodRunning}
-	status2 := v1.PodStatus{Phase: v1.PodSucceeded}
-	server.OnPodAdded(pod1)
-	server.OnPodAdded(pod2)
-	server.OnPodStatusUpdated(pod1, status1)
-	server.OnPodStatusUpdated(pod2, status2)
+
+	mockManager.On("GetPods").Return([]*v1.Pod{pod1, pod2})
+
 	resp, err := server.ListPods(context.Background(), &podsv1alpha1.ListPodsRequest{})
 	require.NoError(t, err)
 	pod1Out := &v1.Pod{}
@@ -88,7 +91,8 @@ func TestListPods(t *testing.T) {
 
 func TestGetPod(t *testing.T) {
 	broadcaster := podsapi.NewBroadcaster()
-	server := podsapi.NewPodsServerForTest(broadcaster)
+	mockManager := new(kubepodtest.MockManager)
+	server := podsapi.NewPodsServerForTest(broadcaster, mockManager)
 	pod1 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: "pod1-uid", Name: "pod1", Namespace: "ns1"}}
 	pod1.Spec.EphemeralContainers = []v1.EphemeralContainer{
 		{
@@ -101,9 +105,10 @@ func TestGetPod(t *testing.T) {
 			},
 		},
 	}
-	status1 := v1.PodStatus{Phase: v1.PodRunning}
-	server.OnPodAdded(pod1)
-	server.OnPodStatusUpdated(pod1, status1)
+	pod1.Status = v1.PodStatus{Phase: v1.PodRunning}
+
+	mockManager.On("GetPodByUID", types.UID("pod1-uid")).Return(pod1, true)
+
 	resp, err := server.GetPod(context.Background(), &podsv1alpha1.GetPodRequest{PodUID: "pod1-uid"})
 	require.NoError(t, err)
 	podOut := &v1.Pod{}
@@ -119,12 +124,41 @@ func TestGetPod(t *testing.T) {
 	assert.True(t, podOut.Spec.EphemeralContainers[0].TTY)
 }
 
+func TestStaticPod(t *testing.T) {
+	broadcaster := podsapi.NewBroadcaster()
+	mockManager := new(kubepodtest.MockManager)
+	server := podsapi.NewPodsServerForTest(broadcaster, mockManager)
+
+	staticPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: "static-pod-uid",
+			Name: "static-pod",
+			Namespace: "default",
+			Annotations: map[string]string{
+				"kubernetes.io/config.source": "file",
+			},
+		},
+	}
+
+	mockManager.On("GetPodByUID", types.UID("static-pod-uid")).Return(staticPod, true)
+
+	resp, err := server.GetPod(context.Background(), &podsv1alpha1.GetPodRequest{PodUID: "static-pod-uid"})
+	require.NoError(t, err)
+
+	podOut := &v1.Pod{}
+	err = podOut.Unmarshal(resp.Pod)
+	require.NoError(t, err)
+	assert.Equal(t, "static-pod", podOut.Name)
+	assert.Equal(t, "file", podOut.Annotations["kubernetes.io/config.source"])
+}
+
 func TestErrorsAndMetrics(t *testing.T) {
 	metrics.Register()
 
 	t.Run("DroppedWatchEventIncrementsMetric", func(t *testing.T) {
 		broadcaster := podsapi.NewBroadcaster()
-		server := podsapi.NewPodsServerForTest(broadcaster)
+		mockManager := new(kubepodtest.MockManager)
+		server := podsapi.NewPodsServerForTest(broadcaster, mockManager)
 		pod1 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: "pod1-uid", Name: "pod1", Namespace: "ns1"}}
 		server.OnPodAdded(pod1)
 
@@ -135,9 +169,9 @@ func TestErrorsAndMetrics(t *testing.T) {
 		defer broadcaster.Unregister(clientChannel)
 
 		// Send two events. The first one should fill the buffer.
-		broadcaster.Broadcast(podsapi.PodWatchEvent{})
+		broadcaster.Broadcast(podsapi.PodWatchEvent{UID: "1"})
 		// The second one should be dropped and increment the metric.
-		broadcaster.Broadcast(podsapi.PodWatchEvent{})
+		broadcaster.Broadcast(podsapi.PodWatchEvent{UID: "2"})
 
 		err := testutil.CollectAndCompare(metrics.PodWatchEventsDroppedTotal, strings.NewReader(`
 			# HELP kubelet_pod_watch_events_dropped_total [ALPHA] Cumulative number of pod watch events dropped.

@@ -31,10 +31,12 @@ import (
 	"k8s.io/klog/v2"
 	podsv1alpha1 "k8s.io/kubelet/pkg/apis/pods/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
+	"k8s.io/kubernetes/pkg/kubelet/pod"
 )
 
 type PodWatchEvent struct {
 	Type watch.EventType
+	UID  types.UID
 	Pod  *v1.Pod
 }
 
@@ -82,92 +84,52 @@ func (b *broadcaster) Broadcast(event PodWatchEvent) {
 // PodsServer is the gRPC server that provides pod information.
 type PodsServer struct {
 	podsv1alpha1.UnimplementedPodsServer
-	lock        sync.RWMutex
-	pods        map[types.UID]*v1.Pod
+	podManager  pod.Manager
 	broadcaster *broadcaster
 }
 
 // NewPodsServer creates a new PodServer for production use.
-func NewPodsServer(broadcaster *broadcaster) *PodsServer {
+func NewPodsServer(broadcaster *broadcaster, podManager pod.Manager) *PodsServer {
 	return &PodsServer{
-		pods:        make(map[types.UID]*v1.Pod),
+		podManager:  podManager,
 		broadcaster: broadcaster,
 	}
 }
 
 // NewPodsServerForTest creates a new PodServer with an injectable ticker for testing.
-func NewPodsServerForTest(broadcaster *broadcaster) *PodsServer {
+func NewPodsServerForTest(broadcaster *broadcaster, podManager pod.Manager) *PodsServer {
 	return &PodsServer{
-		pods:        make(map[types.UID]*v1.Pod),
+		podManager:  podManager,
 		broadcaster: broadcaster,
 	}
 }
 
 // OnPodAdded is called when a pod is added.
 func (s *PodsServer) OnPodAdded(pod *v1.Pod) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	s.pods[pod.UID] = pod.DeepCopy()
-	s.broadcaster.Broadcast(PodWatchEvent{Type: watch.Added, Pod: pod})
+	s.broadcaster.Broadcast(PodWatchEvent{Type: watch.Added, UID: pod.UID})
 	logger := klog.FromContext(context.Background())
 	logger.Info("Pod added to storage", "podUID", pod.UID)
 }
 
 // OnPodUpdated is called when a pod is updated.
 func (s *PodsServer) OnPodUpdated(pod *v1.Pod) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	s.pods[pod.UID] = pod.DeepCopy()
-	s.broadcaster.Broadcast(PodWatchEvent{Type: watch.Modified, Pod: pod})
+	s.broadcaster.Broadcast(PodWatchEvent{Type: watch.Modified, UID: pod.UID})
 	logger := klog.FromContext(context.Background())
 	logger.Info("Pod updated in storage", "podUID", pod.UID)
 }
 
 // OnPodRemoved is called when a pod is removed.
 func (s *PodsServer) OnPodRemoved(pod *v1.Pod) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	delete(s.pods, pod.UID)
-	s.broadcaster.Broadcast(PodWatchEvent{Type: watch.Deleted, Pod: pod.DeepCopy()})
+	s.broadcaster.Broadcast(PodWatchEvent{Type: watch.Deleted, UID: pod.UID, Pod: pod})
 	logger := klog.FromContext(context.Background())
 	logger.Info("Pod removed from storage", "podUID", pod.UID)
 }
 
 // OnPodStatusUpdated is called when a pod's status is updated.
 func (s *PodsServer) OnPodStatusUpdated(pod *v1.Pod, status v1.PodStatus) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	if storedPod, ok := s.pods[pod.UID]; ok {
-		storedPod.Status = status
-		s.broadcaster.Broadcast(PodWatchEvent{Type: watch.Modified, Pod: storedPod})
-		logger := klog.FromContext(context.Background())
-		logger.Info("Pod status updated in storage", "podUID", pod.UID)
-	}
-}
-
-// Get returns a pod by UID.
-func (s *PodsServer) Get(uid types.UID) (*v1.Pod, bool) {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-	pod, ok := s.pods[uid]
-	if !ok {
-		return nil, false
-	}
-	return pod.DeepCopy(), true
-}
-
-// List returns all pods.
-func (s *PodsServer) List() []*v1.Pod {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-	pods := make([]*v1.Pod, 0, len(s.pods))
-	for _, pod := range s.pods {
-		pods = append(pods, pod.DeepCopy())
-	}
-	sort.Slice(pods, func(i, j int) bool {
-		return pods[i].UID < pods[j].UID
-	})
-	return pods
+	s.broadcaster.Broadcast(PodWatchEvent{Type: watch.Modified, UID: pod.UID})
+	logger := klog.FromContext(context.Background())
+	logger.Info("Pod status updated in storage", "podUID", pod.UID)
 }
 
 // ListPods returns a list of pods.
@@ -176,7 +138,10 @@ func (s *PodsServer) ListPods(ctx context.Context, req *podsv1alpha1.ListPodsReq
 	logger.Info("ListPods called")
 
 	// TODO: Implement filtering based on req.Filter, pagination with req.PageToken and req.PageSize
-	podsToReturn := s.List()
+	podsToReturn := s.podManager.GetPods()
+	sort.Slice(podsToReturn, func(i, j int) bool {
+		return podsToReturn[i].UID < podsToReturn[j].UID
+	})
 
 	protoPods := make([][]byte, len(podsToReturn))
 	for i, p := range podsToReturn {
@@ -196,7 +161,7 @@ func (s *PodsServer) GetPod(ctx context.Context, req *podsv1alpha1.GetPodRequest
 	logger.Info("GetPod called", "podUID", req.PodUID)
 
 	podUID := types.UID(req.PodUID)
-	pod, ok := s.Get(podUID)
+	pod, ok := s.podManager.GetPodByUID(podUID)
 	if !ok {
 		return nil, status.Errorf(codes.NotFound, "pod with UID %s not found", req.PodUID)
 	}
@@ -226,7 +191,11 @@ func (s *PodsServer) WatchPods(req *podsv1alpha1.WatchPodsRequest, stream podsv1
 	}()
 
 	// Send initial ADDED events
-	initialPods := s.List()
+	initialPods := s.podManager.GetPods()
+	sort.Slice(initialPods, func(i, j int) bool {
+		return initialPods[i].UID < initialPods[j].UID
+	})
+
 	for _, p := range initialPods {
 		podBytes, err := p.Marshal()
 		if err != nil {
@@ -249,14 +218,38 @@ func (s *PodsServer) WatchPods(req *podsv1alpha1.WatchPodsRequest, stream podsv1
 			logger.Info("Watch context cancelled", "client", clientAddr)
 			return stream.Context().Err()
 		case event := <-clientChannel:
-			podBytes, err := event.Pod.Marshal()
+			var podToMarshal *v1.Pod
+			if event.Type == watch.Deleted {
+				podToMarshal = event.Pod
+			} else {
+				p, ok := s.podManager.GetPodByUID(event.UID)
+				if ok {
+					podToMarshal = p
+				} else {
+					logger.Info("Pod not found in manager during watch event processing", "uid", event.UID, "type", event.Type)
+					continue
+				}
+			}
+
+			if podToMarshal == nil {
+				continue
+			}
+
+			podBytes, err := podToMarshal.Marshal()
 			if err != nil {
 				logger.Error(err, "Error marshalling watch event pod")
 				metrics.PodWatchEventsDroppedTotal.Inc()
 				continue
 			}
+
+			eventType, err := convertWatchEventType(event.Type)
+			if err != nil {
+				logger.Error(err, "Unknown watch event type")
+				continue
+			}
+
 			if err := stream.Send(&podsv1alpha1.WatchPodsEvent{
-				Type: convertWatchEventType(event.Type),
+				Type: eventType,
 				Pod:  podBytes,
 			}); err != nil {
 				logger.Error(err, "Error sending watch event to client", "client", clientAddr)
@@ -266,15 +259,15 @@ func (s *PodsServer) WatchPods(req *podsv1alpha1.WatchPodsRequest, stream podsv1
 	}
 }
 
-func convertWatchEventType(watchType watch.EventType) podsv1alpha1.EventType {
+func convertWatchEventType(watchType watch.EventType) (podsv1alpha1.EventType, error) {
 	switch watchType {
 	case watch.Added:
-		return podsv1alpha1.EventType_ADDED
+		return podsv1alpha1.EventType_ADDED, nil
 	case watch.Modified:
-		return podsv1alpha1.EventType_MODIFIED
+		return podsv1alpha1.EventType_MODIFIED, nil
 	case watch.Deleted:
-		return podsv1alpha1.EventType_DELETED
+		return podsv1alpha1.EventType_DELETED, nil
 	default:
-		return podsv1alpha1.EventType_ADDED
+		return podsv1alpha1.EventType_ADDED, status.Errorf(codes.Internal, "unknown watch event type: %v", watchType)
 	}
 }
