@@ -69,13 +69,8 @@ func TestAssert(t *testing.T) {
 			expectTrace: `(FATAL) FATAL ERROR: <klog header>:
 	Timed out after x.y s.
 	The function passed to Eventually returned the following error:
-	    <*errors.joinError | 0xXXXX>: 
+	    <ktesting.failures>: 
 	    some error
-	    {
-	        errs: [
-	            <*errors.errorString | 0xXXXX>{s: "some error"},
-	        ],
-	    }
 `,
 		},
 		"assert-eventually-error": {
@@ -113,7 +108,7 @@ func TestAssert(t *testing.T) {
 			expectTrace: `(FATAL) FATAL ERROR: <klog header>:
 	Timed out after x.y s.
 	Expected success, but got an error:
-	    <*errors.joinError | 0xXXXX>: 
+	    <ktesting.failures>: 
 	    Expected
 	        <int>: 1
 	    to equal
@@ -122,16 +117,6 @@ func TestAssert(t *testing.T) {
 	        <string>: hello
 	    to equal
 	        <string>: world
-	    {
-	        errs: [
-	            <*errors.errorString | 0xXXXX>{
-	                s: "Expected\n    <int>: 1\nto equal\n    <int>: 2",
-	            },
-	            <*errors.errorString | 0xXXXX>{
-	                s: "Expected\n    <string>: hello\nto equal\n    <string>: world",
-	            },
-	        ],
-	    }
 `,
 		},
 		"eventually-return-okay": {
@@ -153,7 +138,7 @@ func TestAssert(t *testing.T) {
 			expectTrace: `(FATAL) FATAL ERROR: <klog header>:
 	Timed out after x.y s.
 	Expected success, but got an error:
-	    <*errors.joinError | 0xXXXX>: 
+	    <ktesting.failures>: 
 	    Expected
 	        <int>: 1
 	    to equal
@@ -162,16 +147,6 @@ func TestAssert(t *testing.T) {
 	        <string>: hello
 	    to equal
 	        <string>: world
-	    {
-	        errs: [
-	            <*errors.errorString | 0xXXXX>{
-	                s: "Expected\n    <int>: 1\nto equal\n    <int>: 2",
-	            },
-	            <*errors.errorString | 0xXXXX>{
-	                s: "Expected\n    <string>: hello\nto equal\n    <string>: world",
-	            },
-	        ],
-	    }
 `,
 		},
 		"eventually-success": {
@@ -239,13 +214,8 @@ func TestAssert(t *testing.T) {
 			expectTrace: `(FATAL) FATAL ERROR: <klog header>:
 	Failed after x.y s.
 	The function passed to Consistently returned the following error:
-	    <*errors.joinError | 0xXXXX>: 
+	    <ktesting.failures>: 
 	    some error
-	    {
-	        errs: [
-	            <*errors.errorString | 0xXXXX>{s: "some error"},
-	        ],
-	    }
 `,
 		},
 		"assert-consistently-error": {
