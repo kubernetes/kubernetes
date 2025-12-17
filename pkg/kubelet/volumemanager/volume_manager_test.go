@@ -18,6 +18,7 @@ package volumemanager
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"reflect"
 	"strconv"
@@ -28,7 +29,9 @@ import (
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	kubetypes "k8s.io/apimachinery/pkg/types"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -656,28 +659,43 @@ func delayClaimBecomesBound(
 }
 
 func TestWaitForAllPodsUnmount(t *testing.T) {
-	tmpDir, err := utiltesting.MkTmpdir("volumeManagerTest")
-	require.NoError(t, err, "Failed to create temp directory")
-	defer func() {
-		if err := os.RemoveAll(tmpDir); err != nil {
-			t.Errorf("Failed to remove temp directory: %v", err)
-		}
-	}()
+	tmpDir := t.TempDir()
 
 	tests := []struct {
 		name          string
+		numPods       int
 		podMode       v1.PersistentVolumeMode
 		expectedError bool
 	}{
 		{
-			name:          "successful unmount",
+			name:          "successful unmount - single pod",
+			numPods:       1,
 			podMode:       "",
 			expectedError: false,
 		},
 		{
-			name:          "timeout waiting for unmount",
+			name:          "timeout waiting for unmount - single pod",
+			numPods:       1,
 			podMode:       v1.PersistentVolumeFilesystem,
 			expectedError: true,
+		},
+		{
+			name:          "concurrent unmount - multiple pods (10) with timeout errors",
+			numPods:       10,
+			podMode:       v1.PersistentVolumeFilesystem,
+			expectedError: true,
+		},
+		{
+			name:          "concurrent unmount - many pods (50) with timeout errors",
+			numPods:       50,
+			podMode:       v1.PersistentVolumeFilesystem,
+			expectedError: true,
+		},
+		{
+			name:          "concurrent unmount - multiple pods without volumes",
+			numPods:       10,
+			podMode:       "",
+			expectedError: false,
 		},
 	}
 
@@ -686,33 +704,157 @@ func TestWaitForAllPodsUnmount(t *testing.T) {
 			var ctx context.Context = ktesting.Init(t)
 			podManager := kubepod.NewBasicPodManager()
 
-			node, pod, pv, claim := createObjects(test.podMode, test.podMode)
-			kubeClient := fake.NewSimpleClientset(node, pod, pv, claim)
+			node, pods, pvs, claims := createMultiplePodsWithVolumes(test.numPods, test.podMode)
+
+			objects := []runtime.Object{node}
+			for i := 0; i < test.numPods; i++ {
+				objects = append(objects, pods[i], pvs[i], claims[i])
+			}
+			kubeClient := fake.NewClientset(objects...)
 
 			manager := newTestVolumeManager(t, tmpDir, podManager, kubeClient, node)
 
 			sourcesReady := config.NewSourcesReady(func(_ sets.Set[string]) bool { return true })
 			go manager.Run(ctx, sourcesReady)
 
-			podManager.SetPods([]*v1.Pod{pod})
+			podManager.SetPods(pods)
 
-			go simulateVolumeInUseUpdate(
-				v1.UniqueVolumeName(node.Status.VolumesAttached[0].Name),
-				ctx.Done(),
-				manager)
+			if test.podMode != "" {
+				for i := 0; i < test.numPods; i++ {
+					volumeName := v1.UniqueVolumeName(node.Status.VolumesAttached[i].Name)
+					go simulateVolumeInUseUpdate(volumeName, ctx.Done(), manager)
+				}
 
-			err := manager.WaitForAttachAndMount(ctx, pod)
-			require.NoError(t, err, "Failed to wait for attach and mount")
+				for _, pod := range pods {
+					err := manager.WaitForAttachAndMount(ctx, pod)
+					require.NoError(t, err, "Failed to wait for attach and mount for pod %s", pod.Name)
+				}
+			}
 
-			ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
+			unmountCtx, cancel := context.WithTimeout(ctx, 1*time.Second)
 			defer cancel()
-			err = manager.WaitForAllPodsUnmount(ctx, []*v1.Pod{pod})
+
+			err := manager.WaitForAllPodsUnmount(unmountCtx, pods)
 
 			if test.expectedError {
 				require.ErrorIs(t, err, context.DeadlineExceeded, "Expected error due to timeout")
+				// Verify that we get exactly numPods errors in the aggregate
+				var aggErr utilerrors.Aggregate
+				require.ErrorAs(t, err, &aggErr, "Expected error to be an Aggregate error")
+				errs := aggErr.Errors()
+				require.Len(t, errs, test.numPods, "Expected %d errors but got %d", test.numPods, len(errs))
 			} else {
 				require.NoError(t, err, "Expected no error")
 			}
 		})
 	}
+}
+
+func createMultiplePodsWithVolumes(numPods int, pvMode v1.PersistentVolumeMode) (*v1.Node, []*v1.Pod, []*v1.PersistentVolume, []*v1.PersistentVolumeClaim) {
+	attachedVolumes := make([]v1.AttachedVolume, numPods)
+	for i := 0; i < numPods; i++ {
+		attachedVolumes[i] = v1.AttachedVolume{
+			Name:       v1.UniqueVolumeName(fmt.Sprintf("fake/fake-device-%d", i)),
+			DevicePath: fmt.Sprintf("fake/path-%d", i),
+		}
+	}
+
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: testHostname},
+		Status: v1.NodeStatus{
+			VolumesAttached: attachedVolumes,
+		},
+	}
+
+	pods := make([]*v1.Pod, numPods)
+	pvs := make([]*v1.PersistentVolume, numPods)
+	claims := make([]*v1.PersistentVolumeClaim, numPods)
+
+	for i := 0; i < numPods; i++ {
+		podName := fmt.Sprintf("pod-%d", i)
+		claimName := fmt.Sprintf("claim-%d", i)
+		pvName := fmt.Sprintf("pv-%d", i)
+		volumeName := fmt.Sprintf("vol-%d", i)
+		uid := fmt.Sprintf("uid-%d", i)
+
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      podName,
+				Namespace: "nsA",
+				UID:       kubetypes.UID(uid),
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name: "container1",
+					},
+				},
+				Volumes: []v1.Volume{
+					{
+						Name: volumeName,
+						VolumeSource: v1.VolumeSource{
+							PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+								ClaimName: claimName,
+							},
+						},
+					},
+				},
+			},
+		}
+
+		switch pvMode {
+		case v1.PersistentVolumeFilesystem:
+			pod.Spec.Containers[0].VolumeMounts = []v1.VolumeMount{
+				{
+					Name:      volumeName,
+					MountPath: fmt.Sprintf("/mnt/%s", volumeName),
+				},
+			}
+		case v1.PersistentVolumeBlock:
+			pod.Spec.Containers[0].VolumeDevices = []v1.VolumeDevice{
+				{
+					Name:       volumeName,
+					DevicePath: fmt.Sprintf("/dev/%s", volumeName),
+				},
+			}
+		}
+
+		pv := &v1.PersistentVolume{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: pvName,
+			},
+			Spec: v1.PersistentVolumeSpec{
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					RBD: &v1.RBDPersistentVolumeSource{
+						RBDImage: fmt.Sprintf("fake-device-%d", i),
+					},
+				},
+				ClaimRef: &v1.ObjectReference{
+					Namespace: "nsA",
+					Name:      claimName,
+				},
+				VolumeMode: &pvMode,
+			},
+		}
+
+		claim := &v1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      claimName,
+				Namespace: "nsA",
+			},
+			Spec: v1.PersistentVolumeClaimSpec{
+				VolumeName: pvName,
+				VolumeMode: &pvMode,
+			},
+			Status: v1.PersistentVolumeClaimStatus{
+				Phase: v1.ClaimBound,
+			},
+		}
+
+		pods[i] = pod
+		pvs[i] = pv
+		claims[i] = claim
+	}
+
+	return node, pods, pvs, claims
 }
