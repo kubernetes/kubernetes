@@ -510,9 +510,8 @@ func NewMainKubelet(ctx context.Context,
 		MinAge:               kubeCfg.ImageMinimumGCAge.Duration,
 		HighThresholdPercent: int(kubeCfg.ImageGCHighThresholdPercent),
 		LowThresholdPercent:  int(kubeCfg.ImageGCLowThresholdPercent),
+		MaxAge:               kubeCfg.ImageMaximumGCAge.Duration,
 	}
-
-	imageGCPolicy.MaxAge = kubeCfg.ImageMaximumGCAge.Duration
 
 	enforceNodeAllocatable := kubeCfg.EnforceNodeAllocatable
 	if experimentalNodeAllocatableIgnoreEvictionThreshold {
