@@ -154,7 +154,7 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// For HTTP/2.0 requests, we need to define GetBody to replay
 	// the request body after GOAWAY errors are received
 	// For more info see the issue: https://issue.k8s.io/135285
-	if newReq.Body != nil && newReq.Body != http.NoBody {
+	if newReq.GetBody == nil && newReq.Body != nil && newReq.Body != http.NoBody {
 		newReq.Body, newReq.GetBody = wrapBodyForRetry(newReq.Body, defaultRetryableBodyConfig())
 	}
 

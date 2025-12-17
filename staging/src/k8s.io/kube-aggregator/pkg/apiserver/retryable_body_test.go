@@ -62,7 +62,7 @@ func TestWrapBodyForRetry(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			originalBody := io.NopCloser(bytes.NewBufferString(tc.bodyContent))
-			config := retryableBodyConfig{limit: tc.limit, maxAttempts: tc.maxAttempts}
+			config := retryableBodyConfig{maxRetryBytes: tc.limit, maxAttempts: tc.maxAttempts}
 
 			wrappedBody, getBody := wrapBodyForRetry(originalBody, config)
 			if wrappedBody == nil {
@@ -151,7 +151,7 @@ func TestWrapBodyForRetryMaxAttempts(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			bodyContent := "test body content"
 			originalBody := io.NopCloser(bytes.NewBufferString(bodyContent))
-			config := retryableBodyConfig{limit: 1024, maxAttempts: tc.maxAttempts}
+			config := retryableBodyConfig{maxRetryBytes: 1024, maxAttempts: tc.maxAttempts}
 
 			wrappedBody, getBody := wrapBodyForRetry(originalBody, config)
 
@@ -165,7 +165,10 @@ func TestWrapBodyForRetryMaxAttempts(t *testing.T) {
 				body, err := getBody()
 				lastErr = err
 				if err == nil && body != nil {
-					body.Close()
+					err := body.Close()
+					if err != nil {
+						t.Errorf("unexpected close error: %v", err)
+					}
 				}
 			}
 

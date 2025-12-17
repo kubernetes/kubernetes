@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"sync"
 	"sync/atomic"
 )
 
@@ -33,21 +34,21 @@ const (
 )
 
 var (
-	errRequestBodyTooLarge   = errors.New("http/2.0 request body too large for retry")
-	errRetryAlreadyAttempted = errors.New("http/2.0 max retries attempted")
+	errRequestBodyTooLarge   = errors.New("request body too large for retry")
+	errRetryAlreadyAttempted = errors.New("GetBody max retries attempted")
 )
 
 // retryableBodyConfig configures retry behavior
 type retryableBodyConfig struct {
-	limit       int
-	maxAttempts int
+	maxRetryBytes int
+	maxAttempts   int
 }
 
 // defaultRetryableBodyConfig returns defaults
 func defaultRetryableBodyConfig() retryableBodyConfig {
 	return retryableBodyConfig{
-		limit:       defaultRetryableBodyLimit,
-		maxAttempts: defaultMaxRetryAttempts,
+		maxRetryBytes: defaultRetryableBodyLimit,
+		maxAttempts:   defaultMaxRetryAttempts,
 	}
 }
 
@@ -62,7 +63,7 @@ func wrapBodyForRetry(originalBody io.ReadCloser, config retryableBodyConfig) (i
 	var exceeded atomic.Bool
 	var attempts atomic.Int32
 
-	lw := &limitedWriter{buf: &buf, limit: config.limit, exceeded: &exceeded}
+	lw := &limitedWriter{buf: &buf, limit: config.maxRetryBytes, exceeded: &exceeded}
 
 	wrappedBody := io.NopCloser(io.TeeReader(originalBody, lw))
 
@@ -73,7 +74,7 @@ func wrapBodyForRetry(originalBody io.ReadCloser, config retryableBodyConfig) (i
 		if int(attempts.Add(1)) > config.maxAttempts {
 			return nil, errRetryAlreadyAttempted
 		}
-		return io.NopCloser(io.MultiReader(bytes.NewReader(buf.Bytes()), originalBody)), nil
+		return io.NopCloser(io.MultiReader(bytes.NewReader(lw.bytes()), originalBody)), nil
 	}
 
 	return wrappedBody, getBody
@@ -81,19 +82,34 @@ func wrapBodyForRetry(originalBody io.ReadCloser, config retryableBodyConfig) (i
 
 // limitedWriter buffers up to limit bytes; once exceeded it discards further writes.
 type limitedWriter struct {
+	mu       sync.Mutex
 	buf      *bytes.Buffer
 	limit    int
 	exceeded *atomic.Bool
 }
 
 func (lw *limitedWriter) Write(p []byte) (n int, err error) {
+	lw.mu.Lock()
+	defer lw.mu.Unlock()
+
 	if lw.exceeded.Load() {
 		return len(p), nil
 	}
+
 	if lw.buf.Len()+len(p) > lw.limit {
 		lw.exceeded.Store(true)
 		lw.buf = nil
 		return len(p), nil
 	}
 	return lw.buf.Write(p)
+}
+
+// bytes returns a copy of the buffered data, safe for concurrent use
+func (lw *limitedWriter) bytes() []byte {
+	lw.mu.Lock()
+	defer lw.mu.Unlock()
+	if lw.buf == nil {
+		return nil
+	}
+	return lw.buf.Bytes()
 }
