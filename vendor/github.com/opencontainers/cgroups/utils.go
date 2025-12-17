@@ -231,7 +231,7 @@ func rmdir(path string, retry bool) error {
 
 again:
 	err := unix.Rmdir(path)
-	switch err { // nolint:errorlint // unix errors are bare
+	switch err {
 	case nil, unix.ENOENT:
 		return nil
 	case unix.EINTR:
@@ -395,7 +395,7 @@ func WriteCgroupProc(dir string, pid int) error {
 	}
 	defer file.Close()
 
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		_, err = file.WriteString(strconv.Itoa(pid))
 		if err == nil {
 			return nil

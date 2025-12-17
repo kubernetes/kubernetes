@@ -46,7 +46,7 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
 	github.com/onsi/ginkgo/v2 v2.21.0
 	github.com/onsi/gomega v1.35.1
-	github.com/opencontainers/cgroups v0.0.1
+	github.com/opencontainers/cgroups v0.0.2
 	github.com/opencontainers/selinux v1.11.1
 	github.com/pkg/errors v0.9.1
 	github.com/pmezard/go-difflib v1.0.0

@@ -24,6 +24,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/opencontainers/cgroups"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -323,6 +324,7 @@ func VerifyPodContainersCgroupValues(ctx context.Context, f *framework.Framework
 		if tc.Resources.Limits != nil || tc.Resources.Requests != nil {
 			var expectedCPUShares int64
 			var expectedMemLimitString string
+			var expectedCPUSharesString []string
 			expectedMemLimitInBytes := tc.Resources.Limits.Memory().Value()
 			cpuRequest := tc.Resources.Requests.Cpu()
 			cpuLimit := tc.Resources.Limits.Cpu()
@@ -340,14 +342,24 @@ func VerifyPodContainersCgroupValues(ctx context.Context, f *framework.Framework
 				}
 				// convert cgroup v1 cpu.shares value to cgroup v2 cpu.weight value
 				// https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/2254-cgroup-v2#phase-1-convert-from-cgroups-v1-settings-to-v2
-				expectedCPUShares = int64(1 + ((expectedCPUShares-2)*9999)/262142)
+				expectedCPUSharesOld := int64(1 + ((expectedCPUShares-2)*9999)/262142)
+				expectedCPUSharesString = append(expectedCPUSharesString, strconv.FormatInt(expectedCPUSharesOld, 10))
+				// Because of https://github.com/kubernetes/kubernetes/issues/131216, the way of conversion has been changed.
+				// runc: https://github.com/opencontainers/runc/pull/4785
+				// crun: https://github.com/containers/crun/issues/1721
+				// This is dependent on the container runtime version. In order not to break the tests when we upgrade the
+				// container runtimes, we check if either the old or the new conversion matches the actual value for now.
+				expectedCPUSharesNew := int64(cgroups.ConvertCPUSharesToCgroupV2Value(uint64(expectedCPUShares)))
+				expectedCPUSharesString = append(expectedCPUSharesString, strconv.FormatInt(expectedCPUSharesNew, 10))
+			} else {
+				expectedCPUSharesString = append(expectedCPUSharesString, strconv.FormatInt(expectedCPUShares, 10))
 			}
 
 			if expectedMemLimitString != "0" {
 				errs = append(errs, VerifyCgroupValue(f, pod, ci.Name, cgroupMemLimit, expectedMemLimitString))
 			}
 			errs = append(errs, VerifyCgroupValue(f, pod, ci.Name, cgroupCPULimit, expectedCPULimits...))
-			errs = append(errs, VerifyCgroupValue(f, pod, ci.Name, cgroupCPURequest, strconv.FormatInt(expectedCPUShares, 10)))
+			errs = append(errs, VerifyCgroupValue(f, pod, ci.Name, cgroupCPURequest, expectedCPUSharesString...))
 			// TODO(vinaykul,InPlacePodVerticalScaling): Verify oom_score_adj when runc adds support for updating it
 			// See https://github.com/opencontainers/runc/pull/4669
 		}
