@@ -31,6 +31,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	translator "k8s.io/apiserver/pkg/util/proxy"
+	"k8s.io/klog/v2"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/features"
@@ -123,12 +124,21 @@ func (r *AttachREST) Connect(ctx context.Context, name string, opts runtime.Obje
 	if !ok {
 		return nil, fmt.Errorf("Invalid options object: %#v", opts)
 	}
-	location, transport, err := pod.AttachLocation(ctx, r.Store, r.KubeletConn, name, attachOpts)
+
+	location, transport, connInfo, err := pod.AttachLocation(ctx, r.Store, r.KubeletConn, name, attachOpts)
 	if err != nil {
 		return nil, err
 	}
+
+	nodeSupportsWebsockets := checkNodeSupportsWebsockets(connInfo.NodeFeatures)
+
 	handler := newThrottledUpgradeAwareProxyHandler(location, transport, false, true, responder)
 	if utilfeature.DefaultFeatureGate.Enabled(features.TranslateStreamCloseWebsocketRequests) {
+		if utilfeature.DefaultFeatureGate.Enabled(features.ExtendWebSocketsToKubelet) && nodeSupportsWebsockets {
+			// Kubelet supports websockets, so just proxy the request.
+			klog.Infof("DEBUG_WEBSOCKET: API server proxying websocket request for pod %s to node %s", name, connInfo.Hostname)
+			return handler, nil
+		}
 		// Wrap the upgrade aware handler to implement stream translation
 		// for WebSocket/V5 upgrade requests.
 		streamOptions := translator.Options{
@@ -189,12 +199,21 @@ func (r *ExecREST) Connect(ctx context.Context, name string, opts runtime.Object
 	if !ok {
 		return nil, fmt.Errorf("invalid options object: %#v", opts)
 	}
-	location, transport, err := pod.ExecLocation(ctx, r.Store, r.KubeletConn, name, execOpts)
+
+	location, transport, connInfo, err := pod.ExecLocation(ctx, r.Store, r.KubeletConn, name, execOpts)
 	if err != nil {
 		return nil, err
 	}
+
+	nodeSupportsWebsockets := checkNodeSupportsWebsockets(connInfo.NodeFeatures)
+
 	handler := newThrottledUpgradeAwareProxyHandler(location, transport, false, true, responder)
 	if utilfeature.DefaultFeatureGate.Enabled(features.TranslateStreamCloseWebsocketRequests) {
+		if utilfeature.DefaultFeatureGate.Enabled(features.ExtendWebSocketsToKubelet) && nodeSupportsWebsockets {
+			// Kubelet supports websockets, so just proxy the request.
+			klog.Infof("DEBUG_WEBSOCKET: API server proxying websocket request for pod %s to node %s", name, connInfo.Hostname)
+			return handler, nil
+		}
 		// Wrap the upgrade aware handler to implement stream translation
 		// for WebSocket/V5 upgrade requests.
 		streamOptions := translator.Options{
@@ -282,4 +301,16 @@ func newThrottledUpgradeAwareProxyHandler(location *url.URL, transport http.Roun
 	handler := proxy.NewUpgradeAwareHandler(location, transport, wrapTransport, upgradeRequired, proxy.NewErrorResponder(responder))
 	handler.MaxBytesPerSec = capabilities.Get().PerConnectionBandwidthLimitBytesPerSec
 	return handler
+}
+
+func checkNodeSupportsWebsockets(nodeFeatures []string) bool {
+	// Determine if the node we're connecting to supports websocket translation/tunneling.
+	nodeSupportsWebsockets := false
+	for _, feature := range nodeFeatures {
+		if feature == "ExtendWebSocketsToKubelet" {
+			nodeSupportsWebsockets = true
+			break
+		}
+	}
+	return nodeSupportsWebsockets
 }

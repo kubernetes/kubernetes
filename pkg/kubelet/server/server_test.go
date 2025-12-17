@@ -17,6 +17,7 @@ limitations under the License.
 package server
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"errors"
@@ -47,9 +48,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/tools/remotecommand"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -1576,6 +1579,63 @@ func TestServeExecInContainer(t *testing.T) {
 
 func TestServeAttachContainer(t *testing.T) {
 	testExecAttach(t, "attach")
+}
+
+func TestWebsocketExecAttach(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	ss, err := newTestStreamingServer(0)
+	require.NoError(t, err)
+	defer ss.testHTTPServer.Close()
+	fw := newServerTestWithDebug(tCtx, true, ss)
+	defer fw.testHTTPServer.Close()
+
+	podNamespace := "other"
+	podName := "foo"
+	expectedContainerName := "baz"
+	expectedStdin := "stdin"
+	done := make(chan struct{})
+	attachInvoked := false
+
+	fw.fakeKubelet.getAttachCheck = func(podFullName string, uid types.UID, containerName string, streamOpts remotecommandserver.Options) {
+		attachInvoked = true
+	}
+
+	ss.fakeRuntime.attachFunc = func(containerID string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
+		defer close(done)
+		defer stdout.Close() //nolint:errcheck
+		_, err := io.Copy(stdout, stdin)
+		return err
+	}
+
+	requestURL := fw.testHTTPServer.URL + "/attach/" + podNamespace + "/" + podName + "/" + expectedContainerName + "?input=1&output=1"
+
+	websocketLocation, err := url.Parse(fw.testHTTPServer.URL)
+	require.NoError(t, err)
+
+	exec, err := remotecommand.NewWebSocketExecutor(&rest.Config{Host: websocketLocation.Host}, "GET", requestURL)
+	require.NoError(t, err)
+
+	var stdout bytes.Buffer
+	options := &remotecommand.StreamOptions{
+		Stdin:  bytes.NewReader([]byte(expectedStdin)),
+		Stdout: &stdout,
+	}
+
+	errorChan := make(chan error)
+	go func() {
+		errorChan <- exec.StreamWithContext(context.Background(), *options)
+	}()
+
+	select {
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatalf("expect stream to be closed after connection is closed.")
+	case err := <-errorChan:
+		require.NoError(t, err)
+	}
+
+	assert.Equal(t, expectedStdin, stdout.String())
+	assert.True(t, attachInvoked, "attach should be invoked")
+	<-done
 }
 
 func TestServePortForwardIdleTimeout(t *testing.T) {
