@@ -270,8 +270,10 @@ var sourceAddrRegexp = regexp.MustCompile(`^ip6* saddr (!= )?(\S+)`)
 var sourceAddrLookupRegexp = regexp.MustCompile(`^ip6* saddr (!= )?\{([^}]*)\}`)
 var sourceAddrLocalRegexp = regexp.MustCompile(`^fib saddr type local`)
 
-var endpointVMAPRegexp = regexp.MustCompile(`^numgen random mod \d+ vmap \{(.*)\}$`)
+var endpointVMapRegexp = regexp.MustCompile(`^numgen random mod \d+ vmap \{(.*)\}$`)
 var endpointVMapEntryRegexp = regexp.MustCompile(`\d+ : goto (\S+)`)
+var endpointDNATRegexp = regexp.MustCompile(`^dnat ip6* addr \. port to numgen random mod \d+ map \{(.*)\}$`)
+var endpointDNATEntryRegexp = regexp.MustCompile(`\d+ : (\S+) \. (\d+)`)
 
 var masqMarkRegexp = regexp.MustCompile(`^mark set mark or 0x[[:xdigit:]]+$`)
 var masqCheckRegexp = regexp.MustCompile(`^mark and 0x[[:xdigit:]]+ != 0 mark set mark xor 0x[[:xdigit:]]+`)
@@ -281,7 +283,8 @@ var hairpinCheckRegexp = regexp.MustCompile(`^ip6* saddr \. ip6* daddr \. meta l
 var jumpRegexp = regexp.MustCompile(`^(jump|goto) (\S+)$`)
 var returnRegexp = regexp.MustCompile(`^return$`)
 var verdictRegexp = regexp.MustCompile(`^(drop|reject)$`)
-var dnatRegexp = regexp.MustCompile(`^meta l4proto (tcp|udp|sctp) dnat to (\S+)$`)
+var l4protoRegexp = regexp.MustCompile(`^meta l4proto (tcp|udp|sctp)`)
+var dnatRegexp = regexp.MustCompile(`^dnat to (\S+)$`)
 
 var ignoredRegexp = regexp.MustCompile(strings.Join(
 	[]string{
@@ -449,6 +452,15 @@ func (tracer *nftablesTracer) runChain(chname, sourceIP, protocol, destIP, destP
 					break
 				}
 
+			case l4protoRegexp.MatchString(rule):
+				// `meta l4proto (tcp|udp|sctp)`
+				match := l4protoRegexp.FindStringSubmatch(rule)
+				rule = strings.TrimPrefix(rule, match[0])
+				if match[1] != protocol {
+					rule = ""
+					break
+				}
+
 			case masqMarkRegexp.MatchString(rule):
 				// `^mark set mark or 0x[[:xdigit:]]+$`
 				// Mark for masquerade.
@@ -515,20 +527,20 @@ func (tracer *nftablesTracer) runChain(chname, sourceIP, protocol, destIP, destP
 				return false
 
 			case dnatRegexp.MatchString(rule):
-				// `meta l4proto (tcp|udp|sctp) dnat to (\S+)`
+				// `^dnat to (\S+)$`
 				// DNAT to an endpoint IP and terminate processing.
 				match := dnatRegexp.FindStringSubmatch(rule)
-				destEndpoint := match[2]
+				destEndpoint := match[1]
 
 				tracer.matches = append(tracer.matches, ruleObj.Rule)
 				tracer.outputs = append(tracer.outputs, destEndpoint)
 				return true
 
-			case endpointVMAPRegexp.MatchString(rule):
+			case endpointVMapRegexp.MatchString(rule):
 				// `^numgen random mod \d+ vmap \{(.*)\}$`
 				// Selects a random endpoint and jumps to it. For tracePacket's
 				// purposes, we jump to *all* of the endpoints.
-				match := endpointVMAPRegexp.FindStringSubmatch(rule)
+				match := endpointVMapRegexp.FindStringSubmatch(rule)
 				elements := match[1]
 
 				for _, match = range endpointVMapEntryRegexp.FindAllStringSubmatch(elements, -1) {
@@ -540,6 +552,22 @@ func (tracer *nftablesTracer) runChain(chname, sourceIP, protocol, destIP, destP
 					// terminating dnat verdict, but we want to gather all
 					// of the endpoints into tracer.output.
 					_ = tracer.runChain(destChain, sourceIP, protocol, destIP, destPort)
+				}
+				return true
+
+			case endpointDNATRegexp.MatchString(rule):
+				// `^dnat ip6* addr \. port to numgen random mod \d+ map \{(.*)\}$`
+				// Selects a random endpoint and DNATs to it. For tracePacket's
+				// purposes, we DNAT to *all* of the endpoints.
+				match := endpointDNATRegexp.FindStringSubmatch(rule)
+				elements := match[1]
+
+				for _, match = range endpointDNATEntryRegexp.FindAllStringSubmatch(elements, -1) {
+					// `\d+ : (\S+) \. (\d+)`
+					endpointIP, endpointPort := match[1], match[2]
+
+					tracer.matches = append(tracer.matches, ruleObj.Rule)
+					tracer.outputs = append(tracer.outputs, net.JoinHostPort(endpointIP, endpointPort))
 				}
 				return true
 
