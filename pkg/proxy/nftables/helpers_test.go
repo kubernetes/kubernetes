@@ -160,8 +160,9 @@ type nftablesTracer struct {
 	// the return value of tracePacket.
 	outputs []string
 
-	// markMasq tracks whether the packet has been marked for masquerading
-	markMasq bool
+	// additional info about rules we've hit
+	markMasq   bool
+	masquerade bool
 }
 
 // newNFTablesTracer creates an nftablesTracer. nodeIPs are the IP to treat as local node
@@ -272,7 +273,9 @@ var sourceAddrLocalRegexp = regexp.MustCompile(`^fib saddr type local`)
 var endpointVMAPRegexp = regexp.MustCompile(`^numgen random mod \d+ vmap \{(.*)\}$`)
 var endpointVMapEntryRegexp = regexp.MustCompile(`\d+ : goto (\S+)`)
 
-var masqueradeRegexp = regexp.MustCompile(`^jump ` + markMasqChain + `$`)
+var masqMarkRegexp = regexp.MustCompile(`^mark set mark or 0x[[:xdigit:]]+$`)
+var masqCheckRegexp = regexp.MustCompile(`^mark and 0x[[:xdigit:]]+ != 0`)
+var masqueradeRegexp = regexp.MustCompile(`^masquerade fully-random$`)
 var jumpRegexp = regexp.MustCompile(`^(jump|goto) (\S+)$`)
 var returnRegexp = regexp.MustCompile(`^return$`)
 var verdictRegexp = regexp.MustCompile(`^(drop|reject)$`)
@@ -304,10 +307,8 @@ func (tracer *nftablesTracer) runChain(chname, sourceIP, protocol, destIP, destP
 		for rule != "" {
 			rule = strings.TrimLeft(rule, " ")
 
-			// Note that the order of (some of) the cases is important. e.g.,
-			// masqueradeRegexp must be checked before jumpRegexp, since
-			// jumpRegexp would also match masqueradeRegexp but do the wrong
-			// thing with it.
+			// Note that the order of (some of) the cases is important since
+			// some of the regexes might match parts of others.
 
 			switch {
 			case destIPOnlyLookupRegexp.MatchString(rule):
@@ -424,16 +425,33 @@ func (tracer *nftablesTracer) runChain(chname, sourceIP, protocol, destIP, destP
 					break
 				}
 
-			case masqueradeRegexp.MatchString(rule):
-				// `^jump mark-for-masquerade$`
-				// Mark for masquerade: we just treat the jump rule itself as
-				// being what creates the mark, rather than trying to handle
-				// the rules inside that chain and the "masquerading" chain.
-				match := jumpRegexp.FindStringSubmatch(rule)
+			case masqMarkRegexp.MatchString(rule):
+				// `^mark set mark or 0x[[:xdigit:]]+$`
+				// Mark for masquerade.
+				match := masqMarkRegexp.FindStringSubmatch(rule)
 				rule = strings.TrimPrefix(rule, match[0])
 
 				tracer.matches = append(tracer.matches, ruleObj.Rule)
 				tracer.markMasq = true
+
+			case masqCheckRegexp.MatchString(rule):
+				// `^mark and 0x[[:xdigit:]]+ == 0`
+				// Checks the mark
+				match := masqCheckRegexp.FindStringSubmatch(rule)
+				rule = strings.TrimPrefix(rule, match[0])
+				if !tracer.markMasq {
+					rule = ""
+					break
+				}
+
+			case masqueradeRegexp.MatchString(rule):
+				// ^masquerade fully-random$
+				// Actually perform the masquerading
+				match := masqueradeRegexp.FindStringSubmatch(rule)
+				rule = strings.TrimPrefix(rule, match[0])
+
+				tracer.matches = append(tracer.matches, ruleObj.Rule)
+				tracer.masquerade = true
 
 			case jumpRegexp.MatchString(rule):
 				// `^(jump|goto) (\S+)$`
@@ -545,8 +563,11 @@ func tracePacket(t *testing.T, nft *knftables.Fake, sourceIP, protocol, destIP, 
 	tracer.runChain("filter-input", sourceIP, protocol, destIP, destPort)
 
 	// Skip filter-output-pre-dnat, filter-output and nat-output as they ought to be fully redundant with the prerouting chains.
-	// Skip nat-postrouting because it only does masquerading and we handle that separately.
-	return tracer.matches, strings.Join(tracer.outputs, ", "), tracer.markMasq
+
+	// Run nat-postrouting to handle masquerading
+	tracer.runChain("nat-postrouting", sourceIP, protocol, destIP, destPort)
+
+	return tracer.matches, strings.Join(tracer.outputs, ", "), tracer.masquerade
 }
 
 type packetFlowTest struct {
