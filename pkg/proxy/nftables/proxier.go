@@ -93,7 +93,8 @@ const (
 	firewallCheckChain = "firewall-check"
 
 	// masquerading
-	masqueradingChain = "masquerading"
+	masqueradingChain     = "masquerading"
+	hairpinConnectionsSet = "hairpin-connections"
 )
 
 // NewDualStackProxier creates a MetaProxier instance, with IPv4 and IPv6 proxies.
@@ -197,6 +198,7 @@ type Proxier struct {
 	noEndpointServices  *nftElementStorage
 	noEndpointNodePorts *nftElementStorage
 	serviceNodePorts    *nftElementStorage
+	hairpinConnections  *nftElementStorage
 }
 
 // Proxier implements proxy.Provider
@@ -267,6 +269,7 @@ func NewProxier(ctx context.Context,
 		noEndpointServices:  newNFTElementStorage("map", noEndpointServicesMap),
 		noEndpointNodePorts: newNFTElementStorage("map", noEndpointNodePortsMap),
 		serviceNodePorts:    newNFTElementStorage("map", serviceNodePortsMap),
+		hairpinConnections:  newNFTElementStorage("set", hairpinConnectionsSet),
 	}
 
 	logger.V(2).Info("NFTables sync params", "minSyncPeriod", minSyncPeriod, "syncPeriod", syncPeriod, "maxSyncPeriod", proxyutil.FullSyncPeriod)
@@ -463,12 +466,27 @@ func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
 		ensureChain(chain, tx, createdChains, false)
 	}
 
+	// add hairpin-connections set
+	tx.Add(&knftables.Set{
+		Name:    hairpinConnectionsSet,
+		Type:    ipvX_addr + " . " + ipvX_addr + " . inet_proto . inet_service",
+		Comment: ptr.To("service hairpin connections"),
+	})
+
 	// Add the rules in the masquerading chain
 	tx.Add(&knftables.Rule{
 		Chain: masqueradingChain,
 		Rule: knftables.Concat(
 			"mark", "and", proxier.masqueradeMark, "!=", "0",
 			"mark", "set", "mark", "xor", proxier.masqueradeMark,
+			"masquerade fully-random",
+		),
+	})
+	tx.Add(&knftables.Rule{
+		Chain: masqueradingChain,
+		Rule: knftables.Concat(
+			"ct status dnat",
+			ipX, "saddr", ".", ipX, "daddr", ".", "meta l4proto", ".", "th dport", "@", hairpinConnectionsSet,
 			"masquerade fully-random",
 		),
 	})
@@ -676,6 +694,7 @@ func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
 	proxier.noEndpointServices.readOrReset(tx, proxier.nftables, proxier.logger)
 	proxier.noEndpointNodePorts.readOrReset(tx, proxier.nftables, proxier.logger)
 	proxier.serviceNodePorts.readOrReset(tx, proxier.nftables, proxier.logger)
+	proxier.hairpinConnections.readOrReset(tx, proxier.nftables, proxier.logger)
 }
 
 // Sync is called to synchronize the proxier state to nftables as soon as possible.
@@ -1205,6 +1224,17 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 				if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {
 					activeAffinitySets.Insert(epInfo.affinitySetName)
 				}
+
+				// Add endpoint to the hairpin set
+				proxier.hairpinConnections.ensureElem(tx, &knftables.Element{
+					Set: hairpinConnectionsSet,
+					Key: []string{
+						epInfo.IP(),
+						epInfo.IP(),
+						protocol,
+						strconv.Itoa(epInfo.Port()),
+					},
+				})
 			}
 		}
 
@@ -1620,16 +1650,6 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 			}
 			endpointChain := epInfo.chainName
 
-			// Handle traffic that loops back to the originator with SNAT.
-			tx.Add(&knftables.Rule{
-				Chain: endpointChain,
-				Rule: knftables.Concat(
-					ipX, "saddr", epInfo.IP(),
-					proxier.masqueradeRule,
-				),
-				Comment: ptr.To("masquerade hairpin traffic"),
-			})
-
 			// Handle session affinity
 			if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {
 				tx.Add(&knftables.Rule{
@@ -1686,6 +1706,7 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 	proxier.noEndpointServices.cleanupLeftoverKeys(tx)
 	proxier.noEndpointNodePorts.cleanupLeftoverKeys(tx)
 	proxier.serviceNodePorts.cleanupLeftoverKeys(tx)
+	proxier.hairpinConnections.cleanupLeftoverKeys(tx)
 
 	// Sync rules.
 	proxier.logger.V(2).Info("Reloading service nftables data",

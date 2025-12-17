@@ -162,6 +162,7 @@ type nftablesTracer struct {
 	// additional info about rules we've hit
 	markMasq   bool
 	masquerade bool
+	dnat       bool
 }
 
 // newNFTablesTracer creates an nftablesTracer. nodeIPs are the IP to treat as local node
@@ -275,6 +276,8 @@ var endpointVMapEntryRegexp = regexp.MustCompile(`\d+ : goto (\S+)`)
 var masqMarkRegexp = regexp.MustCompile(`^mark set mark or 0x[[:xdigit:]]+$`)
 var masqCheckRegexp = regexp.MustCompile(`^mark and 0x[[:xdigit:]]+ != 0 mark set mark xor 0x[[:xdigit:]]+`)
 var masqueradeRegexp = regexp.MustCompile(`^masquerade fully-random$`)
+var dnatCheckRegexp = regexp.MustCompile(`^ct status dnat`)
+var hairpinCheckRegexp = regexp.MustCompile(`^ip6* saddr \. ip6* daddr \. meta l4proto \. th dport @hairpin-connections`)
 var jumpRegexp = regexp.MustCompile(`^(jump|goto) (\S+)$`)
 var returnRegexp = regexp.MustCompile(`^return$`)
 var verdictRegexp = regexp.MustCompile(`^(drop|reject)$`)
@@ -310,6 +313,28 @@ func (tracer *nftablesTracer) runChain(chname, sourceIP, protocol, destIP, destP
 			// some of the regexes might match parts of others.
 
 			switch {
+			case dnatCheckRegexp.MatchString(rule):
+				// `^ct status dnat`
+				// Part of the hairpin check
+				match := dnatCheckRegexp.FindStringSubmatch(rule)
+				rule = strings.TrimPrefix(rule, match[0])
+				if !tracer.dnat {
+					rule = ""
+					break
+				}
+
+			case hairpinCheckRegexp.MatchString(rule):
+				// `^ip6* saddr \. ip6* daddr \. meta l4proto \. th dport @hairpin-connections`
+				// Tests whether the packet is hairpinning back to its client.
+				match := hairpinCheckRegexp.FindStringSubmatch(rule)
+				rule = strings.TrimPrefix(rule, match[0])
+				if sourceIP != destIP {
+					rule = ""
+					break
+				}
+				// HACK: we don't actually bother doing the full lookup; we
+				// assume that if src and dst matched, it's hairpin.
+
 			case destIPOnlyLookupRegexp.MatchString(rule):
 				// `^ip6* daddr @(\S+)`
 				// Tests whether destIP is a member of the indicated set.
@@ -552,6 +577,7 @@ func tracePacket(t *testing.T, nft *knftables.Fake, sourceIP, protocol, destIP, 
 		if err != nil {
 			t.Errorf("failed to parse host port '%s': %s", tracer.outputs[0], err.Error())
 		}
+		tracer.dnat = true
 	}
 
 	// Run filter-forward, return if packet is terminated.
