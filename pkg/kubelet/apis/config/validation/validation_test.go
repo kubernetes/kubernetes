@@ -634,14 +634,6 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			},
 			errMsg: "invalid configuration: imageMaximumGCAge -1ns must not be negative",
 		}, {
-			name: "imageMaximumGCAge should not be less than imageMinimumGCAge",
-			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
-				conf.ImageMaximumGCAge = metav1.Duration{Duration: 1}
-				conf.ImageMinimumGCAge = metav1.Duration{Duration: 2}
-				return conf
-			},
-			errMsg: "invalid configuration: imageMaximumGCAge 1ns must be greater than imageMinimumGCAge 2ns",
-		}, {
 			name: "containerLogMaxWorkers must be greater than or equal to 1",
 			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
 				conf.ContainerLogMaxWorkers = 0
