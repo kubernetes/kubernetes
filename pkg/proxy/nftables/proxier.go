@@ -474,19 +474,9 @@ func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
 	tx.Add(&knftables.Rule{
 		Chain: masqueradingChain,
 		Rule: knftables.Concat(
-			"mark", "and", proxier.masqueradeMark, "==", "0",
-			"return",
+			"mark", "and", proxier.masqueradeMark, "!=", "0",
+			"masquerade fully-random",
 		),
-	})
-	tx.Add(&knftables.Rule{
-		Chain: masqueradingChain,
-		Rule: knftables.Concat(
-			"mark", "set", "mark", "xor", proxier.masqueradeMark,
-		),
-	})
-	tx.Add(&knftables.Rule{
-		Chain: masqueradingChain,
-		Rule:  "masquerade fully-random",
 	})
 
 	// add cluster-ips set.

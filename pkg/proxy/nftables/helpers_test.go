@@ -590,9 +590,7 @@ var testInput = dedent.Dedent(`
 	add chain ip testing mark-for-masquerade
 	add rule ip testing mark-for-masquerade mark set mark or 0x4000
 	add chain ip testing masquerading
-	add rule ip testing masquerading mark and 0x4000 == 0 return
-	add rule ip testing masquerading mark set mark xor 0x4000
-	add rule ip testing masquerading masquerade fully-random
+	add rule ip testing masquerading mark and 0x4000 != 0 masquerade fully-random
 
 	add set ip testing firewall { type ipv4_addr . inet_proto . inet_service ; comment "destinations that are subject to LoadBalancerSourceRanges" ; }
 	add set ip testing firewall-allow { type ipv4_addr . inet_proto . inet_service . ipv4_addr ; flags interval ; comment "destinations+sources that are allowed by LoadBalancerSourceRanges" ; }
@@ -657,9 +655,7 @@ var testExpected = dedent.Dedent(`
 	add rule ip testing firewall-allow-check drop
 	add rule ip testing firewall-check ip daddr . meta l4proto . th dport @firewall jump firewall-allow-check
 	add rule ip testing mark-for-masquerade mark set mark or 0x4000
-	add rule ip testing masquerading mark and 0x4000 == 0 return
-	add rule ip testing masquerading mark set mark xor 0x4000
-	add rule ip testing masquerading masquerade fully-random
+	add rule ip testing masquerading mark and 0x4000 != 0 masquerade fully-random
 	add rule ip testing service-42NFTM6N-ns2/svc2/tcp/p80 ip daddr 172.30.0.42 tcp dport 80 ip saddr != 10.0.0.0/8 jump mark-for-masquerade
 	add rule ip testing service-42NFTM6N-ns2/svc2/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-SGOXE6O3-ns2/svc2/tcp/p80__10.180.0.2/80 }
 	add rule ip testing service-ULMVA6XW-ns1/svc1/tcp/p80 ip daddr 172.30.0.41 tcp dport 80 ip saddr != 10.0.0.0/8 jump mark-for-masquerade
@@ -805,9 +801,7 @@ func TestTracePacketV4(t *testing.T) {
 		add chain ip kube-proxy firewall-HVFWP5L3-ns5/svc5/tcp/p80
 
 		add rule ip kube-proxy mark-for-masquerade mark set mark or 0x4000
-		add rule ip kube-proxy masquerading mark and 0x4000 == 0 return
-		add rule ip kube-proxy masquerading mark set mark xor 0x4000
-		add rule ip kube-proxy masquerading masquerade fully-random
+		add rule ip kube-proxy masquerading mark and 0x4000 != 0 masquerade fully-random
 		add rule ip kube-proxy filter-prerouting-pre-dnat ct state new jump firewall-check
 		add rule ip kube-proxy filter-forward ct state new jump endpoints-check
 		add rule ip kube-proxy filter-input ct state new jump endpoints-check
@@ -1028,9 +1022,7 @@ func TestTracePacketV6(t *testing.T) {
 		add rule ip6 kube-proxy filter-prerouting-pre-dnat ct state new jump firewall-check
 		add rule ip6 kube-proxy firewall-check ip6 daddr . meta l4proto . th dport vmap @firewall-ips
 		add rule ip6 kube-proxy mark-for-masquerade mark set mark or 0x4000
-		add rule ip6 kube-proxy masquerading mark and 0x4000 == 0 return
-		add rule ip6 kube-proxy masquerading mark set mark xor 0x4000
-		add rule ip6 kube-proxy masquerading masquerade fully-random
+		add rule ip6 kube-proxy masquerading mark and 0x4000 != 0 masquerade fully-random
 		add rule ip6 kube-proxy nat-output jump services
 		add rule ip6 kube-proxy nat-postrouting jump masquerading
 		add rule ip6 kube-proxy nat-prerouting jump services
