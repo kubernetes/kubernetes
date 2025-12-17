@@ -599,6 +599,10 @@ func processDeltas(
 			if err := processReplacedListInfo(handler, info, clientState, keyFunc); err != nil {
 				return err
 			}
+		case ResyncAtomic:
+			if err := processAtomicSync(handler, clientState); err != nil {
+				return err
+			}
 		case Sync, Replaced, Added, Updated:
 			if old, exists, err := clientState.Get(obj); err == nil && exists {
 				if err := clientState.Update(obj); err != nil {
@@ -706,6 +710,15 @@ func processDeltasInBatch(
 	}
 	for _, callback := range callbacks {
 		callback()
+	}
+	return nil
+}
+
+// processAtomicSync processes an AtomicInfo with Type Sync. It calls OnUpdate for each object in the store.
+func processAtomicSync(handler ResourceEventHandler, clientState Store) error {
+	objs := clientState.List()
+	for _, obj := range objs {
+		handler.OnUpdate(obj, obj)
 	}
 	return nil
 }

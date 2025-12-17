@@ -44,10 +44,9 @@ type RealFIFOOptions struct {
 	// see the comment on TransformFunc for details.
 	Transformer TransformFunc
 
-	// AtomicEvents is used to specify whether the RealFIFO will emit replace
-	// events atomically or not. If it is set, a single ReplacedAtomic delta
-	// event will be sent upon replace, otherwise a set of delete and replace
-	// events will be sent.
+	// AtomicEvents is used to specify whether the RealFIFO will emit events
+	// atomically or not. If it is set, a single event will be emitted
+	// atomically for Replace and Resync operations.
 	AtomicEvents bool
 }
 
@@ -93,9 +92,9 @@ type RealFIFO struct {
 	// batchSize determines the maximum number of objects we can combine into a batch.
 	batchSize int
 
-	// emitAtomicEvents defines whether a replace should only send out one
-	// batch of objects on a replace event call rather than a number of delete
-	// and replace events.
+	// emitAtomicEvents defines whether events like Replace and Resync should be emitted
+	// atomically rather than as a series of events. This means that any call to the FIFO
+	// will emit a single event.
 	emitAtomicEvents bool
 }
 
@@ -228,6 +227,15 @@ func (f *RealFIFO) addReplaceToItemsLocked(objs []interface{}, resourceVersion s
 	return nil
 }
 
+func (f *RealFIFO) addResyncToItemsLocked() error {
+	f.items = append(f.items, Delta{
+		Type: ResyncAtomic,
+	})
+	f.cond.Broadcast()
+
+	return nil
+}
+
 // Add inserts an item, and puts it in the queue. The item is only enqueued
 // if it doesn't already exist in the set.
 func (f *RealFIFO) Add(obj interface{}) error {
@@ -296,9 +304,6 @@ func (f *RealFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 	// The underlying array still exists and references this object, so the object will not be garbage collected unless we zero the reference.
 	f.items[0] = Delta{}
 	f.items = f.items[1:]
-	if f.initialPopulationCount > 0 {
-		f.initialPopulationCount--
-	}
 
 	// Only log traces if the queue depth is greater than 10 and it takes more than
 	// 100 milliseconds to process one item from the queue.
@@ -314,9 +319,27 @@ func (f *RealFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 		defer trace.LogIfLong(100 * time.Millisecond)
 	}
 
-	// we wrap in Deltas here to be compatible with preview Pop functions and those interpreting the return value.
-	err := process(Deltas{item}, isInInitialList)
+	// Process the item, this may unlock the lock, and allow other goroutines to add items to the queue.
+	err := f.process(item, isInInitialList, process)
+
+	// Decrement initialPopulationCount if it is greater than 0 after processing the item, to ensure that anything waiting for the cache
+	// to be populated will be unblocked only after the cache has been fully populated.
+	if f.initialPopulationCount > 0 {
+		f.initialPopulationCount--
+	}
 	return Deltas{item}, err
+}
+
+func (f *RealFIFO) process(item Delta, isInInitialList bool, process PopProcessFunc) error {
+	// If we are emitting atomic events, we can optimize the processing by unlocking the lock before calling process so that the
+	// reflector is not blocked while we process the events. This is because we never access the store in the FIFO, and the store will
+	// stay consistent while we process the events.
+	if f.emitAtomicEvents {
+		f.lock.Unlock()
+		defer f.lock.Lock()
+	}
+	// we wrap in Deltas here to be compatible with preview Pop functions and those interpreting the return value.
+	return process(Deltas{item}, isInInitialList)
 }
 
 func (f *RealFIFO) PopBatch(processBatch ProcessBatchFunc, process PopProcessFunc) error {
@@ -369,9 +392,6 @@ func (f *RealFIFO) PopBatch(processBatch ProcessBatchFunc, process PopProcessFun
 		// The underlying array still exists and references this object, so the object will not be garbage collected unless we zero the reference.
 		f.items[i] = Delta{}
 	}
-	if f.initialPopulationCount > 0 {
-		f.initialPopulationCount -= len(deltas)
-	}
 	f.items = f.items[len(deltas):]
 
 	// Only log traces if the queue depth is greater than 10 and it takes more than
@@ -389,10 +409,28 @@ func (f *RealFIFO) PopBatch(processBatch ProcessBatchFunc, process PopProcessFun
 		defer trace.LogIfLong(min(100*time.Millisecond*time.Duration(len(deltas)), time.Second))
 	}
 
+	var err error
 	if len(deltas) == 1 {
-		return process(Deltas{deltas[0]}, isInInitialList)
+		err = f.process(deltas[0], isInInitialList, process)
+	} else {
+		err = f.processBatch(deltas, isInInitialList, processBatch)
 	}
-	return processBatch(deltas, isInInitialList)
+	// Decrement initialPopulationCount if it is greater than 0 after processing the batch, to ensure that anything waiting for the cache
+	// to be populated will be unblocked only after the cache has been fully populated.
+	if f.initialPopulationCount > 0 {
+		f.initialPopulationCount -= len(deltas)
+	}
+	return err
+}
+
+func (f *RealFIFO) processBatch(deltas Deltas, isInInitialList bool, process ProcessBatchFunc) error {
+	// If we are emitting atomic events, we need are able to unlock the lock before calling process so that the
+	// reflector is not blocked while we process the events.
+	if f.emitAtomicEvents {
+		f.lock.Unlock()
+		defer f.lock.Lock()
+	}
+	return process(deltas, isInInitialList)
 }
 
 // Replace
@@ -542,6 +580,10 @@ func (f *RealFIFO) Resync() error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
+	if f.emitAtomicEvents {
+		return f.addResyncToItemsLocked()
+	}
+
 	if f.knownObjects == nil {
 		return nil
 	}
@@ -607,6 +649,12 @@ func NewRealFIFOWithOptions(opts RealFIFOOptions) *RealFIFO {
 
 	if opts.KnownObjects == nil {
 		panic("coding error: knownObjects must be provided")
+	}
+
+	// If we are emitting atomic events, we must not rely on the known objects store as it is expected to be updated
+	// by the controller that provides the processing loop.
+	if opts.AtomicEvents {
+		opts.KnownObjects = nil
 	}
 
 	f := &RealFIFO{

@@ -185,6 +185,8 @@ const (
 	ReplacedList DeltaType = "ReplacedList"
 	// Sync is for synthetic events during a periodic resync.
 	Sync DeltaType = "Sync"
+	// ResyncAtomic is to trigger a resync of the entire queue.
+	ResyncAtomic DeltaType = "ResyncAtomic"
 )
 
 // Delta is a member of Deltas (a list of Delta objects) which
