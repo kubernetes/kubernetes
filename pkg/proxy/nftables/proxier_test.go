@@ -188,6 +188,7 @@ var baseRules = dedent.Dedent(`
 	add rule ip kube-proxy nat-prerouting jump services
 	add rule ip kube-proxy nodeport-endpoints-check ip daddr @nodeport-ips meta l4proto . th dport vmap @no-endpoint-nodeports
 	add rule ip kube-proxy reject-chain reject
+	add rule ip kube-proxy services ip daddr @cluster-ips ip saddr != 10.0.0.0/8 mark set mark or 0x4000 comment "masquerade clusterIP traffic from outside cluster"
 	add rule ip kube-proxy services ip daddr . meta l4proto . th dport vmap @service-ips
 	add rule ip kube-proxy services ip daddr @nodeport-ips meta l4proto . th dport vmap @service-nodeports
 	
@@ -362,7 +363,6 @@ func TestOverallNFTablesRules(t *testing.T) {
 	expected := baseRules + dedent.Dedent(`
 		# svc1
 		add chain ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80
-		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 ip daddr 172.30.0.41 ip saddr != 10.0.0.0/8 mark set mark or 0x4000 comment "masquerade traffic from outside cluster"
 		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-5OJB2KTY-ns1/svc1/tcp/p80__10.180.0.1/80 }
 
 		add chain ip kube-proxy endpoint-5OJB2KTY-ns1/svc1/tcp/p80__10.180.0.1/80
@@ -374,7 +374,6 @@ func TestOverallNFTablesRules(t *testing.T) {
 
 		# svc2
 		add chain ip kube-proxy service-42NFTM6N-ns2/svc2/tcp/p80
-		add rule ip kube-proxy service-42NFTM6N-ns2/svc2/tcp/p80 ip daddr 172.30.0.42 ip saddr != 10.0.0.0/8 mark set mark or 0x4000 comment "masquerade traffic from outside cluster"
 		add rule ip kube-proxy service-42NFTM6N-ns2/svc2/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-SGOXE6O3-ns2/svc2/tcp/p80__10.180.0.2/80 }
 		add chain ip kube-proxy external-42NFTM6N-ns2/svc2/tcp/p80
 		add rule ip kube-proxy external-42NFTM6N-ns2/svc2/tcp/p80 ip saddr 10.0.0.0/8 goto service-42NFTM6N-ns2/svc2/tcp/p80 comment "short-circuit pod traffic"
@@ -396,7 +395,6 @@ func TestOverallNFTablesRules(t *testing.T) {
 
 		# svc3
 		add chain ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80
-		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 ip daddr 172.30.0.43 ip saddr != 10.0.0.0/8 mark set mark or 0x4000 comment "masquerade traffic from outside cluster"
 		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-UEIP74TE-ns3/svc3/tcp/p80__10.180.0.3/80 }
 		add chain ip kube-proxy external-4AT6LBPK-ns3/svc3/tcp/p80
 		add rule ip kube-proxy external-4AT6LBPK-ns3/svc3/tcp/p80 mark set mark or 0x4000 comment "masquerade"
@@ -411,7 +409,6 @@ func TestOverallNFTablesRules(t *testing.T) {
 
 		# svc4
 		add chain ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80
-		add rule ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80 ip daddr 172.30.0.44 ip saddr != 10.0.0.0/8 mark set mark or 0x4000 comment "masquerade traffic from outside cluster"
 		add rule ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80 numgen random mod 2 vmap { 0 : goto endpoint-UNZV3OEC-ns4/svc4/tcp/p80__10.180.0.4/80 , 1 : goto endpoint-5RFCDDV7-ns4/svc4/tcp/p80__10.180.0.5/80 }
 		add chain ip kube-proxy external-LAUZTJTB-ns4/svc4/tcp/p80
 		add rule ip kube-proxy external-LAUZTJTB-ns4/svc4/tcp/p80 mark set mark or 0x4000 comment "masquerade"
@@ -430,7 +427,6 @@ func TestOverallNFTablesRules(t *testing.T) {
 		# svc5
 		add set ip kube-proxy affinity-GTK6MW7G-ns5/svc5/tcp/p80__10.180.0.3/80 { type ipv4_addr ; flags dynamic,timeout ; timeout 10800s ; }
 		add chain ip kube-proxy service-HVFWP5L3-ns5/svc5/tcp/p80
-		add rule ip kube-proxy service-HVFWP5L3-ns5/svc5/tcp/p80 ip daddr 172.30.0.45 ip saddr != 10.0.0.0/8 mark set mark or 0x4000 comment "masquerade traffic from outside cluster"
 		add rule ip kube-proxy service-HVFWP5L3-ns5/svc5/tcp/p80 ip saddr @affinity-GTK6MW7G-ns5/svc5/tcp/p80__10.180.0.3/80 goto endpoint-GTK6MW7G-ns5/svc5/tcp/p80__10.180.0.3/80
 		add rule ip kube-proxy service-HVFWP5L3-ns5/svc5/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-GTK6MW7G-ns5/svc5/tcp/p80__10.180.0.3/80 }
 		add chain ip kube-proxy external-HVFWP5L3-ns5/svc5/tcp/p80
@@ -3893,14 +3889,12 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add element ip kube-proxy service-ips { 172.30.0.42 . tcp . 8080 : goto service-MHHHYRWA-ns2/svc2/tcp/p8080 }
 
 		add chain ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80
-		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 ip daddr 172.30.0.41 ip saddr != 10.0.0.0/8 mark set mark or 0x4000 comment "masquerade traffic from outside cluster"
 		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 }
 		add chain ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80
 		add rule ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 ip saddr 10.0.1.1 mark set mark or 0x4000 comment "masquerade hairpin traffic"
 		add rule ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 meta l4proto tcp dnat to 10.0.1.1:80
 
 		add chain ip kube-proxy service-MHHHYRWA-ns2/svc2/tcp/p8080
-		add rule ip kube-proxy service-MHHHYRWA-ns2/svc2/tcp/p8080 ip daddr 172.30.0.42 ip saddr != 10.0.0.0/8 mark set mark or 0x4000 comment "masquerade traffic from outside cluster"
 		add rule ip kube-proxy service-MHHHYRWA-ns2/svc2/tcp/p8080 numgen random mod 1 vmap { 0 : goto endpoint-7RVP4LUQ-ns2/svc2/tcp/p8080__10.0.2.1/8080 }
 		add chain ip kube-proxy endpoint-7RVP4LUQ-ns2/svc2/tcp/p8080__10.0.2.1/8080
 		add rule ip kube-proxy endpoint-7RVP4LUQ-ns2/svc2/tcp/p8080__10.0.2.1/8080 ip saddr 10.0.2.1 mark set mark or 0x4000 comment "masquerade hairpin traffic"
@@ -3946,21 +3940,18 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add element ip kube-proxy service-ips { 172.30.0.43 . tcp . 80 : goto service-4AT6LBPK-ns3/svc3/tcp/p80 }
 
 		add chain ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80
-		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 ip daddr 172.30.0.41 ip saddr != 10.0.0.0/8 mark set mark or 0x4000 comment "masquerade traffic from outside cluster"
 		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 }
 		add chain ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80
 		add rule ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 ip saddr 10.0.1.1 mark set mark or 0x4000 comment "masquerade hairpin traffic"
 		add rule ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 meta l4proto tcp dnat to 10.0.1.1:80
 
 		add chain ip kube-proxy service-MHHHYRWA-ns2/svc2/tcp/p8080
-		add rule ip kube-proxy service-MHHHYRWA-ns2/svc2/tcp/p8080 ip daddr 172.30.0.42 ip saddr != 10.0.0.0/8 mark set mark or 0x4000 comment "masquerade traffic from outside cluster"
 		add rule ip kube-proxy service-MHHHYRWA-ns2/svc2/tcp/p8080 numgen random mod 1 vmap { 0 : goto endpoint-7RVP4LUQ-ns2/svc2/tcp/p8080__10.0.2.1/8080 }
 		add chain ip kube-proxy endpoint-7RVP4LUQ-ns2/svc2/tcp/p8080__10.0.2.1/8080
 		add rule ip kube-proxy endpoint-7RVP4LUQ-ns2/svc2/tcp/p8080__10.0.2.1/8080 ip saddr 10.0.2.1 mark set mark or 0x4000 comment "masquerade hairpin traffic"
 		add rule ip kube-proxy endpoint-7RVP4LUQ-ns2/svc2/tcp/p8080__10.0.2.1/8080 meta l4proto tcp dnat to 10.0.2.1:8080
 
 		add chain ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80
-		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 ip daddr 172.30.0.43 ip saddr != 10.0.0.0/8 mark set mark or 0x4000 comment "masquerade traffic from outside cluster"
 		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-2OCDJSZQ-ns3/svc3/tcp/p80__10.0.3.1/80 }
 		add chain ip kube-proxy endpoint-2OCDJSZQ-ns3/svc3/tcp/p80__10.0.3.1/80
 		add rule ip kube-proxy endpoint-2OCDJSZQ-ns3/svc3/tcp/p80__10.0.3.1/80 ip saddr 10.0.3.1 mark set mark or 0x4000 comment "masquerade hairpin traffic"
@@ -3969,7 +3960,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
 	assertNumOperations(t, nft,
 		2, // add 1 element each to cluster-ips and service-ips
-		4, // add+flush service chain, add 2 rules
+		3, // add+flush service chain, add 1 rule
 		4, // add+flush endpoint chain, add 2 rules
 	)
 
@@ -3983,7 +3974,6 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add element ip kube-proxy service-ips { 172.30.0.43 . tcp . 80 : goto service-4AT6LBPK-ns3/svc3/tcp/p80 }
 
 		add chain ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80
-		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 ip daddr 172.30.0.41 ip saddr != 10.0.0.0/8 mark set mark or 0x4000 comment "masquerade traffic from outside cluster"
 		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 }
 		add chain ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80
 		add rule ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 ip saddr 10.0.1.1 mark set mark or 0x4000 comment "masquerade hairpin traffic"
@@ -3993,7 +3983,6 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add chain ip kube-proxy endpoint-7RVP4LUQ-ns2/svc2/tcp/p8080__10.0.2.1/8080
 
 		add chain ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80
-		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 ip daddr 172.30.0.43 ip saddr != 10.0.0.0/8 mark set mark or 0x4000 comment "masquerade traffic from outside cluster"
 		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-2OCDJSZQ-ns3/svc3/tcp/p80__10.0.3.1/80 }
 		add chain ip kube-proxy endpoint-2OCDJSZQ-ns3/svc3/tcp/p80__10.0.3.1/80
 		add rule ip kube-proxy endpoint-2OCDJSZQ-ns3/svc3/tcp/p80__10.0.3.1/80 ip saddr 10.0.3.1 mark set mark or 0x4000 comment "masquerade hairpin traffic"
@@ -4015,14 +4004,12 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add element ip kube-proxy service-ips { 172.30.0.43 . tcp . 80 : goto service-4AT6LBPK-ns3/svc3/tcp/p80 }
 
 		add chain ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80
-		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 ip daddr 172.30.0.41 ip saddr != 10.0.0.0/8 mark set mark or 0x4000 comment "masquerade traffic from outside cluster"
 		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 }
 		add chain ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80
 		add rule ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 ip saddr 10.0.1.1 mark set mark or 0x4000 comment "masquerade hairpin traffic"
 		add rule ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 meta l4proto tcp dnat to 10.0.1.1:80
 
 		add chain ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80
-		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 ip daddr 172.30.0.43 ip saddr != 10.0.0.0/8 mark set mark or 0x4000 comment "masquerade traffic from outside cluster"
 		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-2OCDJSZQ-ns3/svc3/tcp/p80__10.0.3.1/80 }
 		add chain ip kube-proxy endpoint-2OCDJSZQ-ns3/svc3/tcp/p80__10.0.3.1/80
 		add rule ip kube-proxy endpoint-2OCDJSZQ-ns3/svc3/tcp/p80__10.0.3.1/80 ip saddr 10.0.3.1 mark set mark or 0x4000 comment "masquerade hairpin traffic"
@@ -4053,14 +4040,12 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add element ip kube-proxy service-ips { 172.30.0.43 . tcp . 80 : goto service-4AT6LBPK-ns3/svc3/tcp/p80 }
 
 		add chain ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80
-		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 ip daddr 172.30.0.41 ip saddr != 10.0.0.0/8 mark set mark or 0x4000 comment "masquerade traffic from outside cluster"
 		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 }
 		add chain ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80
 		add rule ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 ip saddr 10.0.1.1 mark set mark or 0x4000 comment "masquerade hairpin traffic"
 		add rule ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 meta l4proto tcp dnat to 10.0.1.1:80
 
 		add chain ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80
-		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 ip daddr 172.30.0.43 ip saddr != 10.0.0.0/8 mark set mark or 0x4000 comment "masquerade traffic from outside cluster"
 		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-2OCDJSZQ-ns3/svc3/tcp/p80__10.0.3.1/80 }
 		add chain ip kube-proxy endpoint-2OCDJSZQ-ns3/svc3/tcp/p80__10.0.3.1/80
 		add rule ip kube-proxy endpoint-2OCDJSZQ-ns3/svc3/tcp/p80__10.0.3.1/80 ip saddr 10.0.3.1 mark set mark or 0x4000 comment "masquerade hairpin traffic"
@@ -4096,21 +4081,18 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add element ip kube-proxy service-ips { 172.30.0.44 . tcp . 80 : goto service-LAUZTJTB-ns4/svc4/tcp/p80 }
 
 		add chain ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80
-		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 ip daddr 172.30.0.41 ip saddr != 10.0.0.0/8 mark set mark or 0x4000 comment "masquerade traffic from outside cluster"
 		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 }
 		add chain ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80
 		add rule ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 ip saddr 10.0.1.1 mark set mark or 0x4000 comment "masquerade hairpin traffic"
 		add rule ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 meta l4proto tcp dnat to 10.0.1.1:80
 
 		add chain ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80
-		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 ip daddr 172.30.0.43 ip saddr != 10.0.0.0/8 mark set mark or 0x4000 comment "masquerade traffic from outside cluster"
 		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-2OCDJSZQ-ns3/svc3/tcp/p80__10.0.3.1/80 }
 		add chain ip kube-proxy endpoint-2OCDJSZQ-ns3/svc3/tcp/p80__10.0.3.1/80
 		add rule ip kube-proxy endpoint-2OCDJSZQ-ns3/svc3/tcp/p80__10.0.3.1/80 ip saddr 10.0.3.1 mark set mark or 0x4000 comment "masquerade hairpin traffic"
 		add rule ip kube-proxy endpoint-2OCDJSZQ-ns3/svc3/tcp/p80__10.0.3.1/80 meta l4proto tcp dnat to 10.0.3.1:80
 
 		add chain ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80
-		add rule ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80 ip daddr 172.30.0.44 ip saddr != 10.0.0.0/8 mark set mark or 0x4000 comment "masquerade traffic from outside cluster"
 		add rule ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-WAHRBT2B-ns4/svc4/tcp/p80__10.0.4.1/80 }
 		add chain ip kube-proxy endpoint-WAHRBT2B-ns4/svc4/tcp/p80__10.0.4.1/80
 		add rule ip kube-proxy endpoint-WAHRBT2B-ns4/svc4/tcp/p80__10.0.4.1/80 ip saddr 10.0.4.1 mark set mark or 0x4000 comment "masquerade hairpin traffic"
@@ -4119,7 +4101,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
 	assertNumOperations(t, nft,
 		2, // add 1 element to service-ips, remove 1 element from no-endpoint-services
-		4, // add+flush service chain, add 2 rules
+		3, // add+flush service chain, add 1 rule
 		4, // add+flush endpoint chain, add 2 rules
 	)
 
@@ -4139,14 +4121,12 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add element ip kube-proxy service-ips { 172.30.0.44 . tcp . 80 : goto service-LAUZTJTB-ns4/svc4/tcp/p80 }
 
 		add chain ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80
-		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 ip daddr 172.30.0.41 ip saddr != 10.0.0.0/8 mark set mark or 0x4000 comment "masquerade traffic from outside cluster"
 		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 }
 		add chain ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80
 		add rule ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 ip saddr 10.0.1.1 mark set mark or 0x4000 comment "masquerade hairpin traffic"
 		add rule ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 meta l4proto tcp dnat to 10.0.1.1:80
 
 		add chain ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80
-		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 ip daddr 172.30.0.43 ip saddr != 10.0.0.0/8 mark set mark or 0x4000 comment "masquerade traffic from outside cluster"
 		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-SWWHDC7X-ns3/svc3/tcp/p80__10.0.3.2/80 }
 		add chain ip kube-proxy endpoint-2OCDJSZQ-ns3/svc3/tcp/p80__10.0.3.1/80
 		add chain ip kube-proxy endpoint-SWWHDC7X-ns3/svc3/tcp/p80__10.0.3.2/80
@@ -4154,7 +4134,6 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add rule ip kube-proxy endpoint-SWWHDC7X-ns3/svc3/tcp/p80__10.0.3.2/80 meta l4proto tcp dnat to 10.0.3.2:80
 
 		add chain ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80
-		add rule ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80 ip daddr 172.30.0.44 ip saddr != 10.0.0.0/8 mark set mark or 0x4000 comment "masquerade traffic from outside cluster"
 		add rule ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-WAHRBT2B-ns4/svc4/tcp/p80__10.0.4.1/80 }
 		add chain ip kube-proxy endpoint-WAHRBT2B-ns4/svc4/tcp/p80__10.0.4.1/80
 		add rule ip kube-proxy endpoint-WAHRBT2B-ns4/svc4/tcp/p80__10.0.4.1/80 ip saddr 10.0.4.1 mark set mark or 0x4000 comment "masquerade hairpin traffic"
@@ -4162,7 +4141,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		`)
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
 	assertNumOperations(t, nft,
-		4, // add+flush service chain, add 2 rules
+		3, // add+flush service chain, add 1 rule
 		4, // add+flush endpoint chain, add 2 rules
 		1, // flush old endpoint chain
 	)
@@ -4185,14 +4164,12 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add element ip kube-proxy service-ips { 172.30.0.44 . tcp . 80 : goto service-LAUZTJTB-ns4/svc4/tcp/p80 }
 
 		add chain ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80
-		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 ip daddr 172.30.0.41 ip saddr != 10.0.0.0/8 mark set mark or 0x4000 comment "masquerade traffic from outside cluster"
 		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 }
 		add chain ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80
 		add rule ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 ip saddr 10.0.1.1 mark set mark or 0x4000 comment "masquerade hairpin traffic"
 		add rule ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 meta l4proto tcp dnat to 10.0.1.1:80
 
 		add chain ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80
-		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 ip daddr 172.30.0.43 ip saddr != 10.0.0.0/8 mark set mark or 0x4000 comment "masquerade traffic from outside cluster"
 		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 numgen random mod 2 vmap { 0 : goto endpoint-SWWHDC7X-ns3/svc3/tcp/p80__10.0.3.2/80 , 1 : goto endpoint-TQ2QKHCZ-ns3/svc3/tcp/p80__10.0.3.3/80 }
 		add chain ip kube-proxy endpoint-SWWHDC7X-ns3/svc3/tcp/p80__10.0.3.2/80
 		add rule ip kube-proxy endpoint-SWWHDC7X-ns3/svc3/tcp/p80__10.0.3.2/80 ip saddr 10.0.3.2 mark set mark or 0x4000 comment "masquerade hairpin traffic"
@@ -4202,7 +4179,6 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add rule ip kube-proxy endpoint-TQ2QKHCZ-ns3/svc3/tcp/p80__10.0.3.3/80 meta l4proto tcp dnat to 10.0.3.3:80
 
 		add chain ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80
-		add rule ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80 ip daddr 172.30.0.44 ip saddr != 10.0.0.0/8 mark set mark or 0x4000 comment "masquerade traffic from outside cluster"
 		add rule ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-WAHRBT2B-ns4/svc4/tcp/p80__10.0.4.1/80 }
 		add chain ip kube-proxy endpoint-WAHRBT2B-ns4/svc4/tcp/p80__10.0.4.1/80
 		add rule ip kube-proxy endpoint-WAHRBT2B-ns4/svc4/tcp/p80__10.0.4.1/80 ip saddr 10.0.4.1 mark set mark or 0x4000 comment "masquerade hairpin traffic"
@@ -4211,7 +4187,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
 	// (The first endpoint chain is unchanged, but the code recreates it anyway.)
 	assertNumOperations(t, nft,
-		4, // add+flush service chain, add 2 rules
+		3, // add+flush service chain, add 1 rule
 		4, // add+flush original endpoint chain, add 2 rules
 		4, // add+flush new endpoint chain, add 2 rules
 	)
@@ -4230,7 +4206,6 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add element ip kube-proxy service-ips { 172.30.0.44 . tcp . 80 : goto service-LAUZTJTB-ns4/svc4/tcp/p80 }
 
 		add chain ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80
-		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 ip daddr 172.30.0.41 ip saddr != 10.0.0.0/8 mark set mark or 0x4000 comment "masquerade traffic from outside cluster"
 		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 }
 		add chain ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80
 		add rule ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 ip saddr 10.0.1.1 mark set mark or 0x4000 comment "masquerade hairpin traffic"
@@ -4241,7 +4216,6 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add chain ip kube-proxy endpoint-TQ2QKHCZ-ns3/svc3/tcp/p80__10.0.3.3/80
 
 		add chain ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80
-		add rule ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80 ip daddr 172.30.0.44 ip saddr != 10.0.0.0/8 mark set mark or 0x4000 comment "masquerade traffic from outside cluster"
 		add rule ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-WAHRBT2B-ns4/svc4/tcp/p80__10.0.4.1/80 }
 		add chain ip kube-proxy endpoint-WAHRBT2B-ns4/svc4/tcp/p80__10.0.4.1/80
 		add rule ip kube-proxy endpoint-WAHRBT2B-ns4/svc4/tcp/p80__10.0.4.1/80 ip saddr 10.0.4.1 mark set mark or 0x4000 comment "masquerade hairpin traffic"
@@ -4270,14 +4244,12 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add element ip kube-proxy service-ips { 172.30.0.44 . tcp . 80 : goto service-LAUZTJTB-ns4/svc4/tcp/p80 }
 
 		add chain ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80
-		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 ip daddr 172.30.0.41 ip saddr != 10.0.0.0/8 mark set mark or 0x4000 comment "masquerade traffic from outside cluster"
 		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 }
 		add chain ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80
 		add rule ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 ip saddr 10.0.1.1 mark set mark or 0x4000 comment "masquerade hairpin traffic"
 		add rule ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 meta l4proto tcp dnat to 10.0.1.1:80
 
 		add chain ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80
-		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 ip daddr 172.30.0.43 ip saddr != 10.0.0.0/8 mark set mark or 0x4000 comment "masquerade traffic from outside cluster"
 		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 numgen random mod 2 vmap { 0 : goto endpoint-SWWHDC7X-ns3/svc3/tcp/p80__10.0.3.2/80 , 1 : goto endpoint-TQ2QKHCZ-ns3/svc3/tcp/p80__10.0.3.3/80 }
 		add chain ip kube-proxy endpoint-SWWHDC7X-ns3/svc3/tcp/p80__10.0.3.2/80
 		add rule ip kube-proxy endpoint-SWWHDC7X-ns3/svc3/tcp/p80__10.0.3.2/80 ip saddr 10.0.3.2 mark set mark or 0x4000 comment "masquerade hairpin traffic"
@@ -4287,7 +4259,6 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add rule ip kube-proxy endpoint-TQ2QKHCZ-ns3/svc3/tcp/p80__10.0.3.3/80 meta l4proto tcp dnat to 10.0.3.3:80
 
 		add chain ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80
-		add rule ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80 ip daddr 172.30.0.44 ip saddr != 10.0.0.0/8 mark set mark or 0x4000 comment "masquerade traffic from outside cluster"
 		add rule ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-WAHRBT2B-ns4/svc4/tcp/p80__10.0.4.1/80 }
 		add chain ip kube-proxy endpoint-WAHRBT2B-ns4/svc4/tcp/p80__10.0.4.1/80
 		add rule ip kube-proxy endpoint-WAHRBT2B-ns4/svc4/tcp/p80__10.0.4.1/80 ip saddr 10.0.4.1 mark set mark or 0x4000 comment "masquerade hairpin traffic"
@@ -4296,7 +4267,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
 	assertNumOperations(t, nft,
 		2, // remove 1 element from no-endpoint-services, add 1 element to service-ips
-		4, // add+flush service chain, add 2 rules
+		3, // add+flush service chain, add 1 rule
 		8, // add+flush 2 endpoint chains, add 2 rules to each
 	)
 
@@ -4337,12 +4308,10 @@ func TestSyncProxyRulesStartup(t *testing.T) {
 		add chain ip kube-proxy service-MHHHYRWA-ns2/svc2/tcp/p8080
 		add chain ip kube-proxy endpoint-7RVP4LUQ-ns2/svc2/tcp/p8080__10.0.2.1/8080
 		
-		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 ip daddr 172.30.0.41 ip saddr != 10.0.0.0/8 mark set mark or 0x4000 comment "masquerade traffic from outside cluster"
 		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 }
 		add rule ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 ip saddr 10.0.1.1 mark set mark or 0x4000 comment "masquerade hairpin traffic"
 		add rule ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 meta l4proto tcp dnat to 10.0.1.1:80
 
-		add rule ip kube-proxy service-MHHHYRWA-ns2/svc2/tcp/p8080 ip daddr 172.30.0.42 ip saddr != 10.0.0.0/8 mark set mark or 0x4000 comment "masquerade traffic from outside cluster"
 		add rule ip kube-proxy service-MHHHYRWA-ns2/svc2/tcp/p8080 numgen random mod 1 vmap { 0 : goto endpoint-7RVP4LUQ-ns2/svc2/tcp/p8080__10.0.2.1/8080 }
 		add rule ip kube-proxy endpoint-7RVP4LUQ-ns2/svc2/tcp/p8080__10.0.2.1/8080 ip saddr 10.0.2.1 mark set mark or 0x4000 comment "masquerade hairpin traffic"
 		add rule ip kube-proxy endpoint-7RVP4LUQ-ns2/svc2/tcp/p8080__10.0.2.1/8080 meta l4proto tcp dnat to 10.0.2.1:8080
@@ -4427,7 +4396,6 @@ func TestSyncProxyRulesStartup(t *testing.T) {
 		add element ip kube-proxy no-endpoint-services { 172.30.0.43 . tcp . 80 comment "ns3/svc3:p80" : goto reject-chain }
 
 		add chain ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80
-		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 ip daddr 172.30.0.41 ip saddr != 10.0.0.0/8 mark set mark or 0x4000 comment "masquerade traffic from outside cluster"
 		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 numgen random mod 2 vmap { 0 : goto endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 , 1 : goto endpoint-ZCZBVNAZ-ns1/svc1/tcp/p80__10.0.1.2/80 }
 		add chain ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80
 		add rule ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 ip saddr 10.0.1.1 mark set mark or 0x4000 comment "masquerade hairpin traffic"
@@ -4437,7 +4405,6 @@ func TestSyncProxyRulesStartup(t *testing.T) {
 		add rule ip kube-proxy endpoint-ZCZBVNAZ-ns1/svc1/tcp/p80__10.0.1.2/80 meta l4proto tcp dnat to 10.0.1.2:80
 
 		add chain ip kube-proxy service-MHHHYRWA-ns2/svc2/tcp/p8080
-		add rule ip kube-proxy service-MHHHYRWA-ns2/svc2/tcp/p8080 ip daddr 172.30.0.42 ip saddr != 10.0.0.0/8 mark set mark or 0x4000 comment "masquerade traffic from outside cluster"
 		add rule ip kube-proxy service-MHHHYRWA-ns2/svc2/tcp/p8080 numgen random mod 1 vmap { 0 : goto endpoint-7RVP4LUQ-ns2/svc2/tcp/p8080__10.0.2.1/8080 }
 		add chain ip kube-proxy endpoint-7RVP4LUQ-ns2/svc2/tcp/p8080__10.0.2.1/8080
 		add rule ip kube-proxy endpoint-7RVP4LUQ-ns2/svc2/tcp/p8080__10.0.2.1/8080 ip saddr 10.0.2.1 mark set mark or 0x4000 comment "masquerade hairpin traffic"
@@ -4447,7 +4414,7 @@ func TestSyncProxyRulesStartup(t *testing.T) {
 	assertNumOperations(t, nft,
 		setupOps, // nft setup
 		2,        // add svc3 IP to the cluster-ips, and to the no-endpoint-services set
-		8,        // add+flush 2 service chains + 2 rules each
+		6,        // add+flush 2 service chains + 1 rule each
 		4,        // add+flush svc1 endpoint chain + 2 rules
 	)
 }
@@ -4905,7 +4872,6 @@ func TestBadIPs(t *testing.T) {
 	expected := baseRules + dedent.Dedent(`
 		# svc1
 		add chain ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80
-		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 ip daddr 172.30.0.41 ip saddr != 10.0.0.0/8 mark set mark or 0x4000 comment "masquerade traffic from outside cluster"
 		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-5OJB2KTY-ns1/svc1/tcp/p80__10.180.0.1/80 }
 
 		add chain ip kube-proxy external-ULMVA6XW-ns1/svc1/tcp/p80

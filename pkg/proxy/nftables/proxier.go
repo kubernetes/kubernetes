@@ -614,6 +614,33 @@ func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
 		Type:    "inet_proto . inet_service : verdict",
 		Comment: ptr.To("NodePort traffic"),
 	})
+
+	if proxier.masqueradeAll {
+		tx.Add(&knftables.Rule{
+			Chain: servicesChain,
+			Rule: knftables.Concat(
+				ipX, "daddr", "@", clusterIPsSet,
+				proxier.masqueradeRule,
+			),
+			Comment: ptr.To("masquerade all clusterIP traffic"),
+		})
+	} else if proxier.localDetector.IsImplemented() {
+		// This masquerades off-cluster traffic to a service VIP. The
+		// idea is that you can establish a static route for your
+		// Service range, routing to any node, and that node will
+		// bridge into the Service for you. Since that might bounce
+		// off-node, we masquerade here.
+		tx.Add(&knftables.Rule{
+			Chain: servicesChain,
+			Rule: knftables.Concat(
+				ipX, "daddr", "@", clusterIPsSet,
+				proxier.localDetector.IfNotLocalNFT(),
+				proxier.masqueradeRule,
+			),
+			Comment: ptr.To("masquerade clusterIP traffic from outside cluster"),
+		})
+	}
+
 	tx.Add(&knftables.Rule{
 		Chain: servicesChain,
 		Rule: knftables.Concat(
@@ -1428,35 +1455,6 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 		// changes are required.
 		if skipServiceUpdate {
 			continue
-		}
-
-		// Set up internal traffic handling.
-		if hasInternalEndpoints {
-			if proxier.masqueradeAll {
-				tx.Add(&knftables.Rule{
-					Chain: internalTrafficChain,
-					Rule: knftables.Concat(
-						ipX, "daddr", svcInfo.ClusterIP(),
-						proxier.masqueradeRule,
-					),
-					Comment: ptr.To("masquerade all service traffic"),
-				})
-			} else if proxier.localDetector.IsImplemented() {
-				// This masquerades off-cluster traffic to a service VIP. The
-				// idea is that you can establish a static route for your
-				// Service range, routing to any node, and that node will
-				// bridge into the Service for you. Since that might bounce
-				// off-node, we masquerade here.
-				tx.Add(&knftables.Rule{
-					Chain: internalTrafficChain,
-					Rule: knftables.Concat(
-						ipX, "daddr", svcInfo.ClusterIP(),
-						proxier.localDetector.IfNotLocalNFT(),
-						proxier.masqueradeRule,
-					),
-					Comment: ptr.To("masquerade traffic from outside cluster"),
-				})
-			}
 		}
 
 		// Set up external traffic handling (if any "external" destinations are
