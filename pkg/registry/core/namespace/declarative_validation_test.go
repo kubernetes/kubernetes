@@ -56,7 +56,7 @@ func TestDeclarativeValidateForNamespaceCreate(t *testing.T) {
 			expectedErrs: field.ErrorList{{
 				Type:   field.ErrorTypeInvalid,
 				Field:  "metadata.name",
-				Origin: "format=k8s-long-name",
+				Origin: "format=k8s-short-name",
 			}},
 		},
 		"invalid: non-rfc1123 name: too long": {
@@ -66,7 +66,7 @@ func TestDeclarativeValidateForNamespaceCreate(t *testing.T) {
 			expectedErrs: field.ErrorList{{
 				Type:   field.ErrorTypeInvalid,
 				Field:  "metadata.name",
-				Origin: "format=k8s-long-name",
+				Origin: "format=k8s-short-name",
 			}},
 		},
 		// TODO: add more test cases when increasing declarative validation coverage

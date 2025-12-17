@@ -143,8 +143,8 @@ func (namespaceStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Ob
 	newNamespace := obj.(*api.Namespace)
 	oldNamespace := old.(*api.Namespace)
 
-	errorList := validation.ValidateNamespace(newNamespace)
-	allErrs := append(errorList, validation.ValidateNamespaceUpdate(newNamespace, oldNamespace)...)
+	allErrs := validation.ValidateNamespace(newNamespace)
+	allErrs = append(allErrs, validation.ValidateNamespaceUpdate(newNamespace, oldNamespace)...)
 	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newNamespace, oldNamespace, allErrs, operation.Update)
 }
 

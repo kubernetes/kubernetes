@@ -8166,16 +8166,18 @@ func ValidateResourceQuotaStatusUpdate(newResourceQuota, oldResourceQuota *core.
 
 // ValidateNamespace tests if required fields are set.
 func ValidateNamespace(namespace *core.Namespace) field.ErrorList {
-	allErrs := ValidateObjectMeta(&namespace.ObjectMeta, false, ValidateNamespaceName, field.NewPath("metadata"))
+
+	validateName := func(fldPath *field.Path, name string) field.ErrorList {
+		return validate.ShortName(context.Background(), operation.Operation{}, fldPath, &name, nil).MarkCoveredByDeclarative()
+	}
+
+	allErrs := ValidateObjectMetaWithOpts(&namespace.ObjectMeta, false, validateName, field.NewPath("metadata"))
 
 	// TODO: update this block when increasing declarative validation coverage
 	matcher := field.ErrorMatcher{}.ByType().ByField()
-	for _, err := range allErrs {
-		switch {
-		case matcher.Matches(&field.Error{Type: field.ErrorTypeRequired, Field: "metadata.name"}, err):
-			err.MarkCoveredByDeclarative()
-		case matcher.Matches(&field.Error{Type: field.ErrorTypeInvalid, Field: "metadata.name"}, err):
-			err.MarkCoveredByDeclarative().WithOrigin("format=k8s-long-name")
+	for i, err := range allErrs {
+		if matcher.Matches(&field.Error{Type: field.ErrorTypeRequired, Field: "metadata.name"}, err) {
+			allErrs[i] = err.MarkCoveredByDeclarative()
 		}
 	}
 
@@ -8210,10 +8212,9 @@ func ValidateNamespaceUpdate(newNamespace *core.Namespace, oldNamespace *core.Na
 
 	// TODO: update this block when increasing declarative validation coverage
 	matcher := field.ErrorMatcher{}.ByType().ByField()
-	for _, err := range allErrs {
-		switch {
-		case matcher.Matches(&field.Error{Type: field.ErrorTypeInvalid, Field: "metadata.name"}, err):
-			err.MarkCoveredByDeclarative().WithOrigin("immutable")
+	for i, err := range allErrs {
+		if matcher.Matches(&field.Error{Type: field.ErrorTypeInvalid, Field: "metadata.name"}, err) {
+			allErrs[i] = err.MarkCoveredByDeclarative().WithOrigin("immutable")
 		}
 	}
 	return allErrs
@@ -8225,10 +8226,9 @@ func ValidateNamespaceStatusUpdate(newNamespace, oldNamespace *core.Namespace) f
 
 	// TODO: update this block when increasing declarative validation coverage
 	matcher := field.ErrorMatcher{}.ByType().ByField()
-	for _, err := range allErrs {
-		switch {
-		case matcher.Matches(&field.Error{Type: field.ErrorTypeInvalid, Field: "metadata.name"}, err):
-			err.MarkCoveredByDeclarative().WithOrigin("immutable")
+	for i, err := range allErrs {
+		if matcher.Matches(&field.Error{Type: field.ErrorTypeInvalid, Field: "metadata.name"}, err) {
+			allErrs[i] = err.MarkCoveredByDeclarative().WithOrigin("immutable")
 		}
 	}
 
@@ -8250,10 +8250,9 @@ func ValidateNamespaceFinalizeUpdate(newNamespace, oldNamespace *core.Namespace)
 
 	// TODO: update this block when increasing declarative validation coverage
 	matcher := field.ErrorMatcher{}.ByType().ByField()
-	for _, err := range allErrs {
-		switch {
-		case matcher.Matches(&field.Error{Type: field.ErrorTypeInvalid, Field: "metadata.name"}, err):
-			err.MarkCoveredByDeclarative().WithOrigin("immutable")
+	for i, err := range allErrs {
+		if matcher.Matches(&field.Error{Type: field.ErrorTypeInvalid, Field: "metadata.name"}, err) {
+			allErrs[i] = err.MarkCoveredByDeclarative().WithOrigin("immutable")
 		}
 	}
 
