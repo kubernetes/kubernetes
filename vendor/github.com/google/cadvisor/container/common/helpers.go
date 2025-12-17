@@ -387,6 +387,10 @@ func AssignDeviceNamesToDiskStats(namer DeviceNamer, stats *info.DiskIoStats) {
 		stats.IoTime,
 		stats.IoWaitTime,
 		stats.Sectors,
+		stats.IoCostUsage,
+		stats.IoCostWait,
+		stats.IoCostIndebt,
+		stats.IoCostIndelay,
 	)
 }
 

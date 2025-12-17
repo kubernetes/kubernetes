@@ -257,7 +257,7 @@ func getMachineArch() string {
 		klog.Errorf("Cannot get machine architecture, err: %v", err)
 		return ""
 	}
-	return string(uname.Machine[:])
+	return unix.ByteSliceToString(uname.Machine[:])
 }
 
 // arm32 changes

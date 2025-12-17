@@ -15,7 +15,6 @@
 package machine
 
 import (
-	"bytes"
 	"flag"
 	"os"
 	"path/filepath"
@@ -169,10 +168,8 @@ func ContainerOsVersion() string {
 
 func KernelVersion() string {
 	uname := &unix.Utsname{}
-
 	if err := unix.Uname(uname); err != nil {
 		return "Unknown"
 	}
-
-	return string(uname.Release[:bytes.IndexByte(uname.Release[:], 0)])
+	return unix.ByteSliceToString(uname.Release[:])
 }

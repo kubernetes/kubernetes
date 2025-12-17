@@ -281,6 +281,10 @@ func (h *rawContainerHandler) Type() container.ContainerType {
 	return container.ContainerTypeRaw
 }
 
+func (h *rawContainerHandler) GetExitCode() (int, error) {
+	return -1, fmt.Errorf("exit codes not applicable for raw cgroup containers")
+}
+
 type fsNamer struct {
 	fs      []fs.Fs
 	factory info.MachineInfoFactory

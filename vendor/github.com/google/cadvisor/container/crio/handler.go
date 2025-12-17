@@ -360,3 +360,7 @@ func (h *crioContainerHandler) Exists() bool {
 func (h *crioContainerHandler) Type() container.ContainerType {
 	return container.ContainerTypeCrio
 }
+
+func (h *crioContainerHandler) GetExitCode() (int, error) {
+	return -1, fmt.Errorf("exit code not available from CRI-O API")
+}

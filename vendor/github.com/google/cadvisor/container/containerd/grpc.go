@@ -16,9 +16,11 @@
 package containerd
 
 import (
-	"github.com/google/cadvisor/container/containerd/namespaces"
-	"golang.org/x/net/context"
+	"context"
+
 	"google.golang.org/grpc"
+
+	"github.com/google/cadvisor/container/containerd/namespaces"
 )
 
 type namespaceInterceptor struct {

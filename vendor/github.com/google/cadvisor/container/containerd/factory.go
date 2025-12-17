@@ -15,13 +15,13 @@
 package containerd
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"path"
 	"regexp"
 	"strings"
 
-	"golang.org/x/net/context"
 	"k8s.io/klog/v2"
 
 	"github.com/google/cadvisor/container"

@@ -311,7 +311,7 @@ func processStatsFromProcs(rootFs string, cgroupPath string, rootPid int) (info.
 func (h *Handler) schedulerStatsFromProcs() (info.CpuSchedstat, error) {
 	pids, err := h.cgroupManager.GetAllPids()
 	if err != nil {
-		return info.CpuSchedstat{}, fmt.Errorf("Could not get PIDs for container %d: %w", h.pid, err)
+		return info.CpuSchedstat{}, fmt.Errorf("could not get PIDs for container %d: %w", h.pid, err)
 	}
 	alivePids := make(map[int]struct{}, len(pids))
 	for _, pid := range pids {
@@ -793,6 +793,10 @@ func setDiskIoStats(s *cgroups.Stats, ret *info.ContainerStats) {
 	ret.DiskIo.IoWaitTime = diskStatsCopy(s.BlkioStats.IoWaitTimeRecursive)
 	ret.DiskIo.IoMerged = diskStatsCopy(s.BlkioStats.IoMergedRecursive)
 	ret.DiskIo.IoTime = diskStatsCopy(s.BlkioStats.IoTimeRecursive)
+	ret.DiskIo.IoCostUsage = diskStatsCopy(s.BlkioStats.IoCostUsage)
+	ret.DiskIo.IoCostWait = diskStatsCopy(s.BlkioStats.IoCostWait)
+	ret.DiskIo.IoCostIndebt = diskStatsCopy(s.BlkioStats.IoCostIndebt)
+	ret.DiskIo.IoCostIndelay = diskStatsCopy(s.BlkioStats.IoCostIndelay)
 	setPSIStats(s.BlkioStats.PSI, &ret.DiskIo.PSI)
 }
 
