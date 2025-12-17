@@ -1,5 +1,3 @@
-//go:build linux && amd64
-
 /*
 Copyright 2022 The Kubernetes Authors.
 
@@ -16,8 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// This test uses etcd that is only fully supported for AMD64 and Linux
-// https://etcd.io/docs/v3.5/op-guide/supported-platform/#support-tiers
+// This test uses etcd that is only fully supported for AMD64 and ARM64 on Linux.
+// We also test on PPC64LE and s390x which are tier 2.
+//
+// If you test on windows / macOS, be aware that we do not have upstream CI for these.
+//
+// https://etcd.io/docs/v3.6/op-guide/supported-platform/#support-tiers
 
 package cleanup
 
@@ -43,8 +45,6 @@ import (
 // Be careful when moving it around or changing the import statements above.
 // Here are some intentionally blank lines that can be removed to compensate
 // for future additional import statements.
-//
-//
 //
 //
 // This must be line #50.
