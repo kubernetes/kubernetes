@@ -29,6 +29,7 @@ import (
 var apiVersions = []string{"v1", "v2"}
 
 func TestDeclarativeValidate(t *testing.T) {
+
 	for _, apiVersion := range apiVersions {
 		testDeclarativeValidate(t, apiVersion)
 	}
@@ -60,6 +61,18 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			input: makeValidHPA(tweakMaxReplicas(-1)),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "maxReplicas"), int32(-1), "must be greater than or equal to 1").WithOrigin("minimum"),
+			},
+		},
+		"invalid scaleTargetRef - missing name": {
+			input: makeValidHPA(tweakName("")),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "scaleTargetRef", "name"), ""),
+			},
+		},
+		"invalid scaleTargetRef - missing kind": {
+			input: makeValidHPA(tweakKind("")),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "scaleTargetRef", "kind"), ""),
 			},
 		},
 	}
@@ -104,6 +117,20 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			updateObj: makeValidHPA(tweakMaxReplicas(-1)),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "maxReplicas"), int32(-1), "must be greater than or equal to 1").WithOrigin("minimum"),
+			},
+		},
+		"invalid update name": {
+			oldObj:    makeValidHPA(),
+			updateObj: makeValidHPA(tweakName("")),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "scaleTargetRef", "name"), ""),
+			},
+		},
+		"invalid update kind": {
+			oldObj:    makeValidHPA(),
+			updateObj: makeValidHPA(tweakKind("")),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "scaleTargetRef", "kind"), ""),
 			},
 		},
 	}
@@ -153,5 +180,17 @@ func tweakMinReplicas(replicas int32) func(*api.HorizontalPodAutoscaler) {
 func tweakMaxReplicas(replicas int32) func(*api.HorizontalPodAutoscaler) {
 	return func(hpa *api.HorizontalPodAutoscaler) {
 		hpa.Spec.MaxReplicas = replicas
+	}
+}
+
+func tweakName(name string) func(*api.HorizontalPodAutoscaler) {
+	return func(hpa *api.HorizontalPodAutoscaler) {
+		hpa.Spec.ScaleTargetRef.Name = name
+	}
+}
+
+func tweakKind(kind string) func(*api.HorizontalPodAutoscaler) {
+	return func(hpa *api.HorizontalPodAutoscaler) {
+		hpa.Spec.ScaleTargetRef.Kind = kind
 	}
 }
