@@ -43,6 +43,13 @@ type RealFIFOOptions struct {
 	// If set, will be called for objects before enqueueing them. Please
 	// see the comment on TransformFunc for details.
 	Transformer TransformFunc
+
+	// Identifier is used to identify the FIFO used in logs and metrics.
+	Identifier *Identifier
+
+	// If set, metricsProvider will be used to create metrics for the FIFO.
+	// This allows consumers to provide their own metrics implementation.
+	MetricsProvider FIFOMetricsProvider
 }
 
 const (
@@ -86,6 +93,12 @@ type RealFIFO struct {
 
 	// batchSize determines the maximum number of objects we can combine into a batch.
 	batchSize int
+
+	// metrics tracks basic metric information about the FIFO.
+	metrics *fifoMetrics
+
+	// identfier is used to identify this FIFO for metrics and logging purposes.
+	identfier *Identifier
 }
 
 var (
@@ -181,6 +194,7 @@ func (f *RealFIFO) Add(obj interface{}) error {
 
 	f.populated = true
 	retErr := f.addToItems_locked(Added, false, obj)
+	f.metrics.numberOfQueuedItem.Set(float64(len(f.items)))
 
 	return retErr
 }
@@ -192,6 +206,7 @@ func (f *RealFIFO) Update(obj interface{}) error {
 
 	f.populated = true
 	retErr := f.addToItems_locked(Updated, false, obj)
+	f.metrics.numberOfQueuedItem.Set(float64(len(f.items)))
 
 	return retErr
 }
@@ -205,6 +220,7 @@ func (f *RealFIFO) Delete(obj interface{}) error {
 
 	f.populated = true
 	retErr := f.addToItems_locked(Deleted, false, obj)
+	f.metrics.numberOfQueuedItem.Set(float64(len(f.items)))
 
 	return retErr
 }
@@ -251,13 +267,15 @@ func (f *RealFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 	// and new items can't be added until processing finish.
 	// https://github.com/kubernetes/kubernetes/issues/103789
 	if len(f.items) > 10 {
-		id, _ := f.keyOf(item)
 		trace := utiltrace.New("RealFIFO Pop Process",
-			utiltrace.Field{Key: "ID", Value: id},
+			utiltrace.Field{Key: "Name", Value: f.identfier.Name()},
+			utiltrace.Field{Key: "ItemType", Value: item.Type},
 			utiltrace.Field{Key: "Depth", Value: len(f.items)},
 			utiltrace.Field{Key: "Reason", Value: "slow event handlers blocking the queue"})
 		defer trace.LogIfLong(100 * time.Millisecond)
 	}
+
+	f.metrics.numberOfQueuedItem.Set(float64(len(f.items)))
 
 	// we wrap in Deltas here to be compatible with preview Pop functions and those interpreting the return value.
 	err := process(Deltas{item}, isInInitialList)
@@ -319,14 +337,16 @@ func (f *RealFIFO) PopBatch(process ProcessBatchFunc) error {
 	// and new items can't be added until processing finish.
 	// https://github.com/kubernetes/kubernetes/issues/103789
 	if len(f.items) > 10 {
-		id, _ := f.keyOf(deltas[0])
 		trace := utiltrace.New("RealFIFO PopBatch Process",
-			utiltrace.Field{Key: "ID", Value: id},
+			utiltrace.Field{Key: "Name", Value: f.identfier.Name()},
+			utiltrace.Field{Key: "ItemType", Value: f.identfier.ItemType()},
 			utiltrace.Field{Key: "Depth", Value: len(f.items)},
 			utiltrace.Field{Key: "Reason", Value: "slow event handlers blocking the queue"},
 			utiltrace.Field{Key: "BatchSize", Value: len(deltas)})
 		defer trace.LogIfLong(min(100*time.Millisecond*time.Duration(len(deltas)), time.Second))
 	}
+
+	f.metrics.numberOfQueuedItem.Set(float64(len(f.items)))
 
 	err := process(deltas, isInInitialList)
 	return err
@@ -436,6 +456,8 @@ func (f *RealFIFO) Replace(newItems []interface{}, resourceVersion string) error
 		f.initialPopulationCount = len(f.items)
 	}
 
+	f.metrics.numberOfQueuedItem.Set(float64(len(f.items)))
+
 	return nil
 }
 
@@ -484,6 +506,8 @@ func (f *RealFIFO) Resync() error {
 		}
 	}
 
+	f.metrics.numberOfQueuedItem.Set(float64(len(f.items)))
+
 	return nil
 }
 
@@ -519,6 +543,8 @@ func NewRealFIFOWithOptions(opts RealFIFOOptions) *RealFIFO {
 		knownObjects: opts.KnownObjects,
 		transformer:  opts.Transformer,
 		batchSize:    defaultBatchSize,
+		identfier:    opts.Identifier,
+		metrics:      newFIFOMetrics(opts.Identifier, opts.MetricsProvider),
 	}
 
 	f.cond.L = &f.lock
