@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	v1 "k8s.io/api/core/v1"
 	clientfeatures "k8s.io/client-go/features"
 	clientfeaturestesting "k8s.io/client-go/features/testing"
 )
@@ -1288,4 +1289,228 @@ func TestRealFIFO_PopBrokenItemsInBatch(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRealFIFO_Metrics(t *testing.T) {
+	tests := []struct {
+		name           string
+		actions        []func(f *RealFIFO)
+		expectedMetric float64
+	}{
+		{
+			name:           "empty queue has zero metric",
+			actions:        []func(f *RealFIFO){},
+			expectedMetric: 0,
+		},
+		{
+			name: "Add increases metric",
+			actions: []func(f *RealFIFO){
+				func(f *RealFIFO) { f.Add(mkFifoObj("foo", 1)) },
+			},
+			expectedMetric: 1,
+		},
+		{
+			name: "multiple Adds increase metric",
+			actions: []func(f *RealFIFO){
+				func(f *RealFIFO) { f.Add(mkFifoObj("foo", 1)) },
+				func(f *RealFIFO) { f.Add(mkFifoObj("bar", 2)) },
+				func(f *RealFIFO) { f.Add(mkFifoObj("baz", 3)) },
+			},
+			expectedMetric: 3,
+		},
+		{
+			name: "Update increases metric",
+			actions: []func(f *RealFIFO){
+				func(f *RealFIFO) { f.Add(mkFifoObj("foo", 1)) },
+				func(f *RealFIFO) { f.Update(mkFifoObj("foo", 2)) },
+			},
+			expectedMetric: 2,
+		},
+		{
+			name: "Delete increases metric",
+			actions: []func(f *RealFIFO){
+				func(f *RealFIFO) { f.Add(mkFifoObj("foo", 1)) },
+				func(f *RealFIFO) { f.Delete(mkFifoObj("foo", 2)) },
+			},
+			expectedMetric: 2,
+		},
+		{
+			name: "Pop decreases metric",
+			actions: []func(f *RealFIFO){
+				func(f *RealFIFO) { f.Add(mkFifoObj("foo", 1)) },
+				func(f *RealFIFO) { f.Add(mkFifoObj("bar", 2)) },
+				func(f *RealFIFO) { Pop(f) },
+			},
+			expectedMetric: 1,
+		},
+		{
+			name: "Replace sets metric to new count",
+			actions: []func(f *RealFIFO){
+				func(f *RealFIFO) { f.Add(mkFifoObj("old", 1)) },
+				func(f *RealFIFO) {
+					f.Replace([]interface{}{
+						mkFifoObj("foo", 1),
+						mkFifoObj("bar", 2),
+					}, "0")
+				},
+			},
+			// 1 (Add) + 1 (Delete for "old") + 2 (Replace items) = 4
+			expectedMetric: 4,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resetIdentity()
+			metricsProvider := &fakeFIFOMetricsProvider{}
+			id := NewIdentifier("test-fifo", &v1.Pod{})
+
+			f := NewRealFIFOWithOptions(RealFIFOOptions{
+				KeyFunction:     testFifoObjectKeyFunc,
+				KnownObjects:    emptyKnownObjects(),
+				Identifier:      id,
+				MetricsProvider: metricsProvider,
+			})
+
+			for _, action := range tt.actions {
+				action(f)
+			}
+
+			if len(metricsProvider.metrics) != 1 {
+				t.Fatalf("expected 1 metric, got %d", len(metricsProvider.metrics))
+			}
+			if got := metricsProvider.metrics[0].value; got != tt.expectedMetric {
+				t.Errorf("metric value = %v, want %v", got, tt.expectedMetric)
+			}
+		})
+	}
+}
+
+func TestRealFIFO_MetricsNotPublishedForUnnamedFIFO(t *testing.T) {
+	resetIdentity()
+	metricsProvider := &fakeFIFOMetricsProvider{}
+
+	// Identifier with empty name - should not be unique
+	id := NewIdentifier("", &v1.Pod{})
+	f := NewRealFIFOWithOptions(RealFIFOOptions{
+		KeyFunction:     testFifoObjectKeyFunc,
+		KnownObjects:    emptyKnownObjects(),
+		Identifier:      id,
+		MetricsProvider: metricsProvider,
+	})
+
+	// Perform operations
+	f.Add(mkFifoObj("foo", 1))
+	f.Add(mkFifoObj("bar", 2))
+
+	// No metrics should be created because the identifier is not unique (empty name)
+	if len(metricsProvider.metrics) != 0 {
+		t.Errorf("expected 0 metrics for unnamed FIFO, got %d", len(metricsProvider.metrics))
+	}
+}
+
+func TestRealFIFO_MetricsNotPublishedForDuplicateIdentifier(t *testing.T) {
+	resetIdentity()
+	metricsProvider := &fakeFIFOMetricsProvider{}
+
+	// Create first FIFO with a name - this should be unique
+	id1 := NewIdentifier("duplicate-name", &v1.Pod{})
+	f1 := NewRealFIFOWithOptions(RealFIFOOptions{
+		KeyFunction:     testFifoObjectKeyFunc,
+		KnownObjects:    emptyKnownObjects(),
+		Identifier:      id1,
+		MetricsProvider: metricsProvider,
+	})
+
+	// Create second FIFO with the same name - this should NOT be unique
+	id2 := NewIdentifier("duplicate-name", &v1.Pod{})
+	f2 := NewRealFIFOWithOptions(RealFIFOOptions{
+		KeyFunction:     testFifoObjectKeyFunc,
+		KnownObjects:    emptyKnownObjects(),
+		Identifier:      id2,
+		MetricsProvider: metricsProvider,
+	})
+
+	// Add items to both FIFOs
+	f1.Add(mkFifoObj("foo", 1))
+	f2.Add(mkFifoObj("bar", 2))
+
+	// Only one metric should be created (from f1), f2 uses noopMetric
+	if len(metricsProvider.metrics) != 1 {
+		t.Fatalf("expected 1 metric total, got %d", len(metricsProvider.metrics))
+	}
+	if got := metricsProvider.metrics[0].value; got != 1 {
+		t.Errorf("metric value = %v, want 1 (only f1 should update)", got)
+	}
+}
+
+func TestRealFIFO_MetricsTrackedIndependentlyForDifferentFIFOs(t *testing.T) {
+	resetIdentity()
+	metricsProvider := &fakeFIFOMetricsProvider{}
+
+	// Create two FIFOs with different names - both should be unique
+	id1 := NewIdentifier("fifo-1", &v1.Pod{})
+	f1 := NewRealFIFOWithOptions(RealFIFOOptions{
+		KeyFunction:     testFifoObjectKeyFunc,
+		KnownObjects:    emptyKnownObjects(),
+		Identifier:      id1,
+		MetricsProvider: metricsProvider,
+	})
+
+	id2 := NewIdentifier("fifo-2", &v1.Pod{})
+	f2 := NewRealFIFOWithOptions(RealFIFOOptions{
+		KeyFunction:     testFifoObjectKeyFunc,
+		KnownObjects:    emptyKnownObjects(),
+		Identifier:      id2,
+		MetricsProvider: metricsProvider,
+	})
+
+	// Both FIFOs should have created metrics
+	if len(metricsProvider.metrics) != 2 {
+		t.Fatalf("expected 2 metrics, got %d", len(metricsProvider.metrics))
+	}
+
+	// Add items to f1
+	f1.Add(mkFifoObj("foo", 1))
+	f1.Add(mkFifoObj("bar", 2))
+
+	// Add items to f2
+	f2.Add(mkFifoObj("baz", 3))
+
+	// Verify metrics are tracked independently
+	if got := metricsProvider.metrics[0].value; got != 2 {
+		t.Errorf("f1 metric value = %v, want 2", got)
+	}
+	if got := metricsProvider.metrics[1].value; got != 1 {
+		t.Errorf("f2 metric value = %v, want 1", got)
+	}
+
+	// Pop from f1 and verify its metric decreases while f2's stays the same
+	Pop(f1)
+	if got := metricsProvider.metrics[0].value; got != 1 {
+		t.Errorf("f1 metric value after Pop = %v, want 1", got)
+	}
+	if got := metricsProvider.metrics[1].value; got != 1 {
+		t.Errorf("f2 metric value after f1 Pop = %v, want 1 (should be unchanged)", got)
+	}
+}
+
+// fakeGaugeMetric is a test implementation of GaugeMetric that records values.
+type fakeGaugeMetric struct {
+	value float64
+}
+
+func (f *fakeGaugeMetric) Set(v float64) {
+	f.value = v
+}
+
+// fakeFIFOMetricsProvider is a test implementation of FIFOMetricsProvider.
+type fakeFIFOMetricsProvider struct {
+	metrics []*fakeGaugeMetric
+}
+
+func (f *fakeFIFOMetricsProvider) NewQueuedItemMetric(*Identifier) GaugeMetric {
+	metric := &fakeGaugeMetric{}
+	f.metrics = append(f.metrics, metric)
+	return metric
 }
