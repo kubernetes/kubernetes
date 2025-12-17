@@ -198,6 +198,26 @@ func testValidateUpdateForDeclarative(t *testing.T, apiVersion string) {
 			update:       makeValidCSR(withDeniedCondition(), withDeniedCondition(), withApprovedCondition(), withApprovedCondition()),
 			subresources: []string{"/status"},
 		},
+		"spec.usages: nil = invalid on update": {
+			old: makeValidCSR(),
+			update: makeValidCSR(func(csr *api.CertificateSigningRequest) {
+				csr.Spec.Usages = nil
+			}),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "usages"), ""),
+			},
+			subresources: []string{"/"},
+		},
+		"spec.usages: empty = invalid on update": {
+			old: makeValidCSR(),
+			update: makeValidCSR(func(csr *api.CertificateSigningRequest) {
+				csr.Spec.Usages = []api.KeyUsage{}
+			}),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "usages"), ""),
+			},
+			subresources: []string{"/"},
+		},
 	}
 
 	for k, tc := range testCases {
