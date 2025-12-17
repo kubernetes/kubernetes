@@ -56,7 +56,7 @@ const (
 var defaultWatcherMaxLimit int64 = maxLimit
 
 // fatalOnDecodeError is used during testing to panic the server if watcher encounters a decoding error
-var fatalOnDecodeError = atomic.Bool{}
+var fatalOnDecodeError atomic.Bool
 
 func init() {
 	// check to see if we are running in a test environment
