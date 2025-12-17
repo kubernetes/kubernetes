@@ -50,6 +50,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/httpstream/wsstream"
 	"k8s.io/apimachinery/pkg/util/proxy"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -64,6 +65,7 @@ import (
 	"k8s.io/apiserver/pkg/util/compatibility"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/flushwriter"
+	translator "k8s.io/apiserver/pkg/util/proxy"
 	"k8s.io/component-base/configz"
 	"k8s.io/component-base/logs"
 	compbasemetrics "k8s.io/component-base/metrics"
@@ -957,8 +959,23 @@ func (s *Server) getAttach(request *restful.Request, response *restful.Response)
 		streaming.WriteError(err, response.ResponseWriter)
 		return
 	}
-
-	proxyStream(response.ResponseWriter, request.Request, url)
+	// If upgrade request is for v5 websockets, then set up websocket/spdy translation handling.
+	if wsstream.IsWebSocketRequest(request.Request) {
+		klog.Infof("DEBUG_WEBSOCKET: Kubelet creating SPDY translation to CRI at URL: %s", url.String())    //nolint:logcheck
+		klog.Infof("DEBUG_WEBSOCKET: Kubelet translating websocket attach request for pod %s", podFullName) //nolint:logcheck
+		streamOptions := translator.Options{
+			Stdin:  streamOpts.Stdin,
+			Stdout: streamOpts.Stdout,
+			Stderr: streamOpts.Stderr,
+			Tty:    streamOpts.TTY,
+		}
+		spdyHandler := proxy.NewUpgradeAwareHandler(url, nil /*transport*/, false /*wrapTransport*/, true /*upgradeRequired*/, &responder{})
+		streamTranslator := translator.NewStreamTranslatorHandler(url, nil, 0, streamOptions)
+		handler := translator.NewTranslatingHandler(spdyHandler, streamTranslator, wsstream.IsWebSocketRequestWithStreamCloseProtocol)
+		handler.ServeHTTP(response.ResponseWriter, request.Request)
+	} else {
+		proxyStream(response.ResponseWriter, request.Request, url)
+	}
 }
 
 // getExec handles requests to run a command inside a container.
@@ -982,7 +999,23 @@ func (s *Server) getExec(request *restful.Request, response *restful.Response) {
 		streaming.WriteError(err, response.ResponseWriter)
 		return
 	}
-	proxyStream(response.ResponseWriter, request.Request, url)
+	// If upgrade request is for v5 websockets, then set up websocket/spdy translation handling.
+	if wsstream.IsWebSocketRequest(request.Request) {
+		klog.Infof("DEBUG_WEBSOCKET: Kubelet creating SPDY translation to CRI at URL: %s", url.String())    //nolint:logcheck
+		klog.Infof("DEBUG_WEBSOCKET: Kubelet translating websocket attach request for pod %s", podFullName) //nolint:logcheck
+		streamOptions := translator.Options{
+			Stdin:  streamOpts.Stdin,
+			Stdout: streamOpts.Stdout,
+			Stderr: streamOpts.Stderr,
+			Tty:    streamOpts.TTY,
+		}
+		spdyHandler := proxy.NewUpgradeAwareHandler(url, nil /*transport*/, false /*wrapTransport*/, true /*upgradeRequired*/, &responder{})
+		streamTranslator := translator.NewStreamTranslatorHandler(url, nil, 0, streamOptions)
+		handler := translator.NewTranslatingHandler(spdyHandler, streamTranslator, wsstream.IsWebSocketRequestWithStreamCloseProtocol)
+		handler.ServeHTTP(response.ResponseWriter, request.Request)
+	} else {
+		proxyStream(response.ResponseWriter, request.Request, url)
+	}
 }
 
 // getRun handles requests to run a command inside a container.

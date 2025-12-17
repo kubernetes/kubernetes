@@ -18,6 +18,7 @@ package features
 
 import (
 	"k8s.io/component-helpers/nodedeclaredfeatures"
+	"k8s.io/component-helpers/nodedeclaredfeatures/features/extendwebsocketstokubelet"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/inplacepodresize"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/restartallcontainers"
 )
@@ -29,4 +30,5 @@ var AllFeatures = []nodedeclaredfeatures.Feature{
 	restartallcontainers.Feature,
 	inplacepodresize.GuaranteedQoSPodCPUResizeFeature,
 	inplacepodresize.PodLevelResourcesResizeFeature,
+	extendwebsocketstokubelet.Feature,
 }
