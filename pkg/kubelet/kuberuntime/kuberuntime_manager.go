@@ -1467,8 +1467,11 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 			return err
 		}
 		if typeName == "init container" {
-			if m.podInitContainerTimeRecorder != nil {
-				m.podInitContainerTimeRecorder.RecordInitContainerStarted(pod.UID, time.Now())
+			// Don't measure restartable init containers (sidecars)
+			if !podutil.IsRestartableInitContainer(spec.container) {
+				if m.podInitContainerTimeRecorder != nil {
+					m.podInitContainerTimeRecorder.RecordInitContainerStarted(pod.UID, time.Now())
+				}
 			}
 		}
 
@@ -1503,6 +1506,10 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 	for _, cs := range podStatus.ContainerStatuses {
 		// Check if this is an init container
 		for _, init := range pod.Spec.InitContainers {
+			// Don't measure restartable init containers (sidecars)
+			if podutil.IsRestartableInitContainer(&init) {
+				continue
+			}
 			if cs.Name == init.Name && cs.State == kubecontainer.ContainerStateExited && !cs.FinishedAt.IsZero() {
 				if m.podInitContainerTimeRecorder != nil {
 					m.podInitContainerTimeRecorder.RecordInitContainerFinished(pod.UID, cs.FinishedAt)
