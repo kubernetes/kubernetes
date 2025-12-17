@@ -17,13 +17,13 @@ limitations under the License.
 package testing
 
 import (
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"math/rand"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	"k8s.io/apimachinery/pkg/api/apitesting/roundtrip"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	nodevalidation "k8s.io/kubernetes/pkg/apis/node/validation"
 	resourcevalidation "k8s.io/kubernetes/pkg/apis/resource/validation"
@@ -47,6 +47,8 @@ func TestVersionedValidationByFuzzing(t *testing.T) {
 		{Group: "node.k8s.io", Version: "v1beta1"},
 		{Group: "node.k8s.io", Version: "v1"},
 		{Group: "node.k8s.io", Version: "v1alpha1"},
+		{Group: "autoscaling.k8s.io", Version: "v1"},
+		{Group: "autoscaling.k8s.io", Version: "v2"},
 	}
 
 	fuzzIters := *roundtrip.FuzzIters / 10 // TODO: Find a better way to manage test running time
