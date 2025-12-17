@@ -184,9 +184,7 @@ var baseRules = dedent.Dedent(`
 	add rule ip kube-proxy filter-output ct state new jump cluster-ips-check
 	add rule ip kube-proxy firewall-check ip daddr . meta l4proto . th dport vmap @firewall-ips
 	add rule ip kube-proxy mark-for-masquerade mark set mark or 0x4000
-	add rule ip kube-proxy masquerading mark and 0x4000 == 0 return
-	add rule ip kube-proxy masquerading mark set mark xor 0x4000
-	add rule ip kube-proxy masquerading masquerade fully-random
+	add rule ip kube-proxy masquerading mark and 0x4000 != 0 mark set mark xor 0x4000 masquerade fully-random
 	add rule ip kube-proxy nat-output jump services
 	add rule ip kube-proxy nat-postrouting jump masquerading
 	add rule ip kube-proxy nat-prerouting jump services
