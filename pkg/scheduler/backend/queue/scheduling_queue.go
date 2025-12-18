@@ -894,6 +894,8 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(logger klog.Logger, pInfo *
 	// We changed ConsecutiveErrorsCount or UnschedulableCount plus Timestamp, and now the calculated backoff time should be different,
 	// removing the cached backoff time.
 	pInfo.BackoffExpiration = time.Time{}
+	// Clear the flush flag since the pod is returning to the queue after a scheduling attempt.
+	pInfo.WasFlushedFromUnschedulable = false
 
 	if !p.isSchedulingQueueHintEnabled {
 		// fall back to the old behavior which doesn't depend on the queueing hint.
@@ -948,6 +950,8 @@ func (p *PriorityQueue) flushUnschedulablePodsLeftover(logger klog.Logger) {
 	for _, pInfo := range p.unschedulablePods.podInfoMap {
 		lastScheduleTime := pInfo.Timestamp
 		if currentTime.Sub(lastScheduleTime) > p.podMaxInUnschedulablePodsDuration {
+			// Mark this pod as flushed so we can detect if it schedules soon after
+			pInfo.WasFlushedFromUnschedulable = true
 			podsToMove = append(podsToMove, pInfo)
 		}
 	}

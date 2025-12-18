@@ -649,7 +649,7 @@ func Test_InFlightPods(t *testing.T) {
 			},
 		},
 		{
-			name:                         "popped pod must have empty UnschedulablePlugins and PendingPlugins",
+			name:                         "popped pod preserves UnschedulablePlugins and PendingPlugins",
 			isSchedulingQueueHintEnabled: true,
 			initialPods:                  []*v1.Pod{pod1},
 			actions: []action{
@@ -666,8 +666,13 @@ func Test_InFlightPods(t *testing.T) {
 				{eventHappens: &pvAdd}, // Active again.
 				{callback: func(t *testing.T, q *PriorityQueue) {
 					poppedPod = popPod(t, logger, q, pod1)
-					if len(poppedPod.UnschedulablePlugins) > 0 {
-						t.Errorf("QueuedPodInfo from Pop should have empty UnschedulablePlugins, got instead: %+v", poppedPod)
+					// UnschedulablePlugins should be preserved for logging/debugging
+					if !poppedPod.UnschedulablePlugins.Equal(sets.New("fooPlugin2")) {
+						t.Errorf("QueuedPodInfo from Pop should preserve UnschedulablePlugins, expected fooPlugin2, got: %+v", poppedPod.UnschedulablePlugins)
+					}
+					// PendingPlugins are preserved after Pop() for logging
+					if !poppedPod.PendingPlugins.Equal(sets.New("fooPlugin1")) {
+						t.Errorf("QueuedPodInfo from Pop should preserve PendingPlugins, expected fooPlugin1, got: %+v", poppedPod.PendingPlugins)
 					}
 				}},
 				{callback: func(t *testing.T, q *PriorityQueue) {
@@ -935,8 +940,10 @@ func TestPop(t *testing.T) {
 
 			// Now check result of Pop.
 			poppedPod = popPod(t, logger, q, pod)
-			if len(poppedPod.PendingPlugins) > 0 {
-				t.Errorf("QueuedPodInfo from Pop should have empty PendingPlugins, got instead: %+v", poppedPod)
+			// PendingPlugins are preserved after Pop() so they can be logged if scheduling
+			// succeeds, or cleared in handleSchedulingFailure() if it fails.
+			if !poppedPod.PendingPlugins.Equal(sets.New("fooPlugin1")) {
+				t.Errorf("QueuedPodInfo from Pop should preserve PendingPlugins, expected fooPlugin1, got instead: %+v", poppedPod)
 			}
 		})
 	}
@@ -3020,6 +3027,65 @@ func TestHighPriorityFlushUnschedulablePodsLeftover(t *testing.T) {
 	}
 	if p, err := q.Pop(logger); err != nil || p.Pod != midPod {
 		t.Errorf("Expected: %v after Pop, but got: %v", medPriorityPodInfo.Pod.Name, p.Pod.Name)
+	}
+}
+
+// TestFlushUnschedulablePodsLeftoverSetsFlag verifies that the WasFlushedFromUnschedulable
+// flag is correctly set when pods are flushed and cleared when they return to the queue.
+func TestFlushUnschedulablePodsLeftoverSetsFlag(t *testing.T) {
+	c := testingclock.NewFakeClock(time.Now())
+	m := makeEmptyQueueingHintMapPerProfile()
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	q := NewTestQueue(ctx, newDefaultQueueSort(), WithClock(c), WithQueueingHintMapPerProfile(m))
+
+	pod := st.MakePod().Name("test-pod").Namespace("ns1").UID("tp-1").Priority(midPriority).NominatedNodeName("node1").Obj()
+
+	// Add pod to activeQ and pop it to simulate a scheduling attempt
+	q.Add(logger, pod)
+	pInfo, err := q.Pop(logger)
+	if err != nil {
+		t.Fatalf("Unexpected error from Pop: %v", err)
+	}
+
+	// Verify flag is initially false
+	if pInfo.WasFlushedFromUnschedulable {
+		t.Errorf("Expected WasFlushedFromUnschedulable to be false initially, but got true")
+	}
+
+	// Add pod to unschedulablePods (simulating failed scheduling)
+	err = q.AddUnschedulableIfNotPresent(logger, q.newQueuedPodInfo(pod, "fakePlugin"), q.SchedulingCycle())
+	if err != nil {
+		t.Fatalf("Unexpected error from AddUnschedulableIfNotPresent: %v", err)
+	}
+
+	// Advance time past the flush duration and flush
+	c.Step(DefaultPodMaxInUnschedulablePodsDuration + time.Second)
+	q.flushUnschedulablePodsLeftover(logger)
+
+	// Pop the pod and verify flag is now true
+	pInfo, err = q.Pop(logger)
+	if err != nil {
+		t.Fatalf("Unexpected error from Pop after flush: %v", err)
+	}
+	if !pInfo.WasFlushedFromUnschedulable {
+		t.Errorf("Expected WasFlushedFromUnschedulable to be true after flush, but got false")
+	}
+
+	// Simulate pod failing to schedule again and returning to queue
+	err = q.AddUnschedulableIfNotPresent(logger, q.newQueuedPodInfo(pInfo.Pod, "fakePlugin"), q.SchedulingCycle())
+	if err != nil {
+		t.Fatalf("Unexpected error from AddUnschedulableIfNotPresent: %v", err)
+	}
+
+	// Verify flag is cleared when pod returns to queue
+	internalPInfo := q.unschedulablePods.get(pod)
+	if internalPInfo == nil {
+		t.Fatalf("pod should be in unschedulablePods")
+	}
+	if internalPInfo.WasFlushedFromUnschedulable {
+		t.Errorf("Expected WasFlushedFromUnschedulable to be cleared (false) after returning to queue, but got true")
 	}
 }
 
