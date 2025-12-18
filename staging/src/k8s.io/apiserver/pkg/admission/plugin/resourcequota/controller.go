@@ -68,9 +68,10 @@ type quotaEvaluator struct {
 	inProgress sets.String
 
 	// controls the run method so that we can cleanly conform to the Evaluator interface
-	workers int
-	stopCh  <-chan struct{}
-	init    sync.Once
+	workers      int
+	stopCh       <-chan struct{}
+	init         sync.Once
+	waitForReady admission.ReadyFunc
 
 	// lets us know what resources are limited by default
 	config *resourcequotaapi.Configuration
@@ -109,7 +110,7 @@ func newAdmissionWaiter(a admission.Attributes) *admissionWaiter {
 // NewQuotaEvaluator configures an admission controller that can enforce quota constraints
 // using the provided registry.  The registry must have the capability to handle group/kinds that
 // are persisted by the server this admission controller is intercepting
-func NewQuotaEvaluator(quotaAccessor QuotaAccessor, ignoredResources map[schema.GroupResource]struct{}, quotaRegistry quota.Registry, lockAcquisitionFunc func([]corev1.ResourceQuota) func(), config *resourcequotaapi.Configuration, workers int, stopCh <-chan struct{}) Evaluator {
+func NewQuotaEvaluator(quotaAccessor QuotaAccessor, ignoredResources map[schema.GroupResource]struct{}, quotaRegistry quota.Registry, lockAcquisitionFunc func([]corev1.ResourceQuota) func(), config *resourcequotaapi.Configuration, waitForReady admission.ReadyFunc, workers int, stopCh <-chan struct{}) Evaluator {
 	// if we get a nil config, just create an empty default.
 	if config == nil {
 		config = &resourcequotaapi.Configuration{}
@@ -127,9 +128,10 @@ func NewQuotaEvaluator(quotaAccessor QuotaAccessor, ignoredResources map[schema.
 		dirtyWork:  map[string][]*admissionWaiter{},
 		inProgress: sets.String{},
 
-		workers: workers,
-		stopCh:  stopCh,
-		config:  config,
+		workers:      workers,
+		stopCh:       stopCh,
+		waitForReady: waitForReady,
+		config:       config,
 	}
 
 	// The queue underneath is starting a goroutine for metrics
@@ -670,6 +672,10 @@ func (e *quotaEvaluator) Evaluate(a admission.Attributes) error {
 	// if no resources tracked by quota are impacted, then just return
 	if !evaluator.Handles(a) {
 		return nil
+	}
+	// we need to wait for our caches to warm
+	if !e.waitForReady() {
+		return admission.NewForbidden(a, fmt.Errorf("not yet ready to handle request"))
 	}
 	waiter := newAdmissionWaiter(a)
 

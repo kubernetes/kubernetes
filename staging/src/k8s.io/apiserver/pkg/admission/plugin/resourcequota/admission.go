@@ -20,9 +20,7 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"time"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
 	resourcequotaapi "k8s.io/apiserver/pkg/admission/plugin/resourcequota/apis/resourcequota"
@@ -78,11 +76,6 @@ var _ = genericadmissioninitializer.WantsExternalKubeClientSet(&QuotaAdmission{}
 var _ = genericadmissioninitializer.WantsQuotaConfiguration(&QuotaAdmission{})
 var _ = genericadmissioninitializer.WantsDrainedNotification(&QuotaAdmission{})
 
-type liveLookupEntry struct {
-	expiry time.Time
-	items  []*corev1.ResourceQuota
-}
-
 // NewResourceQuota configures an admission controller that can enforce quota constraints
 // using the provided registry.  The registry must have the capability to handle group/kinds that
 // are persisted by the server this admission controller is intercepting
@@ -115,7 +108,7 @@ func (a *QuotaAdmission) SetExternalKubeClientSet(client kubernetes.Interface) {
 func (a *QuotaAdmission) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	quotas := f.Core().V1().ResourceQuotas()
 	a.quotaAccessor.lister = quotas.Lister()
-	a.quotaAccessor.hasSynced = quotas.Informer().HasSynced
+	a.SetReadyFunc(quotas.Informer().HasSynced)
 }
 
 // SetQuotaConfiguration assigns and initializes configuration and evaluator for QuotaAdmission
@@ -125,7 +118,7 @@ func (a *QuotaAdmission) SetQuotaConfiguration(c quota.Configuration) {
 		a.initializationErr = stopChUnconfiguredErr
 		return
 	}
-	a.evaluator = NewQuotaEvaluator(a.quotaAccessor, a.quotaConfiguration.IgnoredResources(), generic.NewRegistry(a.quotaConfiguration.Evaluators()), nil, a.config, a.numEvaluators, a.stopCh)
+	a.evaluator = NewQuotaEvaluator(a.quotaAccessor, a.quotaConfiguration.IgnoredResources(), generic.NewRegistry(a.quotaConfiguration.Evaluators()), nil, a.config, a.WaitForReady, a.numEvaluators, a.stopCh)
 }
 
 // ValidateInitialization ensures an authorizer is set.
@@ -144,9 +137,6 @@ func (a *QuotaAdmission) ValidateInitialization() error {
 	}
 	if a.quotaAccessor.lister == nil {
 		return fmt.Errorf("missing quotaAccessor.lister")
-	}
-	if a.quotaAccessor.hasSynced == nil {
-		return fmt.Errorf("missing quotaAccessor.hasSynced")
 	}
 	if a.quotaConfiguration == nil {
 		return fmt.Errorf("missing quotaConfiguration")
