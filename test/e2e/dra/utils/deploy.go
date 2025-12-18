@@ -310,6 +310,7 @@ func NewDriverInstance(tCtx ktesting.TContext) *Driver {
 		// By default, assume that the kubelet supports DRA and that
 		// the driver's removal causes ResourceSlice cleanup.
 		WithKubelet:                true,
+		WithRealNodes:              true,
 		ExpectResourceSliceRemoval: true,
 	}
 	if tCtx != nil {
@@ -384,6 +385,9 @@ type Driver struct {
 	// Register the DRA test driver with the kubelet and expect DRA to work (= feature.DynamicResourceAllocation).
 	WithKubelet bool
 
+	// Run driver pods. If false, only set up slices and class.
+	WithRealNodes bool
+
 	mutex      sync.Mutex
 	fail       map[MethodInstance]bool
 	callCounts map[MethodInstance]int64
@@ -453,6 +457,10 @@ func (d *Driver) SetUp(tCtx ktesting.TContext, kubeletRootDir string, nodes *Nod
 				tCtx.ExpectNoError(err)
 			}
 		}
+	}
+
+	if !d.WithRealNodes {
+		return
 	}
 
 	manifests := []string{
