@@ -398,6 +398,12 @@ linters:
             #         - fruit
     depguard:
       rules:
+        utils:
+          files:
+            - $all
+          deny:
+            - pkg: "k8s.io/utils/pointer"
+              desc: "k8s.io/utils/pointer shall no longer be used, please use k8s.io/utils/ptr."
         go-cmp:
           files:
             - $all
