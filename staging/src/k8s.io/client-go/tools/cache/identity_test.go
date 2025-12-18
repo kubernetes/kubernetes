@@ -37,13 +37,15 @@ func TestIdentifierUniqueness(t *testing.T) {
 		idName     string
 		obj        runtime.Object
 		wantUnique bool
+		wantErr    bool
 	}{
 		{
-			name:       "empty name is not unique",
+			name:       "empty name returns error",
 			setup:      func() {},
 			idName:     "",
 			obj:        &v1.Pod{},
 			wantUnique: false,
+			wantErr:    true,
 		},
 		{
 			name:       "first identifier with name is unique",
@@ -51,33 +53,37 @@ func TestIdentifierUniqueness(t *testing.T) {
 			idName:     "my-fifo",
 			obj:        &v1.Pod{},
 			wantUnique: true,
+			wantErr:    false,
 		},
 		{
 			name: "same name different itemType is unique",
 			setup: func() {
-				NewIdentifier("my-fifo", &v1.Pod{})
+				_, _ = NewIdentifier("my-fifo", &v1.Pod{})
 			},
 			idName:     "my-fifo",
 			obj:        &v1.ConfigMap{},
 			wantUnique: true,
+			wantErr:    false,
 		},
 		{
 			name: "different name same itemType is unique",
 			setup: func() {
-				NewIdentifier("fifo-1", &v1.Pod{})
+				_, _ = NewIdentifier("fifo-1", &v1.Pod{})
 			},
 			idName:     "fifo-2",
 			obj:        &v1.Pod{},
 			wantUnique: true,
+			wantErr:    false,
 		},
 		{
-			name: "duplicate name+itemType is not unique",
+			name: "duplicate name+itemType returns error",
 			setup: func() {
-				NewIdentifier("my-fifo", &v1.Pod{})
+				_, _ = NewIdentifier("my-fifo", &v1.Pod{})
 			},
 			idName:     "my-fifo",
 			obj:        &v1.Pod{},
 			wantUnique: false,
+			wantErr:    true,
 		},
 	}
 
@@ -86,8 +92,11 @@ func TestIdentifierUniqueness(t *testing.T) {
 			resetIdentity()
 			tt.setup()
 
-			id := NewIdentifier(tt.idName, tt.obj)
+			id, err := NewIdentifier(tt.idName, tt.obj)
 
+			if (err != nil) != tt.wantErr {
+				t.Errorf("NewIdentifier() error = %v, wantErr %v", err, tt.wantErr)
+			}
 			if got := id.IsUnique(); got != tt.wantUnique {
 				t.Errorf("IsUnique() = %v, want %v", got, tt.wantUnique)
 			}

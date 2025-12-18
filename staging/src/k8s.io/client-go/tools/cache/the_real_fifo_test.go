@@ -21,13 +21,16 @@ import (
 	"fmt"
 	"reflect"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	clientfeatures "k8s.io/client-go/features"
 	clientfeaturestesting "k8s.io/client-go/features/testing"
+	"k8s.io/component-base/metrics/testutil"
 )
 
 func (f *RealFIFO) getItems() []Delta {
@@ -1295,7 +1298,7 @@ func TestRealFIFO_Metrics(t *testing.T) {
 	tests := []struct {
 		name           string
 		actions        []func(f *RealFIFO)
-		expectedMetric float64
+		expectedMetric int
 	}{
 		{
 			name:           "empty queue has zero metric",
@@ -1305,40 +1308,40 @@ func TestRealFIFO_Metrics(t *testing.T) {
 		{
 			name: "Add increases metric",
 			actions: []func(f *RealFIFO){
-				func(f *RealFIFO) { f.Add(mkFifoObj("foo", 1)) },
+				func(f *RealFIFO) { _ = f.Add(mkFifoObj("foo", 1)) },
 			},
 			expectedMetric: 1,
 		},
 		{
 			name: "multiple Adds increase metric",
 			actions: []func(f *RealFIFO){
-				func(f *RealFIFO) { f.Add(mkFifoObj("foo", 1)) },
-				func(f *RealFIFO) { f.Add(mkFifoObj("bar", 2)) },
-				func(f *RealFIFO) { f.Add(mkFifoObj("baz", 3)) },
+				func(f *RealFIFO) { _ = f.Add(mkFifoObj("foo", 1)) },
+				func(f *RealFIFO) { _ = f.Add(mkFifoObj("bar", 2)) },
+				func(f *RealFIFO) { _ = f.Add(mkFifoObj("baz", 3)) },
 			},
 			expectedMetric: 3,
 		},
 		{
 			name: "Update increases metric",
 			actions: []func(f *RealFIFO){
-				func(f *RealFIFO) { f.Add(mkFifoObj("foo", 1)) },
-				func(f *RealFIFO) { f.Update(mkFifoObj("foo", 2)) },
+				func(f *RealFIFO) { _ = f.Add(mkFifoObj("foo", 1)) },
+				func(f *RealFIFO) { _ = f.Update(mkFifoObj("foo", 2)) },
 			},
 			expectedMetric: 2,
 		},
 		{
 			name: "Delete increases metric",
 			actions: []func(f *RealFIFO){
-				func(f *RealFIFO) { f.Add(mkFifoObj("foo", 1)) },
-				func(f *RealFIFO) { f.Delete(mkFifoObj("foo", 2)) },
+				func(f *RealFIFO) { _ = f.Add(mkFifoObj("foo", 1)) },
+				func(f *RealFIFO) { _ = f.Delete(mkFifoObj("foo", 2)) },
 			},
 			expectedMetric: 2,
 		},
 		{
 			name: "Pop decreases metric",
 			actions: []func(f *RealFIFO){
-				func(f *RealFIFO) { f.Add(mkFifoObj("foo", 1)) },
-				func(f *RealFIFO) { f.Add(mkFifoObj("bar", 2)) },
+				func(f *RealFIFO) { _ = f.Add(mkFifoObj("foo", 1)) },
+				func(f *RealFIFO) { _ = f.Add(mkFifoObj("bar", 2)) },
 				func(f *RealFIFO) { Pop(f) },
 			},
 			expectedMetric: 1,
@@ -1346,7 +1349,7 @@ func TestRealFIFO_Metrics(t *testing.T) {
 		{
 			name: "Replace sets metric to new count",
 			actions: []func(f *RealFIFO){
-				func(f *RealFIFO) { f.Add(mkFifoObj("old", 1)) },
+				func(f *RealFIFO) { _ = f.Add(mkFifoObj("old", 1)) },
 				func(f *RealFIFO) {
 					f.Replace([]interface{}{
 						mkFifoObj("foo", 1),
@@ -1362,8 +1365,11 @@ func TestRealFIFO_Metrics(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			resetIdentity()
-			metricsProvider := &fakeFIFOMetricsProvider{}
-			id := NewIdentifier("test-fifo", &v1.Pod{})
+			metricsProvider := newTestFIFOMetricsProvider()
+			id, err := NewIdentifier("test-fifo", &v1.Pod{})
+			if err != nil {
+				t.Fatalf("NewIdentifier() unexpected error: %v", err)
+			}
 
 			f := NewRealFIFOWithOptions(RealFIFOOptions{
 				KeyFunction:     testFifoObjectKeyFunc,
@@ -1376,11 +1382,12 @@ func TestRealFIFO_Metrics(t *testing.T) {
 				action(f)
 			}
 
-			if len(metricsProvider.metrics) != 1 {
-				t.Fatalf("expected 1 metric, got %d", len(metricsProvider.metrics))
-			}
-			if got := metricsProvider.metrics[0].value; got != tt.expectedMetric {
-				t.Errorf("metric value = %v, want %v", got, tt.expectedMetric)
+			want := fmt.Sprintf(`# HELP fifo_queued_items [ALPHA] Number of items currently queued in the FIFO.
+# TYPE fifo_queued_items gauge
+fifo_queued_items{item_type="v1.Pod",name="test-fifo"} %d
+`, tt.expectedMetric)
+			if err := testutil.GatherAndCompare(metricsProvider.registry, strings.NewReader(want), "fifo_queued_items"); err != nil {
+				t.Fatal(err)
 			}
 		})
 	}
@@ -1388,10 +1395,13 @@ func TestRealFIFO_Metrics(t *testing.T) {
 
 func TestRealFIFO_MetricsNotPublishedForUnnamedFIFO(t *testing.T) {
 	resetIdentity()
-	metricsProvider := &fakeFIFOMetricsProvider{}
+	metricsProvider := newTestFIFOMetricsProvider()
 
 	// Identifier with empty name - should not be unique
-	id := NewIdentifier("", &v1.Pod{})
+	id, err := NewIdentifier("", &v1.Pod{})
+	if err == nil {
+		t.Fatalf("NewIdentifier() expected error for empty name, got nil")
+	}
 	f := NewRealFIFOWithOptions(RealFIFOOptions{
 		KeyFunction:     testFifoObjectKeyFunc,
 		KnownObjects:    emptyKnownObjects(),
@@ -1400,21 +1410,25 @@ func TestRealFIFO_MetricsNotPublishedForUnnamedFIFO(t *testing.T) {
 	})
 
 	// Perform operations
-	f.Add(mkFifoObj("foo", 1))
-	f.Add(mkFifoObj("bar", 2))
+	_ = f.Add(mkFifoObj("foo", 1))
+	_ = f.Add(mkFifoObj("bar", 2))
 
 	// No metrics should be created because the identifier is not unique (empty name)
-	if len(metricsProvider.metrics) != 0 {
-		t.Errorf("expected 0 metrics for unnamed FIFO, got %d", len(metricsProvider.metrics))
+	want := ""
+	if err := testutil.GatherAndCompare(metricsProvider.registry, strings.NewReader(want), "fifo_queued_items"); err != nil {
+		t.Fatal(err)
 	}
 }
 
 func TestRealFIFO_MetricsNotPublishedForDuplicateIdentifier(t *testing.T) {
 	resetIdentity()
-	metricsProvider := &fakeFIFOMetricsProvider{}
+	metricsProvider := newTestFIFOMetricsProvider()
 
 	// Create first FIFO with a name - this should be unique
-	id1 := NewIdentifier("duplicate-name", &v1.Pod{})
+	id1, err := NewIdentifier("duplicate-name", &v1.Pod{})
+	if err != nil {
+		t.Fatalf("NewIdentifier() unexpected error: %v", err)
+	}
 	f1 := NewRealFIFOWithOptions(RealFIFOOptions{
 		KeyFunction:     testFifoObjectKeyFunc,
 		KnownObjects:    emptyKnownObjects(),
@@ -1423,7 +1437,10 @@ func TestRealFIFO_MetricsNotPublishedForDuplicateIdentifier(t *testing.T) {
 	})
 
 	// Create second FIFO with the same name - this should NOT be unique
-	id2 := NewIdentifier("duplicate-name", &v1.Pod{})
+	id2, err := NewIdentifier("duplicate-name", &v1.Pod{})
+	if err == nil {
+		t.Fatalf("NewIdentifier() expected error for duplicate name, got nil")
+	}
 	f2 := NewRealFIFOWithOptions(RealFIFOOptions{
 		KeyFunction:     testFifoObjectKeyFunc,
 		KnownObjects:    emptyKnownObjects(),
@@ -1432,24 +1449,28 @@ func TestRealFIFO_MetricsNotPublishedForDuplicateIdentifier(t *testing.T) {
 	})
 
 	// Add items to both FIFOs
-	f1.Add(mkFifoObj("foo", 1))
-	f2.Add(mkFifoObj("bar", 2))
+	_ = f1.Add(mkFifoObj("foo", 1))
+	_ = f2.Add(mkFifoObj("bar", 2))
 
-	// Only one metric should be created (from f1), f2 uses noopMetric
-	if len(metricsProvider.metrics) != 1 {
-		t.Fatalf("expected 1 metric total, got %d", len(metricsProvider.metrics))
-	}
-	if got := metricsProvider.metrics[0].value; got != 1 {
-		t.Errorf("metric value = %v, want 1 (only f1 should update)", got)
+	// Only f1's metric should be published, f2 uses noopMetric
+	want := `# HELP fifo_queued_items [ALPHA] Number of items currently queued in the FIFO.
+# TYPE fifo_queued_items gauge
+fifo_queued_items{item_type="v1.Pod",name="duplicate-name"} 1
+`
+	if err := testutil.GatherAndCompare(metricsProvider.registry, strings.NewReader(want), "fifo_queued_items"); err != nil {
+		t.Fatal(err)
 	}
 }
 
 func TestRealFIFO_MetricsTrackedIndependentlyForDifferentFIFOs(t *testing.T) {
 	resetIdentity()
-	metricsProvider := &fakeFIFOMetricsProvider{}
+	metricsProvider := newTestFIFOMetricsProvider()
 
 	// Create two FIFOs with different names - both should be unique
-	id1 := NewIdentifier("fifo-1", &v1.Pod{})
+	id1, err := NewIdentifier("fifo-1", &v1.Pod{})
+	if err != nil {
+		t.Fatalf("NewIdentifier() unexpected error: %v", err)
+	}
 	f1 := NewRealFIFOWithOptions(RealFIFOOptions{
 		KeyFunction:     testFifoObjectKeyFunc,
 		KnownObjects:    emptyKnownObjects(),
@@ -1457,7 +1478,10 @@ func TestRealFIFO_MetricsTrackedIndependentlyForDifferentFIFOs(t *testing.T) {
 		MetricsProvider: metricsProvider,
 	})
 
-	id2 := NewIdentifier("fifo-2", &v1.Pod{})
+	id2, err := NewIdentifier("fifo-2", &v1.Pod{})
+	if err != nil {
+		t.Fatalf("NewIdentifier() unexpected error: %v", err)
+	}
 	f2 := NewRealFIFOWithOptions(RealFIFOOptions{
 		KeyFunction:     testFifoObjectKeyFunc,
 		KnownObjects:    emptyKnownObjects(),
@@ -1465,52 +1489,60 @@ func TestRealFIFO_MetricsTrackedIndependentlyForDifferentFIFOs(t *testing.T) {
 		MetricsProvider: metricsProvider,
 	})
 
-	// Both FIFOs should have created metrics
-	if len(metricsProvider.metrics) != 2 {
-		t.Fatalf("expected 2 metrics, got %d", len(metricsProvider.metrics))
-	}
-
 	// Add items to f1
-	f1.Add(mkFifoObj("foo", 1))
-	f1.Add(mkFifoObj("bar", 2))
+	_ = f1.Add(mkFifoObj("foo", 1))
+	_ = f1.Add(mkFifoObj("bar", 2))
 
 	// Add items to f2
-	f2.Add(mkFifoObj("baz", 3))
+	_ = f2.Add(mkFifoObj("baz", 3))
 
 	// Verify metrics are tracked independently
-	if got := metricsProvider.metrics[0].value; got != 2 {
-		t.Errorf("f1 metric value = %v, want 2", got)
-	}
-	if got := metricsProvider.metrics[1].value; got != 1 {
-		t.Errorf("f2 metric value = %v, want 1", got)
+	want := `# HELP fifo_queued_items [ALPHA] Number of items currently queued in the FIFO.
+# TYPE fifo_queued_items gauge
+fifo_queued_items{item_type="v1.Pod",name="fifo-1"} 2
+fifo_queued_items{item_type="v1.Pod",name="fifo-2"} 1
+`
+	if err := testutil.GatherAndCompare(metricsProvider.registry, strings.NewReader(want), "fifo_queued_items"); err != nil {
+		t.Fatal(err)
 	}
 
 	// Pop from f1 and verify its metric decreases while f2's stays the same
 	Pop(f1)
-	if got := metricsProvider.metrics[0].value; got != 1 {
-		t.Errorf("f1 metric value after Pop = %v, want 1", got)
+
+	wantAfterPop := `# HELP fifo_queued_items [ALPHA] Number of items currently queued in the FIFO.
+# TYPE fifo_queued_items gauge
+fifo_queued_items{item_type="v1.Pod",name="fifo-1"} 1
+fifo_queued_items{item_type="v1.Pod",name="fifo-2"} 1
+`
+	if err := testutil.GatherAndCompare(metricsProvider.registry, strings.NewReader(wantAfterPop), "fifo_queued_items"); err != nil {
+		t.Fatal(err)
 	}
-	if got := metricsProvider.metrics[1].value; got != 1 {
-		t.Errorf("f2 metric value after f1 Pop = %v, want 1 (should be unchanged)", got)
+}
+
+// testFIFOMetricsProvider is a test implementation of FIFOMetricsProvider
+// that uses real prometheus metrics registered with a custom registry.
+// This mirrors the real fifo.MetricsProvider but allows isolated testing.
+type testFIFOMetricsProvider struct {
+	registry *prometheus.Registry
+	gauge    *prometheus.GaugeVec
+}
+
+func newTestFIFOMetricsProvider() *testFIFOMetricsProvider {
+	registry := prometheus.NewRegistry()
+	gauge := prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "fifo_queued_items",
+			Help: "[ALPHA] Number of items currently queued in the FIFO.",
+		},
+		[]string{"name", "item_type"},
+	)
+	registry.MustRegister(gauge)
+	return &testFIFOMetricsProvider{
+		registry: registry,
+		gauge:    gauge,
 	}
 }
 
-// fakeGaugeMetric is a test implementation of GaugeMetric that records values.
-type fakeGaugeMetric struct {
-	value float64
-}
-
-func (f *fakeGaugeMetric) Set(v float64) {
-	f.value = v
-}
-
-// fakeFIFOMetricsProvider is a test implementation of FIFOMetricsProvider.
-type fakeFIFOMetricsProvider struct {
-	metrics []*fakeGaugeMetric
-}
-
-func (f *fakeFIFOMetricsProvider) NewQueuedItemMetric(*Identifier) GaugeMetric {
-	metric := &fakeGaugeMetric{}
-	f.metrics = append(f.metrics, metric)
-	return metric
+func (p *testFIFOMetricsProvider) NewQueuedItemMetric(id *Identifier) GaugeMetric {
+	return p.gauge.WithLabelValues(id.Name(), id.ItemType())
 }

@@ -23,7 +23,9 @@ limitations under the License.
 // pods).
 package cache
 
-import "k8s.io/klog/v2"
+import (
+	"k8s.io/klog/v2"
+)
 
 // FIFOMetricsProvider defines an interface for creating metrics that track FIFO queue operations.
 type FIFOMetricsProvider interface {
@@ -51,7 +53,7 @@ func newFIFOMetrics(id *Identifier, metricsProvider FIFOMetricsProvider) *fifoMe
 	}
 
 	if !id.IsUnique() {
-		klog.Warningf("FIFO metrics not published: empty name or duplicate identifier (name=%q, itemType=%q)", id.Name(), id.ItemType())
+		klog.ErrorS(nil, "FIFO metrics not published: empty name or duplicate identifier", "name", id.Name(), "itemType", id.ItemType())
 		return metrics
 	}
 

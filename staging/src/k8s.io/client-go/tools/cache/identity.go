@@ -24,11 +24,11 @@ limitations under the License.
 package cache
 
 import (
+	"fmt"
 	"reflect"
 	"sync"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/klog/v2"
 )
 
 // identifierRegistry tracks all registered identifier keys to detect collisions.
@@ -62,31 +62,35 @@ type Identifier struct {
 // NewIdentifier creates a new Identifier with the given name and example object.
 // If name is non-empty, it will be registered for uniqueness tracking using
 // both name and itemType as the composite key.
-// If the name+itemType collides with an existing identifier, IsUnique() will return false
-// and metrics will not be published for this identifier.
-func NewIdentifier(name string, obj runtime.Object) *Identifier {
+// If name is empty, an error is returned and metrics will not be published.
+// If the name+itemType collides with an existing identifier, IsUnique() will return false,
+// metrics will not be published for this identifier, and an error is returned.
+func NewIdentifier(name string, obj runtime.Object) (*Identifier, error) {
 	id := &Identifier{name: name, itemType: itemType(obj)}
-	if name != "" {
-		id.unique = registerIdentifier(id.name, id.itemType)
+	if name == "" {
+		return id, fmt.Errorf("FIFO identifier name is empty - metrics will not be published for this FIFO")
 	}
-	return id
+	if err := registerIdentifier(id.name, id.itemType); err != nil {
+		return id, err
+	}
+	id.unique = true
+	return id, nil
 }
 
-// registerIdentifier attempts to register a name+itemType key and returns true if the key
-// was unique (not previously registered), false if it collides.
-func registerIdentifier(name, itemType string) bool {
+// registerIdentifier attempts to register a name+itemType key and returns nil if the key
+// was unique (not previously registered), or an error if it collides.
+func registerIdentifier(name, itemType string) error {
 	key := name + "/" + itemType
 
 	identifierRegistry.Lock()
 	defer identifierRegistry.Unlock()
 
 	if identifierRegistry.keys[key] {
-		klog.Warningf("FIFO identifier %q (itemType=%s) is not unique - metrics will not be published for this FIFO", name, itemType)
-		return false
+		return fmt.Errorf("FIFO identifier %q (itemType=%s) is not unique - metrics will not be published for this FIFO", name, itemType)
 	}
 
 	identifierRegistry.keys[key] = true
-	return true
+	return nil
 }
 
 func (id *Identifier) Name() string {
