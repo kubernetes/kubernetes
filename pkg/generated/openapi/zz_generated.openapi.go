@@ -580,6 +580,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		corev1.ISCSIPersistentVolumeSource{}.OpenAPIModelName():                                                         schema_k8sio_api_core_v1_ISCSIPersistentVolumeSource(ref),
 		corev1.ISCSIVolumeSource{}.OpenAPIModelName():                                                                   schema_k8sio_api_core_v1_ISCSIVolumeSource(ref),
 		corev1.ImageVolumeSource{}.OpenAPIModelName():                                                                   schema_k8sio_api_core_v1_ImageVolumeSource(ref),
+		corev1.ImageVolumeStatus{}.OpenAPIModelName():                                                                   schema_k8sio_api_core_v1_ImageVolumeStatus(ref),
 		corev1.KeyToPath{}.OpenAPIModelName():                                                                           schema_k8sio_api_core_v1_KeyToPath(ref),
 		corev1.Lifecycle{}.OpenAPIModelName():                                                                           schema_k8sio_api_core_v1_Lifecycle(ref),
 		corev1.LifecycleHandler{}.OpenAPIModelName():                                                                    schema_k8sio_api_core_v1_LifecycleHandler(ref),
@@ -733,6 +734,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		corev1.VolumeProjection{}.OpenAPIModelName():                                                                    schema_k8sio_api_core_v1_VolumeProjection(ref),
 		corev1.VolumeResourceRequirements{}.OpenAPIModelName():                                                          schema_k8sio_api_core_v1_VolumeResourceRequirements(ref),
 		corev1.VolumeSource{}.OpenAPIModelName():                                                                        schema_k8sio_api_core_v1_VolumeSource(ref),
+		corev1.VolumeStatus{}.OpenAPIModelName():                                                                        schema_k8sio_api_core_v1_VolumeStatus(ref),
 		corev1.VsphereVirtualDiskVolumeSource{}.OpenAPIModelName():                                                      schema_k8sio_api_core_v1_VsphereVirtualDiskVolumeSource(ref),
 		corev1.WeightedPodAffinityTerm{}.OpenAPIModelName():                                                             schema_k8sio_api_core_v1_WeightedPodAffinityTerm(ref),
 		corev1.WindowsSecurityContextOptions{}.OpenAPIModelName():                                                       schema_k8sio_api_core_v1_WindowsSecurityContextOptions(ref),
@@ -25529,6 +25531,27 @@ func schema_k8sio_api_core_v1_ImageVolumeSource(ref common.ReferenceCallback) co
 	}
 }
 
+func schema_k8sio_api_core_v1_ImageVolumeStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ImageVolumeStatus represents the image-based volume status.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"imageRef": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ImageRef is the digest of the image used for this volume. It should have a value that's similar to the pod's status.containerStatuses[i].imageID. The ImageRef length should not exceed 256 characters.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"imageRef"},
+			},
+		},
+	}
+}
+
 func schema_k8sio_api_core_v1_KeyToPath(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -34327,10 +34350,19 @@ func schema_k8sio_api_core_v1_VolumeMountStatus(ref common.ReferenceCallback) co
 							Format:      "",
 						},
 					},
+					"volumeStatus": {
+						SchemaProps: spec.SchemaProps{
+							Description: "volumeStatus represents volume-type-specific status about the mounted volume.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(corev1.VolumeStatus{}.OpenAPIModelName()),
+						},
+					},
 				},
 				Required: []string{"name", "mountPath"},
 			},
 		},
+		Dependencies: []string{
+			corev1.VolumeStatus{}.OpenAPIModelName()},
 	}
 }
 
@@ -34641,6 +34673,27 @@ func schema_k8sio_api_core_v1_VolumeSource(ref common.ReferenceCallback) common.
 		},
 		Dependencies: []string{
 			corev1.AWSElasticBlockStoreVolumeSource{}.OpenAPIModelName(), corev1.AzureDiskVolumeSource{}.OpenAPIModelName(), corev1.AzureFileVolumeSource{}.OpenAPIModelName(), corev1.CSIVolumeSource{}.OpenAPIModelName(), corev1.CephFSVolumeSource{}.OpenAPIModelName(), corev1.CinderVolumeSource{}.OpenAPIModelName(), corev1.ConfigMapVolumeSource{}.OpenAPIModelName(), corev1.DownwardAPIVolumeSource{}.OpenAPIModelName(), corev1.EmptyDirVolumeSource{}.OpenAPIModelName(), corev1.EphemeralVolumeSource{}.OpenAPIModelName(), corev1.FCVolumeSource{}.OpenAPIModelName(), corev1.FlexVolumeSource{}.OpenAPIModelName(), corev1.FlockerVolumeSource{}.OpenAPIModelName(), corev1.GCEPersistentDiskVolumeSource{}.OpenAPIModelName(), corev1.GitRepoVolumeSource{}.OpenAPIModelName(), corev1.GlusterfsVolumeSource{}.OpenAPIModelName(), corev1.HostPathVolumeSource{}.OpenAPIModelName(), corev1.ISCSIVolumeSource{}.OpenAPIModelName(), corev1.ImageVolumeSource{}.OpenAPIModelName(), corev1.NFSVolumeSource{}.OpenAPIModelName(), corev1.PersistentVolumeClaimVolumeSource{}.OpenAPIModelName(), corev1.PhotonPersistentDiskVolumeSource{}.OpenAPIModelName(), corev1.PortworxVolumeSource{}.OpenAPIModelName(), corev1.ProjectedVolumeSource{}.OpenAPIModelName(), corev1.QuobyteVolumeSource{}.OpenAPIModelName(), corev1.RBDVolumeSource{}.OpenAPIModelName(), corev1.ScaleIOVolumeSource{}.OpenAPIModelName(), corev1.SecretVolumeSource{}.OpenAPIModelName(), corev1.StorageOSVolumeSource{}.OpenAPIModelName(), corev1.VsphereVirtualDiskVolumeSource{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_core_v1_VolumeStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "VolumeStatus represents the status of a mounted volume. At most one of its members must be specified.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"image": {
+						SchemaProps: spec.SchemaProps{
+							Description: "image represents an OCI object (a container image or artifact) pulled and mounted on the kubelet's host machine.",
+							Ref:         ref(corev1.ImageVolumeStatus{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			corev1.ImageVolumeStatus{}.OpenAPIModelName()},
 	}
 }
 

@@ -141,11 +141,7 @@
             "mountPath": "mountPathValue",
             "readOnly": true,
             "recursiveReadOnly": "recursiveReadOnlyValue",
-            "volumeStatus": {
-              "image": {
-                "imageRef": "imageRefValue"
-              }
-            }
+            "volumeStatus": {}
           }
         ],
         "user": {
@@ -239,11 +235,7 @@
             "mountPath": "mountPathValue",
             "readOnly": true,
             "recursiveReadOnly": "recursiveReadOnlyValue",
-            "volumeStatus": {
-              "image": {
-                "imageRef": "imageRefValue"
-              }
-            }
+            "volumeStatus": {}
           }
         ],
         "user": {
@@ -338,11 +330,7 @@
             "mountPath": "mountPathValue",
             "readOnly": true,
             "recursiveReadOnly": "recursiveReadOnlyValue",
-            "volumeStatus": {
-              "image": {
-                "imageRef": "imageRefValue"
-              }
-            }
+            "volumeStatus": {}
           }
         ],
         "user": {
@@ -374,33 +362,6 @@
         "name": "nameValue",
         "resourceClaimName": "resourceClaimNameValue"
       }
-    ],
-    "extendedResourceClaimStatus": {
-      "requestMappings": [
-        {
-          "containerName": "containerNameValue",
-          "resourceName": "resourceNameValue",
-          "requestName": "requestNameValue"
-        }
-      ],
-      "resourceClaimName": "resourceClaimNameValue"
-    },
-    "allocatedResources": {
-      "allocatedResourcesKey": "0"
-    },
-    "resources": {
-      "limits": {
-        "limitsKey": "0"
-      },
-      "requests": {
-        "requestsKey": "0"
-      },
-      "claims": [
-        {
-          "name": "nameValue",
-          "request": "requestValue"
-        }
-      ]
-    }
+    ]
   }
 }
