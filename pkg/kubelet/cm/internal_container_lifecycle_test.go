@@ -22,7 +22,7 @@ import (
 	"github.com/go-logr/logr"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
@@ -89,7 +89,8 @@ func TestPreStartContainer(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			_ = test.lifecycle.PreStartContainer(klog.Background(), pod, container, "42")
+			logger, _ := ktesting.NewTestContext(t)
+			_ = test.lifecycle.PreStartContainer(logger, pod, container, "42")
 		})
 
 		cManager := test.lifecycle.cpuManager
