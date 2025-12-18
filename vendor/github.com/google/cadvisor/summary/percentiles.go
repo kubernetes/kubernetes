@@ -109,6 +109,7 @@ func (r *resource) AddSample(val uint64) {
 		Fifty:      val,
 		Ninety:     val,
 		NinetyFive: val,
+		Count:      1,
 	}
 	r.Add(sample)
 }
@@ -121,6 +122,8 @@ func (r *resource) GetAllPercentiles() info.Percentiles {
 	p.Fifty = r.samples.GetPercentile(0.5)
 	p.Ninety = r.samples.GetPercentile(0.9)
 	p.NinetyFive = r.samples.GetPercentile(0.95)
+	// len(samples) is equal to count stored in mean.
+	p.Count = r.mean.count
 	p.Present = true
 	return p
 }

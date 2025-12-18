@@ -320,6 +320,8 @@ func (p testSubcontainersInfoProvider) GetRequestedContainersInfo(string, v2.Req
 							Periods:          723,
 							ThrottledPeriods: 18,
 							ThrottledTime:    1724314000,
+							BurstsPeriods:    25,
+							BurstTime:        500000000,
 						},
 						Schedstat: info.CpuSchedstat{
 							RunTime:      53643567,
@@ -578,6 +580,30 @@ func (p testSubcontainersInfoProvider) GetRequestedContainersInfo(string, v2.Req
 								"Write":   6,
 							},
 						}},
+						IoCostUsage: []info.PerDiskStats{{
+							Device: "sda1",
+							Major:  8,
+							Minor:  1,
+							Stats:  map[string]uint64{"Count": 1500000},
+						}},
+						IoCostWait: []info.PerDiskStats{{
+							Device: "sda1",
+							Major:  8,
+							Minor:  1,
+							Stats:  map[string]uint64{"Count": 2500000},
+						}},
+						IoCostIndebt: []info.PerDiskStats{{
+							Device: "sda1",
+							Major:  8,
+							Minor:  1,
+							Stats:  map[string]uint64{"Count": 500000},
+						}},
+						IoCostIndelay: []info.PerDiskStats{{
+							Device: "sda1",
+							Major:  8,
+							Minor:  1,
+							Stats:  map[string]uint64{"Count": 750000},
+						}},
 						PSI: info.PSIStats{
 							Full: info.PSIData{
 								Avg10:  0.3,
@@ -778,6 +804,7 @@ func (p testSubcontainersInfoProvider) GetRequestedContainersInfo(string, v2.Req
 						},
 					},
 					CpuSet: info.CPUSetStats{MemoryMigrate: 1},
+					Health: info.Health{Status: "healthy"},
 				},
 			},
 		},
@@ -791,14 +818,14 @@ type erroringSubcontainersInfoProvider struct {
 
 func (p *erroringSubcontainersInfoProvider) GetVersionInfo() (*info.VersionInfo, error) {
 	if p.shouldFail {
-		return nil, errors.New("Oops 1")
+		return nil, errors.New("oops 1")
 	}
 	return p.successfulProvider.GetVersionInfo()
 }
 
 func (p *erroringSubcontainersInfoProvider) GetMachineInfo() (*info.MachineInfo, error) {
 	if p.shouldFail {
-		return nil, errors.New("Oops 2")
+		return nil, errors.New("oops 2")
 	}
 	return p.successfulProvider.GetMachineInfo()
 }
@@ -806,7 +833,7 @@ func (p *erroringSubcontainersInfoProvider) GetMachineInfo() (*info.MachineInfo,
 func (p *erroringSubcontainersInfoProvider) GetRequestedContainersInfo(
 	a string, opt v2.RequestOptions) (map[string]*info.ContainerInfo, error) {
 	if p.shouldFail {
-		return map[string]*info.ContainerInfo{}, errors.New("Oops 3")
+		return map[string]*info.ContainerInfo{}, errors.New("oops 3")
 	}
 	return p.successfulProvider.GetRequestedContainersInfo(a, opt)
 }

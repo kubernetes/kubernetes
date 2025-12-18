@@ -33,7 +33,7 @@ func (f *systemdFactory) String() string {
 }
 
 func (f *systemdFactory) NewContainerHandler(name string, metadataEnvAllowList []string, inHostNamespace bool) (container.ContainerHandler, error) {
-	return nil, fmt.Errorf("Not yet supported")
+	return nil, fmt.Errorf("not yet supported")
 }
 
 func (f *systemdFactory) CanHandleAndAccept(name string) (bool, bool, error) {
