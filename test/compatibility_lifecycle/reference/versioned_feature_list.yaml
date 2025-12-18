@@ -2001,6 +2001,10 @@
     lockToDefault: false
     preRelease: GA
     version: "1.34"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.36"
 - name: VolumeLimitScaling
   versionedSpecs:
   - default: false
