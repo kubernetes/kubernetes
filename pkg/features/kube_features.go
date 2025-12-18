@@ -131,7 +131,7 @@ const (
 	// owner: @HirazawaUi
 	//
 	// Enabling this feature gate will cause the pod's status to change due to a kubelet restart.
-	ChangeContainerStatusOnKubeletRestart = "ChangeContainerStatusOnKubeletRestart"
+	ChangeContainerStatusOnKubeletRestart featuregate.Feature = "ChangeContainerStatusOnKubeletRestart"
 
 	// owner: @sanposhiho @wojtek-t
 	// kep: https://kep.k8s.io/5278
@@ -968,7 +968,7 @@ const (
 	//
 	// Mitigates spurious statefulset rollouts due to controller revision comparison mismatches
 	// which are not semantically significant (e.g. serialization differences or missing defaulted fields).
-	StatefulSetSemanticRevisionComparison = "StatefulSetSemanticRevisionComparison"
+	StatefulSetSemanticRevisionComparison featuregate.Feature = "StatefulSetSemanticRevisionComparison"
 
 	// owner: @cupnes
 	// kep: https://kep.k8s.io/4049
