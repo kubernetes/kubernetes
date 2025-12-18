@@ -1,9 +1,13 @@
+// This package is copied from github.com/gregjones/httpcache
+// with the following changes:
+// - ioutil.NopCloser replaced with io.NopCloser (deprecated)
+// - ioutil.ReadAll replaced with io.ReadAll (deprecated)
+
 // Package httpcache provides a http.RoundTripper implementation that works as a
 // mostly RFC-compliant cache for http responses.
 //
 // It is only suitable for use as a 'private' cache (i.e. for a web-browser or an API-client
 // and not for a shared proxy).
-//
 package httpcache
 
 import (
@@ -11,7 +15,6 @@ import (
 	"bytes"
 	"errors"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httputil"
 	"strings"
@@ -234,7 +237,7 @@ func (t *Transport) RoundTrip(req *http.Request) (resp *http.Response, err error
 				R: resp.Body,
 				OnEOF: func(r io.Reader) {
 					resp := *resp
-					resp.Body = ioutil.NopCloser(r)
+					resp.Body = io.NopCloser(r)
 					respBytes, err := httputil.DumpResponse(&resp, true)
 					if err == nil {
 						t.Cache.Set(cacheKey, respBytes)
