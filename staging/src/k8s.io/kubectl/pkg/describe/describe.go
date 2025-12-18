@@ -734,33 +734,6 @@ type PodDescriber struct {
 func (d *PodDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	pod, err := d.CoreV1().Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
-		if describerSettings.ShowEvents {
-			eventsInterface := d.CoreV1().Events(namespace)
-			selector := eventsInterface.GetFieldSelector(&name, &namespace, nil, nil)
-			initialOpts := metav1.ListOptions{
-				FieldSelector: selector.String(),
-				Limit:         describerSettings.ChunkSize,
-			}
-			events := &corev1.EventList{}
-			err2 := runtimeresource.FollowContinue(&initialOpts,
-				func(options metav1.ListOptions) (runtime.Object, error) {
-					newList, err := eventsInterface.List(context.TODO(), options)
-					if err != nil {
-						return nil, runtimeresource.EnhanceListError(err, options, "events")
-					}
-					events.Items = append(events.Items, newList.Items...)
-					return newList, nil
-				})
-
-			if err2 == nil && len(events.Items) > 0 {
-				return tabbedString(func(out io.Writer) error {
-					w := NewPrefixWriter(out)
-					w.Write(LEVEL_0, "Pod '%v': error '%v', but found events.\n", name, err)
-					DescribeEvents(events, w)
-					return nil
-				})
-			}
-		}
 		return "", err
 	}
 
