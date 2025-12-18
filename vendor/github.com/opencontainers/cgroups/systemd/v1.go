@@ -90,7 +90,7 @@ func genV1ResourcesProperties(r *cgroups.Resources, cm *dbusConnManager) ([]syst
 			newProp("CPUShares", r.CpuShares))
 	}
 
-	addCpuQuota(cm, &properties, r.CpuQuota, r.CpuPeriod)
+	addCPUQuota(cm, &properties, &r.CpuQuota, r.CpuPeriod)
 
 	if r.BlkioWeight != 0 {
 		properties = append(properties,
@@ -334,6 +334,9 @@ func (m *LegacyManager) Set(r *cgroups.Resources) error {
 	if r.Unified != nil {
 		return cgroups.ErrV1NoUnified
 	}
+	// Use a copy since CpuQuota in r may be modified.
+	rCopy := *r
+	r = &rCopy
 	properties, err := genV1ResourcesProperties(r, m.dbus)
 	if err != nil {
 		return err
