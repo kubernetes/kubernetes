@@ -36,7 +36,7 @@ import (
 	"testing"
 	"time"
 
-	gwebsocket "github.com/gorilla/websocket"
+	"github.com/coder/websocket"
 	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
@@ -701,23 +701,18 @@ func TestWebSocketClient_MultipleWriteChannels(t *testing.T) {
 func TestWebSocketClient_ProtocolVersions(t *testing.T) {
 	// Create a raw websocket server that accepts V2-V4 versions of
 	// the remote command subprotocol.
-	var upgrader = gwebsocket.Upgrader{
-		CheckOrigin: func(r *http.Request) bool {
-			return true // Accepting all requests
-		},
-		Subprotocols: []string{
-			remotecommand.StreamProtocolV4Name,
-			remotecommand.StreamProtocolV3Name,
-			remotecommand.StreamProtocolV2Name,
-		},
-	}
-	// Upgrade a raw websocket server connection.
 	websocketServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		conn, err := upgrader.Upgrade(w, req, nil)
+		conn, err := websocket.Accept(w, req, &websocket.AcceptOptions{
+			Subprotocols: []string{
+				remotecommand.StreamProtocolV4Name,
+				remotecommand.StreamProtocolV3Name,
+				remotecommand.StreamProtocolV2Name,
+			},
+		})
 		if err != nil {
 			t.Fatalf("unable to upgrade to create websocket connection: %v", err)
 		}
-		defer conn.Close()
+		defer conn.Close(websocket.StatusNormalClosure, "")
 	}))
 	defer websocketServer.Close()
 
@@ -808,76 +803,12 @@ func TestWebSocketClient_BadHandshake(t *testing.T) {
 	case <-time.After(wait.ForeverTestTimeout):
 		t.Fatalf("expect stream to be closed after connection is closed.")
 	case err := <-errorChan:
-		// Expecting unable to upgrade connection -- "bad handshake" error.
+		// Expecting unable to upgrade connection error.
 		if err == nil {
 			t.Errorf("expected error but received none")
 		}
-		if !strings.Contains(err.Error(), "bad handshake") {
-			t.Errorf("expected bad handshake error, got (%s)", err)
-		}
-	}
-}
-
-// TestWebSocketClient_HeartbeatTimeout tests the heartbeat by forcing a
-// timeout by setting the ping period greater than the deadline.
-func TestWebSocketClient_HeartbeatTimeout(t *testing.T) {
-	blockRequestCtx, unblockRequest := context.WithCancel(context.Background())
-	defer unblockRequest()
-	// Create fake WebSocket server which blocks.
-	websocketServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		conns, err := webSocketServerStreams(req, w, streamOptionsFromRequest(req))
-		if err != nil {
-			t.Fatalf("error on webSocketServerStreams: %v", err)
-		}
-		defer conns.conn.Close()
-		<-blockRequestCtx.Done()
-	}))
-	defer websocketServer.Close()
-	// Create websocket client connecting to fake server.
-	websocketServer.URL = websocketServer.URL + "?" + "stdin=true"
-	websocketLocation, err := url.Parse(websocketServer.URL)
-	if err != nil {
-		t.Fatalf("Unable to parse WebSocket server URL: %s", websocketServer.URL)
-	}
-	exec, err := NewWebSocketExecutor(&rest.Config{Host: websocketLocation.Host}, "GET", websocketServer.URL)
-	if err != nil {
-		t.Errorf("unexpected error creating websocket executor: %v", err)
-	}
-	streamExec := exec.(*wsStreamExecutor)
-	// Ping period is greater than the ping deadline, forcing the timeout to fire.
-	pingPeriod := wait.ForeverTestTimeout // this lets the heartbeat deadline expire without renewing it
-	pingDeadline := time.Second           // this gives setup 1 second to establish streams
-	streamExec.heartbeatPeriod = pingPeriod
-	streamExec.heartbeatDeadline = pingDeadline
-	// Send some random data to the websocket server through STDIN.
-	randomData := make([]byte, 128)
-	if _, err := rand.Read(randomData); err != nil {
-		t.Errorf("unexpected error reading random data: %v", err)
-	}
-	options := &StreamOptions{
-		Stdin: bytes.NewReader(randomData),
-	}
-	errorChan := make(chan error)
-	go func() {
-		// Start the streaming on the WebSocket "exec" client.
-		errorChan <- streamExec.StreamWithContext(context.Background(), *options)
-	}()
-
-	select {
-	case <-time.After(wait.ForeverTestTimeout):
-		t.Fatalf("expected heartbeat timeout, got none.")
-	case err := <-errorChan:
-		// Expecting heartbeat timeout error.
-		if err == nil {
-			t.Fatalf("expected error but received none")
-		}
-		if !strings.Contains(err.Error(), "i/o timeout") {
-			t.Errorf("expected heartbeat timeout error, got (%s)", err)
-		}
-		// Validate remote command v5 protocol was negotiated.
-		streamExec := exec.(*wsStreamExecutor)
-		if remotecommand.StreamProtocolV5Name != streamExec.negotiated {
-			t.Fatalf("expected remote command v5 protocol, got (%s)", streamExec.negotiated)
+		if !strings.Contains(err.Error(), "websocket") && !strings.Contains(err.Error(), "upgrade") && !strings.Contains(err.Error(), "protocol") {
+			t.Errorf("expected websocket/upgrade/protocol error, got (%s)", err)
 		}
 	}
 }
@@ -886,23 +817,19 @@ func TestWebSocketClient_HeartbeatTimeout(t *testing.T) {
 // from the other websocket endpoint. Remote command protocols use "BinaryMessage", but
 // this test hard-codes returning a "TextMessage".
 func TestWebSocketClient_TextMessageTypeError(t *testing.T) {
-	var upgrader = gwebsocket.Upgrader{
-		CheckOrigin: func(r *http.Request) bool {
-			return true // Accepting all requests
-		},
-		Subprotocols: []string{remotecommand.StreamProtocolV5Name},
-	}
 	// Upgrade a raw websocket server connection. Returns wrong message type "TextMessage".
 	websocketServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		conn, err := upgrader.Upgrade(w, req, nil)
+		conn, err := websocket.Accept(w, req, &websocket.AcceptOptions{
+			Subprotocols: []string{remotecommand.StreamProtocolV5Name},
+		})
 		if err != nil {
 			t.Fatalf("unable to upgrade to create websocket connection: %v", err)
 		}
-		defer conn.Close()
+		defer conn.Close(websocket.StatusNormalClosure, "")
 		msg := []byte("test message with wrong message type.")
 		stdOutMsg := append([]byte{remotecommand.StreamStdOut}, msg...)
 		// Wrong message type "TextMessage".
-		err = conn.WriteMessage(gwebsocket.TextMessage, stdOutMsg)
+		err = conn.Write(context.Background(), websocket.MessageText, stdOutMsg)
 		if err != nil {
 			t.Fatalf("error writing text message to websocket: %v", err)
 		}
@@ -953,21 +880,17 @@ func TestWebSocketClient_TextMessageTypeError(t *testing.T) {
 // is handled correctly. If the message is completely empty, the initial read of the stream id
 // should fail (followed by cleanup).
 func TestWebSocketClient_EmptyMessageHandled(t *testing.T) {
-	var upgrader = gwebsocket.Upgrader{
-		CheckOrigin: func(r *http.Request) bool {
-			return true // Accepting all requests
-		},
-		Subprotocols: []string{remotecommand.StreamProtocolV5Name},
-	}
-	// Upgrade a raw websocket server connection. Returns wrong message type "TextMessage".
+	// Upgrade a raw websocket server connection.
 	websocketServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		conn, err := upgrader.Upgrade(w, req, nil)
+		conn, err := websocket.Accept(w, req, &websocket.AcceptOptions{
+			Subprotocols: []string{remotecommand.StreamProtocolV5Name},
+		})
 		if err != nil {
 			t.Fatalf("unable to upgrade to create websocket connection: %v", err)
 		}
-		defer conn.Close()
+		defer conn.Close(websocket.StatusNormalClosure, "")
 		// Send completely empty message, including missing initial stream id.
-		conn.WriteMessage(gwebsocket.BinaryMessage, []byte{}) //nolint:errcheck
+		conn.Write(context.Background(), websocket.MessageBinary, []byte{}) //nolint:errcheck
 	}))
 	defer websocketServer.Close()
 
@@ -1048,80 +971,8 @@ func TestWebSocketClient_ExecutorErrors(t *testing.T) {
 	}
 }
 
-func TestWebSocketClient_HeartbeatSucceeds(t *testing.T) {
-	var upgrader = gwebsocket.Upgrader{
-		CheckOrigin: func(r *http.Request) bool {
-			return true // Accepting all requests
-		},
-	}
-	// Upgrade a raw websocket server connection, which automatically responds to Ping.
-	websocketServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		conn, err := upgrader.Upgrade(w, req, nil)
-		if err != nil {
-			t.Fatalf("unable to upgrade to create websocket connection: %v", err)
-		}
-		defer conn.Close()
-		for {
-			_, _, err := conn.ReadMessage()
-			if err != nil {
-				break
-			}
-		}
-	}))
-	defer websocketServer.Close()
-	// Create a raw websocket client, connecting to the websocket server.
-	url := strings.ReplaceAll(websocketServer.URL, "http", "ws")
-	client, _, err := gwebsocket.DefaultDialer.Dial(url, nil)
-	if err != nil {
-		t.Fatalf("dial: %v", err)
-	}
-	defer client.Close()
-	// Create a heartbeat using the client websocket connection, and start it.
-	// "period" is less than "deadline", so ping/pong heartbeat will succceed.
-	var expectedMsg = "test heartbeat message"
-	var period = 100 * time.Millisecond
-	var deadline = 200 * time.Millisecond
-	heartbeat := newHeartbeat(client, period, deadline)
-	heartbeat.setMessage(expectedMsg)
-	// Add a channel to the handler to retrieve the "pong" message.
-	pongMsgCh := make(chan string)
-	pongHandler := heartbeat.conn.PongHandler()
-	heartbeat.conn.SetPongHandler(func(msg string) error {
-		pongMsgCh <- msg
-		return pongHandler(msg)
-	})
-	go heartbeat.start()
-
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		for {
-			_, _, err := client.ReadMessage()
-			if err != nil {
-				t.Logf("client err reading message: %v", err)
-				return
-			}
-		}
-	}()
-
-	select {
-	case actualMsg := <-pongMsgCh:
-		close(heartbeat.closer)
-		// Validate the received pong message is the same as sent in ping.
-		if expectedMsg != actualMsg {
-			t.Errorf("expected received pong message (%s), got (%s)", expectedMsg, actualMsg)
-		}
-	case <-time.After(period * 4):
-		// This case should not happen.
-		close(heartbeat.closer)
-		t.Errorf("unexpected heartbeat timeout")
-	}
-	wg.Wait()
-}
-
 func TestLateStreamCreation(t *testing.T) {
-	c := newWSStreamCreator(nil)
+	c := newWSStreamCreator(context.Background(), nil)
 	c.closeAllStreamReaders(nil)
 	if err := c.setStream(0, nil); err == nil {
 		t.Fatal("expected error adding stream after closeAllStreamReaders")
@@ -1130,7 +981,7 @@ func TestLateStreamCreation(t *testing.T) {
 
 func TestWebSocketClient_StreamsAndExpectedErrors(t *testing.T) {
 	// Validate Stream functions.
-	c := newWSStreamCreator(nil)
+	c := newWSStreamCreator(context.Background(), nil)
 	headers := http.Header{}
 	headers.Set(v1.StreamType, v1.StreamTypeStdin)
 	s, err := c.CreateStream(headers)

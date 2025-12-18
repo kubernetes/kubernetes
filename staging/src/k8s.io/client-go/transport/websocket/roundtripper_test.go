@@ -77,7 +77,7 @@ func TestWebSocketRoundTripper_RoundTripperFails(t *testing.T) {
 		"Empty response status still returns basic websocket error": {
 			statusCode:    -1,
 			body:          "",
-			expectedError: "websocket: bad handshake",
+			expectedError: "expected handshake response status code 101",
 		},
 		"Empty response body still returns status": {
 			statusCode:    http.StatusForbidden,

@@ -17,15 +17,17 @@ limitations under the License.
 package websocket
 
 import (
+	"context"
 	"crypto/tls"
-	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 
-	gwebsocket "github.com/gorilla/websocket"
+	"github.com/coder/websocket"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -54,11 +56,28 @@ func init() {
 	)
 }
 
+// Conn wraps a *websocket.Conn and stores connection addresses for net.Conn compatibility.
+type Conn struct {
+	*websocket.Conn
+	localAddr  net.Addr
+	remoteAddr net.Addr
+}
+
+// LocalAddr returns the local network address.
+func (c *Conn) LocalAddr() net.Addr {
+	return c.localAddr
+}
+
+// RemoteAddr returns the remote network address.
+func (c *Conn) RemoteAddr() net.Addr {
+	return c.remoteAddr
+}
+
 // ConnectionHolder defines functions for structure providing
 // access to the websocket connection.
 type ConnectionHolder interface {
 	DataBufferSize() int
-	Connection() *gwebsocket.Conn
+	Connection() *Conn
 }
 
 // RoundTripper knows how to establish a connection to a remote WebSocket endpoint and make it available for use.
@@ -75,11 +94,11 @@ type RoundTripper struct {
 	Proxier func(req *http.Request) (*url.URL, error)
 
 	// Conn holds the WebSocket connection after a round trip.
-	Conn *gwebsocket.Conn
+	Conn *Conn
 }
 
 // Connection returns the stored websocket connection.
-func (rt *RoundTripper) Connection() *gwebsocket.Conn {
+func (rt *RoundTripper) Connection() *Conn {
 	return rt.Conn
 }
 
@@ -110,30 +129,46 @@ func (rt *RoundTripper) RoundTrip(request *http.Request) (retResp *http.Response
 	protocolVersions := request.Header[wsstream.WebSocketProtocolHeader]
 	delete(request.Header, wsstream.WebSocketProtocolHeader)
 
-	dialer := gwebsocket.Dialer{
-		Proxy:           rt.Proxier,
-		TLSClientConfig: rt.TLSConfig,
-		Subprotocols:    protocolVersions,
-		ReadBufferSize:  rt.DataBufferSize() + 1024, // add space for the protocol byte indicating which channel the data is for
-		WriteBufferSize: rt.DataBufferSize() + 1024, // add space for the protocol byte indicating which channel the data is for
-	}
+	// Convert URL scheme for websocket
+	wsURL := *request.URL
 	switch request.URL.Scheme {
 	case "https":
-		request.URL.Scheme = "wss"
+		wsURL.Scheme = "wss"
 	case "http":
-		request.URL.Scheme = "ws"
+		wsURL.Scheme = "ws"
 	default:
 		return nil, fmt.Errorf("unknown url scheme: %s", request.URL.Scheme)
 	}
-	wsConn, resp, err := dialer.DialContext(request.Context(), request.URL.String(), request.Header)
+
+	// Create a transport wrapper that captures connection addresses
+	addrCapture := &addrCaptureTransport{}
+	transport := &http.Transport{
+		Proxy:           rt.Proxier,
+		TLSClientConfig: rt.TLSConfig,
+		DialContext:     addrCapture.dialContext,
+	}
+	addrCapture.Transport = transport
+
+	httpClient := &http.Client{
+		Transport: transport,
+	}
+
+	opts := &websocket.DialOptions{
+		HTTPClient:   httpClient,
+		HTTPHeader:   request.Header,
+		Subprotocols: protocolVersions,
+	}
+
+	ctx := request.Context()
+	wsConn, resp, err := websocket.Dial(ctx, wsURL.String(), opts)
 	if err != nil {
-		// BadHandshake error becomes an "UpgradeFailureError" (used for streaming fallback).
-		if errors.Is(err, gwebsocket.ErrBadHandshake) {
-			cause := err
+		// Check if we got a response that indicates upgrade failure
+		if resp != nil && resp.StatusCode != http.StatusSwitchingProtocols {
+			cause := fmt.Errorf("websocket upgrade failed: %w", err)
 			// Enhance the error message with the error response if possible.
-			if resp != nil && len(resp.Status) > 0 {
-				defer resp.Body.Close()                         //nolint:errcheck
-				cause = fmt.Errorf("%w (%s)", err, resp.Status) // Always add the response status
+			if len(resp.Status) > 0 {
+				defer resp.Body.Close()                           //nolint:errcheck
+				cause = fmt.Errorf("%w (%s)", cause, resp.Status) // Always add the response status
 				responseError := ""
 				responseErrorBytes, readErr := io.ReadAll(io.LimitReader(resp.Body, 64*1024))
 				if readErr != nil {
@@ -167,13 +202,56 @@ func (rt *RoundTripper) RoundTrip(request *http.Request) (retResp *http.Response
 		}
 	}
 	if !foundProtocol {
-		wsConn.Close() // nolint:errcheck
+		wsConn.Close(websocket.StatusProtocolError, "invalid protocol") // nolint:errcheck
 		return nil, &httpstream.UpgradeFailureError{Cause: fmt.Errorf("invalid protocol, expected one of %q, got %q", protocolVersions, wsConn.Subprotocol())}
 	}
 
-	rt.Conn = wsConn
+	// Get captured addresses from the transport wrapper
+	localAddr, remoteAddr := addrCapture.getAddrs()
+
+	// Set read limit to handle large data transfers.
+	// -1 disables the limit entirely to align with previous gorilla/websocket behavior
+	wsConn.SetReadLimit(-1)
+
+	rt.Conn = &Conn{
+		Conn:       wsConn,
+		localAddr:  localAddr,
+		remoteAddr: remoteAddr,
+	}
 
 	return resp, nil
+}
+
+// addrCaptureTransport wraps an http.Transport to capture the local and remote
+// addresses of the underlying connection. This is needed because coder/websocket
+// doesn't expose the underlying net.Conn directly.
+type addrCaptureTransport struct {
+	*http.Transport
+	mu         sync.Mutex
+	localAddr  net.Addr
+	remoteAddr net.Addr
+}
+
+// dialContext is the dial function that captures connection addresses.
+// It's assigned to http.Transport.DialContext.
+func (t *addrCaptureTransport) dialContext(ctx context.Context, network, addr string) (net.Conn, error) {
+	dialer := &net.Dialer{}
+	conn, err := dialer.DialContext(ctx, network, addr)
+	if err != nil {
+		return nil, err
+	}
+	// Capture addresses immediately upon successful dial
+	t.mu.Lock()
+	t.localAddr = conn.LocalAddr()
+	t.remoteAddr = conn.RemoteAddr()
+	t.mu.Unlock()
+	return conn, nil
+}
+
+func (t *addrCaptureTransport) getAddrs() (local, remote net.Addr) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.localAddr, t.remoteAddr
 }
 
 // RoundTripperFor transforms the passed rest config into a wrapped roundtripper, as well
@@ -208,17 +286,26 @@ func RoundTripperFor(config *restclient.Config) (http.RoundTripper, ConnectionHo
 // Negotiate opens a connection to a remote server and attempts to negotiate
 // a WebSocket connection. Upon success, it returns the negotiated connection.
 // The round tripper rt must use the WebSocket round tripper wsRt - see RoundTripperFor.
-func Negotiate(rt http.RoundTripper, connectionInfo ConnectionHolder, req *http.Request, protocols ...string) (*gwebsocket.Conn, error) {
+func Negotiate(rt http.RoundTripper, connectionInfo ConnectionHolder, req *http.Request, protocols ...string) (*Conn, error) {
 	// Plumb protocols to RoundTripper#RoundTrip
 	req.Header[wsstream.WebSocketProtocolHeader] = protocols
 	resp, err := rt.RoundTrip(req)
 	if err != nil {
 		return nil, err
 	}
-	err = resp.Body.Close()
-	if err != nil {
-		connectionInfo.Connection().Close()
-		return nil, fmt.Errorf("error closing response body: %v", err)
+	conn := connectionInfo.Connection()
+	if conn == nil {
+		if resp != nil && resp.Body != nil {
+			resp.Body.Close()
+		}
+		return nil, fmt.Errorf("websocket connection was not established")
 	}
-	return connectionInfo.Connection(), nil
+	if resp != nil && resp.Body != nil {
+		err = resp.Body.Close()
+		if err != nil {
+			conn.Close(websocket.StatusNormalClosure, "")
+			return nil, fmt.Errorf("error closing response body: %v", err)
+		}
+	}
+	return conn, nil
 }
