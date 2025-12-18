@@ -311,6 +311,48 @@ func TestEndpointInfoByServicePort(t *testing.T) {
 				},
 			},
 		},
+		"with duplicate Endpoints, prefer non-terminating": {
+			namespacedName: types.NamespacedName{Name: "svc1", Namespace: "ns1"},
+			hostname:       "host1",
+			endpointSlices: []*discovery.EndpointSlice{
+				func() *discovery.EndpointSlice {
+					es := generateEndpointSliceWithOffset("svc1", "ns1", 1, 1, 1, 999, 999, []string{"host1"}, []*int32{ptr.To[int32](80)})
+
+					// Duplicate the endpoint
+					ep1 := es.Endpoints[0]
+					ep1.Conditions.Ready = ptr.To(false)
+					ep1.Conditions.Serving = ptr.To(true)
+					ep1.Conditions.Terminating = ptr.To(true)
+
+					ep2 := es.Endpoints[0]
+					ep2.Conditions.Ready = ptr.To(true)
+					ep2.Conditions.Serving = ptr.To(true)
+					ep2.Conditions.Terminating = ptr.To(false)
+
+					ep3 := es.Endpoints[0]
+					ep3.Conditions.Ready = ptr.To(false)
+					ep3.Conditions.Serving = ptr.To(false)
+					ep3.Conditions.Terminating = ptr.To(true)
+
+					//  ep2 should win since it's the non-terminating one
+					es.Endpoints = []discovery.Endpoint{ep1, ep2, ep3}
+					return es
+				}(),
+			},
+			expectedMap: spToEndpointMap{
+				makeServicePortName("ns1", "svc1", "port-0", v1.ProtocolTCP): {
+					"10.0.1.1:80": &BaseEndpointInfo{
+						ip:          "10.0.1.1",
+						port:        80,
+						endpoint:    "10.0.1.1:80",
+						isLocal:     true,
+						ready:       true,
+						serving:     true,
+						terminating: false,
+					},
+				},
+			},
+		},
 	}
 
 	for name, tc := range testCases {
