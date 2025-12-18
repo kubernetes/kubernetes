@@ -17,7 +17,6 @@ limitations under the License.
 package nodevolumelimits
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -658,18 +657,18 @@ func TestCSILimits(t *testing.T) {
 			}}); err != nil {
 				t.Error(err)
 			}
-			informerfactory.Start(context.TODO().Done())
-			informerfactory.WaitForCacheSync(context.TODO().Done())
+			_, ctx := ktesting.NewTestContext(t)
+			informerfactory.Start(ctx.Done())
+			informerfactory.WaitForCacheSync(ctx.Done())
 			p := &CSILimits{
 				csiManager:           NewCSIManager(getFakeCSINodeLister(csiNode)),
 				pvLister:             getFakeCSIPVLister(test.filterName, test.driverNames...),
 				pvcLister:            append(getFakeCSIPVCLister(test.filterName, scName, test.driverNames...), test.extraClaims...),
 				scLister:             getFakeCSIStorageClassLister(scName, test.driverNames[0]),
-				vaindexer:            informerfactory.Storage().V1().VolumeAttachments().Informer().GetIndexer(),
+				vaIndexer:            informerfactory.Storage().V1().VolumeAttachments().Informer().GetIndexer(),
 				randomVolumeIDPrefix: rand.String(32),
 				translator:           csiTranslator,
 			}
-			_, ctx := ktesting.NewTestContext(t)
 			_, gotPreFilterStatus := p.PreFilter(ctx, nil, test.newPod, nil)
 			if diff := cmp.Diff(test.wantPreFilterStatus, gotPreFilterStatus, statusCmpOpts...); diff != "" {
 				t.Errorf("PreFilter status does not match (-want, +got):\n%s", diff)
@@ -1355,8 +1354,9 @@ func TestVolumeLimitScalingGate(t *testing.T) {
 			}}); err != nil {
 				t.Error(err)
 			}
-			informerfactory.Start(context.TODO().Done())
-			informerfactory.WaitForCacheSync(context.TODO().Done())
+			_, ctx := ktesting.NewTestContext(t)
+			informerfactory.Start(ctx.Done())
+			informerfactory.WaitForCacheSync(ctx.Done())
 
 			csiTranslator := csitrans.New()
 			p := &CSILimits{
@@ -1365,7 +1365,7 @@ func TestVolumeLimitScalingGate(t *testing.T) {
 				pvcLister:  getFakeCSIPVCLister("csi", scName, ebsCSIDriverName),
 				scLister:   getFakeCSIStorageClassLister(scName, ebsCSIDriverName),
 				vaLister:   informerfactory.Storage().V1().VolumeAttachments().Lister(),
-				vaindexer:  informerfactory.Storage().V1().VolumeAttachments().Informer().GetIndexer(),
+				vaIndexer:  informerfactory.Storage().V1().VolumeAttachments().Informer().GetIndexer(),
 				csiDriverLister: func() fakeCSIDriverLister {
 					if tt.csiDriverPresent {
 						return getFakeCSIDriverLister(ebsCSIDriverName)
@@ -1377,7 +1377,6 @@ func TestVolumeLimitScalingGate(t *testing.T) {
 				translator:               csiTranslator,
 			}
 
-			_, ctx := ktesting.NewTestContext(t)
 			// Ensure PreFilter doesn't skip
 			_, preStatus := p.PreFilter(ctx, nil, newPod, nil)
 			if preStatus.Code() == fwk.Skip {
