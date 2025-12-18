@@ -755,6 +755,76 @@ func TestPrintNodeKernelVersion(t *testing.T) {
 	}
 }
 
+func TestPrintNodeArch(t *testing.T) {
+
+	table := []struct {
+		node     api.Node
+		expected []metav1.TableRow
+	}{
+		{
+			node: api.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Status: api.NodeStatus{
+					NodeInfo:  api.NodeSystemInfo{KernelVersion: "fake-kernel-version", Architecture: "fake-arch-amd64"},
+					Addresses: []api.NodeAddress{{Type: api.NodeExternalIP, Address: "1.1.1.1"}},
+				},
+			},
+			// Columns: Name, Status, Roles, Age, KubeletVersion, NodeInternalIP, NodeExternalIP, OSImage, KernelVersion, ContainerRuntimeVersion
+			expected: []metav1.TableRow{
+				{
+					// case 1: KernelVersion with Arch
+					Cells: []interface{}{"foo", "Unknown", "<none>", "<unknown>", "", "<none>", "1.1.1.1", "<unknown>", "fake-kernel-version (fake-arch-amd64)", "<unknown>"},
+				},
+			},
+		},
+		{
+			node: api.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Status: api.NodeStatus{
+					NodeInfo:  api.NodeSystemInfo{Architecture: "fake-arch-arm64"},
+					Addresses: []api.NodeAddress{{Type: api.NodeExternalIP, Address: "1.1.1.1"}},
+				},
+			},
+			// Columns: Name, Status, Roles, Age, KubeletVersion, NodeInternalIP, NodeExternalIP, OSImage, KernelVersion, ContainerRuntimeVersion
+			expected: []metav1.TableRow{
+				{
+					// case 2: KernelVersion unknown with Arch
+					Cells: []interface{}{"foo", "Unknown", "<none>", "<unknown>", "", "<none>", "1.1.1.1", "<unknown>", "<unknown> (fake-arch-arm64)", "<unknown>"},
+				},
+			},
+		},
+		{
+			node: api.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Status: api.NodeStatus{
+					NodeInfo:  api.NodeSystemInfo{KernelVersion: "fake-kernel-version"},
+					Addresses: []api.NodeAddress{{Type: api.NodeExternalIP, Address: "1.1.1.1"}},
+				},
+			},
+			// Columns: Name, Status, Roles, Age, KubeletVersion, NodeInternalIP, NodeExternalIP, OSImage, KernelVersion, ContainerRuntimeVersion
+			expected: []metav1.TableRow{
+				{
+					// case 3: KernelVersion with Arch unknowngs
+					Cells: []interface{}{"foo", "Unknown", "<none>", "<unknown>", "", "<none>", "1.1.1.1", "<unknown>", "fake-kernel-version", "<unknown>"},
+				},
+			},
+		},
+	}
+
+	for i, test := range table {
+		rows, err := printNode(&test.node, printers.GenerateOptions{Wide: true})
+		if err != nil {
+			t.Fatalf("An error occurred generating table rows Node: %#v", err)
+		}
+		for i := range rows {
+			rows[i].Object.Object = nil
+		}
+		if !reflect.DeepEqual(test.expected, rows) {
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+		}
+	}
+}
+
 func TestPrintNodeContainerRuntimeVersion(t *testing.T) {
 
 	table := []struct {
