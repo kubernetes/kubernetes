@@ -510,7 +510,7 @@ func TestReattachMessage(t *testing.T) {
 			container: "bar",
 			rawTTY:    true,
 			stdin:     true,
-			expected:  "Session ended, resume using",
+			expected:  "Session ended, resume using 'kubectl foo -c bar -n test -i -t' command when the pod is running",
 		},
 		{
 			name:      "no stdin",
@@ -549,7 +549,7 @@ func TestReattachMessage(t *testing.T) {
 			container: "debugger",
 			rawTTY:    true,
 			stdin:     true,
-			expected:  "Session ended, the ephemeral container will not be restarted",
+			expected:  "Session ended, the ephemeral container will not be restarted but may be reattached using 'kubectl foo -c debugger -n test -i -t' if it is still running",
 		},
 	}
 	for _, test := range tests {
@@ -558,7 +558,8 @@ func TestReattachMessage(t *testing.T) {
 				StreamOptions: exec.StreamOptions{
 					Stdin: test.stdin,
 				},
-				Pod: test.pod,
+				CommandName: "kubectl",
+				Pod:         test.pod,
 			}
 			if msg := options.reattachMessage(test.container, test.rawTTY); test.expected == "" && msg != "" {
 				t.Errorf("reattachMessage(%v, %v) = %q, want empty string", test.container, test.rawTTY, msg)
