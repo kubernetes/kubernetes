@@ -27,6 +27,8 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/sync/singleflight"
+
 	"github.com/opencontainers/cgroups"
 	"github.com/opencontainers/cgroups/manager"
 	"k8s.io/klog/v2"
@@ -138,6 +140,11 @@ type containerManagerImpl struct {
 	kubeClient clientset.Interface
 	// resourceUpdates is a channel that provides resource updates.
 	resourceUpdates chan resourceupdates.Update
+	// podCgroupDestroyGroup deduplicates concurrent pod cgroup Destroy() calls.
+	// This is shared across all PodContainerManager instances created by
+	// NewPodContainerManager() to prevent race conditions between SyncTerminatedPod
+	// and cleanupOrphanedPodCgroups when both attempt to destroy the same cgroup.
+	podCgroupDestroyGroup singleflight.Group
 }
 
 type features struct {
@@ -407,6 +414,8 @@ func (cm *containerManagerImpl) NewPodContainerManager() PodContainerManager {
 			// Convert (cm.CPUCFSQuotaPeriod) [nanoseconds] / time.Microsecond (1000) to get cpuCFSQuotaPeriod in microseconds.
 			cpuCFSQuotaPeriod:   uint64(cm.CPUCFSQuotaPeriod / time.Microsecond),
 			podContainerManager: cm,
+			// Share the destroyGroup across all PodContainerManager instances.
+			destroyGroup: &cm.podCgroupDestroyGroup,
 		}
 	}
 	return &podContainerManagerNoop{

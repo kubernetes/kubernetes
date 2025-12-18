@@ -23,6 +23,8 @@ import (
 	"path"
 	"strings"
 
+	"golang.org/x/sync/singleflight"
+
 	libcontainercgroups "github.com/opencontainers/cgroups"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -57,6 +59,9 @@ type podContainerManagerImpl struct {
 	cpuCFSQuotaPeriod uint64
 	// podContainerManager is the ContainerManager running on the machine
 	podContainerManager ContainerManager
+	// destroyGroup deduplicates concurrent Destroy() calls for the same cgroup.
+	// This is a pointer to a shared singleflight.Group in containerManagerImpl.
+	destroyGroup *singleflight.Group
 }
 
 // Make sure that podContainerManagerImpl implements the PodContainerManager interface
@@ -201,8 +206,24 @@ func (m *podContainerManagerImpl) tryKillingCgroupProcesses(logger klog.Logger, 
 	return utilerrors.NewAggregate(errlist)
 }
 
-// Destroy destroys the pod container cgroup paths
+// Destroy destroys the pod container cgroup paths.
+//
+// This method uses singleflight to deduplicate concurrent calls for the same
+// cgroup. This prevents the 30-second timeout that occurs when concurrent
+// systemd D-Bus StopUnit calls race to remove the same cgroup slice.
 func (m *podContainerManagerImpl) Destroy(logger klog.Logger, podCgroup CgroupName) error {
+	if m.destroyGroup == nil {
+		return m.destroy(logger, podCgroup)
+	}
+
+	key := m.cgroupManager.Name(podCgroup)
+	_, err, _ := m.destroyGroup.Do(key, func() (interface{}, error) {
+		return nil, m.destroy(logger, podCgroup)
+	})
+	return err
+}
+
+func (m *podContainerManagerImpl) destroy(logger klog.Logger, podCgroup CgroupName) error {
 	// Try killing all the processes attached to the pod cgroup
 	if err := m.tryKillingCgroupProcesses(logger, podCgroup); err != nil {
 		logger.Info("Failed to kill all the processes attached to cgroup", "cgroupName", podCgroup, "err", err)

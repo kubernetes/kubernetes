@@ -21,11 +21,16 @@ package cm
 
 import (
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/singleflight"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 
 	v1 "k8s.io/api/core/v1"
@@ -293,6 +298,91 @@ func TestGetPodContainerName(t *testing.T) {
 			actualCgroupName, actualLiteralCgroupfs := pcm.GetPodContainerName(tt.args.pod)
 			require.Equalf(t, tt.wantCgroupName, actualCgroupName, "Unexpected cgroup name for pod with UID %s, container resources: %v", tt.args.pod.UID, tt.args.pod.Spec.Containers[0].Resources)
 			require.Equalf(t, tt.wantLiteralCgroupfs, actualLiteralCgroupfs, "Unexpected literal cgroupfs for pod with UID %s, container resources: %v", tt.args.pod.UID, tt.args.pod.Spec.Containers[0].Resources)
+		})
+	}
+}
+
+// mockCgroupManager is a mock implementation of CgroupManager for testing.
+type mockCgroupManager struct {
+	destroyCount atomic.Int32
+	destroyDelay time.Duration
+}
+
+func (m *mockCgroupManager) Create(klog.Logger, *CgroupConfig) error { return nil }
+func (m *mockCgroupManager) Update(klog.Logger, *CgroupConfig) error { return nil }
+func (m *mockCgroupManager) Validate(CgroupName) error               { return nil }
+func (m *mockCgroupManager) Exists(CgroupName) bool                  { return true }
+func (m *mockCgroupManager) Name(name CgroupName) string             { return name.ToCgroupfs() }
+func (m *mockCgroupManager) CgroupName(name string) CgroupName {
+	return ParseCgroupfsToCgroupName(name)
+}
+func (m *mockCgroupManager) Pids(klog.Logger, CgroupName) []int            { return []int{} }
+func (m *mockCgroupManager) ReduceCPULimits(klog.Logger, CgroupName) error { return nil }
+func (m *mockCgroupManager) MemoryUsage(CgroupName) (int64, error)         { return 0, nil }
+func (m *mockCgroupManager) GetCgroupConfig(CgroupName, v1.ResourceName) (*ResourceConfig, error) {
+	return nil, nil
+}
+func (m *mockCgroupManager) SetCgroupConfig(klog.Logger, CgroupName, *ResourceConfig) error {
+	return nil
+}
+func (m *mockCgroupManager) Version() int { return 2 }
+
+func (m *mockCgroupManager) Destroy(klog.Logger, *CgroupConfig) error {
+	m.destroyCount.Add(1)
+	if m.destroyDelay > 0 {
+		time.Sleep(m.destroyDelay)
+	}
+	return nil
+}
+
+// TestDestroyConcurrentCalls verifies that concurrent Destroy() calls for the
+// same cgroup are deduplicated when using a shared singleflight.Group.
+//
+// This test simulates the race condition between SyncTerminatedPod and
+// cleanupOrphanedPodCgroups.
+func TestDestroyConcurrentCalls(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	podCgroup := NewCgroupName(RootCgroupName, "besteffort", "pod-test-uid")
+
+	tests := []struct {
+		name                 string
+		shareDestroyGroup    bool
+		expectedDestroyCount int32
+	}{
+		{
+			name:                 "shared destroy group deduplicates calls",
+			shareDestroyGroup:    true,
+			expectedDestroyCount: 1,
+		},
+		{
+			name:                 "separate destroy groups do not deduplicate",
+			shareDestroyGroup:    false,
+			expectedDestroyCount: 2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cgm := &mockCgroupManager{destroyDelay: 50 * time.Millisecond}
+
+			destroyGroup1 := &singleflight.Group{}
+			destroyGroup2 := &singleflight.Group{}
+			if tt.shareDestroyGroup {
+				destroyGroup2 = destroyGroup1
+			}
+
+			pcm1 := &podContainerManagerImpl{cgroupManager: cgm, destroyGroup: destroyGroup1}
+			pcm2 := &podContainerManagerImpl{cgroupManager: cgm, destroyGroup: destroyGroup2}
+
+			var wg sync.WaitGroup
+			wg.Add(2)
+			go func() { defer wg.Done(); pcm1.Destroy(logger, podCgroup) }() //nolint:errcheck
+			go func() { defer wg.Done(); pcm2.Destroy(logger, podCgroup) }() //nolint:errcheck
+			wg.Wait()
+
+			if got := cgm.destroyCount.Load(); got != tt.expectedDestroyCount {
+				t.Errorf("got %d destroy calls, want %d", got, tt.expectedDestroyCount)
+			}
 		})
 	}
 }
