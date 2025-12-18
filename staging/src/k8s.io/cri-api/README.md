@@ -57,6 +57,12 @@ is a readonly mirror repository, all development is done at [kubernetes/kubernet
 
 Here is the change history of the Container Runtime Interface protocol. The change history is maintained manually:
 
+### v1.35
+
+`git diff v1.34.0 1.35.0 -- staging/src/k8s.io/cri-api/pkg/apis/runtime/v1/api.proto`
+
+No changes
+
 ### v1.34
 
 `git diff v1.33.0 v1.34.0 -- staging/src/k8s.io/cri-api/pkg/apis/runtime/v1/api.proto`
