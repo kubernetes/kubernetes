@@ -242,7 +242,7 @@ func (c *CRDFinalizer) deleteInstances(ctx context.Context, crd *apiextensionsv1
 		if len(listObj.(*unstructured.UnstructuredList).Items) == 0 {
 			return true, nil
 		}
-		klog.V(2).Infof("%s.%s waiting for %d items to be removed", crd.Status.AcceptedNames.Plural, crd.Spec.Group, len(listObj.(*unstructured.UnstructuredList).Items))
+		klog.FromContext(ctx).V(2).Info("Waiting for items to be removed", "resource", crd.Status.AcceptedNames.Plural, "group", crd.Spec.Group, "count", len(listObj.(*unstructured.UnstructuredList).Items))
 		return false, nil
 	})
 	if err != nil {
@@ -261,17 +261,20 @@ func (c *CRDFinalizer) deleteInstances(ctx context.Context, crd *apiextensionsv1
 	}, nil
 }
 
+// Run is a legacy wrapper that starts the controller.
+//
+//logcheck:context // RunWithContext should be used instead of Run in code which supports contextual logging.
 func (c *CRDFinalizer) Run(workers int, stopCh <-chan struct{}) {
 	c.RunWithContext(workers, wait.ContextForChannel(stopCh))
 }
 
-//logcheck:context // RunWithContext should be used instead of Run in code which supports contextual logging.
 func (c *CRDFinalizer) RunWithContext(workers int, ctx context.Context) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
-	klog.Info("Starting CRDFinalizer")
-	defer klog.Info("Shutting down CRDFinalizer")
+	logger := klog.FromContext(ctx)
+	logger.Info("Starting CRDFinalizer")
+	defer logger.Info("Shutting down CRDFinalizer")
 
 	if !cache.WaitForCacheSync(ctx.Done(), c.crdSynced) {
 		return
