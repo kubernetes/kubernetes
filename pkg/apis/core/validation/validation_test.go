@@ -561,6 +561,9 @@ func TestValidatePersistentVolumes(t *testing.T) {
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
+			if !scenario.enableVolumeAttributesClass {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, scenario.enableVolumeAttributesClass)
 
 			opts := ValidationOptionsForPersistentVolume(scenario.volume, nil)
@@ -1040,6 +1043,9 @@ func TestValidationOptionsForPersistentVolume(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
+			if !tc.enableVolumeAttributesClass {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, tc.enableVolumeAttributesClass)
 
 			opts := ValidationOptionsForPersistentVolume(nil, tc.oldPv)
@@ -1626,6 +1632,9 @@ func TestValidatePeristentVolumeAttributesClassUpdate(t *testing.T) {
 	}
 
 	for name, scenario := range scenarios {
+		if !scenario.enableVolumeAttributesClass {
+			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+		}
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, scenario.enableVolumeAttributesClass)
 
 		originalNewPV := scenario.newPV.DeepCopy()
@@ -2227,6 +2236,9 @@ func testValidatePVC(t *testing.T, ephemeral bool) {
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
+			if !scenario.enableVolumeAttributesClass {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, scenario.enableVolumeAttributesClass)
 
 			var errs field.ErrorList
@@ -3183,6 +3195,9 @@ func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
+			if !tc.enableVolumeAttributesClass {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, tc.enableVolumeAttributesClass)
 
 			opts := ValidationOptionsForPersistentVolumeClaim(nil, tc.oldPvc)
@@ -3214,6 +3229,9 @@ func TestValidationOptionsForPersistentVolumeClaimTemplate(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
+			if !tc.enableVolumeAttributesClass {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, tc.enableVolumeAttributesClass)
 
 			opts := ValidationOptionsForPersistentVolumeClaimTemplate(nil, tc.oldPvcTemplate)

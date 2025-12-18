@@ -442,6 +442,9 @@ func TestDropDisabledVolumeAttributesClass(t *testing.T) {
 
 	for testName, test := range tests {
 		t.Run(testName, func(t *testing.T) {
+			if !test.vacEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, test.vacEnabled)
 			DropDisabledFields(&test.spec, &test.oldSpec)
 			if test.spec.VolumeAttributesClassName != test.wantVAC {
