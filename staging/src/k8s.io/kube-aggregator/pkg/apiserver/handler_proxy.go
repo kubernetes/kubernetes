@@ -156,6 +156,9 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// For more info see the issue: https://issue.k8s.io/135285
 	if newReq.GetBody == nil && newReq.Body != nil && newReq.Body != http.NoBody {
 		newReq.Body, newReq.GetBody = wrapBodyForRetry(newReq.Body, defaultRetryableBodyConfig())
+		// Closing original body when the request is resolved
+		// This will avoid any leaks for the NopCloser of the wrapped body
+		defer req.Body.Close()
 	}
 
 	if handlingInfo.proxyRoundTripper == nil {

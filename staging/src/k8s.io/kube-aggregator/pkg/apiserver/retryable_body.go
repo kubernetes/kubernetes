@@ -52,7 +52,7 @@ func defaultRetryableBodyConfig() retryableBodyConfig {
 	}
 }
 
-// WrapBodyForRetry wraps a request body to support HTTP/2 GOAWAY retries.
+// wrapBodyForRetry wraps a request body to support HTTP/2 GOAWAY retries.
 // Returns the wrapped body and a GetBody function.
 func wrapBodyForRetry(originalBody io.ReadCloser, config retryableBodyConfig) (io.ReadCloser, func() (io.ReadCloser, error)) {
 	if originalBody == nil {

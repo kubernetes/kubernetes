@@ -187,6 +187,29 @@ func TestWrapBodyForRetryMaxAttempts(t *testing.T) {
 	}
 }
 
+// TestCloseIdempotent verifies that Close() can be called multiple times safely
+// A no-op wrapped body is required as`doRequest` performs a cleanup, so we
+// avoid closing the delegating to originalBody and closing it.
+func TestCloseIdempotent(t *testing.T) {
+	originalBody := io.NopCloser(bytes.NewBufferString("test content"))
+	config := retryableBodyConfig{maxRetryBytes: 1024, maxAttempts: 2}
+
+	wrappedBody, _ := wrapBodyForRetry(originalBody, config)
+
+	// Read all content
+	_, err := io.ReadAll(wrappedBody)
+	if err != nil {
+		t.Fatalf("unexpected read error: %v", err)
+	}
+
+	// Close multiple times - should not error
+	for i := 0; i < 3; i++ {
+		if err := wrappedBody.Close(); err != nil {
+			t.Errorf("Close() call %d returned error: %v", i+1, err)
+		}
+	}
+}
+
 func TestLimitedWriterStopsBuffering(t *testing.T) {
 	tests := []struct {
 		name         string
