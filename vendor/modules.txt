@@ -31,7 +31,7 @@ github.com/Microsoft/go-winio/internal/fs
 github.com/Microsoft/go-winio/internal/socket
 github.com/Microsoft/go-winio/internal/stringbuffer
 github.com/Microsoft/go-winio/pkg/guid
-# github.com/Microsoft/hnslib v0.1.1
+# github.com/Microsoft/hnslib v0.1.2
 ## explicit; go 1.22.0
 github.com/Microsoft/hnslib
 github.com/Microsoft/hnslib/hcn
@@ -504,9 +504,6 @@ github.com/opencontainers/selinux/pkg/pwalkdir
 # github.com/peterbourgon/diskv v2.0.1+incompatible
 ## explicit
 github.com/peterbourgon/diskv
-# github.com/pkg/errors v0.9.1
-## explicit
-github.com/pkg/errors
 # github.com/pmezard/go-difflib v1.0.0
 ## explicit
 github.com/pmezard/go-difflib/difflib
