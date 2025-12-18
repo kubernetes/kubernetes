@@ -7128,3 +7128,27 @@ func TestDescribeProjectedVolumesOptionalSecret(t *testing.T) {
 		t.Errorf("expected to find %q in output: %q", expectedOut, out)
 	}
 }
+
+func TestSmartLabelFor(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"simpleField", "Simple Field"},
+		{"respectPDBs", "Respect PDBs"},
+		{"respectPDB", "Respect PDB"},
+		{"apiURL", "API URL"},
+		{"kubeAPI", "Kube API"},
+		{"userUID", "User UID"},
+		{"HTTPSProxy", "HTTPSProxy"},  // Multiple capitals stay together
+		{"customCRDs", "Custom CRDs"}, // Another pluralized acronym
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			if got := smartLabelFor(tt.input); got != tt.expected {
+				t.Errorf("smartLabelFor(%q) = %q, want %q", tt.input, got, tt.expected)
+			}
+		})
+	}
+}
