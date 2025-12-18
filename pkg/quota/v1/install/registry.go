@@ -28,15 +28,21 @@ import (
 )
 
 // NewQuotaConfigurationForAdmission returns a quota configuration for admission control.
-func NewQuotaConfigurationForAdmission(i informers.SharedInformerFactory) quota.Configuration {
-	evaluators := core.NewEvaluators(nil, i)
-	return generic.NewConfiguration(evaluators, DefaultIgnoredResources())
+func NewQuotaConfigurationForAdmission(i informers.SharedInformerFactory) (quota.Configuration, error) {
+	evaluators, err := core.NewEvaluators(nil, i)
+	if err != nil {
+		return nil, err
+	}
+	return generic.NewConfiguration(evaluators, DefaultIgnoredResources()), nil
 }
 
 // NewQuotaConfigurationForControllers returns a quota configuration for controllers.
-func NewQuotaConfigurationForControllers(f quota.ListerForResourceFunc, i informers.SharedInformerFactory) quota.Configuration {
-	evaluators := core.NewEvaluators(f, i)
-	return generic.NewConfiguration(evaluators, DefaultIgnoredResources())
+func NewQuotaConfigurationForControllers(f quota.ListerForResourceFunc, i informers.SharedInformerFactory) (quota.Configuration, error) {
+	evaluators, err := core.NewEvaluators(f, i)
+	if err != nil {
+		return nil, err
+	}
+	return generic.NewConfiguration(evaluators, DefaultIgnoredResources()), nil
 }
 
 // ignoredResources are ignored by quota by default
