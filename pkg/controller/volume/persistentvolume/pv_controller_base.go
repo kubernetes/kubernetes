@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -64,6 +63,7 @@ import (
 type ControllerParameters struct {
 	KubeClient                clientset.Interface
 	SyncPeriod                time.Duration
+	ConcurrentSyncs           int
 	VolumePlugins             []vol.VolumePlugin
 	VolumeInformer            coreinformers.PersistentVolumeInformer
 	ClaimInformer             coreinformers.PersistentVolumeClaimInformer
@@ -91,6 +91,7 @@ func NewController(ctx context.Context, p ControllerParameters) (*PersistentVolu
 		claimQueue:                    workqueue.NewTypedWithConfig(workqueue.TypedQueueConfig[string]{Name: "claims"}),
 		volumeQueue:                   workqueue.NewTypedWithConfig(workqueue.TypedQueueConfig[string]{Name: "volumes"}),
 		resyncPeriod:                  p.SyncPeriod,
+		workers:                       p.ConcurrentSyncs,
 		operationTimestamps:           metrics.NewOperationStartTimeCache(),
 	}
 
@@ -306,7 +307,7 @@ func (ctrl *PersistentVolumeController) Run(ctx context.Context) {
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting persistent volume controller")
 
-	var wg sync.WaitGroup
+	var wg wait.Group
 	defer func() {
 		logger.Info("Shutting down persistent volume controller")
 		ctrl.claimQueue.ShutDown()
@@ -321,15 +322,22 @@ func (ctrl *PersistentVolumeController) Run(ctx context.Context) {
 	ctrl.initializeCaches(logger, ctrl.volumeLister, ctrl.claimLister)
 	metrics.Register(ctrl.volumes.store, ctrl.claims, &ctrl.volumePluginMgr)
 
-	wg.Go(func() {
-		wait.Until(func() { ctrl.resync(ctx) }, ctrl.resyncPeriod, ctx.Done())
+	wg.StartWithContext(ctx, func(ctx context.Context) {
+		wait.UntilWithContext(ctx, ctrl.resync, ctrl.resyncPeriod)
 	})
-	wg.Go(func() {
-		wait.UntilWithContext(ctx, ctrl.volumeWorker, time.Second)
-	})
-	wg.Go(func() {
-		wait.UntilWithContext(ctx, ctrl.claimWorker, time.Second)
-	})
+
+	for i := 0; i < ctrl.workers; i++ {
+		wg.StartWithContext(ctx, func(ctx context.Context) {
+			wait.UntilWithContext(ctx, ctrl.volumeWorker, time.Second)
+		})
+	}
+
+	for i := 0; i < ctrl.workers; i++ {
+		wg.StartWithContext(ctx, func(ctx context.Context) {
+			wait.UntilWithContext(ctx, ctrl.claimWorker, time.Second)
+		})
+	}
+
 	<-ctx.Done()
 }
 
@@ -492,8 +500,9 @@ func updateMigrationAnnotations(logger klog.Logger, cmpm CSIMigratedPluginManage
 	return false
 }
 
-// volumeWorker processes items from volumeQueue. It must run only once,
-// syncVolume is not assured to be reentrant.
+// volumeWorker processes items from volumeQueue. Multiple workers can run
+// concurrently, but each volume key is processed by only one worker at a time
+// using keyMutex to ensure syncVolume is not called concurrently for the same volume.
 func (ctrl *PersistentVolumeController) volumeWorker(ctx context.Context) {
 	logger := klog.FromContext(ctx)
 	workFunc := func(ctx context.Context) bool {
@@ -509,6 +518,9 @@ func (ctrl *PersistentVolumeController) volumeWorker(ctx context.Context) {
 			logger.V(4).Info("Error getting name of volume to get volume from informer", "volumeKey", key, "err", err)
 			return false
 		}
+		unlock := ctrl.volumeMutex.Lock(name)
+		defer unlock()
+
 		volume, err := ctrl.volumeLister.Get(name)
 		if err == nil {
 			// The volume still exists in informer cache, the event must have
@@ -550,8 +562,9 @@ func (ctrl *PersistentVolumeController) volumeWorker(ctx context.Context) {
 	}
 }
 
-// claimWorker processes items from claimQueue. It must run only once,
-// syncClaim is not reentrant.
+// claimWorker processes items from claimQueue. Multiple workers can run
+// concurrently, but each claim key is processed by only one worker at a time
+// using keyMutex to ensure syncClaim is not called concurrently for the same claim.
 func (ctrl *PersistentVolumeController) claimWorker(ctx context.Context) {
 	logger := klog.FromContext(ctx)
 	workFunc := func() bool {
@@ -567,6 +580,9 @@ func (ctrl *PersistentVolumeController) claimWorker(ctx context.Context) {
 			logger.V(4).Info("Error getting namespace & name of claim to get claim from informer", "claimKey", key, "err", err)
 			return false
 		}
+		unlock := ctrl.claimMutex.Lock(key)
+		defer unlock()
+
 		claim, err := ctrl.claimLister.PersistentVolumeClaims(namespace).Get(name)
 		if err == nil {
 			// The claim still exists in informer cache, the event must have
@@ -581,6 +597,7 @@ func (ctrl *PersistentVolumeController) claimWorker(ctx context.Context) {
 
 		// The claim is not in informer cache, the event must have been "delete"
 		claimObj, found, err := ctrl.claims.GetByKey(key)
+
 		if err != nil {
 			logger.V(2).Info("Error getting claim from cache", "claimKey", key, "err", err)
 			return false

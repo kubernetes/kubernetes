@@ -159,6 +159,7 @@ type PersistentVolumeController struct {
 	volumePluginMgr           vol.VolumePluginMgr
 	enableDynamicProvisioning bool
 	resyncPeriod              time.Duration
+	workers                   int
 
 	// Cache of the last known version of volumes and claims. This cache is
 	// thread safe as long as the volumes/claims there are not modified, they
@@ -182,15 +183,18 @@ type PersistentVolumeController struct {
 	volumes persistentVolumeOrderedIndex
 	claims  cache.Store
 
-	// Work queues of claims and volumes to process. Every queue should have
-	// exactly one worker thread, especially syncClaim() is not reentrant.
-	// Two syncClaims could bind two different claims to the same volume or one
-	// claim to two volumes. The controller would recover from this (due to
-	// version errors in API server and other checks in this controller),
-	// however overall speed of multi-worker controller would be lower than if
-	// it runs single thread only.
+	// Work queues of claims and volumes to process. Multiple workers can process
+	// different items concurrently, but each volume/claim key is protected by
+	// keyMutex to ensure syncVolume/syncClaim are not called concurrently for
+	// the same object.
 	claimQueue  *workqueue.Typed[string]
 	volumeQueue *workqueue.Typed[string]
+
+	// Mutexes to ensure only one worker processes the same volume/claim at a time.
+	// This allows multiple workers to process different volumes/claims concurrently
+	// while preventing concurrent processing of the same object.
+	volumeMutex keyMutex
+	claimMutex  keyMutex
 
 	// Map of scheduled/running operations.
 	runningOperations goroutinemap.GoRoutineMap
@@ -1091,10 +1095,37 @@ func (ctrl *PersistentVolumeController) bindClaimToVolume(ctx context.Context, c
 // both objects as Bound. Volume is saved first.
 // It returns on first error, it's up to the caller to implement some retry
 // mechanism.
+// This function acquires locks for both volume and claim in lexicographic order
+// to prevent deadlock. Callers MUST release any held locks before calling this.
 func (ctrl *PersistentVolumeController) bind(ctx context.Context, volume *v1.PersistentVolume, claim *v1.PersistentVolumeClaim) error {
-	var err error
-	// use updateClaim/updatedVolume to keep the original claim/volume for
-	// logging in error cases.
+	volumeKey := volume.Name
+	claimKey := claimToClaimKey(claim)
+
+	// Acquire locks in lexicographic order to avoid deadlock
+	var unlockVolume, unlockClaim func()
+	if volumeKey < claimKey {
+		unlockVolume = ctrl.volumeMutex.Lock(volumeKey)
+		unlockClaim = ctrl.claimMutex.Lock(claimKey)
+	} else {
+		unlockClaim = ctrl.claimMutex.Lock(claimKey)
+		unlockVolume = ctrl.volumeMutex.Lock(volumeKey)
+	}
+	defer unlockVolume()
+	defer unlockClaim()
+
+	// Re-fetch latest versions after acquiring locks to ensure we have the latest state
+	volumeObj, found, err := ctrl.volumes.store.GetByKey(volumeKey)
+	if err != nil || !found {
+		return fmt.Errorf("volume %s not found in cache: %w", volumeKey, err)
+	}
+	volume = volumeObj.(*v1.PersistentVolume)
+
+	claimObj, found, err := ctrl.claims.GetByKey(claimKey)
+	if err != nil || !found {
+		return fmt.Errorf("claim %s not found in cache: %w", claimKey, err)
+	}
+	claim = claimObj.(*v1.PersistentVolumeClaim)
+
 	var updatedClaim *v1.PersistentVolumeClaim
 	var updatedVolume *v1.PersistentVolume
 

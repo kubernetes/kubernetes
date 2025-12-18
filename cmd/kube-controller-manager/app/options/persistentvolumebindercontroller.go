@@ -17,6 +17,8 @@ limitations under the License.
 package options
 
 import (
+	"fmt"
+
 	"github.com/spf13/pflag"
 
 	persistentvolumeconfig "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/config"
@@ -34,6 +36,7 @@ func (o *PersistentVolumeBinderControllerOptions) AddFlags(fs *pflag.FlagSet) {
 	}
 
 	fs.DurationVar(&o.PVClaimBinderSyncPeriod.Duration, "pvclaimbinder-sync-period", o.PVClaimBinderSyncPeriod.Duration, "The period for syncing persistent volumes and persistent volume claims")
+	fs.Int32Var(&o.PVClaimBinderConcurrentSyncs, "pvclaimbinder-concurrent-syncs", o.PVClaimBinderConcurrentSyncs, "The number of PVCs that are allowed to sync concurrently. Larger number = more responsive PVC binding, but more CPU (and network) load")
 	fs.StringVar(&o.VolumeConfiguration.PersistentVolumeRecyclerConfiguration.PodTemplateFilePathNFS, "pv-recycler-pod-template-filepath-nfs", o.VolumeConfiguration.PersistentVolumeRecyclerConfiguration.PodTemplateFilePathNFS, "The file path to a pod definition used as a template for NFS persistent volume recycling")
 	fs.Int32Var(&o.VolumeConfiguration.PersistentVolumeRecyclerConfiguration.MinimumTimeoutNFS, "pv-recycler-minimum-timeout-nfs", o.VolumeConfiguration.PersistentVolumeRecyclerConfiguration.MinimumTimeoutNFS, "The minimum ActiveDeadlineSeconds to use for an NFS Recycler pod")
 	fs.Int32Var(&o.VolumeConfiguration.PersistentVolumeRecyclerConfiguration.IncrementTimeoutNFS, "pv-recycler-increment-timeout-nfs", o.VolumeConfiguration.PersistentVolumeRecyclerConfiguration.IncrementTimeoutNFS, "the increment of time added per Gi to ActiveDeadlineSeconds for an NFS scrubber pod")
@@ -52,6 +55,7 @@ func (o *PersistentVolumeBinderControllerOptions) ApplyTo(cfg *persistentvolumec
 	}
 
 	cfg.PVClaimBinderSyncPeriod = o.PVClaimBinderSyncPeriod
+	cfg.PVClaimBinderConcurrentSyncs = o.PVClaimBinderConcurrentSyncs
 	cfg.VolumeConfiguration = o.VolumeConfiguration
 
 	return nil
@@ -64,5 +68,8 @@ func (o *PersistentVolumeBinderControllerOptions) Validate() []error {
 	}
 
 	errs := []error{}
+	if o.PVClaimBinderConcurrentSyncs <= 0 {
+		errs = append(errs, fmt.Errorf("pvclaimbinder-concurrent-syncs must be greater than 0, but got %d", o.PVClaimBinderConcurrentSyncs))
+	}
 	return errs
 }

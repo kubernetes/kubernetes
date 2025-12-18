@@ -332,6 +332,7 @@ func newPersistentVolumeBinderController(ctx context.Context, controllerContext 
 	params := persistentvolumecontroller.ControllerParameters{
 		KubeClient:                client,
 		SyncPeriod:                controllerContext.ComponentConfig.PersistentVolumeBinderController.PVClaimBinderSyncPeriod.Duration,
+		ConcurrentSyncs:           int(controllerContext.ComponentConfig.PersistentVolumeBinderController.PVClaimBinderConcurrentSyncs),
 		VolumePlugins:             plugins,
 		VolumeInformer:            controllerContext.InformerFactory.Core().V1().PersistentVolumes(),
 		ClaimInformer:             controllerContext.InformerFactory.Core().V1().PersistentVolumeClaims(),
