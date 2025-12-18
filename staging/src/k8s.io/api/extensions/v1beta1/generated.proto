@@ -30,9 +30,10 @@ import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
 // Package-wide variables from generator "generated".
 option go_package = "k8s.io/api/extensions/v1beta1";
 
-// DEPRECATED - This group version of DaemonSet is deprecated by apps/v1beta2/DaemonSet. See the release notes for
-// more information.
 // DaemonSet represents the configuration of a daemon set.
+//
+// Deprecated: This group version of DaemonSet is deprecated by apps/v1beta2/DaemonSet. See the release notes for
+// more information.
 message DaemonSet {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
