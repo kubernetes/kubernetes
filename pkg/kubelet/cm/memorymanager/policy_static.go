@@ -19,7 +19,9 @@ package memorymanager
 import (
 	"fmt"
 	"sort"
+	"strings"
 
+	"github.com/go-logr/logr"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 
 	v1 "k8s.io/api/core/v1"
@@ -31,7 +33,9 @@ import (
 	corehelper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
+	cmqos "k8s.io/kubernetes/pkg/kubelet/cm/qos"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -94,28 +98,366 @@ func (p *staticPolicy) Start(logger klog.Logger, s state.State) error {
 	return nil
 }
 
+// validatePodScopeResources checks for the "empty shared pool" scenario. This
+// occurs when the sum of exclusive container memory requests consumes the
+// entire pod-level budget, leaving no memory for containers that require a
+// shared pool. Such a configuration is invalid because it would lead to
+// containers in the shared pool having no memory allocated, causing them to
+// fail.
+func (p *staticPolicy) validatePodScopeResources(logger logr.Logger, pod *v1.Pod) error {
+	podTotalMemory, err := getPodRequestedResources(logger, pod)
+	if err != nil {
+		return err
+	}
+
+	hasSharedLongRunningContainers := false
+	// Sum memory requests for all containers that run for the full pod lifetime
+	// (main containers and restartable init containers) to determine the
+	// total exclusive memory usage that might impact the shared pool.
+	sumOfLongRunningExclusiveMemory := make(map[v1.ResourceName]uint64)
+
+	// Check for empty shared pool for standard init containers.
+	for _, container := range pod.Spec.InitContainers {
+		containerReqs, err := getContainerRequestedResources(logger, pod, &container)
+		if err != nil {
+			return err
+		}
+
+		if !podutil.IsRestartableInitContainer(&container) {
+			if len(containerReqs) > 0 {
+				// This check ensures that the pool of memory available to standard init containers
+				// (the total pod budget minus any sidecars up to that point) is large enough to satisfy the
+				// request of the largest standard init container that requires exclusive memory.
+				// Since standard init containers run sequentially, we only need to fit the current.
+				poolForStandardInits := make(map[v1.ResourceName]uint64)
+				for resourceName, podTotalAmount := range podTotalMemory {
+					poolForStandardInits[resourceName] = podTotalAmount - sumOfLongRunningExclusiveMemory[resourceName]
+				}
+				for resourceName, poolSize := range poolForStandardInits {
+					if containerReqs[resourceName] > poolSize {
+						return fmt.Errorf("pod rejected, largest exclusive init container requests %d of %s, but only %d available", containerReqs[resourceName], resourceName, poolSize)
+					}
+				}
+			} else {
+				// This check ensures that if there are any standard init containers that need a
+				// shared pool, that pool is not empty. An empty pool would occur if the pod
+				// budget is fully consumed by sidecars.
+				for resourceName, poolSize := range podTotalMemory {
+					if sumOfLongRunningExclusiveMemory[resourceName] >= poolSize {
+						return fmt.Errorf("pod rejected, pod has shared init containers but no %s available for them", resourceName)
+					}
+				}
+			}
+
+			continue
+		}
+
+		// If there are restartable init containers, keep track for the empty shared pool check.
+		if len(containerReqs) == 0 {
+			hasSharedLongRunningContainers = true
+			continue
+		}
+
+		for resourceName, reqAmount := range containerReqs {
+			sumOfLongRunningExclusiveMemory[resourceName] += reqAmount
+		}
+	}
+
+	// Check for empty shared pool for concurrently running containers (app and restartable init containers).
+	for _, container := range pod.Spec.Containers {
+		containerReqs, err := getContainerRequestedResources(logger, pod, &container)
+		if err != nil {
+			return err
+		}
+
+		if len(containerReqs) == 0 {
+			hasSharedLongRunningContainers = true
+			continue
+		}
+
+		for resourceName, val := range containerReqs {
+			sumOfLongRunningExclusiveMemory[resourceName] += val
+		}
+	}
+
+	// This check ensures that if there are any standard containers that need a shared
+	// pool, that pool is not empty. An empty pool would occur if the pod budget is
+	// fully consumed by sidecars and main containers with exclusive resources.
+	if hasSharedLongRunningContainers {
+		for resourceName, totalPodResource := range podTotalMemory {
+			if sumOfLongRunningExclusiveMemory[resourceName] >= totalPodResource {
+				return fmt.Errorf("pod rejected, sum of exclusive container %s requests equals pod budget, leaving no memory for shared containers", resourceName)
+			}
+		}
+	}
+
+	return nil
+}
+
+// AllocatePod is the entry point for pod-level resource allocation.
+// It's called once per pod by the Topology Manager's pod-scope admit handler.
+// The logic here allocates a single NUMA-aligned "bubble" of memory for the
+// entire pod. All containers within the pod will share this NUMA binding.
+func (p *staticPolicy) AllocatePod(logger klog.Logger, s state.State, pod *v1.Pod) (rerr error) {
+	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod))
+	logger.V(4).Info("AllocatePod called for pod-level managed pod")
+
+	qos := v1qos.GetPodQOS(pod)
+	if qos != v1.PodQOSGuaranteed {
+		return nil
+	}
+
+	// 1. Calculate memory resources.
+	podTotalMemory, err := getPodRequestedResources(logger, pod)
+	if err != nil {
+		logger.Error(err, "Failed to get pod requested resources", "podUID", pod.UID)
+		return nil
+	}
+	logger.V(4).Info("Calculated total pod memory", "podTotalMemory", podTotalMemory)
+
+	metrics.MemoryManagerPinningRequestTotal.Inc()
+	defer func() {
+		if rerr != nil {
+			metrics.MemoryManagerPinningErrorsTotal.Inc()
+			metrics.ResourceManagerAllocationErrorsTotal.WithLabelValues(metrics.ResourceManagerMemory, metrics.ResourceManagerPod).Inc()
+		}
+	}()
+
+	// 2. Validate for the "empty shared pool" case.
+	if err := p.validatePodScopeResources(logger, pod); err != nil {
+		return admission.NewEmptyPodSharedPoolError(err)
+	}
+
+	// 3. Handle hints and NUMA alignment.
+	machineState := s.GetMachineState()
+	bestHint := p.affinity.GetAffinity(string(pod.UID), append(pod.Spec.InitContainers, pod.Spec.Containers...)[0].Name)
+	if bestHint.NUMANodeAffinity == nil {
+		defaultHint, err := p.getDefaultHint(machineState, pod, podTotalMemory)
+		if err != nil {
+			return err
+		}
+		if !defaultHint.Preferred && bestHint.Preferred {
+			return fmt.Errorf("[memorymanager] failed to find the default preferred hint")
+		}
+		bestHint = *defaultHint
+	}
+
+	if !isAffinitySatisfyRequest(machineState, bestHint.NUMANodeAffinity, podTotalMemory) {
+		extendedHint, err := p.extendTopologyManagerHint(machineState, pod, podTotalMemory, bestHint.NUMANodeAffinity)
+		if err != nil {
+			return err
+		}
+		if !extendedHint.Preferred && bestHint.Preferred {
+			return fmt.Errorf("[memorymanager] failed to find the extended preferred hint")
+		}
+		bestHint = *extendedHint
+	}
+
+	if isAffinityViolatingNUMAAllocations(machineState, bestHint.NUMANodeAffinity) {
+		return fmt.Errorf("[memorymanager] preferred hint violates NUMA node allocation")
+	}
+
+	maskBits := bestHint.NUMANodeAffinity.GetBits()
+
+	// 4. Partition the pod's memory allocation, handling init container reuse correctly.
+	exclusiveMemory := make(map[string][]state.Block)
+	sidecarMemory := make(map[v1.ResourceName]uint64)
+
+	// First, iterate through all init containers and allocate their memory.
+	for _, c := range pod.Spec.InitContainers {
+		reqs, err := getContainerRequestedResources(logger, pod, &c)
+		if err != nil {
+			return err
+		}
+
+		metrics.MemoryManagerPinningRequestTotal.Inc()
+
+		// The pool available for this init container is the entire pod allocation
+		// minus what's already taken by sidecars.
+		runnablePool := make(map[v1.ResourceName]uint64)
+		for resourceName, total := range podTotalMemory {
+			runnablePool[resourceName] = total - sidecarMemory[resourceName]
+		}
+
+		if len(reqs) == 0 {
+			// Restartable init containers will access the main pod shared pool.
+			if podutil.IsRestartableInitContainer(&c) {
+				continue
+			}
+
+			// Non restartable init containers will have access to the whole pod pool
+			// amount minus the sidecar exclusive memory up to that point.
+			blocks := []state.Block{}
+			for resourceName, req := range runnablePool {
+				if req > 0 {
+					blocks = append(blocks, state.Block{
+						NUMAAffinity: maskBits,
+						Size:         req,
+						Type:         resourceName,
+					})
+				}
+			}
+			exclusiveMemory[c.Name] = blocks
+			metrics.ResourceManagerContainerAssignments.WithLabelValues(metrics.ResourceManagerMemory, metrics.ResourceManagerSharedPod).Inc()
+			continue
+		}
+
+		// Allocate blocks
+		blocks := []state.Block{}
+		for resourceName, req := range reqs {
+			if req > 0 {
+				blocks = append(blocks, state.Block{
+					NUMAAffinity: maskBits,
+					Size:         req,
+					Type:         resourceName,
+				})
+			}
+		}
+		exclusiveMemory[c.Name] = blocks
+		metrics.ResourceManagerContainerAssignments.WithLabelValues(metrics.ResourceManagerMemory, metrics.ResourceManagerExclusivePod).Inc()
+
+		// If it's a restartable sidecar, its memory is permanently consumed from the pod's budget.
+		if podutil.IsRestartableInitContainer(&c) {
+			for resourceName, req := range reqs {
+				sidecarMemory[resourceName] += req
+			}
+		}
+	}
+
+	// Recalculate the pool available for app containers.
+	// This is the total pod budget minus what all sidecars are using.
+	appContainerPool := make(map[v1.ResourceName]uint64)
+	for resourceName, total := range podTotalMemory {
+		appContainerPool[resourceName] = total - sidecarMemory[resourceName]
+	}
+
+	// Second, iterate through regular containers, allocating from the remaining pool.
+	for _, c := range pod.Spec.Containers {
+		reqs, err := getContainerRequestedResources(logger, pod, &c)
+		if err != nil {
+			// This should not happen, as we have already validated the pod's resources.
+			return err
+		}
+
+		// A container with no memory requests will be part of the shared pool.
+		if len(reqs) == 0 {
+			continue
+		}
+		metrics.MemoryManagerPinningRequestTotal.Inc()
+
+		// Allocate blocks and consume from the pool
+		blocks := []state.Block{}
+		for resourceName, req := range reqs {
+			if req > 0 {
+				blocks = append(blocks, state.Block{
+					NUMAAffinity: maskBits,
+					Size:         req,
+					Type:         resourceName,
+				})
+				appContainerPool[resourceName] -= req
+			}
+		}
+		exclusiveMemory[c.Name] = blocks
+		metrics.ResourceManagerContainerAssignments.WithLabelValues(metrics.ResourceManagerMemory, metrics.ResourceManagerExclusivePod).Inc()
+	}
+
+	// The final shared pool is what remains after all exclusive allocations.
+	podSharedPoolBlocks := []state.Block{}
+	for resourceName, val := range appContainerPool {
+		if val > 0 {
+			podSharedPoolBlocks = append(podSharedPoolBlocks, state.Block{
+				NUMAAffinity: maskBits,
+				Size:         val,
+				Type:         resourceName,
+			})
+		}
+	}
+
+	podAllocation := []state.Block{}
+	for resourceName, requestedSize := range podTotalMemory {
+		podAllocation = append(podAllocation, state.Block{
+			NUMAAffinity: maskBits,
+			Size:         requestedSize,
+			Type:         resourceName,
+		})
+	}
+	s.SetPodMemoryBlocks(string(pod.UID), podAllocation)
+
+	// 5. Now that partitioning is successful, update the global machine state.
+	for resourceName, requestedSize := range podTotalMemory {
+		p.updateMachineState(machineState, maskBits, resourceName, requestedSize)
+	}
+	logger.V(4).Info("Partitioned pod-level memory allocation", "exclusiveMemory", podMemoryAllocationToString(exclusiveMemory), "podSharedPool", memoryBlocksToString(podSharedPoolBlocks))
+
+	// 6. Save all container assignments to the state.
+	podUID := string(pod.UID)
+	for _, c := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
+		if blocks, isExclusive := exclusiveMemory[c.Name]; isExclusive {
+			s.SetMemoryBlocks(podUID, c.Name, blocks)
+		} else {
+			s.SetMemoryBlocks(podUID, c.Name, podSharedPoolBlocks)
+			metrics.ResourceManagerContainerAssignments.WithLabelValues(metrics.ResourceManagerMemory, metrics.ResourceManagerSharedPod).Inc()
+		}
+
+		metrics.ResourceManagerAllocationsTotal.WithLabelValues(metrics.ResourceManagerMemory, metrics.ResourceManagerPod).Inc()
+	}
+
+	s.SetMachineState(machineState)
+	return nil
+}
+
+func podMemoryAllocationToString(alloc map[string][]state.Block) string {
+	if len(alloc) == 0 {
+		return ""
+	}
+	var sb strings.Builder
+	for name, blocks := range alloc {
+		fmt.Fprintf(&sb, ",%s=%s", name, memoryBlocksToString(blocks))
+	}
+	// if we have gone so far, it means we have at least 1 alloc, so the cut is safe
+	repr := sb.String()[1:]
+	return "<" + repr + ">"
+}
+
+func memoryBlocksToString(blocks []state.Block) string {
+	if len(blocks) == 0 {
+		return "[]"
+	}
+	var sb strings.Builder
+	for _, block := range blocks {
+		// Format: {Type:SizeMi @ [NUMA_Nodes]}
+		fmt.Fprintf(&sb, ",{%s:%dMi @ %v}", block.Type, block.Size/(1024*1024), block.NUMAAffinity)
+	}
+	// Cut the leading comma
+	repr := sb.String()[1:]
+	return "[" + repr + "]"
+}
+
 // Allocate call is idempotent
 func (p *staticPolicy) Allocate(logger klog.Logger, s state.State, pod *v1.Pod, container *v1.Container) (rerr error) {
 	// allocate the memory only for guaranteed pods
 	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod), "containerName", container.Name)
+
+	podUID := string(pod.UID)
+	// Allocate the memory only for guaranteed pods
 	qos := v1qos.GetPodQOS(pod)
 	if qos != v1.PodQOSGuaranteed {
 		logger.V(5).Info("Exclusive memory allocation skipped, pod QoS is not guaranteed", "qos", qos)
 		return nil
 	}
 
-	podUID := string(pod.UID)
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
+	if (!utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) || !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources)) && resourcehelper.IsPodLevelResourcesSet(pod) {
 		logger.V(2).Info("Allocation skipped, pod is using pod-level resources which are not supported by the static Memory manager policy", "podUID", podUID)
 		return nil
 	}
 
 	logger.Info("Allocate")
-	// container belongs in an exclusively allocated pool
+	// Container belongs in an exclusively allocated pool
 	metrics.MemoryManagerPinningRequestTotal.Inc()
 	defer func() {
 		if rerr != nil {
 			metrics.MemoryManagerPinningErrorsTotal.Inc()
+			metrics.ResourceManagerAllocationErrorsTotal.WithLabelValues(metrics.ResourceManagerMemory, metrics.ResourceManagerNode).Inc()
 		}
 	}()
 	if blocks := s.GetMemoryBlocks(podUID, container.Name); blocks != nil {
@@ -129,7 +471,7 @@ func (p *staticPolicy) Allocate(logger klog.Logger, s state.State, pod *v1.Pod, 
 	hint := p.affinity.GetAffinity(podUID, container.Name)
 	logger.Info("Got topology affinity", "hint", hint)
 
-	requestedResources, err := getRequestedResources(pod, container)
+	requestedResources, err := getContainerRequestedResources(logger, pod, container)
 	if err != nil {
 		return err
 	}
@@ -190,6 +532,7 @@ func (p *staticPolicy) Allocate(logger klog.Logger, s state.State, pod *v1.Pod, 
 
 		// Update nodes memory state
 		p.updateMachineState(machineState, maskBits, resourceName, requestedSize)
+		metrics.ResourceManagerAllocationsTotal.WithLabelValues(metrics.ResourceManagerMemory, metrics.ResourceManagerNode).Inc()
 	}
 
 	p.updatePodReusableMemory(pod, container, containerBlocks)
@@ -204,6 +547,7 @@ func (p *staticPolicy) Allocate(logger klog.Logger, s state.State, pod *v1.Pod, 
 	// though the final state here doesn't accurately reflect what was (in reality) allocated to each container
 	// TODO: we should refactor our state structs to reflect the amount of the re-used memory
 	p.updateInitContainersMemoryBlocks(logger, s, pod, container, containerBlocks)
+	metrics.ResourceManagerContainerAssignments.WithLabelValues(metrics.ResourceManagerMemory, metrics.ResourceManagerExclusiveNode).Inc()
 
 	logger.V(4).Info("Allocated exclusive memory")
 	return nil
@@ -257,15 +601,35 @@ func (p *staticPolicy) getPodReusableMemory(pod *v1.Pod, numaAffinity bitmask.Bi
 // RemoveContainer call is idempotent
 func (p *staticPolicy) RemoveContainer(logger klog.Logger, s state.State, podUID string, containerName string) {
 	logger = klog.LoggerWithValues(logger, "podUID", podUID, "containerName", containerName)
+	logger.Info("RemoveContainer", "podUID", podUID, "containerName", containerName)
+
+	// Check if this pod is managed with pod-level memory.
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) {
+		if podMemory := s.GetPodMemoryBlocks(podUID); podMemory != nil {
+			s.Delete(podUID, containerName)
+			// If this was the last container for the pod, then release the entire pod-level memory.
+			if len(s.GetMemoryAssignments()[podUID]) == 0 {
+				p.releaseMemory(s, podMemory)
+				s.DeletePod(podUID) // Clean up all state for the pod.
+				logger.Info("Released pod-level memory")
+			}
+			// If other containers still exist, do not release any memory yet.
+			// The pod-level memory will be released when the last container is removed.
+			return
+		}
+	}
 
 	blocks := s.GetMemoryBlocks(podUID, containerName)
 	if blocks == nil {
 		return
 	}
-
-	logger.Info("RemoveContainer", "podUID", podUID, "containerName", containerName)
 	s.Delete(podUID, containerName)
 
+	p.releaseMemory(s, blocks)
+	logger.Info("Released container-level memory")
+}
+
+func (p *staticPolicy) releaseMemory(s state.State, blocks []state.Block) {
 	// Mutate machine memory state to update free and reserved memory
 	machineState := s.GetMachineState()
 	for _, b := range blocks {
@@ -346,13 +710,32 @@ func regenerateHints(logger klog.Logger, pod *v1.Pod, ctn *v1.Container, ctnBloc
 	return hints
 }
 
-func getPodRequestedResources(pod *v1.Pod) (map[v1.ResourceName]uint64, error) {
+func getPodRequestedResources(logger logr.Logger, pod *v1.Pod) (map[v1.ResourceName]uint64, error) {
+	// If pod-level resources are set, use them directly.
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) && resourcehelper.IsPodLevelResourcesSet(pod) {
+		requestedResources := make(map[v1.ResourceName]uint64)
+		for resourceName, quantity := range pod.Spec.Resources.Requests {
+			if resourceName != v1.ResourceMemory && !corehelper.IsHugePageResourceName(resourceName) {
+				continue
+			}
+			requestedSize, succeed := quantity.AsInt64()
+			if !succeed {
+				return nil, fmt.Errorf("[memorymanager] failed to represent quantity as int64")
+			}
+			if requestedSize <= 0 {
+				continue
+			}
+			requestedResources[resourceName] = uint64(requestedSize)
+		}
+		return requestedResources, nil
+	}
+
 	// Maximun resources requested by init containers at any given time.
 	reqRsrcsByInitCtrs := make(map[v1.ResourceName]uint64)
 	// Total resources requested by restartable init containers.
 	reqRsrcsByRestartableInitCtrs := make(map[v1.ResourceName]uint64)
 	for _, ctr := range pod.Spec.InitContainers {
-		reqRsrcs, err := getRequestedResources(pod, &ctr)
+		reqRsrcs, err := getContainerRequestedResources(logger, pod, &ctr)
 
 		if err != nil {
 			return nil, err
@@ -374,7 +757,7 @@ func getPodRequestedResources(pod *v1.Pod) (map[v1.ResourceName]uint64, error) {
 
 	reqRsrcsByAppCtrs := make(map[v1.ResourceName]uint64)
 	for _, ctr := range pod.Spec.Containers {
-		reqRsrcs, err := getRequestedResources(pod, &ctr)
+		reqRsrcs, err := getContainerRequestedResources(logger, pod, &ctr)
 
 		if err != nil {
 			return nil, err
@@ -408,14 +791,37 @@ func (p *staticPolicy) GetPodTopologyHints(logger klog.Logger, s state.State, po
 		return nil
 	}
 
-	reqRsrcs, err := getPodRequestedResources(pod)
+	// Get a count of how much memory has been requested by Pod.
+	reqRsrcs, err := getPodRequestedResources(logger, pod)
 	if err != nil {
 		logger.Error(err, "Failed to get pod requested resources", "podUID", pod.UID)
 		return nil
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
-		logger.V(3).Info("Topology hints generation skipped, pod is using pod-level resources which are not supported by the static Memory manager policy", "podUID", pod.UID)
+	// If the pod has pod-level resources but the feature gate is disabled,
+	// log it and return nil hints to admit the pod without alignment.
+	if (!utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) || !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources)) && resourcehelper.IsPodLevelResourcesSet(pod) {
+		logger.V(3).Info("Memory Manager pod hint generation skipped, pod is using pod-level resources but the PodLevelResourceManagers feature gate is not enabled", "podUID", pod.UID)
+		return nil
+	}
+
+	// Validate that if a pod has containers that will be placed in a shared pool,
+	// there are actually memory left over for that pool after accounting for all
+	// exclusive allocations. If the sum of exclusive memory requests consumes the
+	// entire pod-level memory budget, no hints will be generated, causing the pod
+	// to be rejected by the Topology Manager.
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) && resourcehelper.IsPodLevelResourcesSet(pod) {
+		if err := p.validatePodScopeResources(logger, pod); err != nil {
+			logger.V(2).Info("Pod admission will fail", "error", err)
+			hints := make(map[string][]topologymanager.TopologyHint)
+			for resourceName := range reqRsrcs {
+				hints[string(resourceName)] = []topologymanager.TopologyHint{}
+			}
+			return hints
+		}
+	}
+
+	if len(reqRsrcs) == 0 {
 		return nil
 	}
 
@@ -443,14 +849,16 @@ func (p *staticPolicy) GetTopologyHints(logger klog.Logger, s state.State, pod *
 		return nil
 	}
 
-	requestedResources, err := getRequestedResources(pod, container)
+	requestedResources, err := getContainerRequestedResources(logger, pod, container)
 	if err != nil {
 		logger.Error(err, "Failed to get container requested resources", "podUID", pod.UID, "containerName", container.Name)
 		return nil
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
-		logger.V(3).Info("Topology hints generation skipped, pod is using pod-level resources which are not supported by the static Memory manager policy", "podUID", pod.UID)
+	// If the pod has pod-level resources but the feature gate is disabled,
+	// log it and return nil hints to admit the pod without alignment.
+	if (!utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) || !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources)) && resourcehelper.IsPodLevelResourcesSet(pod) {
+		logger.V(3).Info("Memory Manager pod hint generation skipped, pod is using pod-level resources but the PodLevelResourceManagers feature gate is not enabled", "podUID", pod.UID)
 		return nil
 	}
 
@@ -465,12 +873,21 @@ func (p *staticPolicy) GetTopologyHints(logger klog.Logger, s state.State, pod *
 	return p.calculateHints(s.GetMachineState(), pod, requestedResources)
 }
 
-func getRequestedResources(pod *v1.Pod, container *v1.Container) (map[v1.ResourceName]uint64, error) {
+func getContainerRequestedResources(logger logr.Logger, pod *v1.Pod, container *v1.Container) (map[v1.ResourceName]uint64, error) {
 	requestedResources := map[v1.ResourceName]uint64{}
+	// For pod-level resource management, a container is only considered for exclusive
+	// memory if its request equals its limit for both the CPU and Memory. This
+	// aligns with the Guaranteed QoS requirement for container-level resources.
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) && resourcehelper.IsPodLevelResourcesSet(pod) && !cmqos.IsContainerEquivalentQOSGuaranteed(container) {
+		logger.V(5).Info("Exclusive Memory allocation skipped, container is not eligible, request and limit are not equal", "pod", klog.KObj(pod), "containerName", container.Name)
+		return requestedResources, nil
+	}
+
 	for resourceName, quantity := range container.Resources.Requests {
 		if resourceName != v1.ResourceMemory && !corehelper.IsHugePageResourceName(resourceName) {
 			continue
 		}
+
 		requestedSize, succeed := quantity.AsInt64()
 		if !succeed {
 			return nil, fmt.Errorf("[memorymanager] failed to represent quantity as int64")
@@ -614,45 +1031,18 @@ func (p *staticPolicy) validateState(logger klog.Logger, s state.State) error {
 	// calculate all memory assigned to containers
 	expectedMachineState := p.getDefaultMachineState()
 	for pod, container := range memoryAssignments {
-		for containerName, blocks := range container {
-			for _, b := range blocks {
-				requestedSize := b.Size
-				for _, nodeID := range b.NUMAAffinity {
-					nodeState, ok := expectedMachineState[nodeID]
-					if !ok {
-						return fmt.Errorf("[memorymanager] (pod: %s, container: %s) the memory assignment uses the NUMA that does not exist", pod, containerName)
-					}
-
-					nodeState.NumberOfAssignments++
-					nodeState.Cells = b.NUMAAffinity
-
-					memoryState, ok := nodeState.MemoryMap[b.Type]
-					if !ok {
-						return fmt.Errorf("[memorymanager] (pod: %s, container: %s) the memory assignment uses memory resource that does not exist", pod, containerName)
-					}
-
-					if requestedSize == 0 {
-						continue
-					}
-
-					// this node does not have enough memory continue to the next one
-					if memoryState.Free <= 0 {
-						continue
-					}
-
-					// the node has enough memory to satisfy the request
-					if memoryState.Free >= requestedSize {
-						memoryState.Reserved += requestedSize
-						memoryState.Free -= requestedSize
-						requestedSize = 0
-						continue
-					}
-
-					// the node does not have enough memory, use the node remaining memory and move to the next node
-					requestedSize -= memoryState.Free
-					memoryState.Reserved += memoryState.Free
-					memoryState.Free = 0
+		if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) {
+			if podBlocks := s.GetPodMemoryBlocks(pod); len(podBlocks) > 0 {
+				if err := p.updateExpectedMachineState(expectedMachineState, podBlocks, pod, ""); err != nil {
+					return err
 				}
+				continue
+			}
+		}
+
+		for containerName, blocks := range container {
+			if err := p.updateExpectedMachineState(expectedMachineState, blocks, pod, containerName); err != nil {
+				return err
 			}
 		}
 	}
@@ -665,6 +1055,49 @@ func (p *staticPolicy) validateState(logger klog.Logger, s state.State) error {
 		return fmt.Errorf("[memorymanager] the expected machine state is different from the real one")
 	}
 
+	return nil
+}
+
+func (p *staticPolicy) updateExpectedMachineState(expectedMachineState state.NUMANodeMap, blocks []state.Block, podUID, containerName string) error {
+	for _, b := range blocks {
+		requestedSize := b.Size
+		for _, nodeID := range b.NUMAAffinity {
+			nodeState, ok := expectedMachineState[nodeID]
+			if !ok {
+				return fmt.Errorf("[memorymanager] (pod: %s, container: %s) the memory assignment uses the NUMA that does not exist", podUID, containerName)
+			}
+
+			nodeState.NumberOfAssignments++
+			nodeState.Cells = b.NUMAAffinity
+
+			memoryState, ok := nodeState.MemoryMap[b.Type]
+			if !ok {
+				return fmt.Errorf("[memorymanager] (pod: %s, container: %s) the memory assignment uses memory resource that does not exist", podUID, containerName)
+			}
+
+			if requestedSize == 0 {
+				continue
+			}
+
+			// this node does not have enough memory continue to the next one
+			if memoryState.Free <= 0 {
+				continue
+			}
+
+			// the node has enough memory to satisfy the request
+			if memoryState.Free >= requestedSize {
+				memoryState.Reserved += requestedSize
+				memoryState.Free -= requestedSize
+				requestedSize = 0
+				continue
+			}
+
+			// the node does not have enough memory, use the node remaining memory and move to the next node
+			requestedSize -= memoryState.Free
+			memoryState.Reserved += memoryState.Free
+			memoryState.Free = 0
+		}
+	}
 	return nil
 }
 

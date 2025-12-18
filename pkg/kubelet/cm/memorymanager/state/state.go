@@ -100,14 +100,26 @@ func (as ContainerMemoryAssignments) Clone() ContainerMemoryAssignments {
 	return clone
 }
 
+// PodMemoryAssignments stores memory assignments of pods
+type PodMemoryAssignments map[string]PodEntry
+
+// PodEntry represents pod-level memory assignments for a pod
+type PodEntry struct {
+	MemoryBlocks []Block `json:"memoryBlocks,omitempty"`
+}
+
 // Reader interface used to read current memory/pod assignment state
 type Reader interface {
 	// GetMachineState returns Memory Map stored in the State
 	GetMachineState() NUMANodeMap
 	// GetMemoryBlocks returns memory assignments of a container
 	GetMemoryBlocks(podUID string, containerName string) []Block
+	// GetPodMemoryBlocks returns pod-level memory assignments of a pod
+	GetPodMemoryBlocks(podUID string) []Block
 	// GetMemoryAssignments returns ContainerMemoryAssignments
 	GetMemoryAssignments() ContainerMemoryAssignments
+	// GetPodMemoryAssignments returns all pod-level memory assignments
+	GetPodMemoryAssignments() PodMemoryAssignments
 }
 
 type writer interface {
@@ -115,10 +127,16 @@ type writer interface {
 	SetMachineState(memoryMap NUMANodeMap)
 	// SetMemoryBlocks stores memory assignments of a container
 	SetMemoryBlocks(podUID string, containerName string, blocks []Block)
+	// SetPodMemoryBlocks stores pod-level memory assignments of a pod
+	SetPodMemoryBlocks(podUID string, blocks []Block)
 	// SetMemoryAssignments sets ContainerMemoryAssignments by using the passed parameter
 	SetMemoryAssignments(assignments ContainerMemoryAssignments)
+	// SetPodMemoryAssignments sets PodMemoryAssignments by using the passed parameter
+	SetPodMemoryAssignments(assignments PodMemoryAssignments)
 	// Delete deletes corresponding Blocks from ContainerMemoryAssignments
 	Delete(podUID string, containerName string)
+	// DeletePod deletes all pod-level memory assignments for specified pod
+	DeletePod(podUID string)
 	// ClearState clears machineState and ContainerMemoryAssignments
 	ClearState()
 }

@@ -709,6 +709,13 @@ const (
 	// Enables controlling pod ranking on replicaset scale-down.
 	PodDeletionCost featuregate.Feature = "PodDeletionCost"
 
+	// owner: @KevinTMtz
+	// kep: https://k8s.io/5526
+	//
+	// PodLevelResourceManagers enables pod-level resource management in the Topology, CPU, and Memory managers.
+	// This feature depends on the PodLevelResources feature.
+	PodLevelResourceManagers featuregate.Feature = "PodLevelResourceManagers"
+
 	// owner: @ndixita
 	// key: https://kep.k8s.io/2837
 	//
@@ -1619,6 +1626,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.22"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	PodLevelResourceManagers: {
+		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	PodLevelResources: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
@@ -2374,6 +2385,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	PodCertificateRequest: {AuthorizeNodeWithSelectors},
 
 	PodDeletionCost: {},
+
+	PodLevelResourceManagers: {PodLevelResources},
 
 	PodLevelResources: {},
 
