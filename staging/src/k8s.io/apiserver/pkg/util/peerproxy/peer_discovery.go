@@ -115,11 +115,9 @@ func (h *peerProxyHandler) syncPeerDiscoveryCache(ctx context.Context) error {
 		}
 	}
 
-	// Apply exclusion filter to the cache.
-	if len(newCache) != 0 {
-		if filteredCache, peerDiscoveryChanged := h.filterPeerDiscoveryCache(newCache); peerDiscoveryChanged {
-			newCache = filteredCache
-		}
+	// Apply current exclusion filter to new peer cache entries.
+	if filtered, changed := h.gvExclusionManager.FilterPeerDiscoveryCache(newCache); changed {
+		newCache = filtered
 	}
 
 	h.storePeerDiscoveryCacheAndInvalidate(newCache)
