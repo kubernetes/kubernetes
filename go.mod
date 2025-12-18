@@ -40,7 +40,6 @@ require (
 	github.com/lithammer/dedent v1.1.0
 	github.com/moby/ipvs v1.1.0
 	github.com/moby/sys/userns v0.1.0
-	github.com/mrunalp/fileutils v0.5.1
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
 	github.com/onsi/ginkgo/v2 v2.27.2
 	github.com/onsi/gomega v1.38.2
