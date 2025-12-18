@@ -592,6 +592,7 @@ func (ev *Evaluator) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName 
 			// We do not return as this error is not critical.
 		}
 
+		preemptLastVictim := true
 		if len(victimPods) > 1 {
 			// In order to prevent requesting preemption of the same pod multiple times for the same preemptor,
 			// preemptor is marked as "waiting for preemption of a victim" (by adding it to preempting map).
@@ -607,19 +608,24 @@ func (ev *Evaluator) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName 
 			if err := errCh.ReceiveError(); err != nil {
 				utilruntime.HandleErrorWithContext(ctx, err, "Error occurred during async preemption")
 				result = metrics.GoroutineResultError
+				preemptLastVictim = false
 			}
 		}
 
-		lastVictim := victimPods[len(victimPods)-1]
-		ev.mu.Lock()
-		ev.lastVictimsPendingPreemption[pod.UID] = pendingVictim{namespace: lastVictim.Namespace, name: lastVictim.Name}
-		ev.mu.Unlock()
+		// If any of the previous victims failed to be preempted, then we can skip
+		// the preemption attempt for the last victim Pod to expedite the preemptor's
+		// re-entry to the scheduling cycle.
+		if preemptLastVictim {
+			lastVictim := victimPods[len(victimPods)-1]
+			ev.mu.Lock()
+			ev.lastVictimsPendingPreemption[pod.UID] = pendingVictim{namespace: lastVictim.Namespace, name: lastVictim.Name}
+			ev.mu.Unlock()
 
-		if err := ev.PreemptPod(ctx, c, pod, lastVictim, pluginName); err != nil {
-			utilruntime.HandleErrorWithContext(ctx, err, "Error occurred during async preemption")
-			result = metrics.GoroutineResultError
+			if err := ev.PreemptPod(ctx, c, pod, lastVictim, pluginName); err != nil {
+				utilruntime.HandleErrorWithContext(ctx, err, "Error occurred during async preemption of the last victim")
+				result = metrics.GoroutineResultError
+			}
 		}
-
 		ev.mu.Lock()
 		ev.preempting.Delete(pod.UID)
 		delete(ev.lastVictimsPendingPreemption, pod.UID)
