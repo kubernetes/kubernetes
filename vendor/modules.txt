@@ -540,6 +540,15 @@ github.com/prometheus/procfs/internal/util
 github.com/robfig/cron/v3
 # github.com/rogpeppe/go-internal v1.14.1
 ## explicit; go 1.23
+github.com/rogpeppe/go-internal/diff
+github.com/rogpeppe/go-internal/imports
+github.com/rogpeppe/go-internal/internal/misspell
+github.com/rogpeppe/go-internal/internal/os/execpath
+github.com/rogpeppe/go-internal/par
+github.com/rogpeppe/go-internal/testenv
+github.com/rogpeppe/go-internal/testscript
+github.com/rogpeppe/go-internal/testscript/internal/pty
+github.com/rogpeppe/go-internal/txtar
 # github.com/russross/blackfriday/v2 v2.1.0
 ## explicit
 github.com/russross/blackfriday/v2
@@ -920,6 +929,7 @@ golang.org/x/tools/internal/stdlib
 golang.org/x/tools/internal/typeparams
 golang.org/x/tools/internal/typesinternal
 golang.org/x/tools/internal/versions
+golang.org/x/tools/txtar
 # golang.org/x/tools/go/expect v0.1.1-deprecated
 ## explicit; go 1.23.0
 # google.golang.org/genproto/googleapis/api v0.0.0-20250303144028-a0af3efb3deb
