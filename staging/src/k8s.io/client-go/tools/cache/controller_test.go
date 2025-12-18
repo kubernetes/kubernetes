@@ -1013,7 +1013,9 @@ func testReplaceEvents(t *testing.T, ctx context.Context, fifo Queue, m *eventRe
 
 			items := sortItemsByKey(store.List(), DeletionHandlingMetaNamespaceKeyFunc)
 			assert.Equal(t, tc.replacedItems, items)
-			assert.Equal(t, tc.expectedHistory, m.getHistory())
+			// synthetic delete events from a replace are not ordered, sort by key to make the test deterministic
+			history := sortDeleteEventsByKey(m.getHistory())
+			assert.Equal(t, tc.expectedHistory, history)
 		})
 	}
 }
@@ -1127,4 +1129,18 @@ func sortItemsByKey(items []interface{}, keyFunc KeyFunc) []interface{} {
 		return keyI < keyJ
 	})
 	return items
+}
+
+func sortDeleteEventsByKey(events []eventRecord) []eventRecord {
+	sort.Slice(events, func(i, j int) bool {
+		eventI := events[i]
+		eventJ := events[j]
+		// sort delete events for different objects by key
+		if eventI.Action == "delete" && eventJ.Action == "delete" && eventI.Key != eventJ.Key {
+			return eventI.Key < eventJ.Key
+		}
+		// keep existing order otherwise
+		return i < j
+	})
+	return events
 }
