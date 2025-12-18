@@ -478,12 +478,6 @@ var (
 		Effect: v1.TaintEffectNoSchedule,
 	}
 
-	// ControlPlaneToleration is the toleration to apply on the PodSpec for being able to run that Pod on the control-plane
-	ControlPlaneToleration = v1.Toleration{
-		Key:    LabelNodeRoleControlPlane,
-		Effect: v1.TaintEffectNoSchedule,
-	}
-
 	// ControlPlaneComponents defines the control-plane component names
 	ControlPlaneComponents = []string{KubeAPIServer, KubeControllerManager, KubeScheduler}
 
