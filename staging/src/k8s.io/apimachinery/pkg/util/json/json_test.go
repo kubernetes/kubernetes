@@ -1,5 +1,4 @@
 //go:build go1.8
-// +build go1.8
 
 /*
 Copyright 2015 The Kubernetes Authors.

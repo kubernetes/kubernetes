@@ -1,5 +1,4 @@
 //go:build !notest
-// +build !notest
 
 /*
 Copyright 2020 The Kubernetes Authors.

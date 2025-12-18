@@ -1,5 +1,4 @@
 //go:build darwin
-// +build darwin
 
 /*
 Copyright 2018 The Kubernetes Authors.
