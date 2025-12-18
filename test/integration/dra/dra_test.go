@@ -61,6 +61,7 @@ import (
 	"k8s.io/klog/v2"
 	kubeschedulerconfigv1 "k8s.io/kube-scheduler/config/v1"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
+	"k8s.io/kubernetes/pkg/controller/resourceclaim"
 	resourceclaimmetrics "k8s.io/kubernetes/pkg/controller/resourceclaim/metrics"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -172,6 +173,7 @@ func TestDRA(t *testing.T) {
 					tCtx = tCtx.WithNamespace(namespace)
 					TestCreateResourceSlices(tCtx, 100)
 				})
+				tCtx.Run("ShareResourceClaimSequentially", testShareResourceClaimSequentially)
 				tCtx.Run("UsesAllResources", testUsesAllResources)
 			},
 		},
@@ -249,6 +251,7 @@ func TestDRA(t *testing.T) {
 				// in the experimental channel has an improvement that requires a higher number here than
 				// in the incubating and stable channels.
 				tCtx.Run("FilterTimeout", func(tCtx ktesting.TContext) { testFilterTimeout(tCtx, 20) })
+				tCtx.Run("ShareResourceClaimSequentially", testShareResourceClaimSequentially)
 				tCtx.Run("UsesAllResources", testUsesAllResources)
 			},
 		},
@@ -288,6 +291,7 @@ func TestDRA(t *testing.T) {
 
 			createNodes(tCtx)
 			tCtx = prepareScheduler(tCtx)
+			tCtx = prepareClaimController(tCtx)
 
 			tc.f(tCtx)
 		})
@@ -381,6 +385,27 @@ func startSchedulerWithConfig(tCtx ktesting.TContext, config string) {
 	scheduler.start(tCtx, config)
 }
 
+// prepareClaimController does the same as prepareScheduler for the ResourceClaimController.
+func prepareClaimController(tCtx ktesting.TContext) ktesting.TContext {
+	claimController := &claimControllerSingleton{
+		rootCtx: tCtx,
+	}
+
+	return tCtx.WithValue(claimControllerKey, claimController)
+}
+
+// startClaimController can be used by tests to ensure that the ResourceClaim controller is running.
+// This may be used in parallel tests.
+func startClaimController(tCtx ktesting.TContext) {
+	tCtx.Helper()
+	value := tCtx.Value(claimControllerKey)
+	if value == nil {
+		tCtx.Fatal("internal error: startClaimController without a prior prepareClaimController call")
+	}
+	claimController := value.(*claimControllerSingleton)
+	claimController.start(tCtx)
+}
+
 type schedulerSingleton struct {
 	rootCtx ktesting.TContext
 
@@ -446,6 +471,84 @@ func newSchedulerComponentConfig(tCtx ktesting.TContext, cfgData string) *config
 	tCtx.ExpectNoError(err, "decode default scheduler configuration")
 	return &cfg
 }
+
+type claimControllerSingleton struct {
+	rootCtx ktesting.TContext
+
+	mutex           sync.Mutex
+	usageCount      int
+	wg              sync.WaitGroup
+	informerFactory informers.SharedInformerFactory
+	cancel          func(cause string)
+}
+
+func (claimController *claimControllerSingleton) start(tCtx ktesting.TContext) {
+	tCtx.Helper()
+	claimController.mutex.Lock()
+	defer claimController.mutex.Unlock()
+
+	claimController.usageCount++
+	tCtx.CleanupCtx(claimController.stop)
+	if claimController.usageCount > 1 {
+		// Already started earlier.
+		return
+	}
+
+	// Run claimController with default configuration. This must use the root context because
+	// the per-test tCtx passed to start will get canceled once the test which triggered
+	// starting the claimController is done.
+	tCtx = claimController.rootCtx
+	tCtx.Logf("Starting the ResourceClaim controller for test %s...", tCtx.Name())
+	tCtx = tCtx.WithLogger(klog.LoggerWithName(tCtx.Logger(), "claimController"))
+
+	claimControllerCtx := tCtx.WithCancel()
+	claimController.cancel = claimControllerCtx.Cancel
+
+	client := claimControllerCtx.Client()
+	claimController.informerFactory = informers.NewSharedInformerFactory(client, 0 /* resync period */)
+	controller, err := resourceclaim.NewController(
+		klog.FromContext(claimControllerCtx),
+		resourceclaim.Features{
+			AdminAccess:     utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess),
+			PrioritizedList: utilfeature.DefaultFeatureGate.Enabled(features.DRAPrioritizedList),
+		},
+		claimControllerCtx.Client(),
+		claimController.informerFactory.Core().V1().Pods(),
+		claimController.informerFactory.Resource().V1().ResourceClaims(),
+		claimController.informerFactory.Resource().V1().ResourceClaimTemplates(),
+	)
+	tCtx.ExpectNoError(err, "create ResourceClaim controller")
+
+	claimController.informerFactory.Start(claimControllerCtx.Done())
+	claimController.wg.Go(func() {
+		controller.Run(claimControllerCtx, 1 /* one worker to get more readable log output without interleaving */)
+	})
+	tCtx.Logf("Started the claimController for test %s.", tCtx.Name())
+}
+
+func (claimController *claimControllerSingleton) stop(tCtx ktesting.TContext) {
+	claimController.mutex.Lock()
+	defer claimController.mutex.Unlock()
+
+	claimController.usageCount--
+	if claimController.usageCount > 0 {
+		// Still in use by some other test.
+		return
+	}
+
+	claimController.rootCtx.Logf("Stopping the ResourceClaim controller after test %s...", tCtx.Name())
+	if claimController.cancel != nil {
+		claimController.cancel("test is done")
+	}
+	if claimController.informerFactory != nil {
+		claimController.informerFactory.Shutdown()
+	}
+	claimController.wg.Wait()
+}
+
+type claimControllerKeyType int
+
+var claimControllerKey claimControllerKeyType
 
 // testPod creates a pod with a resource claim reference and then checks
 // whether that field is or isn't getting dropped.
