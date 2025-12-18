@@ -18,10 +18,13 @@ package peerproxy
 
 import (
 	"context"
+	"sync/atomic"
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 
 	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
@@ -33,25 +36,80 @@ import (
 // in peer-aggregated discovery that were deleted but still appear in a peer's discovery.
 type GVExtractor func(obj interface{}) []schema.GroupVersion
 
+// GVExclusionManager manages the exclusion of group-versions from peer discovery.
+// It maintains two atomic maps:
+// - currentlyActiveGVs: All GVs currently served by CRDs and aggregated APIServices
+// - recentlyDeletedGVs: GVs belonging to CRDs and aggregated APIServices that were recently deleted,
+// tracked with deletion timestamp for grace period
+//
+// It runs three workers:
+// 1. Active GV Tracker: Triggered on CRD/APIService events, rebuilds active GVs
+// 2. Reaper: Periodically removes expired GVs from recentlyDeletedGVs
+// 3. Peer Discovery Re-filter: Rate-limited worker that filters peer cache
+type GVExclusionManager struct {
+	// Atomic maps for lock-free access
+	currentlyActiveGVs atomic.Value // map[schema.GroupVersion]struct{}
+	recentlyDeletedGVs atomic.Value // map[schema.GroupVersion]time.Time
+
+	// Informers for fetching active GVs
+	crdInformer         cache.SharedIndexInformer
+	crdExtractor        GVExtractor
+	apiServiceInformer  cache.SharedIndexInformer
+	apiServiceExtractor GVExtractor
+
+	// Worker 1: triggered by CRD/APIService events
+	activeGVQueue workqueue.TypedRateLimitingInterface[string]
+	// Worker 2: periodic reaper's configuration
+	exclusionGracePeriod time.Duration
+	reaperCheckInterval  time.Duration
+	// Worker 3: triggered by Active/Deleted GV changes
+	refilterQueue workqueue.TypedRateLimitingInterface[string]
+
+	peerDiscoveryCache   *atomic.Value // peerProxyHandler.peerDiscoveryInfoCache
+	invalidationCallback *atomic.Pointer[func()]
+}
+
+// NewGVExclusionManager creates a new GV exclusion manager.
+func NewGVExclusionManager(
+	exclusionGracePeriod time.Duration,
+	reaperCheckInterval time.Duration,
+	peerDiscoveryCache *atomic.Value,
+	invalidationCallback *atomic.Pointer[func()],
+) *GVExclusionManager {
+	mgr := &GVExclusionManager{
+		exclusionGracePeriod: exclusionGracePeriod,
+		reaperCheckInterval:  reaperCheckInterval,
+		peerDiscoveryCache:   peerDiscoveryCache,
+		invalidationCallback: invalidationCallback,
+		activeGVQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Name: "active-gv-tracker",
+			}),
+		refilterQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Name: "peer-discovery-refilter",
+			}),
+	}
+
+	mgr.currentlyActiveGVs.Store(map[schema.GroupVersion]struct{}{})
+	mgr.recentlyDeletedGVs.Store(map[schema.GroupVersion]time.Time{})
+
+	return mgr
+}
+
 // RegisterCRDInformerHandlers registers event handlers for CRD informer using a custom extractor.
 // The extractor function is responsible for extracting GroupVersions from CRD objects.
-func (h *peerProxyHandler) RegisterCRDInformerHandlers(crdInformer cache.SharedIndexInformer, extractor GVExtractor) error {
-	h.crdInformer = crdInformer
-	h.crdExtractor = extractor
-	_, err := h.crdInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+func (m *GVExclusionManager) RegisterCRDInformerHandlers(crdInformer cache.SharedIndexInformer, extractor GVExtractor) error {
+	m.crdInformer = crdInformer
+	m.crdExtractor = extractor
+	_, err := m.crdInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			gvs := extractor(obj)
-			if gvs == nil {
-				return
-			}
-			h.addExcludedGVs(gvs)
+			m.handleGVUpdate()
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
-			gvs := extractor(newObj)
-			if gvs == nil {
-				return
-			}
-			h.addExcludedGVs(gvs)
+			m.handleGVUpdate()
 		},
 		DeleteFunc: func(obj interface{}) {
 			// Handle tombstone objects
@@ -62,9 +120,7 @@ func (h *peerProxyHandler) RegisterCRDInformerHandlers(crdInformer cache.SharedI
 			if gvs == nil {
 				return
 			}
-			for _, gv := range gvs {
-				h.gvDeletionQueue.Add(gv.String())
-			}
+			m.onDeleteEvent(gvs)
 		},
 	})
 	return err
@@ -73,23 +129,15 @@ func (h *peerProxyHandler) RegisterCRDInformerHandlers(crdInformer cache.SharedI
 // RegisterAPIServiceInformerHandlers registers event handlers for APIService informer using a custom extractor.
 // The extractor function is responsible for extracting GroupVersions from APIService objects
 // and determining if they represent aggregated APIs.
-func (h *peerProxyHandler) RegisterAPIServiceInformerHandlers(apiServiceInformer cache.SharedIndexInformer, extractor GVExtractor) error {
-	h.apiServiceInformer = apiServiceInformer
-	h.apiServiceExtractor = extractor
-	_, err := h.apiServiceInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+func (m *GVExclusionManager) RegisterAPIServiceInformerHandlers(apiServiceInformer cache.SharedIndexInformer, extractor GVExtractor) error {
+	m.apiServiceInformer = apiServiceInformer
+	m.apiServiceExtractor = extractor
+	_, err := m.apiServiceInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			gvs := extractor(obj)
-			if gvs == nil {
-				return
-			}
-			h.addExcludedGVs(gvs)
+			m.handleGVUpdate()
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
-			gvs := extractor(newObj)
-			if gvs == nil {
-				return
-			}
-			h.addExcludedGVs(gvs)
+			m.handleGVUpdate()
 		},
 		DeleteFunc: func(obj interface{}) {
 			// Handle tombstone objects
@@ -101,30 +149,272 @@ func (h *peerProxyHandler) RegisterAPIServiceInformerHandlers(apiServiceInformer
 			if gvs == nil {
 				return
 			}
-			for _, gv := range gvs {
-				h.gvDeletionQueue.Add(gv.String())
-			}
+			m.onDeleteEvent(gvs)
 		},
 	})
 	return err
 }
 
-// addExcludedGVs adds group-versions to the exclusion set, filters them from the peer discovery cache,
-// and triggers invalidation callbacks if the cache changed.
-func (h *peerProxyHandler) addExcludedGVs(gvs []schema.GroupVersion) {
+// WaitForCacheSync waits for the informer caches to sync.
+func (m *GVExclusionManager) WaitForCacheSync(stopCh <-chan struct{}) bool {
+	synced := []cache.InformerSynced{}
+	if m.crdInformer != nil {
+		synced = append(synced, m.crdInformer.HasSynced)
+	}
+	if m.apiServiceInformer != nil {
+		synced = append(synced, m.apiServiceInformer.HasSynced)
+	}
+	if len(synced) == 0 {
+		return true
+	}
+	return cache.WaitForNamedCacheSync("gv-exclusion-manager", stopCh, synced...)
+}
+
+// getExclusionSet returns the combined exclusion set i.e., union(currentlyActiveGVs, recentlyDeletedGVs)
+func (m *GVExclusionManager) getExclusionSet() map[schema.GroupVersion]struct{} {
+	activeMap := m.loadCurrentlyActiveGVs()
+	deletedMap := m.loadRecentlyDeletedGVs()
+
+	exclusionSet := make(map[schema.GroupVersion]struct{}, len(activeMap)+len(deletedMap))
+	for gv := range activeMap {
+		exclusionSet[gv] = struct{}{}
+	}
+	for gv := range deletedMap {
+		exclusionSet[gv] = struct{}{}
+	}
+
+	return exclusionSet
+}
+
+// handleGVUpdate is called when a CRD or APIService event occurs.
+// This triggers Worker 1 to rebuild the active GV set.
+func (m *GVExclusionManager) handleGVUpdate() {
+	m.activeGVQueue.Add("sync")
+}
+
+// onDeleteEvent is called when a CRD or APIService is deleted.
+// This removes the GVs from currentlyActiveGVs, adds them to recentlyDeletedGVs
+// with current timestamp, and queues Worker 3 to refilter the peer discovery cache.
+func (m *GVExclusionManager) onDeleteEvent(gvs []schema.GroupVersion) {
 	if len(gvs) == 0 {
 		return
 	}
 
-	h.excludedGVsMu.Lock()
-	for _, gv := range gvs {
-		h.excludedGVs[gv] = nil
+	// Remove from currentlyActiveGVs
+	activeMap := m.loadCurrentlyActiveGVs()
+	newActiveMap := make(map[schema.GroupVersion]struct{}, len(activeMap))
+	for k, v := range activeMap {
+		newActiveMap[k] = v
 	}
-	h.excludedGVsMu.Unlock()
+	for _, gv := range gvs {
+		delete(newActiveMap, gv)
+	}
+	m.currentlyActiveGVs.Store(newActiveMap)
 
-	// Load current peer cache and filter it
-	cache := h.peerDiscoveryInfoCache.Load()
+	// Add to recentlyDeletedGVs
+	deletedMap := m.loadRecentlyDeletedGVs()
+	newDeletedMap := make(map[schema.GroupVersion]time.Time, len(deletedMap)+len(gvs))
+	for k, v := range deletedMap {
+		newDeletedMap[k] = v
+	}
+	now := time.Now()
+	for _, gv := range gvs {
+		newDeletedMap[gv] = now
+		klog.V(4).Infof("GV %s deleted: moved to recentlyDeletedGVs", gv.String())
+	}
+	m.recentlyDeletedGVs.Store(newDeletedMap)
+
+	// Queue Worker 3
+	m.refilterQueue.Add("refilter")
+}
+
+// RunActiveGVTracker runs Worker 1: Active GV Tracker
+// This worker is triggered by CRD/APIService events and rebuilds the active GV set.
+func (m *GVExclusionManager) RunActiveGVTracker(ctx context.Context, workers int) {
+	defer m.activeGVQueue.ShutDown()
+
+	klog.Infof("Starting %d Active GV Tracker worker(s)", workers)
+	for i := 0; i < workers; i++ {
+		go wait.UntilWithContext(ctx, m.runActiveGVTrackerWorker, time.Second)
+	}
+
+	<-ctx.Done()
+	klog.Info("Active GV Tracker workers stopped")
+}
+
+func (m *GVExclusionManager) runActiveGVTrackerWorker(ctx context.Context) {
+	for m.processNextActiveGV(ctx) {
+	}
+}
+
+func (m *GVExclusionManager) processNextActiveGV(ctx context.Context) bool {
+	key, shutdown := m.activeGVQueue.Get()
+	if shutdown {
+		return false
+	}
+	defer m.activeGVQueue.Done(key)
+
+	select {
+	case <-ctx.Done():
+		return false
+	default:
+	}
+
+	m.reconcileActiveGVs()
+	return true
+}
+
+// reconcileActiveGVs fetches all GVs from CRD and APIService informers,
+// detects diffs with the previous state, and queues Worker 3 if changes detected.
+func (m *GVExclusionManager) reconcileActiveGVs() {
+	freshGVs := make(map[schema.GroupVersion]struct{})
+
+	// Fetch GVs from CRD informer
+	if m.crdInformer != nil && m.crdExtractor != nil {
+		crdList := m.crdInformer.GetStore().List()
+		for _, item := range crdList {
+			gvs := m.crdExtractor(item)
+			for _, gv := range gvs {
+				freshGVs[gv] = struct{}{}
+			}
+		}
+	}
+
+	// Fetch GVs from APIService informer
+	if m.apiServiceInformer != nil && m.apiServiceExtractor != nil {
+		apiSvcList := m.apiServiceInformer.GetStore().List()
+		for _, item := range apiSvcList {
+			gvs := m.apiServiceExtractor(item)
+			for _, gv := range gvs {
+				freshGVs[gv] = struct{}{}
+			}
+		}
+	}
+
+	// Load previous active GVs and detect diff
+	previousGVs := m.loadCurrentlyActiveGVs()
+	diffDetected := m.diffGVs(previousGVs, freshGVs)
+
+	if diffDetected {
+		m.currentlyActiveGVs.Store(freshGVs)
+		klog.V(4).Infof("Active GVs updated: %d GVs now active", len(freshGVs))
+
+		// Queue Worker 3 for re-filtering
+		m.refilterQueue.Add("refilter")
+	} else {
+		klog.V(4).Infof("No diff detected in active GVs")
+	}
+}
+
+// diffGVs checks if there's a presence/absence difference between two GV maps
+func (m *GVExclusionManager) diffGVs(old, new map[schema.GroupVersion]struct{}) bool {
+	if len(old) != len(new) {
+		return true
+	}
+
+	for gv := range old {
+		if _, exists := new[gv]; !exists {
+			return true
+		}
+	}
+
+	for gv := range new {
+		if _, exists := old[gv]; !exists {
+			return true
+		}
+	}
+
+	return false
+}
+
+// RunReaper runs Worker 2: Reaper
+// This worker periodically removes expired GVs from recentlyDeletedGVs.
+func (m *GVExclusionManager) RunReaper(stopCh <-chan struct{}) {
+	klog.Infof("Starting GV Reaper with %s interval", m.reaperCheckInterval)
+	ticker := time.NewTicker(m.reaperCheckInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			m.reapExpiredGVs()
+		case <-stopCh:
+			klog.Info("GV Reaper stopped")
+			return
+		}
+	}
+}
+
+// reapExpiredGVs removes GVs from recentlyDeletedGVs that have exceeded the grace period.
+func (m *GVExclusionManager) reapExpiredGVs() {
+	deletedMap := m.loadRecentlyDeletedGVs()
+	now := time.Now()
+	newDeletedMap := make(map[schema.GroupVersion]time.Time)
+	anyReaped := false
+
+	for gv, deletionTime := range deletedMap {
+		if now.Sub(deletionTime) > m.exclusionGracePeriod {
+			klog.V(4).Infof("Reaping GV %s (grace period expired)", gv.String())
+			anyReaped = true
+			// Don't add to new map (effectively removing it)
+		} else {
+			newDeletedMap[gv] = deletionTime
+		}
+	}
+
+	if anyReaped {
+		// Atomic swap
+		m.recentlyDeletedGVs.Store(newDeletedMap)
+	}
+}
+
+// RunPeerDiscoveryRefilter runs Worker 3: Peer Discovery Re-filter
+// This worker filters the peer discovery cache using the exclusion set.
+func (m *GVExclusionManager) RunPeerDiscoveryRefilter(ctx context.Context, workers int) {
+	defer m.refilterQueue.ShutDown()
+
+	klog.Infof("Starting %d Peer Discovery Re-filter worker(s)", workers)
+	for i := 0; i < workers; i++ {
+		go wait.UntilWithContext(ctx, m.runRefilterWorker, time.Second)
+	}
+
+	<-ctx.Done()
+	klog.Info("Peer Discovery Re-filter workers stopped")
+}
+
+func (m *GVExclusionManager) runRefilterWorker(ctx context.Context) {
+	for m.processNextRefilter(ctx) {
+	}
+}
+
+func (m *GVExclusionManager) processNextRefilter(ctx context.Context) bool {
+	key, shutdown := m.refilterQueue.Get()
+	if shutdown {
+		return false
+	}
+	defer m.refilterQueue.Done(key)
+
+	select {
+	case <-ctx.Done():
+		return false
+	default:
+	}
+
+	m.refilterPeerDiscoveryCache()
+	return true
+}
+
+// refilterPeerDiscoveryCache filters the peer discovery cache using the exclusion set.
+// Only updates the cache and calls invalidation callback if filtering actually changed content.
+func (m *GVExclusionManager) refilterPeerDiscoveryCache() {
+	if m.peerDiscoveryCache == nil {
+		klog.Warning("peerDiscoveryCache reference not set")
+		return
+	}
+
+	cache := m.peerDiscoveryCache.Load()
 	if cache == nil {
+		klog.V(4).Infof("Peer discovery cache is empty, skipping re-filter")
 		return
 	}
 
@@ -134,69 +424,90 @@ func (h *peerProxyHandler) addExcludedGVs(gvs []schema.GroupVersion) {
 		return
 	}
 
-	// Always trigger filter and callbacks, to ensure late-appearing GVs are filtered.
-	if peerDiscovery, peerDiscoveryChanged := h.filterPeerDiscoveryCache(cacheMap); peerDiscoveryChanged {
-		h.storePeerDiscoveryCacheAndInvalidate(peerDiscovery)
+	if len(cacheMap) == 0 {
+		klog.V(4).Infof("Peer discovery cache is empty, skipping re-filter")
+		return
+	}
+
+	// Filter the cache
+	filteredCache, changed := m.FilterPeerDiscoveryCache(cacheMap)
+
+	if changed {
+		// Atomic swap peer cache
+		m.peerDiscoveryCache.Store(filteredCache)
+
+		// Call invalidation callback
+		if m.invalidationCallback != nil {
+			if callback := m.invalidationCallback.Load(); callback != nil {
+				(*callback)()
+			}
+		}
+
+		klog.V(4).Infof("Peer discovery cache re-filtered, %d GVs excluded", len(m.getExclusionSet()))
+	} else {
+		klog.V(4).Infof("No changes after filtering peer discovery cache")
 	}
 }
 
-// filterPeerDiscoveryCache filters the provided peer discovery cache,
-// excluding GVs in h.excludedGVs.
-func (h *peerProxyHandler) filterPeerDiscoveryCache(cacheMap map[string]PeerDiscoveryCacheEntry) (map[string]PeerDiscoveryCacheEntry, bool) {
-	h.excludedGVsMu.RLock()
-	if len(h.excludedGVs) == 0 {
-		// No exclusions, no filtering needed.
-		h.excludedGVsMu.RUnlock()
+// FilterPeerDiscoveryCache applies the current exclusion set to the provided peer cache.
+// This should be called when new peers are added to ensure their discovery is filtered.
+// Returns the filtered cache and a boolean indicating if any changes were made.
+func (m *GVExclusionManager) FilterPeerDiscoveryCache(cacheMap map[string]PeerDiscoveryCacheEntry) (map[string]PeerDiscoveryCacheEntry, bool) {
+	exclusionSet := m.getExclusionSet()
+	if len(exclusionSet) == 0 {
 		return cacheMap, false
 	}
 
-	excludedCloned := make(map[schema.GroupVersion]struct{}, len(h.excludedGVs))
-	for gv := range h.excludedGVs {
-		excludedCloned[gv] = struct{}{}
-	}
-	h.excludedGVsMu.RUnlock()
-
 	filtered := make(map[string]PeerDiscoveryCacheEntry, len(cacheMap))
-	peerDiscoveryChanged := false
+	anyChanged := false
+
 	for peerID, entry := range cacheMap {
-		newEntry, peerChanged := h.filterPeerCacheEntry(entry, excludedCloned)
-		filtered[peerID] = newEntry
-		if peerChanged {
-			peerDiscoveryChanged = true
+		filteredEntry, changed := m.filterPeerCacheEntry(entry, exclusionSet)
+		filtered[peerID] = filteredEntry
+		if changed {
+			anyChanged = true
 		}
 	}
 
-	return filtered, peerDiscoveryChanged
+	return filtered, anyChanged
 }
 
-// filterPeerCacheEntry filters a single peer's cache entry for excluded groups.
-// Returns the filtered entry and whether any excluded group was present.
-func (h *peerProxyHandler) filterPeerCacheEntry(entry PeerDiscoveryCacheEntry, excluded map[schema.GroupVersion]struct{}) (PeerDiscoveryCacheEntry, bool) {
+// filterPeerCacheEntry filters a single peer's cache entry for excluded GVs.
+// Returns the filtered entry and whether any GVs were excluded.
+func (m *GVExclusionManager) filterPeerCacheEntry(
+	entry PeerDiscoveryCacheEntry,
+	exclusionSet map[schema.GroupVersion]struct{},
+) (PeerDiscoveryCacheEntry, bool) {
 	filteredGVRs := make(map[schema.GroupVersionResource]bool, len(entry.GVRs))
-	peerDiscoveryChanged := false
+	anyExcluded := false
 
 	for existingGVR, v := range entry.GVRs {
 		gv := schema.GroupVersion{Group: existingGVR.Group, Version: existingGVR.Version}
-		if _, skip := excluded[gv]; skip {
-			peerDiscoveryChanged = true
+		if _, excluded := exclusionSet[gv]; excluded {
+			anyExcluded = true
 			continue
 		}
 		filteredGVRs[existingGVR] = v
 	}
 
-	if !peerDiscoveryChanged {
+	if !anyExcluded {
 		return entry, false
 	}
 
 	// Filter the group discovery list
-	filteredGroups := h.filterGroupDiscovery(entry.GroupDiscovery, excluded)
+	filteredGroups := m.filterGroupDiscovery(entry.GroupDiscovery, exclusionSet)
+
 	return PeerDiscoveryCacheEntry{
 		GVRs:           filteredGVRs,
 		GroupDiscovery: filteredGroups,
 	}, true
 }
 
-func (h *peerProxyHandler) filterGroupDiscovery(groupDiscoveries []apidiscoveryv2.APIGroupDiscovery, excluded map[schema.GroupVersion]struct{}) []apidiscoveryv2.APIGroupDiscovery {
+// filterGroupDiscovery filters group discovery entries, removing excluded GVs.
+func (m *GVExclusionManager) filterGroupDiscovery(
+	groupDiscoveries []apidiscoveryv2.APIGroupDiscovery,
+	exclusionSet map[schema.GroupVersion]struct{},
+) []apidiscoveryv2.APIGroupDiscovery {
 	var filteredDiscovery []apidiscoveryv2.APIGroupDiscovery
 	for _, groupDiscovery := range groupDiscoveries {
 		filteredGroup := apidiscoveryv2.APIGroupDiscovery{
@@ -205,7 +516,7 @@ func (h *peerProxyHandler) filterGroupDiscovery(groupDiscoveries []apidiscoveryv
 
 		for _, version := range groupDiscovery.Versions {
 			gv := schema.GroupVersion{Group: groupDiscovery.Name, Version: version.Version}
-			if _, found := excluded[gv]; found {
+			if _, found := exclusionSet[gv]; found {
 				// This version is excluded, skip it
 				continue
 			}
@@ -220,149 +531,20 @@ func (h *peerProxyHandler) filterGroupDiscovery(groupDiscoveries []apidiscoveryv
 	return filteredDiscovery
 }
 
-// RunGVDeletionWorkers starts workers to process GroupVersions from deleted CRDs and APIServices.
-// When a GV is processed, it is checked for usage by other resources. If no longer in use,
-// it is marked with a deletion timestamp, initiating a grace period. After this period,
-// the RunExcludedGVsReaper is responsible for removing the GV from the exclusion set.
-func (h *peerProxyHandler) RunGVDeletionWorkers(ctx context.Context, workers int) {
-	defer func() {
-		klog.Info("Shutting down GV deletion workers")
-		h.gvDeletionQueue.ShutDown()
-	}()
-	klog.Infof("Starting %d GV deletion worker(s)", workers)
-	for i := 0; i < workers; i++ {
-		go func(workerID int) {
-			for h.processNextGVDeletion() {
-				select {
-				case <-ctx.Done():
-					klog.Infof("GV deletion worker %d shutting down", workerID)
-					return
-				default:
-				}
-			}
-		}(i)
-	}
-
-	<-ctx.Done() // Wait till context is done to call deferred shutdown function
-}
-
-// processNextGVDeletion processes a single item from the GV deletion queue.
-func (h *peerProxyHandler) processNextGVDeletion() bool {
-	gvString, shutdown := h.gvDeletionQueue.Get()
-	if shutdown {
-		return false
-	}
-	defer h.gvDeletionQueue.Done(gvString)
-
-	gv, err := schema.ParseGroupVersion(gvString)
-	if err != nil {
-		klog.Errorf("Failed to parse GroupVersion %q: %v", gvString, err)
-		return true
-	}
-
-	h.markGVForDeletionIfUnused(gv)
-	return true
-}
-
-// markGVForDeletionIfUnused checks if a group-version is still in use.
-// If not, it marks it for deletion by setting a timestamp.
-func (h *peerProxyHandler) markGVForDeletionIfUnused(gv schema.GroupVersion) {
-	// Best-effort check if GV is still in use. This is racy - a new CRD/APIService could be
-	// created after this check completes and returns false.
-	if h.isGVUsed(gv) {
-		return
-	}
-
-	h.excludedGVsMu.Lock()
-	defer h.excludedGVsMu.Unlock()
-
-	// Only mark if it's currently active (nil timestamp)
-	if ts, exists := h.excludedGVs[gv]; exists && ts == nil {
-		now := time.Now()
-		h.excludedGVs[gv] = &now
-		klog.V(4).Infof("Marking group-version %q for deletion, grace period started", gv)
-	}
-}
-
-// isGVUsed checks the informer stores to see if any CRD or APIService
-// is still using the given group-version.
-//
-// This is necessary because multiple CRDs or aggregated APIs can share the same group-version,
-// but define different resources (kinds) or versions. Deleting one CRD or APIService
-// for a group-version does not mean the group-version is entirely gone—other CRDs or APIs in that group-version
-// may still exist. We must only remove a group-version from the exclusion set when there are
-// no remaining CRDs or APIService objects for that group-version, to ensure we do not prematurely
-// allow peer-aggregated discovery or proxying for APIs that are still served locally.
-func (h *peerProxyHandler) isGVUsed(gv schema.GroupVersion) bool {
-	// Check CRD informer store for the specific group-version
-	if h.crdInformer != nil && h.crdExtractor != nil {
-		crdList := h.crdInformer.GetStore().List()
-		for _, item := range crdList {
-			gvs := h.crdExtractor(item)
-			if gvs == nil {
-				continue
-			}
-			for _, extractedGV := range gvs {
-				if extractedGV == gv {
-					return true
-				}
-			}
+func (m *GVExclusionManager) loadCurrentlyActiveGVs() map[schema.GroupVersion]struct{} {
+	if val := m.currentlyActiveGVs.Load(); val != nil {
+		if gvMap, ok := val.(map[schema.GroupVersion]struct{}); ok {
+			return gvMap
 		}
 	}
-
-	// Check APIService informer store for the specific group-version
-	if h.apiServiceInformer != nil && h.apiServiceExtractor != nil {
-		apiSvcList := h.apiServiceInformer.GetStore().List()
-		for _, item := range apiSvcList {
-			gvs := h.apiServiceExtractor(item)
-			if gvs == nil {
-				continue
-			}
-			for _, extractedGV := range gvs {
-				if extractedGV == gv {
-					return true
-				}
-			}
-		}
-	}
-
-	return false
+	return map[schema.GroupVersion]struct{}{}
 }
 
-// RunExcludedGVsReaper starts a goroutine that periodically cleans up
-// excluded group-versions that have passed their grace period.
-func (h *peerProxyHandler) RunExcludedGVsReaper(stopCh <-chan struct{}) {
-	klog.Infof("Starting excluded group-versions reaper with %s interval", h.reaperCheckInterval)
-	ticker := time.NewTicker(h.reaperCheckInterval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ticker.C:
-			h.reapExcludedGVs()
-		case <-stopCh:
-			klog.Info("Shutting down excluded group-versions reaper")
-			return
+func (m *GVExclusionManager) loadRecentlyDeletedGVs() map[schema.GroupVersion]time.Time {
+	if val := m.recentlyDeletedGVs.Load(); val != nil {
+		if gvMap, ok := val.(map[schema.GroupVersion]time.Time); ok {
+			return gvMap
 		}
 	}
-}
-
-// reapExcludedGVs is the garbage collector function.
-// It removes group-versions from excludedGVs if their grace period has expired.
-func (h *peerProxyHandler) reapExcludedGVs() {
-	h.excludedGVsMu.Lock()
-	defer h.excludedGVsMu.Unlock()
-
-	now := time.Now()
-	for gv, deletionTime := range h.excludedGVs {
-		if deletionTime == nil {
-			// Still actively excluded
-			continue
-		}
-
-		if now.Sub(*deletionTime) > h.exclusionGracePeriod {
-			klog.V(4).Infof("Reaping excluded group-version %q (grace period expired)", gv)
-			delete(h.excludedGVs, gv)
-		}
-	}
+	return map[schema.GroupVersion]time.Time{}
 }
