@@ -25,7 +25,6 @@ package cache
 
 import (
 	"fmt"
-	"reflect"
 	"sync"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -66,7 +65,7 @@ type Identifier struct {
 // If the name+itemType collides with an existing identifier, IsUnique() will return false,
 // metrics will not be published for this identifier, and an error is returned.
 func NewIdentifier(name string, obj runtime.Object) (*Identifier, error) {
-	id := &Identifier{name: name, itemType: itemType(obj)}
+	id := &Identifier{name: name, itemType: getTypeDescriptionFromObject(obj)}
 	if name == "" {
 		return id, fmt.Errorf("FIFO identifier name is empty - metrics will not be published for this FIFO")
 	}
@@ -119,10 +118,6 @@ func (id *Identifier) IsUnique() bool {
 		return false
 	}
 	return id.unique
-}
-
-func itemType(exampleObject runtime.Object) string {
-	return reflect.TypeOf(exampleObject).Elem().String()
 }
 
 func init() {

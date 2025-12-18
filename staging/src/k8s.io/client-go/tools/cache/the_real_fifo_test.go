@@ -25,11 +25,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	clientfeatures "k8s.io/client-go/features"
 	clientfeaturestesting "k8s.io/client-go/features/testing"
+	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/testutil"
 )
 
@@ -1351,7 +1351,7 @@ func TestRealFIFO_Metrics(t *testing.T) {
 			actions: []func(f *RealFIFO){
 				func(f *RealFIFO) { _ = f.Add(mkFifoObj("old", 1)) },
 				func(f *RealFIFO) {
-					f.Replace([]interface{}{
+					_ = f.Replace([]interface{}{
 						mkFifoObj("foo", 1),
 						mkFifoObj("bar", 2),
 					}, "0")
@@ -1384,7 +1384,7 @@ func TestRealFIFO_Metrics(t *testing.T) {
 
 			want := fmt.Sprintf(`# HELP fifo_queued_items [ALPHA] Number of items currently queued in the FIFO.
 # TYPE fifo_queued_items gauge
-fifo_queued_items{item_type="v1.Pod",name="test-fifo"} %d
+fifo_queued_items{item_type="*v1.Pod",name="test-fifo"} %d
 `, tt.expectedMetric)
 			if err := testutil.GatherAndCompare(metricsProvider.registry, strings.NewReader(want), "fifo_queued_items"); err != nil {
 				t.Fatal(err)
@@ -1455,7 +1455,7 @@ func TestRealFIFO_MetricsNotPublishedForDuplicateIdentifier(t *testing.T) {
 	// Only f1's metric should be published, f2 uses noopMetric
 	want := `# HELP fifo_queued_items [ALPHA] Number of items currently queued in the FIFO.
 # TYPE fifo_queued_items gauge
-fifo_queued_items{item_type="v1.Pod",name="duplicate-name"} 1
+fifo_queued_items{item_type="*v1.Pod",name="duplicate-name"} 1
 `
 	if err := testutil.GatherAndCompare(metricsProvider.registry, strings.NewReader(want), "fifo_queued_items"); err != nil {
 		t.Fatal(err)
@@ -1499,8 +1499,8 @@ func TestRealFIFO_MetricsTrackedIndependentlyForDifferentFIFOs(t *testing.T) {
 	// Verify metrics are tracked independently
 	want := `# HELP fifo_queued_items [ALPHA] Number of items currently queued in the FIFO.
 # TYPE fifo_queued_items gauge
-fifo_queued_items{item_type="v1.Pod",name="fifo-1"} 2
-fifo_queued_items{item_type="v1.Pod",name="fifo-2"} 1
+fifo_queued_items{item_type="*v1.Pod",name="fifo-1"} 2
+fifo_queued_items{item_type="*v1.Pod",name="fifo-2"} 1
 `
 	if err := testutil.GatherAndCompare(metricsProvider.registry, strings.NewReader(want), "fifo_queued_items"); err != nil {
 		t.Fatal(err)
@@ -1511,8 +1511,8 @@ fifo_queued_items{item_type="v1.Pod",name="fifo-2"} 1
 
 	wantAfterPop := `# HELP fifo_queued_items [ALPHA] Number of items currently queued in the FIFO.
 # TYPE fifo_queued_items gauge
-fifo_queued_items{item_type="v1.Pod",name="fifo-1"} 1
-fifo_queued_items{item_type="v1.Pod",name="fifo-2"} 1
+fifo_queued_items{item_type="*v1.Pod",name="fifo-1"} 1
+fifo_queued_items{item_type="*v1.Pod",name="fifo-2"} 1
 `
 	if err := testutil.GatherAndCompare(metricsProvider.registry, strings.NewReader(wantAfterPop), "fifo_queued_items"); err != nil {
 		t.Fatal(err)
@@ -1520,19 +1520,20 @@ fifo_queued_items{item_type="v1.Pod",name="fifo-2"} 1
 }
 
 // testFIFOMetricsProvider is a test implementation of FIFOMetricsProvider
-// that uses real prometheus metrics registered with a custom registry.
+// that uses real component-base metrics registered with a custom registry.
 // This mirrors the real fifo.MetricsProvider but allows isolated testing.
 type testFIFOMetricsProvider struct {
-	registry *prometheus.Registry
-	gauge    *prometheus.GaugeVec
+	registry metrics.KubeRegistry
+	gauge    *metrics.GaugeVec
 }
 
 func newTestFIFOMetricsProvider() *testFIFOMetricsProvider {
-	registry := prometheus.NewRegistry()
-	gauge := prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "fifo_queued_items",
-			Help: "[ALPHA] Number of items currently queued in the FIFO.",
+	registry := metrics.NewKubeRegistry()
+	gauge := metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Name:           "fifo_queued_items",
+			Help:           "Number of items currently queued in the FIFO.",
+			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"name", "item_type"},
 	)

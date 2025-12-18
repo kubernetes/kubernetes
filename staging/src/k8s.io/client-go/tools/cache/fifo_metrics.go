@@ -53,7 +53,7 @@ func newFIFOMetrics(id *Identifier, metricsProvider FIFOMetricsProvider) *fifoMe
 	}
 
 	if !id.IsUnique() {
-		klog.ErrorS(nil, "FIFO metrics not published: empty name or duplicate identifier", "name", id.Name(), "itemType", id.ItemType())
+		klog.Errorf("FIFO metrics not published: empty name or duplicate identifier: %v", id)
 		return metrics
 	}
 
