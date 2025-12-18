@@ -158,7 +158,7 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		newReq.Body, newReq.GetBody = wrapBodyForRetry(newReq.Body, defaultRetryableBodyConfig())
 		// Closing original body when the request is resolved
 		// This will avoid any leaks for the NopCloser of the wrapped body
-		defer req.Body.Close()
+		defer func() { _ = req.Body.Close() }()
 	}
 
 	if handlingInfo.proxyRoundTripper == nil {
