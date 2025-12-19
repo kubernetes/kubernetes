@@ -68,11 +68,13 @@ Otherwise, the golang benchmark framework will try to run a test more than once 
 make test-integration WHAT=./test/integration/scheduler_perf/... KUBE_CACHE_MUTATION_DETECTOR=false KUBE_TIMEOUT=-timeout=1h ETCD_LOGLEVEL=warn KUBE_TEST_VMODULE="''" SHORT=-short=false ARTIFACTS=/tmp FULL_LOG=y KUBE_TEST_ARGS='-run=^$ -benchtime=1ns -bench=BenchmarkPerfScheduling/SchedulingBasic/5000Nodes/5000InitPods/1000PodsToSchedule'
 ```
 
+To run a test with profiler you need to target a specific package directory as `go test` does not support profiling across multiple packages.
+
 To produce a cpu profile:
 
 ```shell
 # In Kubernetes root path
-make test-integration WHAT=./test/integration/scheduler_perf/... KUBE_CACHE_MUTATION_DETECTOR=false KUBE_TIMEOUT=-timeout=1h ETCD_LOGLEVEL=warn KUBE_TEST_VMODULE="''" FULL_LOG=y ARTIFACTS=/tmp SHORT=-short=false KUBE_TEST_ARGS='-run=^$ -benchtime=1ns -bench=BenchmarkPerfScheduling -cpuprofile ~/cpu-profile.out'
+make test-integration WHAT=./test/integration/scheduler_perf/misc KUBE_CACHE_MUTATION_DETECTOR=false KUBE_TIMEOUT=-timeout=1h ETCD_LOGLEVEL=warn KUBE_TEST_VMODULE="''" FULL_LOG=y ARTIFACTS=/tmp SHORT=-short=false KUBE_TEST_ARGS='-run=^$ -benchtime=1ns -bench=BenchmarkPerfScheduling -cpuprofile ~/cpu-profile.out'
 ```
 
 Here some explanations for those parameters:

@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/net/websocket"
@@ -37,6 +38,7 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	compbasemetrics "k8s.io/component-base/metrics"
 )
 
 // timeoutFactory abstracts watch timeout logic for testing
@@ -202,6 +204,29 @@ type WatchServer struct {
 	metricsScope string
 }
 
+// watchEventMetricsRecorder allows the caller to count bytes written and report the size of the event.
+// It is thread-safe, as long as underlying io.Writer is thread-safe.
+// Once all Write calls for a given watch event have finished, RecordEvent must be called.
+type watchEventMetricsRecorder struct {
+	writer      io.Writer
+	countMetric compbasemetrics.CounterMetric
+	sizeMetric  compbasemetrics.ObserverMetric
+	byteCount   atomic.Int64
+}
+
+// Write implements io.Writer.
+func (c *watchEventMetricsRecorder) Write(p []byte) (n int, err error) {
+	n, err = c.writer.Write(p)
+	c.byteCount.Add(int64(n))
+	return
+}
+
+// Record reports the metrics and resets the byte count.
+func (c *watchEventMetricsRecorder) RecordEvent() {
+	c.countMetric.Inc()
+	c.sizeMetric.Observe(float64(c.byteCount.Swap(0)))
+}
+
 // HandleHTTP serves a series of encoded events via HTTP with Transfer-Encoding: chunked.
 // or over a websocket connection.
 func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
@@ -239,7 +264,14 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 	flusher.Flush()
 
 	gvr := s.Scope.Resource
-	watchEncoder := newWatchEncoder(req.Context(), gvr, s.EmbeddedEncoder, s.Encoder, framer)
+
+	recorder := &watchEventMetricsRecorder{
+		writer:      framer,
+		countMetric: metrics.WatchEvents.WithContext(req.Context()).WithLabelValues(gvr.Group, gvr.Version, gvr.Resource),
+		sizeMetric:  metrics.WatchEventsSizes.WithContext(req.Context()).WithLabelValues(gvr.Group, gvr.Version, gvr.Resource),
+	}
+
+	watchEncoder := newWatchEncoder(req.Context(), gvr, s.EmbeddedEncoder, s.Encoder, recorder)
 	ch := s.Watching.ResultChan()
 	done := req.Context().Done()
 
@@ -263,7 +295,6 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 				// End of results.
 				return
 			}
-			metrics.WatchEvents.WithContext(req.Context()).WithLabelValues(gvr.Group, gvr.Version, gvr.Resource).Inc()
 			isWatchListLatencyRecordingRequired := shouldRecordWatchListLatency(event)
 
 			if err := watchEncoder.Encode(event); err != nil {
@@ -271,6 +302,7 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 				// client disconnect.
 				return
 			}
+			recorder.RecordEvent()
 
 			if len(ch) == 0 {
 				flusher.Flush()

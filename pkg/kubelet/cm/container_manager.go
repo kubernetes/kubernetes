@@ -224,25 +224,25 @@ func int64Slice(in []int) []int64 {
 	return out
 }
 
-func podHasExclusiveCPUs(cr cpuAllocationReader, pod *v1.Pod) bool {
+func podHasExclusiveCPUs(logger klog.Logger, cr cpuAllocationReader, pod *v1.Pod) bool {
 	for _, container := range pod.Spec.InitContainers {
-		if containerHasExclusiveCPUs(cr, pod, &container) {
+		if containerHasExclusiveCPUs(logger, cr, pod, &container) {
 			return true
 		}
 	}
 	for _, container := range pod.Spec.Containers {
-		if containerHasExclusiveCPUs(cr, pod, &container) {
+		if containerHasExclusiveCPUs(logger, cr, pod, &container) {
 			return true
 		}
 	}
-	klog.V(4).InfoS("Pod contains no container with pinned cpus", "podName", pod.Name)
+	logger.V(4).Info("Pod contains no container with pinned cpus", "podName", pod.Name)
 	return false
 }
 
-func containerHasExclusiveCPUs(cr cpuAllocationReader, pod *v1.Pod, container *v1.Container) bool {
+func containerHasExclusiveCPUs(logger klog.Logger, cr cpuAllocationReader, pod *v1.Pod, container *v1.Container) bool {
 	exclusiveCPUs := cr.GetExclusiveCPUs(string(pod.UID), container.Name)
 	if !exclusiveCPUs.IsEmpty() {
-		klog.V(4).InfoS("Container has pinned cpus", "podName", pod.Name, "containerName", container.Name)
+		logger.V(4).Info("Container has pinned cpus", "podName", pod.Name, "containerName", container.Name)
 		return true
 	}
 	return false

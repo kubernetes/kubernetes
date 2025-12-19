@@ -44,7 +44,7 @@ func (c *Client) ListenUnix(socketPath string) (net.Listener, error) {
 	if !ok {
 		return nil, errors.New("ssh: streamlocal-forward@openssh.com request denied by peer")
 	}
-	ch := c.forwards.add(&net.UnixAddr{Name: socketPath, Net: "unix"})
+	ch := c.forwards.add("unix", socketPath)
 
 	return &unixListener{socketPath, c, ch}, nil
 }
@@ -96,7 +96,7 @@ func (l *unixListener) Accept() (net.Conn, error) {
 // Close closes the listener.
 func (l *unixListener) Close() error {
 	// this also closes the listener.
-	l.conn.forwards.remove(&net.UnixAddr{Name: l.socketPath, Net: "unix"})
+	l.conn.forwards.remove("unix", l.socketPath)
 	m := streamLocalChannelForwardMsg{
 		l.socketPath,
 	}

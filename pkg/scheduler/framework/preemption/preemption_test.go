@@ -1587,3 +1587,211 @@ func TestIsPodRunningPreemption(t *testing.T) {
 		})
 	}
 }
+
+func TestAsyncPreemptionFailure(t *testing.T) {
+	metrics.Register()
+	var (
+		node1Name            = "node1"
+		defaultSchedulerName = "default-scheduler"
+		failVictimNamePrefix = "fail-victim"
+	)
+
+	makePod := func(name string, priority int32) *v1.Pod {
+		return st.MakePod().Name(name).UID(name).
+			Node(node1Name).SchedulerName(defaultSchedulerName).Priority(priority).
+			Containers([]v1.Container{st.MakeContainer().Name("container1").Obj()}).
+			Obj()
+	}
+
+	preemptor := makePod("preemptor", highPriority)
+
+	makeVictim := func(name string) *v1.Pod {
+		return makePod(name, midPriority)
+	}
+
+	tests := []struct {
+		name                                 string
+		victims                              []*v1.Pod
+		expectSuccessfulPreemption           bool
+		expectPreemptionAttemptForLastVictim bool
+	}{
+		{
+			name: "Failure with a single victim",
+			victims: []*v1.Pod{
+				makeVictim(failVictimNamePrefix),
+			},
+			expectSuccessfulPreemption:           false,
+			expectPreemptionAttemptForLastVictim: true,
+		},
+		{
+			name: "Success with a single victim",
+			victims: []*v1.Pod{
+				makeVictim("victim1"),
+			},
+			expectSuccessfulPreemption:           true,
+			expectPreemptionAttemptForLastVictim: true,
+		},
+		{
+			name: "Failure in first of three victims",
+			victims: []*v1.Pod{
+				makeVictim(failVictimNamePrefix),
+				makeVictim("victim2"),
+				makeVictim("victim3"),
+			},
+			expectSuccessfulPreemption:           false,
+			expectPreemptionAttemptForLastVictim: false,
+		},
+		{
+			name: "Failure in second of three victims",
+			victims: []*v1.Pod{
+				makeVictim("victim1"),
+				makeVictim(failVictimNamePrefix),
+				makeVictim("victim3"),
+			},
+			expectSuccessfulPreemption:           false,
+			expectPreemptionAttemptForLastVictim: false,
+		},
+		{
+			name: "Failure in first two of three victims",
+			victims: []*v1.Pod{
+				makeVictim(failVictimNamePrefix + "1"),
+				makeVictim(failVictimNamePrefix + "2"),
+				makeVictim("victim3"),
+			},
+			expectSuccessfulPreemption:           false,
+			expectPreemptionAttemptForLastVictim: false,
+		},
+		{
+			name: "Failure in third of three victims",
+			victims: []*v1.Pod{
+				makeVictim("victim1"),
+				makeVictim("victim2"),
+				makeVictim(failVictimNamePrefix),
+			},
+			expectSuccessfulPreemption:           false,
+			expectPreemptionAttemptForLastVictim: true,
+		},
+		{
+			name: "Success with three victims",
+			victims: []*v1.Pod{
+				makeVictim("victim1"),
+				makeVictim("victim2"),
+				makeVictim("victim3"),
+			},
+			expectSuccessfulPreemption:           true,
+			expectPreemptionAttemptForLastVictim: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			candidate := &fakeCandidate{
+				name: node1Name,
+				victims: &extenderv1.Victims{
+					Pods: tt.victims,
+				},
+			}
+
+			// Set up the fake clientset.
+			preemptionAttemptedPods := sets.New[string]()
+			deletedPods := sets.New[string]()
+			mu := &sync.RWMutex{}
+			objs := []runtime.Object{preemptor}
+			for _, v := range tt.victims {
+				objs = append(objs, v)
+			}
+
+			cs := clientsetfake.NewClientset(objs...)
+			cs.PrependReactor("delete", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+				mu.Lock()
+				defer mu.Unlock()
+				name := action.(clienttesting.DeleteAction).GetName()
+				preemptionAttemptedPods.Insert(name)
+				if strings.HasPrefix(name, failVictimNamePrefix) {
+					return true, nil, errors.New("delete pod failed")
+				}
+				deletedPods.Insert(name)
+				return true, nil, nil
+			})
+
+			// Set up the framework.
+			informerFactory := informers.NewSharedInformerFactory(cs, 0)
+			eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: cs.EventsV1()})
+			fakeActivator := &fakePodActivator{activatedPods: make(map[string]*v1.Pod), mu: mu}
+
+			registeredPlugins := append([]tf.RegisterPluginFunc{
+				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New)},
+				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			)
+
+			snapshotPods := append([]*v1.Pod{preemptor}, tt.victims...)
+			fwk, err := tf.NewFramework(
+				ctx,
+				registeredPlugins, "",
+				frameworkruntime.WithClientSet(cs),
+				frameworkruntime.WithLogger(logger),
+				frameworkruntime.WithInformerFactory(informerFactory),
+				frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
+				frameworkruntime.WithEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, "test-scheduler")),
+				frameworkruntime.WithPodActivator(fakeActivator),
+				frameworkruntime.WithWaitingPods(frameworkruntime.NewWaitingPodsMap()),
+				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(snapshotPods, []*v1.Node{st.MakeNode().Name(node1Name).Obj()})),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			informerFactory.Start(ctx.Done())
+			informerFactory.WaitForCacheSync(ctx.Done())
+
+			fakePreemptionScorePostFilterPlugin := &FakePreemptionScorePostFilterPlugin{}
+			pe := NewEvaluator("FakePreemptionScorePostFilter", fwk, fakePreemptionScorePostFilterPlugin, true /* asyncPreemptionEnabled */)
+
+			// Run the actual preemption.
+			pe.prepareCandidateAsync(candidate, preemptor, "test-plugin")
+
+			// Wait for the async preemption to finish.
+			err = wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, 5*time.Second, false, func(ctx context.Context) (bool, error) {
+				// Check if the preemptor is removed from the pe.preempting set.
+				pe.mu.RLock()
+				defer pe.mu.RUnlock()
+				return len(pe.preempting) == 0, nil
+			})
+			if err != nil {
+				t.Fatalf("Timed out waiting for async preemption to finish: %v", err)
+			}
+
+			mu.RLock()
+			defer mu.RUnlock()
+
+			lastVictimName := tt.victims[len(tt.victims)-1].Name
+			if tt.expectPreemptionAttemptForLastVictim != preemptionAttemptedPods.Has(lastVictimName) {
+				t.Errorf("Last victim's preemption attempted - wanted: %v, got: %v", tt.expectPreemptionAttemptForLastVictim, preemptionAttemptedPods.Has(lastVictimName))
+			}
+			// Verify that the preemption of the last victim is attempted if and only if
+			// the preemption of all of the preceding victims succeeds.
+			precedingVictimsPreempted := true
+			for _, victim := range tt.victims[:len(tt.victims)-1] {
+				if !preemptionAttemptedPods.Has(victim.Name) || !deletedPods.Has(victim.Name) {
+					precedingVictimsPreempted = false
+				}
+			}
+			if precedingVictimsPreempted != preemptionAttemptedPods.Has(lastVictimName) {
+				t.Errorf("Last victim's preemption attempted - wanted: %v, got: %v", precedingVictimsPreempted, preemptionAttemptedPods.Has(lastVictimName))
+			}
+
+			// Verify that the preemptor is activated if and only if the async preemption fails.
+			if _, ok := fakeActivator.activatedPods[preemptor.Name]; ok != !tt.expectSuccessfulPreemption {
+				t.Errorf("Preemptor activated - wanted: %v, got: %v", !tt.expectSuccessfulPreemption, ok)
+			}
+
+			// Verify if the last victim got deleted as expected.
+			if tt.expectSuccessfulPreemption != deletedPods.Has(lastVictimName) {
+				t.Errorf("Last victim deleted - wanted: %v, got: %v", tt.expectSuccessfulPreemption, deletedPods.Has(lastVictimName))
+			}
+		})
+	}
+}

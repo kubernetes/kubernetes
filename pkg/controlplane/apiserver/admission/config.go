@@ -42,8 +42,12 @@ func (c *Config) New(proxyTransport *http.Transport, egressSelector *egressselec
 	webhookAuthResolverWrapper := webhook.NewDefaultAuthenticationInfoResolverWrapper(proxyTransport, egressSelector, c.LoopbackClientConfig, tp)
 	webhookPluginInitializer := webhookinit.NewPluginInitializer(webhookAuthResolverWrapper, serviceResolver)
 
+	quotaConfiguration, err := quotainstall.NewQuotaConfigurationForAdmission(c.ExternalInformers)
+	if err != nil {
+		return nil, err
+	}
 	kubePluginInitializer := NewPluginInitializer(
-		quotainstall.NewQuotaConfigurationForAdmission(c.ExternalInformers),
+		quotaConfiguration,
 		exclusion.Excluded(),
 	)
 

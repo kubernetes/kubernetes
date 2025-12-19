@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2021 The Kubernetes Authors.
@@ -149,7 +148,7 @@ func TestQoSContainerCgroup(t *testing.T) {
 		},
 	}
 
-	m.setMemoryQoS(qosConfigs)
+	m.setMemoryQoS(logger, qosConfigs)
 
 	burstableMin := resource.MustParse("384Mi")
 	guaranteedMin := resource.MustParse("128Mi")

@@ -597,7 +597,10 @@ func newResourceQuotaController(ctx context.Context, controllerContext Controlle
 
 	discoveryFunc := resourceQuotaControllerDiscoveryClient.ServerPreferredNamespacedResources
 	listerFuncForResource := generic.ListerFuncForResourceFunc(controllerContext.InformerFactory.ForResource)
-	quotaConfiguration := quotainstall.NewQuotaConfigurationForControllers(listerFuncForResource, controllerContext.InformerFactory)
+	quotaConfiguration, err := quotainstall.NewQuotaConfigurationForControllers(listerFuncForResource, controllerContext.InformerFactory)
+	if err != nil {
+		return nil, err
+	}
 
 	resourceQuotaControllerOptions := &resourcequotacontroller.ControllerOptions{
 		QuotaClient:               resourceQuotaControllerClient.CoreV1(),

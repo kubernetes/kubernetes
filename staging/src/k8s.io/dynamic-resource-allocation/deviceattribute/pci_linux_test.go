@@ -136,6 +136,61 @@ func TestGetPCIeRootAttributePCIBusID(t *testing.T) {
 	}
 }
 
+func TestGetPCIBusIDAttribute(t *testing.T) {
+	pciBusID := "0000:02:00.0"
+	expectedAttribute := DeviceAttribute{
+		Name:  StandardDeviceAttributePCIBusID,
+		Value: resourceapi.DeviceAttribute{StringValue: ptr.To(pciBusID)},
+	}
+
+	tests := map[string]struct {
+		address           string
+		expectedAttribute *DeviceAttribute
+		expectsError      bool
+		expectedErrMsg    string
+	}{
+		"valid": {
+			address:           pciBusID,
+			expectedAttribute: &expectedAttribute,
+			expectsError:      false,
+		},
+		"invalid empty PCI Bus ID": {
+			address:           "",
+			expectedAttribute: nil,
+			expectsError:      true,
+			expectedErrMsg:    "PCI Bus ID cannot be empty",
+		},
+		"invalid PCI Bus ID format": {
+			address:           "invalid-pci-id",
+			expectedAttribute: nil,
+			expectsError:      true,
+			expectedErrMsg:    "invalid PCI Bus ID format: invalid-pci-id",
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			got, err := GetPCIBusIDAttribute(test.address)
+			if test.expectsError {
+				if err == nil {
+					t.Errorf("Expected error but got none")
+					return
+				}
+				if !strings.Contains(err.Error(), test.expectedErrMsg) {
+					t.Errorf("Expected error message to contain %q, got %q", test.expectedErrMsg, err.Error())
+					return
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			if !reflect.DeepEqual(got, *test.expectedAttribute) {
+				t.Errorf("Expected attribute %v, got %v", test.expectedAttribute, got)
+			}
+		})
+	}
+}
+
 func touchFile(t *testing.T, path string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {

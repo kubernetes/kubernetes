@@ -26,6 +26,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 )
 
@@ -115,12 +116,13 @@ func Test_stateCheckpoint_storeState(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
 			testDir := getTestDir(t)
 			originalSC, err := NewStateCheckpoint(testDir, testCheckpoint)
 			require.NoError(t, err)
 
 			for podUID, alloc := range tt.args.resInfoMap {
-				err = originalSC.SetPodResourceInfo(podUID, alloc)
+				err = originalSC.SetPodResourceInfo(logger, podUID, alloc)
 				require.NoError(t, err)
 			}
 
@@ -139,12 +141,12 @@ func Test_stateCheckpoint_storeState(t *testing.T) {
 
 			// Setting the pod allocations to the same values should not re-write the checkpoint.
 			for podUID, alloc := range tt.args.resInfoMap {
-				require.NoError(t, originalSC.SetPodResourceInfo(podUID, alloc))
+				require.NoError(t, originalSC.SetPodResourceInfo(logger, podUID, alloc))
 				require.NoFileExists(t, checkpointPath, "checkpoint should not be re-written")
 			}
 
 			// Setting a new value should update the checkpoint.
-			require.NoError(t, originalSC.SetPodResourceInfo("foo-bar", PodResourceInfo{
+			require.NoError(t, originalSC.SetPodResourceInfo(logger, "foo-bar", PodResourceInfo{
 				ContainerResources: map[string]v1.ResourceRequirements{
 					"container1": {Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")}},
 				},
@@ -156,6 +158,7 @@ func Test_stateCheckpoint_storeState(t *testing.T) {
 }
 
 func Test_stateCheckpoint_formatUpgraded(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	// Based on the PodResourceAllocationInfo struct, it's mostly possible that new field will be added
 	// in struct PodResourceAllocationInfo, rather than in struct PodResourceAllocationInfo.AllocationEntries.
 	// Emulate upgrade scenario by pretending that `ResizeStatusEntries` is a new field.
@@ -184,7 +187,7 @@ func Test_stateCheckpoint_formatUpgraded(t *testing.T) {
 	err = sc.checkpointManager.CreateCheckpoint(sc.checkpointName, checkpoint)
 	require.NoError(t, err, "failed to create old checkpoint")
 
-	actualPodResourceAllocation, _, err := restoreState(sc.checkpointManager, sc.checkpointName)
+	actualPodResourceAllocation, _, err := restoreState(logger, sc.checkpointManager, sc.checkpointName)
 	require.NoError(t, err, "failed to restore state")
 
 	require.Equal(t, expectedPodResourceAllocation, actualPodResourceAllocation, "pod resource allocation info is not equal")

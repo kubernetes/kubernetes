@@ -31,6 +31,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -2342,55 +2343,77 @@ var _ = common.SIGDescribe("Services", func() {
 	})
 
 	ginkgo.It("should implement service.kubernetes.io/headless", func(ctx context.Context) {
+		var err error
+
+		ginkgo.By("Creating a Service with no selector and no endpoints")
 		ns := f.Namespace.Name
-		numPods, servicePort := 3, defaultServeHostnameServicePort
-		serviceHeadlessLabels := map[string]string{v1.IsHeadlessService: ""}
+		servicePort := 80
+		svc := &v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "example-custom-endpoints",
+			},
+			Spec: v1.ServiceSpec{
+				Ports: []v1.ServicePort{{
+					Name:     "port80",
+					Port:     int32(servicePort),
+					Protocol: v1.ProtocolTCP,
+				}},
+			},
+		}
+		svc, err = cs.CoreV1().Services(f.Namespace.Name).Create(ctx, svc, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "error creating Service")
+		svcIP := svc.Spec.ClusterIP
 
-		// We will create 2 services to test creating services in both states and also dynamic updates
-		// svcHeadless: Created with the label, will always be disabled. We create this early and
-		//              test again late to make sure it never becomes available.
-		// svcHeadlessToggled: Created without the label then the label is toggled verifying reachability at each step.
+		ginkgo.By("Creating a Pod to handle HTTP requests")
+		podName := "pod-handle-http-request"
+		serverPod := e2epod.NewAgnhostPodFromContainers(
+			"", podName, nil,
+			e2epod.NewAgnhostContainer("container-handle-8090-request", nil, []v1.ContainerPort{{ContainerPort: 8090, Protocol: v1.ProtocolTCP}}, "serve-hostname", "--port", "8090"),
+		)
+		pod := e2epod.NewPodClient(f).CreateSync(ctx, serverPod)
 
-		ginkgo.By("creating service-headless in namespace " + ns)
-		svcHeadless := getServeHostnameService("service-headless")
-		svcHeadless.ObjectMeta.Labels = serviceHeadlessLabels
-		// This should be improved, as we do not want a Headlesss Service to contain an IP...
-		_, svcHeadlessIP, err := StartServeHostnameService(ctx, cs, svcHeadless, ns, numPods)
-		framework.ExpectNoError(err, "failed to create deployment with headless service: %s in the namespace: %s", svcHeadlessIP, ns)
+		addressType := discoveryv1.AddressTypeIPv4
+		if framework.TestContext.ClusterIsIPv6() {
+			addressType = discoveryv1.AddressTypeIPv6
+		}
 
-		ginkgo.By("creating service in namespace " + ns)
-		svcHeadlessToggled := getServeHostnameService("service-headless-toggled")
-		podHeadlessToggledNames, svcHeadlessToggledIP, err := StartServeHostnameService(ctx, cs, svcHeadlessToggled, ns, numPods)
-		framework.ExpectNoError(err, "failed to create deployment with service: %s in the namespace: %s", svcHeadlessToggledIP, ns)
+		ginkgo.By("Creating an EndpointSlice without headless label")
+		eps := &discoveryv1.EndpointSlice{
+			ObjectMeta: metav1.ObjectMeta{GenerateName: "e2e-custom-slice",
+				Labels: map[string]string{
+					discoveryv1.LabelServiceName: svc.Name,
+					discoveryv1.LabelManagedBy:   "e2e-test" + ns,
+				}},
+			AddressType: addressType,
+			Endpoints: []discoveryv1.Endpoint{{
+				Addresses:  []string{pod.Status.PodIP},
+				Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+			}},
+			Ports: []discoveryv1.EndpointPort{{
+				Name:     ptr.To("port80"),
+				Port:     ptr.To[int32](8090),
+				Protocol: ptr.To(v1.ProtocolTCP),
+			}},
+		}
 
-		jig := e2eservice.NewTestJig(cs, ns, svcHeadlessToggled.ObjectMeta.Name)
-
-		ginkgo.By("verifying service is up")
-		framework.ExpectNoError(verifyServeHostnameServiceUp(ctx, cs, ns, podHeadlessToggledNames, svcHeadlessToggledIP, servicePort))
-
-		ginkgo.By("verifying service-headless is not up")
-		framework.ExpectNoError(verifyServeHostnameServiceDown(ctx, cs, ns, svcHeadlessIP, servicePort))
-
-		ginkgo.By("adding service.kubernetes.io/headless label")
-		_, err = jig.UpdateService(ctx, func(svc *v1.Service) {
-			svc.ObjectMeta.Labels = serviceHeadlessLabels
-		})
+		eps, err = f.ClientSet.DiscoveryV1().EndpointSlices(ns).Create(ctx, eps, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
-		ginkgo.By("verifying service is not up")
-		framework.ExpectNoError(verifyServeHostnameServiceDown(ctx, cs, ns, svcHeadlessToggledIP, servicePort))
+		// connect to the service must work
+		ginkgo.By("Creating a client pod that will try to connect to the webserver")
+		clientPod := e2epod.NewAgnhostPod(ns, "client-pod", nil, nil, nil)
+		e2epod.NewPodClient(f).CreateSync(ctx, clientPod)
 
-		ginkgo.By("removing service.kubernetes.io/headless annotation")
-		_, err = jig.UpdateService(ctx, func(svc *v1.Service) {
-			svc.ObjectMeta.Labels = nil
-		})
+		ginkgo.By("Test connection to the webserver")
+		framework.ExpectNoError(verifyServeHostnameServiceUp(ctx, cs, ns, []string{podName}, svcIP, servicePort))
+
+		ginkgo.By("Updating the EndpointSlice to include headless label")
+		eps.ObjectMeta.Labels[v1.IsHeadlessService] = ""
+		_, err = f.ClientSet.DiscoveryV1().EndpointSlices(ns).Update(ctx, eps, metav1.UpdateOptions{})
 		framework.ExpectNoError(err)
 
-		ginkgo.By("verifying service is up")
-		framework.ExpectNoError(verifyServeHostnameServiceUp(ctx, cs, ns, podHeadlessToggledNames, svcHeadlessToggledIP, servicePort))
-
-		ginkgo.By("verifying service-headless is still not up")
-		framework.ExpectNoError(verifyServeHostnameServiceDown(ctx, cs, ns, svcHeadlessIP, servicePort))
+		ginkgo.By("Verify that service is no longer reachable")
+		framework.ExpectNoError(verifyServeHostnameServiceDown(ctx, cs, ns, svcIP, servicePort))
 	})
 
 	ginkgo.It("should be rejected when no endpoints exist", func(ctx context.Context) {

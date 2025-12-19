@@ -28,7 +28,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apimachinery/pkg/util/version"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	utilsnet "k8s.io/utils/net"
@@ -263,21 +262,8 @@ func getEtcdCommand(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.A
 		{Name: "peer-client-cert-auth", Value: "true"},
 		{Name: "snapshot-count", Value: "10000"},
 		{Name: "listen-metrics-urls", Value: fmt.Sprintf("http://%s", net.JoinHostPort(etcdLocalhostAddress, strconv.Itoa(kubeadmconstants.EtcdMetricsPort)))},
-	}
-
-	etcdImageTag := images.GetEtcdImageTag(cfg, supportedEtcdVersion)
-	if etcdVersion, err := version.ParseSemantic(etcdImageTag); err == nil && etcdVersion.AtLeast(version.MustParseSemantic("3.6.0")) {
-		// Arguments used by Etcd 3.6.0+.
-		// TODO: Start always using these once kubeadm only supports etcd >= 3.6.0 for all its supported k8s versions.
-		defaultArguments = append(defaultArguments, []kubeadmapi.Arg{
-			{Name: "feature-gates", Value: "InitialCorruptCheck=true"},
-			{Name: "watch-progress-notify-interval", Value: "5s"},
-		}...)
-	} else {
-		defaultArguments = append(defaultArguments, []kubeadmapi.Arg{
-			{Name: "experimental-initial-corrupt-check", Value: "true"},
-			{Name: "experimental-watch-progress-notify-interval", Value: "5s"},
-		}...)
+		{Name: "feature-gates", Value: "InitialCorruptCheck=true"},
+		{Name: "watch-progress-notify-interval", Value: "5s"},
 	}
 
 	if len(initialCluster) == 0 {

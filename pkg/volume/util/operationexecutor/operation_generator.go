@@ -290,21 +290,21 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 			return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
 		}
 
+		// Update actual state of world
+		addVolumeNodeErr := actualStateOfWorld.MarkVolumeAsAttached(
+			logger, volumeToAttach.VolumeName, volumeToAttach.VolumeSpec, volumeToAttach.NodeName, devicePath)
+		if addVolumeNodeErr != nil {
+			// On failure, return error. Caller will log and retry.
+			eventErr, detailedErr := volumeToAttach.GenerateError("AttachVolume.MarkVolumeAsAttached failed", addVolumeNodeErr)
+			return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
+		}
+
 		// Successful attach event is useful for user debugging
 		simpleMsg, _ := volumeToAttach.GenerateMsg("AttachVolume.Attach succeeded", "")
 		for _, pod := range volumeToAttach.ScheduledPods {
 			og.recorder.Eventf(pod, v1.EventTypeNormal, kevents.SuccessfulAttachVolume, simpleMsg)
 		}
 		klog.Info(volumeToAttach.GenerateMsgDetailed("AttachVolume.Attach succeeded", ""))
-
-		// Update actual state of world
-		addVolumeNodeErr := actualStateOfWorld.MarkVolumeAsAttached(
-			logger, v1.UniqueVolumeName(""), volumeToAttach.VolumeSpec, volumeToAttach.NodeName, devicePath)
-		if addVolumeNodeErr != nil {
-			// On failure, return error. Caller will log and retry.
-			eventErr, detailedErr := volumeToAttach.GenerateError("AttachVolume.MarkVolumeAsAttached failed", addVolumeNodeErr)
-			return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
-		}
 
 		return volumetypes.NewOperationContext(nil, nil, migrated)
 	}

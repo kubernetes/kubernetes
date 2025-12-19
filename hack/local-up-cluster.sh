@@ -1404,8 +1404,8 @@ if [[ "${KUBETEST_IN_DOCKER:-}" == "true" ]]; then
   # configure and start containerd
   echo "configuring containerd"
   containerd config default > /etc/containerd/config.toml
-  sed -ie 's|root = "/var/lib/containerd"|root = "/docker-graph/containerd/daemon"|' /etc/containerd/config.toml
-  sed -ie 's|state = "/run/containerd"|state = "/var/run/docker/containerd/daemon"|' /etc/containerd/config.toml
+  sed -ie 's|root = ./var/lib/containerd.|root = "/docker-graph/containerd/daemon"|' /etc/containerd/config.toml
+  sed -ie 's|state = ./run/containerd.|state = "/var/run/docker/containerd/daemon"|' /etc/containerd/config.toml
   sed -ie 's|enable_cdi = false|enable_cdi = true|' /etc/containerd/config.toml
 
   echo "starting containerd"

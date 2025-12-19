@@ -199,6 +199,12 @@ linters:
           {{include "hack/kube-api-linter/kube-api-linter.yaml" | indent 10 | trim}}
     depguard:
       rules:
+        utils:
+          files:
+            - $all
+          deny:
+            - pkg: "k8s.io/utils/pointer"
+              desc: "k8s.io/utils/pointer shall no longer be used, please use k8s.io/utils/ptr."
         go-cmp:
           files:
             - $all
@@ -253,7 +259,6 @@ linters:
         - typeSwitchVar
         - underef
         - unslice
-        - valSwap
     {{- end}}
     revive:
       # Only these rules are enabled.

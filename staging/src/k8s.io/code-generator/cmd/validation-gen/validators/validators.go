@@ -268,25 +268,27 @@ type TagDoc struct {
 	// StabilityLevel is the stability level of the tag.
 	StabilityLevel StabilityLevel
 	// Args lists any arguments this tag might take.
-	Args []TagArgDoc
+	Args []TagArgDoc `json:",omitempty"`
 	// Usage is how the tag is used, including arguments.
 	Usage string
 	// Description is a short description of this tag's purpose.
 	Description string
 	// Docs is a human-oriented string explaining this tag.
 	Docs string
+	// Warning is an optional warning about this tag.
+	Warning string `json:",omitempty"`
 	// Scopes lists the place or places this tag may be used.
 	Scopes []Scope
 	// Payloads lists zero or more varieties of value for this tag. If this tag
 	// never has a payload, this list should be empty, but if the payload is
 	// optional, this list should include an entry for "<none>".
-	Payloads []TagPayloadDoc
+	Payloads []TagPayloadDoc `json:",omitempty"`
 	// PayloadsType is the type of the payloads.
-	PayloadsType codetags.ValueType
+	PayloadsType codetags.ValueType `json:",omitempty"`
 	// PayloadsRequired is true if a payload is required.
-	PayloadsRequired bool
+	PayloadsRequired bool `json:",omitempty"`
 	// AcceptsUnknownArgs is true if unknown args are accepted
-	AcceptsUnknownArgs bool
+	AcceptsUnknownArgs bool `json:",omitempty"`
 }
 
 func (td TagDoc) Arg(name string) (TagArgDoc, bool) {

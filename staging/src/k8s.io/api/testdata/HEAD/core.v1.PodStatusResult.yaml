@@ -106,6 +106,9 @@ status:
       name: nameValue
       readOnly: true
       recursiveReadOnly: recursiveReadOnlyValue
+      volumeStatus:
+        image:
+          imageRef: imageRefValue
   ephemeralContainerStatuses:
   - allocatedResources:
       allocatedResourcesKey: "0"
@@ -169,6 +172,9 @@ status:
       name: nameValue
       readOnly: true
       recursiveReadOnly: recursiveReadOnlyValue
+      volumeStatus:
+        image:
+          imageRef: imageRefValue
   extendedResourceClaimStatus:
     requestMappings:
     - containerName: containerNameValue
@@ -241,6 +247,9 @@ status:
       name: nameValue
       readOnly: true
       recursiveReadOnly: recursiveReadOnlyValue
+      volumeStatus:
+        image:
+          imageRef: imageRefValue
   message: messageValue
   nominatedNodeName: nominatedNodeNameValue
   observedGeneration: 17

@@ -1,5 +1,4 @@
 //go:build example
-// +build example
 
 /*
 Copyright 2023 The Kubernetes Authors.

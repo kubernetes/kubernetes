@@ -18,7 +18,6 @@ package auth
 
 import (
 	"context"
-	"crypto"
 	"fmt"
 	"strings"
 	"time"
@@ -41,11 +40,6 @@ import (
 	"k8s.io/utils/clock"
 )
 
-const (
-	// spiffeSignerName is the name of the signer for SPIFFE certificates.
-	spiffeSignerName = "row-major.net/spiffe"
-)
-
 var _ = SIGDescribe("Projected PodCertificate",
 	framework.WithFeatureGate(features.PodCertificateRequest),
 	framework.WithFeatureGate(features.ClusterTrustBundle),
@@ -53,31 +47,26 @@ var _ = SIGDescribe("Projected PodCertificate",
 	func() {
 		f := framework.NewDefaultFramework("projected-podcertificate")
 		f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
-		var (
-			signerCtx    context.Context
-			cancelSigner context.CancelFunc
-			signer       *hermeticpodcertificatesigner.Controller
-			caKeys       []crypto.PrivateKey
-			caCerts      [][]byte
-		)
+
+		var spiffeSignerName string
 
 		ginkgo.BeforeEach(func(ctx context.Context) {
+			spiffeSignerName = "e2e.example.com/" + f.UniqueName
+
 			ginkgo.By("Starting in-process pod certificate signer...")
-			signerCtx, cancelSigner = context.WithCancel(context.Background())
+			signerCtx, cancelSigner := context.WithCancel(context.Background())
 			ginkgo.DeferCleanup(func(ctx context.Context) {
 				ginkgo.By("Stopping in-process pod certificate signer...")
-				if cancelSigner != nil {
-					cancelSigner()
-				}
+				cancelSigner()
 			})
 
 			var err error
-			caKeys, caCerts, err = hermeticpodcertificatesigner.GenerateCAHierarchy(1) // Generate CA once
+			caKeys, caCerts, err := hermeticpodcertificatesigner.GenerateCAHierarchy(1) // Generate CA once
 			if err != nil {
 				framework.Failf("failed to generate CA for signer: %v", err)
 			}
 
-			signer = hermeticpodcertificatesigner.New(clock.RealClock{}, spiffeSignerName, caKeys, caCerts, f.ClientSet)
+			signer := hermeticpodcertificatesigner.New(clock.RealClock{}, spiffeSignerName, caKeys, caCerts, f.ClientSet)
 			go signer.Run(signerCtx)
 		})
 
@@ -86,7 +75,7 @@ var _ = SIGDescribe("Projected PodCertificate",
 			ginkgo.By("Using namespace: " + namespace)
 
 			securityContext := generateContainerSecurityContext()
-			serverDeployment, serverService := createServerObjects(namespace, securityContext)
+			serverDeployment, serverService := createServerObjects(namespace, spiffeSignerName, securityContext)
 			ginkgo.By("Creating server deployment...")
 			_, err := f.ClientSet.AppsV1().Deployments(namespace).Create(ctx, serverDeployment, metav1.CreateOptions{})
 			if err != nil {
@@ -99,7 +88,7 @@ var _ = SIGDescribe("Projected PodCertificate",
 				framework.Failf("failed to create server service: %v", err)
 			}
 
-			clientDeployment := createClientObjects(namespace, securityContext)
+			clientDeployment := createClientObjects(namespace, spiffeSignerName, securityContext)
 			ginkgo.By("Creating client deployment...")
 			_, err = f.ClientSet.AppsV1().Deployments(namespace).Create(ctx, clientDeployment, metav1.CreateOptions{})
 			if err != nil {
@@ -129,7 +118,7 @@ var _ = SIGDescribe("Projected PodCertificate",
 			userAnnotations := map[string]string{
 				"spiffe/path-overriding": customPath, // Match the key supported the signer
 			}
-			inspectorPod := createInspectorPod(namespace, "path-override-pod", userAnnotations, nil)
+			inspectorPod := createInspectorPod(namespace, "path-override-pod", userAnnotations, nil, spiffeSignerName)
 
 			ginkgo.By("Creating inspector pod with UserAnnotations...")
 			_, err := f.ClientSet.CoreV1().Pods(namespace).Create(ctx, inspectorPod, metav1.CreateOptions{})
@@ -174,7 +163,7 @@ var _ = SIGDescribe("Projected PodCertificate",
 				ginkgo.By("Using namespace: " + namespace)
 
 				// Create pod without MaxExpirationSeconds
-				testPod := createInspectorPod(namespace, "default-duration-pod", nil, nil)
+				testPod := createInspectorPod(namespace, "default-duration-pod", nil, nil, spiffeSignerName)
 				ginkgo.By("Creating pod without MaxExpirationSeconds...")
 				createdPod, err := f.ClientSet.CoreV1().Pods(namespace).Create(ctx, testPod, metav1.CreateOptions{})
 				if err != nil {
@@ -210,7 +199,7 @@ var _ = SIGDescribe("Projected PodCertificate",
 
 				// Create pod requesting 1 hour
 				requestedSeconds := int32(3600)
-				testPod := createInspectorPod(namespace, "one-hour-duration-pod", nil, &requestedSeconds)
+				testPod := createInspectorPod(namespace, "one-hour-duration-pod", nil, &requestedSeconds, spiffeSignerName)
 				ginkgo.By("Creating pod requesting 1 hour MaxExpirationSeconds...")
 				createdPod, err := f.ClientSet.CoreV1().Pods(namespace).Create(ctx, testPod, metav1.CreateOptions{})
 				if err != nil {
@@ -246,7 +235,7 @@ var _ = SIGDescribe("Projected PodCertificate",
 
 				// Exceeds 91 days
 				tooLongSeconds := int32((91 * 24 * 60 * 60) + 1)
-				testPod := createInspectorPod(namespace, "too-long-duration-pod", nil, &tooLongSeconds)
+				testPod := createInspectorPod(namespace, "too-long-duration-pod", nil, &tooLongSeconds, spiffeSignerName)
 				ginkgo.By("Creating pod requesting >91d MaxExpirationSeconds...")
 				_, err := f.ClientSet.CoreV1().Pods(namespace).Create(ctx, testPod, metav1.CreateOptions{})
 				if err == nil {
@@ -265,7 +254,7 @@ var _ = SIGDescribe("Projected PodCertificate",
 
 				// Less than 1 hour
 				tooShortSeconds := int32(3599)
-				testPod := createInspectorPod(namespace, "too-short-duration-pod", nil, &tooShortSeconds)
+				testPod := createInspectorPod(namespace, "too-short-duration-pod", nil, &tooShortSeconds, spiffeSignerName)
 				ginkgo.By("Creating pod requesting <1h MaxExpirationSeconds...")
 				_, err := f.ClientSet.CoreV1().Pods(namespace).Create(ctx, testPod, metav1.CreateOptions{})
 				if err != nil {
@@ -288,7 +277,7 @@ func generateContainerSecurityContext() *v1.SecurityContext {
 }
 
 // createServerObjects creates the Deployment and Service objects for the mTLS server.
-func createServerObjects(namespace string, securityContext *v1.SecurityContext) (*appsv1.Deployment, *v1.Service) {
+func createServerObjects(namespace string, spiffeSignerName string, securityContext *v1.SecurityContext) (*appsv1.Deployment, *v1.Service) {
 	replicas := int32(1)
 	serverLabels := map[string]string{"app": "server"}
 
@@ -362,7 +351,7 @@ func createServerObjects(namespace string, securityContext *v1.SecurityContext) 
 }
 
 // createClientObjects creates the Deployment object for the mTLS client.
-func createClientObjects(namespace string, securityContext *v1.SecurityContext) *appsv1.Deployment {
+func createClientObjects(namespace string, spiffeSignerName string, securityContext *v1.SecurityContext) *appsv1.Deployment {
 	replicas := int32(1)
 	clientLabels := map[string]string{"app": "client"}
 	fetchURL := "https://server." + namespace + ".svc/spiffe-echo"
@@ -424,7 +413,7 @@ func createClientObjects(namespace string, securityContext *v1.SecurityContext) 
 }
 
 // createInspectorPod creates a pod designed to print its certificate and wait, for inspection purposes.
-func createInspectorPod(namespace, podName string, userAnnotations map[string]string, maxExpirationSeconds *int32) *v1.Pod {
+func createInspectorPod(namespace, podName string, userAnnotations map[string]string, maxExpirationSeconds *int32, spiffeSignerName string) *v1.Pod {
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      podName,

@@ -19,19 +19,24 @@ func (s *PidsGroup) Apply(path string, _ *cgroups.Resources, pid int) error {
 }
 
 func (s *PidsGroup) Set(path string, r *cgroups.Resources) error {
-	if r.PidsLimit != 0 {
-		// "max" is the fallback value.
-		limit := "max"
-
-		if r.PidsLimit > 0 {
-			limit = strconv.FormatInt(r.PidsLimit, 10)
-		}
-
-		if err := cgroups.WriteFile(path, "pids.max", limit); err != nil {
-			return err
-		}
+	if r.PidsLimit == nil {
+		return nil
 	}
 
+	// "max" is the fallback value.
+	val := "max"
+	if limit := *r.PidsLimit; limit > 0 {
+		val = strconv.FormatInt(limit, 10)
+	} else if limit == 0 {
+		// systemd doesn't support setting pids.max to "0", so when setting
+		// TasksMax we need to remap it to "1". We do the same thing here to
+		// avoid flip-flop behaviour between the fs and systemd drivers. In
+		// practice, the pids cgroup behaviour is basically identical.
+		val = "1"
+	}
+	if err := cgroups.WriteFile(path, "pids.max", val); err != nil {
+		return err
+	}
 	return nil
 }
 

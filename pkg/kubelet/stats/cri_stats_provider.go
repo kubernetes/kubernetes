@@ -398,8 +398,12 @@ func (p *criStatsProvider) ListPodCPUAndMemoryStats(ctx context.Context) ([]stat
 					continue
 				}
 				ps := buildPodStats(podSandbox)
+				// Add container-level CPU and memory stats from CRI
+				p.addCRIPodContainerCPUAndMemoryStats(criSandboxStat, ps, containerMap)
 				addCRIPodCPUStats(ps, criSandboxStat)
 				addCRIPodMemoryStats(ps, criSandboxStat)
+				// Aggregate pod swap from container swap stats (CRI doesn't have pod-level swap)
+				aggregatePodSwapStats(ps)
 				result = append(result, *ps)
 			}
 			return result, err
@@ -699,6 +703,33 @@ func (p *criStatsProvider) addSwapStats(
 	}
 }
 
+// aggregatePodSwapStats aggregates pod-level swap stats from container swap stats.
+// This is used when CRI doesn't provide pod-level swap stats (e.g., LinuxPodSandboxStats doesn't have a Swap field).
+func aggregatePodSwapStats(ps *statsapi.PodStats) {
+	if len(ps.Containers) == 0 {
+		return
+	}
+	var swapAvailableBytes, swapUsageBytes uint64
+	var hasSwapStats bool
+	var swapTime metav1.Time
+	for _, cs := range ps.Containers {
+		if cs.Swap != nil {
+			hasSwapStats = true
+			// TODO: Consider picking the newest time across containers instead of just using the last one.
+			swapTime = cs.Swap.Time
+			swapAvailableBytes += ptr.Deref(cs.Swap.SwapAvailableBytes, 0)
+			swapUsageBytes += ptr.Deref(cs.Swap.SwapUsageBytes, 0)
+		}
+	}
+	if hasSwapStats {
+		ps.Swap = &statsapi.SwapStats{
+			Time:               swapTime,
+			SwapAvailableBytes: &swapAvailableBytes,
+			SwapUsageBytes:     &swapUsageBytes,
+		}
+	}
+}
+
 func (p *criStatsProvider) addIOStats(
 	ps *statsapi.PodStats,
 	podUID types.UID,
@@ -781,6 +812,15 @@ func (p *criStatsProvider) makeContainerStats(
 		}
 		if stats.Memory.RssBytes != nil {
 			result.Memory.RSSBytes = &stats.Memory.RssBytes.Value
+		}
+		if stats.Memory.AvailableBytes != nil {
+			result.Memory.AvailableBytes = &stats.Memory.AvailableBytes.Value
+		}
+		if stats.Memory.PageFaults != nil {
+			result.Memory.PageFaults = &stats.Memory.PageFaults.Value
+		}
+		if stats.Memory.MajorPageFaults != nil {
+			result.Memory.MajorPageFaults = &stats.Memory.MajorPageFaults.Value
 		}
 		result.Memory.PSI = makePSIStats(stats.Memory.Psi)
 	} else {

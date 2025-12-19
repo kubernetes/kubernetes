@@ -69,9 +69,3 @@ func Process(filename string, src []byte, opt *Options) ([]byte, error) {
 	}
 	return intimp.Process(filename, src, intopt)
 }
-
-// VendorlessPath returns the devendorized version of the import path ipath.
-// For example, VendorlessPath("foo/bar/vendor/a/b") returns "a/b".
-func VendorlessPath(ipath string) string {
-	return intimp.VendorlessPath(ipath)
-}

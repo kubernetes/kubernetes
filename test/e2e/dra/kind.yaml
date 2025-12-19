@@ -23,7 +23,7 @@ kubeadmConfigPatches:
           - name: "v"
             value: "5"
           - name: "vmodule"
-            value: "allocator=6,dynamicresources=6" # structured/allocator.go, DRA scheduler plugin
+            value: "allocator*=6,pools*=6,dynamicresources=6,allocateddevices=6,dra_manager=6,extendeddynamicresources=6" # structured/internal/*/allocator*.go, DRA scheduler plugin
     controllerManager:
         extraArgs:
           - name: "v"
@@ -53,7 +53,7 @@ kubeadmConfigPatches:
     scheduler:
         extraArgs:
           v: "5"
-          vmodule: "allocator=6,dynamicresources=6" # structured/allocator.go, DRA scheduler plugin
+          vmodule: "allocator*=6,pools*=6,dynamicresources=6,allocateddevices=6,dra_manager=6,extendeddynamicresources=6" # structured/internal/*/allocator*.go, DRA scheduler plugin
     controllerManager:
         extraArgs:
           v: "5"

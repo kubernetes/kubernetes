@@ -323,14 +323,10 @@ func (aq *activeQueue) unlockedPop(logger klog.Logger) (*framework.QueuedPodInfo
 	}
 	aq.schedCycle++
 
-	// Update metrics and reset the set of unschedulable plugins for the next attempt.
+	// Update metrics for unschedulable plugins.
 	for plugin := range pInfo.UnschedulablePlugins.Union(pInfo.PendingPlugins) {
 		metrics.UnschedulableReason(plugin, pInfo.Pod.Spec.SchedulerName).Dec()
 	}
-	pInfo.UnschedulablePlugins.Clear()
-	pInfo.PendingPlugins.Clear()
-	pInfo.GatingPlugin = ""
-	pInfo.GatingPluginEvents = nil
 
 	return pInfo, nil
 }

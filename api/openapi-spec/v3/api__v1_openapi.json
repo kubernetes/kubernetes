@@ -3154,6 +3154,19 @@
         },
         "type": "object"
       },
+      "io.k8s.api.core.v1.ImageVolumeStatus": {
+        "description": "ImageVolumeStatus represents the image-based volume status.",
+        "properties": {
+          "imageRef": {
+            "description": "ImageRef is the digest of the image used for this volume. It should have a value that's similar to the pod's status.containerStatuses[i].imageID. The ImageRef length should not exceed 256 characters.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "imageRef"
+        ],
+        "type": "object"
+      },
       "io.k8s.api.core.v1.KeyToPath": {
         "description": "Maps a string key to a path within a volume.",
         "properties": {
@@ -8726,6 +8739,15 @@
           "recursiveReadOnly": {
             "description": "RecursiveReadOnly must be set to Disabled, Enabled, or unspecified (for non-readonly mounts). An IfPossible value in the original VolumeMount must be translated to Disabled or Enabled, depending on the mount result.",
             "type": "string"
+          },
+          "volumeStatus": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.VolumeStatus"
+              }
+            ],
+            "default": {},
+            "description": "volumeStatus represents volume-type-specific status about the mounted volume."
           }
         },
         "required": [
@@ -8818,6 +8840,20 @@
             },
             "description": "Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
             "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "io.k8s.api.core.v1.VolumeStatus": {
+        "description": "VolumeStatus represents the status of a mounted volume. At most one of its members must be specified.",
+        "properties": {
+          "image": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.ImageVolumeStatus"
+              }
+            ],
+            "description": "image represents an OCI object (a container image or artifact) pulled and mounted on the kubelet's host machine."
           }
         },
         "type": "object"
@@ -9275,16 +9311,6 @@
             "group": "autoscaling",
             "kind": "DeleteOptions",
             "version": "v2"
-          },
-          {
-            "group": "autoscaling",
-            "kind": "DeleteOptions",
-            "version": "v2beta1"
-          },
-          {
-            "group": "autoscaling",
-            "kind": "DeleteOptions",
-            "version": "v2beta2"
           },
           {
             "group": "batch",
@@ -10030,16 +10056,6 @@
             "group": "autoscaling",
             "kind": "WatchEvent",
             "version": "v2"
-          },
-          {
-            "group": "autoscaling",
-            "kind": "WatchEvent",
-            "version": "v2beta1"
-          },
-          {
-            "group": "autoscaling",
-            "kind": "WatchEvent",
-            "version": "v2beta2"
           },
           {
             "group": "batch",

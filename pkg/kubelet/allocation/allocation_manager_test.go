@@ -54,6 +54,7 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
 	_ "k8s.io/kubernetes/pkg/volume/hostpath"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -2345,6 +2346,7 @@ func TestRecordPodDeferredAcceptedResizes(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
 			original := &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					UID:       "1111",
@@ -2387,7 +2389,7 @@ func TestRecordPodDeferredAcceptedResizes(t *testing.T) {
 				return resizedPod, true
 			}
 			am.PushPendingResize(original.UID)
-			resizedPods := am.(*manager).retryPendingResizes(tc.trigger)
+			resizedPods := am.(*manager).retryPendingResizes(logger, tc.trigger)
 
 			require.Len(t, resizedPods, 1)
 			require.Equal(t, original.UID, resizedPods[0].UID)

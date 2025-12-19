@@ -30,7 +30,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc/metadata"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -3164,111 +3163,6 @@ func TestGetBookmarkAfterResourceVersionLockedFunc(t *testing.T) {
 	}
 }
 
-func TestWatchStreamSeparation(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SizeBasedListCostEstimate, false)
-	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
-	t.Cleanup(func() {
-		server.Terminate(t)
-	})
-	setupOpts := &setupOptions{}
-	withDefaults(setupOpts)
-	config := Config{
-		Storage:             etcdStorage,
-		Versioner:           storage.APIObjectVersioner{},
-		GroupResource:       schema.GroupResource{Resource: "pods"},
-		EventsHistoryWindow: DefaultEventFreshDuration,
-		ResourcePrefix:      setupOpts.resourcePrefix,
-		KeyFunc:             setupOpts.keyFunc,
-		GetAttrsFunc:        GetPodAttrs,
-		NewFunc:             newPod,
-		NewListFunc:         newPodList,
-		IndexerFuncs:        setupOpts.indexerFuncs,
-		Codec:               codecs.LegacyCodec(examplev1.SchemeGroupVersion),
-		Clock:               setupOpts.clock,
-	}
-	tcs := []struct {
-		name                         string
-		separateCacheWatchRPC        bool
-		useWatchCacheContextMetadata bool
-		expectBookmarkOnWatchCache   bool
-		expectBookmarkOnEtcd         bool
-	}{
-		{
-			name:                       "common RPC > both get bookmarks",
-			separateCacheWatchRPC:      false,
-			expectBookmarkOnEtcd:       true,
-			expectBookmarkOnWatchCache: true,
-		},
-		{
-			name:                       "separate RPC > only etcd gets bookmarks",
-			separateCacheWatchRPC:      true,
-			expectBookmarkOnEtcd:       true,
-			expectBookmarkOnWatchCache: false,
-		},
-		{
-			name:                         "separate RPC & watch cache context > only watch cache gets bookmarks",
-			separateCacheWatchRPC:        true,
-			useWatchCacheContextMetadata: true,
-			expectBookmarkOnEtcd:         false,
-			expectBookmarkOnWatchCache:   true,
-		},
-	}
-	for _, tc := range tcs {
-		t.Run(tc.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SeparateCacheWatchRPC, tc.separateCacheWatchRPC)
-			cacher, err := NewCacherFromConfig(config)
-			if err != nil {
-				t.Fatalf("Failed to initialize cacher: %v", err)
-			}
-			defer cacher.Stop()
-
-			if !utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
-				if err := cacher.ready.wait(context.TODO()); err != nil {
-					t.Fatalf("unexpected error waiting for the cache to be ready")
-				}
-			}
-
-			getCacherRV := func() uint64 {
-				cacher.watchCache.RLock()
-				defer cacher.watchCache.RUnlock()
-				return cacher.watchCache.resourceVersion
-			}
-			waitContext, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-			defer cancel()
-			waitForEtcdBookmark := watchAndWaitForBookmark(t, waitContext, cacher.storage)
-
-			increaseRV := increaseRVFunc(server.V3Client.Client)
-			increaseRV(context.Background(), t)
-			lastResourceVersion := uint64(increaseRV(context.Background(), t))
-
-			var contextMetadata metadata.MD
-			if tc.useWatchCacheContextMetadata {
-				contextMetadata = metadata.New(map[string]string{"source": "cache"})
-			}
-			// For the first 100ms from watch creation, watch progress requests are ignored.
-			time.Sleep(200 * time.Millisecond)
-			err = cacher.storage.RequestWatchProgress(metadata.NewOutgoingContext(context.Background(), contextMetadata))
-			if err != nil {
-				t.Fatal(err)
-			}
-			// Give time for bookmark to arrive
-			time.Sleep(time.Second)
-
-			etcdWatchResourceVersion := waitForEtcdBookmark()
-			gotEtcdWatchBookmark := etcdWatchResourceVersion == lastResourceVersion
-			if gotEtcdWatchBookmark != tc.expectBookmarkOnEtcd {
-				t.Errorf("Unexpected etcd bookmark check result, rv: %d, lastRV: %d, wantMatching: %v", etcdWatchResourceVersion, lastResourceVersion, tc.expectBookmarkOnEtcd)
-			}
-
-			watchCacheResourceVersion := getCacherRV()
-			cacherGotBookmark := watchCacheResourceVersion == lastResourceVersion
-			if cacherGotBookmark != tc.expectBookmarkOnWatchCache {
-				t.Errorf("Unexpected watch cache bookmark check result, rv: %d, lastRV: %d, wantMatching: %v", watchCacheResourceVersion, lastResourceVersion, tc.expectBookmarkOnWatchCache)
-			}
-		})
-	}
-}
-
 func TestComputeListLimit(t *testing.T) {
 	scenarios := []struct {
 		name          string
@@ -3323,37 +3217,6 @@ func TestComputeListLimit(t *testing.T) {
 				t.Errorf("computeListLimit returned = %v, expected %v", actualLimit, scenario.expectedLimit)
 			}
 		})
-	}
-}
-
-func watchAndWaitForBookmark(t *testing.T, ctx context.Context, etcdStorage storage.Interface) func() (resourceVersion uint64) {
-	opts := storage.ListOptions{ResourceVersion: "", Predicate: storage.Everything, Recursive: true}
-	opts.Predicate.AllowWatchBookmarks = true
-	w, err := etcdStorage.Watch(ctx, "/pods/", opts)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	versioner := storage.APIObjectVersioner{}
-	var rv uint64
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		for event := range w.ResultChan() {
-			if event.Type == watch.Bookmark {
-				rv, err = versioner.ObjectResourceVersion(event.Object)
-				break
-			}
-		}
-	}()
-	return func() (resourceVersion uint64) {
-		defer w.Stop()
-		wg.Wait()
-		if err != nil {
-			t.Fatal(err)
-		}
-		return rv
 	}
 }
 
