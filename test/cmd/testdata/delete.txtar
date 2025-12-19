@@ -1,0 +1,144 @@
+# Copyright The Kubernetes Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Test kubectl delete command variations
+
+####################
+# Delete --all-namespaces Tests
+####################
+
+# Create two test namespaces
+kubectl create namespace delete-ns-one
+stdout 'namespace/delete-ns-one created'
+
+kubectl create namespace delete-ns-two
+stdout 'namespace/delete-ns-two created'
+
+# Create configmaps in both namespaces
+kubectl create configmap one --namespace=delete-ns-one
+stdout 'configmap/one created'
+
+kubectl create configmap two --namespace=delete-ns-two
+stdout 'configmap/two created'
+
+# Label configmaps
+kubectl label configmap one --namespace=delete-ns-one deletetest=true
+stdout 'configmap/one labeled'
+
+kubectl label configmap two --namespace=delete-ns-two deletetest=true
+stdout 'configmap/two labeled'
+
+# Test: Dry-run delete (client-side) with --all-namespaces
+kubectl delete configmap --dry-run=client -l deletetest=true --all-namespaces
+stdout 'dry run'
+
+# Verify configmaps still exist after dry-run
+kubectl get configmap one --namespace=delete-ns-one -o jsonpath='{.metadata.name}'
+stdout 'one'
+
+kubectl get configmap two --namespace=delete-ns-two -o jsonpath='{.metadata.name}'
+stdout 'two'
+
+# Test: Dry-run delete (server-side) with --all-namespaces
+kubectl delete configmap --dry-run=server -l deletetest=true --all-namespaces
+stdout 'server dry run'
+
+# Verify configmaps still exist after dry-run
+kubectl get configmap one --namespace=delete-ns-one -o jsonpath='{.metadata.name}'
+stdout 'one'
+
+kubectl get configmap two --namespace=delete-ns-two -o jsonpath='{.metadata.name}'
+stdout 'two'
+
+# Test: Actually delete configmaps across all namespaces
+kubectl delete configmap -l deletetest=true --all-namespaces
+stdout 'deleted'
+
+# Verify configmaps are deleted in both namespaces
+kubectl get configmap -l deletetest=true --namespace=delete-ns-one -o jsonpath='{range.items}{.metadata.name}:{end}'
+! stdout 'one'
+
+kubectl get configmap -l deletetest=true --namespace=delete-ns-two -o jsonpath='{range.items}{.metadata.name}:{end}'
+! stdout 'two'
+
+# Cleanup namespaces
+kubectl delete namespace delete-ns-one
+kubectl delete namespace delete-ns-two
+
+####################
+# Delete --interactive Tests
+# Note: Interactive tests with stdin are challenging in testscript
+# We test the non-interactive behavior instead
+####################
+
+# Create two test namespaces for interactive tests
+kubectl create namespace delete-interactive-one
+stdout 'namespace/delete-interactive-one created'
+
+kubectl create namespace delete-interactive-two
+stdout 'namespace/delete-interactive-two created'
+
+# Create and label configmaps
+kubectl create configmap cm-one --namespace=delete-interactive-one
+kubectl create configmap cm-two --namespace=delete-interactive-two
+kubectl label configmap cm-one --namespace=delete-interactive-one deletetest=true
+kubectl label configmap cm-two --namespace=delete-interactive-two deletetest=true
+
+# Test: Dry-run delete to see what would be deleted
+kubectl delete configmap --dry-run=server -l deletetest=true --all-namespaces
+stdout 'cm-one'
+stdout 'cm-two'
+stdout 'server dry run'
+
+# Verify resources still exist after dry-run
+kubectl get configmap cm-one --namespace=delete-interactive-one -o jsonpath='{.metadata.name}'
+stdout 'cm-one'
+
+kubectl get configmap cm-two --namespace=delete-interactive-two -o jsonpath='{.metadata.name}'
+stdout 'cm-two'
+
+# Test: Actually delete without interactive flag (standard delete)
+kubectl delete configmap -l deletetest=true --all-namespaces
+stdout 'deleted'
+
+# Verify resources are deleted
+kubectl get configmap -l deletetest=true --namespace=delete-interactive-one -o jsonpath='{range.items}{.metadata.name}{end}'
+! stdout 'cm-one'
+
+kubectl get configmap -l deletetest=true --namespace=delete-interactive-two -o jsonpath='{range.items}{.metadata.name}{end}'
+! stdout 'cm-two'
+
+# Test: Delete with --wait flag
+kubectl create configmap cm-three --namespace=delete-interactive-one
+kubectl label configmap cm-three --namespace=delete-interactive-one deletetest2=true
+kubectl delete configmap -l deletetest2=true --namespace=delete-interactive-one --wait
+stdout 'deleted'
+
+# Verify deletion
+kubectl get configmap -l deletetest2=true --namespace=delete-interactive-one -o jsonpath='{range.items}{.metadata.name}{end}'
+! stdout 'cm-three'
+
+# Test: Delete with --force flag (deprecated but still functional)
+kubectl create configmap cm-four --namespace=delete-interactive-one
+kubectl label configmap cm-four --namespace=delete-interactive-one deletetest3=true
+kubectl delete configmap -l deletetest3=true --namespace=delete-interactive-one --force --wait
+stdout 'deleted'
+
+# Verify deletion
+kubectl get configmap -l deletetest3=true --namespace=delete-interactive-one -o jsonpath='{range.items}{.metadata.name}{end}'
+! stdout 'cm-four'
+
+# Cleanup namespaces
+kubectl delete namespace delete-interactive-one
+kubectl delete namespace delete-interactive-two

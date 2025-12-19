@@ -1,0 +1,129 @@
+# Copyright The Kubernetes Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+# Test Job and CronJob resources
+
+###################################
+# Setup: Create test-jobs namespace
+###################################
+
+# Pre-condition: test-jobs namespace does not exist
+kubectl get namespaces -o jsonpath='{range.items[?(@.metadata.name=="test-jobs")]}{.metadata.name}{end}'
+! stdout 'test-jobs'
+
+# Create test-jobs namespace
+kubectl create namespace test-jobs
+kubectl get namespaces/test-jobs -o jsonpath='{.metadata.name}'
+stdout 'test-jobs'
+
+####################
+# CronJob Tests
+####################
+
+# Pre-condition: cronjob 'pi' does not exist in test-jobs namespace
+kubectl get cronjob --namespace=test-jobs -o jsonpath='{range.items[?(@.metadata.name=="pi")]}{.metadata.name}{end}'
+! stdout 'pi'
+
+# Test: Dry-run create CronJob (client-side)
+kubectl create cronjob pi --dry-run=client --schedule='59 23 31 2 *' --namespace=test-jobs --image=${IMAGE_PERL} -- perl -Mbignum=bpi -wle 'print bpi(20)'
+stdout 'cronjob.batch/pi created'
+stdout 'dry run'
+
+# Test: Dry-run create CronJob (server-side)
+kubectl create cronjob pi --dry-run=server --schedule='59 23 31 2 *' --namespace=test-jobs --image=${IMAGE_PERL} -- perl -Mbignum=bpi -wle 'print bpi(20)'
+stdout 'cronjob.batch/pi created'
+stdout 'server dry run'
+
+# Verify cronjob still doesn't exist after dry-runs
+kubectl get cronjob --namespace=test-jobs -o jsonpath='{range.items[?(@.metadata.name=="pi")]}{.metadata.name}{end}'
+! stdout 'pi'
+
+# Create CronJob 'pi' in test-jobs namespace
+kubectl create cronjob pi --schedule='59 23 31 2 *' --namespace=test-jobs --image=${IMAGE_PERL} -- perl -Mbignum=bpi -wle 'print bpi(20)'
+stdout 'cronjob.batch/pi created'
+
+# Post-condition: cronjob 'pi' exists
+kubectl get cronjob/pi --namespace=test-jobs -o jsonpath='{.metadata.name}'
+stdout 'pi'
+
+# Test: kubectl get cronjob
+kubectl get cronjob/pi --namespace=test-jobs
+stdout 'pi'
+
+# Test: kubectl describe cronjob
+kubectl describe cronjob/pi --namespace=test-jobs
+stdout 'Name:'
+stdout 'pi'
+stdout 'Schedule:'
+
+####################
+# Job Tests
+####################
+
+# Test: Create job in dry-run mode (should not create actual job)
+kubectl create job test-job --from=cronjob/pi --dry-run=true --namespace=test-jobs -o name
+stdout 'job.batch/test-job'
+
+# Post-condition: test-job wasn't created (dry-run only)
+kubectl get jobs --namespace=test-jobs -o jsonpath='{range.items}{.metadata.name}{end}'
+! stdout 'test-job'
+
+# Pre-condition: job 'test-job' does not exist
+kubectl get job --namespace=test-jobs -o jsonpath='{range.items[?(@.metadata.name=="test-job")]}{.metadata.name}{end}'
+! stdout 'test-job'
+
+# Test: Dry-run create job (client-side)
+kubectl create job test-job --from=cronjob/pi --namespace=test-jobs --dry-run=client
+stdout 'job.batch/test-job created'
+stdout 'dry run'
+
+# Test: Dry-run create job (server-side)
+kubectl create job test-job --from=cronjob/pi --namespace=test-jobs --dry-run=server
+stdout 'job.batch/test-job created'
+stdout 'server dry run'
+
+# Verify job still doesn't exist after dry-runs
+kubectl get job --namespace=test-jobs -o jsonpath='{range.items[?(@.metadata.name=="test-job")]}{.metadata.name}{end}'
+! stdout 'test-job'
+
+# Create job 'test-job' from cronjob
+kubectl create job test-job --from=cronjob/pi --namespace=test-jobs
+stdout 'job.batch/test-job created'
+
+# Post-condition: job 'test-job' exists
+kubectl get job/test-job --namespace=test-jobs -o jsonpath='{.metadata.name}'
+stdout 'test-job'
+
+# Test: kubectl get job
+kubectl get job/test-job --namespace=test-jobs
+stdout 'test-job'
+
+# Test: kubectl describe job
+kubectl describe job/test-job --namespace=test-jobs
+stdout 'Name:'
+stdout 'test-job'
+
+####################
+# Cleanup
+####################
+
+kubectl delete job test-job --namespace=test-jobs
+stdout 'job.batch "test-job" deleted'
+
+kubectl delete cronjob pi --namespace=test-jobs
+stdout 'cronjob.batch "pi" deleted'
+
+kubectl delete namespace test-jobs
+stdout 'namespace "test-jobs" deleted'

@@ -1,0 +1,895 @@
+# Copyright The Kubernetes Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+#############################
+# kubectl apply basic tests #
+#############################
+
+# kubectl apply should create the resource that doesn't exist yet
+# Pre-Condition: no POD exists
+kubectl get pods -o jsonpath='{range .items[*]}{.metadata.name}:{end}'
+stdout ''
+
+# Command: apply a pod "test-pod" (doesn't exist) should create this pod
+kubectl apply -f hack/testdata/pod.yaml
+stdout 'pod/test-pod created'
+
+# Post-Condition: pod "test-pod" is created
+kubectl get pods test-pod -o jsonpath='{.metadata.labels.name}'
+stdout 'test-pod-label'
+
+# Post-Condition: pod "test-pod" has configuration annotation
+kubectl get pods test-pod -o yaml
+stdout 'kubectl.kubernetes.io/last-applied-configuration'
+
+# pod has field manager for kubectl client-side apply
+kubectl get --show-managed-fields -f hack/testdata/pod.yaml -o jsonpath='{.metadata.managedFields[*].manager}'
+stdout 'kubectl-client-side-apply'
+
+# Clean up
+kubectl delete pods test-pod
+#####################
+# set-last-applied  #
+#####################
+
+# Pre-Condition: no POD exists
+kubectl get pods -o jsonpath='{range .items[*]}{.metadata.name}:{end}'
+stdout ''
+
+# Command: create "test-pod" (doesn't exist) should create this pod without last-applied annotation
+kubectl create -f hack/testdata/pod.yaml
+stdout 'pod/test-pod created'
+
+# Post-Condition: pod "test-pod" is created
+kubectl get pods test-pod -o jsonpath='{.metadata.labels.name}'
+stdout 'test-pod-label'
+
+# Pre-Condition: pod "test-pod" does not have configuration annotation
+kubectl get pods test-pod -o yaml
+! stdout 'kubectl.kubernetes.io/last-applied-configuration'
+
+# Dry-run set-last-applied (client-side)
+kubectl apply set-last-applied --dry-run=client -f hack/testdata/pod.yaml --create-annotation=true
+
+# After dry-run, annotation should still not exist
+kubectl get pods test-pod -o yaml
+! stdout 'kubectl.kubernetes.io/last-applied-configuration'
+
+# Dry-run set-last-applied (server-side)
+kubectl apply set-last-applied --dry-run=server -f hack/testdata/pod.yaml --create-annotation=true
+
+# After dry-run, annotation should still not exist
+kubectl get pods test-pod -o yaml
+! stdout 'kubectl.kubernetes.io/last-applied-configuration'
+
+# Command: set-last-applied for real
+kubectl apply set-last-applied -f hack/testdata/pod.yaml --create-annotation=true
+
+# Post-Condition: pod "test-pod" has configuration annotation
+kubectl get pods test-pod -o yaml
+stdout 'kubectl.kubernetes.io/last-applied-configuration'
+
+# Clean up
+kubectl delete pods test-pod
+####################################
+# kubectl apply clear defaulted    #
+####################################
+
+# kubectl apply should be able to clear defaulted fields.
+# Pre-Condition: no deployment exists
+kubectl get deployments -o jsonpath='{range .items[*]}{.metadata.name}:{end}'
+stdout ''
+
+# Command: apply a deployment "test-deployment-retainkeys" (doesn't exist) should create this deployment
+kubectl apply -f hack/testdata/retainKeys/deployment/deployment-before.yaml
+
+# Post-Condition: deployment "test-deployment-retainkeys" created
+kubectl get deployments -o jsonpath='{.items[0].metadata.name}'
+stdout 'test-deployment-retainkeys'
+
+# Post-Condition: deployment "test-deployment-retainkeys" has defaulted fields
+kubectl get deployments test-deployment-retainkeys -o yaml
+stdout 'RollingUpdate'
+stdout 'maxSurge'
+stdout 'maxUnavailable'
+stdout 'emptyDir'
+
+# Command: apply a deployment "test-deployment-retainkeys" should clear defaulted fields
+kubectl apply -f hack/testdata/retainKeys/deployment/deployment-after.yaml
+
+# Post-Condition: deployment "test-deployment-retainkeys" has updated fields
+kubectl get deployments test-deployment-retainkeys -o yaml
+stdout 'Recreate'
+! stdout 'RollingUpdate'
+stdout 'hostPath'
+! stdout 'emptyDir'
+
+# Clean up
+kubectl delete deployments test-deployment-retainkeys
+####################################
+# kubectl apply -l label selector  #
+####################################
+
+# kubectl apply -f with label selector should only apply matching objects
+# Pre-Condition: no POD exists
+kubectl get pods -o jsonpath='{range .items[*]}{.metadata.name}:{end}'
+stdout ''
+
+# apply with label selector
+kubectl apply -l unique-label=bingbang -f hack/testdata/filter
+
+# check right pod exists
+kubectl get pods selector-test-pod -o jsonpath='{.metadata.labels.name}'
+stdout 'selector-test-pod'
+
+# check wrong pod doesn't exist
+! kubectl get pods selector-test-pod-dont-apply
+
+# cleanup
+kubectl delete pods selector-test-pod
+####################################
+# kubectl apply null propagation   #
+####################################
+
+# Create a deployment with null values for cpu and terminationMessagePolicy
+kubectl apply -f hack/testdata/null-propagation/deployment-null.yml
+
+# resources.limits.cpu should be empty (null)
+kubectl get deployment/my-dep-null -o jsonpath='{.spec.template.spec.containers[0].resources.requests.cpu}'
+stdout ''
+
+# resources.requests.memory should be 64Mi
+kubectl get deployment/my-dep-null -o jsonpath='{.spec.template.spec.containers[0].resources.requests.memory}'
+stdout '64Mi'
+
+# The default value of the terminationMessagePolicy field is 'File', so the result will not be changed
+kubectl get deployment/my-dep-null -o jsonpath='{.spec.template.spec.containers[0].terminationMessagePolicy}'
+stdout 'File'
+
+# kubectl apply on update should preserve null handling
+kubectl apply -f hack/testdata/null-propagation/deployment-null.yml
+kubectl get deployment/my-dep-null -o jsonpath='{.spec.template.spec.containers[0].resources.requests.cpu}'
+stdout ''
+kubectl get deployment/my-dep-null -o jsonpath='{.spec.template.spec.containers[0].resources.requests.memory}'
+stdout '64Mi'
+kubectl get deployment/my-dep-null -o jsonpath='{.spec.template.spec.containers[0].terminationMessagePolicy}'
+stdout 'File'
+
+# Apply resourcequota with null values
+kubectl apply -f hack/testdata/null-propagation/resourcesquota-null.yml
+
+# hard.limits.cpu should be empty (null)
+kubectl get resourcequota/my-rq -o jsonpath='{.spec.hard.limits\.cpu}'
+stdout ''
+
+# hard.limits.memory should be empty (null)
+kubectl get resourcequota/my-rq -o jsonpath='{.spec.hard.limits\.memory}'
+stdout ''
+
+# kubectl apply on update should preserve null handling for resourcequota
+kubectl apply -f hack/testdata/null-propagation/resourcesquota-null.yml
+kubectl get resourcequota/my-rq -o jsonpath='{.spec.hard.limits\.cpu}'
+stdout ''
+kubectl get resourcequota/my-rq -o jsonpath='{.spec.hard.limits\.memory}'
+stdout ''
+
+# cleanup
+kubectl delete deployment my-dep-null
+kubectl delete resourcequota my-rq
+####################################
+# kubectl apply --dry-run          #
+####################################
+
+# Pre-Condition: no POD exists
+kubectl get pods -o jsonpath='{range .items[*]}{.metadata.name}:{end}'
+stdout ''
+
+# apply dry-run=client should not create pod
+kubectl apply --dry-run=client -f hack/testdata/pod.yaml
+stdout 'pod/test-pod created \(dry run\)'
+
+# No pod exists after dry-run=client
+kubectl get pods -o jsonpath='{range .items[*]}{.metadata.name}:{end}'
+stdout ''
+
+# apply dry-run=server should not create pod
+kubectl apply --dry-run=server -f hack/testdata/pod.yaml
+stdout 'pod/test-pod created \(server dry run\)'
+
+# No pod exists after dry-run=server
+kubectl get pods -o jsonpath='{range .items[*]}{.metadata.name}:{end}'
+stdout ''
+
+# apply non dry-run creates the pod
+kubectl apply -f hack/testdata/pod.yaml
+stdout 'pod/test-pod created'
+
+# Get initial resource version
+kubectl get -f hack/testdata/pod.yaml -o jsonpath='{.metadata.resourceVersion}'
+cp stdout initial_rv
+
+# apply changes with dry-run=client should not modify pod
+kubectl apply --dry-run=client -f hack/testdata/pod-apply.yaml
+stdout 'pod/test-pod configured \(dry run\)'
+
+# Post-Condition: label still has initial value
+kubectl get pods test-pod -o jsonpath='{.metadata.labels.name}'
+stdout 'test-pod-label'
+
+# apply changes with dry-run=server should not modify pod
+kubectl apply --dry-run=server -f hack/testdata/pod-apply.yaml
+stdout 'pod/test-pod configured \(server dry run\)'
+
+# Post-Condition: label still has initial value
+kubectl get pods test-pod -o jsonpath='{.metadata.labels.name}'
+stdout 'test-pod-label'
+
+# Ensure dry-run doesn't persist change - resource version unchanged
+kubectl get -f hack/testdata/pod.yaml -o jsonpath='{.metadata.resourceVersion}'
+cp stdout current_rv
+cmp initial_rv current_rv
+
+# clean-up
+kubectl delete -f hack/testdata/pod.yaml
+####################################
+# kubectl apply dry-run on CR      #
+####################################
+
+# Create CRD for custom resource
+kubectl create -f $WORK/resources-crd.yaml
+
+# Wait for CRD to be established
+kube-retry 'crd resources.mygroup.example.com' '{.status.conditions[?(@.type=="Established")].status}' 'True'
+
+# Dry-run create the CR - should not actually create it
+kubectl apply --dry-run=server -f hack/testdata/CRD/resource.yaml
+stdout 'kind.mygroup.example.com/myobj created \(server dry run\)'
+
+# Make sure that the CR doesn't exist after dry-run
+! kubectl get resource/myobj
+
+# clean-up
+kubectl delete customresourcedefinition resources.mygroup.example.com
+####################################
+# kubectl apply --prune            #
+####################################
+
+# Pre-Condition: namespace nsb exists; no POD exists
+kubectl create ns nsb
+kubectl create serviceaccount default -n nsb
+
+kubectl get pods -o jsonpath='{range .items[*]}{.metadata.name}:{end}'
+stdout ''
+
+# apply a into namespace nsb
+kubectl apply --namespace nsb -l prune-group=true -f hack/testdata/prune/a.yaml
+
+# verify pod a exists in nsb
+kubectl get pods a -n nsb -o jsonpath='{.metadata.name}'
+stdout 'a'
+
+# apply b with namespace and --prune
+kubectl apply --namespace nsb --prune -l prune-group=true -f hack/testdata/prune/b.yaml
+stdout 'pod/b created'
+stdout 'pod/a pruned'
+
+# check right pod exists and wrong pod doesn't exist (use retry since prune is async)
+kube-retry 'pods -n nsb' '{range .items[*]}{.metadata.name}:{end}' 'b:'
+
+# cleanup
+kubectl delete pods b -n nsb
+# same thing without prune for a sanity check
+# Pre-Condition: no POD exists
+kubectl get pods -o jsonpath='{range .items[*]}{.metadata.name}:{end}'
+stdout ''
+
+# apply a
+kubectl apply -l prune-group=true -f hack/testdata/prune/a.yaml
+
+# check right pod exists
+kubectl get pods a -o jsonpath='{.metadata.name}'
+stdout 'a'
+
+# check wrong pod doesn't exist (in nsb) - use retry since deletion may be async
+kube-retry 'pods -n nsb' '{range .items[*]}{.metadata.name}:{end}' ''
+
+# apply b (in nsb namespace)
+kubectl apply -l prune-group=true -f hack/testdata/prune/b.yaml
+
+# check both pods exist
+kubectl get pods a -o jsonpath='{.metadata.name}'
+stdout 'a'
+kubectl get pods b -n nsb -o jsonpath='{.metadata.name}'
+stdout 'b'
+
+# cleanup
+kubectl delete pod/a
+kubectl delete pod/b -n nsb
+
+####################################
+# kubectl apply --prune --all      #
+####################################
+
+# kubectl apply --prune requires a --all flag to select everything
+! kubectl apply --prune -f hack/testdata/prune
+stderr 'all resources selected for prune without explicitly passing --all'
+
+# should apply everything with --all
+kubectl apply --all --prune -f hack/testdata/prune
+kubectl get pods a -o jsonpath='{.metadata.name}'
+stdout 'a'
+kubectl get pods b -n nsb -o jsonpath='{.metadata.name}'
+stdout 'b'
+
+# cleanup
+kubectl delete pod/a
+kubectl delete pod/b -n nsb
+# Note: keep nsb namespace for cross-namespace test later
+####################################
+# kubectl apply --prune-allowlist  #
+####################################
+
+# Pre-Condition: no POD exists
+kubectl get pods -o jsonpath='{range .items[*]}{.metadata.name}:{end}'
+stdout ''
+
+# apply pod a
+kubectl apply --prune -l prune-group=true -f hack/testdata/prune/a.yaml
+
+# check right pod exists
+kubectl get pods a -o jsonpath='{.metadata.name}'
+stdout 'a'
+
+# apply svc and don't prune pod a by overwriting allowlist
+kubectl apply --prune -l prune-group=true -f hack/testdata/prune/svc.yaml --prune-allowlist core/v1/Service
+
+# Both pod a and service should exist
+kubectl get service prune-svc -o jsonpath='{.metadata.name}'
+stdout 'prune-svc'
+kubectl get pods a -o jsonpath='{.metadata.name}'
+stdout 'a'
+
+# apply svc and prune pod a with default allowlist
+kubectl apply --prune -l prune-group=true -f hack/testdata/prune/svc.yaml
+stdout 'pod/a pruned'
+
+# Service should exist but pod a should be gone
+kubectl get service prune-svc -o jsonpath='{.metadata.name}'
+stdout 'prune-svc'
+! kubectl get pods a
+
+# cleanup
+kubectl delete svc prune-svc
+####################################################
+# kubectl apply --prune fallback for non-reapable  #
+####################################################
+
+# kubectl apply --prune should fallback to delete for non reapable types (like PVC)
+# This test verifies that prune with PVCs doesn't break other resource types
+kubectl apply --all --prune -f hack/testdata/prune-reap/a.yml
+kubectl get pvc a-pvc -o jsonpath='{.metadata.name}'
+stdout 'a-pvc'
+
+# Apply b.yml with prune
+kubectl apply --all --prune -f hack/testdata/prune-reap/b.yml
+kubectl get pvc b-pvc -o jsonpath='{.metadata.name}'
+stdout 'b-pvc'
+
+# Verify pods are not affected (should be empty)
+kubectl get pods -o jsonpath='{range .items[*]}{.metadata.name}:{end}'
+stdout ''
+
+# cleanup
+kubectl delete pvc a-pvc b-pvc
+####################################################
+# kubectl apply --prune cross-namespace            #
+####################################################
+
+# kubectl apply --prune can prune resources not in the defaulted namespace
+# Pre-Condition: namespace nsb exists (from earlier test); no POD exists in nsb
+kube-retry 'pods -n nsb' '{range .items[*]}{.metadata.name}:{end}' ''
+
+kubectl get pods -o jsonpath='{range .items[*]}{.metadata.name}:{end}'
+stdout ''
+
+# apply a into namespace nsb
+kubectl apply --namespace nsb -f hack/testdata/prune/a.yaml
+kubectl get pods a -n nsb -o jsonpath='{.metadata.name}'
+stdout 'a'
+
+# apply b with namespace
+kubectl apply --namespace nsb -f hack/testdata/prune/b.yaml
+kubectl get pods b -n nsb -o jsonpath='{.metadata.name}'
+stdout 'b'
+
+# apply --prune must prune a (prune across namespaces)
+kubectl apply --prune --all -f hack/testdata/prune/b.yaml
+
+# check wrong pod doesn't exist and right pod exists
+kube-retry 'pods -n nsb' '{range .items[*]}{.metadata.name}:{end}' 'b:'
+
+# cleanup
+kubectl delete ns nsb
+####################################
+# kubectl apply -n namespace error #
+####################################
+
+# kubectl apply -n must fail if input file contains namespace other than the one given in -n
+! kubectl apply -n foo -f hack/testdata/prune/b.yaml
+stderr 'the namespace from the provided object "nsb" does not match the namespace "foo"'
+
+####################################
+# kubectl apply --force            #
+####################################
+
+# Pre-condition: no service exists
+kubectl get services -o jsonpath='{range .items[*]}{.metadata.name}:{end}'
+stdout ''
+
+# apply service a
+kubectl apply -f hack/testdata/service-revision1.yaml
+
+# check right service exists
+kubectl get services a -o jsonpath='{.metadata.name}'
+stdout 'a'
+
+# change immutable field and apply service a - should fail
+! kubectl apply -f hack/testdata/service-revision2.yaml
+stderr 'may not change once set'
+
+# apply --force to recreate resources for immutable fields
+kubectl apply -f hack/testdata/service-revision2.yaml --force
+
+# check immutable field exists
+kubectl get services a -o jsonpath='{.spec.clusterIP}'
+stdout '10.0.0.12'
+
+# cleanup
+kubectl delete -f hack/testdata/service-revision2.yaml
+####################################
+# kubectl apply -k kustomize       #
+####################################
+
+kubectl apply -k hack/testdata/kustomize
+
+kubectl get configmap test-the-map -o jsonpath='{.metadata.name}'
+stdout 'test-the-map'
+
+kubectl get deployment test-the-deployment -o jsonpath='{.metadata.name}'
+stdout 'test-the-deployment'
+
+kubectl get service test-the-service -o jsonpath='{.metadata.name}'
+stdout 'test-the-service'
+
+# cleanup
+kubectl delete -k hack/testdata/kustomize
+
+# Test --kustomize flag
+kubectl apply --kustomize hack/testdata/kustomize
+
+kubectl get configmap test-the-map -o jsonpath='{.metadata.name}'
+stdout 'test-the-map'
+
+# cleanup
+kubectl delete --kustomize hack/testdata/kustomize
+
+#########################################
+# kubectl apply --server-side tests     #
+#########################################
+
+# kubectl apply --server-side should create the resource that doesn't exist yet
+# Pre-Condition: no POD exists
+kubectl get pods -o jsonpath='{range .items[*]}{.metadata.name}:{end}'
+stdout ''
+
+# Command: apply a pod "test-pod" (doesn't exist) should create this pod
+kubectl apply --server-side -f hack/testdata/pod.yaml
+stdout 'pod/test-pod serverside-applied'
+
+# Post-Condition: pod "test-pod" is created
+kubectl get pods test-pod -o jsonpath='{.metadata.labels.name}'
+stdout 'test-pod-label'
+
+# pod has field manager for kubectl server-side apply
+kubectl get --show-managed-fields -f hack/testdata/pod.yaml -o jsonpath='{.metadata.managedFields[*].manager}'
+stdout 'kubectl'
+
+# pod has custom field manager
+kubectl apply --server-side --field-manager=my-field-manager --force-conflicts -f hack/testdata/pod.yaml
+kubectl get -f hack/testdata/pod.yaml -o jsonpath='{.metadata.managedFields[*].manager}'
+stdout 'my-field-manager'
+
+# can add pod condition via status subresource
+kubectl apply --server-side --subresource=status --field-manager=my-field-manager -f hack/testdata/pod-apply-status.yaml
+kubectl get -f hack/testdata/pod.yaml -o jsonpath='{.status.conditions[*].type}'
+stdout 'example.io/Foo'
+
+# Clean up
+kubectl delete pods test-pod
+####################################
+# kubectl apply --server-side --dry-run
+####################################
+
+# Pre-Condition: no POD exists
+kubectl get pods -o jsonpath='{range .items[*]}{.metadata.name}:{end}'
+stdout ''
+
+# apply dry-run
+kubectl apply --server-side --dry-run=server -f hack/testdata/pod.yaml
+stdout 'pod/test-pod serverside-applied \(server dry run\)'
+
+# No pod exists
+kubectl get pods -o jsonpath='{range .items[*]}{.metadata.name}:{end}'
+stdout ''
+
+# apply non dry-run creates the pod
+kubectl apply --server-side -f hack/testdata/pod.yaml
+stdout 'pod/test-pod serverside-applied'
+
+# Get initial resource version
+kubectl get -f hack/testdata/pod.yaml -o jsonpath='{.metadata.resourceVersion}'
+cp stdout initial_rv_ssa
+
+# apply changes with dry-run=server
+kubectl apply --server-side --dry-run=server -f hack/testdata/pod-apply.yaml
+stdout 'pod/test-pod serverside-applied \(server dry run\)'
+
+# Post-Condition: label still has initial value
+kubectl get pods test-pod -o jsonpath='{.metadata.labels.name}'
+stdout 'test-pod-label'
+
+# Ensure dry-run doesn't persist change
+kubectl get -f hack/testdata/pod.yaml -o jsonpath='{.metadata.resourceVersion}'
+cp stdout current_rv_ssa
+cmp initial_rv_ssa current_rv_ssa
+
+# clean-up
+kubectl delete -f hack/testdata/pod.yaml
+
+####################################
+# kubectl apply --server-side dry-run on CR
+####################################
+
+# Create CRD for custom resource
+kubectl create -f $WORK/resources-crd.yaml
+
+# Wait for CRD to be established
+kube-retry 'crd resources.mygroup.example.com' '{.status.conditions[?(@.type=="Established")].status}' 'True'
+
+# Dry-run create the CR with server-side apply
+kubectl apply --server-side --dry-run=server -f hack/testdata/CRD/resource.yaml
+stdout 'kind.mygroup.example.com/myobj serverside-applied \(server dry run\)'
+
+# Make sure that the CR doesn't exist after dry-run
+! kubectl get resource/myobj
+
+# clean-up
+kubectl delete customresourcedefinition resources.mygroup.example.com
+
+####################################
+# kubectl apply upgrade CSA -> SSA #
+####################################
+
+# Pre-Condition: no POD exists
+kubectl get pods -o jsonpath='{range .items[*]}{.metadata.name}:{end}'
+stdout ''
+
+# run client-side apply
+kubectl apply -f hack/testdata/pod.yaml
+stdout 'pod/test-pod created'
+
+# test upgrade does not work with non-standard server-side apply field manager
+! kubectl apply --server-side --field-manager=not-kubectl -f hack/testdata/pod-apply.yaml
+stderr 'conflict'
+
+# test upgrade from client-side apply to server-side apply
+kubectl apply --server-side -f hack/testdata/pod-apply.yaml
+stdout 'pod/test-pod serverside-applied'
+
+# Post-Condition: pod "test-pod" has configuration annotation
+kubectl get pods test-pod -o yaml
+stdout 'kubectl.kubernetes.io/last-applied-configuration'
+
+# view-last-applied shows the correct config
+kubectl apply view-last-applied pod/test-pod -o json
+stdout 'test-pod-applied'
+
+# Test: downgrade from server-side apply to client-side apply
+kubectl apply --server-side -f hack/testdata/pod.yaml
+stdout 'pod/test-pod serverside-applied'
+
+# Post-Condition: pod "test-pod" has configuration annotation
+kubectl get pods test-pod -o yaml
+stdout 'kubectl.kubernetes.io/last-applied-configuration'
+
+# view-last-applied shows the original config
+kubectl apply view-last-applied pod/test-pod -o json
+stdout 'test-pod-label'
+
+# downgrade to client-side apply
+kubectl apply -f hack/testdata/pod-apply.yaml
+stdout 'pod/test-pod configured'
+
+# clean-up
+kubectl delete -f hack/testdata/pod.yaml
+
+####################################################
+# kubectl apply CSA -> SSA migration with ConfigMap #
+####################################################
+
+# Test apply migration - CSA to SSA workflow with field management
+# Pre-Condition: no configmap exists
+kubectl get configmaps --field-selector=metadata.name=test -o jsonpath='{range .items[*]}{.metadata.name}:{end}'
+stdout ''
+
+# Create a configmap in the cluster with client-side apply
+kubectl apply --server-side=false -f $WORK/configmap-csa-1.yaml
+stdout 'configmap/test created'
+
+# Apply the same manifest with --server-side flag, as per server-side-apply migration instructions
+kubectl apply --server-side -f $WORK/configmap-csa-1.yaml
+stdout 'configmap/test serverside-applied'
+
+# Apply the object a third time using server-side-apply, but this time removing
+# a field (legacy) and adding a field (ssaKey). Old versions of kubectl would not allow the field to be removed
+kubectl apply --server-side -f $WORK/configmap-ssa-2.yaml
+stdout 'configmap/test serverside-applied'
+
+# Fetch the object and check to see that it does not have a field 'legacy'
+kubectl get configmap test -o jsonpath='{.data.key}'
+stdout 'value'
+kubectl get configmap test -o jsonpath='{.data.legacy}'
+stdout ''
+kubectl get configmap test -o jsonpath='{.data.ssaKey}'
+stdout 'ssaValue'
+
+# CSA the object after it has been server-side-applied and had a field removed
+# Add new key with client-side-apply. Also removes the field from server-side-apply
+kubectl apply --server-side=false -f $WORK/configmap-csa-3.yaml
+stdout 'configmap/test configured'
+
+kubectl get configmap test -o jsonpath='{.data.key}'
+stdout 'value'
+kubectl get configmap test -o jsonpath='{.data.newKey}'
+stdout 'newValue'
+kubectl get configmap test -o jsonpath='{.data.ssaKey}'
+stdout ''
+
+# SSA the object without the field added above by CSA. Show that the object
+# on the server has had the field removed
+kubectl apply --server-side -f $WORK/configmap-ssa-2.yaml
+stdout 'configmap/test serverside-applied'
+
+# Fetch the object and check to see that it does not have a field 'newKey'
+kubectl get configmap test -o jsonpath='{.data.key}'
+stdout 'value'
+kubectl get configmap test -o jsonpath='{.data.newKey}'
+stdout ''
+kubectl get configmap test -o jsonpath='{.data.ssaKey}'
+stdout 'ssaValue'
+
+# Show that kubectl diff --server-side also functions after a migration
+# diff returns exit code 1 when there are differences
+! kubectl diff --server-side -f $WORK/configmap-diff.yaml
+stdout '\+  newKey: newValue'
+stdout '\+    newAnnotation: newValue'
+
+# clean-up
+kubectl delete configmap test
+
+####################################################
+# kubectl apply custom field manager migration     #
+####################################################
+
+# Test to show that supplying a custom field manager to kubectl apply
+# does not prevent migration from client-side-apply to server-side-apply
+kubectl apply --server-side=false --field-manager=myfm -f $WORK/configmap-custom-fm-1.yaml
+stdout 'configmap/ssa-test created'
+kubectl get configmap ssa-test -o jsonpath='{.data.key}'
+stdout 'value1'
+
+# show that after client-side applying with a custom field manager, the
+# last-applied-annotation is present
+kubectl get configmap ssa-test -o yaml
+stdout 'kubectl.kubernetes.io/last-applied-configuration'
+
+# Migrate to server-side-apply by applying the same object
+kubectl apply --server-side=true --field-manager=myfm -f $WORK/configmap-custom-fm-1.yaml
+stdout 'configmap/ssa-test serverside-applied'
+kubectl get configmap ssa-test -o jsonpath='{.data.key}'
+stdout 'value1'
+
+# show that after migrating to SSA with a custom field manager, the
+# last-applied-annotation is dropped
+kubectl get configmap ssa-test -o yaml
+! stdout 'kubectl.kubernetes.io/last-applied-configuration'
+
+# Change a field without having any conflict and also drop a field in the same patch
+kubectl apply --server-side=true --field-manager=myfm -f $WORK/configmap-custom-fm-2.yaml
+stdout 'configmap/ssa-test serverside-applied'
+kubectl get configmap ssa-test -o jsonpath='{.data.key}'
+stdout 'value2'
+kubectl get configmap ssa-test -o jsonpath='{.data.legacy}'
+stdout ''
+
+# Clean up
+kubectl delete configmap ssa-test
+
+####################################################
+# kubectl apply multiple resources with failure    #
+####################################################
+
+# Test 1: Multi-resource with namespace ordering issue
+# Pre-Condition: namespace does not exist and no POD exists
+! kubectl get namespace multi-resource-ns
+kubectl get pods -o jsonpath='{range .items[*]}{.metadata.name}:{end}'
+stdout ''
+
+# First pass, namespace is created, but pod is not (since namespace does not exist yet in order)
+! kubectl apply -f hack/testdata/multi-resource-1.yaml
+stderr 'namespaces "multi-resource-ns" not found'
+
+# Pod should not exist yet
+! kubectl get pods test-pod -n multi-resource-ns
+
+# Create service account in the new namespace (required for pod creation)
+kubectl create serviceaccount default -n multi-resource-ns
+
+# Second pass, pod is created (now that namespace exists)
+kubectl apply -f hack/testdata/multi-resource-1.yaml
+kubectl get pods test-pod -n multi-resource-ns -o jsonpath='{.metadata.name}'
+stdout 'test-pod'
+
+# cleanup
+kubectl delete -f hack/testdata/multi-resource-1.yaml
+
+# Test 2: Multi-resource with bogus custom resource
+# Pre-Condition: No configmaps with name=foo
+kubectl get configmaps --field-selector=metadata.name=foo -o jsonpath='{range .items[*]}{.metadata.name}:{end}'
+stdout ''
+
+# Apply a configmap and a bogus custom resource - configmap should succeed, CR should fail
+! kubectl apply -f hack/testdata/multi-resource-2.yaml
+stderr 'no matches for kind "Bogus" in version "example.com/v1"'
+
+# ConfigMap should have been created even with custom resource error
+kubectl get configmaps foo -o jsonpath='{.metadata.name}'
+stdout 'foo'
+
+# cleanup
+kubectl delete configmaps foo
+
+# Test 3: Multi-resource with invalid pod name
+# Pre-Condition: No pods exist
+kubectl get pods -o jsonpath='{range .items[*]}{.metadata.name}:{end}'
+stdout ''
+
+# Applies three pods, one of which is invalid (POD-B), two succeed (pod-a, pod-c)
+! kubectl apply -f hack/testdata/multi-resource-3.yaml
+stderr 'The Pod "POD-B" is invalid'
+
+# pod-a and pod-c should exist despite POD-B failure
+kubectl get pods pod-a -o jsonpath='{.metadata.name}'
+stdout 'pod-a'
+kubectl get pods pod-c -o jsonpath='{.metadata.name}'
+stdout 'pod-c'
+
+# cleanup
+kubectl delete pod pod-a pod-c
+kubectl get pods -o jsonpath='{range .items[*]}{.metadata.name}:{end}'
+stdout ''
+
+# Test 4: Multi-resource with CRD and custom resource ordering
+# Pre-Condition: crd does not exist
+kubectl get crds -o jsonpath='{range .items[*]}{.metadata.name}:{end}'
+! stdout 'widgets.example.com'
+
+# First pass, custom resource fails, but crd apply succeeds
+! kubectl apply -f hack/testdata/multi-resource-4.yaml
+stderr 'no matches for kind "Widget" in version "example.com/v1"'
+
+# Wait for CRD to be established
+kube-retry 'crd widgets.example.com' '{.status.conditions[?(@.type=="Established")].status}' 'True'
+
+# Widget should not exist yet
+! kubectl get widgets foo
+
+# CRD should exist
+kubectl get crds widgets.example.com -o jsonpath='{.metadata.name}'
+stdout 'widgets.example.com'
+
+# Second pass, custom resource is created (now that crd exists)
+kubectl apply -f hack/testdata/multi-resource-4.yaml
+kubectl get widget foo -o jsonpath='{.metadata.name}'
+stdout 'foo'
+
+# cleanup
+kubectl delete -f hack/testdata/multi-resource-4.yaml
+
+-- resources-crd.yaml --
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: resources.mygroup.example.com
+spec:
+  group: mygroup.example.com
+  scope: Namespaced
+  names:
+    plural: resources
+    singular: resource
+    kind: Kind
+    listKind: KindList
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          x-kubernetes-preserve-unknown-fields: true
+          type: object
+
+-- configmap-csa-1.yaml --
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test
+data:
+  key: value
+  legacy: unused
+
+-- configmap-csa-3.yaml --
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test
+data:
+  key: value
+  newKey: newValue
+
+-- configmap-ssa-2.yaml --
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test
+data:
+  key: value
+  ssaKey: ssaValue
+
+-- configmap-diff.yaml --
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test
+  annotations:
+    newAnnotation: newValue
+data:
+  key: value
+  newKey: newValue
+
+-- configmap-custom-fm-1.yaml --
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ssa-test
+data:
+  key: value1
+  legacy: value2
+
+-- configmap-custom-fm-2.yaml --
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ssa-test
+data:
+  key: value2
