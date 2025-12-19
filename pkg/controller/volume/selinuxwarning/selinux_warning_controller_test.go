@@ -54,31 +54,34 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 		existingCSIDrivers []*storagev1.CSIDriver
 		existingPods       []*v1.Pod
 
-		pod                  cache.ObjectName
-		conflicts            []volumecache.Conflict
-		expectError          bool
-		expectedAddedVolumes []addedVolume
-		expectedEvents       []string
-		expectedDeletedPods  []cache.ObjectName
+		pod                     cache.ObjectName
+		csiDriverSELinuxEnabled bool
+		conflicts               []volumecache.Conflict
+		expectError             bool
+		expectedAddedVolumes    []addedVolume
+		expectedEvents          []string
+		expectedDeletedPods     []cache.ObjectName
 	}{
 		{
 			name: "existing pod with no volumes",
 			existingPods: []*v1.Pod{
 				pod("pod1", "s0:c1,c2", nil).build(),
 			},
-			pod:                  cache.ObjectName{Namespace: namespace, Name: "pod1"},
-			expectedEvents:       nil,
-			expectedAddedVolumes: nil,
+			pod:                     cache.ObjectName{Namespace: namespace, Name: "pod1"},
+			csiDriverSELinuxEnabled: true,
+			expectedEvents:          nil,
+			expectedAddedVolumes:    nil,
 		},
 		{
 			name: "existing pod with unbound PVC",
 			existingPods: []*v1.Pod{
 				pod("pod1", "s0:c1,c2", nil).withPVC("non-existing-pvc", "vol1").build(),
 			},
-			pod:                  cache.ObjectName{Namespace: namespace, Name: "pod1"},
-			expectError:          true, // PVC is missing, add back to queue with exp. backoff
-			expectedEvents:       nil,
-			expectedAddedVolumes: nil,
+			pod:                     cache.ObjectName{Namespace: namespace, Name: "pod1"},
+			csiDriverSELinuxEnabled: true,
+			expectError:             true, // PVC is missing, add back to queue with exp. backoff
+			expectedEvents:          nil,
+			expectedAddedVolumes:    nil,
 		},
 		{
 			name: "existing pod with fully bound PVC",
@@ -91,8 +94,9 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 			existingPods: []*v1.Pod{
 				pod("pod1", "s0:c1,c2", nil).withPVC("pvc1", "vol1").build(),
 			},
-			pod:            cache.ObjectName{Namespace: namespace, Name: "pod1"},
-			expectedEvents: nil,
+			pod:                     cache.ObjectName{Namespace: namespace, Name: "pod1"},
+			csiDriverSELinuxEnabled: true,
+			expectedEvents:          nil,
 			expectedAddedVolumes: []addedVolume{
 				{
 					volumeName:   "fake-plugin/pv1",
@@ -114,8 +118,9 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 			existingPods: []*v1.Pod{
 				pod("pod1", "s0:c1,c2", ptr.To(v1.SELinuxChangePolicyRecursive)).withPVC("pvc1", "vol1").build(),
 			},
-			pod:            cache.ObjectName{Namespace: namespace, Name: "pod1"},
-			expectedEvents: nil,
+			pod:                     cache.ObjectName{Namespace: namespace, Name: "pod1"},
+			csiDriverSELinuxEnabled: true,
+			expectedEvents:          nil,
 			expectedAddedVolumes: []addedVolume{
 				{
 					volumeName:   "fake-plugin/pv1",
@@ -137,8 +142,9 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 			existingPods: []*v1.Pod{
 				pod("pod1", "s0:c1,c2", nil).withInlineVolume().build(),
 			},
-			pod:            cache.ObjectName{Namespace: namespace, Name: "pod1"},
-			expectedEvents: nil,
+			pod:                     cache.ObjectName{Namespace: namespace, Name: "pod1"},
+			csiDriverSELinuxEnabled: true,
+			expectedEvents:          nil,
 			expectedAddedVolumes: []addedVolume{
 				{
 					volumeName:   "fake-plugin/ebs.csi.aws.com-inlinevol1",
@@ -160,8 +166,9 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 			existingPods: []*v1.Pod{
 				pod("pod1", "s0:c1,c2", nil).withPVC("pvc1", "vol1").withInlineVolume().build(),
 			},
-			pod:            cache.ObjectName{Namespace: namespace, Name: "pod1"},
-			expectedEvents: nil,
+			pod:                     cache.ObjectName{Namespace: namespace, Name: "pod1"},
+			csiDriverSELinuxEnabled: true,
+			expectedEvents:          nil,
 			expectedAddedVolumes: []addedVolume{
 				{
 					volumeName:   "fake-plugin/pv1",
@@ -191,7 +198,8 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 				pod("pod1", "s0:c1,c2", nil).withPVC("pvc1", "vol1").build(),
 				pod("pod2", "s0:c98,c99", nil).build(),
 			},
-			pod: cache.ObjectName{Namespace: namespace, Name: "pod1"},
+			pod:                     cache.ObjectName{Namespace: namespace, Name: "pod1"},
+			csiDriverSELinuxEnabled: true,
 			conflicts: []volumecache.Conflict{
 				{
 					PropertyName:       "SELinuxLabel",
@@ -236,8 +244,9 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 				pod("pod1", "s0:c1,c2", ptr.To(v1.SELinuxChangePolicyRecursive)).withPVC("pvc1", "vol1").build(),
 				pod("pod2", "s0:c98,c99", ptr.To(v1.SELinuxChangePolicyRecursive)).build(),
 			},
-			pod:       cache.ObjectName{Namespace: namespace, Name: "pod1"},
-			conflicts: []volumecache.Conflict{},
+			pod:                     cache.ObjectName{Namespace: namespace, Name: "pod1"},
+			csiDriverSELinuxEnabled: true,
+			conflicts:               []volumecache.Conflict{},
 			expectedAddedVolumes: []addedVolume{
 				{
 					volumeName:   "fake-plugin/pv1",
@@ -260,7 +269,8 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 				pod("pod1", "s0:c1,c2", ptr.To(v1.SELinuxChangePolicyRecursive)).withPVC("pvc1", "vol1").build(),
 				pod("pod2", "s0:c98,c99", ptr.To(v1.SELinuxChangePolicyMountOption)).withPVC("pvc1", "vol1").build(),
 			},
-			pod: cache.ObjectName{Namespace: namespace, Name: "pod1"},
+			pod:                     cache.ObjectName{Namespace: namespace, Name: "pod1"},
+			csiDriverSELinuxEnabled: true,
 			conflicts: []volumecache.Conflict{
 				{
 					PropertyName:       "SELinuxChangePolicy",
@@ -305,7 +315,8 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 				pod("pod1", "s0:c1,c2", nil).withPVC("pvc1", "vol1").build(),
 				// "pod2" does not exist
 			},
-			pod: cache.ObjectName{Namespace: namespace, Name: "pod1"},
+			pod:                     cache.ObjectName{Namespace: namespace, Name: "pod1"},
+			csiDriverSELinuxEnabled: true,
 			conflicts: []volumecache.Conflict{
 				{
 					PropertyName:       "SELinuxLabel",
@@ -349,8 +360,9 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 			existingPods: []*v1.Pod{
 				pod("pod1", "", ptr.To(v1.SELinuxChangePolicyMountOption)).withPVC("pvc1", "vol1").build(),
 			},
-			pod:       cache.ObjectName{Namespace: namespace, Name: "pod1"},
-			conflicts: []volumecache.Conflict{},
+			pod:                     cache.ObjectName{Namespace: namespace, Name: "pod1"},
+			csiDriverSELinuxEnabled: true,
+			conflicts:               []volumecache.Conflict{},
 			expectedAddedVolumes: []addedVolume{
 				{
 					volumeName:   "fake-plugin/pv1",
@@ -372,8 +384,9 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 			existingPods: []*v1.Pod{
 				pod("pod1", "s0:c1,c2", nil).withPVC("pvc1", "vol1").withPhase(v1.PodPending).build(),
 			},
-			pod:            cache.ObjectName{Namespace: namespace, Name: "pod1"},
-			expectedEvents: nil,
+			pod:                     cache.ObjectName{Namespace: namespace, Name: "pod1"},
+			csiDriverSELinuxEnabled: true,
+			expectedEvents:          nil,
 			expectedAddedVolumes: []addedVolume{
 				{
 					volumeName:   "fake-plugin/pv1",
@@ -395,8 +408,9 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 			existingPods: []*v1.Pod{
 				pod("pod1", "s0:c1,c2", nil).withPVC("pvc1", "vol1").withPhase(v1.PodUnknown).build(),
 			},
-			pod:            cache.ObjectName{Namespace: namespace, Name: "pod1"},
-			expectedEvents: nil,
+			pod:                     cache.ObjectName{Namespace: namespace, Name: "pod1"},
+			csiDriverSELinuxEnabled: true,
+			expectedEvents:          nil,
 			expectedAddedVolumes: []addedVolume{
 				{
 					volumeName:   "fake-plugin/pv1",
@@ -418,10 +432,11 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 			existingPods: []*v1.Pod{
 				pod("pod1", "s0:c1,c2", nil).withPVC("pvc1", "vol1").withPhase(v1.PodSucceeded).build(),
 			},
-			pod:                  cache.ObjectName{Namespace: namespace, Name: "pod1"},
-			expectedEvents:       nil,
-			expectedAddedVolumes: nil,
-			expectedDeletedPods:  []cache.ObjectName{{Namespace: namespace, Name: "pod1"}},
+			pod:                     cache.ObjectName{Namespace: namespace, Name: "pod1"},
+			csiDriverSELinuxEnabled: true,
+			expectedEvents:          nil,
+			expectedAddedVolumes:    nil,
+			expectedDeletedPods:     []cache.ObjectName{{Namespace: namespace, Name: "pod1"}},
 		},
 		{
 			name: "failed pod is removed from the cache",
@@ -434,21 +449,47 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 			existingPods: []*v1.Pod{
 				pod("pod1", "s0:c1,c2", nil).withPVC("pvc1", "vol1").withPhase(v1.PodFailed).build(),
 			},
-			pod:                  cache.ObjectName{Namespace: namespace, Name: "pod1"},
-			expectedEvents:       nil,
-			expectedAddedVolumes: nil,
-			expectedDeletedPods:  []cache.ObjectName{{Namespace: namespace, Name: "pod1"}},
+			pod:                     cache.ObjectName{Namespace: namespace, Name: "pod1"},
+			csiDriverSELinuxEnabled: true,
+			expectedEvents:          nil,
+			expectedAddedVolumes:    nil,
+			expectedDeletedPods:     []cache.ObjectName{{Namespace: namespace, Name: "pod1"}},
 		},
 		{
 			name:         "deleted pod",
 			existingPods: []*v1.Pod{
 				// "pod1" does not exist in the informer
 			},
-			pod:                  cache.ObjectName{Namespace: namespace, Name: "pod1"},
-			expectError:          false,
-			expectedEvents:       nil,
-			expectedAddedVolumes: nil,
-			expectedDeletedPods:  []cache.ObjectName{{Namespace: namespace, Name: "pod1"}},
+			pod:                     cache.ObjectName{Namespace: namespace, Name: "pod1"},
+			csiDriverSELinuxEnabled: true,
+			expectError:             false,
+			expectedEvents:          nil,
+			expectedAddedVolumes:    nil,
+			expectedDeletedPods:     []cache.ObjectName{{Namespace: namespace, Name: "pod1"}},
+		},
+		{
+			name: "existing pod with fully bound PVC and CSIDriver.SELinuxMount disabled",
+			existingPVCs: []*v1.PersistentVolumeClaim{
+				pvcBoundToPV("pv1", "pvc1"),
+			},
+			existingPVs: []*v1.PersistentVolume{
+				pvBoundToPVC("pv1", "pvc1"),
+			},
+			existingPods: []*v1.Pod{
+				pod("pod1", "s0:c1,c2", nil).withPVC("pvc1", "vol1").build(),
+			},
+			pod:                     cache.ObjectName{Namespace: namespace, Name: "pod1"},
+			csiDriverSELinuxEnabled: false,
+			expectedEvents:          nil,
+			expectedAddedVolumes: []addedVolume{
+				{
+					volumeName:   "fake-plugin/pv1",
+					podKey:       cache.ObjectName{Namespace: namespace, Name: "pod1"},
+					label:        "",                              // Label is cleared when the CSI driver does not support SELinuxMount
+					changePolicy: v1.SELinuxChangePolicyRecursive, // Reset to Recursive when the CSI driver does not support SELinuxMount
+					csiDriver:    "ebs.csi.aws.com",               // The PV is a fake EBS volume
+				},
+			},
 		},
 	}
 
@@ -458,7 +499,7 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 
 			_, ctx := ktesting.NewTestContext(t)
 			_, plugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
-			plugin.SupportsSELinux = true
+			plugin.SupportsSELinux = tt.csiDriverSELinuxEnabled
 
 			fakeClient := fake.NewClientset()
 			fakeInformerFactory := informers.NewSharedInformerFactory(fakeClient, controller.NoResyncPeriodFunc())
