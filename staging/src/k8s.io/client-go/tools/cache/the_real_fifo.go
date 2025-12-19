@@ -99,8 +99,7 @@ type RealFIFO struct {
 	emitReplacedAtomic bool
 }
 
-type AtomicInfo struct {
-	Type            DeltaType
+type ReplacedListInfo struct {
 	ResourceVersion string
 	Objects         []interface{}
 }
@@ -216,13 +215,12 @@ func (f *RealFIFO) addReplaceToItemsLocked(objs []interface{}, resourceVersion s
 		}
 	}
 
-	info := AtomicInfo{
-		Type:            Replaced,
+	info := ReplacedListInfo{
 		ResourceVersion: resourceVersion,
 		Objects:         objs,
 	}
 	f.items = append(f.items, Delta{
-		Type:   AtomicEvent,
+		Type:   ReplacedList,
 		Object: info,
 	})
 	f.cond.Broadcast()
@@ -321,7 +319,7 @@ func (f *RealFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 	return Deltas{item}, err
 }
 
-func (f *RealFIFO) PopBatch(process ProcessBatchFunc) error {
+func (f *RealFIFO) PopBatch(processBatch ProcessBatchFunc, process PopProcessFunc) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
@@ -345,7 +343,7 @@ func (f *RealFIFO) PopBatch(process ProcessBatchFunc) error {
 			break
 		}
 		item := f.items[i]
-		if item.Type == AtomicEvent {
+		if item.Type == ReplacedList {
 			if len(deltas) == 0 {
 				deltas = append(deltas, item)
 			}
@@ -391,8 +389,10 @@ func (f *RealFIFO) PopBatch(process ProcessBatchFunc) error {
 		defer trace.LogIfLong(min(100*time.Millisecond*time.Duration(len(deltas)), time.Second))
 	}
 
-	err := process(deltas, isInInitialList)
-	return err
+	if len(deltas) == 1 {
+		return process(Deltas{deltas[0]}, isInInitialList)
+	}
+	return processBatch(deltas, isInInitialList)
 }
 
 // Replace
@@ -412,22 +412,54 @@ func (f *RealFIFO) Replace(newItems []interface{}, resourceVersion string) error
 		return f.addReplaceToItemsLocked(newItems, resourceVersion)
 	}
 
+	err := reconcileReplacement(f.items, f.knownObjects, newItems, f.keyOf,
+		func(obj interface{}) error {
+			return f.addToItems_locked(Deleted, true, DeletedFinalStateUnknown{
+				Key: obj.(DeletedFinalStateUnknown).Key,
+				Obj: obj.(DeletedFinalStateUnknown).Obj,
+			})
+		},
+		func(obj interface{}) error {
+			return f.addToItems_locked(Replaced, false, obj)
+		})
+	if err != nil {
+		return err
+	}
+
+	if !f.populated {
+		f.populated = true
+		f.initialPopulationCount = len(f.items)
+	}
+
+	return nil
+}
+
+// reconcileReplacement takes the items that are already in the queue and the set of new items
+// and based upon the state of the items in the queue and known objects will call onDelete and onReplace
+// depending upon whether the item is being deleted or replaced/added.
+func reconcileReplacement(
+	queuedItems []Delta,
+	knownObjects KeyListerGetter,
+	newItems []interface{},
+	keyOf func(obj interface{}) (string, error),
+	onDelete func(obj interface{}) error,
+	onReplace func(obj interface{}) error,
+) error {
 	// determine the keys of everything we're adding.  We cannot add the items until after the synthetic deletes have been
 	// created for items that don't existing in newItems
 	newKeys := sets.Set[string]{}
 	for _, obj := range newItems {
-		key, err := f.keyOf(obj)
+		key, err := keyOf(obj)
 		if err != nil {
 			return KeyError{obj, err}
 		}
 		newKeys.Insert(key)
 	}
 
-	queuedItems := f.items
 	queuedKeys := []string{}
 	lastQueuedItemForKey := map[string]Delta{}
 	for _, queuedItem := range queuedItems {
-		queuedKey, err := f.keyOf(queuedItem.Object)
+		queuedKey, err := keyOf(queuedItem.Object)
 		if err != nil {
 			return KeyError{queuedItem.Object, err}
 		}
@@ -459,17 +491,16 @@ func (f *RealFIFO) Replace(newItems []interface{}, resourceVersion string) error
 		// if we got here, then the last entry we have for the queued item is *not* a deletion and we need to add a delete
 		deletedObj := lastQueuedItem.Object
 
-		retErr := f.addToItems_locked(Deleted, true, DeletedFinalStateUnknown{
+		if err := onDelete(DeletedFinalStateUnknown{
 			Key: queuedKey,
 			Obj: deletedObj,
-		})
-		if retErr != nil {
-			return fmt.Errorf("couldn't enqueue object: %w", retErr)
+		}); err != nil {
+			return fmt.Errorf("couldn't enqueue object: %w", err)
 		}
 	}
 
 	// Detect deletions for objects not present in the queue, but present in KnownObjects
-	knownKeys := f.knownObjects.ListKeys()
+	knownKeys := knownObjects.ListKeys()
 	for _, knownKey := range knownKeys {
 		if newKeys.Has(knownKey) { // still present
 			continue
@@ -478,7 +509,7 @@ func (f *RealFIFO) Replace(newItems []interface{}, resourceVersion string) error
 			continue
 		}
 
-		deletedObj, exists, err := f.knownObjects.GetByKey(knownKey)
+		deletedObj, exists, err := knownObjects.GetByKey(knownKey)
 		if err != nil {
 			deletedObj = nil
 			utilruntime.HandleError(fmt.Errorf("error during lookup, placing DeleteFinalStateUnknown marker without object: key=%q, err=%w", knownKey, err))
@@ -486,26 +517,19 @@ func (f *RealFIFO) Replace(newItems []interface{}, resourceVersion string) error
 			deletedObj = nil
 			utilruntime.HandleError(fmt.Errorf("key does not exist in known objects store, placing DeleteFinalStateUnknown marker without object: key=%q", knownKey))
 		}
-		retErr := f.addToItems_locked(Deleted, false, DeletedFinalStateUnknown{
+		if err := onDelete(DeletedFinalStateUnknown{
 			Key: knownKey,
 			Obj: deletedObj,
-		})
-		if retErr != nil {
-			return fmt.Errorf("couldn't enqueue object: %w", retErr)
+		}); err != nil {
+			return fmt.Errorf("couldn't enqueue object: %w", err)
 		}
 	}
 
 	// now that we have the deletes we need for items, we can add the newItems to the items queue
 	for _, obj := range newItems {
-		retErr := f.addToItems_locked(Replaced, false, obj)
-		if retErr != nil {
-			return fmt.Errorf("couldn't enqueue object: %w", retErr)
+		if err := onReplace(obj); err != nil {
+			return fmt.Errorf("couldn't enqueue object: %w", err)
 		}
-	}
-
-	if !f.populated {
-		f.populated = true
-		f.initialPopulationCount = len(f.items)
 	}
 
 	return nil

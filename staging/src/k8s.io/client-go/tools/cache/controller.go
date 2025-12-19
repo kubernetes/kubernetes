@@ -231,7 +231,7 @@ func (c *controller) processLoop(ctx context.Context) {
 		default:
 			var err error
 			if useBatchProcess {
-				err = batchQueue.PopBatch(c.config.ProcessBatch)
+				err = batchQueue.PopBatch(c.config.ProcessBatch, PopProcessFunc(c.config.Process))
 			} else {
 				// otherwise fallback to non-batch process behavior
 				_, err = c.config.Pop(PopProcessFunc(c.config.Process))
@@ -591,12 +591,12 @@ func processDeltas(
 		obj := d.Object
 
 		switch d.Type {
-		case AtomicEvent:
-			info, ok := obj.(AtomicInfo)
+		case ReplacedList:
+			info, ok := obj.(ReplacedListInfo)
 			if !ok {
-				return fmt.Errorf("atomic event did not contain AtomicInfo: %T", obj)
+				return fmt.Errorf("ReplacedList did not contain ReplacedListInfo: %T", obj)
 			}
-			if err := processAtomicInfo(handler, info, clientState, keyFunc); err != nil {
+			if err := processReplacedListInfo(handler, info, clientState, keyFunc); err != nil {
 				return err
 			}
 		case Sync, Replaced, Added, Updated:
@@ -654,21 +654,12 @@ func processDeltasInBatch(
 		return nil
 	}
 
-	if len(deltas) == 1 && deltas[0].Type == AtomicEvent {
-		// Atomic replace is unique in that it should always only have one item in the batch
-		// We can safely return after processing here.
-		if err := processDeltas(handler, clientState, Deltas{deltas[0]}, isInInitialList, keyFunc); err != nil {
-			return err
-		}
-		return nil
-	}
-
 	// deltasList is a list of unique objects
 	for _, d := range deltas {
 		obj := d.Object
 		switch d.Type {
-		case AtomicEvent:
-			return fmt.Errorf("ReplacedAtomic is not its own batch")
+		case ReplacedList:
+			return fmt.Errorf("ReplacedList is not supported in batch processing")
 		case Sync, Added, Updated, Replaced:
 			// it will only return one old object for each because items are unique
 			if old, exists, err := clientState.Get(obj); err == nil && exists {
@@ -719,53 +710,51 @@ func processDeltasInBatch(
 	return nil
 }
 
-func processAtomicInfo(handler ResourceEventHandler, info AtomicInfo, clientState Store, keyFunc KeyFunc) error {
-	if info.Type != Replaced {
-		return fmt.Errorf("atomic event only supports Replaced: %s", info.Type)
+func processReplacedListInfo(handler ResourceEventHandler, info ReplacedListInfo, clientState Store, keyFunc KeyFunc) error {
+	var deletions []interface{}
+	type replacement struct {
+		oldObj interface{}
+		newObj interface{}
 	}
-	oldObjs := clientState.List()
-	oldObjMap := map[string]interface{}{}
-	for _, obj := range oldObjs {
-		key, err := keyFunc(obj)
-		if err != nil {
-			return err
-		}
-		oldObjMap[key] = obj
-	}
-	newObjs := map[string]interface{}{}
+	var replacements []replacement
 
-	// ReplacedAtomic has a consistent view into the storage since it is
-	// compiled under the FIFO lock.
-	//
-	// TODO: Use the clientState lock to compile this info for less
-	// contention of FIFO lock.
-	for _, newObj := range info.Objects {
-		key, err := keyFunc(newObj)
-		if err != nil {
-			return err
-		}
-		newObjs[key] = newObj
+	err := reconcileReplacement(nil, clientState, info.Objects, keyFunc,
+		func(obj interface{}) error {
+			deletions = append(deletions, obj)
+			return nil
+		},
+		func(obj interface{}) error {
+			key, err := keyFunc(obj)
+			if err != nil {
+				return err
+			}
+			oldObj, exists, err := clientState.GetByKey(key)
+			if err != nil {
+				return err
+			}
+			if exists {
+				replacements = append(replacements, replacement{oldObj: oldObj, newObj: obj})
+			} else {
+				replacements = append(replacements, replacement{newObj: obj})
+			}
+			return nil
+		},
+	)
+	if err != nil {
+		return err
 	}
-	var objsToDelete []interface{}
-	for key, obj := range oldObjMap {
-		if _, ok := newObjs[key]; !ok {
-			objsToDelete = append(objsToDelete, DeletedFinalStateUnknown{
-				Key: key,
-				Obj: obj,
-			})
-		}
-	}
+
 	if err := clientState.Replace(info.Objects, info.ResourceVersion); err != nil {
 		return err
 	}
-	for _, objToDelete := range objsToDelete {
+	for _, objToDelete := range deletions {
 		handler.OnDelete(objToDelete)
 	}
-	for key, obj := range newObjs {
-		if oldObj, ok := oldObjMap[key]; !ok {
-			handler.OnAdd(obj, true)
+	for _, r := range replacements {
+		if r.oldObj != nil {
+			handler.OnUpdate(r.oldObj, r.newObj)
 		} else {
-			handler.OnUpdate(oldObj, obj)
+			handler.OnAdd(r.newObj, true)
 		}
 	}
 	return nil

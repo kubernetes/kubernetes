@@ -58,9 +58,9 @@ func testRealFIFOPop(f *RealFIFO) testFifoObject {
 	if val == nil {
 		return testFifoObject{name: closedFIFOName}
 	}
-	if val.(Deltas).Newest().Type == AtomicEvent {
+	if val.(Deltas).Newest().Type == ReplacedList {
 		var objs []testFifoObject
-		for _, obj := range val.(Deltas).Newest().Object.(AtomicInfo).Objects {
+		for _, obj := range val.(Deltas).Newest().Object.(ReplacedListInfo).Objects {
 			objs = append(objs, obj.(testFifoObject))
 		}
 		return testFifoObject{name: isAtomic, val: objs}
@@ -1149,7 +1149,13 @@ func TestRealFIFO_PopMultipleDeltaInBatch(t *testing.T) {
 							receivedInitial <- obj
 						}
 						return nil
-					})
+					}, PopProcessFunc(func(obj interface{}, isInInitialList bool) error {
+						received <- []Delta{*obj.(Deltas).Newest()}
+						if isInInitialList {
+							receivedInitial <- []Delta{*obj.(Deltas).Newest()}
+						}
+						return nil
+					}))
 				}()
 				timer := time.NewTimer(time.Millisecond * 50)
 				select {
@@ -1273,7 +1279,10 @@ func TestRealFIFO_PopBrokenItemsInBatch(t *testing.T) {
 					_ = f.PopBatch(func(obj []Delta, isInInitialList bool) error {
 						received <- obj
 						return nil
-					})
+					}, PopProcessFunc(func(obj interface{}, isInInitialList bool) error {
+						received <- []Delta{*obj.(Deltas).Newest()}
+						return nil
+					}))
 				}()
 				timer := time.NewTimer(time.Millisecond * 50)
 				select {
@@ -1311,8 +1320,7 @@ func TestRealFIFO_ReplaceAtomic(t *testing.T) {
 				f.replaceTest(t, []interface{}{}, "123")
 			},
 			expectedDeltas: Deltas{
-				{Type: AtomicEvent, Object: AtomicInfo{
-					Type:            Replaced,
+				{Type: ReplacedList, Object: ReplacedListInfo{
 					ResourceVersion: "123",
 					Objects:         []interface{}{},
 				}},
@@ -1325,8 +1333,7 @@ func TestRealFIFO_ReplaceAtomic(t *testing.T) {
 				f.replaceTest(t, []interface{}{}, "123")
 			},
 			expectedDeltas: Deltas{
-				{Type: AtomicEvent, Object: AtomicInfo{
-					Type:            Replaced,
+				{Type: ReplacedList, Object: ReplacedListInfo{
 					ResourceVersion: "123",
 					Objects:         []interface{}{},
 				}},
@@ -1341,8 +1348,7 @@ func TestRealFIFO_ReplaceAtomic(t *testing.T) {
 				f.replaceTest(t, []interface{}{}, "56")
 			},
 			expectedDeltas: Deltas{
-				{Type: AtomicEvent, Object: AtomicInfo{
-					Type:            Replaced,
+				{Type: ReplacedList, Object: ReplacedListInfo{
 					ResourceVersion: "56",
 					Objects:         []interface{}{},
 				}},
