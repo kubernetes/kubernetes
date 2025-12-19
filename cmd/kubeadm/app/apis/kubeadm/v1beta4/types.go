@@ -170,6 +170,7 @@ type ControlPlaneComponent struct {
 	// An argument name in this list is the flag name as it appears on the
 	// command line except without leading dash(es). Extra arguments will override existing
 	// default arguments. Duplicate extra arguments are allowed.
+	// The default arguments are sorted alpha-numerically but the extra arguments are not.
 	// +optional
 	ExtraArgs []Arg `json:"extraArgs,omitempty"`
 
@@ -260,6 +261,7 @@ type NodeRegistrationOptions struct {
 	// Flags have higher priority when parsing. These values are local and specific to the node kubeadm is executing on.
 	// An argument name in this list is the flag name as it appears on the command line except without leading dash(es).
 	// Extra arguments will override existing default arguments. Duplicate extra arguments are allowed.
+	// The default arguments are sorted alpha-numerically but the extra arguments are not.
 	// +optional
 	KubeletExtraArgs []Arg `json:"kubeletExtraArgs,omitempty"`
 
@@ -321,6 +323,7 @@ type LocalEtcd struct {
 	// An argument name in this list is the flag name as it appears on the
 	// command line except without leading dash(es). Extra arguments will override existing
 	// default arguments. Duplicate extra arguments are allowed.
+	// The default arguments are sorted alpha-numerically but the extra arguments are not.
 	// +optional
 	ExtraArgs []Arg `json:"extraArgs,omitempty"`
 
