@@ -52,6 +52,11 @@ const (
 	maxTimeout = 15 * time.Minute
 )
 
+// MetricsRecorder defines the interface for recording plugin duration metrics.
+type MetricsRecorder interface {
+	ObservePluginDurationAsync(extensionPoint, pluginName, status string, value float64)
+}
+
 // frameworkImpl is the component responsible for initializing and running scheduler
 // plugins.
 type frameworkImpl struct {
