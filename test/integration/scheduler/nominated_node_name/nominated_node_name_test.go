@@ -24,12 +24,15 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-helpers/storage/volume"
 	configv1 "k8s.io/kube-scheduler/config/v1"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
@@ -37,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
 	"k8s.io/kubernetes/pkg/scheduler/backend/queue"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpreemption"
 	plfeature "k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
@@ -199,6 +203,239 @@ func TestNominatedNodeNameIsSetBeforePreBindAndWaitOnPermit(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+type TestBindPlugin struct {
+	remainingFailures int
+	beforeBind        func()
+	defaultBindPlugin fwk.BindPlugin
+}
+
+func (p *TestBindPlugin) Name() string {
+	return "TestBindPlugin"
+}
+
+func (p *TestBindPlugin) Bind(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodename string) *fwk.Status {
+	if p.remainingFailures > 0 {
+		p.remainingFailures--
+		return fwk.NewStatus(fwk.Error, "TestBindPlugin reported error because remainingFailures > 0")
+	}
+	p.beforeBind()
+	return p.defaultBindPlugin.Bind(ctx, state, pod, nodename)
+}
+
+type TestQueueSortPlugin struct {
+	priorities map[string]int
+}
+
+func (p *TestQueueSortPlugin) Name() string {
+	return "TestQueueSortPlugin"
+}
+func (p *TestQueueSortPlugin) Less(pInfo1, pInfo2 fwk.QueuedPodInfo) bool {
+	return p.priorities[pInfo1.GetPodInfo().GetPod().Name] < p.priorities[pInfo2.GetPodInfo().GetPod().Name]
+}
+
+func createPodWithPVC(testCtx *testutils.TestContext, pod v1.Pod, storageClassName string) (*v1.Pod, error) {
+	storage := v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}
+	pvc, err := testutils.CreatePVC(testCtx.ClientSet, st.MakePersistentVolumeClaim().
+		Name("pvc-"+pod.Name).
+		Namespace(pod.Namespace).
+		StorageClassName(&storageClassName).
+		AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}).
+		Resources(storage).
+		Obj())
+	if err != nil {
+		return nil, fmt.Errorf("cannot create pvc: %w", err)
+	}
+
+	pod.Spec.Volumes = []v1.Volume{{
+		Name: "volume",
+		VolumeSource: v1.VolumeSource{
+			PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+				ClaimName: pvc.Name,
+			},
+		},
+	}}
+
+	createdPod, err := testutils.CreatePausePod(testCtx.ClientSet, &pod)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to create pod: %w", err)
+	}
+	return createdPod, nil
+}
+
+func preferredNodeAffinity(preferredNodeName string) *v1.Affinity {
+	return &v1.Affinity{
+		NodeAffinity: &v1.NodeAffinity{
+			PreferredDuringSchedulingIgnoredDuringExecution: []v1.PreferredSchedulingTerm{{
+				Weight: 100,
+				Preference: v1.NodeSelectorTerm{
+					MatchExpressions: []v1.NodeSelectorRequirement{
+						{
+							Key:      "kubernetes.io/hostname",
+							Operator: "In",
+							Values:   []string{preferredNodeName},
+						},
+					},
+				},
+			}},
+		},
+	}
+}
+
+func initSchedulerWithPlugins(t *testing.T, testContext *testutils.TestContext, plugins ...fwk.Plugin) (*testutils.TestContext, testutils.ShutdownFunc) {
+	registry, profile := schedulerutils.InitRegistryAndConfig(t, func(plugin fwk.Plugin) frameworkruntime.PluginFactory {
+		return func(ctx context.Context, obj runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
+			if v, ok := plugin.(*TestBindPlugin); ok {
+				binder, err := defaultbinder.New(ctx, obj, fh)
+				if err != nil {
+					return nil, err
+				}
+				v.defaultBindPlugin = binder.(fwk.BindPlugin)
+			}
+			return plugin, nil
+		}
+	}, plugins...)
+
+	testCtx, teardown := schedulerutils.InitTestSchedulerForFrameworkTest(t, testContext, 0, true,
+		scheduler.WithProfiles(profile),
+		scheduler.WithFrameworkOutOfTreeRegistry(registry))
+	testutils.StartFakePVController(testCtx.Ctx, testCtx.ClientSet, testCtx.InformerFactory)
+
+	return testCtx, teardown
+}
+
+func TestPartialBindingFailureRetriedWithNNN(t *testing.T) {
+	// The test will do the following:
+	// 1. Set up 2 nodes able to hold one pod each
+	// 2. Try to schedule pod1 with dynamically provisioned pvc1 N times, but force failure at pod binding each time
+	// 3. Schedule pod2 with dynamically provisioned pvc2, preferring the same node as pod1
+	// 4. Schedule pod1
+	// 5. Verify that pod1 and pod2 have been scheduled successfully
+	//
+	// It shouldn't matter how many failed attempts pod1 goes through.
+	//
+	// Note that the pvc will be provisioned at the prebind stage even if the pod fails to bind.
+	for _, attempts := range []int{0, 1, 2} {
+		t.Run(fmt.Sprintf("Test pod binds on the originally determined node after successful prebind and %v failed bind attempts and scheduler restart", attempts), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NominatedNodeNameForExpectation, true)
+			testContext := testutils.InitTestAPIServer(t, "nnn-test", nil)
+
+			// This plugin allows us to abort scheduler before binding.
+			bindPlugin := &TestBindPlugin{
+				remainingFailures: attempts,
+			}
+			// We don't use regular pod priorities because they affect behavior related to NominatedNodeName.
+			// In a real scenario, the priorities could be equal and the tiebreaker could be random from the user's perspective.
+			// With a custom plugin we ensure deterministic order without affecting other behavior relevant to the test.
+			queueSortPlugin := &TestQueueSortPlugin{
+				priorities: map[string]int{
+					"test-pod1": 1,
+					"test-pod2": 2,
+				},
+			}
+
+			testCtx, _ := initSchedulerWithPlugins(t, testContext, bindPlugin, queueSortPlugin)
+
+			// Closing scheduler before bind will cancel its context and fail any remaining requests
+			bindPlugin.beforeBind = testCtx.SchedulerCloseFn
+
+			nodes, err := testutils.CreateAndWaitForNodesInCache(testCtx, "test-node", st.MakeNode().Capacity(map[v1.ResourceName]string{
+				// Ensure only one pod can fit in a single node
+				v1.ResourcePods: "1",
+			}), 2)
+			if err != nil {
+				t.Fatalf("failed to create nodes: %v", err)
+			}
+
+			sc := st.MakeStorageClass().
+				Name("sc").
+				VolumeBindingMode(storagev1.VolumeBindingWaitForFirstConsumer).
+				Provisioner("p").
+				Obj()
+			if _, err := testCtx.ClientSet.StorageV1().StorageClasses().Create(testCtx.Ctx, sc, metav1.CreateOptions{}); err != nil {
+				t.Fatalf("failed to create sc: %v", err)
+			}
+
+			makePod := func(name string) *v1.Pod {
+				return testutils.InitPausePod(&testutils.PausePodConfig{
+					Name:      name,
+					Namespace: testCtx.NS.Name,
+					// Ensure all pods prefer the same node.
+					// However, only 1 pod will fit on the preferred node.
+					Affinity: preferredNodeAffinity(nodes[0].Name),
+				})
+			}
+
+			pod1, err := createPodWithPVC(testContext, *makePod("test-pod1"), sc.Name)
+			if err != nil {
+				t.Fatalf("Failed to create pod: %v", err)
+			}
+
+			<-testCtx.SchedulerCtx.Done()
+
+			// Assert pod1 failed to bind
+			pod1AfterBindingFailure, err := testutils.GetPod(testCtx.ClientSet, pod1.Name, pod1.Namespace)
+			if err != nil {
+				t.Fatalf("Failed to get pod1: %v", err)
+			}
+			if pod1AfterBindingFailure.Status.NominatedNodeName != nodes[0].Name {
+				t.Fatalf("pod1 NominatedNodeName is %s, expected %s", pod1AfterBindingFailure.Status.NominatedNodeName, nodes[0].Name)
+			}
+			if pod1AfterBindingFailure.Spec.NodeName != "" {
+				t.Fatalf("pod1 NodeName is %s, expected empty", pod1AfterBindingFailure.Spec.NodeName)
+			}
+			// Assert pvc1 bound successfully
+			pvc1, err := testCtx.ClientSet.CoreV1().PersistentVolumeClaims(pod1.Namespace).Get(
+				testCtx.Ctx, pod1AfterBindingFailure.Spec.Volumes[0].PersistentVolumeClaim.ClaimName, metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("failed to get pvc1: %v", err)
+			}
+			if pvc1.Annotations[volume.AnnSelectedNode] != nodes[0].Name {
+				t.Fatalf("pvc1 selected node is %s, expected %s", pvc1.Annotations[volume.AnnSelectedNode], nodes[0].Name)
+			}
+			if pvc1.Annotations[volume.AnnBindCompleted] != "yes" {
+				t.Fatalf("pvc1 bind is not completed")
+			}
+
+			pod2, err := createPodWithPVC(testContext, *makePod("test-pod2"), sc.Name)
+			if err != nil {
+				t.Fatalf("Failed to create pod2: %v", err)
+			}
+
+			// Bind normally from now on
+			bindPlugin.beforeBind = func() {}
+			// Restart scheduler
+			testCtx, _ = initSchedulerWithPlugins(t, testContext, bindPlugin, queueSortPlugin)
+
+			// Assert pod2 bound successfully
+			if err := testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod2); err != nil {
+				t.Fatalf("Failed to schedule pod2 after restart")
+			}
+
+			// Assert pod1 bound successfully
+			if err := testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod1); err != nil {
+				t.Fatalf("Failed to schedule pod1 after restart")
+			}
+
+			actualPod1, err := testutils.GetPod(testCtx.ClientSet, pod1.Name, pod1.Namespace)
+			if err != nil {
+				t.Fatalf("Failed to get pod1: %v", err)
+			}
+			actualPod2, err := testutils.GetPod(testCtx.ClientSet, pod2.Name, pod2.Namespace)
+			if err != nil {
+				t.Fatalf("Failed to get pod2: %v", err)
+			}
+			// Pod1 should bind to the node determined before scheduler restart.
+			if actualPod1.Spec.NodeName != nodes[0].Name {
+				t.Fatalf("pod1 selected node is %s, expected %s", actualPod1.Spec.NodeName, nodes[0].Name)
+			}
+			// Pod2 should bind to the remaining node.
+			if actualPod2.Spec.NodeName != nodes[1].Name {
+				t.Fatalf("pod2 selected node is %s, expected %s", actualPod2.Spec.NodeName, nodes[1].Name)
+			}
+		})
 	}
 }
 
