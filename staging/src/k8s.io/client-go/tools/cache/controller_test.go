@@ -995,6 +995,9 @@ func testReplaceEvents(t *testing.T, ctx context.Context, fifo Queue, m *eventRe
 
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
+			// Clear history so we don't get noise from previous tests.
+			m.clearHistory()
+
 			for _, obj := range tc.initialObjs {
 				require.NoError(t, fifo.Add(obj), "failed to add")
 			}
