@@ -41,8 +41,8 @@ func TestArgumentsToCommand(t *testing.T) {
 				{Name: "admission-control", Value: "NamespaceLifecycle,LimitRanger"},
 			},
 			expected: []string{
-				"--admission-control=NamespaceLifecycle,LimitRanger",
 				"--allow-privileged=true",
+				"--admission-control=NamespaceLifecycle,LimitRanger",
 			},
 		},
 		{
@@ -56,9 +56,9 @@ func TestArgumentsToCommand(t *testing.T) {
 				{Name: "tls-sni-cert-key", Value: "/some/new/path/subpath"},
 			},
 			expected: []string{
+				"--token-auth-file=/token",
 				"--tls-sni-cert-key=/some/new/path",
 				"--tls-sni-cert-key=/some/new/path/subpath",
-				"--token-auth-file=/token",
 			},
 		},
 		{
@@ -72,8 +72,8 @@ func TestArgumentsToCommand(t *testing.T) {
 				{Name: "tls-sni-cert-key", Value: "/some/new/path"},
 			},
 			expected: []string{
-				"--tls-sni-cert-key=/some/new/path",
 				"--token-auth-file=/token",
+				"--tls-sni-cert-key=/some/new/path",
 			},
 		},
 		{
@@ -85,8 +85,8 @@ func TestArgumentsToCommand(t *testing.T) {
 				{Name: "admission-control", Value: "NamespaceLifecycle,LimitRanger"},
 			},
 			expected: []string{
-				"--admission-control=NamespaceLifecycle,LimitRanger",
 				"--allow-privileged=true",
+				"--admission-control=NamespaceLifecycle,LimitRanger",
 			},
 		},
 		{
@@ -99,9 +99,9 @@ func TestArgumentsToCommand(t *testing.T) {
 				{Name: "admission-control", Value: "NamespaceLifecycle,LimitRanger"},
 			},
 			expected: []string{
-				"--admission-control=NamespaceLifecycle,LimitRanger",
 				"--allow-privileged=true",
 				"--something-that-allows-empty-string=",
+				"--admission-control=NamespaceLifecycle,LimitRanger",
 			},
 		},
 		{
@@ -115,9 +115,29 @@ func TestArgumentsToCommand(t *testing.T) {
 				{Name: "something-that-allows-empty-string", Value: ""},
 			},
 			expected: []string{
-				"--admission-control=NamespaceLifecycle,LimitRanger",
 				"--allow-privileged=true",
+				"--admission-control=NamespaceLifecycle,LimitRanger",
 				"--something-that-allows-empty-string=",
+			},
+		},
+		{
+			name: "base are sorted and overrides are not",
+			base: []kubeadmapi.Arg{
+				{Name: "b", Value: "true"},
+				{Name: "c", Value: "true"},
+				{Name: "a", Value: "true"},
+			},
+			overrides: []kubeadmapi.Arg{
+				{Name: "e", Value: "true"},
+				{Name: "b", Value: "true"},
+				{Name: "d", Value: "true"},
+			},
+			expected: []string{
+				"--a=true",
+				"--c=true",
+				"--e=true",
+				"--b=true",
+				"--d=true",
 			},
 		},
 	}
@@ -187,6 +207,21 @@ func TestArgumentsFromCommand(t *testing.T) {
 				{Name: "admission-control", Value: "NamespaceLifecycle,LimitRanger"},
 				{Name: "tls-sni-cert-key", Value: "/some/path"},
 				{Name: "tls-sni-cert-key", Value: "/some/path/subpath"},
+			},
+		},
+		{
+			name: "args are sorted",
+			args: []string{
+				"--c=foo",
+				"--a=foo",
+				"--b=foo",
+				"--b=bar",
+			},
+			expected: []kubeadmapi.Arg{
+				{Name: "a", Value: "foo"},
+				{Name: "b", Value: "bar"},
+				{Name: "b", Value: "foo"},
+				{Name: "c", Value: "foo"},
 			},
 		},
 	}
