@@ -452,6 +452,7 @@ type ValidatingAdmissionPolicyBinding struct {
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	// spec defines the desired behavior of the ValidatingAdmissionPolicyBinding.
+	// +required
 	Spec ValidatingAdmissionPolicyBindingSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 }
 

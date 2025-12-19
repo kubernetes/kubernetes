@@ -374,6 +374,7 @@ type PodCertificateRequest struct {
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// spec contains the details about the certificate being requested.
+	// +required
 	Spec PodCertificateRequestSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 
 	// status contains the issued certificate, and a standard set of conditions.
