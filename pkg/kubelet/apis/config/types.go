@@ -887,7 +887,7 @@ type ImagePulledRecord struct {
 
 // ImagePullCredentials describe credentials that can be used to pull an image.
 type ImagePullCredentials struct {
-	// KuberneteSecretCoordinates is an index of coordinates of all the kubernetes
+	// KubernetesSecretCoordinates is an index of coordinates of all the kubernetes
 	// secrets that were used to pull the image.
 	// +optional
 	KubernetesSecrets []ImagePullSecret

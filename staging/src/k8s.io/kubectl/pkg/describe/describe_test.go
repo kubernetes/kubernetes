@@ -36,7 +36,6 @@ import (
 	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
-	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	policyv1 "k8s.io/api/policy/v1"
@@ -608,6 +607,65 @@ func TestDescribePodRuntimeClass(t *testing.T) {
 				if strings.Contains(out, unexpected) {
 					t.Errorf("unexpected to find %q in output: %q", unexpected, out)
 				}
+			}
+		})
+	}
+}
+
+func TestDescribePodWorkloadReference(t *testing.T) {
+	testCases := []struct {
+		name     string
+		pod      *corev1.Pod
+		expected string
+	}{
+		{
+			name: "test1",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bar",
+				},
+				Spec: corev1.PodSpec{
+					WorkloadRef: &corev1.WorkloadReference{
+						Name:     "workload",
+						PodGroup: "pg",
+					},
+				},
+			},
+			expected: `WorkloadRef:
+  Name:      workload
+  PodGroup:  pg`,
+		},
+		{
+			name: "test2",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bar",
+				},
+				Spec: corev1.PodSpec{
+					WorkloadRef: &corev1.WorkloadReference{
+						Name:               "workload",
+						PodGroup:           "pg",
+						PodGroupReplicaKey: "pg1",
+					},
+				},
+			},
+			expected: `WorkloadRef:
+  Name:                workload
+  PodGroup:            pg
+  PodGroupReplicaKey:  pg1`,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			fake := fake.NewClientset(tc.pod)
+			c := &describeClient{T: t, Interface: fake}
+			d := PodDescriber{c}
+			out, err := d.Describe("", "bar", DescriberSettings{ShowEvents: true})
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+			if !strings.Contains(out, tc.expected) {
+				t.Errorf("Expected to find %q in output: %q", tc.expected, out)
 			}
 		})
 	}
@@ -3493,38 +3551,6 @@ func TestDescribeJob(t *testing.T) {
 
 func TestDescribeIngress(t *testing.T) {
 	ingresClassName := "test"
-	backendV1beta1 := networkingv1beta1.IngressBackend{
-		ServiceName: "default-backend",
-		ServicePort: intstr.FromInt32(80),
-	}
-	v1beta1 := fake.NewClientset(&networkingv1beta1.Ingress{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "bar",
-			Labels: map[string]string{
-				"id1": "app1",
-				"id2": "app2",
-			},
-			Namespace: "foo",
-		},
-		Spec: networkingv1beta1.IngressSpec{
-			IngressClassName: &ingresClassName,
-			Rules: []networkingv1beta1.IngressRule{
-				{
-					Host: "foo.bar.com",
-					IngressRuleValue: networkingv1beta1.IngressRuleValue{
-						HTTP: &networkingv1beta1.HTTPIngressRuleValue{
-							Paths: []networkingv1beta1.HTTPIngressPath{
-								{
-									Path:    "/foo",
-									Backend: backendV1beta1,
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	})
 	backendV1 := networkingv1.IngressBackend{
 		Service: &networkingv1.IngressServiceBackend{
 			Name: "default-backend",
@@ -3577,23 +3603,6 @@ func TestDescribeIngress(t *testing.T) {
 		input  *fake.Clientset
 		output string
 	}{
-		"IngressRule.HTTP.Paths.Backend.Service v1beta1": {
-			input: v1beta1,
-			output: `Name:             bar
-Labels:           id1=app1
-                  id2=app2
-Namespace:        foo
-Address:          
-Ingress Class:    test
-Default backend:  <default>
-Rules:
-  Host         Path  Backends
-  ----         ----  --------
-  foo.bar.com  
-               /foo   default-backend:80 (<error: services "default-backend" not found>)
-Annotations:   <none>
-Events:        <none>` + "\n",
-		},
 		"IngressRule.HTTP.Paths.Backend.Service v1": {
 			input: netv1,
 			output: `Name:             bar
@@ -5158,7 +5167,7 @@ func TestDescribeEvents(t *testing.T) {
 			}, events),
 		},
 		"EndpointSliceDescriber": &EndpointSliceDescriber{
-			fake.NewClientset(&discoveryv1beta1.EndpointSlice{
+			fake.NewClientset(&discoveryv1.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "bar",
 					Namespace: "foo",
@@ -5174,7 +5183,7 @@ func TestDescribeEvents(t *testing.T) {
 			}, events),
 		},
 		"IngressDescriber": &IngressDescriber{
-			fake.NewClientset(&networkingv1beta1.Ingress{
+			fake.NewClientset(&networkingv1.Ingress{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "bar",
 					Namespace: "foo",
@@ -5471,57 +5480,29 @@ Parameters:
   Kind:      ConfigMap
   Name:      example-parameters` + "\n"
 
-	tests := map[string]struct {
-		input  *fake.Clientset
-		output string
-	}{
-		"basic IngressClass (v1beta1)": {
-			input: fake.NewClientset(&networkingv1beta1.IngressClass{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "example-class",
-				},
-				Spec: networkingv1beta1.IngressClassSpec{
-					Controller: "example.com/controller",
-					Parameters: &networkingv1beta1.IngressClassParametersReference{
-						APIGroup: ptr.To("v1"),
-						Kind:     "ConfigMap",
-						Name:     "example-parameters",
-					},
-				},
-			}),
-			output: expectedOut,
+	input := fake.NewClientset(&networkingv1.IngressClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "example-class",
 		},
-		"basic IngressClass (v1)": {
-			input: fake.NewClientset(&networkingv1.IngressClass{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "example-class",
-				},
-				Spec: networkingv1.IngressClassSpec{
-					Controller: "example.com/controller",
-					Parameters: &networkingv1.IngressClassParametersReference{
-						APIGroup: ptr.To("v1"),
-						Kind:     "ConfigMap",
-						Name:     "example-parameters",
-					},
-				},
-			}),
-			output: expectedOut,
+		Spec: networkingv1.IngressClassSpec{
+			Controller: "example.com/controller",
+			Parameters: &networkingv1.IngressClassParametersReference{
+				APIGroup: ptr.To("v1"),
+				Kind:     "ConfigMap",
+				Name:     "example-parameters",
+			},
 		},
-	}
+	})
 
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			c := &describeClient{T: t, Namespace: "foo", Interface: test.input}
-			d := IngressClassDescriber{c}
-			out, err := d.Describe("", "example-class", DescriberSettings{})
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-			if out != expectedOut {
-				t.Log(out)
-				t.Errorf("expected : %q\n but got output:\n %q", test.output, out)
-			}
-		})
+	c := &describeClient{T: t, Namespace: "foo", Interface: input}
+	d := IngressClassDescriber{c}
+	out, err := d.Describe("", "example-class", DescriberSettings{})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if out != expectedOut {
+		t.Log(out)
+		t.Errorf("expected : %q\n but got output:\n %q", expectedOut, out)
 	}
 }
 
@@ -6600,100 +6581,35 @@ func TestDescribeEndpointSlice(t *testing.T) {
 	protocolTCP := corev1.ProtocolTCP
 	port80 := int32(80)
 
-	testcases := map[string]struct {
-		input  *fake.Clientset
-		output string
-	}{
-		"EndpointSlices v1beta1": {
-			input: fake.NewClientset(&discoveryv1beta1.EndpointSlice{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "foo.123",
-					Namespace: "bar",
-				},
-				AddressType: discoveryv1beta1.AddressTypeIPv4,
-				Endpoints: []discoveryv1beta1.Endpoint{
-					{
-						Addresses:  []string{"1.2.3.4", "1.2.3.5"},
-						Conditions: discoveryv1beta1.EndpointConditions{Ready: ptr.To(true)},
-						TargetRef:  &corev1.ObjectReference{Kind: "Pod", Name: "test-123"},
-						Topology: map[string]string{
-							"topology.kubernetes.io/zone":   "us-central1-a",
-							"topology.kubernetes.io/region": "us-central1",
-						},
-					}, {
-						Addresses:  []string{"1.2.3.6", "1.2.3.7"},
-						Conditions: discoveryv1beta1.EndpointConditions{Ready: ptr.To(true)},
-						TargetRef:  &corev1.ObjectReference{Kind: "Pod", Name: "test-124"},
-						Topology: map[string]string{
-							"topology.kubernetes.io/zone":   "us-central1-b",
-							"topology.kubernetes.io/region": "us-central1",
-						},
-					},
-				},
-				Ports: []discoveryv1beta1.EndpointPort{
-					{
-						Protocol: &protocolTCP,
-						Port:     &port80,
-					},
-				},
-			}),
-
-			output: `Name:         foo.123
-Namespace:    bar
-Labels:       <none>
-Annotations:  <none>
-AddressType:  IPv4
-Ports:
-  Name     Port  Protocol
-  ----     ----  --------
-  <unset>  80    TCP
-Endpoints:
-  - Addresses:  1.2.3.4,1.2.3.5
-    Conditions:
-      Ready:    true
-    Hostname:   <unset>
-    TargetRef:  Pod/test-123
-    Topology:   topology.kubernetes.io/region=us-central1
-                topology.kubernetes.io/zone=us-central1-a
-  - Addresses:  1.2.3.6,1.2.3.7
-    Conditions:
-      Ready:    true
-    Hostname:   <unset>
-    TargetRef:  Pod/test-124
-    Topology:   topology.kubernetes.io/region=us-central1
-                topology.kubernetes.io/zone=us-central1-b
-Events:         <none>` + "\n",
+	input := fake.NewClientset(&discoveryv1.EndpointSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "foo.123",
+			Namespace: "bar",
 		},
-		"EndpointSlices v1": {
-			input: fake.NewClientset(&discoveryv1.EndpointSlice{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "foo.123",
-					Namespace: "bar",
-				},
-				AddressType: discoveryv1.AddressTypeIPv4,
-				Endpoints: []discoveryv1.Endpoint{
-					{
-						Addresses:  []string{"1.2.3.4", "1.2.3.5"},
-						Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
-						TargetRef:  &corev1.ObjectReference{Kind: "Pod", Name: "test-123"},
-						Zone:       ptr.To("us-central1-a"),
-						NodeName:   ptr.To("node-1"),
-					}, {
-						Addresses:  []string{"1.2.3.6", "1.2.3.7"},
-						Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
-						TargetRef:  &corev1.ObjectReference{Kind: "Pod", Name: "test-124"},
-						NodeName:   ptr.To("node-2"),
-					},
-				},
-				Ports: []discoveryv1.EndpointPort{
-					{
-						Protocol: &protocolTCP,
-						Port:     &port80,
-					},
-				},
-			}),
+		AddressType: discoveryv1.AddressTypeIPv4,
+		Endpoints: []discoveryv1.Endpoint{
+			{
+				Addresses:  []string{"1.2.3.4", "1.2.3.5"},
+				Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+				TargetRef:  &corev1.ObjectReference{Kind: "Pod", Name: "test-123"},
+				Zone:       ptr.To("us-central1-a"),
+				NodeName:   ptr.To("node-1"),
+			}, {
+				Addresses:  []string{"1.2.3.6", "1.2.3.7"},
+				Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+				TargetRef:  &corev1.ObjectReference{Kind: "Pod", Name: "test-124"},
+				NodeName:   ptr.To("node-2"),
+			},
+		},
+		Ports: []discoveryv1.EndpointPort{
+			{
+				Protocol: &protocolTCP,
+				Port:     &port80,
+			},
+		},
+	})
 
-			output: `Name:         foo.123
+	output := `Name:         foo.123
 Namespace:    bar
 Labels:       <none>
 Annotations:  <none>
@@ -6717,23 +6633,17 @@ Endpoints:
     TargetRef:  Pod/test-124
     NodeName:   node-2
     Zone:       <unset>
-Events:         <none>` + "\n",
-		},
-	}
+Events:         <none>` + "\n"
 
-	for name, tc := range testcases {
-		t.Run(name, func(t *testing.T) {
-			c := &describeClient{T: t, Namespace: "foo", Interface: tc.input}
-			d := EndpointSliceDescriber{c}
-			out, err := d.Describe("bar", "foo.123", DescriberSettings{ShowEvents: true})
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-			if out != tc.output {
-				t.Log(out)
-				t.Errorf("expected :\n%s\nbut got output:\n%s", tc.output, out)
-			}
-		})
+	c := &describeClient{T: t, Namespace: "foo", Interface: input}
+	d := EndpointSliceDescriber{c}
+	out, err := d.Describe("bar", "foo.123", DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if out != output {
+		t.Log(out)
+		t.Errorf("expected :\n%s\nbut got output:\n%s", output, out)
 	}
 }
 
@@ -7216,5 +7126,29 @@ func TestDescribeProjectedVolumesOptionalSecret(t *testing.T) {
 	expectedOut := "SecretName:  optional-secret\n    Optional:    true"
 	if !strings.Contains(out, expectedOut) {
 		t.Errorf("expected to find %q in output: %q", expectedOut, out)
+	}
+}
+
+func TestSmartLabelFor(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"simpleField", "Simple Field"},
+		{"respectPDBs", "Respect PDBs"},
+		{"respectPDB", "Respect PDB"},
+		{"apiURL", "API URL"},
+		{"kubeAPI", "Kube API"},
+		{"userUID", "User UID"},
+		{"HTTPSProxy", "HTTPSProxy"},  // Multiple capitals stay together
+		{"customCRDs", "Custom CRDs"}, // Another pluralized acronym
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			if got := smartLabelFor(tt.input); got != tt.expected {
+				t.Errorf("smartLabelFor(%q) = %q, want %q", tt.input, got, tt.expected)
+			}
+		})
 	}
 }

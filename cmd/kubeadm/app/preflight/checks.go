@@ -73,7 +73,10 @@ type Checker interface {
 
 // ContainerRuntimeCheck verifies the container runtime.
 type ContainerRuntimeCheck struct {
-	runtime utilruntime.ContainerRuntime
+	criSocket string
+
+	// stubbed out for testing
+	impl utilruntime.Impl
 }
 
 // Name returns label for RuntimeCheck.
@@ -84,10 +87,59 @@ func (ContainerRuntimeCheck) Name() string {
 // Check validates the container runtime
 func (crc ContainerRuntimeCheck) Check() (warnings, errorList []error) {
 	klog.V(1).Infoln("validating the container runtime")
-	defer crc.runtime.Close()
-	if err := crc.runtime.IsRunning(); err != nil {
+	containerRuntime := utilruntime.NewContainerRuntime(crc.criSocket)
+	if crc.impl != nil {
+		containerRuntime.SetImpl(crc.impl)
+	}
+	if err := containerRuntime.Connect(); err != nil {
+		return nil, []error{errors.Wrap(err, "could not connect to the container runtime")}
+	}
+	defer containerRuntime.Close()
+
+	if err := containerRuntime.IsRunning(); err != nil {
 		errorList = append(errorList, err)
 	}
+	return warnings, errorList
+}
+
+// ContainerRuntimeVersionCheck verifies the version compatibility between installed container runtime and kubelet.
+type ContainerRuntimeVersionCheck struct {
+	criSocket string
+
+	// stubbed out for testing
+	impl utilruntime.Impl
+}
+
+// Name returns label for RuntimeCheck.
+func (ContainerRuntimeVersionCheck) Name() string {
+	return "ContainerRuntimeVersion"
+}
+
+// Check validates the container runtime version compatibility with kubelet.
+func (crvc ContainerRuntimeVersionCheck) Check() (warnings, errorList []error) {
+	klog.V(1).Infoln("validating the container runtime version compatibility")
+	containerRuntime := utilruntime.NewContainerRuntime(crvc.criSocket)
+	if crvc.impl != nil {
+		containerRuntime.SetImpl(crvc.impl)
+	}
+	if err := containerRuntime.Connect(); err != nil {
+		return nil, []error{errors.Wrap(err, "could not connect to the container runtime")}
+	}
+	defer containerRuntime.Close()
+
+	ok, err := containerRuntime.IsRuntimeConfigImplemented()
+	if err != nil {
+		return nil, []error{errors.Wrap(err, "could not check if the runtime config is available")}
+	}
+	if !ok {
+		// TODO: return an error once the kubelet version is 1.36 or higher.
+		// https://github.com/kubernetes/kubeadm/issues/3229
+		err := errors.New("You must update your container runtime to a version that supports the CRI method RuntimeConfig. " +
+			"Falling back to using cgroupDriver from kubelet config will be removed in 1.36. " +
+			"For more information, see https://git.k8s.io/enhancements/keps/sig-node/4033-group-driver-detection-over-cri")
+		warnings = append(warnings, err)
+	}
+
 	return warnings, errorList
 }
 
@@ -676,7 +728,7 @@ func (evc ExternalEtcdVersionCheck) Check() (warnings, errorList []error) {
 	klog.V(1).Infoln("validating the external etcd version")
 
 	// Return quickly if the user isn't using external etcd
-	if evc.Etcd.External.Endpoints == nil {
+	if len(evc.Etcd.External.HTTPEndpoints) == 0 {
 		return nil, nil
 	}
 
@@ -692,7 +744,7 @@ func (evc ExternalEtcdVersionCheck) Check() (warnings, errorList []error) {
 	}
 
 	client := evc.getHTTPClient(config)
-	for _, endpoint := range evc.Etcd.External.Endpoints {
+	for _, endpoint := range evc.Etcd.External.HTTPEndpoints {
 		if _, err := url.Parse(endpoint); err != nil {
 			errorList = append(errorList, errors.Wrapf(err, "failed to parse external etcd endpoint %s", endpoint))
 			continue
@@ -807,11 +859,14 @@ func getEtcdVersionResponse(client *http.Client, url string, target interface{})
 
 // ImagePullCheck will pull container images used by kubeadm
 type ImagePullCheck struct {
-	runtime         utilruntime.ContainerRuntime
+	criSocket       string
 	imageList       []string
 	sandboxImage    string
 	imagePullPolicy v1.PullPolicy
 	imagePullSerial bool
+
+	// stubbed out for testing
+	impl utilruntime.Impl
 }
 
 // Name returns the label for ImagePullCheck
@@ -821,6 +876,15 @@ func (ImagePullCheck) Name() string {
 
 // Check pulls images required by kubeadm. This is a mutating check
 func (ipc ImagePullCheck) Check() (warnings, errorList []error) {
+	containerRuntime := utilruntime.NewContainerRuntime(ipc.criSocket)
+	if ipc.impl != nil {
+		containerRuntime.SetImpl(ipc.impl)
+	}
+	if err := containerRuntime.Connect(); err != nil {
+		return nil, []error{errors.Wrap(err, "could not connect to the container runtime")}
+	}
+	defer containerRuntime.Close()
+
 	// Handle unsupported image pull policy and policy Never.
 	policy := ipc.imagePullPolicy
 	switch policy {
@@ -835,7 +899,7 @@ func (ipc ImagePullCheck) Check() (warnings, errorList []error) {
 	}
 
 	// Handle CRI sandbox image warnings.
-	criSandboxImage, err := ipc.runtime.SandboxImage()
+	criSandboxImage, err := containerRuntime.SandboxImage()
 	if err != nil {
 		klog.V(4).Infof("failed to detect the sandbox image for local container runtime, %v", err)
 	} else if criSandboxImage != ipc.sandboxImage {
@@ -845,7 +909,7 @@ func (ipc ImagePullCheck) Check() (warnings, errorList []error) {
 
 	// Perform parallel pulls.
 	if !ipc.imagePullSerial {
-		if err := ipc.runtime.PullImagesInParallel(ipc.imageList, policy == v1.PullIfNotPresent); err != nil {
+		if err := containerRuntime.PullImagesInParallel(ipc.imageList, policy == v1.PullIfNotPresent); err != nil {
 			errorList = append(errorList, err)
 		}
 		return warnings, errorList
@@ -855,14 +919,14 @@ func (ipc ImagePullCheck) Check() (warnings, errorList []error) {
 	for _, image := range ipc.imageList {
 		switch policy {
 		case v1.PullIfNotPresent:
-			if ipc.runtime.ImageExists(image) {
+			if containerRuntime.ImageExists(image) {
 				klog.V(1).Infof("image exists: %s", image)
 				continue
 			}
 			fallthrough // Proceed with pulling the image if it does not exist
 		case v1.PullAlways:
 			klog.V(1).Infof("pulling: %s", image)
-			if err := ipc.runtime.PullImage(image); err != nil {
+			if err := containerRuntime.PullImage(image); err != nil {
 				errorList = append(errorList, errors.WithMessagef(err, "failed to pull image %s", image))
 			}
 		}
@@ -1056,12 +1120,8 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfigura
 // addCommonChecks is a helper function to duplicate checks that are common between both the
 // kubeadm init and join commands
 func addCommonChecks(execer utilsexec.Interface, k8sVersion string, nodeReg *kubeadmapi.NodeRegistrationOptions, checks []Checker) []Checker {
-	containerRuntime := utilruntime.NewContainerRuntime(nodeReg.CRISocket)
-	if err := containerRuntime.Connect(); err != nil {
-		klog.Warningf("[preflight] WARNING: Couldn't create the interface used for talking to the container runtime: %v\n", err)
-	} else {
-		checks = append(checks, ContainerRuntimeCheck{runtime: containerRuntime})
-	}
+	checks = append(checks, ContainerRuntimeCheck{criSocket: nodeReg.CRISocket})
+	checks = append(checks, ContainerRuntimeVersionCheck{criSocket: nodeReg.CRISocket})
 
 	// non-windows checks
 	checks = addSwapCheck(checks)
@@ -1085,9 +1145,10 @@ func RunRootCheckOnly(ignorePreflightErrors sets.Set[string]) error {
 }
 
 // RunUpgradeChecks initializes checks slice of structs and call RunChecks
-func RunUpgradeChecks(execer utilsexec.Interface, ignorePreflightErrors sets.Set[string]) error {
+func RunUpgradeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfiguration, ignorePreflightErrors sets.Set[string]) error {
 	checks := []Checker{
 		SystemVerificationCheck{isUpgrade: true, exec: execer},
+		ContainerRuntimeVersionCheck{criSocket: cfg.NodeRegistration.CRISocket},
 	}
 
 	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
@@ -1095,12 +1156,6 @@ func RunUpgradeChecks(execer utilsexec.Interface, ignorePreflightErrors sets.Set
 
 // RunPullImagesCheck will pull images kubeadm needs if they are not found on the system
 func RunPullImagesCheck(execer utilsexec.Interface, cfg *kubeadmapi.InitConfiguration, ignorePreflightErrors sets.Set[string]) error {
-	containerRuntime := utilruntime.NewContainerRuntime(cfg.NodeRegistration.CRISocket)
-	if err := containerRuntime.Connect(); err != nil {
-		return handleError(os.Stderr, err.Error())
-	}
-	defer containerRuntime.Close()
-
 	serialPull := true
 	if cfg.NodeRegistration.ImagePullSerial != nil {
 		serialPull = *cfg.NodeRegistration.ImagePullSerial
@@ -1108,7 +1163,7 @@ func RunPullImagesCheck(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigur
 
 	checks := []Checker{
 		ImagePullCheck{
-			runtime:         containerRuntime,
+			criSocket:       cfg.NodeRegistration.CRISocket,
 			imageList:       images.GetControlPlaneImages(&cfg.ClusterConfiguration),
 			sandboxImage:    images.GetPauseImage(&cfg.ClusterConfiguration),
 			imagePullPolicy: cfg.NodeRegistration.ImagePullPolicy,

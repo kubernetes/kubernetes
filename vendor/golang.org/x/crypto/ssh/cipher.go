@@ -8,6 +8,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/des"
+	"crypto/fips140"
 	"crypto/rc4"
 	"crypto/subtle"
 	"encoding/binary"
@@ -15,6 +16,7 @@ import (
 	"fmt"
 	"hash"
 	"io"
+	"slices"
 
 	"golang.org/x/crypto/chacha20"
 	"golang.org/x/crypto/internal/poly1305"
@@ -93,41 +95,41 @@ func streamCipherMode(skip int, createFunc func(key, iv []byte) (cipher.Stream, 
 }
 
 // cipherModes documents properties of supported ciphers. Ciphers not included
-// are not supported and will not be negotiated, even if explicitly requested in
-// ClientConfig.Crypto.Ciphers.
-var cipherModes = map[string]*cipherMode{
-	// Ciphers from RFC 4344, which introduced many CTR-based ciphers. Algorithms
-	// are defined in the order specified in the RFC.
-	CipherAES128CTR: {16, aes.BlockSize, streamCipherMode(0, newAESCTR)},
-	CipherAES192CTR: {24, aes.BlockSize, streamCipherMode(0, newAESCTR)},
-	CipherAES256CTR: {32, aes.BlockSize, streamCipherMode(0, newAESCTR)},
+// are not supported and will not be negotiated, even if explicitly configured.
+// When FIPS mode is enabled, only FIPS-approved algorithms are included.
+var cipherModes = map[string]*cipherMode{}
 
-	// Ciphers from RFC 4345, which introduces security-improved arcfour ciphers.
-	// They are defined in the order specified in the RFC.
-	InsecureCipherRC4128: {16, 0, streamCipherMode(1536, newRC4)},
-	InsecureCipherRC4256: {32, 0, streamCipherMode(1536, newRC4)},
+func init() {
+	cipherModes[CipherAES128CTR] = &cipherMode{16, aes.BlockSize, streamCipherMode(0, newAESCTR)}
+	cipherModes[CipherAES192CTR] = &cipherMode{24, aes.BlockSize, streamCipherMode(0, newAESCTR)}
+	cipherModes[CipherAES256CTR] = &cipherMode{32, aes.BlockSize, streamCipherMode(0, newAESCTR)}
+	//  Use of GCM with arbitrary IVs is not allowed in FIPS 140-only mode,
+	// we'll wire it up to NewGCMForSSH in Go 1.26.
+	//
+	// For now it means we'll work with fips140=on but not fips140=only.
+	cipherModes[CipherAES128GCM] = &cipherMode{16, 12, newGCMCipher}
+	cipherModes[CipherAES256GCM] = &cipherMode{32, 12, newGCMCipher}
 
-	// Cipher defined in RFC 4253, which describes SSH Transport Layer Protocol.
-	// Note that this cipher is not safe, as stated in RFC 4253: "Arcfour (and
-	// RC4) has problems with weak keys, and should be used with caution."
-	// RFC 4345 introduces improved versions of Arcfour.
-	InsecureCipherRC4: {16, 0, streamCipherMode(0, newRC4)},
+	if fips140.Enabled() {
+		defaultCiphers = slices.DeleteFunc(defaultCiphers, func(algo string) bool {
+			_, ok := cipherModes[algo]
+			return !ok
+		})
+		return
+	}
 
-	// AEAD ciphers
-	CipherAES128GCM:        {16, 12, newGCMCipher},
-	CipherAES256GCM:        {32, 12, newGCMCipher},
-	CipherChaCha20Poly1305: {64, 0, newChaCha20Cipher},
-
+	cipherModes[CipherChaCha20Poly1305] = &cipherMode{64, 0, newChaCha20Cipher}
+	// Insecure ciphers not included in the default configuration.
+	cipherModes[InsecureCipherRC4128] = &cipherMode{16, 0, streamCipherMode(1536, newRC4)}
+	cipherModes[InsecureCipherRC4256] = &cipherMode{32, 0, streamCipherMode(1536, newRC4)}
+	cipherModes[InsecureCipherRC4] = &cipherMode{16, 0, streamCipherMode(0, newRC4)}
 	// CBC mode is insecure and so is not included in the default config.
 	// (See https://www.ieee-security.org/TC/SP2013/papers/4977a526.pdf). If absolutely
 	// needed, it's possible to specify a custom Config to enable it.
 	// You should expect that an active attacker can recover plaintext if
 	// you do.
-	InsecureCipherAES128CBC: {16, aes.BlockSize, newAESCBCCipher},
-
-	// 3des-cbc is insecure and is not included in the default
-	// config.
-	InsecureCipherTripleDESCBC: {24, des.BlockSize, newTripleDESCBCCipher},
+	cipherModes[InsecureCipherAES128CBC] = &cipherMode{16, aes.BlockSize, newAESCBCCipher}
+	cipherModes[InsecureCipherTripleDESCBC] = &cipherMode{24, des.BlockSize, newTripleDESCBCCipher}
 }
 
 // prefixLen is the length of the packet prefix that contains the packet length

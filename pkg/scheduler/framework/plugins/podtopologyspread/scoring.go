@@ -19,6 +19,7 @@ package podtopologyspread
 import (
 	"context"
 	"fmt"
+	"k8s.io/klog/v2"
 	"math"
 	"sync/atomic"
 
@@ -120,6 +121,7 @@ func (pl *PodTopologySpread) PreScore(
 	pod *v1.Pod,
 	filteredNodes []fwk.NodeInfo,
 ) *fwk.Status {
+
 	allNodes, err := pl.sharedLister.NodeInfos().List()
 	if err != nil {
 		return fwk.AsStatus(fmt.Errorf("getting all nodes: %w", err))
@@ -130,6 +132,7 @@ func (pl *PodTopologySpread) PreScore(
 		return fwk.NewStatus(fwk.Skip)
 	}
 
+	logger := klog.FromContext(ctx)
 	state := &preScoreState{
 		IgnoredNodes: sets.New[string](),
 	}
@@ -167,7 +170,8 @@ func (pl *PodTopologySpread) PreScore(
 
 		for i, c := range state.Constraints {
 			if pl.enableNodeInclusionPolicyInPodTopologySpread &&
-				!c.matchNodeInclusionPolicies(pod, node, requiredNodeAffinity) {
+				!c.matchNodeInclusionPolicies(logger, pod, node, requiredNodeAffinity,
+					pl.enableTaintTolerationComparisonOperators) {
 				continue
 			}
 

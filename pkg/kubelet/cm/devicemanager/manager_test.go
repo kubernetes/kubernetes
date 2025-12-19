@@ -2137,3 +2137,57 @@ func TestAdmitPodWithDRAResources(t *testing.T) {
 		})
 	}
 }
+
+// TestEndpointSyncOnDisconnect verifies that when a device plugin disconnects,
+// the device manager correctly updates its internal state by marking all
+// devices from that endpoint as unhealthy. It ensures that the healthyDevices
+// and unhealthyDevices maps are in sync with the plugin endpoint info.
+func TestEndpointSyncOnDisconnect(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	socketDir, socketName, _, err := tmpSocketDir()
+	require.NoError(t, err)
+	defer func() {
+		if err := os.RemoveAll(socketDir); err != nil {
+			logger.Error(err, "unable to remove socket directory", "dir", socketDir)
+		}
+	}()
+
+	manager, err := newManagerImpl(logger, socketName, nil, nil)
+	require.NoError(t, err)
+
+	resourceName := "domain1.com/resource1"
+	ep := &endpointImpl{
+		resourceName: resourceName,
+		client:       plugin.NewPluginClient(resourceName, socketName, manager),
+		stopTime:     time.Now().Add(-endpointStopGracePeriod * 2), // make the grace period expired
+	}
+
+	manager.endpoints[resourceName] = endpointInfo{e: ep, opts: nil}
+	devs := []*pluginapi.Device{
+		{ID: "Device1", Health: pluginapi.Healthy},
+		{ID: "Device2", Health: pluginapi.Healthy},
+		{ID: "Device3", Health: pluginapi.Unhealthy},
+	}
+	manager.genericDeviceUpdateCallback(logger, resourceName, devs)
+
+	// Disconnect should result in all devices for this resource
+	// moved to the unhealthy set.
+	err = ep.client.Disconnect(logger)
+	require.NoError(t, err)
+
+	require.Contains(t, manager.endpoints, resourceName)
+	require.Contains(t, manager.healthyDevices, resourceName)
+	require.Contains(t, manager.unhealthyDevices, resourceName)
+	require.Len(t, manager.endpoints, 1)
+	require.Empty(t, manager.healthyDevices[resourceName])
+	require.Equal(t, len(devs), manager.unhealthyDevices[resourceName].Len())
+
+	// Expire endpoint to shorten the test
+	ep.stopTime = time.Now().Add(-endpointStopGracePeriod * 2)
+	// Call GetCapacity to trigger https://github.com/kubernetes/kubernetes/issues/133702
+	manager.GetCapacity()
+
+	require.Empty(t, manager.endpoints)
+	require.Empty(t, manager.healthyDevices)
+	require.Empty(t, manager.unhealthyDevices)
+}

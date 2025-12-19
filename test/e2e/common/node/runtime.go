@@ -21,11 +21,11 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -260,127 +260,131 @@ while true; do sleep 1; done
 
 		framework.Context("when running a container with a new image", framework.WithSerial(), func() {
 			var registryAddress string
+			var registryNodeNames []string
+			var pullSecret *v1.Secret
 			ginkgo.BeforeEach(func(ctx context.Context) {
 				var err error
 
-				registryAddress, _, err = e2eregistry.SetupRegistry(ctx, f, false)
+				registryAddress, registryNodeNames, err = e2eregistry.SetupRegistry(ctx, f, true)
 				framework.ExpectNoError(err)
+				gomega.Expect(registryNodeNames).ToNot(gomega.BeEmpty())
 				// we need to wait for the registry to be removed and so we need to delete the whole NS ourselves
 				ginkgo.DeferCleanup(func(ctx context.Context) {
 					f.DeleteNamespace(ctx, f.Namespace.Name)
 				})
-			})
 
-			// Images used for ConformanceContainer are not added into NodePrePullImageList, because this test is
-			// testing image pulling, these images don't need to be prepulled. The ImagePullPolicy
-			// is v1.PullAlways, so it won't be blocked by framework image pre-pull list check.
-			imagePullTest := func(ctx context.Context, image string, hasSecret bool, expectedPhase v1.PodPhase, expectedPullStatus bool) {
-				container := ConformanceContainer{
-					PodClient: e2epod.NewPodClient(f),
-					Container: v1.Container{
-						Name:            "image-pull-test",
-						Image:           image,
-						ImagePullPolicy: v1.PullAlways,
-					},
-					RestartPolicy: v1.RestartPolicyNever,
-				}
-				if hasSecret {
-					secret := e2eregistry.User1DockerSecret(registryAddress)
-					secret.Name = "image-pull-secret-" + string(uuid.NewUUID())
-					// we might be told to use a different docker config JSON.
-					if framework.TestContext.DockerConfigFile != "" {
-						contents, err := os.ReadFile(framework.TestContext.DockerConfigFile)
-						framework.ExpectNoError(err)
-						secret.Data[v1.DockerConfigJsonKey] = contents
-					}
-					ginkgo.By("create image pull secret")
-					_, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(ctx, secret, metav1.CreateOptions{})
+				secret := e2eregistry.User1DockerSecret(registryAddress)
+				secret.Name = "image-pull-secret-" + string(uuid.NewUUID())
+				// we might be told to use a different docker config JSON.
+				if framework.TestContext.DockerConfigFile != "" {
+					contents, err := os.ReadFile(framework.TestContext.DockerConfigFile)
 					framework.ExpectNoError(err)
-					ginkgo.DeferCleanup(framework.IgnoreNotFound(f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Delete), secret.Name, metav1.DeleteOptions{})
-					container.ImagePullSecrets = []string{secret.Name}
+					secret.Data[v1.DockerConfigJsonKey] = contents
 				}
-				// checkContainerStatus checks whether the container status matches expectation.
-				checkContainerStatus := func(ctx context.Context) error {
-					status, err := container.GetStatus(ctx)
-					if err != nil {
-						return fmt.Errorf("failed to get container status: %w", err)
-					}
-					// We need to check container state first. The default pod status is pending, If we check pod phase first,
-					// and the expected pod phase is Pending, the container status may not even show up when we check it.
-					// Check container state
-					if !expectedPullStatus {
-						if status.State.Running == nil {
-							return fmt.Errorf("expected container state: Running, got: %q",
-								GetContainerState(status.State))
-						}
-					}
-					if expectedPullStatus {
-						if status.State.Waiting == nil {
-							gomega.Expect(status.State.Running).To(gomega.BeNil())
-							return fmt.Errorf("expected container state: Waiting, got: %q",
-								GetContainerState(status.State))
-						}
-						reason := status.State.Waiting.Reason
-						if reason != images.ErrImagePull.Error() &&
-							reason != images.ErrImagePullBackOff.Error() {
-							return fmt.Errorf("unexpected waiting reason: %q", reason)
-						}
-					}
-					// Check pod phase
-					phase, err := container.GetPhase(ctx)
-					if err != nil {
-						return fmt.Errorf("failed to get pod phase: %w", err)
-					}
-					if phase != expectedPhase {
-						return fmt.Errorf("expected pod phase: %q, got: %q", expectedPhase, phase)
-					}
-					return nil
-				}
-
-				// The image registry is not stable, which sometimes causes the test to fail. Add retry mechanism to make this less flaky.
-				const flakeRetry = 3
-				for i := 1; i <= flakeRetry; i++ {
-					var err error
-					ginkgo.By("create the container")
-					container.Create(ctx)
-					ginkgo.By("check the container status")
-					for start := time.Now(); time.Since(start) < ContainerStatusRetryTimeout; time.Sleep(ContainerStatusPollInterval) {
-						if err = checkContainerStatus(ctx); err == nil {
-							break
-						}
-					}
-					ginkgo.By("delete the container")
-					_ = container.Delete(ctx)
-					if err == nil {
-						break
-					}
-					if i < flakeRetry {
-						framework.Logf("No.%d attempt failed: %v, retrying...", i, err)
-					} else {
-						framework.Failf("All %d attempts failed: %v", flakeRetry, err)
-					}
-				}
-			}
+				ginkgo.By("create image pull secret")
+				pullSecret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(ctx, secret, metav1.CreateOptions{})
+				framework.ExpectNoError(err)
+			})
 
 			f.It("should not be able to pull image from invalid registry", f.WithNodeConformance(), func(ctx context.Context) {
 				image := imageutils.GetE2EImage(imageutils.InvalidRegistryImage)
-				imagePullTest(ctx, image, false, v1.PodPending, true)
+				_ = ImagePullTest(ctx, f, image, v1.PullAlways, nil, registryNodeNames[0], v1.PodPending, true)
 			})
 
 			f.It("should be able to pull image", f.WithNodeConformance(), func(ctx context.Context) {
 				image := imageutils.GetE2EImage(imageutils.Agnhost)
-				imagePullTest(ctx, image, false, v1.PodRunning, false)
+				_ = ImagePullTest(ctx, f, image, v1.PullAlways, nil, registryNodeNames[0], v1.PodRunning, false)
 			})
 
 			f.It("should not be able to pull from private registry without secret", f.WithNodeConformance(), func(ctx context.Context) {
 				image := registryAddress + "/pause:testing"
-				imagePullTest(ctx, image, false, v1.PodPending, true)
+				_ = ImagePullTest(ctx, f, image, v1.PullAlways, nil, registryNodeNames[0], v1.PodPending, true)
 			})
 
 			f.It("should be able to pull from private registry with secret", f.WithNodeConformance(), func(ctx context.Context) {
 				image := registryAddress + "/pause:testing"
-				imagePullTest(ctx, image, true, v1.PodRunning, false)
+				_ = ImagePullTest(ctx, f, image, v1.PullAlways, pullSecret, registryNodeNames[0], v1.PodRunning, false)
 			})
 		})
 	})
 })
+
+// Images used by imagePullTest are not added to NodePrePullImageList because this test is
+// specifically testing image pulling behavior. The containers use ImagePullPolicy values other
+// than PullNever, so the framework allows them to be pulled during the test.
+func ImagePullTest(ctx context.Context, f *framework.Framework, image string, imagePullPolicy v1.PullPolicy, pullSecret *v1.Secret, nodeName string, expectedPhase v1.PodPhase, expectedPullStatus bool) *v1.Pod {
+	container := ConformanceContainer{
+		PodClient: e2epod.NewPodClient(f),
+		NodeName:  nodeName,
+		Container: v1.Container{
+			Name:            "image-pull-test",
+			Image:           image,
+			ImagePullPolicy: imagePullPolicy,
+		},
+		RestartPolicy: v1.RestartPolicyNever,
+	}
+	if pullSecret != nil {
+		container.ImagePullSecrets = []string{pullSecret.Name}
+	}
+	// checkContainerStatus checks whether the container status matches expectation.
+	checkContainerStatus := func(ctx context.Context) error {
+		status, err := container.GetStatus(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get container status: %w", err)
+		}
+		// We need to check container state first. The default pod status is pending, If we check pod phase first,
+		// and the expected pod phase is Pending, the container status may not even show up when we check it.
+		// Check container state
+		if !expectedPullStatus {
+			if status.State.Running == nil {
+				return fmt.Errorf("expected container state: Running, got: %q",
+					GetContainerState(status.State))
+			}
+		}
+		if expectedPullStatus {
+			if status.State.Waiting == nil {
+				gomega.Expect(status.State.Running).To(gomega.BeNil())
+				return fmt.Errorf("expected container state: Waiting, got: %q",
+					GetContainerState(status.State))
+			}
+			reason := status.State.Waiting.Reason
+			if reason != images.ErrImagePull.Error() &&
+				reason != images.ErrImagePullBackOff.Error() &&
+				reason != images.ErrImageNeverPull.Error() {
+				return fmt.Errorf("unexpected waiting reason: %q", reason)
+			}
+		}
+		// Check pod phase
+		phase, err := container.GetPhase(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get pod phase: %w", err)
+		}
+		if phase != expectedPhase {
+			return fmt.Errorf("expected pod phase: %q, got: %q", expectedPhase, phase)
+		}
+		return nil
+	}
+
+	ginkgo.By("create the container")
+	testPod := container.Create(ctx)
+	ginkgo.DeferCleanup(func(ctx context.Context) {
+		ginkgo.By("delete the conformance container")
+		if err := container.Delete(ctx); err != nil {
+			framework.Logf("error deleting a conformance container: %v", err)
+		}
+	})
+
+	ginkgo.By("check the container status")
+	var latestErr error
+	err := wait.PollUntilContextCancel(ctx, ContainerStatusPollInterval, true, func(ctx context.Context) (bool, error) {
+		if latestErr = checkContainerStatus(ctx); latestErr != nil {
+			return false, nil
+		}
+		return true, nil
+	})
+	if err != nil {
+		framework.Failf("Failed to read container status: %v; last observed error from wait loop: %v", err, latestErr)
+	}
+
+	return testPod
+}

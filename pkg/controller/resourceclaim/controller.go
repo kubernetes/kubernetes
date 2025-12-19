@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -411,11 +412,6 @@ func (ec *Controller) enqueueResourceClaim(logger klog.Logger, oldObj, newObj in
 
 func (ec *Controller) Run(ctx context.Context, workers int) {
 	defer runtime.HandleCrashWithContext(ctx)
-	defer ec.queue.ShutDown()
-
-	logger := klog.FromContext(ctx)
-	logger.Info("Starting resource claim controller")
-	defer logger.Info("Shutting down resource claim controller")
 
 	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	eventBroadcaster.StartLogging(klog.Infof)
@@ -423,14 +419,25 @@ func (ec *Controller) Run(ctx context.Context, workers int) {
 	ec.recorder = eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "resource_claim"})
 	defer eventBroadcaster.Shutdown()
 
+	logger := klog.FromContext(ctx)
+	logger.Info("Starting resource claim controller")
+
+	var wg sync.WaitGroup
+	defer func() {
+		logger.Info("Shutting down resource claim controller")
+		ec.queue.ShutDown()
+		wg.Wait()
+	}()
+
 	if !cache.WaitForNamedCacheSyncWithContext(ctx, ec.podSynced, ec.claimsSynced, ec.templatesSynced) {
 		return
 	}
 
 	for i := 0; i < workers; i++ {
-		go wait.UntilWithContext(ctx, ec.runWorker, time.Second)
+		wg.Go(func() {
+			wait.UntilWithContext(ctx, ec.runWorker, time.Second)
+		})
 	}
-
 	<-ctx.Done()
 }
 
@@ -1029,7 +1036,7 @@ func (collector *customCollector) DescribeWithStability(ch chan<- *metrics.Desc)
 }
 
 func (collector *customCollector) CollectWithStability(ch chan<- metrics.Metric) {
-	allocateMetrics := make(map[string]map[string]int)
+	rcMetrics := make(map[resourceclaimmetrics.NumResourceClaimLabels]int)
 	rcList, err := collector.rcLister.List(labels.Everything())
 	if err != nil {
 		collector.logger.Error(err, "failed to list resource claims for metrics collection")
@@ -1042,14 +1049,22 @@ func (collector *customCollector) CollectWithStability(ch chan<- metrics.Metric)
 			allocated = "true"
 		}
 		adminAccess := collector.adminAccessFunc(rc)
-		if allocateMetrics[allocated] == nil {
-			allocateMetrics[allocated] = make(map[string]int)
+		source := ""
+		if val, ok := rc.Annotations[resourceapi.ExtendedResourceClaimAnnotation]; ok && val == "true" {
+			source = "extended_resource"
+		} else if val, ok := rc.Annotations[podResourceClaimAnnotation]; ok && val != "" {
+			source = "resource_claim_template"
 		}
-		allocateMetrics[allocated][adminAccess]++
+		rcMetrics[resourceclaimmetrics.NumResourceClaimLabels{Allocated: allocated, AdminAccess: adminAccess, Source: source}]++
 	}
-	for allocated, adminAccessMap := range allocateMetrics {
-		for adminAccess, count := range adminAccessMap {
-			ch <- metrics.NewLazyConstMetric(resourceclaimmetrics.NumResourceClaimsDesc, metrics.GaugeValue, float64(count), allocated, adminAccess)
-		}
+	for rcLabels, count := range rcMetrics {
+		ch <- metrics.NewLazyConstMetric(
+			resourceclaimmetrics.NumResourceClaimsDesc,
+			metrics.GaugeValue,
+			float64(count),
+			rcLabels.Allocated,
+			rcLabels.AdminAccess,
+			rcLabels.Source,
+		)
 	}
 }

@@ -34,10 +34,13 @@ var _ State = &stateMemory{}
 
 // NewStateMemory creates new State to track resources resourcesated to pods
 func NewStateMemory(resources PodResourceInfoMap) State {
+	// Use klog.TODO() because we currently do not have a proper logger to pass in.
+	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
+	logger := klog.TODO()
 	if resources == nil {
 		resources = PodResourceInfoMap{}
 	}
-	klog.V(2).InfoS("Initialized new in-memory state store for pod resource information tracking")
+	logger.V(2).Info("Initialized new in-memory state store for pod resource information tracking")
 	return &stateMemory{
 		podResources: resources,
 	}
@@ -59,6 +62,19 @@ func (s *stateMemory) GetContainerResources(podUID types.UID, containerName stri
 	return *resources.DeepCopy(), ok
 }
 
+// GetPodLevelResources returns current resources information at pod-level
+func (s *stateMemory) GetPodLevelResources(podUID types.UID) (*v1.ResourceRequirements, bool) {
+	s.RLock()
+	defer s.RUnlock()
+
+	pr, ok := s.podResources[podUID]
+	if !ok {
+		return nil, ok
+	}
+
+	return pr.PodLevelResources.DeepCopy(), ok
+}
+
 func (s *stateMemory) GetPodResourceInfoMap() PodResourceInfoMap {
 	s.RLock()
 	defer s.RUnlock()
@@ -74,34 +90,68 @@ func (s *stateMemory) GetPodResourceInfo(podUID types.UID) (PodResourceInfo, boo
 }
 
 func (s *stateMemory) SetContainerResources(podUID types.UID, containerName string, resources v1.ResourceRequirements) error {
+	// Use klog.TODO() because we currently do not have a proper logger to pass in.
+	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
+	logger := klog.TODO()
+
 	s.Lock()
 	defer s.Unlock()
 
-	if _, ok := s.podResources[podUID]; !ok {
-		s.podResources[podUID] = PodResourceInfo{
+	podInfo, ok := s.podResources[podUID]
+	if !ok {
+		podInfo = PodResourceInfo{
 			ContainerResources: make(map[string]v1.ResourceRequirements),
 		}
 	}
 
-	s.podResources[podUID].ContainerResources[containerName] = resources
-	klog.V(3).InfoS("Updated container resource information", "podUID", podUID, "containerName", containerName, "resources", resources)
+	if podInfo.ContainerResources == nil {
+		podInfo.ContainerResources = make(map[string]v1.ResourceRequirements)
+	}
+
+	podInfo.ContainerResources[containerName] = resources
+	s.podResources[podUID] = podInfo
+
+	logger.V(3).Info("Updated container resource information", "podUID", podUID, "containerName", containerName, "resources", resources)
 	return nil
 }
 
-func (s *stateMemory) SetPodResourceInfo(podUID types.UID, resourceInfo PodResourceInfo) error {
+func (s *stateMemory) SetPodLevelResources(podUID types.UID, resources *v1.ResourceRequirements) error {
+	// Use klog.TODO() because we currently do not have a proper logger to pass in.
+	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
+	logger := klog.TODO()
+	s.Lock()
+	defer s.Unlock()
+
+	podInfo, ok := s.podResources[podUID]
+	if !ok {
+		podInfo.PodLevelResources = &v1.ResourceRequirements{}
+	}
+
+	podInfo.PodLevelResources = resources
+
+	s.podResources[podUID] = podInfo
+
+	logger.V(3).Info("Updated pod-level resource info", "podUID", podUID, "resources", resources)
+	return nil
+}
+
+func (s *stateMemory) SetPodResourceInfo(logger klog.Logger, podUID types.UID, resourceInfo PodResourceInfo) error {
 	s.Lock()
 	defer s.Unlock()
 
 	s.podResources[podUID] = resourceInfo
-	klog.V(3).InfoS("Updated pod resource information", "podUID", podUID, "information", resourceInfo)
+	logger.V(3).Info("Updated pod resource information", "podUID", podUID, "information", resourceInfo)
 	return nil
 }
 
 func (s *stateMemory) RemovePod(podUID types.UID) error {
+	// Use klog.TODO() because we currently do not have a proper logger to pass in.
+	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
+	logger := klog.TODO()
 	s.Lock()
 	defer s.Unlock()
 	delete(s.podResources, podUID)
-	klog.V(3).InfoS("Deleted pod resource information", "podUID", podUID)
+	logger.V(3).Info("Deleted pod resource information", "podUID", podUID)
 	return nil
 }
 

@@ -75,6 +75,20 @@ type PodCertificateProjectionApplyConfiguration struct {
 	// and leaf certificate are consistent, because it is possible to read the
 	// files mid-rotation.
 	CertificateChainPath *string `json:"certificateChainPath,omitempty"`
+	// userAnnotations allow pod authors to pass additional information to
+	// the signer implementation.  Kubernetes does not restrict or validate this
+	// metadata in any way.
+	//
+	// These values are copied verbatim into the `spec.unverifiedUserAnnotations` field of
+	// the PodCertificateRequest objects that Kubelet creates.
+	//
+	// Entries are subject to the same validation as object metadata annotations,
+	// with the addition that all keys must be domain-prefixed. No restrictions
+	// are placed on values, except an overall size limitation on the entire field.
+	//
+	// Signers should document the keys and values they support. Signers should
+	// deny requests that contain keys they do not recognize.
+	UserAnnotations map[string]string `json:"userAnnotations,omitempty"`
 }
 
 // PodCertificateProjectionApplyConfiguration constructs a declarative configuration of the PodCertificateProjection type for use with
@@ -128,5 +142,19 @@ func (b *PodCertificateProjectionApplyConfiguration) WithKeyPath(value string) *
 // If called multiple times, the CertificateChainPath field is set to the value of the last call.
 func (b *PodCertificateProjectionApplyConfiguration) WithCertificateChainPath(value string) *PodCertificateProjectionApplyConfiguration {
 	b.CertificateChainPath = &value
+	return b
+}
+
+// WithUserAnnotations puts the entries into the UserAnnotations field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the entries provided by each call will be put on the UserAnnotations field,
+// overwriting an existing map entries in UserAnnotations field with the same key.
+func (b *PodCertificateProjectionApplyConfiguration) WithUserAnnotations(entries map[string]string) *PodCertificateProjectionApplyConfiguration {
+	if b.UserAnnotations == nil && len(entries) > 0 {
+		b.UserAnnotations = make(map[string]string, len(entries))
+	}
+	for k, v := range entries {
+		b.UserAnnotations[k] = v
+	}
 	return b
 }

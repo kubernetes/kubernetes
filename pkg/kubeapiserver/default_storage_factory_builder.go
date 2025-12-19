@@ -38,7 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/networking"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/resource"
-	"k8s.io/kubernetes/pkg/apis/storage"
+	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/apis/storagemigration"
 )
 
@@ -84,10 +84,10 @@ func NewStorageFactoryConfigEffectiveVersion(effectiveVersion basecompatibility.
 		admissionregistration.Resource("mutatingadmissionpolicies").WithVersion("v1beta1"),
 		admissionregistration.Resource("mutatingadmissionpolicybindings").WithVersion("v1beta1"),
 		certificates.Resource("clustertrustbundles").WithVersion("v1beta1"),
-		certificates.Resource("podcertificaterequests").WithVersion("v1alpha1"),
-		storage.Resource("volumeattributesclasses").WithVersion("v1beta1"),
+		certificates.Resource("podcertificaterequests").WithVersion("v1beta1"),
 		storagemigration.Resource("storagemigrations").WithVersion("v1beta1"),
 		resource.Resource("devicetaintrules").WithVersion("v1alpha3"),
+		scheduling.Resource("workloads").WithVersion("v1alpha1"),
 	}
 
 	return &StorageFactoryConfig{

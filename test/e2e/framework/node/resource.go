@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"k8s.io/klog/v2"
 	"net"
 	"strings"
 	"time"
@@ -325,12 +326,13 @@ func GetPublicIps(ctx context.Context, c clientset.Interface) ([]string, error) 
 // If EITHER 1 or 2 is not true, most tests will want to ignore the node entirely.
 // If there are no nodes that are both ready and schedulable, this will return an error.
 func GetReadySchedulableNodes(ctx context.Context, c clientset.Interface) (nodes *v1.NodeList, err error) {
+	logger := klog.FromContext(ctx)
 	nodes, err = checkWaitListSchedulableNodes(ctx, c)
 	if err != nil {
 		return nil, fmt.Errorf("listing schedulable nodes error: %w", err)
 	}
 	Filter(nodes, func(node v1.Node) bool {
-		return IsNodeSchedulable(&node) && isNodeUntainted(&node)
+		return IsNodeSchedulable(logger, &node) && isNodeUntainted(logger, &node)
 	})
 	if len(nodes.Items) == 0 {
 		return nil, fmt.Errorf("there are currently no ready, schedulable nodes in the cluster")
@@ -374,25 +376,26 @@ func GetRandomReadySchedulableNode(ctx context.Context, c clientset.Interface) (
 // E.g. in tests related to nodes with gpu we care about nodes despite
 // presence of nvidia.com/gpu=present:NoSchedule taint
 func GetReadyNodesIncludingTainted(ctx context.Context, c clientset.Interface) (nodes *v1.NodeList, err error) {
+	logger := klog.FromContext(ctx)
 	nodes, err = checkWaitListSchedulableNodes(ctx, c)
 	if err != nil {
 		return nil, fmt.Errorf("listing schedulable nodes error: %w", err)
 	}
 	Filter(nodes, func(node v1.Node) bool {
-		return IsNodeSchedulable(&node)
+		return IsNodeSchedulable(logger, &node)
 	})
 	return nodes, nil
 }
 
 // isNodeUntainted tests whether a fake pod can be scheduled on "node", given its current taints.
 // TODO: need to discuss wether to return bool and error type
-func isNodeUntainted(node *v1.Node) bool {
-	return isNodeUntaintedWithNonblocking(node, "")
+func isNodeUntainted(logger klog.Logger, node *v1.Node) bool {
+	return isNodeUntaintedWithNonblocking(logger, node, "")
 }
 
 // isNodeUntaintedWithNonblocking tests whether a fake pod can be scheduled on "node"
 // but allows for taints in the list of non-blocking taints.
-func isNodeUntaintedWithNonblocking(node *v1.Node, nonblockingTaints string) bool {
+func isNodeUntaintedWithNonblocking(logger klog.Logger, node *v1.Node, nonblockingTaints string) bool {
 	// Simple lookup for nonblocking taints based on comma-delimited list.
 	nonblockingTaintsMap := map[string]struct{}{}
 	for _, t := range strings.Split(nonblockingTaints, ",") {
@@ -413,10 +416,10 @@ func isNodeUntaintedWithNonblocking(node *v1.Node, nonblockingTaints string) boo
 		n = nodeCopy
 	}
 
-	return toleratesTaintsWithNoScheduleNoExecuteEffects(n.Spec.Taints, nil)
+	return toleratesTaintsWithNoScheduleNoExecuteEffects(logger, n.Spec.Taints, nil)
 }
 
-func toleratesTaintsWithNoScheduleNoExecuteEffects(taints []v1.Taint, tolerations []v1.Toleration) bool {
+func toleratesTaintsWithNoScheduleNoExecuteEffects(logger klog.Logger, taints []v1.Taint, tolerations []v1.Toleration) bool {
 	filteredTaints := []v1.Taint{}
 	for _, taint := range taints {
 		if taint.Effect == v1.TaintEffectNoExecute || taint.Effect == v1.TaintEffectNoSchedule {
@@ -426,7 +429,8 @@ func toleratesTaintsWithNoScheduleNoExecuteEffects(taints []v1.Taint, toleration
 
 	toleratesTaint := func(taint v1.Taint) bool {
 		for _, toleration := range tolerations {
-			if toleration.ToleratesTaint(&taint) {
+			//	TaintTolerationComparisonOperators feature gate will be false for e2e since the feature is in Alpha.
+			if toleration.ToleratesTaint(logger, &taint, false) {
 				return true
 			}
 		}
@@ -446,17 +450,18 @@ func toleratesTaintsWithNoScheduleNoExecuteEffects(taints []v1.Taint, toleration
 // IsNodeSchedulable returns true if:
 // 1) doesn't have "unschedulable" field set
 // 2) it also returns true from IsNodeReady
-func IsNodeSchedulable(node *v1.Node) bool {
+func IsNodeSchedulable(logger klog.Logger, node *v1.Node) bool {
 	if node == nil {
 		return false
 	}
-	return !node.Spec.Unschedulable && IsNodeReady(node)
+
+	return !node.Spec.Unschedulable && IsNodeReady(logger, node)
 }
 
 // IsNodeReady returns true if:
 // 1) it's Ready condition is set to true
 // 2) doesn't have NetworkUnavailable condition set to true
-func IsNodeReady(node *v1.Node) bool {
+func IsNodeReady(logger klog.Logger, node *v1.Node) bool {
 	nodeReady := IsConditionSetAsExpected(node, v1.NodeReady, true)
 	networkReady := isConditionUnset(node, v1.NodeNetworkUnavailable) ||
 		IsConditionSetAsExpectedSilent(node, v1.NodeNetworkUnavailable, false)
@@ -467,8 +472,8 @@ func IsNodeReady(node *v1.Node) bool {
 // 1) doesn't have "unschedulable" field set
 // 2) it also returns true from IsNodeReady
 // 3) it also returns true from isNodeUntainted
-func isNodeSchedulableWithoutTaints(node *v1.Node) bool {
-	return IsNodeSchedulable(node) && isNodeUntainted(node)
+func isNodeSchedulableWithoutTaints(logger klog.Logger, node *v1.Node) bool {
+	return IsNodeSchedulable(logger, node) && isNodeUntainted(logger, node)
 }
 
 // hasNonblockingTaint returns true if the node contains at least

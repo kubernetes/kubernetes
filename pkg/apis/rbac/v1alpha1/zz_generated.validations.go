@@ -82,27 +82,27 @@ func Validate_ClusterRoleBinding(ctx context.Context, op operation.Operation, fl
 
 	// field rbacv1alpha1.ClusterRoleBinding.Subjects
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []rbacv1alpha1.Subject) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj []rbacv1alpha1.Subject, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
 			// iterate the list and call the type's validation function
 			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_Subject)...)
 			return
-		}(fldPath.Child("subjects"), obj.Subjects, safe.Field(oldObj, func(oldObj *rbacv1alpha1.ClusterRoleBinding) []rbacv1alpha1.Subject { return oldObj.Subjects }))...)
+		}(fldPath.Child("subjects"), obj.Subjects, safe.Field(oldObj, func(oldObj *rbacv1alpha1.ClusterRoleBinding) []rbacv1alpha1.Subject { return oldObj.Subjects }), oldObj != nil)...)
 
 	// field rbacv1alpha1.ClusterRoleBinding.RoleRef
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *rbacv1alpha1.RoleRef) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *rbacv1alpha1.RoleRef, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_RoleRef(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("roleRef"), &obj.RoleRef, safe.Field(oldObj, func(oldObj *rbacv1alpha1.ClusterRoleBinding) *rbacv1alpha1.RoleRef { return &oldObj.RoleRef }))...)
+		}(fldPath.Child("roleRef"), &obj.RoleRef, safe.Field(oldObj, func(oldObj *rbacv1alpha1.ClusterRoleBinding) *rbacv1alpha1.RoleRef { return &oldObj.RoleRef }), oldObj != nil)...)
 
 	return errs
 }
@@ -115,9 +115,9 @@ func Validate_ClusterRoleBindingList(ctx context.Context, op operation.Operation
 
 	// field rbacv1alpha1.ClusterRoleBindingList.Items
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []rbacv1alpha1.ClusterRoleBinding) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj []rbacv1alpha1.ClusterRoleBinding, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
 			// iterate the list and call the type's validation function
@@ -125,7 +125,7 @@ func Validate_ClusterRoleBindingList(ctx context.Context, op operation.Operation
 			return
 		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *rbacv1alpha1.ClusterRoleBindingList) []rbacv1alpha1.ClusterRoleBinding {
 			return oldObj.Items
-		}))...)
+		}), oldObj != nil)...)
 
 	return errs
 }
@@ -138,27 +138,27 @@ func Validate_RoleBinding(ctx context.Context, op operation.Operation, fldPath *
 
 	// field rbacv1alpha1.RoleBinding.Subjects
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []rbacv1alpha1.Subject) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj []rbacv1alpha1.Subject, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
 			// iterate the list and call the type's validation function
 			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_Subject)...)
 			return
-		}(fldPath.Child("subjects"), obj.Subjects, safe.Field(oldObj, func(oldObj *rbacv1alpha1.RoleBinding) []rbacv1alpha1.Subject { return oldObj.Subjects }))...)
+		}(fldPath.Child("subjects"), obj.Subjects, safe.Field(oldObj, func(oldObj *rbacv1alpha1.RoleBinding) []rbacv1alpha1.Subject { return oldObj.Subjects }), oldObj != nil)...)
 
 	// field rbacv1alpha1.RoleBinding.RoleRef
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *rbacv1alpha1.RoleRef) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *rbacv1alpha1.RoleRef, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_RoleRef(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("roleRef"), &obj.RoleRef, safe.Field(oldObj, func(oldObj *rbacv1alpha1.RoleBinding) *rbacv1alpha1.RoleRef { return &oldObj.RoleRef }))...)
+		}(fldPath.Child("roleRef"), &obj.RoleRef, safe.Field(oldObj, func(oldObj *rbacv1alpha1.RoleBinding) *rbacv1alpha1.RoleRef { return &oldObj.RoleRef }), oldObj != nil)...)
 
 	return errs
 }
@@ -171,15 +171,15 @@ func Validate_RoleBindingList(ctx context.Context, op operation.Operation, fldPa
 
 	// field rbacv1alpha1.RoleBindingList.Items
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []rbacv1alpha1.RoleBinding) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj []rbacv1alpha1.RoleBinding, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
 			// iterate the list and call the type's validation function
 			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_RoleBinding)...)
 			return
-		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *rbacv1alpha1.RoleBindingList) []rbacv1alpha1.RoleBinding { return oldObj.Items }))...)
+		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *rbacv1alpha1.RoleBindingList) []rbacv1alpha1.RoleBinding { return oldObj.Items }), oldObj != nil)...)
 
 	return errs
 }
@@ -192,9 +192,9 @@ func Validate_RoleRef(ctx context.Context, op operation.Operation, fldPath *fiel
 
 	// field rbacv1alpha1.RoleRef.Name
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call field-attached validations
@@ -207,7 +207,7 @@ func Validate_RoleRef(ctx context.Context, op operation.Operation, fldPath *fiel
 				return // do not proceed
 			}
 			return
-		}(fldPath.Child("name"), &obj.Name, safe.Field(oldObj, func(oldObj *rbacv1alpha1.RoleRef) *string { return &oldObj.Name }))...)
+		}(fldPath.Child("name"), &obj.Name, safe.Field(oldObj, func(oldObj *rbacv1alpha1.RoleRef) *string { return &oldObj.Name }), oldObj != nil)...)
 
 	return errs
 }
@@ -220,9 +220,9 @@ func Validate_Subject(ctx context.Context, op operation.Operation, fldPath *fiel
 
 	// field rbacv1alpha1.Subject.Name
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call field-attached validations
@@ -235,7 +235,7 @@ func Validate_Subject(ctx context.Context, op operation.Operation, fldPath *fiel
 				return // do not proceed
 			}
 			return
-		}(fldPath.Child("name"), &obj.Name, safe.Field(oldObj, func(oldObj *rbacv1alpha1.Subject) *string { return &oldObj.Name }))...)
+		}(fldPath.Child("name"), &obj.Name, safe.Field(oldObj, func(oldObj *rbacv1alpha1.Subject) *string { return &oldObj.Name }), oldObj != nil)...)
 
 	// field rbacv1alpha1.Subject.Namespace has no validation
 	return errs

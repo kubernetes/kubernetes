@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2025 The Kubernetes Authors.
@@ -32,6 +31,13 @@ func IsInPlacePodVerticalScalingAllowed(pod *v1.Pod) (allowed bool, msg, reason 
 	}
 	if kubetypes.IsStaticPod(pod) {
 		return false, "In-place resize of static-pods is not supported", "static_pod"
+	}
+	return true, "", ""
+}
+
+func IsInPlacePodLevelResourcesVerticalScalingAllowed(pod *v1.Pod) (allowed bool, msg, reason string) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
+		return false, "InPlacePodLevelResourcesVerticalScaling is disabled", "plr_feature_gate_off"
 	}
 	return true, "", ""
 }

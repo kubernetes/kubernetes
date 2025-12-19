@@ -247,8 +247,25 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 		if !w.containerID.IsEmpty() {
 			w.resultsManager.Remove(w.containerID)
 		}
+
 		w.containerID = kubecontainer.ParseContainerID(c.ContainerID)
-		w.resultsManager.Set(w.containerID, w.initialValue, w.pod)
+		if !utilfeature.DefaultFeatureGate.Enabled(features.ChangeContainerStatusOnKubeletRestart) {
+			// On kubelet restart, we don't want to immediately set the probe result to Failure,
+			// as this could cause a container that was Ready to become NotReady.
+			isRestart := false
+			if c.State.Running != nil {
+				containerStartTime := c.State.Running.StartedAt.Time
+				if !containerStartTime.IsZero() && containerStartTime.Before(kubeletRestartGracePeriod(w.probeManager.start)) {
+					isRestart = true
+				}
+			}
+			if !isRestart {
+				w.resultsManager.Set(w.containerID, w.initialValue, w.pod)
+			}
+		} else {
+			w.resultsManager.Set(w.containerID, w.initialValue, w.pod)
+		}
+
 		// We've got a new container; resume probing.
 		w.onHold = false
 	}
@@ -273,7 +290,9 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 			if c.State.Terminated == nil {
 				return true
 			}
-			return podutil.ContainerShouldRestart(w.container, w.pod.Spec, c.State.Terminated.ExitCode)
+			containerShouldRestart := podutil.ContainerShouldRestart(w.container, w.pod.Spec, c.State.Terminated.ExitCode)
+			allContainersRestarting := utilfeature.DefaultFeatureGate.Enabled(features.RestartAllContainersOnContainerExits) && kubecontainer.ShouldAllContainersRestart(w.pod, nil, &status)
+			return containerShouldRestart || allContainersRestarting
 		}
 		return c.State.Terminated == nil ||
 			w.pod.Spec.RestartPolicy != v1.RestartPolicyNever ||

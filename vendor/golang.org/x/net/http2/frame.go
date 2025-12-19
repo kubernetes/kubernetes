@@ -280,6 +280,8 @@ type Framer struct {
 	// lastHeaderStream is non-zero if the last frame was an
 	// unfinished HEADERS/CONTINUATION.
 	lastHeaderStream uint32
+	// lastFrameType holds the type of the last frame for verifying frame order.
+	lastFrameType FrameType
 
 	maxReadSize uint32
 	headerBuf   [frameHeaderLen]byte
@@ -347,7 +349,7 @@ func (fr *Framer) maxHeaderListSize() uint32 {
 func (f *Framer) startWrite(ftype FrameType, flags Flags, streamID uint32) {
 	// Write the FrameHeader.
 	f.wbuf = append(f.wbuf[:0],
-		0, // 3 bytes of length, filled in in endWrite
+		0, // 3 bytes of length, filled in endWrite
 		0,
 		0,
 		byte(ftype),
@@ -488,30 +490,41 @@ func terminalReadFrameError(err error) bool {
 	return err != nil
 }
 
-// ReadFrame reads a single frame. The returned Frame is only valid
-// until the next call to ReadFrame.
+// ReadFrameHeader reads the header of the next frame.
+// It reads the 9-byte fixed frame header, and does not read any portion of the
+// frame payload. The caller is responsible for consuming the payload, either
+// with ReadFrameForHeader or directly from the Framer's io.Reader.
 //
-// If the frame is larger than previously set with SetMaxReadFrameSize, the
-// returned error is ErrFrameTooLarge. Other errors may be of type
-// ConnectionError, StreamError, or anything else from the underlying
-// reader.
+// If the frame is larger than previously set with SetMaxReadFrameSize, it
+// returns the frame header and ErrFrameTooLarge.
 //
-// If ReadFrame returns an error and a non-nil Frame, the Frame's StreamID
-// indicates the stream responsible for the error.
-func (fr *Framer) ReadFrame() (Frame, error) {
+// If the returned FrameHeader.StreamID is non-zero, it indicates the stream
+// responsible for the error.
+func (fr *Framer) ReadFrameHeader() (FrameHeader, error) {
 	fr.errDetail = nil
-	if fr.lastFrame != nil {
-		fr.lastFrame.invalidate()
-	}
 	fh, err := readFrameHeader(fr.headerBuf[:], fr.r)
 	if err != nil {
-		return nil, err
+		return fh, err
 	}
 	if fh.Length > fr.maxReadSize {
 		if fh == invalidHTTP1LookingFrameHeader() {
-			return nil, fmt.Errorf("http2: failed reading the frame payload: %w, note that the frame header looked like an HTTP/1.1 header", ErrFrameTooLarge)
+			return fh, fmt.Errorf("http2: failed reading the frame payload: %w, note that the frame header looked like an HTTP/1.1 header", ErrFrameTooLarge)
 		}
-		return nil, ErrFrameTooLarge
+		return fh, ErrFrameTooLarge
+	}
+	if err := fr.checkFrameOrder(fh); err != nil {
+		return fh, err
+	}
+	return fh, nil
+}
+
+// ReadFrameForHeader reads the payload for the frame with the given FrameHeader.
+//
+// It behaves identically to ReadFrame, other than not checking the maximum
+// frame size.
+func (fr *Framer) ReadFrameForHeader(fh FrameHeader) (Frame, error) {
+	if fr.lastFrame != nil {
+		fr.lastFrame.invalidate()
 	}
 	payload := fr.getReadBuf(fh.Length)
 	if _, err := io.ReadFull(fr.r, payload); err != nil {
@@ -527,9 +540,7 @@ func (fr *Framer) ReadFrame() (Frame, error) {
 		}
 		return nil, err
 	}
-	if err := fr.checkFrameOrder(f); err != nil {
-		return nil, err
-	}
+	fr.lastFrame = f
 	if fr.logReads {
 		fr.debugReadLoggerf("http2: Framer %p: read %v", fr, summarizeFrame(f))
 	}
@@ -537,6 +548,24 @@ func (fr *Framer) ReadFrame() (Frame, error) {
 		return fr.readMetaFrame(f.(*HeadersFrame))
 	}
 	return f, nil
+}
+
+// ReadFrame reads a single frame. The returned Frame is only valid
+// until the next call to ReadFrame or ReadFrameBodyForHeader.
+//
+// If the frame is larger than previously set with SetMaxReadFrameSize, the
+// returned error is ErrFrameTooLarge. Other errors may be of type
+// ConnectionError, StreamError, or anything else from the underlying
+// reader.
+//
+// If ReadFrame returns an error and a non-nil Frame, the Frame's StreamID
+// indicates the stream responsible for the error.
+func (fr *Framer) ReadFrame() (Frame, error) {
+	fh, err := fr.ReadFrameHeader()
+	if err != nil {
+		return nil, err
+	}
+	return fr.ReadFrameForHeader(fh)
 }
 
 // connError returns ConnectionError(code) but first
@@ -551,20 +580,19 @@ func (fr *Framer) connError(code ErrCode, reason string) error {
 // checkFrameOrder reports an error if f is an invalid frame to return
 // next from ReadFrame. Mostly it checks whether HEADERS and
 // CONTINUATION frames are contiguous.
-func (fr *Framer) checkFrameOrder(f Frame) error {
-	last := fr.lastFrame
-	fr.lastFrame = f
+func (fr *Framer) checkFrameOrder(fh FrameHeader) error {
+	lastType := fr.lastFrameType
+	fr.lastFrameType = fh.Type
 	if fr.AllowIllegalReads {
 		return nil
 	}
 
-	fh := f.Header()
 	if fr.lastHeaderStream != 0 {
 		if fh.Type != FrameContinuation {
 			return fr.connError(ErrCodeProtocol,
 				fmt.Sprintf("got %s for stream %d; expected CONTINUATION following %s for stream %d",
 					fh.Type, fh.StreamID,
-					last.Header().Type, fr.lastHeaderStream))
+					lastType, fr.lastHeaderStream))
 		}
 		if fh.StreamID != fr.lastHeaderStream {
 			return fr.connError(ErrCodeProtocol,
@@ -1152,7 +1180,16 @@ type PriorityFrame struct {
 	PriorityParam
 }
 
-// PriorityParam are the stream prioritzation parameters.
+var defaultRFC9218Priority = PriorityParam{
+	incremental: 0,
+	urgency:     3,
+}
+
+// Note that HTTP/2 has had two different prioritization schemes, and
+// PriorityParam struct below is a superset of both schemes. The exported
+// symbols are from RFC 7540 and the non-exported ones are from RFC 9218.
+
+// PriorityParam are the stream prioritization parameters.
 type PriorityParam struct {
 	// StreamDep is a 31-bit stream identifier for the
 	// stream that this stream depends on. Zero means no
@@ -1167,6 +1204,20 @@ type PriorityParam struct {
 	// the spec, "Add one to the value to obtain a weight between
 	// 1 and 256."
 	Weight uint8
+
+	// "The urgency (u) parameter value is Integer (see Section 3.3.1 of
+	// [STRUCTURED-FIELDS]), between 0 and 7 inclusive, in descending order of
+	// priority. The default is 3."
+	urgency uint8
+
+	// "The incremental (i) parameter value is Boolean (see Section 3.3.6 of
+	// [STRUCTURED-FIELDS]). It indicates if an HTTP response can be processed
+	// incrementally, i.e., provide some meaningful output as chunks of the
+	// response arrive."
+	//
+	// We use uint8 (i.e. 0 is false, 1 is true) instead of bool so we can
+	// avoid unnecessary type conversions and because either type takes 1 byte.
+	incremental uint8
 }
 
 func (p PriorityParam) IsZero() bool {

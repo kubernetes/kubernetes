@@ -19,8 +19,10 @@ package cache
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	utiltrace "k8s.io/utils/trace"
 )
 
 // ThreadSafeStore is an interface that allows concurrent indexed
@@ -56,6 +58,19 @@ type ThreadSafeStore interface {
 	AddIndexers(newIndexers Indexers) error
 	// Resync is a no-op and is deprecated
 	Resync() error
+}
+
+// ThreadSafeStoreWithTransaction is a store that can batch execute multiple transactions.
+type ThreadSafeStoreWithTransaction interface {
+	ThreadSafeStore
+	// Transaction allows performing multiple writes in one call.
+	Transaction(fns ...ThreadSafeStoreTransaction)
+}
+
+// ThreadSafeStoreTransaction embeds a Transaction and includes the specific Key identifying the affected object.
+type ThreadSafeStoreTransaction struct {
+	Transaction
+	Key string
 }
 
 // storeIndex implements the indexing functionality for Store interface
@@ -229,13 +244,41 @@ type threadSafeMap struct {
 	index *storeIndex
 }
 
+func (c *threadSafeMap) Transaction(txns ...ThreadSafeStoreTransaction) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	trace := utiltrace.New("ThreadSafeMap Transaction Process",
+		utiltrace.Field{Key: "Size", Value: len(txns)},
+		utiltrace.Field{Key: "Reason", Value: "Slow batch process due to too many items"})
+	defer trace.LogIfLong(min(500*time.Millisecond*time.Duration(len(txns)), 5*time.Second))
+
+	for _, txn := range txns {
+		switch txn.Type {
+		case TransactionTypeAdd:
+			c.addLocked(txn.Key, txn.Object)
+		case TransactionTypeUpdate:
+			c.updateLocked(txn.Key, txn.Object)
+		case TransactionTypeDelete:
+			c.deleteLocked(txn.Key)
+		}
+	}
+}
+
 func (c *threadSafeMap) Add(key string, obj interface{}) {
 	c.Update(key, obj)
+}
+
+func (c *threadSafeMap) addLocked(key string, obj interface{}) {
+	c.updateLocked(key, obj)
 }
 
 func (c *threadSafeMap) Update(key string, obj interface{}) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
+	c.updateLocked(key, obj)
+}
+
+func (c *threadSafeMap) updateLocked(key string, obj interface{}) {
 	oldObject := c.items[key]
 	c.items[key] = obj
 	c.index.updateIndices(oldObject, obj, key)
@@ -244,6 +287,10 @@ func (c *threadSafeMap) Update(key string, obj interface{}) {
 func (c *threadSafeMap) Delete(key string) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
+	c.deleteLocked(key)
+}
+
+func (c *threadSafeMap) deleteLocked(key string) {
 	if obj, exists := c.items[key]; exists {
 		c.index.updateIndices(obj, nil, key)
 		delete(c.items, key)

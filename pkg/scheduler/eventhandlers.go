@@ -33,6 +33,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	corev1nodeaffinity "k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
+	"k8s.io/dynamic-resource-allocation/deviceclass/extendedresourcecache"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -62,7 +63,7 @@ func (sched *Scheduler) addNodeToCache(obj interface{}) {
 
 	logger.V(3).Info("Add event for node", "node", klog.KObj(node))
 	nodeInfo := sched.Cache.AddNode(logger, node)
-	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, nil, node, preCheckForNode(nodeInfo))
+	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, nil, node, preCheckForNode(logger, nodeInfo))
 }
 
 func (sched *Scheduler) updateNodeInCache(oldObj, newObj interface{}) {
@@ -89,7 +90,7 @@ func (sched *Scheduler) updateNodeInCache(oldObj, newObj interface{}) {
 	// Only requeue unschedulable pods if the node became more schedulable.
 	for _, evt := range events {
 		startMoving := time.Now()
-		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, oldNode, newNode, preCheckForNode(nodeInfo))
+		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, oldNode, newNode, preCheckForNode(logger, nodeInfo))
 		movingDuration := metrics.SinceInSeconds(startMoving)
 
 		metrics.EventHandlingLatency.WithLabelValues(evt.Label()).Observe(updatingDuration + movingDuration)
@@ -134,6 +135,10 @@ func (sched *Scheduler) addPod(obj interface{}) {
 		return
 	}
 
+	if sched.WorkloadManager != nil {
+		// Register pod into workload manager before adding to the cache or scheduling queue.
+		sched.WorkloadManager.AddPod(pod)
+	}
 	if assignedPod(pod) {
 		sched.addAssignedPodToCache(pod)
 	} else if responsibleForPod(pod, sched.Profiles) {
@@ -154,6 +159,10 @@ func (sched *Scheduler) updatePod(oldObj, newObj interface{}) {
 		return
 	}
 
+	if sched.WorkloadManager != nil {
+		// Update pod in workload manager before updating it in the cache or scheduling queue.
+		sched.WorkloadManager.UpdatePod(oldPod, newPod)
+	}
 	if assignedPod(oldPod) {
 		sched.updateAssignedPodInCache(oldPod, newPod)
 	} else if assignedPod(newPod) {
@@ -178,6 +187,10 @@ func (sched *Scheduler) deletePod(obj interface{}) {
 	switch t := obj.(type) {
 	case *v1.Pod:
 		pod = t
+		if sched.WorkloadManager != nil {
+			// Delete pod from workload manager before deleting the pod from cache or scheduling queue.
+			sched.WorkloadManager.DeletePod(pod)
+		}
 		if assignedPod(pod) {
 			sched.deleteAssignedPodFromCache(pod)
 		} else if responsibleForPod(pod, sched.Profiles) {
@@ -192,6 +205,10 @@ func (sched *Scheduler) deletePod(obj interface{}) {
 		if !ok {
 			utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert to *v1.Pod", "obj", t.Obj)
 			return
+		}
+		if sched.WorkloadManager != nil {
+			// Delete pod from workload manager before deleting the pod from cache or scheduling queue.
+			sched.WorkloadManager.DeletePod(pod)
 		}
 		// The carried object may be stale, so we don't use it to check if
 		// it's assigned or not. Attempting to cleanup anyways.
@@ -215,6 +232,9 @@ func (sched *Scheduler) addPodToSchedulingQueue(pod *v1.Pod) {
 	logger := sched.logger
 	logger.V(3).Info("Add event for unscheduled pod", "pod", klog.KObj(pod))
 	sched.SchedulingQueue.Add(logger, pod)
+	if utilfeature.DefaultFeatureGate.Enabled(features.GangScheduling) {
+		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.EventUnscheduledPodAdd, nil, pod, nil)
+	}
 }
 
 func (sched *Scheduler) syncPodWithDispatcher(pod *v1.Pod) *v1.Pod {
@@ -482,6 +502,7 @@ func addAllEventHandlers(
 	dynInformerFactory dynamicinformer.DynamicSharedInformerFactory,
 	resourceClaimCache *assumecache.AssumeCache,
 	resourceSliceTracker *resourceslicetracker.Tracker,
+	draManager fwk.SharedDRAManager,
 	gvkMap map[fwk.EventResource]fwk.ActionType,
 ) error {
 	var (
@@ -629,8 +650,20 @@ func addAllEventHandlers(
 			}
 		case fwk.DeviceClass:
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+				handler := cache.ResourceEventHandler(buildEvtResHandler(at, fwk.DeviceClass))
+				if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
+					// Inject updating of the cache before the scheduler event handlers ("chaining")
+					// to ensure that the cache gets updated before the scheduler kicks off
+					// pod scheduling based on a DeviceClass event.
+					//
+					// We know that this is a DefaultDRAManager and we know that it
+					// uses an ExtendedResourceCache, so no need for type checks.
+					erCache := draManager.DeviceClassResolver().(*extendedresourcecache.ExtendedResourceCache)
+					erCache.AddEventHandler(handler)
+					handler = erCache
+				}
 				if handlerRegistration, err = informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandler(
-					buildEvtResHandler(at, fwk.DeviceClass),
+					handler,
 				); err != nil {
 					return err
 				}
@@ -650,6 +683,15 @@ func addAllEventHandlers(
 				return err
 			}
 			handlers = append(handlers, handlerRegistration)
+		case fwk.Workload:
+			if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
+				if handlerRegistration, err = informerFactory.Scheduling().V1alpha1().Workloads().Informer().AddEventHandler(
+					buildEvtResHandler(at, fwk.Workload),
+				); err != nil {
+					return err
+				}
+				handlers = append(handlers, handlerRegistration)
+			}
 		default:
 			// Tests may not instantiate dynInformerFactory.
 			if dynInformerFactory == nil {
@@ -682,7 +724,7 @@ func addAllEventHandlers(
 	return nil
 }
 
-func preCheckForNode(nodeInfo *framework.NodeInfo) queue.PreEnqueueCheck {
+func preCheckForNode(logger klog.Logger, nodeInfo *framework.NodeInfo) queue.PreEnqueueCheck {
 	if utilfeature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints) {
 		// QHint is initially created from the motivation of replacing this preCheck.
 		// It assumes that the scheduler only has in-tree plugins, which is problematic for our extensibility.
@@ -698,7 +740,9 @@ func preCheckForNode(nodeInfo *framework.NodeInfo) queue.PreEnqueueCheck {
 		if len(admissionResults) != 0 {
 			return false
 		}
-		_, isUntolerated := corev1helpers.FindMatchingUntoleratedTaint(nodeInfo.Node().Spec.Taints, pod.Spec.Tolerations, helper.DoNotScheduleTaintsFilterFunc())
+		_, isUntolerated := corev1helpers.FindMatchingUntoleratedTaint(logger, nodeInfo.Node().Spec.Taints, pod.Spec.Tolerations,
+			helper.DoNotScheduleTaintsFilterFunc(),
+			utilfeature.DefaultFeatureGate.Enabled(features.TaintTolerationComparisonOperators))
 		return !isUntolerated
 	}
 }
@@ -709,7 +753,7 @@ func preCheckForNode(nodeInfo *framework.NodeInfo) queue.PreEnqueueCheck {
 // returns all failures.
 func AdmissionCheck(pod *v1.Pod, nodeInfo *framework.NodeInfo, includeAllFailures bool) []AdmissionResult {
 	var admissionResults []AdmissionResult
-	insufficientResources := noderesources.Fits(pod, nodeInfo, noderesources.ResourceRequestsOptions{
+	insufficientResources := noderesources.Fits(pod, nodeInfo, nil, noderesources.ResourceRequestsOptions{
 		EnablePodLevelResources:   utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
 		EnableDRAExtendedResource: utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource),
 	})

@@ -55,8 +55,10 @@ var _ ContainerManager = &FakeContainerManager{}
 func NewFakeContainerManager() *FakeContainerManager {
 	return &FakeContainerManager{
 		PodContainerManager: NewFakePodContainerManager(),
-		cpuManager:          cpumanager.NewFakeManager(klog.TODO()),
-		memoryManager:       memorymanager.NewFakeManager(klog.TODO()),
+		// Use klog.TODO() because we currently do not have a proper logger to pass in.
+		// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
+		cpuManager:    cpumanager.NewFakeManager(klog.TODO()),
+		memoryManager: memorymanager.NewFakeManager(klog.TODO()),
 	}
 }
 
@@ -102,7 +104,7 @@ func (cm *FakeContainerManager) GetQOSContainersInfo() QOSContainersInfo {
 	return QOSContainersInfo{}
 }
 
-func (cm *FakeContainerManager) UpdateQOSCgroups() error {
+func (cm *FakeContainerManager) UpdateQOSCgroups(logger klog.Logger) error {
 	cm.Lock()
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "UpdateQOSCgroups")

@@ -22,6 +22,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
@@ -40,6 +41,7 @@ type ImageLocality struct {
 }
 
 var _ fwk.ScorePlugin = &ImageLocality{}
+var _ fwk.SignPlugin = &ImageLocality{}
 
 // Name is the name of the plugin used in the plugin registry and configurations.
 const Name = names.ImageLocality
@@ -47,6 +49,21 @@ const Name = names.ImageLocality
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *ImageLocality) Name() string {
 	return Name
+}
+
+// Filtering and scoring based on container image names.
+func (pl *ImageLocality) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
+	nameSet := sets.New[string]()
+
+	containers := []v1.Container{}
+	containers = append(containers, pod.Spec.Containers...)
+	containers = append(containers, pod.Spec.InitContainers...)
+
+	for _, container := range containers {
+		nameSet.Insert(normalizedImageName(container.Image))
+	}
+	names := sets.List(nameSet)
+	return []fwk.SignFragment{{Key: fwk.ImageNamesSignerName, Value: names}}, nil
 }
 
 // Score invoked at the score extension point.

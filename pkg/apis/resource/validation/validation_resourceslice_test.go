@@ -55,6 +55,14 @@ func testCounters() map[string]resourceapi.Counter {
 	}
 }
 
+func testMultipleCounters(count int) map[string]resourceapi.Counter {
+	counters := make(map[string]resourceapi.Counter)
+	for i := 0; i < count; i++ {
+		counters[fmt.Sprintf("memory-%d", i)] = resourceapi.Counter{Value: resource.MustParse("1Gi")}
+	}
+	return counters
+}
+
 func testResourceSlice(name, nodeName, driverName string, numDevices int) *resourceapi.ResourceSlice {
 	slice := &resourceapi.ResourceSlice{
 		ObjectMeta: metav1.ObjectMeta{
@@ -76,6 +84,19 @@ func testResourceSlice(name, nodeName, driverName string, numDevices int) *resou
 			Capacity:   testCapacity(),
 		}
 		slice.Spec.Devices = append(slice.Spec.Devices, device)
+	}
+	return slice
+}
+
+func testResourceSliceWithSharedCounters(name, poolName, driverName string, numCounterSets int) *resourceapi.ResourceSlice {
+	slice := testResourceSlice(name, poolName, driverName, 1)
+	slice.Spec.Devices = nil
+	for i := 0; i < numCounterSets; i++ {
+		counterSet := resourceapi.CounterSet{
+			Name:     fmt.Sprintf("counterset-%d", i),
+			Counters: testCounters(),
+		}
+		slice.Spec.SharedCounters = append(slice.Spec.SharedCounters, counterSet)
 	}
 	return slice
 }
@@ -107,6 +128,25 @@ func TestValidateResourceSlice(t *testing.T) {
 		"too-large": {
 			wantFailures: field.ErrorList{field.TooMany(field.NewPath("spec", "devices"), resourceapi.ResourceSliceMaxDevices+1, resourceapi.ResourceSliceMaxDevices)},
 			slice:        testResourceSlice(goodName, goodName, goodName, resourceapi.ResourceSliceMaxDevices+1),
+		},
+		"good-taints": {
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, goodName, resourceapi.ResourceSliceMaxDevicesWithTaintsOrConsumesCounters)
+				for i := range slice.Spec.Devices {
+					slice.Spec.Devices[i].Taints = []resourceapi.DeviceTaint{{Key: "example.com/taint", Effect: resourceapi.DeviceTaintEffectNoExecute}}
+				}
+				return slice
+			}(),
+		},
+		"too-large-taints": {
+			wantFailures: field.ErrorList{field.TooMany(field.NewPath("spec", "devices"), resourceapi.ResourceSliceMaxDevicesWithTaintsOrConsumesCounters+1, resourceapi.ResourceSliceMaxDevicesWithTaintsOrConsumesCounters)},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, goodName, resourceapi.ResourceSliceMaxDevicesWithTaintsOrConsumesCounters+1)
+				for i := range slice.Spec.Devices {
+					slice.Spec.Devices[i].Taints = []resourceapi.DeviceTaint{{Key: "example.com/taint", Effect: resourceapi.DeviceTaintEffectNoExecute}}
+				}
+				return slice
+			}(),
 		},
 		"missing-name": {
 			wantFailures: field.ErrorList{field.Required(field.NewPath("metadata", "name"), "name or generateName is required")},
@@ -323,6 +363,21 @@ func TestValidateResourceSlice(t *testing.T) {
 			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "driver"), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')")},
 			slice:        testResourceSlice(goodName, goodName, badName, 1),
 		},
+		"both-shared-counters-and-devices": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec"), "", "only one of `sharedCounters` or `devices` is allowed"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.SharedCounters = []resourceapi.CounterSet{
+					{
+						Name:     "counterset",
+						Counters: testCounters(),
+					},
+				}
+				return slice
+			}(),
+		},
 		"bad-devices": {
 			wantFailures: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "devices").Index(1).Child("name"), badName, "a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')"),
@@ -335,7 +390,7 @@ func TestValidateResourceSlice(t *testing.T) {
 		},
 		"bad-attribute": {
 			wantFailures: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "devices").Index(1).Child("attributes"), badName, "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_' (e.g. 'my_name',  or 'MY_NAME',  or 'MyName', regex used for validation is '[A-Za-z_][A-Za-z0-9_]*')"),
+				field.Invalid(field.NewPath("spec", "devices").Index(1).Child("attributes").Key(badName), badName, "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_' (e.g. 'my_name',  or 'MY_NAME',  or 'MyName', regex used for validation is '[A-Za-z_][A-Za-z0-9_]*')"),
 				field.Invalid(field.NewPath("spec", "devices").Index(1).Child("attributes").Key(badName), "", "exactly one value must be specified").MarkCoveredByDeclarative(),
 				field.Invalid(field.NewPath("spec", "devices").Index(2).Child("attributes").Key(goodName), resourceapi.DeviceAttribute{StringValue: ptr.To("x"), VersionValue: ptr.To("1.2.3")}, "exactly one value must be specified").MarkCoveredByDeclarative(),
 				field.Invalid(field.NewPath("spec", "devices").Index(3).Child("attributes").Key(goodName).Child("version"), strings.Repeat("x", resourceapi.DeviceAttributeMaxValueLength+1), "must be a string compatible with semver.org spec 2.0.0"),
@@ -371,8 +426,8 @@ func TestValidateResourceSlice(t *testing.T) {
 		},
 		"bad-attribute-c-identifier": {
 			wantFailures: field.ErrorList{
-				field.TooLongMaxLength(field.NewPath("spec", "devices").Index(1).Child("attributes"), strings.Repeat(".", resourceapi.DeviceMaxIDLength+1), resourceapi.DeviceMaxIDLength),
-				field.Invalid(field.NewPath("spec", "devices").Index(1).Child("attributes"), strings.Repeat(".", resourceapi.DeviceMaxIDLength+1), "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_' (e.g. 'my_name',  or 'MY_NAME',  or 'MyName', regex used for validation is '[A-Za-z_][A-Za-z0-9_]*')"),
+				field.TooLongMaxLength(field.NewPath("spec", "devices").Index(1).Child("attributes").Key(strings.Repeat(".", resourceapi.DeviceMaxIDLength+1)), strings.Repeat(".", resourceapi.DeviceMaxIDLength+1), resourceapi.DeviceMaxIDLength),
+				field.Invalid(field.NewPath("spec", "devices").Index(1).Child("attributes").Key(strings.Repeat(".", resourceapi.DeviceMaxIDLength+1)), strings.Repeat(".", resourceapi.DeviceMaxIDLength+1), "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_' (e.g. 'my_name',  or 'MY_NAME',  or 'MyName', regex used for validation is '[A-Za-z_][A-Za-z0-9_]*')"),
 			},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, goodName, 2)
@@ -384,8 +439,8 @@ func TestValidateResourceSlice(t *testing.T) {
 		},
 		"bad-attribute-domain": {
 			wantFailures: field.ErrorList{
-				field.TooLong(field.NewPath("spec", "devices").Index(1).Child("attributes"), strings.Repeat("_", resourceapi.DeviceMaxDomainLength+1), resourceapi.DeviceMaxDomainLength),
-				field.Invalid(field.NewPath("spec", "devices").Index(1).Child("attributes"), strings.Repeat("_", resourceapi.DeviceMaxDomainLength+1), "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
+				field.TooLong(field.NewPath("spec", "devices").Index(1).Child("attributes").Key(strings.Repeat("_", resourceapi.DeviceMaxDomainLength+1)+"/y"), strings.Repeat("_", resourceapi.DeviceMaxDomainLength+1), resourceapi.DeviceMaxDomainLength),
+				field.Invalid(field.NewPath("spec", "devices").Index(1).Child("attributes").Key(strings.Repeat("_", resourceapi.DeviceMaxDomainLength+1)+"/y"), strings.Repeat("_", resourceapi.DeviceMaxDomainLength+1), "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
 			},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, goodName, 2)
@@ -397,8 +452,8 @@ func TestValidateResourceSlice(t *testing.T) {
 		},
 		"bad-key-too-long": {
 			wantFailures: field.ErrorList{
-				field.TooLong(field.NewPath("spec", "devices").Index(1).Child("attributes"), strings.Repeat("x", resourceapi.DeviceMaxDomainLength+1), resourceapi.DeviceMaxDomainLength),
-				field.TooLongMaxLength(field.NewPath("spec", "devices").Index(1).Child("attributes"), strings.Repeat("y", resourceapi.DeviceMaxIDLength+1), resourceapi.DeviceMaxIDLength),
+				field.TooLong(field.NewPath("spec", "devices").Index(1).Child("attributes").Key("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx...xxxxxxxxxxxx/yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy"), strings.Repeat("x", resourceapi.DeviceMaxDomainLength+1), resourceapi.DeviceMaxDomainLength),
+				field.TooLongMaxLength(field.NewPath("spec", "devices").Index(1).Child("attributes").Key("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx...xxxxxxxxxxxx/yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy"), strings.Repeat("y", resourceapi.DeviceMaxIDLength+1), resourceapi.DeviceMaxIDLength),
 			},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, goodName, 2)
@@ -410,8 +465,8 @@ func TestValidateResourceSlice(t *testing.T) {
 		},
 		"bad-attribute-empty-domain-and-c-identifier": {
 			wantFailures: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "devices").Index(1).Child("attributes"), "", "the domain must not be empty"),
-				field.Invalid(field.NewPath("spec", "devices").Index(1).Child("attributes"), "", "the name must not be empty"),
+				field.Invalid(field.NewPath("spec", "devices").Index(1).Child("attributes").Key("/"), "", "the domain must not be empty"),
+				field.Invalid(field.NewPath("spec", "devices").Index(1).Child("attributes").Key("/"), "", "the name must not be empty"),
 			},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, goodName, 2)
@@ -497,7 +552,7 @@ func TestValidateResourceSlice(t *testing.T) {
 
 					field.Invalid(fldPath.Index(3).Child("key"), badName, "name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')"),
 					field.Invalid(fldPath.Index(3).Child("value"), badName, "a valid label must be an empty string or consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyValue',  or 'my_value',  or '12345', regex used for validation is '(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?')"),
-					field.NotSupported(fldPath.Index(3).Child("effect"), resourceapi.DeviceTaintEffect("some-other-op"), []resourceapi.DeviceTaintEffect{resourceapi.DeviceTaintEffectNoExecute, resourceapi.DeviceTaintEffectNoSchedule}).MarkCoveredByDeclarative(),
+					field.NotSupported(fldPath.Index(3).Child("effect"), resourceapi.DeviceTaintEffect("some-other-effect"), []resourceapi.DeviceTaintEffect{resourceapi.DeviceTaintEffectNoExecute, resourceapi.DeviceTaintEffectNoSchedule, resourceapi.DeviceTaintEffectNone}).MarkCoveredByDeclarative(),
 				}
 			}(),
 			slice: func() *resourceapi.ResourceSlice {
@@ -522,7 +577,7 @@ func TestValidateResourceSlice(t *testing.T) {
 						// Invalid strings.
 						Key:    badName,
 						Value:  badName,
-						Effect: "some-other-op",
+						Effect: "some-other-effect",
 					},
 				}
 				return slice
@@ -646,16 +701,44 @@ func TestValidateResourceSlice(t *testing.T) {
 				return slice
 			}(),
 		},
+		"missing-name-shared-counters": {
+			wantFailures: field.ErrorList{
+				field.Required(field.NewPath("spec", "sharedCounters").Index(0).Child("name"), "").MarkCoveredByDeclarative(),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithSharedCounters(goodName, goodName, driverName, 1)
+				slice.Spec.SharedCounters = []resourceapi.CounterSet{
+					{
+						Counters: testCounters(),
+					},
+				}
+				return slice
+			}(),
+		},
 		"bad-name-shared-counters": {
 			wantFailures: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "sharedCounters").Index(0).Child("name"), badName, "a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')"),
+				field.Invalid(field.NewPath("spec", "sharedCounters").Index(0).Child("name"), badName, "a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')").MarkCoveredByDeclarative(),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithSharedCounters(goodName, goodName, driverName, 0)
+				slice.Spec.SharedCounters = []resourceapi.CounterSet{
+					{
+						Name:     badName,
+						Counters: testCounters(),
+					},
+				}
+				return slice
+			}(),
+		},
+		"missing-counter-shared-counters": {
+			wantFailures: field.ErrorList{
 				field.Required(field.NewPath("spec", "sharedCounters").Index(0).Child("counters"), ""),
 			},
 			slice: func() *resourceapi.ResourceSlice {
-				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice := testResourceSliceWithSharedCounters(goodName, goodName, driverName, 0)
 				slice.Spec.SharedCounters = []resourceapi.CounterSet{
 					{
-						Name: badName,
+						Name: goodName,
 					},
 				}
 				return slice
@@ -663,10 +746,10 @@ func TestValidateResourceSlice(t *testing.T) {
 		},
 		"bad-countername-shared-counters": {
 			wantFailures: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "sharedCounters").Index(0).Child("counters"), badName, "a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')").MarkCoveredByDeclarative(),
+				field.Invalid(field.NewPath("spec", "sharedCounters").Index(0).Child("counters").Key(badName), badName, "a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')"),
 			},
 			slice: func() *resourceapi.ResourceSlice {
-				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice := testResourceSliceWithSharedCounters(goodName, goodName, driverName, 1)
 				slice.Spec.SharedCounters = []resourceapi.CounterSet{
 					{
 						Name: goodName,
@@ -678,26 +761,12 @@ func TestValidateResourceSlice(t *testing.T) {
 				return slice
 			}(),
 		},
-		"missing-name-shared-counters": {
-			wantFailures: field.ErrorList{
-				field.Required(field.NewPath("spec", "sharedCounters").Index(0).Child("name"), ""),
-			},
-			slice: func() *resourceapi.ResourceSlice {
-				slice := testResourceSlice(goodName, goodName, driverName, 1)
-				slice.Spec.SharedCounters = []resourceapi.CounterSet{
-					{
-						Counters: testCounters(),
-					},
-				}
-				return slice
-			}(),
-		},
 		"duplicate-shared-counters": {
 			wantFailures: field.ErrorList{
-				field.Duplicate(field.NewPath("spec", "sharedCounters").Index(1), goodName),
+				field.Duplicate(field.NewPath("spec", "sharedCounters").Index(1), goodName).MarkCoveredByDeclarative(),
 			},
 			slice: func() *resourceapi.ResourceSlice {
-				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice := testResourceSliceWithSharedCounters(goodName, goodName, driverName, 1)
 				slice.Spec.SharedCounters = []resourceapi.CounterSet{
 					{
 						Name:     goodName,
@@ -711,27 +780,82 @@ func TestValidateResourceSlice(t *testing.T) {
 				return slice
 			}(),
 		},
-		"too-large-shared-counters": {
-			wantFailures: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "sharedCounters"), resourceapi.ResourceSliceMaxSharedCounters+1, fmt.Sprintf("the total number of shared counters must not exceed %d", resourceapi.ResourceSliceMaxSharedCounters)),
-			},
+		"max-shared-counters": {
 			slice: func() *resourceapi.ResourceSlice {
-				slice := testResourceSlice(goodName, goodName, driverName, 1)
-				slice.Spec.SharedCounters = createSharedCounters(resourceapi.ResourceSliceMaxSharedCounters + 1)
+				slice := testResourceSliceWithSharedCounters(goodName, goodName, driverName, 1)
+				slice.Spec.SharedCounters = createSharedCounters(resourceapi.ResourceSliceMaxCounterSets)
 				return slice
 			}(),
 		},
-		"missing-counterset-consumes-counter": {
+		"too-many-shared-counters": {
 			wantFailures: field.ErrorList{
-				field.Required(field.NewPath("spec", "devices").Index(0).Child("consumesCounters").Index(0).Child("counterSet"), ""),
-				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("consumesCounters").Index(0).Child("counterSet"), "", "must reference a counterSet defined in the ResourceSlice sharedCounters"),
+				field.TooMany(field.NewPath("spec", "sharedCounters"), resourceapi.ResourceSliceMaxCounterSets+1, resourceapi.ResourceSliceMaxCounterSets).MarkCoveredByDeclarative(),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithSharedCounters(goodName, goodName, driverName, 1)
+				slice.Spec.SharedCounters = createSharedCounters(resourceapi.ResourceSliceMaxCounterSets + 1)
+				return slice
+			}(),
+		},
+		"max-counters-in-counter-set": {
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithSharedCounters(goodName, goodName, driverName, 1)
+				slice.Spec.SharedCounters[0].Counters = testMultipleCounters(resourceapi.ResourceSliceMaxCountersPerCounterSet)
+				return slice
+			}(),
+		},
+		"too-many-counters-in-counter-set": {
+			wantFailures: field.ErrorList{
+				field.TooMany(field.NewPath("spec", "sharedCounters").Index(0).Child("counters"), resourceapi.ResourceSliceMaxCountersPerCounterSet+1, resourceapi.ResourceSliceMaxCountersPerCounterSet),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithSharedCounters(goodName, goodName, driverName, 1)
+				slice.Spec.SharedCounters[0].Counters = testMultipleCounters(resourceapi.ResourceSliceMaxCountersPerCounterSet + 1)
+				return slice
+			}(),
+		},
+		"missing-name-counterset-consumes-counter": {
+			wantFailures: field.ErrorList{
+				field.Required(field.NewPath("spec", "devices").Index(0).Child("consumesCounters").Index(0).Child("counterSet"), "").MarkCoveredByDeclarative(),
 			},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, driverName, 1)
-				slice.Spec.SharedCounters = createSharedCounters(1)
 				slice.Spec.Devices[0].ConsumesCounters = []resourceapi.DeviceCounterConsumption{
 					{
 						Counters: testCounters(),
+					},
+				}
+				return slice
+			}(),
+		},
+		"bad-name-counterset-consumes-counter": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("consumesCounters").Index(0).Child("counterSet"), badName, "a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')").MarkCoveredByDeclarative(),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].ConsumesCounters = []resourceapi.DeviceCounterConsumption{
+					{
+						CounterSet: badName,
+						Counters:   testCounters(),
+					},
+				}
+				return slice
+			}(),
+		},
+		"duplicate-counterset-consumes-counter": {
+			wantFailures: field.ErrorList{
+				field.Duplicate(field.NewPath("spec", "devices").Index(0).Child("consumesCounters").Index(1), goodName).MarkCoveredByDeclarative()},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].ConsumesCounters = []resourceapi.DeviceCounterConsumption{
+					{
+						CounterSet: goodName,
+						Counters:   testCounters(),
+					},
+					{
+						CounterSet: goodName,
+						Counters:   testCounters(),
 					},
 				}
 				return slice
@@ -743,7 +867,6 @@ func TestValidateResourceSlice(t *testing.T) {
 			},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, driverName, 1)
-				slice.Spec.SharedCounters = createSharedCounters(1)
 				slice.Spec.Devices[0].ConsumesCounters = []resourceapi.DeviceCounterConsumption{
 					{
 						CounterSet: "counterset-0",
@@ -752,65 +875,82 @@ func TestValidateResourceSlice(t *testing.T) {
 				return slice
 			}(),
 		},
-		"wrong-counterref-consumes-counter": {
-			wantFailures: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("consumesCounters").Index(0).Child("counters"), "fake", "must reference a counter defined in the ResourceSlice sharedCounters"),
-			},
+		"max-device-counter-consumption-for-device": {
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, driverName, 1)
-				slice.Spec.SharedCounters = createSharedCounters(1)
-				slice.Spec.Devices[0].ConsumesCounters = []resourceapi.DeviceCounterConsumption{
-					{
-						Counters: map[string]resourceapi.Counter{
-							"fake": {Value: resource.MustParse("1Gi")},
-						},
-						CounterSet: "counterset-0",
-					},
-				}
-				return slice
-			}(),
-		},
-		"wrong-sharedcounterref-consumes-counter": {
-			wantFailures: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("consumesCounters").Index(0).Child("counterSet"), "fake", "must reference a counterSet defined in the ResourceSlice sharedCounters"),
-			},
-			slice: func() *resourceapi.ResourceSlice {
-				slice := testResourceSlice(goodName, goodName, driverName, 1)
-				slice.Spec.SharedCounters = createSharedCounters(1)
-				slice.Spec.Devices[0].ConsumesCounters = []resourceapi.DeviceCounterConsumption{
-					{
-						Counters:   testCounters(),
-						CounterSet: "fake",
-					},
-				}
-				return slice
-			}(),
-		},
-		"too-large-consumes-counter": {
-			wantFailures: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "devices").Index(0), resourceapi.ResourceSliceMaxCountersPerDevice+1, fmt.Sprintf("the total number of counters must not exceed %d", resourceapi.ResourceSliceMaxCountersPerDevice)),
-				field.Invalid(field.NewPath("spec", "sharedCounters"), resourceapi.ResourceSliceMaxSharedCounters+1, fmt.Sprintf("the total number of shared counters must not exceed %d", resourceapi.ResourceSliceMaxSharedCounters)),
-			},
-			slice: func() *resourceapi.ResourceSlice {
-				slice := testResourceSlice(goodName, goodName, driverName, 1)
-				slice.Spec.SharedCounters = createSharedCounters(resourceapi.ResourceSliceMaxSharedCounters + 1)
 				slice.Spec.Devices[0].Attributes = nil
 				slice.Spec.Devices[0].Capacity = nil
-				slice.Spec.Devices[0].ConsumesCounters = createConsumesCounters(resourceapi.ResourceSliceMaxCountersPerDevice + 1)
+				slice.Spec.Devices[0].ConsumesCounters = createConsumesCounters(resourceapi.ResourceSliceMaxDeviceCounterConsumptionsPerDevice)
 				return slice
 			}(),
 		},
-		"too-many-device-counters-in-slice": {
+		"too-many-device-counter-consumption-for-device": {
 			wantFailures: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "devices"), resourceapi.ResourceSliceMaxDeviceCountersPerSlice+1, fmt.Sprintf("the total number of counters in devices must not exceed %d", resourceapi.ResourceSliceMaxDeviceCountersPerSlice)),
+				field.TooMany(field.NewPath("spec", "devices").Index(0).Child("consumesCounters"), resourceapi.ResourceSliceMaxDeviceCounterConsumptionsPerDevice+1, resourceapi.ResourceSliceMaxDeviceCounterConsumptionsPerDevice).MarkCoveredByDeclarative(),
 			},
 			slice: func() *resourceapi.ResourceSlice {
-				slice := testResourceSlice(goodName, goodName, driverName, 65)
-				slice.Spec.SharedCounters = createSharedCounters(16)
-				for i := 0; i < 64; i++ {
-					slice.Spec.Devices[i].ConsumesCounters = createConsumesCounters(16)
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].Attributes = nil
+				slice.Spec.Devices[0].Capacity = nil
+				slice.Spec.Devices[0].ConsumesCounters = createConsumesCounters(resourceapi.ResourceSliceMaxDeviceCounterConsumptionsPerDevice + 1)
+				return slice
+			}(),
+		},
+		"max-counters-in-device-counter-consumption": {
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].Attributes = nil
+				slice.Spec.Devices[0].Capacity = nil
+				slice.Spec.Devices[0].ConsumesCounters = []resourceapi.DeviceCounterConsumption{
+					{
+						CounterSet: "counterset-0",
+						Counters:   testMultipleCounters(resourceapi.ResourceSliceMaxCountersPerDeviceCounterConsumption),
+					},
 				}
-				slice.Spec.Devices[64].ConsumesCounters = createConsumesCounters(1)
+				return slice
+			}(),
+		},
+		"too-many-counters-in-device-counter-consumption": {
+			wantFailures: field.ErrorList{
+				field.TooMany(field.NewPath("spec", "devices").Index(0).Child("consumesCounters").Index(0).Child("counters"), resourceapi.ResourceSliceMaxCountersPerDeviceCounterConsumption+1, resourceapi.ResourceSliceMaxCountersPerDeviceCounterConsumption),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].Attributes = nil
+				slice.Spec.Devices[0].Capacity = nil
+				slice.Spec.Devices[0].ConsumesCounters = []resourceapi.DeviceCounterConsumption{
+					{
+						CounterSet: "counterset-0",
+						Counters:   testMultipleCounters(resourceapi.ResourceSliceMaxCountersPerDeviceCounterConsumption + 1),
+					},
+				}
+				return slice
+			}(),
+		},
+		"max-number-of-devices-with-consumes-counters": {
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, goodName, resourceapi.ResourceSliceMaxDevicesWithTaintsOrConsumesCounters)
+				for i := range slice.Spec.Devices {
+					slice.Spec.Devices[i].ConsumesCounters = []resourceapi.DeviceCounterConsumption{
+						{
+							CounterSet: "counterset-0",
+							Counters:   testCounters(),
+						},
+					}
+				}
+				return slice
+			}(),
+		},
+		"too-many-devices-with-consumes-counters": {
+			wantFailures: field.ErrorList{field.TooMany(field.NewPath("spec", "devices"), resourceapi.ResourceSliceMaxDevicesWithTaintsOrConsumesCounters+1, resourceapi.ResourceSliceMaxDevicesWithTaintsOrConsumesCounters)},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, goodName, resourceapi.ResourceSliceMaxDevicesWithTaintsOrConsumesCounters+1)
+				slice.Spec.Devices[0].ConsumesCounters = []resourceapi.DeviceCounterConsumption{
+					{
+						CounterSet: "counterset-0",
+						Counters:   testCounters(),
+					},
+				}
 				return slice
 			}(),
 		},
@@ -867,6 +1007,17 @@ func TestValidateResourceSlice(t *testing.T) {
 func TestValidateResourceSliceUpdate(t *testing.T) {
 	name := "valid"
 	validResourceSlice := testResourceSlice(name, name, name, 1)
+	invalidResourceSliceWithTaints := validResourceSlice.DeepCopy()
+	invalidResourceSliceWithTaints.Spec.Devices[0].Taints = []resourceapi.DeviceTaint{
+		{
+			Key:    "unhealthy-power",
+			Effect: resourceapi.DeviceTaintEffectNoExecute,
+		},
+		{
+			Key:    "unhealthy-mem",
+			Effect: "some-other-effect",
+		},
+	}
 
 	scenarios := map[string]struct {
 		oldResourceSlice *resourceapi.ResourceSlice
@@ -935,6 +1086,31 @@ func TestValidateResourceSliceUpdate(t *testing.T) {
 						}},
 					}},
 				}
+				return slice
+			},
+		},
+		"invalid-new-effect-in-old-device": {
+			wantFailures:     field.ErrorList{field.NotSupported(field.NewPath("spec", "devices").Index(0).Child("taints").Index(1).Child("effect"), resourceapi.DeviceTaintEffect("some-other-effect"), []resourceapi.DeviceTaintEffect{resourceapi.DeviceTaintEffectNoExecute, resourceapi.DeviceTaintEffectNoSchedule, resourceapi.DeviceTaintEffectNone})}.MarkCoveredByDeclarative(),
+			oldResourceSlice: validResourceSlice,
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				slice.Spec.Devices[0].Taints = invalidResourceSliceWithTaints.Spec.Devices[0].Taints
+				return slice
+			},
+		},
+		"valid-old-effect": {
+			oldResourceSlice: invalidResourceSliceWithTaints,
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				slice.Spec.Devices[0].Attributes["foo"] = resourceapi.DeviceAttribute{StringValue: ptr.To("bar")}
+				return slice
+			},
+		},
+		"invalid-new-effect-in-new-device": {
+			wantFailures:     field.ErrorList{field.NotSupported(field.NewPath("spec", "devices").Index(1).Child("taints").Index(1).Child("effect"), resourceapi.DeviceTaintEffect("some-other-effect"), []resourceapi.DeviceTaintEffect{resourceapi.DeviceTaintEffectNoExecute, resourceapi.DeviceTaintEffectNoSchedule, resourceapi.DeviceTaintEffectNone})}.MarkCoveredByDeclarative(),
+			oldResourceSlice: invalidResourceSliceWithTaints,
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				device := slice.Spec.Devices[0].DeepCopy()
+				device.Name += "-other"
+				slice.Spec.Devices = append(slice.Spec.Devices, *device)
 				return slice
 			},
 		},

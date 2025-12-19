@@ -155,6 +155,23 @@ linters:
       - text: "Conditions field in AllocatedDeviceStatus has incorrect tags, should be: `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,5,rep,name=conditions\"`"
         path: "staging/src/k8s.io/api/resource/"
       
+      # Commentstart - Ignore commentstart issues for existing API group
+      # TODO: For each existing API group, we aim to remove it over time.
+      - text: "godoc for field .* should start with '.* ...'"
+        path: "staging/src/k8s.io/api/(admissionregistration|apiserverinternal|apps|authentication|authorization|autoscaling|batch|certificates|coordination|core|discovery|events|extensions|flowcontrol|imagepolicy|networking|node|policy|rbac|resource|scheduling|storage|storagemigration)"
+      - text: "field .* is missing godoc comment"
+        path: "staging/src/k8s.io/api/autoscaling/"
+      
+      
+      # notimestamp: Legacy 'Timestamp' fields retained for backward compatibility
+      - text: 'notimestamp: naming convention "notimestamp": field ExpirationTimestamp: prefer use of the term ''time'' over ''timestamp'''
+        path: "staging/src/k8s.io/api/authentication/v1/types.go"
+      - text: 'notimestamp: naming convention "notimestamp": field (Timestamps|FirstTimestamp|LastTimestamp): prefer use of the term ''time'' over ''timestamp'''
+        path: "staging/src/k8s.io/api/core/v1/types.go"
+      - text: 'notimestamp: naming convention "notimestamp": field Deprecated(FirstTimestamp|LastTimestamp): prefer use of the term ''time'' over ''timestamp'''
+        path: "staging/src/k8s.io/api/events/(v1|v1beta1)/types.go"
+      - text: 'notimestamp: naming convention "notimestamp": field AllocationTimestamp: prefer use of the term ''time'' over ''timestamp'''
+        path: "staging/src/k8s.io/api/resource/(v1|v1beta1|v1beta2)/types.go"
       
       # Pre-existing issues from the conflictmarkers linter
       # The Error field in some older API types is marked as both optional and required.
@@ -314,7 +331,7 @@ linters:
             disable:
               - '*'
             enable:
-              # - "commentstart" # Ensure comments start with the serialized version of the field name.
+              - "commentstart" # Ensure comments start with the serialized version of the field name.
               - "conditions" # Ensure conditions have the correct json tags and markers.
               - "conflictingmarkers" # Detect mutually exclusive markers on the same field.
               # - "integers" # Ensure only int32 and int64 are used for integers.
@@ -324,12 +341,13 @@ linters:
               # - "nofloats" # Ensure floats are not used.
               # - "nomaps" # Ensure maps are not used, unless they are `map[string]string` (for labels/annotations/etc).
               # - "nophase" # Ensure field names do not have the word "phase" in them.
-              # - "notimestamp" # Ensure fields are not named "timestamp", prefer "time".
+              - "notimestamp" # Ensure fields are not named "timestamp", prefer "time".
               # - "optionalfields" # Ensure fields marked optional have omitempty and pointers.
               # - "optionalorrequired" # Every field should be marked as `+optional` xor `+required`.
               # - "requiredfields" # Required fields should only be pointers when required based on the validity of the zero value, they should always have `omitempty`.
               - "ssatags" # Ensure lists have a listType tag.
               # - "uniquemarkers" # Ensure markers are not duplicated across field and type definitions.
+              - "duplicatemarkers" #Prevent identical markers from being present on types and fields
           lintersConfig:
             conditions:
               isFirstField: Ignore
@@ -380,6 +398,12 @@ linters:
             #         - fruit
     depguard:
       rules:
+        utils:
+          files:
+            - $all
+          deny:
+            - pkg: "k8s.io/utils/pointer"
+              desc: "k8s.io/utils/pointer shall no longer be used, please use k8s.io/utils/ptr."
         go-cmp:
           files:
             - $all
@@ -425,7 +449,6 @@ linters:
         - typeSwitchVar
         - underef
         - unslice
-        - valSwap
     revive:
       # Only these rules are enabled.
       rules:

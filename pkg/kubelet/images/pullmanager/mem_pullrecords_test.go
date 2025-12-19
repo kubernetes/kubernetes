@@ -297,9 +297,17 @@ func TestNewCachedPullRecordsAccessor(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			gotAccessor := NewCachedPullRecordsAccessor(tt.delegate, 50, 100, 10)
+			gotMeteredAccessor, ok := gotAccessor.(*meteringRecordsAccessor)
+			if !ok {
+				t.Fatalf("the tested accessor must be a metered records accessor, got %T", gotAccessor)
+			}
+			inMemAccessor, ok := gotMeteredAccessor.sizeExposedPullRecordsAccessor.(*cachedPullRecordsAccessor)
+			if !ok {
+				t.Fatalf("the metered accessor's delegate is not an inMemAccesor: %T", gotMeteredAccessor.sizeExposedPullRecordsAccessor)
+			}
 
 			expectedCachedIntents := tt.wantCacheIntents
-			if err := cmpRecordsMapAndCache(expectedCachedIntents, gotAccessor.intents); err != nil {
+			if err := cmpRecordsMapAndCache(expectedCachedIntents, inMemAccessor.intents); err != nil {
 				t.Errorf("NewCachedPullRecordsAccessor cache does not match: %v", err)
 			}
 
@@ -312,7 +320,7 @@ func TestNewCachedPullRecordsAccessor(t *testing.T) {
 				t.Errorf("NewCachedPullRecordsAccessor().ListImagePullIntents() errors don't match = %v, want %v", intentsErr, tt.wantIntentsError)
 			}
 			expectedPulledRecords := tt.wantCachePulledRecords
-			if err := cmpRecordsMapAndCache(expectedPulledRecords, gotAccessor.pulledRecords); err != nil {
+			if err := cmpRecordsMapAndCache(expectedPulledRecords, inMemAccessor.pulledRecords); err != nil {
 				t.Errorf("NewCachedPullRecordsAccessor cache does not match: %v", err)
 			}
 
@@ -325,11 +333,11 @@ func TestNewCachedPullRecordsAccessor(t *testing.T) {
 				t.Errorf("NewCachedPullRecordsAccessor().ListImagePullIntents() errors don't match = %v, want %v", pulledRecordsErr, tt.wantPulledRecordsError)
 			}
 
-			if gotIntentsAuthoritative := gotAccessor.intents.authoritative.Load(); gotIntentsAuthoritative != tt.wantIntentsAuthoritative {
+			if gotIntentsAuthoritative := inMemAccessor.intents.authoritative.Load(); gotIntentsAuthoritative != tt.wantIntentsAuthoritative {
 				t.Errorf("NewCachedPullRecordsAccessor().intents.authoritative = %v, want %v", gotIntentsAuthoritative, tt.wantIntentsAuthoritative)
 			}
 
-			if gotPulledRecordsAuthoritative := gotAccessor.pulledRecords.authoritative.Load(); gotPulledRecordsAuthoritative != tt.wantPulledRecordsAuthoritative {
+			if gotPulledRecordsAuthoritative := inMemAccessor.pulledRecords.authoritative.Load(); gotPulledRecordsAuthoritative != tt.wantPulledRecordsAuthoritative {
 				t.Errorf("NewCachedPullRecordsAccessor().pulledRecords.authoritative = %v, want %v", gotPulledRecordsAuthoritative, tt.wantPulledRecordsAuthoritative)
 			}
 		})

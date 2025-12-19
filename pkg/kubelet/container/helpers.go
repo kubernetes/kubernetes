@@ -117,6 +117,71 @@ func ShouldContainerBeRestarted(logger klog.Logger, container *v1.Container, pod
 	return true
 }
 
+// ShouldAllContainersRestart checks if the pod should be restarted.
+// First checks whether the apiPodStatus has the AllContainersRestarting condition.
+// Then checks if any container from podStatus are exited with matching rules,
+// or any containers from apiPodStatus are exited with matching rules.
+func ShouldAllContainersRestart(pod *v1.Pod, podStatus *PodStatus, apiPodStatus *v1.PodStatus) bool {
+	if apiPodStatus != nil {
+		for _, cond := range apiPodStatus.Conditions {
+			if cond.Type == v1.AllContainersRestarting && cond.Status == v1.ConditionTrue {
+				return true
+			}
+		}
+	}
+
+	nameToAPIStatus := make(map[string]*v1.ContainerStatus)
+	if apiPodStatus != nil {
+		for i := range apiPodStatus.InitContainerStatuses {
+			nameToAPIStatus[apiPodStatus.InitContainerStatuses[i].Name] = &apiPodStatus.InitContainerStatuses[i]
+		}
+		for i := range apiPodStatus.ContainerStatuses {
+			nameToAPIStatus[apiPodStatus.ContainerStatuses[i].Name] = &apiPodStatus.ContainerStatuses[i]
+		}
+	}
+
+	for c := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
+		if c == nil {
+			continue
+		}
+		if podStatus != nil {
+			status := podStatus.FindContainerStatusByName(c.Name)
+			if status == nil || status.State != ContainerStateExited {
+				continue
+			}
+			exitCode := int32(status.ExitCode)
+			rule, ok := podutil.FindMatchingContainerRestartRule(*c, exitCode)
+			if ok && rule.Action == v1.ContainerRestartRuleActionRestartAllContainers {
+				return true
+			}
+		}
+		if apiPodStatus != nil {
+			apiStatus, ok := nameToAPIStatus[c.Name]
+			if !ok || apiStatus.State.Terminated == nil {
+				continue
+			}
+			exitCode := apiStatus.State.Terminated.ExitCode
+			rule, ok := podutil.FindMatchingContainerRestartRule(*c, exitCode)
+			if ok && rule.Action == v1.ContainerRestartRuleActionRestartAllContainers {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// AllContainersRestartCleanedUp returns true if all containers are removed
+// from the runtime and podStatus.
+func AllContainersRestartCleanedUp(pod *v1.Pod, podStatus *PodStatus) bool {
+	for c := range podutil.ContainerIter(&pod.Spec, podutil.Containers|podutil.InitContainers) {
+		if podStatus.FindContainerStatusByName(c.Name) != nil {
+			return false
+		}
+	}
+	return true
+}
+
 // HashContainer returns the hash of the container. It is used to compare
 // the running container with its desired spec.
 // Note: remember to update hashValues in container_hash_test.go as well.

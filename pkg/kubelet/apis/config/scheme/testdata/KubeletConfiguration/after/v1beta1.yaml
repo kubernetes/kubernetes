@@ -25,7 +25,8 @@ cpuCFSQuota: true
 cpuCFSQuotaPeriod: 100ms
 cpuManagerPolicy: none
 cpuManagerReconcilePeriod: 10s
-crashLoopBackOff: {}
+crashLoopBackOff:
+  maxContainerRestartPeriod: 5m0s
 enableControllerAttachDetach: true
 enableDebugFlagsHandler: true
 enableDebuggingHandlers: true
@@ -49,6 +50,7 @@ imageGCHighThresholdPercent: 85
 imageGCLowThresholdPercent: 80
 imageMaximumGCAge: 0s
 imageMinimumGCAge: 2m0s
+imagePullCredentialsVerificationPolicy: NeverVerifyPreloadedImages
 iptablesDropBit: 15
 iptablesMasqueradeBit: 14
 kind: KubeletConfiguration

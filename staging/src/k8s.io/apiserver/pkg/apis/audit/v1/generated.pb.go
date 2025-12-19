@@ -36,6 +36,8 @@ import (
 	k8s_io_apimachinery_pkg_types "k8s.io/apimachinery/pkg/types"
 )
 
+func (m *AuthenticationMetadata) Reset() { *m = AuthenticationMetadata{} }
+
 func (m *Event) Reset() { *m = Event{} }
 
 func (m *EventList) Reset() { *m = EventList{} }
@@ -49,6 +51,34 @@ func (m *Policy) Reset() { *m = Policy{} }
 func (m *PolicyList) Reset() { *m = PolicyList{} }
 
 func (m *PolicyRule) Reset() { *m = PolicyRule{} }
+
+func (m *AuthenticationMetadata) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *AuthenticationMetadata) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *AuthenticationMetadata) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	i -= len(m.ImpersonationConstraint)
+	copy(dAtA[i:], m.ImpersonationConstraint)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.ImpersonationConstraint)))
+	i--
+	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
 
 func (m *Event) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
@@ -70,6 +100,20 @@ func (m *Event) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.AuthenticationMetadata != nil {
+		{
+			size, err := m.AuthenticationMetadata.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x1
+		i--
+		dAtA[i] = 0x8a
+	}
 	i -= len(m.UserAgent)
 	copy(dAtA[i:], m.UserAgent)
 	i = encodeVarintGenerated(dAtA, i, uint64(len(m.UserAgent)))
@@ -612,6 +656,17 @@ func encodeVarintGenerated(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return base
 }
+func (m *AuthenticationMetadata) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.ImpersonationConstraint)
+	n += 1 + l + sovGenerated(uint64(l))
+	return n
+}
+
 func (m *Event) Size() (n int) {
 	if m == nil {
 		return 0
@@ -670,6 +725,10 @@ func (m *Event) Size() (n int) {
 	}
 	l = len(m.UserAgent)
 	n += 2 + l + sovGenerated(uint64(l))
+	if m.AuthenticationMetadata != nil {
+		l = m.AuthenticationMetadata.Size()
+		n += 2 + l + sovGenerated(uint64(l))
+	}
 	return n
 }
 
@@ -841,6 +900,16 @@ func sovGenerated(x uint64) (n int) {
 func sozGenerated(x uint64) (n int) {
 	return sovGenerated(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
+func (this *AuthenticationMetadata) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&AuthenticationMetadata{`,
+		`ImpersonationConstraint:` + fmt.Sprintf("%v", this.ImpersonationConstraint) + `,`,
+		`}`,
+	}, "")
+	return s
+}
 func (this *Event) String() string {
 	if this == nil {
 		return "nil"
@@ -872,6 +941,7 @@ func (this *Event) String() string {
 		`StageTimestamp:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.StageTimestamp), "MicroTime", "v11.MicroTime", 1), `&`, ``, 1) + `,`,
 		`Annotations:` + mapStringForAnnotations + `,`,
 		`UserAgent:` + fmt.Sprintf("%v", this.UserAgent) + `,`,
+		`AuthenticationMetadata:` + strings.Replace(this.AuthenticationMetadata.String(), "AuthenticationMetadata", "AuthenticationMetadata", 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -985,6 +1055,88 @@ func valueToStringGenerated(v interface{}) string {
 	}
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("*%v", pv)
+}
+func (m *AuthenticationMetadata) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: AuthenticationMetadata: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: AuthenticationMetadata: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ImpersonationConstraint", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ImpersonationConstraint = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
 }
 func (m *Event) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
@@ -1644,6 +1796,42 @@ func (m *Event) Unmarshal(dAtA []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			m.UserAgent = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 17:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field AuthenticationMetadata", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.AuthenticationMetadata == nil {
+				m.AuthenticationMetadata = &AuthenticationMetadata{}
+			}
+			if err := m.AuthenticationMetadata.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

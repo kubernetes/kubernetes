@@ -91,6 +91,13 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				field.Duplicate(field.NewPath("spec", "devices", "requests").Index(1), "req-0"),
 			},
 		},
+		"invalid requests, too many AND duplicate name (short-circuit check)": {
+			input: mkValidResourceClaim(tweakDevicesRequests(33), tweakAddDeviceRequest(mkDeviceRequest("req-0"))),
+			expectedErrs: field.ErrorList{
+				// We expect ONLY TooMany, suppressing the Duplicate error because of short-circuiting
+				field.TooMany(field.NewPath("spec", "devices", "requests"), 33, 32).WithOrigin("maxItems"),
+			},
+		},
 		"invalid constraints, too many": {
 			input: mkValidResourceClaim(tweakDevicesConstraints(33)),
 			expectedErrs: field.ErrorList{

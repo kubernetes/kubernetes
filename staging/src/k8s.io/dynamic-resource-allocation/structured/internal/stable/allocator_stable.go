@@ -107,8 +107,10 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 		requestData:          make(map[requestIndices]requestData),
 		result:               make([]internalAllocationResult, len(claims)),
 	}
-	alloc.logger.V(5).Info("Starting allocation", "numClaims", len(alloc.claimsToAllocate))
-	defer alloc.logger.V(5).Info("Done with allocation", "success", len(finalResult) == len(alloc.claimsToAllocate), "err", finalErr)
+	alloc.logger.V(5).Info("Starting allocation", "numClaims", len(alloc.claimsToAllocate), "numSlices", len(alloc.slices))
+	defer func() {
+		alloc.logger.V(5).Info("Done with allocation", "success", len(finalResult) == len(alloc.claimsToAllocate), "err", finalErr)
+	}()
 
 	// First determine all eligible pools.
 	pools, err := GatherPools(ctx, alloc.slices, node, a.features)
@@ -267,6 +269,17 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 		return nil, err
 	}
 	if !done {
+		// If no devices could be allocated, but we found one or more
+		// invalid pools, return an error here. We didn't do it during
+		// allocation since there might be valid pools from which the
+		// claims could be satisfied.
+		for _, pool := range pools {
+			if pool.IsInvalid {
+				// Not a fatal error, allocation on other nodes may proceed.
+				// The error is only surfaced if allocation fails on all nodes.
+				return nil, fmt.Errorf("invalid resource pools were encountered%w", internal.ErrFailedAllocationOnNode)
+			}
+		}
 		return nil, nil
 	}
 
@@ -286,6 +299,11 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 		}
 
 		// Populate configs.
+
+		// Each class config gets added only once.
+		// We need to keep track of which class configs have already been added and at which position in the allocationResult.Devices.Config.
+		type configRange struct{ start, end int }
+		configIndexesForClass := make(map[string]configRange) // Key: class name / Value: position of the configs for the class in allocationResult.Devices.Config.
 		for requestIndex := range claim.Spec.Devices.Requests {
 			requestKey := requestIndices{claimIndex: claimIndex, requestIndex: requestIndex}
 			requestData := alloc.requestData[requestKey]
@@ -296,15 +314,29 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 			}
 
 			class := requestData.class
-			if class != nil {
-				for _, config := range class.Spec.Config {
-					allocationResult.Devices.Config = append(allocationResult.Devices.Config, resourceapi.DeviceAllocationConfiguration{
-						Source:              resourceapi.AllocationConfigSourceClass,
-						Requests:            nil, // All of them...
-						DeviceConfiguration: config.DeviceConfiguration,
-					})
-				}
+			if class == nil {
+				continue
 			}
+			configIndexes, exists := configIndexesForClass[class.Name]
+			if exists {
+				// The configs for the class have already been added.
+				// Just append the request name for the request class.
+				for i := configIndexes.start; i < configIndexes.end; i++ {
+					allocationResult.Devices.Config[i].Requests = append(allocationResult.Devices.Config[i].Requests, requestData.requestName())
+				}
+				continue
+			}
+
+			// Add all configs for the class once.
+			initialConfigLen := len(allocationResult.Devices.Config)
+			for _, config := range class.Spec.Config {
+				allocationResult.Devices.Config = append(allocationResult.Devices.Config, resourceapi.DeviceAllocationConfiguration{
+					Source:              resourceapi.AllocationConfigSourceClass,
+					Requests:            []string{requestData.requestName()},
+					DeviceConfiguration: config.DeviceConfiguration,
+				})
+			}
+			configIndexesForClass[class.Name] = configRange{start: initialConfigLen, end: len(allocationResult.Devices.Config)}
 		}
 		for _, config := range claim.Spec.Devices.Config {
 			// If Requests are empty, it applies to all. So it can just be included.
@@ -515,6 +547,13 @@ type requestData struct {
 
 	// pre-determined set of devices for allocating "all" devices
 	allDevices []deviceWithID
+}
+
+func (rd *requestData) requestName() string {
+	if rd.parentRequest != nil {
+		return fmt.Sprintf("%s/%s", rd.parentRequest.name(), rd.request.name())
+	}
+	return rd.request.name()
 }
 
 type deviceWithID struct {
@@ -790,11 +829,11 @@ func (alloc *allocator) allocateOne(r deviceIndices, allocateSubRequest bool) (b
 
 	// We need to find suitable devices.
 	for _, pool := range alloc.pools {
-		// If the pool is not valid, then fail now. It's okay when pools of one driver
-		// are invalid if we allocate from some other pool, but it's not safe to
-		// allocated from an invalid pool.
-		if pool.IsInvalid {
-			return false, fmt.Errorf("pool %s is invalid: %s", pool.Pool, pool.InvalidReason)
+		// We don't allocate devices from invalid or incomplete pools, but
+		// don't error out here since there might be available devices in other
+		// pools.
+		if pool.IsIncomplete || pool.IsInvalid {
+			continue
 		}
 		for _, slice := range pool.Slices {
 			for deviceIndex := range slice.Spec.Devices {
@@ -900,7 +939,7 @@ func (alloc *allocator) isSelectable(r requestIndices, requestData requestData, 
 	}
 
 	if ptr.Deref(slice.Spec.PerDeviceNodeSelection, false) {
-		matches, err := nodeMatches(alloc.node, ptr.Deref(device.NodeName, ""), ptr.Deref(device.AllNodes, false), device.NodeSelector)
+		matches, err := NodeMatches(alloc.node, ptr.Deref(device.NodeName, ""), ptr.Deref(device.AllNodes, false), device.NodeSelector)
 		if err != nil {
 			return false, err
 		}

@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -138,20 +139,25 @@ func (jm *ControllerV2) Run(ctx context.Context, workers int) {
 	jm.broadcaster.StartRecordingToSink(&corev1client.EventSinkImpl{Interface: jm.kubeClient.CoreV1().Events("")})
 	defer jm.broadcaster.Shutdown()
 
-	defer jm.queue.ShutDown()
-
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting cronjob controller v2")
-	defer logger.Info("Shutting down cronjob controller v2")
+
+	var wg sync.WaitGroup
+	defer func() {
+		logger.Info("Shutting down cronjob controller v2")
+		jm.queue.ShutDown()
+		wg.Wait()
+	}()
 
 	if !cache.WaitForNamedCacheSyncWithContext(ctx, jm.jobListerSynced, jm.cronJobListerSynced) {
 		return
 	}
 
 	for i := 0; i < workers; i++ {
-		go wait.UntilWithContext(ctx, jm.worker, time.Second)
+		wg.Go(func() {
+			wait.UntilWithContext(ctx, jm.worker, time.Second)
+		})
 	}
-
 	<-ctx.Done()
 }
 

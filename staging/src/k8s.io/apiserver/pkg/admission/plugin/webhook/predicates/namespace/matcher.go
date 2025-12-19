@@ -44,8 +44,13 @@ type Matcher struct {
 	Client          clientset.Interface
 }
 
-func (m *Matcher) GetNamespace(name string) (*v1.Namespace, error) {
-	return m.NamespaceLister.Get(name)
+func (m *Matcher) GetNamespace(ctx context.Context, name string) (*v1.Namespace, error) {
+	ns, err := m.NamespaceLister.Get(name)
+	if apierrors.IsNotFound(err) && len(name) > 0 {
+		// in case of latency in our caches, make a call direct to storage to verify that it truly exists or not
+		ns, err = m.Client.CoreV1().Namespaces().Get(ctx, name, metav1.GetOptions{})
+	}
+	return ns, err
 }
 
 // Validate checks if the Matcher has a NamespaceLister and Client.

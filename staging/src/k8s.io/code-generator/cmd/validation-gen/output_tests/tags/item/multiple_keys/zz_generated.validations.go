@@ -56,9 +56,9 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 
 	// field Struct.Items
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []Item) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj []Item, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
 			// call field-attached validations
@@ -75,13 +75,13 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 				})...)
 			}()
 			return
-		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *Struct) []Item { return oldObj.Items }))...)
+		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *Struct) []Item { return oldObj.Items }), oldObj != nil)...)
 
 	// field Struct.OutOfOrder
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []Item) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj []Item, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
 			// call field-attached validations
@@ -95,13 +95,13 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 				})...)
 			}()
 			return
-		}(fldPath.Child("outOfOrder"), obj.OutOfOrder, safe.Field(oldObj, func(oldObj *Struct) []Item { return oldObj.OutOfOrder }))...)
+		}(fldPath.Child("outOfOrder"), obj.OutOfOrder, safe.Field(oldObj, func(oldObj *Struct) []Item { return oldObj.OutOfOrder }), oldObj != nil)...)
 
 	// field Struct.PtrItems
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []PtrItem) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj []PtrItem, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
 			// call field-attached validations
@@ -117,13 +117,13 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 				})...)
 			}()
 			return
-		}(fldPath.Child("ptrItems"), obj.PtrItems, safe.Field(oldObj, func(oldObj *Struct) []PtrItem { return oldObj.PtrItems }))...)
+		}(fldPath.Child("ptrItems"), obj.PtrItems, safe.Field(oldObj, func(oldObj *Struct) []PtrItem { return oldObj.PtrItems }), oldObj != nil)...)
 
 	// field Struct.MixedPtrItems
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []MixedPtrItem) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj []MixedPtrItem, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
 			// call field-attached validations
@@ -139,7 +139,7 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 				})...)
 			}()
 			return
-		}(fldPath.Child("mixedPtrItems"), obj.MixedPtrItems, safe.Field(oldObj, func(oldObj *Struct) []MixedPtrItem { return oldObj.MixedPtrItems }))...)
+		}(fldPath.Child("mixedPtrItems"), obj.MixedPtrItems, safe.Field(oldObj, func(oldObj *Struct) []MixedPtrItem { return oldObj.MixedPtrItems }), oldObj != nil)...)
 
 	return errs
 }

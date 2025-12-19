@@ -57,21 +57,23 @@ type InTreeToCSITranslator interface {
 
 // CSILimits is a plugin that checks node volume limits.
 type CSILimits struct {
-	csiNodeLister storagelisters.CSINodeLister
-	pvLister      corelisters.PersistentVolumeLister
-	pvcLister     corelisters.PersistentVolumeClaimLister
-	scLister      storagelisters.StorageClassLister
-	vaLister      storagelisters.VolumeAttachmentLister
+	csiManager      fwk.CSIManager
+	pvLister        corelisters.PersistentVolumeLister
+	pvcLister       corelisters.PersistentVolumeClaimLister
+	scLister        storagelisters.StorageClassLister
+	vaLister        storagelisters.VolumeAttachmentLister
+	csiDriverLister storagelisters.CSIDriverLister
 
 	enableCSIMigrationPortworx bool
 	randomVolumeIDPrefix       string
-
-	translator InTreeToCSITranslator
+	enableVolumeLimitScaling   bool
+	translator                 InTreeToCSITranslator
 }
 
 var _ fwk.PreFilterPlugin = &CSILimits{}
 var _ fwk.FilterPlugin = &CSILimits{}
 var _ fwk.EnqueueExtensions = &CSILimits{}
+var _ fwk.SignPlugin = &CSILimits{}
 
 // CSIName is the name of the plugin used in the plugin registry and configurations.
 const CSIName = names.NodeVolumeLimits
@@ -261,7 +263,7 @@ func (pl *CSILimits) Filter(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, 
 
 	logger := klog.FromContext(ctx)
 
-	csiNode, err := pl.csiNodeLister.Get(node.Name)
+	csiNode, err := pl.csiManager.CSINodes().Get(node.Name)
 	if err != nil {
 		// TODO: return the error once CSINode is created by default (2 releases)
 		logger.V(5).Info("Could not get a CSINode object for the node", "node", klog.KObj(node), "err", err)
@@ -280,6 +282,19 @@ func (pl *CSILimits) Filter(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, 
 	// If the pod doesn't have any new CSI volumes, the predicate will always be true
 	if len(newVolumes) == 0 {
 		return nil
+	}
+
+	if pl.enableVolumeLimitScaling {
+		for _, driverName := range newVolumes {
+			driverInstalled, err := pl.checkCSIDriverOnNode(driverName, csiNode)
+			if err != nil {
+				return fwk.AsStatus(err)
+			}
+			if !driverInstalled {
+				driverNotInstalledMsg := fmt.Sprintf("%s CSI driver is not installed on the node", driverName)
+				return fwk.NewStatus(fwk.Unschedulable, driverNotInstalledMsg)
+			}
+		}
 	}
 
 	// If the node doesn't have volume limits, the predicate will always be true
@@ -336,6 +351,29 @@ func (pl *CSILimits) Filter(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, 
 	}
 
 	return nil
+}
+
+func (pl *CSILimits) checkCSIDriverOnNode(pluginName string, csiNode *storagev1.CSINode) (bool, error) {
+	// the registered driver must be a CSI driver to enforce this limit, if we can't find the driver,
+	// we assume the driver may not be a CSI driver and allow the pod to be scheduled.
+	_, err := pl.csiDriverLister.Get(pluginName)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return true, nil
+		}
+		return false, fmt.Errorf("error getting CSIDriver for provider %s: %w", pluginName, err)
+	}
+
+	if csiNode == nil {
+		return false, nil
+	}
+
+	for _, driver := range csiNode.Spec.Drivers {
+		if driver.Name == pluginName {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // filterAttachableVolumes filters the attachable volumes from the pod and adds them to the result map.
@@ -550,18 +588,20 @@ func NewCSI(_ context.Context, _ runtime.Object, handle fwk.Handle, fts feature.
 	informerFactory := handle.SharedInformerFactory()
 	pvLister := informerFactory.Core().V1().PersistentVolumes().Lister()
 	pvcLister := informerFactory.Core().V1().PersistentVolumeClaims().Lister()
-	csiNodesLister := informerFactory.Storage().V1().CSINodes().Lister()
 	scLister := informerFactory.Storage().V1().StorageClasses().Lister()
 	vaLister := informerFactory.Storage().V1().VolumeAttachments().Lister()
+	csiDriverLister := informerFactory.Storage().V1().CSIDrivers().Lister()
 	csiTranslator := csitrans.New()
 
 	return &CSILimits{
-		csiNodeLister:              csiNodesLister,
+		csiManager:                 handle.SharedCSIManager(),
 		pvLister:                   pvLister,
 		pvcLister:                  pvcLister,
 		scLister:                   scLister,
 		vaLister:                   vaLister,
+		csiDriverLister:            csiDriverLister,
 		enableCSIMigrationPortworx: fts.EnableCSIMigrationPortworx,
+		enableVolumeLimitScaling:   fts.EnableVolumeLimitScaling,
 		randomVolumeIDPrefix:       rand.String(32),
 		translator:                 csiTranslator,
 	}, nil
@@ -618,4 +658,11 @@ func (pl *CSILimits) getNodeVolumeAttachmentInfo(logger klog.Logger, nodeName st
 
 func getVolumeUniqueName(driverName, volumeHandle string) string {
 	return fmt.Sprintf("%s/%s", driverName, volumeHandle)
+}
+
+// Feasibility and scoring based on the non-synthetic volume sources.
+func (pl *CSILimits) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
+	return []fwk.SignFragment{
+		{Key: fwk.VolumesSignerName, Value: fwk.VolumesSigner(pod)},
+	}, nil
 }

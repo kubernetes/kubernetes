@@ -43,7 +43,6 @@ func (StatuszEndpointRestrictions) AllowsStreamSchema(s string) bool {
 func isStructured(gvk *schema.GroupVersionKind) bool {
 	if gvk != nil {
 		if gvk.Group == "config.k8s.io" && gvk.Version == "v1alpha1" {
-			// TODO: extend this to Flagz once we have a structured Flagz type.
 			if gvk.Kind == "Statusz" {
 				return true
 			}

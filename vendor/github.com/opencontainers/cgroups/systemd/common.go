@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 	"sync"
@@ -206,6 +207,20 @@ func stopUnit(cm *dbusConnManager, unitName string) error {
 	_ = resetFailedUnit(cm, unitName)
 
 	return nil
+}
+
+func addPid(cm *dbusConnManager, unitName, subcgroup string, pid int) error {
+	absSubcgroup := subcgroup
+	if !path.IsAbs(absSubcgroup) {
+		absSubcgroup = "/" + subcgroup
+	}
+	if absSubcgroup != path.Clean(absSubcgroup) {
+		return fmt.Errorf("bad sub cgroup path: %s", subcgroup)
+	}
+
+	return cm.retryOnDisconnect(func(c *systemdDbus.Conn) error {
+		return c.AttachProcessesToUnit(context.TODO(), unitName, absSubcgroup, []uint32{uint32(pid)})
+	})
 }
 
 func resetFailedUnit(cm *dbusConnManager, name string) error {

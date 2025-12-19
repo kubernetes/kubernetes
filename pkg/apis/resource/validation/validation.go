@@ -703,71 +703,87 @@ func validateResourceSliceSpec(spec, oldSpec *resource.ResourceSliceSpec, fldPat
 			"exactly one of `nodeName`, `nodeSelector`, `allNodes`, `perDeviceNodeSelection` is required, but multiple fields are set"))
 	}
 
-	sharedCounterToCounterNames := gatherSharedCounterCounterNames(spec.SharedCounters)
-	allErrs = append(allErrs, validateSet(spec.Devices, resource.ResourceSliceMaxDevices,
+	if spec.SharedCounters != nil && spec.Devices != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, "", "only one of `sharedCounters` or `devices` is allowed"))
+	}
+
+	maxDevices := resource.ResourceSliceMaxDevices
+	if haveDeviceTaints(spec) || haveConsumesCounters(spec) {
+		maxDevices = resource.ResourceSliceMaxDevicesWithTaintsOrConsumesCounters
+	}
+	allErrs = append(allErrs, validateSet(spec.Devices, maxDevices,
 		func(device resource.Device, fldPath *field.Path) field.ErrorList {
-			return validateDevice(device, fldPath, sharedCounterToCounterNames, spec.PerDeviceNodeSelection)
+			oldDevice := lookupDevice(oldSpec, device.Name)
+			return validateDevice(device, oldDevice, fldPath, spec.PerDeviceNodeSelection)
 		},
 		func(device resource.Device) string {
 			return device.Name
 		}, fldPath.Child("devices"))...)
 
-	// Size limit for total number of counters in devices enforced here.
-	numDeviceCounters := 0
-	for _, device := range spec.Devices {
-		for _, c := range device.ConsumesCounters {
-			numDeviceCounters += len(c.Counters)
-		}
-	}
-	if numDeviceCounters > resource.ResourceSliceMaxDeviceCountersPerSlice {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("devices"), numDeviceCounters, fmt.Sprintf("the total number of counters in devices must not exceed %d", resource.ResourceSliceMaxDeviceCountersPerSlice)))
-	}
-
-	// Size limit for all shared counters enforced here.
-	numCounters := 0
-	for _, set := range spec.SharedCounters {
-		numCounters += len(set.Counters)
-	}
-	if numCounters > resource.ResourceSliceMaxSharedCounters {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("sharedCounters"), numCounters, fmt.Sprintf("the total number of shared counters must not exceed %d", resource.ResourceSliceMaxSharedCounters)))
-	}
-	allErrs = append(allErrs, validateSet(spec.SharedCounters, -1,
+	allErrs = append(allErrs, validateSet(spec.SharedCounters, resource.ResourceSliceMaxCounterSets,
 		validateCounterSet,
 		func(counterSet resource.CounterSet) string {
 			return counterSet.Name
-		}, fldPath.Child("sharedCounters"))...)
+		}, fldPath.Child("sharedCounters"), sizeCovered, uniquenessCovered)...)
 
 	return allErrs
+}
+
+func haveDeviceTaints(spec *resource.ResourceSliceSpec) bool {
+	if spec == nil {
+		return false
+	}
+
+	for _, device := range spec.Devices {
+		if len(device.Taints) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func haveConsumesCounters(spec *resource.ResourceSliceSpec) bool {
+	if spec == nil {
+		return false
+	}
+
+	for _, device := range spec.Devices {
+		if len(device.ConsumesCounters) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func lookupDevice(spec *resource.ResourceSliceSpec, deviceName string) *resource.Device {
+	if spec == nil {
+		return nil
+	}
+	for i := range spec.Devices {
+		device := &spec.Devices[i]
+		if device.Name == deviceName {
+			return device
+		}
+	}
+	return nil
 }
 
 func validateCounterSet(counterSet resource.CounterSet, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if counterSet.Name == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "").MarkCoveredByDeclarative())
 	} else {
-		allErrs = append(allErrs, validateCounterName(counterSet.Name, fldPath.Child("name"))...)
+		allErrs = append(allErrs, validateCounterName(counterSet.Name, fldPath.Child("name"))...).MarkCoveredByDeclarative()
 	}
 	if len(counterSet.Counters) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("counters"), ""))
 	} else {
 		// The size limit is enforced for across all sets by the caller.
-		allErrs = append(allErrs, validateMap(counterSet.Counters, -1, validation.DNS1123LabelMaxLength,
-			validateCounterName, validateDeviceCounter, fldPath.Child("counters"), keysCovered)...)
+		allErrs = append(allErrs, validateMap(counterSet.Counters, resource.ResourceSliceMaxCountersPerCounterSet, validation.DNS1123LabelMaxLength,
+			validateCounterName, validateDeviceCounter, fldPath.Child("counters"))...)
 	}
 
 	return allErrs
-}
-
-func gatherSharedCounterCounterNames(sharedCounters []resource.CounterSet) map[string]sets.Set[string] {
-	sharedCounterToCounterMap := make(map[string]sets.Set[string])
-	for _, counterSet := range sharedCounters {
-		counterNames := sets.New[string]()
-		for counterName := range counterSet.Counters {
-			counterNames.Insert(counterName)
-		}
-		sharedCounterToCounterMap[counterSet.Name] = counterNames
-	}
-	return sharedCounterToCounterMap
 }
 
 func validateResourcePool(pool resource.ResourcePool, fldPath *field.Path) field.ErrorList {
@@ -782,7 +798,7 @@ func validateResourcePool(pool resource.ResourcePool, fldPath *field.Path) field
 	return allErrs
 }
 
-func validateDevice(device resource.Device, fldPath *field.Path, sharedCounterToCounterNames map[string]sets.Set[string], perDeviceNodeSelection *bool) field.ErrorList {
+func validateDevice(device resource.Device, oldDevice *resource.Device, fldPath *field.Path, perDeviceNodeSelection *bool) field.ErrorList {
 	var allErrs field.ErrorList
 	allowMultipleAllocations := device.AllowMultipleAllocations != nil && *device.AllowMultipleAllocations
 	allErrs = append(allErrs, validateDeviceName(device.Name, fldPath.Child("name"))...)
@@ -799,35 +815,21 @@ func validateDevice(device resource.Device, fldPath *field.Path, sharedCounterTo
 	} else {
 		allErrs = append(allErrs, validateMap(device.Capacity, -1, attributeAndCapacityMaxKeyLength, validateQualifiedName, validateSingleAllocatableDeviceCapacity, fldPath.Child("capacity"))...)
 	}
-	allErrs = append(allErrs, validateSlice(device.Taints, resource.DeviceTaintsMaxLength, validateDeviceTaint, fldPath.Child("taints"))...)
+	// If the entire set is the same as before then validation can be skipped.
+	// We could also do the DeepEqual on the entire spec, but here it is a bit cheaper.
+	if oldDevice == nil || !apiequality.Semantic.DeepEqual(oldDevice.Taints, device.Taints) {
+		allErrs = append(allErrs, validateSlice(device.Taints, resource.DeviceTaintsMaxLength,
+			func(taint resource.DeviceTaint, fldPath *field.Path) field.ErrorList {
+				return validateDeviceTaint(taint, nil, fldPath)
+			},
+			fldPath.Child("taints"))...)
+	}
 
-	allErrs = append(allErrs, validateSet(device.ConsumesCounters, -1,
+	allErrs = append(allErrs, validateSet(device.ConsumesCounters, resource.ResourceSliceMaxDeviceCounterConsumptionsPerDevice,
 		validateDeviceCounterConsumption,
 		func(deviceCapacityConsumption resource.DeviceCounterConsumption) string {
 			return deviceCapacityConsumption.CounterSet
-		}, fldPath.Child("consumesCounters"))...)
-
-	var countersLength int
-	for _, set := range device.ConsumesCounters {
-		countersLength += len(set.Counters)
-	}
-	if countersLength > resource.ResourceSliceMaxCountersPerDevice {
-		allErrs = append(allErrs, field.Invalid(fldPath, countersLength, fmt.Sprintf("the total number of counters must not exceed %d", resource.ResourceSliceMaxCountersPerDevice)))
-	}
-
-	for i, deviceCounterConsumption := range device.ConsumesCounters {
-		if capacityNames, exists := sharedCounterToCounterNames[deviceCounterConsumption.CounterSet]; exists {
-			for capacityName := range deviceCounterConsumption.Counters {
-				if !capacityNames.Has(string(capacityName)) {
-					allErrs = append(allErrs, field.Invalid(fldPath.Child("consumesCounters").Index(i).Child("counters"),
-						capacityName, "must reference a counter defined in the ResourceSlice sharedCounters"))
-				}
-			}
-		} else {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("consumesCounters").Index(i).Child("counterSet"),
-				deviceCounterConsumption.CounterSet, "must reference a counterSet defined in the ResourceSlice sharedCounters"))
-		}
-	}
+		}, fldPath.Child("consumesCounters"), sizeCovered, uniquenessCovered)...)
 
 	if perDeviceNodeSelection != nil && *perDeviceNodeSelection {
 		setFields := make([]string, 0, 3)
@@ -870,14 +872,15 @@ func validateDeviceCounterConsumption(deviceCounterConsumption resource.DeviceCo
 	var allErrs field.ErrorList
 
 	if len(deviceCounterConsumption.CounterSet) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("counterSet"), ""))
+		allErrs = append(allErrs, field.Required(fldPath.Child("counterSet"), "").MarkCoveredByDeclarative())
+	} else {
+		allErrs = append(allErrs, validateCounterName(deviceCounterConsumption.CounterSet, fldPath.Child("counterSet"))...).MarkCoveredByDeclarative()
 	}
 	if len(deviceCounterConsumption.Counters) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("counters"), ""))
 	} else {
-		// The size limit is enforced for the entire device.
-		allErrs = append(allErrs, validateMap(deviceCounterConsumption.Counters, -1, validation.DNS1123LabelMaxLength,
-			validateCounterName, validateDeviceCounter, fldPath.Child("counters"), keysCovered)...)
+		allErrs = append(allErrs, validateMap(deviceCounterConsumption.Counters, resource.ResourceSliceMaxCountersPerDeviceCounterConsumption,
+			validation.DNS1123LabelMaxLength, validateCounterName, validateDeviceCounter, fldPath.Child("counters"))...)
 	}
 	return allErrs
 }
@@ -1151,14 +1154,10 @@ const (
 	sizeCovered
 	// The uniqueness check is covered by declarative validation.
 	uniquenessCovered
-	// key validation is covered by declarative validation.
-	keysCovered
 )
 
-// validateSlice ensures that a slice does not exceed a certain maximum size
-// and that all entries are valid.
-// A negative maxSize disables the length check.
-func validateSlice[T any](slice []T, maxSize int, validateItem func(T, *field.Path) field.ErrorList, fldPath *field.Path, opts ...validationOption) field.ErrorList {
+// validateItems validates each item in a slice.
+func validateItems[T any](slice []T, validateItem func(T, *field.Path) field.ErrorList, fldPath *field.Path, opts ...validationOption) field.ErrorList {
 	var allErrs field.ErrorList
 	for i, item := range slice {
 		idxPath := fldPath.Index(i)
@@ -1168,6 +1167,13 @@ func validateSlice[T any](slice []T, maxSize int, validateItem func(T, *field.Pa
 		}
 		allErrs = append(allErrs, errs...)
 	}
+	return allErrs
+}
+
+// validateSlice ensures that a slice does not exceed a certain maximum size
+// and that all entries are valid.
+// A negative maxSize disables the length check.
+func validateSlice[T any](slice []T, maxSize int, validateItem func(T, *field.Path) field.ErrorList, fldPath *field.Path, opts ...validationOption) field.ErrorList {
 	if maxSize >= 0 && len(slice) > maxSize {
 		// Dumping the entire field into the error message is likely to be too long,
 		// in particular when it is already beyond the maximum size. Instead this
@@ -1176,15 +1182,28 @@ func validateSlice[T any](slice []T, maxSize int, validateItem func(T, *field.Pa
 		if slices.Contains(opts, sizeCovered) {
 			err = err.MarkCoveredByDeclarative()
 		}
-		allErrs = append(allErrs, err)
+		// maxSize check short-circuits for DOS protection
+		return field.ErrorList{err}
 	}
-	return allErrs
+	return validateItems(slice, validateItem, fldPath, opts...)
 }
 
 // validateSet ensures that a slice contains no duplicates, does not
 // exceed a certain maximum size and that all entries are valid.
 func validateSet[T any, K comparable](slice []T, maxSize int, validateItem func(item T, fldPath *field.Path) field.ErrorList, itemKey func(T) K, fldPath *field.Path, opts ...validationOption) field.ErrorList {
-	allErrs := validateSlice(slice, maxSize, validateItem, fldPath, opts...)
+	if maxSize >= 0 && len(slice) > maxSize {
+		// Dumping the entire field into the error message is likely to be too long,
+		// in particular when it is already beyond the maximum size. Instead this
+		// just shows the number of entries.
+		err := field.TooMany(fldPath, len(slice), maxSize).WithOrigin("maxItems")
+		if slices.Contains(opts, sizeCovered) {
+			err = err.MarkCoveredByDeclarative()
+		}
+		// maxSize check short-circuits for DOS protection
+		return field.ErrorList{err}
+	}
+
+	allErrs := validateItems(slice, validateItem, fldPath, opts...)
 
 	allItems := sets.New[K]()
 	for i, item := range slice {
@@ -1221,19 +1240,16 @@ func quantityKey(item apiresource.Quantity) string {
 // small limit gets increased because it is okay to include more details.
 // This is not used for validation of keys, which has to be done by
 // the callback function.
-func validateMap[K ~string, T any](m map[K]T, maxSize, truncateKeyLen int, validateKey func(K, *field.Path) field.ErrorList, validateItem func(T, *field.Path) field.ErrorList, fldPath *field.Path, opts ...validationOption) field.ErrorList {
+func validateMap[K ~string, T any](m map[K]T, maxSize, truncateKeyLen int, validateKey func(K, *field.Path) field.ErrorList, validateItem func(T, *field.Path) field.ErrorList, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if maxSize >= 0 && len(m) > maxSize {
 		allErrs = append(allErrs, field.TooMany(fldPath, len(m), maxSize))
+		// maxSize check short-circuits for DOS protection
+		return allErrs
 	}
 	for key, item := range m {
 		keyPath := fldPath.Key(truncateIfTooLong(string(key), truncateKeyLen))
-
-		keyValidationErrors := validateKey(key, fldPath)
-		if slices.Contains(opts, keysCovered) {
-			keyValidationErrors = keyValidationErrors.MarkCoveredByDeclarative()
-		}
-		allErrs = append(allErrs, keyValidationErrors...)
+		allErrs = append(allErrs, validateKey(key, keyPath)...)
 		allErrs = append(allErrs, validateItem(item, keyPath)...)
 	}
 	return allErrs
@@ -1342,7 +1358,11 @@ func validateDeviceTaintRuleSpec(spec, oldSpec *resource.DeviceTaintRuleSpec, fl
 		oldFilter = oldSpec.DeviceSelector // +k8s:verify-mutation:reason=clone
 	}
 	allErrs = append(allErrs, validateDeviceTaintSelector(spec.DeviceSelector, oldFilter, fldPath.Child("deviceSelector"))...)
-	allErrs = append(allErrs, validateDeviceTaint(spec.Taint, fldPath.Child("taint"))...)
+	var oldTaint *resource.DeviceTaint
+	if oldSpec != nil {
+		oldTaint = &oldSpec.Taint // +k8s:verify-mutation:reason=clone
+	}
+	allErrs = append(allErrs, validateDeviceTaint(spec.Taint, oldTaint, fldPath.Child("taint"))...)
 	return allErrs
 }
 
@@ -1351,9 +1371,6 @@ func validateDeviceTaintSelector(filter, oldFilter *resource.DeviceTaintSelector
 
 	if filter == nil {
 		return allErrs
-	}
-	if filter.DeviceClassName != nil {
-		allErrs = append(allErrs, validateDeviceClassName(*filter.DeviceClassName, fldPath.Child("deviceClassName"))...)
 	}
 	if filter.Driver != nil {
 		allErrs = append(allErrs, validateDriverName(*filter.Driver, fldPath.Child("driver"))...)
@@ -1365,37 +1382,26 @@ func validateDeviceTaintSelector(filter, oldFilter *resource.DeviceTaintSelector
 		allErrs = append(allErrs, validateDeviceName(*filter.Device, fldPath.Child("device"))...)
 	}
 
-	// If the selectors are exactly as before, we treat the CEL expressions as "stored".
-	// Any change, including merely reordering selectors, triggers validation as new
-	// expressions.
-	stored := false
-	if oldFilter != nil {
-		stored = apiequality.Semantic.DeepEqual(filter.Selectors, oldFilter.Selectors)
-	}
-	allErrs = append(allErrs, validateSlice(filter.Selectors, resource.DeviceSelectorsMaxSize,
-		func(selector resource.DeviceSelector, fldPath *field.Path) field.ErrorList {
-			return validateSelector(selector, fldPath, stored)
-		},
-		fldPath.Child("selectors"))...)
-
 	return allErrs
 }
 
 var validDeviceTolerationOperators = []resource.DeviceTolerationOperator{resource.DeviceTolerationOpEqual, resource.DeviceTolerationOpExists}
-var validDeviceTaintEffects = sets.New(resource.DeviceTaintEffectNoSchedule, resource.DeviceTaintEffectNoExecute)
+var validDeviceTaintEffects = sets.New(resource.DeviceTaintEffectNoSchedule, resource.DeviceTaintEffectNoExecute, resource.DeviceTaintEffectNone)
 
-func validateDeviceTaint(taint resource.DeviceTaint, fldPath *field.Path) field.ErrorList {
+func validateDeviceTaint(taint resource.DeviceTaint, oldTaint *resource.DeviceTaint, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 
 	allErrs = append(allErrs, metav1validation.ValidateLabelName(taint.Key, fldPath.Child("key"))...) // Includes checking for non-empty.
 	if taint.Value != "" {
 		allErrs = append(allErrs, validateLabelValue(taint.Value, fldPath.Child("value"))...)
 	}
-	switch {
-	case taint.Effect == "":
-		allErrs = append(allErrs, field.Required(fldPath.Child("effect"), "").MarkCoveredByDeclarative()) // Required in a taint.
-	case !validDeviceTaintEffects.Has(taint.Effect):
-		allErrs = append(allErrs, field.NotSupported(fldPath.Child("effect"), taint.Effect, sets.List(validDeviceTaintEffects)).MarkCoveredByDeclarative())
+	if oldTaint == nil || oldTaint.Effect != taint.Effect {
+		switch {
+		case taint.Effect == "":
+			allErrs = append(allErrs, field.Required(fldPath.Child("effect"), "").MarkCoveredByDeclarative()) // Required in a taint.
+		case !validDeviceTaintEffects.Has(taint.Effect):
+			allErrs = append(allErrs, field.NotSupported(fldPath.Child("effect"), taint.Effect, sets.List(validDeviceTaintEffects)).MarkCoveredByDeclarative())
+		}
 	}
 
 	return allErrs
@@ -1474,6 +1480,20 @@ func validateDeviceBindingParameters(bindingConditions, bindingFailureConditions
 	}
 	if len(bindingFailureConditions) == 0 && len(bindingConditions) > 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("bindingFailureConditions"), bindingFailureConditions, "bindingFailureConditions are required to use bindingConditions"))
+	}
+
+	return allErrs
+}
+
+// ValidateDeviceTaintRuleStatusUpdate tests if a DeviceTaintRule status update is valid.
+func ValidateDeviceTaintRuleStatusUpdate(rule, oldRule *resource.DeviceTaintRule) field.ErrorList {
+	var allErrs field.ErrorList
+
+	fldPath := field.NewPath("status")
+	allErrs = corevalidation.ValidateObjectMetaUpdate(&rule.ObjectMeta, &oldRule.ObjectMeta, field.NewPath("metadata")) // Covers invalid name changes.
+	allErrs = append(allErrs, metav1validation.ValidateConditions(rule.Status.Conditions, fldPath.Child("conditions"))...)
+	if len(rule.Status.Conditions) > resource.DeviceTaintRuleStatusMaxConditions {
+		allErrs = append(allErrs, field.TooMany(fldPath.Child("conditions"), len(rule.Status.Conditions), resource.DeviceTaintRuleStatusMaxConditions))
 	}
 
 	return allErrs

@@ -88,6 +88,7 @@ message ClaimResource {
     string driver_name = 2;
     string pool_name = 3;
     string device_name = 4;
+    optional string share_id = 5;
 }
 
 // CDIDevice specifies a CDI device information

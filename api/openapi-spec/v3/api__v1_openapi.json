@@ -3154,6 +3154,19 @@
         },
         "type": "object"
       },
+      "io.k8s.api.core.v1.ImageVolumeStatus": {
+        "description": "ImageVolumeStatus represents the image-based volume status.",
+        "properties": {
+          "imageRef": {
+            "description": "ImageRef is the digest of the image used for this volume. It should have a value that's similar to the pod's status.containerStatuses[i].imageID. The ImageRef length should not exceed 256 characters.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "imageRef"
+        ],
+        "type": "object"
+      },
       "io.k8s.api.core.v1.KeyToPath": {
         "description": "Maps a string key to a path within a volume.",
         "properties": {
@@ -4222,6 +4235,15 @@
             "default": {},
             "description": "Endpoints of daemons running on the Node."
           },
+          "declaredFeatures": {
+            "description": "DeclaredFeatures represents the features related to feature gates that are declared by the node.",
+            "items": {
+              "default": "",
+              "type": "string"
+            },
+            "type": "array",
+            "x-kubernetes-list-type": "atomic"
+          },
           "features": {
             "allOf": [
               {
@@ -5009,7 +5031,7 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.VolumeNodeAffinity"
               }
             ],
-            "description": "nodeAffinity defines constraints that limit what nodes this volume can be accessed from. This field influences the scheduling of pods that use this volume."
+            "description": "nodeAffinity defines constraints that limit what nodes this volume can be accessed from. This field influences the scheduling of pods that use this volume. This field is mutable if MutablePVNodeAffinity feature gate is enabled."
           },
           "persistentVolumeReclaimPolicy": {
             "description": "persistentVolumeReclaimPolicy defines what happens to a persistent volume when released from its claim. Valid options are Retain (default for manually created PersistentVolumes), Delete (default for dynamically provisioned PersistentVolumes), and Recycle (deprecated). Recycle must be supported by the volume plugin underlying this PersistentVolume. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#reclaiming",
@@ -5326,6 +5348,14 @@
           "signerName": {
             "description": "Kubelet's generated CSRs will be addressed to this signer.",
             "type": "string"
+          },
+          "userAnnotations": {
+            "additionalProperties": {
+              "default": "",
+              "type": "string"
+            },
+            "description": "userAnnotations allow pod authors to pass additional information to the signer implementation.  Kubernetes does not restrict or validate this metadata in any way.\n\nThese values are copied verbatim into the `spec.unverifiedUserAnnotations` field of the PodCertificateRequest objects that Kubelet creates.\n\nEntries are subject to the same validation as object metadata annotations, with the addition that all keys must be domain-prefixed. No restrictions are placed on values, except an overall size limitation on the entire field.\n\nSigners should document the keys and values they support. Signers should deny requests that contain keys they do not recognize.",
+            "type": "object"
           }
         },
         "required": [
@@ -6037,6 +6067,14 @@
             "x-kubernetes-list-type": "map",
             "x-kubernetes-patch-merge-key": "name",
             "x-kubernetes-patch-strategy": "merge,retainKeys"
+          },
+          "workloadRef": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.WorkloadReference"
+              }
+            ],
+            "description": "WorkloadRef provides a reference to the Workload object that this Pod belongs to. This field is used by the scheduler to identify the PodGroup and apply the correct group scheduling policies. The Workload object referenced by this field may not exist at the time the Pod is created. This field is immutable, but a Workload object with the same name may be recreated with different policies. Doing this during pod scheduling may result in the placement not conforming to the expected policies."
           }
         },
         "required": [
@@ -6047,6 +6085,13 @@
       "io.k8s.api.core.v1.PodStatus": {
         "description": "PodStatus represents information about the status of a pod. Status may trail the actual state of a system, especially if the node that hosts the pod cannot contact the control plane.",
         "properties": {
+          "allocatedResources": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
+            },
+            "description": "AllocatedResources is the total requests allocated for this pod by the node. If pod-level requests are not set, this will be the total requests aggregated across containers in the pod.",
+            "type": "object"
+          },
           "conditions": {
             "description": "Current service state of pod. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-conditions",
             "items": {
@@ -6199,6 +6244,14 @@
             "x-kubernetes-list-type": "map",
             "x-kubernetes-patch-merge-key": "name",
             "x-kubernetes-patch-strategy": "merge,retainKeys"
+          },
+          "resources": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.ResourceRequirements"
+              }
+            ],
+            "description": "Resources represents the compute resource requests and limits that have been applied at the pod level if pod-level requests or limits are set in PodSpec.Resources"
           },
           "startTime": {
             "allOf": [
@@ -8227,7 +8280,7 @@
             "type": "string"
           },
           "operator": {
-            "description": "Operator represents a key's relationship to the value. Valid operators are Exists and Equal. Defaults to Equal. Exists is equivalent to wildcard for value, so that a pod can tolerate all taints of a particular category.",
+            "description": "Operator represents a key's relationship to the value. Valid operators are Exists, Equal, Lt, and Gt. Defaults to Equal. Exists is equivalent to wildcard for value, so that a pod can tolerate all taints of a particular category. Lt and Gt perform numeric comparisons (requires feature gate TaintTolerationComparisonOperators).",
             "type": "string"
           },
           "tolerationSeconds": {
@@ -8686,6 +8739,15 @@
           "recursiveReadOnly": {
             "description": "RecursiveReadOnly must be set to Disabled, Enabled, or unspecified (for non-readonly mounts). An IfPossible value in the original VolumeMount must be translated to Disabled or Enabled, depending on the mount result.",
             "type": "string"
+          },
+          "volumeStatus": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.VolumeStatus"
+              }
+            ],
+            "default": {},
+            "description": "volumeStatus represents volume-type-specific status about the mounted volume."
           }
         },
         "required": [
@@ -8782,6 +8844,20 @@
         },
         "type": "object"
       },
+      "io.k8s.api.core.v1.VolumeStatus": {
+        "description": "VolumeStatus represents the status of a mounted volume. At most one of its members must be specified.",
+        "properties": {
+          "image": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.ImageVolumeStatus"
+              }
+            ],
+            "description": "image represents an OCI object (a container image or artifact) pulled and mounted on the kubelet's host machine."
+          }
+        },
+        "type": "object"
+      },
       "io.k8s.api.core.v1.VsphereVirtualDiskVolumeSource": {
         "description": "Represents a vSphere volume resource.",
         "properties": {
@@ -8853,6 +8929,30 @@
             "type": "string"
           }
         },
+        "type": "object"
+      },
+      "io.k8s.api.core.v1.WorkloadReference": {
+        "description": "WorkloadReference identifies the Workload object and PodGroup membership that a Pod belongs to. The scheduler uses this information to apply workload-aware scheduling semantics.",
+        "properties": {
+          "name": {
+            "default": "",
+            "description": "Name defines the name of the Workload object this Pod belongs to. Workload must be in the same namespace as the Pod. If it doesn't match any existing Workload, the Pod will remain unschedulable until a Workload object is created and observed by the kube-scheduler. It must be a DNS subdomain.",
+            "type": "string"
+          },
+          "podGroup": {
+            "default": "",
+            "description": "PodGroup is the name of the PodGroup within the Workload that this Pod belongs to. If it doesn't match any existing PodGroup within the Workload, the Pod will remain unschedulable until the Workload object is recreated and observed by the kube-scheduler. It must be a DNS label.",
+            "type": "string"
+          },
+          "podGroupReplicaKey": {
+            "description": "PodGroupReplicaKey specifies the replica key of the PodGroup to which this Pod belongs. It is used to distinguish pods belonging to different replicas of the same pod group. The pod group policy is applied separately to each replica. When set, it must be a DNS label.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "podGroup"
+        ],
         "type": "object"
       },
       "io.k8s.api.policy.v1.Eviction": {
@@ -9211,16 +9311,6 @@
             "group": "autoscaling",
             "kind": "DeleteOptions",
             "version": "v2"
-          },
-          {
-            "group": "autoscaling",
-            "kind": "DeleteOptions",
-            "version": "v2beta1"
-          },
-          {
-            "group": "autoscaling",
-            "kind": "DeleteOptions",
-            "version": "v2beta2"
           },
           {
             "group": "batch",
@@ -9966,16 +10056,6 @@
             "group": "autoscaling",
             "kind": "WatchEvent",
             "version": "v2"
-          },
-          {
-            "group": "autoscaling",
-            "kind": "WatchEvent",
-            "version": "v2beta1"
-          },
-          {
-            "group": "autoscaling",
-            "kind": "WatchEvent",
-            "version": "v2beta2"
           },
           {
             "group": "batch",

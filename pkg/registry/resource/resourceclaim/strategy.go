@@ -153,15 +153,19 @@ func NewStatusStrategy(resourceclaimStrategy *resourceclaimStrategy) *resourcecl
 func (*resourceclaimStatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	fields := map[fieldpath.APIVersion]*fieldpath.Set{
 		"resource.k8s.io/v1alpha3": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("metadata"),
 			fieldpath.MakePathOrDie("spec"),
 		),
 		"resource.k8s.io/v1beta1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("metadata"),
 			fieldpath.MakePathOrDie("spec"),
 		),
 		"resource.k8s.io/v1beta2": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("metadata"),
 			fieldpath.MakePathOrDie("spec"),
 		),
 		"resource.k8s.io/v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("metadata"),
 			fieldpath.MakePathOrDie("spec"),
 		),
 	}
@@ -237,6 +241,7 @@ func dropDisabledStatusFields(newClaim, oldClaim *resource.ResourceClaim) {
 	dropDisabledDRAResourceClaimDeviceStatusFields(newClaim, oldClaim)
 	dropDisabledDRAAdminAccessStatusFields(newClaim, oldClaim)
 	dropDisabledDRAResourceClaimConsumableCapacityStatusFields(newClaim, oldClaim)
+	dropDeviceBindingConditionsFields(newClaim, oldClaim)
 }
 
 func dropDisabledDRAAdminAccessStatusFields(newClaim, oldClaim *resource.ResourceClaim) {
@@ -373,6 +378,20 @@ func draConsumableCapacityFeatureInUse(claim *resource.ResourceClaim) bool {
 	return false
 }
 
+func draDeviceBindingConditionsInUse(claim *resource.ResourceClaim) bool {
+	if claim == nil {
+		return false
+	}
+	if allocation := claim.Status.Allocation; allocation != nil {
+		for _, result := range allocation.Devices.Results {
+			if result.BindingConditions != nil || result.BindingFailureConditions != nil {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // dropDisabledDRAResourceClaimConsumableCapacityStatusFields drops any new feature fields
 // from the newClaim status if they were not used in the oldClaim.
 func dropDisabledDRAResourceClaimConsumableCapacityStatusFields(newClaim, oldClaim *resource.ResourceClaim) {
@@ -392,6 +411,23 @@ func dropDisabledDRAResourceClaimConsumableCapacityStatusFields(newClaim, oldCla
 	if devices := newClaim.Status.Devices; devices != nil {
 		for i := range devices {
 			newClaim.Status.Devices[i].ShareID = nil
+		}
+	}
+}
+
+// dropDeviceBindingConditionsFields drops any new feature fields
+// from the newClaim status if they were not used in the oldClaim.
+func dropDeviceBindingConditionsFields(newClaim, oldClaim *resource.ResourceClaim) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceBindingConditions) ||
+		draDeviceBindingConditionsInUse(oldClaim) {
+		// No need to drop anything.
+		return
+	}
+
+	if allocation := newClaim.Status.Allocation; allocation != nil {
+		for i := range allocation.Devices.Results {
+			newClaim.Status.Allocation.Devices.Results[i].BindingConditions = nil
+			newClaim.Status.Allocation.Devices.Results[i].BindingFailureConditions = nil
 		}
 	}
 }

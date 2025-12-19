@@ -54,9 +54,9 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Struct) (errs field.ErrorList) {
 	// field Struct.StructType
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *other.StructType) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj *other.StructType, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
 			// call field-attached validations
@@ -66,7 +66,7 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 				})...)
 			}()
 			return
-		}(safe.Value(fldPath, func() *field.Path { return fldPath.Child("other.StructType") }), &obj.StructType, safe.Field(oldObj, func(oldObj *Struct) *other.StructType { return &oldObj.StructType }))...)
+		}(safe.Value(fldPath, func() *field.Path { return fldPath.Child("other.StructType") }), &obj.StructType, safe.Field(oldObj, func(oldObj *Struct) *other.StructType { return &oldObj.StructType }), oldObj != nil)...)
 
 	return errs
 }

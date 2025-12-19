@@ -76,7 +76,7 @@ var _ = SIGDescribe("Container Runtime Conformance Test", func() {
 					})
 				})
 
-				f.It(testCase.description+"", f.WithNodeConformance(), func(ctx context.Context) {
+				f.It(testCase.description+"", f.WithNodeConformance(), f.WithDisruptive(), f.WithSerial(), func(ctx context.Context) {
 					name := "image-pull-test"
 					container := node.ConformanceContainer{
 						PodClient: e2epod.NewPodClient(f),
@@ -94,9 +94,16 @@ var _ = SIGDescribe("Container Runtime Conformance Test", func() {
 
 					auth := e2eregistry.User1DockerSecret(registryAddress).Data[v1.DockerConfigJsonKey]
 					configFile := filepath.Join(services.KubeletRootDirectory, "config.json")
+
+					// the kubelet would cache the config for 5 minutes, let's restart instead
+					restartKubelet(context.Background(), true)
+
 					err := os.WriteFile(configFile, []byte(auth), 0644)
 					framework.ExpectNoError(err)
-					ginkgo.DeferCleanup(func() { framework.ExpectNoError(os.Remove(configFile)) })
+					ginkgo.DeferCleanup(func() {
+						framework.ExpectNoError(os.Remove(configFile))
+						framework.ExpectNoError(os.RemoveAll(filepath.Join(services.KubeletRootDirectory, "image_manager")))
+					})
 
 					// checkContainerStatus checks whether the container status matches expectation.
 					checkContainerStatus := func(ctx context.Context) error {
@@ -147,13 +154,15 @@ var _ = SIGDescribe("Container Runtime Conformance Test", func() {
 
 					ginkgo.By("check the container status")
 					var latestErr error
-					err = wait.PollUntilContextCancel(ctx, node.ContainerStatusPollInterval, true, func(ctx context.Context) (bool, error) {
+					err = wait.PollUntilContextTimeout(ctx, node.ContainerStatusPollInterval, node.ContainerStatusRetryTimeout, true, func(ctx context.Context) (bool, error) {
 						if latestErr = checkContainerStatus(ctx); latestErr != nil {
 							return false, nil
 						}
 						return true, nil
 					})
 					if err != nil {
+						credsContent, readErr := os.ReadFile(configFile)
+						framework.Logf("credentials read error: %v; credentials used:\n%v", readErr, credsContent)
 						framework.Failf("Failed to read container status: %v; last observed error from wait loop: %v", err, latestErr)
 					}
 				})

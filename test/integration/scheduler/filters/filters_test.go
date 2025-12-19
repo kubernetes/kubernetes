@@ -24,6 +24,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	"github.com/stretchr/testify/mock"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -33,6 +34,9 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
+	ndffeatures "k8s.io/component-helpers/nodedeclaredfeatures/features"
+	ndftesting "k8s.io/component-helpers/nodedeclaredfeatures/testing"
 	"k8s.io/component-helpers/storage/volume"
 	"k8s.io/kubernetes/pkg/features"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -1491,9 +1495,238 @@ func TestTaintTolerationFilter(t *testing.T) {
 			}).Container(pause).Obj(),
 			fit: true,
 		},
+		{
+			name: "Pod with Gt toleration matches node taint with greater value",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-gt-1").
+					Taints([]v1.Taint{
+						{
+							Key:    "node.example.com/priority-level",
+							Value:  "999",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					}).Obj(),
+			},
+			incomingPod: st.MakePod().Name("pod-gt-1").
+				Tolerations([]v1.Toleration{
+					{
+						Key:      "node.example.com/priority-level",
+						Operator: v1.TolerationOpGt,
+						Value:    "900",
+						Effect:   v1.TaintEffectNoSchedule,
+					},
+				}).Container(pause).
+				Obj(),
+			fit: true,
+		},
+		{
+			name: "Pod with Gt toleration does not match node taint with lesser value",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-gt-2").
+					Taints([]v1.Taint{
+						{
+							Key:    "node.example.com/priority-level",
+							Value:  "850",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					}).Obj(),
+			},
+			incomingPod: st.MakePod().Name("pod-gt-2").
+				Tolerations([]v1.Toleration{
+					{
+						Key:      "node.example.com/priority-level",
+						Operator: v1.TolerationOpGt,
+						Value:    "900",
+						Effect:   v1.TaintEffectNoSchedule,
+					},
+				}).Container(pause).
+				Obj(),
+			fit: false,
+		},
+		{
+			name: "Pod with Lt toleration matches node taint with lesser value",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-lt-1").
+					Taints([]v1.Taint{
+						{
+							Key:    "node.example.com/error-rate",
+							Value:  "5",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					}).Obj(),
+			},
+			incomingPod: st.MakePod().Name("pod-lt-1").
+				Tolerations([]v1.Toleration{
+					{
+						Key:      "node.example.com/error-rate",
+						Operator: v1.TolerationOpLt,
+						Value:    "10",
+						Effect:   v1.TaintEffectNoSchedule,
+					},
+				}).Container(pause).
+				Obj(),
+			fit: true,
+		},
+		{
+			name: "Pod with Lt toleration does not match node taint with greater value",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-lt-2").
+					Taints([]v1.Taint{
+						{
+							Key:    "node.example.com/error-rate",
+							Value:  "15",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					}).Obj(),
+			},
+			incomingPod: st.MakePod().Name("pod-lt-2").
+				Tolerations([]v1.Toleration{
+					{
+						Key:      "node.example.com/error-rate",
+						Operator: v1.TolerationOpLt,
+						Value:    "10",
+						Effect:   v1.TaintEffectNoSchedule,
+					},
+				}).Container(pause).
+				Obj(),
+			fit: false,
+		},
+		{
+			name: "Pod with mixed tolerations including Gt operator",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-mixed").
+					Taints([]v1.Taint{
+						{
+							Key:    "node.example.com/priority-level",
+							Value:  "950",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+						{
+							Key:    "node.example.com/zone",
+							Value:  "west",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					}).Obj(),
+			},
+			incomingPod: st.MakePod().Name("pod-mixed").
+				Tolerations([]v1.Toleration{
+					{
+						Key:      "node.example.com/priority-level",
+						Operator: v1.TolerationOpGt,
+						Value:    "900",
+						Effect:   v1.TaintEffectNoSchedule,
+					},
+					{
+						Key:      "node.example.com/zone",
+						Operator: v1.TolerationOpEqual,
+						Value:    "west",
+						Effect:   v1.TaintEffectNoSchedule,
+					},
+				}).Container(pause).
+				Obj(),
+			fit: true,
+		},
+		{
+			name: "Pod with Gt toleration with negative values",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-negative").
+					Taints([]v1.Taint{
+						{
+							Key:    "node.example.com/temperature",
+							Value:  "10",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					}).Obj(),
+			},
+			incomingPod: st.MakePod().Name("pod-negative").
+				Tolerations([]v1.Toleration{
+					{
+						Key:      "node.example.com/temperature",
+						Operator: v1.TolerationOpGt,
+						Value:    "-20",
+						Effect:   v1.TaintEffectNoSchedule,
+					},
+				}).Container(pause).
+				Obj(),
+			fit: true,
+		},
+		{
+			name: "Pod with Lt toleration with zero values",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-zero").
+					Taints([]v1.Taint{
+						{
+							Key:    "node.example.com/latency",
+							Value:  "0",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					}).Obj(),
+			},
+			incomingPod: st.MakePod().Name("pod-zero").
+				Tolerations([]v1.Toleration{
+					{
+						Key:      "node.example.com/latency",
+						Operator: v1.TolerationOpLt,
+						Value:    "5",
+						Effect:   v1.TaintEffectNoSchedule,
+					},
+				}).Container(pause).
+				Obj(),
+			fit: true, // 0 < 5
+		},
+		{
+			name: "Pod with Gt toleration and empty Effect matches any taint effect",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-any-effect").
+					Taints([]v1.Taint{
+						{
+							Key:    "node.example.com/priority-level",
+							Value:  "999",
+							Effect: v1.TaintEffectPreferNoSchedule,
+						},
+					}).Obj(),
+			},
+			incomingPod: st.MakePod().Name("pod-any-effect").
+				Tolerations([]v1.Toleration{
+					{
+						Key:      "node.example.com/priority-level",
+						Operator: v1.TolerationOpGt,
+						Value:    "900",
+					},
+				}).Container(pause).
+				Obj(),
+			fit: true,
+		},
+		{
+			name: "Pod with Lt toleration with large numbers",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-large").
+					Taints([]v1.Taint{
+						{
+							Key:    "node.example.com/memory",
+							Value:  "999999999",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					}).Obj(),
+			},
+			incomingPod: st.MakePod().Name("pod-large").
+				Tolerations([]v1.Toleration{
+					{
+						Key:      "node.example.com/memory",
+						Operator: v1.TolerationOpLt,
+						Value:    "1000000000",
+						Effect:   v1.TaintEffectNoSchedule,
+					},
+				}).Container(pause).
+				Obj(),
+			fit: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Enable the TaintTolerationComparisonOperators feature gate for Gt/Lt tests
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TaintTolerationComparisonOperators, true)
+
 			testCtx := initTest(t, "taint-toleration-filter")
 			cs := testCtx.ClientSet
 			ns := testCtx.NS.Name
@@ -2929,6 +3162,129 @@ func TestNodeAffinityFilter(t *testing.T) {
 					podUnschedulable(cs, testPod.Namespace, testPod.Name))
 				if err != nil {
 					t.Errorf("Test Failed: Expected pod %s/%s to be unschedulable but got error: %v", testPod.Namespace, testPod.Name, err)
+				}
+			}
+		})
+	}
+}
+
+func TestNodeDeclaredFeaturesFilter(t *testing.T) {
+	// Helper to create a pod that requires the feature.
+	podRequiringFeatureA := st.MakePod().Name("pod-req-feature-a").
+		UID("pod-req-feature").
+		Containers([]v1.Container{{Name: "container-req-feature-a", Image: imageutils.GetPauseImageName()}}).Obj()
+
+	// Helper to create a pod that does NOT require the feature.
+	podWithoutRequirement := st.MakePod().Name("pod-no-req").UID("pod-no-req").
+		Containers([]v1.Container{{Name: "container-no-req", Image: imageutils.GetPauseImageName()}}).
+		Obj()
+
+	nodeWithFeatureA := st.MakeNode().Name("node-with-feature-a").DeclaredFeatures([]string{"FeatureA"}).Obj()
+
+	nodeWithFeatureB := st.MakeNode().Name("node-with-feature-b").DeclaredFeatures([]string{"FeatureB"}).Obj()
+	nodeWithFeatureB.Status.DeclaredFeatures = []string{"FeatureB"}
+
+	nodeWithoutFeatures := st.MakeNode().Name("node-without-features").Obj()
+	nodeWithoutFeatures.Status.DeclaredFeatures = []string{}
+
+	nodeWithMultipleFeatures := st.MakeNode().Name("node-with-multiple-features").DeclaredFeatures([]string{"FeatureA", "FeatureB"}).Obj()
+
+	mockFeature := ndftesting.NewMockFeature(t)
+	mockFeature.EXPECT().Name().Return("FeatureA").Maybe()
+	mockFeature.EXPECT().InferForScheduling(mock.Anything).RunAndReturn(func(podInfo *ndf.PodInfo) bool {
+		return podInfo.Spec.Containers[0].Name == "container-req-feature-a"
+	})
+	mockFeature.EXPECT().MaxVersion().Return(nil).Maybe()
+	mockFeature.EXPECT().InferForUpdate(mock.Anything, mock.Anything).Return(false).Maybe()
+	mockFeature.EXPECT().Discover(mock.Anything).Return(false).Maybe()
+
+	tests := []struct {
+		name           string
+		pod            *v1.Pod
+		nodes          []*v1.Node
+		featureEnabled bool
+		expectedNode   string
+	}{
+		{
+			name:           "Feature gate disabled",
+			pod:            podRequiringFeatureA.DeepCopy(),
+			nodes:          []*v1.Node{nodeWithoutFeatures},
+			featureEnabled: false,
+			expectedNode:   "node-without-features",
+		},
+		{
+			name:           "pod without feature requirement schedulable on node without features",
+			pod:            podWithoutRequirement.DeepCopy(),
+			nodes:          []*v1.Node{nodeWithoutFeatures},
+			featureEnabled: true,
+			expectedNode:   "node-without-features",
+		},
+		{
+			name:           "pod without feature requirement schedulable on node with features",
+			pod:            podWithoutRequirement.DeepCopy(),
+			nodes:          []*v1.Node{nodeWithFeatureA},
+			featureEnabled: true,
+			expectedNode:   "node-with-feature-a",
+		},
+		{
+			name:           "pod with feature requirement schedulable on node with the feature",
+			pod:            podRequiringFeatureA.DeepCopy(),
+			nodes:          []*v1.Node{nodeWithFeatureA, nodeWithFeatureB},
+			featureEnabled: true,
+			expectedNode:   "node-with-feature-a",
+		},
+		{
+			name:           "pod with feature requirement not schedulable on node without features",
+			pod:            podRequiringFeatureA.DeepCopy(),
+			nodes:          []*v1.Node{nodeWithFeatureB},
+			featureEnabled: true,
+			expectedNode:   "",
+		},
+		{
+			name:           "pod with feature requirement schedulable on node with multiple features",
+			pod:            podRequiringFeatureA.DeepCopy(),
+			nodes:          []*v1.Node{nodeWithMultipleFeatures, nodeWithoutFeatures},
+			featureEnabled: true,
+			expectedNode:   "node-with-multiple-features",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, tt.featureEnabled)
+			if tt.featureEnabled {
+				originalAllFeatures := ndffeatures.AllFeatures
+				ndffeatures.AllFeatures = []ndf.Feature{mockFeature}
+				defer func() {
+					ndffeatures.AllFeatures = originalAllFeatures
+				}()
+			}
+			testCtx := testutils.InitTestSchedulerWithNS(t, "node-features-filter")
+			cs := testCtx.ClientSet
+			ns := testCtx.NS.Name
+			for _, node := range tt.nodes {
+				if _, err := testutils.CreateNode(testCtx.ClientSet, node); err != nil {
+					t.Fatalf("Failed to create node %v: %v", node.Name, err)
+				}
+			}
+			// Ensure nodes are present in scheduler cache.
+			if err := testutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, len(tt.nodes)); err != nil {
+				t.Fatalf("Failed to wait for nodes in cache: %v", err)
+			}
+
+			tt.pod.Namespace = ns
+			if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, tt.pod, metav1.CreateOptions{}); err != nil {
+				t.Fatalf("Failed to create pod %v: %v", tt.pod.Name, err)
+			}
+			if tt.expectedNode != "" {
+				err := wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false, testutils.PodScheduledIn(cs, tt.pod.Namespace, tt.pod.Name, []string{tt.expectedNode}))
+				if err != nil {
+					t.Errorf("Expected pod to be scheduled, but it was not: %v", err)
+				}
+			} else {
+				err := wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false, testutils.PodUnschedulable(cs, tt.pod.Namespace, tt.pod.Name))
+				if err != nil {
+					t.Errorf("Expected pod to be unschedulable, but it was not: %v", err)
 				}
 			}
 		})

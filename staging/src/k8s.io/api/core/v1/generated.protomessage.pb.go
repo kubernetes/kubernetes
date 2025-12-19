@@ -181,6 +181,8 @@ func (*ISCSIVolumeSource) ProtoMessage() {}
 
 func (*ImageVolumeSource) ProtoMessage() {}
 
+func (*ImageVolumeStatus) ProtoMessage() {}
+
 func (*KeyToPath) ProtoMessage() {}
 
 func (*Lifecycle) ProtoMessage() {}
@@ -489,8 +491,12 @@ func (*VolumeResourceRequirements) ProtoMessage() {}
 
 func (*VolumeSource) ProtoMessage() {}
 
+func (*VolumeStatus) ProtoMessage() {}
+
 func (*VsphereVirtualDiskVolumeSource) ProtoMessage() {}
 
 func (*WeightedPodAffinityTerm) ProtoMessage() {}
 
 func (*WindowsSecurityContextOptions) ProtoMessage() {}
+
+func (*WorkloadReference) ProtoMessage() {}

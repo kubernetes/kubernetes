@@ -1,6 +1,3 @@
-//go:build !usegocmp
-// +build !usegocmp
-
 /*
 Copyright 2025 The Kubernetes Authors.
 

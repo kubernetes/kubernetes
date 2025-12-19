@@ -92,20 +92,25 @@ func NewPodGCInternal(ctx context.Context, kubeClient clientset.Interface, podIn
 }
 
 func (gcc *PodGCController) Run(ctx context.Context) {
-	logger := klog.FromContext(ctx)
-
 	defer utilruntime.HandleCrashWithContext(ctx)
 
+	logger := klog.FromContext(ctx)
 	logger.Info("Starting GC controller")
-	defer gcc.nodeQueue.ShutDown()
-	defer logger.Info("Shutting down GC controller")
+
+	var wg sync.WaitGroup
+	defer func() {
+		logger.Info("Shutting down GC controller")
+		gcc.nodeQueue.ShutDown()
+		wg.Wait()
+	}()
 
 	if !cache.WaitForNamedCacheSyncWithContext(ctx, gcc.podListerSynced, gcc.nodeListerSynced) {
 		return
 	}
 
-	go wait.UntilWithContext(ctx, gcc.gc, gcc.gcCheckPeriod)
-
+	wg.Go(func() {
+		wait.UntilWithContext(ctx, gcc.gc, gcc.gcCheckPeriod)
+	})
 	<-ctx.Done()
 }
 

@@ -292,16 +292,22 @@ func (rq *Controller) worker(queue workqueue.TypedRateLimitingInterface[string])
 // Run begins quota controller using the specified number of workers
 func (rq *Controller) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrashWithContext(ctx)
-	defer rq.queue.ShutDown()
-	defer rq.missingUsageQueue.ShutDown()
 
 	logger := klog.FromContext(ctx)
-
 	logger.Info("Starting resource quota controller")
-	defer logger.Info("Shutting down resource quota controller")
+
+	var wg sync.WaitGroup
+	defer func() {
+		logger.Info("Shutting down resource quota controller")
+		rq.missingUsageQueue.ShutDown()
+		rq.queue.ShutDown()
+		wg.Wait()
+	}()
 
 	if rq.quotaMonitor != nil {
-		go rq.quotaMonitor.Run(ctx)
+		wg.Go(func() {
+			rq.quotaMonitor.Run(ctx)
+		})
 	}
 
 	if !cache.WaitForNamedCacheSyncWithContext(ctx, rq.informerSyncedFuncs...) {
@@ -310,15 +316,23 @@ func (rq *Controller) Run(ctx context.Context, workers int) {
 
 	// the workers that chug through the quota calculation backlog
 	for i := 0; i < workers; i++ {
-		go wait.UntilWithContext(ctx, rq.worker(rq.queue), time.Second)
-		go wait.UntilWithContext(ctx, rq.worker(rq.missingUsageQueue), time.Second)
+		wg.Go(func() {
+			wait.UntilWithContext(ctx, rq.worker(rq.queue), time.Second)
+		})
+		wg.Go(func() {
+			wait.UntilWithContext(ctx, rq.worker(rq.missingUsageQueue), time.Second)
+		})
 	}
+
 	// the timer for how often we do a full recalculation across all quotas
 	if rq.resyncPeriod() > 0 {
-		go wait.UntilWithContext(ctx, rq.enqueueAll, rq.resyncPeriod())
+		wg.Go(func() {
+			wait.UntilWithContext(ctx, rq.enqueueAll, rq.resyncPeriod())
+		})
 	} else {
 		logger.Info("periodic quota controller resync disabled")
 	}
+
 	<-ctx.Done()
 }
 

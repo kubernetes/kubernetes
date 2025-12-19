@@ -28,6 +28,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/status"
@@ -180,7 +181,9 @@ func TestDoProbe(t *testing.T) {
 }
 
 func TestDoProbeWithContainerRestartRules(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerRestartRules, true)
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.ContainerRestartRules: true,
+	})
 	TestDoProbe(t)
 
 	var (
@@ -291,6 +294,121 @@ func TestDoProbeWithContainerRestartRules(t *testing.T) {
 
 			if c := w.doProbe(ctx); c != tc.expectContinue {
 				t.Errorf("[%s-%s] Expected continue to be %v but got %v", probeType, tc.name, tc.expectContinue, c)
+			}
+		}
+	}
+}
+
+func TestDoProbeWithContainerRestartAllContainers(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.ContainerRestartRules:                true,
+		features.NodeDeclaredFeatures:                 true,
+		features.RestartAllContainersOnContainerExits: true,
+	})
+	TestDoProbe(t)
+	TestDoProbeWithContainerRestartRules(t)
+
+	var (
+		restartPolicyNever = v1.ContainerRestartPolicyNever
+	)
+
+	logger, ctx := ktesting.NewTestContext(t)
+	m := newTestManager()
+	for _, probeType := range [...]probeType{liveness, readiness, startup} {
+		testcases := []struct {
+			name           string
+			pod            func() v1.Pod
+			podStatus      func() v1.PodStatus
+			expectContinue bool
+		}{
+			{
+				name: "container terminated with matching restartAllContainers",
+				pod: func() v1.Pod {
+					pod := getTestPod()
+					setTestProbe(pod, probeType, v1.Probe{})
+					c := pod.Spec.Containers[0]
+					c.RestartPolicy = &restartPolicyNever
+					c.RestartPolicyRules = []v1.ContainerRestartRule{{
+						Action: v1.ContainerRestartRuleActionRestartAllContainers,
+						ExitCodes: &v1.ContainerRestartRuleOnExitCodes{
+							Operator: v1.ContainerRestartRuleOnExitCodesOpIn,
+							Values:   []int32{1},
+						},
+					}}
+					pod.Spec.Containers[0] = c
+					return *pod
+				},
+				podStatus:      getTestRunningStatusWithFailedContainer,
+				expectContinue: true,
+			},
+			{
+				name: "container terminated by restartAllContainers",
+				pod: func() v1.Pod {
+					pod := getTestPod()
+					setTestProbe(pod, probeType, v1.Probe{})
+					triggerContainer := v1.Container{
+						Name:          "trigger",
+						RestartPolicy: &restartPolicyNever,
+						RestartPolicyRules: []v1.ContainerRestartRule{{
+							Action: v1.ContainerRestartRuleActionRestartAllContainers,
+							ExitCodes: &v1.ContainerRestartRuleOnExitCodes{
+								Operator: v1.ContainerRestartRuleOnExitCodesOpIn,
+								Values:   []int32{1},
+							},
+						}},
+					}
+					pod.Spec.Containers = append(pod.Spec.Containers, triggerContainer)
+					return *pod
+				},
+				podStatus: func() v1.PodStatus {
+					status := getTestRunningStatusWithFailedContainer()
+					// Mark the trigger container as terminated.
+					status.ContainerStatuses = append(status.ContainerStatuses, v1.ContainerStatus{
+						Name: "trigger",
+						State: v1.ContainerState{
+							Terminated: &v1.ContainerStateTerminated{
+								ExitCode: 1,
+							},
+						},
+					})
+					return status
+				},
+				expectContinue: true,
+			},
+			{
+				name: "container cleaned up by restartAllContainers",
+				pod: func() v1.Pod {
+					pod := getTestPod()
+					setTestProbe(pod, probeType, v1.Probe{})
+					triggerContainer := v1.Container{
+						Name:          "trigger",
+						RestartPolicy: &restartPolicyNever,
+						RestartPolicyRules: []v1.ContainerRestartRule{{
+							Action: v1.ContainerRestartRuleActionRestartAllContainers,
+							ExitCodes: &v1.ContainerRestartRuleOnExitCodes{
+								Operator: v1.ContainerRestartRuleOnExitCodesOpIn,
+								Values:   []int32{1},
+							},
+						}},
+					}
+					pod.Spec.Containers = append(pod.Spec.Containers, triggerContainer)
+					return *pod
+				},
+				// After cleanup, the container will be in Waiting state, and pod in Pending state
+				podStatus:      getTestPendingStatus,
+				expectContinue: true,
+			},
+		}
+
+		for _, tc := range testcases {
+			pod := tc.pod()
+			podStatus := tc.podStatus()
+			w := newWorker(m, probeType, &pod, pod.Spec.Containers[0])
+
+			m.statusManager.SetPodStatus(logger, w.pod, podStatus)
+
+			if c := w.doProbe(ctx); c != tc.expectContinue {
+				t.Errorf("[%s: %s] Expected continue to be %v but got %v", probeType, tc.name, tc.expectContinue, c)
 			}
 		}
 	}
@@ -778,4 +896,141 @@ func TestStartupProbeDisabledByStarted(t *testing.T) {
 	msg = "Started, probe failure, result success"
 	expectContinue(t, w, w.doProbe(ctx), msg)
 	expectResult(t, w, results.Success, msg)
+}
+
+func TestChangeContainerStatusOnKubeletRestart(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+
+	tests := []struct {
+		name           string
+		featureEnabled bool
+		isRestart      bool
+		probeType      probeType
+		initialValue   results.Result
+		expectSet      bool
+	}{
+		{
+			name:           "feature enabled, is restart, readiness",
+			featureEnabled: true,
+			isRestart:      true,
+			probeType:      readiness,
+			initialValue:   results.Failure,
+			expectSet:      true,
+		},
+		{
+			name:           "feature enabled, is restart, liveness",
+			featureEnabled: true,
+			isRestart:      true,
+			probeType:      liveness,
+			initialValue:   results.Success,
+			expectSet:      true,
+		},
+		{
+			name:           "feature enabled, is restart, startup",
+			featureEnabled: true,
+			isRestart:      true,
+			probeType:      startup,
+			initialValue:   results.Unknown,
+			expectSet:      true,
+		},
+		{
+			name:           "feature enabled, not restart, readiness",
+			featureEnabled: true,
+			isRestart:      false,
+			probeType:      readiness,
+			initialValue:   results.Failure,
+			expectSet:      true,
+		},
+		{
+			name:           "feature enabled, not restart, liveness",
+			featureEnabled: true,
+			isRestart:      false,
+			probeType:      liveness,
+			initialValue:   results.Success,
+			expectSet:      true,
+		},
+		{
+			name:           "feature enabled, not restart, startup",
+			featureEnabled: true,
+			isRestart:      false,
+			probeType:      startup,
+			initialValue:   results.Unknown,
+			expectSet:      true,
+		},
+		{
+			name:           "feature disabled, is restart, readiness",
+			featureEnabled: false,
+			isRestart:      true,
+			probeType:      readiness,
+			expectSet:      false,
+		},
+		{
+			name:           "feature disabled, is restart, liveness",
+			featureEnabled: false,
+			isRestart:      true,
+			probeType:      liveness,
+			expectSet:      false,
+		},
+		{
+			name:           "feature disabled, is restart, startup",
+			featureEnabled: false,
+			isRestart:      true,
+			probeType:      startup,
+			expectSet:      false,
+		},
+		{
+			name:           "feature disabled, not restart, readiness",
+			featureEnabled: false,
+			isRestart:      false,
+			probeType:      readiness,
+			initialValue:   results.Failure,
+			expectSet:      true,
+		},
+		{
+			name:           "feature disabled, not restart, liveness",
+			featureEnabled: false,
+			isRestart:      false,
+			probeType:      liveness,
+			initialValue:   results.Success,
+			expectSet:      true,
+		},
+		{
+			name:           "feature disabled, not restart, startup",
+			featureEnabled: false,
+			isRestart:      false,
+			probeType:      startup,
+			initialValue:   results.Unknown,
+			expectSet:      true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ChangeContainerStatusOnKubeletRestart, tc.featureEnabled)
+
+			m := newTestManager()
+			podStatus := getTestRunningStatus()
+			podStatus.ContainerStatuses[0].ContainerID = "test://container-id"
+			if tc.isRestart {
+				podStatus.ContainerStatuses[0].State.Running.StartedAt = metav1.Time{Time: m.start.Add(-5 * time.Minute)}
+			} else {
+				podStatus.ContainerStatuses[0].State.Running.StartedAt = metav1.Time{Time: m.start.Add(5 * time.Minute)}
+			}
+
+			w := newTestWorker(m, tc.probeType, v1.Probe{InitialDelaySeconds: 1000})
+			m.statusManager.SetPodStatus(logger, w.pod, podStatus)
+
+			w.doProbe(ctx)
+
+			containerID := kubecontainer.ParseContainerID(podStatus.ContainerStatuses[0].ContainerID)
+			result, ok := resultsManager(m, tc.probeType).Get(containerID)
+
+			if ok != tc.expectSet {
+				t.Errorf("Expected result to be set: %v, but got: %v", tc.expectSet, ok)
+			}
+			if tc.expectSet && result != tc.initialValue {
+				t.Errorf("Expected result %v, but got: %v", tc.initialValue, result)
+			}
+		})
+	}
 }

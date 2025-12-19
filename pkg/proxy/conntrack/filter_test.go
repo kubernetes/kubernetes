@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2024 The Kubernetes Authors.
@@ -22,151 +21,154 @@ package conntrack
 import (
 	"testing"
 
-	"github.com/stretchr/testify/require"
 	"github.com/vishvananda/netlink"
-	"golang.org/x/sys/unix"
 
 	netutils "k8s.io/utils/net"
 )
 
-func applyFilter(flowList []netlink.ConntrackFlow, ipv4Filter *conntrackFilter, ipv6Filter *conntrackFilter) (ipv4Match, ipv6Match int) {
-	for _, flow := range flowList {
-		if ipv4Filter.MatchConntrackFlow(&flow) == true {
-			ipv4Match++
-		}
-		if ipv6Filter.MatchConntrackFlow(&flow) == true {
-			ipv6Match++
-		}
+func TestFlowFilter(t *testing.T) {
+	flow1 := &netlink.ConntrackFlow{
+		Forward: netlink.IPTuple{
+			SrcIP:    netutils.ParseIPSloppy("1.1.1.1"),
+			DstIP:    netutils.ParseIPSloppy("2.2.2.2"),
+			SrcPort:  1000,
+			DstPort:  2000,
+			Protocol: 6,
+		},
 	}
-	return ipv4Match, ipv6Match
-}
-
-func TestConntrackFilter(t *testing.T) {
-	var flowList []netlink.ConntrackFlow
-	flow1 := netlink.ConntrackFlow{}
-	flow1.FamilyType = unix.AF_INET
-	flow1.Forward.SrcIP = netutils.ParseIPSloppy("10.0.0.1")
-	flow1.Forward.DstIP = netutils.ParseIPSloppy("20.0.0.1")
-	flow1.Forward.SrcPort = 1000
-	flow1.Forward.DstPort = 2000
-	flow1.Forward.Protocol = 17
-	flow1.Reverse.SrcIP = netutils.ParseIPSloppy("20.0.0.1")
-	flow1.Reverse.DstIP = netutils.ParseIPSloppy("192.168.1.1")
-	flow1.Reverse.SrcPort = 2000
-	flow1.Reverse.DstPort = 1000
-	flow1.Reverse.Protocol = 17
-
-	flow2 := netlink.ConntrackFlow{}
-	flow2.FamilyType = unix.AF_INET
-	flow2.Forward.SrcIP = netutils.ParseIPSloppy("10.0.0.2")
-	flow2.Forward.DstIP = netutils.ParseIPSloppy("20.0.0.2")
-	flow2.Forward.SrcPort = 5000
-	flow2.Forward.DstPort = 6000
-	flow2.Forward.Protocol = 6
-	flow2.Reverse.SrcIP = netutils.ParseIPSloppy("20.0.0.2")
-	flow2.Reverse.DstIP = netutils.ParseIPSloppy("192.168.1.1")
-	flow2.Reverse.SrcPort = 6000
-	flow2.Reverse.DstPort = 5000
-	flow2.Reverse.Protocol = 6
-
-	flow3 := netlink.ConntrackFlow{}
-	flow3.FamilyType = unix.AF_INET6
-	flow3.Forward.SrcIP = netutils.ParseIPSloppy("eeee:eeee:eeee:eeee:eeee:eeee:eeee:eeee")
-	flow3.Forward.DstIP = netutils.ParseIPSloppy("dddd:dddd:dddd:dddd:dddd:dddd:dddd:dddd")
-	flow3.Forward.SrcPort = 1000
-	flow3.Forward.DstPort = 2000
-	flow3.Forward.Protocol = 132
-	flow3.Reverse.SrcIP = netutils.ParseIPSloppy("dddd:dddd:dddd:dddd:dddd:dddd:dddd:dddd")
-	flow3.Reverse.DstIP = netutils.ParseIPSloppy("eeee:eeee:eeee:eeee:eeee:eeee:eeee:eeee")
-	flow3.Reverse.SrcPort = 2000
-	flow3.Reverse.DstPort = 1000
-	flow3.Reverse.Protocol = 132
-	flowList = append(flowList, flow1, flow2, flow3)
+	flow2 := &netlink.ConntrackFlow{
+		Forward: netlink.IPTuple{
+			SrcIP:    netutils.ParseIPSloppy("3.3.3.3"),
+			DstIP:    netutils.ParseIPSloppy("4.4.4.4"),
+			SrcPort:  3000,
+			DstPort:  4000,
+			Protocol: 17,
+		},
+	}
+	flowEmpty := &netlink.ConntrackFlow{
+		Forward: netlink.IPTuple{
+			Protocol: 6,
+		},
+	}
 
 	testCases := []struct {
-		name              string
-		filterV4          *conntrackFilter
-		filterV6          *conntrackFilter
-		expectedV4Matches int
-		expectedV6Matches int
+		name          string
+		filterFlows   []*netlink.ConntrackFlow
+		matchFlow     *netlink.ConntrackFlow
+		expectedMatch bool
 	}{
 		{
-			name:              "Empty filter",
-			filterV4:          &conntrackFilter{},
-			filterV6:          &conntrackFilter{},
-			expectedV4Matches: 0,
-			expectedV6Matches: 0,
+			name:          "Match existing flow",
+			filterFlows:   []*netlink.ConntrackFlow{flow1, flow2},
+			matchFlow:     flow1,
+			expectedMatch: true,
 		},
 		{
-			name:              "Protocol filter",
-			filterV4:          &conntrackFilter{protocol: 6},
-			filterV6:          &conntrackFilter{protocol: 17},
-			expectedV4Matches: 1,
-			expectedV6Matches: 1,
+			name:          "No match for non-existent flow",
+			filterFlows:   []*netlink.ConntrackFlow{flow1},
+			matchFlow:     flow2,
+			expectedMatch: false,
 		},
 		{
-			name:              "Original Source IP filter",
-			filterV4:          &conntrackFilter{original: &connectionTuple{srcIP: netutils.ParseIPSloppy("10.0.0.1")}},
-			filterV6:          &conntrackFilter{original: &connectionTuple{srcIP: netutils.ParseIPSloppy("eeee:eeee:eeee:eeee:eeee:eeee:eeee:eeee")}},
-			expectedV4Matches: 1,
-			expectedV6Matches: 1,
-		},
-		{
-			name:              "Original Destination IP filter",
-			filterV4:          &conntrackFilter{original: &connectionTuple{dstIP: netutils.ParseIPSloppy("20.0.0.1")}},
-			filterV6:          &conntrackFilter{original: &connectionTuple{dstIP: netutils.ParseIPSloppy("dddd:dddd:dddd:dddd:dddd:dddd:dddd:dddd")}},
-			expectedV4Matches: 1,
-			expectedV6Matches: 1,
-		},
-		{
-			name:              "Original Source Port Filter",
-			filterV4:          &conntrackFilter{protocol: 6, original: &connectionTuple{srcPort: 5000}},
-			filterV6:          &conntrackFilter{protocol: 132, original: &connectionTuple{srcPort: 1000}},
-			expectedV4Matches: 1,
-			expectedV6Matches: 1,
-		},
-		{
-			name:              "Original Destination Port Filter",
-			filterV4:          &conntrackFilter{protocol: 6, original: &connectionTuple{dstPort: 6000}},
-			filterV6:          &conntrackFilter{protocol: 132, original: &connectionTuple{dstPort: 2000}},
-			expectedV4Matches: 1,
-			expectedV6Matches: 1,
-		},
-		{
-			name:              "Reply Source IP filter",
-			filterV4:          &conntrackFilter{reply: &connectionTuple{srcIP: netutils.ParseIPSloppy("20.0.0.1")}},
-			filterV6:          &conntrackFilter{reply: &connectionTuple{srcIP: netutils.ParseIPSloppy("dddd:dddd:dddd:dddd:dddd:dddd:dddd:dddd")}},
-			expectedV4Matches: 1,
-			expectedV6Matches: 1,
-		},
-		{
-			name:              "Reply Destination IP filter",
-			filterV4:          &conntrackFilter{reply: &connectionTuple{dstIP: netutils.ParseIPSloppy("192.168.1.1")}},
-			filterV6:          &conntrackFilter{reply: &connectionTuple{dstIP: netutils.ParseIPSloppy("dddd:dddd:dddd:dddd:dddd:dddd:dddd:dddd")}},
-			expectedV4Matches: 2,
-			expectedV6Matches: 0,
-		},
-		{
-			name:              "Reply Source Port filter",
-			filterV4:          &conntrackFilter{protocol: 17, reply: &connectionTuple{srcPort: 2000}},
-			filterV6:          &conntrackFilter{protocol: 132, reply: &connectionTuple{srcPort: 2000}},
-			expectedV4Matches: 1,
-			expectedV6Matches: 1,
-		},
-		{
-			name:              "Reply Destination Port filter",
-			filterV4:          &conntrackFilter{protocol: 6, reply: &connectionTuple{dstPort: 5000}},
-			filterV6:          &conntrackFilter{protocol: 132, reply: &connectionTuple{dstPort: 1000}},
-			expectedV4Matches: 1,
-			expectedV6Matches: 1,
+			name:          "No match for empty flow against specific filter",
+			filterFlows:   []*netlink.ConntrackFlow{flow1},
+			matchFlow:     flowEmpty,
+			expectedMatch: false,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			v4Matches, v6Matches := applyFilter(flowList, tc.filterV4, tc.filterV6)
-			require.Equal(t, tc.expectedV4Matches, v4Matches)
-			require.Equal(t, tc.expectedV6Matches, v6Matches)
+			f := newFlowFilter(tc.filterFlows)
+			match := f.MatchConntrackFlow(tc.matchFlow)
+			if match != tc.expectedMatch {
+				t.Errorf("MatchConntrackFlow() = %v, want %v", match, tc.expectedMatch)
+			}
+		})
+	}
+}
+
+func TestFlowFilter_Exhaustive(t *testing.T) {
+	flow1 := &netlink.ConntrackFlow{
+		Forward: netlink.IPTuple{
+			SrcIP:    netutils.ParseIPSloppy("1.1.1.1"),
+			DstIP:    netutils.ParseIPSloppy("2.2.2.2"),
+			SrcPort:  1000,
+			DstPort:  2000,
+			Protocol: 6,
+		},
+		Reverse: netlink.IPTuple{
+			SrcIP:    netutils.ParseIPSloppy("2.2.2.2"),
+			DstIP:    netutils.ParseIPSloppy("1.1.1.1"),
+			SrcPort:  2000,
+			DstPort:  1000,
+			Protocol: 6,
+		},
+	}
+	flow2 := &netlink.ConntrackFlow{
+		Forward: netlink.IPTuple{
+			SrcIP:    netutils.ParseIPSloppy("3.3.3.3"),
+			DstIP:    netutils.ParseIPSloppy("4.4.4.4"),
+			SrcPort:  3000,
+			DstPort:  4000,
+			Protocol: 17,
+		},
+		Reverse: netlink.IPTuple{
+			SrcIP:    netutils.ParseIPSloppy("4.4.4.4"),
+			DstIP:    netutils.ParseIPSloppy("3.3.3.3"),
+			SrcPort:  4000,
+			DstPort:  3000,
+			Protocol: 17,
+		},
+	}
+	flowEmpty := &netlink.ConntrackFlow{
+		Forward: netlink.IPTuple{
+			Protocol: 6,
+		},
+		Reverse: netlink.IPTuple{
+			Protocol: 6,
+		},
+	}
+
+	testCases := []struct {
+		name          string
+		filterFlows   []*netlink.ConntrackFlow
+		matchFlow     *netlink.ConntrackFlow
+		expectedMatch bool
+	}{
+		{
+			name:          "Match existing flow",
+			filterFlows:   []*netlink.ConntrackFlow{flow1, flow2},
+			matchFlow:     flow1,
+			expectedMatch: true,
+		},
+		{
+			name:          "No match for non-existent flow",
+			filterFlows:   []*netlink.ConntrackFlow{flow1},
+			matchFlow:     flow2,
+			expectedMatch: false,
+		},
+		{
+			name:          "No match for empty flow against specific filter",
+			filterFlows:   []*netlink.ConntrackFlow{flow1},
+			matchFlow:     flowEmpty,
+			expectedMatch: false,
+		},
+		{
+			name:          "Match empty flow if filter has empty flow",
+			filterFlows:   []*netlink.ConntrackFlow{flowEmpty},
+			matchFlow:     flowEmpty,
+			expectedMatch: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newFlowFilter(tc.filterFlows)
+			match := f.MatchConntrackFlow(tc.matchFlow)
+			if match != tc.expectedMatch {
+				t.Errorf("MatchConntrackFlow() = %v, want %v", match, tc.expectedMatch)
+			}
 		})
 	}
 }

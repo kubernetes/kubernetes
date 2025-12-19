@@ -366,7 +366,7 @@ func TestSchedulerDefaults(t *testing.T) {
 									{Name: names.VolumeZone},
 									{Name: names.PodTopologySpread, Weight: ptr.To[int32](2)},
 									{Name: names.InterPodAffinity, Weight: ptr.To[int32](2)},
-									{Name: names.DynamicResources},
+									{Name: names.DynamicResources, Weight: ptr.To[int32](2)},
 									{Name: names.DefaultPreemption},
 									{Name: names.NodeResourcesBalancedAllocation, Weight: ptr.To[int32](1)},
 									{Name: names.ImageLocality, Weight: ptr.To[int32](1)},
@@ -890,6 +890,18 @@ func TestPluginArgsDefaults(t *testing.T) {
 					{Utilization: 0, Score: 10},
 					{Utilization: 100, Score: 0},
 				},
+			},
+		},
+		{
+			name: "DynamicResourcesArgs defaults, DRADeviceBindingConditions enabled",
+			features: map[featuregate.Feature]bool{
+				features.DRADeviceBindingConditions:   true,
+				features.DRAResourceClaimDeviceStatus: true,
+			},
+			in: &configv1.DynamicResourcesArgs{},
+			want: &configv1.DynamicResourcesArgs{
+				FilterTimeout:  &metav1.Duration{Duration: 10 * time.Second},
+				BindingTimeout: &metav1.Duration{Duration: 600 * time.Second},
 			},
 		},
 	}

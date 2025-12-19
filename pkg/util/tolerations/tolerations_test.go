@@ -341,7 +341,7 @@ func TestFuzzed(t *testing.T) {
 			gen.TolerationSeconds = ptr.To[int64](r.Int63n(10))
 		}
 		// Ensure only valid tolerations are generated.
-		require.NoError(t, validation.ValidateTolerations([]api.Toleration{gen}, field.NewPath("")).ToAggregate(), "%#v", gen)
+		require.NoError(t, validation.ValidateTolerations([]api.Toleration{gen}, field.NewPath(""), validation.PodValidationOptions{}).ToAggregate(), "%#v", gen)
 		return gen
 	}
 	genTolerations := func() []api.Toleration {

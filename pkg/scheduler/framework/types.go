@@ -33,6 +33,7 @@ import (
 	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/api/resource"
+	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
 	resourcehelper "k8s.io/component-helpers/resource"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
@@ -75,6 +76,7 @@ var (
 		fwk.ResourceClaim,
 		fwk.ResourceSlice,
 		fwk.DeviceClass,
+		fwk.Workload,
 	}
 )
 
@@ -141,7 +143,7 @@ func MatchAnyClusterEvent(ce fwk.ClusterEvent, incomingEvents []fwk.ClusterEvent
 }
 
 func UnrollWildCardResource() []fwk.ClusterEventWithHint {
-	return []fwk.ClusterEventWithHint{
+	events := []fwk.ClusterEventWithHint{
 		{Event: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.All}},
 		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.All}},
 		{Event: fwk.ClusterEvent{Resource: fwk.PersistentVolume, ActionType: fwk.All}},
@@ -153,6 +155,10 @@ func UnrollWildCardResource() []fwk.ClusterEventWithHint {
 		{Event: fwk.ClusterEvent{Resource: fwk.ResourceClaim, ActionType: fwk.All}},
 		{Event: fwk.ClusterEvent{Resource: fwk.DeviceClass, ActionType: fwk.All}},
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
+		events = append(events, fwk.ClusterEventWithHint{Event: fwk.ClusterEvent{Resource: fwk.Workload, ActionType: fwk.All}})
+	}
+	return events
 }
 
 // NodeInfo is node level aggregated information.
@@ -196,6 +202,9 @@ type NodeInfo struct {
 	// Whenever NodeInfo changes, generation is bumped.
 	// This is used to avoid cloning it if the object didn't change.
 	Generation int64
+
+	// DeclaredFeatures is a set of features published by the node
+	DeclaredFeatures ndf.FeatureSet
 }
 
 func (n *NodeInfo) GetPods() []fwk.PodInfo {
@@ -236,6 +245,11 @@ func (n *NodeInfo) GetPVCRefCounts() map[string]int {
 
 func (n *NodeInfo) GetGeneration() int64 {
 	return n.Generation
+}
+
+// GetNodeDeclaredFeatures returns the declared feature set of the node
+func (n *NodeInfo) GetNodeDeclaredFeatures() ndf.FeatureSet {
+	return n.DeclaredFeatures
 }
 
 // NodeInfo implements KMetadata, so for example klog.KObjSlice(nodes) works
@@ -284,6 +298,7 @@ func (n *NodeInfo) SnapshotConcrete() *NodeInfo {
 		ImageStates:      make(map[string]*fwk.ImageStateSummary),
 		PVCRefCounts:     make(map[string]int),
 		Generation:       n.Generation,
+		DeclaredFeatures: n.DeclaredFeatures.Clone(),
 	}
 	if len(n.Pods) > 0 {
 		clone.Pods = append([]fwk.PodInfo(nil), n.Pods...)
@@ -460,6 +475,9 @@ func (n *NodeInfo) updatePVCRefCounts(pod *v1.Pod, add bool) {
 func (n *NodeInfo) SetNode(node *v1.Node) {
 	n.node = node
 	n.Allocatable = NewResource(node.Status.Allocatable)
+	if utilfeature.DefaultFeatureGate.Enabled(features.NodeDeclaredFeatures) {
+		n.DeclaredFeatures = ndf.NewFeatureSet(node.Status.DeclaredFeatures...)
+	}
 	n.Generation = nextGeneration()
 }
 
@@ -508,6 +526,12 @@ type QueuedPodInfo struct {
 	// That's why we need to distinguish ConsecutiveErrorsCount for the error status and UnschedulableCount for the unschedulable status.
 	// See https://github.com/kubernetes/kubernetes/issues/128744 for the discussion.
 	ConsecutiveErrorsCount int
+	// WasFlushedFromUnschedulable tracks whether this pod was most recently moved to activeQ
+	// by the periodic flush from unschedulablePods due to timeout (rather than by an event).
+	// This is used to detect if the pod becomes schedulable soon after flush, which may
+	// indicate queueing hint misconfigurations or event handling bugs.
+	// This flag is cleared when the pod returns to the queue for any reason.
+	WasFlushedFromUnschedulable bool
 	// The time when the pod is added to the queue for the first time. The pod may be added
 	// back to the queue multiple times before it's successfully scheduled.
 	// It shouldn't be updated once initialized. It's used to record the e2e scheduling
@@ -593,6 +617,15 @@ func (pqi *QueuedPodInfo) DeepCopy() *QueuedPodInfo {
 		PendingPlugins:          pqi.PendingPlugins.Clone(),
 		ConsecutiveErrorsCount:  pqi.ConsecutiveErrorsCount,
 	}
+}
+
+// ClearRejectorPlugins clears the plugin-related fields that track why a pod
+// was rejected in a previous scheduling attempt.
+func (pqi *QueuedPodInfo) ClearRejectorPlugins() {
+	pqi.UnschedulablePlugins.Clear()
+	pqi.PendingPlugins.Clear()
+	pqi.GatingPlugin = ""
+	pqi.GatingPluginEvents = nil
 }
 
 // PodInfo is a wrapper to a Pod with additional pre-computed information to
@@ -702,8 +735,10 @@ func (pi *PodInfo) CalculateResource() fwk.PodResource {
 	}
 	inPlacePodVerticalScalingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling)
 	podLevelResourcesEnabled := utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources)
+	inPlacePodLevelResourcesVerticalScalingEnabled := utilfeature.DefaultMutableFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling)
 	requests := resourcehelper.PodRequests(pi.Pod, resourcehelper.PodResourcesOptions{
 		UseStatusResources: inPlacePodVerticalScalingEnabled,
+		InPlacePodLevelResourcesVerticalScalingEnabled: inPlacePodLevelResourcesVerticalScalingEnabled,
 		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
 		SkipPodLevelResources: !podLevelResourcesEnabled,
 	})
@@ -713,6 +748,7 @@ func (pi *PodInfo) CalculateResource() fwk.PodResource {
 	if len(nonMissingContainerRequests) > 0 {
 		non0Requests = resourcehelper.PodRequests(pi.Pod, resourcehelper.PodResourcesOptions{
 			UseStatusResources: inPlacePodVerticalScalingEnabled,
+			InPlacePodLevelResourcesVerticalScalingEnabled: inPlacePodLevelResourcesVerticalScalingEnabled,
 			// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
 			SkipPodLevelResources:       !podLevelResourcesEnabled,
 			NonMissingContainerRequests: nonMissingContainerRequests,

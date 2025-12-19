@@ -135,8 +135,8 @@ func dropDisabledDRAResourceClaimConsumableCapacityFields(new, old *resource.Res
 		return
 	}
 
-	for _, constaint := range new.Devices.Constraints {
-		constaint.DistinctAttribute = nil
+	for i := range new.Devices.Constraints {
+		new.Devices.Constraints[i].DistinctAttribute = nil
 	}
 
 	for i := range new.Devices.Requests {

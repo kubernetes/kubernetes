@@ -66,6 +66,7 @@ const (
 	internalAPIServerGroup       = "internal.apiserver.k8s.io"
 	admissionRegistrationGroup   = "admissionregistration.k8s.io"
 	storageVersionMigrationGroup = "storagemigration.k8s.io"
+	schedulingGroup              = "scheduling.k8s.io"
 )
 
 func addDefaultMetadata(obj runtime.Object) {
@@ -145,6 +146,9 @@ func viewRules() []rbacv1.PolicyRule {
 	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
 		rules = append(rules, rbacv1helpers.NewRule(Read...).Groups(resourceGroup).Resources("resourceclaims", "resourceclaims/status", "resourceclaimtemplates").RuleOrDie())
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
+		rules = append(rules, rbacv1helpers.NewRule(Read...).Groups(schedulingGroup).Resources("workloads").RuleOrDie())
+	}
 	return rules
 }
 
@@ -185,6 +189,9 @@ func editRules() []rbacv1.PolicyRule {
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
 		rules = append(rules, rbacv1helpers.NewRule(Write...).Groups(resourceGroup).Resources("resourceclaims", "resourceclaimtemplates").RuleOrDie())
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
+		rules = append(rules, rbacv1helpers.NewRule(Write...).Groups(schedulingGroup).Resources("workloads").RuleOrDie())
 	}
 	return rules
 }
@@ -645,9 +652,12 @@ func ClusterRoles() []rbacv1.ClusterRole {
 				rbacv1helpers.NewRule("create", "delete").Groups(resourceGroup).Resources("resourceclaims").RuleOrDie(),
 			)
 		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaints) {
+		if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaintRules) {
 			kubeSchedulerRules = append(kubeSchedulerRules, rbacv1helpers.NewRule(Read...).Groups(resourceGroup).Resources("devicetaintrules").RuleOrDie())
 		}
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
+		kubeSchedulerRules = append(kubeSchedulerRules, rbacv1helpers.NewRule(Read...).Groups(schedulingGroup).Resources("workloads").RuleOrDie())
 	}
 	roles = append(roles, rbacv1.ClusterRole{
 		// a role to use for the kube-scheduler
