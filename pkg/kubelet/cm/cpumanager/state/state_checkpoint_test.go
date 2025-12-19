@@ -444,22 +444,16 @@ func TestCheckpointStateAllocateAndReclaim(t *testing.T) {
 	testingDir := t.TempDir()
 
 	cpm, err := checkpointmanager.NewCheckpointManager(testingDir)
-	if err != nil {
-		t.Fatalf("could not create testing checkpoint manager: %v", err)
-	}
+	require.NoError(t, err, "could not create testing checkpoint manager")
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 			// ensure there is no previous checkpoint
-			if rmErr := cpm.RemoveCheckpoint(testingCheckpoint); rmErr != nil {
-				t.Fatalf("could not remove previous checkpoint: %v", rmErr)
-			}
+			require.NoError(t, cpm.RemoveCheckpoint(testingCheckpoint), "could not remove previous checkpoint")
 
 			logger, _ := ktesting.NewTestContext(t)
 			state, err := NewCheckpointState(logger, testingDir, testingCheckpoint, "none", nil)
-			if err != nil {
-				t.Fatalf("could not create testing checkpointState instance: %v", err)
-			}
+			require.NoError(t, err, "could not create testing checkpointState instance")
 
 			defaultCPUset := tc.defaultCPUset
 			assignments := tc.assignments
