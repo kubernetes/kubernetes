@@ -570,23 +570,6 @@ func TestRetryPendingResizes(t *testing.T) {
 			expectedResize:        nil,
 		},
 		{
-			name:                  "static pod, expect Infeasible",
-			originalRequests:      v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
-			newRequests:           v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
-			expectedAllocatedReqs: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
-			annotations:           map[string]string{kubetypes.ConfigSourceAnnotationKey: kubetypes.FileSource},
-
-			expectedResize: []*v1.PodCondition{
-				{
-					Type:    v1.PodResizePending,
-					Status:  "True",
-					Reason:  "Infeasible",
-					Message: "In-place resize of static-pods is not supported",
-				},
-			},
-			expectPodSyncTriggered: "true",
-		},
-		{
 			name:                  "Increase CPU from min shares",
 			originalRequests:      v1.ResourceList{v1.ResourceCPU: cpu2m},
 			newRequests:           v1.ResourceList{v1.ResourceCPU: cpu1000m},
@@ -864,7 +847,6 @@ func TestRetryPendingResizes(t *testing.T) {
 		# HELP kubelet_pod_infeasible_resizes_total [ALPHA] Number of infeasible resizes for pods.
 	    # TYPE kubelet_pod_infeasible_resizes_total counter
 	    kubelet_pod_infeasible_resizes_total{reason_detail="insufficient_node_allocatable"} 5
-	    kubelet_pod_infeasible_resizes_total{reason_detail="static_pod"} 2
 	`
 	assert.NoError(t, testutil.GatherAndCompare(
 		legacyregistry.DefaultGatherer, strings.NewReader(expectedMetrics), "kubelet_pod_infeasible_resizes_total",
