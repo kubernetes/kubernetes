@@ -822,7 +822,7 @@ func validateDevice(device resource.Device, oldDevice *resource.Device, fldPath 
 			func(taint resource.DeviceTaint, fldPath *field.Path) field.ErrorList {
 				return validateDeviceTaint(taint, nil, fldPath)
 			},
-			fldPath.Child("taints"))...)
+			fldPath.Child("taints"), sizeCovered)...)
 	}
 
 	allErrs = append(allErrs, validateSet(device.ConsumesCounters, resource.ResourceSliceMaxDeviceCounterConsumptionsPerDevice,
