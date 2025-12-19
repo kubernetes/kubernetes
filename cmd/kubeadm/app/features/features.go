@@ -55,7 +55,7 @@ var InitFeatureGates = FeatureList{
 		DeprecationMessage: "Deprecated in favor of the core kubelet feature UserNamespacesSupport which is beta since 1.30." +
 			" Once UserNamespacesSupport graduates to GA, kubeadm will start using it and RootlessControlPlane will be removed.",
 	},
-	NodeLocalCRISocket: {FeatureSpec: featuregate.FeatureSpec{Default: true, PreRelease: featuregate.Beta}},
+	NodeLocalCRISocket: {FeatureSpec: featuregate.FeatureSpec{Default: true, PreRelease: featuregate.GA, LockToDefault: true}},
 }
 
 // Feature represents a feature being gated
