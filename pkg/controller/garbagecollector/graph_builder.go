@@ -35,6 +35,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	clientgofeaturegate "k8s.io/client-go/features"
 	"k8s.io/client-go/metadata"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
@@ -121,18 +122,13 @@ type GraphBuilder struct {
 
 // monitor runs a Controller with a local stop channel.
 type monitor struct {
-	controller cache.Controller
-	store      cache.Store
+	lastSyncResourceVersion func() string
+	synced                  cache.DoneChecker
+	store                   cache.Store
 
 	// stopCh stops Controller. If stopCh is nil, the monitor is considered to be
 	// not yet started.
 	stopCh chan struct{}
-}
-
-// Run is intended to be called in a goroutine. Multiple calls of this is an
-// error.
-func (m *monitor) Run() {
-	m.controller.Run(m.stopCh)
 }
 
 type monitors map[schema.GroupVersionResource]*monitor
@@ -185,7 +181,7 @@ func NewDependencyGraphBuilder(
 	return graphBuilder
 }
 
-func (gb *GraphBuilder) controllerFor(logger klog.Logger, resource schema.GroupVersionResource, kind schema.GroupVersionKind) (cache.Controller, cache.Store, error) {
+func (gb *GraphBuilder) controllerFor(logger klog.Logger, resource schema.GroupVersionResource, kind schema.GroupVersionKind) (func() string, cache.DoneChecker, cache.Store, error) {
 	handlers := cache.ResourceEventHandlerFuncs{
 		// add the event to the dependencyGraphBuilder's graphChanges.
 		AddFunc: func(obj interface{}) {
@@ -224,12 +220,21 @@ func (gb *GraphBuilder) controllerFor(logger klog.Logger, resource schema.GroupV
 	shared, err := gb.sharedInformers.ForResource(resource)
 	if err != nil {
 		logger.V(4).Info("unable to use a shared informer", "resource", resource, "kind", kind, "err", err)
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	logger.V(4).Info("using a shared informer", "resource", resource, "kind", kind)
 	// need to clone because it's from a shared cache
-	shared.Informer().AddEventHandlerWithResyncPeriod(handlers, ResourceResyncTime)
-	return shared.Informer().GetController(), shared.Informer().GetStore(), nil
+	handle, err := shared.Informer().AddEventHandlerWithResyncPeriod(handlers, ResourceResyncTime)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("register event handler: %w", err)
+	}
+
+	lastSyncResourceVersion := shared.Informer().LastSyncResourceVersion
+	if !clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.InformerResourceVersion) {
+		lastSyncResourceVersion = func() string { return "" }
+	}
+
+	return lastSyncResourceVersion, handle.HasSyncedChecker(), shared.Informer().GetStore(), nil
 }
 
 // syncMonitors rebuilds the monitor set according to the supplied resources,
@@ -265,12 +270,12 @@ func (gb *GraphBuilder) syncMonitors(logger klog.Logger, resources map[schema.Gr
 			errs = append(errs, fmt.Errorf("couldn't look up resource %q: %v", resource, err))
 			continue
 		}
-		c, s, err := gb.controllerFor(logger, resource, kind)
+		l, hs, s, err := gb.controllerFor(logger, resource, kind)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("couldn't start monitor for resource %q: %v", resource, err))
 			continue
 		}
-		current[resource] = &monitor{store: s, controller: c}
+		current[resource] = &monitor{lastSyncResourceVersion: l, synced: hs, store: s}
 		added++
 	}
 	gb.monitors = current
@@ -309,7 +314,6 @@ func (gb *GraphBuilder) startMonitors(logger klog.Logger) {
 		if monitor.stopCh == nil {
 			monitor.stopCh = make(chan struct{})
 			gb.sharedInformers.Start(gb.stopCh)
-			gb.monitorWG.Go(monitor.Run)
 			started++
 		}
 	}
@@ -352,7 +356,7 @@ func (gb *GraphBuilder) IsResourceSynced(resource schema.GroupVersionResource) b
 	gb.monitorLock.Lock()
 	defer gb.monitorLock.Unlock()
 	monitor, ok := gb.monitors[resource]
-	return ok && monitor.controller.HasSynced()
+	return ok && cache.IsDone(monitor.synced)
 }
 
 // IsSynced returns true if any monitors exist AND all those monitors'
@@ -369,7 +373,7 @@ func (gb *GraphBuilder) IsSynced(logger klog.Logger) bool {
 	}
 
 	for resource, monitor := range gb.monitors {
-		if !monitor.controller.HasSynced() {
+		if !cache.IsDone(monitor.synced) {
 			logger.V(4).Info("garbage controller monitor not yet synced", "resource", resource)
 			return false
 		}
@@ -1018,8 +1022,8 @@ func (gb *GraphBuilder) GetGraphResources() (
 }
 
 type Monitor struct {
-	Store      cache.Store
-	Controller cache.Controller
+	LastSyncResourceVersion func() string
+	Store                   cache.Store
 }
 
 // GetMonitor returns a monitor for the given resource. It will return the
@@ -1034,15 +1038,14 @@ func (gb *GraphBuilder) GetMonitor(ctx context.Context, resource schema.GroupVer
 	}
 
 	resourceMonitor := &Monitor{
-		Store:      monitor.store,
-		Controller: monitor.controller,
+		LastSyncResourceVersion: monitor.lastSyncResourceVersion,
+		Store:                   monitor.store,
 	}
 
-	if !cache.WaitForNamedCacheSyncWithContext(
+	if !cache.WaitFor(
 		ctx,
-		func() bool {
-			return monitor.controller.HasSynced()
-		},
+		"caches",
+		monitor.synced,
 	) {
 		return nil, false, nil
 	}

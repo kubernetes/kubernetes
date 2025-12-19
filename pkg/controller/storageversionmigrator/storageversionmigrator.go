@@ -251,7 +251,7 @@ func (svmc *SVMController) sync(ctx context.Context, key string) error {
 		return svmc.failMigration(ctx, toBeProcessedSVM, fmt.Errorf("resource does not exist in GC: %w", errMonitor))
 	}
 
-	gcListResourceVersion := resourceMonitor.Controller.LastSyncResourceVersion()
+	gcListResourceVersion := resourceMonitor.LastSyncResourceVersion()
 	listResourceVersion := toBeProcessedSVM.Status.ResourceVersion
 
 	rvCmp, err := resourceversion.CompareResourceVersion(gcListResourceVersion, listResourceVersion)

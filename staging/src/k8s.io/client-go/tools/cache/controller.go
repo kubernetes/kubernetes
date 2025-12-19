@@ -111,63 +111,47 @@ type ProcessFunc func(obj interface{}, isInInitialList bool) error
 // The deltas must not contain multiple entries for the same object.
 type ProcessBatchFunc func(deltas []Delta, isInInitialList bool) error
 
-// `*controller` implements Controller
-type controller struct {
+// ControllerImpl is a low-level controller that is parameterized by a
+// Config and used in sharedIndexInformer.
+type ControllerImpl struct {
 	config         Config
 	reflector      *Reflector
 	reflectorMutex sync.RWMutex
 	clock          clock.Clock
 }
 
-// Controller is a low-level controller that is parameterized by a
-// Config and used in sharedIndexInformer.
-type Controller interface {
-	// RunWithContext does two things.  One is to construct and run a Reflector
-	// to pump objects/notifications from the Config's ListerWatcher
-	// to the Config's Queue and possibly invoke the occasional Resync
-	// on that Queue.  The other is to repeatedly Pop from the Queue
-	// and process with the Config's ProcessFunc.  Both of these
-	// continue until the context is canceled.
-	//
-	// It's an error to call RunWithContext more than once.
-	// RunWithContext blocks; call via go.
-	RunWithContext(ctx context.Context)
-
-	// Run does the same as RunWithContext with a stop channel instead of
-	// a context.
-	//
-	// Contextual logging: RunWithcontext should be used instead of Run in code which supports contextual logging.
-	Run(stopCh <-chan struct{})
-
-	// HasSynced delegates to the Config's Queue
-	HasSynced() bool
-
-	// HasSyncedChecker enables waiting for syncing without polling.
-	// The returned DoneChecker can be passed to WaitFor.
-	// It delegates to the Config's Queue.
-	HasSyncedChecker() DoneChecker
-
-	// LastSyncResourceVersion delegates to the Reflector when there
-	// is one, otherwise returns the empty string
-	LastSyncResourceVersion() string
-}
+// Controller is an alias for a pointer to ControllerImpl because
+// the public type used to be an interface with that name. The alias
+// allows consumers of this package to continue using cache.Controller.
+type Controller = *ControllerImpl
 
 // New makes a new Controller from the given Config.
 func New(c *Config) Controller {
-	ctlr := &controller{
+	ctlr := &ControllerImpl{
 		config: *c,
 		clock:  &clock.RealClock{},
 	}
 	return ctlr
 }
 
-// Run implements [Controller.Run].
-func (c *controller) Run(stopCh <-chan struct{}) {
+// Run does the same as RunWithContext with a stop channel instead of
+// a context.
+//
+//logcheck:context // RunWithContext should be used instead of Run in code which supports contextual logging.
+func (c *ControllerImpl) Run(stopCh <-chan struct{}) {
 	c.RunWithContext(wait.ContextForChannel(stopCh))
 }
 
-// RunWithContext implements [Controller.RunWithContext].
-func (c *controller) RunWithContext(ctx context.Context) {
+// RunWithContext does two things.  One is to construct and run a Reflector
+// to pump objects/notifications from the Config's ListerWatcher
+// to the Config's Queue and possibly invoke the occasional Resync
+// on that Queue.  The other is to repeatedly Pop from the Queue
+// and process with the Config's ProcessFunc.  Both of these
+// continue until the context is canceled.
+//
+// It's an error to call RunWithContext more than once.
+// RunWithContext blocks; call via go.
+func (c *ControllerImpl) RunWithContext(ctx context.Context) {
 	defer utilruntime.HandleCrashWithContext(ctx)
 	go func() {
 		<-ctx.Done()
@@ -208,19 +192,22 @@ func (c *controller) RunWithContext(ctx context.Context) {
 	wg.Wait()
 }
 
-// Returns true once this controller has completed an initial resource listing
-func (c *controller) HasSynced() bool {
+// Returns true once this controller has completed an initial resource listing.
+// It delegates to the Config's Queue.
+func (c *ControllerImpl) HasSynced() bool {
 	return c.config.Queue.HasSynced()
 }
 
 // HasSyncedChecker enables waiting for syncing without polling.
 // The returned DoneChecker can be passed to [WaitFor].
 // It delegates to the Config's Queue.
-func (c *controller) HasSyncedChecker() DoneChecker {
+func (c *ControllerImpl) HasSyncedChecker() DoneChecker {
 	return c.config.Queue.HasSyncedChecker()
 }
 
-func (c *controller) LastSyncResourceVersion() string {
+// LastSyncResourceVersion delegates to the Reflector when there
+// is one, otherwise returns the empty string
+func (c *ControllerImpl) LastSyncResourceVersion() string {
 	c.reflectorMutex.RLock()
 	defer c.reflectorMutex.RUnlock()
 	if c.reflector == nil {
@@ -233,7 +220,7 @@ func (c *controller) LastSyncResourceVersion() string {
 // TODO: Consider doing the processing in parallel. This will require a little thought
 // to make sure that we don't end up processing the same object multiple times
 // concurrently.
-func (c *controller) processLoop(ctx context.Context) {
+func (c *ControllerImpl) processLoop(ctx context.Context) {
 	useBatchProcess := false
 	batchQueue, ok := c.config.Queue.(QueueWithBatch)
 	if ok && c.config.ProcessBatch != nil && clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.InOrderInformersBatchProcess) {
@@ -461,7 +448,7 @@ type InformerOptions struct {
 // while also providing event notifications. You should only used the returned
 // Store for Get/List operations; Add/Modify/Deletes will cause the event
 // notifications to be faulty.
-func NewInformerWithOptions(options InformerOptions) (Store, Controller) {
+func NewInformerWithOptions(options InformerOptions) (Store, *ControllerImpl) {
 	var clientState Store
 	if options.Indexers == nil {
 		clientState = NewStore(DeletionHandlingMetaNamespaceKeyFunc)
@@ -492,7 +479,7 @@ func NewInformer(
 	objType runtime.Object,
 	resyncPeriod time.Duration,
 	h ResourceEventHandler,
-) (Store, Controller) {
+) (Store, *ControllerImpl) {
 	// This will hold the client state, as we know it.
 	clientState := NewStore(DeletionHandlingMetaNamespaceKeyFunc)
 
@@ -528,7 +515,7 @@ func NewIndexerInformer(
 	resyncPeriod time.Duration,
 	h ResourceEventHandler,
 	indexers Indexers,
-) (Indexer, Controller) {
+) (Indexer, *ControllerImpl) {
 	// This will hold the client state, as we know it.
 	clientState := NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, indexers)
 
@@ -557,7 +544,7 @@ func NewTransformingInformer(
 	resyncPeriod time.Duration,
 	h ResourceEventHandler,
 	transformer TransformFunc,
-) (Store, Controller) {
+) (Store, *ControllerImpl) {
 	// This will hold the client state, as we know it.
 	clientState := NewStore(DeletionHandlingMetaNamespaceKeyFunc)
 
@@ -587,7 +574,7 @@ func NewTransformingIndexerInformer(
 	h ResourceEventHandler,
 	indexers Indexers,
 	transformer TransformFunc,
-) (Indexer, Controller) {
+) (Indexer, *ControllerImpl) {
 	// This will hold the client state, as we know it.
 	clientState := NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, indexers)
 
@@ -799,7 +786,7 @@ func processReplacedAllInfo(logger klog.Logger, handler ResourceEventHandler, in
 // Parameters
 //   - clientState is the store you want to populate
 //   - options contain the options to configure the controller
-func newInformer(clientState Store, options InformerOptions, keyFunc KeyFunc) Controller {
+func newInformer(clientState Store, options InformerOptions, keyFunc KeyFunc) *ControllerImpl {
 	// This will hold incoming changes. Note how we pass clientState in as a
 	// KeyLister, that way resync operations will result in the correct set
 	// of update/delete deltas.

@@ -124,17 +124,11 @@ func NewMonitor(informersStarted <-chan struct{}, informerFactory informerfactor
 
 // monitor runs a Controller with a local stop channel.
 type monitor struct {
-	controller cache.Controller
+	synced cache.DoneChecker
 
 	// stopCh stops Controller. If stopCh is nil, the monitor is considered to be
 	// not yet started.
 	stopCh chan struct{}
-}
-
-// Run is intended to be called in a goroutine. Multiple calls of this is an
-// error.
-func (m *monitor) Run() {
-	m.controller.Run(m.stopCh)
 }
 
 type monitors map[schema.GroupVersionResource]*monitor
@@ -142,7 +136,7 @@ type monitors map[schema.GroupVersionResource]*monitor
 // UpdateFilter is a function that returns true if the update event should be added to the resourceChanges queue.
 type UpdateFilter func(resource schema.GroupVersionResource, oldObj, newObj interface{}) bool
 
-func (qm *QuotaMonitor) controllerFor(ctx context.Context, resource schema.GroupVersionResource) (cache.Controller, error) {
+func (qm *QuotaMonitor) controllerFor(ctx context.Context, resource schema.GroupVersionResource) (cache.DoneChecker, error) {
 	logger := klog.FromContext(ctx)
 
 	handlers := cache.ResourceEventHandlerFuncs{
@@ -173,8 +167,11 @@ func (qm *QuotaMonitor) controllerFor(ctx context.Context, resource schema.Group
 	shared, err := qm.informerFactory.ForResource(resource)
 	if err == nil {
 		logger.V(4).Info("QuotaMonitor using a shared informer", "resource", resource.String())
-		shared.Informer().AddEventHandlerWithResyncPeriod(handlers, qm.resyncPeriod())
-		return shared.Informer().GetController(), nil
+		handle, err := shared.Informer().AddEventHandlerWithResyncPeriod(handlers, qm.resyncPeriod())
+		if err != nil {
+			return nil, fmt.Errorf("register event handler: %w", err)
+		}
+		return handle.HasSyncedChecker(), nil
 	}
 	logger.V(4).Info("QuotaMonitor unable to use a shared informer", "resource", resource.String(), "err", err)
 
@@ -213,7 +210,7 @@ func (qm *QuotaMonitor) SyncMonitors(ctx context.Context, resources map[schema.G
 			kept++
 			continue
 		}
-		c, err := qm.controllerFor(ctx, resource)
+		s, err := qm.controllerFor(ctx, resource)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("couldn't start monitor for resource %q: %v", resource, err))
 			continue
@@ -230,7 +227,7 @@ func (qm *QuotaMonitor) SyncMonitors(ctx context.Context, resources map[schema.G
 		}
 
 		// track the monitor
-		current[resource] = &monitor{controller: c}
+		current[resource] = &monitor{synced: s}
 		added++
 	}
 	qm.monitors = current
@@ -269,7 +266,6 @@ func (qm *QuotaMonitor) StartMonitors(ctx context.Context) {
 		if monitor.stopCh == nil {
 			monitor.stopCh = make(chan struct{})
 			qm.informerFactory.Start(qm.stopCh)
-			qm.monitorWG.Go(monitor.Run)
 			started++
 		}
 	}
@@ -292,7 +288,7 @@ func (qm *QuotaMonitor) IsSynced(ctx context.Context) bool {
 	}
 
 	for resource, monitor := range qm.monitors {
-		if !monitor.controller.HasSynced() {
+		if !cache.IsDone(monitor.synced) {
 			logger.V(4).Info("quota monitor not synced", "resource", resource)
 			return false
 		}
