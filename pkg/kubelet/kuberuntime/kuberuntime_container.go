@@ -39,7 +39,7 @@ import (
 	"github.com/opencontainers/selinux/go-selinux"
 	grpcstatus "google.golang.org/grpc/status"
 
-	"github.com/armon/circbuf"
+	"k8s.io/utils/buffer"
 	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
@@ -589,11 +589,11 @@ func getTerminationMessage(status *runtimeapi.ContainerStatus, terminationMessag
 // by path. It reads up to max log lines.
 func (m *kubeGenericRuntimeManager) readLastStringFromContainerLogs(ctx context.Context, path string) string {
 	value := int64(kubecontainer.MaxContainerTerminationMessageLogLines)
-	buf, _ := circbuf.NewBuffer(kubecontainer.MaxContainerTerminationMessageLogLength)
+	buf, _ := buffer.NewTypedRingFixed[byte](kubecontainer.MaxContainerTerminationMessageLogLength)
 	if err := m.ReadLogs(ctx, path, "", &v1.PodLogOptions{TailLines: &value}, buf, buf); err != nil {
 		return fmt.Sprintf("Error on reading termination message from logs: %v", err)
 	}
-	return buf.String()
+	return string(buf.Slice())
 }
 
 func (m *kubeGenericRuntimeManager) convertToKubeContainerStatus(ctx context.Context, podUID kubetypes.UID, status *runtimeapi.ContainerStatus) (cStatus *kubecontainer.Status) {
