@@ -76,6 +76,7 @@ func InitCustomVolumeExpandTestSuite(patterns []storageframework.TestPattern) st
 func InitVolumeExpandTestSuite() storageframework.TestSuite {
 	patterns := []storageframework.TestPattern{
 		storageframework.DefaultFsDynamicPV,
+		storageframework.XfsDynamicPV,
 		storageframework.BlockVolModeDynamicPV,
 		storageframework.DefaultFsDynamicPVAllowExpansion,
 		storageframework.BlockVolModeDynamicPVAllowExpansion,
@@ -185,8 +186,16 @@ func (v *volumeExpandTestSuite) DefineTests(driver storageframework.TestDriver, 
 			gomega.Expect(l.resource.Sc.AllowVolumeExpansion).NotTo(gomega.BeNil())
 			allowVolumeExpansion := *l.resource.Sc.AllowVolumeExpansion
 			gomega.Expect(allowVolumeExpansion).To(gomega.BeFalseBecause("expected AllowVolumeExpansion value to be false"))
+
+			// Re-fetch PVC to get the latest status with updated capacity
+			ginkgo.By("Re-fetching PVC to get latest status")
+			l.resource.Pvc, err = f.ClientSet.CoreV1().PersistentVolumeClaims(l.resource.Pvc.Namespace).Get(ctx, l.resource.Pvc.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err, "While re-fetching PVC before expansion")
+
 			ginkgo.By("Expanding non-expandable pvc")
-			currentPvcSize := l.resource.Pvc.Spec.Resources.Requests[v1.ResourceStorage]
+			// Use Status.Capacity instead of Spec.Resources.Requests to get the actual allocated size.
+			// CSI drivers may allocate larger volumes than requested (e.g., due to minimum size constraints).
+			currentPvcSize := l.resource.Pvc.Status.Capacity[v1.ResourceStorage]
 			newSize := currentPvcSize.DeepCopy()
 			newSize.Add(expandSize)
 			framework.Logf("currentPvcSize %v, newSize %v", currentPvcSize, newSize)
@@ -219,9 +228,16 @@ func (v *volumeExpandTestSuite) DefineTests(driver storageframework.TestDriver, 
 			err = e2epod.DeletePodWithWait(ctx, f.ClientSet, l.pod)
 			framework.ExpectNoError(err, "while deleting pod for resizing")
 
+			// Re-fetch PVC to get the latest status with updated capacity
+			ginkgo.By("Re-fetching PVC to get latest status")
+			l.resource.Pvc, err = f.ClientSet.CoreV1().PersistentVolumeClaims(l.resource.Pvc.Namespace).Get(ctx, l.resource.Pvc.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err, "While re-fetching PVC before expansion")
+
 			// We expand the PVC while no pod is using it to ensure offline expansion
 			ginkgo.By("Expanding current pvc")
-			currentPvcSize := l.resource.Pvc.Spec.Resources.Requests[v1.ResourceStorage]
+			// Use Status.Capacity instead of Spec.Resources.Requests to get the actual allocated size.
+			// CSI drivers may allocate larger volumes than requested (e.g., due to minimum size constraints).
+			currentPvcSize := l.resource.Pvc.Status.Capacity[v1.ResourceStorage]
 			newSize := currentPvcSize.DeepCopy()
 			newSize.Add(expandSize)
 			framework.Logf("currentPvcSize %v, newSize %v", currentPvcSize, newSize)
@@ -291,9 +307,16 @@ func (v *volumeExpandTestSuite) DefineTests(driver storageframework.TestDriver, 
 			ginkgo.DeferCleanup(e2epod.DeletePodWithWait, f.ClientSet, l.pod)
 			framework.ExpectNoError(err, "While creating pods for resizing")
 
+			// Re-fetch PVC to get the latest status with updated capacity
+			ginkgo.By("Re-fetching PVC to get latest status")
+			l.resource.Pvc, err = f.ClientSet.CoreV1().PersistentVolumeClaims(l.resource.Pvc.Namespace).Get(ctx, l.resource.Pvc.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err, "While re-fetching PVC before expansion")
+
 			// We expand the PVC while l.pod is using it for online expansion.
 			ginkgo.By("Expanding current pvc")
-			currentPvcSize := l.resource.Pvc.Spec.Resources.Requests[v1.ResourceStorage]
+			// Use Status.Capacity instead of Spec.Resources.Requests to get the actual allocated size.
+			// CSI drivers may allocate larger volumes than requested (e.g., due to minimum size constraints).
+			currentPvcSize := l.resource.Pvc.Status.Capacity[v1.ResourceStorage]
 			newSize := currentPvcSize.DeepCopy()
 			newSize.Add(expandSize)
 			framework.Logf("currentPvcSize %v, newSize %v", currentPvcSize, newSize)
@@ -343,9 +366,16 @@ func (v *volumeExpandTestSuite) DefineTests(driver storageframework.TestDriver, 
 			ginkgo.DeferCleanup(e2epod.DeletePodWithWait, f.ClientSet, l.pod)
 			framework.ExpectNoError(err, "While creating pods for resizing")
 
+			// Re-fetch PVC to get the latest status with updated capacity
+			ginkgo.By("Re-fetching PVC to get latest status")
+			l.resource.Pvc, err = f.ClientSet.CoreV1().PersistentVolumeClaims(l.resource.Pvc.Namespace).Get(ctx, l.resource.Pvc.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err, "While re-fetching PVC before expansion")
+
 			// We expand the PVC while l.pod is using it for online expansion.
 			ginkgo.By("Expanding current pvc")
-			currentPvcSize := l.resource.Pvc.Spec.Resources.Requests[v1.ResourceStorage]
+			// Use Status.Capacity instead of Spec.Resources.Requests to get the actual allocated size.
+			// CSI drivers may allocate larger volumes than requested (e.g., due to minimum size constraints).
+			currentPvcSize := l.resource.Pvc.Status.Capacity[v1.ResourceStorage]
 			newSize := currentPvcSize.DeepCopy()
 			newSize.Add(expandSize)
 			framework.Logf("currentPvcSize %v, newSize %v", currentPvcSize, newSize)

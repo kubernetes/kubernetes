@@ -173,6 +173,14 @@ func (pl *InterPodAffinity) isSchedulableAfterPodChange(logger klog.Logger, pod 
 	if err != nil {
 		return fwk.Queue, err
 	}
+	if modifiedPod != nil && originalPod != nil && pod.UID == modifiedPod.UID {
+		// The only update event we listen on is UpdatePodLabel, so we can assume the labels have changed.
+		// The pod can become schedulable after update to its labels because e.g. some other pod might have
+		// anti-affinity on the old labels but not on the new ones.
+		logger.V(5).Info("the target pod labels have changed and it may be schedulable now",
+			"pod", klog.KObj(pod))
+		return fwk.Queue, nil
+	}
 	if (modifiedPod != nil && modifiedPod.Spec.NodeName == "") || (originalPod != nil && originalPod.Spec.NodeName == "") {
 		logger.V(5).Info("the added/updated/deleted pod is unscheduled, so it doesn't make the target pod schedulable",
 			"pod", klog.KObj(pod), "originalPod", klog.KObj(originalPod), "modifiedPod", klog.KObj(modifiedPod))
@@ -220,15 +228,27 @@ func (pl *InterPodAffinity) isSchedulableAfterPodChange(logger klog.Logger, pod 
 		return fwk.QueueSkip, nil
 	}
 
-	// Pod is deleted. Return Queue when the deleted pod matching the target pod's anti-affinity.
-	if !podMatchesAllAffinityTerms(antiTerms, originalPod) {
-		logger.V(5).Info("a scheduled pod was deleted but it doesn't match the target pod's anti-affinity",
-			"pod", klog.KObj(pod), "modifiedPod", klog.KObj(modifiedPod))
-		return fwk.QueueSkip, nil
+	// Pod is deleted. Return Queue when the deleted pod matches the target pod's anti-affinity or vice versa.
+
+	if podMatchesAllAffinityTerms(antiTerms, originalPod) {
+		logger.V(5).Info("a scheduled pod was deleted and it matches the target pod's anti-affinity. The pod may be schedulable now",
+			"pod", klog.KObj(pod), "originalPod", klog.KObj(originalPod))
+		return fwk.Queue, nil
 	}
-	logger.V(5).Info("a scheduled pod was deleted and it matches the target pod's anti-affinity. The pod may be schedulable now",
-		"pod", klog.KObj(pod), "modifiedPod", klog.KObj(modifiedPod))
-	return fwk.Queue, nil
+
+	originalPodAntiTerms, err := fwk.GetAffinityTerms(originalPod, fwk.GetPodAntiAffinityTerms(originalPod.Spec.Affinity))
+	if err != nil {
+		return fwk.Queue, err
+	}
+	if podMatchesAllAffinityTerms(originalPodAntiTerms, pod) {
+		logger.V(5).Info("a scheduled pod was deleted and the target pod matches the deleted pod's anti-affinity. The pod may be schedulable now",
+			"pod", klog.KObj(pod), "originalPod", klog.KObj(originalPod))
+		return fwk.Queue, nil
+	}
+
+	logger.V(5).Info("a scheduled pod was deleted but it doesn't match the target pod's anti-affinity, nor vice versa",
+		"pod", klog.KObj(pod), "originalPod", klog.KObj(originalPod))
+	return fwk.QueueSkip, nil
 }
 
 func (pl *InterPodAffinity) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {

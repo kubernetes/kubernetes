@@ -992,6 +992,15 @@ func (ImageVolumeSource) SwaggerDoc() map[string]string {
 	return map_ImageVolumeSource
 }
 
+var map_ImageVolumeStatus = map[string]string{
+	"":         "ImageVolumeStatus represents the image-based volume status.",
+	"imageRef": "ImageRef is the digest of the image used for this volume. It should have a value that's similar to the pod's status.containerStatuses[i].imageID. The ImageRef length should not exceed 256 characters.",
+}
+
+func (ImageVolumeStatus) SwaggerDoc() map[string]string {
+	return map_ImageVolumeStatus
+}
+
 var map_KeyToPath = map[string]string{
 	"":     "Maps a string key to a path within a volume.",
 	"key":  "key is the key to project.",
@@ -2782,6 +2791,7 @@ var map_VolumeMountStatus = map[string]string{
 	"mountPath":         "MountPath corresponds to the original VolumeMount.",
 	"readOnly":          "ReadOnly corresponds to the original VolumeMount.",
 	"recursiveReadOnly": "RecursiveReadOnly must be set to Disabled, Enabled, or unspecified (for non-readonly mounts). An IfPossible value in the original VolumeMount must be translated to Disabled or Enabled, depending on the mount result.",
+	"volumeStatus":      "volumeStatus represents volume-type-specific status about the mounted volume.",
 }
 
 func (VolumeMountStatus) SwaggerDoc() map[string]string {
@@ -2857,6 +2867,15 @@ var map_VolumeSource = map[string]string{
 
 func (VolumeSource) SwaggerDoc() map[string]string {
 	return map_VolumeSource
+}
+
+var map_VolumeStatus = map[string]string{
+	"":      "VolumeStatus represents the status of a mounted volume. At most one of its members must be specified.",
+	"image": "image represents an OCI object (a container image or artifact) pulled and mounted on the kubelet's host machine.",
+}
+
+func (VolumeStatus) SwaggerDoc() map[string]string {
+	return map_VolumeStatus
 }
 
 var map_VsphereVirtualDiskVolumeSource = map[string]string{

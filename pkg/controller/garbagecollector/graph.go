@@ -79,7 +79,8 @@ type node struct {
 	virtualLock sync.RWMutex
 	// when processing an Update event, we need to compare the updated
 	// ownerReferences with the owners recorded in the graph.
-	owners []metav1.OwnerReference
+	owners     []metav1.OwnerReference
+	ownersLock sync.RWMutex
 }
 
 // clone() must only be called from the single-threaded GraphBuilder.processGraphChanges()
@@ -138,6 +139,18 @@ func (n *node) isDeletingDependents() bool {
 	return n.deletingDependents
 }
 
+func (n *node) setOwners(owners []metav1.OwnerReference) {
+	n.ownersLock.Lock()
+	defer n.ownersLock.Unlock()
+	n.owners = owners
+}
+
+func (n *node) getOwners() []metav1.OwnerReference {
+	n.ownersLock.RLock()
+	defer n.ownersLock.RUnlock()
+	return n.owners
+}
+
 func (n *node) addDependent(dependent *node) {
 	n.dependentsLock.Lock()
 	defer n.dependentsLock.Unlock()
@@ -179,7 +192,7 @@ func (n *node) blockingDependents() []*node {
 	dependents := n.getDependents()
 	var ret []*node
 	for _, dep := range dependents {
-		for _, owner := range dep.owners {
+		for _, owner := range dep.getOwners() {
 			if owner.UID == n.identity.UID && owner.BlockOwnerDeletion != nil && *owner.BlockOwnerDeletion {
 				ret = append(ret, dep)
 			}
@@ -216,6 +229,9 @@ func (n *node) String() string {
 
 	n.dependentsLock.RLock()
 	defer n.dependentsLock.RUnlock()
+
+	n.ownersLock.RLock()
+	defer n.ownersLock.RUnlock()
 
 	return fmt.Sprintf("%#v", n)
 }

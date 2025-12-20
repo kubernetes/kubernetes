@@ -14,13 +14,12 @@ require (
 	bitbucket.org/bertimus9/systemstat v0.5.0
 	github.com/JeffAshton/win_pdh v0.0.0-20161109143554-76bb4ee9f0ab
 	github.com/Microsoft/go-winio v0.6.2
-	github.com/Microsoft/hnslib v0.1.1
-	github.com/armon/circbuf v0.0.0-20190214190532-5111143e8da2
+	github.com/Microsoft/hnslib v0.1.2
 	github.com/blang/semver/v4 v4.0.0
 	github.com/container-storage-interface/spec v1.9.0
 	github.com/coredns/corefile-migration v1.0.29
 	github.com/coreos/go-oidc v2.3.0+incompatible
-	github.com/coreos/go-systemd/v22 v22.5.0
+	github.com/coreos/go-systemd/v22 v22.6.0
 	github.com/cpuguy83/go-md2man/v2 v2.0.6
 	github.com/cyphar/filepath-securejoin v0.6.0
 	github.com/distribution/reference v0.6.0
@@ -40,11 +39,10 @@ require (
 	github.com/lithammer/dedent v1.1.0
 	github.com/moby/ipvs v1.1.0
 	github.com/moby/sys/userns v0.1.0
-	github.com/mrunalp/fileutils v0.5.1
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
-	github.com/onsi/ginkgo/v2 v2.27.2
-	github.com/onsi/gomega v1.38.2
-	github.com/opencontainers/cgroups v0.0.3
+	github.com/onsi/ginkgo/v2 v2.27.3
+	github.com/onsi/gomega v1.38.3
+	github.com/opencontainers/cgroups v0.0.6
 	github.com/opencontainers/selinux v1.13.0
 	github.com/pmezard/go-difflib v1.0.0
 	github.com/prometheus/client_golang v1.23.2
@@ -56,9 +54,9 @@ require (
 	github.com/stretchr/testify v1.11.1
 	github.com/vishvananda/netlink v1.3.1
 	github.com/vishvananda/netns v0.0.5
-	go.etcd.io/etcd/api/v3 v3.6.5
-	go.etcd.io/etcd/client/pkg/v3 v3.6.5
-	go.etcd.io/etcd/client/v3 v3.6.5
+	go.etcd.io/etcd/api/v3 v3.6.6
+	go.etcd.io/etcd/client/pkg/v3 v3.6.6
+	go.etcd.io/etcd/client/v3 v3.6.6
 	go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful v0.44.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.61.0
 	go.opentelemetry.io/otel v1.36.0
@@ -116,7 +114,7 @@ require (
 	k8s.io/pod-security-admission v0.0.0
 	k8s.io/sample-apiserver v0.0.0
 	k8s.io/system-validators v1.12.1
-	k8s.io/utils v0.0.0-20251002143259-bc988d571ff4
+	k8s.io/utils v0.0.0-20251219084037-98d557b7f1e7
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730
 	sigs.k8s.io/knftables v0.0.17
 	sigs.k8s.io/randfill v1.0.0
@@ -163,10 +161,8 @@ require (
 	github.com/google/btree v1.1.3 // indirect
 	github.com/google/pprof v0.0.0-20250403155104-27863c87afa6 // indirect
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 // indirect
-	github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus v1.0.1 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.0 // indirect
-	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.26.3 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jonboulle/clockwork v0.5.0 // indirect
@@ -190,7 +186,6 @@ require (
 	github.com/opencontainers/image-spec v1.1.1 // indirect
 	github.com/opencontainers/runtime-spec v1.2.1 // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
-	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pquerna/cachecontrol v0.1.0 // indirect
 	github.com/prometheus/procfs v0.16.1 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
@@ -203,8 +198,8 @@ require (
 	github.com/xiang90/probing v0.0.0-20221125231312-a49e3df8f510 // indirect
 	github.com/xlab/treeprint v1.2.0 // indirect
 	go.etcd.io/bbolt v1.4.3 // indirect
-	go.etcd.io/etcd/pkg/v3 v3.6.5 // indirect
-	go.etcd.io/etcd/server/v3 v3.6.5 // indirect
+	go.etcd.io/etcd/pkg/v3 v3.6.6 // indirect
+	go.etcd.io/etcd/server/v3 v3.6.6 // indirect
 	go.etcd.io/raft/v3 v3.6.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.60.0 // indirect

@@ -77,7 +77,7 @@ func (m *podContainerManagerImpl) EnsureExists(logger klog.Logger, pod *v1.Pod) 
 	if !alreadyExists {
 		enforceCPULimits := m.enforceCPULimits
 		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DisableCPUQuotaWithExclusiveCPUs) && m.podContainerManager.PodHasExclusiveCPUs(pod) {
-			klog.V(2).InfoS("Disabled CFS quota", "pod", klog.KObj(pod))
+			logger.V(2).Info("Disabled CFS quota", "pod", klog.KObj(pod))
 			enforceCPULimits = false
 		}
 		enforceMemoryQoS := false
@@ -95,7 +95,7 @@ func (m *podContainerManagerImpl) EnsureExists(logger klog.Logger, pod *v1.Pod) 
 			containerConfig.ResourceParameters.PidsLimit = &m.podPidsLimit
 		}
 		if enforceMemoryQoS {
-			klog.V(4).InfoS("MemoryQoS config for pod", "pod", klog.KObj(pod), "unified", containerConfig.ResourceParameters.Unified)
+			logger.V(4).Info("MemoryQoS config for pod", "pod", klog.KObj(pod), "unified", containerConfig.ResourceParameters.Unified)
 		}
 		if err := m.cgroupManager.Create(logger, containerConfig); err != nil {
 			return fmt.Errorf("failed to create container for %v : %v", podContainerName, err)
@@ -148,14 +148,14 @@ func (m *podContainerManagerImpl) SetPodCgroupConfig(logger klog.Logger, pod *v1
 }
 
 // Kill one process ID
-func (m *podContainerManagerImpl) killOnePid(pid int) error {
+func (m *podContainerManagerImpl) killOnePid(logger klog.Logger, pid int) error {
 	// os.FindProcess never returns an error on POSIX
 	// https://go-review.googlesource.com/c/go/+/19093
 	p, _ := os.FindProcess(pid)
 	if err := p.Kill(); err != nil {
 		// If the process already exited, that's fine.
 		if errors.Is(err, os.ErrProcessDone) {
-			klog.V(3).InfoS("Process no longer exists", "pid", pid)
+			logger.V(3).Info("Process no longer exists", "pid", pid)
 			return nil
 		}
 		return err
@@ -178,23 +178,23 @@ func (m *podContainerManagerImpl) tryKillingCgroupProcesses(logger klog.Logger, 
 	removed := map[int]bool{}
 	for i := 0; i < 5; i++ {
 		if i != 0 {
-			klog.V(3).InfoS("Attempt failed to kill all unwanted process from cgroup, retrying", "attempt", i, "cgroupName", podCgroup)
+			logger.V(3).Info("Attempt failed to kill all unwanted process from cgroup, retrying", "attempt", i, "cgroupName", podCgroup)
 		}
 		errlist = []error{}
 		for _, pid := range pidsToKill {
 			if _, ok := removed[pid]; ok {
 				continue
 			}
-			klog.V(3).InfoS("Attempting to kill process from cgroup", "pid", pid, "cgroupName", podCgroup)
-			if err := m.killOnePid(pid); err != nil {
-				klog.V(3).InfoS("Failed to kill process from cgroup", "pid", pid, "cgroupName", podCgroup, "err", err)
+			logger.V(3).Info("Attempting to kill process from cgroup", "pid", pid, "cgroupName", podCgroup)
+			if err := m.killOnePid(logger, pid); err != nil {
+				logger.V(3).Info("Failed to kill process from cgroup", "pid", pid, "cgroupName", podCgroup, "err", err)
 				errlist = append(errlist, err)
 			} else {
 				removed[pid] = true
 			}
 		}
 		if len(errlist) == 0 {
-			klog.V(3).InfoS("Successfully killed all unwanted processes from cgroup", "cgroupName", podCgroup)
+			logger.V(3).Info("Successfully killed all unwanted processes from cgroup", "cgroupName", podCgroup)
 			return nil
 		}
 	}
@@ -254,6 +254,9 @@ func (m *podContainerManagerImpl) IsPodCgroup(cgroupfs string) (bool, types.UID)
 // GetAllPodsFromCgroups scans through all the subsystems of pod cgroups
 // Get list of pods whose cgroup still exist on the cgroup mounts
 func (m *podContainerManagerImpl) GetAllPodsFromCgroups() (map[types.UID]CgroupName, error) {
+	// Use klog.TODO() because we currently do not have a proper logger to pass in.
+	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
+	logger := klog.TODO()
 	// Map for storing all the found pods on the disk
 	foundPods := make(map[types.UID]CgroupName)
 	qosContainersList := [3]CgroupName{m.qosContainersInfo.BestEffort, m.qosContainersInfo.Burstable, m.qosContainersInfo.Guaranteed}
@@ -294,7 +297,7 @@ func (m *podContainerManagerImpl) GetAllPodsFromCgroups() (map[types.UID]CgroupN
 				parts := strings.Split(basePath, podCgroupNamePrefix)
 				// the uid is missing, so we log the unexpected cgroup not of form pod<uid>
 				if len(parts) != 2 {
-					klog.InfoS("Pod cgroup manager ignored unexpected cgroup because it is not a pod", "path", cgroupfsPath)
+					logger.Info("Pod cgroup manager ignored unexpected cgroup because it is not a pod", "path", cgroupfsPath)
 					continue
 				}
 				podUID := parts[1]

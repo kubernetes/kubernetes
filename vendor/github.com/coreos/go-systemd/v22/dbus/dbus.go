@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Integration with the systemd D-Bus API.  See http://www.freedesktop.org/wiki/Software/systemd/dbus/
+// Package dbus provides integration with the systemd D-Bus API.
+// See http://www.freedesktop.org/wiki/Software/systemd/dbus/
 package dbus
 
 import (

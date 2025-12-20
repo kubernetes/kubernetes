@@ -1892,7 +1892,12 @@
             "name": "nameValue",
             "mountPath": "mountPathValue",
             "readOnly": true,
-            "recursiveReadOnly": "recursiveReadOnlyValue"
+            "recursiveReadOnly": "recursiveReadOnlyValue",
+            "volumeStatus": {
+              "image": {
+                "imageRef": "imageRefValue"
+              }
+            }
           }
         ],
         "user": {
@@ -1985,7 +1990,12 @@
             "name": "nameValue",
             "mountPath": "mountPathValue",
             "readOnly": true,
-            "recursiveReadOnly": "recursiveReadOnlyValue"
+            "recursiveReadOnly": "recursiveReadOnlyValue",
+            "volumeStatus": {
+              "image": {
+                "imageRef": "imageRefValue"
+              }
+            }
           }
         ],
         "user": {
@@ -2079,7 +2089,12 @@
             "name": "nameValue",
             "mountPath": "mountPathValue",
             "readOnly": true,
-            "recursiveReadOnly": "recursiveReadOnlyValue"
+            "recursiveReadOnly": "recursiveReadOnlyValue",
+            "volumeStatus": {
+              "image": {
+                "imageRef": "imageRefValue"
+              }
+            }
           }
         ],
         "user": {

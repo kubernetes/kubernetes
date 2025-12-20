@@ -28,6 +28,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -147,6 +148,10 @@ func (s *VolumeGroupSnapshottableTestSuite) DefineTests(driver storageframework.
 								"app": statefulSetName,
 							},
 						},
+						PersistentVolumeClaimRetentionPolicy: &appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+							WhenDeleted: appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
+							WhenScaled:  appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
+						},
 						Template: v1.PodTemplateSpec{
 							ObjectMeta: metav1.ObjectMeta{
 								Labels: map[string]string{
@@ -226,28 +231,57 @@ func (s *VolumeGroupSnapshottableTestSuite) DefineTests(driver storageframework.
 				return originalMntTestData
 			}
 
-			cleanup := func(ctx context.Context) {
+			cleanupResources := func(ctx context.Context) {
 				if groupTest.statefulSet != nil {
-					framework.Logf("Deleting StatefulSet %s", groupTest.statefulSet.Name)
-					err := cs.AppsV1().StatefulSets(f.Namespace.Name).Delete(ctx, groupTest.statefulSet.Name, metav1.DeleteOptions{})
-					framework.ExpectNoError(err, "failed to delete StatefulSet %s", groupTest.statefulSet.Name)
+					framework.Logf("deleting StatefulSet %s", groupTest.statefulSet.Name)
+					e2estatefulset.DeleteAllStatefulSets(ctx, cs, groupTest.statefulSet.Namespace)
 				}
-				for _, volumeResource := range groupTest.volumeResources {
-					if volumeResource != nil {
-						framework.Logf("Deleting volume resource")
-						err := volumeResource.CleanupResource(ctx)
-						framework.ExpectNoError(err, "failed to delete volume resource")
+
+				var cleanupVGSErrs []error
+				for _, vgsr := range groupTest.snapshots {
+					if vgsr == nil || vgsr.VGS == nil {
+						framework.Logf("Skipping cleanup: VolumeGroupSnapshotResource or VGS is nil")
+						continue
+					}
+
+					vgsName := vgsr.VGS.GetName()
+					vgsNamespace := vgsr.VGS.GetNamespace()
+
+					framework.Logf("deleting VolumeGroupSnapshotResource %s/%s", vgsNamespace, vgsName)
+					err := vgsr.CleanupResource(ctx, f.Timeouts)
+					if err != nil {
+						cleanupVGSErrs = append(cleanupVGSErrs, err)
+						framework.Logf("Warning: failed to delete VolumeGroupSnapshotResource %s/%s: %v", vgsNamespace, vgsName, err)
+					} else {
+						framework.Logf("deleted VolumeGroupSnapshotResource %s/%s", vgsNamespace, vgsName)
 					}
 				}
+				framework.ExpectNoError(utilerrors.NewAggregate(cleanupVGSErrs), "failed to delete VGS resources")
+
+				var cleanupVolumeErrs []error
+				for _, volumeResource := range groupTest.volumeResources {
+					if volumeResource == nil || volumeResource.Pvc == nil {
+						continue
+					}
+
+					ns, name := volumeResource.Pvc.Namespace, volumeResource.Pvc.Name
+					framework.Logf("deleting volume resource %s/%s", ns, name)
+					if err := volumeResource.CleanupResource(ctx); err != nil {
+						cleanupVolumeErrs = append(cleanupVolumeErrs, fmt.Errorf("%s/%s: %w", ns, name, err))
+						framework.Logf("Warning: failed to delete volume resource %s/%s: %v", ns, name, err)
+					} else {
+						framework.Logf("deleted volume resource %s/%s", ns, name)
+					}
+				}
+				framework.ExpectNoError(utilerrors.NewAggregate(cleanupVolumeErrs), "failed to delete volume resources")
 			}
 
 			ginkgo.It("should create snapshots for StatefulSet volumes and verify data consistency after restore", func(ctx context.Context) {
 				init(ctx)
 				createStatefulSetAndVolumes(ctx)
-				ginkgo.DeferCleanup(cleanup)
+				ginkgo.DeferCleanup(cleanupResources)
 
 				originalMntTestData := writeTestDataToVolumes(ctx)
-
 				snapshot := storageframework.CreateVolumeGroupSnapshotResource(ctx, snapshottableDriver, groupTest.config, pattern, labelValue, f.Namespace.Name, f.Timeouts, map[string]string{"deletionPolicy": pattern.SnapshotDeletionPolicy.String()})
 				groupTest.snapshots = append(groupTest.snapshots, snapshot)
 

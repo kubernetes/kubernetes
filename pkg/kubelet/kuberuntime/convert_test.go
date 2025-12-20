@@ -94,7 +94,7 @@ func TestConvertToKubeContainerImageSpec(t *testing.T) {
 	}
 
 	for _, test := range testCases {
-		actual := toKubeContainerImageSpec(test.input)
+		actual := ToKubeContainerImageSpec(test.input)
 		assert.Equal(t, test.expected, actual)
 	}
 }
@@ -155,7 +155,7 @@ func TestConvertToRuntimeAPIImageSpec(t *testing.T) {
 	}
 
 	for _, test := range testCases {
-		actual := toRuntimeAPIImageSpec(test.input)
+		actual := ToRuntimeAPIImageSpec(test.input)
 		assert.Equal(t, test.expected, actual)
 	}
 }
@@ -232,7 +232,7 @@ func TestConvertToKubeContainerImageSpecWithRuntimeHandlerInImageSpecCri(t *test
 
 	for _, test := range testCases {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RuntimeClassInImageCriAPI, true)
-		actual := toKubeContainerImageSpec(test.input)
+		actual := ToKubeContainerImageSpec(test.input)
 		assert.Equal(t, test.expected, actual)
 	}
 }
@@ -294,7 +294,7 @@ func TestConvertToRuntimeAPIImageSpecWithRuntimeHandlerInImageSpecCri(t *testing
 
 	for _, test := range testCases {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RuntimeClassInImageCriAPI, true)
-		actual := toRuntimeAPIImageSpec(test.input)
+		actual := ToRuntimeAPIImageSpec(test.input)
 		assert.Equal(t, test.expected, actual)
 	}
 }

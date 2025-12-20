@@ -304,7 +304,7 @@ func (m *cgroupCommon) toResources(logger klog.Logger, resourceConfig *ResourceC
 		resources.CpuPeriod = *resourceConfig.CPUPeriod
 	}
 	if resourceConfig.PidsLimit != nil {
-		resources.PidsLimit = *resourceConfig.PidsLimit
+		resources.PidsLimit = resourceConfig.PidsLimit
 	}
 	if !resourceConfig.CPUSet.IsEmpty() {
 		resources.CpusetCpus = resourceConfig.CPUSet.String()

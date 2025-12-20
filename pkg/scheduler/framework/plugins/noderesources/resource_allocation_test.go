@@ -18,6 +18,7 @@ package noderesources
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -36,6 +37,7 @@ import (
 	"k8s.io/dynamic-resource-allocation/deviceclass/extendedresourcecache"
 	"k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/dynamic-resource-allocation/structured"
+	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
@@ -451,7 +453,7 @@ func TestCalculateResourceAllocatableRequest(t *testing.T) {
 		},
 		"DRA-backed-resource-with-per-device-node-selection": {
 			enableDRAExtendedResource: true,
-			node:                      st.MakeNode().Name(nodeName).Obj(),
+			node:                      st.MakeNode().Name(nodeName).Label("zone", "us-east-1a").Obj(),
 			extendedResource:          explicitExtendedResource,
 			objects: []apiruntime.Object{
 				&resourceapi.DeviceClass{
@@ -500,13 +502,26 @@ func TestCalculateResourceAllocatableRequest(t *testing.T) {
 								},
 							},
 							{
-								Name:     "device-3",
-								AllNodes: ptr.To(true), // This device matches all nodes
+								Name: "device-3",
+								// Use a node selector to ensure nodeMatches is exercised for this device
+								NodeSelector: &v1.NodeSelector{
+									NodeSelectorTerms: []v1.NodeSelectorTerm{
+										{
+											MatchExpressions: []v1.NodeSelectorRequirement{
+												{
+													Key:      "zone",
+													Operator: v1.NodeSelectorOpIn,
+													Values:   []string{"us-east-1a"},
+												},
+											},
+										},
+									},
+								},
 								Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
 									"model": {StringValue: ptr.To("SOME-XZY")},
 								},
 								Capacity: map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
-									"memory": {Value: resource.MustParse("24Gi")}, // 24GB GPU - matches CEL (>= 8GB)
+									"memory": {Value: resource.MustParse("24Gi")}, // 24GB GPU - matches CEL (>= 8GiB)
 								},
 							},
 						},
@@ -531,7 +546,7 @@ func TestCalculateResourceAllocatableRequest(t *testing.T) {
 					Obj(),
 			},
 			podRequest:          1,
-			expectedAllocatable: 2, // Only device-1 (matches test-node) and device-3 (matches all nodes)
+			expectedAllocatable: 2, // device-1 matches the test node and device-3 matches via its selector
 			expectedRequested:   2, // 1 allocated (device-1) + 1 requested
 		},
 	}
@@ -545,42 +560,10 @@ func TestCalculateResourceAllocatableRequest(t *testing.T) {
 
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, tc.enableDRAExtendedResource)
 
-			client := fake.NewClientset(tc.objects...)
-			informerFactory := informers.NewSharedInformerFactory(client, 0)
-			resourceSliceTrackerOpts := tracker.Options{
-				SliceInformer: informerFactory.Resource().V1().ResourceSlices(),
-				TaintInformer: informerFactory.Resource().V1alpha3().DeviceTaintRules(),
-				ClassInformer: informerFactory.Resource().V1().DeviceClasses(),
-				KubeClient:    client,
-			}
-			resourceSliceTracker, err := tracker.StartTracker(tCtx, resourceSliceTrackerOpts)
+			draManager, err := newTestDRAManager(t, tCtx, logger, tc.objects...)
 			if err != nil {
-				t.Fatalf("couldn't start resource slice tracker: %v", err)
+				t.Fatalf("failed to create fake DRA manager: %v", err)
 			}
-			draManager := dynamicresources.NewDRAManager(
-				tCtx,
-				assumecache.NewAssumeCache(
-					logger,
-					informerFactory.Resource().V1().ResourceClaims().Informer(),
-					"resource claim",
-					"",
-					nil),
-				resourceSliceTracker,
-				informerFactory)
-
-			if tc.enableDRAExtendedResource {
-				cache := draManager.DeviceClassResolver().(*extendedresourcecache.ExtendedResourceCache)
-				if _, err := informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandler(cache); err != nil {
-					logger.Error(err, "failed to add device class informer event handler")
-				}
-			}
-
-			informerFactory.Start(tCtx.Done())
-			t.Cleanup(func() {
-				// Now we can wait for all goroutines to stop.
-				informerFactory.Shutdown()
-			})
-			informerFactory.WaitForCacheSync(tCtx.Done())
 
 			nodeInfo := framework.NewNodeInfo()
 			nodeInfo.SetNode(tc.node)
@@ -613,6 +596,46 @@ func TestCalculateResourceAllocatableRequest(t *testing.T) {
 			}
 		})
 	}
+}
+
+// newTestDRAManager creates a DefaultDRAManager for testing purposes
+func newTestDRAManager(t *testing.T, ctx context.Context, logger klog.Logger, objects ...apiruntime.Object) (*dynamicresources.DefaultDRAManager, error) {
+	client := fake.NewClientset(objects...)
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
+	resourceSliceTrackerOpts := tracker.Options{
+		SliceInformer: informerFactory.Resource().V1().ResourceSlices(),
+		TaintInformer: informerFactory.Resource().V1alpha3().DeviceTaintRules(),
+		ClassInformer: informerFactory.Resource().V1().DeviceClasses(),
+		KubeClient:    client,
+	}
+	resourceSliceTracker, err := tracker.StartTracker(ctx, resourceSliceTrackerOpts)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't start resource slice tracker: %w", err)
+	}
+	draManager := dynamicresources.NewDRAManager(
+		ctx,
+		assumecache.NewAssumeCache(
+			logger,
+			informerFactory.Resource().V1().ResourceClaims().Informer(),
+			"resource claim",
+			"",
+			nil),
+		resourceSliceTracker,
+		informerFactory)
+
+	cache := draManager.DeviceClassResolver().(*extendedresourcecache.ExtendedResourceCache)
+	if _, err := informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandler(cache); err != nil {
+		return nil, fmt.Errorf("failed to add device class informer event handler: %w", err)
+	}
+
+	informerFactory.Start(ctx.Done())
+	t.Cleanup(func() {
+		// Now we can wait for all goroutines to stop.
+		informerFactory.Shutdown()
+	})
+	informerFactory.WaitForCacheSync(ctx.Done())
+
+	return draManager, nil
 }
 
 // getCachedDeviceMatch checks the cache for a DeviceMatches result
@@ -839,6 +862,45 @@ func TestNodeMatchCaching(t *testing.T) {
 			assert.True(t, found2, "Result should be found in cache")
 			assert.Equal(t, tc.expectedMatch, matches2, "Cached result should match expected value")
 		})
+	}
+}
+
+func TestNodeMatchesCacheHit(t *testing.T) {
+	scorer := &resourceAllocationScorer{
+		DRACaches: DRACaches{
+			celCache: cel.NewCache(1, cel.Features{}),
+		},
+	}
+
+	node := st.MakeNode().Name("cache-node").Label("zone", "us-east-1a").Obj()
+	selector := &v1.NodeSelector{
+		NodeSelectorTerms: []v1.NodeSelectorTerm{
+			{
+				MatchExpressions: []v1.NodeSelectorRequirement{
+					{
+						Key:      "zone",
+						Operator: v1.NodeSelectorOpIn,
+						Values:   []string{"us-east-1a"},
+					},
+				},
+			},
+		},
+	}
+
+	firstMatch, err := scorer.nodeMatches(node, "", false, selector)
+	if err != nil {
+		t.Fatalf("unexpected error while evaluating selector: %v", err)
+	}
+	if !firstMatch {
+		t.Fatalf("expected nodeMatches to return true for the selector")
+	}
+
+	secondMatch, err := scorer.nodeMatches(node, "", false, selector)
+	if err != nil {
+		t.Fatalf("unexpected error while hitting cache: %v", err)
+	}
+	if !secondMatch {
+		t.Fatalf("expected cached nodeMatches to be true")
 	}
 }
 

@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
+	"strings"
 	"sync"
 
 	"golang.org/x/sys/unix"
@@ -136,6 +138,33 @@ func (m *Manager) Apply(pid int) (retErr error) {
 		}
 
 	}
+	return retErr
+}
+
+// AddPid adds a process with a given pid to an existing cgroup.
+// The subcgroup argument is either empty, or a path relative to
+// a cgroup under under the manager's cgroup.
+func (m *Manager) AddPid(subcgroup string, pid int) (retErr error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	c := m.cgroups
+
+	for _, dir := range m.paths {
+		path := path.Join(dir, subcgroup)
+		if !strings.HasPrefix(path, dir) {
+			return fmt.Errorf("bad sub cgroup path: %s", subcgroup)
+		}
+
+		if err := cgroups.WriteCgroupProc(path, pid); err != nil {
+			if isIgnorableError(c.Rootless, err) && c.Path == "" {
+				retErr = cgroups.ErrRootless
+				continue
+			}
+			return err
+		}
+	}
+
 	return retErr
 }
 

@@ -44,19 +44,19 @@ func TestUnion(t *testing.T) {
 			name:        "two members set",
 			fields:      []string{"a", "b", "c", "d"},
 			fieldValues: []bool{false, true, false, true},
-			expected:    field.ErrorList{field.Invalid(nil, "{b, d}", "must specify exactly one of: `a`, `b`, `c`, `d`")},
+			expected:    field.ErrorList{field.Invalid(nil, "{b, d}", "must specify exactly one of: `a`, `b`, `c`, `d`")}.WithOrigin("union"),
 		},
 		{
 			name:        "all members set",
 			fields:      []string{"a", "b", "c", "d"},
 			fieldValues: []bool{true, true, true, true},
-			expected:    field.ErrorList{field.Invalid(nil, "{a, b, c, d}", "must specify exactly one of: `a`, `b`, `c`, `d`")},
+			expected:    field.ErrorList{field.Invalid(nil, "{a, b, c, d}", "must specify exactly one of: `a`, `b`, `c`, `d`")}.WithOrigin("union"),
 		},
 		{
 			name:        "no member set",
 			fields:      []string{"a", "b", "c", "d"},
 			fieldValues: []bool{false, false, false, false},
-			expected:    field.ErrorList{field.Invalid(nil, "", "must specify one of: `a`, `b`, `c`, `d`")},
+			expected:    field.ErrorList{field.Invalid(nil, "", "must specify one of: `a`, `b`, `c`, `d`")}.WithOrigin("union"),
 		},
 	}
 
@@ -115,7 +115,7 @@ func TestDiscriminatedUnion(t *testing.T) {
 			expected: field.ErrorList{
 				field.Invalid(field.NewPath("b"), "", "may only be specified when `type` is \"B\""),
 				field.Invalid(field.NewPath("c"), "", "must be specified when `type` is \"C\""),
-			},
+			}.WithOrigin("union"),
 		},
 		{
 			name:               "invalid, discriminator correct, multiple members set",
@@ -126,7 +126,7 @@ func TestDiscriminatedUnion(t *testing.T) {
 			expected: field.ErrorList{
 				field.Invalid(field.NewPath("b"), "", "may only be specified when `type` is \"B\""),
 				field.Invalid(field.NewPath("d"), "", "may only be specified when `type` is \"D\""),
-			},
+			}.WithOrigin("union"),
 		},
 	}
 
@@ -217,7 +217,7 @@ func TestUnionRatcheting(t *testing.T) {
 			},
 			expected: field.ErrorList{
 				field.Invalid(nil, "{m1, m2}", "must specify exactly one of: `m1`, `m2`"),
-			},
+			}.WithOrigin("union"),
 		},
 	}
 
@@ -312,7 +312,7 @@ func TestDiscriminatedUnionRatcheting(t *testing.T) {
 			},
 			expected: field.ErrorList{
 				field.Invalid(field.NewPath("m2"), "", "may only be specified when `d` is \"m2\""),
-			},
+			}.WithOrigin("union"),
 		},
 		{
 			name: "fail on changing the discriminator",
@@ -327,7 +327,7 @@ func TestDiscriminatedUnionRatcheting(t *testing.T) {
 			expected: field.ErrorList{
 				field.Invalid(field.NewPath("m1"), "", "may only be specified when `d` is \"m1\""),
 				field.Invalid(field.NewPath("m2"), "", "must be specified when `d` is \"m2\""),
-			},
+			}.WithOrigin("union"),
 		},
 	}
 

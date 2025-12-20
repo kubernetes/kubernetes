@@ -8,11 +8,12 @@ godebug default=go1.25
 
 require (
 	github.com/blang/semver/v4 v4.0.0
+	github.com/go-logr/logr v1.4.3
 	github.com/google/cel-go v0.26.0
 	github.com/google/go-cmp v0.7.0
-	github.com/onsi/gomega v1.38.2
+	github.com/onsi/gomega v1.38.3
 	github.com/stretchr/testify v1.11.1
-	go.etcd.io/etcd/client/pkg/v3 v3.6.5
+	go.etcd.io/etcd/client/pkg/v3 v3.6.6
 	google.golang.org/grpc v1.72.2
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
@@ -21,7 +22,7 @@ require (
 	k8s.io/component-helpers v0.0.0
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/kubelet v0.0.0
-	k8s.io/utils v0.0.0-20251002143259-bc988d571ff4
+	k8s.io/utils v0.0.0-20251219084037-98d557b7f1e7
 )
 
 require (
@@ -32,7 +33,6 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/emicklei/go-restful/v3 v3.12.2 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.0 // indirect
-	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-openapi/jsonpointer v0.21.0 // indirect
 	github.com/go-openapi/jsonreference v0.20.2 // indirect
 	github.com/go-openapi/swag v0.23.0 // indirect

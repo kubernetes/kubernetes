@@ -127,11 +127,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 		return nil, fmt.Errorf("gather pool information: %w", err)
 	}
 	alloc.pools = pools
-	if loggerV := alloc.logger.V(7); loggerV.Enabled() {
-		loggerV.Info("Gathered pool information", "numPools", len(pools), "pools", pools)
-	} else {
-		alloc.logger.V(5).Info("Gathered pool information", "numPools", len(pools))
-	}
+	alloc.logger.V(5).Info("Gathered pool information", "pools", logPools(alloc.logger, pools))
 
 	// We allocate one claim after the other and for each claim, all of
 	// its requests. For each individual device we pick one possible
@@ -255,7 +251,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 	// We can estimate the size based on what we need to allocate.
 	alloc.allocatingDevices = make(map[DeviceID]sets.Set[int], minDevicesTotal)
 
-	alloc.logger.V(6).Info("Gathered information about devices", "numAllocated", len(alloc.allocatedDevices), "minDevicesToBeAllocated", minDevicesTotal)
+	alloc.logger.V(5).Info("Gathered information about devices", "allocatedDevices", logAllocatedDevices(alloc.logger, alloc.allocatedDevices), "minDevicesToBeAllocated", minDevicesTotal)
 
 	// In practice, there aren't going to be many different CEL
 	// expressions. Most likely, there is going to be handful of different

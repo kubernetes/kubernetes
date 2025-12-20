@@ -46,12 +46,6 @@ var (
 			},
 		},
 	}
-	longerIDValidateOption = CSINodeValidationOptions{
-		AllowLongNodeID: true,
-	}
-	shorterIDValidationOption = CSINodeValidationOptions{
-		AllowLongNodeID: false,
-	}
 )
 
 func TestValidateStorageClass(t *testing.T) {
@@ -936,9 +930,9 @@ func TestValidateAllowedTopologies(t *testing.T) {
 func TestCSINodeValidation(t *testing.T) {
 	driverName := "driver-name"
 	driverName2 := "1io.kubernetes-storage-2-csi-driver3"
-	longName := "my-a-b-c-d-c-f-g-h-i-j-k-l-m-n-o-p-q-r-s-t-u-v-w-x-y-z-ABCDEFGHIJKLMNOPQRSTUVWXYZ-driver" // 88 chars
+	longName := strings.Repeat("a", 88)
 	nodeID := "nodeA"
-	longID := longName + longName + "abcdefghijklmnopqrstuvwxyz" // 202 chars
+	longID := strings.Repeat("a", 257)
 	successCases := []storage.CSINode{{
 		// driver name: dot only
 		ObjectMeta: metav1.ObjectMeta{Name: "foo1"},
@@ -1085,25 +1079,9 @@ func TestCSINodeValidation(t *testing.T) {
 	}}
 
 	for _, csiNode := range successCases {
-		if errs := ValidateCSINode(&csiNode, shorterIDValidationOption); len(errs) != 0 {
+		if errs := ValidateCSINode(&csiNode); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
-	}
-
-	nodeIDCase := storage.CSINode{
-		// node ID length > 128 but < 192
-		ObjectMeta: metav1.ObjectMeta{Name: "foo7"},
-		Spec: storage.CSINodeSpec{
-			Drivers: []storage.CSINodeDriver{{
-				Name:         driverName,
-				NodeID:       longID,
-				TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
-			}},
-		},
-	}
-
-	if errs := ValidateCSINode(&nodeIDCase, longerIDValidateOption); len(errs) != 0 {
-		t.Errorf("expected success: %v", errs)
 	}
 
 	errorCases := []storage.CSINode{{
@@ -1254,21 +1232,26 @@ func TestCSINodeValidation(t *testing.T) {
 				TopologyKeys: []string{"Company.Com/zone1", "company.com/zone2"},
 			}},
 		},
+	}, {
+		ObjectMeta: metav1.ObjectMeta{Name: "foo15"},
+		Spec: storage.CSINodeSpec{
+			Drivers: []storage.CSINodeDriver{{
+				Name:         driverName,
+				NodeID:       longID,
+				TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+			}},
+		},
 	},
-		nodeIDCase,
 	}
 
 	for _, csiNode := range errorCases {
-		if errs := ValidateCSINode(&csiNode, shorterIDValidationOption); len(errs) == 0 {
+		if errs := ValidateCSINode(&csiNode); len(errs) == 0 {
 			t.Errorf("Expected failure for test: %v", csiNode)
 		}
 	}
 }
 
 func TestCSINodeUpdateValidation(t *testing.T) {
-	//driverName := "driver-name"
-	//driverName2 := "1io.kubernetes-storage-2-csi-driver3"
-	//longName := "my-a-b-c-d-c-f-g-h-i-j-k-l-m-n-o-p-q-r-s-t-u-v-w-x-y-z-ABCDEFGHIJKLMNOPQRSTUVWXYZ-driver"
 	nodeID := "nodeA"
 	// Test with feature gate disabled
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MutableCSINodeAllocatableCount, false)
@@ -1351,7 +1334,7 @@ func TestCSINodeUpdateValidation(t *testing.T) {
 	}}
 
 	for _, csiNode := range successCases {
-		if errs := ValidateCSINodeUpdate(&csiNode, &old, shorterIDValidationOption); len(errs) != 0 {
+		if errs := ValidateCSINodeUpdate(&csiNode, &old); len(errs) != 0 {
 			t.Errorf("expected success: %+v", errs)
 		}
 	}
@@ -1449,7 +1432,7 @@ func TestCSINodeUpdateValidation(t *testing.T) {
 	}}
 
 	for _, csiNode := range errorCases {
-		if errs := ValidateCSINodeUpdate(&csiNode, &old, shorterIDValidationOption); len(errs) == 0 {
+		if errs := ValidateCSINodeUpdate(&csiNode, &old); len(errs) == 0 {
 			t.Errorf("Expected failure for test: %+v", csiNode)
 		}
 	}
@@ -1506,13 +1489,13 @@ func TestCSINodeUpdateValidation(t *testing.T) {
 	}}
 
 	for _, csiNode := range errorCases {
-		if errs := ValidateCSINodeUpdate(&csiNode, &old, shorterIDValidationOption); len(errs) == 0 {
+		if errs := ValidateCSINodeUpdate(&csiNode, &old); len(errs) == 0 {
 			t.Errorf("Expected failure for test: %+v", csiNode)
 		}
 	}
 
 	for _, csiNode := range successCases {
-		if errs := ValidateCSINodeUpdate(&csiNode, &old, shorterIDValidationOption); len(errs) != 0 {
+		if errs := ValidateCSINodeUpdate(&csiNode, &old); len(errs) != 0 {
 			t.Errorf("expected success with feature gate enabled: %+v", errs)
 		}
 	}

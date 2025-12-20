@@ -41,6 +41,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	core "k8s.io/client-go/testing"
@@ -4074,6 +4075,7 @@ func TestConvertToAPIContainerStatuses(t *testing.T) {
 				test.currentStatus,
 				test.previousStatus,
 				test.containers,
+				nil,
 				test.hasInitContainers,
 				test.isInitContainer,
 				test.podRestarting,
@@ -4085,6 +4087,185 @@ func TestConvertToAPIContainerStatuses(t *testing.T) {
 				if status.State.Terminated != nil {
 					status.State.Terminated.ContainerID = ""
 				}
+				assert.Equal(t, test.expected[i], status, "[test %s]", test.name)
+			}
+		})
+	}
+}
+
+// imageDigestRuntime is a simple wrapper that returns a fixed digest for image volumes
+type imageDigestRuntime struct {
+	*containertest.FakeRuntime
+	digest string
+}
+
+func (r *imageDigestRuntime) GetImageRef(ctx context.Context, image kubecontainer.ImageSpec) (string, error) {
+	return r.digest, nil
+}
+
+func TestConvertToAPIContainerStatusesWithImageVolumeDigest(t *testing.T) {
+	const (
+		imageVolumeName      = "image-volume"
+		imageVolumeMountPath = "/mock/path"
+		imageVolumeRef       = "registry.k8s.io/example:1.2.3"
+		imageDigest          = "sha256:abcd1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcd"
+	)
+
+	now := metav1.Now()
+
+	tests := []struct {
+		name           string
+		pod            *v1.Pod
+		currentStatus  *kubecontainer.PodStatus
+		previousStatus []v1.ContainerStatus
+		expected       []v1.ContainerStatus
+	}{
+		{
+			name: "with image volume - should include digest in status",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					NodeName: "node123",
+					Containers: []v1.Container{
+						{
+							Name: "containerA",
+							VolumeMounts: []v1.VolumeMount{
+								{
+									Name:      imageVolumeName,
+									MountPath: imageVolumeMountPath,
+								},
+							},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: imageVolumeName,
+							VolumeSource: v1.VolumeSource{
+								Image: &v1.ImageVolumeSource{
+									Reference: imageVolumeRef,
+								},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						runningState("containerA"),
+					},
+				},
+				ObjectMeta: metav1.ObjectMeta{Name: "my-pod", DeletionTimestamp: &now},
+			},
+			currentStatus: &kubecontainer.PodStatus{
+				ContainerStatuses: []*kubecontainer.Status{
+					{
+						ID:    kubecontainer.ContainerID{Type: "test", ID: "containerA-id"},
+						Name:  "containerA",
+						State: kubecontainer.ContainerStateRunning,
+						Image: imageVolumeRef,
+						Mounts: []kubecontainer.Mount{
+							{
+								Name:          imageVolumeName,
+								ContainerPath: imageVolumeMountPath,
+								Image:         &runtimeapi.ImageSpec{Image: imageVolumeRef},
+							},
+						},
+					},
+				},
+			},
+			previousStatus: []v1.ContainerStatus{
+				func() v1.ContainerStatus {
+					previousContainerA := runningState("containerA")
+					previousContainerA.VolumeMounts = []v1.VolumeMountStatus{
+						{
+							Name:      imageVolumeName,
+							MountPath: imageVolumeMountPath,
+						},
+					}
+					return previousContainerA
+				}(),
+			},
+			expected: []v1.ContainerStatus{
+				func() v1.ContainerStatus {
+					containerStatus := runningState("containerA")
+					containerStatus.Image = imageVolumeRef
+					containerStatus.ContainerID = "test://containerA-id"
+					containerStatus.Resources = &v1.ResourceRequirements{}
+					containerStatus.VolumeMounts = []v1.VolumeMountStatus{
+						{
+							Name:         imageVolumeName,
+							MountPath:    imageVolumeMountPath,
+							VolumeStatus: v1.VolumeStatus{Image: &v1.ImageVolumeStatus{ImageRef: imageDigest}},
+						},
+					}
+					return containerStatus
+				}(),
+			},
+		},
+		{
+			name: "with no image volume - should not include digest in status",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					NodeName: "node123",
+					Containers: []v1.Container{
+						{
+							Name: "containerA",
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						runningState("containerA"),
+					},
+				},
+				ObjectMeta: metav1.ObjectMeta{Name: "my-pod", DeletionTimestamp: &now},
+			},
+			currentStatus: &kubecontainer.PodStatus{
+				ContainerStatuses: []*kubecontainer.Status{
+					{
+						ID:    kubecontainer.ContainerID{Type: "test", ID: "containerA-id"},
+						Name:  "containerA",
+						State: kubecontainer.ContainerStateRunning,
+					},
+				},
+			},
+			previousStatus: []v1.ContainerStatus{
+				runningState("containerA"),
+			},
+			expected: []v1.ContainerStatus{
+				func() v1.ContainerStatus {
+					containerStatus := runningState("containerA")
+					containerStatus.ContainerID = "test://containerA-id"
+					containerStatus.Resources = &v1.ResourceRequirements{}
+					return containerStatus
+				}(),
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ImageVolume, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ImageVolumeWithDigest, true)
+
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
+			kl := testKubelet.kubelet
+
+			// Mock the container runtime to return the expected image digest
+			kl.containerRuntime = &imageDigestRuntime{
+				FakeRuntime: &containertest.FakeRuntime{},
+				digest:      imageDigest,
+			}
+
+			containerStatuses := kl.convertToAPIContainerStatuses(
+				test.pod,
+				test.currentStatus,
+				test.previousStatus,
+				test.pod.Spec.Containers,
+				sets.New(imageVolumeName),
+				false,
+				false,
+				false,
+			)
+			for i, status := range containerStatuses {
 				assert.Equal(t, test.expected[i], status, "[test %s]", test.name)
 			}
 		})
@@ -5399,7 +5580,7 @@ func TestConvertToAPIContainerStatusesDataRace(t *testing.T) {
 	// detection, so would catch a race condition consistently, despite only spawning 2 goroutines
 	for i := 0; i < 2; i++ {
 		go func() {
-			kl.convertToAPIContainerStatuses(pod, criStatus, []v1.ContainerStatus{}, []v1.Container{}, false, false, false)
+			kl.convertToAPIContainerStatuses(pod, criStatus, []v1.ContainerStatus{}, []v1.Container{}, nil, false, false, false)
 		}()
 	}
 }
@@ -5868,8 +6049,7 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 				state = tc.State
 			}
 			podStatus := testPodStatus(state, resources)
-
-			cStatuses := kubelet.convertToAPIContainerStatuses(tPod, podStatus, []v1.ContainerStatus{tc.OldStatus}, tPod.Spec.Containers, false, false, false)
+			cStatuses := kubelet.convertToAPIContainerStatuses(tPod, podStatus, []v1.ContainerStatus{tc.OldStatus}, tPod.Spec.Containers, nil, false, false, false)
 			actual := cStatuses[0]
 			// Explicitly test AllocatedResources and Resources separately for debuggability.
 			assert.Equal(t, tc.Expected.AllocatedResources, actual.AllocatedResources, "AllocatedResources")
@@ -5995,7 +6175,9 @@ func TestConvertToAPIContainerStatusesForUser(t *testing.T) {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SupplementalGroupsPolicy, tc.featureEnabled)
 		tPod := testPod.DeepCopy()
 		t.Logf("TestCase: %q", tdesc)
-		cStatuses := kubelet.convertToAPIContainerStatuses(tPod, tc.testPodStatus, tPod.Status.ContainerStatuses, tPod.Spec.Containers, false, false, false)
+
+		cStatuses := kubelet.convertToAPIContainerStatuses(tPod, tc.testPodStatus, tPod.Status.ContainerStatuses, tPod.Spec.Containers, nil, false, false, false)
+
 		assert.Equal(t, tc.expectedContainerStatus, cStatuses)
 	}
 }
