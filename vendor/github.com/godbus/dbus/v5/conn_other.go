@@ -1,3 +1,4 @@
+//go:build !darwin
 // +build !darwin
 
 package dbus
@@ -6,7 +7,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"os/user"
@@ -19,7 +19,6 @@ var execCommand = exec.Command
 func getSessionBusPlatformAddress() (string, error) {
 	cmd := execCommand("dbus-launch")
 	b, err := cmd.CombinedOutput()
-
 	if err != nil {
 		return "", err
 	}
@@ -42,10 +41,10 @@ func getSessionBusPlatformAddress() (string, error) {
 // It tries different techniques employed by different operating systems,
 // returning the first valid address it finds, or an empty string.
 //
-// * /run/user/<uid>/bus           if this exists, it *is* the bus socket. present on
-//                                 Ubuntu 18.04
-// * /run/user/<uid>/dbus-session: if this exists, it can be parsed for the bus
-//                                 address. present on Ubuntu 16.04
+//   - /run/user/<uid>/bus           if this exists, it *is* the bus socket. present on
+//     Ubuntu 18.04
+//   - /run/user/<uid>/dbus-session: if this exists, it can be parsed for the bus
+//     address. present on Ubuntu 16.04
 //
 // See https://dbus.freedesktop.org/doc/dbus-launch.1.html
 func tryDiscoverDbusSessionBusAddress() string {
@@ -61,14 +60,9 @@ func tryDiscoverDbusSessionBusAddress() string {
 			// text file // containing the address of the socket, e.g.:
 			// DBUS_SESSION_BUS_ADDRESS=unix:abstract=/tmp/dbus-E1c73yNqrG
 
-			if f, err := ioutil.ReadFile(runUserSessionDbusFile); err == nil {
-				fileContent := string(f)
-
-				prefix := "DBUS_SESSION_BUS_ADDRESS="
-
-				if strings.HasPrefix(fileContent, prefix) {
-					address := strings.TrimRight(strings.TrimPrefix(fileContent, prefix), "\n\r")
-					return address
+			if f, err := os.ReadFile(runUserSessionDbusFile); err == nil {
+				if addr, ok := strings.CutPrefix(string(f), "DBUS_SESSION_BUS_ADDRESS="); ok {
+					return strings.TrimRight(addr, "\n\r")
 				}
 			}
 		}

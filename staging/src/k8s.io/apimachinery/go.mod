@@ -8,14 +8,14 @@ godebug default=go1.25
 
 require (
 	github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5
-	github.com/davecgh/go-spew v1.1.1
+	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/fxamacker/cbor/v2 v2.9.0
 	github.com/google/gnostic-models v0.7.0
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
 	github.com/moby/spdystream v0.5.0
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f
-	github.com/pmezard/go-difflib v1.0.0
+	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2
 	github.com/spf13/pflag v1.0.9
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/net v0.47.0

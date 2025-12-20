@@ -22,7 +22,7 @@ func (tid TraceID) String() string {
 	return hex.EncodeToString(tid[:])
 }
 
-// IsEmpty returns false if id contains at least one non-zero byte.
+// IsEmpty reports whether the TraceID contains only zero bytes.
 func (tid TraceID) IsEmpty() bool {
 	return tid == [traceIDSize]byte{}
 }
@@ -50,7 +50,7 @@ func (sid SpanID) String() string {
 	return hex.EncodeToString(sid[:])
 }
 
-// IsEmpty returns true if the span ID contains at least one non-zero byte.
+// IsEmpty reports whether the SpanID contains only zero bytes.
 func (sid SpanID) IsEmpty() bool {
 	return sid == [spanIDSize]byte{}
 }
@@ -82,7 +82,7 @@ func marshalJSON(id []byte) ([]byte, error) {
 }
 
 // unmarshalJSON inflates trace id from hex string, possibly enclosed in quotes.
-func unmarshalJSON(dst []byte, src []byte) error {
+func unmarshalJSON(dst, src []byte) error {
 	if l := len(src); l >= 2 && src[0] == '"' && src[l-1] == '"' {
 		src = src[1 : l-1]
 	}

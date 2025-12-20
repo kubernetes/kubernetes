@@ -35,7 +35,7 @@ type snapshot struct {
 
 var _ ReadOnlySpan = snapshot{}
 
-func (s snapshot) private() {}
+func (snapshot) private() {}
 
 // Name returns the name of the span.
 func (s snapshot) Name() string {

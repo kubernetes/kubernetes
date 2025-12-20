@@ -117,7 +117,7 @@ func (k Key) StringSlice(v []string) KeyValue {
 	}
 }
 
-// Defined returns true for non-empty keys.
+// Defined reports whether the key is not empty.
 func (k Key) Defined() bool {
 	return len(k) != 0
 }
