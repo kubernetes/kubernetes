@@ -356,11 +356,38 @@ func (c *consistencyChecker) calculateDigests(ctx context.Context) (*storageDige
 	if !c.cacher.Ready() {
 		return nil, fmt.Errorf("cache is not ready")
 	}
-	cacheDigest, cacheResourceVersion, err := c.calculateStoreDigest(ctx, c.cacher, "0", 0)
+	// variables for tracking the diff in consistency checker
+	trackingList := []namespaceNameRV{}
+	foundDiff := false
+
+	cacheDigest, cacheResourceVersion, err := c.calculateStoreDigest(ctx, c.cacher, "0", 0, func(obj metav1.Object) {
+		// collect items from cacher's list
+		trackingList = append(trackingList, namespaceNameRV{Namespace: obj.GetNamespace(), Name: obj.GetName(), RV: obj.GetResourceVersion()})
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed calculating cache digest: %w", err)
 	}
-	etcdDigest, etcdResourceVersion, err := c.calculateStoreDigest(ctx, c.etcd, cacheResourceVersion, storageWatchListPageSize)
+	etcdDigest, etcdResourceVersion, err := c.calculateStoreDigest(ctx, c.etcd, cacheResourceVersion, storageWatchListPageSize, func(obj metav1.Object) {
+		// compare the item in etcd's list against trackingList which is cacher's list
+		if foundDiff {
+			return
+		}
+		item := namespaceNameRV{Namespace: obj.GetNamespace(), Name: obj.GetName(), RV: obj.GetResourceVersion()}
+		if len(trackingList) == 0 {
+			foundDiff = true
+			klog.ErrorS(nil, "cache consistency checker found a diff: etcd has more items", "etcdItem", item)
+		} else {
+			if trackingList[0] != item {
+				foundDiff = true
+				klog.ErrorS(nil, "cache consistency checker found a diff:", "cacheItem", trackingList[0], "etcdItem", item)
+			}
+			// This is cheap since it slices existing slice with no copying.
+			trackingList = trackingList[1:]
+		}
+	})
+	if len(trackingList) > 0 {
+		klog.ErrorS(nil, "cache consistency checker found a diff: cache has more items", "cacheItem", trackingList[0])
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed calculating etcd digest: %w", err)
 	}
@@ -374,13 +401,19 @@ func (c *consistencyChecker) calculateDigests(ctx context.Context) (*storageDige
 	}, nil
 }
 
+type namespaceNameRV struct {
+	Namespace string
+	Name      string
+	RV        string
+}
+
 type storageDigest struct {
 	ResourceVersion string
 	CacheDigest     string
 	EtcdDigest      string
 }
 
-func (c *consistencyChecker) calculateStoreDigest(ctx context.Context, store getLister, resourceVersion string, limit int64) (digest, rv string, err error) {
+func (c *consistencyChecker) calculateStoreDigest(ctx context.Context, store getLister, resourceVersion string, limit int64, metaProcessor func(objectMeta metav1.Object)) (digest, rv string, err error) {
 	opts := storage.ListOptions{
 		Recursive:       true,
 		Predicate:       storage.Everything,
@@ -399,7 +432,7 @@ func (c *consistencyChecker) calculateStoreDigest(ctx context.Context, store get
 		if err != nil {
 			return "", "", err
 		}
-		err = addListToDigest(h, resp)
+		err = addListToDigest(h, resp, metaProcessor)
 		if err != nil {
 			return "", "", err
 		}
@@ -420,7 +453,7 @@ func (c *consistencyChecker) calculateStoreDigest(ctx context.Context, store get
 	}
 }
 
-func addListToDigest(h hash.Hash64, list runtime.Object) error {
+func addListToDigest(h hash.Hash64, list runtime.Object, metaProcessor func(objectMeta metav1.Object)) error {
 	return meta.EachListItem(list, func(obj runtime.Object) error {
 		objectMeta, err := meta.Accessor(obj)
 		if err != nil {
@@ -430,6 +463,7 @@ func addListToDigest(h hash.Hash64, list runtime.Object) error {
 		if err != nil {
 			return err
 		}
+		metaProcessor(objectMeta)
 		return nil
 	})
 }
