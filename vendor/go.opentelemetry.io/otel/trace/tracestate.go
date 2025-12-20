@@ -80,7 +80,7 @@ func checkKeyRemain(key string) bool {
 //
 // param n is remain part length, should be 255 in simple-key or 13 in system-id.
 func checkKeyPart(key string, n int) bool {
-	if len(key) == 0 {
+	if key == "" {
 		return false
 	}
 	first := key[0] // key's first char
@@ -102,7 +102,7 @@ func isAlphaNum(c byte) bool {
 //
 // param n is remain part length, should be 240 exactly.
 func checkKeyTenant(key string, n int) bool {
-	if len(key) == 0 {
+	if key == "" {
 		return false
 	}
 	return isAlphaNum(key[0]) && len(key[1:]) <= n && checkKeyRemain(key[1:])
@@ -191,7 +191,7 @@ func ParseTraceState(ts string) (TraceState, error) {
 	for ts != "" {
 		var memberStr string
 		memberStr, ts, _ = strings.Cut(ts, listDelimiters)
-		if len(memberStr) == 0 {
+		if memberStr == "" {
 			continue
 		}
 
