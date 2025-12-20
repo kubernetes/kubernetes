@@ -176,12 +176,19 @@ func Preemptable(preemptor, preemptee *v1.Pod) bool {
 	if IsCriticalPod(preemptor) && !IsCriticalPod(preemptee) {
 		return true
 	}
-	if (preemptor != nil && preemptor.Spec.Priority != nil) &&
-		(preemptee != nil && preemptee.Spec.Priority != nil) {
-		return *(preemptor.Spec.Priority) > *(preemptee.Spec.Priority)
+
+	preemptorPriority := int32(0)
+	preempteePriority := int32(0)
+
+	if preemptor != nil && preemptor.Spec.Priority != nil {
+		preemptorPriority = *preemptor.Spec.Priority
 	}
 
-	return false
+	if preemptee != nil && preemptee.Spec.Priority != nil {
+		preempteePriority = *preemptee.Spec.Priority
+	}
+
+	return preemptorPriority > preempteePriority
 }
 
 // IsCriticalPodBasedOnPriority checks if the given pod is a critical pod based on priority resolved from pod Spec.
