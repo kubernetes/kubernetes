@@ -1,11 +1,9 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-  - mikedanese
-  - dims
-  - wlan0
-  - andrewsykim
   - cheftako
+  - elmiko
+  - joelspeed
 reviewers:
   - aojea
   - wojtek-t
@@ -24,6 +22,10 @@ reviewers:
   - jingxu97
   - wlan0
   - cheftako
+  - andrewsykim
+emeritus_approvers:
+  - mikedanese
+  - dims
   - andrewsykim
 labels:
   - sig/cloud-provider
