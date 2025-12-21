@@ -160,6 +160,10 @@ type JobSpecApplyConfiguration struct {
 	// characters as defined by RFC 3986. The value cannot exceed 63 characters.
 	// This field is immutable.
 	ManagedBy *string `json:"managedBy,omitempty"`
+	// GangPolicy specifies the gang scheduling configuration for this Job.
+	// When set, all pods in the Job are scheduled as a group according to the specified policy.
+	// This is only valid if JobGangPolicy feature gate is enabled.
+	GangPolicy *GangPolicyApplyConfiguration `json:"gangPolicy,omitempty"`
 }
 
 // JobSpecApplyConfiguration constructs a declarative configuration of the JobSpec type for use with
@@ -293,5 +297,13 @@ func (b *JobSpecApplyConfiguration) WithPodReplacementPolicy(value batchv1.PodRe
 // If called multiple times, the ManagedBy field is set to the value of the last call.
 func (b *JobSpecApplyConfiguration) WithManagedBy(value string) *JobSpecApplyConfiguration {
 	b.ManagedBy = &value
+	return b
+}
+
+// WithGangPolicy sets the GangPolicy field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the GangPolicy field is set to the value of the last call.
+func (b *JobSpecApplyConfiguration) WithGangPolicy(value *GangPolicyApplyConfiguration) *JobSpecApplyConfiguration {
+	b.GangPolicy = value
 	return b
 }

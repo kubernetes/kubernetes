@@ -445,6 +445,11 @@ const (
 	// pods have fully terminated.
 	JobPodReplacementPolicy featuregate.Feature = "JobPodReplacementPolicy"
 
+	// owner: @kannon92
+	// kep : tbd
+	// Allow users to specify gang scheduling policy on Job creation
+	JobGangPolicy featuregate.Feature = "JobGangPolicy"
+
 	// owner: @tenzen-y
 	// kep: https://kep.k8s.io/3998
 	//
@@ -1414,6 +1419,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.37
 	},
 
+	JobGangPolicy: {
+		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	JobSuccessPolicy: {
 		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
@@ -2286,6 +2295,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	JobManagedBy: {},
 
 	JobPodReplacementPolicy: {},
+
+	JobGangPolicy: {GangScheduling, GenericWorkload},
 
 	JobSuccessPolicy: {},
 

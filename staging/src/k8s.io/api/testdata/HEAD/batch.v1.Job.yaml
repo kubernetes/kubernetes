@@ -38,6 +38,8 @@ spec:
   backoffLimitPerIndex: 12
   completionMode: completionModeValue
   completions: 2
+  gangPolicy:
+    policy: policyValue
   managedBy: managedByValue
   manualSelector: true
   maxFailedIndexes: 13

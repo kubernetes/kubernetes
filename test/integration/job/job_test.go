@@ -33,9 +33,11 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	eventsv1 "k8s.io/api/events/v1"
+	schedulingv1alpha1 "k8s.io/api/scheduling/v1alpha1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
@@ -4726,6 +4728,154 @@ func TestMutableSchedulingDirectivesForSuspendedJobs(t *testing.T) {
 	}
 }
 
+func TestGangScheduling(t *testing.T) {
+	testCases := []struct {
+		name               string
+		featureGateEnabled bool
+		gangPolicy         *batchv1.GangPolicy
+		parallelism        int32
+		completions        int32
+		expectWorkloadRef  bool
+		expectedPodGroup   string
+		expectedActivePods int
+	}{
+		{
+			name:               "NoGang policy with feature gate enabled - pods have no workloadRef",
+			featureGateEnabled: true,
+			gangPolicy: &batchv1.GangPolicy{
+				Policy: batchv1.NoGang,
+			},
+			parallelism:        3,
+			completions:        6,
+			expectWorkloadRef:  false,
+			expectedActivePods: 3,
+		},
+		{
+			name:               "JobAsGang policy with feature gate enabled - pods have workloadRef",
+			featureGateEnabled: true,
+			gangPolicy: &batchv1.GangPolicy{
+				Policy: batchv1.JobAsGang,
+			},
+			parallelism:        5,
+			completions:        10,
+			expectWorkloadRef:  true,
+			expectedPodGroup:   "default",
+			expectedActivePods: 5,
+		},
+		{
+			name:               "JobAsGang policy with feature gate disabled - pods have no workloadRef",
+			featureGateEnabled: false,
+			gangPolicy: &batchv1.GangPolicy{
+				Policy: batchv1.JobAsGang,
+			},
+			parallelism:        5,
+			completions:        10,
+			expectWorkloadRef:  false,
+			expectedActivePods: 5,
+		},
+		{
+			name:               "NoGang policy with feature gate disabled - pods have no workloadRef",
+			featureGateEnabled: false,
+			gangPolicy: &batchv1.GangPolicy{
+				Policy: batchv1.NoGang,
+			},
+			parallelism:        3,
+			completions:        6,
+			expectWorkloadRef:  false,
+			expectedActivePods: 3,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.featureGateEnabled {
+				// Enable feature gates with their dependencies
+				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.GenericWorkload, true)
+				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.GangScheduling, true)
+				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobGangPolicy, true)
+			} else {
+				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobGangPolicy, false)
+			}
+
+			// Enable the scheduling.k8s.io/v1alpha1 API for workload support
+			closeFn, restConfig, clientSet, ns := setupWithRuntimeConfig(t, "gang-scheduling", map[schema.GroupVersion]bool{
+				schedulingv1alpha1.SchemeGroupVersion: true,
+			})
+			t.Cleanup(closeFn)
+			ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
+			t.Cleanup(cancel)
+
+			job, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Parallelism: ptr.To(tc.parallelism),
+					Completions: ptr.To(tc.completions),
+					GangPolicy:  tc.gangPolicy,
+				},
+			})
+			if err != nil {
+				t.Fatalf("Failed to create Job: %v", err)
+			}
+
+			// Wait a moment for the controller to process the Job
+			time.Sleep(sleepDurationForControllerLatency)
+
+			// When workloadRef is set, pods may not become "Active" without a gang scheduler
+			// So for JobAsGang, just verify pods are created (any phase)
+			// For NoGang or feature gate off, verify normal active pod behavior
+			if tc.expectWorkloadRef {
+				// Wait for pods to be created (they won't be scheduled without gang scheduler)
+				var pods *v1.PodList
+				err = wait.PollUntilContextTimeout(ctx, waitInterval, 10*time.Second, true, func(ctx context.Context) (bool, error) {
+					pods, err = clientSet.CoreV1().Pods(ns.Name).List(ctx, metav1.ListOptions{})
+					if err != nil {
+						return false, err
+					}
+					return len(pods.Items) == tc.expectedActivePods, nil
+				})
+				if err != nil {
+					t.Fatalf("Failed to wait for pods to be created: %v", err)
+				}
+			} else {
+				// For NoGang or feature gate off, verify normal active pod behavior
+				validateJobsPodsStatusOnly(ctx, t, clientSet, job, podsByStatus{
+					Active:      tc.expectedActivePods,
+					Ready:       ptr.To[int32](0),
+					Terminating: ptr.To[int32](0),
+				})
+			}
+
+			// Verify workloadRef on pods
+			pods, err := clientSet.CoreV1().Pods(ns.Name).List(ctx, metav1.ListOptions{})
+			if err != nil {
+				t.Fatalf("Failed to list pods: %v", err)
+			}
+
+			if tc.expectWorkloadRef {
+				// For JobAsGang policy with feature gate enabled, verify pods have workloadRef
+				for _, pod := range pods.Items {
+					if pod.Spec.WorkloadRef == nil {
+						t.Errorf("Expected pod %s to have workloadRef set for JobAsGang policy, but it was nil", pod.Name)
+					} else {
+						if pod.Spec.WorkloadRef.Name != job.Name {
+							t.Errorf("Expected pod %s workloadRef.Name to be %q, got %q", pod.Name, job.Name, pod.Spec.WorkloadRef.Name)
+						}
+						if pod.Spec.WorkloadRef.PodGroup != tc.expectedPodGroup {
+							t.Errorf("Expected pod %s workloadRef.PodGroup to be %q, got %q", pod.Name, tc.expectedPodGroup, pod.Spec.WorkloadRef.PodGroup)
+						}
+					}
+				}
+			} else {
+				// For NoGang policy or feature gate disabled, verify pods do NOT have workloadRef
+				for _, pod := range pods.Items {
+					if pod.Spec.WorkloadRef != nil {
+						t.Errorf("Expected pod %s to NOT have workloadRef set, but it was: %+v", pod.Name, pod.Spec.WorkloadRef)
+					}
+				}
+			}
+		})
+	}
+}
+
 type podsByStatus struct {
 	Active      int
 	Ready       *int32
@@ -5129,6 +5279,35 @@ func createJobWithDefaults(ctx context.Context, clientSet clientset.Interface, n
 func setup(t testing.TB, nsBaseName string) (framework.TearDownFunc, *restclient.Config, clientset.Interface, *v1.Namespace) {
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+
+	config := restclient.CopyConfig(server.ClientConfig)
+	config.QPS = restConfigQPS
+	config.Burst = restConfigBurst
+	config.Timeout = 0
+	clientSet, err := clientset.NewForConfig(config)
+	if err != nil {
+		t.Fatalf("Error creating clientset: %v", err)
+	}
+
+	ns := framework.CreateNamespaceOrDie(clientSet, nsBaseName, t)
+	closeFn := func() {
+		framework.DeleteNamespaceOrDie(clientSet, ns, t)
+		server.TearDownFn()
+	}
+	return closeFn, config, clientSet, ns
+}
+
+func setupWithRuntimeConfig(t testing.TB, nsBaseName string, apis map[schema.GroupVersion]bool) (framework.TearDownFunc, *restclient.Config, clientset.Interface, *v1.Namespace) {
+	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+	apiServerFlags := framework.DefaultTestServerFlags()
+	var runtimeConfigs []string
+	for key, value := range apis {
+		runtimeConfigs = append(runtimeConfigs, fmt.Sprintf("%s=%t", key, value))
+	}
+	if len(runtimeConfigs) > 0 {
+		apiServerFlags = append(apiServerFlags, "--runtime-config="+strings.Join(runtimeConfigs, ","))
+	}
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, apiServerFlags, framework.SharedEtcd())
 
 	config := restclient.CopyConfig(server.ClientConfig)
 	config.QPS = restConfigQPS

@@ -42,6 +42,11 @@ func (in CronJobStatus) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in GangPolicy) OpenAPIModelName() string {
+	return "io.k8s.api.batch.v1.GangPolicy"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in Job) OpenAPIModelName() string {
 	return "io.k8s.api.batch.v1.Job"
 }

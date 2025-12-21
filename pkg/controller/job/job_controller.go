@@ -27,6 +27,7 @@ import (
 
 	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
+	schedulingv1alpha1 "k8s.io/api/scheduling/v1alpha1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -815,6 +816,90 @@ func (jm *Controller) getPodsForJob(ctx context.Context, j *batch.Job) ([]*v1.Po
 	return pods, err
 }
 
+// ensureWorkloadForJob creates a Workload object for the Job if gangPolicy is JobAsGang
+// and the Workload doesn't already exist.
+func (jm *Controller) ensureWorkloadForJob(ctx context.Context, job *batch.Job) error {
+	logger := klog.FromContext(ctx)
+
+	// Check if JobGangPolicy feature gate is enabled
+	if !feature.DefaultFeatureGate.Enabled(features.JobGangPolicy) {
+		return nil
+	}
+
+	// Check if the job has gangPolicy set to JobAsGang
+	if job.Spec.GangPolicy == nil || job.Spec.GangPolicy.Policy != batch.JobAsGang {
+		return nil
+	}
+
+	// Use the job's name as the workload name
+	workloadName := job.Name
+
+	// Check if the workload already exists
+	_, err := jm.kubeClient.SchedulingV1alpha1().Workloads(job.Namespace).Get(ctx, workloadName, metav1.GetOptions{})
+	if err == nil {
+		// Workload already exists
+		logger.V(4).Info("Workload already exists for job", "job", job.Name, "workload", workloadName)
+		return nil
+	}
+	if !apierrors.IsNotFound(err) {
+		// Some other error occurred
+		return fmt.Errorf("failed to get workload %s: %w", workloadName, err)
+	}
+
+	// Workload doesn't exist, create it
+	parallelism := int32(1)
+	if job.Spec.Parallelism != nil {
+		parallelism = *job.Spec.Parallelism
+	}
+
+	workload := &schedulingv1alpha1.Workload{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      workloadName,
+			Namespace: job.Namespace,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         batch.SchemeGroupVersion.String(),
+					Kind:               "Job",
+					Name:               job.Name,
+					UID:                job.UID,
+					Controller:         ptr.To(true),
+					BlockOwnerDeletion: ptr.To(true),
+				},
+			},
+		},
+		Spec: schedulingv1alpha1.WorkloadSpec{
+			ControllerRef: &schedulingv1alpha1.TypedLocalObjectReference{
+				APIGroup: batch.SchemeGroupVersion.Group,
+				Kind:     "Job",
+				Name:     job.Name,
+			},
+			PodGroups: []schedulingv1alpha1.PodGroup{
+				{
+					Name: "default",
+					Policy: schedulingv1alpha1.PodGroupPolicy{
+						Gang: &schedulingv1alpha1.GangSchedulingPolicy{
+							MinCount: parallelism,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	_, err = jm.kubeClient.SchedulingV1alpha1().Workloads(job.Namespace).Create(ctx, workload, metav1.CreateOptions{})
+	if err != nil {
+		if apierrors.IsAlreadyExists(err) {
+			logger.V(4).Info("Workload was created by another goroutine", "job", job.Name, "workload", workloadName)
+			return nil
+		}
+		return fmt.Errorf("failed to create workload %s: %w", workloadName, err)
+	}
+
+	logger.V(2).Info("Created workload for job", "job", job.Name, "workload", workloadName, "minCount", parallelism)
+	jm.recorder.Eventf(job, v1.EventTypeNormal, "WorkloadCreated", "Created Workload %s for gang scheduling", workloadName)
+	return nil
+}
+
 // syncJob will sync the job with the given key if it has had its expectations fulfilled, meaning
 // it did not expect to see any more of its pods created or deleted. This function is not meant to be invoked
 // concurrently with the same key.
@@ -880,6 +965,11 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 	if job.Spec.CompletionMode != nil && *job.Spec.CompletionMode != batch.NonIndexedCompletion && *job.Spec.CompletionMode != batch.IndexedCompletion {
 		jm.recorder.Event(&job, v1.EventTypeWarning, "UnknownCompletionMode", "Skipped Job sync because completion mode is unknown")
 		return nil
+	}
+
+	// Ensure Workload is created if gangPolicy is JobAsGang
+	if err := jm.ensureWorkloadForJob(ctx, &job); err != nil {
+		return fmt.Errorf("failed to ensure workload for job: %w", err)
 	}
 
 	completionMode := getCompletionMode(&job)
@@ -1766,6 +1856,15 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 		}
 		podTemplate.Finalizers = appendJobCompletionFinalizerIfNotFound(podTemplate.Finalizers)
 
+		// Set workloadRef if JobAsGang policy is enabled
+		if feature.DefaultFeatureGate.Enabled(features.JobGangPolicy) &&
+			job.Spec.GangPolicy != nil &&
+			job.Spec.GangPolicy.Policy == batch.JobAsGang {
+			podTemplate.Spec.WorkloadRef = &v1.WorkloadReference{
+				Name:     job.Name,
+				PodGroup: "default",
+			}
+		}
 		// Counters for pod creation status (used by the job_pods_creation_total metric)
 		var creationsSucceeded, creationsFailed int32 = 0, 0
 
