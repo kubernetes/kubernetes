@@ -1057,6 +1057,7 @@ func (p *processorListener) run() {
 	//
 	// This only applies if utilruntime is configured to not panic, which is not the default.
 	sleepAfterCrash := false
+	sleepBeforeInitialAdd := true
 	for next := range p.nextCh {
 		if sleepAfterCrash {
 			// Sleep before processing the next item.
@@ -1071,6 +1072,14 @@ func (p *processorListener) run() {
 			case updateNotification:
 				p.handler.OnUpdate(notification.oldObj, notification.newObj)
 			case addNotification:
+				if notification.isInInitialList && sleepBeforeInitialAdd {
+					// Code that fails because of this delay is probably doing
+					// informertFactory.WaitForCacheSync without a following
+					// cache.WaitForCacheSync(handle.HasSynced) for this
+					// event handler.
+					time.Sleep(5 * time.Second)
+					sleepBeforeInitialAdd = false
+				}
 				p.handler.OnAdd(notification.newObj, notification.isInInitialList)
 				if notification.isInInitialList {
 					p.syncTracker.Finished()
